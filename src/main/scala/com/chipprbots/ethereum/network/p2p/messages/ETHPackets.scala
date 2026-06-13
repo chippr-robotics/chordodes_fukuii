@@ -303,6 +303,28 @@ object ETHPackets {
               latestBlock = ByteUtils.bytesToBigInt(latestBlockBytes),
               latestBlockHash = ByteString(latestBlockHashBytes)
             )
+          // (4) ≥8 fields: forward-compat Status extension — extract canonical 7, ignore trailing.
+          // Peer is likely on an experimental/future Status variant. Decode tolerantly;
+          // networkId/genesis check will gate acceptance; most will be rejected as UselessPeer.
+          case RLPList(
+                RLPValue(protocolVersionBytes),
+                RLPValue(networkIdBytes),
+                RLPValue(genesisHashBytes),
+                forkIdRlp: RLPList,
+                RLPValue(earliestBlockBytes),
+                RLPValue(latestBlockBytes),
+                RLPValue(latestBlockHashBytes),
+                _*
+              ) =>
+            Status69(
+              ByteUtils.bytesToBigInt(protocolVersionBytes).toInt,
+              ByteUtils.bytesToBigInt(networkIdBytes).toLong,
+              ByteString(genesisHashBytes),
+              decode[ForkId](forkIdRlp),
+              ByteUtils.bytesToBigInt(earliestBlockBytes),
+              ByteUtils.bytesToBigInt(latestBlockBytes),
+              ByteString(latestBlockHashBytes)
+            )
           case other =>
             val fieldCount = other match { case RLPList(items @ _*) => items.length; case _ => -1 }
             throw new RuntimeException(s"Cannot decode Status69 (got $fieldCount fields): $other")
@@ -416,6 +438,28 @@ object ETHPackets {
               earliestBlock = BigInt(0),
               latestBlock = ByteUtils.bytesToBigInt(latestBlockBytes),
               latestBlockHash = ByteString(latestBlockHashBytes)
+            )
+          // (4) ≥8 fields: forward-compat Status extension — extract canonical 7, ignore trailing.
+          // Peer is likely on an experimental/future Status variant. Decode tolerantly;
+          // networkId/genesis check will gate acceptance; most will be rejected as UselessPeer.
+          case RLPList(
+                RLPValue(protocolVersionBytes),
+                RLPValue(networkIdBytes),
+                RLPValue(genesisHashBytes),
+                forkIdRlp: RLPList,
+                RLPValue(earliestBlockBytes),
+                RLPValue(latestBlockBytes),
+                RLPValue(latestBlockHashBytes),
+                _*
+              ) =>
+            Status70(
+              ByteUtils.bytesToBigInt(protocolVersionBytes).toInt,
+              ByteUtils.bytesToBigInt(networkIdBytes).toLong,
+              ByteString(genesisHashBytes),
+              decode[ForkId](forkIdRlp),
+              ByteUtils.bytesToBigInt(earliestBlockBytes),
+              ByteUtils.bytesToBigInt(latestBlockBytes),
+              ByteString(latestBlockHashBytes)
             )
           case other =>
             val fieldCount = other match { case RLPList(items @ _*) => items.length; case _ => -1 }
