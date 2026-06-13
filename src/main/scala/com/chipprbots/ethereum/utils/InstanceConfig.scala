@@ -171,6 +171,9 @@ class InstanceConfig(val config: TypesafeConfig, val instanceId: String = "defau
       override val maxTotalWalSize: Long =
         if (rocksDbConfig.hasPath("max-total-wal-size")) rocksDbConfig.getLong("max-total-wal-size")
         else 512L * 1024 * 1024
+      // spec 002 US2 (FR-005): off by default; enables block-cache hit/miss tickers at ~1-2% read overhead.
+      override val enableStatistics: Boolean =
+        rocksDbConfig.hasPath("enable-statistics") && rocksDbConfig.getBoolean("enable-statistics")
     }
   }
 

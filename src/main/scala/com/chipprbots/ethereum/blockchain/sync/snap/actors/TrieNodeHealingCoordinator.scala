@@ -16,6 +16,7 @@ import scala.concurrent.duration.Duration
 import com.chipprbots.ethereum.blockchain.sync.snap._
 import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController
 import com.chipprbots.ethereum.db.storage.{
+  BfsEntry,
   BfsQueueStorage,
   HealingFrontierStorage,
   InMemoryBfsQueueStorage,
@@ -1249,100 +1250,144 @@ class TrieNodeHealingCoordinator(
     val visitedCount = new java.util.concurrent.atomic.AtomicLong(0L)
     val frontierCount = new java.util.concurrent.atomic.AtomicLong(0L)
 
+    // --- spec 002 US2 observability (observation-only, FR-006/FR-007/FR-008) ---
+    // Per-level coarse-phase timers (nanos) accumulated across chunks/sub-ranges, and re-walk inflation
+    // counters. These are read and reset at each level boundary. They are pure instrumentation: they never
+    // gate or change which nodes the walk enqueues/visits/declares missing (the markIfNew gate and enqueue
+    // logic below are untouched). queueReadNanos/trieReadNanos/queueWriteNanos are summed over all chunks of
+    // the level (aggregate CPU when sub-ranges run in parallel); childRefsSeen counts every HashNode child
+    // reference observed BEFORE the markIfNew de-dup gate, distinctEnqueued counts only the references that
+    // pass the gate, so childRefsSeen / max(1, distinctEnqueued) is the faithful re-walk inflation ratio.
+    val queueReadNanos = new java.util.concurrent.atomic.AtomicLong(0L)
+    val trieReadNanos = new java.util.concurrent.atomic.AtomicLong(0L)
+    val queueWriteNanos = new java.util.concurrent.atomic.AtomicLong(0L)
+    val childRefsSeen = new java.util.concurrent.atomic.AtomicLong(0L)
+    val distinctEnqueued = new java.util.concurrent.atomic.AtomicLong(0L)
+    // Windowed GC-pressure sampler: baseline captured at walk start; sampled per level.
+    val gcSampler = new GcPressureSampler()
+
     // Process a sub-range [subFrom, subTo) of the current level; returns frontier entries.
     def processSubRange(subFrom: Long, subTo: Long, levelIndex: Int): Seq[HealingEntry] = {
       val subFrontier = mutable.Buffer.empty[HealingEntry]
 
-      queue.iterateRange(subFrom, subTo).foreach { chunk =>
-        val results = mptStorage.multiGetNodes(chunk.map(_.hash))
-        val nextBuf = mutable.ArrayBuffer[(Array[Byte], Seq[Array[Byte]], Boolean)]()
+      // Time the queue-read (chunk fetch) per chunk WITHOUT changing iteration semantics: drive the lazy
+      // iterator explicitly and time only the production of each chunk (one nanoTime pair per chunk fetch,
+      // not per node). The body that follows is byte-identical to the prior `.foreach { chunk => ... }`.
+      val chunkIterator = queue.iterateRange(subFrom, subTo)
+      var moreChunks = true
+      while (moreChunks) {
+        val readStart = System.nanoTime()
+        val hasNext = chunkIterator.hasNext
+        val chunk = if (hasNext) chunkIterator.next() else Seq.empty[BfsEntry]
+        queueReadNanos.addAndGet(System.nanoTime() - readStart)
+        if (!hasNext) moreChunks = false
+        else {
+          val trieReadStart = System.nanoTime()
+          val results = mptStorage.multiGetNodes(chunk.map(_.hash))
+          trieReadNanos.addAndGet(System.nanoTime() - trieReadStart)
+          val nextBuf = mutable.ArrayBuffer[(Array[Byte], Seq[Array[Byte]], Boolean)]()
 
-        chunk.zip(results).foreach { case (entry, nodeOpt) =>
-          val v = visitedCount.incrementAndGet()
-          if (v % 100_000 == 0) {
-            log.info(
-              s"[HEAL-BFS] Level $levelIndex: $v nodes visited, ${frontierCount.get()} frontier found, " +
-                s"${queue.counter - subTo} L${levelIndex + 1} queued"
-            )
-            SNAPSyncMetrics.setHealingRebuildVisited(v)
-          }
+          chunk.zip(results).foreach { case (entry, nodeOpt) =>
+            val v = visitedCount.incrementAndGet()
+            if (v % 100_000 == 0) {
+              log.info(
+                s"[HEAL-BFS] Level $levelIndex: $v nodes visited, ${frontierCount.get()} frontier found, " +
+                  s"${queue.counter - subTo} L${levelIndex + 1} queued"
+              )
+              SNAPSyncMetrics.setHealingRebuildVisited(v)
+            }
 
-          val pathset = entry.pathset.map(ByteString(_))
-          val nibbles = HexPrefix.decode(pathset.last.toArray)._1
+            val pathset = entry.pathset.map(ByteString(_))
+            val nibbles = HexPrefix.decode(pathset.last.toArray)._1
 
-          nodeOpt match {
-            case None =>
-              subFrontier += HealingEntry(pathset, ByteString(entry.hash))
-              frontierCount.incrementAndGet()
+            nodeOpt match {
+              case None =>
+                subFrontier += HealingEntry(pathset, ByteString(entry.hash))
+                frontierCount.incrementAndGet()
 
-            case Some(node) =>
-              try
-                node match {
-                  case branch: BranchNode =>
-                    for (i <- 0 until 16) branch.children(i) match {
-                      case hashChild: HashNode =>
-                        val childHash = ByteString(hashChild.hashNode)
-                        if (markIfNew(childHash)) {
-                          val childNibbles = nibbles :+ i.toByte
-                          val childCompact = ByteString(HexPrefix.encode(childNibbles, isLeaf = false))
-                          val childPathset =
-                            if (entry.isStorage) Seq(pathset.head.toArray, childCompact.toArray)
-                            else Seq(childCompact.toArray)
-                          nextBuf += ((hashChild.hashNode, childPathset, entry.isStorage))
-                        }
-                      case _ =>
-                    }
+              case Some(node) =>
+                try
+                  node match {
+                    case branch: BranchNode =>
+                      for (i <- 0 until 16) branch.children(i) match {
+                        case hashChild: HashNode =>
+                          val childHash = ByteString(hashChild.hashNode)
+                          // Observation-only (FR-008/FR-023): count this child reference before the de-dup gate.
+                          childRefsSeen.incrementAndGet()
+                          if (markIfNew(childHash)) {
+                            distinctEnqueued.incrementAndGet()
+                            val childNibbles = nibbles :+ i.toByte
+                            val childCompact = ByteString(HexPrefix.encode(childNibbles, isLeaf = false))
+                            val childPathset =
+                              if (entry.isStorage) Seq(pathset.head.toArray, childCompact.toArray)
+                              else Seq(childCompact.toArray)
+                            nextBuf += ((hashChild.hashNode, childPathset, entry.isStorage))
+                          }
+                        case _ =>
+                      }
 
-                  case ext: ExtensionNode =>
-                    ext.next match {
-                      case hashChild: HashNode =>
-                        val childHash = ByteString(hashChild.hashNode)
-                        if (markIfNew(childHash)) {
-                          val childNibbles = nibbles ++ ext.sharedKey.toArray
-                          val childCompact = ByteString(HexPrefix.encode(childNibbles, isLeaf = false))
-                          val childPathset =
-                            if (entry.isStorage) Seq(pathset.head.toArray, childCompact.toArray)
-                            else Seq(childCompact.toArray)
-                          nextBuf += ((hashChild.hashNode, childPathset, entry.isStorage))
-                        }
-                      case _ =>
-                    }
+                    case ext: ExtensionNode =>
+                      ext.next match {
+                        case hashChild: HashNode =>
+                          val childHash = ByteString(hashChild.hashNode)
+                          // Observation-only (FR-008/FR-023): count this child reference before the de-dup gate.
+                          childRefsSeen.incrementAndGet()
+                          if (markIfNew(childHash)) {
+                            distinctEnqueued.incrementAndGet()
+                            val childNibbles = nibbles ++ ext.sharedKey.toArray
+                            val childCompact = ByteString(HexPrefix.encode(childNibbles, isLeaf = false))
+                            val childPathset =
+                              if (entry.isStorage) Seq(pathset.head.toArray, childCompact.toArray)
+                              else Seq(childCompact.toArray)
+                            nextBuf += ((hashChild.hashNode, childPathset, entry.isStorage))
+                          }
+                        case _ =>
+                      }
 
-                  case leaf: LeafNode if !entry.isStorage =>
-                    Account(leaf.value).foreach { account =>
-                      if (
-                        account.storageRoot != Account.EmptyStorageRootHash &&
-                        markIfNew(account.storageRoot)
-                      ) {
-                        val allNibbles = nibbles ++ leaf.key.toArray
-                        if (allNibbles.length == 64) {
-                          val accountHashBytes =
-                            allNibbles.grouped(2).map(g => ((g(0) << 4) | g(1)).toByte).toArray
-                          val accountHash = ByteString(accountHashBytes)
-                          val emptyStoragePath = ByteString(HexPrefix.encode(Array.empty[Byte], isLeaf = false))
-                          nextBuf += (
-                            (
-                              account.storageRoot.toArray,
-                              Seq(accountHash.toArray, emptyStoragePath.toArray),
-                              true
+                    case leaf: LeafNode if !entry.isStorage =>
+                      Account(leaf.value).foreach { account =>
+                        // Observation-only (FR-008/FR-023): count the account-leaf storageRoot reference
+                        // before the de-dup gate, when there is a non-empty storage root to follow.
+                        if (account.storageRoot != Account.EmptyStorageRootHash) childRefsSeen.incrementAndGet()
+                        if (
+                          account.storageRoot != Account.EmptyStorageRootHash &&
+                          markIfNew(account.storageRoot)
+                        ) {
+                          distinctEnqueued.incrementAndGet()
+                          val allNibbles = nibbles ++ leaf.key.toArray
+                          if (allNibbles.length == 64) {
+                            val accountHashBytes =
+                              allNibbles.grouped(2).map(g => ((g(0) << 4) | g(1)).toByte).toArray
+                            val accountHash = ByteString(accountHashBytes)
+                            val emptyStoragePath = ByteString(HexPrefix.encode(Array.empty[Byte], isLeaf = false))
+                            nextBuf += (
+                              (
+                                account.storageRoot.toArray,
+                                Seq(accountHash.toArray, emptyStoragePath.toArray),
+                                true
+                              )
                             )
-                          )
+                          }
                         }
                       }
-                    }
 
-                  case _ => // storage trie leaf, NullNode, inline HashNode
+                    case _ => // storage trie leaf, NullNode, inline HashNode
+                  }
+                catch {
+                  case NonFatal(e) =>
+                    log.debug(
+                      s"[HEAL-BFS] Cannot traverse ${Hex.toHexString(entry.hash.take(4))}: ${e.getMessage} — skipping"
+                    )
                 }
-              catch {
-                case NonFatal(e) =>
-                  log.debug(
-                    s"[HEAL-BFS] Cannot traverse ${Hex.toHexString(entry.hash.take(4))}: ${e.getMessage} — skipping"
-                  )
-              }
+            }
           }
-        }
-        if (nextBuf.nonEmpty) queue.enqueueBatch(nextBuf.toSeq)
-      }
+          if (nextBuf.nonEmpty) {
+            val writeStart = System.nanoTime()
+            queue.enqueueBatch(nextBuf.toSeq)
+            queueWriteNanos.addAndGet(System.nanoTime() - writeStart)
+          }
+        } // end else (non-empty chunk)
+      } // end while (moreChunks)
       subFrontier.toSeq
     }
 
@@ -1381,10 +1426,36 @@ class TrieNodeHealingCoordinator(
 
       val fc = frontierCount.get()
       val queued = queue.counter - levelEnd
+
+      // --- spec 002 US2 observability: derive + push the per-level signals (observation-only) ---
+      val queueReadMs = queueReadNanos.get() / 1_000_000L
+      val trieReadMs = trieReadNanos.get() / 1_000_000L
+      val queueWriteMs = queueWriteNanos.get() / 1_000_000L
+      val refsSeen = childRefsSeen.get()
+      val enqueued = distinctEnqueued.get()
+      val inflationRatio = refsSeen.toDouble / math.max(1L, enqueued).toDouble
+      val (gcPauseMs, gcFraction) = gcSampler.sample()
+
       log.info(
-        s"[HEAL-BFS] Level $levelIndex complete: $levelSize processed, $fc frontier total, $queued queued for L${levelIndex + 1}"
+        s"[HEAL-BFS] Level $levelIndex complete: $levelSize processed, $fc frontier total, $queued queued for L${levelIndex + 1}" +
+          f" | phase(ms) queueRead=$queueReadMs trieRead=$trieReadMs queueWrite=$queueWriteMs" +
+          f" | inflation childRefsSeen=$refsSeen distinctEnqueued=$enqueued ratio=$inflationRatio%.2f" +
+          f" | gc pauseMs=$gcPauseMs fraction=$gcFraction%.4f"
       )
       SNAPSyncMetrics.setHealingRebuildVisited(visitedCount.get())
+      SNAPSyncMetrics.setHealingPhaseQueueReadMs(queueReadMs)
+      SNAPSyncMetrics.setHealingPhaseTrieReadMs(trieReadMs)
+      SNAPSyncMetrics.setHealingPhaseQueueWriteMs(queueWriteMs)
+      SNAPSyncMetrics.setHealingInflationRatio(inflationRatio)
+      SNAPSyncMetrics.setHealingGcPauseMs(gcPauseMs)
+      SNAPSyncMetrics.setHealingGcFraction(gcFraction)
+
+      // Reset the per-level accumulators so the next level's gauges/log reflect only that level.
+      queueReadNanos.set(0L)
+      trieReadNanos.set(0L)
+      queueWriteNanos.set(0L)
+      childRefsSeen.set(0L)
+      distinctEnqueued.set(0L)
 
       // Free the consumed level immediately (one range tombstone). Levels are processed exactly
       // once and never re-read, and on ETC mainnet the live queue otherwise accumulates the whole

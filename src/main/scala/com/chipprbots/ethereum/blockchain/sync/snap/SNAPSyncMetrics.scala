@@ -180,6 +180,45 @@ object SNAPSyncMetrics extends MetricsContainer {
   final private val HealingRebuildVisitedGauge =
     metrics.registry.gauge("snapsync.healing.rebuild.visited.gauge", new AtomicLong(0L))
 
+  // ===== Frontier-Rebuild Walk Observability (spec 002 US2 — observation-only, FR-005..FR-008) =====
+  //
+  // Per-level (or windowed) diagnostics for the post-SNAP `[HEAL-BFS]` walk, so an operator can read off
+  // whether a slow walk is cache-, GC-, or disk-bound and whether shared-subtrie re-walk is inflating it.
+  // These are pushed by `TrieNodeHealingCoordinator.rebuildFrontierBFS` at each level boundary; they never
+  // influence which nodes the walk enqueues/visits/declares missing.
+
+  /** Per-level wall/CPU time (ms) spent in queue reads (`iterateRange` chunk fetch). Aggregate CPU across readers when
+    * the level is processed in parallel sub-ranges.
+    */
+  final private val HealingPhaseQueueReadMsGauge =
+    metrics.registry.gauge("snapsync.healing.phase.queue_read_ms.gauge", new AtomicLong(0L))
+
+  /** Per-level time (ms) spent in `multiGetNodes` (the dominant random trie read). Aggregate CPU when parallel.
+    */
+  final private val HealingPhaseTrieReadMsGauge =
+    metrics.registry.gauge("snapsync.healing.phase.trie_read_ms.gauge", new AtomicLong(0L))
+
+  /** Per-level time (ms) spent in `enqueueBatch` (queue writes). Aggregate CPU when parallel. */
+  final private val HealingPhaseQueueWriteMsGauge =
+    metrics.registry.gauge("snapsync.healing.phase.queue_write_ms.gauge", new AtomicLong(0L))
+
+  /** GC pause time (ms) accumulated in the walk window, sampled via `GcPressureSampler`. JVM-wide GC during the walk
+    * window (the walk dominates), not attributed solely to the walk.
+    */
+  final private val HealingGcPauseMsGauge =
+    metrics.registry.gauge("snapsync.healing.gc.pause_ms.gauge", new AtomicLong(0L))
+
+  /** GC pause fraction (GC pause ms ÷ wall ms) in the walk window. */
+  final private val HealingGcFractionGauge =
+    metrics.registry.gauge("snapsync.healing.gc.fraction.gauge", new AtomicDouble(0d))
+
+  /** Per-level re-walk inflation ratio: `childRefsSeen ÷ max(1, distinctEnqueued)`. 1.0 = no shared-subtrie inflation;
+    * > 1 means child references were seen more than once (the visited-set de-dup gate's workload). Feeds SC-004's 1.5×
+    * check.
+    */
+  final private val HealingInflationRatioGauge =
+    metrics.registry.gauge("snapsync.healing.inflation_ratio.gauge", new AtomicDouble(0d))
+
   // ===== Peer Performance Metrics =====
 
   /** Number of SNAP-capable peers currently connected */
@@ -347,6 +386,14 @@ object SNAPSyncMetrics extends MetricsContainer {
   def setHealingFrontierPending(count: Long): Unit = HealingFrontierPendingGauge.set(count)
   def setHealingActiveRequests(count: Long): Unit = HealingActiveRequestsGauge.set(count)
   def setHealingRebuildVisited(count: Long): Unit = HealingRebuildVisitedGauge.set(count)
+
+  // Frontier-rebuild walk observability (spec 002 US2 — observation-only)
+  def setHealingPhaseQueueReadMs(ms: Long): Unit = HealingPhaseQueueReadMsGauge.set(ms)
+  def setHealingPhaseTrieReadMs(ms: Long): Unit = HealingPhaseTrieReadMsGauge.set(ms)
+  def setHealingPhaseQueueWriteMs(ms: Long): Unit = HealingPhaseQueueWriteMsGauge.set(ms)
+  def setHealingGcPauseMs(ms: Long): Unit = HealingGcPauseMsGauge.set(ms)
+  def setHealingGcFraction(fraction: Double): Unit = HealingGcFractionGauge.set(fraction)
+  def setHealingInflationRatio(ratio: Double): Unit = HealingInflationRatioGauge.set(ratio)
 
   // ===== Peer and Network Metrics =====
 
