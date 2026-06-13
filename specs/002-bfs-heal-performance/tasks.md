@@ -204,8 +204,8 @@ ratio as expected and stays within the heap budget.
 
 ### Implementation for User Story 6
 
-- [ ] T048 [US6] Correct the "LRU" naming → FIFO/insertion-order and the per-entry cost (~120–150B with ByteString, not 80B) in the visited-set comments + `DefaultVisitedCap` docstring; note eviction protects no recently-touched node, in `TrieNodeHealingCoordinator.scala` (same file as US1/US2/US3 → sequence after them)
-- [ ] T049 [US6] Document the cap-tuning procedure (raise only on a measured `inflation_ratio`, within the heap budget; do NOT set 20M) next to the `healing-visited-cap` key, in `src/main/resources/conf/base/sync.conf`
+- [x] T048 [US6] Correct the "LRU" naming → FIFO/insertion-order and the per-entry cost (~120–150B with ByteString, not 80B) in the visited-set comments + `DefaultVisitedCap` docstring; note eviction protects no recently-touched node, in `TrieNodeHealingCoordinator.scala` (same file as US1/US2/US3 → sequence after them)
+- [x] T049 [US6] Document the cap-tuning procedure (raise only on a measured `inflation_ratio`, within the heap budget; do NOT set 20M) next to the `healing-visited-cap` key, in `src/main/resources/conf/base/sync.conf`
 
 **Checkpoint**: naming/docs honest; cap is evidence-tuned via US2's metric.
 
@@ -220,13 +220,13 @@ ratio as expected and stays within the heap budget.
 
 ### Tests for User Story 7 (write first, expect FAIL)
 
-- [ ] T050 [P] [US7] `ReferenceCountNodeStorage.multiGet(keys) == keys.map(get)` (incl. `None` for misses), resolving to one batched datasource call, in `src/test/scala/com/chipprbots/ethereum/db/storage/ReferenceCountNodeStorageSpec.scala`
-- [ ] T051 [P] [US7] `FastSyncNodeStorage` inherits the batched `multiGet` with an identical unwrap; archive vs basic return identical decoded bytes for the same node set (SC-006), in `ReferenceCountNodeStorageSpec.scala`
+- [x] T050 [P] [US7] `ReferenceCountNodeStorage.multiGet(keys) == keys.map(get)` (incl. `None` for misses), resolving to one batched datasource call, in `src/test/scala/com/chipprbots/ethereum/db/storage/ReferenceCountNodeStorageSpec.scala`
+- [x] T051 [P] [US7] `FastSyncNodeStorage` inherits the batched `multiGet` with an identical unwrap; archive vs basic return identical decoded bytes for the same node set (SC-006), in `ReferenceCountNodeStorageSpec.scala`
 
 ### Implementation for User Story 7
 
-- [ ] T052 [P] [US7] Add `override def multiGet` to `ReferenceCountNodeStorage` (`nodeStorage.multiGet` → same `storedNodeFromBytes(_).nodeEncoded.toArray` unwrap as per-key `get`), in `src/main/scala/com/chipprbots/ethereum/db/storage/ReferenceCountNodeStorage.scala`
-- [ ] T053 [P] [US7] (optional) Add `override def multiGet` to `ReadOnlyNodeStorage` honoring the in-memory buffer first then batching misses, preserving order/buffer-shadows semantics, in `src/main/scala/com/chipprbots/ethereum/db/storage/ReadOnlyNodeStorage.scala`
+- [x] T052 [P] [US7] Add `override def multiGet` to `ReferenceCountNodeStorage` (`nodeStorage.multiGet` → same `storedNodeFromBytes(_).nodeEncoded.toArray` unwrap as per-key `get`), in `src/main/scala/com/chipprbots/ethereum/db/storage/ReferenceCountNodeStorage.scala`
+- [x] T053 [P] [US7] (optional) Add `override def multiGet` to `ReadOnlyNodeStorage` honoring the in-memory buffer first then batching misses, preserving order/buffer-shadows semantics, in `src/main/scala/com/chipprbots/ethereum/db/storage/ReadOnlyNodeStorage.scala`
 
 **Checkpoint**: basic-pruning nodes no longer degrade to 50K serial gets; results byte-identical.
 

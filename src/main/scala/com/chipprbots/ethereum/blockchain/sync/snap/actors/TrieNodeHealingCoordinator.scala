@@ -162,13 +162,17 @@ class TrieNodeHealingCoordinator(
   // go-ethereum trie.Sync.Missing() alignment — bounded working set rather than full upfront BFS.
   private val FrontierBatchSize = 1000
 
-  // Cap on the frontier-rebuild DFS `visited` set. The DFS walks the full state trie (accounts +
+  // Cap on the frontier-rebuild walk's `visited` set. The walk covers the full state trie (accounts +
   // every storage trie — tens of millions of nodes on ETC mainnet); an unbounded visited set grew
-  // to ~2.9 GB and OOM-looped the node. A fixed-capacity LRU (insertion-order eviction) bounds it
-  // to ~cap × 80 B ≈ 320 MB. Completeness is preserved: any missing node re-discovered after an
-  // eviction is de-duplicated by `pendingHashSet`, and an evicted present node is only re-walked
-  // if reached again via a shared reference. See docs/design/healing-frontier-scale.md.
-  // Operator-tunable via `sync.snap-sync.healing-visited-cap`; defaults to DefaultVisitedCap.
+  // to ~2.9 GB and OOM-looped the node. A fixed-capacity FIFO/insertion-order set (NOT an LRU — it
+  // evicts the earliest-INSERTED entry regardless of recent access) bounds the heap; budget for
+  // ~cap × ~120-150 B (a 32-byte ByteString key + its wrapper + the LinkedHashMap entry), i.e. the
+  // 4M default is ~480-640 MB, NOT the 320 MB an 80 B/entry estimate would suggest. Completeness is
+  // preserved: an evicted present node is only RE-WALKED if reached again via a shared reference
+  // (extra work, never a skip), and any missing node it re-discovers is de-duplicated by
+  // `pendingHashSet`. See docs/design/healing-frontier-scale.md. Operator-tunable via
+  // `sync.snap-sync.healing-visited-cap`; raise it only from a measured `inflation_ratio` (US2) and
+  // within the heap budget — do NOT set it to 20M (~2.4-3.2 GB) on a 6 GB heap (it OOMs).
   private val HealingVisitedCap: Int = visitedCap
   private val HealingTraversalParallelism: Int = traversalParallelism
   private val bfsQueue: BfsQueueStorage = bfsQueueStorageOpt.getOrElse(new InMemoryBfsQueueStorage())
@@ -1223,8 +1227,9 @@ class TrieNodeHealingCoordinator(
     import com.chipprbots.ethereum.domain.Account
     import scala.util.control.NonFatal
 
-    // LRU-bounded visited set (companion boundedVisitedSet): at the cap the ELDEST entry is
-    // evicted instead of refusing new entries. Refusing (the previous ConcurrentHashMap gate)
+    // FIFO/insertion-order bounded visited set (companion boundedVisitedSet): at the cap the
+    // earliest-INSERTED entry is evicted (NOT an LRU — recent access does not protect an entry)
+    // instead of refusing new entries. Refusing (the previous ConcurrentHashMap gate)
     // silently TRUNCATED the traversal on tries larger than the cap — children past the cap were
     // never enqueued, the queue drained early, and the walk reported "Complete" (and set the
     // Layer-2 completeness marker) having covered only `cap` of the trie. Eviction trades that
@@ -1582,8 +1587,10 @@ class TrieNodeHealingCoordinator(
 
 object TrieNodeHealingCoordinator {
 
-  /** Default cap on the frontier-rebuild DFS `visited` LRU: 4M entries ≈ 320 MB. Used when
-    * `sync.snap-sync.healing-visited-cap` is unset. See docs/design/healing-frontier-scale.md.
+  /** Default cap on the frontier-rebuild walk's FIFO `visited` set: 4M entries ≈ 480-640 MB (a 32-byte ByteString key +
+    * wrapper + LinkedHashMap entry is ~120-150 B, not the 80 B an "≈320 MB" estimate assumed). Insertion-order
+    * eviction, NOT LRU. Used when `sync.snap-sync.healing-visited-cap` is unset. Raise only from a measured
+    * `inflation_ratio` and within the heap budget. See docs/design/healing-frontier-scale.md.
     */
   val DefaultVisitedCap: Int = 4_000_000
 
@@ -1608,10 +1615,10 @@ object TrieNodeHealingCoordinator {
     */
   val BfsChunkSize: Int = 50_000
 
-  /** Heap-bounded `visited` set for the frontier-rebuild DFS: a `LinkedHashMap`-backed LRU that evicts the
-    * earliest-inserted (already-completed) subtries once it exceeds `cap` (insertion-order eviction). Exposed on the
-    * companion so the eviction contract (size never exceeds `cap`; eldest dropped first) is unit-testable without
-    * instantiating the actor.
+  /** Heap-bounded `visited` set for the frontier-rebuild walk: a `LinkedHashMap`-backed FIFO that evicts the
+    * earliest-INSERTED (already-completed) subtries once it exceeds `cap` (insertion-order eviction — NOT an LRU;
+    * recent access does not protect an entry). Exposed on the companion so the eviction contract (size never exceeds
+    * `cap`; eldest dropped first) is unit-testable without instantiating the actor.
     */
   def boundedVisitedSet(cap: Int): mutable.Set[ByteString] = {
     val lru = new java.util.LinkedHashMap[ByteString, java.lang.Boolean](1024, 0.75f, false) {
