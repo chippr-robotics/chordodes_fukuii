@@ -50,6 +50,21 @@ trait DataSource {
   def multiGetOptimized(namespace: Namespace, keys: Seq[Array[Byte]]): Seq[Option[Array[Byte]]] =
     keys.map(k => getOptimized(namespace, k))
 
+  /** Forward range scan over `[fromKey, toKeyExclusive)` in ascending unsigned-lexicographic key order, within
+    * `namespace`. Synchronous; the returned `Iterator` is materialized from the bounded window so no storage-native
+    * iterator/resource outlives this call (close-on-return — abort-safe even if the caller stops consuming).
+    *
+    * Unlike [[multiGetOptimized]] (independent random point lookups, one bloom probe per key), implementations should
+    * use a single forward seek+next — the right primitive for a dense, sequentially-keyed column family such as the BFS
+    * level queue, where every key is present and contiguous. Keys with high bytes (>= 0x80) MUST order correctly
+    * (unsigned compare).
+    */
+  def scanRange(
+      namespace: Namespace,
+      fromKey: Array[Byte],
+      toKeyExclusive: Array[Byte]
+  ): Iterator[(Array[Byte], Array[Byte])]
+
   /** Delete every key in `[fromKey, toKeyExclusive)` (lexicographic byte order) within `namespace`.
     *
     * Implementations should prefer a storage-native range delete over per-key tombstones: RocksDB writes a SINGLE range

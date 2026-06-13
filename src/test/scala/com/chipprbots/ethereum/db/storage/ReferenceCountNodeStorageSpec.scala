@@ -307,6 +307,39 @@ class ReferenceCountNodeStorageSpec extends AnyFlatSpec with Matchers {
     storage3.get(key3) shouldEqual None
   }
 
+  // ---- US7 (spec 002): batched multiGet must equal per-key get on basic pruning ----
+
+  it should "batch multiGet identically to per-key get, incl. None for absent keys (US7/FR-021/FR-022)" taggedAs (
+    UnitTest,
+    DatabaseTest
+  ) in new TestSetup {
+    val storage = new ReferenceCountNodeStorage(nodeStorage, bn = 1)
+    val inserted: Seq[(ByteString, Array[Byte])] = insertRangeKeys(4, storage)
+    val present: Seq[ByteString] = inserted.map(_._1)
+    val absent: ByteString = kec256(ByteString("absent-key"))
+    // interleave present/absent + a duplicate to exercise ordering and None handling
+    val query: Seq[ByteString] = Seq(present(0), absent, present(2), present(1), absent, present(3), present(0))
+
+    val viaMulti: Seq[Option[Array[Byte]]] = storage.multiGet(query)
+    val viaGet: Seq[Option[Array[Byte]]] = query.map(storage.get)
+
+    viaMulti.length shouldEqual query.length
+    viaMulti.map(_.map(_.toSeq)) shouldEqual viaGet.map(_.map(_.toSeq))
+    viaMulti(1) shouldBe None // absent
+    viaMulti(4) shouldBe None // absent
+    viaMulti.head.map(_.toSeq) shouldEqual Some(inserted.head._2.toSeq)
+  }
+
+  it should "inherit the batched multiGet on FastSyncNodeStorage with results identical to get (US7/SC-006)" taggedAs (
+    UnitTest,
+    DatabaseTest
+  ) in new TestSetup {
+    val storage = new FastSyncNodeStorage(nodeStorage, bn = 1)
+    val inserted: Seq[(ByteString, Array[Byte])] = insertRangeKeys(3, storage)
+    val keys: Seq[ByteString] = inserted.map(_._1) :+ kec256(ByteString("nope"))
+    storage.multiGet(keys).map(_.map(_.toSeq)) shouldEqual keys.map(storage.get).map(_.map(_.toSeq))
+  }
+
   trait TestSetup {
     val dataSource: EphemDataSource = EphemDataSource()
     val nodeStorage = new NodeStorage(dataSource)

@@ -112,10 +112,18 @@ class RocksDbBfsQueueStorage(dataSource: DataSource, namespace: Namespace) exten
       def hasNext: Boolean = pos < rangeTo
       def next(): Seq[BfsEntry] = {
         val end = math.min(rangeTo, pos + chunkSize)
-        val keys = (pos until end).map(longToBytes)
-        val values = dataSource.multiGetOptimized(namespace, keys)
+        // Forward range scan over the dense, contiguous [pos, end) key window (one seek+next) instead
+        // of materializing N keys + N random point lookups via multiGetOptimized. The queue keys are
+        // gapless big-endian longs, so the scan returns exactly the present entries in key order —
+        // identical content and order to the prior `multiGetOptimized(...).flatten`. (spec 002 US5)
+        val entries = dataSource
+          .scanRange(namespace, longToBytes(pos), longToBytes(end))
+          .map { case (_, v) =>
+            decodeEntry(v)
+          }
+          .toSeq
         pos = end
-        values.flatten.map(decodeEntry)
+        entries
       }
     }
   }

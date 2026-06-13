@@ -49,6 +49,35 @@ class EphemDataSource(var storage: Map[ByteBuffer, Array[Byte]]) extends DataSou
       }
     }
 
+  override def scanRange(
+      namespace: Namespace,
+      fromKey: Array[Byte],
+      toKeyExclusive: Array[Byte]
+  ): Iterator[(Array[Byte], Array[Byte])] = synchronized {
+    def cmp(a: Array[Byte], b: Array[Byte]): Int = {
+      val n = math.min(a.length, b.length)
+      var i = 0
+      var d = 0
+      while (i < n && d == 0) {
+        d = (a(i) & 0xff) - (b(i) & 0xff)
+        i += 1
+      }
+      if (d != 0) d else a.length - b.length
+    }
+    val ns = namespace.toArray
+    // Emit in ascending unsigned-suffix order to match the RocksDB iterator (and the prior
+    // increasing-key multiGet order). Window is half-open [fromKey, toKeyExclusive).
+    storage.iterator
+      .collect {
+        case (k, v) if { val raw = k.array(); raw.length >= ns.length && raw.take(ns.length).sameElements(ns) } =>
+          (k.array().drop(ns.length), v)
+      }
+      .filter { case (suffix, _) => cmp(suffix, fromKey) >= 0 && cmp(suffix, toKeyExclusive) < 0 }
+      .toArray
+      .sortWith { case ((a, _), (b, _)) => cmp(a, b) < 0 }
+      .iterator
+  }
+
   override def update(dataSourceUpdates: Seq[DataUpdate]): Unit = synchronized {
     dataSourceUpdates.foreach {
       case DataSourceUpdate(namespace, toRemove, toUpsert) =>

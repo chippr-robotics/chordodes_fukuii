@@ -24,12 +24,32 @@ class RocksDbDataSource(
     private var dbOptions: DBOptions,
     private var cfOptions: ColumnFamilyOptions,
     private val nameSpaces: Seq[Namespace],
-    private var handles: Map[Namespace, ColumnFamilyHandle]
+    private var handles: Map[Namespace, ColumnFamilyHandle],
+    private var statistics: Option[Statistics] = None
 ) extends DataSource
     with Logger {
 
   @volatile
   private var isClosed = false
+
+  /** RocksDB block-cache tickers (spec 002 US2 / FR-005), or `None` when `rocksdb.enable-statistics` is off.
+    *
+    * @return
+    *   `(blockCacheHit, blockCacheMiss, indexFilterHit, indexFilterMiss)` where the index/filter components sum the
+    *   index- and filter-block tickers. The values are cumulative counts since DB open.
+    */
+  def cacheStats: Option[(Long, Long, Long, Long)] =
+    statistics.map { stats =>
+      val hit = stats.getTickerCount(TickerType.BLOCK_CACHE_HIT)
+      val miss = stats.getTickerCount(TickerType.BLOCK_CACHE_MISS)
+      val idxFilterHit =
+        stats.getTickerCount(TickerType.BLOCK_CACHE_INDEX_HIT) +
+          stats.getTickerCount(TickerType.BLOCK_CACHE_FILTER_HIT)
+      val idxFilterMiss =
+        stats.getTickerCount(TickerType.BLOCK_CACHE_INDEX_MISS) +
+          stats.getTickerCount(TickerType.BLOCK_CACHE_FILTER_MISS)
+      (hit, miss, idxFilterHit, idxFilterMiss)
+    }
 
   /** This function obtains the associated value to a key, if there exists one.
     *
@@ -121,6 +141,37 @@ class RocksDbDataSource(
       case NonFatal(error) =>
         throw RocksDbDataSourceException(s"DataSource error while deleting range", error)
     } finally dbLock.writeLock().unlock()
+  }
+
+  /** Forward range scan via a single seek+next over a bounded `[fromKey, toKeyExclusive)` window. Uses
+    * `scanReadOptions` (fillCache=false) so a large queue scan does not evict the hot block cache. Drains the window
+    * into a buffer and CLOSES the native iterator before returning, so no `RocksIterator` handle outlives the call —
+    * abort-safe by construction (the caller can drop the returned Iterator without leaking). The caller passes a
+    * bounded chunk, so peak memory is O(chunk), matching the prior `multiGetOptimized` result list.
+    */
+  override def scanRange(
+      namespace: Namespace,
+      fromKey: Array[Byte],
+      toKeyExclusive: Array[Byte]
+  ): Iterator[(Array[Byte], Array[Byte])] = {
+    dbLock.readLock().lock()
+    try {
+      assureNotClosed()
+      val it = db.newIterator(handles(namespace), scanReadOptions)
+      try {
+        val buf = scala.collection.mutable.ArrayBuffer.empty[(Array[Byte], Array[Byte])]
+        it.seek(fromKey)
+        while (it.isValid && java.util.Arrays.compareUnsigned(it.key(), toKeyExclusive) < 0) {
+          buf += ((it.key(), it.value()))
+          it.next()
+        }
+        buf.iterator
+      } finally it.close()
+    } catch {
+      case error: RocksDbDataSourceClosedException => throw error
+      case NonFatal(error) =>
+        throw RocksDbDataSourceException(s"scanRange failed for namespace $namespace", error)
+    } finally dbLock.readLock().unlock()
   }
 
   private def doWrite(dataSourceUpdates: Seq[DataUpdate], sync: Boolean): Unit = {
@@ -227,7 +278,7 @@ class RocksDbDataSource(
   override def clear(): Unit = {
     destroy()
     log.debug(s"About to create new DataSource for path: ${rocksDbConfig.path}")
-    val (newDb, handles, readOptions, dbOptions, cfOptions) = createDB(rocksDbConfig, nameSpaces.tail)
+    val (newDb, handles, readOptions, dbOptions, cfOptions, statistics) = createDB(rocksDbConfig, nameSpaces.tail)
 
     assert(nameSpaces.size == handles.size)
 
@@ -236,6 +287,7 @@ class RocksDbDataSource(
     this.handles = nameSpaces.zip(handles.toList).toMap
     this.dbOptions = dbOptions
     this.cfOptions = cfOptions
+    this.statistics = statistics
     this.isClosed = false
   }
 
@@ -265,6 +317,9 @@ class RocksDbDataSource(
       dbOptions.close()
       // 3. Free column families options
       cfOptions.close()
+      // 4. Free the Statistics handle (spec 002 US2), if statistics were enabled.
+      statistics.foreach(_.close())
+      statistics = None
       log.info(s"DataSource closed successfully in the path: ${rocksDbConfig.path}")
     } catch {
       case error: RocksDbDataSourceClosedException =>
@@ -335,6 +390,11 @@ trait RocksDbConfig {
   val dbWriteBufferSize: Long = 512L * 1024 * 1024
   // Ceiling (bytes) on total live WAL across column families.
   val maxTotalWalSize: Long = 512L * 1024 * 1024
+  // When true, attach a RocksDB `Statistics` object (StatsLevel.EXCEPT_DETAILED_TIMERS) to the DB so
+  // block-cache hit/miss tickers become observable (spec 002 US2 / FR-005). Defaulted to false so all
+  // existing implementors (tests, alternate configs) compile unchanged; statistics add ~1-2% read overhead
+  // and are only worth enabling to diagnose a slow heal walk.
+  val enableStatistics: Boolean = false
 }
 
 object RocksDbDataSource extends Logger {
@@ -370,7 +430,7 @@ object RocksDbDataSource extends Logger {
   private def createDB(
       rocksDbConfig: RocksDbConfig,
       namespaces: Seq[Namespace]
-  ): (RocksDB, mutable.Buffer[ColumnFamilyHandle], ReadOptions, DBOptions, ColumnFamilyOptions) = {
+  ): (RocksDB, mutable.Buffer[ColumnFamilyHandle], ReadOptions, DBOptions, ColumnFamilyOptions, Option[Statistics]) = {
     import rocksDbConfig._
     import scala.jdk.CollectionConverters._
     import java.nio.file.{Files, Paths, Path => JPath}
@@ -433,6 +493,17 @@ object RocksDbDataSource extends Logger {
         // memtable pinning the oldest WAL is released rather than accumulating.
         .setMaxTotalWalSize(maxTotalWalSize)
 
+      // spec 002 US2 (FR-005): optionally attach a Statistics object so block-cache hit/miss tickers
+      // become observable. Off by default (~1-2% read overhead). The handle is returned so close()
+      // can release it. EXCEPT_DETAILED_TIMERS keeps the cheaper tickers without the per-op histograms.
+      val statistics: Option[Statistics] =
+        if (rocksDbConfig.enableStatistics) {
+          val stats = new Statistics()
+          stats.setStatsLevel(StatsLevel.EXCEPT_DETAILED_TIMERS)
+          options.setStatistics(stats)
+          Some(stats)
+        } else None
+
       val cfOpts =
         new ColumnFamilyOptions()
           .setCompressionType(CompressionType.LZ4_COMPRESSION)
@@ -472,7 +543,8 @@ object RocksDbDataSource extends Logger {
         columnFamilyHandleList,
         readOptions,
         options,
-        cfOpts
+        cfOpts,
+        statistics
       )
     } catch {
       case error: RocksDbDataSourceException =>
@@ -487,11 +559,11 @@ object RocksDbDataSource extends Logger {
 
   def apply(rocksDbConfig: RocksDbConfig, namespaces: Seq[Namespace]): RocksDbDataSource = {
     val allNameSpaces = Seq(RocksDB.DEFAULT_COLUMN_FAMILY.toIndexedSeq) ++ namespaces
-    val (db, handles, readOptions, dbOptions, cfOptions) = createDB(rocksDbConfig, namespaces)
+    val (db, handles, readOptions, dbOptions, cfOptions, statistics) = createDB(rocksDbConfig, namespaces)
     assert(allNameSpaces.size == handles.size)
     val handlesMap = allNameSpaces.zip(handles.toList).toMap
     // This assert ensures that we do not have duplicated namespaces
     assert(handlesMap.size == handles.size)
-    new RocksDbDataSource(db, rocksDbConfig, readOptions, dbOptions, cfOptions, allNameSpaces, handlesMap)
+    new RocksDbDataSource(db, rocksDbConfig, readOptions, dbOptions, cfOptions, allNameSpaces, handlesMap, statistics)
   }
 }

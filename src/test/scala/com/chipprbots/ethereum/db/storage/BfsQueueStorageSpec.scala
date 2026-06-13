@@ -142,4 +142,87 @@ class BfsQueueStorageSpec extends AnyFlatSpec with Matchers {
     q.counter shouldBe 0L
     drain(q.iterateRange(0L, 20L)) shouldBe empty
   }
+
+  // US4 (spec 002): max-open-files and block-cache-size are operator-tunable; opening at raised /
+  // edge values (max-open-files = -1 unlimited, a larger block cache) must succeed and round-trip.
+  "RocksDbDataSource" should "open and round-trip at raised max-open-files (-1) and block-cache-size (US4)" taggedAs UnitTest in {
+    val dbPath = Files.createTempDirectory("bfs-queue-rocksdb-raised").toAbsolutePath.toString
+    val dataSource = RocksDbDataSource(
+      new RocksDbConfig {
+        override val createIfMissing: Boolean = true
+        override val paranoidChecks: Boolean = true
+        override val path: String = dbPath
+        override val maxThreads: Int = 1
+        override val maxOpenFiles: Int = -1 // unlimited (geth default) — must not error
+        override val verifyChecksums: Boolean = true
+        override val levelCompaction: Boolean = true
+        override val blockSize: Long = 16384
+        override val blockCacheSize: Long = 268435456L // 256MB (raised from the 32MB test default)
+      },
+      Namespaces.nsSeq
+    )
+    try {
+      val q = new RocksDbBfsQueueStorage(dataSource, Namespaces.BfsQueueNamespace)
+      q.enqueueBatch((0 until 32).map(entry))
+      drain(q.iterateRange(0L, 32L)).size shouldBe 32
+    } finally {
+      dataSource.destroy()
+      val dir = new File(dbPath)
+      !dir.exists() || dir.delete()
+    }
+  }
+
+  // ---- US5 (spec 002): forward-scan DataSource.scanRange ----
+
+  "DataSource.scanRange (RocksDb)" should "return identical (key,value) pairs to multiGetOptimized over the same window (US5/FR-016)" taggedAs UnitTest in
+    withRocksDb { ds =>
+      val q = new RocksDbBfsQueueStorage(ds, Namespaces.BfsQueueNamespace)
+      q.enqueueBatch((0 until 100).map(entry))
+      val (from, to) = (10L, 40L)
+      val scanned = ds
+        .scanRange(Namespaces.BfsQueueNamespace, BfsQueueStorage.longToBytes(from), BfsQueueStorage.longToBytes(to))
+        .toSeq
+      val viaMulti =
+        ds.multiGetOptimized(Namespaces.BfsQueueNamespace, (from until to).map(BfsQueueStorage.longToBytes)).flatten
+      scanned.size shouldBe 30
+      scanned.map(_._2.toSeq) shouldBe viaMulti.map(_.toSeq)
+      scanned.map(_._1.toSeq) shouldBe (from until to).map(i => BfsQueueStorage.longToBytes(i).toSeq)
+    }
+
+  it should "honor half-open bounds and unsigned key order including high bytes (US5)" taggedAs UnitTest in
+    withRocksDb { ds =>
+      val q = new RocksDbBfsQueueStorage(ds, Namespaces.BfsQueueNamespace)
+      q.enqueueBatch((0 until 300).map(entry)) // counters cross 0x80 (128) and 0xFF (255)
+      def scan(a: Long, b: Long): Seq[(Array[Byte], Array[Byte])] =
+        ds.scanRange(Namespaces.BfsQueueNamespace, BfsQueueStorage.longToBytes(a), BfsQueueStorage.longToBytes(b)).toSeq
+      scan(50L, 50L) shouldBe empty // [k,k) is empty
+      scan(50L, 51L).size shouldBe 1 // single element; toExclusive excluded
+      val win = scan(120L, 260L) // spans the 0x80/0xFF last-byte boundary
+      win.size shouldBe 140
+      win.map(_._1.toSeq) shouldBe (120L until 260L).map(i => BfsQueueStorage.longToBytes(i).toSeq)
+    }
+
+  it should "not leak a native iterator when iterateRange is abandoned mid-scan (US5/FR-018)" taggedAs UnitTest in
+    withRocksDb { ds =>
+      val q = new RocksDbBfsQueueStorage(ds, Namespaces.BfsQueueNamespace)
+      q.enqueueBatch((0 until 100).map(entry))
+      val it = q.iterateRange(0L, 100L, chunkSize = 10)
+      it.next().size shouldBe 10 // consume only the first chunk, then drop `it`
+      // withRocksDb's finally destroys the DataSource; a leaked open native iterator would error there.
+      // scanRange closes its iterator per chunk, so nothing is open between chunks. Reaching here is the assertion.
+      succeed
+    }
+
+  "EphemDataSource.scanRange" should "return sorted, namespace-isolated entries within [from,to) (US5/FR-017)" taggedAs UnitTest in {
+    val ds = EphemDataSource()
+    val nsA: IndexedSeq[Byte] = IndexedSeq('a'.toByte)
+    val nsB: IndexedSeq[Byte] = IndexedSeq('b'.toByte)
+    Seq(7, 2, 9, 4, 0).foreach(i =>
+      ds.update(keyUpsert(nsA, BfsQueueStorage.longToBytes(i.toLong)))
+    ) // inserted out of order
+    (0 until 10).foreach(i => ds.update(keyUpsert(nsB, BfsQueueStorage.longToBytes(i.toLong))))
+    val scanned = ds.scanRange(nsA, BfsQueueStorage.longToBytes(2L), BfsQueueStorage.longToBytes(8L)).toSeq
+    // sorted ascending, half-open [2,8), and nsB entries excluded
+    scanned.map(_._1.toSeq) shouldBe Seq(2L, 4L, 7L).map(i => BfsQueueStorage.longToBytes(i).toSeq)
+  }
 }

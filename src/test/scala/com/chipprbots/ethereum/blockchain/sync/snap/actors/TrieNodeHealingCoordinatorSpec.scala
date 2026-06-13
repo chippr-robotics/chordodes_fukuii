@@ -937,4 +937,301 @@ class TrieNodeHealingCoordinatorSpec
     // After BFS completes the queue counter resets to 0 (clear() called at end of rebuildFrontierBFS).
     bfsQueue.counter shouldBe 0L
   }
+
+  // ── T009 / T031 (US1/US3, FR-025): shared-ancestor completeness ──────────────────────────────
+  //
+  // The visited set de-dups a node the first time its hash is seen; a SECOND parent referencing the
+  // same hash is a no-op. FR-025 mandates a regression proving that this de-dup of a *shared* present
+  // ancestor never short-circuits descent into that ancestor's own children: a missing grandchild
+  // behind the shared ancestor must still be discovered exactly once. Uses the T003 fixture.
+
+  it should "discover a missing grandchild behind a SHARED branch ancestor exactly once (FR-025)" taggedAs UnitTest in {
+    val fx = HealingTrieFixtures.sharedAncestor() // shared ancestor is a present BranchNode
+
+    val coordinator = system.actorOf(
+      TrieNodeHealingCoordinator.props(
+        stateRoot = fx.rootHash,
+        networkPeerManager = TestProbe().ref,
+        requestTracker = new SNAPRequestTracker()(system.scheduler),
+        mptStorage = fx.storage,
+        batchSize = 16,
+        snapSyncController = TestProbe().ref,
+        healingWriterEcOverride = Some(system.dispatcher)
+      )
+    )
+
+    coordinator ! Messages.StartTrieNodeHealing(fx.rootHash)
+
+    // The shared ancestor is reached via two parents but visited once; the missing grandchild below it
+    // is still discovered. It is the ONLY absent node, so the frontier is exactly 1 — not 0 (skipped)
+    // and not 2 (double-counted).
+    awaitAssert(
+      {
+        coordinator ! Messages.HealingGetProgress
+        expectMsgType[HealingStatistics](2.seconds).pendingTasks shouldBe 1
+      },
+      max = 5.seconds,
+      interval = 100.millis
+    )
+  }
+
+  it should "discover a missing grandchild behind a SHARED extension ancestor exactly once (FR-025)" taggedAs UnitTest in {
+    // Same invariant on the ExtensionNode de-dup arm of rebuildFrontierBFS.
+    val fx = HealingTrieFixtures.sharedAncestor(sharedIsExtension = true)
+
+    val coordinator = system.actorOf(
+      TrieNodeHealingCoordinator.props(
+        stateRoot = fx.rootHash,
+        networkPeerManager = TestProbe().ref,
+        requestTracker = new SNAPRequestTracker()(system.scheduler),
+        mptStorage = fx.storage,
+        batchSize = 16,
+        snapSyncController = TestProbe().ref,
+        healingWriterEcOverride = Some(system.dispatcher)
+      )
+    )
+
+    coordinator ! Messages.StartTrieNodeHealing(fx.rootHash)
+
+    awaitAssert(
+      {
+        coordinator ! Messages.HealingGetProgress
+        expectMsgType[HealingStatistics](2.seconds).pendingTasks shouldBe 1
+      },
+      max = 5.seconds,
+      interval = 100.millis
+    )
+  }
+
+  // ── T027 (US3): serial-equivalence (FR-012) ──────────────────────────────────────────────────
+  //
+  // With traversalParallelism = 1 the walk takes the serial branch. The emitted frontier (the
+  // pendingTasks set) over a fixed multi-node trie must be identical to a reference run — and
+  // identical whether or not a reader EC is supplied. Proves FR-012 (the serial path is unchanged
+  // and a reader EC, unused on the serial branch, does not perturb it).
+
+  it should "emit an identical serial frontier with cfg=1, with and without a reader EC (FR-012)" taggedAs UnitTest in {
+    import java.util.concurrent.Executors
+
+    // A drive helper: run a cfg=1 walk over a fresh copy of the multi-node fixture and return the
+    // frontier size. Each call gets its own fixture+coordinator so the runs are independent.
+    def frontierSizeWithCfg1(readerEc: Option[scala.concurrent.ExecutionContext]): Int = {
+      val fx = HealingTrieFixtures.multiNodeWithSharedAncestor()
+      val coordinator = system.actorOf(
+        TrieNodeHealingCoordinator.props(
+          stateRoot = fx.rootHash,
+          networkPeerManager = TestProbe().ref,
+          requestTracker = new SNAPRequestTracker()(system.scheduler),
+          mptStorage = fx.storage,
+          batchSize = 16,
+          snapSyncController = TestProbe().ref,
+          healingWriterEcOverride = Some(system.dispatcher),
+          healingReaderEcOverride = readerEc,
+          traversalParallelism = 1 // serial branch
+        )
+      )
+      coordinator ! Messages.StartTrieNodeHealing(fx.rootHash)
+      var observed = -1
+      awaitAssert(
+        {
+          coordinator ! Messages.HealingGetProgress
+          observed = expectMsgType[HealingStatistics](2.seconds).pendingTasks
+          observed shouldBe fx.missingNodeHashes.size // 2 distinct missing nodes
+        },
+        max = 5.seconds,
+        interval = 100.millis
+      )
+      system.stop(coordinator)
+      observed
+    }
+
+    // Reference run (no reader EC) and a run WITH a reader EC must agree, and both must equal the
+    // fixture's known missing-node count.
+    val pool = Executors.newFixedThreadPool(2)
+    val readerEc = scala.concurrent.ExecutionContext.fromExecutorService(pool)
+    try {
+      val reference = frontierSizeWithCfg1(None)
+      val withReader = frontierSizeWithCfg1(Some(readerEc))
+      reference shouldBe 2
+      withReader shouldBe reference
+    } finally {
+      pool.shutdownNow()
+      ()
+    }
+  }
+
+  // ── T029 / T031 (US3): no Await-on-same-pool deadlock + shared-ancestor under concurrency ─────
+  //
+  // The parallel-split branch (`effectiveParallelism > 1 && levelSize > BfsChunkSize=50,000`) dispatches
+  // sub-ranges as Futures on the reader EC while the parent walk Future parks on `Await` on the writer EC.
+  // Sharing one pool would deadlock once parallelism nears the pool size (forge's fix: a distinct reader
+  // pool). This test uses a fixture whose level-4 frontier is wider than 50,000 so the split branch is
+  // GENUINELY taken, with a real reader EC distinct from the writer EC and effective parallelism > 1, and
+  // asserts the walk completes within a bounded TestKit timeout (no deadlock). T031's shared-ancestor
+  // concurrent assertion is folded into the smaller wide-fanout fixture below: a tiny synthetic trie's
+  // levels are all < 50,000, so the split branch cannot be exercised on it — the genuine concurrency path
+  // is exercised here, and the shared-ancestor invariant under that configuration is asserted next.
+
+  it should "complete a >50K-entry parallel level without Await-on-same-pool deadlock (T029)" taggedAs UnitTest in {
+    import java.util.concurrent.Executors
+
+    val fx = HealingTrieFixtures.wideFrontierLevel() // level-4 frontier = 53,248 > 50,000
+
+    // A real, fixed-size reader pool distinct from the writer EC. The writer EC is also a small fixed
+    // pool so neither starves the actor thread. effectiveParallelism on the 4-core CI host with
+    // traversalParallelism=2 / min=2 / reserved=2 is min(2, min(4, max(2, 2))) = 2 > 1 → the split fires.
+    val readerPool = Executors.newFixedThreadPool(2)
+    val writerPool = Executors.newSingleThreadExecutor()
+    val readerEc = scala.concurrent.ExecutionContext.fromExecutorService(readerPool)
+    val writerEc = scala.concurrent.ExecutionContext.fromExecutorService(writerPool)
+
+    val coordinator = system.actorOf(
+      TrieNodeHealingCoordinator.props(
+        stateRoot = fx.rootHash,
+        networkPeerManager = TestProbe().ref,
+        requestTracker = new SNAPRequestTracker()(system.scheduler),
+        mptStorage = fx.storage,
+        batchSize = 16,
+        snapSyncController = TestProbe().ref,
+        healingWriterEcOverride = Some(writerEc),
+        healingReaderEcOverride = Some(readerEc),
+        traversalParallelism = 2,
+        healingMinParallelism = 2,
+        healingReservedCores = 2,
+        // Lift the emission high-water above the frontier so backpressure never blocks the walk here —
+        // the point of this test is the split/Await path, not the drain gate (covered elsewhere).
+        frontierHighWater = 200000,
+        frontierLowWater = 100000
+      )
+    )
+
+    try {
+      coordinator ! Messages.StartTrieNodeHealing(fx.rootHash)
+
+      // No deadlock: the full frontier lands within a generous-but-bounded timeout. If the parallel
+      // Await deadlocked, pendingTasks would never reach the expected count and this would time out.
+      awaitAssert(
+        {
+          coordinator ! Messages.HealingGetProgress
+          expectMsgType[HealingStatistics](3.seconds).pendingTasks shouldBe fx.expectedFrontier
+        },
+        max = 60.seconds,
+        interval = 500.millis
+      )
+    } finally {
+      system.stop(coordinator)
+      readerPool.shutdownNow()
+      writerPool.shutdownNow()
+      ()
+    }
+  }
+
+  it should "still discover a missing node behind a shared ancestor with parallel readers configured (T031)" taggedAs UnitTest in {
+    import java.util.concurrent.Executors
+
+    // Wide fan-out shared-ancestor fixture: many parents reference one shared present node above the
+    // single missing grandchild. With a real reader EC and effective parallelism > 1 configured, the
+    // shared ancestor is still enqueued once and its missing grandchild discovered exactly once. (The
+    // fixture's levels are < 50,000 so the physical split does not fire — the genuine parallel-split
+    // path is proven by the >50K T029 test above; this asserts the FR-025 invariant under the
+    // concurrency configuration.)
+    val fx = HealingTrieFixtures.wideSharedAncestor(fanout = 12)
+
+    val readerPool = Executors.newFixedThreadPool(2)
+    val readerEc = scala.concurrent.ExecutionContext.fromExecutorService(readerPool)
+
+    val coordinator = system.actorOf(
+      TrieNodeHealingCoordinator.props(
+        stateRoot = fx.rootHash,
+        networkPeerManager = TestProbe().ref,
+        requestTracker = new SNAPRequestTracker()(system.scheduler),
+        mptStorage = fx.storage,
+        batchSize = 16,
+        snapSyncController = TestProbe().ref,
+        healingWriterEcOverride = Some(system.dispatcher),
+        healingReaderEcOverride = Some(readerEc),
+        traversalParallelism = 2,
+        healingMinParallelism = 2,
+        healingReservedCores = 2
+      )
+    )
+
+    try {
+      coordinator ! Messages.StartTrieNodeHealing(fx.rootHash)
+      awaitAssert(
+        {
+          coordinator ! Messages.HealingGetProgress
+          expectMsgType[HealingStatistics](2.seconds).pendingTasks shouldBe 1
+        },
+        max = 5.seconds,
+        interval = 100.millis
+      )
+    } finally {
+      system.stop(coordinator)
+      readerPool.shutdownNow()
+      ()
+    }
+  }
+
+  // ── T026 (US3): effective-parallelism formula ────────────────────────────────────────────────
+  //
+  // `computeEffectiveParallelism` is the pure extraction of the inline clamp in `startFrontierBFS`
+  // (spec 002 T026): min(traversalParallelism, min(nproc, max(minParallelism, nproc − reservedCores))).
+  // Pinning it here proves the clamp never exceeds the operator ceiling or the CPU count, honours the
+  // min-parallelism floor, and collapses to the serial path at cfg=1 — independent of the host's nproc.
+
+  "TrieNodeHealingCoordinator.computeEffectiveParallelism" should
+    "clamp the 4-core / cfg=4 / min=2 / reserved=2 reference host to 2" taggedAs UnitTest in {
+      // max(2, 4−2) = 2; min(4, min(4, 2)) = 2. The 4-core reference host keeps 2 readers.
+      TrieNodeHealingCoordinator.computeEffectiveParallelism(
+        traversalParallelism = 4,
+        availableProcessors = 4,
+        minParallelism = 2,
+        reservedCores = 2
+      ) shouldBe 2
+    }
+
+  it should "rise to the cfg ceiling on a 16-core host (cfg is the binding limit)" taggedAs UnitTest in {
+    // max(2, 16−2) = 14; min(16, 14) = 14; min(cfg=4, 14) = 4. The operator ceiling caps it.
+    TrieNodeHealingCoordinator.computeEffectiveParallelism(
+      traversalParallelism = 4,
+      availableProcessors = 16,
+      minParallelism = 2,
+      reservedCores = 2
+    ) shouldBe 4
+  }
+
+  it should "collapse to 1 (the serial path) when cfg=1, on any host" taggedAs UnitTest in {
+    // cfg=1 ⇒ the outer min(1, …) is 1 regardless of cores/min/reserved → the serial branch in the walk.
+    TrieNodeHealingCoordinator.computeEffectiveParallelism(1, 4, 2, 2) shouldBe 1
+    TrieNodeHealingCoordinator.computeEffectiveParallelism(1, 64, 8, 0) shouldBe 1
+  }
+
+  it should "still clamp to nproc when the min-parallelism floor exceeds the CPU count" taggedAs UnitTest in {
+    // min=8 on a 4-core host: max(8, 4−2) = 8, but the inner min(nproc=4, 8) caps it at 4 (never oversubscribe).
+    TrieNodeHealingCoordinator.computeEffectiveParallelism(
+      traversalParallelism = 16,
+      availableProcessors = 4,
+      minParallelism = 8,
+      reservedCores = 2
+    ) shouldBe 4
+  }
+
+  it should "fall back to the min-parallelism floor when reserved cores ≥ nproc" taggedAs UnitTest in {
+    // reserved=4 on a 4-core host: nproc−reserved = 0, so max(min=2, 0) = 2 lifts it to the floor;
+    // min(nproc=4, 2) = 2; min(cfg=4, 2) = 2. The floor protects a host whose reservation would otherwise zero it.
+    TrieNodeHealingCoordinator.computeEffectiveParallelism(
+      traversalParallelism = 4,
+      availableProcessors = 4,
+      minParallelism = 2,
+      reservedCores = 4
+    ) shouldBe 2
+    // reserved beyond nproc (negative nproc−reserved) is clamped identically by the max floor.
+    TrieNodeHealingCoordinator.computeEffectiveParallelism(
+      traversalParallelism = 4,
+      availableProcessors = 4,
+      minParallelism = 2,
+      reservedCores = 8
+    ) shouldBe 2
+  }
 }

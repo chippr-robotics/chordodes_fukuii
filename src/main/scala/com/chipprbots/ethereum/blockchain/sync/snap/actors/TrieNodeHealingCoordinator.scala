@@ -16,6 +16,7 @@ import scala.concurrent.duration.Duration
 import com.chipprbots.ethereum.blockchain.sync.snap._
 import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController
 import com.chipprbots.ethereum.db.storage.{
+  BfsEntry,
   BfsQueueStorage,
   HealingFrontierStorage,
   InMemoryBfsQueueStorage,
@@ -46,7 +47,10 @@ class TrieNodeHealingCoordinator(
     visitedCap: Int = TrieNodeHealingCoordinator.DefaultVisitedCap,
     healingFrontierStorage: Option[HealingFrontierStorage] = None,
     healingWriterEcOverride: Option[ExecutionContext] = None,
+    healingReaderEcOverride: Option[ExecutionContext] = None,
     traversalParallelism: Int = TrieNodeHealingCoordinator.DefaultDfsParallelism,
+    healingMinParallelism: Int = TrieNodeHealingCoordinator.DefaultMinParallelism,
+    healingReservedCores: Int = TrieNodeHealingCoordinator.DefaultReservedCores,
     bfsQueueStorageOpt: Option[BfsQueueStorage] = None,
     storageScheme: StorageScheme = StorageScheme.Hash,
     pathNodeStorageOpt: Option[PathNodeStorage] = None,
@@ -79,6 +83,17 @@ class TrieNodeHealingCoordinator(
     */
   private val healingWriterEc: ExecutionContext =
     healingWriterEcOverride.getOrElse(context.system.dispatchers.lookup("healing-writer-dispatcher"))
+
+  /** Dedicated dispatcher for the BFS sub-range *reader* Futures (`processSubRange`). Distinct from `healingWriterEc`
+    * to break a latent thread-starvation deadlock: the parent walk Future parks a `healingWriterEc` thread inside
+    * `Await.result(...)` (rebuildFrontierBFS) while waiting for the N sub-range Futures to finish. If those sub-range
+    * Futures shared `healingWriterEc`, raising parallelism toward the pool size would leave the parked parent waiting
+    * on Futures queued behind it on the same pool → deadlock. Running the sub-ranges on a separate pool removes the
+    * dependency. Tests inject their own EC (a same-thread EC forces deterministic serial execution); production looks
+    * up `healing-reader-dispatcher`. See spec 002 R3 §2 (T032/T033).
+    */
+  private val healingReaderEc: ExecutionContext =
+    healingReaderEcOverride.getOrElse(context.system.dispatchers.lookup("healing-reader-dispatcher"))
 
   // Global stagnation detection: if no nodes healed for this duration, declare
   // healing complete with a warning. Prevents infinite loops when all peers lack
@@ -162,15 +177,21 @@ class TrieNodeHealingCoordinator(
   // go-ethereum trie.Sync.Missing() alignment — bounded working set rather than full upfront BFS.
   private val FrontierBatchSize = 1000
 
-  // Cap on the frontier-rebuild DFS `visited` set. The DFS walks the full state trie (accounts +
+  // Cap on the frontier-rebuild walk's `visited` set. The walk covers the full state trie (accounts +
   // every storage trie — tens of millions of nodes on ETC mainnet); an unbounded visited set grew
-  // to ~2.9 GB and OOM-looped the node. A fixed-capacity LRU (insertion-order eviction) bounds it
-  // to ~cap × 80 B ≈ 320 MB. Completeness is preserved: any missing node re-discovered after an
-  // eviction is de-duplicated by `pendingHashSet`, and an evicted present node is only re-walked
-  // if reached again via a shared reference. See docs/design/healing-frontier-scale.md.
-  // Operator-tunable via `sync.snap-sync.healing-visited-cap`; defaults to DefaultVisitedCap.
+  // to ~2.9 GB and OOM-looped the node. A fixed-capacity FIFO/insertion-order set (NOT an LRU — it
+  // evicts the earliest-INSERTED entry regardless of recent access) bounds the heap; budget for
+  // ~cap × ~120-150 B (a 32-byte ByteString key + its wrapper + the LinkedHashMap entry), i.e. the
+  // 4M default is ~480-640 MB, NOT the 320 MB an 80 B/entry estimate would suggest. Completeness is
+  // preserved: an evicted present node is only RE-WALKED if reached again via a shared reference
+  // (extra work, never a skip), and any missing node it re-discovers is de-duplicated by
+  // `pendingHashSet`. See docs/design/healing-frontier-scale.md. Operator-tunable via
+  // `sync.snap-sync.healing-visited-cap`; raise it only from a measured `inflation_ratio` (US2) and
+  // within the heap budget — do NOT set it to 20M (~2.4-3.2 GB) on a 6 GB heap (it OOMs).
   private val HealingVisitedCap: Int = visitedCap
   private val HealingTraversalParallelism: Int = traversalParallelism
+  private val HealingMinParallelism: Int = healingMinParallelism
+  private val HealingReservedCores: Int = healingReservedCores
   private val bfsQueue: BfsQueueStorage = bfsQueueStorageOpt.getOrElse(new InMemoryBfsQueueStorage())
 // --- Layer 2: persisted frontier (sync.snap-sync.healing-frontier-persistence) ---
   // When `healingFrontierStorage` is defined, the outstanding frontier is mirrored to a dedicated RocksDB
@@ -200,6 +221,9 @@ class TrieNodeHealingCoordinator(
     * called BEFORE the in-memory `pendingTasks`/`activeRequests` are cleared.
     */
   private def clearPersistedFrontier(): Unit =
+    // FR/T013: a same-root HealingPivotRefreshed no longer reaches here — its early guard returns first.
+    // Reaching this method therefore always means a genuine invalidation (differing-root refresh or
+    // abandonment), so dropping the completeness marker below is always correct.
     healingFrontierStorage.foreach { store =>
       val outstanding =
         pendingTasks.iterator.map(_.hash).toSeq ++ activeRequests.values.iterator.flatMap(_.tasks.iterator.map(_.hash))
@@ -564,64 +588,75 @@ class TrieNodeHealingCoordinator(
       context.stop(self)
 
     case HealingPivotRefreshed(newStateRoot) =>
-      val oldRoot = Hex.toHexString(stateRoot.take(4).toArray)
-      val newRootHex = Hex.toHexString(newStateRoot.take(4).toArray)
-      log.info(
-        s"Healing pivot refreshed: $oldRoot -> $newRootHex. " +
-          s"Clearing ${pendingTasks.size} pending tasks, ${statelessPeers.size} stateless peers."
-      )
-      stateRoot = newStateRoot
-      flushRawNodesSync() // Flush any buffered nodes before clearing state
-      clearPersistedFrontier() // Layer 2: old-root frontier is stale after refresh — reseed (below) repopulates it
-      pendingTasks.clear() // Will be re-populated by root reseed + inline discovery / trie walk from controller
-      pendingHashSet.clear()
-      statelessPeers.clear()
-      peerCooldownUntilMs.clear()
-      peerResponseBytesTarget.clear()
-      // Cancel active requests (they're for the old root)
-      activeRequests.keys.foreach(requestTracker.completeRequest(_, 0))
-      activeRequests.clear()
-      pivotRefreshRequested = false
-      consecutiveIdleChecks = 0
-      consecutiveStagnations = 0
-      consecutiveDeadPulses = 0
-      verificationPassComplete = false // new pivot root → must re-verify trie completeness
-      lastPulseHealedCount = totalNodesHealed
-      lastHealedAtMs = System.currentTimeMillis() // BUG-4: give fresh pivot a full stagnation window
-      // ARCH-PIVOT-RESEED: Re-seed with new root for top-down discovery of trie delta.
-      // Content-addressed inline tasks (~99% valid) were cleared — new root seeds a fresh
-      // top-down traversal of the updated trie.
-      val pivotReseedPath = ByteString(com.chipprbots.ethereum.mpt.HexPrefix.encode(Array.empty[Byte], isLeaf = false))
-      if (!pendingHashSet.contains(newStateRoot) && !isNodeInStorage(newStateRoot)) {
-        val reseedEntry = HealingEntry(Seq(pivotReseedPath), newStateRoot)
-        pendingTasks += reseedEntry
-        pendingHashSet += newStateRoot
-        persistFrontier(Seq(reseedEntry)) // Layer 2: the new pivot root is a new frontier entry
+      // FR-003: a same-root refresh is a no-op. ByteString `==` is full 32-byte value equality (NOT the
+      // 4-byte log prefix). Returning here preserves a valid completeness marker and the persisted
+      // frontier — the old body would clear both via clearPersistedFrontier(), wiping a good snapshot.
+      if (newStateRoot == stateRoot) {
         log.info(
-          s"[HEAL] Re-seeded with new root ${Hex.toHexString(newStateRoot.take(4).toArray)} " +
-            s"for inline discovery of pivot delta"
+          s"[HEAL] Pivot refresh to same root ${Hex.toHexString(stateRoot.take(4).toArray)} — " +
+            s"no-op, preserving completeness marker and frontier"
         )
       } else {
-        // FIX-BUG2-PIVOT: Root already in local storage — run a verification DFS to discover
-        // any missing children instead of dead-looping with zero pending tasks.
-        // Without this, walkRunning stays false and pending stays 0 → 316-pulse dead loop (RUN10).
-        // discoverMissingChildren skips locally-held storage roots without recursing into their
-        // children, so the new pivot root may be local yet have gaps in storage sub-tries.
-        if (trieWalkInProgress || verificationDFSRunning) {
-          // A walk is already running on the SHARED bfsQueue — rebuildFrontierBFS clears the queue
-          // on entry, so starting a second walk here would corrupt the running one. The pivot's
-          // verificationPassComplete=false (set above) guarantees HealingCheckCompletion starts a
-          // fresh verification once the current walk's flags clear.
+        val oldRoot = Hex.toHexString(stateRoot.take(4).toArray)
+        val newRootHex = Hex.toHexString(newStateRoot.take(4).toArray)
+        log.info(
+          s"Healing pivot refreshed: $oldRoot -> $newRootHex. " +
+            s"Clearing ${pendingTasks.size} pending tasks, ${statelessPeers.size} stateless peers."
+        )
+        stateRoot = newStateRoot
+        flushRawNodesSync() // Flush any buffered nodes before clearing state
+        clearPersistedFrontier() // Layer 2: old-root frontier is stale after refresh — reseed (below) repopulates it
+        pendingTasks.clear() // Will be re-populated by root reseed + inline discovery / trie walk from controller
+        pendingHashSet.clear()
+        statelessPeers.clear()
+        peerCooldownUntilMs.clear()
+        peerResponseBytesTarget.clear()
+        // Cancel active requests (they're for the old root)
+        activeRequests.keys.foreach(requestTracker.completeRequest(_, 0))
+        activeRequests.clear()
+        pivotRefreshRequested = false
+        consecutiveIdleChecks = 0
+        consecutiveStagnations = 0
+        consecutiveDeadPulses = 0
+        verificationPassComplete = false // new pivot root → must re-verify trie completeness
+        lastPulseHealedCount = totalNodesHealed
+        lastHealedAtMs = System.currentTimeMillis() // BUG-4: give fresh pivot a full stagnation window
+        // ARCH-PIVOT-RESEED: Re-seed with new root for top-down discovery of trie delta.
+        // Content-addressed inline tasks (~99% valid) were cleared — new root seeds a fresh
+        // top-down traversal of the updated trie.
+        val pivotReseedPath =
+          ByteString(com.chipprbots.ethereum.mpt.HexPrefix.encode(Array.empty[Byte], isLeaf = false))
+        if (!pendingHashSet.contains(newStateRoot) && !isNodeInStorage(newStateRoot)) {
+          val reseedEntry = HealingEntry(Seq(pivotReseedPath), newStateRoot)
+          pendingTasks += reseedEntry
+          pendingHashSet += newStateRoot
+          persistFrontier(Seq(reseedEntry)) // Layer 2: the new pivot root is a new frontier entry
           log.info(
-            s"[HEAL] New root ${Hex.toHexString(newStateRoot.take(4).toArray)} already in storage, " +
-              s"but a frontier walk is running — verification deferred until it completes"
+            s"[HEAL] Re-seeded with new root ${Hex.toHexString(newStateRoot.take(4).toArray)} " +
+              s"for inline discovery of pivot delta"
           )
         } else {
-          log.info(
-            s"[HEAL] New root ${Hex.toHexString(newStateRoot.take(4).toArray)} already in storage " +
-              s"— starting verification DFS to find missing children"
-          )
-          startVerificationDFS(newStateRoot, pivotReseedPath)
+          // FIX-BUG2-PIVOT: Root already in local storage — run a verification DFS to discover
+          // any missing children instead of dead-looping with zero pending tasks.
+          // Without this, walkRunning stays false and pending stays 0 → 316-pulse dead loop (RUN10).
+          // discoverMissingChildren skips locally-held storage roots without recursing into their
+          // children, so the new pivot root may be local yet have gaps in storage sub-tries.
+          if (trieWalkInProgress || verificationDFSRunning) {
+            // A walk is already running on the SHARED bfsQueue — rebuildFrontierBFS clears the queue
+            // on entry, so starting a second walk here would corrupt the running one. The pivot's
+            // verificationPassComplete=false (set above) guarantees HealingCheckCompletion starts a
+            // fresh verification once the current walk's flags clear.
+            log.info(
+              s"[HEAL] New root ${Hex.toHexString(newStateRoot.take(4).toArray)} already in storage, " +
+                s"but a frontier walk is running — verification deferred until it completes"
+            )
+          } else {
+            log.info(
+              s"[HEAL] New root ${Hex.toHexString(newStateRoot.take(4).toArray)} already in storage " +
+                s"— starting verification DFS to find missing children"
+            )
+            startVerificationDFS(newStateRoot, pivotReseedPath)
+          }
         }
       }
 
@@ -657,6 +692,19 @@ class TrieNodeHealingCoordinator(
         if (verificationPassComplete || totalNodesHealed == 0) {
           flushRawNodesSync()
           log.info(s"Healing round complete: $totalNodesHealed total nodes healed. Notifying controller.")
+          // FR-002: mark the snapshot complete ONLY on the verified-complete path — a verification DFS
+          // actually walked the trie and found zero missing nodes (verificationPassComplete == true).
+          // FR-004: do NOT mark on the pure `totalNodesHealed == 0` idle arm: the coordinator was never
+          // given work, so the trie may be untraversed and we cannot assert completeness. Setting the
+          // marker here (gated on verificationPassComplete) is the single completion chokepoint for the
+          // verification path — VerificationDFSComplete routes through HealingCheckCompletion, so this is
+          // equivalent to (and cleaner than) writing the marker inside VerificationDFSComplete.
+          if (verificationPassComplete) {
+            healingFrontierStorage.foreach { store =>
+              store.markComplete()
+              log.info("[HEAL-RESTART] Verification DFS complete — persisted frontier marked as a complete snapshot")
+            }
+          }
           snapSyncController ! SNAPSyncController.StateHealingComplete
         } else {
           // Inline tasks done with actual healing work — run a full DFS to catch storage sub-trie
@@ -1196,8 +1244,9 @@ class TrieNodeHealingCoordinator(
     import com.chipprbots.ethereum.domain.Account
     import scala.util.control.NonFatal
 
-    // LRU-bounded visited set (companion boundedVisitedSet): at the cap the ELDEST entry is
-    // evicted instead of refusing new entries. Refusing (the previous ConcurrentHashMap gate)
+    // FIFO/insertion-order bounded visited set (companion boundedVisitedSet): at the cap the
+    // earliest-INSERTED entry is evicted (NOT an LRU — recent access does not protect an entry)
+    // instead of refusing new entries. Refusing (the previous ConcurrentHashMap gate)
     // silently TRUNCATED the traversal on tries larger than the cap — children past the cap were
     // never enqueued, the queue drained early, and the walk reported "Complete" (and set the
     // Layer-2 completeness marker) having covered only `cap` of the trie. Eviction trades that
@@ -1217,100 +1266,144 @@ class TrieNodeHealingCoordinator(
     val visitedCount = new java.util.concurrent.atomic.AtomicLong(0L)
     val frontierCount = new java.util.concurrent.atomic.AtomicLong(0L)
 
+    // --- spec 002 US2 observability (observation-only, FR-006/FR-007/FR-008) ---
+    // Per-level coarse-phase timers (nanos) accumulated across chunks/sub-ranges, and re-walk inflation
+    // counters. These are read and reset at each level boundary. They are pure instrumentation: they never
+    // gate or change which nodes the walk enqueues/visits/declares missing (the markIfNew gate and enqueue
+    // logic below are untouched). queueReadNanos/trieReadNanos/queueWriteNanos are summed over all chunks of
+    // the level (aggregate CPU when sub-ranges run in parallel); childRefsSeen counts every HashNode child
+    // reference observed BEFORE the markIfNew de-dup gate, distinctEnqueued counts only the references that
+    // pass the gate, so childRefsSeen / max(1, distinctEnqueued) is the faithful re-walk inflation ratio.
+    val queueReadNanos = new java.util.concurrent.atomic.AtomicLong(0L)
+    val trieReadNanos = new java.util.concurrent.atomic.AtomicLong(0L)
+    val queueWriteNanos = new java.util.concurrent.atomic.AtomicLong(0L)
+    val childRefsSeen = new java.util.concurrent.atomic.AtomicLong(0L)
+    val distinctEnqueued = new java.util.concurrent.atomic.AtomicLong(0L)
+    // Windowed GC-pressure sampler: baseline captured at walk start; sampled per level.
+    val gcSampler = new GcPressureSampler()
+
     // Process a sub-range [subFrom, subTo) of the current level; returns frontier entries.
     def processSubRange(subFrom: Long, subTo: Long, levelIndex: Int): Seq[HealingEntry] = {
       val subFrontier = mutable.Buffer.empty[HealingEntry]
 
-      queue.iterateRange(subFrom, subTo).foreach { chunk =>
-        val results = mptStorage.multiGetNodes(chunk.map(_.hash))
-        val nextBuf = mutable.ArrayBuffer[(Array[Byte], Seq[Array[Byte]], Boolean)]()
+      // Time the queue-read (chunk fetch) per chunk WITHOUT changing iteration semantics: drive the lazy
+      // iterator explicitly and time only the production of each chunk (one nanoTime pair per chunk fetch,
+      // not per node). The body that follows is byte-identical to the prior `.foreach { chunk => ... }`.
+      val chunkIterator = queue.iterateRange(subFrom, subTo)
+      var moreChunks = true
+      while (moreChunks) {
+        val readStart = System.nanoTime()
+        val hasNext = chunkIterator.hasNext
+        val chunk = if (hasNext) chunkIterator.next() else Seq.empty[BfsEntry]
+        queueReadNanos.addAndGet(System.nanoTime() - readStart)
+        if (!hasNext) moreChunks = false
+        else {
+          val trieReadStart = System.nanoTime()
+          val results = mptStorage.multiGetNodes(chunk.map(_.hash))
+          trieReadNanos.addAndGet(System.nanoTime() - trieReadStart)
+          val nextBuf = mutable.ArrayBuffer[(Array[Byte], Seq[Array[Byte]], Boolean)]()
 
-        chunk.zip(results).foreach { case (entry, nodeOpt) =>
-          val v = visitedCount.incrementAndGet()
-          if (v % 100_000 == 0) {
-            log.info(
-              s"[HEAL-BFS] Level $levelIndex: $v nodes visited, ${frontierCount.get()} frontier found, " +
-                s"${queue.counter - subTo} L${levelIndex + 1} queued"
-            )
-            SNAPSyncMetrics.setHealingRebuildVisited(v)
-          }
+          chunk.zip(results).foreach { case (entry, nodeOpt) =>
+            val v = visitedCount.incrementAndGet()
+            if (v % 100_000 == 0) {
+              log.info(
+                s"[HEAL-BFS] Level $levelIndex: $v nodes visited, ${frontierCount.get()} frontier found, " +
+                  s"${queue.counter - subTo} L${levelIndex + 1} queued"
+              )
+              SNAPSyncMetrics.setHealingRebuildVisited(v)
+            }
 
-          val pathset = entry.pathset.map(ByteString(_))
-          val nibbles = HexPrefix.decode(pathset.last.toArray)._1
+            val pathset = entry.pathset.map(ByteString(_))
+            val nibbles = HexPrefix.decode(pathset.last.toArray)._1
 
-          nodeOpt match {
-            case None =>
-              subFrontier += HealingEntry(pathset, ByteString(entry.hash))
-              frontierCount.incrementAndGet()
+            nodeOpt match {
+              case None =>
+                subFrontier += HealingEntry(pathset, ByteString(entry.hash))
+                frontierCount.incrementAndGet()
 
-            case Some(node) =>
-              try
-                node match {
-                  case branch: BranchNode =>
-                    for (i <- 0 until 16) branch.children(i) match {
-                      case hashChild: HashNode =>
-                        val childHash = ByteString(hashChild.hashNode)
-                        if (markIfNew(childHash)) {
-                          val childNibbles = nibbles :+ i.toByte
-                          val childCompact = ByteString(HexPrefix.encode(childNibbles, isLeaf = false))
-                          val childPathset =
-                            if (entry.isStorage) Seq(pathset.head.toArray, childCompact.toArray)
-                            else Seq(childCompact.toArray)
-                          nextBuf += ((hashChild.hashNode, childPathset, entry.isStorage))
-                        }
-                      case _ =>
-                    }
+              case Some(node) =>
+                try
+                  node match {
+                    case branch: BranchNode =>
+                      for (i <- 0 until 16) branch.children(i) match {
+                        case hashChild: HashNode =>
+                          val childHash = ByteString(hashChild.hashNode)
+                          // Observation-only (FR-008/FR-023): count this child reference before the de-dup gate.
+                          childRefsSeen.incrementAndGet()
+                          if (markIfNew(childHash)) {
+                            distinctEnqueued.incrementAndGet()
+                            val childNibbles = nibbles :+ i.toByte
+                            val childCompact = ByteString(HexPrefix.encode(childNibbles, isLeaf = false))
+                            val childPathset =
+                              if (entry.isStorage) Seq(pathset.head.toArray, childCompact.toArray)
+                              else Seq(childCompact.toArray)
+                            nextBuf += ((hashChild.hashNode, childPathset, entry.isStorage))
+                          }
+                        case _ =>
+                      }
 
-                  case ext: ExtensionNode =>
-                    ext.next match {
-                      case hashChild: HashNode =>
-                        val childHash = ByteString(hashChild.hashNode)
-                        if (markIfNew(childHash)) {
-                          val childNibbles = nibbles ++ ext.sharedKey.toArray
-                          val childCompact = ByteString(HexPrefix.encode(childNibbles, isLeaf = false))
-                          val childPathset =
-                            if (entry.isStorage) Seq(pathset.head.toArray, childCompact.toArray)
-                            else Seq(childCompact.toArray)
-                          nextBuf += ((hashChild.hashNode, childPathset, entry.isStorage))
-                        }
-                      case _ =>
-                    }
+                    case ext: ExtensionNode =>
+                      ext.next match {
+                        case hashChild: HashNode =>
+                          val childHash = ByteString(hashChild.hashNode)
+                          // Observation-only (FR-008/FR-023): count this child reference before the de-dup gate.
+                          childRefsSeen.incrementAndGet()
+                          if (markIfNew(childHash)) {
+                            distinctEnqueued.incrementAndGet()
+                            val childNibbles = nibbles ++ ext.sharedKey.toArray
+                            val childCompact = ByteString(HexPrefix.encode(childNibbles, isLeaf = false))
+                            val childPathset =
+                              if (entry.isStorage) Seq(pathset.head.toArray, childCompact.toArray)
+                              else Seq(childCompact.toArray)
+                            nextBuf += ((hashChild.hashNode, childPathset, entry.isStorage))
+                          }
+                        case _ =>
+                      }
 
-                  case leaf: LeafNode if !entry.isStorage =>
-                    Account(leaf.value).foreach { account =>
-                      if (
-                        account.storageRoot != Account.EmptyStorageRootHash &&
-                        markIfNew(account.storageRoot)
-                      ) {
-                        val allNibbles = nibbles ++ leaf.key.toArray
-                        if (allNibbles.length == 64) {
-                          val accountHashBytes =
-                            allNibbles.grouped(2).map(g => ((g(0) << 4) | g(1)).toByte).toArray
-                          val accountHash = ByteString(accountHashBytes)
-                          val emptyStoragePath = ByteString(HexPrefix.encode(Array.empty[Byte], isLeaf = false))
-                          nextBuf += (
-                            (
-                              account.storageRoot.toArray,
-                              Seq(accountHash.toArray, emptyStoragePath.toArray),
-                              true
+                    case leaf: LeafNode if !entry.isStorage =>
+                      Account(leaf.value).foreach { account =>
+                        // Observation-only (FR-008/FR-023): count the account-leaf storageRoot reference
+                        // before the de-dup gate, when there is a non-empty storage root to follow.
+                        if (account.storageRoot != Account.EmptyStorageRootHash) childRefsSeen.incrementAndGet()
+                        if (
+                          account.storageRoot != Account.EmptyStorageRootHash &&
+                          markIfNew(account.storageRoot)
+                        ) {
+                          distinctEnqueued.incrementAndGet()
+                          val allNibbles = nibbles ++ leaf.key.toArray
+                          if (allNibbles.length == 64) {
+                            val accountHashBytes =
+                              allNibbles.grouped(2).map(g => ((g(0) << 4) | g(1)).toByte).toArray
+                            val accountHash = ByteString(accountHashBytes)
+                            val emptyStoragePath = ByteString(HexPrefix.encode(Array.empty[Byte], isLeaf = false))
+                            nextBuf += (
+                              (
+                                account.storageRoot.toArray,
+                                Seq(accountHash.toArray, emptyStoragePath.toArray),
+                                true
+                              )
                             )
-                          )
+                          }
                         }
                       }
-                    }
 
-                  case _ => // storage trie leaf, NullNode, inline HashNode
+                    case _ => // storage trie leaf, NullNode, inline HashNode
+                  }
+                catch {
+                  case NonFatal(e) =>
+                    log.debug(
+                      s"[HEAL-BFS] Cannot traverse ${Hex.toHexString(entry.hash.take(4))}: ${e.getMessage} — skipping"
+                    )
                 }
-              catch {
-                case NonFatal(e) =>
-                  log.debug(
-                    s"[HEAL-BFS] Cannot traverse ${Hex.toHexString(entry.hash.take(4))}: ${e.getMessage} — skipping"
-                  )
-              }
+            }
           }
-        }
-        if (nextBuf.nonEmpty) queue.enqueueBatch(nextBuf.toSeq)
-      }
+          if (nextBuf.nonEmpty) {
+            val writeStart = System.nanoTime()
+            queue.enqueueBatch(nextBuf.toSeq)
+            queueWriteNanos.addAndGet(System.nanoTime() - writeStart)
+          }
+        } // end else (non-empty chunk)
+      } // end while (moreChunks)
       subFrontier.toSeq
     }
 
@@ -1336,10 +1429,19 @@ class TrieNodeHealingCoordinator(
             }
             .filter { case (from, to) => from < to }
 
+          // Sub-range readers run on healingReaderEc (NOT healingWriterEc): the parent walk Future already
+          // holds a healingWriterEc thread and parks it on the Await below. Sharing the pool would let the
+          // parked parent wait on sub-range Futures queued behind it on the same pool once parallelism nears
+          // the pool size (thread-starvation deadlock). The dedicated reader pool removes that dependency
+          // (spec 002 R3 §2, T033). `scala.concurrent.blocking` marks the park as a managed-blocking section
+          // so a fork-join-backed EC (e.g. a test EC) compensates; on the production thread-pool dispatcher it
+          // is a harmless no-op but documents intent.
           val futures = subRanges.map { case (from, to) =>
-            Future(processSubRange(from, to, levelIndex))(healingWriterEc)
+            Future(processSubRange(from, to, levelIndex))(healingReaderEc)
           }
-          futures.flatMap(f => Await.result(f, Duration.Inf))
+          scala.concurrent.blocking {
+            futures.flatMap(f => Await.result(f, Duration.Inf))
+          }
         }
 
       allFrontier.grouped(FrontierBatchSize).foreach { batch =>
@@ -1349,10 +1451,36 @@ class TrieNodeHealingCoordinator(
 
       val fc = frontierCount.get()
       val queued = queue.counter - levelEnd
+
+      // --- spec 002 US2 observability: derive + push the per-level signals (observation-only) ---
+      val queueReadMs = queueReadNanos.get() / 1_000_000L
+      val trieReadMs = trieReadNanos.get() / 1_000_000L
+      val queueWriteMs = queueWriteNanos.get() / 1_000_000L
+      val refsSeen = childRefsSeen.get()
+      val enqueued = distinctEnqueued.get()
+      val inflationRatio = refsSeen.toDouble / math.max(1L, enqueued).toDouble
+      val (gcPauseMs, gcFraction) = gcSampler.sample()
+
       log.info(
-        s"[HEAL-BFS] Level $levelIndex complete: $levelSize processed, $fc frontier total, $queued queued for L${levelIndex + 1}"
+        s"[HEAL-BFS] Level $levelIndex complete: $levelSize processed, $fc frontier total, $queued queued for L${levelIndex + 1}" +
+          f" | phase(ms) queueRead=$queueReadMs trieRead=$trieReadMs queueWrite=$queueWriteMs" +
+          f" | inflation childRefsSeen=$refsSeen distinctEnqueued=$enqueued ratio=$inflationRatio%.2f" +
+          f" | gc pauseMs=$gcPauseMs fraction=$gcFraction%.4f"
       )
       SNAPSyncMetrics.setHealingRebuildVisited(visitedCount.get())
+      SNAPSyncMetrics.setHealingPhaseQueueReadMs(queueReadMs)
+      SNAPSyncMetrics.setHealingPhaseTrieReadMs(trieReadMs)
+      SNAPSyncMetrics.setHealingPhaseQueueWriteMs(queueWriteMs)
+      SNAPSyncMetrics.setHealingInflationRatio(inflationRatio)
+      SNAPSyncMetrics.setHealingGcPauseMs(gcPauseMs)
+      SNAPSyncMetrics.setHealingGcFraction(gcFraction)
+
+      // Reset the per-level accumulators so the next level's gauges/log reflect only that level.
+      queueReadNanos.set(0L)
+      trieReadNanos.set(0L)
+      queueWriteNanos.set(0L)
+      childRefsSeen.set(0L)
+      distinctEnqueued.set(0L)
 
       // Free the consumed level immediately (one range tombstone). Levels are processed exactly
       // once and never re-read, and on ETC mainnet the live queue otherwise accumulates the whole
@@ -1383,10 +1511,22 @@ class TrieNodeHealingCoordinator(
       onComplete: () => Unit
   ): Unit = {
     val selfRef = self
-    val effectiveParallelism = math.min(
-      HealingTraversalParallelism,
-      math.max(1, Runtime.getRuntime.availableProcessors() - 2)
-    )
+    // Effective parallelism floor (spec 002 R3 §1, T034): min(cfg, max(minParallelism, nproc − reservedCores)).
+    // Never exceeds the operator ceiling (HealingTraversalParallelism) or the CPU count — `min` with `cfg`
+    // clamps first, and `cfg <= 1` forces the serial branch (`effectiveParallelism <= 1`) below, preserving
+    // the serial baseline (FR-012). The minParallelism floor lifts the previous `max(1, …)` so a host with
+    // few spare cores still splits large levels; reservedCores keeps headroom for the live node + GC. On the
+    // 4-core reference host the default (min 2, reserved 2) still yields max(2, 4−2) = 2.
+    val nproc = Runtime.getRuntime.availableProcessors()
+    // Extracted to the pure companion `computeEffectiveParallelism` (spec 002 T026) so the clamp is
+    // unit-testable without instantiating the actor. byte-identical to the prior inline expression.
+    val effectiveParallelism =
+      TrieNodeHealingCoordinator.computeEffectiveParallelism(
+        HealingTraversalParallelism,
+        nproc,
+        HealingMinParallelism,
+        HealingReservedCores
+      )
     // Guard BOTH walk kinds (rebuild + verification): the watchdog, HealingCheckCompletion and the
     // pivot-refresh path gate on this flag, and the bfsQueue is shared (cleared on walk entry), so
     // a second concurrent walk corrupts the first. Cleared by FrontierRebuildComplete /
@@ -1555,8 +1695,10 @@ class TrieNodeHealingCoordinator(
 
 object TrieNodeHealingCoordinator {
 
-  /** Default cap on the frontier-rebuild DFS `visited` LRU: 4M entries ≈ 320 MB. Used when
-    * `sync.snap-sync.healing-visited-cap` is unset. See docs/design/healing-frontier-scale.md.
+  /** Default cap on the frontier-rebuild walk's FIFO `visited` set: 4M entries ≈ 480-640 MB (a 32-byte ByteString key +
+    * wrapper + LinkedHashMap entry is ~120-150 B, not the 80 B an "≈320 MB" estimate assumed). Insertion-order
+    * eviction, NOT LRU. Used when `sync.snap-sync.healing-visited-cap` is unset. Raise only from a measured
+    * `inflation_ratio` and within the heap budget. See docs/design/healing-frontier-scale.md.
     */
   val DefaultVisitedCap: Int = 4_000_000
 
@@ -1576,15 +1718,27 @@ object TrieNodeHealingCoordinator {
     */
   val DefaultDfsParallelism: Int = 4
 
+  /** Floor on BFS level parallelism (spec 002 R3 §1, T034): `effectiveParallelism = min(traversalParallelism,
+    * min(nproc, max(DefaultMinParallelism, nproc − DefaultReservedCores)))`. Lifts the old `max(1, …)` so a host with
+    * few spare cores still splits large levels. Operator-tunable via `sync.snap-sync.healing-min-parallelism`.
+    */
+  val DefaultMinParallelism: Int = 2
+
+  /** Cores reserved for the live node + GC, subtracted from `availableProcessors` before the min-parallelism floor
+    * (spec 002 R3 §1, T034). On the 4-core reference host this yields max(2, 4−2) = 2. Operator-tunable via
+    * `sync.snap-sync.healing-reserved-cores`.
+    */
+  val DefaultReservedCores: Int = 2
+
   /** Maximum number of node hashes per `multiGetNodes` call inside `rebuildFrontierBFS`. Keeps each Java list under
     * ~1.6 MB (50K × 32B) and prevents a single enormous call when a trie level spans hundreds of thousands of nodes.
     */
   val BfsChunkSize: Int = 50_000
 
-  /** Heap-bounded `visited` set for the frontier-rebuild DFS: a `LinkedHashMap`-backed LRU that evicts the
-    * earliest-inserted (already-completed) subtries once it exceeds `cap` (insertion-order eviction). Exposed on the
-    * companion so the eviction contract (size never exceeds `cap`; eldest dropped first) is unit-testable without
-    * instantiating the actor.
+  /** Heap-bounded `visited` set for the frontier-rebuild walk: a `LinkedHashMap`-backed FIFO that evicts the
+    * earliest-INSERTED (already-completed) subtries once it exceeds `cap` (insertion-order eviction — NOT an LRU;
+    * recent access does not protect an entry). Exposed on the companion so the eviction contract (size never exceeds
+    * `cap`; eldest dropped first) is unit-testable without instantiating the actor.
     */
   def boundedVisitedSet(cap: Int): mutable.Set[ByteString] = {
     val lru = new java.util.LinkedHashMap[ByteString, java.lang.Boolean](1024, 0.75f, false) {
@@ -1593,6 +1747,26 @@ object TrieNodeHealingCoordinator {
     }
     java.util.Collections.newSetFromMap[ByteString](lru).asScala
   }
+
+  /** Effective BFS level parallelism (spec 002 R3 §1, T026/T034): `min(traversalParallelism, min(availableProcessors,
+    * max(minParallelism, availableProcessors − reservedCores)))`.
+    *
+    * Pure — no side effects, no I/O, no system reads (the caller supplies `availableProcessors`). Extracted from the
+    * inline expression in `startFrontierBFS` so the clamp is unit-testable without instantiating the actor; the result
+    * is byte-identical to that prior expression for all inputs. It is a performance/scheduling knob only: it controls
+    * how a BFS level is split into sub-ranges for parallel reading and never changes which nodes the walk
+    * enqueues/visits/declares missing (`<= 1` ⇒ the serial branch). See `DefaultMinParallelism`/`DefaultReservedCores`.
+    */
+  def computeEffectiveParallelism(
+      traversalParallelism: Int,
+      availableProcessors: Int,
+      minParallelism: Int,
+      reservedCores: Int
+  ): Int =
+    math.min(
+      traversalParallelism,
+      math.min(availableProcessors, math.max(minParallelism, availableProcessors - reservedCores))
+    )
 
   def props(
       stateRoot: ByteString,
@@ -1605,7 +1779,10 @@ object TrieNodeHealingCoordinator {
       visitedCap: Int = DefaultVisitedCap,
       healingFrontierStorage: Option[HealingFrontierStorage] = None,
       healingWriterEcOverride: Option[ExecutionContext] = None,
+      healingReaderEcOverride: Option[ExecutionContext] = None,
       traversalParallelism: Int = DefaultDfsParallelism,
+      healingMinParallelism: Int = DefaultMinParallelism,
+      healingReservedCores: Int = DefaultReservedCores,
       bfsQueueStorageOpt: Option[BfsQueueStorage] = None,
       storageScheme: StorageScheme = StorageScheme.Hash,
       pathNodeStorageOpt: Option[PathNodeStorage] = None,
@@ -1625,7 +1802,10 @@ object TrieNodeHealingCoordinator {
         visitedCap,
         healingFrontierStorage,
         healingWriterEcOverride,
+        healingReaderEcOverride,
         traversalParallelism,
+        healingMinParallelism,
+        healingReservedCores,
         bfsQueueStorageOpt,
         storageScheme,
         pathNodeStorageOpt,

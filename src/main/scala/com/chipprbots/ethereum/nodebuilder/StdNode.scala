@@ -15,6 +15,7 @@ import com.chipprbots.ethereum.consensus.mining.StdMiningBuilder
 import com.chipprbots.ethereum.console.Tui
 import com.chipprbots.ethereum.console.TuiConfig
 import com.chipprbots.ethereum.console.TuiUpdater
+import com.chipprbots.ethereum.db.dataSource.RocksDbCacheMetrics
 import com.chipprbots.ethereum.metrics.Metrics
 import com.chipprbots.ethereum.metrics.MetricsConfig
 import com.chipprbots.ethereum.network.PeerManagerActor
@@ -94,6 +95,11 @@ abstract class BaseNode extends Node {
             // Ensure app_snapsync_* series exist even before SNAP sync starts.
             val _ = SNAPSyncMetrics
           }
+
+          // Register the RocksDB block-cache hit/miss poll gauges against the live state DataSource
+          // (spec 002 US2 / FR-005). No-op unless the DataSource is a RocksDbDataSource; the gauges
+          // read 0.0 until db.rocksdb.enable-statistics = true.
+          RocksDbCacheMetrics.register(storagesInstance.dataSource)
         }
       case Failure(exception) => throw exception
     }

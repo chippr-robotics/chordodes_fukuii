@@ -34,7 +34,7 @@ class FrontierRebuildSpec extends AnyFlatSpec with Matchers {
     }
   }
 
-  it should "evict the earliest-inserted entries first (insertion-order LRU)" taggedAs UnitTest in {
+  it should "evict the earliest-inserted entries first (insertion-order / FIFO, not LRU)" taggedAs UnitTest in {
     val cap = 50
     val total = 200
     val visited = TrieNodeHealingCoordinator.boundedVisitedSet(cap)

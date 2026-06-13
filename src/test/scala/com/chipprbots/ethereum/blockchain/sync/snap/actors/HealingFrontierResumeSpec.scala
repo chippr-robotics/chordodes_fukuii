@@ -197,4 +197,39 @@ class HealingFrontierResumeSpec
         100.millis
       )
     }
+
+  // ---- US1 (spec 002): completeness-marker set/clear semantics ----
+
+  it should "SET the completeness marker after a fresh full-state walk completes (FR-002) so a restart can skip" taggedAs UnitTest in
+    // Fresh heal: no marker, empty frontier, childless-leaf root in storage → the coordinator runs the
+    // full-state rebuild walk which, finding nothing missing, persists the completeness marker. The
+    // user-visible FR-002 outcome is that a completed heal is recorded as complete so the next restart
+    // skips the walk (the resume-skip tests above prove the skip fires once the marker is set). The
+    // verification-path set-site (HealingCheckCompletion gated on verificationPassComplete) is exercised
+    // by "skip the walk and complete via verification ..." above and proven invariant-safe by review.
+    withResumeFixture(persistence = true, markComplete = false) { (coordinator, root, store, _) =>
+      store.isComplete shouldBe false
+      coordinator ! Messages.StartTrieNodeHealing(root)
+      awaitAssert(store.isComplete shouldBe true, 5.seconds, 100.millis)
+    }
+
+  it should "PRESERVE the completeness marker on a same-root pivot refresh (FR-003 no-op)" taggedAs UnitTest in
+    // A pivot refresh to the SAME state root must not wipe a valid marker: the new guard short-circuits
+    // before clearPersistedFrontier(). Previously the unconditional clear dropped the marker on every
+    // refresh (frequent on peer-scarce mainnet), silently defeating the skip-on-restart.
+    withResumeFixture(persistence = true, markComplete = true) { (coordinator, root, store, _) =>
+      store.isComplete shouldBe true
+      coordinator ! Messages.HealingPivotRefreshed(root) // same root as props stateRoot
+      // The guard is synchronous on the actor thread; give the mailbox a moment and confirm it stayed set.
+      awaitAssert(store.isComplete shouldBe true, 2.seconds, 100.millis)
+    }
+
+  it should "CLEAR the completeness marker on a different-root pivot refresh (FR-003 genuine invalidation)" taggedAs UnitTest in
+    // A refresh to a genuinely different root may invalidate already-healed subtries, so the marker is
+    // dropped (conservative) and the new root reseeded for re-traversal.
+    withResumeFixture(persistence = true, markComplete = true) { (coordinator, _, store, _) =>
+      store.isComplete shouldBe true
+      coordinator ! Messages.HealingPivotRefreshed(kec256(ByteString("a-genuinely-different-root")))
+      awaitAssert(store.isComplete shouldBe false, 2.seconds, 100.millis)
+    }
 }
