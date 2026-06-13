@@ -165,6 +165,38 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
       }
     }
 
+    "receiving an 8-field STATUS (canonical 7 + 1 trailing extension field)" should {
+      "decode successfully by extracting canonical 7 fields and ignoring the trailing extension" taggedAs UnitTest in {
+        import com.chipprbots.ethereum.rlp._
+        import ETHPackets.Status70.Status70._
+        val genesisHash = ByteString(Array.fill(32)(0x33.toByte))
+        val latestHash = ByteString(Array.fill(32)(0x44.toByte))
+        val canonical = ETHPackets.Status70.Status70(
+          protocolVersion = 70,
+          networkId = 1L,
+          genesisHash = genesisHash,
+          forkId = ForkId(0xbe46d57cL, None),
+          earliestBlock = BigInt(0),
+          latestBlock = BigInt(20000000),
+          latestBlockHash = latestHash
+        )
+        val canonicalRlp = rawDecode(canonical.toBytes).asInstanceOf[RLPList]
+        val i = canonicalRlp.items
+        val eightFieldBytes =
+          encode(RLPList(i(0), i(1), i(2), i(3), i(4), i(5), i(6), RLPValue(BigInt(99).toByteArray)))
+        val decoded = decoder(Capability.ETH70).fromBytes(Codes.StatusCode, eightFieldBytes)
+        decoded match {
+          case Right(s: ETHPackets.Status70.Status70) =>
+            s.networkId shouldEqual 1L
+            s.genesisHash shouldEqual genesisHash
+            s.earliestBlock shouldEqual BigInt(0)
+            s.latestBlock shouldEqual BigInt(20000000)
+            s.latestBlockHash shouldEqual latestHash
+          case other => fail(s"Expected tolerant 8-field Status70 decode, got $other")
+        }
+      }
+    }
+
     "receiving a STATUS that matches no known shape" should {
       "still be rejected" taggedAs UnitTest in {
         import com.chipprbots.ethereum.rlp._
