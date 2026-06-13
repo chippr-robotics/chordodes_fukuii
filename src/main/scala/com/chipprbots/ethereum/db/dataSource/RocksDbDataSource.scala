@@ -123,6 +123,37 @@ class RocksDbDataSource(
     } finally dbLock.writeLock().unlock()
   }
 
+  /** Forward range scan via a single seek+next over a bounded `[fromKey, toKeyExclusive)` window. Uses
+    * `scanReadOptions` (fillCache=false) so a large queue scan does not evict the hot block cache. Drains the window
+    * into a buffer and CLOSES the native iterator before returning, so no `RocksIterator` handle outlives the call —
+    * abort-safe by construction (the caller can drop the returned Iterator without leaking). The caller passes a
+    * bounded chunk, so peak memory is O(chunk), matching the prior `multiGetOptimized` result list.
+    */
+  override def scanRange(
+      namespace: Namespace,
+      fromKey: Array[Byte],
+      toKeyExclusive: Array[Byte]
+  ): Iterator[(Array[Byte], Array[Byte])] = {
+    dbLock.readLock().lock()
+    try {
+      assureNotClosed()
+      val it = db.newIterator(handles(namespace), scanReadOptions)
+      try {
+        val buf = scala.collection.mutable.ArrayBuffer.empty[(Array[Byte], Array[Byte])]
+        it.seek(fromKey)
+        while (it.isValid && java.util.Arrays.compareUnsigned(it.key(), toKeyExclusive) < 0) {
+          buf += ((it.key(), it.value()))
+          it.next()
+        }
+        buf.iterator
+      } finally it.close()
+    } catch {
+      case error: RocksDbDataSourceClosedException => throw error
+      case NonFatal(error) =>
+        throw RocksDbDataSourceException(s"scanRange failed for namespace $namespace", error)
+    } finally dbLock.readLock().unlock()
+  }
+
   private def doWrite(dataSourceUpdates: Seq[DataUpdate], sync: Boolean): Unit = {
     dbLock.writeLock().lock()
     try {

@@ -157,11 +157,11 @@ metrics, without exceeding the memory budget (SC-005).
 
 ### Tests for User Story 4 (write first, expect FAIL)
 
-- [ ] T037 [P] [US4] Test: open a `RocksDbDataSource` with raised `maxOpenFiles`/`blockCacheSize` (inline `RocksDbConfig`) without error (FR-013/FR-014), in `src/test/scala/com/chipprbots/ethereum/db/storage/BfsQueueStorageSpec.scala` (reuse the `withRocksDb` harness)
+- [x] T037 [P] [US4] Test: open a `RocksDbDataSource` with raised `maxOpenFiles`/`blockCacheSize` (inline `RocksDbConfig`) without error (FR-013/FR-014), in `src/test/scala/com/chipprbots/ethereum/db/storage/BfsQueueStorageSpec.scala` (reuse the `withRocksDb` harness)
 
 ### Implementation for User Story 4
 
-- [ ] T038 [US4] Document in `db.conf`: raise `max-open-files` to ≥ the on-disk SST count (or `-1` unlimited); raise `block-cache-size` ONLY on low US2 hit rate; warn the block cache is OFF-HEAP and counts against the container memory cgroup (FR-015/SC-005). No default value change, in `src/main/resources/conf/base/db.conf`
+- [x] T038 [US4] Document in `db.conf`: raise `max-open-files` to ≥ the on-disk SST count (or `-1` unlimited); raise `block-cache-size` ONLY on low US2 hit rate; warn the block cache is OFF-HEAP and counts against the container memory cgroup (FR-015/SC-005). No default value change, in `src/main/resources/conf/base/db.conf`
 
 **Checkpoint**: knobs documented with safe ranges and the memory guardrail; no code plumbing needed (fields already wired).
 
@@ -177,18 +177,18 @@ boundaries + unsigned ordering; Ephem parity (sorted); no open-iterator error on
 
 ### Tests for User Story 5 (write first, expect FAIL)
 
-- [ ] T039 [P] [US5] `scanRange` round-trip on RocksDb equals `multiGetOptimized` over the same window, in `BfsQueueStorageSpec.scala`
-- [ ] T040 [P] [US5] `scanRange` half-open boundaries (`[k,k)` empty; `toExclusive` excluded) + unsigned ordering for high-byte (≥0x80) keys, in `BfsQueueStorageSpec.scala`
-- [ ] T041 [P] [US5] `EphemDataSource.scanRange` parity: namespace isolation, range bounds, sorted output (FR-017), in `BfsQueueStorageSpec.scala`
-- [ ] T042 [P] [US5] `iterateRange` via `scanRange` equals the old path across chunk sizes incl. chunk-splitting (AS5.1/AS5.2), in `BfsQueueStorageSpec.scala`
-- [ ] T043 [P] [US5] No-leak on abort: consume only the first chunk then drop the outer iterator; DB closes cleanly (FR-018), in `BfsQueueStorageSpec.scala`
+- [x] T039 [P] [US5] `scanRange` round-trip on RocksDb equals `multiGetOptimized` over the same window, in `BfsQueueStorageSpec.scala`
+- [x] T040 [P] [US5] `scanRange` half-open boundaries (`[k,k)` empty; `toExclusive` excluded) + unsigned ordering for high-byte (≥0x80) keys, in `BfsQueueStorageSpec.scala`
+- [x] T041 [P] [US5] `EphemDataSource.scanRange` parity: namespace isolation, range bounds, sorted output (FR-017), in `BfsQueueStorageSpec.scala`
+- [x] T042 [P] [US5] `iterateRange` via `scanRange` equals the old path across chunk sizes incl. chunk-splitting (AS5.1/AS5.2), in `BfsQueueStorageSpec.scala`
+- [x] T043 [P] [US5] No-leak on abort: consume only the first chunk then drop the outer iterator; DB closes cleanly (FR-018), in `BfsQueueStorageSpec.scala`
 
 ### Implementation for User Story 5
 
-- [ ] T044 [US5] Add abstract `def scanRange(namespace, fromKey, toKeyExclusive): Iterator[(Array[Byte],Array[Byte])]` (forward, half-open, unsigned-lexicographic) with scaladoc on ordering/boundary/close contract, in `src/main/scala/com/chipprbots/ethereum/db/dataSource/DataSource.scala`
-- [ ] T045 [P] [US5] Implement `scanRange` in `RocksDbDataSource` via `db.newIterator(handle, scanReadOptions)` + `seek` + drain `[from,to)` with `Arrays.compareUnsigned`, closing the iterator + releasing the read lock in `try/finally` (no `return`/`finalize`), in `RocksDbDataSource.scala` (depends on T044)
-- [ ] T046 [P] [US5] Implement `scanRange` in `EphemDataSource` by filtering the in-memory map on namespace + `[from,to)` and emitting SORTED `(suffix-key, value)` pairs (reuse the `deleteRange` comparator), in `src/main/scala/com/chipprbots/ethereum/db/dataSource/EphemDataSource.scala` (depends on T044)
-- [ ] T047 [US5] Rewrite `RocksDbBfsQueueStorage.iterateRange` to chunk `dataSource.scanRange` (decode each value to `BfsEntry`); keep the outer `Iterator[Seq[BfsEntry]]` and O(chunkSize) memory, in `src/main/scala/com/chipprbots/ethereum/db/storage/BfsQueueStorage.scala` (depends on T045, T046)
+- [x] T044 [US5] Add abstract `def scanRange(namespace, fromKey, toKeyExclusive): Iterator[(Array[Byte],Array[Byte])]` (forward, half-open, unsigned-lexicographic) with scaladoc on ordering/boundary/close contract, in `src/main/scala/com/chipprbots/ethereum/db/dataSource/DataSource.scala`
+- [x] T045 [P] [US5] Implement `scanRange` in `RocksDbDataSource` via `db.newIterator(handle, scanReadOptions)` + `seek` + drain `[from,to)` with `Arrays.compareUnsigned`, closing the iterator + releasing the read lock in `try/finally` (no `return`/`finalize`), in `RocksDbDataSource.scala` (depends on T044)
+- [x] T046 [P] [US5] Implement `scanRange` in `EphemDataSource` by filtering the in-memory map on namespace + `[from,to)` and emitting SORTED `(suffix-key, value)` pairs (reuse the `deleteRange` comparator), in `src/main/scala/com/chipprbots/ethereum/db/dataSource/EphemDataSource.scala` (depends on T044)
+- [x] T047 [US5] Rewrite `RocksDbBfsQueueStorage.iterateRange` to chunk `dataSource.scanRange` (decode each value to `BfsEntry`); keep the outer `Iterator[Seq[BfsEntry]]` and O(chunkSize) memory, in `src/main/scala/com/chipprbots/ethereum/db/storage/BfsQueueStorage.scala` (depends on T045, T046)
 
 **Checkpoint**: queue reads use the forward scan with identical results; banked efficiency win.
 
