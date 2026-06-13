@@ -32,6 +32,19 @@ class ReadOnlyNodeStorage private (wrapped: NodesKeyValueStorage) extends NodesK
     */
   override def get(key: NodeHash): Option[NodeEncoded] = buffer.getOrElse(key, wrapped.get(key))
 
+  /** Batched read with buffer-shadows-wrapped semantics matching `get`: keys present in the in-memory buffer take their
+    * buffered value (which may be `None` for a deleted key); the remaining keys are fetched from the wrapped store in a
+    * SINGLE `multiGet` rather than N serial `get`s. Order and results are identical to `keys.map(get)`. (spec 002 US7 /
+    * FR-022)
+    */
+  override def multiGet(keys: Seq[NodeHash]): Seq[Option[NodeEncoded]] = {
+    val missKeys = keys.filterNot(buffer.contains)
+    val missResults: Map[NodeHash, Option[NodeEncoded]] =
+      if (missKeys.isEmpty) Map.empty
+      else missKeys.zip(wrapped.multiGet(missKeys)).toMap
+    keys.map(k => buffer.getOrElse(k, missResults.getOrElse(k, None)))
+  }
+
   /** This function updates the KeyValueStore by deleting, updating and inserting new (key-value) pairs.
     *
     * @param toRemove

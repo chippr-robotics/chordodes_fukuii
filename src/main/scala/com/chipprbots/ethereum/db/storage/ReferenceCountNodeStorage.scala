@@ -37,6 +37,15 @@ class ReferenceCountNodeStorage(nodeStorage: NodesStorage, bn: BigInt) extends N
   def get(key: ByteString): Option[NodeEncoded] =
     nodeStorage.get(key).map(node => storedNodeFromBytes(node).nodeEncoded.toArray)
 
+  /** Batched read: the trait default is `keys.map(get)`, which on basic pruning degrades to N serial point lookups
+    * (~50K per chunk during the post-SNAP healing walk). Route through the inner `nodeStorage.multiGet` (a single
+    * `dataSource.multiGetOptimized` JNI call) and apply the SAME ref-count unwrap as `get`, so the result is
+    * byte-identical element-for-element (including `None` for absent keys). Mirrors `ArchiveNodeStorage.multiGet`.
+    * (spec 002 US7 / FR-021, FR-022)
+    */
+  override def multiGet(keys: Seq[NodeHash]): Seq[Option[NodeEncoded]] =
+    nodeStorage.multiGet(keys).map(_.map(node => storedNodeFromBytes(node).nodeEncoded.toArray))
+
   def update(toRemove: Seq[NodeHash], toUpsert: Seq[(NodeHash, NodeEncoded)]): ReferenceCountNodeStorage = {
 
     val deathRowKey = drRowKey(bn)
