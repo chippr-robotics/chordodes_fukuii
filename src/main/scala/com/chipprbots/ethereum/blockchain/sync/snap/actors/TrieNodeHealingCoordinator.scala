@@ -1548,9 +1548,9 @@ class TrieNodeHealingCoordinator(
 
 object TrieNodeHealingCoordinator {
 
-  /** Default expected insertions for the BFS walk's Bloom-filter visited set.
-    * At 1% FPR over 200M nodes ≈ 240 MB heap — covers ETC and ETH mainnet full-state walks with
-    * headroom. Operator-tunable via `sync.snap-sync.healing-bfs-bloom-expected-size`.
+  /** Default expected insertions for the BFS walk's Bloom-filter visited set. At 1% FPR over 200M nodes ≈ 240 MB heap —
+    * covers ETC and ETH mainnet full-state walks with headroom. Operator-tunable via
+    * `sync.snap-sync.healing-bfs-bloom-expected-size`.
     */
   val DefaultBfsBloomExpectedInsertions: Long = 200_000_000L
 
@@ -1575,9 +1575,9 @@ object TrieNodeHealingCoordinator {
     */
   val BfsChunkSize: Int = 50_000
 
-  /** Guava Bloom filter for the BFS visited set. Monotonically growing — no eviction, no false
-    * negatives. Thread-safe (Guava 33.x lock-striped put/mightContain). Exposed on the companion
-    * so markIfNew semantics are unit-testable without instantiating the actor.
+  /** Guava Bloom filter for the BFS visited set. Monotonically growing — no eviction, no false negatives. Thread-safe
+    * (Guava 33.x lock-striped put/mightContain). Exposed on the companion so markIfNew semantics are unit-testable
+    * without instantiating the actor.
     */
   def bfsVisitedFilter(expectedInsertions: Long, fpp: Double = 0.01): BloomFilter[Array[Byte]] =
     BloomFilter.create(Funnels.byteArrayFunnel(), expectedInsertions, fpp)

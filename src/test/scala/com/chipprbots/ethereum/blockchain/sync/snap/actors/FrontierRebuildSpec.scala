@@ -26,7 +26,7 @@ class FrontierRebuildSpec extends AnyFlatSpec with Matchers {
     val filter = TrieNodeHealingCoordinator.bfsVisitedFilter(expectedInsertions = 10_000L)
     val entries = (0 until 1_000).map(hash)
     entries.foreach(filter.put)
-    entries.foreach { e => filter.mightContain(e) shouldBe true }
+    entries.foreach(e => filter.mightContain(e) shouldBe true)
   }
 
   it should "report mightContain = false for entries that were never inserted (with low FPR)" taggedAs UnitTest in {
@@ -45,14 +45,14 @@ class FrontierRebuildSpec extends AnyFlatSpec with Matchers {
       else { filter.put(h); true }
 
     val h1 = hash(42)
-    markIfNew(h1) shouldBe true  // first encounter — new
+    markIfNew(h1) shouldBe true // first encounter — new
     markIfNew(h1) shouldBe false // second encounter — already seen
     markIfNew(h1) shouldBe false // idempotent
   }
 
   it should "accumulate without bound — no eviction up to expected capacity" taggedAs UnitTest in {
     // Insert exactly expectedInsertions entries; all must still be present (no eviction).
-    val n      = 50_000
+    val n = 50_000
     val filter = TrieNodeHealingCoordinator.bfsVisitedFilter(expectedInsertions = n.toLong)
     (0 until n).foreach(i => filter.put(hash(i)))
     val misses = (0 until n).count(i => !filter.mightContain(hash(i)))
@@ -64,11 +64,11 @@ class FrontierRebuildSpec extends AnyFlatSpec with Matchers {
     import scala.concurrent.ExecutionContext.Implicits.global
     import scala.concurrent.duration._
 
-    val n      = 10_000
+    val n = 10_000
     val filter = TrieNodeHealingCoordinator.bfsVisitedFilter(expectedInsertions = n.toLong)
 
-    val writers  = Future.traverse((0 until n / 2).toList)(i => Future(filter.put(hash(i))))
-    val readers  = Future.traverse((0 until n / 2).toList)(i => Future(filter.mightContain(hash(i))))
+    val writers = Future.traverse((0 until n / 2).toList)(i => Future(filter.put(hash(i))))
+    val readers = Future.traverse((0 until n / 2).toList)(i => Future(filter.mightContain(hash(i))))
     Await.result(writers.zip(readers), 10.seconds)
 
     // After writes complete, every written entry must be present.
