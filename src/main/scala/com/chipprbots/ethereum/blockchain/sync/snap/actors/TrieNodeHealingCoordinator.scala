@@ -47,7 +47,10 @@ class TrieNodeHealingCoordinator(
     visitedCap: Int = TrieNodeHealingCoordinator.DefaultVisitedCap,
     healingFrontierStorage: Option[HealingFrontierStorage] = None,
     healingWriterEcOverride: Option[ExecutionContext] = None,
+    healingReaderEcOverride: Option[ExecutionContext] = None,
     traversalParallelism: Int = TrieNodeHealingCoordinator.DefaultDfsParallelism,
+    healingMinParallelism: Int = TrieNodeHealingCoordinator.DefaultMinParallelism,
+    healingReservedCores: Int = TrieNodeHealingCoordinator.DefaultReservedCores,
     bfsQueueStorageOpt: Option[BfsQueueStorage] = None,
     storageScheme: StorageScheme = StorageScheme.Hash,
     pathNodeStorageOpt: Option[PathNodeStorage] = None,
@@ -80,6 +83,17 @@ class TrieNodeHealingCoordinator(
     */
   private val healingWriterEc: ExecutionContext =
     healingWriterEcOverride.getOrElse(context.system.dispatchers.lookup("healing-writer-dispatcher"))
+
+  /** Dedicated dispatcher for the BFS sub-range *reader* Futures (`processSubRange`). Distinct from `healingWriterEc`
+    * to break a latent thread-starvation deadlock: the parent walk Future parks a `healingWriterEc` thread inside
+    * `Await.result(...)` (rebuildFrontierBFS) while waiting for the N sub-range Futures to finish. If those sub-range
+    * Futures shared `healingWriterEc`, raising parallelism toward the pool size would leave the parked parent waiting
+    * on Futures queued behind it on the same pool → deadlock. Running the sub-ranges on a separate pool removes the
+    * dependency. Tests inject their own EC (a same-thread EC forces deterministic serial execution); production looks
+    * up `healing-reader-dispatcher`. See spec 002 R3 §2 (T032/T033).
+    */
+  private val healingReaderEc: ExecutionContext =
+    healingReaderEcOverride.getOrElse(context.system.dispatchers.lookup("healing-reader-dispatcher"))
 
   // Global stagnation detection: if no nodes healed for this duration, declare
   // healing complete with a warning. Prevents infinite loops when all peers lack
@@ -176,6 +190,8 @@ class TrieNodeHealingCoordinator(
   // within the heap budget — do NOT set it to 20M (~2.4-3.2 GB) on a 6 GB heap (it OOMs).
   private val HealingVisitedCap: Int = visitedCap
   private val HealingTraversalParallelism: Int = traversalParallelism
+  private val HealingMinParallelism: Int = healingMinParallelism
+  private val HealingReservedCores: Int = healingReservedCores
   private val bfsQueue: BfsQueueStorage = bfsQueueStorageOpt.getOrElse(new InMemoryBfsQueueStorage())
 // --- Layer 2: persisted frontier (sync.snap-sync.healing-frontier-persistence) ---
   // When `healingFrontierStorage` is defined, the outstanding frontier is mirrored to a dedicated RocksDB
@@ -1413,10 +1429,19 @@ class TrieNodeHealingCoordinator(
             }
             .filter { case (from, to) => from < to }
 
+          // Sub-range readers run on healingReaderEc (NOT healingWriterEc): the parent walk Future already
+          // holds a healingWriterEc thread and parks it on the Await below. Sharing the pool would let the
+          // parked parent wait on sub-range Futures queued behind it on the same pool once parallelism nears
+          // the pool size (thread-starvation deadlock). The dedicated reader pool removes that dependency
+          // (spec 002 R3 §2, T033). `scala.concurrent.blocking` marks the park as a managed-blocking section
+          // so a fork-join-backed EC (e.g. a test EC) compensates; on the production thread-pool dispatcher it
+          // is a harmless no-op but documents intent.
           val futures = subRanges.map { case (from, to) =>
-            Future(processSubRange(from, to, levelIndex))(healingWriterEc)
+            Future(processSubRange(from, to, levelIndex))(healingReaderEc)
           }
-          futures.flatMap(f => Await.result(f, Duration.Inf))
+          scala.concurrent.blocking {
+            futures.flatMap(f => Await.result(f, Duration.Inf))
+          }
         }
 
       allFrontier.grouped(FrontierBatchSize).foreach { batch =>
@@ -1486,10 +1511,22 @@ class TrieNodeHealingCoordinator(
       onComplete: () => Unit
   ): Unit = {
     val selfRef = self
-    val effectiveParallelism = math.min(
-      HealingTraversalParallelism,
-      math.max(1, Runtime.getRuntime.availableProcessors() - 2)
-    )
+    // Effective parallelism floor (spec 002 R3 §1, T034): min(cfg, max(minParallelism, nproc − reservedCores)).
+    // Never exceeds the operator ceiling (HealingTraversalParallelism) or the CPU count — `min` with `cfg`
+    // clamps first, and `cfg <= 1` forces the serial branch (`effectiveParallelism <= 1`) below, preserving
+    // the serial baseline (FR-012). The minParallelism floor lifts the previous `max(1, …)` so a host with
+    // few spare cores still splits large levels; reservedCores keeps headroom for the live node + GC. On the
+    // 4-core reference host the default (min 2, reserved 2) still yields max(2, 4−2) = 2.
+    val nproc = Runtime.getRuntime.availableProcessors()
+    // Extracted to the pure companion `computeEffectiveParallelism` (spec 002 T026) so the clamp is
+    // unit-testable without instantiating the actor. byte-identical to the prior inline expression.
+    val effectiveParallelism =
+      TrieNodeHealingCoordinator.computeEffectiveParallelism(
+        HealingTraversalParallelism,
+        nproc,
+        HealingMinParallelism,
+        HealingReservedCores
+      )
     // Guard BOTH walk kinds (rebuild + verification): the watchdog, HealingCheckCompletion and the
     // pivot-refresh path gate on this flag, and the bfsQueue is shared (cleared on walk entry), so
     // a second concurrent walk corrupts the first. Cleared by FrontierRebuildComplete /
@@ -1681,6 +1718,18 @@ object TrieNodeHealingCoordinator {
     */
   val DefaultDfsParallelism: Int = 4
 
+  /** Floor on BFS level parallelism (spec 002 R3 §1, T034): `effectiveParallelism = min(traversalParallelism,
+    * min(nproc, max(DefaultMinParallelism, nproc − DefaultReservedCores)))`. Lifts the old `max(1, …)` so a host with
+    * few spare cores still splits large levels. Operator-tunable via `sync.snap-sync.healing-min-parallelism`.
+    */
+  val DefaultMinParallelism: Int = 2
+
+  /** Cores reserved for the live node + GC, subtracted from `availableProcessors` before the min-parallelism floor
+    * (spec 002 R3 §1, T034). On the 4-core reference host this yields max(2, 4−2) = 2. Operator-tunable via
+    * `sync.snap-sync.healing-reserved-cores`.
+    */
+  val DefaultReservedCores: Int = 2
+
   /** Maximum number of node hashes per `multiGetNodes` call inside `rebuildFrontierBFS`. Keeps each Java list under
     * ~1.6 MB (50K × 32B) and prevents a single enormous call when a trie level spans hundreds of thousands of nodes.
     */
@@ -1699,6 +1748,26 @@ object TrieNodeHealingCoordinator {
     java.util.Collections.newSetFromMap[ByteString](lru).asScala
   }
 
+  /** Effective BFS level parallelism (spec 002 R3 §1, T026/T034): `min(traversalParallelism, min(availableProcessors,
+    * max(minParallelism, availableProcessors − reservedCores)))`.
+    *
+    * Pure — no side effects, no I/O, no system reads (the caller supplies `availableProcessors`). Extracted from the
+    * inline expression in `startFrontierBFS` so the clamp is unit-testable without instantiating the actor; the result
+    * is byte-identical to that prior expression for all inputs. It is a performance/scheduling knob only: it controls
+    * how a BFS level is split into sub-ranges for parallel reading and never changes which nodes the walk
+    * enqueues/visits/declares missing (`<= 1` ⇒ the serial branch). See `DefaultMinParallelism`/`DefaultReservedCores`.
+    */
+  def computeEffectiveParallelism(
+      traversalParallelism: Int,
+      availableProcessors: Int,
+      minParallelism: Int,
+      reservedCores: Int
+  ): Int =
+    math.min(
+      traversalParallelism,
+      math.min(availableProcessors, math.max(minParallelism, availableProcessors - reservedCores))
+    )
+
   def props(
       stateRoot: ByteString,
       networkPeerManager: ActorRef,
@@ -1710,7 +1779,10 @@ object TrieNodeHealingCoordinator {
       visitedCap: Int = DefaultVisitedCap,
       healingFrontierStorage: Option[HealingFrontierStorage] = None,
       healingWriterEcOverride: Option[ExecutionContext] = None,
+      healingReaderEcOverride: Option[ExecutionContext] = None,
       traversalParallelism: Int = DefaultDfsParallelism,
+      healingMinParallelism: Int = DefaultMinParallelism,
+      healingReservedCores: Int = DefaultReservedCores,
       bfsQueueStorageOpt: Option[BfsQueueStorage] = None,
       storageScheme: StorageScheme = StorageScheme.Hash,
       pathNodeStorageOpt: Option[PathNodeStorage] = None,
@@ -1730,7 +1802,10 @@ object TrieNodeHealingCoordinator {
         visitedCap,
         healingFrontierStorage,
         healingWriterEcOverride,
+        healingReaderEcOverride,
         traversalParallelism,
+        healingMinParallelism,
+        healingReservedCores,
         bfsQueueStorageOpt,
         storageScheme,
         pathNodeStorageOpt,

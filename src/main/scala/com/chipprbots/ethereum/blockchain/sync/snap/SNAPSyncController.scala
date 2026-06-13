@@ -3307,6 +3307,8 @@ class SNAPSyncController(
               visitedCap = snapSyncConfig.healingVisitedCap,
               healingFrontierStorage = healingFrontierStorageOpt,
               traversalParallelism = snapSyncConfig.healingTraversalParallelism,
+              healingMinParallelism = snapSyncConfig.healingMinParallelism,
+              healingReservedCores = snapSyncConfig.healingReservedCores,
               bfsQueueStorageOpt = Some(bfsQueueStorage),
               storageScheme = snapSyncConfig.storageScheme,
               pathNodeStorageOpt = pathNodeStorageOpt,
@@ -3368,6 +3370,8 @@ class SNAPSyncController(
                   visitedCap = snapSyncConfig.healingVisitedCap,
                   healingFrontierStorage = healingFrontierStorageOpt,
                   traversalParallelism = snapSyncConfig.healingTraversalParallelism,
+                  healingMinParallelism = snapSyncConfig.healingMinParallelism,
+                  healingReservedCores = snapSyncConfig.healingReservedCores,
                   bfsQueueStorageOpt = Some(bfsQueueStorage),
                   storageScheme = snapSyncConfig.storageScheme,
                   pathNodeStorageOpt = pathNodeStorageOpt,
@@ -4682,8 +4686,12 @@ case class SNAPSyncConfig(
     // Layer 2: persist the outstanding healing frontier so a restart resumes (O(frontier)) instead of
     // re-walking the full state. Default false (ships dark). See docs/design/healing-frontier-scale.md.
     healingFrontierPersistence: Boolean = false,
-    // Operator ceiling for BFS level parallelism. Effective = min(this, availableProcessors - 2).
+    // Operator ceiling for BFS level parallelism. Effective =
+    // min(this, min(nproc, max(healingMinParallelism, nproc - healingReservedCores))).
     healingTraversalParallelism: Int = actors.TrieNodeHealingCoordinator.DefaultDfsParallelism,
+    // Floor on effective BFS parallelism and cores reserved for the live node + GC (spec 002 R3 §1).
+    healingMinParallelism: Int = actors.TrieNodeHealingCoordinator.DefaultMinParallelism,
+    healingReservedCores: Int = actors.TrieNodeHealingCoordinator.DefaultReservedCores,
     healingFrontierHighWater: Int = actors.TrieNodeHealingCoordinator.DefaultFrontierHighWater,
     healingFrontierLowWater: Int = actors.TrieNodeHealingCoordinator.DefaultFrontierLowWater,
     stateValidationEnabled: Boolean = true,
@@ -4795,6 +4803,14 @@ object SNAPSyncConfig {
         if (snapConfig.hasPath("healing-traversal-parallelism"))
           snapConfig.getInt("healing-traversal-parallelism")
         else actors.TrieNodeHealingCoordinator.DefaultDfsParallelism,
+      healingMinParallelism =
+        if (snapConfig.hasPath("healing-min-parallelism"))
+          snapConfig.getInt("healing-min-parallelism")
+        else actors.TrieNodeHealingCoordinator.DefaultMinParallelism,
+      healingReservedCores =
+        if (snapConfig.hasPath("healing-reserved-cores"))
+          snapConfig.getInt("healing-reserved-cores")
+        else actors.TrieNodeHealingCoordinator.DefaultReservedCores,
       healingFrontierHighWater =
         if (snapConfig.hasPath("healing-frontier-high-water"))
           snapConfig.getInt("healing-frontier-high-water")
