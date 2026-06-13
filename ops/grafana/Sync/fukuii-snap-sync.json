@@ -1912,6 +1912,247 @@
           "showLegend": true
         }
       }
+    },
+    {
+      "type": "timeseries",
+      "title": "Heal Phase Timing (per-level ms)",
+      "id": 320,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 76
+      },
+      "description": "Spec 002 US2: per-level (last-write-wins) time spent in each BFS heal-walk phase. trie_read is the dominant random-read cost — if it dwarfs queue_read/queue_write the walk is disk/trie-read bound; cross-check the RocksDB Cache Hit Rate panel. Reflects the most recently completed level, not a walk total.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "app_snapsync_healing_phase_queue_read_ms_gauge{instance=~\"$instance\"}",
+          "refId": "A",
+          "legendFormat": "{{instance}} queue read ms"
+        },
+        {
+          "expr": "app_snapsync_healing_phase_trie_read_ms_gauge{instance=~\"$instance\"}",
+          "refId": "B",
+          "legendFormat": "{{instance}} trie read ms"
+        },
+        {
+          "expr": "app_snapsync_healing_phase_queue_write_ms_gauge{instance=~\"$instance\"}",
+          "refId": "C",
+          "legendFormat": "{{instance}} queue write ms"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Heal GC Pressure (cumulative since walk start)",
+      "id": 321,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 76
+      },
+      "description": "Spec 002 US2: GC pause ms (left axis) and GC fraction = pause ms / wall ms (right axis), both CUMULATIVE since the walk started (unlike the per-level phase gauges). A fraction creeping toward ~0.2+ means the walk is GC-bound — lower the visited cap or raise heap before chasing disk.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "app_snapsync_healing_gc_pause_ms_gauge{instance=~\"$instance\"}",
+          "refId": "A",
+          "legendFormat": "{{instance}} GC pause ms"
+        },
+        {
+          "expr": "app_snapsync_healing_gc_fraction_gauge{instance=~\"$instance\"}",
+          "refId": "B",
+          "legendFormat": "{{instance}} GC fraction"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Heal Inflation Ratio (per-level, < 1.5x healthy)",
+      "id": 322,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 84
+      },
+      "description": "Spec 002 US2 / SC-004: per-level childRefsSeen / distinctEnqueued. 1.0 = no shared-subtrie re-walk; < 1.5x is healthy. This is the number that justifies a healing-visited-cap change — raise the cap only when this is high AND there is heap headroom (never to a value that risks OOM at 6g). The 1.5 line is the SC-004 marker.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "app_snapsync_healing_inflation_ratio_gauge{instance=~\"$instance\"}",
+          "refId": "A",
+          "legendFormat": "{{instance}} inflation ratio"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1.5
+              }
+            ]
+          },
+          "custom.thresholdsStyle": {
+            "mode": "line"
+          }
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "RocksDB Cache Hit Rate (enable-statistics only)",
+      "id": 323,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 84
+      },
+      "description": "Spec 002 US2: RocksDB block-cache hit rate (right axis, 0-1) with raw hit/miss tickers (left axis). ONLY populated when db.rocksdb.enable-statistics = true (~1-2% overhead); reads 0 otherwise. Use a low hit_rate during a slow walk (high trie_read ms) to confirm the walk is cache-miss-bound BEFORE raising max-open-files / block-cache-size (block cache is off-heap — counts against the memory cgroup).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "app_db_rocksdb_block_cache_hit_rate{instance=~\"$instance\"}",
+          "refId": "A",
+          "legendFormat": "{{instance}} hit rate"
+        },
+        {
+          "expr": "rate(app_db_rocksdb_block_cache_hit{instance=~\"$instance\"}[5m])",
+          "refId": "B",
+          "legendFormat": "{{instance}} hits/s"
+        },
+        {
+          "expr": "rate(app_db_rocksdb_block_cache_miss{instance=~\"$instance\"}[5m])",
+          "refId": "C",
+          "legendFormat": "{{instance}} misses/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 5
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "max",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      }
     }
   ],
   "refresh": "10s",

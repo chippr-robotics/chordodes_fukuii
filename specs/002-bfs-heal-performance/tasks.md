@@ -234,8 +234,8 @@ ratio as expected and stays within the heap budget.
 
 ## Phase 10: Polish & Cross-Cutting Concerns
 
-- [ ] T054 [P] Update the operator metrics reference with the new `app_snapsync.healing.*` and `app_db.rocksdb.block_cache.*` series, in `docs/operations/metrics-reference.md`
-- [ ] T055 [P] Add the new gauges to the SNAP-sync Grafana dashboard (phase timing, GC, inflation ratio, cache hit/miss), in `ops/grafana/Sync/fukuii-snap-sync.json`
+- [x] T054 [P] Update the operator metrics reference with the new `app_snapsync.healing.*` and `app_db.rocksdb.block_cache.*` series, in `docs/operations/metrics-reference.md`
+- [x] T055 [P] Add the new gauges to the SNAP-sync Grafana dashboard (phase timing, GC, inflation ratio, cache hit/miss), in `ops/grafana/Sync/fukuii-snap-sync.json`
 - [ ] T056 `eye` validation: run the targeted test suites for each story and confirm pass/fail with evidence; on a large Mordor/disposable trie, capture before/after walk timing + the new per-phase/inflation numbers (node STOPPED per the freeze warning)
 - [ ] T057 Run `sbt scalafmtAll` then `sbt pp` (compile-all → scalafmt → fast + integration tests); resolve all findings
 - [ ] T058 Run `specs/002-bfs-heal-performance/quickstart.md` validation end-to-end and record results
