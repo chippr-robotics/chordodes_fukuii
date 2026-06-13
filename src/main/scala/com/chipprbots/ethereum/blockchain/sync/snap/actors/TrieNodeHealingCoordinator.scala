@@ -100,9 +100,9 @@ class TrieNodeHealingCoordinator(
   private var consecutiveStagnations: Int = 0
   private val MaxConsecutiveStagnations: Int = 3
   private var trieWalkInProgress: Boolean = false
-  // Verification DFS state: gates StateHealingComplete and catches storage sub-trie gaps (Fix BUG-1/BUG-2).
-  // verificationPassComplete = true only after a DFS traversal finds zero missing nodes.
-  // verificationDFSRunning = true while ANY frontier walk Future (crash-recovery rebuild OR
+  // Verification BFS state: gates StateHealingComplete and catches storage sub-trie gaps (Fix BUG-1/BUG-2).
+  // verificationPassComplete = true only after a BFS traversal finds zero missing nodes.
+  // verificationBFSRunning = true while ANY frontier walk Future (crash-recovery rebuild OR
   // verification) is executing on healingWriterEc. Set inside startFrontierBFS so both walk kinds
   // are covered — the crash-recovery rebuild previously set NO flag, so HEAL-PULSE reported
   // walkRunning=false and the dead-pulse watchdog force-started a verification walk 6 minutes into
@@ -110,7 +110,7 @@ class TrieNodeHealingCoordinator(
   // both producing garbage coverage. @volatile: set from the walk's EC thread, read on the actor
   // thread by the watchdog/completion/pivot gates.
   private var verificationPassComplete: Boolean = false
-  @volatile private var verificationDFSRunning: Boolean = false
+  @volatile private var verificationBFSRunning: Boolean = false
   // Dead-loop watchdog (Fix BUG-2): consecutive HEAL-PULSE cycles with no walk/pending/active/healed.
   private var consecutiveDeadPulses: Int = 0
   // Inline child discovery counter (Besu-aligned scheduler approach)
@@ -158,7 +158,7 @@ class TrieNodeHealingCoordinator(
   private val ThrottleUpFillRatio = 0.8
   private val RateMeasurementImpact = 0.005 // geometric EMA weight per node
 
-  // Crash-recovery DFS: emit frontier in batches so healing starts before traversal completes.
+  // Crash-recovery BFS: emit frontier in batches so healing starts before traversal completes.
   // go-ethereum trie.Sync.Missing() alignment — bounded working set rather than full upfront BFS.
   private val FrontierBatchSize = 1000
 
@@ -324,18 +324,18 @@ class TrieNodeHealingCoordinator(
   // Internal message for async flush completion
   private case class FlushComplete(count: Int)
 
-  // Internal message for async frontier rebuild completion (crash-recovery BFS or verification DFS)
+  // Internal message for async frontier rebuild completion (crash-recovery BFS or verification BFS)
   private case class FrontierRebuilt(entries: Seq[HealingEntry])
-  // Sent by startVerificationDFS when the DFS Future completes — gates verificationPassComplete.
-  private case object VerificationDFSComplete
+  // Sent by startVerificationBFS when the BFS Future completes — gates verificationPassComplete.
+  private case object VerificationBFSComplete
 
-  // Layer 2: the full-state rebuild DFS finished — the persisted frontier is now a COMPLETE snapshot.
+  // Layer 2: the full-state rebuild BFS finished — the persisted frontier is now a COMPLETE snapshot.
   // Sent after the final FrontierRebuilt so the completeness marker is set only once every node is persisted.
   private case object FrontierRebuildComplete
 
   // A frontier walk Future died with an exception. Resets the walk flags WITHOUT setting any
   // completion marker, so the watchdog / HealingCheckCompletion gates can start a fresh walk.
-  // Without this, an exception skips onComplete() and verificationDFSRunning stays true forever,
+  // Without this, an exception skips onComplete() and verificationBFSRunning stays true forever,
   // permanently blocking every future walk (including the watchdog) until restart.
   private case object FrontierWalkFailed
 
@@ -396,8 +396,8 @@ class TrieNodeHealingCoordinator(
         // Recovery cost: O(healed_nodes × local_read) vs O(healed_nodes × network_rtt).
         log.info(
           s"[HEAL-RESTART] Root ${Hex.toHexString(root.take(8).toArray)} already in local storage " +
-            s"— rebuilding frontier via local DFS in batches of $FrontierBatchSize " +
-            s"(crash recovery, go-ethereum trie.Sync.Missing() depth-first pattern)"
+            s"— rebuilding frontier via local BFS in batches of $FrontierBatchSize " +
+            s"(crash recovery, go-ethereum trie.Sync.Missing() BFS pattern)"
         )
         val selfRef = self
         val ec = healingWriterEc
@@ -406,14 +406,14 @@ class TrieNodeHealingCoordinator(
         import scala.util.control.NonFatal
         Future {
           // Layer 2: if a persisted frontier exists, resume from it (O(frontier)) and skip the full-state walk.
-          // Empty / absent / unreadable ⇒ fail-safe fallback to the provably-complete DFS (logged loudly).
+          // Empty / absent / unreadable ⇒ fail-safe fallback to the provably-complete BFS (logged loudly).
           val resumed: Option[Seq[HealingEntry]] = frontierStore.flatMap { store =>
             try {
               val loaded = store.loadAll().map { case (h, ps) => HealingEntry(pathset = ps, hash = h) }
               if (store.isComplete && loaded.nonEmpty) {
-                // COMPLETE snapshot (the prior rebuild DFS finished) — safe to skip the full-state walk.
+                // COMPLETE snapshot (the prior rebuild BFS finished) — safe to skip the full-state walk.
                 log.info(
-                  s"[HEAL-RESTART] Resumed ${loaded.size} frontier entries from a complete persisted snapshot — skipping full-state DFS"
+                  s"[HEAL-RESTART] Resumed ${loaded.size} frontier entries from a complete persisted snapshot — skipping full-state BFS"
                 )
                 Some(loaded)
               } else if (store.isComplete) {
@@ -430,21 +430,21 @@ class TrieNodeHealingCoordinator(
                 )
                 Some(Seq.empty)
               } else if (loaded.nonEmpty) {
-                // PARTIAL frontier: the prior rebuild DFS was interrupted before completion, so the un-walked
-                // region's missing nodes are not yet recorded. Skipping the DFS would silently leave gaps —
+                // PARTIAL frontier: the prior rebuild BFS was interrupted before completion, so the un-walked
+                // region's missing nodes are not yet recorded. Skipping the BFS would silently leave gaps —
                 // re-run the full walk (it re-persists idempotently and sets the marker on completion).
                 log.warning(
                   s"[HEAL-RESTART] Persisted frontier has ${loaded.size} entries but no completeness marker " +
-                    s"(prior rebuild interrupted) — re-running full-state DFS to avoid skipping un-walked nodes"
+                    s"(prior rebuild interrupted) — re-running full-state BFS to avoid skipping un-walked nodes"
                 )
                 None
               } else {
-                log.info("[HEAL-RESTART] Persisted frontier empty — falling back to full-state DFS")
+                log.info("[HEAL-RESTART] Persisted frontier empty — falling back to full-state BFS")
                 None
               }
             } catch {
               case NonFatal(e) =>
-                log.error(e, "[HEAL-RESTART] Failed to load persisted frontier — falling back to full-state DFS")
+                log.error(e, "[HEAL-RESTART] Failed to load persisted frontier — falling back to full-state BFS")
                 None
             }
           }
@@ -453,7 +453,7 @@ class TrieNodeHealingCoordinator(
               selfRef ! FrontierRebuilt(entries)
             case Some(_) =>
               // Complete-and-empty: rebuild already proven done; verification alone decides completion.
-              startVerificationDFS(root, emptyPath)
+              startVerificationBFS(root, emptyPath)
             case None =>
               // Mark the persisted frontier authoritative when the full walk is done (all workers complete).
               startFrontierBFS(root, emptyPath, isStor = false, () => selfRef ! FrontierRebuildComplete)
@@ -481,16 +481,16 @@ class TrieNodeHealingCoordinator(
       tryRedispatchPendingTasks()
 
     case FrontierRebuildComplete =>
-      // The full-state rebuild DFS walked the entire trie; every still-missing node is now persisted.
+      // The full-state rebuild BFS walked the entire trie; every still-missing node is now persisted.
       // Mark the snapshot complete so a future restart may resume it instead of re-walking (Layer 2).
-      verificationDFSRunning = false // rebuild walk finished — release the single-flight gate
+      verificationBFSRunning = false // rebuild walk finished — release the single-flight gate
       healingFrontierStorage.foreach { store =>
         store.markComplete()
         log.info("[HEAL-RESTART] Full-state rebuild complete — persisted frontier marked as a complete snapshot")
       }
 
     case FrontierWalkFailed =>
-      verificationDFSRunning = false
+      verificationBFSRunning = false
       trieWalkInProgress = false
       log.warning(
         "[HEAL-BFS] Frontier walk failed — flags reset; verification will be retried by " +
@@ -599,12 +599,12 @@ class TrieNodeHealingCoordinator(
             s"for inline discovery of pivot delta"
         )
       } else {
-        // FIX-BUG2-PIVOT: Root already in local storage — run a verification DFS to discover
+        // FIX-BUG2-PIVOT: Root already in local storage — run a verification BFS to discover
         // any missing children instead of dead-looping with zero pending tasks.
         // Without this, walkRunning stays false and pending stays 0 → 316-pulse dead loop (RUN10).
         // discoverMissingChildren skips locally-held storage roots without recursing into their
         // children, so the new pivot root may be local yet have gaps in storage sub-tries.
-        if (trieWalkInProgress || verificationDFSRunning) {
+        if (trieWalkInProgress || verificationBFSRunning) {
           // A walk is already running on the SHARED bfsQueue — rebuildFrontierBFS clears the queue
           // on entry, so starting a second walk here would corrupt the running one. The pivot's
           // verificationPassComplete=false (set above) guarantees HealingCheckCompletion starts a
@@ -616,9 +616,9 @@ class TrieNodeHealingCoordinator(
         } else {
           log.info(
             s"[HEAL] New root ${Hex.toHexString(newStateRoot.take(4).toArray)} already in storage " +
-              s"— starting verification DFS to find missing children"
+              s"— starting verification BFS to find missing children"
           )
-          startVerificationDFS(newStateRoot, pivotReseedPath)
+          startVerificationBFS(newStateRoot, pivotReseedPath)
         }
       }
 
@@ -645,43 +645,43 @@ class TrieNodeHealingCoordinator(
       }
 
     case HealingCheckCompletion =>
-      if (isComplete && !flushing && !trieWalkInProgress && !verificationDFSRunning) {
+      if (isComplete && !flushing && !trieWalkInProgress && !verificationBFSRunning) {
         // FIX-BUG1-VERIFY: gate: skip verification when no inline healing was done.
         // If totalNodesHealed == 0 the coordinator was never given nodes to heal (idle case) OR
         // all nodes were already in local storage — either way the trie is complete from our
         // perspective. The BUG 2 pivot-reseed path (root held locally) is handled separately by
-        // HealingPivotRefreshed calling startVerificationDFS directly, not through this gate.
+        // HealingPivotRefreshed calling startVerificationBFS directly, not through this gate.
         if (verificationPassComplete || totalNodesHealed == 0) {
           flushRawNodesSync()
           log.info(s"Healing round complete: $totalNodesHealed total nodes healed. Notifying controller.")
           snapSyncController ! SNAPSyncController.StateHealingComplete
         } else {
-          // Inline tasks done with actual healing work — run a full DFS to catch storage sub-trie
-          // gaps that discoverMissingChildren silently skips when the storage root is in storage.
-          // Analogous to go-ethereum's trie.Sync.Missing() depth-first traversal.
+          // Inline tasks done with actual healing work — run a verification BFS to catch storage
+          // sub-trie gaps that discoverMissingChildren silently skips when the storage root is in
+          // storage. Analogous to go-ethereum's trie.Sync.Missing() trie traversal.
           val emptyPath = ByteString(com.chipprbots.ethereum.mpt.HexPrefix.encode(Array.empty[Byte], isLeaf = false))
           log.info(
             s"[HEAL-VERIFY] All inline tasks done ($totalNodesHealed healed). " +
-              s"Starting verification DFS on locally-held trie to catch storage sub-trie gaps..."
+              s"Starting verification BFS on locally-held trie to catch storage sub-trie gaps..."
           )
-          startVerificationDFS(stateRoot, emptyPath)
+          startVerificationBFS(stateRoot, emptyPath)
         }
       }
 
-    case VerificationDFSComplete =>
-      verificationDFSRunning = false
+    case VerificationBFSComplete =>
+      verificationBFSRunning = false
       if (isComplete) {
-        // DFS traversed all locally-held nodes and found zero missing descendants — trie is complete.
+        // BFS traversed all locally-held nodes and found zero missing descendants — trie is complete.
         verificationPassComplete = true
         log.info(
-          s"[HEAL-VERIFY] Verification DFS complete — no missing nodes found. " +
+          s"[HEAL-VERIFY] Verification BFS complete — no missing nodes found. " +
             s"Trie is fully healed ($totalNodesHealed nodes). Declaring completion."
         )
         self ! HealingCheckCompletion
       } else {
-        // DFS found missing nodes queued via FrontierRebuilt — healing needs to continue.
+        // BFS found missing nodes queued via FrontierRebuilt — healing needs to continue.
         log.info(
-          s"[HEAL-VERIFY] Verification DFS found additional missing nodes " +
+          s"[HEAL-VERIFY] Verification BFS found additional missing nodes " +
             s"(pending=${pendingTasks.size} active=${activeRequests.size}) — resuming healing."
         )
         tryRedispatchPendingTasks()
@@ -699,7 +699,7 @@ class TrieNodeHealingCoordinator(
       // rebuild/verification Future) — the same OR the watchdog gates use. Rendering only
       // trieWalkInProgress reported walkRunning=false during a live BFS rebuild, which misled
       // operators (and matched the pre-fix watchdog bug that double-started walks).
-      val anyWalkRunning = trieWalkInProgress || verificationDFSRunning
+      val anyWalkRunning = trieWalkInProgress || verificationBFSRunning
       log.info(
         s"[HEAL-PULSE] $healPct% (est) | healed=$totalNodesHealed (+$recentHealed last 2min) | " +
           s"pending=${pendingTasks.size} active=${activeRequests.size} peers=${knownAvailablePeers.size} | " +
@@ -717,11 +717,11 @@ class TrieNodeHealingCoordinator(
       lastPulseHealedCount = totalNodesHealed
 
       // FIX-BUG2-WATCHDOG: Dead-loop safety net — fires when the coordinator has no walk, no
-      // verification DFS, no pending tasks, no active requests, and zero healing progress.
-      // Primary fix is startVerificationDFS in HealingCheckCompletion and HealingPivotRefreshed;
+      // verification BFS, no pending tasks, no active requests, and zero healing progress.
+      // Primary fix is startVerificationBFS in HealingCheckCompletion and HealingPivotRefreshed;
       // this watchdog catches any residual edge case (e.g. stale state after pivot race).
       if (
-        !trieWalkInProgress && !verificationDFSRunning &&
+        !trieWalkInProgress && !verificationBFSRunning &&
         pendingTasks.isEmpty && activeRequests.isEmpty &&
         recentHealed == 0 && !pivotRefreshRequested && !verificationPassComplete
       ) {
@@ -731,14 +731,14 @@ class TrieNodeHealingCoordinator(
             s"walkRunning=false verifyRunning=false pending=0 active=0 healed=0 in last 2min"
         )
         if (consecutiveDeadPulses >= 3) {
-          log.warning("[HEAL-WATCHDOG] 3 consecutive dead pulses — force-starting verification DFS")
+          log.warning("[HEAL-WATCHDOG] 3 consecutive dead pulses — force-starting verification BFS")
           consecutiveDeadPulses = 0
           val emptyPath = ByteString(com.chipprbots.ethereum.mpt.HexPrefix.encode(Array.empty[Byte], isLeaf = false))
-          startVerificationDFS(stateRoot, emptyPath)
+          startVerificationBFS(stateRoot, emptyPath)
         }
       } else if (
         recentHealed > 0 || pendingTasks.nonEmpty || activeRequests.nonEmpty ||
-        trieWalkInProgress || verificationDFSRunning
+        trieWalkInProgress || verificationBFSRunning
       ) {
         consecutiveDeadPulses = 0
       }
@@ -1366,8 +1366,8 @@ class TrieNodeHealingCoordinator(
 
   /** Launch a frontier rebuild or verification BFS on the healing writer executor.
     *
-    * Replaces startParallelFrontierDFS. A single Future on healingWriterEc is sufficient — BFS naturally maximises I/O
-    * batching per level without needing keyspace splitting.
+    * A single Future on healingWriterEc is sufficient — BFS naturally maximises I/O batching per level without needing
+    * keyspace splitting.
     */
   private def startFrontierBFS(
       root: ByteString,
@@ -1383,8 +1383,8 @@ class TrieNodeHealingCoordinator(
     // Guard BOTH walk kinds (rebuild + verification): the watchdog, HealingCheckCompletion and the
     // pivot-refresh path gate on this flag, and the bfsQueue is shared (cleared on walk entry), so
     // a second concurrent walk corrupts the first. Cleared by FrontierRebuildComplete /
-    // VerificationDFSComplete / FrontierWalkFailed.
-    verificationDFSRunning = true
+    // VerificationBFSComplete / FrontierWalkFailed.
+    verificationBFSRunning = true
     Future {
       try {
         rebuildFrontierBFS(root, Seq(rootPath), isStor, selfRef, bfsQueue, effectiveParallelism)
@@ -1403,17 +1403,17 @@ class TrieNodeHealingCoordinator(
   /** Start a verification BFS (see [[startFrontierBFS]]).
     *
     * Traverses all locally-held trie nodes starting at `root` / `rootPath` and queues any missing descendants as
-    * `FrontierRebuilt` messages. Sends `VerificationDFSComplete` when done.
+    * `FrontierRebuilt` messages. Sends `VerificationBFSComplete` when done.
     *
     * Needed because `discoverMissingChildren` skips storage roots that are already in local storage without recursing
     * into their children — a storage sub-trie with a locally-held root can still have gaps deeper in the tree (RUN10:
     * account 888157b2 had 11 missing storage nodes after StateHeal declared completion). BFS catches every missing
     * descendant in O(levels × chunk_reads) instead of O(total_nodes) point-reads.
     */
-  private def startVerificationDFS(root: ByteString, rootPath: ByteString): Unit = {
-    verificationDFSRunning = true
+  private def startVerificationBFS(root: ByteString, rootPath: ByteString): Unit = {
+    verificationBFSRunning = true
     val selfRef = self
-    startFrontierBFS(root, rootPath, isStor = false, () => selfRef ! VerificationDFSComplete)
+    startFrontierBFS(root, rootPath, isStor = false, () => selfRef ! VerificationBFSComplete)
   }
 
   /** Inline child discovery after each healed node — Besu/geth scheduler-driven alignment. Decodes the healed node,
