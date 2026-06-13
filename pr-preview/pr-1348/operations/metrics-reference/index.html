@@ -5405,6 +5405,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#heal-walk-performance-observability-spec-002-us2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Heal-walk performance observability (spec 002 US2)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rocksdb-block-cache-spec-002-us2-app_db_rocksdb_" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RocksDB block cache (spec 002 US2 — app_db_rocksdb_*)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#snap-peers-requests-and-data-integrity" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5924,6 +5946,120 @@ newly discovered missing nodes (backlog rises), heal requests then drain it
 If the walk is skipped entirely (<code>[HEAL-RESTART] Resumed ... from a complete persisted
 snapshot</code> in the logs), <code>rebuild_visited</code> stays flat — that is normal.</p>
 </blockquote>
+<h2 id="heal-walk-performance-observability-spec-002-us2">Heal-walk performance observability (spec 002 US2)<a class="headerlink" href="#heal-walk-performance-observability-spec-002-us2" title="Permanent link">&para;</a></h2>
+<p>These gauges instrument the post-SNAP <code>[HEAL-BFS]</code> frontier-rebuild walk so an operator can tell
+whether a slow walk is <strong>cache-, GC-, or disk-bound</strong> and whether shared-subtrie re-walk is
+inflating the work. They are <strong>observation-only</strong> — they never influence which nodes the walk
+enqueues, visits, or declares missing. The coordinator pushes them at each BFS level boundary
+(<code>TrieNodeHealingCoordinator.rebuildFrontierBFS</code>) and also appends the same numbers to the
+<code>[HEAL-BFS] Level complete</code> log line.</p>
+<blockquote>
+<p><strong>Scope caveat — read this before charting.</strong> The three per-phase timing gauges and the
+inflation ratio are <strong>per-level, last-write-wins</strong>: each level boundary overwrites the previous
+value, so at any scrape they reflect the <strong>most recently completed level</strong>, not a walk total.
+Watch them as a live "what is this level doing" signal, not a cumulative sum. The GC gauges are
+the exception — they are <strong>cumulative since walk start</strong> (the sampler holds a baseline from the
+first level and reports the delta against it), so GC pause/fraction grow over the walk while the
+per-phase/inflation gauges oscillate level to level.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Type</th>
+<th>Meaning</th>
+<th>Surfaced in</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>app_snapsync_healing_phase_queue_read_ms_gauge</code></td>
+<td>gauge</td>
+<td>Per-level time (ms) spent in BFS-queue reads (<code>iterateRange</code>/<code>scanRange</code> chunk fetch). Aggregate CPU across readers when the level runs in parallel sub-ranges. Last-write-wins per level.</td>
+<td>SNAP Sync: State Healing (Heal Phase Timing)</td>
+</tr>
+<tr>
+<td><code>app_snapsync_healing_phase_trie_read_ms_gauge</code></td>
+<td>gauge</td>
+<td>Per-level time (ms) spent in <code>multiGetNodes</code> — the dominant random trie read. A high value here vs. queue-read/queue-write means the walk is <strong>disk/trie-read bound</strong>; cross-check the RocksDB cache hit-rate below.</td>
+<td>SNAP Sync: State Healing (Heal Phase Timing)</td>
+</tr>
+<tr>
+<td><code>app_snapsync_healing_phase_queue_write_ms_gauge</code></td>
+<td>gauge</td>
+<td>Per-level time (ms) spent in <code>enqueueBatch</code> (BFS-queue writes). Aggregate CPU when parallel. Last-write-wins per level.</td>
+<td>SNAP Sync: State Healing (Heal Phase Timing)</td>
+</tr>
+<tr>
+<td><code>app_snapsync_healing_gc_pause_ms_gauge</code></td>
+<td>gauge</td>
+<td><strong>Cumulative since walk start.</strong> GC pause time (ms) accumulated in the walk window, sampled via <code>GcPressureSampler</code> (JVM-wide GC during the window, which the walk dominates — not attributed solely to the walk).</td>
+<td>SNAP Sync: State Healing (Heal GC Pressure)</td>
+</tr>
+<tr>
+<td><code>app_snapsync_healing_gc_fraction_gauge</code></td>
+<td>gauge</td>
+<td><strong>Cumulative since walk start.</strong> GC pause ms ÷ wall ms over the walk window. A fraction creeping toward, say, 0.2+ means the walk is <strong>GC-bound</strong> — lower the visited cap or raise heap before chasing disk.</td>
+<td>SNAP Sync: State Healing (Heal GC Pressure)</td>
+</tr>
+<tr>
+<td><code>app_snapsync_healing_inflation_ratio_gauge</code></td>
+<td>gauge</td>
+<td>Per-level re-walk inflation: <code>childRefsSeen ÷ max(1, distinctEnqueued)</code>. <strong>1.0 = no shared-subtrie inflation</strong>; &gt; 1 means child references were seen more than once (the visited-set de-dup gate's workload). <strong>SC-004 guidance: &lt; 1.5× is healthy.</strong> This is the number that justifies any <code>healing-visited-cap</code> change — raise the cap only when this ratio is high and you have heap headroom; never set it to a value (e.g. 20M) that risks OOM at 6g.</td>
+<td>SNAP Sync: State Healing (Heal Inflation Ratio)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="rocksdb-block-cache-spec-002-us2-app_db_rocksdb_">RocksDB block cache (spec 002 US2 — <code>app_db_rocksdb_*</code>)<a class="headerlink" href="#rocksdb-block-cache-spec-002-us2-app_db_rocksdb_" title="Permanent link">&para;</a></h2>
+<p>These poll gauges sample the RocksDB block-cache hit/miss tickers at scrape time. They are <strong>only
+populated when <code>db.rocksdb.enable-statistics = true</code></strong> (statistics add ~1–2 % overhead, so the
+flag is off by default); with the flag off, every series reads <strong>0.0</strong>. Use them to confirm a slow
+heal walk (high <code>healing_phase_trie_read_ms</code>) is genuinely <strong>cache-miss-bound</strong> <em>before</em> raising
+<code>db.rocksdb.max-open-files</code> or <code>db.rocksdb.block-cache-size</code> — both of those knobs only help if the
+hit-rate is low. The block cache is <strong>off-heap</strong> and counts against the container memory cgroup, so
+raise <code>block-cache-size</code> cautiously.</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Type</th>
+<th>Meaning</th>
+<th>Surfaced in</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>app_db_rocksdb_block_cache_hit</code></td>
+<td>gauge</td>
+<td>Cumulative <code>BLOCK_CACHE_HIT</code> ticker since DB open. <code>0.0</code> when statistics disabled.</td>
+<td>SNAP Sync: State Healing (RocksDB Cache Hit Rate)</td>
+</tr>
+<tr>
+<td><code>app_db_rocksdb_block_cache_miss</code></td>
+<td>gauge</td>
+<td>Cumulative <code>BLOCK_CACHE_MISS</code> ticker since DB open. <code>0.0</code> when statistics disabled.</td>
+<td>SNAP Sync: State Healing (RocksDB Cache Hit Rate)</td>
+</tr>
+<tr>
+<td><code>app_db_rocksdb_block_cache_hit_rate</code></td>
+<td>gauge</td>
+<td>Derived <code>hit / (hit + miss)</code>; <code>0.0</code> when statistics disabled or the denominator is 0. A low value during a slow walk = the walk is <strong>cache-miss-bound</strong>; raising <code>max-open-files</code>/<code>block-cache-size</code> may help.</td>
+<td>SNAP Sync: State Healing (RocksDB Cache Hit Rate)</td>
+</tr>
+<tr>
+<td><code>app_db_rocksdb_index_filter_hit</code></td>
+<td>gauge</td>
+<td>Cumulative index- + filter-block cache hits (<code>BLOCK_CACHE_INDEX_HIT + BLOCK_CACHE_FILTER_HIT</code>). <code>0.0</code> when statistics disabled.</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>app_db_rocksdb_index_filter_miss</code></td>
+<td>gauge</td>
+<td>Cumulative index- + filter-block cache misses (<code>BLOCK_CACHE_INDEX_MISS + BLOCK_CACHE_FILTER_MISS</code>). A high index/filter miss rate points at too few open files / undersized cache for the SST count.</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
 <h2 id="snap-peers-requests-and-data-integrity">SNAP peers, requests, and data integrity<a class="headerlink" href="#snap-peers-requests-and-data-integrity" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
