@@ -448,6 +448,9 @@ class SNAPSyncController(
   private var lastAccountProgressMs: Long = System.currentTimeMillis()
   private var lastAccountTasksCompleted: Int = 0
   private var lastAccountsDownloaded: Long = 0
+  // Tracks storage contract completion (0.0–1.0) from push-based ProgressStorageContracts messages.
+  // Used to suppress proactive pivot rolls when storage is nearly done (Bug 2 guard).
+  private var storageContractProgressPct: Double = 0.0
 
   override def preStart(): Unit = {
     checkStorageSchemeMismatch()
@@ -764,6 +767,7 @@ class SNAPSyncController(
       progressMonitor.updateEstimates(accounts = estimatedTotal)
 
     case ProgressStorageContracts(completed, total) =>
+      if (total > 0) storageContractProgressPct = completed.toDouble / total
       progressMonitor.updateStorageContracts(completed, total)
       if (completed > 0 && total > 0) {
         val currentSlots = progressMonitor.getStorageSlotsSynced
@@ -1346,7 +1350,14 @@ class SNAPSyncController(
     // we're still in ByteCodeAndStorageSync phase (would have transitioned if truly complete).
     val isTimeoutResponse =
       stats.tasksPending == 0 && stats.tasksActive == 0 && stats.tasksCompleted == 0 && stats.elapsedTimeMs == 0
-    val workRemaining = isTimeoutResponse || stats.tasksPending > 0 || stats.tasksActive > 0
+    // Bug 1 fix: coordinator mailbox was backed up processing a batch — ask timed out and returned
+    // all-zeros. This is liveness, not stagnation. Reset the clock and skip this tick so the
+    // stagnation timer doesn't advance while the coordinator is actively working.
+    if (isTimeoutResponse) {
+      lastStorageProgressMs = System.currentTimeMillis()
+      return
+    }
+    val workRemaining = stats.tasksPending > 0 || stats.tasksActive > 0
 
     // Special case: coordinator reports 0 pending + 0 active but never sent StorageRangeSyncComplete.
     // This means trie construction is stuck (accountsInTrieConstruction/pendingAccountSlots not empty).
@@ -3099,9 +3110,16 @@ class SNAPSyncController(
         currentNetworkBestFromSnapPeers().foreach { networkBest =>
           val pivotAge = networkBest - pivotBlock.get
           val recentlyRolled = lastProactivePivotBlock.exists(last => (networkBest - last) <= BigInt(50))
+          // Bug 2 guard: suppress proactive pivot rolls once storage contracts are ≥80% complete.
+          // At that stage account sync is already done, so a pivot change generates no new storage
+          // tasks but disrupts dispatch for the remaining tail — causing stagnation and force-complete.
+          // ProgressStorageContracts is push-based (not ask), so storageContractProgressPct is reliable.
+          val storageLateStage =
+            currentPhase == ByteCodeAndStorageSync && storageContractProgressPct >= 0.80
           if (
             pivotAge > SnapServeWindowBlocks && !recentlyRolled &&
-            pivotProbeRequestId.isEmpty && pendingProbeCommit.isEmpty
+            pivotProbeRequestId.isEmpty && pendingProbeCommit.isEmpty &&
+            !storageLateStage
           ) {
             val now = System.currentTimeMillis
             if (now - lastProbeAttemptMs >= ProbeCooldownMs) {

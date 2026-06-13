@@ -110,7 +110,8 @@ class RocksDbBfsQueueStorage(dataSource: DataSource, namespace: Namespace) exten
         // Forward iterator scan: O(1) seek + sequential block reads. Keys are dense big-endian
         // longs in sorted SST files — the ideal case for a range scan vs batch point-lookups.
         // Concurrent enqueueBatch writes land at keys ≥ `to`; the [from, to) range is read-only.
-        rdb.iterateSyncRange(namespace, longToBytes(from), longToBytes(to))
+        rdb
+          .iterateSyncRange(namespace, longToBytes(from), longToBytes(to))
           .map(decodeEntry)
           .grouped(chunkSize)
       case _ =>
