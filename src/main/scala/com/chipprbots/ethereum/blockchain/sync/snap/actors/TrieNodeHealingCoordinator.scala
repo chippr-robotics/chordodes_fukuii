@@ -200,6 +200,9 @@ class TrieNodeHealingCoordinator(
     * called BEFORE the in-memory `pendingTasks`/`activeRequests` are cleared.
     */
   private def clearPersistedFrontier(): Unit =
+    // FR/T013: a same-root HealingPivotRefreshed no longer reaches here — its early guard returns first.
+    // Reaching this method therefore always means a genuine invalidation (differing-root refresh or
+    // abandonment), so dropping the completeness marker below is always correct.
     healingFrontierStorage.foreach { store =>
       val outstanding =
         pendingTasks.iterator.map(_.hash).toSeq ++ activeRequests.values.iterator.flatMap(_.tasks.iterator.map(_.hash))
@@ -564,64 +567,75 @@ class TrieNodeHealingCoordinator(
       context.stop(self)
 
     case HealingPivotRefreshed(newStateRoot) =>
-      val oldRoot = Hex.toHexString(stateRoot.take(4).toArray)
-      val newRootHex = Hex.toHexString(newStateRoot.take(4).toArray)
-      log.info(
-        s"Healing pivot refreshed: $oldRoot -> $newRootHex. " +
-          s"Clearing ${pendingTasks.size} pending tasks, ${statelessPeers.size} stateless peers."
-      )
-      stateRoot = newStateRoot
-      flushRawNodesSync() // Flush any buffered nodes before clearing state
-      clearPersistedFrontier() // Layer 2: old-root frontier is stale after refresh — reseed (below) repopulates it
-      pendingTasks.clear() // Will be re-populated by root reseed + inline discovery / trie walk from controller
-      pendingHashSet.clear()
-      statelessPeers.clear()
-      peerCooldownUntilMs.clear()
-      peerResponseBytesTarget.clear()
-      // Cancel active requests (they're for the old root)
-      activeRequests.keys.foreach(requestTracker.completeRequest(_, 0))
-      activeRequests.clear()
-      pivotRefreshRequested = false
-      consecutiveIdleChecks = 0
-      consecutiveStagnations = 0
-      consecutiveDeadPulses = 0
-      verificationPassComplete = false // new pivot root → must re-verify trie completeness
-      lastPulseHealedCount = totalNodesHealed
-      lastHealedAtMs = System.currentTimeMillis() // BUG-4: give fresh pivot a full stagnation window
-      // ARCH-PIVOT-RESEED: Re-seed with new root for top-down discovery of trie delta.
-      // Content-addressed inline tasks (~99% valid) were cleared — new root seeds a fresh
-      // top-down traversal of the updated trie.
-      val pivotReseedPath = ByteString(com.chipprbots.ethereum.mpt.HexPrefix.encode(Array.empty[Byte], isLeaf = false))
-      if (!pendingHashSet.contains(newStateRoot) && !isNodeInStorage(newStateRoot)) {
-        val reseedEntry = HealingEntry(Seq(pivotReseedPath), newStateRoot)
-        pendingTasks += reseedEntry
-        pendingHashSet += newStateRoot
-        persistFrontier(Seq(reseedEntry)) // Layer 2: the new pivot root is a new frontier entry
+      // FR-003: a same-root refresh is a no-op. ByteString `==` is full 32-byte value equality (NOT the
+      // 4-byte log prefix). Returning here preserves a valid completeness marker and the persisted
+      // frontier — the old body would clear both via clearPersistedFrontier(), wiping a good snapshot.
+      if (newStateRoot == stateRoot) {
         log.info(
-          s"[HEAL] Re-seeded with new root ${Hex.toHexString(newStateRoot.take(4).toArray)} " +
-            s"for inline discovery of pivot delta"
+          s"[HEAL] Pivot refresh to same root ${Hex.toHexString(stateRoot.take(4).toArray)} — " +
+            s"no-op, preserving completeness marker and frontier"
         )
       } else {
-        // FIX-BUG2-PIVOT: Root already in local storage — run a verification DFS to discover
-        // any missing children instead of dead-looping with zero pending tasks.
-        // Without this, walkRunning stays false and pending stays 0 → 316-pulse dead loop (RUN10).
-        // discoverMissingChildren skips locally-held storage roots without recursing into their
-        // children, so the new pivot root may be local yet have gaps in storage sub-tries.
-        if (trieWalkInProgress || verificationDFSRunning) {
-          // A walk is already running on the SHARED bfsQueue — rebuildFrontierBFS clears the queue
-          // on entry, so starting a second walk here would corrupt the running one. The pivot's
-          // verificationPassComplete=false (set above) guarantees HealingCheckCompletion starts a
-          // fresh verification once the current walk's flags clear.
+        val oldRoot = Hex.toHexString(stateRoot.take(4).toArray)
+        val newRootHex = Hex.toHexString(newStateRoot.take(4).toArray)
+        log.info(
+          s"Healing pivot refreshed: $oldRoot -> $newRootHex. " +
+            s"Clearing ${pendingTasks.size} pending tasks, ${statelessPeers.size} stateless peers."
+        )
+        stateRoot = newStateRoot
+        flushRawNodesSync() // Flush any buffered nodes before clearing state
+        clearPersistedFrontier() // Layer 2: old-root frontier is stale after refresh — reseed (below) repopulates it
+        pendingTasks.clear() // Will be re-populated by root reseed + inline discovery / trie walk from controller
+        pendingHashSet.clear()
+        statelessPeers.clear()
+        peerCooldownUntilMs.clear()
+        peerResponseBytesTarget.clear()
+        // Cancel active requests (they're for the old root)
+        activeRequests.keys.foreach(requestTracker.completeRequest(_, 0))
+        activeRequests.clear()
+        pivotRefreshRequested = false
+        consecutiveIdleChecks = 0
+        consecutiveStagnations = 0
+        consecutiveDeadPulses = 0
+        verificationPassComplete = false // new pivot root → must re-verify trie completeness
+        lastPulseHealedCount = totalNodesHealed
+        lastHealedAtMs = System.currentTimeMillis() // BUG-4: give fresh pivot a full stagnation window
+        // ARCH-PIVOT-RESEED: Re-seed with new root for top-down discovery of trie delta.
+        // Content-addressed inline tasks (~99% valid) were cleared — new root seeds a fresh
+        // top-down traversal of the updated trie.
+        val pivotReseedPath =
+          ByteString(com.chipprbots.ethereum.mpt.HexPrefix.encode(Array.empty[Byte], isLeaf = false))
+        if (!pendingHashSet.contains(newStateRoot) && !isNodeInStorage(newStateRoot)) {
+          val reseedEntry = HealingEntry(Seq(pivotReseedPath), newStateRoot)
+          pendingTasks += reseedEntry
+          pendingHashSet += newStateRoot
+          persistFrontier(Seq(reseedEntry)) // Layer 2: the new pivot root is a new frontier entry
           log.info(
-            s"[HEAL] New root ${Hex.toHexString(newStateRoot.take(4).toArray)} already in storage, " +
-              s"but a frontier walk is running — verification deferred until it completes"
+            s"[HEAL] Re-seeded with new root ${Hex.toHexString(newStateRoot.take(4).toArray)} " +
+              s"for inline discovery of pivot delta"
           )
         } else {
-          log.info(
-            s"[HEAL] New root ${Hex.toHexString(newStateRoot.take(4).toArray)} already in storage " +
-              s"— starting verification DFS to find missing children"
-          )
-          startVerificationDFS(newStateRoot, pivotReseedPath)
+          // FIX-BUG2-PIVOT: Root already in local storage — run a verification DFS to discover
+          // any missing children instead of dead-looping with zero pending tasks.
+          // Without this, walkRunning stays false and pending stays 0 → 316-pulse dead loop (RUN10).
+          // discoverMissingChildren skips locally-held storage roots without recursing into their
+          // children, so the new pivot root may be local yet have gaps in storage sub-tries.
+          if (trieWalkInProgress || verificationDFSRunning) {
+            // A walk is already running on the SHARED bfsQueue — rebuildFrontierBFS clears the queue
+            // on entry, so starting a second walk here would corrupt the running one. The pivot's
+            // verificationPassComplete=false (set above) guarantees HealingCheckCompletion starts a
+            // fresh verification once the current walk's flags clear.
+            log.info(
+              s"[HEAL] New root ${Hex.toHexString(newStateRoot.take(4).toArray)} already in storage, " +
+                s"but a frontier walk is running — verification deferred until it completes"
+            )
+          } else {
+            log.info(
+              s"[HEAL] New root ${Hex.toHexString(newStateRoot.take(4).toArray)} already in storage " +
+                s"— starting verification DFS to find missing children"
+            )
+            startVerificationDFS(newStateRoot, pivotReseedPath)
+          }
         }
       }
 
@@ -657,6 +671,19 @@ class TrieNodeHealingCoordinator(
         if (verificationPassComplete || totalNodesHealed == 0) {
           flushRawNodesSync()
           log.info(s"Healing round complete: $totalNodesHealed total nodes healed. Notifying controller.")
+          // FR-002: mark the snapshot complete ONLY on the verified-complete path — a verification DFS
+          // actually walked the trie and found zero missing nodes (verificationPassComplete == true).
+          // FR-004: do NOT mark on the pure `totalNodesHealed == 0` idle arm: the coordinator was never
+          // given work, so the trie may be untraversed and we cannot assert completeness. Setting the
+          // marker here (gated on verificationPassComplete) is the single completion chokepoint for the
+          // verification path — VerificationDFSComplete routes through HealingCheckCompletion, so this is
+          // equivalent to (and cleaner than) writing the marker inside VerificationDFSComplete.
+          if (verificationPassComplete) {
+            healingFrontierStorage.foreach { store =>
+              store.markComplete()
+              log.info("[HEAL-RESTART] Verification DFS complete — persisted frontier marked as a complete snapshot")
+            }
+          }
           snapSyncController ! SNAPSyncController.StateHealingComplete
         } else {
           // Inline tasks done with actual healing work — run a full DFS to catch storage sub-trie
