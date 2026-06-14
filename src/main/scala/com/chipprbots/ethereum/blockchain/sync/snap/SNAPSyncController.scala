@@ -4688,7 +4688,7 @@ case class SNAPSyncConfig(
     healingFrontierPersistence: Boolean = false,
     // Operator ceiling for BFS level parallelism. Effective =
     // min(this, min(nproc, max(healingMinParallelism, nproc - healingReservedCores))).
-    healingTraversalParallelism: Int = actors.TrieNodeHealingCoordinator.DefaultDfsParallelism,
+    healingTraversalParallelism: Int = actors.TrieNodeHealingCoordinator.DefaultBfsParallelism,
     // Floor on effective BFS parallelism and cores reserved for the live node + GC (spec 002 R3 §1).
     healingMinParallelism: Int = actors.TrieNodeHealingCoordinator.DefaultMinParallelism,
     healingReservedCores: Int = actors.TrieNodeHealingCoordinator.DefaultReservedCores,
@@ -4802,7 +4802,7 @@ object SNAPSyncConfig {
       healingTraversalParallelism =
         if (snapConfig.hasPath("healing-traversal-parallelism"))
           snapConfig.getInt("healing-traversal-parallelism")
-        else actors.TrieNodeHealingCoordinator.DefaultDfsParallelism,
+        else actors.TrieNodeHealingCoordinator.DefaultBfsParallelism,
       healingMinParallelism =
         if (snapConfig.hasPath("healing-min-parallelism"))
           snapConfig.getInt("healing-min-parallelism")
