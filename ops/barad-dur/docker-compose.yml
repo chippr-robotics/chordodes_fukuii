@@ -142,6 +142,12 @@ services:
     volumes:
       - ${FUKUII_DATA_DIR:-./data/fukuii}:/app/data
       - ./fukuii-conf-1:/app/conf:ro
+    environment:
+      # MALLOC_ARENA_MAX=2: cap glibc malloc arenas to slash native/off-heap RSS (RocksDB + JNI),
+      # the dominant non-heap growth on this memory-tight 16GB host. Keeps total RSS under mem_limit
+      # so the ~9.6g L6/L7 walk peak no longer trips systemd-oomd / host memory pressure (the
+      # documented over-subscription fix). Off-heap reduction, not a heap change — the walk keeps its heap.
+      MALLOC_ARENA_MAX: "2"
     # Override the image entrypoint (`java -jar <jar>`) — that puts -jar
     # before any flags we add via `command`, which makes the JVM treat all
     # our -X / -D flags as program args. We need JVM args BEFORE -jar, so
