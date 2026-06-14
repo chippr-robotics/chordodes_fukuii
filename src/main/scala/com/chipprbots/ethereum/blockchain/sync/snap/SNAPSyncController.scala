@@ -249,6 +249,13 @@ class SNAPSyncController(
   private var consecutivePivotRefreshes: Int = 0
   private val MaxConsecutivePivotRefreshes = 10
 
+  // Pivot blocks confirmed unservable in this session. When a refreshPivotInPlace resolves
+  // to the same block as one in this set, fast-track consecutivePivotRefreshes to the
+  // threshold so dormant mode activates after the next coordinator escalation (2–3 cycles
+  // instead of 10). Entries are never cleared — a failed pivot block should not be retried
+  // within the same session.
+  private val failedPivotBlocks: mutable.Set[BigInt] = mutable.Set.empty
+
   // Pending pivot refresh: when refreshPivotInPlace() needs a header from a peer,
   // it requests a bootstrap and stores the pending pivot here. When BootstrapComplete
   // arrives in the syncing state, the refresh is completed.
@@ -808,6 +815,9 @@ class SNAPSyncController(
         }
       } else if (currentPhase == AccountRangeSync || currentPhase == ByteCodeAndStorageSync) {
         lastPivotRestartMs = now
+        // Record the current pivot block as failed so completePivotRefreshWithStateRoot can
+        // detect when refreshPivotInPlace resolves back to the same block.
+        pivotBlock.foreach(failedPivotBlocks.add)
         consecutivePivotRefreshes += 1
         log.info(s"Consecutive stateless pivot refreshes: $consecutivePivotRefreshes/$MaxConsecutivePivotRefreshes")
         if (consecutivePivotRefreshes >= MaxConsecutivePivotRefreshes) {
@@ -3876,6 +3886,18 @@ class SNAPSyncController(
       log.info(
         s"Pivot refresh produced same root ($newRoot): $reason. Re-arming coordinators to clear stateless peers."
       )
+      // If this pivot block is known-failed, fast-track the counter to the threshold so the
+      // NEXT PivotStateUnservable triggers dormant mode (2–3 cycles instead of 10). Without
+      // this, the churn loop runs the full 10-cycle budget before escalating — ~20 min of
+      // 1/12th-throughput degradation when ETH-genesis peers contaminate the storage pool.
+      // Re-arm happens unconditionally (prevents coordinator wedge); the counter jump is additive.
+      if (pivotBlock.exists(failedPivotBlocks.contains)) {
+        log.warning(
+          s"Same-root refresh resolved to known-failed pivot block ${pivotBlock.getOrElse("?")} " +
+            s"(root $newRoot). Fast-tracking consecutivePivotRefreshes to $MaxConsecutivePivotRefreshes."
+        )
+        consecutivePivotRefreshes = MaxConsecutivePivotRefreshes
+      }
       accountRangeCoordinator.foreach(_ ! actors.Messages.PivotRefreshed(newStateRoot))
       storageRangeCoordinator.foreach(_ ! actors.Messages.StoragePivotRefreshed(newStateRoot))
       return
