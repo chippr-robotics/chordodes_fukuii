@@ -471,18 +471,16 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
         import com.chipprbots.ethereum.rlp._
         // Mirrors the live DECODE_ERROR observed on 5.161.72.73:30303:
         // RLPList(Queue(RLPValue(45), RLPValue(89), ...)) — 8 RLPValues, no embedded RLPList.
-        val eightAllValueBytes = encode(
-          RLPList(
-            RLPValue(Array[Byte](45)),
-            RLPValue(Array[Byte](89)),
-            RLPValue(Array.fill(32)(0x00.toByte)),
-            RLPValue(Array.fill(32)(0x00.toByte)),
-            RLPValue(Array[Byte](0)),
-            RLPValue(Array.fill(8)(0x00.toByte)),
-            RLPValue(Array.fill(32)(0x00.toByte)),
-            RLPValue(Array[Byte](0))
-          )
-        )
+        val eightAllValueBytes = encode(RLPList(
+          RLPValue(Array[Byte](45)),
+          RLPValue(Array[Byte](89)),
+          RLPValue(Array.fill(32)(0x00.toByte)),
+          RLPValue(Array.fill(32)(0x00.toByte)),
+          RLPValue(Array[Byte](0)),
+          RLPValue(Array.fill(8)(0x00.toByte)),
+          RLPValue(Array.fill(32)(0x00.toByte)),
+          RLPValue(Array[Byte](0))
+        ))
         val decoded = decoder(Capability.ETH69).fromBytes(Codes.StatusCode, eightAllValueBytes)
         decoded match {
           case Right(s: ETHPackets.Status69.Status69) =>
