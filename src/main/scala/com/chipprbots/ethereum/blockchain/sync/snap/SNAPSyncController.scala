@@ -3075,7 +3075,17 @@ class SNAPSyncController(
     storageRangeCoordinator.foreach { coordinator =>
       val snapPeers = peersToDownloadFrom.collect {
         case (_, peerWithInfo)
-            if peerWithInfo.peerInfo.remoteStatus.supportsSnap && peerWithInfo.peerInfo.forkAccepted =>
+            if peerWithInfo.peerInfo.remoteStatus.supportsSnap &&
+              peerWithInfo.peerInfo.forkAccepted &&
+              // Exclude genesis peers (maxBlockNumber=0): nodes that announced block 0 in STATUS
+              // and have never advanced. On ETC this is typically ETH mainnet geth nodes connecting
+              // due to the shared legacy networkId=1 (pre-DAO split). They cannot serve ETC state
+              // and return empty StorageRanges on every request, burning 5 strikes per peer and
+              // collapsing the eligible pool within one pivot cycle.
+              // NOTE: this filter is safe unlike the former `>= pivot` guard removed in PR #1238:
+              // a peer at block 0 cannot serve *any* historical state; a stale peer at block N <
+              // pivot still holds SNAP data up to N and should remain eligible.
+              peerWithInfo.peerInfo.maxBlockNumber > BigInt(0) =>
           peerWithInfo.peer
       }
 
