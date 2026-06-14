@@ -250,10 +250,28 @@ class StorageRangeCoordinator(
   private def recordPeerSuccess(peerId: String): Unit =
     emptyResponseStrikes.remove(peerId)
 
+  // Low-eligible recovery: trigger pivot refresh when almost all peers are stateless but
+  // one peer remains, preventing allStateless from ever becoming true. With the parallel
+  // subtask dispatch added in spec 005 (storageConcurrency=16), ETH-genesis peers (connecting
+  // due to shared networkId=1) can accumulate 5 strikes each within one pivot cycle. If 11 of
+  // 12 peers become stateless the one remaining peer serves all tasks at 1/12th throughput
+  // with no automatic recovery until the next natural pivot roll (≈4 min observed in RUN02).
+  // Threshold: trigger when ≤1 peer eligible AND pool has ≥4 total peers.
+  // Backoff: uses the existing minRefreshIntervalMs/maxRefreshIntervalMs schedule, so it
+  // cannot churn faster than allStateless recovery.
+  private val lowEligibleMaxCount: Int = 1
+  private val lowEligibleMinPoolSize: Int = 4
+
   private def maybeRequestPivotRefresh(): Unit = {
     if (pivotRefreshRequested) return
     val allStateless = knownAvailablePeers.nonEmpty &&
       knownAvailablePeers.forall(p => statelessPeers.contains(p.id.value))
+
+    val eligibleCount = (knownAvailablePeers.size - statelessPeers.size).max(0)
+    val lowEligible = !allStateless &&
+      knownAvailablePeers.size >= lowEligibleMinPoolSize &&
+      eligibleCount <= lowEligibleMaxCount &&
+      tasks.nonEmpty
 
     // Secondary trigger: tasks pending but no dispatch/response activity for 2 minutes.
     // Catches "ghost" peers that remain in knownAvailablePeers after disconnecting
@@ -262,7 +280,7 @@ class StorageRangeCoordinator(
     // (SNAPRequestTracker timeouts are poll-based, not scheduled), so we check
     // activity time regardless of in-flight count.
     val now = System.currentTimeMillis()
-    val dispatchStalled = !allStateless && tasks.nonEmpty && maxInFlightPerPeer > 0 &&
+    val dispatchStalled = !allStateless && !lowEligible && tasks.nonEmpty && maxInFlightPerPeer > 0 &&
       (now - lastDispatchOrResponseMs) > noActivityTimeoutMs
 
     if (dispatchStalled) {
@@ -287,7 +305,7 @@ class StorageRangeCoordinator(
       }
     }
 
-    if (allStateless || dispatchStalled) {
+    if (allStateless || lowEligible || dispatchStalled) {
       val backoffMs = math.min(
         maxRefreshIntervalMs,
         minRefreshIntervalMs * (1L << math.min(consecutiveUnproductiveRefreshes, 3))
@@ -311,15 +329,28 @@ class StorageRangeCoordinator(
       pivotRefreshRequested = true
       consecutiveUnproductiveRefreshes += 1
       lastPivotRefreshTimeMs = now
-      log.warning(
-        s"All ${statelessPeers.size} known peers are stateless for root ${stateRoot.take(4).toHex}. " +
-          s"Requesting pivot refresh from controller (attempt $consecutiveUnproductiveRefreshes)."
-      )
-      snapSyncController ! SNAPSyncController.PivotStateUnservable(
-        rootHash = stateRoot,
-        reason = "all peers stateless for StorageRange root",
-        consecutiveEmptyResponses = statelessPeers.size
-      )
+      if (lowEligible) {
+        log.warning(
+          s"Low-eligible storage peers: ${eligibleCount}/${knownAvailablePeers.size} eligible, " +
+            s"${statelessPeers.size} stateless for root ${stateRoot.take(4).toHex}. " +
+            s"Requesting pivot refresh to restore peer pool (attempt $consecutiveUnproductiveRefreshes)."
+        )
+        snapSyncController ! SNAPSyncController.PivotStateUnservable(
+          rootHash = stateRoot,
+          reason = "low-eligible peers for StorageRange root",
+          consecutiveEmptyResponses = statelessPeers.size
+        )
+      } else {
+        log.warning(
+          s"All ${statelessPeers.size} known peers are stateless for root ${stateRoot.take(4).toHex}. " +
+            s"Requesting pivot refresh from controller (attempt $consecutiveUnproductiveRefreshes)."
+        )
+        snapSyncController ! SNAPSyncController.PivotStateUnservable(
+          rootHash = stateRoot,
+          reason = "all peers stateless for StorageRange root",
+          consecutiveEmptyResponses = statelessPeers.size
+        )
+      }
     }
   }
 
