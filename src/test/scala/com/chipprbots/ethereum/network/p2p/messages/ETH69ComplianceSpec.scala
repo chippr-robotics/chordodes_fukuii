@@ -375,70 +375,121 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
   }
 
   // ── Status69 tolerant decode — live peers announce eth/69 but emit non-canonical STATUS shapes.
-  // The codec must decode them so the networkId/genesis handshake check can reject off-network
-  // peers as UselessPeer; a codec throw disconnects + blacklists the peer and starves the pool.
+  // The codec uses a two-arm match: canonical 7-field arm, then a catch-all stub that extracts
+  // version+networkId and zeros the rest so the genesis/networkId check can reject as UselessPeer
+  // without a codec crash. All non-canonical inputs decode to the stub regardless of shape.
 
   "ETH69 Status69 tolerant decode" when {
 
     "receiving an ETH/68-shaped 6-field STATUS on the eth/69 channel" should {
-      "decode it (forkId at index 5, bestHash mapped to latestBlockHash)" taggedAs UnitTest in {
+      "decode as stub (empty genesis) for clean UselessPeer rejection" taggedAs UnitTest in {
         import ETHPackets.Status68.Status68._
-        val genesisHash = ByteString(Array.fill(32)(0xcd.toByte))
-        val bestHash = ByteString(Array.fill(32)(0xab.toByte))
         val eth68Shaped = ETHPackets.Status68.Status68(
-          protocolVersion = 69, // announces eth/69 in the payload, but the shape is ETH/68
+          protocolVersion = 69,
           networkId = 7L,
           totalDifficulty = BigInt("167378406679735"),
-          bestHash = bestHash,
-          genesisHash = genesisHash,
+          bestHash = ByteString(Array.fill(32)(0xab.toByte)),
+          genesisHash = ByteString(Array.fill(32)(0xcd.toByte)),
           forkId = ForkId(0xbe46d57cL, None)
         )
-        val encoded = eth68Shaped.toBytes
-        val decoded = decoder(Capability.ETH69).fromBytes(Codes.StatusCode, encoded)
+        val decoded = decoder(Capability.ETH69).fromBytes(Codes.StatusCode, eth68Shaped.toBytes)
         decoded match {
           case Right(s: ETHPackets.Status69.Status69) =>
             s.protocolVersion shouldEqual 69
             s.networkId shouldEqual 7L
-            s.genesisHash shouldEqual genesisHash
-            s.forkId shouldEqual ForkId(0xbe46d57cL, None)
+            s.genesisHash shouldEqual ByteString.empty
+            s.forkId shouldEqual ForkId(0, None)
             s.earliestBlock shouldEqual BigInt(0)
             s.latestBlock shouldEqual BigInt(0)
-            s.latestBlockHash shouldEqual bestHash
-          case other => fail(s"Expected tolerant Status69 decode, got $other")
+            s.latestBlockHash shouldEqual ByteString.empty
+          case other => fail(s"Expected stub Status69 decode, got $other")
         }
       }
     }
 
     "receiving the legacy 6-field shape (forkId at index 3, no earliestBlock)" should {
-      "decode it with earliestBlock defaulted to 0" taggedAs UnitTest in {
+      "decode as stub (empty genesis) for clean UselessPeer rejection" taggedAs UnitTest in {
         import com.chipprbots.ethereum.rlp._
         import ETHPackets.Status69.Status69._
-        val genesisHash = ByteString(Array.fill(32)(0x11.toByte))
-        val latestHash = ByteString(Array.fill(32)(0x22.toByte))
         val canonical = ETHPackets.Status69.Status69(
           protocolVersion = 69,
           networkId = 7L,
-          genesisHash = genesisHash,
+          genesisHash = ByteString(Array.fill(32)(0x11.toByte)),
           forkId = ForkId(0xfc64ec04L, Some(1150000L)),
           earliestBlock = BigInt(0),
           latestBlock = BigInt(424242),
-          latestBlockHash = latestHash
+          latestBlockHash = ByteString(Array.fill(32)(0x22.toByte))
         )
-        // Rearrange the canonical 7-field wire form [v, netId, genesis, forkId, earliest, latest,
-        // latestHash] into the legacy 6-field form [v, netId, genesis, forkId, latest, latestHash].
-        val canonicalRlp = rawDecode(canonical.toBytes).asInstanceOf[RLPList]
-        val i = canonicalRlp.items
+        val i = rawDecode(canonical.toBytes).asInstanceOf[RLPList].items
         val legacyBytes = encode(RLPList(i(0), i(1), i(2), i(3), i(5), i(6)))
         val decoded = decoder(Capability.ETH69).fromBytes(Codes.StatusCode, legacyBytes)
         decoded match {
           case Right(s: ETHPackets.Status69.Status69) =>
             s.networkId shouldEqual 7L
-            s.genesisHash shouldEqual genesisHash
-            s.forkId shouldEqual ForkId(0xfc64ec04L, Some(1150000L))
+            s.genesisHash shouldEqual ByteString.empty
+            s.forkId shouldEqual ForkId(0, None)
             s.earliestBlock shouldEqual BigInt(0)
-            s.latestBlock shouldEqual BigInt(424242)
-            s.latestBlockHash shouldEqual latestHash
-          case other => fail(s"Expected tolerant legacy Status69 decode, got $other")
+            s.latestBlock shouldEqual BigInt(0)
+            s.latestBlockHash shouldEqual ByteString.empty
+          case other => fail(s"Expected stub Status69 decode, got $other")
+        }
+      }
+    }
+
+    "receiving an 8-field STATUS (canonical 7 + 1 trailing extension field)" should {
+      "decode as stub (empty genesis) for clean UselessPeer rejection" taggedAs UnitTest in {
+        import com.chipprbots.ethereum.rlp._
+        import ETHPackets.Status69.Status69._
+        val canonical = ETHPackets.Status69.Status69(
+          protocolVersion = 69,
+          networkId = 1L,
+          genesisHash = ByteString(Array.fill(32)(0x33.toByte)),
+          forkId = ForkId(0xbe46d57cL, None),
+          earliestBlock = BigInt(0),
+          latestBlock = BigInt(20000000),
+          latestBlockHash = ByteString(Array.fill(32)(0x44.toByte))
+        )
+        val i = rawDecode(canonical.toBytes).asInstanceOf[RLPList].items
+        val eightFieldBytes =
+          encode(RLPList(i(0), i(1), i(2), i(3), i(4), i(5), i(6), RLPValue(BigInt(99).toByteArray)))
+        val decoded = decoder(Capability.ETH69).fromBytes(Codes.StatusCode, eightFieldBytes)
+        decoded match {
+          case Right(s: ETHPackets.Status69.Status69) =>
+            s.networkId shouldEqual 1L
+            s.genesisHash shouldEqual ByteString.empty
+            s.forkId shouldEqual ForkId(0, None)
+            s.earliestBlock shouldEqual BigInt(0)
+            s.latestBlock shouldEqual BigInt(0)
+            s.latestBlockHash shouldEqual ByteString.empty
+          case other => fail(s"Expected stub Status69 decode, got $other")
+        }
+      }
+    }
+
+    "receiving an 8-field all-RLPValue STATUS (no forkId RLPList — live observed variant)" should {
+      "decode as stub (empty genesis) for clean UselessPeer rejection" taggedAs UnitTest in {
+        import com.chipprbots.ethereum.rlp._
+        // Mirrors the live DECODE_ERROR observed on 5.161.72.73:30303:
+        // RLPList(Queue(RLPValue(45), RLPValue(89), ...)) — 8 RLPValues, no embedded RLPList.
+        val eightAllValueBytes = encode(
+          RLPList(
+            RLPValue(Array[Byte](45)),
+            RLPValue(Array[Byte](89)),
+            RLPValue(Array.fill(32)(0x00.toByte)),
+            RLPValue(Array.fill(32)(0x00.toByte)),
+            RLPValue(Array[Byte](0)),
+            RLPValue(Array.fill(8)(0x00.toByte)),
+            RLPValue(Array.fill(32)(0x00.toByte)),
+            RLPValue(Array[Byte](0))
+          )
+        )
+        val decoded = decoder(Capability.ETH69).fromBytes(Codes.StatusCode, eightAllValueBytes)
+        decoded match {
+          case Right(s: ETHPackets.Status69.Status69) =>
+            s.protocolVersion shouldEqual 45
+            s.networkId shouldEqual 89L
+            s.genesisHash shouldEqual ByteString.empty
+          case other => fail(s"Expected stub Status69 decode for all-RLPValue input, got $other")
         }
       }
     }
@@ -446,7 +497,8 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
     "receiving a STATUS that matches no known shape" should {
       "still be rejected" taggedAs UnitTest in {
         import com.chipprbots.ethereum.rlp._
-        val garbage = encode(RLPList(RLPValue(Array[Byte](69)), RLPValue(Array[Byte](7))))
+        // Single-field input — does not satisfy the 2-field minimum of the catch-all arm.
+        val garbage = encode(RLPList(RLPValue(Array[Byte](69))))
         val decoded = decoder(Capability.ETH69).fromBytes(Codes.StatusCode, garbage)
         decoded.isLeft shouldBe true
       }

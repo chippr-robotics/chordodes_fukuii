@@ -240,11 +240,11 @@ object ETHPackets {
       }
 
       implicit class Status69Dec(val bytes: Array[Byte]) extends AnyVal {
-        // Tolerant 3-arm decode (restored from ETH69.Status.StatusDec.toETH69Status — PR #1316
-        // regressed this to a single canonical arm, which threw DECODE_ERROR on every peer that
-        // announces eth/69 but emits an ETH/68-shaped or legacy STATUS — chiefly off-network
-        // peers, who should be rejected cleanly as UselessPeer at the networkId/genesis check
-        // rather than crash the codec).
+        // Two-arm decode: canonical match + catch-all stub.
+        // The catch-all covers all off-spec STATUS shapes (ETH/68-shaped, legacy 6-field,
+        // ≥8-field extensions, no-forkId variants) without requiring a new arm per variant.
+        // Stub uses empty genesisHash so the upstream networkId/genesis check always rejects
+        // via UselessPeer rather than crashing the codec with DECODE_ERROR.
         def toStatus69: Status69 = rawDecode(bytes) match {
           // (1) Canonical 7-field EIP-7642 — geth/besu/reth/nethermind on a real eth/69 chain.
           case RLPList(
@@ -265,43 +265,19 @@ object ETHPackets {
               ByteUtils.bytesToBigInt(latestBlockBytes),
               ByteString(latestBlockHashBytes)
             )
-          // (2) 6-field ETH/68-shape on the eth/69 channel (forkId at idx 5): peers that
-          // announce eth/69 but send an ETH/68 STATUS. Accept so the genesis/networkId check
-          // can reject them as UselessPeer instead of emitting a noisy DECODE_ERROR.
-          case RLPList(
-                RLPValue(protocolVersionBytes),
-                RLPValue(networkIdBytes),
-                RLPValue(_totalDifficultyBytes),
-                RLPValue(bestHashBytes),
-                RLPValue(genesisHashBytes),
-                forkIdRlp: RLPList
-              ) =>
+          // (2) Anything else: extract version+networkId for tracing, stub the rest.
+          // Observed variants: ETH/68-shape (TD+bestHash), legacy 6-field (no earliestBlock),
+          // ≥8-field extensions, all-RLPValue (no forkId list). All are off-network or
+          // off-spec and will be rejected by the genesis/networkId check as UselessPeer.
+          case RLPList(RLPValue(protocolVersionBytes), RLPValue(networkIdBytes), _*) =>
             Status69(
               ByteUtils.bytesToBigInt(protocolVersionBytes).toInt,
               ByteUtils.bytesToBigInt(networkIdBytes).toLong,
-              ByteString(genesisHashBytes),
-              decode[ForkId](forkIdRlp),
+              genesisHash = ByteString.empty,
+              forkId = ForkId(0, None),
               earliestBlock = BigInt(0),
               latestBlock = BigInt(0),
-              latestBlockHash = ByteString(bestHashBytes)
-            )
-          // (3) 6-field legacy fukuii shape (forkId at idx 3, no earliestBlock).
-          case RLPList(
-                RLPValue(protocolVersionBytes),
-                RLPValue(networkIdBytes),
-                RLPValue(genesisHashBytes),
-                forkIdRlp: RLPList,
-                RLPValue(latestBlockBytes),
-                RLPValue(latestBlockHashBytes)
-              ) =>
-            Status69(
-              ByteUtils.bytesToBigInt(protocolVersionBytes).toInt,
-              ByteUtils.bytesToBigInt(networkIdBytes).toLong,
-              ByteString(genesisHashBytes),
-              decode[ForkId](forkIdRlp),
-              earliestBlock = BigInt(0),
-              latestBlock = ByteUtils.bytesToBigInt(latestBlockBytes),
-              latestBlockHash = ByteString(latestBlockHashBytes)
+              latestBlockHash = ByteString.empty
             )
           case other =>
             val fieldCount = other match { case RLPList(items @ _*) => items.length; case _ => -1 }
@@ -358,9 +334,7 @@ object ETHPackets {
       }
 
       implicit class Status70Dec(val bytes: Array[Byte]) extends AnyVal {
-        // Tolerant 3-arm decode matching Status69Dec — accepts canonical 7-field, ETH68-shaped,
-        // and legacy 6-field fukuii-shaped status from peers that announce eth/70 but emit an
-        // older STATUS shape. Rejects via RuntimeException; callers map that to MalformedMessageError.
+        // Two-arm decode: canonical match + catch-all stub. Mirrors Status69Dec.
         def toStatus70: Status70 = rawDecode(bytes) match {
           // (1) Canonical 7-field EIP-7706 shape.
           case RLPList(
@@ -381,41 +355,16 @@ object ETHPackets {
               ByteUtils.bytesToBigInt(latestBlockBytes),
               ByteString(latestBlockHashBytes)
             )
-          // (2) 6-field ETH68-shaped STATUS sent on eth/70 channel — accept for clean UselessPeer rejection.
-          case RLPList(
-                RLPValue(protocolVersionBytes),
-                RLPValue(networkIdBytes),
-                RLPValue(_totalDifficultyBytes),
-                RLPValue(bestHashBytes),
-                RLPValue(genesisHashBytes),
-                forkIdRlp: RLPList
-              ) =>
+          // (2) Anything else: stub for clean UselessPeer rejection. See Status69Dec for observed variants.
+          case RLPList(RLPValue(protocolVersionBytes), RLPValue(networkIdBytes), _*) =>
             Status70(
               ByteUtils.bytesToBigInt(protocolVersionBytes).toInt,
               ByteUtils.bytesToBigInt(networkIdBytes).toLong,
-              ByteString(genesisHashBytes),
-              decode[ForkId](forkIdRlp),
+              genesisHash = ByteString.empty,
+              forkId = ForkId(0, None),
               earliestBlock = BigInt(0),
               latestBlock = BigInt(0),
-              latestBlockHash = ByteString(bestHashBytes)
-            )
-          // (3) 6-field legacy fukuii shape (forkId at idx 3, no earliestBlock).
-          case RLPList(
-                RLPValue(protocolVersionBytes),
-                RLPValue(networkIdBytes),
-                RLPValue(genesisHashBytes),
-                forkIdRlp: RLPList,
-                RLPValue(latestBlockBytes),
-                RLPValue(latestBlockHashBytes)
-              ) =>
-            Status70(
-              ByteUtils.bytesToBigInt(protocolVersionBytes).toInt,
-              ByteUtils.bytesToBigInt(networkIdBytes).toLong,
-              ByteString(genesisHashBytes),
-              decode[ForkId](forkIdRlp),
-              earliestBlock = BigInt(0),
-              latestBlock = ByteUtils.bytesToBigInt(latestBlockBytes),
-              latestBlockHash = ByteString(latestBlockHashBytes)
+              latestBlockHash = ByteString.empty
             )
           case other =>
             val fieldCount = other match { case RLPList(items @ _*) => items.length; case _ => -1 }

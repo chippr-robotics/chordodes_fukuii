@@ -96,71 +96,93 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
     }
   }
 
-  // ── Status70 tolerant decode — mirrors PR #1324 pattern applied to ETH69.
-  // Some peers may announce eth/70 but emit an older STATUS shape; decode tolerantly
-  // so the networkId/genesis check can reject them as UselessPeer instead of DECODE_ERROR.
+  // ── Status70 tolerant decode — mirrors Status69Dec two-arm design.
+  // Non-canonical STATUS shapes decode as stubs so the genesis/networkId check
+  // can reject as UselessPeer without a codec crash.
 
   "ETH70 Status70 tolerant decode" when {
 
     "receiving an ETH/68-shaped 6-field STATUS on the eth/70 channel" should {
-      "decode it (forkId at index 5, bestHash mapped to latestBlockHash)" taggedAs UnitTest in {
+      "decode as stub (empty genesis) for clean UselessPeer rejection" taggedAs UnitTest in {
         import ETHPackets.Status68.Status68._
-        val genesisHash = ByteString(Array.fill(32)(0xcd.toByte))
-        val bestHash = ByteString(Array.fill(32)(0xab.toByte))
-        // A peer that announces eth/70 but sends an ETH/68-shaped STATUS (with TD)
         val eth68Shaped = ETHPackets.Status68.Status68(
-          protocolVersion = 70, // eth/70 version number, but the shape is ETH/68
+          protocolVersion = 70,
           networkId = 7L,
           totalDifficulty = BigInt("167378406679735"),
-          bestHash = bestHash,
-          genesisHash = genesisHash,
+          bestHash = ByteString(Array.fill(32)(0xab.toByte)),
+          genesisHash = ByteString(Array.fill(32)(0xcd.toByte)),
           forkId = ForkId(0xbe46d57cL, None)
         )
-        val encoded = eth68Shaped.toBytes
-        val decoded = decoder(Capability.ETH70).fromBytes(Codes.StatusCode, encoded)
+        val decoded = decoder(Capability.ETH70).fromBytes(Codes.StatusCode, eth68Shaped.toBytes)
         decoded match {
           case Right(s: ETHPackets.Status70.Status70) =>
             s.protocolVersion shouldEqual 70
             s.networkId shouldEqual 7L
-            s.genesisHash shouldEqual genesisHash
-            s.forkId shouldEqual ForkId(0xbe46d57cL, None)
+            s.genesisHash shouldEqual ByteString.empty
+            s.forkId shouldEqual ForkId(0, None)
             s.earliestBlock shouldEqual BigInt(0)
             s.latestBlock shouldEqual BigInt(0)
-            s.latestBlockHash shouldEqual bestHash
-          case other => fail(s"Expected tolerant Status70 decode, got $other")
+            s.latestBlockHash shouldEqual ByteString.empty
+          case other => fail(s"Expected stub Status70 decode, got $other")
         }
       }
     }
 
     "receiving the legacy 6-field shape (forkId at index 3, no earliestBlock)" should {
-      "decode it with earliestBlock defaulted to 0" taggedAs UnitTest in {
+      "decode as stub (empty genesis) for clean UselessPeer rejection" taggedAs UnitTest in {
         import com.chipprbots.ethereum.rlp._
         import ETHPackets.Status70.Status70._
-        val genesisHash = ByteString(Array.fill(32)(0x11.toByte))
-        val latestHash = ByteString(Array.fill(32)(0x22.toByte))
         val canonical = ETHPackets.Status70.Status70(
           protocolVersion = 70,
           networkId = 7L,
-          genesisHash = genesisHash,
+          genesisHash = ByteString(Array.fill(32)(0x11.toByte)),
           forkId = ForkId(0xfc64ec04L, Some(1150000L)),
           earliestBlock = BigInt(0),
           latestBlock = BigInt(424242),
-          latestBlockHash = latestHash
+          latestBlockHash = ByteString(Array.fill(32)(0x22.toByte))
         )
-        // Drop earliestBlock (index 4) to get the legacy 6-field shape
-        val canonicalRlp = rawDecode(canonical.toBytes).asInstanceOf[RLPList]
-        val i = canonicalRlp.items
+        val i = rawDecode(canonical.toBytes).asInstanceOf[RLPList].items
         val legacyBytes = encode(RLPList(i(0), i(1), i(2), i(3), i(5), i(6)))
         val decoded = decoder(Capability.ETH70).fromBytes(Codes.StatusCode, legacyBytes)
         decoded match {
           case Right(s: ETHPackets.Status70.Status70) =>
             s.networkId shouldEqual 7L
-            s.genesisHash shouldEqual genesisHash
-            s.forkId shouldEqual ForkId(0xfc64ec04L, Some(1150000L))
+            s.genesisHash shouldEqual ByteString.empty
+            s.forkId shouldEqual ForkId(0, None)
             s.earliestBlock shouldEqual BigInt(0)
-            s.latestBlock shouldEqual BigInt(424242)
-            s.latestBlockHash shouldEqual latestHash
-          case other => fail(s"Expected tolerant legacy Status70 decode, got $other")
+            s.latestBlock shouldEqual BigInt(0)
+            s.latestBlockHash shouldEqual ByteString.empty
+          case other => fail(s"Expected stub Status70 decode, got $other")
+        }
+      }
+    }
+
+    "receiving an 8-field STATUS (canonical 7 + 1 trailing extension field)" should {
+      "decode as stub (empty genesis) for clean UselessPeer rejection" taggedAs UnitTest in {
+        import com.chipprbots.ethereum.rlp._
+        import ETHPackets.Status70.Status70._
+        val canonical = ETHPackets.Status70.Status70(
+          protocolVersion = 70,
+          networkId = 1L,
+          genesisHash = ByteString(Array.fill(32)(0x33.toByte)),
+          forkId = ForkId(0xbe46d57cL, None),
+          earliestBlock = BigInt(0),
+          latestBlock = BigInt(20000000),
+          latestBlockHash = ByteString(Array.fill(32)(0x44.toByte))
+        )
+        val i = rawDecode(canonical.toBytes).asInstanceOf[RLPList].items
+        val eightFieldBytes =
+          encode(RLPList(i(0), i(1), i(2), i(3), i(4), i(5), i(6), RLPValue(BigInt(99).toByteArray)))
+        val decoded = decoder(Capability.ETH70).fromBytes(Codes.StatusCode, eightFieldBytes)
+        decoded match {
+          case Right(s: ETHPackets.Status70.Status70) =>
+            s.networkId shouldEqual 1L
+            s.genesisHash shouldEqual ByteString.empty
+            s.forkId shouldEqual ForkId(0, None)
+            s.earliestBlock shouldEqual BigInt(0)
+            s.latestBlock shouldEqual BigInt(0)
+            s.latestBlockHash shouldEqual ByteString.empty
+          case other => fail(s"Expected stub Status70 decode, got $other")
         }
       }
     }
@@ -168,7 +190,7 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
     "receiving a STATUS that matches no known shape" should {
       "still be rejected" taggedAs UnitTest in {
         import com.chipprbots.ethereum.rlp._
-        val garbage = encode(RLPList(RLPValue(Array[Byte](70)), RLPValue(Array[Byte](1))))
+        val garbage = encode(RLPList(RLPValue(Array[Byte](70))))
         val decoded = decoder(Capability.ETH70).fromBytes(Codes.StatusCode, garbage)
         decoded.isLeft shouldBe true
       }

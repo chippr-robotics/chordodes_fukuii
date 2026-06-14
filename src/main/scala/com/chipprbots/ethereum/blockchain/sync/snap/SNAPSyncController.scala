@@ -249,6 +249,13 @@ class SNAPSyncController(
   private var consecutivePivotRefreshes: Int = 0
   private val MaxConsecutivePivotRefreshes = 10
 
+  // Pivot blocks confirmed unservable in this session. When a refreshPivotInPlace resolves
+  // to the same block as one in this set, fast-track consecutivePivotRefreshes to the
+  // threshold so dormant mode activates after the next coordinator escalation (2–3 cycles
+  // instead of 10). Entries are never cleared — a failed pivot block should not be retried
+  // within the same session.
+  private val failedPivotBlocks: mutable.Set[BigInt] = mutable.Set.empty
+
   // Pending pivot refresh: when refreshPivotInPlace() needs a header from a peer,
   // it requests a bootstrap and stores the pending pivot here. When BootstrapComplete
   // arrives in the syncing state, the refresh is completed.
@@ -448,6 +455,9 @@ class SNAPSyncController(
   private var lastAccountProgressMs: Long = System.currentTimeMillis()
   private var lastAccountTasksCompleted: Int = 0
   private var lastAccountsDownloaded: Long = 0
+  // Tracks storage contract completion (0.0–1.0) from push-based ProgressStorageContracts messages.
+  // Used to suppress proactive pivot rolls when storage is nearly done (Bug 2 guard).
+  private var storageContractProgressPct: Double = 0.0
 
   override def preStart(): Unit = {
     checkStorageSchemeMismatch()
@@ -764,6 +774,7 @@ class SNAPSyncController(
       progressMonitor.updateEstimates(accounts = estimatedTotal)
 
     case ProgressStorageContracts(completed, total) =>
+      if (total > 0) storageContractProgressPct = completed.toDouble / total
       progressMonitor.updateStorageContracts(completed, total)
       if (completed > 0 && total > 0) {
         val currentSlots = progressMonitor.getStorageSlotsSynced
@@ -804,6 +815,9 @@ class SNAPSyncController(
         }
       } else if (currentPhase == AccountRangeSync || currentPhase == ByteCodeAndStorageSync) {
         lastPivotRestartMs = now
+        // Record the current pivot block as failed so completePivotRefreshWithStateRoot can
+        // detect when refreshPivotInPlace resolves back to the same block.
+        pivotBlock.foreach(failedPivotBlocks.add)
         consecutivePivotRefreshes += 1
         log.info(s"Consecutive stateless pivot refreshes: $consecutivePivotRefreshes/$MaxConsecutivePivotRefreshes")
         if (consecutivePivotRefreshes >= MaxConsecutivePivotRefreshes) {
@@ -1346,7 +1360,14 @@ class SNAPSyncController(
     // we're still in ByteCodeAndStorageSync phase (would have transitioned if truly complete).
     val isTimeoutResponse =
       stats.tasksPending == 0 && stats.tasksActive == 0 && stats.tasksCompleted == 0 && stats.elapsedTimeMs == 0
-    val workRemaining = isTimeoutResponse || stats.tasksPending > 0 || stats.tasksActive > 0
+    // Bug 1 fix: coordinator mailbox was backed up processing a batch — ask timed out and returned
+    // all-zeros. This is liveness, not stagnation. Reset the clock and skip this tick so the
+    // stagnation timer doesn't advance while the coordinator is actively working.
+    if (isTimeoutResponse) {
+      lastStorageProgressMs = System.currentTimeMillis()
+      return
+    }
+    val workRemaining = stats.tasksPending > 0 || stats.tasksActive > 0
 
     // Special case: coordinator reports 0 pending + 0 active but never sent StorageRangeSyncComplete.
     // This means trie construction is stuck (accountsInTrieConstruction/pendingAccountSlots not empty).
@@ -3064,7 +3085,17 @@ class SNAPSyncController(
     storageRangeCoordinator.foreach { coordinator =>
       val snapPeers = peersToDownloadFrom.collect {
         case (_, peerWithInfo)
-            if peerWithInfo.peerInfo.remoteStatus.supportsSnap && peerWithInfo.peerInfo.forkAccepted =>
+            if peerWithInfo.peerInfo.remoteStatus.supportsSnap &&
+              peerWithInfo.peerInfo.forkAccepted &&
+              // Exclude genesis peers (maxBlockNumber=0): nodes that announced block 0 in STATUS
+              // and have never advanced. On ETC this is typically ETH mainnet geth nodes connecting
+              // due to the shared legacy networkId=1 (pre-DAO split). They cannot serve ETC state
+              // and return empty StorageRanges on every request, burning 5 strikes per peer and
+              // collapsing the eligible pool within one pivot cycle.
+              // NOTE: this filter is safe unlike the former `>= pivot` guard removed in PR #1238:
+              // a peer at block 0 cannot serve *any* historical state; a stale peer at block N <
+              // pivot still holds SNAP data up to N and should remain eligible.
+              peerWithInfo.peerInfo.maxBlockNumber > BigInt(0) =>
           peerWithInfo.peer
       }
 
@@ -3099,9 +3130,16 @@ class SNAPSyncController(
         currentNetworkBestFromSnapPeers().foreach { networkBest =>
           val pivotAge = networkBest - pivotBlock.get
           val recentlyRolled = lastProactivePivotBlock.exists(last => (networkBest - last) <= BigInt(50))
+          // Bug 2 guard: suppress proactive pivot rolls once storage contracts are ≥80% complete.
+          // At that stage account sync is already done, so a pivot change generates no new storage
+          // tasks but disrupts dispatch for the remaining tail — causing stagnation and force-complete.
+          // ProgressStorageContracts is push-based (not ask), so storageContractProgressPct is reliable.
+          val storageLateStage =
+            currentPhase == ByteCodeAndStorageSync && storageContractProgressPct >= 0.80
           if (
             pivotAge > SnapServeWindowBlocks && !recentlyRolled &&
-            pivotProbeRequestId.isEmpty && pendingProbeCommit.isEmpty
+            pivotProbeRequestId.isEmpty && pendingProbeCommit.isEmpty &&
+            !storageLateStage
           ) {
             val now = System.currentTimeMillis
             if (now - lastProbeAttemptMs >= ProbeCooldownMs) {
@@ -3848,6 +3886,18 @@ class SNAPSyncController(
       log.info(
         s"Pivot refresh produced same root ($newRoot): $reason. Re-arming coordinators to clear stateless peers."
       )
+      // If this pivot block is known-failed, fast-track the counter to the threshold so the
+      // NEXT PivotStateUnservable triggers dormant mode (2–3 cycles instead of 10). Without
+      // this, the churn loop runs the full 10-cycle budget before escalating — ~20 min of
+      // 1/12th-throughput degradation when ETH-genesis peers contaminate the storage pool.
+      // Re-arm happens unconditionally (prevents coordinator wedge); the counter jump is additive.
+      if (pivotBlock.exists(failedPivotBlocks.contains)) {
+        log.warning(
+          s"Same-root refresh resolved to known-failed pivot block ${pivotBlock.getOrElse("?")} " +
+            s"(root $newRoot). Fast-tracking consecutivePivotRefreshes to $MaxConsecutivePivotRefreshes."
+        )
+        consecutivePivotRefreshes = MaxConsecutivePivotRefreshes
+      }
       accountRangeCoordinator.foreach(_ ! actors.Messages.PivotRefreshed(newStateRoot))
       storageRangeCoordinator.foreach(_ ! actors.Messages.StoragePivotRefreshed(newStateRoot))
       return
