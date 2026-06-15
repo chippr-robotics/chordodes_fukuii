@@ -41,6 +41,29 @@ single source of truth.
 | `fukuii-first-start`         | Bootstrap a brand-new node end to end | runbooks/first-start |
 | `fukuii-security-hardening`  | IP block/unblock, trusted peers, RPC exposure review | runbooks/security; admin block/trusted methods |
 | `fukuii-custom-networks`     | Stand up a private/consortium/custom-genesis chain | runbooks/custom-networks, enterprise-deployment |
+| `fukuii-engine-api-setup`    | Configure and verify Engine API (JWT auth, port, CL client connection) | runbooks/engine-api |
+
+## Code quality skills
+
+Development-time skills for dependency hygiene and technical debt triage.
+These do not correspond to operational runbooks — they analyse source and
+build configuration directly.
+
+| Skill | Workflow | Backing source |
+| :--- | :--- | :--- |
+| `fukuii-dependency-audit`    | Audit all library versions; flag stale, CVE-affected, or non-LTS deps | `build.sbt`, endoflife.date, CVE feeds |
+| `fukuii-tech-debt-inventory` | Inventory technical debt: deprecated APIs, suppressed warnings, TODO/FIXME, scalafmt violations | Source scan + scapegoat report |
+
+## Spec Kit — Bug triage
+
+Three-step structured bug triage. Artifacts land in `.specify/bugs/<slug>/`
+and can be referenced in PRs. The workflow is strictly sequential.
+
+| Skill | Step | What it produces |
+| :--- | :--- | :--- |
+| `speckit-bug-assess` | 1 — Assess | `.specify/bugs/<slug>/assessment.md`: root cause, reproduction steps, remediation options |
+| `speckit-bug-fix`    | 2 — Fix    | `.specify/bugs/<slug>/fix.md`: changes applied, tests added, `sbt testEssential` result |
+| `speckit-bug-test`   | 3 — Verify | `.specify/bugs/<slug>/test.md`: symptom reproduction verdict (`verified`/`partial`/`failed`) |
 
 ## Validation
 

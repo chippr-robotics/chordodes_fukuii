@@ -47,9 +47,9 @@ object ResourceHealthMonitor {
       case rdb: RocksDbDataSource => Some(rdb)
       case _                      => None
     }
-    val rt    = Runtime.getRuntime
+    val rt = Runtime.getRuntime
     val memMX = ManagementFactory.getMemoryMXBean
-    val osMX  = ManagementFactory.getOperatingSystemMXBean.asInstanceOf[com.sun.management.OperatingSystemMXBean]
+    val osMX = ManagementFactory.getOperatingSystemMXBean.asInstanceOf[com.sun.management.OperatingSystemMXBean]
 
     Behaviors.setup { ctx =>
       var phaseCtx: Map[String, String] = Map("phase" -> "INIT")
@@ -68,19 +68,19 @@ object ResourceHealthMonitor {
             .map(b => math.max(0L, b.getCollectionCount))
             .sum
 
-          val gcPct   = (gcMsNow - lastGcMs) / 600.0
+          val gcPct = (gcMsNow - lastGcMs) / 600.0
           val gcCalls = gcCntNow - lastGcCount
           lastGcMs = gcMsNow
           lastGcCount = gcCntNow
 
           val heapUsed = (rt.totalMemory - rt.freeMemory) >> 20
-          val heapMax  = rt.maxMemory >> 20
-          val heapPct  = if (heapMax > 0) heapUsed * 100 / heapMax else 0L
-          val offHeap  = memMX.getNonHeapMemoryUsage.getUsed >> 20
+          val heapMax = rt.maxMemory >> 20
+          val heapPct = if (heapMax > 0) heapUsed * 100 / heapMax else 0L
+          val offHeap = memMX.getNonHeapMemoryUsage.getUsed >> 20
           val sysFreeGB = f"${osMX.getFreePhysicalMemorySize / 1e9}%.1f"
-          val swap     = readSwapUsedMB()
-          val load     = f"${osMX.getSystemLoadAverage}%.1f"
-          val rdbMem   = rocksOpt.map(_.totalMemtableSizeMB).getOrElse(0L)
+          val swap = readSwapUsedMB()
+          val load = f"${osMX.getSystemLoadAverage}%.1f"
+          val rdbMem = rocksOpt.map(_.totalMemtableSizeMB).getOrElse(0L)
 
           val ctxStr = phaseCtx.map { case (k, v) => s"$k=$v" }.mkString(" ")
           ctx.log.info(
@@ -107,7 +107,7 @@ object ResourceHealthMonitor {
       val path = Paths.get("/proc/meminfo")
       if (!Files.exists(path)) return -1L
       var total = 0L
-      var free  = 0L
+      var free = 0L
       Files.readAllLines(path).asScala.foreach { line =>
         if (line.startsWith("SwapTotal:")) total = line.split("\\s+")(1).toLong
         else if (line.startsWith("SwapFree:")) free = line.split("\\s+")(1).toLong

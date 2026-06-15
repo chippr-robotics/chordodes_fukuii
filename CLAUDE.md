@@ -57,6 +57,7 @@ session is the orchestrator** — subagents cannot spawn other subagents, so you
 | `wraith`  | Scala 3 compile errors / build failures | On compile failures |
 | `herald`  | P2P / RLPx / ETH wire protocol, Snappy, handshakes, multi-client interop | On networking issues |
 | `mithril` | Idiomatic Scala 3 modernization (opaque types, enums, given/using) | On-demand |
+| `prism`   | Code quality review: functionality, tests, readability, structure, simplicity, performance, security, scala-fp — non-consensus code only | On-demand: before `eye`, after `mithril`/`wraith`, before PR |
 
 ### Consensus-Critical Change Protocol (mandatory)
 
