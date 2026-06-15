@@ -15,10 +15,12 @@ import com.chipprbots.ethereum.db.storage.{
   EvmCodeStorage,
   FlatSlotStorage,
   HealingFrontierStorage,
+  HealingVisitedStorage,
   MptStorage,
   Namespaces,
   PathNodeStorage,
   RocksDbBfsQueueStorage,
+  RocksDbHealingVisitedStorage,
   SnapSyncProgressStorage,
   StateStorage
 }
@@ -3341,6 +3343,9 @@ class SNAPSyncController(
   private lazy val bfsQueueStorage: BfsQueueStorage =
     new RocksDbBfsQueueStorage(flatSlotStorage.dataSource, Namespaces.BfsQueueNamespace)
 
+  private lazy val visitedStorage: HealingVisitedStorage =
+    new RocksDbHealingVisitedStorage(flatSlotStorage.dataSource, Namespaces.HealingVisitedNamespace)
+
   private def startStateHealing(): Unit = {
     // Guard: prevent duplicate healing coordinator creation (Bug 27).
     // Can happen when ByteCodeSyncComplete and StorageRangeSyncComplete arrive in quick
@@ -3369,12 +3374,12 @@ class SNAPSyncController(
               batchSize = snapSyncConfig.healingBatchSize,
               snapSyncController = self,
               concurrency = snapSyncConfig.healingConcurrency,
-              visitedCap = snapSyncConfig.healingVisitedCap,
               healingFrontierStorage = healingFrontierStorageOpt,
               traversalParallelism = snapSyncConfig.healingTraversalParallelism,
               healingMinParallelism = snapSyncConfig.healingMinParallelism,
               healingReservedCores = snapSyncConfig.healingReservedCores,
               bfsQueueStorageOpt = Some(bfsQueueStorage),
+              visitedStorageOpt = Some(visitedStorage),
               storageScheme = snapSyncConfig.storageScheme,
               pathNodeStorageOpt = pathNodeStorageOpt,
               frontierHighWater = snapSyncConfig.healingFrontierHighWater,
@@ -3434,12 +3439,12 @@ class SNAPSyncController(
                   batchSize = snapSyncConfig.healingBatchSize,
                   snapSyncController = self,
                   concurrency = snapSyncConfig.healingConcurrency,
-                  visitedCap = snapSyncConfig.healingVisitedCap,
                   healingFrontierStorage = healingFrontierStorageOpt,
                   traversalParallelism = snapSyncConfig.healingTraversalParallelism,
                   healingMinParallelism = snapSyncConfig.healingMinParallelism,
                   healingReservedCores = snapSyncConfig.healingReservedCores,
                   bfsQueueStorageOpt = Some(bfsQueueStorage),
+                  visitedStorageOpt = Some(visitedStorage),
                   storageScheme = snapSyncConfig.storageScheme,
                   pathNodeStorageOpt = pathNodeStorageOpt,
                   frontierHighWater = snapSyncConfig.healingFrontierHighWater,

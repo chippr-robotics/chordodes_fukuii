@@ -27,6 +27,8 @@ object Namespaces {
     IndexedSeq[Byte]('t'.toByte) // state trie nodes, path-keyed (PathScheme only)
   val StorageTriePathNamespace: IndexedSeq[Byte] =
     IndexedSeq[Byte]('u'.toByte) // storage trie nodes, path-keyed, scoped by accountHash (PathScheme only)
+  val HealingVisitedNamespace: IndexedSeq[Byte] =
+    IndexedSeq[Byte]('v'.toByte) // BFS heal-walk visited set (keccak hash -> empty) — OPT-059 disk-backed dedup
 
   val nsSeq: Seq[IndexedSeq[Byte]] = Seq(
     ReceiptsNamespace,
@@ -47,6 +49,7 @@ object Namespaces {
     BfsQueueNamespace,
     SnapSyncProgressNamespace,
     StateTriePathNamespace,
-    StorageTriePathNamespace
+    StorageTriePathNamespace,
+    HealingVisitedNamespace
   )
 }

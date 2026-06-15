@@ -19,7 +19,9 @@ import com.chipprbots.ethereum.db.storage.{
   BfsEntry,
   BfsQueueStorage,
   HealingFrontierStorage,
+  HealingVisitedStorage,
   InMemoryBfsQueueStorage,
+  InMemoryHealingVisitedStorage,
   MptStorage,
   PathNodeStorage
 }
@@ -45,7 +47,6 @@ class TrieNodeHealingCoordinator(
     batchSize: Int,
     snapSyncController: ActorRef,
     concurrency: Int,
-    visitedCap: Int = TrieNodeHealingCoordinator.DefaultVisitedCap,
     healingFrontierStorage: Option[HealingFrontierStorage] = None,
     healingWriterEcOverride: Option[ExecutionContext] = None,
     healingReaderEcOverride: Option[ExecutionContext] = None,
@@ -53,6 +54,7 @@ class TrieNodeHealingCoordinator(
     healingMinParallelism: Int = TrieNodeHealingCoordinator.DefaultMinParallelism,
     healingReservedCores: Int = TrieNodeHealingCoordinator.DefaultReservedCores,
     bfsQueueStorageOpt: Option[BfsQueueStorage] = None,
+    visitedStorageOpt: Option[HealingVisitedStorage] = None,
     storageScheme: StorageScheme = StorageScheme.Hash,
     pathNodeStorageOpt: Option[PathNodeStorage] = None,
     frontierHighWater: Int = TrieNodeHealingCoordinator.DefaultFrontierHighWater,
@@ -191,7 +193,8 @@ class TrieNodeHealingCoordinator(
   // `pendingHashSet`. See docs/design/healing-frontier-scale.md. Operator-tunable via
   // `sync.snap-sync.healing-visited-cap`; raise it only from a measured `inflation_ratio` (US2) and
   // within the heap budget — do NOT set it to 20M (~2.4-3.2 GB) on a 6 GB heap (it OOMs).
-  private val HealingVisitedCap: Int = visitedCap
+  private val visitedStorage: HealingVisitedStorage =
+    visitedStorageOpt.getOrElse(new InMemoryHealingVisitedStorage())
   private val HealingTraversalParallelism: Int = traversalParallelism
   private val HealingMinParallelism: Int = healingMinParallelism
   private val HealingReservedCores: Int = healingReservedCores
@@ -1380,27 +1383,17 @@ class TrieNodeHealingCoordinator(
     import com.chipprbots.ethereum.domain.Account
     import scala.util.control.NonFatal
 
-    // FIFO/insertion-order bounded visited set (companion boundedVisitedSet): at the cap the
-    // earliest-INSERTED entry is evicted (NOT an LRU — recent access does not protect an entry)
-    // instead of refusing new entries. Refusing (the previous ConcurrentHashMap gate)
-    // silently TRUNCATED the traversal on tries larger than the cap — children past the cap were
-    // never enqueued, the queue drained early, and the walk reported "Complete" (and set the
-    // Layer-2 completeness marker) having covered only `cap` of the trie. Eviction trades that
-    // correctness hole for bounded re-walks of shared subtries (de-duplicated downstream by
-    // pendingHashSet). Access is synchronized: worker threads only touch it via markIfNew, and
-    // per-check lock cost is negligible against the 50K-node multiGet I/O per chunk.
-    val visitedLru = TrieNodeHealingCoordinator.boundedVisitedSet(HealingVisitedCap)
-    def markIfNew(h: ByteString): Boolean = visitedLru.synchronized {
-      if (visitedLru.contains(h)) false
-      else {
-        visitedLru += h
-        true
-      }
-    }
+    // Disk-backed visited set (OPT-059): clear any residual from a prior walk, then mark all seeds.
+    // RocksDB point-get latency at warm block-cache is ~1-5 µs — negligible vs the 50K-node
+    // multiGet I/O per chunk. markIfNew is non-atomic under concurrency: two sub-range threads may
+    // both see the same child hash as absent and both return true, causing a duplicate BFS-queue
+    // entry. This is benign — downstream pendingHashSet deduplicates any resulting duplicate
+    // missing-node reports.
+    visitedStorage.clear()
     // spec 003 C2: mark every seed hash as visited (level 0). For one seed this is the prior
     // markIfNew(startHash); for many it pre-loads the shared visited set so cross-seed shared
     // subtries are de-duplicated exactly as within a single walk.
-    seeds.foreach { case (h, _, _) => markIfNew(h) }
+    seeds.foreach { case (h, _, _) => visitedStorage.markIfNew(h) }
 
     val visitedCount = new java.util.concurrent.atomic.AtomicLong(0L)
     val frontierCount = new java.util.concurrent.atomic.AtomicLong(0L)
@@ -1469,7 +1462,7 @@ class TrieNodeHealingCoordinator(
                           val childHash = ByteString(hashChild.hashNode)
                           // Observation-only (FR-008/FR-023): count this child reference before the de-dup gate.
                           childRefsSeen.incrementAndGet()
-                          if (markIfNew(childHash)) {
+                          if (visitedStorage.markIfNew(childHash)) {
                             distinctEnqueued.incrementAndGet()
                             val childNibbles = nibbles :+ i.toByte
                             val childCompact = ByteString(HexPrefix.encode(childNibbles, isLeaf = false))
@@ -1487,7 +1480,7 @@ class TrieNodeHealingCoordinator(
                           val childHash = ByteString(hashChild.hashNode)
                           // Observation-only (FR-008/FR-023): count this child reference before the de-dup gate.
                           childRefsSeen.incrementAndGet()
-                          if (markIfNew(childHash)) {
+                          if (visitedStorage.markIfNew(childHash)) {
                             distinctEnqueued.incrementAndGet()
                             val childNibbles = nibbles ++ ext.sharedKey.toArray
                             val childCompact = ByteString(HexPrefix.encode(childNibbles, isLeaf = false))
@@ -1506,7 +1499,7 @@ class TrieNodeHealingCoordinator(
                         if (account.storageRoot != Account.EmptyStorageRootHash) childRefsSeen.incrementAndGet()
                         if (
                           account.storageRoot != Account.EmptyStorageRootHash &&
-                          markIfNew(account.storageRoot)
+                          visitedStorage.markIfNew(account.storageRoot)
                         ) {
                           distinctEnqueued.incrementAndGet()
                           val allNibbles = nibbles ++ leaf.key.toArray
@@ -1971,7 +1964,6 @@ object TrieNodeHealingCoordinator {
       batchSize: Int,
       snapSyncController: ActorRef,
       concurrency: Int = 16,
-      visitedCap: Int = DefaultVisitedCap,
       healingFrontierStorage: Option[HealingFrontierStorage] = None,
       healingWriterEcOverride: Option[ExecutionContext] = None,
       healingReaderEcOverride: Option[ExecutionContext] = None,
@@ -1979,6 +1971,7 @@ object TrieNodeHealingCoordinator {
       healingMinParallelism: Int = DefaultMinParallelism,
       healingReservedCores: Int = DefaultReservedCores,
       bfsQueueStorageOpt: Option[BfsQueueStorage] = None,
+      visitedStorageOpt: Option[HealingVisitedStorage] = None,
       storageScheme: StorageScheme = StorageScheme.Hash,
       pathNodeStorageOpt: Option[PathNodeStorage] = None,
       frontierHighWater: Int = DefaultFrontierHighWater,
@@ -1996,7 +1989,6 @@ object TrieNodeHealingCoordinator {
         batchSize,
         snapSyncController,
         concurrency,
-        visitedCap,
         healingFrontierStorage,
         healingWriterEcOverride,
         healingReaderEcOverride,
@@ -2004,6 +1996,7 @@ object TrieNodeHealingCoordinator {
         healingMinParallelism,
         healingReservedCores,
         bfsQueueStorageOpt,
+        visitedStorageOpt,
         storageScheme,
         pathNodeStorageOpt,
         frontierHighWater,
