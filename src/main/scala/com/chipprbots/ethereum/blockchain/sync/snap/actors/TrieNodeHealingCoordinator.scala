@@ -660,6 +660,29 @@ class TrieNodeHealingCoordinator(
         }
       }
 
+    case HealingResumeDispatch =>
+      // Controller declined to roll the pivot in response to our HealingStagnated (heal-hold-pivot-on-stagnation).
+      // The held root stays valid and its missing nodes are still ~99.9% servable by current peers (content-
+      // addressed GetTrieNodes by hash). Clear the pivotRefreshRequested latch the stagnation path set when it
+      // fired HealingStagnated, give a fresh stagnation window, and resume dispatching the EXISTING pending tasks.
+      // NOTHING is cleared (root, pendingTasks, frontier, verificationPassComplete all preserved) — that is the
+      // whole point: a slow-but-servable verification pass must survive so it can converge against one stable root.
+      if (pivotRefreshRequested) {
+        log.info(
+          s"[HEAL] Resume dispatch on held root ${Hex.toHexString(stateRoot.take(4).toArray)} " +
+            s"(stagnation hold — pivot NOT rolled). pending=${pendingTasks.size} peers=${knownAvailablePeers.size}"
+        )
+        pivotRefreshRequested = false
+        // Reset only the re-fire guards so the next genuine stagnation can still escalate; we are NOT
+        // claiming progress was made (totalNodesHealed/lastPulseHealedCount untouched).
+        consecutiveStagnations = 0
+        consecutiveIdleChecks = 0
+        lastHealedAtMs = System.currentTimeMillis() // give the held root a fresh healingStagnationTimeoutMs window
+        tryRedispatchPendingTasks()
+      } else {
+        log.debug("[HEAL] HealingResumeDispatch with no pending pivot-refresh latch — ignoring")
+      }
+
     case TrieNodesResponseMsg(response) =>
       handleResponse(response)
 

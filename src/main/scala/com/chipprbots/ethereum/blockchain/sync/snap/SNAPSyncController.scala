@@ -1102,16 +1102,43 @@ class SNAPSyncController(
       log.warning("All healing peers stateless — refreshing pivot in-place for healing")
       refreshPivotInPlace("all healing peers stateless")
 
-    // FIX-STAGNATION-LIMIT: Coordinator detected no healing progress for MaxConsecutiveStagnations
-    // consecutive 2-min cycles. Refresh pivot — coordinator receives HealingPivotRefreshed,
-    // clears stale tasks + stateless peers, re-seeds new root top-down (Besu-aligned).
-    // Do NOT stop coordinator — refreshPivotInPlace sends HealingPivotRefreshed to it directly.
+    // Coordinator detected no healing progress (MaxConsecutiveStagnations 2-min cycles, or the
+    // healingStagnationTimeoutMs path). Stagnation means "healing is SLOW", NOT "the root is unservable".
+    //
+    // LIVELOCK (fixed by heal-hold-pivot-on-stagnation): rolling the pivot on stagnation resets the
+    // coordinator's verificationPassComplete=false and re-seeds a pending task, so a slow verification BFS
+    // (~16-20h on a slow SSD) is orphaned by a pivot roll (~28-min snap serve window) and can NEVER coincide
+    // with a quiet inter-roll window → completion gate never satisfied, regular sync never reached. The
+    // missing nodes DO heal (durable, content-addressed), but the gate can't close.
+    //
+    // FIX: HOLD the healing pivot fixed on stagnation — resume/retry dispatch against the held root instead
+    // of rolling. Consensus-safe: the healing pivot is a SYNC target, not a consensus rule. GetTrieNodes
+    // fetches missing nodes BY HASH (content-addressed), so a stale root's missing nodes stay ~99.9% servable
+    // by current peers. After healing converges against the held root → StateValidation → regular sync, which
+    // executes blocks forward and fetches any residual missing node on-demand by hash. No state-root / EVM /
+    // gas / reward / RLP output changes — this only changes WHEN the pivot rolls during the healing phase.
+    //
+    // The GENUINE-unservable path (HealingAllPeersStateless, above) is UNCHANGED: if the held root truly
+    // becomes unservable by ALL peers, we still MUST roll or healing stalls.
+    //
+    // Set heal-hold-pivot-on-stagnation = false to restore the legacy roll-on-stagnation behaviour.
     case actors.Messages.HealingStagnated(healed, pending) if currentPhase == StateHealing =>
-      log.warning(
-        s"[HEAL-STAGNATED] Healing stuck: healed=$healed pending=$pending — " +
-          s"refreshing pivot for fresh healing round"
-      )
-      refreshPivotInPlace("healing-stagnated")
+      if (snapSyncConfig.healHoldPivotOnStagnation) {
+        log.warning(
+          s"[HEAL-STAGNATED] Healing slow (healed=$healed pending=$pending) — HOLDING pivot (not rolling); " +
+            s"resuming dispatch on held root so the verification pass can converge"
+        )
+        trieNodeHealingCoordinator.foreach(_ ! actors.Messages.HealingResumeDispatch)
+      } else {
+        // Legacy behaviour: refresh pivot — coordinator receives HealingPivotRefreshed, clears stale tasks +
+        // stateless peers, re-seeds new root top-down (Besu-aligned). Do NOT stop coordinator —
+        // refreshPivotInPlace sends HealingPivotRefreshed to it directly.
+        log.warning(
+          s"[HEAL-STAGNATED] Healing stuck: healed=$healed pending=$pending — " +
+            s"refreshing pivot for fresh healing round (legacy roll-on-stagnation)"
+        )
+        refreshPivotInPlace("healing-stagnated")
+      }
 
     case StateHealingComplete =>
       progressMonitor.startPhase(StateHealing)
@@ -4744,6 +4771,14 @@ case class SNAPSyncConfig(
     healingReservedCores: Int = actors.TrieNodeHealingCoordinator.DefaultReservedCores,
     healingFrontierHighWater: Int = actors.TrieNodeHealingCoordinator.DefaultFrontierHighWater,
     healingFrontierLowWater: Int = actors.TrieNodeHealingCoordinator.DefaultFrontierLowWater,
+    // Post-SNAP healing livelock fix. When true (default), a healing STAGNATION (slow progress) holds the
+    // healing pivot fixed and resumes dispatch against the held root instead of rolling the pivot. Rolling on
+    // stagnation orphans the in-flight verification BFS and resets its completeness gate, so on slow/peer-scarce
+    // nodes the gate can never close and regular sync is never reached, even though the missing nodes heal.
+    // Holding is consensus-safe: GetTrieNodes fetches missing nodes by hash (content-addressed), so a stale
+    // root stays ~99.9% servable; regular sync fills any residual gap on-demand. The GENUINE all-peers-stateless
+    // roll (HealingAllPeersStateless) is unaffected. Set false to restore legacy roll-on-stagnation.
+    healHoldPivotOnStagnation: Boolean = true,
     stateValidationEnabled: Boolean = true,
     maxRetries: Int = 3,
     timeout: FiniteDuration = 30.seconds,
@@ -4869,6 +4904,10 @@ object SNAPSyncConfig {
         if (snapConfig.hasPath("healing-frontier-low-water"))
           snapConfig.getInt("healing-frontier-low-water")
         else actors.TrieNodeHealingCoordinator.DefaultFrontierLowWater,
+      healHoldPivotOnStagnation =
+        if (snapConfig.hasPath("heal-hold-pivot-on-stagnation"))
+          snapConfig.getBoolean("heal-hold-pivot-on-stagnation")
+        else true,
       stateValidationEnabled = snapConfig.getBoolean("state-validation-enabled"),
       maxRetries = snapConfig.getInt("max-retries"),
       timeout = snapConfig.getDuration("timeout").toMillis.millis,

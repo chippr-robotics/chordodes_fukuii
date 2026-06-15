@@ -254,6 +254,16 @@ object Messages {
     */
   case class HealingStagnated(healed: Long, pending: Long) extends TrieNodeHealingCoordinatorMessage
 
+  /** Sent by SNAPSyncController in reply to a `HealingStagnated` it chose NOT to act on by rolling the pivot
+    * (`heal-hold-pivot-on-stagnation = true`). It tells the coordinator to clear the in-flight `pivotRefreshRequested`
+    * latch (set when the coordinator fired `HealingStagnated`) and resume dispatching the existing pending tasks
+    * against the held root. This breaks the post-SNAP healing livelock: a slow-but-servable verification pass is no
+    * longer aborted by a stagnation-driven pivot roll, so a single walk can converge against one stable root. The
+    * coordinator keeps the held root and its pending frontier — nothing is cleared. See SNAPSyncController's
+    * HealingStagnated handler for the full rationale.
+    */
+  case object HealingResumeDispatch extends TrieNodeHealingCoordinatorMessage
+
   /** Sent by SNAPSyncController when pivot advanced beyond SNAP serve window during healing (Besu reloadTrieHeal
     * pattern). Coordinator abandons pending tasks and signals completion so a fresh coordinator + walk can start for
     * the new root.
