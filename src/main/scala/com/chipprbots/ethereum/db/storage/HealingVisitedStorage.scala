@@ -23,6 +23,27 @@ trait HealingVisitedStorage {
 
   /** Delete all stored entries. Called at the start of each BFS walk to ensure a clean slate. */
   def clear(): Unit
+
+  /** Returns the pivot root hash stored from the last BFS walk, if any. Used to detect whether the visited set is still
+    * valid for the current walk (same pivot root → skip clear, resume). Default: None (always treat as fresh, i.e. full
+    * clear on next walk).
+    */
+  def storedRoot(): Option[ByteString] = None
+
+  /** Clear all visited entries and record `root` as the active pivot root for this walk. Called when a BFS walk starts
+    * on a DIFFERENT root than the last walk (or no prior root exists). Default: delegates to clear() — correct for
+    * in-memory and test implementations.
+    */
+  def clearAndSetRoot(root: ByteString): Unit = clear()
+}
+
+object RocksDbHealingVisitedStorage {
+
+  /** 21-byte sentinel key stored in HealingVisitedNamespace to record the active BFS pivot root. 21 bytes sorts BEFORE
+    * all 32-byte keccak hash keys in RocksDB lexicographic order, so it lies outside the deleteRange end key ([FF×32 +
+    * 0x00]) — explicit toRemove delete is required in both clear() and clearAndSetRoot().
+    */
+  val RootMarkerKey: Array[Byte] = "__visited_root__".getBytes("UTF-8")
 }
 
 /** RocksDB column-family-backed implementation. Keys are raw 32-byte keccak hashes; values are empty. No cap — disk is
@@ -75,6 +96,33 @@ class RocksDbHealingVisitedStorage(dataSource: DataSource, namespace: Namespace)
       true
     }
 
+  /** Returns the pivot root hash stored from the last BFS walk, if any. */
+  override def storedRoot(): Option[ByteString] =
+    dataSource.getOptimized(namespace, RocksDbHealingVisitedStorage.RootMarkerKey).map(ByteString(_))
+
+  /** Clear all 32-byte hash keys and write the new pivot root marker atomically. deleteRange first (canonical RocksDB
+    * state), then explicit root marker update. The root marker (21-byte key) lies outside the hash range tombstone — it
+    * requires an explicit toRemove then re-upsert in the same update call.
+    */
+  override def clearAndSetRoot(root: ByteString): Unit = {
+    dataSource.deleteRange(
+      namespace,
+      Array.fill(32)(0x00.toByte),
+      Array.fill(32)(0xff.toByte) :+ 0x00.toByte
+    )
+    dataSource.update(
+      Seq(
+        DataSourceUpdateOptimized(
+          namespace,
+          toRemove = Seq(RocksDbHealingVisitedStorage.RootMarkerKey),
+          toUpsert = Seq(RocksDbHealingVisitedStorage.RootMarkerKey -> root.toArray)
+        )
+      )
+    )
+    pendingAdds.clear()
+    pendingSize.set(0)
+  }
+
   override def clear(): Unit = {
     // deleteRange first: makes RocksDB the canonical authority for the cleared range.
     // Draining pendingAdds after prevents any buffered key from surviving as a
@@ -85,6 +133,16 @@ class RocksDbHealingVisitedStorage(dataSource: DataSource, namespace: Namespace)
       namespace,
       Array.fill(32)(0x00.toByte),
       Array.fill(32)(0xff.toByte) :+ 0x00.toByte
+    )
+    // Root marker (21-byte key) lies outside the hash range — explicit delete required.
+    dataSource.update(
+      Seq(
+        DataSourceUpdateOptimized(
+          namespace,
+          toRemove = Seq(RocksDbHealingVisitedStorage.RootMarkerKey),
+          toUpsert = Nil
+        )
+      )
     )
     pendingAdds.clear()
     pendingSize.set(0)
@@ -100,4 +158,8 @@ class InMemoryHealingVisitedStorage extends HealingVisitedStorage {
     map.putIfAbsent(key, java.lang.Boolean.TRUE) eq null
 
   override def clear(): Unit = map.clear()
+
+  // No persistent root concept in-memory — always treat as fresh on restart.
+  override def storedRoot(): Option[ByteString] = None
+  override def clearAndSetRoot(root: ByteString): Unit = map.clear()
 }

@@ -1383,17 +1383,26 @@ class TrieNodeHealingCoordinator(
     import com.chipprbots.ethereum.domain.Account
     import scala.util.control.NonFatal
 
-    // Disk-backed visited set (OPT-059): clear any residual from a prior walk, then mark all seeds.
-    // RocksDB point-get latency at warm block-cache is ~1-5 µs — negligible vs the 50K-node
-    // multiGet I/O per chunk. markIfNew is non-atomic under concurrency: two sub-range threads may
-    // both see the same child hash as absent and both return true, causing a duplicate BFS-queue
-    // entry. This is benign — downstream pendingHashSet deduplicates any resulting duplicate
-    // missing-node reports.
-    visitedStorage.clear()
-    // spec 003 C2: mark every seed hash as visited (level 0). For one seed this is the prior
-    // markIfNew(startHash); for many it pre-loads the shared visited set so cross-seed shared
-    // subtries are de-duplicated exactly as within a single walk.
-    seeds.foreach { case (h, _, _) => visitedStorage.markIfNew(h) }
+    // Disk-backed visited set (OPT-059 / Fix 3 / spec 003 C2): conditional clear keyed by primary
+    // seed root. If the stored root matches, the visited set from a prior walk is still valid —
+    // already-walked nodes will return false from markIfNew (point-get hit), skipping re-enqueue.
+    // This reduces crash-recovery cost from a full re-walk (~6h at L7) to O(point-gets over the
+    // already-visited portion (~20-30 min). If the root differs or no root is stored, clear and
+    // record the new root so the next restart can resume correctly.
+    // For multi-seed walks (spec 003 scoped verification), all seeds are marked at level 0 so
+    // cross-seed shared subtries are de-duplicated within a single walk.
+    // markIfNew is non-atomic under concurrency: duplicate BFS-queue entries are benign.
+    val primaryRoot = seeds.head._1
+    visitedStorage.storedRoot() match {
+      case Some(stored) if stored == primaryRoot =>
+        log.info(
+          "[HEAL-BFS] Resuming visited set from previous walk (same pivot root) — skipping already-walked nodes"
+        )
+        seeds.foreach { case (h, _, _) => visitedStorage.markIfNew(h) }
+      case _ =>
+        visitedStorage.clearAndSetRoot(primaryRoot)
+        seeds.foreach { case (h, _, _) => visitedStorage.markIfNew(h) }
+    }
 
     val visitedCount = new java.util.concurrent.atomic.AtomicLong(0L)
     val frontierCount = new java.util.concurrent.atomic.AtomicLong(0L)
