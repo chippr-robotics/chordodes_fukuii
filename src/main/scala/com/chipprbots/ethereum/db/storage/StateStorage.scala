@@ -4,6 +4,8 @@ import java.util.concurrent.TimeUnit
 
 import scala.concurrent.duration.FiniteDuration
 
+import org.apache.pekko.util.ByteString
+
 import com.chipprbots.ethereum.db.cache.LruCache
 import com.chipprbots.ethereum.db.cache.MapCache
 import com.chipprbots.ethereum.db.dataSource.DataSource
@@ -35,6 +37,12 @@ trait StateStorage {
     * (Archive, Cached).
     */
   def flushPendingPrunes(): Unit = ()
+
+  /** Replay any pruning blocks missed by a prior crash (gap between the persisted watermark and bestBlock -
+    * pruningHistory). Called at node startup, before sync resumes. Default no-op for Archive and Cached implementations
+    * that prune eagerly.
+    */
+  def replayMissedPrunes(bestBlock: BigInt): Unit = ()
 }
 
 class ArchiveStateStorage(private val nodeStorage: NodeStorage) extends StateStorage {
@@ -66,14 +74,18 @@ class ReferenceCountedStateStorage(
 ) extends StateStorage {
 
   // Batch pruning deletes across blocks: flush when accumulated byte size exceeds the threshold
-  // or every PruneSafetyInterval blocks, whichever comes first.  Terminal flush on graceful shutdown
+  // or every PruneSafetyInterval blocks, whichever comes first. Terminal flush on graceful shutdown
   // via flushPendingPrunes() prevents the last partial batch from being silently discarded.
   private val PruneByteThreshold: Long = 64L * 1024 * 1024 // 64 MB
   private val PruneSafetyInterval: Int = 1000 // blocks
+  // Atomic watermark: written in the same WriteBatch as the deletes. On restart, replayMissedPrunes
+  // reads this to detect any gap left by a prior crash and replays it before sync resumes.
+  private val LastPrunedBlockKey: NodeHash = ByteString("prune-lwm".getBytes("UTF-8"))
 
   private var pendingDeletes: List[NodeHash] = List.empty
   private var pendingByteSize: Long = 0L
   private var blocksSincePruneFlush: Int = 0
+  private var highestPendingBlock: BigInt = BigInt(0)
 
   override def forcePersist(reason: FlushSituation): Boolean = true
 
@@ -83,11 +95,11 @@ class ReferenceCountedStateStorage(
     if (deletes.nonEmpty) {
       pendingDeletes = deletes.toList ::: pendingDeletes
       pendingByteSize += deletes.view.map(_.length.toLong).sum
+      if (blockToPrune > highestPendingBlock) highestPendingBlock = blockToPrune
     }
     blocksSincePruneFlush += 1
-    if (pendingByteSize >= PruneByteThreshold || blocksSincePruneFlush >= PruneSafetyInterval) {
+    if (pendingByteSize >= PruneByteThreshold || blocksSincePruneFlush >= PruneSafetyInterval)
       doFlushPendingPrunes()
-    }
     updateBestBlocksData()
   }
 
@@ -110,11 +122,49 @@ class ReferenceCountedStateStorage(
 
   override def flushPendingPrunes(): Unit = doFlushPendingPrunes()
 
+  /** On restart after crash, replay any pruning blocks missed while pendingDeletes was in-memory only. Chunked into
+    * ≤1000-block sub-batches with intermediate watermark flushes to bound memory for months-long gaps (N blocks × M
+    * snapshots per block → tens of millions of keys).
+    */
+  override def replayMissedPrunes(bestBlock: BigInt): Unit = {
+    val lastFlushed = nodeStorage
+      .get(LastPrunedBlockKey)
+      .map(bytes => if (bytes.isEmpty) BigInt(0) else BigInt(bytes.toArray))
+      .getOrElse(BigInt(0))
+    val gapStart = lastFlushed + 1
+    val gapEnd = bestBlock - pruningHistory
+    if (gapStart > gapEnd) return
+
+    val ChunkSize = BigInt(1000)
+    var chunkStart = gapStart
+    while (chunkStart <= gapEnd) {
+      val chunkEnd = (chunkStart + ChunkSize - 1).min(gapEnd)
+      val chunkDeletes = (chunkStart to chunkEnd)
+        .flatMap(bn => ReferenceCountNodeStorage.collectPruneTargets(bn, nodeStorage))
+        .toList
+      if (chunkDeletes.nonEmpty)
+        nodeStorage.updateCond(
+          chunkDeletes,
+          Seq(LastPrunedBlockKey -> chunkEnd.toByteArray),
+          inMemory = false
+        )
+      chunkStart = chunkEnd + 1
+    }
+  }
+
   private def doFlushPendingPrunes(): Unit = {
     if (pendingDeletes.nonEmpty) {
-      nodeStorage.updateCond(pendingDeletes, Nil, inMemory = false)
+      // Only write the watermark when at least one block had pruning data.
+      // Guards against persisting BigInt(0) on threshold-triggered flushes where
+      // every block in the interval had no prune targets (highestPendingBlock stays 0).
+      val watermarkUpsert =
+        if (highestPendingBlock > 0) Seq(LastPrunedBlockKey -> highestPendingBlock.toByteArray)
+        else Nil
+      // Atomic: deletes + watermark in one WriteBatch — either both commit or neither does.
+      nodeStorage.updateCond(pendingDeletes, watermarkUpsert, inMemory = false)
       pendingDeletes = List.empty
       pendingByteSize = 0L
+      highestPendingBlock = BigInt(0)
     }
     blocksSincePruneFlush = 0
   }

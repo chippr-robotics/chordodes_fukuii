@@ -288,9 +288,11 @@ abstract class BaseNode extends Node {
         case None =>
           log.error("No block found for number {} when trying to fix database", bestBlockInfo.number)
       }
-
     }
 
+    // Replay any pruning blocks missed by a prior crash (OPT-046 watermark).
+    val bestBlock = storagesInstance.storages.appStateStorage.getBestBlockNumber()
+    storagesInstance.storages.stateStorage.replayMissedPrunes(bestBlock)
   }
 }
 
