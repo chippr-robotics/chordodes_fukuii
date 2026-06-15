@@ -44,7 +44,7 @@ crossPaths := true
 // patch for error on 'early-semver' problems
 ThisBuild / evictionErrorLevel := Level.Info
 
-val `scala-3` = "3.3.7" // Scala 3 LTS version
+val `scala-3` = "3.3.8" // Scala 3 LTS version (released 2026-06-11)
 val supportedScalaVersions = List(`scala-3`) // Scala 3 only
 
 // Base scalac options
@@ -62,6 +62,8 @@ val scala3Options = Seq(
   "-Wconf:msg=Compiler synthesis of Manifest:s,cat=deprecation:s", // Suppress Manifest deprecation warnings
   "-Ykind-projector", // Scala 3 replacement for kind-projector plugin
   "-Xmax-inlines:64" // Increase inline depth limit for complex boopickle/circe derivations
+  // NOTE: -source:future deferred — requires ~1,652 wildcard imports migrated from `_` to `*` first
+  // See .local/docs/moderization-review-june/scala-future-source.md for the pre-flight spec
 )
 
 def commonSettings(projectName: String): Seq[sbt.Def.Setting[_]] = Seq(
@@ -573,7 +575,8 @@ addCommandAlias("testMPT", "testOnly -- -n MPTTest")
 addCommandAlias("testEthereum", "testOnly -- -n EthereumTest")
 
 // Scapegoat configuration for Scala 3
-(ThisBuild / scapegoatVersion) := "3.3.4"
+// 3.3.6 is the first scapegoat cross-build published for Scala 3.3.8
+(ThisBuild / scapegoatVersion) := "3.3.6"
 scapegoatReports := Seq("xml", "html")
 scapegoatConsoleOutput := false
 scapegoatDisabledInspections := Seq("UnsafeTraversableMethods")

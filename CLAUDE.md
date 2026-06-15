@@ -1,7 +1,7 @@
 # CLAUDE.md — Working in fukuii
 
 `fukuii` is a **multi-network EVM client** (forked from IOHK Mantis, repackaged
-under `com.chipprbots`), running on **Scala 3.3.7 LTS** with Akka actors.
+under `com.chipprbots`), running on **Scala 3.3.8 LTS** with Apache Pekko actors.
 It supports two independent chain families:
 
 - **Ethereum Classic (ETC/Mordor)** — PoW/Ethash, ECIP-1017 fixed-supply
@@ -133,7 +133,7 @@ Read it before planning or implementing. Highlights:
 - Consensus-critical code (EVM/gas, state roots, hashes, RLP, Ethash, rewards,
   hard forks) MUST be byte-for-byte deterministic and ETC-spec compliant — design
   before implementing; follow the `forge` protocol in `.github/agents/forge.md`.
-- Scala 3.3.7 LTS only; code MUST pass `scalafmt` + `scalafix`.
+- Scala 3.3.8 LTS only; code MUST pass `scalafmt` + `scalafix`.
 - Tests MUST be deterministic (no `Thread.sleep`); keep statement coverage ≥ 70%.
 - Run `sbt pp` before opening a PR; CI gates and review must be green to merge.
 
