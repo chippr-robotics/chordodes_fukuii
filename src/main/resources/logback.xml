@@ -295,6 +295,6 @@
     <!-- =================================================================== -->
     <!-- METRICS - Performance monitoring                                    -->
     <!-- =================================================================== -->
-    <!-- Set to DEBUG for metrics collection troubleshooting -->
-    <logger name="com.chipprbots.ethereum.metrics" level="ERROR" />
+    <!-- INFO emits [RESOURCE-PULSE] every 60s; raise to DEBUG for deeper metrics troubleshooting -->
+    <logger name="com.chipprbots.ethereum.metrics" level="INFO" />
 </configuration>

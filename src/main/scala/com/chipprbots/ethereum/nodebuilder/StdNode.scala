@@ -182,8 +182,9 @@ abstract class BaseNode extends Node {
   private[this] def startMining(): Unit = mining.startProtocol(this)
 
   private[this] def startResourceHealthMonitor(): Unit = {
-    val _ = system.actorOf(
-      ResourceHealthMonitor.props(storagesInstance.dataSource),
+    import org.apache.pekko.actor.typed.scaladsl.adapter._
+    val _ = system.spawn(
+      ResourceHealthMonitor(storagesInstance.dataSource),
       ResourceHealthMonitor.ActorName
     )
   }
