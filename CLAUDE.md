@@ -140,9 +140,10 @@ Read it before planning or implementing. Highlights:
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/002-bfs-heal-performance/plan.md` (post-SNAP BFS heal-walk performance,
-redundancy-avoidance & observability — US1 skip-when-complete via the completeness
-marker, US2 metrics, US3 parallelism+pipelining, US4 config, US5 forward-scan,
-US6 visited-set accounting, US7 basic-pruning batching; Bloom filter rejected).
-Prior plan: `specs/001-healing-frontier-scale/plan.md`.
+`specs/003-scoped-heal-verification/plan.md` (scope the post-SNAP heal completion
+verification to re-walk only the healed subtrees instead of re-seeding the state
+root and re-walking the whole ~90M-node trie — reuse the BFS kernel with multi-seed,
+mandatory full-root fallback when full coverage isn't durably proven, byte-for-byte
+completion parity (FR-007). Consensus-adjacent; forge-reviewed; builds on the
+hold-pivot livelock fix #1357). Prior plan: `specs/002-bfs-heal-performance/plan.md`.
 <!-- SPECKIT END -->
