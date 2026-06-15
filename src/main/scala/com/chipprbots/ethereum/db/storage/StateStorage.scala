@@ -29,6 +29,12 @@ trait StateStorage {
   def saveNode(nodeHash: NodeHash, nodeEncoded: NodeEncoded, bn: BigInt): Unit
   def getNode(nodeHash: NodeHash): Option[MptNode]
   def forcePersist(reason: FlushSituation): Boolean
+
+  /** Flush any accumulated pending pruning deletions to RocksDB.
+    * Must be called during graceful shutdown to prevent the final partial batch from being silently discarded.
+    * Default no-op for storage implementations that prune eagerly (Archive, Cached).
+    */
+  def flushPendingPrunes(): Unit = ()
 }
 
 class ArchiveStateStorage(private val nodeStorage: NodeStorage) extends StateStorage {
@@ -58,11 +64,30 @@ class ReferenceCountedStateStorage(
     private val nodeStorage: NodeStorage,
     private val pruningHistory: BigInt
 ) extends StateStorage {
+
+  // Batch pruning deletes across blocks: flush when accumulated byte size exceeds the threshold
+  // or every PruneSafetyInterval blocks, whichever comes first.  Terminal flush on graceful shutdown
+  // via flushPendingPrunes() prevents the last partial batch from being silently discarded.
+  private val PruneByteThreshold: Long = 64L * 1024 * 1024 // 64 MB
+  private val PruneSafetyInterval: Int  = 1000              // blocks
+
+  private var pendingDeletes: List[NodeHash] = List.empty
+  private var pendingByteSize: Long = 0L
+  private var blocksSincePruneFlush: Int = 0
+
   override def forcePersist(reason: FlushSituation): Boolean = true
 
   override def onBlockSave(bn: BigInt, currentBestSavedBlock: BigInt)(updateBestBlocksData: () => Unit): Unit = {
     val blockToPrune = bn - pruningHistory
-    ReferenceCountNodeStorage.prune(blockToPrune, nodeStorage, inMemory = blockToPrune > currentBestSavedBlock)
+    val deletes = ReferenceCountNodeStorage.collectPruneTargets(blockToPrune, nodeStorage)
+    if (deletes.nonEmpty) {
+      pendingDeletes = deletes.toList ::: pendingDeletes
+      pendingByteSize += deletes.view.map(_.length.toLong).sum
+    }
+    blocksSincePruneFlush += 1
+    if (pendingByteSize >= PruneByteThreshold || blocksSincePruneFlush >= PruneSafetyInterval) {
+      doFlushPendingPrunes()
+    }
     updateBestBlocksData()
   }
 
@@ -82,6 +107,17 @@ class ReferenceCountedStateStorage(
 
   override def getNode(nodeHash: NodeHash): Option[MptNode] =
     new FastSyncNodeStorage(nodeStorage, 0).get(nodeHash).map(_.toMptNode)
+
+  override def flushPendingPrunes(): Unit = doFlushPendingPrunes()
+
+  private def doFlushPendingPrunes(): Unit = {
+    if (pendingDeletes.nonEmpty) {
+      nodeStorage.updateCond(pendingDeletes, Nil, inMemory = false)
+      pendingDeletes = List.empty
+      pendingByteSize = 0L
+    }
+    blocksSincePruneFlush = 0
+  }
 }
 
 class CachedReferenceCountedStateStorage(

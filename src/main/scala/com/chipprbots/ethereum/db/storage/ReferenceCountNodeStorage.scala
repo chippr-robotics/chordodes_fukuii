@@ -170,6 +170,22 @@ object ReferenceCountNodeStorage extends PruneSupport with Logger {
     log.debug(s"Pruned block $blockNumber")
   }
 
+  /** Collects all keys to delete when pruning `blockNumber` without committing any deletions.
+    * Returns the death-row key, snapshot metadata keys, and dead trie-node keys as a flat sequence.
+    * Returns an empty sequence when there is no pruning data for this block (e.g. block predates history).
+    * The caller accumulates these across blocks and flushes via `nodeStorage.updateCond` at a batch threshold.
+    */
+  def collectPruneTargets(blockNumber: BigInt, nodeStorage: NodesStorage): Seq[NodeHash] = {
+    var result = Seq.empty[NodeHash]
+    withSnapshotCount(blockNumber, nodeStorage) { (snapshotsCountKey, snapshotCount) =>
+      val deathRowKey  = drRowKey(blockNumber)
+      val snapshotKeys = snapshotKeysUpTo(blockNumber, snapshotCount)
+      val toBeRemoved  = getNodesToBeRemovedInPruning(blockNumber, deathRowKey, nodeStorage)
+      result = (deathRowKey +: snapshotsCountKey +: snapshotKeys) ++ toBeRemoved
+    }
+    result
+  }
+
   /** Looks for the StoredNode snapshots based on block number and saves (or deletes) them
     *
     * @param blockNumber

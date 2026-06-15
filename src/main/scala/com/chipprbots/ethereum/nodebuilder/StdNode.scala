@@ -273,6 +273,7 @@ abstract class BaseNode extends Node {
       tryAndLogFailure(() => jsonRpcIpcServer.close())
     }
     tryAndLogFailure(() => Metrics.get().close())
+    tryAndLogFailure(() => storagesInstance.storages.stateStorage.flushPendingPrunes())
     tryAndLogFailure(() => storagesInstance.dataSource.close())
   }
 
