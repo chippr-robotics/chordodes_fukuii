@@ -23,6 +23,7 @@ import com.chipprbots.ethereum.db.storage.{
   MptStorage,
   PathNodeStorage
 }
+import com.chipprbots.ethereum.metrics.ResourceHealthMonitor
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.{GetTrieNodes, TrieNodes}
@@ -404,6 +405,12 @@ class TrieNodeHealingCoordinator(
   // permanently blocking every future walk (including the watchdog) until restart.
   private case object FrontierWalkFailed
 
+  /** Fire-and-forget update to the node-wide ResourceHealthMonitor. Safe to call on the actor thread only. */
+  private def notifyMonitor(phase: String, ctx: Map[String, String]): Unit =
+    context.system
+      .actorSelection(s"/user/${ResourceHealthMonitor.ActorName}")
+      .tell(ResourceHealthMonitor.UpdatePhaseContext(phase, ctx), self)
+
   /** Synchronous flush — used only for final completion flush (small buffer, safe to block). */
   private def flushRawNodesSync(): Unit =
     if (rawNodeBuffer.nonEmpty) {
@@ -549,6 +556,7 @@ class TrieNodeHealingCoordinator(
       // The full-state rebuild BFS walked the entire trie; every still-missing node is now persisted.
       // Mark the snapshot complete so a future restart may resume it instead of re-walking (Layer 2).
       verificationBFSRunning = false // rebuild walk finished — release the single-flight gate
+      notifyMonitor("HEAL-APPLY", Map("healed" -> totalNodesHealed.toString, "pending" -> pendingTasks.size.toString))
       healingFrontierStorage.foreach { store =>
         store.markComplete()
         log.info("[HEAL-RESTART] Full-state rebuild complete — persisted frontier marked as a complete snapshot")
@@ -821,6 +829,7 @@ class TrieNodeHealingCoordinator(
           SNAPSyncMetrics.setHealingScopedDurationMs(elapsedMs)
           scopedVerificationActive = false
         }
+        notifyMonitor("HEAL-VERIFY-COMPLETE", Map("healed" -> totalNodesHealed.toString))
         log.info(
           s"[HEAL-VERIFY] Verification BFS complete — no missing nodes found. " +
             s"Trie is fully healed ($totalNodesHealed nodes). Declaring completion."
@@ -1679,6 +1688,7 @@ class TrieNodeHealingCoordinator(
     // a second concurrent walk corrupts the first. Cleared by FrontierRebuildComplete /
     // VerificationBFSComplete / FrontierWalkFailed.
     verificationBFSRunning = true
+    notifyMonitor("HEAL-BFS", Map("root" -> Hex.toHexString(root.take(4).toArray)))
     Future {
       try {
         rebuildFrontierBFS(seeds, selfRef, bfsQueue, effectiveParallelism)

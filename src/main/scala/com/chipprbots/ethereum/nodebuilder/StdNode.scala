@@ -18,6 +18,7 @@ import com.chipprbots.ethereum.console.TuiUpdater
 import com.chipprbots.ethereum.db.dataSource.RocksDbCacheMetrics
 import com.chipprbots.ethereum.metrics.Metrics
 import com.chipprbots.ethereum.metrics.MetricsConfig
+import com.chipprbots.ethereum.metrics.ResourceHealthMonitor
 import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.network.ServerActor
 import com.chipprbots.ethereum.network.StaticNodesLoader
@@ -74,6 +75,7 @@ abstract class BaseNode extends Node {
     // Phase 5: Background work
     startSyncController()
     startMining()
+    startResourceHealthMonitor()
 
     // Phase 6: Non-critical maintenance
     runDBConsistencyCheck()
@@ -178,6 +180,13 @@ abstract class BaseNode extends Node {
   private[this] def startSyncController(): Unit = syncController ! SyncProtocol.Start
 
   private[this] def startMining(): Unit = mining.startProtocol(this)
+
+  private[this] def startResourceHealthMonitor(): Unit = {
+    val _ = system.actorOf(
+      ResourceHealthMonitor.props(storagesInstance.dataSource),
+      ResourceHealthMonitor.ActorName
+    )
+  }
 
   private[this] def startDiscoveryManager(): Unit = peerDiscoveryManager ! PeerDiscoveryManager.Start
 

@@ -18,6 +18,7 @@ import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcher.InternalLastBlockImport
 import com.chipprbots.ethereum.blockchain.sync.regular.RegularSync.ProgressProtocol
 import com.chipprbots.ethereum.blockchain.sync.regular.RegularSync.ProgressState
+import com.chipprbots.ethereum.metrics.ResourceHealthMonitor
 import com.chipprbots.ethereum.consensus.ConsensusAdapter
 import com.chipprbots.ethereum.consensus.validators.BlockValidator
 import com.chipprbots.ethereum.db.storage.{EvmCodeStorage, StateStorage}
@@ -172,6 +173,19 @@ class RegularSync(
         s"RegularSync: current=${progressState.currentBlock} best=${progressState.bestKnownNetworkBlock} " +
           s"lag=$lag rate=${f"$rate%.1f"}/s eta=$etaStr"
       )
+      context.system
+        .actorSelection(s"/user/${ResourceHealthMonitor.ActorName}")
+        .tell(
+          ResourceHealthMonitor.UpdatePhaseContext(
+            if (lag == 0) "SYNCED" else "REGULAR-SYNC",
+            Map(
+              "blocks/s" -> f"$rate%.1f",
+              "lag"      -> lag.toString,
+              "head"     -> progressState.currentBlock.toString
+            )
+          ),
+          self
+        )
       context.become(
         running(
           progressState.copy(lastPrintBlock = progressState.currentBlock, lastPrintTimeMs = now)
