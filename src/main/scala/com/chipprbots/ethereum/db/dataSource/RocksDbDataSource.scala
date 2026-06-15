@@ -251,9 +251,22 @@ class RocksDbDataSource(
     * files. Avoids per-key bloom filter evaluation and issues sequential block reads rather than the batch of random
     * point lookups that multiGetAsList performs.
     *
-    * The returned iterator is NOT thread-safe. It closes the underlying RocksDB iterator when hasNext returns false
-    * (exhaustion or end-of-range). The iterator must be consumed to completion or explicitly closed by the caller;
-    * failing to do so leaks the native iterator until GC.
+    * Locking (issue #1355): the native `RocksIterator` is opened, drained, and closed in self-contained BATCHES, each
+    * batch fully bracketed by `dbLock.readLock()` + `assureNotClosed()` — exactly the `scanRange` idiom. Between
+    * batches NO native iterator and NO lock are held: the returned `Iterator` buffers one batch and yields it
+    * element-by-element, opening the next native iterator (re-seeking past the last key returned) only once the buffer
+    * drains. This keeps memory at O(batch) (the full `[from,toExcl)` range is never materialized, so the consumer's
+    * `.grouped(chunkSize)` still pulls lazily), while guaranteeing that a concurrent `close()`/`clear()` — which takes
+    * `dbLock.writeLock()` and frees the native CF + db handles — can never race a live native iterator. Before #1355
+    * this method drove one long-lived native iterator with no lock and no `assureNotClosed()`, so a SIGTERM-driven
+    * `close()` mid heal-walk could free native memory under the iterator (use-after-free / SIGSEGV).
+    *
+    * Abort-safe by construction: because no native iterator survives a batch boundary, abandoning the returned iterator
+    * mid-scan (or the consumer throwing) leaks nothing — the open iterator is always closed in the batch `finally`
+    * before control returns to the caller. (Previously the native iterator was closed only when `hasNext` returned
+    * false on full drain, leaking it on any early abandon.)
+    *
+    * The returned iterator is NOT thread-safe (single-consumer).
     *
     * Concurrent-write safety: callers must only scan ranges whose upper bound is fixed before scan creation (i.e., no
     * concurrent writer advances keys into [fromKey, toKeyExcl)).
@@ -262,23 +275,59 @@ class RocksDbDataSource(
       namespace: Namespace,
       fromKey: Array[Byte],
       toKeyExcl: Array[Byte]
-  ): Iterator[Array[Byte]] = {
-    val it = db.newIterator(handles(namespace), scanReadOptions)
-    it.seek(fromKey)
+  ): Iterator[Array[Byte]] =
     new Iterator[Array[Byte]] {
-      private var closed = false
-      def hasNext: Boolean = {
-        val alive = !closed && it.isValid && java.util.Arrays.compare(it.key(), toKeyExcl) < 0
-        if (!alive && !closed) { it.close(); closed = true }
-        alive
+      // Bounds per-batch memory independently of total range size, preserving the O(chunk) laziness contract.
+      private val refillBatchSize = 4096
+      private val buffer = scala.collection.mutable.ArrayDeque.empty[Array[Byte]]
+      // Strict lower bound for the NEXT batch: the last KEY yielded so far. `null` until the first batch is drained;
+      // the first batch seeks to `fromKey` (inclusive), later batches re-seek past `lastKey` (exclusive).
+      private var lastKey: Array[Byte] = null
+      private var exhausted = false
+
+      /** Open one native iterator, drain up to `refillBatchSize` entries of `[seekFrom..toKeyExcl)` into `buffer`, then
+        * close it. Mirrors `scanRange`: readLock + assureNotClosed for the whole batch, native iterator closed in a
+        * `finally`, read lock released in a `finally`. Sets `exhausted` when the batch ends the range.
+        */
+      private def refill(): Unit = {
+        dbLock.readLock().lock()
+        try {
+          assureNotClosed()
+          val it = db.newIterator(handles(namespace), scanReadOptions)
+          try {
+            if (lastKey == null) it.seek(fromKey)
+            else {
+              // Resume strictly after the last key returned. Keys are unique, so seek+skip is exact.
+              it.seek(lastKey)
+              if (it.isValid && java.util.Arrays.equals(it.key(), lastKey)) it.next()
+            }
+            var taken = 0
+            while (taken < refillBatchSize && it.isValid && java.util.Arrays.compareUnsigned(it.key(), toKeyExcl) < 0) {
+              lastKey = it.key()
+              buffer += it.value()
+              it.next()
+              taken += 1
+            }
+            // End of range reached within this batch (either no more valid keys or the next key is >= toKeyExcl).
+            if (taken < refillBatchSize) exhausted = true
+          } finally it.close()
+        } catch {
+          case error: RocksDbDataSourceClosedException => throw error
+          case NonFatal(error) =>
+            throw RocksDbDataSourceException(s"iterateSyncRange failed for namespace $namespace", error)
+        } finally dbLock.readLock().unlock()
       }
+
+      def hasNext: Boolean = {
+        if (buffer.isEmpty && !exhausted) refill()
+        buffer.nonEmpty
+      }
+
       def next(): Array[Byte] = {
-        val v = it.value()
-        it.next()
-        v
+        if (!hasNext) throw new NoSuchElementException("iterateSyncRange exhausted")
+        buffer.removeHead()
       }
     }
-  }
 
   private def dbIterator: Resource[IO, RocksIterator] =
     Resource.fromAutoCloseable(IO(db.newIterator()))
