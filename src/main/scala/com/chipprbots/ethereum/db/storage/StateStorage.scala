@@ -30,9 +30,9 @@ trait StateStorage {
   def getNode(nodeHash: NodeHash): Option[MptNode]
   def forcePersist(reason: FlushSituation): Boolean
 
-  /** Flush any accumulated pending pruning deletions to RocksDB.
-    * Must be called during graceful shutdown to prevent the final partial batch from being silently discarded.
-    * Default no-op for storage implementations that prune eagerly (Archive, Cached).
+  /** Flush any accumulated pending pruning deletions to RocksDB. Must be called during graceful shutdown to prevent the
+    * final partial batch from being silently discarded. Default no-op for storage implementations that prune eagerly
+    * (Archive, Cached).
     */
   def flushPendingPrunes(): Unit = ()
 }
@@ -69,7 +69,7 @@ class ReferenceCountedStateStorage(
   // or every PruneSafetyInterval blocks, whichever comes first.  Terminal flush on graceful shutdown
   // via flushPendingPrunes() prevents the last partial batch from being silently discarded.
   private val PruneByteThreshold: Long = 64L * 1024 * 1024 // 64 MB
-  private val PruneSafetyInterval: Int  = 1000              // blocks
+  private val PruneSafetyInterval: Int = 1000 // blocks
 
   private var pendingDeletes: List[NodeHash] = List.empty
   private var pendingByteSize: Long = 0L

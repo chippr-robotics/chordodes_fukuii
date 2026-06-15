@@ -180,8 +180,8 @@ class RegularSync(
             if (lag == 0) "SYNCED" else "REGULAR-SYNC",
             Map(
               "blocks/s" -> f"$rate%.1f",
-              "lag"      -> lag.toString,
-              "head"     -> progressState.currentBlock.toString
+              "lag" -> lag.toString,
+              "head" -> progressState.currentBlock.toString
             )
           ),
           self

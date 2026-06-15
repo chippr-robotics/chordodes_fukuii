@@ -385,9 +385,9 @@ class RocksDbDataSource(
 
   /** Aggregate RocksDB active-memtable + immutable-memtable memory across all column families, in MB.
     *
-    * Uses the `rocksdb.size-all-mem-tables` property per CF handle. Returns 0 on any error (handles map
-    * not yet populated, DB closed, unsupported property). Safe to call from any thread; does NOT acquire
-    * the RW lock because `getLongProperty` is a read-only call on an immutable view of the CF handles.
+    * Uses the `rocksdb.size-all-mem-tables` property per CF handle. Returns 0 on any error (handles map not yet
+    * populated, DB closed, unsupported property). Safe to call from any thread; does NOT acquire the RW lock because
+    * `getLongProperty` is a read-only call on an immutable view of the CF handles.
     */
   def totalMemtableSizeMB: Long =
     handles.values.foldLeft(0L) { (acc, handle) =>
