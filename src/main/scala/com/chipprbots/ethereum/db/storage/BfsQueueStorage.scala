@@ -131,11 +131,19 @@ class RocksDbBfsQueueStorage(dataSource: DataSource, namespace: Namespace) exten
     }
 
   def deleteRange(from: Long, to: Long): Unit =
-    // Single native range tombstone — O(1) regardless of (to - from). The previous
-    // implementation expanded the range into 10K-key point-delete batches; clearing the
-    // ~140M-entry queue after a full ETC-mainnet walk wrote ~140M tombstones over ~30 minutes
-    // at full CPU (observed live 2026-06-12) while the next walk waited.
-    if (from < to) dataSource.deleteRange(namespace, longToBytes(from), longToBytes(to))
+    if (from < to) {
+      // Single native range tombstone — O(1) write. Then immediately compact to physically
+      // remove the tombstoned keys from SST files. Without compaction, each level's tombstone
+      // persists in SST files and the forward iterator must check every live key against all
+      // accumulated tombstones — observed as 8–9× queueRead degradation in C1 vs C0 on ETC
+      // mainnet (RUN03-1, 2026-06-15). Compaction adds ~2–10s per level (proportional to level
+      // size); this is far cheaper than the accumulated scan overhead across subsequent cycles.
+      dataSource.deleteRange(namespace, longToBytes(from), longToBytes(to))
+      dataSource match {
+        case rdb: RocksDbDataSource => rdb.compact(namespace)
+        case _                      => // in-memory: no-op
+      }
+    }
 
   def clear(): Unit = {
     // Tombstone the ENTIRE keyspace, not just [0, counter): the counter is in-memory only, so
@@ -143,6 +151,10 @@ class RocksDbBfsQueueStorage(dataSource: DataSource, namespace: Namespace) exten
     // entries. The old `if (counter > 0)` guard skipped deletion entirely in that state,
     // leaving the garbage on disk forever. Long.MaxValue exceeds any key ever assigned.
     dataSource.deleteRange(namespace, longToBytes(0L), longToBytes(Long.MaxValue))
+    dataSource match {
+      case rdb: RocksDbDataSource => rdb.compact(namespace)
+      case _                      => // in-memory: no-op
+    }
     writeCounter.set(0L)
   }
 }

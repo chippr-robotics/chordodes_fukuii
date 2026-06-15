@@ -143,6 +143,27 @@ class RocksDbDataSource(
     } finally dbLock.writeLock().unlock()
   }
 
+  /** Synchronously compact the entire column family, forcing RocksDB to process any pending range tombstones and merge
+    * SST files. Blocks until compaction is complete.
+    *
+    * Used by [[com.chipprbots.ethereum.db.storage.RocksDbBfsQueueStorage]] after each BFS level deletion to prevent
+    * range-tombstone proliferation from degrading subsequent forward scans. Without this, each new BFS cycle starts
+    * with N accumulated tombstones (one per prior level deletion), causing iterateSyncRange to slow by ~8–9× per
+    * accumulated tombstone generation.
+    */
+  def compact(namespace: Namespace): Unit = {
+    dbLock.readLock().lock()
+    try {
+      assureNotClosed()
+      db.compactRange(handles(namespace))
+    } catch {
+      case error: RocksDbDataSourceClosedException =>
+        throw error
+      case NonFatal(error) =>
+        throw RocksDbDataSourceException(s"DataSource error while compacting namespace", error)
+    } finally dbLock.readLock().unlock()
+  }
+
   /** Forward range scan via a single seek+next over a bounded `[fromKey, toKeyExclusive)` window. Uses
     * `scanReadOptions` (fillCache=false) so a large queue scan does not evict the hot block cache. Drains the window
     * into a buffer and CLOSES the native iterator before returning, so no `RocksIterator` handle outlives the call —
