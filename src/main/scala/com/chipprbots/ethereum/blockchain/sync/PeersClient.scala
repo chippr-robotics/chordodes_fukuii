@@ -39,7 +39,7 @@ class PeersClient(
 ) extends Actor
     with ActorLogging
     with PeerListSupportNg {
-  import PeersClient._
+  import PeersClient.*
 
   implicit val ec: ExecutionContext = context.dispatcher
 
@@ -155,7 +155,8 @@ class PeersClient(
       requestMsg: RequestMsg,
       responseMsgCode: Int,
       toSerializable: RequestMsg => MessageSerializable
-  )(implicit scheduler: Scheduler, classTag: ClassTag[ResponseMsg]): ActorRef =
+  )(implicit scheduler: Scheduler, classTag: ClassTag[ResponseMsg]): ActorRef = {
+    implicit val toSer: RequestMsg => MessageSerializable = toSerializable
     context.actorOf(
       PeerRequestHandler.props[RequestMsg, ResponseMsg](
         peer = peer,
@@ -164,8 +165,9 @@ class PeersClient(
         peerEventBus = peerEventBus,
         requestMsg = requestMsg,
         responseMsgCode = responseMsgCode
-      )(classTag, scheduler, toSerializable)
+      )
     )
+  }
 
   private def handleResponse[ResponseMsg <: ResponseMessage](requesters: Requesters, responseMsg: ResponseMsg): Unit = {
     val requestHandler = sender()

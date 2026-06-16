@@ -19,11 +19,11 @@ import com.chipprbots.ethereum.NormalPatience
 import com.chipprbots.ethereum.Timeouts
 import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.domain.BlockchainReader
-import com.chipprbots.ethereum.jsonrpc.EthFilterService._
-import com.chipprbots.ethereum.jsonrpc.{FilterManager => FM}
+import com.chipprbots.ethereum.jsonrpc.EthFilterService.*
+import com.chipprbots.ethereum.jsonrpc.FilterManager as FM
 import com.chipprbots.ethereum.utils.FilterConfig
 import scala.concurrent.Future
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class EthFilterServiceSpec
     extends TestKit(ActorSystem("EthFilterServiceSpec_ActorSystem"))
@@ -90,7 +90,7 @@ class EthFilterServiceSpec
   }
 
   it should "handle getLogs request" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    (mockBlockchainReader.getBestBlockNumber _).when().returns(BigInt(100))
+    mockBlockchainReader.getBestBlockNumber.when().returns(BigInt(100))
     val filter: Filter = Filter(None, None, None, Seq.empty)
     val res: Future[Either[JsonRpcError, GetLogsResponse]] =
       ethFilterService.getLogs(GetLogsRequest(filter)).unsafeToFuture()

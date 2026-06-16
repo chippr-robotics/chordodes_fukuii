@@ -13,18 +13,18 @@ import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.Await
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import org.json4s._
-import org.json4s.native.JsonMethods._
+import org.json4s.*
+import org.json4s.native.JsonMethods.*
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.NormalPatience
 import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.domain.Block
-import com.chipprbots.ethereum.jsonrpc.SubscriptionManager._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.jsonrpc.SubscriptionManager.*
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Unit tests for SubscriptionManager actor.
   *

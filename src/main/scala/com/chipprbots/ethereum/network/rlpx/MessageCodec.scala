@@ -90,7 +90,7 @@ class MessageCodec(
     val remoteClientId: String,
     compressionPolicy: MessageCodec.CompressionPolicy
 ) extends Logger {
-  import MessageCodec._
+  import MessageCodec.*
 
   val contextIdCounter = new AtomicInteger
 

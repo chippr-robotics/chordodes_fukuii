@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 import java.security.SecureRandom
 import java.util.concurrent.atomic.AtomicReference
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import cats.effect.{Deferred, IO, Ref, Resource, Temporal}
 import cats.implicits.*

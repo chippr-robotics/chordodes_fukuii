@@ -12,7 +12,7 @@ import com.chipprbots.ethereum.db.storage.NodeStorage.NodeEncoded
 import com.chipprbots.ethereum.db.storage.NodeStorage.NodeHash
 import com.chipprbots.ethereum.mpt
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
-import com.chipprbots.ethereum.rlp.{encode => encodeRLP}
+import com.chipprbots.ethereum.rlp.encode as encodeRLP
 import com.chipprbots.ethereum.utils.ByteUtils.matchingLength
 
 object MerklePatriciaTrie {
@@ -101,7 +101,7 @@ class MerklePatriciaTrie[K, V] private (private[mpt] val rootNode: Option[MptNod
     vSerializer: ByteArraySerializable[V]
 ) extends SimpleMap[K, V, MerklePatriciaTrie[K, V]] {
 
-  import MerklePatriciaTrie._
+  import MerklePatriciaTrie.*
 
   lazy val getRootHash: Array[Byte] = rootNode.map(_.hash).getOrElse(EmptyRootHash)
 

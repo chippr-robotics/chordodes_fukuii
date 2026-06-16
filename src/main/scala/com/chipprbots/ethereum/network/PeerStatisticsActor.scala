@@ -2,11 +2,11 @@ package com.chipprbots.ethereum.network
 
 import java.time.Clock
 
-import org.apache.pekko.actor._
+import org.apache.pekko.actor.*
 
 import scala.concurrent.duration.FiniteDuration
 
-import com.chipprbots.ethereum.network.PeerEventBusActor._
+import com.chipprbots.ethereum.network.PeerEventBusActor.*
 import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.messages.Codes
 
@@ -15,7 +15,7 @@ class PeerStatisticsActor(
     var maybeStats: Option[TimeSlotStats[PeerId, PeerStat]]
 )(implicit clock: Clock)
     extends Actor {
-  import PeerStatisticsActor._
+  import PeerStatisticsActor.*
 
   override def preStart(): Unit = {
     // Subscribe to messages received from handshaked peers to maintain stats.

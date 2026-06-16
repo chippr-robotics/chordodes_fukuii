@@ -8,14 +8,14 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.Codes
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.{Status68 => Status}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.Status68 as Status
 import com.chipprbots.ethereum.forkid.ForkId
 import com.chipprbots.ethereum.network.rlpx.Frame
 import com.chipprbots.ethereum.network.rlpx.FrameCodec
 import com.chipprbots.ethereum.network.rlpx.Header
 import com.chipprbots.ethereum.network.rlpx.MessageCodec
 import com.chipprbots.ethereum.network.rlpx.MessageCodec.CompressionPolicy
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 
 class MessageCodecSpec extends AnyFlatSpec with Matchers {

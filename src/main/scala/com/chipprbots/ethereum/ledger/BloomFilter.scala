@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.ledger
 
 import org.apache.pekko.util.ByteString
 
-import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.crypto.*
 import com.chipprbots.ethereum.domain.TxLogEntry
 import com.chipprbots.ethereum.utils.ByteUtils
 import com.chipprbots.ethereum.utils.ByteUtils.or
@@ -34,7 +34,7 @@ object BloomFilter {
     if (bloomFilters.isEmpty)
       EmptyBloomFilter
     else
-      ByteString(or(bloomFilters: _*))
+      ByteString(or(bloomFilters*))
   }
 
   // Bloom filter function that reduces a log to a single 256-byte hash based on equation 24 from the YP
@@ -42,7 +42,7 @@ object BloomFilter {
     val dataForBloomFilter = logEntry.loggerAddress.bytes +: logEntry.logTopics
     val bloomFilters = dataForBloomFilter.map(bytes => bloomFilter(bytes.toArray))
 
-    or(bloomFilters: _*)
+    or(bloomFilters*)
   }
 
   // Bloom filter that sets 3 bits out of 2048 based on equations 25-28 from the YP

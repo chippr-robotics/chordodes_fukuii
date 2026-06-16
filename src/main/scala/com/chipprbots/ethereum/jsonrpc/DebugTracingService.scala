@@ -96,7 +96,7 @@ class DebugTracingService(
     transactionMappingStorage: TransactionMappingStorage
 ) extends ResolveBlock {
 
-  import DebugTracingService._
+  import DebugTracingService.*
 
   implicit private val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
 

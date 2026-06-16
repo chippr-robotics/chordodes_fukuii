@@ -10,8 +10,8 @@ import scala.util.Try
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-import ByteStringUtils._
-import com.chipprbots.ethereum.testing.Tags._
+import ByteStringUtils.*
+import com.chipprbots.ethereum.testing.Tags.*
 
 class ByteStringUtilsTest extends AnyWordSpec with Matchers {
 

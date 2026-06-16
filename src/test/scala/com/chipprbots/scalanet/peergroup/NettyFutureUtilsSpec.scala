@@ -1,6 +1,6 @@
 package com.chipprbots.scalanet.peergroup
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global

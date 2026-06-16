@@ -3,15 +3,15 @@ package com.chipprbots.ethereum.jsonrpc
 import org.apache.pekko.util.ByteString
 
 import org.bouncycastle.util.encoders.Hex
-import org.json4s._
-import org.json4s.native.JsonMethods._
+import org.json4s.*
+import org.json4s.native.JsonMethods.*
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
-import com.chipprbots.ethereum.jsonrpc.EthBlocksJsonMethodsImplicits._
+import com.chipprbots.ethereum.jsonrpc.EthBlocksJsonMethodsImplicits.*
 
 /** Test to verify that genesis block is serialized correctly:
   *   1. mixHash field should be present

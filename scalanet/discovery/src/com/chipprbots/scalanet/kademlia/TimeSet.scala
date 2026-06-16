@@ -55,10 +55,10 @@ object TimeSet {
   def empty[T]: TimeSet[T] = emptyInstance.asInstanceOf[TimeSet[T]]
 
   def apply[T](elems: T*): TimeSet[T] = {
-    new TimeSet[T]().addAll(elems: _*)
+    new TimeSet[T]().addAll(elems*)
   }
 
   def apply[T](clock: Clock, elems: T*): TimeSet[T] = {
-    new TimeSet[T](clock).addAll(elems: _*)
+    new TimeSet[T](clock).addAll(elems*)
   }
 }

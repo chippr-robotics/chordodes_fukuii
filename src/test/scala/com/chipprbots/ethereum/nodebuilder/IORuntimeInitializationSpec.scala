@@ -6,12 +6,12 @@ import org.apache.pekko.testkit.TestKit
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Tests to validate that IORuntime is properly initialized in the NodeBuilder trait hierarchy to prevent null pointer
   * exceptions during actor creation.

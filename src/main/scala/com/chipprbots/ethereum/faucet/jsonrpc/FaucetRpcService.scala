@@ -12,7 +12,7 @@ import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.SendFundsRequest
 import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.SendFundsResponse
 import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.StatusRequest
 import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.StatusResponse
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
 
 import scala.annotation.unused
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError

@@ -8,7 +8,7 @@ import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist
 import com.chipprbots.ethereum.network.PeerId
@@ -86,7 +86,7 @@ object NetService {
 }
 
 trait NetServiceAPI {
-  import NetService._
+  import NetService.*
 
   def version(req: VersionRequest): ServiceResponse[VersionResponse]
   def listening(req: ListeningRequest): ServiceResponse[ListeningResponse]
@@ -110,8 +110,8 @@ class NetService(
     blacklist: Blacklist,
     config: NetService.NetServiceConfig
 ) extends NetServiceAPI {
-  import NetService._
-  import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
+  import NetService.*
+  import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
 
   def version(req: VersionRequest): ServiceResponse[VersionResponse] =
     IO.pure(Right(VersionResponse(Config.Network.peer.networkId.toString())))

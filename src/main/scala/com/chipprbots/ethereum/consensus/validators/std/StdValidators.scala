@@ -8,7 +8,7 @@ import scala.annotation.unused
 
 import com.chipprbots.ethereum.consensus.mining.GetBlockHeaderByHash
 import com.chipprbots.ethereum.consensus.mining.GetNBlocksBack
-import com.chipprbots.ethereum.consensus.validators._
+import com.chipprbots.ethereum.consensus.validators.*
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.Receipt
 import com.chipprbots.ethereum.ledger.BlockExecutionError

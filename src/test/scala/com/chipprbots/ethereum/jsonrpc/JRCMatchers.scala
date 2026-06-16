@@ -70,7 +70,7 @@ trait JRCMatchers extends Matchers {
   def haveDecimalResult(result: BigDecimal): ResponseMatcher = haveResult(result = JDecimal(result))
   def haveByteStringResult(result: ByteString): ResponseMatcher =
     haveResult(result = JString("0x" + ByteStringUtils.hash2string(result)))
-  def haveObjectResult(items: (String, JValue)*): ResponseMatcher = haveResult(result = JObject(items: _*))
+  def haveObjectResult(items: (String, JValue)*): ResponseMatcher = haveResult(result = JObject(items*))
   def haveResult(result: JValue): ResponseMatcher = beResponse(result = Some(result))
   def haveError(expectedError: JsonRpcError): ResponseMatcher = beResponse(error = Some(expectedError))
 

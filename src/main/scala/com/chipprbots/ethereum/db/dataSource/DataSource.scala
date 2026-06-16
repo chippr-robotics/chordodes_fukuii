@@ -7,7 +7,7 @@ import fs2.Stream
 import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource.IterationError
 
 trait DataSource {
-  import DataSource._
+  import DataSource.*
 
   /** This function obtains the associated value to a key. It requires the (key-value) pair to be in the DataSource
     *

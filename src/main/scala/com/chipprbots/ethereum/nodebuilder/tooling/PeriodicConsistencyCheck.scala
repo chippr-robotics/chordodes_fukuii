@@ -49,7 +49,7 @@ case class PeriodicConsistencyCheck(
     shutdown: () => Unit,
     engineApiEnabled: Boolean = false
 ) extends Logger {
-  import PeriodicConsistencyCheck._
+  import PeriodicConsistencyCheck.*
 
   def check(): Behavior[ConsistencyCheck] = Behaviors.receiveMessage { case Tick =>
     // Match the skip conditions in StdNode.runDBConsistencyCheck: the post-SNAP best block

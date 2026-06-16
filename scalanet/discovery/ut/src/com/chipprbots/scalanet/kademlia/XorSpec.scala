@@ -1,11 +1,11 @@
 package com.chipprbots.scalanet.kademlia
 
-import com.chipprbots.scalanet.kademlia.Generators._
-import com.chipprbots.scalanet.kademlia.Xor._
+import com.chipprbots.scalanet.kademlia.Generators.*
+import com.chipprbots.scalanet.kademlia.Xor.*
 import org.scalacheck.Gen.posNum
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks._
+import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks.*
 import scodec.bits.BitVector
 
 class XorSpec extends AnyFlatSpec with Matchers {

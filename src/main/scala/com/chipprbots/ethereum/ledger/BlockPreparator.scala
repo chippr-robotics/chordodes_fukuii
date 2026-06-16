@@ -7,8 +7,8 @@ import org.apache.pekko.util.ByteString
 import com.chipprbots.ethereum.consensus.validators.SignedTransactionError.TransactionSignatureError
 import com.chipprbots.ethereum.consensus.validators.SignedTransactionValidator
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
-import com.chipprbots.ethereum.domain.UInt256._
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.UInt256.*
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.ledger.BlockExecutionError.StateBeforeFailure
 import com.chipprbots.ethereum.ledger.BlockExecutionError.TxsExecutionError
 
@@ -16,7 +16,7 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 import com.chipprbots.ethereum.utils.DebugTrace
 import com.chipprbots.ethereum.utils.Logger
-import com.chipprbots.ethereum.vm.{PC => _, *}
+import com.chipprbots.ethereum.vm.{PC as _, *}
 
 /** This is used from a [[com.chipprbots.ethereum.consensus.blocks.BlockGenerator BlockGenerator]].
   */
@@ -487,7 +487,7 @@ class BlockPreparator(
     // needs to return the unused portion: (gasLimit - executionGas) * effectiveGasPrice.
     // No maxFee overpay to undo.
     val refundAmount = totalGasToRefund * gasPrice
-    val refundGasFn = pay(senderAddress, refundAmount.toUInt256, withTouch = false) _
+    val refundGasFn = pay(senderAddress, refundAmount.toUInt256, withTouch = false)
     // EIP-1559: miner receives only the priority fee (effectiveGasPrice - baseFee).
     // The baseFee portion is burned on ETH chains, or credited to treasury on ETC (ECIP-1111).
     val minerGasPrice = blockHeader.baseFee match {
@@ -496,7 +496,7 @@ class BlockPreparator(
       case None                                          => gasPrice
     }
     val payMinerForGasFn =
-      pay(Address(blockHeader.beneficiary), (executionGasToPayToMiner * minerGasPrice).toUInt256, withTouch = true) _
+      pay(Address(blockHeader.beneficiary), (executionGasToPayToMiner * minerGasPrice).toUInt256, withTouch = true)
 
     val worldAfterPayments = refundGasFn.andThen(payMinerForGasFn)(resultWithErrorHandling.world)
 
@@ -505,9 +505,9 @@ class BlockPreparator(
     // post-execution deduction needed here — would double-charge.
     val worldAfterBlobGas = worldAfterPayments
 
-    val deleteAccountsFn = deleteAccounts(resultWithErrorHandling.addressesToDelete) _
-    val deleteTouchedAccountsFn = deleteEmptyTouchedAccounts _
-    val persistStateFn = InMemoryWorldStateProxy.persistState _
+    val deleteAccountsFn = deleteAccounts(resultWithErrorHandling.addressesToDelete)
+    val deleteTouchedAccountsFn = deleteEmptyTouchedAccounts
+    val persistStateFn = InMemoryWorldStateProxy.persistState
 
     val world2 = deleteAccountsFn.andThen(deleteTouchedAccountsFn).andThen(persistStateFn)(worldAfterBlobGas)
 

@@ -18,7 +18,7 @@ import com.chipprbots.ethereum.rlp.RLPValue
   */
 class BlockBodyWireFormatSpec extends AnyFlatSpec with Matchers {
 
-  import BlockBody._
+  import BlockBody.*
 
   "BlockBody wire encoding" should "frame typed transactions as RLP byte strings (EIP-2718)" in {
     val typedTx = TransactionWithAccessList(

@@ -13,7 +13,7 @@ import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.rlp
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPValue
-import com.chipprbots.ethereum.rlp.UInt256RLPImplicits._
+import com.chipprbots.ethereum.rlp.UInt256RLPImplicits.*
 import com.chipprbots.ethereum.utils.DebugTrace
 import com.chipprbots.ethereum.utils.Logger
 
@@ -33,7 +33,7 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
     */
   def run(context: ProgramContext[W, S]): ProgramResult[W, S] = {
     {
-      import context._
+      import context.*
       import org.bouncycastle.util.encoders.Hex
       log.trace(
         s"caller:  $callerAddr | recipient: $recipientAddr | gasPrice: $gasPrice | value: $value | inputData: ${Hex
@@ -222,7 +222,7 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
         // either way observe the step.
         tracer.foreach(_.onStep(opCode, state, newState))
         state.env.tracer.foreach(_.onStep(opCode, state, newState))
-        import newState._
+        import newState.*
         log.trace(
           s"$opCode | pc: $pc | depth: ${env.callDepth} | gasUsed: ${state.gas - gas} | gas: $gas | stack: $stack"
         )

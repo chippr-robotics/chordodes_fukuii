@@ -6,7 +6,7 @@ import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.Scheduler
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.bouncycastle.util.encoders.Hex
 
@@ -22,8 +22,8 @@ import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 trait PeerListSupportNg { self: Actor with ActorLogging =>
-  import PeerListSupportNg._
-  import Blacklist._
+  import PeerListSupportNg.*
+  import Blacklist.*
 
   implicit private val ec: ExecutionContext = context.dispatcher
 

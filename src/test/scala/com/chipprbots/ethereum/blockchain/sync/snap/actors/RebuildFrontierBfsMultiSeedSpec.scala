@@ -4,16 +4,16 @@ import org.apache.pekko.actor.{ActorRef, ActorSystem}
 import org.apache.pekko.testkit.{ImplicitSender, TestKit, TestProbe}
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.blockchain.sync.snap._
+import com.chipprbots.ethereum.blockchain.sync.snap.*
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.mpt.{BranchNode, HashNode, MptNode, NullNode}
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestMptStorage
 
 /** T012 (US1, C2 / FR-007): single-element multi-seed byte-parity.

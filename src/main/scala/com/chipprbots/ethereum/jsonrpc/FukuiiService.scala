@@ -7,7 +7,7 @@ import cats.effect.IO
 import cats.implicits.*
 
 import scala.annotation.unused
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.collection.immutable.NumericRange
 
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
@@ -40,7 +40,7 @@ class FukuiiService(
     syncController: ActorRef
 ) {
 
-  import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
+  import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
   implicit val timeout: Timeout = Timeout(10.seconds)
 
   implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig

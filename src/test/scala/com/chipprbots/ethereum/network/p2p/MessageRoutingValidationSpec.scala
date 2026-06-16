@@ -9,7 +9,7 @@ import com.chipprbots.ethereum.forkid.ForkId
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.Codes
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Validates that ETH68 and ETH69 messages are correctly routed to their decoders. ETH62-67 decoder routing removed:
   * Fukuii only negotiates ETH68 and ETH69.
@@ -29,7 +29,7 @@ class MessageRoutingValidationSpec extends AnyFlatSpec with Matchers {
     UnitTest,
     NetworkTest
   ) in {
-    import ETHPackets.Status68.Status68._
+    import ETHPackets.Status68.Status68.*
     val status = ETHPackets.Status68.Status68(
       protocolVersion = 68,
       networkId = 1,
@@ -53,7 +53,7 @@ class MessageRoutingValidationSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "route ETH69 Status messages to ETH69MessageDecoder" taggedAs (UnitTest, NetworkTest) in {
-    import ETHPackets.Status69.Status69._
+    import ETHPackets.Status69.Status69.*
     val status = ETHPackets.Status69.Status69(
       protocolVersion = 69,
       networkId = 1,

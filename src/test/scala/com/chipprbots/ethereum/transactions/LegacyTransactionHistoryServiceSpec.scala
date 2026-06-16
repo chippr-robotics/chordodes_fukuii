@@ -12,11 +12,11 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.crypto.generateKeyPair
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.transactions.TransactionHistoryService.ExtendedTransactionData
 import com.chipprbots.ethereum.transactions.TransactionHistoryService.MinedTransactionData
 import com.chipprbots.ethereum.transactions.testing.PendingTransactionsManagerAutoPilot
-import com.chipprbots.ethereum.{blockchain => _, _}
+import com.chipprbots.ethereum.{blockchain as _, *}
 
 class LegacyTransactionHistoryServiceSpec
     extends TestKit(ActorSystem("TransactionHistoryServiceSpec-system"))
@@ -35,7 +35,7 @@ class LegacyTransactionHistoryServiceSpec
   def createFixture() = new Fixture
 
   "returns account recent transactions in newest -> oldest order" in testCaseM { (fixture: Fixture) =>
-    import fixture._
+    import fixture.*
 
     val address = Address("ee4439beb5c71513b080bbf9393441697a29f478")
 
@@ -92,7 +92,7 @@ class LegacyTransactionHistoryServiceSpec
 
   "does not return account recent transactions from older blocks and return pending txs" in testCaseM {
     (fixture: Fixture) =>
-      import fixture._
+      import fixture.*
 
       val blockWithTx = Block(Fixtures.Blocks.Block3125369.header, Fixtures.Blocks.Block3125369.body)
 

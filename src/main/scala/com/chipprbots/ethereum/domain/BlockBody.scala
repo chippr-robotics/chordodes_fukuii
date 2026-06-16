@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.domain
 
-import com.chipprbots.ethereum.domain.BlockHeaderImplicits._
-import com.chipprbots.ethereum.domain.Withdrawal._
+import com.chipprbots.ethereum.domain.BlockHeaderImplicits.*
+import com.chipprbots.ethereum.domain.Withdrawal.*
 import com.chipprbots.ethereum.rlp.PrefixedRLPEncodable
 import com.chipprbots.ethereum.rlp.RLPEncodeable
 import com.chipprbots.ethereum.rlp.RLPList
@@ -31,7 +31,7 @@ object BlockBody {
 
   val empty: BlockBody = BlockBody(Seq.empty, Seq.empty)
 
-  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.TypedTransaction._
+  import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.TypedTransaction.*
 
   def blockBodyToRlpEncodable(
       blockBody: BlockBody,
@@ -49,19 +49,19 @@ object BlockBody {
       }
     }
     val baseParts: Seq[RLPEncodeable] = Seq(
-      RLPList(txItems: _*),
-      RLPList(blockBody.uncleNodesList.map(blockHeaderToRlpEncodable): _*)
+      RLPList(txItems*),
+      RLPList(blockBody.uncleNodesList.map(blockHeaderToRlpEncodable)*)
     )
     val withdrawalsPart: Seq[RLPEncodeable] = blockBody.withdrawals match {
-      case Some(ws) => Seq(RLPList(ws.map(w => WithdrawalEnc(w).toRLPEncodable): _*))
+      case Some(ws) => Seq(RLPList(ws.map(w => WithdrawalEnc(w).toRLPEncodable)*))
       case None     => Seq.empty
     }
-    RLPList((baseParts ++ withdrawalsPart): _*)
+    RLPList((baseParts ++ withdrawalsPart)*)
   }
 
   implicit class BlockBodyEnc(msg: BlockBody) extends RLPSerializable {
     override def toRLPEncodable: RLPEncodeable = {
-      import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions._
+      import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
 
       blockBodyToRlpEncodable(
         msg,
@@ -99,7 +99,7 @@ object BlockBody {
 
   implicit class BlockBodyRLPEncodableDec(val rlpEncodeable: RLPEncodeable) {
     def toBlockBody: BlockBody = {
-      import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions._
+      import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
 
       rlpEncodableToBlockBody(
         rlpEncodeable,

@@ -23,7 +23,7 @@ import com.chipprbots.ethereum.rlp.RLPCodec.Ops
 import com.chipprbots.ethereum.rlp.RLPEncodeable
 import com.chipprbots.ethereum.rlp.RLPEncoder
 import com.chipprbots.ethereum.rlp.RLPImplicitConversions.toEncodeable
-import com.chipprbots.ethereum.rlp.RLPImplicitDerivations._
+import com.chipprbots.ethereum.rlp.RLPImplicitDerivations.*
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPValue
@@ -86,7 +86,7 @@ trait ContentCodecs {
       },
       {
         case RLPList(items @ _*) if items.length == 4 =>
-          val address = RLPList(items.take(3): _*).decodeAs[Node.Address]("address")
+          val address = RLPList(items.take(3)*).decodeAs[Node.Address]("address")
           val id = items(3).decodeAs[PublicKey]("id")
           Node(id, address)
       }
@@ -133,7 +133,7 @@ trait ContentCodecs {
 
         EthereumNodeRecord.Content(
           seq.decodeAs[Long]("seq"),
-          attrs: _*
+          attrs*
         )
       }
     )
@@ -149,7 +149,7 @@ trait ContentCodecs {
       { case RLPList(signature, content @ _*) =>
         EthereumNodeRecord(
           signature.decodeAs[Signature]("signature"),
-          RLPList(content: _*).decodeAs[EthereumNodeRecord.Content]("content")
+          RLPList(content*).decodeAs[EthereumNodeRecord.Content]("content")
         )
       }
     )
@@ -168,7 +168,7 @@ trait PayloadCodecs { self: ContentCodecs =>
         RLPEncoder.encode(to),
         RLPEncoder.encode(expiration)
       ) ++ enrSeq.toList.map(RLPEncoder.encode(_))
-      RLPList(items: _*)
+      RLPList(items*)
     },
     {
       case RLPList(items @ _*) if items.length >= 4 =>
@@ -191,7 +191,7 @@ trait PayloadCodecs { self: ContentCodecs =>
         RLPEncoder.encode(pingHash),
         RLPEncoder.encode(expiration)
       ) ++ enrSeq.toList.map(RLPEncoder.encode(_))
-      RLPList(items: _*)
+      RLPList(items*)
     },
     {
       case RLPList(items @ _*) if items.length >= 3 =>

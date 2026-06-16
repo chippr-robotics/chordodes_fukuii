@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.network
 
 import java.util.concurrent.Callable
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 import org.apache.hc.client5.http.classic.methods.HttpGet
 import org.apache.hc.client5.http.classic.methods.HttpPost

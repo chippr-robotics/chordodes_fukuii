@@ -8,9 +8,9 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.domain.UInt256._
-import com.chipprbots.ethereum.testing.Tags._
-import com.chipprbots.ethereum.vm.Generators._
+import com.chipprbots.ethereum.domain.UInt256.*
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.vm.Generators.*
 
 import Fixtures.blockchainConfig
 
@@ -18,7 +18,7 @@ class OpCodeGasSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
 
   override val config: EvmConfig = EvmConfig.PhoenixConfigBuilder(blockchainConfig)
 
-  import config.feeSchedule._
+  import config.feeSchedule.*
 
   val stackOpsFees: List[(OpCode with ConstGas, BigInt)] = (pushOps ++ dupOps ++ swapOps).map(_ -> G_verylow)
   val constOpsFees: List[(ConstOp, BigInt)] = constOps.map(_ -> G_base)
@@ -122,7 +122,7 @@ class OpCodeGasSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
     }
   }
 
-  test(constGasOps: _*) { op =>
+  test(constGasOps*) { op =>
     val stateGen = getProgramStateGen(
       stackGen = getStackGen(elems = op.delta),
       gasGen = getBigIntGen(max = op.baseGasFn(config.feeSchedule) * 2)
@@ -422,7 +422,7 @@ class OpCodeGasSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
     // Constantinople + Phoenix tested in SSTOREOpCodeGasPostConstantinopleSpec
 
     val petersburgConfig = EvmConfig.PetersburgConfigBuilder(blockchainConfig)
-    import petersburgConfig.feeSchedule._
+    import petersburgConfig.feeSchedule.*
 
     val storage = MockStorage.Empty.store(Zero, One)
     val table = Table[UInt256, UInt256, BigInt, BigInt](
@@ -476,7 +476,7 @@ class OpCodeGasSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
     }
   }
 
-  test(logOps: _*) { op =>
+  test(logOps*) { op =>
     val table = Table[UInt256, BigInt](
       ("size", "expectedGas"),
       (0, G_log + G_logtopic * op.i),

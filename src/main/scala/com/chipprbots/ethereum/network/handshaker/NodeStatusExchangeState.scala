@@ -14,7 +14,7 @@ trait NodeStatusExchangeState[T <: Message] extends InProgressState[PeerInfo] wi
 
   val handshakerConfiguration: NetworkHandshakerConfiguration
 
-  import handshakerConfiguration._
+  import handshakerConfiguration.*
 
   def nextMessage: NextMessage =
     NextMessage(

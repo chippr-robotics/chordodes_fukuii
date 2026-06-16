@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.network.p2p.EthereumMessageDecoder
 import com.chipprbots.ethereum.network.p2p.NetworkMessageDecoder
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPValue
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Wire-format compliance tests for ETH68.
   *
@@ -28,7 +28,7 @@ class ETH68ComplianceSpec extends AnyWordSpec with Matchers {
   // ── Status68 — 6-field wire format ──────────────────────────────────────────
 
   "ETH68 Status68" when {
-    import ETHPackets.Status68.Status68._
+    import ETHPackets.Status68.Status68.*
 
     "encoding" should {
 
@@ -56,7 +56,7 @@ class ETH68ComplianceSpec extends AnyWordSpec with Matchers {
           ForkId(0xbe46d57cL, None)
         )
         val encoded = msg.toBytes
-        import com.chipprbots.ethereum.rlp._
+        import com.chipprbots.ethereum.rlp.*
         import com.chipprbots.ethereum.utils.ByteUtils
         rawDecode(encoded) match {
           case RLPList(_, _, RLPValue(tdBytes), _, _, _) =>
@@ -71,7 +71,7 @@ class ETH68ComplianceSpec extends AnyWordSpec with Matchers {
   // ── GetBlockHeaders / BlockHeaders — requestId round-trip ──────────────────
 
   "ETH68 GetBlockHeaders" when {
-    import ETHPackets.GetBlockHeaders._
+    import ETHPackets.GetBlockHeaders.*
 
     "encoding and decoding" should {
 
@@ -89,7 +89,7 @@ class ETH68ComplianceSpec extends AnyWordSpec with Matchers {
   }
 
   "ETH68 BlockHeaders" when {
-    import ETHPackets.BlockHeaders._
+    import ETHPackets.BlockHeaders.*
 
     "encoding and decoding" should {
 
@@ -108,7 +108,7 @@ class ETH68ComplianceSpec extends AnyWordSpec with Matchers {
   // ── GetBlockBodies / BlockBodies — requestId round-trip ────────────────────
 
   "ETH68 GetBlockBodies" when {
-    import ETHPackets.GetBlockBodies._
+    import ETHPackets.GetBlockBodies.*
 
     "encoding and decoding" should {
 
@@ -127,7 +127,7 @@ class ETH68ComplianceSpec extends AnyWordSpec with Matchers {
   // ── GetReceipts / Receipts68 — requestId round-trip ────────────────────────
 
   "ETH68 GetReceipts" when {
-    import ETHPackets.GetReceipts._
+    import ETHPackets.GetReceipts.*
 
     "encoding and decoding" should {
 
@@ -146,8 +146,8 @@ class ETH68ComplianceSpec extends AnyWordSpec with Matchers {
   // ── Receipts68 — bloom PRESENT in wire format ───────────────────────────────
 
   "ETH68 Receipts68" when {
-    import ETHPackets.Receipts68._
-    import com.chipprbots.ethereum.rlp._
+    import ETHPackets.Receipts68.*
+    import com.chipprbots.ethereum.rlp.*
 
     "encoding" should {
 
@@ -209,8 +209,8 @@ class ETH68ComplianceSpec extends AnyWordSpec with Matchers {
   // ── NewBlock — TD field present in wire bytes ────────────────────────────────
 
   "ETH68 NewBlock" when {
-    import ETHPackets.NewBlock._
-    import com.chipprbots.ethereum.rlp._
+    import ETHPackets.NewBlock.*
+    import com.chipprbots.ethereum.rlp.*
     import com.chipprbots.ethereum.utils.ByteUtils
 
     "encoding" should {

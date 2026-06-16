@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.network.rlpx.FrameCodec
 import com.chipprbots.ethereum.network.rlpx.Header
 import com.chipprbots.ethereum.network.rlpx.MessageCodec
 import com.chipprbots.ethereum.network.rlpx.MessageCodec.CompressionPolicy
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Malformed-input resilience tests for MessageCodec.readFrames and FrameCodec.readFrames.
   *

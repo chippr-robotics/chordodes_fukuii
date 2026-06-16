@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.rlp
 
 import org.apache.pekko.util.ByteString
 
-import com.chipprbots.ethereum.rlp.RLP._
+import com.chipprbots.ethereum.rlp.RLP.*
 import com.chipprbots.ethereum.utils.ByteUtils
 
 import RLPCodec.Ops
@@ -133,7 +133,7 @@ object RLPImplicits {
 
   private def seqCodec[T](using enc: RLPEncoder[T], dec: RLPDecoder[T]) = new RLPEncoder[Seq[T]]
     with RLPDecoder[Seq[T]] {
-    override def encode(obj: Seq[T]): RLPEncodeable = RLPList(obj.map(enc.encode): _*)
+    override def encode(obj: Seq[T]): RLPEncodeable = RLPList(obj.map(enc.encode)*)
 
     override def decode(rlp: RLPEncodeable): Seq[T] = rlp match {
       case l: RLPList => l.items.map(dec.decode)

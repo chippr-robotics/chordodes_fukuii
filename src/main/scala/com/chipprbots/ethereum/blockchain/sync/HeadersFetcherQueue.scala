@@ -21,7 +21,7 @@ import com.chipprbots.ethereum.utils.Logger
   */
 class HeadersFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[GetBlockHeaders, BlockHeaders] with Logger {
 
-  import HeadersFetcherQueue._
+  import HeadersFetcherQueue.*
 
   private val pendingQueue = mutable.Queue[BigInt]()
   private val inFlightMap = mutable.Map[PeerId, InFlightEntry]()

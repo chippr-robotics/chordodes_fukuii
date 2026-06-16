@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.cors.scaladsl.model.HttpOriginMatcher
-import org.apache.pekko.http.scaladsl.model._
+import org.apache.pekko.http.scaladsl.model.*
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.http.scaladsl.testkit.ScalatestRouteTest
 import org.apache.pekko.testkit.TestProbe
@@ -19,7 +19,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
@@ -47,7 +47,7 @@ import com.chipprbots.ethereum.jsonrpc.server.http.JsonRpcHttpServer.RateLimitCo
 import com.chipprbots.ethereum.keystore.KeyStore
 import com.chipprbots.ethereum.ledger.StxLedger
 import com.chipprbots.ethereum.network.p2p.messages.Capability
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.FilterConfig
 import com.chipprbots.ethereum.utils.Logger
 

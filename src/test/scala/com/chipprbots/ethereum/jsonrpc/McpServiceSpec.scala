@@ -8,7 +8,7 @@ import org.apache.pekko.util.Timeout
 
 import cats.effect.unsafe.implicits.global
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
@@ -16,8 +16,8 @@ import org.scalatest.wordspec.AnyWordSpecLike
 
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage
 import com.chipprbots.ethereum.domain.BlockchainReader
-import com.chipprbots.ethereum.jsonrpc.McpService._
-import com.chipprbots.ethereum.utils._
+import com.chipprbots.ethereum.jsonrpc.McpService.*
+import com.chipprbots.ethereum.utils.*
 
 class McpServiceSpec
     extends TestKit(ActorSystem("McpServiceSpec"))

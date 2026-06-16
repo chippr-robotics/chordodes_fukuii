@@ -1,15 +1,15 @@
 package com.chipprbots.ethereum.network.discovery
 
 import org.apache.pekko.util.ByteString
-import org.bouncycastle.util.encoders.{Hex => BCHex}
-import org.scalatest.matchers.should._
+import org.bouncycastle.util.encoders.Hex as BCHex
+import org.scalatest.matchers.should.*
 import org.scalatest.wordspec.AnyWordSpec
 import scodec.bits.{BitVector, ByteVector}
 
 import com.chipprbots.ethereum.forkid.ForkId
-import com.chipprbots.ethereum.forkid.ForkId._
-import com.chipprbots.ethereum.rlp._
-import com.chipprbots.ethereum.utils.Config._
+import com.chipprbots.ethereum.forkid.ForkId.*
+import com.chipprbots.ethereum.rlp.*
+import com.chipprbots.ethereum.utils.Config.*
 import com.chipprbots.scalanet.discovery.crypto.Signature
 import com.chipprbots.scalanet.discovery.ethereum.EthereumNodeRecord
 

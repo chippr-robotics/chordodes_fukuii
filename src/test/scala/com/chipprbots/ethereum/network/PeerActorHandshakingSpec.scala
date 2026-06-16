@@ -26,16 +26,16 @@ import com.chipprbots.ethereum.network.PeerActor.GetStatus
 import com.chipprbots.ethereum.network.PeerActor.Status.Handshaked
 import com.chipprbots.ethereum.network.PeerActor.StatusResponse
 import com.chipprbots.ethereum.network.handshaker.Handshaker.NextMessage
-import com.chipprbots.ethereum.network.handshaker._
+import com.chipprbots.ethereum.network.handshaker.*
 import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Hello
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Pong
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.{Status68 => Status}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.Status68 as Status
 import com.chipprbots.ethereum.forkid.ForkId
 import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 
 class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers {
@@ -45,7 +45,7 @@ class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers {
     NetworkTest
   ) in new TestSetup {
 
-    import DefaultValues._
+    import DefaultValues.*
 
     val peerActorHandshakeSucceeds: TestActorRef[PeerActor[PeerInfo]] =
       peerActor(MockHandshakerAlwaysSucceeds(defaultStatus, defaultBlockNumber, defaultForkAccepted))
@@ -66,7 +66,7 @@ class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers {
     NetworkTest
   ) in new TestSetup {
 
-    import DefaultValues._
+    import DefaultValues.*
 
     val peerActorHandshakeFails: TestActorRef[PeerActor[PeerInfo]] =
       peerActor(MockHandshakerAlwaysFails(defaultReasonDisconnect))
@@ -86,7 +86,7 @@ class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers {
     NetworkTest
   ) in new TestSetup {
 
-    import DefaultValues._
+    import DefaultValues.*
 
     val peerActorHandshakeRequiresHello: TestActorRef[PeerActor[PeerInfo]] = peerActor(MockHandshakerRequiresHello())
 
@@ -109,7 +109,7 @@ class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers {
     NetworkTest
   ) in new TestSetup {
 
-    import DefaultValues._
+    import DefaultValues.*
 
     val peerActorHandshakeRequiresHello: TestActorRef[PeerActor[PeerInfo]] = peerActor(MockHandshakerRequiresHello())
 
@@ -130,7 +130,7 @@ class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers {
     NetworkTest
   ) in new TestSetup {
 
-    import DefaultValues._
+    import DefaultValues.*
 
     val peerActorHandshakeRequiresHello: TestActorRef[PeerActor[PeerInfo]] = peerActor(MockHandshakerRequiresHello())
 
@@ -148,7 +148,7 @@ class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers {
 
   it should "ignore unhandled message while establishing connection" taggedAs (UnitTest, NetworkTest) in new TestSetup {
 
-    import DefaultValues._
+    import DefaultValues.*
 
     val peerActorHandshakeRequiresHello: TestActorRef[PeerActor[PeerInfo]] = peerActor(MockHandshakerRequiresHello())
 
@@ -245,7 +245,7 @@ class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers {
 
   case object MockHelloExchangeState extends InProgressState[PeerInfo] {
 
-    import DefaultValues._
+    import DefaultValues.*
 
     def nextMessage: NextMessage = NextMessage(defaultHello, defaultTimeout)
 

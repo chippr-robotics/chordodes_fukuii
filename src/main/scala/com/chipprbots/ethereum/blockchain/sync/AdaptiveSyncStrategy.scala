@@ -68,7 +68,7 @@ object SyncResult {
   * Note: This class is NOT thread-safe. It should be used from a single actor or protected by external synchronization.
   */
 class AdaptiveSyncController extends Logger {
-  import SyncStrategy._
+  import SyncStrategy.*
 
   @volatile private var currentStrategy: Option[SyncStrategy] = None
   @volatile private var failedStrategies: Set[SyncStrategy] = Set.empty

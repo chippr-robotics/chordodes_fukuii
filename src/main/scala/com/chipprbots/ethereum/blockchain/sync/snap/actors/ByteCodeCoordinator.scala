@@ -10,13 +10,13 @@ import org.apache.pekko.actor.{
   OneForOneStrategy,
   Terminated
 }
-import org.apache.pekko.actor.SupervisorStrategy._
+import org.apache.pekko.actor.SupervisorStrategy.*
 import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import com.chipprbots.ethereum.blockchain.sync.snap._
+import com.chipprbots.ethereum.blockchain.sync.snap.*
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.network.Peer
@@ -64,7 +64,7 @@ class ByteCodeCoordinator(
 ) extends Actor
     with ActorLogging {
 
-  import Messages._
+  import Messages.*
   implicit private val ec: scala.concurrent.ExecutionContext = context.dispatcher
 
   // Per-peer concurrency budget — dynamically adjusted by SNAPSyncController via UpdateMaxInFlightPerPeer.

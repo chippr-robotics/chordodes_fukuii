@@ -5,7 +5,7 @@ import com.typesafe.config.ConfigFactory
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 // scalastyle:off magic.number
 class ConfigValidatorSpec extends AnyFlatSpec with Matchers {

@@ -10,12 +10,12 @@ import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.Resource
 import cats.effect.unsafe.IORuntime
-import cats.syntax.traverse._
+import cats.syntax.traverse.*
 
 import scala.concurrent.Await
 import scala.concurrent.Future
 import scala.concurrent.Promise
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.math.BigInt
 
 import org.scalamock.scalatest.AsyncMockFactory
@@ -27,7 +27,7 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.BlockHelpers
 import com.chipprbots.ethereum.ResourceFixtures
 import com.chipprbots.ethereum.WordSpecBase
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
 import com.chipprbots.ethereum.blockchain.sync.PeersClient
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
@@ -35,9 +35,9 @@ import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
 import com.chipprbots.ethereum.consensus.ConsensusAdapter
 import com.chipprbots.ethereum.crypto.kec256
-import com.chipprbots.ethereum.domain.BlockHeaderImplicits._
-import com.chipprbots.ethereum.domain._
-import com.chipprbots.ethereum.ledger._
+import com.chipprbots.ethereum.domain.BlockHeaderImplicits.*
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.ledger.*
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeers
@@ -56,8 +56,8 @@ import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.{NewBlockHashes, BlockHash}
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetNodeData
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NodeData
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{GetBlockHeaders => ETHGetBlockHeaders}
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{GetBlockBodies => ETHGetBlockBodies}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders as ETHGetBlockHeaders
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockBodies as ETHGetBlockBodies
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{BlockHeaders, BlockBodies}
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config.SyncConfig
@@ -282,8 +282,8 @@ class RegularSyncSpec
       ) in sync(
         new Fixture(testSystem) {
           override lazy val blockchainReader: BlockchainReader = stub[BlockchainReader]
-          (blockchainReader.getBestBlockNumber _).when().returns(BigInt(1000))
-          (blockchainReader.getSnapSyncPivotBlock _).when().returns(None)
+          blockchainReader.getBestBlockNumber.when().returns(BigInt(1000))
+          blockchainReader.getSnapSyncPivotBlock.when().returns(None)
 
           val importerFetcher = TestProbe("importerFetcher")
           val importerSupervisor = TestProbe("importerSupervisor")
@@ -331,8 +331,8 @@ class RegularSyncSpec
         new Fixture(testSystem) {
           override lazy val blockchain: BlockchainImpl = stub[BlockchainImpl]
           override lazy val blockchainReader: BlockchainReader = stub[BlockchainReader]
-          (blockchainReader.getBestBlockNumber _).when().onCall(() => bestBlock.number)
-          (blockchainReader.getSnapSyncPivotBlock _).when().returns(None) // no SNAP sync pivot
+          blockchainReader.getBestBlockNumber.when().onCall(() => bestBlock.number)
+          blockchainReader.getSnapSyncPivotBlock.when().returns(None) // no SNAP sync pivot
           override lazy val consensusAdapter: ConsensusAdapter = stub[ConsensusAdapter]
           (consensusAdapter
             .evaluateBranchBlock(_: Block)(_: IORuntime, _: BlockchainConfig))
@@ -399,8 +399,8 @@ class RegularSyncSpec
       new Fixture(testSystem) {
         override lazy val blockchainReader: BlockchainReader = stub[BlockchainReader]
         override lazy val blockchain: BlockchainImpl = stub[BlockchainImpl]
-        (blockchainReader.getBestBlockNumber _).when().onCall(() => bestBlock.number)
-        (blockchainReader.getSnapSyncPivotBlock _).when().returns(None) // no SNAP sync pivot
+        blockchainReader.getBestBlockNumber.when().onCall(() => bestBlock.number)
+        blockchainReader.getSnapSyncPivotBlock.when().returns(None) // no SNAP sync pivot
         override lazy val consensusAdapter: ConsensusAdapter = stub[ConsensusAdapter]
         (consensusAdapter
           .evaluateBranchBlock(_: Block)(_: IORuntime, _: BlockchainConfig))
@@ -543,9 +543,9 @@ class RegularSyncSpec
         val failingBlock: Block = testBlocksChunked.head.head
         peersClient.setAutoPilot(new PeersClientAutoPilot)
         override lazy val branchResolution: BranchResolution = stub[BranchResolution]
-        (blockchainReader.getBestBlockNumber _).when().returns(0)
-        (blockchainReader.getSnapSyncPivotBlock _).when().returns(None) // no SNAP sync pivot
-        (branchResolution.resolveBranch _).when(*).returns(NewBetterBranch(Nil)).atLeastOnce()
+        blockchainReader.getBestBlockNumber.when().returns(0)
+        blockchainReader.getSnapSyncPivotBlock.when().returns(None) // no SNAP sync pivot
+        branchResolution.resolveBranch.when(*).returns(NewBetterBranch(Nil)).atLeastOnce()
         (consensusAdapter
           .evaluateBranchBlock(_: Block)(_: IORuntime, _: BlockchainConfig))
           .when(*, *, *)
@@ -553,9 +553,9 @@ class RegularSyncSpec
 
         var saveNodeWasCalled: Boolean = false
         val nodeData: List[ByteString] = List(ByteString(failingBlock.header.toBytes: Array[Byte]))
-        (blockchainReader.getBestBlockNumber _).when().returns(0)
-        (blockchainReader.getBlockHeaderByNumber _).when(*).returns(Some(BlockHelpers.genesis.header))
-        (stateStorage.saveNode _)
+        blockchainReader.getBestBlockNumber.when().returns(0)
+        blockchainReader.getBlockHeaderByNumber.when(*).returns(Some(BlockHelpers.genesis.header))
+        stateStorage.saveNode
           .when(*, *, *)
           .onCall { (hash, encoded, totalDifficulty) =>
             val expectedNode = nodeData.head
@@ -770,7 +770,7 @@ class RegularSyncSpec
 
     "reporting progress" should {
       "return NotSyncing until fetching started" in testCaseT { fixture =>
-        import fixture._
+        import fixture.*
 
         for {
           _ <- IO(regularSync ! SyncProtocol.Start)
@@ -795,7 +795,7 @@ class RegularSyncSpec
       }
 
       "return initial status after fetching first batch of data" in testCaseT { fixture =>
-        import fixture._
+        import fixture.*
 
         for {
           _ <- testBlocks
@@ -830,7 +830,7 @@ class RegularSyncSpec
       }
 
       "return initial status after fetching first batch of data when starting from genesis" in testCaseT { fixture =>
-        import fixture._
+        import fixture.*
 
         for {
           _ <- IO {
@@ -858,7 +858,7 @@ class RegularSyncSpec
       }
 
       "return updated status after importing blocks" taggedAs DisabledTest in testCaseT { fixture =>
-        import fixture._
+        import fixture.*
 
         for {
           _ <- IO {
@@ -889,7 +889,7 @@ class RegularSyncSpec
 
       "return SyncDone when on top" in customTestCaseResourceM(actorSystemResource.map(new OnTopFixture(_))) {
         fixture =>
-          import fixture._
+          import fixture.*
 
           for {
             _ <- IO(goToTop())

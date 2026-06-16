@@ -7,7 +7,7 @@ import org.scalatest.matchers.should.Matchers
 import scodec.bits.BitVector
 import com.chipprbots.scalanet.discovery.crypto.PublicKey
 import com.chipprbots.scalanet.discovery.crypto.Signature
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class Secp256k1SigAlgSpec extends AnyFlatSpec with Matchers {
   behavior.of("Secp256k1SigAlg")

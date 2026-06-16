@@ -6,7 +6,7 @@ import org.scalatest.ParallelTestExecution
 
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 /** L8 — MESSConfig.reactivationBlock parsing: olympia-block-number fallback.

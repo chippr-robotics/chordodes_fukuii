@@ -2,9 +2,9 @@ package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
 import org.apache.pekko.actor.{Actor, ActorLogging, ActorRef, Props}
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import com.chipprbots.ethereum.blockchain.sync.snap._
+import com.chipprbots.ethereum.blockchain.sync.snap.*
 
 /** StorageRangeWorker fetches storage ranges from a peer.
   *
@@ -24,7 +24,7 @@ class StorageRangeWorker(
 ) extends Actor
     with ActorLogging {
 
-  import Messages._
+  import Messages.*
 
   private var currentRequestId: Option[BigInt] = None
 

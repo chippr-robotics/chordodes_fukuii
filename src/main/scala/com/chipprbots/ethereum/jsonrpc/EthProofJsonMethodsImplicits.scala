@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.json4s.JsonAST._
+import org.json4s.JsonAST.*
 
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError.InvalidParams
 import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofRequest
@@ -11,8 +11,8 @@ import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder
 
 object EthProofJsonMethodsImplicits extends JsonMethodsImplicits {
   def extractStorageKeys(input: JValue): Either[JsonRpcError, Seq[StorageProofKey]] = {
-    import cats.syntax.traverse._
-    import cats.syntax.either._
+    import cats.syntax.traverse.*
+    import cats.syntax.either.*
     input match {
       case JArray(elems) =>
         elems.traverse { x =>

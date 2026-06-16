@@ -21,11 +21,11 @@ import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.SignedTransactionWithSender
-import com.chipprbots.ethereum.jsonrpc.TraceService._
+import com.chipprbots.ethereum.jsonrpc.TraceService.*
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ledger.StxLedger
 import com.chipprbots.ethereum.ledger.TxResult
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.ExecutionTracer
 
 /** Unit tests for TraceService.
@@ -51,7 +51,7 @@ class TraceServiceSpec
   "TraceService.traceTransaction" should
     "return InvalidParams when transaction is not found" taggedAs (UnitTest, RPCTest) in new TestSetup {
       val unknownHash: ByteString = ByteString(Array.fill(32)(0xff.toByte))
-      (txMappingStorage.get _).expects(unknownHash).returning(None)
+      txMappingStorage.get.expects(unknownHash).returning(None)
 
       val result = service
         .traceTransaction(TraceTransactionRequest(unknownHash))
@@ -69,8 +69,8 @@ class TraceServiceSpec
       .put(block.header.parentHash, block.header.copy(number = block.header.number - 1))
       .commit()
 
-    (txMappingStorage.get _).expects(txHash).returning(Some(TransactionLocation(block.header.hash, txIndex)))
-    (mockLedger.advanceWorldToTx _).expects(*, *, *, *).returning(mockWorld)
+    txMappingStorage.get.expects(txHash).returning(Some(TransactionLocation(block.header.hash, txIndex)))
+    mockLedger.advanceWorldToTx.expects(*, *, *, *).returning(mockWorld)
     (mockLedger
       .simulateTransactionWithTracer(
         _: SignedTransactionWithSender,
@@ -110,7 +110,7 @@ class TraceServiceSpec
   "TraceService.replayTransaction" should
     "return InvalidParams when transaction is not found" taggedAs (UnitTest, RPCTest) in new TestSetup {
       val unknownHash: ByteString = ByteString(Array.fill(32)(0xee.toByte))
-      (txMappingStorage.get _).expects(unknownHash).returning(None)
+      txMappingStorage.get.expects(unknownHash).returning(None)
 
       val result = service
         .replayTransaction(TraceReplayTransactionRequest(unknownHash, TraceOptions(trace = true)))
@@ -128,8 +128,8 @@ class TraceServiceSpec
       .put(block.header.parentHash, block.header.copy(number = block.header.number - 1))
       .commit()
 
-    (txMappingStorage.get _).expects(txHash).returning(Some(TransactionLocation(block.header.hash, txIndex)))
-    (mockLedger.advanceWorldToTx _).expects(*, *, *, *).returning(mockWorld)
+    txMappingStorage.get.expects(txHash).returning(Some(TransactionLocation(block.header.hash, txIndex)))
+    mockLedger.advanceWorldToTx.expects(*, *, *, *).returning(mockWorld)
     (mockLedger
       .simulateTransactionWithTracer(
         _: SignedTransactionWithSender,

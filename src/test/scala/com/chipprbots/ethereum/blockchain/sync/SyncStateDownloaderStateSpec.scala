@@ -15,7 +15,7 @@ import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.must.Matchers
 
 import com.chipprbots.ethereum.WithActorSystemShutDown
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.blockchain.sync.fast.DownloaderState
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.SyncResponse
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateSchedulerActor.NoUsefulDataInResponse

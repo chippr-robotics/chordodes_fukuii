@@ -88,7 +88,7 @@ object BfsQueueStorage {
   * all other namespaces. Memory during BFS = O(chunk_size) ≈ 4 MB.
   */
 class RocksDbBfsQueueStorage(dataSource: DataSource, namespace: Namespace) extends BfsQueueStorage {
-  import BfsQueueStorage._
+  import BfsQueueStorage.*
 
   private val writeCounter = new AtomicLong(0L)
 
@@ -149,7 +149,7 @@ class RocksDbBfsQueueStorage(dataSource: DataSource, namespace: Namespace) exten
 
 /** In-memory implementation for tests and the default (no DataSource wired). */
 class InMemoryBfsQueueStorage extends BfsQueueStorage {
-  import BfsQueueStorage._
+  import BfsQueueStorage.*
 
   private val data = mutable.LongMap[Array[Byte]]()
   private val writeCounter = new AtomicLong(0L)

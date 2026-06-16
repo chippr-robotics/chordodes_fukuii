@@ -4,20 +4,20 @@ import javax.net.ssl.SSLContext
 
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.cors.javadsl.CorsRejection
-import org.apache.pekko.http.cors.scaladsl.CorsDirectives._
+import org.apache.pekko.http.cors.scaladsl.CorsDirectives.*
 import org.apache.pekko.http.cors.scaladsl.model.HttpOriginMatcher
 import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
-import org.apache.pekko.http.scaladsl.model._
-import org.apache.pekko.http.scaladsl.server.Directives._
-import org.apache.pekko.http.scaladsl.server._
+import org.apache.pekko.http.scaladsl.model.*
+import org.apache.pekko.http.scaladsl.server.Directives.*
+import org.apache.pekko.http.scaladsl.server.*
 
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
-import cats.syntax.all._
+import cats.syntax.all.*
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import com.typesafe.config.{Config => TypesafeConfig}
+import com.typesafe.config.Config as TypesafeConfig
 import org.json4s.DefaultFormats
 import org.json4s.Formats
 import org.json4s.JInt
@@ -27,7 +27,7 @@ import org.json4s.native.Serialization
 import com.chipprbots.ethereum.faucet.jsonrpc.FaucetJsonRpcController
 import com.chipprbots.ethereum.healthcheck.HealthcheckResponse
 import com.chipprbots.ethereum.healthcheck.HealthcheckResult
-import com.chipprbots.ethereum.jsonrpc._
+import com.chipprbots.ethereum.jsonrpc.*
 import com.chipprbots.ethereum.jsonrpc.graphql.GraphQLService
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController

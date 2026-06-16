@@ -32,7 +32,7 @@ final class CheckpointDownloader(
     httpClient: HttpClient = CheckpointDownloader.defaultHttpClient,
     progressLogIntervalBytes: Long = CheckpointDownloader.DefaultProgressLogInterval
 ) {
-  import CheckpointDownloader._
+  import CheckpointDownloader.*
   private val log = LoggerFactory.getLogger(getClass)
 
   /** Download from `url` to `target`. If `${target}.tmp` exists, attempt to resume via `Range` header. If `target`

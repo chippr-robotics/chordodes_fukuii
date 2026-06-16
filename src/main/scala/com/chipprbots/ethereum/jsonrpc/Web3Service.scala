@@ -18,7 +18,7 @@ object Web3Service {
 }
 
 class Web3Service {
-  import Web3Service._
+  import Web3Service.*
 
   def sha3(req: Sha3Request): ServiceResponse[Sha3Response] =
     IO(Right(Sha3Response(crypto.kec256(req.data))))

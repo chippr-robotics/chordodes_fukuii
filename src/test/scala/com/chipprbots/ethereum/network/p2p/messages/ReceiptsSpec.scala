@@ -6,7 +6,7 @@ import org.bouncycastle.util.encoders.Hex
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.crypto.*
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.LegacyReceipt
 import com.chipprbots.ethereum.domain.Receipt
@@ -15,11 +15,11 @@ import com.chipprbots.ethereum.domain.TxLogEntry
 import com.chipprbots.ethereum.domain.Type01Receipt
 import com.chipprbots.ethereum.network.p2p.EthereumMessageDecoder
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Receipts68
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Receipts68._
-import com.chipprbots.ethereum.rlp.RLPImplicitConversions._
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Receipts68.*
+import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
-import com.chipprbots.ethereum.rlp._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.rlp.*
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Receipt encoding/decoding tests.
   *
@@ -49,7 +49,7 @@ class ReceiptsSpec extends AnyFlatSpec with Matchers {
 
   val encodedLogEntry: RLPList = RLPList(
     RLPValue(loggerAddress.bytes.toArray[Byte]),
-    RLPList(logTopics.map(t => RLPValue(t.toArray[Byte])): _*),
+    RLPList(logTopics.map(t => RLPValue(t.toArray[Byte]))*),
     RLPValue(logData.toArray[Byte])
   )
 

@@ -24,7 +24,7 @@ import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.db.storage.MptStorage
 import com.chipprbots.ethereum.db.storage.StateStorage
 import com.chipprbots.ethereum.db.storage.StateStorage.GenesisDataLoad
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.jsonrpc.JsonMethodsImplicits
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.rlp
@@ -45,7 +45,7 @@ class GenesisDataLoader(
   private val hashLength = 64
   private val addressLength = 40
 
-  import Account._
+  import Account.*
 
   private val emptyTrieRootHash = ByteString(crypto.kec256(rlp.encode(Array.empty[Byte])))
 

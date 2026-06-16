@@ -7,7 +7,7 @@ import org.scalatest.ParallelTestExecution
 import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
 
 import com.chipprbots.ethereum.network.p2p.messages.Capability
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.{Config, InstanceConfig}
 
 // scalastyle:off magic.number

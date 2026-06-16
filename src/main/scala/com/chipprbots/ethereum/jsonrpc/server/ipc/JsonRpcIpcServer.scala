@@ -9,13 +9,13 @@ import java.net.Socket
 import cats.effect.unsafe.IORuntime
 
 import scala.annotation.tailrec
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Try
 
 import org.json4s.JsonAST.JValue
-import org.json4s._
+import org.json4s.*
 import org.json4s.native
-import org.json4s.native.JsonMethods._
+import org.json4s.native.JsonMethods.*
 import org.json4s.native.Serialization
 import org.scalasbt.ipcsocket.UnixDomainServerSocket
 
@@ -126,7 +126,7 @@ object JsonRpcIpcServer {
   }
 
   object JsonRpcIpcServerConfig {
-    import com.typesafe.config.{Config => TypesafeConfig}
+    import com.typesafe.config.Config as TypesafeConfig
 
     def apply(fukuiiConfig: TypesafeConfig): JsonRpcIpcServerConfig = {
       val rpcIpcConfig = fukuiiConfig.getConfig("network.rpc.ipc")

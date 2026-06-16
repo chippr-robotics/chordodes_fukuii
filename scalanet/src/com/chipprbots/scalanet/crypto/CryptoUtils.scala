@@ -1,7 +1,7 @@
 package com.chipprbots.scalanet.crypto
 
 import java.math.BigInteger
-import java.security._
+import java.security.*
 import java.security.cert.X509Certificate
 import java.security.spec.ECGenParameterSpec
 import java.security.spec.PKCS8EncodedKeySpec

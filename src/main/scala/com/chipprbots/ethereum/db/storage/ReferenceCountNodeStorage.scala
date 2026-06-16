@@ -8,7 +8,7 @@ import com.chipprbots.ethereum.db.storage.pruning.PruneSupport
 import com.chipprbots.ethereum.mpt.NodesKeyValueStorage
 import com.chipprbots.ethereum.utils.Logger
 
-import encoding._
+import encoding.*
 
 /** This class helps to deal with two problems regarding MptNodes storage: 1) Define a way to delete ones that are no
   * longer needed but allow rollbacks to be performed 2) Avoids removal of nodes that can be used in different trie
@@ -32,7 +32,7 @@ import encoding._
   */
 class ReferenceCountNodeStorage(nodeStorage: NodesStorage, bn: BigInt) extends NodesKeyValueStorage {
 
-  import ReferenceCountNodeStorage._
+  import ReferenceCountNodeStorage.*
 
   def get(key: ByteString): Option[NodeEncoded] =
     nodeStorage.get(key).map(node => storedNodeFromBytes(node).nodeEncoded.toArray)

@@ -11,12 +11,12 @@ import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.ObjectGenerators
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
-import com.chipprbots.ethereum.domain.BlockHeaderImplicits._
+import com.chipprbots.ethereum.domain.BlockHeaderImplicits.*
 import com.chipprbots.ethereum.rlp
-import com.chipprbots.ethereum.rlp.RLPImplicitConversions._
+import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
 import com.chipprbots.ethereum.rlp.RLPList
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class BlockHeaderSpec extends AnyFreeSpec with Matchers with ScalaCheckPropertyChecks with ObjectGenerators {
 

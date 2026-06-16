@@ -11,7 +11,7 @@ import org.apache.pekko.actor.{
   Status,
   Terminated
 }
-import org.apache.pekko.actor.SupervisorStrategy._
+import org.apache.pekko.actor.SupervisorStrategy.*
 import org.apache.pekko.util.ByteString
 
 import java.io.{BufferedOutputStream, FileOutputStream, RandomAccessFile}
@@ -19,10 +19,10 @@ import java.nio.file.{Files, Path}
 
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future, blocking}
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.{Success, Failure}
 
-import com.chipprbots.ethereum.blockchain.sync.snap._
+import com.chipprbots.ethereum.blockchain.sync.snap.*
 import com.chipprbots.ethereum.db.storage.{MptStorage, PathNodeStorage}
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.network.Peer
@@ -76,7 +76,7 @@ class AccountRangeCoordinator(
 ) extends Actor
     with ActorLogging {
 
-  import Messages._
+  import Messages.*
   import SNAPSyncController.PivotStateUnservable
 
   // Mutable state root — updated in-place when the controller refreshes the pivot.
@@ -286,7 +286,7 @@ class AccountRangeCoordinator(
   // Priority queue: dequeue the task with the SMALLEST remaining keyspace first.
   // This focuses workers on nearly-complete ranges, ensuring at least some ranges
   // finish before peers stop responding (instead of spreading work evenly across all 16).
-  private[actors] val pendingTasks = mutable.PriorityQueue[AccountTask](remainingTasks: _*)(
+  private[actors] val pendingTasks = mutable.PriorityQueue[AccountTask](remainingTasks*)(
     Ordering.by[AccountTask, BigInt](_.remainingKeyspace).reverse
   )
   // requestId -> (task, worker, peer)

@@ -1,10 +1,10 @@
 package com.chipprbots.ethereum.ethtest
 
-import io.circe.parser._
+import io.circe.parser.*
 import java.io.File
 import scala.io.Source
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Comprehensive test suite that runs multiple tests from ethereum/tests repository
   *

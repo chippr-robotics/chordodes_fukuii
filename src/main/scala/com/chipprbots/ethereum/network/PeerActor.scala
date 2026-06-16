@@ -5,13 +5,13 @@ import java.net.URI
 
 import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.SupervisorStrategy.Escalate
-import org.apache.pekko.actor._
+import org.apache.pekko.actor.*
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.util.ByteString
 
 import org.bouncycastle.util.encoders.Hex
 
-import com.chipprbots.ethereum.network.PeerActor.Status._
+import com.chipprbots.ethereum.network.PeerActor.Status.*
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerHandshakeSuccessful
 import com.chipprbots.ethereum.network.PeerEventBusActor.Publish
@@ -21,10 +21,10 @@ import com.chipprbots.ethereum.network.handshaker.Handshaker.HandshakeComplete.H
 import com.chipprbots.ethereum.network.handshaker.Handshaker.HandshakeComplete.HandshakeSuccess
 import com.chipprbots.ethereum.network.handshaker.Handshaker.HandshakeResult
 import com.chipprbots.ethereum.network.handshaker.Handshaker.NextMessage
-import com.chipprbots.ethereum.network.p2p._
+import com.chipprbots.ethereum.network.p2p.*
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.Codes
-import com.chipprbots.ethereum.network.p2p.messages.WireProtocol._
+import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.*
 import com.chipprbots.ethereum.network.rlpx.AuthHandshaker
 import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler
 import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.RLPxConfiguration
@@ -50,7 +50,7 @@ class PeerActor[R <: HandshakeResult](
     with ActorLogging
     with Stash {
 
-  import PeerActor._
+  import PeerActor.*
   import context.{dispatcher, system}
 
   override val supervisorStrategy: OneForOneStrategy =
@@ -270,7 +270,7 @@ class PeerActor[R <: HandshakeResult](
 
   def handleDisconnectMsg(rlpxConnection: RLPxConnection, status: Status): Receive = {
     case RLPxConnectionHandler.MessageReceived(d: Disconnect) =>
-      import Disconnect.Reasons._
+      import Disconnect.Reasons.*
       log.info(
         s"DISCONNECT_DEBUG: Received disconnect from ${peerAddress.getHostString}:${peerAddress.getPort} - reason code: 0x${d.reason.toHexString} (${Disconnect.reasonToString(d.reason)}), status: $status"
       )

@@ -4,13 +4,13 @@ import java.util.zip.CRC32
 
 import org.apache.pekko.util.ByteString
 
-import com.chipprbots.ethereum.rlp._
-import com.chipprbots.ethereum.utils.BigIntExtensionMethods._
+import com.chipprbots.ethereum.rlp.*
+import com.chipprbots.ethereum.utils.BigIntExtensionMethods.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
-import com.chipprbots.ethereum.utils.ByteUtils._
+import com.chipprbots.ethereum.utils.ByteUtils.*
 import com.chipprbots.ethereum.utils.Hex
 
-import RLPImplicitConversions._
+import RLPImplicitConversions.*
 import RLPImplicits.given
 
 case class ForkId(hash: BigInt, next: Option[BigInt]) {
@@ -98,7 +98,7 @@ object ForkId {
 
   implicit class ForkIdEnc(forkId: ForkId) extends RLPSerializable {
 
-    import com.chipprbots.ethereum.utils.ByteUtils._
+    import com.chipprbots.ethereum.utils.ByteUtils.*
     override def toRLPEncodable: RLPEncodeable = {
       val hash: Array[Byte] = bigIntToBytes(forkId.hash, 4).takeRight(4)
       val next: Array[Byte] = bigIntToUnsignedByteArray(forkId.next.getOrElse(BigInt(0))).takeRight(8)

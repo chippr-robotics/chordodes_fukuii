@@ -5,7 +5,7 @@ import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
-import cats.syntax.either._
+import cats.syntax.either.*
 
 import scala.reflect.ClassTag
 
@@ -13,9 +13,9 @@ import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
 import com.chipprbots.ethereum.consensus.mining.Mining
-import com.chipprbots.ethereum.crypto._
-import com.chipprbots.ethereum.domain._
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
+import com.chipprbots.ethereum.crypto.*
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
 import com.chipprbots.ethereum.keystore.KeyStore
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ledger.StxLedger
@@ -92,7 +92,7 @@ class EthInfoService(
     askTimeout: Timeout
 ) extends ResolveBlock {
 
-  import EthInfoService._
+  import EthInfoService.*
 
   def protocolVersion(@unused req: ProtocolVersionRequest): ServiceResponse[ProtocolVersionResponse] =
     IO.pure(Right(ProtocolVersionResponse(f"0x${capability.version}%x")))
@@ -260,7 +260,7 @@ class EthInfoService(
     // EIP-1559: When no gas price is explicitly specified, use baseFee=0 so calls
     // don't need to worry about funding. Matches geth behavior for eth_call/eth_estimateGas.
     val header = if (!req.tx.gasPriceExplicit && block.block.header.baseFee.isDefined) {
-      import BlockHeader.HeaderExtraFields._
+      import BlockHeader.HeaderExtraFields.*
       val zeroBaseFeeExtra = block.block.header.extraFields match {
         case HefPostOlympia(_)                    => HefPostOlympia(0)
         case HefPostShanghai(_, wr)               => HefPostShanghai(0, wr)

@@ -5,12 +5,12 @@ import java.io.File
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
-import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
+import scala.concurrent.duration.*
+import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
 import com.typesafe.config.ConfigFactory
-import com.typesafe.config.{Config => TypesafeConfig}
+import com.typesafe.config.Config as TypesafeConfig
 
 import com.chipprbots.ethereum.db.storage.pruning.ArchivePruning
 import com.chipprbots.ethereum.db.storage.pruning.BasicPruning
@@ -19,7 +19,7 @@ import com.chipprbots.ethereum.db.storage.pruning.PruningMode
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.utils.VmConfig.VmMode
 
-import ConfigUtils._
+import ConfigUtils.*
 
 /** Singleton Config for backward compatibility. All existing code that references `Config.xxx` continues to work
   * unchanged. For multi-instance mode, create new `InstanceConfig` instances instead.
@@ -194,7 +194,7 @@ object Config extends InstanceConfig(ConfigFactory.load().getConfig("fukuii"), "
             syncConfig.getDuration("cl-wait-timeout").toMillis.millis
           else 5.minutes,
         bootstrapCheckpoints = if (syncConfig.hasPath("bootstrap-checkpoints")) {
-          import scala.jdk.CollectionConverters._
+          import scala.jdk.CollectionConverters.*
           syncConfig.getStringList("bootstrap-checkpoints").asScala.toSeq.flatMap { entry =>
             // Format: "blockNumber:0xblockHash"
             entry.split(":") match {
@@ -500,7 +500,7 @@ object VmConfig {
 
   def apply(mpConfig: TypesafeConfig): VmConfig = {
     def parseExternalConfig(): ExternalConfig = {
-      import ExternalConfig._
+      import ExternalConfig.*
 
       val extConf = mpConfig.getConfig("vm.external")
       val vmType = extConf.getString("vm-type").toLowerCase

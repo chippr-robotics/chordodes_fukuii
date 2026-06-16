@@ -21,12 +21,12 @@ import com.chipprbots.scalanet.peergroup.ControlEvent.InitializationError
 import com.chipprbots.scalanet.peergroup.InetMultiAddress
 import com.chipprbots.scalanet.peergroup.NettyFutureUtils.toTask
 import com.chipprbots.scalanet.peergroup.PeerGroup.ServerEvent.ChannelCreated
-import com.chipprbots.scalanet.peergroup.PeerGroup._
+import com.chipprbots.scalanet.peergroup.PeerGroup.*
 import com.typesafe.scalalogging.StrictLogging
 import io.netty.bootstrap.Bootstrap
 import io.netty.buffer.Unpooled
 import io.netty.channel
-import io.netty.channel._
+import io.netty.channel.*
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.DatagramPacket
 import io.netty.channel.socket.nio.NioDatagramChannel

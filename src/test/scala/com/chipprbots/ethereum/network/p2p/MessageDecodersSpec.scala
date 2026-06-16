@@ -12,7 +12,7 @@ import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.Codes
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.security.SecureRandomBuilder
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Verifies that EthereumMessageDecoder dispatches to ETH68/ETH69 decoders.
   *
@@ -21,7 +21,7 @@ import com.chipprbots.ethereum.testing.Tags._
   */
 class MessageDecodersSpec extends AnyFlatSpec with Matchers with SecureRandomBuilder {
 
-  def decode: Capability => MessageDecoder = EthereumMessageDecoder.ethMessageDecoder _
+  def decode: Capability => MessageDecoder = EthereumMessageDecoder.ethMessageDecoder
 
   val exampleHash: ByteString = ByteString(
     Hex.decode("fccdbfe911f9df0a6cc0107d1240f76dfdd1d301b65fdc3cd2ae62752affbef6")
@@ -64,13 +64,13 @@ class MessageDecodersSpec extends AnyFlatSpec with Matchers with SecureRandomBui
   }
 
   it should "decode NewBlock in ETH68" taggedAs (UnitTest, NetworkTest) in {
-    import ETHPackets.NewBlock._
+    import ETHPackets.NewBlock.*
     val msg = ETHPackets.NewBlock(Fixtures.Blocks.Block3125369.block, BigInt(12345))
     decode(Capability.ETH68).fromBytes(Codes.NewBlockCode, msg.toBytes) shouldBe Right(msg)
   }
 
   it should "decode SignedTransactions in ETH68" taggedAs (UnitTest, NetworkTest) in {
-    import ETHPackets.SignedTransactions._
+    import ETHPackets.SignedTransactions.*
     val txs = ETHPackets.SignedTransactions(ObjectGenerators.signedTxSeqGen(3, secureRandom, None).sample.get)
     decode(Capability.ETH68).fromBytes(Codes.SignedTransactionsCode, txs.toBytes) shouldBe Right(txs)
   }

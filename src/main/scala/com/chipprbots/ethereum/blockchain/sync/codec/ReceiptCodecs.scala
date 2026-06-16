@@ -2,12 +2,12 @@ package com.chipprbots.ethereum.blockchain.sync.codec
 
 import org.apache.pekko.util.ByteString
 
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.Transaction.TransactionTypeValidator
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.TypedTransaction._
-import com.chipprbots.ethereum.rlp.RLPImplicitConversions._
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.TypedTransaction.*
+import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
-import com.chipprbots.ethereum.rlp._
+import com.chipprbots.ethereum.rlp.*
 import com.chipprbots.ethereum.utils.ByteUtils
 
 /** RLP codecs for Receipt and TxLogEntry (storage and wire format).
@@ -26,11 +26,11 @@ object ReceiptCodecs {
 
   implicit class TxLogEntryEnc(logEntry: TxLogEntry) extends RLPSerializable {
     override def toRLPEncodable: RLPEncodeable = {
-      import logEntry._
+      import logEntry.*
       val topicsRLP = logTopics.map(t => RLPValue(t.toArray[Byte]))
       RLPList(
         RLPValue(loggerAddress.bytes.toArray[Byte]),
-        RLPList(topicsRLP: _*),
+        RLPList(topicsRLP*),
         RLPValue(data.toArray[Byte])
       )
     }
@@ -48,7 +48,7 @@ object ReceiptCodecs {
 
   implicit class ReceiptEnc(receipt: Receipt) extends RLPSerializable {
     override def toRLPEncodable: RLPEncodeable = {
-      import receipt._
+      import receipt.*
       val stateHash: RLPEncodeable = postTransactionStateHash match {
         case HashOutcome(hash) => RLPValue(hash.toArray[Byte])
         case SuccessOutcome    => 1.toByte
@@ -58,7 +58,7 @@ object ReceiptCodecs {
         stateHash,
         cumulativeGasUsed,
         RLPValue(logsBloomFilter.toArray[Byte]),
-        RLPList(logs.map(_.toRLPEncodable): _*)
+        RLPList(logs.map(_.toRLPEncodable)*)
       )
       receipt match {
         case _: LegacyReceipt      => legacyRLPReceipt
@@ -72,7 +72,7 @@ object ReceiptCodecs {
   }
 
   implicit class ReceiptSeqEnc(receipts: Seq[Receipt]) extends RLPSerializable {
-    override def toRLPEncodable: RLPEncodeable = RLPList(receipts.map(_.toRLPEncodable): _*)
+    override def toRLPEncodable: RLPEncodeable = RLPList(receipts.map(_.toRLPEncodable)*)
   }
 
   implicit class ReceiptDec(val bytes: Array[Byte]) extends AnyVal {

@@ -13,7 +13,7 @@ import com.github.jgonian.ipmath.Ipv6
 import com.github.jgonian.ipmath.Ipv6Range
 
 class InetAddressOps(val address: InetAddress) extends AnyVal {
-  import InetAddressOps._
+  import InetAddressOps.*
 
   def isIPv4: Boolean =
     address.isInstanceOf[Inet4Address]

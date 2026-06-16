@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.utils
 import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
-import scala.math.Ordering.Implicits._
+import scala.math.Ordering.Implicits.*
 
 object ByteStringUtils {
   def hash2string(hash: ByteString): String =

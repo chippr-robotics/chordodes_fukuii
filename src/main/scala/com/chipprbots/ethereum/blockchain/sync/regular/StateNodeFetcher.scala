@@ -5,18 +5,18 @@ import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.AbstractBehavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.actor.{ActorRef => ClassicActorRef}
+import org.apache.pekko.actor.ActorRef as ClassicActorRef
 import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
-import cats.syntax.either._
+import cats.syntax.either.*
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Failure
 import scala.util.Success
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
-import com.chipprbots.ethereum.blockchain.sync.PeersClient._
+import com.chipprbots.ethereum.blockchain.sync.PeersClient.*
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcher.FetchCommand
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcher.FetchedStateNode
 import com.chipprbots.ethereum.crypto.kec256
@@ -46,7 +46,7 @@ class StateNodeFetcher(
   val log = context.log
   implicit val runtime: IORuntime = IORuntime.global
 
-  import StateNodeFetcher._
+  import StateNodeFetcher.*
 
   override def makeAdaptedMessage[T <: Message](peer: Peer, msg: T): StateNodeFetcherCommand = AdaptedMessage(peer, msg)
 

@@ -20,7 +20,7 @@ class StxLedger(
     blockPreparator: BlockPreparator,
     configBuilder: BlockchainConfigBuilder
 ) {
-  import configBuilder._
+  import configBuilder.*
 
   def simulateTransaction(
       stx: SignedTransactionWithSender,

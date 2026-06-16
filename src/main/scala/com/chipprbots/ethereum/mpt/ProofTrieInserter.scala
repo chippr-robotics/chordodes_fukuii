@@ -15,7 +15,7 @@ import org.apache.pekko.util.ByteString
   * Not thread-safe — one instance per verification task.
   */
 final class ProofTrieInserter(initialRoot: MptNode) {
-  import StackTrie._
+  import StackTrie.*
 
   // No-op callback: we only care about the final root hash, not intermediate node writes.
   private val hasher = new StackTrie((_, _, _) => ())

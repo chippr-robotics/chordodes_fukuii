@@ -1,12 +1,12 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.json4s.JsonAST._
-import org.json4s.JsonDSL._
+import org.json4s.JsonAST.*
+import org.json4s.JsonDSL.*
 
-import com.chipprbots.ethereum.jsonrpc.EthTxService._
+import com.chipprbots.ethereum.jsonrpc.EthTxService.*
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError.InvalidParams
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonEncoder
-import com.chipprbots.ethereum.jsonrpc.serialization.JsonEncoder.OptionToNull._
+import com.chipprbots.ethereum.jsonrpc.serialization.JsonEncoder.OptionToNull.*
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder.NoParamsMethodDecoder
 
@@ -270,7 +270,7 @@ object EthTxJsonMethodsImplicits extends JsonMethodsImplicits {
   implicit val RawTransactionResponseJsonEncoder: JsonEncoder[RawTransactionResponse] =
     new JsonEncoder[RawTransactionResponse] {
       override def encodeJson(t: RawTransactionResponse): JValue =
-        t.transactionResponse.map((RawTransactionCodec.asRawTransaction _).andThen(encodeAsHex))
+        t.transactionResponse.map(RawTransactionCodec.asRawTransaction.andThen(encodeAsHex))
     }
 
 }

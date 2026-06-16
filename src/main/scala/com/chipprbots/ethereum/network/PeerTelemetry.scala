@@ -69,7 +69,7 @@ case object PeerTelemetry extends MetricsContainer with Logger {
       removeMeter(infoMeters, peer.id)
       val infoGauge = Gauge
         .builder(InfoMetricName, this, (_: Any) => 1.0)
-        .tags(tags: _*)
+        .tags(tags*)
         .strongReference(true)
         .register(metrics.registry)
       infoMeters.put(peer.id, infoGauge)

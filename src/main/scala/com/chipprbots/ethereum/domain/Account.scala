@@ -10,7 +10,7 @@ import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.mpt.ByteArraySerializable
 import com.chipprbots.ethereum.rlp
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
-import com.chipprbots.ethereum.rlp._
+import com.chipprbots.ethereum.rlp.*
 import com.chipprbots.ethereum.utils.ByteUtils
 
 object Account {
@@ -23,8 +23,8 @@ object Account {
   // RLP codec — inlined from ETH63.AccountImplicits (go-ethereum / Erigon inline pattern)
   implicit class AccountEnc(val account: Account) extends RLPSerializable {
     override def toRLPEncodable: RLPEncodeable = {
-      import account._
-      import UInt256RLPImplicits._
+      import account.*
+      import UInt256RLPImplicits.*
       import RLPImplicits.byteStringEncDec
       RLPList(
         nonce.toRLPEncodable,

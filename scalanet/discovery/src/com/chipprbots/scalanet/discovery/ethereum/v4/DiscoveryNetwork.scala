@@ -10,7 +10,7 @@ import cats.effect.IO
 import cats.effect.Temporal
 import cats.implicits.*
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.control.NoStackTrace
 import scala.util.control.NonFatal
 
@@ -85,7 +85,7 @@ object DiscoveryNetwork {
     new DiscoveryNetwork[A] with LazyLogging {
 
       import DiscoveryRPC.ENRSeq
-      import Payload._
+      import Payload.*
 
       private val expirationSeconds = config.messageExpiration.toSeconds
       private val maxClockDriftSeconds = config.maxClockDrift.toSeconds

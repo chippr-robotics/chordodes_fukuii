@@ -10,11 +10,11 @@ import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
-import cats.syntax.parallel._
+import cats.syntax.parallel.*
 
 import scala.annotation.unused
 import scala.collection.concurrent.TrieMap
-import scala.collection.concurrent.{Map => ConcurrentMap}
+import scala.collection.concurrent.Map as ConcurrentMap
 import scala.concurrent.duration.FiniteDuration
 
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
@@ -30,7 +30,7 @@ import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.ommers.OmmersPool
@@ -86,8 +86,8 @@ class EthMiningService(
     coinbaseProvider: CoinbaseProvider,
     system: ActorSystem
 ) extends TransactionPicker {
-  import configBuilder._
-  import EthMiningService._
+  import configBuilder.*
+  import EthMiningService.*
 
   val hashRate: ConcurrentMap[ByteString, (BigInt, Date)] = new TrieMap[ByteString, (BigInt, Date)]()
   val lastActive = new AtomicReference[Option[Date]](None)
@@ -161,7 +161,7 @@ class EthMiningService(
               PoWMiningMetrics.recordStaleShare()
               Right(SubmitWorkResponse(false))
             } else {
-              import pendingBlock._
+              import pendingBlock.*
               syncingController ! SyncProtocol.MinedBlock(
                 block.copy(header = block.header.copy(nonce = req.nonce, mixHash = req.mixHash))
               )

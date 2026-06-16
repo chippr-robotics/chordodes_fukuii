@@ -6,12 +6,12 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.keystore.EncryptedKeyJsonCodec
 import com.chipprbots.ethereum.utils.ByteStringUtils
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class CliCommandsSpec extends AnyFlatSpec with Matchers with EitherValues {
 
-  import CliCommands._
-  import Fixture._
+  import CliCommands.*
+  import Fixture.*
 
   behavior.of(generatePrivateKeyCommand)
   it should "generate correct private key" taggedAs (UnitTest) in {

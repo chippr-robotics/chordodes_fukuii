@@ -5,7 +5,7 @@ import java.security.SecureRandom
 
 import org.apache.pekko.util.ByteString
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 import scala.language.implicitConversions
 
 import com.typesafe.config.Config
@@ -35,8 +35,8 @@ import com.chipprbots.ethereum.rlp
 import com.chipprbots.ethereum.rpcTest.Tags.MainNet
 import com.chipprbots.ethereum.rpcTest.Tags.PrivNet
 import com.chipprbots.ethereum.rpcTest.Tags.PrivNetNoMining
-import com.chipprbots.ethereum.rpcTest.TestContracts._
-import com.chipprbots.ethereum.rpcTest.TestData._
+import com.chipprbots.ethereum.rpcTest.TestContracts.*
+import com.chipprbots.ethereum.rpcTest.TestData.*
 import com.chipprbots.ethereum.utils.KeyStoreConfig
 import com.chipprbots.ethereum.utils.Logger
 

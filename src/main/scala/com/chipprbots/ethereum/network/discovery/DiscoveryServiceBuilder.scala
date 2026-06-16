@@ -13,7 +13,7 @@ import com.chipprbots.scalanet.discovery.crypto.PublicKey
 import com.chipprbots.scalanet.discovery.crypto.SigAlg
 import com.chipprbots.scalanet.discovery.ethereum.EthereumNodeRecord
 import com.chipprbots.scalanet.discovery.ethereum.v4
-import com.chipprbots.scalanet.discovery.ethereum.{Node => ENode}
+import com.chipprbots.scalanet.discovery.ethereum.Node as ENode
 import com.chipprbots.scalanet.peergroup.ExternalAddressResolver
 import com.chipprbots.scalanet.peergroup.InetMultiAddress
 import com.chipprbots.scalanet.peergroup.udp.StaticUDPPeerGroup
@@ -29,7 +29,7 @@ import com.chipprbots.ethereum.utils.NodeStatus
 import com.chipprbots.ethereum.utils.ServerStatus
 import com.chipprbots.scalanet.discovery.ethereum.v4.Packet
 import com.chipprbots.scalanet.discovery.ethereum.v5
-import com.chipprbots.scalanet.discovery.ethereum.{Node => ScNode}
+import com.chipprbots.scalanet.discovery.ethereum.Node as ScNode
 import com.chipprbots.scalanet.discovery.ethereum.EthereumNodeRecord.Content
 import com.chipprbots.scalanet.peergroup.udp.V5DemuxResponder
 
@@ -50,7 +50,7 @@ trait DiscoveryServiceBuilder extends Logger {
 
     implicit val packetCodec: Codec[Packet] = v4.Packet.packetCodec(allowDecodeOverMaxPacketSize = true)
     implicit val payloadCodec = RLPCodecs.payloadCodec
-    implicit val enrContentCodec: Codec[Content] = RLPCodecs.codecFromRLPCodec(RLPCodecs.enrContentRLPCodec)
+    implicit val enrContentCodec: Codec[Content] = RLPCodecs.codecFromRLPCodec(using RLPCodecs.enrContentRLPCodec)
 
     // Warm up the discv4 packet pack/unpack path eagerly. The first invocation
     // pays ~100 ms in JIT/class-loading + Bouncy Castle ECDSA provider init +
@@ -351,7 +351,7 @@ trait DiscoveryServiceBuilder extends Logger {
   ): StaticUDPPeerGroup.SyncResponder = {
     import V5RLPCodecs.codecFromRLPCodec
     implicit val v5PayloadCodec: Codec[v5.Payload] = V5RLPCodecs.payloadCodec
-    implicit val v5EnrCodec: Codec[EthereumNodeRecord] = codecFromRLPCodec(V5RLPCodecs.enrRLPCodec)
+    implicit val v5EnrCodec: Codec[EthereumNodeRecord] = codecFromRLPCodec(using V5RLPCodecs.enrRLPCodec)
 
     val localPubBytes = localNode.id.value.bytes
     val localNodeId = v5.Session.nodeIdFromPublicKey(localPubBytes)

@@ -8,7 +8,7 @@ import org.apache.pekko.util.Timeout
 import cats.effect.IO
 
 import scala.annotation.unused
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.concurrent.ExecutionContext
 
 import org.json4s.JsonAST.JValue
@@ -113,7 +113,7 @@ class McpService(
     transactionMappingStorage: TransactionMappingStorage
 )(implicit val executionContext: ExecutionContext) {
 
-  import McpService._
+  import McpService.*
 
   implicit val timeout: Timeout = Timeout(10.seconds)
 
@@ -142,7 +142,7 @@ class McpService(
     )
 
   def toolsList(@unused request: McpToolsListRequest): ServiceResponse[McpToolsListResponse] = {
-    import org.json4s.JsonDSL._
+    import org.json4s.JsonDSL.*
 
     val tools = McpToolRegistry.getAllTools().map { toolDef =>
       McpTool(

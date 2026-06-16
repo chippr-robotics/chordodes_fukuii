@@ -9,7 +9,7 @@ import scala.jdk.CollectionConverters.*
 
 import org.slf4j.LoggerFactory
 
-import com.chipprbots.ethereum.utils.{Logger => FukuiiLogger}
+import com.chipprbots.ethereum.utils.Logger as FukuiiLogger
 
 /** Log suppression mechanism using Logback.
   *

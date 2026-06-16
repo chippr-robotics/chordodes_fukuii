@@ -2,8 +2,8 @@ package com.chipprbots.ethereum.ethtest
 
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
-import io.circe._
-import io.circe.parser._
+import io.circe.*
+import io.circe.parser.*
 import scala.io.Source
 
 /** Adapter for running ethereum/tests JSON blockchain tests

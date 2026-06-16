@@ -6,10 +6,10 @@ import org.bouncycastle.util.encoders.Hex
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator._
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.*
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.ledger.BloomFilter
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class StdBlockValidatorSpec extends AnyFlatSpec with Matchers {
 

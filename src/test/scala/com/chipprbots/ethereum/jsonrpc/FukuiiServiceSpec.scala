@@ -97,7 +97,7 @@ class FukuiiServiceSpec
       }
 
       customTestCaseM(new TxHistoryFixture) { fixture =>
-        import fixture._
+        import fixture.*
 
         fukuiiService
           .getAccountTransactions(GetAccountTransactionsRequest(fakeTransaction.senderAddress, BigInt(0) to BigInt(1)))
@@ -106,7 +106,7 @@ class FukuiiServiceSpec
     }
 
     "should validate range size against configuration" in testCaseM { (fixture: Fixture) =>
-      import fixture._
+      import fixture.*
 
       fukuiiService
         .getAccountTransactions(

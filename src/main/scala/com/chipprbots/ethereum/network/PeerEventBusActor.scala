@@ -13,7 +13,7 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MaintainedPee
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerHandshakeSuccessful
-import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier._
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.*
 import com.chipprbots.ethereum.network.handshaker.Handshaker.HandshakeResult
 import com.chipprbots.ethereum.network.p2p.Message
 
@@ -250,7 +250,7 @@ object PeerEventBusActor {
 }
 
 class PeerEventBusActor extends Actor {
-  import PeerEventBusActor._
+  import PeerEventBusActor.*
 
   val peerEventBus: PeerEventBus = new PeerEventBus
 

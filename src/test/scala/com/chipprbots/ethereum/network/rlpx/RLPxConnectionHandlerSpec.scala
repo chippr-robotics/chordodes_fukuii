@@ -32,7 +32,7 @@ import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.RLPxConfigurat
 import com.chipprbots.ethereum.security.SecureRandomBuilder
 
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 // SCALA 3 MIGRATION: Fixed by creating manual stub implementation for AuthHandshaker
 // @Ignore - Un-ignored per issue to identify test failures
@@ -506,8 +506,8 @@ class RLPxConnectionHandlerSpec
       connection.expectMsgClass(classOf[Tcp.Register])
 
       // Configure stubFrameCodec to return empty Seq instead of null
-      (stubFrameCodec.readFrames _).when(*).returns(Seq.empty)
-      (stubFrameCodec.writeFrames _).when(*).returns(ByteString.empty)
+      stubFrameCodec.readFrames.when(*).returns(Seq.empty)
+      stubFrameCodec.writeFrames.when(*).returns(ByteString.empty)
 
       // AuthHandshaker handles initial message
       val data = ByteString((0 until AuthHandshaker.InitiatePacketLength).map(_.toByte).toArray)
@@ -531,7 +531,7 @@ class RLPxConnectionHandlerSpec
         )
       }
 
-      (mockHelloExtractor.readHello _)
+      mockHelloExtractor.readHello
         .expects(ByteString.empty)
         .returning(Some((Hello(5, "", Capability.ETH63 :: Nil, 30303, ByteString("abc")), Seq.empty)))
       mockMessageCodec.readMessagesHandler = Some(_ => Nil) // For processing of messages after handshaking finishes

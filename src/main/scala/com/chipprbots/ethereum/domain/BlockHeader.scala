@@ -10,12 +10,12 @@ import com.chipprbots.ethereum.rlp.RLPImplicits.given
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPSerializable
 import com.chipprbots.ethereum.rlp.rawDecode
-import com.chipprbots.ethereum.rlp.{encode => rlpEncode}
+import com.chipprbots.ethereum.rlp.encode as rlpEncode
 import com.chipprbots.ethereum.utils.ByteStringUtils
 
 import BlockHeader.HeaderExtraFields
-import BlockHeader.HeaderExtraFields._
-import BlockHeaderImplicits._
+import BlockHeader.HeaderExtraFields.*
+import BlockHeaderImplicits.*
 
 case class BlockHeader(
     parentHash: ByteString,
@@ -153,7 +153,7 @@ object BlockHeader {
     val extraFieldsEncoded = rlpList.items.takeRight(numberOfExtraFields)
 
     val rlpItemsWithoutNonce = baseFields ++ extraFieldsEncoded
-    rlpEncode(RLPList(rlpItemsWithoutNonce: _*))
+    rlpEncode(RLPList(rlpItemsWithoutNonce*))
   }
 
   sealed trait HeaderExtraFields
@@ -187,15 +187,15 @@ object BlockHeader {
 
 object BlockHeaderImplicits {
 
-  import com.chipprbots.ethereum.rlp.RLPImplicitConversions._
+  import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
   import com.chipprbots.ethereum.rlp.RLPValue
   import com.chipprbots.ethereum.utils.ByteUtils
 
-  import BlockHeader.HeaderExtraFields._
+  import BlockHeader.HeaderExtraFields.*
 
   implicit class BlockHeaderEnc(blockHeader: BlockHeader) extends RLPSerializable {
     override def toRLPEncodable: RLPEncodeable = {
-      import blockHeader._
+      import blockHeader.*
 
       val baseItems: Seq[RLPEncodeable] = Seq(
         RLPValue(parentHash.toArray),
@@ -244,7 +244,7 @@ object BlockHeaderImplicits {
           Seq.empty
       }
 
-      RLPList((baseItems ++ extraItems): _*)
+      RLPList((baseItems ++ extraItems)*)
     }
   }
 

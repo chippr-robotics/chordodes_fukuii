@@ -27,8 +27,8 @@ import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.jsonrpc.EthBlocksService._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.jsonrpc.EthBlocksService.*
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 
 class EthBlocksServiceSpec

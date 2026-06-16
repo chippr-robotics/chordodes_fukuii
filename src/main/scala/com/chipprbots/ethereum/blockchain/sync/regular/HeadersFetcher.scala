@@ -4,7 +4,7 @@ import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.AbstractBehavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.actor.{ActorRef => ClassicActorRef}
+import org.apache.pekko.actor.ActorRef as ClassicActorRef
 import org.apache.pekko.util.ByteString
 
 import cats.effect.IO
@@ -23,8 +23,8 @@ import com.chipprbots.ethereum.blockchain.sync.regular.HeadersFetcher.HeadersFet
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{BlockHeaders => ETH68BlockHeaders}
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{GetBlockHeaders => ETH68GetBlockHeaders}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders as ETH68BlockHeaders
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders as ETH68GetBlockHeaders
 import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
@@ -39,7 +39,7 @@ class HeadersFetcher(
   val log: Logger = context.log
   implicit val runtime: IORuntime = IORuntime.global
 
-  import HeadersFetcher._
+  import HeadersFetcher.*
 
   override def makeAdaptedMessage[T <: Message](peer: Peer, msg: T): HeadersFetcherCommand = AdaptedMessage(peer, msg)
 

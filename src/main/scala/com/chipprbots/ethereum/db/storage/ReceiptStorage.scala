@@ -2,12 +2,12 @@ package com.chipprbots.ethereum.db.storage
 
 import org.apache.pekko.util.ByteString
 
-import boopickle.DefaultBasic._
+import boopickle.DefaultBasic.*
 import boopickle.Pickler
 
 import com.chipprbots.ethereum.db.dataSource.DataSource
 import com.chipprbots.ethereum.db.storage.ReceiptStorage.BlockHash
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.utils.ByteUtils.byteSequenceToBuffer
 import com.chipprbots.ethereum.utils.ByteUtils.compactPickledBytes
 
@@ -16,7 +16,7 @@ import com.chipprbots.ethereum.utils.ByteUtils.compactPickledBytes
   */
 class ReceiptStorage(val dataSource: DataSource) extends TransactionalKeyValueStorage[BlockHash, Seq[Receipt]] {
 
-  import ReceiptStorage._
+  import ReceiptStorage.*
 
   override val namespace: IndexedSeq[Byte] = Namespaces.ReceiptsNamespace
 
@@ -28,7 +28,7 @@ class ReceiptStorage(val dataSource: DataSource) extends TransactionalKeyValueSt
     compactPickledBytes(Pickle.intoBytes(receipts))
 
   override def valueDeserializer: IndexedSeq[Byte] => ReceiptSeq =
-    (byteSequenceToBuffer _).andThen(Unpickle[Seq[Receipt]].fromBytes)
+    byteSequenceToBuffer.andThen(Unpickle[Seq[Receipt]].fromBytes)
 }
 
 object ReceiptStorage {

@@ -12,7 +12,7 @@ import cats.effect.IO
 import cats.effect.Resource
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Failure
 import scala.util.Random
 import scala.util.Success
@@ -21,7 +21,7 @@ import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.scalanet.discovery.crypto.PublicKey
 import com.chipprbots.scalanet.discovery.ethereum.v4
-import com.chipprbots.scalanet.discovery.ethereum.{Node => ENode}
+import com.chipprbots.scalanet.discovery.ethereum.Node as ENode
 import fs2.Stream
 import scodec.bits.BitVector
 
@@ -67,7 +67,7 @@ class PeerDiscoveryManager(
       .filter(!isLocalNode(_))
   } yield (service, randomNodes)
 
-  import PeerDiscoveryManager._
+  import PeerDiscoveryManager.*
 
   // The following logic is for backwards compatibility.
   val alreadyDiscoveredNodes: Vector[Node] =

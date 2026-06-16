@@ -16,7 +16,7 @@ trait MessageSerializable extends Message {
 
 @FunctionalInterface
 trait MessageDecoder extends Logger { self =>
-  import MessageDecoder._
+  import MessageDecoder.*
 
   def fromBytes(`type`: Int, payload: Array[Byte]): Either[DecodingError, Message]
 

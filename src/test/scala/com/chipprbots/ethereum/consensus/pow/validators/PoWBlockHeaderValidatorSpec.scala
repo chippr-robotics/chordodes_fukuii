@@ -9,10 +9,10 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.utils.Config
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class PoWBlockHeaderValidatorSpec extends AnyFlatSpecLike with Matchers {
-  import PoWBlockHeaderValidatorSpec._
+  import PoWBlockHeaderValidatorSpec.*
 
   "PoWBlockHeaderValidator" should "validate Ethash block headers" taggedAs (UnitTest, ConsensusTest, SlowTest) in {
     PoWBlockHeaderValidator.validateEvenMore(validEthashBlockHeader)(blockchainConfig) shouldBe Right(BlockHeaderValid)

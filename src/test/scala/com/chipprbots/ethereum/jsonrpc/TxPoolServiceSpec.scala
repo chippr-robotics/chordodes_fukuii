@@ -10,11 +10,11 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.NormalPatience
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransaction
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransactionsResponse
@@ -35,7 +35,7 @@ class TxPoolServiceSpec
     with ScalaFutures
     with NormalPatience {
 
-  import TxPoolService._
+  import TxPoolService.*
 
   implicit val runtime: IORuntime = IORuntime.global
 

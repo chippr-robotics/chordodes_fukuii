@@ -28,7 +28,7 @@ import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.network.PeerManagerActor.Peers
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import scala.concurrent.Future
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class DebugServiceSpec
     extends TestKit(ActorSystem("ActorSystem_DebugServiceSpec"))

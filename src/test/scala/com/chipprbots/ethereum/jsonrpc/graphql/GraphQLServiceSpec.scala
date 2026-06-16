@@ -37,7 +37,7 @@ import com.chipprbots.ethereum.ledger.StxLedger
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class GraphQLServiceSpec
     extends TestKit(ActorSystem("GraphQLServiceSpec_ActorSystem"))

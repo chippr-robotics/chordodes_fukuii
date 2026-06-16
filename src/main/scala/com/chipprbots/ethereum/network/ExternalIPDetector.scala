@@ -5,7 +5,7 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.{CompletableFuture, TimeUnit}
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 import scala.util.{Try, Using}
 
 import org.jupnp.UpnpServiceImpl

@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.consensus
 
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.language.postfixOps
 
 import org.scalatest.concurrent.ScalaFutures
@@ -21,12 +21,12 @@ import com.chipprbots.ethereum.blockchain.sync.regular.BlockImportFailed
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockImportedToTop
 import com.chipprbots.ethereum.blockchain.sync.regular.ChainReorganised
 import com.chipprbots.ethereum.blockchain.sync.regular.DuplicateBlock
-import com.chipprbots.ethereum.consensus.mining._
+import com.chipprbots.ethereum.consensus.mining.*
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderDifficultyError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderParentNotFoundError
-import com.chipprbots.ethereum.consensus.validators._
+import com.chipprbots.ethereum.consensus.validators.*
 import com.chipprbots.ethereum.db.storage.MptStorage
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.branch.Branch
 import com.chipprbots.ethereum.domain.branch.EmptyBranch
 import com.chipprbots.ethereum.ledger.BlockData
@@ -39,7 +39,7 @@ import com.chipprbots.ethereum.ledger.OmmersTestSetup
 import com.chipprbots.ethereum.ledger.TestSetupWithVmAndValidators
 import com.chipprbots.ethereum.mpt.LeafNode
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 class ConsensusAdapterSpec
@@ -85,18 +85,18 @@ class ConsensusAdapterSpec
     val blockData = BlockData(block, Seq.empty[Receipt], newWeight)
 
     // Just to bypass metrics needs
-    (blockchainReader.getBlockByHash _).expects(*).anyNumberOfTimes().returning(None)
-    (blockchainWriter.save _).expects(*, *, *, *).returning(())
-    (blockchainWriter.saveBestKnownBlocks _).expects(*, *).returning(())
+    blockchainReader.getBlockByHash.expects(*).anyNumberOfTimes().returning(None)
+    blockchainWriter.save.expects(*, *, *, *).returning(())
+    blockchainWriter.saveBestKnownBlocks.expects(*, *).returning(())
 
-    (blockQueue.enqueueBlock _).expects(block, bestNum).returning(Some(Leaf(hash, newWeight)))
-    (blockQueue.getBranch _).expects(hash, true).returning(List(block))
+    blockQueue.enqueueBlock.expects(block, bestNum).returning(Some(Leaf(hash, newWeight)))
+    blockQueue.getBranch.expects(hash, true).returning(List(block))
 
-    (blockchainReader.getBlockHeaderByHash _).expects(*).anyNumberOfTimes().returning(Some(block.header))
-    (blockchain.getBackingMptStorage _)
+    blockchainReader.getBlockHeaderByHash.expects(*).anyNumberOfTimes().returning(Some(block.header))
+    blockchain.getBackingMptStorage
       .expects(*)
       .returning(storagesInstance.storages.stateStorage.getBackingStorage(6))
-    (blockchain.saveBlockState _).expects(*).anyNumberOfTimes().returning(())
+    blockchain.saveBlockState.expects(*).anyNumberOfTimes().returning(())
 
     whenReady(blockImportNotFailingAfterExecValidation.evaluateBranchBlock(block).unsafeToFuture()) {
       _ shouldEqual BlockImportedToTop(List(blockData))
@@ -114,10 +114,10 @@ class ConsensusAdapterSpec
     setChainWeightForBlock(bestBlock, currentWeight)
 
     val hash: ByteString = block.header.hash
-    (blockQueue.enqueueBlock _)
+    blockQueue.enqueueBlock
       .expects(block, bestNum)
       .returning(Some(Leaf(hash, currentWeight.increase(block.header))))
-    (blockQueue.getBranch _).expects(hash, true).returning(List(block))
+    blockQueue.getBranch.expects(hash, true).returning(List(block))
 
     val mptStorage = mock[MptStorage]
     val mptNode = LeafNode(
@@ -127,12 +127,12 @@ class ConsensusAdapterSpec
       Some(MerklePatriciaTrie.EmptyRootHash)
     )
 
-    (blockchainReader.getBlockHeaderByHash _).expects(*).anyNumberOfTimes().returning(Some(block.header))
-    (blockchainReader.getBlockHeaderByNumber _).expects(*).anyNumberOfTimes().returning(Some(block.header))
-    (blockchain.getBackingMptStorage _).expects(*).returning(mptStorage)
-    (mptStorage.get _).expects(*).returning(mptNode)
+    blockchainReader.getBlockHeaderByHash.expects(*).anyNumberOfTimes().returning(Some(block.header))
+    blockchainReader.getBlockHeaderByNumber.expects(*).anyNumberOfTimes().returning(Some(block.header))
+    blockchain.getBackingMptStorage.expects(*).returning(mptStorage)
+    mptStorage.get.expects(*).returning(mptNode)
 
-    (blockQueue.removeSubtree _).expects(*)
+    blockQueue.removeSubtree.expects(*)
 
     whenReady(consensusAdapter.evaluateBranchBlock(block).unsafeToFuture())(
       _ shouldBe BlockImportFailed(
@@ -151,8 +151,8 @@ class ConsensusAdapterSpec
     // After the post-PivotHeaderBootstrap fix, evaluateBranchBlock falls back to
     // getBestBlockHeader() when the full block isn't available. Both must report
     // None for the "no best block" scenario.
-    (blockchainReader.getBestBlock _).expects().returning(None)
-    (blockchainReader.getBestBlockHeader _).expects().returning(None)
+    blockchainReader.getBestBlock.expects().returning(None)
+    blockchainReader.getBestBlockHeader.expects().returning(None)
     setChainWeightForBlock(bestBlock, currentWeight)
 
     whenReady(consensusAdapter.evaluateBranchBlock(block).unsafeToFuture())(
@@ -169,10 +169,10 @@ class ConsensusAdapterSpec
     setBlockExists(block, inChain = false, inQueue = false)
     setBestBlock(bestBlock)
     // Chain weight is missing - should log warning but not return early with the old error message
-    (blockchainReader.getChainWeightByHash _).expects(*).anyNumberOfTimes().returning(None)
+    blockchainReader.getChainWeightByHash.expects(*).anyNumberOfTimes().returning(None)
 
-    (blockchainReader.getBlockHeaderByHash _).expects(*).anyNumberOfTimes().returning(Some(block.header))
-    (blockQueue.enqueueBlock _).expects(*, *).anyNumberOfTimes().returning(None)
+    blockchainReader.getBlockHeaderByHash.expects(*).anyNumberOfTimes().returning(Some(block.header))
+    blockQueue.enqueueBlock.expects(*, *).anyNumberOfTimes().returning(None)
 
     // The code should continue processing and call block validation, not return early
     // Since chain weight is None, processing may continue but won't succeed fully
@@ -553,24 +553,24 @@ class ConsensusAdapterSpec
     override lazy val mockBlockQueue: BlockQueue = mock[BlockQueue]
 
     // Setup default expectations
-    (blockchainReader.getBestBranch _).expects().anyNumberOfTimes().returning(EmptyBranch)
+    blockchainReader.getBestBranch.expects().anyNumberOfTimes().returning(EmptyBranch)
 
     // Helper methods implementation (have MockFactory context here)
     override def setBlockExists(block: Block, inChain: Boolean, inQueue: Boolean): CallHandler1[ByteString, Boolean] = {
-      (blockchainReader.getBlockByHash _)
+      blockchainReader.getBlockByHash
         .expects(block.header.hash)
         .anyNumberOfTimes()
         .returning(Some(block).filter(_ => inChain))
-      (blockQueue.isQueued _).expects(block.header.hash).anyNumberOfTimes().returning(inQueue)
+      blockQueue.isQueued.expects(block.header.hash).anyNumberOfTimes().returning(inQueue)
     }
 
     override def setBestBlock(block: Block): CallHandler0[BigInt] = {
-      (blockchainReader.getBestBlock _).expects().anyNumberOfTimes().returning(Some(block))
-      (blockchainReader.getBestBlockNumber _).expects().anyNumberOfTimes().returning(block.header.number)
+      blockchainReader.getBestBlock.expects().anyNumberOfTimes().returning(Some(block))
+      blockchainReader.getBestBlockNumber.expects().anyNumberOfTimes().returning(block.header.number)
     }
 
     override def setBestBlockNumber(num: BigInt): CallHandler0[BigInt] =
-      (blockchainReader.getBestBlockNumber _).expects().returning(num)
+      blockchainReader.getBestBlockNumber.expects().returning(num)
 
     override def setChainWeightForBlock(
         block: Block,
@@ -582,7 +582,7 @@ class ConsensusAdapterSpec
         hash: ByteString,
         weight: ChainWeight
     ): CallHandler1[ByteString, Option[ChainWeight]] =
-      (blockchainReader.getChainWeightByHash _).expects(hash).anyNumberOfTimes().returning(Some(weight))
+      blockchainReader.getChainWeightByHash.expects(hash).anyNumberOfTimes().returning(Some(weight))
 
     override def expectBlockSaved(
         block: Block,
@@ -596,10 +596,10 @@ class ConsensusAdapterSpec
         .once()
 
     override def setHeaderInChain(hash: ByteString, result: Boolean = true): CallHandler2[Branch, ByteString, Boolean] =
-      (blockchainReader.isInChain _).expects(*, hash).returning(result)
+      blockchainReader.isInChain.expects(*, hash).returning(result)
 
     override def setBlockByNumber(number: BigInt, block: Option[Block]): CallHandler2[Branch, BigInt, Option[Block]] =
-      (blockchainReader.getBlockByNumber _).expects(*, number).returning(block)
+      blockchainReader.getBlockByNumber.expects(*, number).returning(block)
 
     override def setGenesisHeader(header: BlockHeader): Unit =
       (() => blockchainReader.genesisHeader).expects().returning(header)

@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.blockchain.sync
 
 import scala.collection.mutable
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.utils.Logger
 
@@ -19,7 +19,7 @@ import com.chipprbots.ethereum.utils.Logger
   * Reference: go-ethereum/p2p/msgrate/msgrate.go
   */
 class PeerRateTracker extends Logger {
-  import PeerRateTracker._
+  import PeerRateTracker.*
 
   // Per-peer rate tracking
   private val peers = mutable.Map[String, PeerStats]()

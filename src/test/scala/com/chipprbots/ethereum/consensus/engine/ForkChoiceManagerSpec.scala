@@ -9,8 +9,8 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.domain.BlockHeader
-import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Verifies the publisher pattern added in #1207: every `applyForkChoiceState` call must notify the registered listener
   * with a `BeaconHead` message — including the unknown-head (Left("SYNCING")) branch, which is the trigger SNAP needs

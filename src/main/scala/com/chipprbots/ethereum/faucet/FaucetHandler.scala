@@ -18,8 +18,8 @@ class FaucetHandler(walletService: WalletService, config: FaucetConfig)(using ru
     extends Actor
     with ActorLogging {
 
-  import FaucetHandler.FaucetHandlerMsg._
-  import FaucetHandler.FaucetHandlerResponse._
+  import FaucetHandler.FaucetHandlerMsg.*
+  import FaucetHandler.FaucetHandlerResponse.*
 
   override def preStart(): Unit =
     self ! Initialization

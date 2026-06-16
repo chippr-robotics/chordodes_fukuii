@@ -5,7 +5,7 @@ import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 object EthashDifficultyCalculator extends DifficultyCalculator {
-  import DifficultyCalculator._
+  import DifficultyCalculator.*
   private val ExpDifficultyPeriod: Int = 100_000
   private val ByzantiumRelaxDifficulty: BigInt = 3_000_000
   private val ConstantinopleRelaxDifficulty: BigInt = 5_000_000
@@ -14,7 +14,7 @@ object EthashDifficultyCalculator extends DifficultyCalculator {
   def calculateDifficulty(blockNumber: BigInt, blockTimestamp: Long, parentHeader: BlockHeader)(implicit
       blockchainConfig: BlockchainConfig
   ): BigInt = {
-    import blockchainConfig.forkBlockNumbers._
+    import blockchainConfig.forkBlockNumbers.*
 
     lazy val timestampDiff = blockTimestamp - parentHeader.unixTimestamp
 
@@ -55,7 +55,7 @@ object EthashDifficultyCalculator extends DifficultyCalculator {
   private def calculateBombExponent(blockNumber: BigInt)(implicit
       blockchainConfig: BlockchainConfig
   ): Int = {
-    import blockchainConfig.forkBlockNumbers._
+    import blockchainConfig.forkBlockNumbers.*
     if (blockNumber < difficultyBombPauseBlockNumber)
       (blockNumber / ExpDifficultyPeriod - 2).toInt
     else if (blockNumber < difficultyBombContinueBlockNumber)

@@ -5,13 +5,13 @@ import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.{Success, Failure}
 
 import com.chipprbots.ethereum.db.storage.{AppStateStorage, EvmCodeStorage, StateStorage}
 import com.chipprbots.ethereum.domain.Account
-import com.chipprbots.ethereum.mpt._
-import com.chipprbots.ethereum.mpt.MptVisitors._
+import com.chipprbots.ethereum.mpt.*
+import com.chipprbots.ethereum.mpt.MptVisitors.*
 import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncConfig
 
 /** Bytecode recovery actor for Bug 20 hardening.
@@ -42,7 +42,7 @@ class BytecodeRecoveryActor(
 ) extends Actor
     with ActorLogging {
 
-  import BytecodeRecoveryActor._
+  import BytecodeRecoveryActor.*
   import context.dispatcher
 
   override def preStart(): Unit = preloadedMissingForTesting match {

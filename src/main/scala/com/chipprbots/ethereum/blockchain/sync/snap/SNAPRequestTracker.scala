@@ -1,15 +1,15 @@
 package com.chipprbots.ethereum.blockchain.sync.snap
 
-import org.apache.pekko.actor._
+import org.apache.pekko.actor.*
 import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.blockchain.sync.PeerRateTracker
 import com.chipprbots.ethereum.network.Peer
-import com.chipprbots.ethereum.network.p2p.messages.SNAP._
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
 import com.chipprbots.ethereum.utils.Logger
 
 /** SNAP request tracker for managing pending requests and matching responses
@@ -25,7 +25,7 @@ import com.chipprbots.ethereum.utils.Logger
   */
 class SNAPRequestTracker(implicit scheduler: Scheduler) extends Logger {
 
-  import SNAPRequestTracker._
+  import SNAPRequestTracker.*
 
   /** Pending requests tracked by request ID */
   private val pendingRequests = mutable.Map[BigInt, PendingRequest]()

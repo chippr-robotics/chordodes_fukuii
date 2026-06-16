@@ -18,15 +18,15 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
-import com.google.protobuf.{ByteString => GByteString}
+import com.google.protobuf.ByteString as GByteString
 import com.typesafe.config.ConfigFactory
 
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
-import com.chipprbots.ethereum.extvm.Implicits._
+import com.chipprbots.ethereum.extvm.Implicits.*
 import com.chipprbots.ethereum.extvm.msg.AccessListData
 import com.chipprbots.ethereum.extvm.msg.StorageEntry
-import com.chipprbots.ethereum.utils._
+import com.chipprbots.ethereum.utils.*
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm
 import com.chipprbots.ethereum.vm.EvmConfig
 import com.chipprbots.ethereum.vm.ProgramContext
@@ -116,7 +116,7 @@ class VMServer(messageHandler: MessageHandler) extends Logger {
 
   // scalastyle:off method.length
   private def constructContextFromMsg(contextMsg: msg.CallContext): ProgramContext[World, Storage] = {
-    import ByteString.{empty => irrelevant} // used for irrelevant BlockHeader fields
+    import ByteString.empty as irrelevant // used for irrelevant BlockHeader fields
 
     val blockHeaderMsg = contextMsg.blockHeader.getOrElse(
       throw new IllegalArgumentException("Block header is required in call context")

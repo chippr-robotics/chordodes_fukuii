@@ -10,7 +10,7 @@ import com.chipprbots.ethereum.utils.Logger
 
 trait FastSyncBranchResolver {
 
-  import FastSyncBranchResolver._
+  import FastSyncBranchResolver.*
 
   protected def blockchain: Blockchain
   protected def blockchainReader: BlockchainReader
@@ -67,7 +67,7 @@ class RecentBlocksSearch(blockchainReader: BlockchainReader) {
 }
 
 object BinarySearchSupport extends Logger {
-  import FastSyncBranchResolver._
+  import FastSyncBranchResolver.*
 
   sealed trait BinarySearchResult
   final case class BinarySearchCompleted(highestCommonBlockNumber: BigInt) extends BinarySearchResult

@@ -29,8 +29,8 @@ case class EthNodeStatus68ExchangeState(
     clientId: String = ""
 ) extends NodeStatusExchangeState[ETHPackets.Status68.Status68] {
 
-  import ETHPackets.Status68.Status68._ // toBytes for createStatusMsg
-  import handshakerConfiguration._
+  import ETHPackets.Status68.Status68.* // toBytes for createStatusMsg
+  import handshakerConfiguration.*
 
   def applyResponseMessage: PartialFunction[Message, HandshakerState[PeerInfo]] = {
     // ETH68MessageDecoder returns ETHPackets.Status68.Status68

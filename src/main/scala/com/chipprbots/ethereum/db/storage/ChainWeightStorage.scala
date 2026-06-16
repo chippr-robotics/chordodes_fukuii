@@ -4,10 +4,10 @@ import java.nio.BufferUnderflowException
 
 import org.apache.pekko.util.ByteString
 
-import boopickle.Default._
+import boopickle.Default.*
 
 import com.chipprbots.ethereum.db.dataSource.DataSource
-import com.chipprbots.ethereum.db.storage.ChainWeightStorage._
+import com.chipprbots.ethereum.db.storage.ChainWeightStorage.*
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.utils.ByteUtils.byteSequenceToBuffer
 import com.chipprbots.ethereum.utils.ByteUtils.compactPickledBytes
@@ -17,8 +17,8 @@ import com.chipprbots.ethereum.utils.ByteUtils.compactPickledBytes
 class ChainWeightStorage(val dataSource: DataSource) extends TransactionalKeyValueStorage[BlockHash, ChainWeight] {
   val namespace: IndexedSeq[Byte] = Namespaces.ChainWeightNamespace
   val keySerializer: BlockHash => ByteString = identity
-  val keyDeserializer: IndexedSeq[Byte] => BlockHash = bytes => ByteString(bytes: _*)
-  val valueSerializer: ChainWeight => IndexedSeq[Byte] = (Pickle.intoBytes[ChainWeight] _).andThen(compactPickledBytes)
+  val keyDeserializer: IndexedSeq[Byte] => BlockHash = bytes => ByteString(bytes*)
+  val valueSerializer: ChainWeight => IndexedSeq[Byte] = Pickle.intoBytes[ChainWeight].andThen(compactPickledBytes)
   val valueDeserializer: IndexedSeq[Byte] => ChainWeight = { bytes =>
     val buffer = byteSequenceToBuffer(bytes)
     try

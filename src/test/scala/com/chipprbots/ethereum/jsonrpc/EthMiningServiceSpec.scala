@@ -40,7 +40,7 @@ import com.chipprbots.ethereum.domain.BlockHeader.getEncodedWithoutNonce
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.jsonrpc.EthMiningService._
+import com.chipprbots.ethereum.jsonrpc.EthMiningService.*
 import com.chipprbots.ethereum.jsonrpc.NodeJsonRpcHealthChecker.JsonRpcHealthConfig
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
 import com.chipprbots.ethereum.jsonrpc.server.http.JsonRpcHttpServer.JsonRpcHttpServerConfig
@@ -50,7 +50,7 @@ import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.nodebuilder.ApisBuilder
 import com.chipprbots.ethereum.ommers.OmmersPool
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteStringUtils
@@ -108,7 +108,7 @@ class EthMiningServiceSpec
 
     ethMiningService.getMining(GetMiningRequest()).unsafeRunSync() shouldEqual Right(GetMiningResponse(false))
 
-    (blockGenerator.getPrepared _).expects(*).returning(Some(PendingBlock(block, Nil)))
+    blockGenerator.getPrepared.expects(*).returning(Some(PendingBlock(block, Nil)))
     ethMiningService
       .submitWork(
         SubmitWorkRequest(ByteString("nonce"), ByteString(Hex.decode("01" * 32)), ByteString(Hex.decode("01" * 32)))
@@ -235,7 +235,7 @@ class EthMiningServiceSpec
 
     val headerHash: ByteString = ByteString(Hex.decode("01" * 32))
 
-    (blockGenerator.getPrepared _).expects(headerHash).returning(Some(PendingBlock(block, Nil)))
+    blockGenerator.getPrepared.expects(headerHash).returning(Some(PendingBlock(block, Nil)))
 
     val req: SubmitWorkRequest = SubmitWorkRequest(ByteString("nonce"), headerHash, ByteString(Hex.decode("01" * 32)))
 
@@ -247,7 +247,7 @@ class EthMiningServiceSpec
 
     val headerHash: ByteString = ByteString(Hex.decode("01" * 32))
 
-    (blockGenerator.getPrepared _).expects(headerHash).returning(None)
+    blockGenerator.getPrepared.expects(headerHash).returning(None)
 
     val req: SubmitWorkRequest = SubmitWorkRequest(ByteString("nonce"), headerHash, ByteString(Hex.decode("01" * 32)))
 
@@ -379,7 +379,7 @@ class EthMiningServiceSpec
       blockchainWriter.save(block, Nil, ChainWeight.totalDifficultyOnly(block.header.difficulty), true)
 
       // getPrepared returns parentBlock (number=0); best=1; diff=1 > threshold=0 → stale
-      (blockGenerator.getPrepared _).expects(*).returning(Some(PendingBlock(parentBlock, Nil)))
+      blockGenerator.getPrepared.expects(*).returning(Some(PendingBlock(parentBlock, Nil)))
 
       val result = ethMiningService
         .submitWork(
@@ -398,7 +398,7 @@ class EthMiningServiceSpec
     // Save parentBlock so best = 0; pending block is at number 1 (ahead of best — not stale)
     blockchainWriter.save(parentBlock, Nil, ChainWeight.totalDifficultyOnly(parentBlock.header.difficulty), true)
 
-    (blockGenerator.getPrepared _).expects(*).returning(Some(PendingBlock(block, Nil)))
+    blockGenerator.getPrepared.expects(*).returning(Some(PendingBlock(block, Nil)))
 
     val result = ethMiningService
       .submitWork(

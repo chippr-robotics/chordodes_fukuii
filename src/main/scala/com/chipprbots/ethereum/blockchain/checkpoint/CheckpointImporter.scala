@@ -33,7 +33,7 @@ final class CheckpointImporter(
     evmCodeStorage: EvmCodeStorage,
     appStateStorage: AppStateStorage
 ) {
-  import CheckpointImporter._
+  import CheckpointImporter.*
   private val log = LoggerFactory.getLogger(getClass)
 
   /** Import from a file. Gzip-wrapped archives are auto-detected by either:

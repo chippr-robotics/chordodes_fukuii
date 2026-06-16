@@ -4,7 +4,7 @@ import org.apache.pekko.actor.{Actor, ActorRef, ActorSystem, Props}
 import org.apache.pekko.testkit.{ImplicitSender, TestKit, TestProbe}
 
 import java.net.InetSocketAddress
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
 import com.chipprbots.ethereum.db.dataSource.{DataSourceBatchUpdate, EphemDataSource}
 import com.chipprbots.ethereum.domain.{BlockHeader, BlockchainWriter}
 import com.chipprbots.ethereum.network.{Peer, PeerId}
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 
 class PivotHeaderBootstrapSpec

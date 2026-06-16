@@ -5,7 +5,7 @@ import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.AbstractBehavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.actor.{ActorRef => ClassicActorRef}
+import org.apache.pekko.actor.ActorRef as ClassicActorRef
 import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
@@ -41,7 +41,7 @@ class BodiesSliceFetcher(
 ) extends AbstractBehavior[BodiesSliceFetcher.SliceCommand](context)
     with FetchRequest[BodiesSliceFetcher.SliceCommand] {
 
-  import BodiesSliceFetcher._
+  import BodiesSliceFetcher.*
 
   val log = context.log
   implicit val runtime: IORuntime = IORuntime.global

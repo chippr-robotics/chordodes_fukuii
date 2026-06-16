@@ -26,13 +26,13 @@ import scalapb.descriptors.FieldDescriptor
 import scalapb.descriptors.PValue
 
 import com.chipprbots.ethereum.vm.Generators
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class MessageHandlerSpec extends AnyFlatSpec with Matchers with MockFactory with ScalaCheckPropertyChecks {
 
-  import Implicits._
+  import Implicits.*
   import org.apache.pekko.pattern.pipe
-  import scala.concurrent.duration._
+  import scala.concurrent.duration.*
 
   "MessageHandler" should "send arbitrary messages" taggedAs (UnitTest, VMTest) in {
     implicit val system = ActorSystem("MessageHandlerSpec_System")

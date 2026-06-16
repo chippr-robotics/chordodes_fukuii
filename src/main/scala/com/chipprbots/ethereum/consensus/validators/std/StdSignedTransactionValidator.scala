@@ -1,9 +1,9 @@
 package com.chipprbots.ethereum.consensus.validators
 package std
 
-import com.chipprbots.ethereum.consensus.validators.SignedTransactionError._
+import com.chipprbots.ethereum.consensus.validators.SignedTransactionError.*
 import com.chipprbots.ethereum.crypto.ECDSASignature
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.vm.EvmConfig
 
@@ -137,9 +137,9 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
     *   Either the validated transaction or TransactionSyntaxError if an error was detected
     */
   private def checkSyntacticValidity(stx: SignedTransaction): Either[SignedTransactionError, SignedTransactionValid] = {
-    import LegacyTransaction._
-    import stx._
-    import stx.tx._
+    import LegacyTransaction.*
+    import stx.*
+    import stx.tx.*
 
     val maxNonceValue = BigInt(2).pow(8 * NonceLength) - 1
     val maxGasValue = BigInt(2).pow(8 * GasLength) - 1

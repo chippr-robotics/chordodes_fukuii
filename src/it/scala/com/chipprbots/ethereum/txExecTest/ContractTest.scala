@@ -12,7 +12,7 @@ import com.chipprbots.ethereum.txExecTest.util.FixtureProvider
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.domain.BlockchainStorages
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class ContractTest extends AnyFlatSpec with Matchers {
   val blockchainConfig = Config.blockchains.blockchainConfig

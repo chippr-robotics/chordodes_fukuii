@@ -6,7 +6,7 @@ import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.Props
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.apache.pekko.pattern.ask
 import org.apache.pekko.util.Timeout
@@ -25,7 +25,7 @@ import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.MessageSerializable
 import com.chipprbots.ethereum.network.p2p.messages.Codes
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetNodeData
-import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs._
+import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs.*
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NodeData
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.rlp.RLPEncodeable
@@ -148,7 +148,7 @@ class BlockchainHostActor(
       val receipts = blockHashes
         .take(peerConfiguration.fastSyncHostConfiguration.maxReceiptsPerMessage)
         .flatMap(hash => blockchainReader.getReceiptsByHash(hash))
-      val receiptsRLP = RLPList(receipts.map(rs => RLPList(rs.map(_.toRLPEncodable): _*)): _*)
+      val receiptsRLP = RLPList(receipts.map(rs => RLPList(rs.map(_.toRLPEncodable)*))*)
       log.info("HOST_RECEIPTS_ETH68: requestId={} blocks={}", requestId, receipts.size)
       Some(ETHPackets.Receipts68(requestId, receiptsRLP))
 
@@ -158,7 +158,7 @@ class BlockchainHostActor(
       val receipts = blockHashes
         .take(peerConfiguration.fastSyncHostConfiguration.maxReceiptsPerMessage)
         .flatMap(hash => blockchainReader.getReceiptsByHash(hash))
-      val receiptsRLP = RLPList(receipts.map(rs => RLPList(rs.map(_.toRLPEncodable): _*)): _*)
+      val receiptsRLP = RLPList(receipts.map(rs => RLPList(rs.map(_.toRLPEncodable)*))*)
       log.info("HOST_RECEIPTS_ETH69: requestId={} blocks={} (bloom-absent, EIP-7642)", requestId, receipts.size)
       Some(ETHPackets.Receipts69(requestId, receiptsRLP))
 
@@ -191,12 +191,12 @@ class BlockchainHostActor(
                         if (cb + encBytes > MaxResponseBytes) (encs, true, cb)
                         else (encs :+ enc, false, cb + encBytes)
                     }
-                  val blockRLP = RLPList(fittingEncs.map(e => e): _*)
+                  val blockRLP = RLPList(fittingEncs.map(e => e)*)
                   (lists :+ blockRLP, incomplete, newBytes, incomplete)
               }
           }
 
-      val receiptsRLP = RLPList(blockReceiptLists: _*)
+      val receiptsRLP = RLPList(blockReceiptLists*)
       log.info(
         "HOST_RECEIPTS_ETH70: requestId={} blocks={} incomplete={}",
         requestId,

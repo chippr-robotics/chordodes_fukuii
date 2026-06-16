@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.blockchain.sync.snap.actors
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Deterministic unit test for [[GcPressureSampler]] (spec 002 US2 / T015). The GC-bean-sum supplier and the wall clock
   * are injected fakes driven by mutable cells, so the test advances time/pauses explicitly with no `Thread.sleep`.

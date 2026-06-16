@@ -5,7 +5,7 @@ import org.apache.pekko.pattern.ask
 import org.apache.pekko.util.{ByteString, Timeout}
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainWriter
@@ -48,7 +48,7 @@ final class PivotHeaderBootstrap(
     extends Actor
     with ActorLogging {
 
-  import PivotHeaderBootstrap._
+  import PivotHeaderBootstrap.*
 
   private val byHashMode: Boolean = targetHash.isDefined
   private def targetDesc: String = targetHash match {

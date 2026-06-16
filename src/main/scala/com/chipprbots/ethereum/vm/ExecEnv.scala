@@ -8,7 +8,7 @@ import com.chipprbots.ethereum.domain.UInt256
 
 object ExecEnv {
   def apply(context: ProgramContext[_, _], code: ByteString, ownerAddr: Address): ExecEnv = {
-    import context._
+    import context.*
 
     ExecEnv(
       ownerAddr,

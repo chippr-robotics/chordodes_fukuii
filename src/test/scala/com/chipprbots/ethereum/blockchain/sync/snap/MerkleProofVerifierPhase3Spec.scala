@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync.snap
 
-import java.util.concurrent.{Callable, Executors, Future => JFuture, TimeUnit}
+import java.util.concurrent.{Callable, Executors, Future as JFuture, TimeUnit}
 
 import org.apache.pekko.util.ByteString
 
@@ -10,7 +10,7 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.mpt.{MerklePatriciaTrie, MptTraversals, byteStringSerializer}
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestMptStorage
 
 /** Reference-behavioral test suite for MerkleProofVerifier Phase 3 (leaf insertion).

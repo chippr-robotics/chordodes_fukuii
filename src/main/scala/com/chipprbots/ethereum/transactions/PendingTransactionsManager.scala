@@ -7,8 +7,8 @@ import org.apache.pekko.actor.Props
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
-import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
+import scala.concurrent.duration.*
+import scala.jdk.CollectionConverters.*
 
 import com.google.common.cache.Cache
 import com.google.common.cache.CacheBuilder
@@ -27,7 +27,7 @@ import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.jsonrpc.NewPendingTransaction
 import com.chipprbots.ethereum.network.p2p.messages.Codes
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetPooledTransactions._
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetPooledTransactions.*
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.transactions.SignedTransactionsFilterActor.ProperSignedTransactions
 import com.chipprbots.ethereum.utils.BlockchainConfig
@@ -97,7 +97,7 @@ class PendingTransactionsManager(
     with MetricsContainer
     with ActorLogging {
 
-  import PendingTransactionsManager._
+  import PendingTransactionsManager.*
 
   metrics.gauge(
     "transactions.pool.size.gauge",
@@ -263,7 +263,7 @@ class PendingTransactionsManager(
     case com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
           .MessageFromPeer(msg: ETHPackets.PooledTransactions, peerId) =>
       // Validate received txs against their announcements (type/size mismatch = blob violation)
-      import com.chipprbots.ethereum.domain._
+      import com.chipprbots.ethereum.domain.*
       val announcementViolation = msg.txs.zipWithIndex.exists { case (stx, idx) =>
         pendingAnnouncements.get(stx.hash).exists { case (announcedType, announcedSize, _) =>
           val actualType: Byte = stx.tx match {
@@ -322,7 +322,7 @@ class PendingTransactionsManager(
   /** Announce transaction hashes to connected peers via NewPooledTransactionHashes. */
   private def notifyPeersOfTransactions(txs: Seq[SignedTransaction], peers: Seq[Peer]): Unit = {
     if (txs.isEmpty || peers.isEmpty) return
-    import com.chipprbots.ethereum.domain._
+    import com.chipprbots.ethereum.domain.*
 
     val txSeq = txs.groupBy(_.hash).values.map(_.head).toSeq
     peers.foreach { peer =>

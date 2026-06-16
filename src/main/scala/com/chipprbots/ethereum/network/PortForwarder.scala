@@ -7,8 +7,8 @@ import cats.effect.IO
 import cats.effect.Resource
 import cats.implicits.*
 
-import scala.jdk.CollectionConverters._
-import scala.util.chaining._
+import scala.jdk.CollectionConverters.*
+import scala.util.chaining.*
 
 import org.jupnp.DefaultUpnpServiceConfiguration
 import org.jupnp.QueueingThreadPoolExecutor

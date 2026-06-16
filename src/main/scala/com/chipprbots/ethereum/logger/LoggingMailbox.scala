@@ -4,7 +4,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.dispatch._
+import org.apache.pekko.dispatch.*
 import org.apache.pekko.event.Logging
 
 import com.typesafe.config.Config

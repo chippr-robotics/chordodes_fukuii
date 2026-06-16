@@ -35,7 +35,7 @@ class CombinedRecoveryScanActor(
 ) extends Actor
     with ActorLogging {
 
-  import CombinedRecoveryScanActor._
+  import CombinedRecoveryScanActor.*
   import context.dispatcher
 
   override def preStart(): Unit = {

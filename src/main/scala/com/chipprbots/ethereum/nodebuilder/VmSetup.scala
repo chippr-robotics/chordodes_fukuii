@@ -9,7 +9,7 @@ import com.chipprbots.ethereum.utils.VmConfig
   */
 object VmSetup extends Logger {
 
-  import VmConfig.VmMode._
+  import VmConfig.VmMode.*
 
   def vm(vmConfig: VmConfig): VMImpl =
     vmConfig.mode match {

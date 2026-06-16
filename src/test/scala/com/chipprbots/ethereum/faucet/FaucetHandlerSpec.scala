@@ -87,7 +87,7 @@ class FaucetHandlerSpec
       "should be able to paid if it was initialized successfully" in new TestSetup {
         withInitializedFaucet {
           val retTxId = ByteString(Hex.decode("112233"))
-          (walletService.sendFunds _).expects(wallet, paymentAddress).returning(IO.pure(Right(retTxId)))
+          walletService.sendFunds.expects(wallet, paymentAddress).returning(IO.pure(Right(retTxId)))
 
           sender.send(faucetHandler, FaucetHandlerMsg.SendFunds(paymentAddress))
           sender.expectMsg(FaucetHandlerResponse.TransactionSent(retTxId))
@@ -97,7 +97,7 @@ class FaucetHandlerSpec
       "should failed the payment if don't can parse the payload" in new TestSetup {
         withInitializedFaucet {
           val errorMessage = RpcClientError("parser error")
-          (walletService.sendFunds _)
+          walletService.sendFunds
             .expects(wallet, paymentAddress)
             .returning(IO.pure(Left(errorMessage)))
 
@@ -109,7 +109,7 @@ class FaucetHandlerSpec
       "should failed the payment if throw rpc client error" in new TestSetup {
         withInitializedFaucet {
           val errorMessage = ParserError("error parser")
-          (walletService.sendFunds _)
+          walletService.sendFunds
             .expects(wallet, paymentAddress)
             .returning(IO.pure(Left(errorMessage)))
 

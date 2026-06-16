@@ -1,15 +1,15 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 
-import org.apache.pekko.event.Logging._
+import org.apache.pekko.event.Logging.*
 import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.network.PeerId
-import com.chipprbots.ethereum.utils.ByteStringUtils._
+import com.chipprbots.ethereum.utils.ByteStringUtils.*
 
 sealed abstract class ImportMessages(block: Block) {
-  import ImportMessages._
+  import ImportMessages.*
   protected lazy val hash: ByteString = block.header.hash
   protected lazy val number: BigInt = block.number
 
@@ -39,7 +39,7 @@ object ImportMessages {
 }
 
 class MinedBlockImportMessages(block: Block) extends ImportMessages(block) {
-  import ImportMessages._
+  import ImportMessages.*
   override def preImport(): LogEntry = (DebugLevel, s"Importing new mined block (${block.idTag})")
   override def importedToTheTop(): LogEntry =
     (DebugLevel, s"Added new mined block $number to top of the chain")
@@ -56,7 +56,7 @@ class MinedBlockImportMessages(block: Block) extends ImportMessages(block) {
 }
 
 class NewBlockImportMessages(block: Block, peerId: PeerId) extends ImportMessages(block) {
-  import ImportMessages._
+  import ImportMessages.*
   override def preImport(): LogEntry = (DebugLevel, s"Handling NewBlock message for block (${block.idTag})")
   override def importedToTheTop(): LogEntry =
     (

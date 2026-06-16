@@ -3,12 +3,12 @@ package com.chipprbots.ethereum.ethtest
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import java.io.File
-import io.circe._
-import io.circe.parser._
+import io.circe.*
+import io.circe.parser.*
 import scala.io.Source
 import scala.util.Using
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Test suite for ethereum/tests TransactionTests category
   *

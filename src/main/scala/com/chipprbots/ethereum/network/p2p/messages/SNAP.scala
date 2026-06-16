@@ -3,11 +3,11 @@ package com.chipprbots.ethereum.network.p2p.messages
 import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.domain.Account
-import com.chipprbots.ethereum.domain.Account._
+import com.chipprbots.ethereum.domain.Account.*
 import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.MessageSerializableImplicit
 import com.chipprbots.ethereum.rlp
-import com.chipprbots.ethereum.rlp._
+import com.chipprbots.ethereum.rlp.*
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 import com.chipprbots.ethereum.utils.ByteUtils
 
@@ -88,7 +88,7 @@ object SNAP {
         with RLPSerializable {
       override def code: Int = Codes.GetAccountRangeCode
       override def toRLPEncodable: RLPEncodeable = {
-        import msg._
+        import msg.*
         RLPList(
           RLPValue(ByteUtils.bigIntToUnsignedByteArray(requestId)),
           RLPValue(rootHash.toArray[Byte]),
@@ -157,7 +157,7 @@ object SNAP {
         with RLPSerializable {
       override def code: Int = Codes.AccountRangeCode
       override def toRLPEncodable: RLPEncodeable = {
-        import msg._
+        import msg.*
         // Per geth's snap protocol: encode each account body in SLIM format
         // (storageRoot/codeHash empty when default). Saves ~64 bytes per EOA — critical
         // for byte-budget-constrained responses. Decoder normalises empties back to
@@ -257,7 +257,7 @@ object SNAP {
         with RLPSerializable {
       override def code: Int = Codes.GetStorageRangesCode
       override def toRLPEncodable: RLPEncodeable = {
-        import msg._
+        import msg.*
         val accountHashesList = accountHashes.map(h => RLPValue(h.toArray[Byte]))
         RLPList(
           RLPValue(ByteUtils.bigIntToUnsignedByteArray(requestId)),
@@ -336,7 +336,7 @@ object SNAP {
         with RLPSerializable {
       override def code: Int = Codes.StorageRangesCode
       override def toRLPEncodable: RLPEncodeable = {
-        import msg._
+        import msg.*
         // Encode slots as list of lists of [hash, value] pairs
         val slotsList = slots.map { accountSlots =>
           val slotPairs = accountSlots.map { case (hash, value) =>
@@ -432,7 +432,7 @@ object SNAP {
         with RLPSerializable {
       override def code: Int = Codes.GetByteCodesCode
       override def toRLPEncodable: RLPEncodeable = {
-        import msg._
+        import msg.*
         val hashesList = hashes.map(h => RLPValue(h.toArray[Byte]))
         RLPList(
           RLPValue(ByteUtils.bigIntToUnsignedByteArray(requestId)),
@@ -498,7 +498,7 @@ object SNAP {
         with RLPSerializable {
       override def code: Int = Codes.ByteCodesCode
       override def toRLPEncodable: RLPEncodeable = {
-        import msg._
+        import msg.*
         val codesList = codes.map(c => RLPValue(c.toArray[Byte]))
         RLPList(
           RLPValue(ByteUtils.bigIntToUnsignedByteArray(requestId)),
@@ -567,7 +567,7 @@ object SNAP {
         with RLPSerializable {
       override def code: Int = Codes.GetTrieNodesCode
       override def toRLPEncodable: RLPEncodeable = {
-        import msg._
+        import msg.*
         // Encode paths as list of lists of node hashes
         val pathsList = paths.map { path =>
           val nodeHashes = path.map(h => RLPValue(h.toArray[Byte]))
@@ -647,7 +647,7 @@ object SNAP {
         with RLPSerializable {
       override def code: Int = Codes.TrieNodesCode
       override def toRLPEncodable: RLPEncodeable = {
-        import msg._
+        import msg.*
         val nodesList = nodes.map(n => RLPValue(n.toArray[Byte]))
         RLPList(
           RLPValue(ByteUtils.bigIntToUnsignedByteArray(requestId)),

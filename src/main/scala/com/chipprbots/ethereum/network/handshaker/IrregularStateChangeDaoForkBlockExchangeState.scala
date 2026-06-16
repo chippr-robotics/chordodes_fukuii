@@ -19,7 +19,7 @@ case class IrregularStateChangeDaoForkBlockExchangeState(
 ) extends InProgressState[PeerInfo]
     with Logger {
 
-  import handshakerConfiguration._
+  import handshakerConfiguration.*
 
   def nextMessage: NextMessage = {
     val getBlockHeadersMsg: MessageSerializable =

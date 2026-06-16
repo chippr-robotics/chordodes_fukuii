@@ -35,7 +35,7 @@ object EthashBlockHeaderValidator {
   def validateHeader(
       blockHeader: BlockHeader
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] = {
-    import EthashUtils._
+    import EthashUtils.*
 
     def getPowCacheData(epoch: Long, seed: ByteString): PowCacheData = {
       var result: PowCacheData = null

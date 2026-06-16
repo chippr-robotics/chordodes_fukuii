@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.json4s.JsonAST._
+import org.json4s.JsonAST.*
 import org.json4s.Merge
 
 import com.chipprbots.ethereum.jsonrpc.EthTxJsonMethodsImplicits.transactionResponseJsonEncoder
@@ -12,13 +12,13 @@ import com.chipprbots.ethereum.jsonrpc.FukuiiService.ResetFastSyncResponse
 import com.chipprbots.ethereum.jsonrpc.FukuiiService.RestartFastSyncRequest
 import com.chipprbots.ethereum.jsonrpc.FukuiiService.RestartFastSyncResponse
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonEncoder
-import com.chipprbots.ethereum.jsonrpc.serialization.JsonEncoder.Ops._
+import com.chipprbots.ethereum.jsonrpc.serialization.JsonEncoder.Ops.*
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodCodec
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder.NoParamsMethodDecoder
 import com.chipprbots.ethereum.transactions.TransactionHistoryService.ExtendedTransactionData
 
-import JsonEncoder.OptionToNull._
+import JsonEncoder.OptionToNull.*
 
 object FukuiiJsonMethodImplicits extends JsonMethodsImplicits {
   implicit val extendedTransactionDataJsonEncoder: JsonEncoder[ExtendedTransactionData] = extendedTxData => {

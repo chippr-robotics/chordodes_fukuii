@@ -16,7 +16,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.testing.TestMptStorage
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Tests for [[StackTrie]].
   *

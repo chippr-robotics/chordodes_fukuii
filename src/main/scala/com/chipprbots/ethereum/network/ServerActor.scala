@@ -33,7 +33,7 @@ class ServerActor(
 ) extends Actor
     with ActorLogging {
 
-  import ServerActor._
+  import ServerActor.*
   import context.system
 
   // Lazy so the context is available at first use rather than at construction time.

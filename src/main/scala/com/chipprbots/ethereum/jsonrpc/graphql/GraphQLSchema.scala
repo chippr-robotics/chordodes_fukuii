@@ -49,8 +49,8 @@ import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.rlp
 import com.chipprbots.ethereum.rlp.RLPList
 
-import com.chipprbots.ethereum.jsonrpc.graphql.GraphQLTypes._
-import com.chipprbots.ethereum.jsonrpc.graphql.GraphQLScalars._
+import com.chipprbots.ethereum.jsonrpc.graphql.GraphQLTypes.*
+import com.chipprbots.ethereum.jsonrpc.graphql.GraphQLScalars.*
 
 /** Sangria schema implementing EIP-1767, adapted from geth's `graphql/schema.go`.
   *
@@ -86,7 +86,7 @@ object GraphQLSchema {
   }
 
   private def rlpEncodeReceipt(r: Receipt): ByteString = {
-    import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs._
+    import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs.*
     ByteString(r.toBytes)
   }
 
@@ -1167,7 +1167,7 @@ object GraphQLSchema {
               // `pending.transactions` from a concurrent test may miss a just-submitted tx.
               // Follow up with an `askFor` on the same actor; Pekko processes messages in
               // arrival order, so the Get reply confirms the Add has been committed.
-              import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
+              import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
               import com.chipprbots.ethereum.transactions.PendingTransactionsManager
               implicit val askTimeout: org.apache.pekko.util.Timeout =
                 org.apache.pekko.util.Timeout(scala.concurrent.duration.DurationInt(5).seconds)

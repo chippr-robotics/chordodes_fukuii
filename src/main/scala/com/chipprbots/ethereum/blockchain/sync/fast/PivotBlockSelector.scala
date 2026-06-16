@@ -9,7 +9,7 @@ import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason.InvalidPivotBlockElectionResponse
@@ -45,8 +45,8 @@ class PivotBlockSelector(
     with ActorLogging
     with PeerListSupportNg {
 
-  import PivotBlockSelector._
-  import syncConfig._
+  import PivotBlockSelector.*
+  import syncConfig.*
 
   private var pivotBlockRetryCount = 0
   private var totalSelectionAttempts = 0

@@ -1,19 +1,19 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
 import org.apache.pekko.actor.{Actor, ActorLogging, ActorRef, Props, SupervisorStrategy, OneForOneStrategy}
-import org.apache.pekko.actor.SupervisorStrategy._
+import org.apache.pekko.actor.SupervisorStrategy.*
 import org.apache.pekko.util.ByteString
 import org.bouncycastle.util.encoders.Hex
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
+import scala.concurrent.duration.*
+import scala.jdk.CollectionConverters.*
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.Duration
 
-import com.chipprbots.ethereum.blockchain.sync.snap._
+import com.chipprbots.ethereum.blockchain.sync.snap.*
 import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController
 import com.chipprbots.ethereum.db.storage.{
   BfsEntry,
@@ -83,7 +83,7 @@ class TrieNodeHealingCoordinator(
 ) extends Actor
     with ActorLogging {
 
-  import Messages._
+  import Messages.*
 
   // Task management — each task has a pathset (for GetTrieNodes) and a hash (for verification).
   // ArrayDeque (circular buffer) gives O(1) amortized head/tail operations (#1167). The previous

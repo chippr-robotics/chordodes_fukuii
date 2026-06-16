@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.consensus.validators
 import com.chipprbots.ethereum.consensus.difficulty.DifficultyCalculator
 import com.chipprbots.ethereum.consensus.eip1559.BaseFeeCalculator
 import com.chipprbots.ethereum.consensus.mining.GetBlockHeaderByHash
-import com.chipprbots.ethereum.consensus.validators.BlockHeaderError._
+import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.*
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostCancun
@@ -24,7 +24,7 @@ import com.chipprbots.ethereum.utils.DaoForkConfig
   */
 trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator {
 
-  import BlockHeaderValidator._
+  import BlockHeaderValidator.*
 
   /** The difficulty calculator. This is specific to the consensus protocol.
     */
@@ -139,7 +139,7 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator {
       }
 
     if (blockHeader.extraData.length <= MaxExtraDataSize) {
-      import blockchainConfig._
+      import blockchainConfig.*
       daoForkConfig.map(c => validateDaoForkExtraData(blockHeader, c)).getOrElse(Right(BlockHeaderValid))
     } else {
       Left(HeaderExtraDataError)

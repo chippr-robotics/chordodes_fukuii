@@ -8,7 +8,7 @@ import scala.util.Success
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.MptStorage
 import com.chipprbots.ethereum.domain.Account
-import com.chipprbots.ethereum.mpt._
+import com.chipprbots.ethereum.mpt.*
 import com.chipprbots.ethereum.mpt.MptVisitors.PathTrackingLeafWalkVisitor
 
 /** Single-pass post-SNAP recovery scan: ONE walk of the account trie that checks BOTH the contract bytecode

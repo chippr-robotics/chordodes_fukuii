@@ -25,7 +25,7 @@ import com.chipprbots.ethereum.keystore.KeyStore.KeyStoreError
 import com.chipprbots.ethereum.security.SecureRandomBuilder
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.KeyStoreConfig
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class KeyStoreImplSpec extends AnyFlatSpec with Matchers with BeforeAndAfter with SecureRandomBuilder {
 

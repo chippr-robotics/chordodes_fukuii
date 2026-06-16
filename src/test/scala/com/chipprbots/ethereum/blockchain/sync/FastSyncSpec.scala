@@ -18,7 +18,7 @@ import com.chipprbots.ethereum.FreeSpecBase
 import com.chipprbots.ethereum.ObjectGenerators
 import com.chipprbots.ethereum.SpecFixtures
 import com.chipprbots.ethereum.WithActorSystemShutDown
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSync
@@ -143,7 +143,7 @@ class FastSyncSpec
         UnitTest,
         SyncTest
       ) in testCaseM { (fixture: Fixture) =>
-        import fixture._
+        import fixture.*
 
         (for {
           _ <- saveGenesis
@@ -240,7 +240,7 @@ class FastSyncSpec
         SyncTest,
         FlakyTest
       ) in testCaseM { (fixture: Fixture) =>
-        import fixture._
+        import fixture.*
         (for {
           _ <- saveGenesis
           _ <- saveTestBlocksWithWeights
@@ -270,7 +270,7 @@ class FastSyncSpec
         UnitTest,
         SyncTest
       ) in testCaseM { (fixture: Fixture) =>
-        import fixture._
+        import fixture.*
 
         (for {
           _ <- startSync
@@ -283,7 +283,7 @@ class FastSyncSpec
         SyncTest,
         FlakyTest
       ) in testCaseM { (fixture: Fixture) =>
-        import fixture._
+        import fixture.*
 
         (for {
           _ <- startSync
@@ -307,7 +307,7 @@ class FastSyncSpec
         SyncTest,
         FlakyTest
       ) in testCaseM { (fixture: Fixture) =>
-        import fixture._
+        import fixture.*
 
         (for {
           _ <- saveGenesis
@@ -340,7 +340,7 @@ class FastSyncSpec
             )
         }
       ) { (fixture: Fixture) =>
-        import fixture._
+        import fixture.*
 
         (for {
           _ <- saveGenesis

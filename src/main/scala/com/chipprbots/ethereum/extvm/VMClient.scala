@@ -6,14 +6,14 @@ import scala.annotation.tailrec
 
 import scalapb.UnknownFieldSet
 
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Logger
 import com.chipprbots.ethereum.utils.VmConfig
 import com.chipprbots.ethereum.vm
-import com.chipprbots.ethereum.vm._
+import com.chipprbots.ethereum.vm.*
 
-import Implicits._
+import Implicits.*
 
 /** @param testMode
   *   \- if enabled the client will send blockchain configuration with each configuration. This is useful to override
@@ -147,7 +147,7 @@ class VMClient(_externalVmConfig: VmConfig.ExternalConfig, messageHandler: Messa
       if (change.code.isEmpty) w1 else w1.saveCode(address, change.code)
     }
 
-    worldWithUpdatedAccounts.touchAccounts(resultMsg.touchedAccounts.map(a => a: Address): _*)
+    worldWithUpdatedAccounts.touchAccounts(resultMsg.touchedAccounts.map(a => a: Address)*)
   }
 
   private def buildCallContextMsg(ctx: ProgramContext[_, _]): msg.CallContext = {

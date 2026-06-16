@@ -6,16 +6,16 @@ import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.BlockBody.BlockBodyRLPEncodableDec
-import com.chipprbots.ethereum.domain.BlockHeaderImplicits._
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.BlockHeaderImplicits.*
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.forkid.ForkId
-import com.chipprbots.ethereum.forkid.ForkId._
+import com.chipprbots.ethereum.forkid.ForkId.*
 import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.MessageSerializableImplicit
 import com.chipprbots.ethereum.rlp.RLPCodec.Ops
-import com.chipprbots.ethereum.rlp.RLPImplicitConversions._
+import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
-import com.chipprbots.ethereum.rlp._
+import com.chipprbots.ethereum.rlp.*
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 import com.chipprbots.ethereum.utils.ByteUtils
 
@@ -166,7 +166,7 @@ object ETHPackets {
           with RLPSerializable {
         override def code: Int = Codes.StatusCode
         override def toRLPEncodable: RLPEncodeable = {
-          import msg._
+          import msg.*
           RLPList(
             RLPValue(ByteUtils.bigIntToUnsignedByteArray(BigInt(protocolVersion))),
             RLPValue(ByteUtils.bigIntToUnsignedByteArray(BigInt(networkId))),
@@ -226,7 +226,7 @@ object ETHPackets {
           with RLPSerializable {
         override def code: Int = Codes.StatusCode
         override def toRLPEncodable: RLPEncodeable = {
-          import msg._
+          import msg.*
           RLPList(
             RLPValue(ByteUtils.bigIntToUnsignedByteArray(protocolVersion)),
             RLPValue(ByteUtils.bigIntToUnsignedByteArray(networkId)),
@@ -320,7 +320,7 @@ object ETHPackets {
           with RLPSerializable {
         override def code: Int = Codes.StatusCode
         override def toRLPEncodable: RLPEncodeable = {
-          import msg._
+          import msg.*
           RLPList(
             RLPValue(ByteUtils.bigIntToUnsignedByteArray(protocolVersion)),
             RLPValue(ByteUtils.bigIntToUnsignedByteArray(networkId)),
@@ -403,13 +403,13 @@ object ETHPackets {
     }
 
     object NewBlockHashes {
-      import BlockHash._
+      import BlockHash.*
       implicit class NewBlockHashesEnc(val underlyingMsg: NewBlockHashes)
           extends MessageSerializableImplicit[NewBlockHashes](underlyingMsg)
           with RLPSerializable {
         override def code: Int = Codes.NewBlockHashesCode
         override def toRLPEncodable: RLPEncodeable =
-          RLPList(msg.hashes.map(_.toRLPEncodable): _*)
+          RLPList(msg.hashes.map(_.toRLPEncodable)*)
       }
 
       implicit class NewBlockHashesDec(val bytes: Array[Byte]) extends AnyVal {
@@ -501,7 +501,7 @@ object ETHPackets {
                 RLPValue(payload.toArray),
                 toRlpList(accessList),
                 RLPValue(ByteUtils.bigIntToUnsignedByteArray(maxFeePerBlobGas)),
-                RLPList(blobVersionedHashes.map(h => RLPValue(h.toArray)): _*),
+                RLPList(blobVersionedHashes.map(h => RLPValue(h.toArray))*),
                 RLPValue(ByteUtils.bigIntToUnsignedByteArray(signedTx.signature.v)),
                 RLPValue(ByteUtils.bigIntToUnsignedByteArray(signedTx.signature.r)),
                 RLPValue(ByteUtils.bigIntToUnsignedByteArray(signedTx.signature.s))
@@ -773,13 +773,13 @@ object ETHPackets {
         with RLPSerializable {
       override def code: Int = Codes.SignedTransactionsCode
       override def toRLPEncodable: RLPEncodeable =
-        RLPList(msg.txs.map(_.toRLPEncodable): _*)
+        RLPList(msg.txs.map(_.toRLPEncodable)*)
     }
 
     implicit class SignedTransactionsDec(val bytes: Array[Byte]) extends AnyVal {
       def toSignedTransactions: SignedTransactions = rawDecode(bytes) match {
         case rlpList: RLPList =>
-          import TypedTransaction._
+          import TypedTransaction.*
           SignedTransactions(rlpList.items.toTypedRLPEncodables.map(_.toSignedTransaction))
         case _ => throw new RuntimeException("Cannot decode SignedTransactions")
       }
@@ -798,15 +798,15 @@ object ETHPackets {
     implicit class NewBlockEnc(val underlyingMsg: NewBlock)
         extends MessageSerializableImplicit[NewBlock](underlyingMsg)
         with RLPSerializable {
-      import SignedTransactions._
+      import SignedTransactions.*
       override def code: Int = Codes.NewBlockCode
       override def toRLPEncodable: RLPEncodeable = {
-        import msg._
+        import msg.*
         RLPList(
           RLPList(
             block.header.toRLPEncodable,
-            RLPList(block.body.transactionList.map(_.toRLPEncodable): _*),
-            RLPList(block.body.uncleNodesList.map(_.toRLPEncodable): _*)
+            RLPList(block.body.transactionList.map(_.toRLPEncodable)*),
+            RLPList(block.body.uncleNodesList.map(_.toRLPEncodable)*)
           ),
           RLPValue(ByteUtils.bigIntToUnsignedByteArray(totalDifficulty))
         )
@@ -819,8 +819,8 @@ object ETHPackets {
               RLPList(blockHeader, transactionList: RLPList, uncleNodesList: RLPList),
               RLPValue(totalDifficultyBytes)
             ) =>
-          import SignedTransactions._
-          import TypedTransaction._
+          import SignedTransactions.*
+          import TypedTransaction.*
           NewBlock(
             Block(
               blockHeader.toBlockHeader,
@@ -851,7 +851,7 @@ object ETHPackets {
         with RLPSerializable {
       override def code: Int = Codes.GetBlockHeadersCode
       override def toRLPEncodable: RLPEncodeable = {
-        import msg._
+        import msg.*
         def num(b: BigInt): RLPValue = RLPValue(ByteUtils.bigIntToUnsignedByteArray(b))
         val reverseFlag: RLPValue =
           if (reverse) RLPValue(Array[Byte](1.toByte)) else RLPValue(Array.emptyByteArray)
@@ -933,7 +933,7 @@ object ETHPackets {
       override def toRLPEncodable: RLPEncodeable =
         RLPList(
           RLPValue(ByteUtils.bigIntToUnsignedByteArray(msg.requestId)),
-          RLPList(msg.headers.map(_.toRLPEncodable): _*)
+          RLPList(msg.headers.map(_.toRLPEncodable)*)
         )
     }
 
@@ -999,7 +999,7 @@ object ETHPackets {
       override def toRLPEncodable: RLPEncodeable =
         RLPList(
           RLPValue(ByteUtils.bigIntToUnsignedByteArray(msg.requestId)),
-          RLPList(msg.bodies.map(_.toRLPEncodable): _*)
+          RLPList(msg.bodies.map(_.toRLPEncodable)*)
         )
     }
 
@@ -1032,7 +1032,7 @@ object ETHPackets {
         with RLPSerializable {
       override def code: Int = Codes.NewPooledTransactionHashesCode
       override def toRLPEncodable: RLPEncodeable = {
-        import msg._
+        import msg.*
         RLPList(RLPValue(types.toArray), toRlpList(sizes), toRlpList(hashes))
       }
     }
@@ -1093,7 +1093,7 @@ object ETHPackets {
     implicit class PooledTransactionsEnc(val underlyingMsg: PooledTransactions)
         extends MessageSerializableImplicit[PooledTransactions](underlyingMsg)
         with RLPSerializable {
-      import SignedTransactions._
+      import SignedTransactions.*
       override def code: Int = Codes.PooledTransactionsCode
       override def toRLPEncodable: RLPEncodeable = {
         val txItems: Seq[RLPEncodeable] = msg.txs.map { stx =>
@@ -1102,15 +1102,15 @@ object ETHPackets {
             case None           => stx.toRLPEncodable
           }
         }
-        RLPList(RLPValue(ByteUtils.bigIntToUnsignedByteArray(msg.requestId)), RLPList(txItems: _*))
+        RLPList(RLPValue(ByteUtils.bigIntToUnsignedByteArray(msg.requestId)), RLPList(txItems*))
       }
     }
 
     implicit class PooledTransactionsDec(val bytes: Array[Byte]) extends AnyVal {
       def toPooledTransactions: PooledTransactions = rawDecode(bytes) match {
         case RLPList(RLPValue(requestIdBytes), rlpList: RLPList) =>
-          import SignedTransactions._
-          import TypedTransaction._
+          import SignedTransactions.*
+          import TypedTransaction.*
           val typedItems = rlpList.items.toTypedRLPEncodables
           typedItems.foreach {
             case PrefixedRLPEncodable(Transaction.Type03, inner: RLPList) =>
@@ -1228,7 +1228,7 @@ object ETHPackets {
     override def toRLPEncodable: RLPEncodeable =
       RLPList(
         RLPValue(logEntry.loggerAddress.bytes.toArray[Byte]),
-        RLPList(logEntry.logTopics.map(t => RLPValue(t.toArray[Byte])): _*),
+        RLPList(logEntry.logTopics.map(t => RLPValue(t.toArray[Byte]))*),
         RLPValue(logEntry.data.toArray[Byte])
       )
   }
@@ -1257,7 +1257,7 @@ object ETHPackets {
           receiptStateHash(r),
           RLPValue(ByteUtils.bigIntToUnsignedByteArray(r.cumulativeGasUsed)),
           RLPValue(r.logsBloomFilter.toArray[Byte]),
-          RLPList(r.logs.map(_.toRLPEncodable): _*)
+          RLPList(r.logs.map(_.toRLPEncodable)*)
         )
       )
   }
@@ -1272,7 +1272,7 @@ object ETHPackets {
         RLPList(
           receiptStateHash(r),
           RLPValue(ByteUtils.bigIntToUnsignedByteArray(r.cumulativeGasUsed)),
-          RLPList(r.logs.map(_.toRLPEncodable): _*)
+          RLPList(r.logs.map(_.toRLPEncodable)*)
         )
       )
   }
@@ -1494,7 +1494,7 @@ object ETHPackets {
         extends MessageSerializableImplicit[NodeData](underlyingMsg)
         with RLPSerializable {
       override def code: Int = Codes.NodeDataCode
-      override def toRLPEncodable: RLPEncodeable = RLPList(msg.values.map(v => RLPValue(v.toArray[Byte])): _*)
+      override def toRLPEncodable: RLPEncodeable = RLPList(msg.values.map(v => RLPValue(v.toArray[Byte]))*)
     }
 
     implicit class NodeDataDec(val bytes: Array[Byte]) extends AnyVal {

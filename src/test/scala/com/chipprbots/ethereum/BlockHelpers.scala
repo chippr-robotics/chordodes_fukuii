@@ -4,11 +4,11 @@ import org.apache.pekko.util.ByteString
 
 import scala.util.Random
 
-import mouse.all._
+import mouse.all.*
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 
 import com.chipprbots.ethereum.crypto.generateKeyPair
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields
 import com.chipprbots.ethereum.security.SecureRandomBuilder
 

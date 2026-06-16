@@ -93,12 +93,12 @@ class FukuiiJRCSpec extends FreeSpecBase with SpecFixtures with AsyncMockFactory
 
   "Fukuii JRC" - {
     "should handle fukuii_getAccountTransactions" in testCaseM[IO] { fixture =>
-      import fixture._
+      import fixture.*
       val block = Fixtures.Blocks.Block3125369
       val sentTx = block.body.transactionList.head
       val receivedTx = block.body.transactionList.last
 
-      (fukuiiService.getAccountTransactions _)
+      fukuiiService.getAccountTransactions
         .expects(*)
         .returning(
           IO.pure(

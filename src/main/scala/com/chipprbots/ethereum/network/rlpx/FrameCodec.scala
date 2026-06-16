@@ -234,7 +234,7 @@ class FrameCodec(private val secrets: Secrets) extends Logger {
   }
 
   private def processFramePayload(payload: ByteString): ByteString = {
-    import com.chipprbots.ethereum.utils.ByteStringUtils._
+    import com.chipprbots.ethereum.utils.ByteStringUtils.*
     var i = 0
     val elements = new ArrayBuffer[ByteStringElement]()
     while (i < payload.length) {

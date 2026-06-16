@@ -8,10 +8,10 @@ import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist
-import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason._
+import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason.*
 import com.chipprbots.ethereum.blockchain.sync.CacheBasedBlacklist
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg
 import com.chipprbots.ethereum.blockchain.sync.PeerRequestHandler
@@ -32,9 +32,9 @@ import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetReceipts.GetReceiptsEnc
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetReceipts70.GetReceipts70Enc
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
-import com.chipprbots.ethereum.rlp._
+import com.chipprbots.ethereum.rlp.*
 import com.chipprbots.ethereum.domain.Receipt
-import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs._
+import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs.*
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 /** Downloads block headers, bodies, and receipts from genesis to a target block in parallel with SNAP state sync.
@@ -63,7 +63,7 @@ class ChainDownloader(
     with ActorLogging
     with PeerListSupportNg {
 
-  import ChainDownloader._
+  import ChainDownloader.*
 
   // PeerRequestHandler.props requires an implicit Scheduler
   implicit val implicitScheduler: Scheduler = scheduler
@@ -548,7 +548,7 @@ class ChainDownloader(
       requestedHashes: Seq[ByteString],
       eth66Receipts: ETHPackets.Receipts68
   ): Unit = {
-    import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.TypedTransaction._
+    import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.TypedTransaction.*
 
     val hashStrings = requestedHashes.map(h => s"0x${h.toArray.map("%02x".format(_)).mkString}")
     val receiptsRlp = eth66Receipts.receiptsForBlocks
@@ -620,7 +620,7 @@ class ChainDownloader(
       requestedHashes: Seq[ByteString],
       receipts70: ETHPackets.Receipts70
   ): Unit = {
-    import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.TypedTransaction._
+    import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.TypedTransaction.*
 
     val hashStrings = requestedHashes.map(h => s"0x${h.toArray.map("%02x".format(_)).mkString}")
     val receiptsRlp = receipts70.receiptsForBlocks

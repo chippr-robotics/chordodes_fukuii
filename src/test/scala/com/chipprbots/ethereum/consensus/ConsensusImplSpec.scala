@@ -23,11 +23,11 @@ import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.ledger.BlockData
 import com.chipprbots.ethereum.ledger.BlockExecution
 import com.chipprbots.ethereum.ledger.BlockExecutionError.ValidationAfterExecError
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 class ConsensusImplSpec extends AnyFlatSpec with Matchers with ScalaFutures with NormalPatience with MockFactory {
-  import ConsensusImplSpec._
+  import ConsensusImplSpec.*
   "Consensus" should "extend the current best chain" taggedAs (UnitTest, ConsensusTest) in new ConsensusSetup {
     val chainExtension = BlockHelpers.generateChain(3, initialBestBlock)
 

@@ -2,15 +2,15 @@ package com.chipprbots.ethereum.utils
 
 import org.apache.pekko.util.ByteString
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
 import com.typesafe.config.ConfigRenderOptions
-import com.typesafe.config.{Config => TypesafeConfig}
+import com.typesafe.config.Config as TypesafeConfig
 
 import com.chipprbots.ethereum.consensus.mess.MESSConfig
 import com.chipprbots.ethereum.domain.{Address, UInt256}
-import com.chipprbots.ethereum.utils.NumericUtils._
+import com.chipprbots.ethereum.utils.NumericUtils.*
 
 /** Identifies whether the chain follows ETC (PoW indefinitely) or ETH (post-Merge PoS via CL). */
 sealed trait NetworkType

@@ -12,7 +12,7 @@ import scala.util.Try
 import com.chipprbots.scalanet.crypto.CryptoUtils
 import com.chipprbots.scalanet.crypto.CryptoUtils.SignatureScheme
 import com.chipprbots.scalanet.crypto.CryptoUtils.SupportedCurves
-import org.bouncycastle.asn1._
+import org.bouncycastle.asn1.*
 import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils
 import org.bouncycastle.math.ec.custom.sec.SecP256K1Curve
 import org.joda.time.DateTime

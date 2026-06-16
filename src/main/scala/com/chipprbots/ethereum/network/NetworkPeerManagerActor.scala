@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.network
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.apache.pekko.actor.Actor
 import org.apache.pekko.actor.ActorLogging
@@ -10,12 +10,12 @@ import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.domain.ChainWeight
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor._
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.*
 import com.chipprbots.ethereum.network.PeerActor.DisconnectPeer
-import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent._
+import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.*
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
 import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
-import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier._
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.*
 import com.chipprbots.ethereum.network.PeerEventBusActor.Unsubscribe
 import com.chipprbots.ethereum.network.handshaker.Handshaker.HandshakeResult
 import com.chipprbots.ethereum.network.p2p.Message
@@ -24,10 +24,10 @@ import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.Codes
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes
 import com.chipprbots.ethereum.network.p2p.messages.ETH69
-import com.chipprbots.ethereum.domain.Account._
+import com.chipprbots.ethereum.domain.Account.*
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.network.p2p.messages.SNAP
-import com.chipprbots.ethereum.network.p2p.messages.SNAP._
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect
 import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
@@ -774,7 +774,7 @@ class NetworkPeerManagerActor(
       case _ => // Don't log other message types
     }
 
-    (updateChainWeight(message) _)
+    updateChainWeight(message)
       .andThen(updateForkAccepted(message, initialPeerWithInfo.peer))
       .andThen(updateMaxBlock(message))(initialPeerWithInfo.peerInfo)
   }

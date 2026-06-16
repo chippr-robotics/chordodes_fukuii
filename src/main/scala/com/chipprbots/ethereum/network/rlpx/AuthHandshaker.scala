@@ -17,12 +17,12 @@ import org.bouncycastle.math.ec.ECPoint
 import org.bouncycastle.util.encoders.Hex
 import org.slf4j.LoggerFactory
 
-import com.chipprbots.ethereum.crypto._
-import com.chipprbots.ethereum.network._
+import com.chipprbots.ethereum.crypto.*
+import com.chipprbots.ethereum.network.*
 import com.chipprbots.ethereum.rlp
-import com.chipprbots.ethereum.utils.ByteUtils._
+import com.chipprbots.ethereum.utils.ByteUtils.*
 
-import AuthInitiateMessageV4._
+import AuthInitiateMessageV4.*
 
 sealed trait AuthHandshakeResult
 case object AuthHandshakeError extends AuthHandshakeResult
@@ -75,7 +75,7 @@ case class AuthHandshaker(
     remotePubKeyOpt: Option[ECPoint] = None
 ) extends scala.reflect.Selectable {
 
-  import AuthHandshaker._
+  import AuthHandshaker.*
 
   def initiate(uri: URI): (ByteString, AuthHandshaker) = {
     val remotePubKey = publicKeyFromNodeId(uri.getUserInfo)

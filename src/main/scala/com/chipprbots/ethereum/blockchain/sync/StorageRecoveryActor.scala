@@ -5,14 +5,14 @@ import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import scala.util.{Success, Failure}
 
 import com.chipprbots.ethereum.db.storage.{AppStateStorage, FlatSlotStorage, StateStorage}
 import com.chipprbots.ethereum.domain.Account
-import com.chipprbots.ethereum.mpt._
-import com.chipprbots.ethereum.mpt.MptVisitors._
+import com.chipprbots.ethereum.mpt.*
+import com.chipprbots.ethereum.mpt.MptVisitors.*
 import com.chipprbots.ethereum.blockchain.sync.snap.{SNAPSyncConfig, SNAPSyncController, StorageTask}
 import com.chipprbots.ethereum.blockchain.sync.snap.actors
 import com.chipprbots.ethereum.blockchain.sync.ProgressMilestones
@@ -50,7 +50,7 @@ class StorageRecoveryActor(
 ) extends Actor
     with ActorLogging {
 
-  import StorageRecoveryActor._
+  import StorageRecoveryActor.*
   import context.dispatcher
 
   override def preStart(): Unit = preloadedMissingForTesting match {

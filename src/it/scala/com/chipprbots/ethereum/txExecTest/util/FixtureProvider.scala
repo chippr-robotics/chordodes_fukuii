@@ -13,21 +13,21 @@ import com.chipprbots.ethereum.db.cache.AppCaches
 import com.chipprbots.ethereum.db.cache.LruCache
 import com.chipprbots.ethereum.db.components.EphemDataSourceComponent
 import com.chipprbots.ethereum.db.storage.NodeStorage.NodeHash
-import com.chipprbots.ethereum.db.storage._
+import com.chipprbots.ethereum.db.storage.*
 import com.chipprbots.ethereum.db.storage.pruning.ArchivePruning
 import com.chipprbots.ethereum.db.storage.pruning.PruningMode
-import com.chipprbots.ethereum.domain.Account._
-import com.chipprbots.ethereum.domain.BlockBody._
-import com.chipprbots.ethereum.domain.BlockHeaderImplicits._
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.Account.*
+import com.chipprbots.ethereum.domain.BlockBody.*
+import com.chipprbots.ethereum.domain.BlockHeaderImplicits.*
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.mpt.BranchNode
 import com.chipprbots.ethereum.mpt.ExtensionNode
 import com.chipprbots.ethereum.mpt.HashNode
 import com.chipprbots.ethereum.mpt.LeafNode
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.mpt.MptNode
-import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs._
-import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs._
+import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs.*
+import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs.*
 import com.chipprbots.ethereum.utils.Config
 
 object FixtureProvider {

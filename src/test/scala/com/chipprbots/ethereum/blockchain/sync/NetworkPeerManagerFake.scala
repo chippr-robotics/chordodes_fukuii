@@ -160,7 +160,7 @@ object NetworkPeerManagerFake {
       hashes.flatMap(hash => blocks.find(_.hash == hash)).map(_.body)
 
     private def emptyReceiptsRlp(count: Int): RLPList =
-      RLPList(List.fill(count)(RLPList()): _*)
+      RLPList(List.fill(count)(RLPList())*)
 
     def blockMatchesStart(block: Block, startingBlock: Either[BigInt, ByteString]): Boolean =
       startingBlock.fold(nr => block.number == nr, hash => block.hash == hash)

@@ -4,7 +4,7 @@ import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.AbstractBehavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.actor.{ActorRef => ClassicActorRef}
+import org.apache.pekko.actor.ActorRef as ClassicActorRef
 
 import cats.effect.unsafe.IORuntime
 
@@ -75,8 +75,8 @@ class PoWMiningCoordinator private (
     minerOpt: Option[Miner]
 ) extends AbstractBehavior[CoordinatorProtocol](context) {
 
-  import configBuilder._
-  import PoWMiningCoordinator._
+  import configBuilder.*
+  import PoWMiningCoordinator.*
 
   // CE3: Using global IORuntime for typed actor operations
   implicit private val scheduler: IORuntime = IORuntime.global

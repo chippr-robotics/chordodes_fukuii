@@ -15,7 +15,7 @@ import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.Await
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.apache.pekko.testkit.TestKit
 
@@ -33,11 +33,11 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPe
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerHandshakeSuccessful
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
-import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier._
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.*
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Ping
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Pong
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import scala.concurrent.Future
 
 class PeerEventBusActorSpec

@@ -8,8 +8,8 @@ import org.apache.pekko.actor.Cancellable
 import org.apache.pekko.actor.Props
 import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.actor.SupervisorStrategy
-import org.apache.pekko.actor.typed.scaladsl.adapter._
-import org.apache.pekko.actor.typed.{ActorRef => TypedActorRef}
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
@@ -27,7 +27,7 @@ import com.chipprbots.ethereum.ledger.BranchResolution
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class RegularSync(
     peersClient: ActorRef,

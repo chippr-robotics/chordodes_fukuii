@@ -11,7 +11,7 @@ import scala.collection.immutable.Queue
 import scala.collection.immutable.SortedMap
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
-import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcherState._
+import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcherState.*
 import com.chipprbots.ethereum.consensus.validators.BlockValidator
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody

@@ -23,7 +23,7 @@ object Assembly {
   implicit class ByteStringAsByteCode(val bytes: ByteString) extends ByteCode
 }
 
-import Assembly._
+import Assembly.*
 
 case class Assembly(byteCode: ByteCode*) {
   val code: ByteString = byteCode.foldLeft(ByteString.empty)(_.bytes ++ _.bytes)

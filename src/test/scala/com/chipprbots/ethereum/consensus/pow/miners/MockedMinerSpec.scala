@@ -1,16 +1,16 @@
 package com.chipprbots.ethereum.consensus.pow.miners
 
-import org.apache.pekko.actor.{ActorSystem => ClassicSystem}
+import org.apache.pekko.actor.ActorSystem as ClassicSystem
 import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestKit
 
 import cats.effect.IO
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalamock.handlers.CallHandler4
 import org.scalamock.handlers.CallHandler6
-import org.scalatest._
+import org.scalatest.*
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
@@ -21,17 +21,17 @@ import com.chipprbots.ethereum.consensus.pow.MinerSpecSetup
 import com.chipprbots.ethereum.consensus.pow.PoWBlockCreator
 import com.chipprbots.ethereum.consensus.pow.blocks.PoWBlockGenerator
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MineBlocks
-import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerResponses._
+import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerResponses.*
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.MptStorage
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.jsonrpc.EthMiningService
 import com.chipprbots.ethereum.jsonrpc.EthMiningService.SubmitHashRateResponse
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteStringUtils
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 // SCALA 3 MIGRATION: Fixed by refactoring MinerSpecSetup to use abstract mock members pattern.
 // ACTOR SYSTEM FIX: TestSetup now overrides classicSystem to use TestKit's actor system,
@@ -96,7 +96,7 @@ class MockedMinerSpec
 
         val errorMsg = s"Unable to get parent block with hash ${ByteStringUtils.hash2string(parentHash)} for mining"
 
-        (blockchainReader.getBlockByHash _).expects(parentHash).returns(None)
+        blockchainReader.getBlockByHash.expects(parentHash).returns(None)
 
         withStartedMiner {
           sendToMiner(MineBlocks(2, withTransactions = false, Some(parentHash)))
@@ -139,7 +139,7 @@ class MockedMinerSpec
         val parentHash = origin.hash
         val bfm = createBlockForMining(parent, Seq.empty)
 
-        (blockchainReader.getBlockByHash _).expects(parentHash).returns(Some(parent))
+        blockchainReader.getBlockByHash.expects(parentHash).returns(Some(parent))
 
         blockCreatorBehaviour(parent, withTransactions = false, bfm)
 
@@ -259,7 +259,7 @@ class MockedMinerSpec
     )
 
     // Allow getBestBlock to be called 0 or more times since some tests use getBlockByHash instead
-    (blockchainReader.getBestBlock _).expects().returns(Some(origin)).anyNumberOfTimes()
+    blockchainReader.getBestBlock.expects().returns(Some(origin)).anyNumberOfTimes()
 
     // Implement abstract expectation methods
     // NOTE: MockedMiner tests use createBlockForMining() which doesn't call this method,
@@ -307,7 +307,7 @@ class MockedMinerSpec
         .returning(IO.pure(PendingBlockAndState(PendingBlock(resultBlock, Nil), fakeWorld)))
 
     override def setupMiningServiceExpectation(): Unit =
-      (ethMiningService.submitHashRate _)
+      ethMiningService.submitHashRate
         .expects(*)
         .returns(IO.pure(Right(SubmitHashRateResponse(true))))
         .atLeastOnce()

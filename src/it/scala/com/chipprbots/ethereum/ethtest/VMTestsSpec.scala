@@ -1,11 +1,11 @@
 package com.chipprbots.ethereum.ethtest
 
 import java.io.File
-import io.circe.parser._
+import io.circe.parser.*
 import scala.io.Source
 import scala.util.Using
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Test suite for ethereum/tests VMTests category
   *

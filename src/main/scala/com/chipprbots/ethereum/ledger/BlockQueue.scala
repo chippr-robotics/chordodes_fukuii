@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.ledger
 import org.apache.pekko.util.ByteString
 
 import scala.annotation.tailrec
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockchainReader
@@ -48,7 +48,7 @@ class BlockQueue(
     *   and its total difficulty, otherwise None
     */
   def enqueueBlock(block: Block, bestBlockNumber: BigInt = blockchainReader.getBestBlockNumber()): Option[Leaf] = {
-    import block.header._
+    import block.header.*
 
     cleanUp(bestBlockNumber)
 
@@ -212,7 +212,7 @@ class BlockQueue(
     }
 
   private def addBlock(block: Block, parentWeight: Option[ChainWeight]): Unit = {
-    import block.header._
+    import block.header.*
 
     val weight = parentWeight.map(_.increase(block.header))
     blocks += hash -> QueuedBlock(block, weight)

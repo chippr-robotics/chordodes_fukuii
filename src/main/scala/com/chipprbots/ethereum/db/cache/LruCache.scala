@@ -36,7 +36,7 @@ class LruCache[K <: AnyRef, V <: AnyRef](
   }
 
   override def getValues: Seq[(K, V)] = {
-    import scala.jdk.CollectionConverters._
+    import scala.jdk.CollectionConverters.*
     lruCache.asMap().asScala.toSeq
   }
 

@@ -3,22 +3,22 @@ package com.chipprbots.ethereum.sync
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.typesafe.config.ConfigValueFactory
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.FreeSpecBase
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.metrics.Metrics
 import com.chipprbots.ethereum.metrics.MetricsConfig
 import com.chipprbots.ethereum.sync.util.RegularSyncItSpecUtils.FakePeer
-import com.chipprbots.ethereum.sync.util.SyncCommonItSpec._
+import com.chipprbots.ethereum.sync.util.SyncCommonItSpec.*
 import com.chipprbots.ethereum.utils.Config
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** End-to-End test suite for blockchain state synchronization and validation.
   *

@@ -2,7 +2,7 @@ package com.chipprbots.ethereum
 
 import org.apache.pekko.util.Timeout
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.concurrent.PatienceConfiguration
 

@@ -6,14 +6,14 @@ import cats.effect.unsafe.IORuntime
 import io.circe.Json
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Failure
 import scala.util.Success
 
 import sangria.ast.Document
 import sangria.execution.{ErrorWithResolver, Executor, HandledException, QueryAnalysisError, QueryReducer}
 import sangria.marshalling.ResultMarshaller
-import sangria.marshalling.circe._
+import sangria.marshalling.circe.*
 import sangria.parser.{QueryParser, SyntaxError}
 
 import com.chipprbots.ethereum.utils.Logger

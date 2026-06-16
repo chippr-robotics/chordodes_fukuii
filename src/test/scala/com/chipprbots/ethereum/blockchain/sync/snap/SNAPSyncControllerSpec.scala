@@ -2,13 +2,13 @@ package com.chipprbots.ethereum.blockchain.sync.snap
 
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.db.storage.MptStorage
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestMptStorage
 
 class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
@@ -70,7 +70,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
   }
 
   "SyncProgress" should "format progress string correctly" taggedAs UnitTest in {
-    import SNAPSyncController._
+    import SNAPSyncController.*
 
     val progress = SyncProgress(
       phase = AccountRangeSync,
@@ -103,7 +103,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "handle different phases correctly" taggedAs UnitTest in {
-    import SNAPSyncController._
+    import SNAPSyncController.*
 
     val phases = Seq(Idle, AccountRangeSync, ByteCodeAndStorageSync, StateHealing, StateValidation, Completed)
 
@@ -137,7 +137,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
   }
 
   "SNAPSyncController messages" should "be defined correctly" taggedAs UnitTest in {
-    import SNAPSyncController._
+    import SNAPSyncController.*
 
     // Test that all message types are defined
     val start = Start
@@ -211,8 +211,8 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
   // consensus layer via engine_forkchoiceUpdated; SNAP must support a hint message and a
   // by-hash bootstrap variant.
   "SNAPSyncController.CLPivotHint" should "carry the head hash and optional header" taggedAs UnitTest in {
-    import SNAPSyncController._
-    import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields._
+    import SNAPSyncController.*
+    import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
     import com.chipprbots.ethereum.domain.BlockHeader
 
     val headHash = ByteString(Array.fill(32)(0x42.toByte))
@@ -243,7 +243,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
   }
 
   "SNAPSyncController.StartRegularSyncBootstrapByHash" should "carry the head hash" taggedAs UnitTest in {
-    import SNAPSyncController._
+    import SNAPSyncController.*
     val headHash = ByteString(Array.fill(32)(0xaa.toByte))
     val msg = StartRegularSyncBootstrapByHash(headHash)
     msg.headHash shouldBe headHash
@@ -251,14 +251,14 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
   }
 
   "PivotSelectionSource.CLDrivenPivot" should "be a distinct value from NetworkPivot/LocalPivot" taggedAs UnitTest in {
-    import SNAPSyncController._
+    import SNAPSyncController.*
     val sources: Seq[PivotSelectionSource] = Seq(NetworkPivot, LocalPivot, CLDrivenPivot)
     sources.distinct.size shouldBe 3
     CLDrivenPivot.name shouldBe "cl-driven"
   }
 
   it should "have bootstrap message with target block" taggedAs UnitTest in {
-    import SNAPSyncController._
+    import SNAPSyncController.*
 
     // Test bootstrap message
     val targetBlock = BigInt(1025)
@@ -269,7 +269,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "have correct phase types" taggedAs UnitTest in {
-    import SNAPSyncController._
+    import SNAPSyncController.*
 
     // Test phase hierarchy
     val idle: SyncPhase = Idle
@@ -289,7 +289,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
   }
 
   "SNAPSyncController" should "provide status for eth_syncing RPC" taggedAs UnitTest in {
-    import SNAPSyncController._
+    import SNAPSyncController.*
 
     // Verify that SNAP sync phases can be converted to state node progress
     // This is tested indirectly through the currentSyncStatus method
@@ -347,7 +347,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
   }
 
   "SyncProgress formatCount" should "format large numbers with K/M suffixes" taggedAs UnitTest in {
-    import SNAPSyncController._
+    import SNAPSyncController.*
 
     val progress = SyncProgress(
       phase = AccountRangeSync,
@@ -381,7 +381,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
   // ---- J8: State machine — phase ordering and restart detection -------------------
 
   "SyncPhase" should "enumerate all 6 phases as distinct values" taggedAs UnitTest in {
-    import SNAPSyncController._
+    import SNAPSyncController.*
 
     val allPhases: Seq[SyncPhase] = Seq(
       Idle,
@@ -395,7 +395,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "declare Idle before AccountRangeSync in canonical declaration order" taggedAs UnitTest in {
-    import SNAPSyncController._
+    import SNAPSyncController.*
 
     // The canonical SNAP sync pipeline order.  We can't enforce ordering via sealed trait alone,
     // but locking the set of phases here means adding a new phase forces updating this test.
@@ -416,7 +416,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "include ChainDownloadCompletion as a valid intermediate phase" taggedAs UnitTest in {
-    import SNAPSyncController._
+    import SNAPSyncController.*
     val phase: SyncPhase = ChainDownloadCompletion
     phase shouldBe a[SyncPhase]
     phase should not be Completed
@@ -603,7 +603,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "show ByteCode phase with total and percentage" taggedAs UnitTest in {
-    import SNAPSyncController._
+    import SNAPSyncController.*
 
     val progress = SyncProgress(
       phase = ByteCodeAndStorageSync,
@@ -642,7 +642,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
   // even on failure, causing healing to start with a corrupt trie.
 
   "AccountTrieFinalizationFailed message" should "exist and carry an error string" taggedAs UnitTest in {
-    import SNAPSyncController._
+    import SNAPSyncController.*
     val msg = AccountTrieFinalizationFailed("root mismatch: computed 8f5d92fe != expected b8c5a89e")
     msg.error should include("root mismatch")
     msg.error should include("8f5d92fe")
@@ -650,7 +650,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "be distinct from AccountTrieFinalized (success path)" taggedAs UnitTest in {
-    import SNAPSyncController._
+    import SNAPSyncController.*
     import org.apache.pekko.util.ByteString
     val failed = AccountTrieFinalizationFailed("some error")
     val succeeded = AccountTrieFinalized(ByteString(Array.fill(32)(0.toByte)))
@@ -658,7 +658,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
   }
 
   "SNAPSyncController message set" should "include AccountTrieFinalizationFailed alongside AccountTrieFinalized" taggedAs UnitTest in {
-    import SNAPSyncController._
+    import SNAPSyncController.*
     // Both success and failure finalization messages must exist so the controller
     // can distinguish "proceed to healing" from "restart with fresh pivot".
     val successMsg: AnyRef = AccountTrieFinalized(org.apache.pekko.util.ByteString.empty)

@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.sync
 
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.typesafe.config.ConfigValueFactory
 import org.scalatest.BeforeAndAfterAll
@@ -12,10 +12,10 @@ import com.chipprbots.ethereum.FreeSpecBase
 import com.chipprbots.ethereum.metrics.Metrics
 import com.chipprbots.ethereum.metrics.MetricsConfig
 import com.chipprbots.ethereum.sync.util.RegularSyncItSpecUtils.FakePeer
-import com.chipprbots.ethereum.sync.util.SyncCommonItSpec._
+import com.chipprbots.ethereum.sync.util.SyncCommonItSpec.*
 import com.chipprbots.ethereum.utils.Config
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class RegularSyncItSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll {
   implicit val testRuntime: IORuntime = IORuntime.global
@@ -132,7 +132,7 @@ class RegularSyncItSpec extends FreeSpecBase with Matchers with BeforeAndAfterAl
   ) in customTestCaseResourceM(
     FakePeer.start2FakePeersRes()
   ) { case (peer1, peer2) =>
-    import MetricsHelper._
+    import MetricsHelper.*
 
     val minedMetricBefore = sampleMetric(MinedBlockPropagation)
     val defaultMetricBefore = sampleMetric(DefaultBlockPropagation)

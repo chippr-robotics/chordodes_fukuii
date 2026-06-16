@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.domain
 
 import org.apache.pekko.util.ByteString
 
-import com.chipprbots.ethereum.domain.BlockHeaderImplicits._
+import com.chipprbots.ethereum.domain.BlockHeaderImplicits.*
 import com.chipprbots.ethereum.rlp.RLPEncodeable
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPSerializable
@@ -32,8 +32,8 @@ case class Block(header: BlockHeader, body: BlockBody) {
 object Block {
 
   implicit class BlockEnc(val obj: Block) extends RLPSerializable {
-    import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions._
-    import com.chipprbots.ethereum.rlp.RLPImplicitConversions._
+    import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
+    import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
     import com.chipprbots.ethereum.rlp.RLPImplicits.given
 
     override def toRLPEncodable: RLPEncodeable = {
@@ -48,8 +48,8 @@ object Block {
       }
       val base = Seq(
         obj.header.toRLPEncodable,
-        RLPList(txItems: _*),
-        RLPList(obj.body.uncleNodesList.map(_.toRLPEncodable): _*)
+        RLPList(txItems*),
+        RLPList(obj.body.uncleNodesList.map(_.toRLPEncodable)*)
       )
       // Shanghai+ blocks include withdrawals as 4th item
       val withWithdrawals = obj.body.withdrawals match {
@@ -61,16 +61,16 @@ object Block {
               byteStringToEncodeable(w.address.bytes),
               toEncodeable[BigInt](w.amount)
             )
-          }: _*)
+          }*)
         case None => base
       }
-      RLPList(withWithdrawals: _*)
+      RLPList(withWithdrawals*)
     }
   }
 
   implicit class BlockDec(val bytes: Array[Byte]) extends AnyVal {
-    import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions._
-    import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.TypedTransaction._
+    import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
+    import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.TypedTransaction.*
     def toBlock: Block = rawDecode(bytes) match {
       case RLPList(header: RLPList, stx: RLPList, uncles: RLPList) =>
         val decodedHeader = header.toBlockHeader
@@ -92,7 +92,7 @@ object Block {
         val stx = rlpList.items(1).asInstanceOf[RLPList]
         val uncles = rlpList.items(2).asInstanceOf[RLPList]
         val withdrawalsRlp = rlpList.items(3).asInstanceOf[RLPList]
-        import com.chipprbots.ethereum.rlp.RLPImplicitConversions._
+        import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
         val ws = withdrawalsRlp.items.collect { case w: RLPList =>
           val idx: BigInt = bigIntFromEncodeable(w.items(0))
           val vIdx: BigInt = bigIntFromEncodeable(w.items(1))

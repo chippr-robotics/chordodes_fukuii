@@ -10,10 +10,10 @@ import scala.collection.mutable
 import scala.util.control.NonFatal
 
 import fs2.Stream
-import org.rocksdb._
+import org.rocksdb.*
 
-import com.chipprbots.ethereum.db.dataSource.DataSource._
-import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource._
+import com.chipprbots.ethereum.db.dataSource.DataSource.*
+import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource.*
 import com.chipprbots.ethereum.utils.Logger
 import com.chipprbots.ethereum.utils.TryWithResources.withResources
 
@@ -103,7 +103,7 @@ class RocksDbDataSource(
     */
   override def multiGetOptimized(namespace: Namespace, keys: Seq[Array[Byte]]): Seq[Option[Array[Byte]]] = {
     if (keys.isEmpty) return Seq.empty
-    import scala.jdk.CollectionConverters._
+    import scala.jdk.CollectionConverters.*
     dbLock.readLock().lock()
     try {
       assureNotClosed()
@@ -425,7 +425,7 @@ class RocksDbDataSource(
 
   protected def destroyDB(): Unit =
     try {
-      import rocksDbConfig._
+      import rocksDbConfig.*
       val tableCfg = new BlockBasedTableConfig()
         .setBlockSize(blockSize)
         .setBlockCache(new ClockCache(blockCacheSize))
@@ -515,9 +515,9 @@ object RocksDbDataSource extends Logger {
       rocksDbConfig: RocksDbConfig,
       namespaces: Seq[Namespace]
   ): (RocksDB, mutable.Buffer[ColumnFamilyHandle], ReadOptions, DBOptions, ColumnFamilyOptions, Option[Statistics]) = {
-    import rocksDbConfig._
-    import scala.jdk.CollectionConverters._
-    import java.nio.file.{Files, Paths, Path => JPath}
+    import rocksDbConfig.*
+    import scala.jdk.CollectionConverters.*
+    import java.nio.file.{Files, Paths, Path as JPath}
 
     // Ensure native RocksDB library is loaded (only happens once per JVM)
     libraryLoaded

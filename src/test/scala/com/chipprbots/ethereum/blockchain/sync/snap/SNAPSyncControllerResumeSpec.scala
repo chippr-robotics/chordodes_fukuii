@@ -7,7 +7,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.db.dataSource.{RocksDbConfig, RocksDbDataSource}
 import com.chipprbots.ethereum.db.storage.{Namespaces, SnapSyncProgress, SnapSyncProgressStorage}
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Hex
 
 import java.io.File

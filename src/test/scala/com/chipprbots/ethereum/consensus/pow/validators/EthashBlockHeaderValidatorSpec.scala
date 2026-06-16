@@ -15,15 +15,15 @@ import com.chipprbots.ethereum.SuperSlow
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.consensus.pow.difficulty.EthashDifficultyCalculator
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError
-import com.chipprbots.ethereum.consensus.validators.BlockHeaderError._
+import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.*
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
-import com.chipprbots.ethereum.consensus.validators.BlockHeaderValidator._
+import com.chipprbots.ethereum.consensus.validators.BlockHeaderValidator.*
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValidatorSkeleton
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.DaoForkConfig
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 // scalastyle:off magic.number
 class EthashBlockHeaderValidatorSpec
@@ -53,7 +53,7 @@ class EthashBlockHeaderValidatorSpec
   }
 
   it should "validate DAO block (extra data)" taggedAs (UnitTest, ConsensusTest) in {
-    import Fixtures.Blocks._
+    import Fixtures.Blocks.*
     val cases: TableFor4[BlockHeader, Block, Boolean, Boolean] = Table(
       ("Block", "Parent Block", "Supports Dao Fork", "Valid"),
       (DaoForkBlock.header, DaoParentBlock.block, false, true)
@@ -174,14 +174,14 @@ class EthashBlockHeaderValidatorSpec
       .storeBlockHeader(validParentBlockHeader)
       .and(blockchainWriter.storeBlockBody(validParentBlockHeader.hash, validParentBlockBody))
       .commit()
-    PoWBlockHeaderValidator.validate(validBlockHeader, blockchainReader.getBlockHeaderByHash _) match {
+    PoWBlockHeaderValidator.validate(validBlockHeader, blockchainReader.getBlockHeaderByHash) match {
       case Right(_) => succeed
       case _        => fail()
     }
   }
 
   it should "return a failure if the parent's header is not taggedAs (UnitTest, ConsensusTest) in storage" in new EphemBlockchainTestSetup {
-    PoWBlockHeaderValidator.validate(validBlockHeader, blockchainReader.getBlockHeaderByHash _) match {
+    PoWBlockHeaderValidator.validate(validBlockHeader, blockchainReader.getBlockHeaderByHash) match {
       case Left(HeaderParentNotFoundError) => succeed
       case _                               => fail()
     }
@@ -407,7 +407,7 @@ class EthashBlockHeaderValidatorSpec
   val validParent: Block = Block(validParentBlockHeader, validParentBlockBody)
 
   def createBlockchainConfig(supportsDaoFork: Boolean = false): BlockchainConfig = {
-    import Fixtures.Blocks._
+    import Fixtures.Blocks.*
     BlockchainConfig(
       forkBlockNumbers = ForkBlockNumbers.Empty.copy(
         frontierBlockNumber = 0,

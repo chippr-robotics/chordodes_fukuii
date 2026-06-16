@@ -31,10 +31,10 @@ import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.FindNode
 import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.Neighbors
 import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.ENRRequest
 import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.ENRResponse
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class RLPCodecsSpec extends AnyFlatSpec with Matchers {
-  import com.chipprbots.ethereum.rlp.RLPImplicitConversions._
+  import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
   import com.chipprbots.ethereum.rlp.RLPImplicits.given
   import RLPCodecs.given
 

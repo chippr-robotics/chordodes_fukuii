@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.vm
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 import Fixtures.blockchainConfig
 

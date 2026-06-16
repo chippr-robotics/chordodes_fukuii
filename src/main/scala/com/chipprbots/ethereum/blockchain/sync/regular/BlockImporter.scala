@@ -14,7 +14,7 @@ import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import cats.implicits.*
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
@@ -24,10 +24,10 @@ import com.chipprbots.ethereum.blockchain.sync.regular.RegularSync.ProgressProto
 import com.chipprbots.ethereum.consensus.ConsensusAdapter
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.db.storage.{EvmCodeStorage, StateStorage}
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.BlockchainWriter
-import com.chipprbots.ethereum.ledger._
-import com.chipprbots.ethereum.mpt._
+import com.chipprbots.ethereum.ledger.*
+import com.chipprbots.ethereum.mpt.*
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingAccountNodeException
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingStorageNodeException
@@ -40,7 +40,7 @@ import com.chipprbots.ethereum.jsonrpc.NewBlockImported
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.RemoveTransactions
 import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.Config.SyncConfig
-import com.chipprbots.ethereum.utils.FunctorOps._
+import com.chipprbots.ethereum.utils.FunctorOps.*
 
 class BlockImporter(
     fetcher: ActorRef,
@@ -59,8 +59,8 @@ class BlockImporter(
 ) extends Actor
     with ActorLogging {
 
-  import BlockImporter._
-  import configBuilder._
+  import BlockImporter.*
+  import configBuilder.*
 
   implicit val runtime: IORuntime = IORuntime.global
 
@@ -516,7 +516,7 @@ class BlockImporter(
     importWith(
       IO(doLog(importMessages.preImport()))
         .flatMap(_ => consensus.evaluateBranchBlock(block))
-        .tap((importMessages.messageForImportResult _).andThen(doLog))
+        .tap(importMessages.messageForImportResult.andThen(doLog))
         .tap {
           case BlockImportedToTop(importedBlocksData) =>
             val (blocks, weights) = importedBlocksData.map(data => (data.block, data.weight)).unzip

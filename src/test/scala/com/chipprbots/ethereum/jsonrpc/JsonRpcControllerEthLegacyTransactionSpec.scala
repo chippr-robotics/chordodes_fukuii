@@ -11,8 +11,8 @@ import org.bouncycastle.util.encoders.Hex
 import org.json4s.DefaultFormats
 import org.json4s.Extraction
 import org.json4s.Formats
-import org.json4s.JsonAST._
-import org.json4s.JsonDSL._
+import org.json4s.JsonAST.*
+import org.json4s.JsonDSL.*
 import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpecLike
@@ -23,17 +23,17 @@ import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.LongPatience
 import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.crypto.ECDSASignature
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.jsonrpc.EthBlocksService.GetBlockTransactionCountByNumberResponse
-import com.chipprbots.ethereum.jsonrpc.EthTxService._
-import com.chipprbots.ethereum.jsonrpc.EthUserService._
+import com.chipprbots.ethereum.jsonrpc.EthTxService.*
+import com.chipprbots.ethereum.jsonrpc.EthUserService.*
 import com.chipprbots.ethereum.jsonrpc.FilterManager.TxLog
-import com.chipprbots.ethereum.jsonrpc.PersonalService._
+import com.chipprbots.ethereum.jsonrpc.PersonalService.*
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers.OptionNoneToJNullSerializer
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers.QuantitiesSerializer
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers.UnformattedDataJsonSerializer
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransaction
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 // scalastyle:off magic.number
 class JsonRpcControllerEthLegacyTransactionSpec
@@ -108,7 +108,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
     override val jsonRpcController: JsonRpcController = super.jsonRpcController.copy(ethTxService = mockEthTxService)
 
     val txResponse: SignedTransaction = Fixtures.Blocks.Block3125369.body.transactionList.head
-    (mockEthTxService.getRawTransactionByHash _)
+    mockEthTxService.getRawTransactionByHash
       .expects(*)
       .returning(IO.pure(Right(RawTransactionResponse(Some(txResponse)))))
 
@@ -304,7 +304,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
     override val jsonRpcController: JsonRpcController = super.jsonRpcController.copy(ethTxService = mockEthTxService)
 
     val txResponse: TransactionResponse = TransactionResponse(Fixtures.Blocks.Block3125369.body.transactionList.head)
-    (mockEthTxService.getTransactionByHash _)
+    mockEthTxService.getTransactionByHash
       .expects(*)
       .returning(IO.pure(Right(GetTransactionByHashResponse(Some(txResponse)))))
 
@@ -324,7 +324,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethUserService = mockEthUserService)
 
-    (mockEthUserService.getTransactionCount _)
+    mockEthUserService.getTransactionCount
       .expects(*)
       .returning(IO.pure(Right(GetTransactionCountResponse(123))))
 
@@ -419,7 +419,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
       )
     )
 
-    (mockEthTxService.getTransactionReceipt _).expects(*).returning(IO.pure(mockResponse))
+    mockEthTxService.getTransactionReceipt.expects(*).returning(IO.pure(mockResponse))
 
     val request: JsonRpcRequest = newJsonRpcRequest(
       "eth_getTransactionReceipt",
@@ -509,7 +509,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
       )
     )
 
-    (mockEthTxService.getTransactionReceipt _).expects(*).returning(IO.pure(mockResponse))
+    mockEthTxService.getTransactionReceipt.expects(*).returning(IO.pure(mockResponse))
 
     val request: JsonRpcRequest = newJsonRpcRequest(
       "eth_getTransactionReceipt",
@@ -563,7 +563,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
     RPCTest
   ) in new JsonRpcControllerFixture {
     val mockEthTxService = mock[EthTxService]
-    (mockEthTxService.ethPendingTransactions _)
+    mockEthTxService.ethPendingTransactions
       .expects(*)
       .returning(IO.pure(Right(EthPendingTransactionsResponse(List()))))
     val jRpcController: JsonRpcController = jsonRpcController.copy(ethTxService = mockEthTxService)
@@ -605,7 +605,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
     }
 
     val mockEthTxService = mock[EthTxService]
-    (mockEthTxService.ethPendingTransactions _)
+    mockEthTxService.ethPendingTransactions
       .expects(*)
       .returning(IO.pure(Right(EthPendingTransactionsResponse(transactions))))
     val jRpcController: JsonRpcController = jsonRpcController.copy(ethTxService = mockEthTxService)

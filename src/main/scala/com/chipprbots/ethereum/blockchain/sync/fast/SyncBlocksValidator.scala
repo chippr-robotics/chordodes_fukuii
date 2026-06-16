@@ -13,8 +13,8 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
 
 trait SyncBlocksValidator { this: ActorLogging =>
 
-  import SyncBlocksValidator._
-  import BlockBodyValidationResult._
+  import SyncBlocksValidator.*
+  import BlockBodyValidationResult.*
 
   def blockchainReader: BlockchainReader
   def validators: Validators

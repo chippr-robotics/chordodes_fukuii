@@ -10,8 +10,8 @@ import org.apache.pekko.util.ByteString
 
 import scala.concurrent.ExecutionContext
 
-import org.json4s._
-import org.json4s.native.JsonMethods._
+import org.json4s.*
+import org.json4s.native.JsonMethods.*
 
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.Block
@@ -37,7 +37,7 @@ import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
   */
 class SubscriptionManager(blockchainReader: BlockchainReader) extends Actor with ActorLogging {
 
-  import SubscriptionManager._
+  import SubscriptionManager.*
 
   implicit val formats: Formats = DefaultFormats + JsonSerializers.RpcErrorJsonSerializer
   implicit val ec: ExecutionContext = context.dispatcher

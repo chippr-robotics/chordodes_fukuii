@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.network
 
 import java.time.Clock
 
-import cats._
+import cats.*
 import cats.implicits.*
 
 import scala.annotation.tailrec
@@ -18,7 +18,7 @@ class TimeSlotStats[K, V: Monoid] private (
     // Ring buffer of slots statistics.
     val buffer: TimeSlotStats.Buffer[K, V]
 )(implicit clock: Clock) {
-  import TimeSlotStats._
+  import TimeSlotStats.*
 
   /** Overall length of the timewindow. */
   def duration: FiniteDuration = slotDuration * slotCount

@@ -7,14 +7,14 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.Fixtures.{Blocks => BlockFixtures}
+import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.UInt256
 
-import MockWorldState._
+import MockWorldState.*
 import Fixtures.blockchainConfig
 
 // scalastyle:off method.length
@@ -22,7 +22,7 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
 
   val config: EvmConfig = EvmConfig.ByzantiumConfigBuilder(blockchainConfig)
 
-  import config.feeSchedule._
+  import config.feeSchedule.*
 
   // scalastyle:off
   object fxt {
@@ -150,7 +150,7 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
       .saveAccount(addresWithRevert, accountWithCode(revertProgram.code))
       .saveCode(addresWithRevert, revertProgram.code)
 
-    val createCode: Assembly = Assembly(initPart(contractCode.code.size).byteCode ++ contractCode.byteCode: _*)
+    val createCode: Assembly = Assembly(initPart(contractCode.code.size).byteCode ++ contractCode.byteCode*)
 
     val copyCodeGas: BigInt =
       G_copy * wordsForBytes(contractCode.code.size) + config.calcMemCost(0, 0, contractCode.code.size)
@@ -437,9 +437,9 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
 
       "result in an out of gas if the code is larger than the limit" in {
         val codeSize = maxCodeSize + 1
-        val largeContractCode = Assembly((0 until codeSize).map(_ => Assembly.OpCodeAsByteCode(STOP)): _*)
+        val largeContractCode = Assembly((0 until codeSize).map(_ => Assembly.OpCodeAsByteCode(STOP))*)
         val createCode =
-          Assembly(fxt.initPart(largeContractCode.code.size).byteCode ++ largeContractCode.byteCode: _*).code
+          Assembly(fxt.initPart(largeContractCode.code.size).byteCode ++ largeContractCode.byteCode*).code
         val call = CreateResult(context = context, createCode = createCode, opcode = opcode)
 
         call.stateOut.error shouldBe None
@@ -448,9 +448,9 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
 
       "not result in an out of gas if the code is smaller than the limit" in {
         val codeSize = maxCodeSize - 1
-        val largeContractCode = Assembly((0 until codeSize).map(_ => Assembly.OpCodeAsByteCode(STOP)): _*)
+        val largeContractCode = Assembly((0 until codeSize).map(_ => Assembly.OpCodeAsByteCode(STOP))*)
         val createCode =
-          Assembly(fxt.initPart(largeContractCode.code.size).byteCode ++ largeContractCode.byteCode: _*).code
+          Assembly(fxt.initPart(largeContractCode.code.size).byteCode ++ largeContractCode.byteCode*).code
         val call = CreateResult(context = context, createCode = createCode, opcode = opcode)
 
         call.stateOut.error shouldBe None

@@ -17,7 +17,7 @@ import fs2.Stream
 import io.vavr.collection.PriorityQueue
 
 import com.chipprbots.ethereum.blockchain.sync.fast.LoadableBloomFilter.BloomFilterLoadingResult
-import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler._
+import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.*
 import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource.IterationError
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.NodeStorage

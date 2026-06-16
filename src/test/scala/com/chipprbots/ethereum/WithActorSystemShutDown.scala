@@ -3,7 +3,7 @@ package com.chipprbots.ethereum
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.testkit.TestKit
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.Suite

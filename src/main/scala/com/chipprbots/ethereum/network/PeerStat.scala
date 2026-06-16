@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.network
 
-import cats._
+import cats.*
 import cats.implicits.*
 
 case class PeerStat(

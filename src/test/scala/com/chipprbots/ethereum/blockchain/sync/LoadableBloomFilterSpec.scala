@@ -8,7 +8,7 @@ import com.google.common.hash.PrimitiveSink
 import fs2.Stream
 
 import com.chipprbots.ethereum.FlatSpecBase
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.blockchain.sync.fast.LoadableBloomFilter
 import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource.IterationError
 

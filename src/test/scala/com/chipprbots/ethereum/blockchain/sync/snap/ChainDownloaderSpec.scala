@@ -24,7 +24,7 @@ import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerId
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class ChainDownloaderSpec
     extends TestKit(ActorSystem("ChainDownloaderSpec"))
@@ -101,7 +101,7 @@ class ChainDownloaderSpec
 
     // findBestStoredHeader probes block 1; mock it as missing so the binary search falls
     // through and returns 0 immediately, leaving the actor in `downloading` state.
-    (blockchainReader.getBlockHeaderByNumber _)
+    blockchainReader.getBlockHeaderByNumber
       .expects(BigInt(1))
       .returning(None)
       .anyNumberOfTimes()
@@ -139,7 +139,7 @@ class ChainDownloaderSpec
     val networkPeerManager = TestProbe()
     val peerEventBus = TestProbe()
 
-    (blockchainReader.getBlockHeaderByNumber _)
+    blockchainReader.getBlockHeaderByNumber
       .expects(BigInt(1))
       .returning(None)
       .anyNumberOfTimes()
@@ -181,7 +181,7 @@ class ChainDownloaderSpec
     val networkPeerManager = TestProbe()
     val peerEventBus = TestProbe()
 
-    (blockchainReader.getBlockHeaderByNumber _)
+    blockchainReader.getBlockHeaderByNumber
       .expects(BigInt(1))
       .returning(None)
       .anyNumberOfTimes()

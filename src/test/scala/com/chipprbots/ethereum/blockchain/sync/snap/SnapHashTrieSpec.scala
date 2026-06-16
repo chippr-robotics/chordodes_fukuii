@@ -11,7 +11,7 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.mpt.{ByteArraySerializable, MerklePatriciaTrie}
 import com.chipprbots.ethereum.testing.TestMptStorage
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Tests for [[SnapHashTrie]] — the batching wrapper around [[StackTrie]].
   *

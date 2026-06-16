@@ -8,7 +8,7 @@ import cats.effect.unsafe.IORuntime
 
 import scala.annotation.tailrec
 
-import com.chipprbots.ethereum.consensus.Consensus._
+import com.chipprbots.ethereum.consensus.Consensus.*
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader

@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.ethtest
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Test suite to identify and flag gas calculation discrepancies
   *

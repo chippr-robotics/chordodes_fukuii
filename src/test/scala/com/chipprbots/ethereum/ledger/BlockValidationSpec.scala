@@ -10,13 +10,13 @@ import org.scalatest.wordspec.AnyWordSpec
 import com.chipprbots.ethereum.Mocks
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
-import com.chipprbots.ethereum.utils.ByteStringUtils._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.utils.ByteStringUtils.*
+import com.chipprbots.ethereum.testing.Tags.*
 
 class BlockValidationSpec extends AnyWordSpec with Matchers with MockFactory {
-  import BlockValidationTestSetup._
+  import BlockValidationTestSetup.*
 
   "BlockValidation" should {
     "validate block after execution" when {

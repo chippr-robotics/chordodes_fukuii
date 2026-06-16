@@ -8,7 +8,7 @@ import com.chipprbots.ethereum.utils.Logger
 
 class SyncProgressMonitor(@annotation.unused _scheduler: Scheduler) extends Logger {
 
-  import SNAPSyncController._
+  import SNAPSyncController.*
 
   private var currentPhaseState: SyncPhase = Idle
   private var bytecodesDone: Boolean = false
@@ -303,7 +303,7 @@ case class SyncProgress(
 ) {
 
   private def wormChasesBrainBar: String = {
-    import SNAPSyncController._
+    import SNAPSyncController.*
 
     val stages = Vector[SyncPhase](
       AccountRangeSync,

@@ -3,13 +3,13 @@ package com.chipprbots.ethereum.metrics
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
-import io.micrometer.core.instrument._
+import io.micrometer.core.instrument.*
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import io.micrometer.core.instrument.binder.logging.LogbackMetrics
-import io.prometheus.metrics.exporter.httpserver.{HTTPServer => PrometheusHTTPServer}
+import io.prometheus.metrics.exporter.httpserver.HTTPServer as PrometheusHTTPServer
 import io.prometheus.metrics.instrumentation.jvm.JvmMetrics
 import kamon.Kamon
 import org.slf4j.LoggerFactory
@@ -66,7 +66,7 @@ case class Metrics(metricsPrefix: String, registry: MeterRegistry, serverPort: I
   def timer(name: String, tags: String*): Timer =
     Timer
       .builder(mkName(name))
-      .tags(tags: _*)
+      .tags(tags*)
       .register(registry)
 
   /** Returns a [[io.micrometer.core.instrument.DistributionSummary DistributionSummary]].

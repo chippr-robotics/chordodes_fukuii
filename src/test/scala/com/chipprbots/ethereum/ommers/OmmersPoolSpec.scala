@@ -31,8 +31,8 @@ class OmmersPoolSpec
 
       /** 00 --> 11 --> 21 --> [31] (chain1) \-> 14 (chain4) [] new block, reference! () ommer given the new block
         */
-      (blockchainReader.getBlockHeaderByHash _).expects(block2Chain1.hash).returns(Some(block2Chain1))
-      (blockchainReader.getBlockHeaderByHash _).expects(block1Chain1.hash).returns(Some(block1Chain1))
+      blockchainReader.getBlockHeaderByHash.expects(block2Chain1.hash).returns(Some(block2Chain1))
+      blockchainReader.getBlockHeaderByHash.expects(block1Chain1.hash).returns(Some(block1Chain1))
 
       ommersPool ! AddOmmers(
         block0,
@@ -52,8 +52,8 @@ class OmmersPoolSpec
         /** 00 --> (11) --> 21 --> 31 (chain1) \ \ \-> 33 (chain3) \ \--> 22 --> 32 (chain2) \-> [14] (chain4) [] new
           * block, reference! () ommer given the new block
           */
-        (blockchainReader.getBlockHeaderByHash _).expects(block0.hash).returns(Some(block0))
-        (blockchainReader.getBlockHeaderByHash _).expects(block0.parentHash).returns(None)
+        blockchainReader.getBlockHeaderByHash.expects(block0.hash).returns(Some(block0))
+        blockchainReader.getBlockHeaderByHash.expects(block0.parentHash).returns(None)
 
         ommersPool ! AddOmmers(
           block0,
@@ -74,8 +74,8 @@ class OmmersPoolSpec
         /** XX --> (11) --> 21 --> 31 (chain1) \ \ \-> 33 (chain3) \ \--> 22 --> 32 (chain2) \--> 14 ---> [24] (chain4)
           * \-> (15) (chain5) [] new block, reference! () ommer given the new block XX removed block
           */
-        (blockchainReader.getBlockHeaderByHash _).expects(block1Chain4.hash).returns(Some(block1Chain4)).once()
-        (blockchainReader.getBlockHeaderByHash _).expects(block0.hash).returns(Some(block0)).once()
+        blockchainReader.getBlockHeaderByHash.expects(block1Chain4.hash).returns(Some(block1Chain4)).once()
+        blockchainReader.getBlockHeaderByHash.expects(block0.hash).returns(Some(block0)).once()
 
         ommersPool ! AddOmmers(
           block0,
@@ -101,8 +101,8 @@ class OmmersPoolSpec
         /** 00 --> 11 --> 21 --> [31] (chain1) \ \ \-> (33) (chain3) \ \--> (22) --> 32 (chain2) \-> 14 (chain4) [] new
           * block, reference! () ommer given the new block
           */
-        (blockchainReader.getBlockHeaderByHash _).expects(block2Chain1.hash).returns(Some(block2Chain1))
-        (blockchainReader.getBlockHeaderByHash _).expects(block1Chain1.hash).returns(Some(block1Chain1))
+        blockchainReader.getBlockHeaderByHash.expects(block2Chain1.hash).returns(Some(block2Chain1))
+        blockchainReader.getBlockHeaderByHash.expects(block1Chain1.hash).returns(Some(block1Chain1))
 
         ommersPool ! AddOmmers(
           block0,

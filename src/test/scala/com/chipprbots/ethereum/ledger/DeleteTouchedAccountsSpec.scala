@@ -16,7 +16,7 @@ import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm
 import com.chipprbots.ethereum.vm.EvmConfig
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class DeleteTouchedAccountsSpec extends AnyFlatSpec with Matchers {
 

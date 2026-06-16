@@ -14,10 +14,10 @@ import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.StateStorage
-import com.chipprbots.ethereum.domain._
-import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields._
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
 import com.chipprbots.ethereum.jsonrpc.FilterManager.TxLog
-import com.chipprbots.ethereum.ledger._
+import com.chipprbots.ethereum.ledger.*
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.rlp
@@ -132,7 +132,7 @@ class EthSimulateService(
 ) extends ResolveBlock
     with Logger {
 
-  import EthSimulateService._
+  import EthSimulateService.*
 
   implicit val bcConfig: BlockchainConfig = blockchainConfig
 
@@ -1018,7 +1018,7 @@ class EthSimulateService(
       blockHeader: BlockHeader,
       world: InMemoryWorldStateProxy
   ): InMemoryWorldStateProxy = {
-    import com.chipprbots.ethereum.ledger.BlockExecution._
+    import com.chipprbots.ethereum.ledger.BlockExecution.*
     blockHeader.parentBeaconBlockRoot match {
       case Some(beaconRoot) =>
         val timestamp = UInt256(blockHeader.unixTimestamp)
@@ -1044,7 +1044,7 @@ class EthSimulateService(
       blockHeader: BlockHeader,
       world: InMemoryWorldStateProxy
   ): InMemoryWorldStateProxy = {
-    import com.chipprbots.ethereum.ledger.BlockExecution._
+    import com.chipprbots.ethereum.ledger.BlockExecution.*
     val blockNumber = blockHeader.number
     // Deploy history storage contract if not already deployed
     val w1 = if (world.getCode(HistoryStorageAddress).isEmpty) {
@@ -1111,7 +1111,7 @@ class EthSimulateService(
     if (receipts.isEmpty) EmptyBloom
     else {
       val blooms = receipts.map(_.logsBloomFilter.toArray)
-      ByteString(ByteUtils.or(EmptyBloom.toArray +: blooms: _*))
+      ByteString(ByteUtils.or(EmptyBloom.toArray +: blooms*))
     }
 
   /** ABI-decode the string payload of an `Error(string)` revert (selector 0x08c379a0). Returns None for any other

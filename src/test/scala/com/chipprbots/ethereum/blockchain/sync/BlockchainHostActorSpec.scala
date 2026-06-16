@@ -6,7 +6,7 @@ import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.language.postfixOps
 
 import org.bouncycastle.util.encoders.Hex
@@ -15,7 +15,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.Timeouts
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
@@ -34,9 +34,9 @@ import com.chipprbots.ethereum.network.PeerManagerActor.FastSyncHostConfiguratio
 import com.chipprbots.ethereum.network.PeerManagerActor.PeerConfiguration
 import com.chipprbots.ethereum.network.p2p.messages.Codes
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetNodeData
-import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs._
+import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs.*
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NodeData
-import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs._
+import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs.*
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders
@@ -84,7 +84,7 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
         ETHPackets.Receipts68(
           BigInt(0),
           com.chipprbots.ethereum.rlp
-            .RLPList(receipts.map(rs => com.chipprbots.ethereum.rlp.RLPList(rs.map(_.toRLPEncodable): _*)): _*)
+            .RLPList(receipts.map(rs => com.chipprbots.ethereum.rlp.RLPList(rs.map(_.toRLPEncodable)*))*)
         ),
         peerId
       )

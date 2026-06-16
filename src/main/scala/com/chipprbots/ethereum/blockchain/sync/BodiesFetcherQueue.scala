@@ -23,7 +23,7 @@ import com.chipprbots.ethereum.utils.Logger
   */
 class BodiesFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[GetBlockBodies, BlockBodies] with Logger {
 
-  import BodiesFetcherQueue._
+  import BodiesFetcherQueue.*
 
   private val pendingQueue = mutable.Queue[ByteString]()
   private val inFlightMap = mutable.Map[PeerId, InFlightEntry]()

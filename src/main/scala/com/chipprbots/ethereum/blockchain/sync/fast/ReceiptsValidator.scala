@@ -9,8 +9,8 @@ import com.chipprbots.ethereum.domain.Receipt
 
 trait ReceiptsValidator {
 
-  import ReceiptsValidator._
-  import ReceiptsValidationResult._
+  import ReceiptsValidator.*
+  import ReceiptsValidationResult.*
 
   def blockchainReader: BlockchainReader
   def validators: Validators

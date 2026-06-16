@@ -7,8 +7,8 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Account
-import com.chipprbots.ethereum.mpt._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.mpt.*
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestMptStorage
 
 // ── K7: SNAP server byte-budget and time-budget limits (regression for commit 50cfb7ca8) ─────

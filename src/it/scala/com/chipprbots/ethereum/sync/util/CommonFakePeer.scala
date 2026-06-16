@@ -14,7 +14,7 @@ import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 
@@ -64,10 +64,10 @@ import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.RLPxConfigurat
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.nodebuilder.PruningConfigBuilder
 import com.chipprbots.ethereum.security.SecureRandomBuilder
-import com.chipprbots.ethereum.sync.util.SyncCommonItSpec._
-import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils._
+import com.chipprbots.ethereum.sync.util.SyncCommonItSpec.*
+import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils.*
 import com.chipprbots.ethereum.utils.ServerStatus.Listening
-import com.chipprbots.ethereum.utils._
+import com.chipprbots.ethereum.utils.*
 import com.chipprbots.ethereum.vm.EvmConfig
 
 abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCustomConfig)

@@ -5,8 +5,8 @@ import org.apache.pekko.util.ByteString
 import cats.effect.IO
 
 import org.json4s.JValue
-import org.json4s.JsonAST._
-import org.json4s.JsonDSL._
+import org.json4s.JsonAST.*
+import org.json4s.JsonDSL.*
 import org.json4s.jvalue2monadic
 
 import com.chipprbots.ethereum.consensus.mining.Mining
@@ -108,7 +108,7 @@ class TraceService(
     transactionMappingStorage: TransactionMappingStorage
 ) extends ResolveBlock {
 
-  import TraceService._
+  import TraceService.*
 
   implicit private val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
 

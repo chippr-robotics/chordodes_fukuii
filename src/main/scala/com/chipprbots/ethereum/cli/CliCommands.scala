@@ -9,7 +9,7 @@ import com.monovore.decline.Opts
 import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.crypto
-import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.crypto.*
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.keystore.EncryptedKey
 import com.chipprbots.ethereum.keystore.EncryptedKeyJsonCodec

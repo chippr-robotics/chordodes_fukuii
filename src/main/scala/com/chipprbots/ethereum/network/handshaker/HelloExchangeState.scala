@@ -17,7 +17,7 @@ case class HelloExchangeState(handshakerConfiguration: NetworkHandshakerConfigur
     extends InProgressState[PeerInfo]
     with Logger {
 
-  import handshakerConfiguration._
+  import handshakerConfiguration.*
 
   override def nextMessage: NextMessage = {
     log.debug("RLPx connection established, sending Hello")

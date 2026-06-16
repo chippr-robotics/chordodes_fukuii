@@ -20,7 +20,7 @@ import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class RestrictedEthashBlockHeaderValidatorSpec
     extends AnyFlatSpec

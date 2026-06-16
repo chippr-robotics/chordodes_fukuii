@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.rlp
 
-import scala.compiletime._
+import scala.compiletime.*
 import scala.deriving.Mirror
 import scala.reflect.ClassTag
 
@@ -127,7 +127,7 @@ object RLPDerivation {
           case _ =>
             throw RLPException(
               s"Unexpected items at the end of the RLPList: ${items.size} leftover items.",
-              RLPList(items: _*)
+              RLPList(items*)
             )
         }
       case _: (head *: tail) =>

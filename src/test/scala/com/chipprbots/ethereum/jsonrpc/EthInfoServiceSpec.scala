@@ -15,7 +15,7 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum._
+import com.chipprbots.ethereum.*
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
@@ -23,15 +23,15 @@ import com.chipprbots.ethereum.consensus.mining.MiningConfigs
 import com.chipprbots.ethereum.consensus.mining.TestMining
 import com.chipprbots.ethereum.consensus.pow.blocks.PoWBlockGenerator
 import com.chipprbots.ethereum.db.storage.AppStateStorage
-import com.chipprbots.ethereum.domain._
-import com.chipprbots.ethereum.jsonrpc.EthInfoService._
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.jsonrpc.EthInfoService.*
 import com.chipprbots.ethereum.keystore.KeyStore
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ledger.StxLedger
 import com.chipprbots.ethereum.ledger.TxResult
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.testing.ActorsTesting.simpleAutoPilot
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class EthServiceSpec
     extends TestKit(ActorSystem("EthInfoServiceSpec_ActorSystem"))
@@ -116,7 +116,7 @@ class EthServiceSpec
     )
 
     val txResult: TxResult = TxResult(worldStateProxy, 123, Nil, ByteString("return_value"), None)
-    (stxLedger.simulateTransaction _).expects(*, *, *).returning(txResult)
+    stxLedger.simulateTransaction.expects(*, *, *).returning(txResult)
 
     val tx: CallTx = CallTx(
       Some(ByteString(Hex.decode("da714fe079751fa7a1ad80b76571ea6ec52a446c"))),
@@ -147,10 +147,10 @@ class EthServiceSpec
       ethCompatibleStorage = true
     )
     val nonRevertResult: TxResult = TxResult(worldStateProxy, 123, Nil, ByteString.empty, None)
-    (stxLedger.simulateTransaction _).expects(*, *, *).returning(nonRevertResult)
+    stxLedger.simulateTransaction.expects(*, *, *).returning(nonRevertResult)
 
     val estimatedGas: BigInt = BigInt(123)
-    (stxLedger.binarySearchGasEstimation _).expects(*, *, *).returning(estimatedGas)
+    stxLedger.binarySearchGasEstimation.expects(*, *, *).returning(estimatedGas)
 
     val tx: CallTx = CallTx(
       Some(ByteString(Hex.decode("da714fe079751fa7a1ad80b76571ea6ec52a446c"))),

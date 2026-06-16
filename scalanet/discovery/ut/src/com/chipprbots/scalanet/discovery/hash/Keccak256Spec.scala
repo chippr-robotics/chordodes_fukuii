@@ -2,7 +2,7 @@ package com.chipprbots.scalanet.discovery.hash
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import scodec.bits._
+import scodec.bits.*
 
 class Keccak256Spec extends AnyFlatSpec with Matchers {
   behavior of "Keccak256"

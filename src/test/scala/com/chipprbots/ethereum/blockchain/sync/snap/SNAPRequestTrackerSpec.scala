@@ -8,14 +8,14 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.blockchain.sync.PeerRateTracker
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.network.Peer
-import com.chipprbots.ethereum.network.p2p.messages.SNAP._
-import com.chipprbots.ethereum.testing.Tags._
-import com.chipprbots.ethereum.testing.PeerTestHelpers._
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.PeerTestHelpers.*
 
 class SNAPRequestTrackerSpec
     extends TestKit(ActorSystem("SNAPRequestTrackerSpec"))

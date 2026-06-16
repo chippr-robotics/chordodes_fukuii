@@ -9,9 +9,9 @@ import org.json4s.JsonAST.JNull
 import org.json4s.JsonAST.JObject
 import org.json4s.JsonAST.JString
 import org.json4s.JsonAST.JValue
-import org.json4s.JsonDSL._
+import org.json4s.JsonDSL.*
 
-import com.chipprbots.ethereum.jsonrpc.AdminService._
+import com.chipprbots.ethereum.jsonrpc.AdminService.*
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError.InvalidParams
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonEncoder
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder

@@ -21,7 +21,7 @@ class BlockBroadcasterActor(
 ) extends Actor
     with ActorLogging
     with PeerListSupportNg {
-  import BlockBroadcasterActor._
+  import BlockBroadcasterActor.*
 
   override def receive: Receive = handlePeerListMessages.orElse(handleBroadcastMessages)
 

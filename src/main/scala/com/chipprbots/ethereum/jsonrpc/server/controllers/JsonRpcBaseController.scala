@@ -8,7 +8,7 @@ import scala.collection.immutable.ArraySeq
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 
-import com.typesafe.config.{Config => TypesafeConfig}
+import com.typesafe.config.Config as TypesafeConfig
 import org.json4s.DefaultFormats
 import org.json4s.JNull
 import org.json4s.native
@@ -35,7 +35,7 @@ trait ApisBase {
 trait JsonRpcBaseController {
   self: ApisBase with Logger =>
 
-  import JsonRpcBaseController._
+  import JsonRpcBaseController.*
 
   val config: JsonRpcConfig
   implicit def executionContext: ExecutionContext = scala.concurrent.ExecutionContext.global
@@ -129,7 +129,7 @@ object JsonRpcBaseController {
 
   object JsonRpcConfig {
     def apply(fukuiiConfig: TypesafeConfig, availableApis: List[String]): JsonRpcConfig = {
-      import scala.concurrent.duration._
+      import scala.concurrent.duration.*
       val rpcConfig = fukuiiConfig.getConfig("network.rpc")
 
       new JsonRpcConfig {

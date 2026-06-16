@@ -5,8 +5,8 @@ import org.apache.pekko.util.ByteString
 import scodec.bits.ByteVector
 
 import com.chipprbots.ethereum.forkid.{Connect, ForkId, ForkIdValidator}
-import com.chipprbots.ethereum.forkid.ForkId._
-import com.chipprbots.ethereum.rlp._
+import com.chipprbots.ethereum.forkid.ForkId.*
+import com.chipprbots.ethereum.rlp.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.scalanet.discovery.ethereum.EthereumNodeRecord
 import com.chipprbots.scalanet.discovery.ethereum.KeyValueTag

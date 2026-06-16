@@ -7,7 +7,7 @@ import org.apache.pekko.http.scaladsl.Http
 import scala.util.Failure
 import scala.util.Success
 
-import com.chipprbots.ethereum.jsonrpc._
+import com.chipprbots.ethereum.jsonrpc.*
 import com.chipprbots.ethereum.jsonrpc.graphql.GraphQLService
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController
 import com.chipprbots.ethereum.jsonrpc.server.http.JsonRpcHttpServer.JsonRpcHttpServerConfig

@@ -12,7 +12,7 @@ import com.chipprbots.ethereum.utils.ByteUtils
 trait AuthInitiateEcdsaCodec {
 
   def encodeECDSA(sig: ECDSASignature): ByteString = {
-    import sig._
+    import sig.*
 
     val recoveryId: Byte = (v - 27).toByte
 

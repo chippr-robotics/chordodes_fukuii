@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.jsonrpc.mcp
 
-import org.json4s.JsonAST._
-import org.json4s.JsonDSL._
+import org.json4s.JsonAST.*
+import org.json4s.JsonDSL.*
 
 /** Node health check prompt for MCP. Guides users through a comprehensive health check.
   */

@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.crypto.zksnark
 import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.crypto.zksnark.BN128.Point
-import com.chipprbots.ethereum.crypto.zksnark.FiniteField.Ops._
+import com.chipprbots.ethereum.crypto.zksnark.FiniteField.Ops.*
 
 /** Barreto–Naehrig curve over some finite field Curve equation: Y^2^ = X^3^ + b, where "b" is a constant number
   * belonging to corresponding specific field
@@ -187,7 +187,7 @@ object BN128 {
 
   case class BN128G2(p: Point[Fp2])
   object BN128G2 {
-    import BN128Fp2._
+    import BN128Fp2.*
 
     /** "r" order of cyclic subgroup
       */

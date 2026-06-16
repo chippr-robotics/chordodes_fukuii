@@ -9,14 +9,14 @@ import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.consensus.blocks.PendingBlockAndState
 import com.chipprbots.ethereum.consensus.mining.wrongMiningArgument
 import com.chipprbots.ethereum.consensus.pow.PoWBlockCreator
 import com.chipprbots.ethereum.consensus.pow.PoWMining
-import com.chipprbots.ethereum.consensus.pow.miners.MinerProtocol._
+import com.chipprbots.ethereum.consensus.pow.miners.MinerProtocol.*
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MineBlock
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MineBlocks
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerProtocol
@@ -39,7 +39,7 @@ class MockedMiner(
     configBuilder: BlockchainConfigBuilder
 ) extends Actor
     with ActorLogging {
-  import configBuilder._
+  import configBuilder.*
   import org.apache.pekko.pattern.pipe
   // CE3: Using global IORuntime for actor operations
   implicit val scheduler: IORuntime = IORuntime.global

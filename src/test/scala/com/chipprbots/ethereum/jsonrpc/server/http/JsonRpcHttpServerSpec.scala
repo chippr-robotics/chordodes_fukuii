@@ -4,8 +4,8 @@ import java.net.InetAddress
 import java.util.concurrent.TimeUnit
 
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.http.scaladsl.model._
-import org.apache.pekko.http.scaladsl.model.headers._
+import org.apache.pekko.http.scaladsl.model.*
+import org.apache.pekko.http.scaladsl.model.headers.*
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.http.scaladsl.testkit.ScalatestRouteTest
 import org.apache.pekko.util.ByteString
@@ -21,18 +21,18 @@ import org.json4s.JsonAST.JInt
 import org.json4s.JsonAST.JNothing
 import org.json4s.JsonAST.JString
 import org.json4s.native.JsonMethods
-import org.json4s.native.JsonMethods._
+import org.json4s.native.JsonMethods.*
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.healthcheck.HealthcheckResponse
 import com.chipprbots.ethereum.healthcheck.HealthcheckResult
-import com.chipprbots.ethereum.jsonrpc._
+import com.chipprbots.ethereum.jsonrpc.*
 import com.chipprbots.ethereum.jsonrpc.server.controllers.ApisBase
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
 import com.chipprbots.ethereum.jsonrpc.server.http.JsonRpcHttpServer.JsonRpcHttpServerConfig
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.jsonrpc.server.http.JsonRpcHttpServer.RateLimitConfig
 import com.chipprbots.ethereum.utils.BuildInfo
 import com.chipprbots.ethereum.utils.Logger
@@ -58,13 +58,13 @@ class JsonRpcHttpServerSpec
     with ScalatestRouteTest
     with org.scalamock.scalatest.MockFactory {
 
-  import JsonRpcHttpServerSpec._
+  import JsonRpcHttpServerSpec.*
 
   // Provide implicit MockFactory reference for TestSetup instances
   implicit val mockFactoryInstance: org.scalamock.scalatest.MockFactory = this
 
   it should "respond to healthcheck" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    (mockJsonRpcHealthChecker.healthCheck _)
+    mockJsonRpcHealthChecker.healthCheck
       .expects()
       .returning(IO.pure(HealthcheckResponse(List(HealthcheckResult.ok("peerCount", Some("2"))))))
 
@@ -84,7 +84,7 @@ class JsonRpcHttpServerSpec
     UnitTest,
     RPCTest
   ) in new TestSetup {
-    (mockJsonRpcHealthChecker.healthCheck _)
+    mockJsonRpcHealthChecker.healthCheck
       .expects()
       .returning(
         IO.pure(
@@ -127,7 +127,7 @@ class JsonRpcHttpServerSpec
   }
 
   it should "pass valid json request to controller" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    (mockJsonRpcController.handleRequest _)
+    mockJsonRpcController.handleRequest
       .expects(*)
       .returning(IO.pure(jsonRpcResponseSuccessful))
 
@@ -144,7 +144,7 @@ class JsonRpcHttpServerSpec
   }
 
   it should "pass valid batch json request to controller" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    (mockJsonRpcController.handleRequest _)
+    mockJsonRpcController.handleRequest
       .expects(*)
       .twice()
       .returning(IO.pure(jsonRpcResponseSuccessful))
@@ -186,7 +186,7 @@ class JsonRpcHttpServerSpec
 
   it should "accept CORS Requests" taggedAs (UnitTest, RPCTest) in new TestSetup {
 
-    (mockJsonRpcController.handleRequest _)
+    mockJsonRpcController.handleRequest
       .expects(*)
       .returning(IO.pure(jsonRpcResponseSuccessful))
 
@@ -206,7 +206,7 @@ class JsonRpcHttpServerSpec
     UnitTest,
     RPCTest
   ) in new TestSetup {
-    (mockJsonRpcController.handleRequest _)
+    mockJsonRpcController.handleRequest
       .expects(*)
       .returning(IO.pure(jsonRpcResponseSuccessful))
 
@@ -223,7 +223,7 @@ class JsonRpcHttpServerSpec
   }
 
   it should "return too many requests error with ip-restriction enabled and two requests executed taggedAs (UnitTest, RPCTest) in a row" in new TestSetup {
-    (mockJsonRpcController.handleRequest _)
+    mockJsonRpcController.handleRequest
       .expects(*)
       .returning(IO.pure(jsonRpcResponseSuccessful))
 
@@ -261,7 +261,7 @@ class JsonRpcHttpServerSpec
     UnitTest,
     RPCTest
   ) in new TestSetup {
-    (mockJsonRpcController.handleRequest _)
+    mockJsonRpcController.handleRequest
       .expects(*)
       .twice()
       .returning(IO.pure(jsonRpcResponseSuccessful))
@@ -295,7 +295,7 @@ class JsonRpcHttpServerSpec
     UnitTest,
     RPCTest
   ) in new TestSetup {
-    (mockJsonRpcController.handleRequest _)
+    mockJsonRpcController.handleRequest
       .expects(*)
       .twice()
       .returning(IO.pure(jsonRpcResponseSuccessful))
@@ -329,7 +329,7 @@ class JsonRpcHttpServerSpec
 
   it should "return status code OK when throw LogicError" taggedAs (UnitTest, RPCTest) in new TestSetup {
     val jsonRpcError = JsonRpcError.LogicError("Faucet error: Connection not established")
-    (mockJsonRpcController.handleRequest _)
+    mockJsonRpcController.handleRequest
       .expects(*)
       .returning(
         IO.pure(
@@ -358,7 +358,7 @@ class JsonRpcHttpServerSpec
     UnitTest,
     RPCTest
   ) in new TestSetup {
-    (mockJsonRpcController.handleRequest _)
+    mockJsonRpcController.handleRequest
       .expects(*)
       .returning(
         IO.pure(
@@ -390,7 +390,7 @@ class JsonRpcHttpServerSpec
   }
 
   it should "return status code BadRequest when parser request failure" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    (mockJsonRpcController.handleRequest _)
+    mockJsonRpcController.handleRequest
       .expects(*)
       .returning(
         IO.pure(
@@ -422,7 +422,7 @@ class JsonRpcHttpServerSpec
     RPCTest
   ) in new TestSetup {
     val error = JsonRpcError.InvalidParams()
-    (mockJsonRpcController.handleRequest _)
+    mockJsonRpcController.handleRequest
       .expects(*)
       .returning(
         IO.pure(
@@ -517,8 +517,8 @@ class JsonRpcHttpServerSpec
 }
 
 object JsonRpcHttpServerSpec extends JsonMethodsImplicits {
-  import org.json4s._
-  import org.json4s.native.JsonMethods._
+  import org.json4s.*
+  import org.json4s.native.JsonMethods.*
 
   private def parserJsonRpcError(jsonRpcError: JValue): JsonRpcError = {
     val code = (jsonRpcError \ "code").extract[Int]

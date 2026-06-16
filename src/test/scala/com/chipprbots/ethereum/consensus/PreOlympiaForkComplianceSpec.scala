@@ -9,7 +9,7 @@ import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EtcForks
 import com.chipprbots.ethereum.vm.EvmConfig
 import com.chipprbots.ethereum.vm.FeeSchedule
 import com.chipprbots.ethereum.vm.PUSH0
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 // scalastyle:off magic.number
 /** Verifies that each pre-Olympia ETC fork selects the correct EVM configuration (fee schedule, opcode list, and EIP

@@ -4,9 +4,9 @@ import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage.Code
-import com.chipprbots.ethereum.db.storage._
+import com.chipprbots.ethereum.db.storage.*
 import com.chipprbots.ethereum.domain
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.rlp
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
@@ -19,7 +19,7 @@ import com.chipprbots.ethereum.vm.WorldStateProxy
 
 object InMemoryWorldStateProxy {
 
-  import Account._
+  import Account.*
 
   def apply(
       evmCodeStorage: EvmCodeStorage,
@@ -106,7 +106,7 @@ object InMemoryWorldStateProxy {
     def persistAccountsStateTrie(worldState: InMemoryWorldStateProxy): InMemoryWorldStateProxy =
       worldState.copyWith(accountsStateTrie = worldState.accountsStateTrie.persist())
 
-    (persistCode _).andThen(persistContractStorage).andThen(persistAccountsStateTrie)(worldState)
+    persistCode.andThen(persistContractStorage).andThen(persistAccountsStateTrie)(worldState)
   }
 
   /** Returns an [[InMemorySimpleMapProxy]] of the accounts state trie "The world state (state), is a mapping between

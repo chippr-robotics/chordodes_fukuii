@@ -11,8 +11,8 @@ import org.bouncycastle.util.encoders.Hex
 import org.json4s.DefaultFormats
 import org.json4s.Extraction
 import org.json4s.Formats
-import org.json4s.JsonAST._
-import org.json4s.JsonDSL._
+import org.json4s.JsonAST.*
+import org.json4s.JsonDSL.*
 import org.json4s.jvalue2monadic
 import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.ScalaFutures
@@ -27,14 +27,14 @@ import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
 import com.chipprbots.ethereum.consensus.blocks.PendingBlock
 import com.chipprbots.ethereum.consensus.blocks.PendingBlockAndState
 import com.chipprbots.ethereum.crypto.kec256
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.jsonrpc.EthBlocksService.GetUncleCountByBlockHashResponse
 import com.chipprbots.ethereum.jsonrpc.EthBlocksService.GetUncleCountByBlockNumberResponse
-import com.chipprbots.ethereum.jsonrpc.EthFilterService._
-import com.chipprbots.ethereum.jsonrpc.EthInfoService._
-import com.chipprbots.ethereum.jsonrpc.EthUserService._
+import com.chipprbots.ethereum.jsonrpc.EthFilterService.*
+import com.chipprbots.ethereum.jsonrpc.EthInfoService.*
+import com.chipprbots.ethereum.jsonrpc.EthUserService.*
 import com.chipprbots.ethereum.jsonrpc.FilterManager.LogFilterLogs
-import com.chipprbots.ethereum.jsonrpc.PersonalService._
+import com.chipprbots.ethereum.jsonrpc.PersonalService.*
 import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofRequest
 import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofResponse
 import com.chipprbots.ethereum.jsonrpc.ProofService.ProofAccount
@@ -46,7 +46,7 @@ import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers.Unformatted
 import com.chipprbots.ethereum.ommers.OmmersPool
 import com.chipprbots.ethereum.ommers.OmmersPool.Ommers
 import com.chipprbots.ethereum.testing.ActorsTesting.simpleAutoPilot
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import org.scalatest.prop.TableFor1
 
@@ -396,7 +396,7 @@ class JsonRpcControllerEthSpec
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethInfoService = mockEthInfoService)
 
-    (mockEthInfoService.call _).expects(*).returning(IO.pure(Right(CallResponse(ByteString("asd")))))
+    mockEthInfoService.call.expects(*).returning(IO.pure(Right(CallResponse(ByteString("asd")))))
 
     val json: List[JValue] = List(
       JObject(
@@ -420,7 +420,7 @@ class JsonRpcControllerEthSpec
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethInfoService = mockEthInfoService)
 
-    (mockEthInfoService.estimateGas _)
+    mockEthInfoService.estimateGas
       .expects(*)
       .anyNumberOfTimes()
       .returning(IO.pure(Right(EstimateGasResponse(2310))))
@@ -456,7 +456,7 @@ class JsonRpcControllerEthSpec
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethUserService = mockEthUserService)
 
-    (mockEthUserService.getCode _)
+    mockEthUserService.getCode
       .expects(*)
       .returning(IO.pure(Right(GetCodeResponse(ByteString(Hex.decode("FFAA22"))))))
 
@@ -525,7 +525,7 @@ class JsonRpcControllerEthSpec
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethUserService = mockEthUserService)
 
-    (mockEthUserService.getBalance _)
+    mockEthUserService.getBalance
       .expects(*)
       .returning(IO.pure(Right(GetBalanceResponse(17))))
 
@@ -552,7 +552,7 @@ class JsonRpcControllerEthSpec
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethUserService = mockEthUserService)
 
-    (mockEthUserService.getBalance _)
+    mockEthUserService.getBalance
       .expects(*)
       .returning(IO.pure(Left(JsonRpcError.NodeNotFound)))
 
@@ -573,7 +573,7 @@ class JsonRpcControllerEthSpec
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethUserService = mockEthUserService)
 
-    (mockEthUserService.getStorageAt _)
+    mockEthUserService.getStorageAt
       .expects(*)
       .returning(IO.pure(Right(GetStorageAtResponse(ByteString("response")))))
 
@@ -617,7 +617,7 @@ class JsonRpcControllerEthSpec
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethFilterService = mockEthFilterService)
 
-    (mockEthFilterService.newFilter _)
+    mockEthFilterService.newFilter
       .expects(*)
       .returning(IO.pure(Right(NewFilterResponse(123))))
 
@@ -642,7 +642,7 @@ class JsonRpcControllerEthSpec
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethFilterService = mockEthFilterService)
 
-    (mockEthFilterService.newBlockFilter _)
+    mockEthFilterService.newBlockFilter
       .expects(*)
       .returning(IO.pure(Right(NewFilterResponse(999))))
 
@@ -662,7 +662,7 @@ class JsonRpcControllerEthSpec
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethFilterService = mockEthFilterService)
 
-    (mockEthFilterService.newPendingTransactionFilter _)
+    mockEthFilterService.newPendingTransactionFilter
       .expects(*)
       .returning(IO.pure(Right(NewFilterResponse(2))))
 
@@ -680,7 +680,7 @@ class JsonRpcControllerEthSpec
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethFilterService = mockEthFilterService)
 
-    (mockEthFilterService.uninstallFilter _)
+    mockEthFilterService.uninstallFilter
       .expects(*)
       .returning(IO.pure(Right(UninstallFilterResponse(true))))
 
@@ -698,7 +698,7 @@ class JsonRpcControllerEthSpec
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethFilterService = mockEthFilterService)
 
-    (mockEthFilterService.getFilterChanges _)
+    mockEthFilterService.getFilterChanges
       .expects(*)
       .returning(
         IO.pure(
@@ -799,7 +799,7 @@ class JsonRpcControllerEthSpec
     // setup
     val mockEthProofService = mock[EthProofService]
     override val jsonRpcController: JsonRpcController = super.jsonRpcController.copy(proofService = mockEthProofService)
-    (mockEthProofService.getProof _)
+    mockEthProofService.getProof
       .expects(expectedDecodedRequest)
       .returning(IO.pure(Right(expectedEncodedResponse)))
 
@@ -844,7 +844,7 @@ class JsonRpcControllerEthSpec
     val mockEthProofService = mock[EthProofService]
     override val jsonRpcController: JsonRpcController = super.jsonRpcController.copy(proofService = mockEthProofService)
 
-    (mockEthProofService.getProof _)
+    mockEthProofService.getProof
       .expects(*)
       .returning(IO.pure(Left(JsonRpcError.NodeNotFound)))
 
@@ -867,7 +867,7 @@ class JsonRpcControllerEthSpec
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethFilterService = mockEthFilterService)
 
-    (mockEthFilterService.getFilterLogs _)
+    mockEthFilterService.getFilterLogs
       .expects(*)
       .returning(
         IO.pure(
@@ -897,7 +897,7 @@ class JsonRpcControllerEthSpec
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethFilterService = mockEthFilterService)
 
-    (mockEthFilterService.getLogs _)
+    mockEthFilterService.getLogs
       .expects(*)
       .returning(
         IO.pure(

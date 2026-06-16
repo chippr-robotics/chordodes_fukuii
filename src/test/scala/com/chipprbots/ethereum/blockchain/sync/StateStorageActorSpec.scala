@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.blockchain.sync
 
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.pattern._
+import org.apache.pekko.pattern.*
 import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestKit
 
@@ -12,7 +12,7 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.NormalPatience
 import com.chipprbots.ethereum.WithActorSystemShutDown
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSync.SyncState
 import com.chipprbots.ethereum.blockchain.sync.fast.StateStorageActor
 import com.chipprbots.ethereum.blockchain.sync.fast.StateStorageActor.GetStorage

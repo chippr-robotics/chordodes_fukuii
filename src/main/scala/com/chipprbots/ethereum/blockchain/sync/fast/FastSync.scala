@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.blockchain.sync.fast
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
-import org.apache.pekko.actor._
+import org.apache.pekko.actor.*
 import org.apache.pekko.util.ByteString
 
 import cats.data.NonEmptyList
@@ -12,18 +12,18 @@ import cats.implicits.*
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Random
 
 import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.domain.appstate.BlockInfo
-import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason._
-import com.chipprbots.ethereum.blockchain.sync.Blacklist._
+import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason.*
+import com.chipprbots.ethereum.blockchain.sync.Blacklist.*
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
 import com.chipprbots.ethereum.blockchain.sync.PeerRequestHandler.ResponseReceived
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
-import com.chipprbots.ethereum.blockchain.sync._
+import com.chipprbots.ethereum.blockchain.sync.*
 import com.chipprbots.ethereum.blockchain.sync.PeerRateTracker
 import com.chipprbots.ethereum.blockchain.sync.fast.ReceiptsValidator.ReceiptsValidationResult
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncBlocksValidator.BlockBodyValidationResult
@@ -38,7 +38,7 @@ import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.FastSyncStateStorage
 import com.chipprbots.ethereum.db.storage.NodeStorage
 import com.chipprbots.ethereum.db.storage.StateStorage
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.Peer
@@ -73,9 +73,9 @@ class FastSync(
     with ReceiptsValidator
     with SyncBlocksValidator {
 
-  import configBuilder._
-  import FastSync._
-  import syncConfig._
+  import configBuilder.*
+  import FastSync.*
+  import syncConfig.*
 
   val syncController: ActorRef = context.parent
 
@@ -362,8 +362,8 @@ class FastSync(
         //   RLPValue(typeByte || rlp(payload))
         // so we must expand them before calling toTypedRLPEncodables/toReceipt.
         val receipts: Seq[Seq[Receipt]] = {
-          import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs._
-          import ETHPackets.TypedTransaction._
+          import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs.*
+          import ETHPackets.TypedTransaction.*
           import com.chipprbots.ethereum.rlp.{RLPEncodeable, RLPException, RLPValue, rawDecode}
 
           def expandTypedReceipts(items: Seq[RLPEncodeable]): Seq[RLPEncodeable] =
@@ -609,7 +609,7 @@ class FastSync(
     }
 
     private def updateValidationState(header: BlockHeader): Unit = {
-      import syncConfig.{fastSyncBlockValidationK => K, fastSyncBlockValidationX => X}
+      import syncConfig.{fastSyncBlockValidationK as K, fastSyncBlockValidationX as X}
       syncState = syncState.updateNextBlockToValidate(header, K, X)
     }
 

@@ -10,7 +10,7 @@ import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.Await
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.typesafe.config.ConfigFactory
 import org.bouncycastle.util.encoders.Hex
@@ -23,7 +23,7 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.Mocks
 import com.chipprbots.ethereum.LongPatience
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSync.SyncState
 import com.chipprbots.ethereum.consensus.mining.GetBlockHeaderByHash
 import com.chipprbots.ethereum.consensus.mining.TestMining
@@ -33,7 +33,7 @@ import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderPoWEr
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValidator
 import com.chipprbots.ethereum.consensus.validators.Validators
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.ledger.VMImpl
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers
@@ -42,9 +42,9 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPe
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{BlockBodies, GetBlockBodies}
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockBodies.GetBlockBodiesEnc
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{GetBlockHeaders => ETH62GetBlockHeaders}
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{GetReceipts => ETH63GetReceipts}
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{NodeData => ETH63NodeData}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders as ETH62GetBlockHeaders
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetReceipts as ETH63GetReceipts
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NodeData as ETH63NodeData
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config.SyncConfig
@@ -62,7 +62,7 @@ class SyncControllerSpec
     UnitTest,
     SyncTest
   ) in withTestSetup() { testSetup =>
-    import testSetup._
+    import testSetup.*
     syncController ! SyncProtocol.Start
 
     val handshakedPeers = HandshakedPeers(twoAcceptedPeers)
@@ -81,7 +81,7 @@ class SyncControllerSpec
     UnitTest,
     SyncTest
   ) in withTestSetup() { testSetup =>
-    import testSetup._
+    import testSetup.*
     startWithState(defaultStateBeforeNodeRestart)
 
     syncController ! SyncProtocol.Start
@@ -110,7 +110,7 @@ class SyncControllerSpec
     UnitTest,
     SyncTest
   ) in withTestSetup() { testSetup =>
-    import testSetup._
+    import testSetup.*
     startWithState(defaultStateBeforeNodeRestart)
 
     syncController ! SyncProtocol.Start
@@ -156,7 +156,7 @@ class SyncControllerSpec
       }
     }
   ) { testSetup =>
-    import testSetup._
+    import testSetup.*
     startWithState(
       defaultStateBeforeNodeRestart.copy(nextBlockToFullyValidate =
         defaultStateBeforeNodeRestart.bestBlockHeaderNumber + 1
@@ -209,7 +209,7 @@ class SyncControllerSpec
       }
     }
   ) { testSetup =>
-    import testSetup._
+    import testSetup.*
     startWithState(defaultStateBeforeNodeRestart)
 
     syncController ! SyncProtocol.Start
@@ -240,7 +240,7 @@ class SyncControllerSpec
 
   it should "not change best block after receiving faraway block" taggedAs DisabledTest in withTestSetup() {
     testSetup =>
-      import testSetup._
+      import testSetup.*
 
       startWithState(defaultStateBeforeNodeRestart)
 
@@ -295,7 +295,7 @@ class SyncControllerSpec
       }
     }
   ) { testSetup =>
-    import testSetup._
+    import testSetup.*
     startWithState(defaultStateBeforeNodeRestart)
 
     syncController ! SyncProtocol.Start
@@ -337,7 +337,7 @@ class SyncControllerSpec
   }
 
   it should "not process, out of date new pivot block" taggedAs (UnitTest, SyncTest) in withTestSetup() { testSetup =>
-    import testSetup._
+    import testSetup.*
     startWithState(defaultStateBeforeNodeRestart)
     syncController ! SyncProtocol.Start
 
@@ -382,7 +382,7 @@ class SyncControllerSpec
     SyncTest,
     FlakyTest
   ) in withTestSetup() { testSetup =>
-    import testSetup._
+    import testSetup.*
     startWithState(defaultStateBeforeNodeRestart)
     syncController ! SyncProtocol.Start
 
@@ -431,7 +431,7 @@ class SyncControllerSpec
 
   it should "re-enqueue block bodies when empty response is received" taggedAs DisabledTest in withTestSetup() {
     testSetup =>
-      import testSetup._
+      import testSetup.*
 
       startWithState(defaultStateBeforeNodeRestart)
 
@@ -467,7 +467,7 @@ class SyncControllerSpec
     SyncTest,
     FlakyTest
   ) in withTestSetup() { testSetup =>
-    import testSetup._
+    import testSetup.*
     startWithState(defaultStateBeforeNodeRestart)
 
     syncController ! SyncProtocol.Start
@@ -552,7 +552,7 @@ class SyncControllerSpec
     UnitTest,
     SyncTest
   ) in withRecoveryTestSetup() { testSetup =>
-    import testSetup._
+    import testSetup.*
     seedSnapDoneWithRecovery(storagesInstance.storages.appStateStorage)
 
     syncController ! SyncProtocol.Start
@@ -569,7 +569,7 @@ class SyncControllerSpec
     UnitTest,
     SyncTest
   ) in withRecoveryTestSetup() { testSetup =>
-    import testSetup._
+    import testSetup.*
     seedSnapDoneWithRecovery(storagesInstance.storages.appStateStorage, needStorage = false)
 
     syncController ! SyncProtocol.Start
@@ -585,7 +585,7 @@ class SyncControllerSpec
     UnitTest,
     SyncTest
   ) in withRecoveryTestSetup() { testSetup =>
-    import testSetup._
+    import testSetup.*
     seedSnapDoneWithRecovery(storagesInstance.storages.appStateStorage, needBytecode = false)
 
     syncController ! SyncProtocol.Start
@@ -601,7 +601,7 @@ class SyncControllerSpec
     UnitTest,
     SyncTest
   ) in withRecoveryTestSetup() { testSetup =>
-    import testSetup._
+    import testSetup.*
     // snap done but no stateRoot/pivotBlock stored → startRecovery falls to case _ => and calls startRegularSync
     seedSnapDoneWithRecovery(
       storagesInstance.storages.appStateStorage,
@@ -635,7 +635,7 @@ class SyncControllerSpec
     UnitTest,
     SyncTest
   ) in withRecoveryTestSetup() { testSetup =>
-    import testSetup._
+    import testSetup.*
     val pivotNum = BigInt(100)
     val rootA = ByteString(Array.fill[Byte](32)(0x11)) // stored in pivot header
     val rootB = ByteString(Array.fill[Byte](32)(0x22)) // snapSyncStateRoot — differs from rootA
@@ -665,7 +665,7 @@ class SyncControllerSpec
     UnitTest,
     SyncTest
   ) in withRecoveryTestSetup() { testSetup =>
-    import testSetup._
+    import testSetup.*
     val pivotNum = BigInt(100)
     val rootA = ByteString(Array.fill[Byte](32)(0x33)) // stored in pivot header, NOT in MPT
     val rootB = ByteString(Array.fill[Byte](32)(0x44)) // finalizedRoot, present in MPT
@@ -694,7 +694,7 @@ class SyncControllerSpec
     UnitTest,
     SyncTest
   ) in withRecoveryTestSetup() { testSetup =>
-    import testSetup._
+    import testSetup.*
     // No snapSyncDone → start() → case (false, _, true, _) → startSnapSync()
     syncController ! SyncProtocol.Start
 
@@ -724,7 +724,7 @@ class SyncControllerSpec
     UnitTest,
     SyncTest
   ) in withTestSetup() { testSetup =>
-    import testSetup._
+    import testSetup.*
     // doFastSync=true, doSnapSync=false; pre-set fastSyncDone → case (_, true, false, true) → startRegularSync()
     storagesInstance.storages.appStateStorage.fastSyncDone().commit()
 
@@ -881,7 +881,7 @@ class SyncControllerSpec
             } else {
               val rec = msg.underlyingMsg.blockHashes.flatMap(h => blockchainData.receipts.get(h))
               // For empty receipts, create an RLPList with empty receipt sequences
-              val receiptsRlp = RLPList(rec.map(_ => RLPList()): _*)
+              val receiptsRlp = RLPList(rec.map(_ => RLPList())*)
               sender ! MessageFromPeer(ETHPackets.Receipts68(requestId, receiptsRlp), peer)
               this
             }

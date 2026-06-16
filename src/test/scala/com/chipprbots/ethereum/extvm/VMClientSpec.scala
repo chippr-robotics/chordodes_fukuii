@@ -17,7 +17,7 @@ import com.chipprbots.ethereum.extvm.msg.CallResult
 import com.chipprbots.ethereum.extvm.msg.VMQuery
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
 import com.chipprbots.ethereum.utils.VmConfig
-import com.chipprbots.ethereum.vm._
+import com.chipprbots.ethereum.vm.*
 import com.chipprbots.ethereum.vm.utils.MockVmInput
 import com.chipprbots.ethereum.extvm.msg.BlockHeader
 import com.chipprbots.ethereum.extvm.msg.CallContext
@@ -29,12 +29,12 @@ import com.chipprbots.ethereum.extvm.msg.Code
 import com.chipprbots.ethereum.extvm.msg.GetBlockhash
 import com.chipprbots.ethereum.extvm.msg.Blockhash
 import com.chipprbots.ethereum.extvm.msg.Hello
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class VMClientSpec extends AnyFlatSpec with Matchers with MockFactory {
 
-  import com.chipprbots.ethereum.Fixtures.Blocks._
-  import Implicits._
+  import com.chipprbots.ethereum.Fixtures.Blocks.*
+  import Implicits.*
 
   "VMClient" should "handle call context and result" taggedAs (UnitTest, VMTest) in new TestSetup {
     val programContext: ProgramContext[MockWorldState, MockStorage] =
@@ -60,7 +60,7 @@ class VMClientSpec extends AnyFlatSpec with Matchers with MockFactory {
     )
 
     inSequence {
-      (messageHandler.sendMessage _).expects(expectedCallContextMsg)
+      messageHandler.sendMessage.expects(expectedCallContextMsg)
       (messageHandler.awaitMessage(_: GeneratedMessageCompanion[msg.VMQuery])).expects(*).returns(resultQueryMsg)
     }
 
@@ -92,7 +92,7 @@ class VMClientSpec extends AnyFlatSpec with Matchers with MockFactory {
     inSequence {
       (messageHandler.sendMessage(_: msg.CallContext)).expects(*)
       (messageHandler.awaitMessage(_: GeneratedMessageCompanion[msg.VMQuery])).expects(*).returns(accountQueryMsg)
-      (messageHandler.sendMessage _).expects(expectedAccountResponseMsg)
+      messageHandler.sendMessage.expects(expectedAccountResponseMsg)
       (messageHandler.awaitMessage(_: GeneratedMessageCompanion[msg.VMQuery])).expects(*).returns(resultQueryMsg)
     }
 
@@ -118,7 +118,7 @@ class VMClientSpec extends AnyFlatSpec with Matchers with MockFactory {
     inSequence {
       (messageHandler.sendMessage(_: msg.CallContext)).expects(*)
       (messageHandler.awaitMessage(_: GeneratedMessageCompanion[msg.VMQuery])).expects(*).returns(storageQueryMsg)
-      (messageHandler.sendMessage _).expects(expectedStorageDataResponseMsg)
+      messageHandler.sendMessage.expects(expectedStorageDataResponseMsg)
       (messageHandler.awaitMessage(_: GeneratedMessageCompanion[msg.VMQuery])).expects(*).returns(resultQueryMsg)
     }
 
@@ -142,7 +142,7 @@ class VMClientSpec extends AnyFlatSpec with Matchers with MockFactory {
     inSequence {
       (messageHandler.sendMessage(_: msg.CallContext)).expects(*)
       (messageHandler.awaitMessage(_: GeneratedMessageCompanion[msg.VMQuery])).expects(*).returns(getCodeQueryMsg)
-      (messageHandler.sendMessage _).expects(expectedCodeResponseMsg)
+      messageHandler.sendMessage.expects(expectedCodeResponseMsg)
       (messageHandler.awaitMessage(_: GeneratedMessageCompanion[msg.VMQuery])).expects(*).returns(resultQueryMsg)
     }
 
@@ -165,7 +165,7 @@ class VMClientSpec extends AnyFlatSpec with Matchers with MockFactory {
     inSequence {
       (messageHandler.sendMessage(_: msg.CallContext)).expects(*)
       (messageHandler.awaitMessage(_: GeneratedMessageCompanion[msg.VMQuery])).expects(*).returns(getBlockhashQueryMsg)
-      (messageHandler.sendMessage _).expects(expectedBlockhashResponseMsg)
+      messageHandler.sendMessage.expects(expectedBlockhashResponseMsg)
       (messageHandler.awaitMessage(_: GeneratedMessageCompanion[msg.VMQuery])).expects(*).returns(resultQueryMsg)
     }
 
@@ -193,7 +193,7 @@ class VMClientSpec extends AnyFlatSpec with Matchers with MockFactory {
     )
     val expectedHelloConfigMsg = msg.Hello.Config.EthereumConfig(expectedEthereumConfig)
     val expectedHelloMsg = msg.Hello(version = "testVersion", config = expectedHelloConfigMsg)
-    (messageHandler.sendMessage _).expects(expectedHelloMsg)
+    messageHandler.sendMessage.expects(expectedHelloMsg)
     vmClient.sendHello("testVersion", blockchainConfig)
   }
 

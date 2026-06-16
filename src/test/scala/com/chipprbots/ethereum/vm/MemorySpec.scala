@@ -9,8 +9,8 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.testing.Tags._
-import com.chipprbots.ethereum.vm.Generators._
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.vm.Generators.*
 
 class MemorySpec extends AnyFunSuite with ScalaCheckPropertyChecks with Matchers {
 
@@ -24,10 +24,10 @@ class MemorySpec extends AnyFunSuite with ScalaCheckPropertyChecks with Matchers
     if (size <= 0)
       ByteString()
     else
-      ByteString((start until (start + size)).map(_.toByte): _*)
+      ByteString((start until (start + size)).map(_.toByte)*)
 
-  import Arbitrary._
-  import Gen._
+  import Arbitrary.*
+  import Gen.*
 
   test("Store a Byte", UnitTest, VMTest) {
     forAll(choose(10, 100), arbitrary[Byte], choose(0, 200)) { (initialMemorySize, b, idx) =>

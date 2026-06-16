@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.consensus.engine
 import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError
-import com.chipprbots.ethereum.consensus.validators.BlockHeaderError._
+import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.*
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValidatorSkeleton
 import com.chipprbots.ethereum.domain.BlockHeader

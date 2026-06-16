@@ -9,7 +9,7 @@ import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.vm
 
-import EvmConfig._
+import EvmConfig.*
 
 // scalastyle:off magic.number
 object EvmConfig {
@@ -244,8 +244,8 @@ case class EvmConfig(
     eip6780Enabled: Boolean = false
 ) {
 
-  import feeSchedule._
-  import EvmConfig._
+  import feeSchedule.*
+  import EvmConfig.*
 
   def opCodes: List[OpCode] =
     opCodeList.opCodes

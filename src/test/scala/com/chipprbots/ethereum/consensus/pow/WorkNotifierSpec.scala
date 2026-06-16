@@ -4,12 +4,12 @@ import java.util.concurrent.ConcurrentLinkedQueue
 
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
-import org.apache.pekko.http.scaladsl.server.Directives._
+import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.Await
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.Eventually
@@ -20,7 +20,7 @@ import org.scalatest.time.Seconds
 import org.scalatest.time.Span
 
 import com.chipprbots.ethereum.WithActorSystemShutDown
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class WorkNotifierSpec
     extends TestKit(ActorSystem("WorkNotifierSpec"))

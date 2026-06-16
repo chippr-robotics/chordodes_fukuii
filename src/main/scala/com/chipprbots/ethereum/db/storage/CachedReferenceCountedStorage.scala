@@ -6,7 +6,7 @@ import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
 
-import boopickle.Default._
+import boopickle.Default.*
 import com.google.common.cache.RemovalNotification
 
 import com.chipprbots.ethereum.db.cache.Cache
@@ -198,7 +198,7 @@ class NoHistoryCachedReferenceCountedStorage(nodeStorage: NodeStorage, cache: Ca
   def persist(): Unit = {}
 }
 
-import com.chipprbots.ethereum.utils.ByteUtils._
+import com.chipprbots.ethereum.utils.ByteUtils.*
 
 final case class HeapEntry(nodeEncoded: NodeEncoded, numOfParents: Int, bn: BigInt) {
 
@@ -210,7 +210,7 @@ final case class HeapEntry(nodeEncoded: NodeEncoded, numOfParents: Int, bn: BigI
 }
 
 object HeapEntry {
-  import boopickle.Default._
+  import boopickle.Default.*
 
   implicit val HeapEntryPickler: Pickler[HeapEntry] = generatePickler[HeapEntry]
 
@@ -289,7 +289,7 @@ object ChangeLog {
   def getDrwKey(bn: BigInt): ByteString = ByteString(deathRowPrefix ++ bn.toByteArray)
 
   import Update.{updatePickler, byteStringPickler}
-  import boopickle.Default._
+  import boopickle.Default.*
 
   def serializeChangeLog(changeLog: List[Update]): Array[Byte] =
     compactPickledBytes(Pickle.intoBytes(changeLog)).toArray[Byte]

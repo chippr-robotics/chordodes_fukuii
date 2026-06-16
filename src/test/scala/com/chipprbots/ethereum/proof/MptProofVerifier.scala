@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.proof
 
 import org.apache.pekko.util.ByteString
 
-import cats.syntax.either._
+import cats.syntax.either.*
 
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.db.storage.NodeStorage

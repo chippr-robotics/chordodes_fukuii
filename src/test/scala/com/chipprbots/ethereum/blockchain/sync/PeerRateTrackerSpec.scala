@@ -5,7 +5,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Unit tests for PeerRateTracker (ARCH-001).
   *
@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.testing.Tags._
   */
 class PeerRateTrackerSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks {
 
-  import PeerRateTracker._
+  import PeerRateTracker.*
 
   "PeerRateTracker" should "return capacity floor before any measurement" taggedAs UnitTest in {
     val tracker = new PeerRateTracker()

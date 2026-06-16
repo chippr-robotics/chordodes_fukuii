@@ -4,7 +4,7 @@ import org.apache.pekko.util.ByteString
 
 import scala.util.Try
 
-import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.crypto.*
 import com.chipprbots.ethereum.crypto.Secp256r1
 import com.chipprbots.ethereum.crypto.zksnark.BN128.BN128G1
 import com.chipprbots.ethereum.crypto.zksnark.BN128.BN128G2
@@ -12,7 +12,7 @@ import com.chipprbots.ethereum.crypto.zksnark.BN128Fp
 import com.chipprbots.ethereum.crypto.zksnark.PairingCheck
 import com.chipprbots.ethereum.crypto.zksnark.PairingCheck.G1G2Pair
 import com.chipprbots.ethereum.domain.Address
-import com.chipprbots.ethereum.utils.ByteStringUtils._
+import com.chipprbots.ethereum.utils.ByteStringUtils.*
 import com.chipprbots.ethereum.utils.ByteUtils
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EtcForks
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EtcForks.EtcFork

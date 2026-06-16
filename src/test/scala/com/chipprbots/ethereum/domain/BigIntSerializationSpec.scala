@@ -7,8 +7,8 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.rlp // Package object for encode/decode methods
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
-import com.chipprbots.ethereum.rlp._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.rlp.*
+import com.chipprbots.ethereum.testing.Tags.*
 
 class BigIntSerializationSpec extends AnyFlatSpec with Matchers {
 

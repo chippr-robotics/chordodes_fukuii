@@ -4,14 +4,14 @@ import org.apache.pekko.util.ByteString
 
 import org.bouncycastle.math.ec.ECPoint
 
-import com.chipprbots.ethereum.crypto._
-import com.chipprbots.ethereum.rlp._
+import com.chipprbots.ethereum.crypto.*
+import com.chipprbots.ethereum.rlp.*
 
 object AuthInitiateMessageV4 extends AuthInitiateEcdsaCodec {
 
   implicit class AuthInitiateMessageV4Enc(obj: AuthInitiateMessageV4) extends RLPSerializable {
     override def toRLPEncodable: RLPEncodeable = {
-      import obj._
+      import obj.*
       // byte 0 of encoded ECC point indicates that it is uncompressed point, it is part of bouncycastle encoding
       RLPList(
         RLPValue(encodeECDSA(signature).toArray),

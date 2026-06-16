@@ -155,7 +155,7 @@ object BlockchainConfigForEvm {
     etcFork >= EtcForks.Olympia
 
   def apply(blockchainConfig: BlockchainConfig): BlockchainConfigForEvm = {
-    import blockchainConfig._
+    import blockchainConfig.*
     val isEth = networkType == com.chipprbots.ethereum.utils.NetworkType.ETH
     BlockchainConfigForEvm(
       frontierBlockNumber = forkBlockNumbers.frontierBlockNumber,

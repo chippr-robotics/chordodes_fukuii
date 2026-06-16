@@ -8,7 +8,7 @@ import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.consensus.engine.ForkChoiceManager
 import com.chipprbots.ethereum.consensus.mining.Mining
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.BlockHeaderImplicits.BlockHeaderEnc
 import com.chipprbots.ethereum.ledger.BlockQueue
 import com.chipprbots.ethereum.rlp
@@ -84,7 +84,7 @@ class EthBlocksService(
     private val _forkChoiceManagerOpt: Option[ForkChoiceManager] = None
 ) extends ResolveBlock {
   final override def forkChoiceManagerOpt: Option[ForkChoiceManager] = _forkChoiceManagerOpt
-  import EthBlocksService._
+  import EthBlocksService.*
 
   implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
 
@@ -369,7 +369,7 @@ class EthBlocksService(
   }
 
   def getRawReceipts(req: GetRawReceiptsRequest): ServiceResponse[GetRawReceiptsResponse] = IO {
-    import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs._
+    import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs.*
     val raw = resolveBlock(req.block).toOption.flatMap { case ResolvedBlock(block, _) =>
       blockchainReader.getReceiptsByHash(block.header.hash).map { receipts =>
         receipts.map(r => ByteString(r.toBytes))

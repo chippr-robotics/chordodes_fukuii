@@ -9,7 +9,7 @@ import sangria.ast
 
 class GraphQLScalarsSpec extends AnyFlatSpec with Matchers {
 
-  import GraphQLScalars._
+  import GraphQLScalars.*
 
   // ------ Bytes32 ------
   "Bytes32Type" should "round-trip a 0x-prefixed 32-byte hex string" in {

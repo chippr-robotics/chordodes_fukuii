@@ -6,14 +6,14 @@ import cats.implicits.*
 
 import scala.util.Try
 
-import org.json4s.JsonAST._
-import org.json4s.JsonDSL._
-import org.json4s._
+import org.json4s.JsonAST.*
+import org.json4s.JsonDSL.*
+import org.json4s.*
 
 import com.chipprbots.ethereum.blockchain.data.GenesisAccount
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError.InvalidParams
-import com.chipprbots.ethereum.jsonrpc.TestService._
+import com.chipprbots.ethereum.jsonrpc.TestService.*
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonEncoder
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder
 import com.chipprbots.ethereum.testmode.SealEngineType

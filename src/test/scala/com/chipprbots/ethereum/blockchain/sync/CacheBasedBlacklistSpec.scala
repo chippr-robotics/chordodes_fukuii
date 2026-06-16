@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.blockchain.sync
 
 import java.util.concurrent.TimeUnit
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.github.blemale.scaffeine.Scaffeine
 import com.google.common.testing.FakeTicker
@@ -10,11 +10,11 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.scalatest.ParallelTestExecution
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.network.PeerId
 
 class CacheBasedBlacklistSpec extends AnyWordSpecLike with Matchers with ParallelTestExecution {
-  import Blacklist._
+  import Blacklist.*
 
   private val peer1 = PeerId("1")
   private val peer2 = PeerId("2")
@@ -53,7 +53,7 @@ class CacheBasedBlacklistSpec extends AnyWordSpecLike with Matchers with Paralle
         .maximumSize(
           maxSize
         )
-        .ticker(ticker.read _)
+        .ticker(() => ticker.read())
         .build[BlacklistId, BlacklistReason.BlacklistReasonType]()
       val blacklist = CacheBasedBlacklist(cache)
       blacklist.add(peer1, 1.minute, reason)
@@ -93,7 +93,7 @@ class CacheBasedBlacklistSpec extends AnyWordSpecLike with Matchers with Paralle
           read = (_, _, duration) => duration
         )
         .maximumSize(maxSize)
-        .ticker(ticker.read _)
+        .ticker(() => ticker.read())
         .build[BlacklistId, BlacklistReason.BlacklistReasonType]()
       val blacklist = CacheBasedBlacklist(cache)
 

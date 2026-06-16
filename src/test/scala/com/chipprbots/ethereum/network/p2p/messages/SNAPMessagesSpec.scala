@@ -6,7 +6,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 import com.chipprbots.ethereum.domain.Account
-import com.chipprbots.ethereum.network.p2p.messages.SNAP._
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.AccountRange.AccountRangeEnc
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.AccountRange.AccountRangeDec
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.ByteCodes.ByteCodesEnc

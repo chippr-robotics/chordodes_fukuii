@@ -26,7 +26,7 @@ class RlpExtensionVisitor(extensionNode: ExtensionNode) extends ExtensionVisitor
 
   override def done(): RLPEncodeable = {
     val copy = util.Arrays.copyOf[RLPEncodeable](array, 2)
-    RLPList(ArraySeq.unsafeWrapArray(copy): _*)
+    RLPList(ArraySeq.unsafeWrapArray(copy)*)
   }
 }
 
@@ -43,7 +43,7 @@ class RlpBranchVisitor(@annotation.unused _branchNode: BranchNode) extends Branc
     list = RLPValue(term.map(_.toArray[Byte]).getOrElse(Array.empty[Byte])) :: list
 
   override def done(): RLPEncodeable =
-    RLPList(list.reverse: _*)
+    RLPList(list.reverse*)
 }
 
 class RlpEncVisitor extends MptVisitor[RLPEncodeable] {

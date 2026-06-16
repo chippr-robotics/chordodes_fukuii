@@ -2,9 +2,9 @@ package com.chipprbots.ethereum.crypto
 
 object ECDSASignatureImplicits {
 
-  import com.chipprbots.ethereum.rlp.RLPImplicitConversions._
+  import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
   import com.chipprbots.ethereum.rlp.RLPImplicits.given
-  import com.chipprbots.ethereum.rlp._
+  import com.chipprbots.ethereum.rlp.*
 
   implicit val ecdsaSignatureDec: RLPDecoder[ECDSASignature] = new RLPDecoder[ECDSASignature] {
     override def decode(rlp: RLPEncodeable): ECDSASignature = rlp match {

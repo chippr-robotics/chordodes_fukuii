@@ -11,7 +11,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.WithActorSystemShutDown
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockBroadcast
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockBroadcast.BlockToBroadcast
@@ -431,7 +431,7 @@ class BlockBroadcastSpec
     // With 2 peers: sqrt(2)=1 random peer gets NewBlock, both get NewBlockHashes,
     // and the ETH69 peer gets a BlockRangeUpdate — 4 messages total.
     // Collect all 4 messages (order non-deterministic).
-    import scala.concurrent.duration._
+    import scala.concurrent.duration.*
     val messages = (1 to 4).map(_ => networkPeerManagerProbe.receiveOne(3.seconds)).toSet
 
     // One NewBlock to either peer
@@ -478,7 +478,7 @@ class BlockBroadcastSpec
       Map(peer.id -> PeerWithInfo(peer, eth69PeerInfo))
     )
 
-    import scala.concurrent.duration._
+    import scala.concurrent.duration.*
     val messages = networkPeerManagerProbe.receiveN(3, 3.seconds)
     val newBlocks = messages.collect {
       case NetworkPeerManagerActor.SendMessage(msg, id) if msg.underlyingMsg.isInstanceOf[ETHPackets.NewBlock] => id
@@ -502,7 +502,7 @@ class BlockBroadcastSpec
       Map(peer.id -> PeerWithInfo(peer, eth69PeerInfo))
     )
 
-    import scala.concurrent.duration._
+    import scala.concurrent.duration.*
     // Only NewBlockHashes + BRU should arrive (no NewBlock)
     val messages = (1 to 2).map(_ => networkPeerManagerProbe.receiveOne(2.seconds))
     messages.foreach {
@@ -535,7 +535,7 @@ class BlockBroadcastSpec
       )
     }
 
-    import scala.concurrent.duration._
+    import scala.concurrent.duration.*
     val allMessages = networkPeerManagerProbe.receiveN(9, 5.seconds) // 3 × (NewBlock + Hashes + BRU)
     val bruCount = allMessages.count {
       case NetworkPeerManagerActor.SendMessage(msg, _) =>
@@ -564,7 +564,7 @@ class BlockBroadcastSpec
       )
     }
 
-    import scala.concurrent.duration._
+    import scala.concurrent.duration.*
 
     // Blocks 1–31: no BRU (not at epoch boundary)
     (1 to 31).foreach(broadcastAt)
@@ -620,7 +620,7 @@ class BlockBroadcastSpec
 
         bb.broadcastBlock(BlockToBroadcast(block, ourWeight), Map(p.id -> PeerWithInfo(p, eth68PeerInfo)))
 
-        import scala.concurrent.duration._
+        import scala.concurrent.duration.*
         val messages = pm.receiveN(2, 3.seconds)
         val hasNewBlock = messages.exists {
           case NetworkPeerManagerActor.SendMessage(msg, _) => msg.underlyingMsg.isInstanceOf[ETHPackets.NewBlock]
@@ -646,7 +646,7 @@ class BlockBroadcastSpec
       Map(peer.id -> PeerWithInfo(peer, initialPeerInfo)) // ETH68 peer from TestSetup
     )
 
-    import scala.concurrent.duration._
+    import scala.concurrent.duration.*
     val messages = networkPeerManagerProbe.receiveN(2, 3.seconds)
     val hasBru = messages.exists {
       case NetworkPeerManagerActor.SendMessage(msg, _) => msg.underlyingMsg.isInstanceOf[ETH69.BlockRangeUpdate]

@@ -6,16 +6,16 @@ import cats.effect.IO
 
 import java.security.MessageDigest
 
-import com.chipprbots.ethereum.consensus.engine.PayloadStatus._
+import com.chipprbots.ethereum.consensus.engine.PayloadStatus.*
 import com.chipprbots.ethereum.consensus.validators.std.MptListValidator
 import com.chipprbots.ethereum.crypto.kec256
-import com.chipprbots.ethereum.domain._
-import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields._
-import com.chipprbots.ethereum.domain.Withdrawal._
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
+import com.chipprbots.ethereum.domain.Withdrawal.*
 import com.chipprbots.ethereum.ledger.BlockExecution
 import com.chipprbots.ethereum.mpt.ByteArraySerializable
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions._
-import com.chipprbots.ethereum.rlp.{encode => rlpEncode}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
+import com.chipprbots.ethereum.rlp.encode as rlpEncode
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Logger
 
@@ -33,7 +33,7 @@ class EngineApiService(
 
   import org.apache.pekko.pattern.ask
   import org.apache.pekko.util.Timeout
-  import scala.concurrent.duration._
+  import scala.concurrent.duration.*
   import scala.concurrent.Await
   implicit private val askTimeout: Timeout = Timeout(3.seconds)
 
@@ -552,7 +552,7 @@ class EngineApiService(
                     // engine_getPayloadV3 can emit them in the blobsBundle envelope.
                     val (pendingTxs, blobTxRawBytesFromPool): (Seq[SignedTransaction], Map[ByteString, ByteString]) =
                       try {
-                        import com.chipprbots.ethereum.transactions.PendingTransactionsManager._
+                        import com.chipprbots.ethereum.transactions.PendingTransactionsManager.*
                         val future =
                           (pendingTransactionsManager ? GetPendingTransactions).mapTo[PendingTransactionsResponse]
                         val response = Await.result(future, 3.seconds)
@@ -722,7 +722,7 @@ class EngineApiService(
                       }
 
                     val receiptsLogs = BloomFilter.EmptyBloomFilter.toArray +: receipts.map(_.logsBloomFilter.toArray)
-                    val bloomFilter = ByteString(com.chipprbots.ethereum.utils.ByteUtils.or(receiptsLogs: _*))
+                    val bloomFilter = ByteString(com.chipprbots.ethereum.utils.ByteUtils.or(receiptsLogs*))
                     def buildMpt[T](
                         items: Seq[T],
                         ser: com.chipprbots.ethereum.mpt.ByteArraySerializable[T]

@@ -6,7 +6,7 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
 
 class TargetTimeDifficultyCalculator(powTargetTime: Long) extends DifficultyCalculator {
 
-  import DifficultyCalculator._
+  import DifficultyCalculator.*
 
   /** The lowerBoundExpectedRatio (l for abbreviation below) divides the timestamp diff into ranges: [0, l) => c = 1,
     * difficulty increases [l, 2*l) => c = 0. difficulty stays the same ... [l*i, l*(i+1) ) => c = 1-i, difficulty

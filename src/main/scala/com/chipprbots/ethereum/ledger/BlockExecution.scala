@@ -7,7 +7,7 @@ import cats.implicits.*
 import scala.annotation.tailrec
 
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.ledger.BlockExecutionError.MissingParentError
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MPTException
 import com.chipprbots.ethereum.utils.BlockchainConfig
@@ -206,7 +206,7 @@ class BlockExecution(
       block: Block,
       world: InMemoryWorldStateProxy
   )(implicit blockchainConfig: BlockchainConfig): InMemoryWorldStateProxy = {
-    import BlockExecution._
+    import BlockExecution.*
     // Only apply post-Cancun (when parentBeaconBlockRoot is present)
     block.header.parentBeaconBlockRoot match {
       case Some(beaconRoot) if blockchainConfig.isCancunTimestamp(block.header.unixTimestamp) =>
@@ -241,7 +241,7 @@ class BlockExecution(
       block: Block,
       world: InMemoryWorldStateProxy
   )(implicit blockchainConfig: BlockchainConfig): InMemoryWorldStateProxy = {
-    import BlockExecution._
+    import BlockExecution.*
     val blockNumber = block.header.number
     // EIP-2935 activates at Prague on ETH chains (timestamp fork), or at Olympia on ETC chains (block number fork).
     val pragueActive = blockchainConfig.isPragueTimestamp(block.header.unixTimestamp)
@@ -385,7 +385,7 @@ class BlockExecution(
   )(implicit blockchainConfig: BlockchainConfig): (InMemoryWorldStateProxy, Seq[ByteString]) = {
     if (!blockchainConfig.isPragueTimestamp(block.header.unixTimestamp)) return (world, Nil)
 
-    import BlockExecution._
+    import BlockExecution.*
     val evmConfig = EvmConfig.forBlock(block.header.number, block.header.unixTimestamp, blockchainConfig)
     var w = world
     val outputs = scala.collection.mutable.ListBuffer.empty[ByteString]
@@ -441,7 +441,7 @@ class BlockExecution(
     * empty if none).
     */
   def collectDepositRequests(receipts: Seq[Receipt]): Option[ByteString] = {
-    import BlockExecution._
+    import BlockExecution.*
     val buf = scala.collection.mutable.ArrayBuffer.empty[Byte]
     for {
       receipt <- receipts

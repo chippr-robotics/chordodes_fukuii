@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import org.apache.pekko.actor._
+import org.apache.pekko.actor.*
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.FiniteDuration
@@ -30,7 +30,7 @@ class PeerRequestHandler[RequestMsg <: Message, ResponseMsg <: Message: ClassTag
     extends Actor
     with ActorLogging {
 
-  import PeerRequestHandler._
+  import PeerRequestHandler.*
 
   private val initiator: ActorRef = context.parent
 

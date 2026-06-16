@@ -12,8 +12,8 @@ import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.TxLogEntry
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.domain.UInt256._
-import com.chipprbots.ethereum.vm.Generators._
+import com.chipprbots.ethereum.domain.UInt256.*
+import com.chipprbots.ethereum.vm.Generators.*
 
 import Fixtures.blockchainConfig
 
@@ -57,7 +57,7 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
     }
   }
 
-  test(unaryOps: _*) { op =>
+  test(unaryOps*) { op =>
     forAll(getProgramStateGen()) { stateIn =>
       val stateOut = executeOp(op, stateIn)
 
@@ -72,7 +72,7 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
     }
   }
 
-  test(binaryOps: _*) { op =>
+  test(binaryOps*) { op =>
     forAll(getProgramStateGen()) { stateIn =>
       val stateOut = executeOp(op, stateIn)
 
@@ -87,7 +87,7 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
     }
   }
 
-  test(ternaryOps: _*) { op =>
+  test(ternaryOps*) { op =>
     forAll(getProgramStateGen()) { stateIn =>
       val stateOut = executeOp(op, stateIn)
 
@@ -102,7 +102,7 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
     }
   }
 
-  test(constOps.filter(_ != MSIZE): _*) { op =>
+  test(constOps.filter(_ != MSIZE)*) { op =>
     forAll(getProgramStateGen()) { stateIn =>
       val stateOut = executeOp(op, stateIn)
 
@@ -644,7 +644,7 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
     }
   }
 
-  test(pushOps: _*) { op =>
+  test(pushOps*) { op =>
     val stateGen = getProgramStateGen(codeGen = getByteStringGen(0, 32))
 
     forAll(stateGen) { stateIn =>
@@ -659,7 +659,7 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
     }
   }
 
-  test(dupOps: _*) { op =>
+  test(dupOps*) { op =>
     forAll(getProgramStateGen()) { stateIn =>
       val stateOut = executeOp(op, stateIn)
 
@@ -671,7 +671,7 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
     }
   }
 
-  test(swapOps: _*) { op =>
+  test(swapOps*) { op =>
     forAll(getProgramStateGen()) { stateIn =>
       val stateOut = executeOp(op, stateIn)
 
@@ -683,7 +683,7 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
     }
   }
 
-  test(logOps: _*) { op =>
+  test(logOps*) { op =>
     val stateGen = getProgramStateGen(
       stackGen = getStackGen(maxWord = UInt256(256)),
       memGen = getMemoryGen(maxSize = 256)

@@ -6,7 +6,7 @@ import cats.effect.IO
 
 import com.chipprbots.ethereum.consensus.mining.Mining
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
@@ -31,8 +31,8 @@ class EthUserService(
     evmCodeStorage: EvmCodeStorage,
     configBuilder: BlockchainConfigBuilder
 ) extends ResolveBlock {
-  import configBuilder._
-  import EthUserService._
+  import configBuilder.*
+  import EthUserService.*
 
   def getCode(req: GetCodeRequest): ServiceResponse[GetCodeResponse] =
     IO {

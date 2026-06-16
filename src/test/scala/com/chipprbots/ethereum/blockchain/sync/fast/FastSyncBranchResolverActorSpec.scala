@@ -26,8 +26,8 @@ import org.scalatest.freespec.AnyFreeSpecLike
 import com.chipprbots.ethereum.BlockHelpers
 import com.chipprbots.ethereum.NormalPatience
 import com.chipprbots.ethereum.WithActorSystemShutDown
-import com.chipprbots.ethereum.testing.Tags._
-import com.chipprbots.ethereum.blockchain.sync._
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.blockchain.sync.*
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSyncBranchResolverActor.BranchResolutionFailed
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSyncBranchResolverActor.BranchResolutionFailed.NoCommonBlockFound
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSyncBranchResolverActor.BranchResolvedSuccessful
@@ -35,14 +35,14 @@ import com.chipprbots.ethereum.blockchain.sync.fast.FastSyncBranchResolverActor.
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor._
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.*
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{
-  BlockHeaders => ETHBlockHeaders,
-  GetBlockHeaders => ETHGetBlockHeaders
+  BlockHeaders as ETHBlockHeaders,
+  GetBlockHeaders as ETHGetBlockHeaders
 }
 import com.chipprbots.ethereum.utils.Logger
 
@@ -54,7 +54,7 @@ class FastSyncBranchResolverActorSpec
     with WithActorSystemShutDown { self =>
   implicit val timeout: Timeout = Timeout(30.seconds)
 
-  import FastSyncBranchResolverActorSpec._
+  import FastSyncBranchResolverActorSpec.*
 
   "FastSyncBranchResolver" - {
     "fetch headers from the new master peer" - {
@@ -284,7 +284,7 @@ class FastSyncBranchResolverActorSpec
     }
 
     val handshakedPeers: Map[Peer, PeerInfo] =
-      (0 to 5).toList.map((peerId _).andThen(getPeer)).fproduct(getPeerInfo(_)).toMap
+      (0 to 5).toList.map(peerId.andThen(getPeer)).fproduct(getPeerInfo(_)).toMap
 
     def saveBlocks(blocks: List[Block]): Unit =
       blocks.foreach(block =>

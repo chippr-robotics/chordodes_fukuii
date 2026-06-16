@@ -33,7 +33,7 @@ class CheckpointDownloaderSpec extends AnyWordSpec with Matchers with EitherValu
   override def afterEach(): Unit = {
     if (server != null) server.stop(0)
     if (tmpDir != null) {
-      import scala.jdk.CollectionConverters._
+      import scala.jdk.CollectionConverters.*
       val walk = Files.walk(tmpDir)
       try
         walk.iterator.asScala.toSeq.reverse.foreach(p => Files.deleteIfExists(p))

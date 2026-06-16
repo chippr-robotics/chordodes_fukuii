@@ -63,7 +63,7 @@ object UInt256 {
 /** Represents 256 bit unsigned integers with standard arithmetic, byte-wise operation and EVM-specific extensions */
 class UInt256 private (private val n: BigInt) extends Ordered[UInt256] {
 
-  import UInt256._
+  import UInt256.*
   require(n >= 0 && n < Modulus, s"Invalid UInt256 value: $n")
 
   // byte-wise operations

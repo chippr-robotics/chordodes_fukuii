@@ -7,12 +7,12 @@ import org.apache.pekko.util.ByteString
 import scala.collection.immutable.ArraySeq
 
 import boopickle.CompositePickler
-import boopickle.Default._
+import boopickle.Default.*
 
-import com.chipprbots.ethereum.blockchain.sync.fast.FastSync._
+import com.chipprbots.ethereum.blockchain.sync.fast.FastSync.*
 import com.chipprbots.ethereum.db.dataSource.DataSource
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields
-import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields._
+import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
 import com.chipprbots.ethereum.utils.ByteUtils.compactPickledBytes
 
 object FastSyncStateStorage {
@@ -25,7 +25,7 @@ class FastSyncStateStorage(val dataSource: DataSource)
     extends KeyValueStorage[String, SyncState, FastSyncStateStorage] {
   type T = FastSyncStateStorage
 
-  import FastSyncStateStorage._
+  import FastSyncStateStorage.*
 
   override val namespace: IndexedSeq[Byte] = Namespaces.FastSyncStateNamespace
 

@@ -23,7 +23,7 @@ import com.chipprbots.ethereum.utils.Logger
   */
 class ReceiptsFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[GetReceipts, Receipts68] with Logger {
 
-  import ReceiptsFetcherQueue._
+  import ReceiptsFetcherQueue.*
 
   private val pendingQueue = mutable.Queue[ByteString]()
   private val inFlightMap = mutable.Map[PeerId, InFlightEntry]()

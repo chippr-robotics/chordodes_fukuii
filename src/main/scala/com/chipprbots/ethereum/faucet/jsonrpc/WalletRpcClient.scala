@@ -11,7 +11,7 @@ import cats.effect.IO
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.Duration
 
-import io.circe.syntax._
+import io.circe.syntax.*
 
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.jsonrpc.client.RpcClient
@@ -30,7 +30,7 @@ class WalletRpcClient(node: Uri, timeout: Duration, getSSLContext: () => Either[
 ) extends RpcClient(node, timeout, getSSLContext)
     with WalletRpcClientApi
     with Logger {
-  import com.chipprbots.ethereum.jsonrpc.client.CommonJsonCodecs._
+  import com.chipprbots.ethereum.jsonrpc.client.CommonJsonCodecs.*
 
   def getNonce(address: Address): IO[Either[RpcError, BigInt]] =
     doRequest[BigInt]("eth_getTransactionCount", List(address.asJson, "latest".asJson))

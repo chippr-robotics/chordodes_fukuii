@@ -16,9 +16,9 @@ import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockchainReader
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
-import com.chipprbots.ethereum.jsonrpc.JsonRpcError._
-import com.chipprbots.ethereum.jsonrpc.PersonalService._
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
+import com.chipprbots.ethereum.jsonrpc.JsonRpcError.*
+import com.chipprbots.ethereum.jsonrpc.PersonalService.*
 import com.chipprbots.ethereum.keystore.KeyStore
 import com.chipprbots.ethereum.keystore.Wallet
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
@@ -70,7 +70,7 @@ object PersonalService {
 }
 
 trait PersonalServiceAPI {
-  import PersonalService._
+  import PersonalService.*
 
   def importRawKey(req: ImportRawKeyRequest): ServiceResponse[ImportRawKeyResponse]
   def newAccount(req: NewAccountRequest): ServiceResponse[NewAccountResponse]
@@ -94,7 +94,7 @@ class PersonalService(
     ethTxService: EthTxService
 ) extends PersonalServiceAPI
     with Logger {
-  import configBuilder._
+  import configBuilder.*
 
   private val unlockedWallets: ExpiringMap[Address, Wallet] = ExpiringMap.empty(Duration.ofSeconds(defaultUnlockTime))
 
@@ -144,7 +144,7 @@ class PersonalService(
   }
 
   def sign(request: SignRequest): ServiceResponse[SignResponse] = IO {
-    import request._
+    import request.*
 
     val accountWallet =
       passphrase.fold(unlockedWallets.get(request.address).toRight(AccountLocked)) { pass =>
@@ -158,7 +158,7 @@ class PersonalService(
   }
 
   def ecRecover(req: EcRecoverRequest): ServiceResponse[EcRecoverResponse] = IO {
-    import req._
+    import req.*
     signature
       .publicKey(getMessageToSign(message))
       .map { publicKey =>

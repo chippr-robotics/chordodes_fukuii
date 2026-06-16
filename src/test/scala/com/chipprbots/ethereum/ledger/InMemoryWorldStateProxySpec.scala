@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MPTException
 import com.chipprbots.ethereum.vm.EvmConfig
 import com.chipprbots.ethereum.vm.Generators
 import org.scalatest.compatible.Assertion
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class InMemoryWorldStateProxySpec extends AnyFlatSpec with Matchers {
 

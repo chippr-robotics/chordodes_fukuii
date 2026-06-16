@@ -10,7 +10,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.SuperSlow
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.blockchain.sync.StateSyncUtils.MptNodeData
 import com.chipprbots.ethereum.blockchain.sync.StateSyncUtils.TrieProvider
 import com.chipprbots.ethereum.blockchain.sync.StateSyncUtils.checkAllDataExists

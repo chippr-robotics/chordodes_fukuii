@@ -118,7 +118,7 @@ case class HashNode(hashNode: Array[Byte]) extends MptNode {
 }
 
 case object NullNode extends MptNode {
-  import MerklePatriciaTrie._
+  import MerklePatriciaTrie.*
   val cachedHash: Option[Array[Byte]] = Some(EmptyRootHash)
   val cachedRlpEncoded: Option[Array[Byte]] = Some(EmptyEncoded)
   def withCachedHash(cachedHash: Array[Byte]): MptNode = this

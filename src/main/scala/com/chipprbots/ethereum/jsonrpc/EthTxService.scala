@@ -52,7 +52,7 @@ class EthTxService(
 )(implicit val blockchainConfig: BlockchainConfig)
     extends TransactionPicker
     with ResolveBlock {
-  import EthTxService._
+  import EthTxService.*
   // blockchainConfig is taken as an implicit constructor parameter so multi-instance
   // runtime callers (NodeBuilder) automatically supply the per-instance config in scope
   // (see NodeBuilder line 72), instead of every service silently shadowing it with the

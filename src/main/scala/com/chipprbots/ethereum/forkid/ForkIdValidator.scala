@@ -5,7 +5,7 @@ import java.util.zip.CRC32
 import org.apache.pekko.util.ByteString
 
 import cats.Monad
-import cats.data.EitherT._
+import cats.data.EitherT.*
 import cats.implicits.*
 
 import org.typelevel.log4cats.Logger
@@ -13,14 +13,14 @@ import org.typelevel.log4cats.SelfAwareStructuredLogger
 import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import com.chipprbots.ethereum.utils.BlockchainConfig
-import com.chipprbots.ethereum.utils.ByteUtils._
+import com.chipprbots.ethereum.utils.ByteUtils.*
 
 sealed trait ForkIdValidationResult
 case object Connect extends ForkIdValidationResult
 case object ErrRemoteStale extends ForkIdValidationResult
 case object ErrLocalIncompatibleOrStale extends ForkIdValidationResult
 
-import cats.effect._
+import cats.effect.*
 
 object ForkIdValidator {
 

@@ -94,7 +94,7 @@ class TxPoolService(
     override val getTransactionFromPoolTimeout: FiniteDuration,
     txPoolConfig: TxPoolConfig
 ) extends TransactionPicker {
-  import TxPoolService._
+  import TxPoolService.*
 
   /** txpool_besuTransactions — returns all pending transactions.
     *

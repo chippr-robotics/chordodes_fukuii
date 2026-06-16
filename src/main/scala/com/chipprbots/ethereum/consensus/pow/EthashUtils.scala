@@ -14,7 +14,7 @@ import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.crypto.kec512
-import com.chipprbots.ethereum.utils.ByteUtils._
+import com.chipprbots.ethereum.utils.ByteUtils.*
 
 object EthashUtils {
 
@@ -142,7 +142,7 @@ object EthashUtils {
       fullSize: Long,
       cache: Array[Int]
   ): EthashProofOfWork =
-    hashimoto(hashWithoutNonce, nonce, fullSize, (calcDatasetItem _).curried(cache))
+    hashimoto(hashWithoutNonce, nonce, fullSize, calcDatasetItem(cache, _))
 
   def hashimoto(
       hashWithoutNonce: Array[Byte],

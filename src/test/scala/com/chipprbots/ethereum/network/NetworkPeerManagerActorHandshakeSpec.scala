@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.network
 
 import java.net.InetSocketAddress
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.testkit.TestActorRef
@@ -26,7 +26,7 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerHandshake
 import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
 import com.chipprbots.ethereum.network.PeerEventBusActor.Unsubscribe
 import com.chipprbots.ethereum.network.p2p.messages.Capability
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 // Regression tests for Issues 6 and 8: dual-connection races between inbound and
 // outbound TCP connections to the same peer. All assertions are behavioural: they

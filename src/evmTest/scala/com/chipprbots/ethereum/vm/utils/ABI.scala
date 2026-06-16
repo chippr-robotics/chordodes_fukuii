@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.vm.utils
 
-import ABI._
+import ABI.*
 
 object ABI {
   case class Param(name: String, `type`: String)

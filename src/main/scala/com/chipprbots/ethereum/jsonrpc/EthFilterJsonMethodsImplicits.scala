@@ -2,9 +2,9 @@ package com.chipprbots.ethereum.jsonrpc
 
 import org.apache.pekko.util.ByteString
 
-import org.json4s._
+import org.json4s.*
 
-import com.chipprbots.ethereum.jsonrpc.EthFilterService._
+import com.chipprbots.ethereum.jsonrpc.EthFilterService.*
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError.InvalidParams
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonEncoder
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder
@@ -86,7 +86,7 @@ object EthFilterJsonMethodsImplicits extends JsonMethodsImplicits {
 
   implicit val eth_getFilterLogs: JsonMethodDecoder[GetFilterLogsRequest] with JsonEncoder[GetFilterLogsResponse] =
     new JsonMethodDecoder[GetFilterLogsRequest] with JsonEncoder[GetFilterLogsResponse] {
-      import FilterManager._
+      import FilterManager.*
 
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetFilterLogsRequest] =
         params match {

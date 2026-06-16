@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.blockchain.sync.snap
 import org.apache.pekko.actor.{Actor, ActorLogging, ActorRef, Props, Scheduler, Cancellable}
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.concurrent.ExecutionContext
 import scala.collection.mutable
 import scala.util.Try
@@ -24,7 +24,7 @@ import com.chipprbots.ethereum.db.storage.{
 }
 import com.chipprbots.ethereum.domain.{Block, BlockBody, BlockHeader, BlockchainReader, BlockchainWriter, ChainWeight}
 import com.chipprbots.ethereum.network.p2p.messages.{Capability, SNAP}
-import com.chipprbots.ethereum.network.p2p.messages.SNAP._
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
 import com.chipprbots.ethereum.utils.Hex
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
@@ -56,7 +56,7 @@ class SNAPSyncController(
   private val snapValidationEc: ExecutionContext =
     context.system.dispatchers.lookup("snap-validation-dispatcher")
 
-  import SNAPSyncController._
+  import SNAPSyncController.*
 
   // SNAP download progress storage (namespace 'p'). Shares the same RocksDB DataSource as
   // AppStateStorage but uses a dedicated namespace so progress survives crash-restart without

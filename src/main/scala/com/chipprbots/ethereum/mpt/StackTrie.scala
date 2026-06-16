@@ -33,7 +33,7 @@ import com.chipprbots.ethereum.crypto
   * responsibility. This class is strictly write-only: it never reads from any backing storage.
   */
 final class StackTrie(onTrieNode: (Array[Byte], ByteString, Array[Byte]) => Unit) {
-  import StackTrie._
+  import StackTrie.*
 
   private var root: StNode = StNode.empty
   // last hex key seen, for strict-ascending sort enforcement

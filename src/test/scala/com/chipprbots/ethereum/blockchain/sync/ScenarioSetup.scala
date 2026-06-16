@@ -20,7 +20,7 @@ import com.chipprbots.ethereum.consensus.validators.Validators
 import com.chipprbots.ethereum.ledger.BlockExecution
 import com.chipprbots.ethereum.ledger.BlockValidation
 import com.chipprbots.ethereum.ledger.VMImpl
-import com.chipprbots.ethereum.nodebuilder._
+import com.chipprbots.ethereum.nodebuilder.*
 
 /** Provides a standard setup for the test suites. The reference to "cake" is about the "Cake Pattern" used in Fukuii.
   * Specifically it relates to the creation and wiring of the several components of a

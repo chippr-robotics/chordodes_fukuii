@@ -212,7 +212,7 @@ class CheckpointExporterSpec
     tmpRoot = Files.createTempDirectory("checkpoint-exporter-spec")
 
   override def afterEach(): Unit = {
-    import scala.jdk.CollectionConverters._
+    import scala.jdk.CollectionConverters.*
     val walk = Files.walk(tmpRoot)
     try walk.iterator.asScala.toSeq.reverse.foreach(p => Files.deleteIfExists(p))
     finally walk.close()

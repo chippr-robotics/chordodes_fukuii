@@ -12,7 +12,7 @@ import com.chipprbots.scalanet.peergroup.PeerGroup.ServerEvent.ChannelCreated
 import com.chipprbots.scalanet.peergroup.Channel.{ChannelEvent, MessageReceived}
 import com.chipprbots.scalanet.peergroup.Channel
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class MockPeerGroup[A, M](
     override val processAddress: A,

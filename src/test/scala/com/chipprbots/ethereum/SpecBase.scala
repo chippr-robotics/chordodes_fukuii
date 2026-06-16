@@ -9,7 +9,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
 import org.scalactic.TypeCheckedTripleEquals
-import org.scalatest._
+import org.scalatest.*
 import org.scalatest.diagrams.Diagrams
 import org.scalatest.flatspec.AsyncFlatSpecLike
 import org.scalatest.freespec.AsyncFreeSpecLike

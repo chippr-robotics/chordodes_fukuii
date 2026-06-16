@@ -1,6 +1,6 @@
 package com.chipprbots.scalanet.discovery.ethereum.v4
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.scalanet.discovery.ethereum.Node
 

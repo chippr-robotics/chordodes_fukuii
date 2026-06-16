@@ -5,17 +5,17 @@ import java.net.URI
 import java.util.Collections.newSetFromMap
 
 import org.apache.pekko.actor.SupervisorStrategy.Stop
-import org.apache.pekko.actor._
+import org.apache.pekko.actor.*
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
-import cats.syntax.parallel._
+import cats.syntax.parallel.*
 
 import scala.collection.mutable
-import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
+import scala.concurrent.duration.*
+import scala.jdk.CollectionConverters.*
 
 import org.bouncycastle.util.encoders.Hex
 
@@ -24,7 +24,7 @@ import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistId
 import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.TaskActorOps
 import com.chipprbots.ethereum.network.PeerActor.PeerClosedConnection
 import com.chipprbots.ethereum.network.PeerActor.Status.Handshaked
-import com.chipprbots.ethereum.network.PeerEventBusActor._
+import com.chipprbots.ethereum.network.PeerEventBusActor.*
 import com.chipprbots.ethereum.network.PeerManagerActor.PeerConfiguration
 import com.chipprbots.ethereum.network.discovery.DiscoveryConfig
 import com.chipprbots.ethereum.network.discovery.Node
@@ -63,7 +63,7 @@ class PeerManagerActor(
     */
   val maxBlacklistedNodes: Int = 32 * 8 * discoveryConfig.kademliaBucketSize
 
-  import PeerManagerActor._
+  import PeerManagerActor.*
   import org.apache.pekko.pattern.pipe
 
   val triedNodes: mutable.Set[ByteString] = lruSet[ByteString](maxBlacklistedNodes)
@@ -953,7 +953,7 @@ object PeerManagerActor {
       shortBlacklistDuration: FiniteDuration,
       longBlacklistDuration: FiniteDuration
   ): FiniteDuration = {
-    import Disconnect.Reasons._
+    import Disconnect.Reasons.*
     reason match {
       case BreachOfProtocol | IncompatibleP2pProtocolVersion | NullNodeIdentityReceived =>
         DefaultPermanentBlacklistDuration

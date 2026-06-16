@@ -6,9 +6,9 @@ import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.MessageSerializableImplicit
-import com.chipprbots.ethereum.rlp.RLPImplicitConversions._
+import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
-import com.chipprbots.ethereum.rlp._
+import com.chipprbots.ethereum.rlp.*
 import com.chipprbots.ethereum.utils.ByteUtils
 
 object WireProtocol {
@@ -20,16 +20,16 @@ object WireProtocol {
     implicit class HelloEnc(val underlyingMsg: Hello)
         extends MessageSerializableImplicit[Hello](underlyingMsg)
         with RLPSerializable {
-      import com.chipprbots.ethereum.rlp._
+      import com.chipprbots.ethereum.rlp.*
 
       override def code: Int = Hello.code
 
       override def toRLPEncodable: RLPEncodeable = {
-        import msg._
+        import msg.*
         RLPList(
           p2pVersion,
           clientId,
-          RLPList(capabilities.map(_.toRLPEncodable): _*),
+          RLPList(capabilities.map(_.toRLPEncodable)*),
           listenPort,
           RLPValue(nodeId.toArray[Byte])
         )
@@ -37,7 +37,7 @@ object WireProtocol {
     }
 
     implicit class HelloDec(val bytes: Array[Byte]) extends AnyVal {
-      import Capability._
+      import Capability.*
 
       def toHello: Hello = rawDecode(bytes) match {
         case RLPList(

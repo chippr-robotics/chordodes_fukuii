@@ -25,7 +25,7 @@ import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.Receipt
 import com.chipprbots.ethereum.domain.branch.Branch
 import com.chipprbots.ethereum.domain.branch.EmptyBranch
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class BranchResolutionSpec
     extends AnyWordSpec
@@ -372,26 +372,26 @@ class BranchResolutionSpec
     override lazy val mockBlockQueue: BlockQueue = mock[BlockQueue]
 
     // Setup default expectations
-    (blockchainReader.getBestBranch _).expects().anyNumberOfTimes().returning(EmptyBranch)
+    blockchainReader.getBestBranch.expects().anyNumberOfTimes().returning(EmptyBranch)
 
     val branchResolution = new BranchResolution(blockchainReader)
 
     // Helper methods implementation (have MockFactory context here)
     override def setBlockExists(block: Block, inChain: Boolean, inQueue: Boolean): CallHandler1[ByteString, Boolean] = {
-      (blockchainReader.getBlockByHash _)
+      blockchainReader.getBlockByHash
         .expects(block.header.hash)
         .anyNumberOfTimes()
         .returning(Some(block).filter(_ => inChain))
-      (blockQueue.isQueued _).expects(block.header.hash).anyNumberOfTimes().returning(inQueue)
+      blockQueue.isQueued.expects(block.header.hash).anyNumberOfTimes().returning(inQueue)
     }
 
     override def setBestBlock(block: Block): CallHandler0[BigInt] = {
-      (blockchainReader.getBestBlock _).expects().anyNumberOfTimes().returning(Some(block))
-      (blockchainReader.getBestBlockNumber _).expects().anyNumberOfTimes().returning(block.header.number)
+      blockchainReader.getBestBlock.expects().anyNumberOfTimes().returning(Some(block))
+      blockchainReader.getBestBlockNumber.expects().anyNumberOfTimes().returning(block.header.number)
     }
 
     override def setBestBlockNumber(num: BigInt): CallHandler0[BigInt] =
-      (blockchainReader.getBestBlockNumber _).expects().returning(num)
+      blockchainReader.getBestBlockNumber.expects().returning(num)
 
     override def setChainWeightForBlock(
         block: Block,
@@ -403,7 +403,7 @@ class BranchResolutionSpec
         hash: ByteString,
         weight: ChainWeight
     ): CallHandler1[ByteString, Option[ChainWeight]] =
-      (blockchainReader.getChainWeightByHash _).expects(hash).anyNumberOfTimes().returning(Some(weight))
+      blockchainReader.getChainWeightByHash.expects(hash).anyNumberOfTimes().returning(Some(weight))
 
     override def expectBlockSaved(
         block: Block,
@@ -417,10 +417,10 @@ class BranchResolutionSpec
         .once()
 
     override def setHeaderInChain(hash: ByteString, result: Boolean = true): CallHandler2[Branch, ByteString, Boolean] =
-      (blockchainReader.isInChain _).expects(*, hash).returning(result)
+      blockchainReader.isInChain.expects(*, hash).returning(result)
 
     override def setBlockByNumber(number: BigInt, block: Option[Block]): CallHandler2[Branch, BigInt, Option[Block]] =
-      (blockchainReader.getBlockByNumber _).expects(*, number).returning(block)
+      blockchainReader.getBlockByNumber.expects(*, number).returning(block)
 
     override def setGenesisHeader(header: BlockHeader): Unit =
       (() => blockchainReader.genesisHeader).expects().returning(header)
@@ -458,7 +458,7 @@ class BranchResolutionSpec
 
     /** Expect blockchainReader.getBlockHeaderByHash(commonParentHash) once, returning a header with `ts`. */
     def expectAncestorHeader(ts: Long = ancestorTs): Unit =
-      (blockchainReader.getBlockHeaderByHash _)
+      blockchainReader.getBlockHeaderByHash
         .expects(commonParentHash)
         .returning(Some(defaultHeader.copy(number = 9, unixTimestamp = ts)))
   }

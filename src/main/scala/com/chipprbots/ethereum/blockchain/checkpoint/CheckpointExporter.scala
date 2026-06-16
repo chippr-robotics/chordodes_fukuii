@@ -44,7 +44,7 @@ final class CheckpointExporter(
     blockchainReader: BlockchainReader,
     chainId: BigInt
 ) {
-  import CheckpointExporter._
+  import CheckpointExporter.*
   private val log = LoggerFactory.getLogger(getClass)
 
   def exportArchive(blockNumber: BigInt, output: Path, gzip: Boolean = false): Either[ExportError, ExportResult] = {

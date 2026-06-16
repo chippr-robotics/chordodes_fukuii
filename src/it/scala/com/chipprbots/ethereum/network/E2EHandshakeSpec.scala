@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.network
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.typesafe.config.ConfigValueFactory
 import org.scalatest.BeforeAndAfterAll
@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.metrics.MetricsConfig
 import com.chipprbots.ethereum.sync.util.RegularSyncItSpecUtils.FakePeer
 import com.chipprbots.ethereum.utils.Config
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** End-to-End test suite for P2P handshake functionality.
   *

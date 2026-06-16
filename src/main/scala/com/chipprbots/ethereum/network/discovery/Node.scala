@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.network.discovery
 
-import java.net._
+import java.net.*
 
 import org.apache.pekko.util.ByteString
 
@@ -110,7 +110,7 @@ object NodeParser extends Logger {
     }
 
   private def validateNodeUri(node: String): Either[Set[Error], URI] = {
-    import com.chipprbots.ethereum.utils.ValidationUtils._
+    import com.chipprbots.ethereum.utils.ValidationUtils.*
 
     val uri = validateUri(node)
     uri match {

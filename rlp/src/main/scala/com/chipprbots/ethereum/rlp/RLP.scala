@@ -241,7 +241,7 @@ private[rlp] object RLP {
         case ItemBounds(start, end, false, isEmpty) =>
           RLPValue(if (isEmpty) Array.empty[Byte] else data.slice(start, end + 1)) -> (end + 1)
         case ItemBounds(start, end, true, _) =>
-          RLPList(decodeListRecursive(data, start, end - start + 1, Queue()): _*) -> (end + 1)
+          RLPList(decodeListRecursive(data, start, end - start + 1, Queue())*) -> (end + 1)
       }
     }
 

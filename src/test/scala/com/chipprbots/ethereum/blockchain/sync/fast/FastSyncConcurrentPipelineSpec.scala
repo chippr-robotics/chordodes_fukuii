@@ -27,7 +27,7 @@ import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockBodies
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Queue-level regression and isolation tests for FastSync's three concurrent fetch pipelines (ARCH-002 / [11b]).
   *
@@ -36,7 +36,7 @@ import com.chipprbots.ethereum.testing.Tags._
   */
 class FastSyncConcurrentPipelineSpec extends AnyFlatSpec with Matchers {
 
-  import Helpers._
+  import Helpers.*
 
   private val fastSyncSourcePath =
     "src/main/scala/com/chipprbots/ethereum/blockchain/sync/fast/FastSync.scala"

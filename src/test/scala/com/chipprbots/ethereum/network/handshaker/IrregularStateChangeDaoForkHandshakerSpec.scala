@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.crypto.generateKeyPair
 import com.chipprbots.ethereum.db.storage.AppStateStorage
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.forkid.ForkId
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
@@ -27,9 +27,9 @@ import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Hello
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Hello.HelloEnc
 import com.chipprbots.ethereum.security.SecureRandomBuilder
-import com.chipprbots.ethereum.testing.Tags._
-import com.chipprbots.ethereum.utils.ByteStringUtils._
-import com.chipprbots.ethereum.utils._
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.utils.ByteStringUtils.*
+import com.chipprbots.ethereum.utils.*
 
 class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matchers {
 

@@ -10,11 +10,11 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.SuperSlow
 import com.chipprbots.ethereum.utils.ByteStringUtils
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class EthashUtilsSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks with SuperSlow {
 
-  import com.chipprbots.ethereum.consensus.pow.EthashUtils._
+  import com.chipprbots.ethereum.consensus.pow.EthashUtils.*
 
   val ecip1099forkBlockNumber: Long = 11460000
 

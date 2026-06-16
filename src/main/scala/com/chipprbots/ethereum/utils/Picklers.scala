@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.utils
 
 import org.apache.pekko.util.ByteString
 
-import boopickle.DefaultBasic._
+import boopickle.DefaultBasic.*
 import boopickle.Pickler
 
 import com.chipprbots.ethereum.crypto.ECDSASignature
@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields
-import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields._
+import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
 import com.chipprbots.ethereum.domain.LegacyTransaction
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.domain.Transaction

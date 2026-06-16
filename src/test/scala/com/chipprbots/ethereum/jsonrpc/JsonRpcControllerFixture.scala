@@ -4,7 +4,7 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.bouncycastle.util.encoders.Hex
 import org.json4s.JsonAST.JArray
@@ -23,7 +23,7 @@ import com.chipprbots.ethereum.consensus.blocks.PendingBlockAndState
 import com.chipprbots.ethereum.consensus.mining.CoinbaseProvider
 import com.chipprbots.ethereum.consensus.mining.MiningConfigs
 import com.chipprbots.ethereum.consensus.mining.TestMining
-import com.chipprbots.ethereum.consensus.pow.blocks._
+import com.chipprbots.ethereum.consensus.pow.blocks.*
 import com.chipprbots.ethereum.consensus.pow.blocks.PoWBlockGenerator
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.utils.BlockchainConfig
@@ -61,7 +61,7 @@ class JsonRpcControllerFixture(implicit system: ActorSystem, mockFactory: org.sc
     with ApisBuilder {
 
   // Import all mockFactory members to enable mock creation and expectations
-  import mockFactory._
+  import mockFactory.*
 
   def config: JsonRpcConfig = JsonRpcConfig(Config.config, available)
 

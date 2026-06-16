@@ -6,7 +6,7 @@ import com.chipprbots.ethereum.forkid.ForkId
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.MessageSerializableImplicit
-import com.chipprbots.ethereum.rlp._
+import com.chipprbots.ethereum.rlp.*
 import com.chipprbots.ethereum.utils.ByteUtils
 
 /** ETH/69 protocol (EIP-7642) — restructured Status, simplified receipts, BlockRangeUpdate.
@@ -52,7 +52,7 @@ object ETH69 {
         extends MessageSerializableImplicit[Status](underlyingMsg)
         with RLPSerializable {
       override def code: Int = Codes.StatusCode
-      import msg._
+      import msg.*
       // EIP-7642 wire layout: 7 fields, with earliestBlock between forkId and latestBlock.
       // Matches go-ethereum's `StatusPacket` (eth/protocols/eth/protocol.go) and besu's
       // `StatusMessage69` exactly. Closes the cross-client interop break observed in
@@ -69,7 +69,7 @@ object ETH69 {
     }
 
     implicit class StatusDec(val bytes: Array[Byte]) extends AnyVal {
-      import com.chipprbots.ethereum.forkid.ForkId._
+      import com.chipprbots.ethereum.forkid.ForkId.*
 
       /** Decode an ETH/69 STATUS frame.
         *

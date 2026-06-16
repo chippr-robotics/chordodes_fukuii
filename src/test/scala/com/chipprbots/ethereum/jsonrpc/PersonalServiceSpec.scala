@@ -26,11 +26,11 @@ import com.chipprbots.ethereum.NormalPatience
 import com.chipprbots.ethereum.Timeouts
 import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.crypto.ECDSASignature
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.branch.EmptyBranch
-import com.chipprbots.ethereum.testing.Tags._
-import com.chipprbots.ethereum.jsonrpc.JsonRpcError._
-import com.chipprbots.ethereum.jsonrpc.PersonalService._
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.jsonrpc.JsonRpcError.*
+import com.chipprbots.ethereum.jsonrpc.PersonalService.*
 import com.chipprbots.ethereum.consensus.mining.Mining
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage
 import com.chipprbots.ethereum.keystore.KeyStore
@@ -39,7 +39,7 @@ import com.chipprbots.ethereum.keystore.KeyStore.IOError
 import com.chipprbots.ethereum.keystore.Wallet
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
-import com.chipprbots.ethereum.transactions.PendingTransactionsManager._
+import com.chipprbots.ethereum.transactions.PendingTransactionsManager.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
@@ -61,7 +61,7 @@ class PersonalServiceSpec
   implicit val runtime: IORuntime = IORuntime.global
 
   "PersonalService" should "import private keys" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    (keyStore.importPrivateKey _).expects(prvKey, passphrase).returning(Right(address))
+    keyStore.importPrivateKey.expects(prvKey, passphrase).returning(Right(address))
 
     val req: ImportRawKeyRequest = ImportRawKeyRequest(prvKey, passphrase)
     val res: Either[JsonRpcError, ImportRawKeyResponse] = personal.importRawKey(req).unsafeRunSync()
@@ -70,7 +70,7 @@ class PersonalServiceSpec
   }
 
   it should "create new accounts" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    (keyStore.newAccount _).expects(passphrase).returning(Right(address))
+    keyStore.newAccount.expects(passphrase).returning(Right(address))
 
     val req: NewAccountRequest = NewAccountRequest(passphrase)
     val res: Either[JsonRpcError, NewAccountResponse] = personal.newAccount(req).unsafeRunSync()
@@ -79,7 +79,7 @@ class PersonalServiceSpec
   }
 
   it should "handle too short passphrase error" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    (keyStore.newAccount _).expects(passphrase).returning(Left(KeyStore.PassPhraseTooShort(7)))
+    keyStore.newAccount.expects(passphrase).returning(Left(KeyStore.PassPhraseTooShort(7)))
 
     val req: NewAccountRequest = NewAccountRequest(passphrase)
     val res: Either[JsonRpcError, NewAccountResponse] = personal.newAccount(req).unsafeRunSync()
@@ -89,7 +89,7 @@ class PersonalServiceSpec
 
   it should "list accounts" taggedAs (UnitTest, RPCTest) in new TestSetup {
     val addresses: List[Address] = List(123, 42, 1).map(Address(_))
-    (keyStore.listAccounts _).expects().returning(Right(addresses))
+    keyStore.listAccounts.expects().returning(Right(addresses))
 
     val res: Either[JsonRpcError, ListAccountsResponse] = personal.listAccounts(ListAccountsRequest()).unsafeRunSync()
 
@@ -97,16 +97,16 @@ class PersonalServiceSpec
   }
 
   it should "translate KeyStore errors to JsonRpc errors" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    (keyStore.listAccounts _).expects().returning(Left(IOError("boom!")))
+    keyStore.listAccounts.expects().returning(Left(IOError("boom!")))
     val res1: Either[JsonRpcError, ListAccountsResponse] = personal.listAccounts(ListAccountsRequest()).unsafeRunSync()
     res1 shouldEqual Left(LogicError("boom!"))
 
-    (keyStore.unlockAccount _).expects(*, *).returning(Left(KeyStore.KeyNotFound))
+    keyStore.unlockAccount.expects(*, *).returning(Left(KeyStore.KeyNotFound))
     val res2: Either[JsonRpcError, UnlockAccountResponse] =
       personal.unlockAccount(UnlockAccountRequest(Address(42), "passphrase", None)).unsafeRunSync()
     res2 shouldEqual Left(KeyNotFound)
 
-    (keyStore.unlockAccount _).expects(*, *).returning(Left(KeyStore.DecryptionFailed))
+    keyStore.unlockAccount.expects(*, *).returning(Left(KeyStore.DecryptionFailed))
     val res3: Either[JsonRpcError, UnlockAccountResponse] =
       personal.unlockAccount(UnlockAccountRequest(Address(42), "passphrase", None)).unsafeRunSync()
     res3 shouldEqual Left(InvalidPassphrase)
@@ -120,7 +120,7 @@ class PersonalServiceSpec
   }
 
   it should "unlock an account given a correct passphrase" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    (keyStore.unlockAccount _).expects(address, passphrase).returning(Right(wallet))
+    keyStore.unlockAccount.expects(address, passphrase).returning(Right(wallet))
 
     val req: UnlockAccountRequest = UnlockAccountRequest(address, passphrase, None)
     val res: Either[JsonRpcError, UnlockAccountResponse] = personal.unlockAccount(req).unsafeRunSync()
@@ -129,13 +129,13 @@ class PersonalServiceSpec
   }
 
   it should "send a transaction (given sender address and a passphrase)" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    (keyStore.unlockAccount _)
+    keyStore.unlockAccount
       .expects(address, passphrase)
       .returning(Right(wallet))
 
-    (blockchainReader.getBestBlockNumber _).expects().returning(1234)
-    (blockchainReader.getAccount _).expects(*, address, BigInt(1234)).returning(Some(Account(nonce, 2 * txValue)))
-    (blockchainReader.getBestBlockNumber _).expects().returning(forkBlockNumbers.eip155BlockNumber - 1)
+    blockchainReader.getBestBlockNumber.expects().returning(1234)
+    blockchainReader.getAccount.expects(*, address, BigInt(1234)).returning(Some(Account(nonce, 2 * txValue)))
+    blockchainReader.getBestBlockNumber.expects().returning(forkBlockNumbers.eip155BlockNumber - 1)
 
     val req: SendTransactionWithPassphraseRequest = SendTransactionWithPassphraseRequest(tx, passphrase)
     val res: Future[Either[JsonRpcError, SendTransactionWithPassphraseResponse]] =
@@ -154,13 +154,13 @@ class PersonalServiceSpec
   ) in new TestSetup {
     val newTx: SignedTransaction = wallet.signTx(tx.toTransaction(nonce + 1), None).tx
 
-    (keyStore.unlockAccount _)
+    keyStore.unlockAccount
       .expects(address, passphrase)
       .returning(Right(wallet))
 
-    (blockchainReader.getBestBlockNumber _).expects().returning(1234)
-    (blockchainReader.getAccount _).expects(*, address, BigInt(1234)).returning(Some(Account(nonce, 2 * txValue)))
-    (blockchainReader.getBestBlockNumber _).expects().returning(forkBlockNumbers.eip155BlockNumber - 1)
+    blockchainReader.getBestBlockNumber.expects().returning(1234)
+    blockchainReader.getAccount.expects(*, address, BigInt(1234)).returning(Some(Account(nonce, 2 * txValue)))
+    blockchainReader.getBestBlockNumber.expects().returning(forkBlockNumbers.eip155BlockNumber - 1)
 
     val req: SendTransactionWithPassphraseRequest = SendTransactionWithPassphraseRequest(tx, passphrase)
     val res: Future[Either[JsonRpcError, SendTransactionWithPassphraseResponse]] =
@@ -174,7 +174,7 @@ class PersonalServiceSpec
   }
 
   it should "fail to send a transaction given a wrong passphrase" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    (keyStore.unlockAccount _)
+    keyStore.unlockAccount
       .expects(address, passphrase)
       .returning(Left(KeyStore.DecryptionFailed))
 
@@ -189,15 +189,15 @@ class PersonalServiceSpec
     UnitTest,
     RPCTest
   ) in new TestSetup {
-    (keyStore.unlockAccount _)
+    keyStore.unlockAccount
       .expects(address, passphrase)
       .returning(Right(wallet))
 
     personal.unlockAccount(UnlockAccountRequest(address, passphrase, None)).unsafeRunSync()
 
-    (blockchainReader.getBestBlockNumber _).expects().returning(1234)
-    (blockchainReader.getAccount _).expects(*, address, BigInt(1234)).returning(Some(Account(nonce, 2 * txValue)))
-    (blockchainReader.getBestBlockNumber _).expects().returning(forkBlockNumbers.eip155BlockNumber - 1)
+    blockchainReader.getBestBlockNumber.expects().returning(1234)
+    blockchainReader.getAccount.expects(*, address, BigInt(1234)).returning(Some(Account(nonce, 2 * txValue)))
+    blockchainReader.getBestBlockNumber.expects().returning(forkBlockNumbers.eip155BlockNumber - 1)
 
     val req: SendTransactionRequest = SendTransactionRequest(tx)
     val res: Future[Either[JsonRpcError, SendTransactionResponse]] = personal.sendTransaction(req).unsafeToFuture()
@@ -218,7 +218,7 @@ class PersonalServiceSpec
   }
 
   it should "lock an unlocked account" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    (keyStore.unlockAccount _)
+    keyStore.unlockAccount
       .expects(address, passphrase)
       .returning(Right(wallet))
 
@@ -235,7 +235,7 @@ class PersonalServiceSpec
 
   it should "sign a message when correct passphrase is sent" taggedAs (UnitTest, RPCTest) in new TestSetup {
 
-    (keyStore.unlockAccount _)
+    keyStore.unlockAccount
       .expects(address, passphrase)
       .returning(Right(wallet))
 
@@ -259,7 +259,7 @@ class PersonalServiceSpec
 
   it should "sign a message using an unlocked account" taggedAs (UnitTest, RPCTest) in new TestSetup {
 
-    (keyStore.unlockAccount _)
+    keyStore.unlockAccount
       .expects(address, passphrase)
       .returning(Right(wallet))
 
@@ -296,7 +296,7 @@ class PersonalServiceSpec
 
     val wrongPassphase = "wrongPassphrase"
 
-    (keyStore.unlockAccount _)
+    keyStore.unlockAccount
       .expects(address, wrongPassphase)
       .returning(Left(DecryptionFailed))
 
@@ -310,7 +310,7 @@ class PersonalServiceSpec
 
   it should "return an error when signing if unexistent address is sent" taggedAs (UnitTest, RPCTest) in new TestSetup {
 
-    (keyStore.unlockAccount _)
+    keyStore.unlockAccount
       .expects(address, passphrase)
       .returning(Left(KeyStore.KeyNotFound))
 
@@ -339,7 +339,7 @@ class PersonalServiceSpec
 
   it should "allow to sign and recover the same message" taggedAs (UnitTest, RPCTest) in new TestSetup {
 
-    (keyStore.unlockAccount _)
+    keyStore.unlockAccount
       .expects(address, passphrase)
       .returning(Right(wallet))
 
@@ -358,13 +358,13 @@ class PersonalServiceSpec
   }
 
   it should "produce not chain specific transaction before eip155" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    (keyStore.unlockAccount _)
+    keyStore.unlockAccount
       .expects(address, passphrase)
       .returning(Right(wallet))
 
-    (blockchainReader.getBestBlockNumber _).expects().returning(1234)
-    (blockchainReader.getAccount _).expects(*, address, BigInt(1234)).returning(Some(Account(nonce, 2 * txValue)))
-    (blockchainReader.getBestBlockNumber _).expects().returning(forkBlockNumbers.eip155BlockNumber - 1)
+    blockchainReader.getBestBlockNumber.expects().returning(1234)
+    blockchainReader.getAccount.expects(*, address, BigInt(1234)).returning(Some(Account(nonce, 2 * txValue)))
+    blockchainReader.getBestBlockNumber.expects().returning(forkBlockNumbers.eip155BlockNumber - 1)
 
     val req: SendTransactionWithPassphraseRequest = SendTransactionWithPassphraseRequest(tx, passphrase)
     val res: Future[Either[JsonRpcError, SendTransactionWithPassphraseResponse]] =
@@ -378,14 +378,14 @@ class PersonalServiceSpec
   }
 
   it should "produce chain specific transaction after eip155" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    (keyStore.unlockAccount _)
+    keyStore.unlockAccount
       .expects(address, passphrase)
       .returning(Right(wallet))
 
-    (blockchainReader.getBestBlockNumber _).expects().returning(1234)
-    (blockchainReader.getAccount _).expects(*, address, BigInt(1234)).returning(Some(Account(nonce, 2 * txValue)))
+    blockchainReader.getBestBlockNumber.expects().returning(1234)
+    blockchainReader.getAccount.expects(*, address, BigInt(1234)).returning(Some(Account(nonce, 2 * txValue)))
     new Block(Fixtures.Blocks.Block3125369.header, Fixtures.Blocks.Block3125369.body)
-    (blockchainReader.getBestBlockNumber _).expects().returning(forkBlockNumbers.eip155BlockNumber)
+    blockchainReader.getBestBlockNumber.expects().returning(forkBlockNumbers.eip155BlockNumber)
 
     val req: SendTransactionWithPassphraseRequest = SendTransactionWithPassphraseRequest(tx, passphrase)
     val res: Future[Either[JsonRpcError, SendTransactionWithPassphraseResponse]] =
@@ -402,12 +402,12 @@ class PersonalServiceSpec
     UnitTest,
     RPCTest
   ) in new TestSetup {
-    (keyStore.unlockAccount _)
+    keyStore.unlockAccount
       .expects(address, passphrase)
       .returning(Right(wallet))
 
-    (blockchainReader.getBestBlockNumber _).expects().returning(1234)
-    (blockchainReader.getAccount _)
+    blockchainReader.getBestBlockNumber.expects().returning(1234)
+    blockchainReader.getAccount
       .expects(*, address, BigInt(1234))
       .throwing(new MissingNodeException(ByteString(new Array[Byte](32))))
 
@@ -425,14 +425,14 @@ class PersonalServiceSpec
     UnitTest,
     RPCTest
   ) in new TestSetup {
-    (keyStore.unlockAccount _)
+    keyStore.unlockAccount
       .expects(address, passphrase)
       .returning(Right(wallet))
 
     personal.unlockAccount(UnlockAccountRequest(address, passphrase, None)).unsafeRunSync()
 
-    (blockchainReader.getBestBlockNumber _).expects().returning(1234)
-    (blockchainReader.getAccount _)
+    blockchainReader.getBestBlockNumber.expects().returning(1234)
+    blockchainReader.getAccount
       .expects(*, address, BigInt(1234))
       .throwing(new MissingNodeException(ByteString(new Array[Byte](32))))
 
@@ -447,7 +447,7 @@ class PersonalServiceSpec
   }
 
   it should "return an error when importing a duplicated key" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    (keyStore.importPrivateKey _).expects(prvKey, passphrase).returning(Left(KeyStore.DuplicateKeySaved))
+    keyStore.importPrivateKey.expects(prvKey, passphrase).returning(Left(KeyStore.DuplicateKeySaved))
 
     val req: ImportRawKeyRequest = ImportRawKeyRequest(prvKey, passphrase)
     val res: Either[JsonRpcError, ImportRawKeyResponse] = personal.importRawKey(req).unsafeRunSync()
@@ -458,7 +458,7 @@ class PersonalServiceSpec
     UnitTest,
     RPCTest
   ) in new TestSetup {
-    (keyStore.unlockAccount _).expects(address, passphrase).returning(Right(wallet))
+    keyStore.unlockAccount.expects(address, passphrase).returning(Right(wallet))
 
     val message: ByteString = ByteString(Hex.decode("deadbeaf"))
 
@@ -525,7 +525,7 @@ class PersonalServiceSpec
 
     val txPool: TestProbe = TestProbe()
     val blockchainReader: BlockchainReader = mock[BlockchainReader]
-    (blockchainReader.getBestBranch _).expects().returning(EmptyBranch).anyNumberOfTimes()
+    blockchainReader.getBestBranch.expects().returning(EmptyBranch).anyNumberOfTimes()
     val blockchain: BlockchainImpl = mock[BlockchainImpl]
 
     // suggestGasPrice() is private[jsonrpc] — ScalaMock generates its proxy outside the package

@@ -16,7 +16,7 @@ import com.chipprbots.ethereum.ledger.VMImpl
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.Config.SyncConfig
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class DeleteAccountsSpec extends AnyFlatSpec with Matchers with MockFactory {
 
@@ -76,7 +76,7 @@ class DeleteAccountsSpec extends AnyFlatSpec with Matchers with MockFactory {
     val accountAddresses: Set[Address] = Set(validAccountAddress, validAccountAddress2, validAccountAddress3)
 
     // Mock the getBackingMptStorage call
-    (DeleteAccountsSpec.this.blockchain.getBackingMptStorage _)
+    DeleteAccountsSpec.this.blockchain.getBackingMptStorage
       .expects(BigInt(-1))
       .returning(storagesInstance.storages.stateStorage.getBackingStorage(0))
       .anyNumberOfTimes()

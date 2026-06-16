@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.db.storage
 
 import org.apache.pekko.util.ByteString
 
-import boopickle.Default._
+import boopickle.Default.*
 
 import com.chipprbots.ethereum.db.dataSource.DataSource
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage.TransactionLocation
@@ -18,7 +18,7 @@ class TransactionMappingStorage(val dataSource: DataSource)
   def keyDeserializer: IndexedSeq[Byte] => TxHash = identity
   def valueSerializer: TransactionLocation => IndexedSeq[Byte] = tl => compactPickledBytes(Pickle.intoBytes(tl))
   def valueDeserializer: IndexedSeq[Byte] => TransactionLocation =
-    (byteSequenceToBuffer _).andThen(Unpickle[TransactionLocation].fromBytes)
+    byteSequenceToBuffer.andThen(Unpickle[TransactionLocation].fromBytes)
 
   implicit val byteStringPickler: Pickler[ByteString] =
     transformPickler[ByteString, Array[Byte]](ByteString(_))(_.toArray[Byte])

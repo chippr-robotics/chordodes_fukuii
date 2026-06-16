@@ -4,14 +4,14 @@ import java.net.InetSocketAddress
 import java.net.URI
 import java.util.concurrent.TimeUnit
 
-import org.apache.pekko.actor._
+import org.apache.pekko.actor.*
 import org.apache.pekko.testkit.ExplicitlyTriggeredScheduler
 import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.github.blemale.scaffeine.Cache
 import com.github.blemale.scaffeine.Scaffeine
@@ -56,7 +56,7 @@ import com.chipprbots.ethereum.network.discovery.PeerDiscoveryManager
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 
 import Arbitrary.arbitrary
@@ -937,7 +937,7 @@ class PeerManagerSpec
       PeerId("Charlie") -> stat(responses = 0, firstSeen = 20.hours, lastSeen = 5.minute).copy(requestsReceived = 1000)
     )
 
-    val priority = PeerManagerActor.prunePriority(stats, now) _
+    val priority = PeerManagerActor.prunePriority(stats, now)
 
     priority(PeerId("Alice")) shouldBe (50.0 / 1.hour.toMillis) +- 0.001
     priority(PeerId("Alice")) shouldBe >(priority(PeerId("Bob")))
@@ -1009,7 +1009,7 @@ class PeerManagerSpec
       .maximumSize(
         10
       )
-      .ticker(ticker.read _)
+      .ticker(ticker.read)
       .build[BlacklistId, BlacklistReason.BlacklistReasonType]()
     val blacklist: CacheBasedBlacklist = CacheBasedBlacklist(cache)
 

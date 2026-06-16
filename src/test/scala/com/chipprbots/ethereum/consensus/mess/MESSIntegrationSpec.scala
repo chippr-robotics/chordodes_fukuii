@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.consensus.mess
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 // ── L6: MESS blockchain-level reorg boundary (ECBP-1100 + Spiral deactivation + Olympia re-activation) ─────
 //

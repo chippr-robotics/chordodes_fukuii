@@ -15,10 +15,10 @@ import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.mpt.ByteArraySerializable
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions._
-import com.chipprbots.ethereum.rlp.RLPImplicitConversions._
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
+import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
-import com.chipprbots.ethereum.rlp.{encode => rlpEncode, *}
+import com.chipprbots.ethereum.rlp.{encode as rlpEncode, *}
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteUtils
 
@@ -515,7 +515,7 @@ object SignedTransaction {
             RLPValue(tx.payload.toArray[Byte]),
             tx.accessList,
             tx.maxFeePerBlobGas,
-            RLPList(tx.blobVersionedHashes.map(h => RLPValue(h.toArray)): _*)
+            RLPList(tx.blobVersionedHashes.map(h => RLPValue(h.toArray))*)
           )
         )
       )
