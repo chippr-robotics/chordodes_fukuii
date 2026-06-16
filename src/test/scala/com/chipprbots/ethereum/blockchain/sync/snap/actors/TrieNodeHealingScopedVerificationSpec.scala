@@ -30,8 +30,8 @@ import java.util.concurrent.{Executors, TimeUnit}
   *   - V2: with the completeness marker proven and a small CLEAN healed set, the completion gate engages the scoped
   *     path (gauge=1), the scoped walk re-walks only the healed subtrees, and the coordinator reaches
   *     StateHealingComplete.
-  *   - V3: a healed node with a deeper MISSING descendant must NOT declare completion — the gap surfaces as a pending
-  *     frontier and the round stays open until it is clean (FR-006).
+  *   - V3: a healed node with a deeper MISSING descendant must NOT declare completion — the gap surfaces in the open
+  *     frontier (queued or in-flight) and the round stays open until it is clean (FR-006).
   */
 class TrieNodeHealingScopedVerificationSpec
     extends TestKit(ActorSystem("TrieNodeHealingScopedVerificationSpec"))
@@ -78,10 +78,18 @@ class TrieNodeHealingScopedVerificationSpec
     ()
   }
 
-  private def pendingTasks(coordinator: ActorRef): Int = {
+  /** The OPEN frontier = pending (queued) + active (in-flight). A missing descendant discovered inline at the heal site
+    * is enqueued to `pendingTasks`, then — because the heal response was non-empty so the peer stays eligible — the
+    * same `handleResponse` call pipelines it straight into an in-flight `GetTrieNodes` request via
+    * `dispatchIfPossible`, moving it from `pendingTasks` into `activeTasks`. Which bucket it lands in is a
+    * non-deterministic pipelining detail; the FR-006 invariant is that it stays in the open frontier (pending OR
+    * active), keeping the round open (`isComplete == false`) so no completion is declared while the gap is unhealed.
+    */
+  private def openFrontier(coordinator: ActorRef): Int = {
     val probe = TestProbe()
     coordinator.tell(Messages.HealingGetProgress, probe.ref)
-    probe.expectMsgType[HealingStatistics](2.seconds).pendingTasks
+    val stats = probe.expectMsgType[HealingStatistics](2.seconds)
+    stats.pendingTasks + stats.activeTasks
   }
 
   /** Wait for StateHealingComplete, ignoring interleaved ProgressNodesHealed messages. */
@@ -192,8 +200,10 @@ class TrieNodeHealingScopedVerificationSpec
         // Heal the branch — its only child is missing, so a gap remains below the healed node.
         coordinator ! Messages.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = Seq(encoded)))
 
-        // The missing descendant must surface as a pending frontier entry; the round MUST stay open.
-        awaitAssert(pendingTasks(coordinator) should be >= 1, 5.seconds, 100.millis)
+        // The missing descendant must surface in the OPEN frontier (pending OR in-flight); the round MUST stay open.
+        // Inline discovery enqueues it, then the non-empty heal response pipelines it straight into an active
+        // request — so it is in `activeTasks`, not necessarily `pendingTasks`. Either keeps `isComplete` false.
+        awaitAssert(openFrontier(coordinator) should be >= 1, 5.seconds, 100.millis)
         // No completion is declared while the gap is unhealed (FR-006). ProgressNodesHealed is allowed.
         assertNoCompletion(controller, 1.second)
         missingChild.length shouldBe 32 // sanity: the gap hash is a real keccak-256 child reference
