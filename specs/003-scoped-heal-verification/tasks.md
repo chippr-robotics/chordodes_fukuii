@@ -26,8 +26,8 @@
 
 ## Phase 1: Setup (config scaffolding)
 
-- [ ] T001 Add `scoped-heal-verification = true` and `scoped-heal-max-paths = 200000` keys (with explanatory comments mirroring `heal-hold-pivot-on-stagnation`) to the `snap-sync` block in `src/main/resources/conf/base/sync.conf` (per contract C5).
-- [ ] T002 Add `scopedHealVerification: Boolean = true` and `scopedHealMaxPaths: Int = 200000` to the `SNAPSyncConfig` case class, parse them with the `hasPath`-guarded idiom in `SNAPSyncConfig.fromConfig`, and thread both into `TrieNodeHealingCoordinator.props`/constructor beside `healingTraversalParallelism`, in `src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/SNAPSyncController.scala` (contract C5).
+- [X] T001 Add `scoped-heal-verification = true` and `scoped-heal-max-paths = 200000` keys (with explanatory comments mirroring `heal-hold-pivot-on-stagnation`) to the `snap-sync` block in `src/main/resources/conf/base/sync.conf` (per contract C5).
+- [X] T002 Add `scopedHealVerification: Boolean = true` and `scopedHealMaxPaths: Int = 200000` to the `SNAPSyncConfig` case class, parse them with the `hasPath`-guarded idiom in `SNAPSyncConfig.fromConfig`, and thread both into `TrieNodeHealingCoordinator.props`/constructor beside `healingTraversalParallelism`, in `src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/SNAPSyncController.scala` (contract C5).
 
 ---
 
@@ -35,10 +35,10 @@
 
 **⚠️ MUST complete before any user-story phase.**
 
-- [ ] T003 Add the healed-paths accumulator fields to `TNHC` — `healedPathsThisRound: mutable.LinkedHashMap[ByteString, HealingEntry]`, `healedPathsRoot: ByteString`, `healedPathsOverflowed: Boolean` — mirroring `pendingTasks`/`pendingHashSet`, in `TrieNodeHealingCoordinator.scala` (contract C1; data-model.md §Healed-paths set).
-- [ ] T004 Capture each healed node's `HealingEntry` into `healedPathsThisRound` at the single heal site in `TNHC.handleResponse` (immediately after `totalNodesHealed += 1`, ~`:1081`): tag `healedPathsRoot = stateRoot` on first capture of the round, dedup by hash, and set `healedPathsOverflowed` when size would exceed `scopedHealMaxPaths`, in `TrieNodeHealingCoordinator.scala` (contract C1).
-- [ ] T005 Clear the healed-paths set (`empty`, `healedPathsOverflowed = false`) at the three reset sites — differing-root `HealingPivotRefreshed` (~`:599`), `HealingForceComplete` (~`:576`), and after a verified `StateHealingComplete` (~`:731`); do NOT clear on same-root `HealingPivotRefreshed` — in `TrieNodeHealingCoordinator.scala` (contract C1).
-- [ ] T006 Add the multi-seed `rebuildFrontierBFS(seeds: Seq[(ByteString, Seq[ByteString], Boolean)], ...)` overload as the kernel and reduce the existing single-seed signature to a thin wrapper that calls it with one seed; the ONLY kernel deltas are seeding `markIfNew` and `enqueueBatch` over `seeds` (contract C2) — in `TrieNodeHealingCoordinator.scala`. Must be byte-identical for a single seed.
+- [X] T003 Add the healed-paths accumulator fields to `TNHC` — `healedPathsThisRound: mutable.LinkedHashMap[ByteString, HealingEntry]`, `healedPathsRoot: ByteString`, `healedPathsOverflowed: Boolean` — mirroring `pendingTasks`/`pendingHashSet`, in `TrieNodeHealingCoordinator.scala` (contract C1; data-model.md §Healed-paths set).
+- [X] T004 Capture each healed node's `HealingEntry` into `healedPathsThisRound` at the single heal site in `TNHC.handleResponse` (immediately after `totalNodesHealed += 1`, ~`:1081`): tag `healedPathsRoot = stateRoot` on first capture of the round, dedup by hash, and set `healedPathsOverflowed` when size would exceed `scopedHealMaxPaths`, in `TrieNodeHealingCoordinator.scala` (contract C1).
+- [X] T005 Clear the healed-paths set (`empty`, `healedPathsOverflowed = false`) at the three reset sites — differing-root `HealingPivotRefreshed` (~`:599`), `HealingForceComplete` (~`:576`), and after a verified `StateHealingComplete` (~`:731`); do NOT clear on same-root `HealingPivotRefreshed` — in `TrieNodeHealingCoordinator.scala` (contract C1).
+- [X] T006 Add the multi-seed `rebuildFrontierBFS(seeds: Seq[(ByteString, Seq[ByteString], Boolean)], ...)` overload as the kernel and reduce the existing single-seed signature to a thin wrapper that calls it with one seed; the ONLY kernel deltas are seeding `markIfNew` and `enqueueBatch` over `seeds` (contract C2) — in `TrieNodeHealingCoordinator.scala`. Must be byte-identical for a single seed.
 
 ---
 
@@ -48,12 +48,12 @@
 
 **Independent test**: With the CF `g` completeness marker set and a small clean healed set, the completion gate seeds the BFS from the healed paths (not the root) and completes far faster than a full-root walk, with identical resulting state.
 
-- [ ] T007 [US1] Add `startScopedVerification(seeds: Seq[HealingEntry])` — sibling of `startVerificationBFS` — mapping each entry to `(hash, pathset, pathset.size > 1)`, launching the multi-seed walk on `healingWriterEc` via `startFrontierBFS` plumbing, reusing `verificationBFSRunning`, the shared `bfsQueue`, and routing completion to the existing `VerificationBFSComplete` handler and exceptions to `FrontierWalkFailed`, in `TrieNodeHealingCoordinator.scala` (contract C3).
-- [ ] T008 [US1] In `TNHC.HealingCheckCompletion` (~`:732-742`), add the `useScoped` decision and call `startScopedVerification(healedPathsThisRound.values.toSeq)` on the scoped branch (full predicate completed in T013); leave the completion declaration (`:715-731`) untouched so completion flows through the single `verificationPassComplete` chokepoint, in `TrieNodeHealingCoordinator.scala` (contract C4).
-- [ ] T009 [P] [US1] Test: scope-capture completeness (V1) — drive N heals, assert `healedPathsThisRound` equals exactly those N `(hash, pathset)` pairs (dedup, no skip), in a new `TrieNodeHealingScopeCaptureSpec.scala`.
-- [ ] T010 [P] [US1] Test: scoped completion (V2) — marker set + small clean healed set → asserts BFS seeded from healed paths, only those subtrees visited, reaches `StateHealingComplete`, in `TrieNodeHealingScopedVerificationSpec.scala`.
-- [ ] T011 [P] [US1] Test: gap below a healed node (V3 / FR-006) — healed node with a deeper missing descendant → scoped walk discovers it, emits `FrontierRebuilt`, does NOT complete until clean, in `TrieNodeHealingScopedVerificationSpec.scala`.
-- [ ] T012 [P] [US1] Test: multi-seed single-element byte-parity (C2) — assert the single-seed wrapper and a one-element multi-seed call produce identical visited set / frontier emission, in `RebuildFrontierBfsMultiSeedSpec.scala`.
+- [X] T007 [US1] Add `startScopedVerification(seeds: Seq[HealingEntry])` — sibling of `startVerificationBFS` — mapping each entry to `(hash, pathset, pathset.size > 1)`, launching the multi-seed walk on `healingWriterEc` via `startFrontierBFS` plumbing, reusing `verificationBFSRunning`, the shared `bfsQueue`, and routing completion to the existing `VerificationBFSComplete` handler and exceptions to `FrontierWalkFailed`, in `TrieNodeHealingCoordinator.scala` (contract C3).
+- [X] T008 [US1] In `TNHC.HealingCheckCompletion` (~`:732-742`), add the `useScoped` decision and call `startScopedVerification(healedPathsThisRound.values.toSeq)` on the scoped branch (full predicate completed in T013); leave the completion declaration (`:715-731`) untouched so completion flows through the single `verificationPassComplete` chokepoint, in `TrieNodeHealingCoordinator.scala` (contract C4).
+- [X] T009 [P] [US1] Test: scope-capture completeness (V1) — drive N heals, assert `healedPathsThisRound` equals exactly those N `(hash, pathset)` pairs (dedup, no skip), in a new `TrieNodeHealingScopeCaptureSpec.scala`.
+- [X] T010 [P] [US1] Test: scoped completion (V2) — marker set + small clean healed set → asserts BFS seeded from healed paths, only those subtrees visited, reaches `StateHealingComplete`, in `TrieNodeHealingScopedVerificationSpec.scala`.
+- [X] T011 [P] [US1] Test: gap below a healed node (V3 / FR-006) — healed node with a deeper missing descendant → scoped walk discovers it, emits `FrontierRebuilt`, does NOT complete until clean, in `TrieNodeHealingScopedVerificationSpec.scala`.
+- [X] T012 [P] [US1] Test: multi-seed single-element byte-parity (C2) — assert the single-seed wrapper and a one-element multi-seed call produce identical visited set / frontier emission, in `RebuildFrontierBfsMultiSeedSpec.scala`.
 
 **Checkpoint**: US1 demonstrable — scoped verification engages and completes on a covered, small-gap node.
 
@@ -65,9 +65,9 @@
 
 **Independent test**: For each fallback clause (disabled / no-marker / empty-or-restart / over-bound / pivot-changed / fresh), the gate takes the full-root path; and scoped-vs-full-root completion yields an identical state root + marker.
 
-- [ ] T013 [US2] Implement the full 5-condition `useScoped` predicate in `TNHC.HealingCheckCompletion` — `scopedHealVerification` (F1) ∧ `healingFrontierStorage.exists(_.isComplete)` (F2/F6) ∧ `healedPathsThisRound.nonEmpty` (F3) ∧ `!healedPathsOverflowed` (F4) ∧ `healedPathsRoot == stateRoot` (F5); `else` keeps the unchanged `startVerificationBFS(stateRoot, emptyPath)` full-root fallback (contract C4, FR-004/005/009/011).
-- [ ] T014 [P] [US2] Test: byte-parity (V4 / FR-007 / SC-004) — same healed state reaches completion via scoped and via full-root (config flip); assert identical final state root AND identical CF `g` completeness-marker bytes, in `ScopedVerificationParitySpec.scala`.
-- [ ] T015 [P] [US2] Test: fallback clauses F1-F6 (V5 / SC-003) — each unsafe condition asserts the full-root branch is taken and `startScopedVerification` is NOT called, in `ScopedVerificationFallbackSpec.scala`.
+- [X] T013 [US2] Implement the full 5-condition `useScoped` predicate in `TNHC.HealingCheckCompletion` — `scopedHealVerification` (F1) ∧ `healingFrontierStorage.exists(_.isComplete)` (F2/F6) ∧ `healedPathsThisRound.nonEmpty` (F3) ∧ `!healedPathsOverflowed` (F4) ∧ `healedPathsRoot == stateRoot` (F5); `else` keeps the unchanged `startVerificationBFS(stateRoot, emptyPath)` full-root fallback (contract C4, FR-004/005/009/011).
+- [X] T014 [P] [US2] Test: byte-parity (V4 / FR-007 / SC-004) — same healed state reaches completion via scoped and via full-root (config flip); assert identical final state root AND identical CF `g` completeness-marker bytes, in `ScopedVerificationParitySpec.scala`.
+- [X] T015 [P] [US2] Test: fallback clauses F1-F6 (V5 / SC-003) — each unsafe condition asserts the full-root branch is taken and `startScopedVerification` is NOT called, in `ScopedVerificationFallbackSpec.scala`.
 
 **Checkpoint**: US1+US2 = the safe MVP — scoped when proven, full-root otherwise, identical outcomes.
 
@@ -79,9 +79,9 @@
 
 **Independent test**: A scoped run emits the engagement log + `app_snapsync.healing.scoped_*` metrics; disabling the config flag yields the full-root path with a "scoping disabled" log.
 
-- [ ] T016 [US3] Add the `[HEAL-VERIFY-SCOPED]` engagement + completion logs and the additive `SNAPSyncMetrics` gauges (`scoped_verification` 0/1, `scoped_subtrees`, `scoped_duration_ms`, `app_`-prefixed) on scoped entry and on `VerificationBFSComplete` for a scoped run; set the gauge to 0 on the full-root path — in `TrieNodeHealingCoordinator.scala` and `SNAPSyncMetrics.scala` (contract C6, FR-010).
-- [ ] T017 [US3] Emit the once-per-round "scoped verification disabled by config — using full-root verification" log when the fallback engages specifically because `scopedHealVerification == false`, in `TrieNodeHealingCoordinator.scala` (contract C5, US3 AS2).
-- [ ] T018 [P] [US3] Test: observability (V6) — scoped path emits the engagement log + moves the gauges; disabled path emits the "scoping disabled" log and the full-root walk, in `ScopedVerificationObservabilitySpec.scala`.
+- [X] T016 [US3] Add the `[HEAL-VERIFY-SCOPED]` engagement + completion logs and the additive `SNAPSyncMetrics` gauges (`scoped_verification` 0/1, `scoped_subtrees`, `scoped_duration_ms`, `app_`-prefixed) on scoped entry and on `VerificationBFSComplete` for a scoped run; set the gauge to 0 on the full-root path — in `TrieNodeHealingCoordinator.scala` and `SNAPSyncMetrics.scala` (contract C6, FR-010).
+- [X] T017 [US3] Emit the once-per-round "scoped verification disabled by config — using full-root verification" log when the fallback engages specifically because `scopedHealVerification == false`, in `TrieNodeHealingCoordinator.scala` (contract C5, US3 AS2).
+- [X] T018 [P] [US3] Test: observability (V6) — scoped path emits the engagement log + moves the gauges; disabled path emits the "scoping disabled" log and the full-root walk, in `ScopedVerificationObservabilitySpec.scala`.
 
 **Checkpoint**: full feature — fast, safe, observable, controllable.
 

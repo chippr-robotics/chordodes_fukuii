@@ -3378,7 +3378,9 @@ class SNAPSyncController(
               storageScheme = snapSyncConfig.storageScheme,
               pathNodeStorageOpt = pathNodeStorageOpt,
               frontierHighWater = snapSyncConfig.healingFrontierHighWater,
-              frontierLowWater = snapSyncConfig.healingFrontierLowWater
+              frontierLowWater = snapSyncConfig.healingFrontierLowWater,
+              scopedHealVerification = snapSyncConfig.scopedHealVerification,
+              scopedHealMaxPaths = snapSyncConfig.scopedHealMaxPaths
             )
             .withDispatcher("sync-dispatcher"),
           s"trie-node-healing-coordinator-$coordinatorGeneration"
@@ -3441,7 +3443,9 @@ class SNAPSyncController(
                   storageScheme = snapSyncConfig.storageScheme,
                   pathNodeStorageOpt = pathNodeStorageOpt,
                   frontierHighWater = snapSyncConfig.healingFrontierHighWater,
-                  frontierLowWater = snapSyncConfig.healingFrontierLowWater
+                  frontierLowWater = snapSyncConfig.healingFrontierLowWater,
+                  scopedHealVerification = snapSyncConfig.scopedHealVerification,
+                  scopedHealMaxPaths = snapSyncConfig.scopedHealMaxPaths
                 )
                 .withDispatcher("sync-dispatcher"),
               s"trie-node-healing-coordinator-$coordinatorGeneration"
@@ -4779,6 +4783,17 @@ case class SNAPSyncConfig(
     // root stays ~99.9% servable; regular sync fills any residual gap on-demand. The GENUINE all-peers-stateless
     // roll (HealingAllPeersStateless) is unaffected. Set false to restore legacy roll-on-stagnation.
     healHoldPivotOnStagnation: Boolean = true,
+    // Scoped post-heal verification (spec 003). When true (default), the post-heal completion
+    // verification re-walks ONLY the subtrees rooted at the nodes healed this round instead of
+    // re-seeding the state root and re-walking the whole trie. It engages only when the durable
+    // completeness marker proves a prior full-trie clean walk against the current root AND the
+    // healed-paths set is non-empty, in-bound, and same-root; otherwise it falls back to the
+    // unchanged full-root verification. Byte-parity of the completion decision/state root/marker is
+    // preserved. Set false to force the conservative full-root verification on every round.
+    scopedHealVerification: Boolean = true,
+    // Upper bound on the in-memory healed-paths set (spec 003 FR-011). Over-bound rounds fall back to
+    // full-root verification rather than growing the set, bounding its worst-case heap.
+    scopedHealMaxPaths: Int = 200000,
     stateValidationEnabled: Boolean = true,
     maxRetries: Int = 3,
     timeout: FiniteDuration = 30.seconds,
@@ -4908,6 +4923,14 @@ object SNAPSyncConfig {
         if (snapConfig.hasPath("heal-hold-pivot-on-stagnation"))
           snapConfig.getBoolean("heal-hold-pivot-on-stagnation")
         else true,
+      scopedHealVerification =
+        if (snapConfig.hasPath("scoped-heal-verification"))
+          snapConfig.getBoolean("scoped-heal-verification")
+        else true,
+      scopedHealMaxPaths =
+        if (snapConfig.hasPath("scoped-heal-max-paths"))
+          snapConfig.getInt("scoped-heal-max-paths")
+        else 200000,
       stateValidationEnabled = snapConfig.getBoolean("state-validation-enabled"),
       maxRetries = snapConfig.getInt("max-retries"),
       timeout = snapConfig.getDuration("timeout").toMillis.millis,
