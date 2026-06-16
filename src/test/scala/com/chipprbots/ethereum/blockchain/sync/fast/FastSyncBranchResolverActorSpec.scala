@@ -14,7 +14,7 @@ import org.apache.pekko.util.Timeout
 import cats.effect.Deferred
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
-import cats.implicits._
+import cats.implicits.*
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.duration.FiniteDuration

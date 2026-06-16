@@ -7,7 +7,7 @@ import org.apache.pekko.actor._
 import org.apache.pekko.util.ByteString
 
 import cats.data.NonEmptyList
-import cats.implicits._
+import cats.implicits.*
 
 import scala.annotation.tailrec
 import scala.collection.mutable

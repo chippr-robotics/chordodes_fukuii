@@ -9,7 +9,7 @@ import cats.effect.IO
 import cats.effect.Ref
 import cats.effect.Resource
 import cats.effect.std.Semaphore
-import cats.implicits._
+import cats.implicits.*
 
 import scala.concurrent.duration._
 

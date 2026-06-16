@@ -5,7 +5,7 @@ import java.nio.file.Paths
 
 import scala.collection.immutable.ArraySeq
 
-import cats.implicits._
+import cats.implicits.*
 
 import com.monovore.decline.Command
 import com.monovore.decline.Opts

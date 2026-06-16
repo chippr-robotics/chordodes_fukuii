@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.cli
 
 import java.security.SecureRandom
 
-import cats.implicits._
+import cats.implicits.*
 
 import com.monovore.decline.Command
 import com.monovore.decline.Opts

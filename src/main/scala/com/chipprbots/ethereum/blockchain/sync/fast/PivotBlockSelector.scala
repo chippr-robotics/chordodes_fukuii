@@ -330,7 +330,7 @@ object PivotBlockSelector {
   case class BlockHeaderWithVotes(header: BlockHeader, votes: Int = 1) {
     def vote: BlockHeaderWithVotes = copy(votes = votes + 1)
   }
-  import cats.implicits._
+  import cats.implicits.*
   implicit class SortableHeadersMap(headers: Map[ByteString, BlockHeaderWithVotes]) {
     def mostVotedHeader: Option[BlockHeaderWithVotes] =
       headers.toList.maximumByOption { case (_, headerWithVotes) => headerWithVotes.votes }.map(_._2)

@@ -7,7 +7,7 @@ import cats.effect.IO
 import cats.effect.Ref
 import cats.effect.Resource
 import cats.effect.Temporal
-import cats.implicits._
+import cats.implicits.*
 
 import scala.collection.immutable.SortedSet
 import scala.concurrent.duration._

@@ -4,7 +4,7 @@ import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
-import cats.implicits._
+import cats.implicits.*
 
 import scala.collection.immutable.NumericRange
 import scala.concurrent.duration.FiniteDuration

@@ -8,7 +8,7 @@ import cats.Show
 import cats.effect.Deferred
 import cats.effect.IO
 import cats.effect.Temporal
-import cats.implicits._
+import cats.implicits.*
 
 import scala.concurrent.duration._
 import scala.util.control.NoStackTrace

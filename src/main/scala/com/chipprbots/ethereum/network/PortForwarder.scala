@@ -5,7 +5,7 @@ import java.util.concurrent.ExecutorService
 
 import cats.effect.IO
 import cats.effect.Resource
-import cats.implicits._
+import cats.implicits.*
 
 import scala.jdk.CollectionConverters._
 import scala.util.chaining._

@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.jsonrpc
 
 import org.apache.pekko.util.ByteString
 
-import cats.implicits._
+import cats.implicits.*
 
 import scala.util.Try
 

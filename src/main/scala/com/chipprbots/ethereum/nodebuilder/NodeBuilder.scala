@@ -11,7 +11,7 @@ import com.typesafe.config.ConfigFactory
 
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
-import cats.implicits._
+import cats.implicits.*
 
 import scala.concurrent.Future
 import scala.concurrent.duration._

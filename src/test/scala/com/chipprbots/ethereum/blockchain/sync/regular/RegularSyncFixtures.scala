@@ -16,7 +16,7 @@ import cats.Eq
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
-import cats.implicits._
+import cats.implicits.*
 
 import scala.collection.mutable
 import scala.concurrent.duration.DurationInt

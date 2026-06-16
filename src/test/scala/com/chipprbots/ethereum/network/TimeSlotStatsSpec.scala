@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.network
 import java.time.Clock
 
 import cats.data.State
-import cats.implicits._
+import cats.implicits.*
 import cats.kernel.Monoid
 
 import scala.concurrent.duration._

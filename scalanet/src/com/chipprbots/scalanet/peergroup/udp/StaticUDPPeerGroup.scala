@@ -8,7 +8,7 @@ import cats.effect.Ref
 import cats.effect.Resource
 import cats.effect.std.Semaphore
 import cats.effect.unsafe.implicits.global
-import cats.implicits._
+import cats.implicits.*
 
 import scala.util.control.NonFatal
 

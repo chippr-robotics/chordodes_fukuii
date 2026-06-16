@@ -10,7 +10,7 @@ import scala.util.control.NonFatal
 
 import cats.effect.{Deferred, IO, Resource, Temporal}
 import cats.effect.std.Queue
-import cats.implicits._
+import cats.implicits.*
 import com.chipprbots.scalanet.discovery.crypto.{PrivateKey, PublicKey, SigAlg, Signature}
 import com.chipprbots.scalanet.discovery.ethereum.{EthereumNodeRecord, Node}
 import com.chipprbots.scalanet.peergroup.CloseableQueue

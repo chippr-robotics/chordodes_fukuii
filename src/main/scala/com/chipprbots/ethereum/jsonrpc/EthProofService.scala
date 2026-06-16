@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.jsonrpc
 import org.apache.pekko.util.ByteString
 
 import cats.effect.IO
-import cats.implicits._
+import cats.implicits.*
 
 import com.chipprbots.ethereum.consensus.blocks.BlockGenerator
 import com.chipprbots.ethereum.domain.Account

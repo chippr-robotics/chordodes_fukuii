@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.duration._
 
 import cats.effect.{Deferred, IO, Ref, Resource, Temporal}
-import cats.implicits._
+import cats.implicits.*
 import com.chipprbots.scalanet.discovery.crypto.{PrivateKey, PublicKey, SigAlg}
 import com.chipprbots.scalanet.discovery.ethereum.{EthereumNodeRecord, Node}
 import com.typesafe.scalalogging.LazyLogging

@@ -1,6 +1,6 @@
 package com.chipprbots.scalanet.discovery.ethereum.v4
 
-import cats.implicits._
+import cats.implicits.*
 import cats.effect.Ref
 import com.chipprbots.scalanet.discovery.crypto.{PublicKey, Signature}
 import com.chipprbots.scalanet.discovery.ethereum.{EthereumNodeRecord, Node}

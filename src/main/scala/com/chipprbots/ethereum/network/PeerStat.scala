@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.network
 
 import cats._
-import cats.implicits._
+import cats.implicits.*
 
 case class PeerStat(
     responsesReceived: Int,

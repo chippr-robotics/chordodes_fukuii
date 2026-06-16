@@ -3,7 +3,7 @@ package com.chipprbots.scalanet.discovery.ethereum.v4
 import java.net.InetAddress
 
 import cats._
-import cats.implicits._
+import cats.implicits.*
 
 import com.chipprbots.scalanet.discovery.ethereum.Node
 import com.chipprbots.scalanet.discovery.hash.Hash
