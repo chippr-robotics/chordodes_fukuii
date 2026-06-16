@@ -27,8 +27,9 @@ import java.util.concurrent.{Executors, TimeUnit}
 
 /** T010 (V2) + T011 (V3 / FR-006): scoped post-heal verification behaviour.
   *
-  *   - V2: with the completeness marker proven and a small CLEAN healed set, the completion gate engages the scoped path
-  *     (gauge=1), the scoped walk re-walks only the healed subtrees, and the coordinator reaches StateHealingComplete.
+  *   - V2: with the completeness marker proven and a small CLEAN healed set, the completion gate engages the scoped
+  *     path (gauge=1), the scoped walk re-walks only the healed subtrees, and the coordinator reaches
+  *     StateHealingComplete.
   *   - V3: a healed node with a deeper MISSING descendant must NOT declare completion — the gap surfaces as a pending
   *     frontier and the round stays open until it is clean (FR-006).
   */

@@ -38,8 +38,8 @@ import java.util.concurrent.{Executors, TimeUnit}
   *   - F4: healed-paths set exceeds the bound.
   *   - F5: pivot root changed during the round (a differing-root refresh clears the set → fallback on the next gate).
   *
-  * F3 (restart-lost / empty set) is structurally an empty set, the same fallback F4 exercises (over-bound latches the set
-  * empty); a true restart-lost set is covered by the resume/restart path and the data-model lifecycle.
+  * F3 (restart-lost / empty set) is structurally an empty set, the same fallback F4 exercises (over-bound latches the
+  * set empty); a true restart-lost set is covered by the resume/restart path and the data-model lifecycle.
   */
 class ScopedVerificationFallbackSpec
     extends TestKit(ActorSystem("ScopedVerificationFallbackSpec"))

@@ -27,11 +27,11 @@ import java.util.concurrent.{Executors, TimeUnit}
 
 /** T014 (US2, V4 / FR-007 / SC-004): scoped-vs-full-root completion byte-parity.
   *
-  * The SAME healed state, driven to completion once with `scoped-heal-verification = true` (scoped path) and once with it
-  * `false` (full-root fallback), MUST yield an identical completion outcome: the same StateHealingComplete signal, the
-  * same unchanged state root, and the same CF `g` completeness-marker bytes (`isComplete == true`). Verification never
-  * recomputes or rewrites the state root — it is a pure local read — so the only observable is the marker + the signal,
-  * which must match across the config flip.
+  * The SAME healed state, driven to completion once with `scoped-heal-verification = true` (scoped path) and once with
+  * it `false` (full-root fallback), MUST yield an identical completion outcome: the same StateHealingComplete signal,
+  * the same unchanged state root, and the same CF `g` completeness-marker bytes (`isComplete == true`). Verification
+  * never recomputes or rewrites the state root — it is a pure local read — so the only observable is the marker + the
+  * signal, which must match across the config flip.
   */
 class ScopedVerificationParitySpec
     extends TestKit(ActorSystem("ScopedVerificationParitySpec"))

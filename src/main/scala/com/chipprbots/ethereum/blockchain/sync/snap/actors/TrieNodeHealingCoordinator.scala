@@ -305,9 +305,9 @@ class TrieNodeHealingCoordinator(
   private var scopedVerificationSeedCount: Int = 0
   private var scopedVerificationActive: Boolean = false
 
-  /** Reset the scoped-verification healed-paths set (spec 003 C1). Called at the round-invalidation /
-    * round-close sites — differing-root HealingPivotRefreshed, HealingForceComplete, and after a verified
-    * StateHealingComplete — NOT on a same-root refresh (that round is still valid). Idempotent.
+  /** Reset the scoped-verification healed-paths set (spec 003 C1). Called at the round-invalidation / round-close sites
+    * — differing-root HealingPivotRefreshed, HealingForceComplete, and after a verified StateHealingComplete — NOT on a
+    * same-root refresh (that round is still valid). Idempotent.
     */
   private def clearHealedPathsSet(): Unit = {
     healedPathsThisRound.clear()
@@ -1354,10 +1354,11 @@ class TrieNodeHealingCoordinator(
 
   /** Multi-seed frontier-rebuild BFS kernel (spec 003 C2/FR-002/FR-003). Seeds the level-0 frontier with EVERY
     * `(startHash, startPathset, isStorage)` in `seeds` instead of a single root, then runs the identical level-order
-    * traversal: each seed's HP-encoded `startPathset` re-anchors the walk at that node and the unchanged per-child nibble
-    * arithmetic extends it into that subtree. For a single-element `seeds` this is byte-identical to the prior single-seed
-    * walk (same visited set, level expansion, child-path arithmetic, FrontierRebuilt emission, backpressure). The walk
-    * performs NO state writes — it is a pure local read (`multiGetNodes`) that emits `FrontierRebuilt` for missing nodes.
+    * traversal: each seed's HP-encoded `startPathset` re-anchors the walk at that node and the unchanged per-child
+    * nibble arithmetic extends it into that subtree. For a single-element `seeds` this is byte-identical to the prior
+    * single-seed walk (same visited set, level expansion, child-path arithmetic, FrontierRebuilt emission,
+    * backpressure). The walk performs NO state writes — it is a pure local read (`multiGetNodes`) that emits
+    * `FrontierRebuilt` for missing nodes.
     */
   private def rebuildFrontierBFS(
       seeds: Seq[(ByteString, Seq[ByteString], Boolean)],
@@ -1648,8 +1649,9 @@ class TrieNodeHealingCoordinator(
 
   /** Multi-seed frontier-rebuild / verification launcher (spec 003 C3). Launches the multi-seed `rebuildFrontierBFS`
     * kernel (C2) on `healingWriterEc`, reusing `verificationBFSRunning`, the shared `bfsQueue`, and the same
-    * `computeEffectiveParallelism` clamp. Routes success to `onComplete()` and any walk exception to `FrontierWalkFailed`
-    * exactly as the single-seed launcher did. For a single-element `seeds` this is byte-identical to the prior launcher.
+    * `computeEffectiveParallelism` clamp. Routes success to `onComplete()` and any walk exception to
+    * `FrontierWalkFailed` exactly as the single-seed launcher did. For a single-element `seeds` this is byte-identical
+    * to the prior launcher.
     */
   private def startFrontierBFS(
       seeds: Seq[(ByteString, Seq[ByteString], Boolean)],
@@ -1715,10 +1717,11 @@ class TrieNodeHealingCoordinator(
   /** Launch a SCOPED verification BFS seeded from the healed-paths set (spec 003 C3/FR-002/FR-006). Each healed node's
     * subtree is re-walked to completion; any missing descendant is emitted via `FrontierRebuilt`. Sends
     * `VerificationBFSComplete` on done — the SAME completion path the full-root verification uses, so completion flows
-    * through the single `verificationPassComplete` chokepoint (no new completion message, no new marker set-point). Each
-    * `HealingEntry` maps to `(hash, pathset, pathset.size > 1)`: a `pathset.size > 1` entry is a storage-trie seed
-    * `(storageRootHash, Seq(accountHash32, compactStoragePath), isStorage = true)`, mirroring `discoverMissingChildren`'s
-    * `pathset.size > 1` storage test. Reuses `verificationBFSRunning`, the shared `bfsQueue`, and `startFrontierBFS`.
+    * through the single `verificationPassComplete` chokepoint (no new completion message, no new marker set-point).
+    * Each `HealingEntry` maps to `(hash, pathset, pathset.size > 1)`: a `pathset.size > 1` entry is a storage-trie seed
+    * `(storageRootHash, Seq(accountHash32, compactStoragePath), isStorage = true)`, mirroring
+    * `discoverMissingChildren`'s `pathset.size > 1` storage test. Reuses `verificationBFSRunning`, the shared
+    * `bfsQueue`, and `startFrontierBFS`.
     */
   private def startScopedVerification(seeds: Seq[HealingEntry]): Unit = {
     verificationBFSRunning = true
@@ -1887,8 +1890,8 @@ object TrieNodeHealingCoordinator {
   // warning), so a stalled drain (no peers, dead actor) can't deadlock the walk.
   val FrontierBackpressureMaxWaitMs: Long = 10.minutes.toMillis
 
-  /** Default upper bound on the in-memory healed-paths set used for scoped post-heal verification (spec 003 FR-011).
-    * A round that heals more than this many distinct nodes falls back to full-root verification rather than growing the
+  /** Default upper bound on the in-memory healed-paths set used for scoped post-heal verification (spec 003 FR-011). A
+    * round that heals more than this many distinct nodes falls back to full-root verification rather than growing the
     * set, bounding its worst-case heap (~200K × HealingEntry ≈ tens of MB). Operator-tunable via
     * `sync.snap-sync.scoped-heal-max-paths`.
     */

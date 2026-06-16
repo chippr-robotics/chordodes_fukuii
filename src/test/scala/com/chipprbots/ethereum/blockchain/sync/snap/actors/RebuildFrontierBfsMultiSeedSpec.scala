@@ -19,11 +19,11 @@ import com.chipprbots.ethereum.testing.TestMptStorage
 /** T012 (US1, C2 / FR-007): single-element multi-seed byte-parity.
   *
   * `rebuildFrontierBFS` was generalized from one seed to a SET. The single-seed signature is now a thin wrapper that
-  * calls the multi-seed kernel with `Seq(one seed)`; the contract (C2) requires that path be BYTE-IDENTICAL to the prior
-  * single-seed walk. The kernel is private, so parity is asserted observably: the full-root single-seed walk
-  * (`StartTrieNodeHealing` → wrapper → one-element kernel) over a fixed trie must discover EXACTLY the same frontier as a
-  * direct one-seed walk over the same root. Both descend the identical stored subtree, so identical frontier counts over
-  * a deterministic fixture demonstrate the wrapper and a one-element multi-seed call agree.
+  * calls the multi-seed kernel with `Seq(one seed)`; the contract (C2) requires that path be BYTE-IDENTICAL to the
+  * prior single-seed walk. The kernel is private, so parity is asserted observably: the full-root single-seed walk
+  * (`StartTrieNodeHealing` → wrapper → one-element kernel) over a fixed trie must discover EXACTLY the same frontier as
+  * a direct one-seed walk over the same root. Both descend the identical stored subtree, so identical frontier counts
+  * over a deterministic fixture demonstrate the wrapper and a one-element multi-seed call agree.
   */
 class RebuildFrontierBfsMultiSeedSpec
     extends TestKit(ActorSystem("RebuildFrontierBfsMultiSeedSpec"))
