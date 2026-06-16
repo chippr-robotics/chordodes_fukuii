@@ -16,7 +16,6 @@ import com.chipprbots.ethereum.extvm.msg.CallContext.Config
 import com.chipprbots.ethereum.extvm.msg.CallResult
 import com.chipprbots.ethereum.extvm.msg.VMQuery
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
-import com.chipprbots.ethereum.utils.VmConfig
 import com.chipprbots.ethereum.vm._
 import com.chipprbots.ethereum.vm.utils.MockVmInput
 import com.chipprbots.ethereum.extvm.msg.BlockHeader
@@ -242,8 +241,7 @@ class VMClientSpec extends AnyFlatSpec with Matchers with MockFactory {
 
     val messageHandler: MessageHandlerApi = mock[MessageHandlerApi]
 
-    val externalVmConfig: VmConfig.ExternalConfig = VmConfig.ExternalConfig("fukuii", None, "127.0.0.1", 0)
-    val vmClient = new VMClient(externalVmConfig, messageHandler, testMode = false)
+    val vmClient = new VMClient(messageHandler, testMode = false)
   }
 
 }

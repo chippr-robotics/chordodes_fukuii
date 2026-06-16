@@ -34,7 +34,8 @@ trait HealingVisitedStorage {
     * on a DIFFERENT root than the last walk (or no prior root exists). Default: delegates to clear() — correct for
     * in-memory and test implementations.
     */
-  def clearAndSetRoot(root: ByteString): Unit = clear()
+  @annotation.nowarn("id=E198")
+  def clearAndSetRoot(_root: ByteString): Unit = clear()
 }
 
 object RocksDbHealingVisitedStorage {

@@ -14,7 +14,7 @@ import org.bouncycastle.crypto.digests.SHA256Digest
 import org.bouncycastle.crypto.generators.ECKeyPairGenerator
 import org.bouncycastle.crypto.generators.PKCS5S2ParametersGenerator
 import org.bouncycastle.crypto.generators.SCrypt
-import org.bouncycastle.crypto.params._
+import org.bouncycastle.crypto.params.*
 import org.bouncycastle.math.ec.ECPoint
 import org.bouncycastle.util.encoders.Hex
 

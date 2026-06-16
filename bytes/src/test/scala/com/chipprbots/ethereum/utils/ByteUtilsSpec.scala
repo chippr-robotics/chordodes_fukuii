@@ -5,7 +5,7 @@ import org.scalacheck.Gen
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class ByteUtilsSpec extends AnyFunSuite with ScalaCheckPropertyChecks {
   def byteArrayOfNItemsGen(n: Int): Gen[Array[Byte]] =

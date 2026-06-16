@@ -5,6 +5,7 @@ import org.apache.pekko.util.ByteString
 import com.chipprbots.ethereum.db.dataSource.DataSource
 import com.chipprbots.ethereum.db.dataSource.DataSourceUpdateOptimized
 import com.chipprbots.ethereum.mpt.HexPrefix
+import com.chipprbots.ethereum.utils.Logger
 
 /** Path-keyed trie node storage for PathScheme SNAP sync.
   *
@@ -35,7 +36,7 @@ import com.chipprbots.ethereum.mpt.HexPrefix
   * @param dataSource
   *   Shared RocksDB data source. Both column families live in the same data source instance.
   */
-class PathNodeStorage(val dataSource: DataSource) {
+class PathNodeStorage(val dataSource: DataSource) extends Logger {
 
   private val acctNs: IndexedSeq[Byte] = Namespaces.StateTriePathNamespace
   private val storageNs: IndexedSeq[Byte] = Namespaces.StorageTriePathNamespace
@@ -50,11 +51,12 @@ class PathNodeStorage(val dataSource: DataSource) {
     * @param nibblePath
     *   raw nibble array (each byte 0x00–0x0f)
     * @param hash
-    *   keccak256 hash of `rlp` (logged but not stored as the key — the path is the key in PathScheme)
+    *   keccak256 hash of `rlp` (logged, not stored — the path is the key in PathScheme)
     * @param rlp
     *   RLP-encoded node bytes
     */
   def writeAccountNode(nibblePath: Array[Byte], hash: ByteString, rlp: Array[Byte]): Unit = {
+    log.trace("writeAccountNode hash={}", hash)
     val key = encodePath(nibblePath)
     dataSource.update(
       Seq(DataSourceUpdateOptimized(namespace = acctNs, toRemove = Nil, toUpsert = Seq(key -> rlp)))
@@ -96,11 +98,12 @@ class PathNodeStorage(val dataSource: DataSource) {
     * @param nibblePath
     *   raw nibble array for the node's position in the storage trie
     * @param hash
-    *   keccak256 hash of `rlp`
+    *   keccak256 hash of `rlp` (logged, not stored — the path is the key in PathScheme)
     * @param rlp
     *   RLP-encoded node bytes
     */
   def writeStorageNode(accountHash: ByteString, nibblePath: Array[Byte], hash: ByteString, rlp: Array[Byte]): Unit = {
+    log.trace("writeStorageNode accountHash={} hash={}", accountHash, hash)
     val key = storageKey(accountHash, nibblePath)
     dataSource.update(
       Seq(DataSourceUpdateOptimized(namespace = storageNs, toRemove = Nil, toUpsert = Seq(key -> rlp)))
@@ -140,8 +143,6 @@ class PathNodeStorage(val dataSource: DataSource) {
 
   private def deleteByPrefix(ns: IndexedSeq[Byte], prefix: Array[Byte]): Unit = {
     import cats.effect.unsafe.implicits.global
-    import fs2.Stream
-
     // Collect keys matching prefix, then batch-delete them.
     val keys: Vector[Array[Byte]] = dataSource
       .iterate(ns)

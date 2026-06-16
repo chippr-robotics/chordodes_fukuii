@@ -128,7 +128,7 @@ trait RegularSyncFixtures { self: Matchers with AsyncMockFactory =>
       (adapter
         .evaluateBranch(_: NonEmptyList[Block])(_: IORuntime, _: BlockchainConfig))
         .when(*, *, *)
-        .onCall { case (nel: NonEmptyList[Block], _, _) =>
+        .onCall { case (nel: NonEmptyList[Block] @unchecked, _, _) =>
           def go(remaining: List[Block], acc: List[BlockData]): IO[BlockImportResult] =
             remaining match {
               case Nil => IO.pure(BlockImportedToTop(acc.reverse))
@@ -460,7 +460,7 @@ trait RegularSyncFixtures { self: Matchers with AsyncMockFactory =>
     (consensusAdapter
       .evaluateBranch(_: NonEmptyList[Block])(_: IORuntime, _: BlockchainConfig))
       .when(*, *, *)
-      .onCall { case (nel: NonEmptyList[Block], _, _) =>
+      .onCall { case (nel: NonEmptyList[Block] @unchecked, _, _) =>
         if (nel.toList.contains(testBlocks.last)) importedLastTestBlock = true
         val blockData = nel.toList.map(b => BlockData(b, Nil, ChainWeight.totalDifficultyOnly(b.header.difficulty)))
         IO.pure(BlockImportedToTop(blockData))

@@ -210,7 +210,6 @@ class BfsQueueStorageSpec extends AnyFlatSpec with Matchers {
       it.next().size shouldBe 10 // consume only the first chunk, then drop `it`
       // withRocksDb's finally destroys the DataSource; a leaked open native iterator would error there.
       // scanRange closes its iterator per chunk, so nothing is open between chunks. Reaching here is the assertion.
-      succeed
     }
 
   "EphemDataSource.scanRange" should "return sorted, namespace-isolated entries within [from,to) (US5/FR-017)" taggedAs UnitTest in {

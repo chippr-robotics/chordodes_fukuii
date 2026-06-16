@@ -3,7 +3,6 @@ package com.chipprbots.scalanet
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 
-import scala.concurrent.duration.FiniteDuration
 
 /** Test ergonomics for `cats.effect.IO` mimicking the monix `TaskValues`
   * helpers from the original IOHK scalanet. Provides `.evaluated` (run sync,
@@ -22,8 +21,6 @@ object IOValues {
       } catch {
         case t: Throwable => t
       }
-
-    def delayBy(d: FiniteDuration): IO[A] = io.delayBy(d)
   }
 }
 

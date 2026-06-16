@@ -2,8 +2,6 @@ package com.chipprbots.ethereum.network
 
 import java.net.InetSocketAddress
 
-import scala.concurrent.duration._
-
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.Props
 import org.apache.pekko.testkit.TestActorRef
@@ -28,7 +26,6 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier._
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
-import com.chipprbots.ethereum.network.p2p.messages.Codes
 import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.Config
 

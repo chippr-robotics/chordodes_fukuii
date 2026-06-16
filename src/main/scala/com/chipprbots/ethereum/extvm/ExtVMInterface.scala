@@ -45,7 +45,7 @@ class ExtVMInterface(externaVmConfig: VmConfig.ExternalConfig, blockchainConfig:
       .toMat(Sink.queue[ByteString]())(Keep.both)
       .run()
 
-    val client = new VMClient(externaVmConfig, new MessageHandler(connIn, connOut), testMode)
+    val client = new VMClient(new MessageHandler(connIn, connOut), testMode)
     client.sendHello(ApiVersionProvider.version, blockchainConfig)
 
     vmClient = Some(client)

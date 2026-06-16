@@ -7,7 +7,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import com.chipprbots.ethereum.crypto.zksnark.BN128.Point
 import com.chipprbots.ethereum.crypto.zksnark.BN128Fp
 import com.chipprbots.ethereum.crypto.zksnark.Fp
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class BN128FpSpec extends AnyFunSuite with ScalaCheckPropertyChecks {
 

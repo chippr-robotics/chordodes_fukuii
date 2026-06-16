@@ -4,7 +4,6 @@ import java.net.InetSocketAddress
 
 import scala.util.control.NonFatal
 
-import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 import com.chipprbots.scalanet.peergroup.CloseableQueue
 import com.typesafe.scalalogging.LazyLogging
@@ -46,9 +45,10 @@ object V5DemuxResponder extends LazyLogging {
     val result = inner(sender, bits)
 
     val isV5 = result match {
-      case StaticUDPPeerGroup.SyncResult.Reply(_) => true
-      case StaticUDPPeerGroup.SyncResult.Stop     => true
-      case StaticUDPPeerGroup.SyncResult.Pass     => false
+      case StaticUDPPeerGroup.SyncResult.Reply(_)         => true
+      case StaticUDPPeerGroup.SyncResult.ClaimedReply(_)  => true
+      case StaticUDPPeerGroup.SyncResult.Stop             => true
+      case StaticUDPPeerGroup.SyncResult.Pass             => false
     }
 
     if (isV5) {

@@ -9,7 +9,6 @@ import scalapb.UnknownFieldSet
 import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Logger
-import com.chipprbots.ethereum.utils.VmConfig
 import com.chipprbots.ethereum.vm
 import com.chipprbots.ethereum.vm._
 
@@ -19,8 +18,7 @@ import Implicits._
   *   \- if enabled the client will send blockchain configuration with each configuration. This is useful to override
   *   configuration for each test, rather than to recreate the VM.
   */
-class VMClient(_externalVmConfig: VmConfig.ExternalConfig, messageHandler: MessageHandlerApi, testMode: Boolean)
-    extends Logger {
+class VMClient(messageHandler: MessageHandlerApi, testMode: Boolean) extends Logger {
 
   def sendHello(version: String, blockchainConfig: BlockchainConfig): Unit = {
     val config = BlockchainConfigForEvm(blockchainConfig)

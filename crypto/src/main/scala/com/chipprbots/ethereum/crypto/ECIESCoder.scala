@@ -12,7 +12,7 @@ import org.bouncycastle.crypto.engines.AESEngine
 import org.bouncycastle.crypto.generators.ECKeyPairGenerator
 import org.bouncycastle.crypto.macs.HMac
 import org.bouncycastle.crypto.modes.SICBlockCipher
-import org.bouncycastle.crypto.params._
+import org.bouncycastle.crypto.params.*
 import org.bouncycastle.math.ec.ECPoint
 
 object ECIESCoder {

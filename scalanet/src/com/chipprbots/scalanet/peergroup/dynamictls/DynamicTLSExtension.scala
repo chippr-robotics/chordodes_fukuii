@@ -260,7 +260,7 @@ private[scalanet] object DynamicTLSExtension {
       val validInterval = getInterval()
 
       SignedKey
-        .buildSignedKeyExtension(Secp256k1, hostKeyPair, connectionKeyPairPublicKeyAsBytes, secureRandom)
+        .buildSignedKeyExtension(hostKeyType, hostKeyPair, connectionKeyPairPublicKeyAsBytes, secureRandom)
         .map {
           case (signedKey, signedKeyExtension) =>
             val nodeId = signedKey.publicKey.getNodeId
