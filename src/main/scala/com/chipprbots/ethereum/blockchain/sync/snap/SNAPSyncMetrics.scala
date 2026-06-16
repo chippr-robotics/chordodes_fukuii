@@ -219,6 +219,24 @@ object SNAPSyncMetrics extends MetricsContainer {
   final private val HealingInflationRatioGauge =
     metrics.registry.gauge("snapsync.healing.inflation_ratio.gauge", new AtomicDouble(0d))
 
+  // ===== Scoped Post-Heal Verification (spec 003 C6 — observation-only, FR-010) =====
+  //
+  // Distinguish the scoped post-heal verification path (re-walks only the healed subtrees) from the
+  // full-root fallback, and report how much it covered / how long it took. These NEVER gate any
+  // consensus or completion decision — pure instrumentation pushed by `TrieNodeHealingCoordinator`.
+
+  /** 1 = the last post-heal verification engaged the SCOPED path; 0 = it took the full-root fallback. */
+  final private val HealingScopedVerificationGauge =
+    metrics.registry.gauge("snapsync.healing.scoped_verification.gauge", new AtomicLong(0L))
+
+  /** Number of healed subtrees (seed count) the scoped verification re-walked. */
+  final private val HealingScopedSubtreesGauge =
+    metrics.registry.gauge("snapsync.healing.scoped_subtrees.gauge", new AtomicLong(0L))
+
+  /** Wall time (ms) of the last scoped verification, from launch to the clean-pass completion. */
+  final private val HealingScopedDurationMsGauge =
+    metrics.registry.gauge("snapsync.healing.scoped_duration_ms.gauge", new AtomicLong(0L))
+
   // ===== Peer Performance Metrics =====
 
   /** Number of SNAP-capable peers currently connected */
@@ -394,6 +412,11 @@ object SNAPSyncMetrics extends MetricsContainer {
   def setHealingGcPauseMs(ms: Long): Unit = HealingGcPauseMsGauge.set(ms)
   def setHealingGcFraction(fraction: Double): Unit = HealingGcFractionGauge.set(fraction)
   def setHealingInflationRatio(ratio: Double): Unit = HealingInflationRatioGauge.set(ratio)
+
+  // spec 003 C6/T016 — scoped post-heal verification (observation-only)
+  def setHealingScopedVerification(scoped: Long): Unit = HealingScopedVerificationGauge.set(scoped)
+  def setHealingScopedSubtrees(count: Long): Unit = HealingScopedSubtreesGauge.set(count)
+  def setHealingScopedDurationMs(ms: Long): Unit = HealingScopedDurationMsGauge.set(ms)
 
   // ===== Peer and Network Metrics =====
 

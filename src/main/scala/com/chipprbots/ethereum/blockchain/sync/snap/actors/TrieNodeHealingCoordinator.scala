@@ -56,7 +56,9 @@ class TrieNodeHealingCoordinator(
     pathNodeStorageOpt: Option[PathNodeStorage] = None,
     frontierHighWater: Int = TrieNodeHealingCoordinator.DefaultFrontierHighWater,
     frontierLowWater: Int = TrieNodeHealingCoordinator.DefaultFrontierLowWater,
-    frontierBackpressureMaxWaitMs: Long = TrieNodeHealingCoordinator.FrontierBackpressureMaxWaitMs
+    frontierBackpressureMaxWaitMs: Long = TrieNodeHealingCoordinator.FrontierBackpressureMaxWaitMs,
+    scopedHealVerification: Boolean = true,
+    scopedHealMaxPaths: Int = TrieNodeHealingCoordinator.DefaultScopedHealMaxPaths
 ) extends Actor
     with ActorLogging {
 
@@ -276,6 +278,42 @@ class TrieNodeHealingCoordinator(
 
   // Dedup set for pending tasks — prevents the same missing node from being queued multiple times
   private val pendingHashSet = mutable.Set[ByteString]()
+
+  // --- spec 003: scoped post-heal verification (FR-001) ---
+  // Bounded, per-round, in-memory accumulator of the nodes HEALED this round (their HealingEntry,
+  // captured at the single heal site in handleResponse). Mirrors the pendingTasks/pendingHashSet
+  // pairing: a LinkedHashMap keyed by node hash dedups re-served/re-queued nodes while preserving the
+  // authoritative HealingEntry value and a stable insertion order for deterministic seeding. The
+  // completion gate uses this as the scope for the post-heal verification BFS (re-walking only the
+  // healed subtrees) when the durable completeness marker proves full-trie coverage; otherwise it
+  // falls back to full-root verification. NOT persisted (actor field state, like pendingTasks); a
+  // restart loses it and the gate falls back to full-root (correct, slower). See spec 003 C1/C4.
+  private val healedPathsThisRound: mutable.LinkedHashMap[ByteString, HealingEntry] =
+    mutable.LinkedHashMap.empty
+  // The state root the current round's healed paths were healed against (FR-009 / F5 guard). Tagged on
+  // the first capture of the round; a scoped verification is launched only when this == stateRoot.
+  private var healedPathsRoot: ByteString = ByteString.empty
+  // Latched true once the round would exceed scopedHealMaxPaths (FR-011 / F4). Once set, no further
+  // capture occurs and the gate falls back to full-root verification (which covers everything).
+  private var healedPathsOverflowed: Boolean = false
+
+  // spec 003 C6/T016: observability state for the IN-FLIGHT scoped verification run. When a scoped
+  // verification is launched, scopedVerificationActive is set with its start time and seed count so the
+  // VerificationBFSComplete handler can emit the [HEAL-VERIFY-SCOPED] completion log + duration gauge.
+  // Cleared (None) on the full-root path so the completion handler does not mis-attribute a full-root run.
+  private var scopedVerificationStartMs: Long = 0L
+  private var scopedVerificationSeedCount: Int = 0
+  private var scopedVerificationActive: Boolean = false
+
+  /** Reset the scoped-verification healed-paths set (spec 003 C1). Called at the round-invalidation / round-close sites
+    * — differing-root HealingPivotRefreshed, HealingForceComplete, and after a verified StateHealingComplete — NOT on a
+    * same-root refresh (that round is still valid). Idempotent.
+    */
+  private def clearHealedPathsSet(): Unit = {
+    healedPathsThisRound.clear()
+    healedPathsRoot = ByteString.empty
+    healedPathsOverflowed = false
+  }
 
   // Stateless peer tracking (geth-aligned: peers that return empty TrieNodes for current root)
   private val statelessPeers = mutable.Set[String]()
@@ -584,6 +622,7 @@ class TrieNodeHealingCoordinator(
       activeRequests.clear()
       pendingTasks.clear()
       pendingHashSet.clear()
+      clearHealedPathsSet() // spec 003 C1: abandonment — drop the scoped-verification scope (hygiene)
       snapSyncController ! SNAPSyncController.StateHealingComplete
       context.stop(self)
 
@@ -606,6 +645,7 @@ class TrieNodeHealingCoordinator(
         stateRoot = newStateRoot
         flushRawNodesSync() // Flush any buffered nodes before clearing state
         clearPersistedFrontier() // Layer 2: old-root frontier is stale after refresh — reseed (below) repopulates it
+        clearHealedPathsSet() // spec 003 C1/F5: old-root healed paths are stale — clear before next gate
         pendingTasks.clear() // Will be re-populated by root reseed + inline discovery / trie walk from controller
         pendingHashSet.clear()
         statelessPeers.clear()
@@ -729,16 +769,39 @@ class TrieNodeHealingCoordinator(
             }
           }
           snapSyncController ! SNAPSyncController.StateHealingComplete
+          clearHealedPathsSet() // spec 003 C1: round closed — next round starts with a fresh scope
         } else {
-          // Inline tasks done with actual healing work — run a full BFS to catch storage sub-trie
-          // gaps that discoverMissingChildren silently skips when the storage root is in storage.
-          // Analogous to go-ethereum's trie.Sync.Missing() trie traversal.
-          val emptyPath = ByteString(com.chipprbots.ethereum.mpt.HexPrefix.encode(Array.empty[Byte], isLeaf = false))
-          log.info(
-            s"[HEAL-VERIFY] All inline tasks done ($totalNodesHealed healed). " +
-              s"Starting verification BFS on locally-held trie to catch storage sub-trie gaps..."
-          )
-          startVerificationBFS(stateRoot, emptyPath)
+          // Inline tasks done with actual healing work — verify before declaring completion to catch
+          // storage sub-trie gaps that discoverMissingChildren silently skips when the storage root is
+          // already in storage. Analogous to go-ethereum's trie.Sync.Missing() trie traversal.
+          //
+          // spec 003 C4/FR-004/FR-005/FR-009/FR-011: scope the verification to ONLY the healed subtrees
+          // when full-trie coverage is durably proven and a valid in-bound same-root healed scope exists;
+          // otherwise fall back to the UNCHANGED full-root verification. The predicate is pure, evaluated
+          // at gate time (live reads), and all five operands are cheap local reads.
+          val useScoped =
+            scopedHealVerification && // F1: scoping not disabled
+              healingFrontierStorage.exists(_.isComplete) && // F2/F6: full-coverage precondition proven
+              healedPathsThisRound.nonEmpty && // F3: scope present (not restart-lost / pre-first-heal)
+              !healedPathsOverflowed && // F4: within the configured bound (FR-011)
+              healedPathsRoot == stateRoot // F5: same root the scope was healed against (FR-009)
+
+          if (useScoped) {
+            startScopedVerification(healedPathsThisRound.values.toSeq)
+          } else {
+            // spec 003 C5/T017 (US3 AS2): when the fallback engaged specifically because scoping is
+            // disabled by config, surface it once per round so an operator can see the conservative path
+            // is in effect (distinct from the precondition-not-proven / over-bound / root-changed cases).
+            if (!scopedHealVerification)
+              log.info("[HEAL-VERIFY-SCOPED] scoped verification disabled by config — using full-root verification")
+            val emptyPath =
+              ByteString(com.chipprbots.ethereum.mpt.HexPrefix.encode(Array.empty[Byte], isLeaf = false))
+            log.info(
+              s"[HEAL-VERIFY] All inline tasks done ($totalNodesHealed healed). " +
+                s"Starting verification BFS on locally-held trie to catch storage sub-trie gaps..."
+            )
+            startVerificationBFS(stateRoot, emptyPath)
+          }
         }
       }
 
@@ -747,6 +810,17 @@ class TrieNodeHealingCoordinator(
       if (isComplete) {
         // BFS traversed all locally-held nodes and found zero missing descendants — trie is complete.
         verificationPassComplete = true
+        // spec 003 C6/T016: if this clean pass was the SCOPED path, emit the completion log + duration
+        // gauge so an operator can confirm engagement and the time saved vs a full-root re-walk.
+        if (scopedVerificationActive) {
+          val elapsedMs = System.currentTimeMillis() - scopedVerificationStartMs
+          log.info(
+            s"[HEAL-VERIFY-SCOPED] Scoped verification complete in ${elapsedMs}ms " +
+              s"over $scopedVerificationSeedCount subtrees — declaring completion"
+          )
+          SNAPSyncMetrics.setHealingScopedDurationMs(elapsedMs)
+          scopedVerificationActive = false
+        }
         log.info(
           s"[HEAL-VERIFY] Verification BFS complete — no missing nodes found. " +
             s"Trie is fully healed ($totalNodesHealed nodes). Declaring completion."
@@ -1079,6 +1153,17 @@ class TrieNodeHealingCoordinator(
           }
           healedCount += 1
           totalNodesHealed += 1
+          // spec 003 C1/FR-001: capture this healed node's HealingEntry as a scoped-verification seed.
+          // This is the ONLY site that increments totalNodesHealed for network-served nodes, so the
+          // accumulator is exactly {nodes whose bytes were written this round}. Tag the round's root on
+          // first capture (F5), dedup by hash, and latch overflow at scopedHealMaxPaths (F4/FR-011).
+          taskByHash.get(nodeHash).foreach { task =>
+            if (healedPathsThisRound.isEmpty) healedPathsRoot = stateRoot
+            if (!healedPathsOverflowed && !healedPathsThisRound.contains(task.hash)) {
+              if (healedPathsThisRound.size >= scopedHealMaxPaths) healedPathsOverflowed = true
+              else healedPathsThisRound.update(task.hash, task)
+            }
+          }
           receivedBytes += nodeData.length
           totalBytesReceived += nodeData.length
           healedHashes += nodeHash
@@ -1261,6 +1346,25 @@ class TrieNodeHealingCoordinator(
       selfRef: ActorRef,
       queue: BfsQueueStorage,
       effectiveParallelism: Int
+  ): Unit =
+    // spec 003 C2: byte-identical thin wrapper over the multi-seed kernel for a single seed. The
+    // full-root / crash-recovery / pivot-reseed callers reach the SAME traversal as before — the only
+    // generalization is that the kernel seeds markIfNew + enqueueBatch over a SET (level 0) instead of one.
+    rebuildFrontierBFS(Seq((startHash, startPathset, isStor)), selfRef, queue, effectiveParallelism)
+
+  /** Multi-seed frontier-rebuild BFS kernel (spec 003 C2/FR-002/FR-003). Seeds the level-0 frontier with EVERY
+    * `(startHash, startPathset, isStorage)` in `seeds` instead of a single root, then runs the identical level-order
+    * traversal: each seed's HP-encoded `startPathset` re-anchors the walk at that node and the unchanged per-child
+    * nibble arithmetic extends it into that subtree. For a single-element `seeds` this is byte-identical to the prior
+    * single-seed walk (same visited set, level expansion, child-path arithmetic, FrontierRebuilt emission,
+    * backpressure). The walk performs NO state writes — it is a pure local read (`multiGetNodes`) that emits
+    * `FrontierRebuilt` for missing nodes.
+    */
+  private def rebuildFrontierBFS(
+      seeds: Seq[(ByteString, Seq[ByteString], Boolean)],
+      selfRef: ActorRef,
+      queue: BfsQueueStorage,
+      effectiveParallelism: Int
   ): Unit = {
     import com.chipprbots.ethereum.mpt.{BranchNode, ExtensionNode, HashNode, LeafNode}
     import com.chipprbots.ethereum.mpt.HexPrefix
@@ -1284,7 +1388,10 @@ class TrieNodeHealingCoordinator(
         true
       }
     }
-    markIfNew(startHash)
+    // spec 003 C2: mark every seed hash as visited (level 0). For one seed this is the prior
+    // markIfNew(startHash); for many it pre-loads the shared visited set so cross-seed shared
+    // subtries are de-duplicated exactly as within a single walk.
+    seeds.foreach { case (h, _, _) => markIfNew(h) }
 
     val visitedCount = new java.util.concurrent.atomic.AtomicLong(0L)
     val frontierCount = new java.util.concurrent.atomic.AtomicLong(0L)
@@ -1431,9 +1538,11 @@ class TrieNodeHealingCoordinator(
     }
 
     queue.clear()
-    queue.enqueueBatch(Seq((startHash.toArray, startPathset.map(_.toArray), isStor)))
+    // spec 003 C2: enqueue ALL seeds as level 0. For one seed this is the prior single-entry enqueue;
+    // queue.counter (levelEnd) now reflects seeds.size as level 0.
+    queue.enqueueBatch(seeds.map { case (h, ps, s) => (h.toArray, ps.map(_.toArray), s) })
     var levelStart = 0L
-    var levelEnd = queue.counter // = 1L after root enqueued
+    var levelEnd = queue.counter // = seeds.size after the level-0 enqueue (1 for the single-seed wrapper)
     var levelIndex = 0
 
     while (levelStart < levelEnd) {
@@ -1532,6 +1641,21 @@ class TrieNodeHealingCoordinator(
       rootPath: ByteString,
       isStor: Boolean,
       onComplete: () => Unit
+  ): Unit =
+    // spec 003 C2/C3: byte-identical thin wrapper over the multi-seed launcher for a single seed. The
+    // full-root / crash-recovery / pivot-reseed callers reach the SAME walk (the kernel collapses one
+    // seed to the prior single-entry enqueue).
+    startFrontierBFS(Seq((root, Seq(rootPath), isStor)), onComplete)
+
+  /** Multi-seed frontier-rebuild / verification launcher (spec 003 C3). Launches the multi-seed `rebuildFrontierBFS`
+    * kernel (C2) on `healingWriterEc`, reusing `verificationBFSRunning`, the shared `bfsQueue`, and the same
+    * `computeEffectiveParallelism` clamp. Routes success to `onComplete()` and any walk exception to
+    * `FrontierWalkFailed` exactly as the single-seed launcher did. For a single-element `seeds` this is byte-identical
+    * to the prior launcher.
+    */
+  private def startFrontierBFS(
+      seeds: Seq[(ByteString, Seq[ByteString], Boolean)],
+      onComplete: () => Unit
   ): Unit = {
     val selfRef = self
     // Effective parallelism floor (spec 002 R3 §1, T034): min(cfg, max(minParallelism, nproc − reservedCores)).
@@ -1557,7 +1681,7 @@ class TrieNodeHealingCoordinator(
     verificationBFSRunning = true
     Future {
       try {
-        rebuildFrontierBFS(root, Seq(rootPath), isStor, selfRef, bfsQueue, effectiveParallelism)
+        rebuildFrontierBFS(seeds, selfRef, bfsQueue, effectiveParallelism)
         onComplete()
       } catch {
         case scala.util.control.NonFatal(e) =>
@@ -1583,7 +1707,38 @@ class TrieNodeHealingCoordinator(
   private def startVerificationBFS(root: ByteString, rootPath: ByteString): Unit = {
     verificationBFSRunning = true
     val selfRef = self
+    // spec 003 C6/T016: full-root path — clear the scoped engagement gauge so a dashboard can
+    // distinguish the two paths, and mark the in-flight run as NOT scoped for the completion handler.
+    scopedVerificationActive = false
+    SNAPSyncMetrics.setHealingScopedVerification(0L)
     startFrontierBFS(root, rootPath, isStor = false, () => selfRef ! VerificationBFSComplete)
+  }
+
+  /** Launch a SCOPED verification BFS seeded from the healed-paths set (spec 003 C3/FR-002/FR-006). Each healed node's
+    * subtree is re-walked to completion; any missing descendant is emitted via `FrontierRebuilt`. Sends
+    * `VerificationBFSComplete` on done — the SAME completion path the full-root verification uses, so completion flows
+    * through the single `verificationPassComplete` chokepoint (no new completion message, no new marker set-point).
+    * Each `HealingEntry` maps to `(hash, pathset, pathset.size > 1)`: a `pathset.size > 1` entry is a storage-trie seed
+    * `(storageRootHash, Seq(accountHash32, compactStoragePath), isStorage = true)`, mirroring
+    * `discoverMissingChildren`'s `pathset.size > 1` storage test. Reuses `verificationBFSRunning`, the shared
+    * `bfsQueue`, and `startFrontierBFS`.
+    */
+  private def startScopedVerification(seeds: Seq[HealingEntry]): Unit = {
+    verificationBFSRunning = true
+    val selfRef = self
+    // spec 003 C6/T016: record the in-flight scoped run for the completion log + duration gauge, and
+    // emit the engagement signal on entry.
+    scopedVerificationActive = true
+    scopedVerificationSeedCount = seeds.size
+    scopedVerificationStartMs = System.currentTimeMillis()
+    log.info(
+      s"[HEAL-VERIFY-SCOPED] Scoped verification engaged — ${seeds.size} healed subtrees " +
+        s"(root ${Hex.toHexString(stateRoot.take(4).toArray)}); skipping full-root re-walk"
+    )
+    SNAPSyncMetrics.setHealingScopedVerification(1L)
+    SNAPSyncMetrics.setHealingScopedSubtrees(seeds.size.toLong)
+    val bfsSeeds = seeds.map(e => (e.hash, e.pathset, e.pathset.size > 1))
+    startFrontierBFS(bfsSeeds, () => selfRef ! VerificationBFSComplete)
   }
 
   /** Inline child discovery after each healed node — Besu/geth scheduler-driven alignment. Decodes the healed node,
@@ -1735,6 +1890,13 @@ object TrieNodeHealingCoordinator {
   // warning), so a stalled drain (no peers, dead actor) can't deadlock the walk.
   val FrontierBackpressureMaxWaitMs: Long = 10.minutes.toMillis
 
+  /** Default upper bound on the in-memory healed-paths set used for scoped post-heal verification (spec 003 FR-011). A
+    * round that heals more than this many distinct nodes falls back to full-root verification rather than growing the
+    * set, bounding its worst-case heap (~200K × HealingEntry ≈ tens of MB). Operator-tunable via
+    * `sync.snap-sync.scoped-heal-max-paths`.
+    */
+  val DefaultScopedHealMaxPaths: Int = 200_000
+
   /** Operator-configurable ceiling for BFS level parallelism. Effective parallelism is `min(DefaultBfsParallelism,
     * max(1, availableProcessors - 2))` so large levels are split across sub-ranges on `healingWriterEc`. See
     * `healing-traversal-parallelism` in `sync.conf`.
@@ -1811,7 +1973,9 @@ object TrieNodeHealingCoordinator {
       pathNodeStorageOpt: Option[PathNodeStorage] = None,
       frontierHighWater: Int = DefaultFrontierHighWater,
       frontierLowWater: Int = DefaultFrontierLowWater,
-      frontierBackpressureMaxWaitMs: Long = FrontierBackpressureMaxWaitMs
+      frontierBackpressureMaxWaitMs: Long = FrontierBackpressureMaxWaitMs,
+      scopedHealVerification: Boolean = true,
+      scopedHealMaxPaths: Int = DefaultScopedHealMaxPaths
   ): Props =
     Props(
       new TrieNodeHealingCoordinator(
@@ -1834,7 +1998,9 @@ object TrieNodeHealingCoordinator {
         pathNodeStorageOpt,
         frontierHighWater,
         frontierLowWater,
-        frontierBackpressureMaxWaitMs
+        frontierBackpressureMaxWaitMs,
+        scopedHealVerification,
+        scopedHealMaxPaths
       )
     )
 }
