@@ -18,6 +18,7 @@ import com.chipprbots.ethereum.extvm.msg.CallContext
 import com.chipprbots.ethereum.extvm.msg.CallContext.Config
 import com.chipprbots.ethereum.extvm.msg.CallResult
 import com.chipprbots.ethereum.extvm.msg.Code
+import com.chipprbots.ethereum.extvm.msg.EthereumConfig
 import com.chipprbots.ethereum.extvm.msg.GetAccount
 import com.chipprbots.ethereum.extvm.msg.GetBlockhash
 import com.chipprbots.ethereum.extvm.msg.GetCode
@@ -27,10 +28,8 @@ import com.chipprbots.ethereum.extvm.msg.StorageData
 import com.chipprbots.ethereum.extvm.msg.VMQuery
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
-import com.chipprbots.ethereum.utils.VmConfig
 import com.chipprbots.ethereum.vm.*
 import com.chipprbots.ethereum.vm.utils.MockVmInput
-import com.chipprbots.ethereum.extvm.msg.EthereumConfig
 
 class VMClientSpec extends AnyFlatSpec with Matchers with MockFactory {
 
@@ -192,7 +191,8 @@ class VMClientSpec extends AnyFlatSpec with Matchers with MockFactory {
       accountStartNonce = blockchainConfig.accountStartNonce,
       chainId = ByteString(blockchainConfig.chainId)
     )
-    val expectedHelloConfigMsg: msg.Hello.Config.EthereumConfig = msg.Hello.Config.EthereumConfig(expectedEthereumConfig)
+    val expectedHelloConfigMsg: msg.Hello.Config.EthereumConfig =
+      msg.Hello.Config.EthereumConfig(expectedEthereumConfig)
     val expectedHelloMsg: Hello = msg.Hello(version = "testVersion", config = expectedHelloConfigMsg)
     messageHandler.sendMessage.expects(expectedHelloMsg)
     vmClient.sendHello("testVersion", blockchainConfig)
@@ -243,8 +243,7 @@ class VMClientSpec extends AnyFlatSpec with Matchers with MockFactory {
 
     val messageHandler: MessageHandlerApi = mock[MessageHandlerApi]
 
-    val externalVmConfig: VmConfig.ExternalConfig = VmConfig.ExternalConfig("fukuii", None, "127.0.0.1", 0)
-    val vmClient = new VMClient(externalVmConfig, messageHandler, testMode = false)
+    val vmClient = new VMClient(messageHandler, testMode = false)
   }
 
 }

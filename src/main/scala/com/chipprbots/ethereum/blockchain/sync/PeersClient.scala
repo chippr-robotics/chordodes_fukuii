@@ -114,7 +114,7 @@ class PeersClient(
           case Some(peer) =>
             log.debug("Selected peer {} with address {} for request", peer.id, peer.remoteAddress.getHostString)
             // Adapt message format based on peer's negotiated capability
-            val adaptedMessage = adaptMessageForPeer(peer, message)
+            val adaptedMessage = adaptMessageForPeer(message)
             // Create a type-safe conversion function for the adapted message
             val adaptedToSerializable: Message => MessageSerializable = (msg: Message) =>
               msg match {
@@ -323,7 +323,7 @@ class PeersClient(
 
   /** Adapts message format based on peer's negotiated capability. ETH68+ always uses request-id — no adaptation needed.
     */
-  private def adaptMessageForPeer[RequestMsg <: Message](_peer: Peer, message: RequestMsg): Message = message
+  private def adaptMessageForPeer[RequestMsg <: Message](message: RequestMsg): Message = message
 
   private def responseClassTag[RequestMsg <: Message](requestMsg: RequestMsg): ClassTag[_ <: Message] =
     requestMsg match {

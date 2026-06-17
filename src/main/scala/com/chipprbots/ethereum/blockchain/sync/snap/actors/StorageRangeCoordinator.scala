@@ -500,7 +500,7 @@ class StorageRangeCoordinator(
           new SnapPathTrie(
             owner = accountHash,
             skipLeftBoundary = false, // storage tasks are always fresh (no per-slot resume cursor)
-            writePath = (path, hash, blob) => pns.writeStorageNode(accountHash, path, hash, blob),
+            writePath = (path, _, blob) => pns.writeStorageNode(accountHash, path, blob),
             deleteExact = path => pns.deleteStorageNode(accountHash, path)
           )
       }

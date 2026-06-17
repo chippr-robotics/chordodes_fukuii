@@ -13,14 +13,14 @@ import scala.collection.mutable
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-import scala.concurrent.duration.Duration
 import scala.concurrent.duration.*
+import scala.concurrent.duration.Duration
 import scala.jdk.CollectionConverters.*
 
 import org.bouncycastle.util.encoders.Hex
 
-import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController
 import com.chipprbots.ethereum.blockchain.sync.snap.*
+import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController
 import com.chipprbots.ethereum.db.storage.BfsEntry
 import com.chipprbots.ethereum.db.storage.BfsQueueStorage
 import com.chipprbots.ethereum.db.storage.HealingFrontierStorage
@@ -1532,9 +1532,9 @@ class TrieNodeHealingCoordinator(
                 taskByHash.get(nodeHash).foreach { task =>
                   val nibbles = com.chipprbots.ethereum.mpt.HexPrefix.decode(task.pathset.last.toArray)._1
                   if (task.pathset.size > 1)
-                    pns.writeStorageNode(ByteString(task.pathset.head), nibbles, nodeHash, nodeData.toArray)
+                    pns.writeStorageNode(ByteString(task.pathset.head), nibbles, nodeData.toArray)
                   else
-                    pns.writeAccountNode(nibbles, nodeHash, nodeData.toArray)
+                    pns.writeAccountNode(nibbles, nodeData.toArray)
                 }
               }
           }

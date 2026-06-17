@@ -1507,7 +1507,7 @@ class AccountRangeCoordinator(
           new SnapPathTrie(
             owner = ByteString.empty,
             skipLeftBoundary = skipLeft,
-            writePath = (path, hash, blob) => pns.writeAccountNode(path, hash, blob),
+            writePath = (path, _, blob) => pns.writeAccountNode(path, blob),
             deleteExact = path => pns.deleteAccountNode(path)
           )
       }

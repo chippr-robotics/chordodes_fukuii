@@ -49,12 +49,10 @@ class PathNodeStorage(val dataSource: DataSource) {
     *
     * @param nibblePath
     *   raw nibble array (each byte 0x00–0x0f)
-    * @param hash
-    *   keccak256 hash of `rlp` (logged but not stored as the key — the path is the key in PathScheme)
     * @param rlp
     *   RLP-encoded node bytes
     */
-  def writeAccountNode(nibblePath: Array[Byte], hash: ByteString, rlp: Array[Byte]): Unit = {
+  def writeAccountNode(nibblePath: Array[Byte], rlp: Array[Byte]): Unit = {
     val key = encodePath(nibblePath)
     dataSource.update(
       Seq(DataSourceUpdateOptimized(namespace = acctNs, toRemove = Nil, toUpsert = Seq(key -> rlp)))
@@ -95,12 +93,10 @@ class PathNodeStorage(val dataSource: DataSource) {
     *   32-byte account hash that owns this storage trie
     * @param nibblePath
     *   raw nibble array for the node's position in the storage trie
-    * @param hash
-    *   keccak256 hash of `rlp`
     * @param rlp
     *   RLP-encoded node bytes
     */
-  def writeStorageNode(accountHash: ByteString, nibblePath: Array[Byte], hash: ByteString, rlp: Array[Byte]): Unit = {
+  def writeStorageNode(accountHash: ByteString, nibblePath: Array[Byte], rlp: Array[Byte]): Unit = {
     val key = storageKey(accountHash, nibblePath)
     dataSource.update(
       Seq(DataSourceUpdateOptimized(namespace = storageNs, toRemove = Nil, toUpsert = Seq(key -> rlp)))

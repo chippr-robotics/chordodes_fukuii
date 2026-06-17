@@ -5,17 +5,17 @@ import org.apache.pekko.util.ByteString
 import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.crypto.ECDSASignature
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.BlockBody.BlockBodyRLPEncodableDec
 import com.chipprbots.ethereum.domain.BlockHeaderImplicits.*
-import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.forkid.ForkId
 import com.chipprbots.ethereum.forkid.ForkId.*
 import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.MessageSerializableImplicit
+import com.chipprbots.ethereum.rlp.*
 import com.chipprbots.ethereum.rlp.RLPCodec.Ops
 import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
-import com.chipprbots.ethereum.rlp.*
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 import com.chipprbots.ethereum.utils.ByteUtils
 
@@ -102,10 +102,7 @@ object ETHPackets {
         import Transaction.TransactionTypeValidator
         val result = new scala.collection.mutable.ArrayBuffer[RLPEncodeable](encodables.size)
         var i = 0
-        val items = encodables match {
-          case indexed: IndexedSeq[RLPEncodeable @unchecked] => indexed
-          case other                                         => other.toIndexedSeq
-        }
+        val items = encodables.toIndexedSeq
         val len = items.size
         while (i < len)
           items(i) match {
