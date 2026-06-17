@@ -1,5 +1,7 @@
 package com.chipprbots.ethereum.consensus.pow.miners
 
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
+
 import cats.effect.IO
 
 import scala.concurrent.duration.*
@@ -104,8 +106,9 @@ class EthashMinerSpec extends AnyFlatSpec with Matchers with org.scalamock.scala
       pendingTransactionsManager = pendingTransactionsManager.ref,
       getTransactionFromPoolTimeout = getTransactionFromPoolTimeout,
       mining = mining,
-      ommersPool = ommersPool.ref,
-      coinbaseProvider = coinbaseProvider
+      ommersPool = ommersPool.ref.toTyped[com.chipprbots.ethereum.ommers.OmmersPool.Command],
+      coinbaseProvider = coinbaseProvider,
+      system = classicSystem
     )
 
     val dagManager = new EthashDAGManager(blockCreator)

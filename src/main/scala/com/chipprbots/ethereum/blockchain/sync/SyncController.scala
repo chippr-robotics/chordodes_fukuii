@@ -56,7 +56,7 @@ class SyncController(
     pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
       com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
     ],
-    ommersPool: ActorRef,
+    ommersPool: org.apache.pekko.actor.typed.ActorRef[com.chipprbots.ethereum.ommers.OmmersPool.Command],
     networkPeerManager: ActorRef,
     blacklist: Blacklist,
     syncConfig: SyncConfig,
@@ -1912,7 +1912,7 @@ object SyncController {
       pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
         com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
       ],
-      ommersPool: ActorRef,
+      ommersPool: org.apache.pekko.actor.typed.ActorRef[com.chipprbots.ethereum.ommers.OmmersPool.Command],
       networkPeerManager: ActorRef,
       blacklist: Blacklist,
       syncConfig: SyncConfig,

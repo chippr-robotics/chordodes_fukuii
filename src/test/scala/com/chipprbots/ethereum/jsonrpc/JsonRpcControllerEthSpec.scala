@@ -275,8 +275,14 @@ class JsonRpcControllerEthSpec
       PendingTransactionsManager.PendingTransactionsResponse(Nil)
     })
 
-    ommersPool.setAutoPilot(simpleAutoPilot { case OmmersPool.GetOmmers(_) =>
-      Ommers(Nil)
+    ommersPool.setAutoPilot(new org.apache.pekko.testkit.TestActor.AutoPilot {
+      def run(sender: org.apache.pekko.actor.ActorRef, msg: Any): org.apache.pekko.testkit.TestActor.AutoPilot = {
+        msg match {
+          case OmmersPool.GetOmmers(_, replyTo) => replyTo ! Ommers(Nil)
+          case _                                => ()
+        }
+        org.apache.pekko.testkit.TestActor.KeepRunning
+      }
     })
 
     val request: JsonRpcRequest = newJsonRpcRequest("eth_getWork")

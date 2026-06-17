@@ -245,8 +245,11 @@ trait MinerSpecSetup
   protected def prepareMocks(): Unit = {
     setupMiningServiceExpectation()
 
-    ommersPool.setAutoPilot { (sender: ActorRef, _: Any) =>
-      sender ! OmmersPool.Ommers(Nil)
+    ommersPool.setAutoPilot { (_: ActorRef, msg: Any) =>
+      msg match {
+        case OmmersPool.GetOmmers(_, replyTo) => replyTo ! OmmersPool.Ommers(Nil)
+        case _                                => ()
+      }
       TestActor.KeepRunning
     }
 

@@ -52,7 +52,7 @@ class BlockImporter(
     evmCodeStorage: EvmCodeStorage,
     branchResolution: BranchResolution,
     syncConfig: SyncConfig,
-    ommersPool: ActorRef,
+    ommersPool: org.apache.pekko.actor.typed.ActorRef[com.chipprbots.ethereum.ommers.OmmersPool.Command],
     broadcaster: ActorRef,
     pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
       com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
@@ -719,7 +719,7 @@ object BlockImporter {
       evmCodeStorage: EvmCodeStorage,
       branchResolution: BranchResolution,
       syncConfig: SyncConfig,
-      ommersPool: ActorRef,
+      ommersPool: org.apache.pekko.actor.typed.ActorRef[com.chipprbots.ethereum.ommers.OmmersPool.Command],
       broadcaster: ActorRef,
       pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
         com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command

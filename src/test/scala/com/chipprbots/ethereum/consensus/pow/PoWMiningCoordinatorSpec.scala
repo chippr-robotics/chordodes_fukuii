@@ -273,8 +273,9 @@ class PoWMiningCoordinatorSpec
       pendingTransactionsManager = pendingTransactionsManager.ref,
       getTransactionFromPoolTimeout = getTransactionFromPoolTimeout,
       mining = mining,
-      ommersPool = ommersPool.ref,
-      coinbaseProvider = coinbaseProvider
+      ommersPool = ommersPool.ref.toTyped[com.chipprbots.ethereum.ommers.OmmersPool.Command],
+      coinbaseProvider = coinbaseProvider,
+      system = classicSystem
     )
 
     val coordinator: typed.ActorRef[CoordinatorProtocol] = testKit.spawn(
@@ -345,8 +346,11 @@ class PoWMiningCoordinatorSpec
       .returns(IO.pure(Right(SubmitHashRateResponse(true))))
       .anyNumberOfTimes()
 
-    ommersPool.setAutoPilot { (sender: ActorRef, _: Any) =>
-      sender ! OmmersPool.Ommers(Nil)
+    ommersPool.setAutoPilot { (_: ActorRef, msg: Any) =>
+      msg match {
+        case OmmersPool.GetOmmers(_, replyTo) => replyTo ! OmmersPool.Ommers(Nil)
+        case _                                => ()
+      }
       TestActor.KeepRunning
     }
 

@@ -1,9 +1,8 @@
 package com.chipprbots.ethereum.ommers
 
-import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.ImplicitSender
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe
+import org.apache.pekko.actor.typed.ActorRef
 
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.freespec.AnyFreeSpecLike
@@ -11,19 +10,14 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures.Blocks.Block3125369
 import com.chipprbots.ethereum.Timeouts
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.ommers.OmmersPool.AddOmmers
+import com.chipprbots.ethereum.ommers.OmmersPool.Command
 import com.chipprbots.ethereum.ommers.OmmersPool.GetOmmers
+import com.chipprbots.ethereum.ommers.OmmersPool.Ommers
 
-class OmmersPoolSpec
-    extends TestKit(ActorSystem("OmmersPoolSpec_System"))
-    with AnyFreeSpecLike
-    with ImplicitSender
-    with WithActorSystemShutDown
-    with Matchers
-    with MockFactory {
+class OmmersPoolSpec extends ScalaTestWithActorTestKit with AnyFreeSpecLike with Matchers with MockFactory {
 
   "OmmersPool" - {
 
@@ -41,8 +35,8 @@ class OmmersPoolSpec
         block2Chain1
       )
 
-      ommersPool ! GetOmmers(block3Chain1.parentHash)
-      expectMsg(Timeouts.normalTimeout, OmmersPool.Ommers(Seq.empty))
+      ommersPool ! GetOmmers(block3Chain1.parentHash, ommersProbe.ref)
+      ommersProbe.expectMessage(Timeouts.normalTimeout, OmmersPool.Ommers(Seq.empty))
     }
 
     "should return ommers properly" - {
@@ -65,8 +59,8 @@ class OmmersPoolSpec
           block3Chain3
         )
 
-        ommersPool ! GetOmmers(block1Chain4.parentHash)
-        expectMsg(Timeouts.normalTimeout, OmmersPool.Ommers(Seq(block1Chain1)))
+        ommersPool ! GetOmmers(block1Chain4.parentHash, ommersProbe.ref)
+        ommersProbe.expectMessage(Timeouts.normalTimeout, OmmersPool.Ommers(Seq(block1Chain1)))
       }
 
       "despite of start losing older ommers candidates" in new TestSetup {
@@ -92,8 +86,8 @@ class OmmersPoolSpec
         // Notice that in terms of additions, current pool implementation is behaving as a queue with a fixed size!
         ommersPool ! AddOmmers(block1Chain5)
 
-        ommersPool ! GetOmmers(block2Chain4.parentHash)
-        expectMsg(Timeouts.normalTimeout, OmmersPool.Ommers(Seq(block1Chain5, block1Chain1)))
+        ommersPool ! GetOmmers(block2Chain4.parentHash, ommersProbe.ref)
+        ommersProbe.expectMessage(Timeouts.normalTimeout, OmmersPool.Ommers(Seq(block1Chain5, block1Chain1)))
       }
 
       "by respecting size and generation limits" in new TestSetup {
@@ -114,8 +108,8 @@ class OmmersPoolSpec
           block3Chain3
         )
 
-        ommersPool ! GetOmmers(block3Chain1.parentHash)
-        expectMsg(Timeouts.normalTimeout, OmmersPool.Ommers(Seq(block2Chain2, block3Chain3)))
+        ommersPool ! GetOmmers(block3Chain1.parentHash, ommersProbe.ref)
+        ommersProbe.expectMessage(Timeouts.normalTimeout, OmmersPool.Ommers(Seq(block2Chain2, block3Chain3)))
       }
 
     }
@@ -160,9 +154,10 @@ class OmmersPoolSpec
 
     // Mock created lazily so it's initialized when accessed within the MockFactory context
     lazy val blockchainReader: BlockchainReader = mock[BlockchainReader]
-    lazy val ommersPool: ActorRef =
-      system.actorOf(
-        OmmersPool.props(blockchainReader, ommersPoolSize, ommerGenerationLimit, returnedOmmerSizeLimit)
+    lazy val ommersProbe: TestProbe[Ommers] = testKit.createTestProbe[Ommers]()
+    lazy val ommersPool: ActorRef[Command] =
+      testKit.spawn(
+        OmmersPool(blockchainReader, ommersPoolSize, ommerGenerationLimit, returnedOmmerSizeLimit)
       )
   }
 }

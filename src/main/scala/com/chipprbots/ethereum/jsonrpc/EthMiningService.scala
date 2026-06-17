@@ -6,6 +6,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
@@ -30,7 +31,6 @@ import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.ommers.OmmersPool
@@ -78,7 +78,7 @@ class EthMiningService(
     blockchainReader: BlockchainReader,
     mining: Mining,
     jsonRpcConfig: JsonRpcConfig,
-    ommersPool: ActorRef,
+    ommersPool: typed.ActorRef[OmmersPool.Command],
     syncingController: ActorRef,
     val pendingTransactionsManager: ActorRef,
     val getTransactionFromPoolTimeout: FiniteDuration,
@@ -264,10 +264,12 @@ class EthMiningService(
   private def getOmmersFromPool(parentBlockHash: ByteString): IO[OmmersPool.Ommers] =
     mining.ifEthash { ethash =>
       val miningConfig = ethash.config.specific
+      import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
+      import org.apache.pekko.actor.typed.scaladsl.adapter.*
       implicit val timeout: Timeout = Timeout(miningConfig.ommerPoolQueryTimeout)
+      implicit val scheduler: org.apache.pekko.actor.typed.Scheduler = system.toTyped.scheduler
 
-      ommersPool
-        .askFor[OmmersPool.Ommers](OmmersPool.GetOmmers(parentBlockHash))
+      IO.fromFuture(IO(ommersPool.ask[OmmersPool.Ommers](OmmersPool.GetOmmers(parentBlockHash, _))))
         .handleError { ex =>
           log.error("failed to get ommer, mining block with empty ommers list", ex)
           OmmersPool.Ommers(Nil)

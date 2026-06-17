@@ -43,7 +43,7 @@ class RegularSync(
     blockValidator: BlockValidator,
     blacklist: Blacklist,
     syncConfig: SyncConfig,
-    ommersPool: ActorRef,
+    ommersPool: org.apache.pekko.actor.typed.ActorRef[com.chipprbots.ethereum.ommers.OmmersPool.Command],
     pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
       com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
     ],
@@ -207,7 +207,7 @@ object RegularSync {
       blockValidator: BlockValidator,
       blacklist: Blacklist,
       syncConfig: SyncConfig,
-      ommersPool: ActorRef,
+      ommersPool: org.apache.pekko.actor.typed.ActorRef[com.chipprbots.ethereum.ommers.OmmersPool.Command],
       pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
         com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
       ],

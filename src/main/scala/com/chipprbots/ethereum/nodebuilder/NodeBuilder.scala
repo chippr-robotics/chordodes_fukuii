@@ -1023,7 +1023,8 @@ trait OmmersPoolBuilder {
   self: ActorSystemBuilder with BlockchainBuilder with MiningConfigBuilder =>
 
   lazy val ommersPoolSize: Int = 30
-  lazy val ommersPool: ActorRef = system.actorOf(OmmersPool.props(blockchainReader, ommersPoolSize))
+  lazy val ommersPool: org.apache.pekko.actor.typed.ActorRef[OmmersPool.Command] =
+    system.spawn(OmmersPool(blockchainReader, ommersPoolSize), "ommers-pool")
 }
 
 trait VmBuilder {

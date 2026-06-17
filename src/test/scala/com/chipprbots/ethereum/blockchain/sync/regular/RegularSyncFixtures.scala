@@ -102,7 +102,7 @@ trait RegularSyncFixtures { self: Matchers with AsyncMockFactory =>
           validators.blockValidator,
           blacklist,
           syncConfig,
-          ommersPool.ref,
+          ommersPool.ref.toTyped[com.chipprbots.ethereum.ommers.OmmersPool.Command],
           pendingTransactionsManager.ref
             .toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
           system.scheduler,
@@ -475,8 +475,8 @@ trait RegularSyncFixtures { self: Matchers with AsyncMockFactory =>
     // Set up AutoPilot for ommersPool to respond to GetOmmers messages
     ommersPool.setAutoPilot(new AutoPilot {
       def run(sender: ActorRef, msg: Any): AutoPilot = msg match {
-        case OmmersPool.GetOmmers(_) =>
-          sender ! OmmersPool.Ommers(Seq.empty)
+        case OmmersPool.GetOmmers(_, replyTo) =>
+          replyTo ! OmmersPool.Ommers(Seq.empty)
           this
         case _ => this
       }

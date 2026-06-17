@@ -1,6 +1,8 @@
 package com.chipprbots.ethereum.consensus.pow
 
 import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed
 import org.apache.pekko.util.ByteString
 
 import cats.effect.IO
@@ -12,7 +14,6 @@ import com.chipprbots.ethereum.consensus.blocks.PendingBlockAndState
 import com.chipprbots.ethereum.consensus.mining.CoinbaseProvider
 import com.chipprbots.ethereum.consensus.pow.blocks.PoWBlockGenerator
 import com.chipprbots.ethereum.domain.Block
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.TaskActorOps
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ommers.OmmersPool
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransactionsResponse
@@ -23,8 +24,9 @@ class PoWBlockCreator(
     val pendingTransactionsManager: ActorRef,
     val getTransactionFromPoolTimeout: FiniteDuration,
     mining: PoWMining,
-    ommersPool: ActorRef,
-    coinbaseProvider: CoinbaseProvider
+    ommersPool: typed.ActorRef[OmmersPool.Command],
+    coinbaseProvider: CoinbaseProvider,
+    system: ActorSystem
 ) extends TransactionPicker {
 
   lazy val fullConsensusConfig = mining.config
@@ -48,12 +50,15 @@ class PoWBlockCreator(
     }
   }
 
-  private def getOmmersFromPool(parentBlockHash: ByteString): IO[OmmersPool.Ommers] =
-    ommersPool
-      .askFor[OmmersPool.Ommers](OmmersPool.GetOmmers(parentBlockHash))
+  private def getOmmersFromPool(parentBlockHash: ByteString): IO[OmmersPool.Ommers] = {
+    import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
+    import org.apache.pekko.actor.typed.scaladsl.adapter.*
+    implicit val scheduler: org.apache.pekko.actor.typed.Scheduler = system.toTyped.scheduler
+    IO.fromFuture(IO(ommersPool.ask[OmmersPool.Ommers](OmmersPool.GetOmmers(parentBlockHash, _))))
       .handleError { ex =>
         log.error("Failed to get ommers, mining block with empty ommers list", ex)
         OmmersPool.Ommers(Nil)
       }
+  }
 
 }

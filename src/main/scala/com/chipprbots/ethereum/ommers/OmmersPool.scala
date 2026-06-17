@@ -1,8 +1,8 @@
 package com.chipprbots.ethereum.ommers
 
-import org.apache.pekko.actor.Actor
-import org.apache.pekko.actor.ActorLogging
-import org.apache.pekko.actor.Props
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.util.ByteString
 
 import scala.annotation.tailrec
@@ -11,37 +11,70 @@ import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
-import com.chipprbots.ethereum.ommers.OmmersPool.AddOmmers
-import com.chipprbots.ethereum.ommers.OmmersPool.GetOmmers
 
-class OmmersPool(
-    blockchainReader: BlockchainReader,
-    ommersPoolSize: Int,
-    ommerGenerationLimit: Int,
-    returnedOmmersSizeLimit: Int
-) extends Actor
-    with ActorLogging {
+object OmmersPool {
 
-  var ommersPool: Seq[BlockHeader] = Nil
+  sealed trait Command
+  case class AddOmmers(ommers: List[BlockHeader]) extends Command
 
-  override def receive: Receive = {
-    case AddOmmers(ommers) =>
-      ommersPool = (ommers ++ ommersPool).take(ommersPoolSize).distinct
-      logStatus(event = "Ommers after add", ommers = ommersPool)
-
-    case GetOmmers(parentBlockHash) =>
-      val ancestors = collectAncestors(parentBlockHash, ommerGenerationLimit)
-      val ommers = ommersPool
-        .filter { b =>
-          val notAncestor = ancestors.find(_.hash == b.hash).isEmpty
-          ancestors.find(_.hash == b.parentHash).isDefined && notAncestor
-        }
-        .take(returnedOmmersSizeLimit)
-      logStatus(event = s"Ommers given parent block ${Hex.toHexString(parentBlockHash.toArray)}", ommers)
-      sender() ! OmmersPool.Ommers(ommers)
+  object AddOmmers {
+    def apply(b: BlockHeader*): AddOmmers = AddOmmers(b.toList)
   }
 
-  private def collectAncestors(parentHash: ByteString, generationLimit: Int): List[BlockHeader] = {
+  case class GetOmmers(parentBlockHash: ByteString, replyTo: ActorRef[Ommers]) extends Command
+
+  case class Ommers(headers: Seq[BlockHeader])
+
+  /** As is stated on section 11.1, eq. (143) of the YP
+    *
+    * @param ommerGenerationLimit
+    *   should be === 6
+    * @param returnedOmmersSizeLimit
+    *   should be === 2
+    *
+    * Probably not worthy but those params could be placed in mining config.
+    */
+  def apply(
+      blockchainReader: BlockchainReader,
+      ommersPoolSize: Int,
+      ommerGenerationLimit: Int = 6,
+      returnedOmmersSizeLimit: Int = 2
+  ): Behavior[Command] =
+    running(blockchainReader, ommersPoolSize, ommerGenerationLimit, returnedOmmersSizeLimit, Nil)
+
+  private def running(
+      blockchainReader: BlockchainReader,
+      ommersPoolSize: Int,
+      ommerGenerationLimit: Int,
+      returnedOmmersSizeLimit: Int,
+      ommersPool: Seq[BlockHeader]
+  ): Behavior[Command] =
+    Behaviors.receive { (context, message) =>
+      message match {
+        case AddOmmers(ommers) =>
+          val updated = (ommers ++ ommersPool).take(ommersPoolSize).distinct
+          logStatus(context, event = "Ommers after add", ommers = updated)
+          running(blockchainReader, ommersPoolSize, ommerGenerationLimit, returnedOmmersSizeLimit, updated)
+
+        case GetOmmers(parentBlockHash, replyTo) =>
+          val ancestors = collectAncestors(blockchainReader, parentBlockHash, ommerGenerationLimit)
+          val ommers = ommersPool
+            .filter { b =>
+              val notAncestor = ancestors.find(_.hash == b.hash).isEmpty
+              ancestors.find(_.hash == b.parentHash).isDefined && notAncestor
+            }
+            .take(returnedOmmersSizeLimit)
+          logStatus(context, event = s"Ommers given parent block ${Hex.toHexString(parentBlockHash.toArray)}", ommers)
+          replyTo ! OmmersPool.Ommers(ommers)
+          Behaviors.same
+      }
+    }
+
+  private def collectAncestors(
+      blockchainReader: BlockchainReader,
+      parentHash: ByteString,
+      generationLimit: Int
+  ): List[BlockHeader] = {
     @tailrec
     def rec(hash: ByteString, limit: Int, acc: List[BlockHeader]): List[BlockHeader] =
       if (limit > 0) {
@@ -55,39 +88,12 @@ class OmmersPool(
     rec(parentHash, generationLimit, List.empty)
   }
 
-  private def logStatus(event: String, ommers: Seq[BlockHeader]): Unit = {
+  private def logStatus(
+      context: org.apache.pekko.actor.typed.scaladsl.ActorContext[Command],
+      event: String,
+      ommers: Seq[BlockHeader]
+  ): Unit = {
     lazy val ommersAsString: Seq[String] = ommers.map(bh => s"[number = ${bh.number}, hash = ${bh.hashAsHexString}]")
-    log.debug(s"$event ${ommersAsString}")
+    context.log.debug(s"$event ${ommersAsString}")
   }
-}
-
-object OmmersPool {
-
-  /** As is stated on section 11.1, eq. (143) of the YP
-    *
-    * @param ommerGenerationLimit
-    *   should be === 6
-    * @param returnedOmmersSizeLimit
-    *   should be === 2
-    *
-    * Probably not worthy but those params could be placed in mining config.
-    */
-  def props(
-      blockchainReader: BlockchainReader,
-      ommersPoolSize: Int,
-      ommerGenerationLimit: Int = 6,
-      returnedOmmersSizeLimit: Int = 2
-  ): Props = Props(
-    new OmmersPool(blockchainReader, ommersPoolSize, ommerGenerationLimit, returnedOmmersSizeLimit)
-  )
-
-  case class AddOmmers(ommers: List[BlockHeader])
-
-  object AddOmmers {
-    def apply(b: BlockHeader*): AddOmmers = AddOmmers(b.toList)
-  }
-
-  case class GetOmmers(parentBlockHash: ByteString)
-
-  case class Ommers(headers: Seq[BlockHeader])
 }

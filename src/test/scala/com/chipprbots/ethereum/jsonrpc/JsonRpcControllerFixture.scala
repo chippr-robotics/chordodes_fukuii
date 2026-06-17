@@ -42,6 +42,7 @@ import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ledger.StxLedger
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.nodebuilder.ApisBuilder
+import com.chipprbots.ethereum.ommers.OmmersPool
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.FilterConfig
@@ -189,7 +190,7 @@ class JsonRpcControllerFixture(implicit system: ActorSystem, mockFactory: org.sc
     blockchainReader,
     mining,
     config,
-    ommersPool.ref,
+    ommersPool.ref.toTyped[OmmersPool.Command],
     syncingController.ref,
     pendingTransactionsManager.ref,
     getTransactionFromPoolTimeout,

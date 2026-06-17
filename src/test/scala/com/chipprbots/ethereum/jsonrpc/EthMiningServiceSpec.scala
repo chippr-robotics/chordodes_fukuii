@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.jsonrpc
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
@@ -93,8 +94,10 @@ class EthMiningServiceSpec
     // Handle the actor messages
     pendingTransactionsManager.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     pendingTransactionsManager.reply(PendingTransactionsManager.PendingTransactionsResponse(Nil))
-    ommersPool.expectMsg(OmmersPool.GetOmmers(parentBlock.hash))
-    ommersPool.reply(OmmersPool.Ommers(Nil))
+    ommersPool.expectMsgPF() {
+      case OmmersPool.GetOmmers(hash, replyTo) if hash == parentBlock.hash =>
+        replyTo ! OmmersPool.Ommers(Nil)
+    }
 
     // Wait for the result
     import scala.concurrent.Await
@@ -152,8 +155,10 @@ class EthMiningServiceSpec
     // Handle the actor messages
     pendingTransactionsManager.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     pendingTransactionsManager.reply(PendingTransactionsManager.PendingTransactionsResponse(Nil))
-    ommersPool.expectMsg(OmmersPool.GetOmmers(parentBlock.hash))
-    ommersPool.reply(OmmersPool.Ommers(Nil))
+    ommersPool.expectMsgPF() {
+      case OmmersPool.GetOmmers(hash, replyTo) if hash == parentBlock.hash =>
+        replyTo ! OmmersPool.Ommers(Nil)
+    }
 
     // Wait for the result
     import scala.concurrent.Await
@@ -188,8 +193,10 @@ class EthMiningServiceSpec
     pendingTransactionsManager.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     pendingTransactionsManager.reply(PendingTransactionsManager.PendingTransactionsResponse(Nil))
 
-    ommersPool.expectMsg(OmmersPool.GetOmmers(parentBlock.hash))
-    ommersPool.reply(OmmersPool.Ommers(Nil))
+    ommersPool.expectMsgPF() {
+      case OmmersPool.GetOmmers(hash, replyTo) if hash == parentBlock.hash =>
+        replyTo ! OmmersPool.Ommers(Nil)
+    }
 
     // Wait for the result
     import scala.concurrent.Await
@@ -220,8 +227,10 @@ class EthMiningServiceSpec
     pendingTransactionsManager.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     pendingTransactionsManager.reply(PendingTransactionsManager.PendingTransactionsResponse(Nil))
 
-    ommersPool.expectMsg(OmmersPool.GetOmmers(parentBlock.hash))
-    ommersPool.reply(OmmersPool.Ommers(Nil))
+    ommersPool.expectMsgPF() {
+      case OmmersPool.GetOmmers(hash, replyTo) if hash == parentBlock.hash =>
+        replyTo ! OmmersPool.Ommers(Nil)
+    }
 
     assert(response.isRight)
     val responseData = response.toOption.get
@@ -357,8 +366,10 @@ class EthMiningServiceSpec
 
     pendingTransactionsManager.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     pendingTransactionsManager.reply(PendingTransactionsManager.PendingTransactionsResponse(Nil))
-    ommersPool.expectMsg(OmmersPool.GetOmmers(parentBlock.hash))
-    ommersPool.reply(OmmersPool.Ommers(Nil))
+    ommersPool.expectMsgPF() {
+      case OmmersPool.GetOmmers(hash, replyTo) if hash == parentBlock.hash =>
+        replyTo ! OmmersPool.Ommers(Nil)
+    }
 
     import scala.concurrent.Await
     val result: Either[JsonRpcError, GetWorkResponse] = Await.result(workFuture, 10.seconds)
@@ -460,8 +471,10 @@ class EthMiningServiceSpec
     pendingTransactionsManager.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     pendingTransactionsManager.reply(PendingTransactionsManager.PendingTransactionsResponse(Nil))
 
-    ommersPool.expectMsg(OmmersPool.GetOmmers(parentBlock.hash))
-    ommersPool.reply(OmmersPool.Ommers(Nil))
+    ommersPool.expectMsgPF() {
+      case OmmersPool.GetOmmers(hash, replyTo) if hash == parentBlock.hash =>
+        replyTo ! OmmersPool.Ommers(Nil)
+    }
 
     // Wait for the result
     import scala.concurrent.Await
@@ -518,7 +531,7 @@ class EthMiningServiceSpec
       blockchainReader,
       mining,
       jsonRpcConfig,
-      ommersPool.ref,
+      ommersPool.ref.toTyped[OmmersPool.Command],
       syncingController.ref,
       pendingTransactionsManager.ref,
       getTransactionFromPoolTimeout,

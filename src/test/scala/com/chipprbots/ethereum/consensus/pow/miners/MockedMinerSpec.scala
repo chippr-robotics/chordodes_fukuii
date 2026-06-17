@@ -1,7 +1,8 @@
 package com.chipprbots.ethereum.consensus.pow.miners
 
 import org.apache.pekko.actor.ActorSystem as ClassicSystem
-import org.apache.pekko.testkit.TestActorRef
+import org.apache.pekko.actor.typed
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestKit
 
 import cats.effect.IO
@@ -249,14 +250,19 @@ class MockedMinerSpec
     override lazy val mockEvmCodeStorage: EvmCodeStorage = mock[EvmCodeStorage]
     override lazy val mockMptStorage: MptStorage = mock[MptStorage]
 
-    val miner: TestActorRef[Nothing] = TestActorRef(
-      MockedMiner.props(
-        blockchainReader,
-        blockCreator,
-        sync.ref,
-        this
+    val miner: typed.ActorRef[MockedMiner.Command] =
+      classicSystem.spawnAnonymous(
+        MockedMiner(
+          blockchainReader,
+          blockCreator,
+          sync.ref,
+          this
+        )
       )
-    )
+
+    // Reply target for the Typed ask/reply pattern (Classic sender() is gone in Typed).
+    private val parentReplyTo: typed.ActorRef[MockedMiner.MockedMinerResponse] =
+      parentActor.ref.toTyped[MockedMiner.MockedMinerResponse]
 
     // Allow getBestBlock to be called 0 or more times since some tests use getBlockByHash instead
     (() => blockchainReader.getBestBlock).expects().returns(Some(origin)).anyNumberOfTimes()
@@ -319,12 +325,12 @@ class MockedMinerSpec
     }
 
     protected def withStartedMiner(behaviour: => Unit): Unit = {
-      miner ! MinerProtocol.StartMining
+      miner ! MockedMiner.Send(MockedMiner.StartMining, parentReplyTo)
       behaviour
-      miner ! MinerProtocol.StopMining
+      miner ! MockedMiner.Send(MockedMiner.StopMining, parentReplyTo)
     }
 
-    protected def sendToMiner(msg: MinerProtocol): Unit =
-      miner.tell(msg, parentActor.ref)
+    protected def sendToMiner(msg: MockedMiner.MockedMinerProtocol): Unit =
+      miner ! MockedMiner.Send(msg, parentReplyTo)
   }
 }

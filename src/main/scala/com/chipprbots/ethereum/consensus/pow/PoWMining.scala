@@ -4,6 +4,7 @@ package pow
 
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.DispatcherSelector
+import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.Timeout
 
@@ -39,7 +40,6 @@ import com.chipprbots.ethereum.consensus.validators.Validators
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.TaskActorOps
 import com.chipprbots.ethereum.ledger.BlockPreparator
 import com.chipprbots.ethereum.ledger.VMImpl
 import com.chipprbots.ethereum.nodebuilder.Node
@@ -69,28 +69,36 @@ class PoWMining private (
   )
 
   @volatile private[pow] var minerCoordinatorRef: Option[ActorRef[CoordinatorProtocol]] = None
-  @volatile private[pow] var mockedMinerRef: Option[org.apache.pekko.actor.ActorRef] = None
+  @volatile private[pow] var mockedMinerRef: Option[ActorRef[MockedMiner.Command]] = None
+  // Captured at spawn time to provide the Typed Scheduler (ask) and ignoreRef (fire-and-forget).
+  @volatile private[this] var minerSystem: Option[org.apache.pekko.actor.typed.ActorSystem[Nothing]] = None
 
   final val BlockForgerDispatcherId = "fukuii.async.dispatchers.block-forger"
   implicit private val timeout: Timeout = 20.seconds
 
   override def sendMiner(msg: MinerProtocol): Unit =
     msg match {
-      case mineBlocks: MockedMiner.MineBlocks => mockedMinerRef.foreach(_ ! mineBlocks)
+      case mineBlocks: MockedMiner.MineBlocks =>
+        // Fire-and-forget MineBlocks: no reply target needed.
+        for { ref <- mockedMinerRef; sys <- minerSystem } ref ! MockedMiner.Send(mineBlocks, sys.ignoreRef)
       case MinerProtocol.StartMining =>
-        mockedMinerRef.foreach(_ ! MockedMiner.StartMining)
+        for { ref <- mockedMinerRef; sys <- minerSystem } ref ! MockedMiner.Send(MockedMiner.StartMining, sys.ignoreRef)
         minerCoordinatorRef.foreach(_ ! PoWMiningCoordinator.SetMiningMode(PoWMiningCoordinator.RecurrentMining))
       case MinerProtocol.StopMining =>
-        mockedMinerRef.foreach(_ ! MockedMiner.StopMining)
+        for { ref <- mockedMinerRef; sys <- minerSystem } ref ! MockedMiner.Send(MockedMiner.StopMining, sys.ignoreRef)
         minerCoordinatorRef.foreach(_ ! PoWMiningCoordinator.StopMining)
       case _ => log.warn("SendMiner method received unexpected message {}", msg)
     }
 
   // no interactions are done with minerCoordinatorRef using the ask pattern
   override def askMiner(msg: MockedMinerProtocol): IO[MockedMinerResponse] =
-    mockedMinerRef
-      .map(_.askFor[MockedMinerResponse](msg))
-      .getOrElse(IO.pure(MinerNotExist))
+    (mockedMinerRef, minerSystem) match {
+      case (Some(ref), Some(sys)) =>
+        import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
+        implicit val scheduler: Scheduler = sys.scheduler
+        IO.fromFuture(IO(ref.ask[MockedMinerResponse](replyTo => MockedMiner.Send(msg, replyTo))))
+      case _ => IO.pure(MinerNotExist)
+    }
 
   private[this] val mutex = new Object
 
@@ -115,7 +123,8 @@ class PoWMining private (
             )
           case MockedPow =>
             log.info("Instantiating MockedMiner")
-            mockedMinerRef = Some(MockedMiner(node))
+            minerSystem = Some(node.system.toTyped)
+            mockedMinerRef = Some(MockedMiner.spawn(node))
           case EngineApi =>
             log.info("Engine API mode — mining disabled (blocks from CL)")
         }
@@ -142,7 +151,8 @@ class PoWMining private (
             getTransactionFromPoolTimeout = node.txPoolConfig.getTransactionFromPoolTimeout,
             mining = mining,
             ommersPool = node.ommersPool,
-            coinbaseProvider = node.coinbaseProvider
+            coinbaseProvider = node.coinbaseProvider,
+            system = node.system
           )
         case mining => wrongMiningArgument[PoWMining](mining)
       }
