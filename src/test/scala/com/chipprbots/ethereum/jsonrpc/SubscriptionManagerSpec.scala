@@ -63,7 +63,12 @@ class SubscriptionManagerSpec
 
   // ── helpers for typed ask ──────────────────────────────────────────────────
 
-  def subscribe(mgr: ActorRef[SubscriptionManager.Command], connId: String, subType: String, params: Option[JValue] = None): SubscribeResponse = {
+  def subscribe(
+      mgr: ActorRef[SubscriptionManager.Command],
+      connId: String,
+      subType: String,
+      params: Option[JValue] = None
+  ): SubscribeResponse = {
     val probe = testKit.createTestProbe[SubscribeResponse]()
     mgr ! Subscribe(connId, subType, params, probe.ref)
     probe.receiveMessage(5.seconds)

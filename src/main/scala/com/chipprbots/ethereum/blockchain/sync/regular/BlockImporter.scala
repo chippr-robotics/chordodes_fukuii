@@ -54,7 +54,9 @@ class BlockImporter(
     syncConfig: SyncConfig,
     ommersPool: ActorRef,
     broadcaster: ActorRef,
-    pendingTransactionsManager: ActorRef,
+    pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
+      com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
+    ],
     supervisor: ActorRef,
     configBuilder: BlockchainConfigBuilder
 ) extends Actor
@@ -719,7 +721,9 @@ object BlockImporter {
       syncConfig: SyncConfig,
       ommersPool: ActorRef,
       broadcaster: ActorRef,
-      pendingTransactionsManager: ActorRef,
+      pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
+        com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
+      ],
       supervisor: ActorRef,
       configBuilder: BlockchainConfigBuilder
   ): Props =

@@ -3,6 +3,7 @@ package com.chipprbots.ethereum.faucet
 import java.security.SecureRandom
 
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.util.ByteString
 
@@ -28,7 +29,6 @@ import com.chipprbots.ethereum.jsonrpc.client.RpcClient.ParserError
 import com.chipprbots.ethereum.jsonrpc.client.RpcClient.RpcClientError
 import com.chipprbots.ethereum.keystore.KeyStore.DecryptionFailed
 import com.chipprbots.ethereum.keystore.Wallet
-import org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe
 
 class FaucetHandlerSpec
     extends ScalaTestWithActorTestKit

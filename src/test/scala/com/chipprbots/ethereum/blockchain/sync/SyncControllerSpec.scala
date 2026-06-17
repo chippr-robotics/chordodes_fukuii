@@ -3,6 +3,7 @@ package com.chipprbots.ethereum.blockchain.sync
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.Props
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.ExplicitlyTriggeredScheduler
 import org.apache.pekko.testkit.TestActor.AutoPilot
 import org.apache.pekko.testkit.TestActorRef
@@ -810,7 +811,8 @@ class SyncControllerSpec
           consensusAdapter,
           validators,
           peerMessageBus.ref,
-          pendingTransactionsManager.ref,
+          pendingTransactionsManager.ref
+            .toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
           ommersPool.ref,
           networkPeerManager.ref,
           blacklist,

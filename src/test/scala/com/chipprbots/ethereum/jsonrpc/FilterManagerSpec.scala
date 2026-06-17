@@ -55,7 +55,8 @@ class FilterManagerSpec
 
     (() => blockchainReader.getBestBlockNumber).expects().returning(3)
 
-    val createProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[NewFilterResponse] = testKit.createTestProbe[NewFilterResponse]()
+    val createProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[NewFilterResponse] =
+      testKit.createTestProbe[NewFilterResponse]()
     filterManager ! FilterManager.NewLogFilter(
       Some(BlockParam.WithNumber(1)),
       Some(BlockParam.Latest),
@@ -117,7 +118,8 @@ class FilterManagerSpec
         )
       )
 
-    val logsProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[FilterLogs] = testKit.createTestProbe[FilterLogs]()
+    val logsProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[FilterLogs] =
+      testKit.createTestProbe[FilterLogs]()
     filterManager ! FilterManager.GetFilterLogs(createResp.id, logsProbe.ref)
     val logsResp: LogFilterLogs = logsProbe.expectMessageType[LogFilterLogs]
 
@@ -137,7 +139,8 @@ class FilterManagerSpec
     // same best block, no new logs
     (() => blockchainReader.getBestBlockNumber).expects().returning(3).twice()
 
-    val changesProbe1: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[FilterChanges] = testKit.createTestProbe[FilterChanges]()
+    val changesProbe1: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[FilterChanges] =
+      testKit.createTestProbe[FilterChanges]()
     filterManager ! FilterManager.GetFilterChanges(createResp.id, changesProbe1.ref)
     val changesResp1: LogFilterChanges = changesProbe1.expectMessageType[LogFilterChanges]
 
@@ -211,7 +214,8 @@ class FilterManagerSpec
         )
       )
 
-    val changesProbe2: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[FilterChanges] = testKit.createTestProbe[FilterChanges]()
+    val changesProbe2: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[FilterChanges] =
+      testKit.createTestProbe[FilterChanges]()
     filterManager ! FilterManager.GetFilterChanges(createResp.id, changesProbe2.ref)
     val changesResp2: LogFilterChanges = changesProbe2.expectMessageType[LogFilterChanges]
 
@@ -225,7 +229,8 @@ class FilterManagerSpec
 
     (() => blockchainReader.getBestBlockNumber).expects().returning(3)
 
-    val createProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[NewFilterResponse] = testKit.createTestProbe[NewFilterResponse]()
+    val createProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[NewFilterResponse] =
+      testKit.createTestProbe[NewFilterResponse]()
     filterManager ! FilterManager.NewLogFilter(
       Some(BlockParam.WithNumber(1)),
       Some(BlockParam.Pending),
@@ -319,7 +324,8 @@ class FilterManagerSpec
         )
       )
 
-    val logsProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[FilterLogs] = testKit.createTestProbe[FilterLogs]()
+    val logsProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[FilterLogs] =
+      testKit.createTestProbe[FilterLogs]()
     filterManager ! FilterManager.GetFilterLogs(createResp.id, logsProbe.ref)
     val logsResp: LogFilterLogs = logsProbe.expectMessageType[LogFilterLogs]
 
@@ -353,13 +359,15 @@ class FilterManagerSpec
 
     (() => blockchainReader.getBestBlockNumber).expects().returning(3).twice()
 
-    val createProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[NewFilterResponse] = testKit.createTestProbe[NewFilterResponse]()
+    val createProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[NewFilterResponse] =
+      testKit.createTestProbe[NewFilterResponse]()
     filterManager ! FilterManager.NewBlockFilter(createProbe.ref)
     val createResp: NewFilterResponse = createProbe.expectMessageType[NewFilterResponse]
 
     (() => blockchainReader.getBestBlockNumber).expects().returning(3)
 
-    val logsProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[FilterLogs] = testKit.createTestProbe[FilterLogs]()
+    val logsProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[FilterLogs] =
+      testKit.createTestProbe[FilterLogs]()
     filterManager ! FilterManager.GetFilterLogs(createResp.id, logsProbe.ref)
     val getLogsRes: BlockFilterLogs = logsProbe.expectMessageType[BlockFilterLogs]
 
@@ -375,7 +383,8 @@ class FilterManagerSpec
     blockchainReader.getBlockHeaderByNumber.expects(BigInt(5)).returning(Some(bh5))
     blockchainReader.getBlockHeaderByNumber.expects(BigInt(6)).returning(Some(bh6))
 
-    val changesProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[FilterChanges] = testKit.createTestProbe[FilterChanges]()
+    val changesProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[FilterChanges] =
+      testKit.createTestProbe[FilterChanges]()
     filterManager ! FilterManager.GetFilterChanges(createResp.id, changesProbe.ref)
     val getChangesRes: BlockFilterChanges = changesProbe.expectMessageType[BlockFilterChanges]
 
@@ -386,7 +395,8 @@ class FilterManagerSpec
 
     (() => blockchainReader.getBestBlockNumber).expects().returning(3).twice()
 
-    val createProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[NewFilterResponse] = testKit.createTestProbe[NewFilterResponse]()
+    val createProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[NewFilterResponse] =
+      testKit.createTestProbe[NewFilterResponse]()
     filterManager ! FilterManager.NewPendingTransactionFilter(createProbe.ref)
     val createResp: NewFilterResponse = createProbe.expectMessageType[NewFilterResponse]
 
@@ -405,7 +415,8 @@ class FilterManagerSpec
 
     (() => keyStore.listAccounts).expects().returning(Right(List(stx.senderAddress)))
 
-    val logsProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[FilterLogs] = testKit.createTestProbe[FilterLogs]()
+    val logsProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[FilterLogs] =
+      testKit.createTestProbe[FilterLogs]()
     filterManager ! FilterManager.GetFilterLogs(createResp.id, logsProbe.ref)
 
     ptmProbe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
@@ -421,7 +432,8 @@ class FilterManagerSpec
 
     (() => blockchainReader.getBestBlockNumber).expects().returning(3).twice()
 
-    val createProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[NewFilterResponse] = testKit.createTestProbe[NewFilterResponse]()
+    val createProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[NewFilterResponse] =
+      testKit.createTestProbe[NewFilterResponse]()
     filterManager ! FilterManager.NewPendingTransactionFilter(createProbe.ref)
     val createResp: NewFilterResponse = createProbe.expectMessageType[NewFilterResponse]
 
@@ -440,7 +452,8 @@ class FilterManagerSpec
 
     (() => keyStore.listAccounts).expects().returning(Right(List(stx.senderAddress)))
 
-    val logsProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[FilterLogs] = testKit.createTestProbe[FilterLogs]()
+    val logsProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[FilterLogs] =
+      testKit.createTestProbe[FilterLogs]()
     filterManager ! FilterManager.GetFilterLogs(createResp.id, logsProbe.ref)
 
     ptmProbe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
@@ -455,7 +468,8 @@ class FilterManagerSpec
     manualTime.timePasses(26.seconds) // Exceeds longTimeout (25s) — filter should be evicted
 
     // the filter should no longer exist
-    val logsProbe2: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[FilterLogs] = testKit.createTestProbe[FilterLogs]()
+    val logsProbe2: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[FilterLogs] =
+      testKit.createTestProbe[FilterLogs]()
     filterManager ! FilterManager.GetFilterLogs(createResp.id, logsProbe2.ref)
 
     ptmProbe.expectNoMessage()

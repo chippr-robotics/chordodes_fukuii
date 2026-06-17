@@ -407,7 +407,7 @@ trait BlockchainHostBuilder {
       peerConfiguration,
       peerEventBus,
       networkPeerManager,
-      pendingTransactionsManager
+      pendingTransactionsManagerTyped
     ),
     "blockchain-host"
   )
@@ -442,7 +442,13 @@ trait NetServiceBuilder {
 }
 
 trait PendingTransactionsManagerBuilder {
+  // Classic bridge ref — for out-of-scope callers (FilterManager, EthMiningService,
+  // EthTxService, TxPoolService, PersonalService, TransactionHistoryService, TestService,
+  // PoWBlockCreator, TransactionPicker).
   def pendingTransactionsManager: ActorRef
+  // Typed ref — for in-scope callers (EngineApiService, BlockImporter, BlockchainHostActor,
+  // RegularSync, SyncController).
+  def pendingTransactionsManagerTyped: org.apache.pekko.actor.typed.ActorRef[PendingTransactionsManager.Command]
 }
 object PendingTransactionsManagerBuilder {
   trait Default extends PendingTransactionsManagerBuilder {
@@ -454,16 +460,43 @@ object PendingTransactionsManagerBuilder {
       with BlockchainBuilder
       with StorageBuilder =>
 
-    lazy val pendingTransactionsManager: ActorRef =
-      system.actorOf(
-        PendingTransactionsManager.props(
+    lazy val pendingTransactionsManagerTyped
+        : org.apache.pekko.actor.typed.ActorRef[PendingTransactionsManager.Command] =
+      system.spawn(
+        PendingTransactionsManager(
           txPoolConfig,
           peerManager,
           networkPeerManager,
           peerEventBus,
           blockchainReader,
           storagesInstance.storages.stateStorage
-        )
+        ),
+        "pending-transactions-manager"
+      )
+
+    // Classic bridge actor for out-of-scope callers.
+    // Translates the legacy GetPendingTransactions case object to the Typed ask pattern,
+    // and forwards all other PTM Commands directly.
+    lazy val pendingTransactionsManager: ActorRef =
+      system.actorOf(
+        org.apache.pekko.actor.Props(new org.apache.pekko.actor.Actor {
+          implicit private val scheduler: org.apache.pekko.actor.typed.Scheduler =
+            context.system.toTyped.scheduler
+          implicit private val bridgeTimeout: org.apache.pekko.util.Timeout =
+            org.apache.pekko.util.Timeout(txPoolConfig.pendingTxManagerQueryTimeout)
+
+          def receive: Receive = {
+            case PendingTransactionsManager.GetPendingTransactions =>
+              val s = sender()
+              import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
+              pendingTransactionsManagerTyped
+                .ask(ref => PendingTransactionsManager.GetPendingTransactionsReq(ref))
+                .foreach(s ! _)(context.dispatcher)
+            case cmd: PendingTransactionsManager.Command =>
+              pendingTransactionsManagerTyped ! cmd
+          }
+        }),
+        "ptm-classic-bridge"
       )
   }
 }
@@ -874,13 +907,16 @@ trait EngineApiBuilder {
 
   lazy val forkChoiceManager: ForkChoiceManager = new ForkChoiceManager(blockchainReader, blockchainWriter)
 
-  lazy val engineApiService: EngineApiService = new EngineApiService(
-    blockchainReader,
-    blockchainWriter,
-    blockExecution,
-    forkChoiceManager,
-    pendingTransactionsManager
-  )(blockchainConfig)
+  lazy val engineApiService: EngineApiService = {
+    implicit val typedScheduler: org.apache.pekko.actor.typed.Scheduler = system.toTyped.scheduler
+    new EngineApiService(
+      blockchainReader,
+      blockchainWriter,
+      blockExecution,
+      forkChoiceManager,
+      pendingTransactionsManagerTyped
+    )(blockchainConfig, typedScheduler)
+  }
 
   lazy val engineApiController: EngineApiController = new EngineApiController(engineApiService, Some(jsonRpcController))
 
@@ -1054,7 +1090,7 @@ trait SyncControllerBuilder extends SyncControllerRefBuilder {
       consensusAdapter,
       mining.validators,
       peerEventBus,
-      pendingTransactionsManager,
+      pendingTransactionsManagerTyped,
       ommersPool,
       networkPeerManager,
       blacklist,

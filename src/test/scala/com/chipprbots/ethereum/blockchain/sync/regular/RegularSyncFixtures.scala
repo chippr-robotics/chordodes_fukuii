@@ -4,6 +4,7 @@ import java.net.InetSocketAddress
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.PoisonPill
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.pattern.ask
 import org.apache.pekko.testkit.TestActor.AutoPilot
 import org.apache.pekko.testkit.TestKitBase
@@ -102,7 +103,8 @@ trait RegularSyncFixtures { self: Matchers with AsyncMockFactory =>
           blacklist,
           syncConfig,
           ommersPool.ref,
-          pendingTransactionsManager.ref,
+          pendingTransactionsManager.ref
+            .toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
           system.scheduler,
           this
         )

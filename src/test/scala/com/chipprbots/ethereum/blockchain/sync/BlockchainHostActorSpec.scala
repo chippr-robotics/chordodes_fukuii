@@ -2,6 +2,7 @@ package com.chipprbots.ethereum.blockchain.sync
 
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.Props
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
@@ -381,7 +382,7 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
           peerConf,
           peerEventBus.ref,
           networkPeerManager.ref,
-          pendingTxManager.ref
+          pendingTxManager.ref.toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command]
         )
       )
     )

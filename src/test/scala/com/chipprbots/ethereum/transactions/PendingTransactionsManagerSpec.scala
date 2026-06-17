@@ -2,9 +2,9 @@ package com.chipprbots.ethereum.transactions
 
 import java.net.InetSocketAddress
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.pattern.ask
+import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
@@ -43,7 +43,6 @@ import com.chipprbots.ethereum.security.SecureRandomBuilder
 import com.chipprbots.ethereum.testing.Tags.OlympiaTest
 import com.chipprbots.ethereum.testing.Tags.UnitTest
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.*
-import com.chipprbots.ethereum.transactions.SignedTransactionsFilterActor.ProperSignedTransactions
 import com.chipprbots.ethereum.utils.TxPoolConfig
 
 /** Test suite for PendingTransactionsManager actor.
@@ -182,7 +181,7 @@ class PendingTransactionsManagerSpec
 
     eventually {
       val pendingTxs: PendingTransactionsResponse =
-        (pendingTransactionsManager ? GetPendingTransactions).mapTo[PendingTransactionsResponse].futureValue
+        pendingTransactionsManager.ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref)).futureValue
       pendingTxs.pendingTransactions.map(_.stx).toSet shouldBe msg
     }
   }
@@ -194,7 +193,7 @@ class PendingTransactionsManagerSpec
 
     eventually {
       val pendingTxs: PendingTransactionsResponse =
-        (pendingTransactionsManager ? GetPendingTransactions).mapTo[PendingTransactionsResponse].futureValue
+        pendingTransactionsManager.ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref)).futureValue
       pendingTxs.pendingTransactions.map(_.stx).length shouldBe 1
       pendingTxs.pendingTransactions.map(_.stx).toSet shouldBe msg
     }
@@ -205,9 +204,9 @@ class PendingTransactionsManagerSpec
     // events. When a tx lands it announces the hashes (ETH/67
     // NewPooledTransactionHashes) to every connected peer rather than
     // pushing the full tx body — peers pull the body via GetPooledTransactions.
-    pendingTransactionsManager ! PeerEvent.PeerHandshakeSuccessful(peer1, new HandshakeResult {})
-    pendingTransactionsManager ! PeerEvent.PeerHandshakeSuccessful(peer2, new HandshakeResult {})
-    pendingTransactionsManager ! PeerEvent.PeerHandshakeSuccessful(peer3, new HandshakeResult {})
+    pendingTransactionsManager ! WrappedPeerEvent(PeerEvent.PeerHandshakeSuccessful(peer1, new HandshakeResult {}))
+    pendingTransactionsManager ! WrappedPeerEvent(PeerEvent.PeerHandshakeSuccessful(peer2, new HandshakeResult {}))
+    pendingTransactionsManager ! WrappedPeerEvent(PeerEvent.PeerHandshakeSuccessful(peer3, new HandshakeResult {}))
 
     val stx: SignedTransactionWithSender = newStx()
     pendingTransactionsManager ! AddTransactions(stx)
@@ -224,14 +223,14 @@ class PendingTransactionsManagerSpec
     }
 
     val pendingTxs: PendingTransactionsResponse =
-      (pendingTransactionsManager ? GetPendingTransactions).mapTo[PendingTransactionsResponse].futureValue
+      pendingTransactionsManager.ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref)).futureValue
     pendingTxs.pendingTransactions.map(_.stx) shouldBe Seq(stx)
   }
 
   it should "notify other peers about received transactions and handle removal" taggedAs (UnitTest) in new TestSetup {
-    pendingTransactionsManager ! PeerEvent.PeerHandshakeSuccessful(peer1, new HandshakeResult {})
-    pendingTransactionsManager ! PeerEvent.PeerHandshakeSuccessful(peer2, new HandshakeResult {})
-    pendingTransactionsManager ! PeerEvent.PeerHandshakeSuccessful(peer3, new HandshakeResult {})
+    pendingTransactionsManager ! WrappedPeerEvent(PeerEvent.PeerHandshakeSuccessful(peer1, new HandshakeResult {}))
+    pendingTransactionsManager ! WrappedPeerEvent(PeerEvent.PeerHandshakeSuccessful(peer2, new HandshakeResult {}))
+    pendingTransactionsManager ! WrappedPeerEvent(PeerEvent.PeerHandshakeSuccessful(peer3, new HandshakeResult {}))
 
     val tx1: Seq[SignedTransactionWithSender] = Seq.fill(10)(newStx())
     val msg1 = tx1.toSet
@@ -269,7 +268,7 @@ class PendingTransactionsManagerSpec
     pendingTransactionsManager ! RemoveTransactions(tx2.drop(2).map(_.tx))
 
     val pendingTxs: PendingTransactionsResponse =
-      (pendingTransactionsManager ? GetPendingTransactions).mapTo[PendingTransactionsResponse].futureValue
+      pendingTransactionsManager.ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref)).futureValue
     pendingTxs.pendingTransactions.size shouldBe 6
     pendingTxs.pendingTransactions.map(_.stx).toSet shouldBe (tx2.take(2) ++ tx1.takeRight(4)).toSet
   }
@@ -284,22 +283,22 @@ class PendingTransactionsManagerSpec
 
     eventually {
       val pendingTxs: PendingTransactionsResponse =
-        (pendingTransactionsManager ? GetPendingTransactions).mapTo[PendingTransactionsResponse].futureValue
+        pendingTransactionsManager.ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref)).futureValue
       pendingTxs.pendingTransactions.map(_.stx).toSet shouldBe msg1
     }
 
     pendingTransactionsManager ! RemoveTransactions(msg1.map(_.tx).toSeq)
 
     // No broadcast should follow since the tx is gone by the time peers show up.
-    pendingTransactionsManager ! PeerEvent.PeerHandshakeSuccessful(peer1, new HandshakeResult {})
-    pendingTransactionsManager ! PeerEvent.PeerHandshakeSuccessful(peer2, new HandshakeResult {})
-    pendingTransactionsManager ! PeerEvent.PeerHandshakeSuccessful(peer3, new HandshakeResult {})
+    pendingTransactionsManager ! WrappedPeerEvent(PeerEvent.PeerHandshakeSuccessful(peer1, new HandshakeResult {}))
+    pendingTransactionsManager ! WrappedPeerEvent(PeerEvent.PeerHandshakeSuccessful(peer2, new HandshakeResult {}))
+    pendingTransactionsManager ! WrappedPeerEvent(PeerEvent.PeerHandshakeSuccessful(peer3, new HandshakeResult {}))
 
     etcPeerManager.expectNoMessage()
 
     eventually {
       val pendingTxs: PendingTransactionsResponse =
-        (pendingTransactionsManager ? GetPendingTransactions).mapTo[PendingTransactionsResponse].futureValue
+        pendingTransactionsManager.ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref)).futureValue
       pendingTxs.pendingTransactions.size shouldBe 0
     }
   }
@@ -309,15 +308,15 @@ class PendingTransactionsManagerSpec
     val otherTx: SignedTransactionWithSender = newStx(1, tx, keyPair2)
     val overrideTx: SignedTransactionWithSender = newStx(1, tx.copy(value = 2 * tx.value), keyPair1)
 
-    pendingTransactionsManager ! PeerEvent.PeerHandshakeSuccessful(peer1, new HandshakeResult {})
+    pendingTransactionsManager ! WrappedPeerEvent(PeerEvent.PeerHandshakeSuccessful(peer1, new HandshakeResult {}))
 
     pendingTransactionsManager ! AddOrOverrideTransaction(firstTx.tx)
     pendingTransactionsManager ! AddOrOverrideTransaction(otherTx.tx)
     pendingTransactionsManager ! AddOrOverrideTransaction(overrideTx.tx)
 
     eventually {
-      val pendingTxs: Seq[PendingTransaction] = (pendingTransactionsManager ? GetPendingTransactions)
-        .mapTo[PendingTransactionsResponse]
+      val pendingTxs: Seq[PendingTransaction] = pendingTransactionsManager
+        .ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref))
         .futureValue
         .pendingTransactions
 
@@ -352,7 +351,7 @@ class PendingTransactionsManagerSpec
     val stx: SignedTransactionWithSender = newStx()
     pendingTransactionsManager ! AddTransactions(stx)
 
-    pendingTransactionsManager ! PeerEvent.PeerHandshakeSuccessful(peer1, new HandshakeResult {})
+    pendingTransactionsManager ! WrappedPeerEvent(PeerEvent.PeerHandshakeSuccessful(peer1, new HandshakeResult {}))
 
     // On handshake the pool replays its current contents to the new peer as a
     // NewPooledTransactionHashes announce; the peer pulls bodies on demand.
@@ -375,8 +374,9 @@ class PendingTransactionsManagerSpec
       override val pendingTxManagerQueryTimeout: FiniteDuration = Timeouts.veryLongTimeout
     }
 
-    override val pendingTransactionsManager: ActorRef = system.actorOf(
-      PendingTransactionsManager.props(txPoolConfig, peerManager.ref, etcPeerManager.ref, peerMessageBus.ref)
+    override val pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[Command] = system.spawn(
+      PendingTransactionsManager(txPoolConfig, peerManager.ref, etcPeerManager.ref, peerMessageBus.ref),
+      s"ptm-test-timeout-${java.util.UUID.randomUUID()}"
     )
 
     val stx: SignedTransactionWithSender = newStx()
@@ -384,14 +384,14 @@ class PendingTransactionsManagerSpec
 
     eventually {
       val pendingTxs: PendingTransactionsResponse =
-        (pendingTransactionsManager ? GetPendingTransactions).mapTo[PendingTransactionsResponse].futureValue
+        pendingTransactionsManager.ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref)).futureValue
       pendingTxs.pendingTransactions.map(_.stx).toSet shouldBe Set(stx)
     }
 
     // Wait for transaction to timeout (500ms + some buffer for actor processing)
     eventually {
       val pendingTxsAfter: PendingTransactionsResponse =
-        (pendingTransactionsManager ? GetPendingTransactions).mapTo[PendingTransactionsResponse].futureValue
+        pendingTransactionsManager.ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref)).futureValue
       pendingTxsAfter.pendingTransactions.map(_.stx).toSet shouldBe Set.empty
     }
   }
@@ -423,7 +423,8 @@ class PendingTransactionsManagerSpec
     val stx: SignedTransactionWithSender = newStx(0, zeroTipLegacy)
     pendingTransactionsManager ! AddTransactions(stx)
     eventually {
-      val resp = (pendingTransactionsManager ? GetPendingTransactions).mapTo[PendingTransactionsResponse].futureValue
+      val resp =
+        pendingTransactionsManager.ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref)).futureValue
       resp.pendingTransactions shouldBe empty
     }
   }
@@ -443,7 +444,8 @@ class PendingTransactionsManagerSpec
     val stx: SignedTransactionWithSender = newStx(0, validLegacy)
     pendingTransactionsManager ! AddTransactions(stx)
     eventually {
-      val resp = (pendingTransactionsManager ? GetPendingTransactions).mapTo[PendingTransactionsResponse].futureValue
+      val resp =
+        pendingTransactionsManager.ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref)).futureValue
       resp.pendingTransactions.map(_.stx).toSet shouldBe Set(stx)
     }
   }
@@ -469,7 +471,8 @@ class PendingTransactionsManagerSpec
     val stx: SignedTransactionWithSender = newDynamicStx(BigInt(0), zeroTipType2)
     pendingTransactionsManager ! AddTransactions(stx)
     eventually {
-      val resp = (pendingTransactionsManager ? GetPendingTransactions).mapTo[PendingTransactionsResponse].futureValue
+      val resp =
+        pendingTransactionsManager.ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref)).futureValue
       resp.pendingTransactions shouldBe empty
     }
   }
@@ -492,7 +495,8 @@ class PendingTransactionsManagerSpec
     val stx: SignedTransactionWithSender = newDynamicStx(BigInt(0), validType2)
     pendingTransactionsManager ! AddTransactions(stx)
     eventually {
-      val resp = (pendingTransactionsManager ? GetPendingTransactions).mapTo[PendingTransactionsResponse].futureValue
+      val resp =
+        pendingTransactionsManager.ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref)).futureValue
       resp.pendingTransactions.map(_.stx).toSet shouldBe Set(stx)
     }
   }
@@ -532,13 +536,15 @@ class PendingTransactionsManagerSpec
 
     pendingTransactionsManager ! AddTransactions(rejectedStx)
     eventually {
-      val resp = (pendingTransactionsManager ? GetPendingTransactions).mapTo[PendingTransactionsResponse].futureValue
+      val resp =
+        pendingTransactionsManager.ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref)).futureValue
       resp.pendingTransactions shouldBe empty // zero-tip tx rejected, nonce NOT held
     }
 
     pendingTransactionsManager ! AddTransactions(acceptedStx)
     eventually {
-      val resp = (pendingTransactionsManager ? GetPendingTransactions).mapTo[PendingTransactionsResponse].futureValue
+      val resp =
+        pendingTransactionsManager.ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref)).futureValue
       resp.pendingTransactions.map(_.stx.tx.hash) shouldBe Seq(acceptedStx.tx.hash) // same nonce accepted
     }
   }
@@ -557,15 +563,16 @@ class PendingTransactionsManagerSpec
         override def getBestBlock: Option[Block] = Some(blockWithBaseFee)
       }
 
-    override val pendingTransactionsManager: ActorRef = system.actorOf(
-      PendingTransactionsManager.props(
+    override val pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[Command] = system.spawn(
+      PendingTransactionsManager(
         txPoolConfig,
         peerManager.ref,
         etcPeerManager.ref,
         peerMessageBus.ref,
         blockchainReader = fakeBlockchainReader,
         stateStorage = null
-      )
+      ),
+      s"ptm-test-basefee-${java.util.UUID.randomUUID()}"
     )
 
     def newDynamicStx(
@@ -611,11 +618,15 @@ class PendingTransactionsManagerSpec
       override val getTransactionFromPoolTimeout: FiniteDuration = Timeouts.veryLongTimeout
     }
 
+    implicit lazy val typedScheduler: org.apache.pekko.actor.typed.Scheduler = system.toTyped.scheduler
+    implicit val askTimeout: org.apache.pekko.util.Timeout = org.apache.pekko.util.Timeout(Timeouts.veryLongTimeout)
+
     val peerManager: TestProbe = TestProbe()
     val etcPeerManager: TestProbe = TestProbe()
     val peerMessageBus: TestProbe = TestProbe()
-    val pendingTransactionsManager: ActorRef = system.actorOf(
-      PendingTransactionsManager.props(txPoolConfig, peerManager.ref, etcPeerManager.ref, peerMessageBus.ref)
+    val pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[Command] = system.spawn(
+      PendingTransactionsManager(txPoolConfig, peerManager.ref, etcPeerManager.ref, peerMessageBus.ref),
+      s"ptm-test-${java.util.UUID.randomUUID()}"
     )
   }
 

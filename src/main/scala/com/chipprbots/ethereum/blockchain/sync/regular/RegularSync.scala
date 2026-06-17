@@ -44,7 +44,9 @@ class RegularSync(
     blacklist: Blacklist,
     syncConfig: SyncConfig,
     ommersPool: ActorRef,
-    pendingTransactionsManager: ActorRef,
+    pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
+      com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
+    ],
     scheduler: Scheduler,
     configBuilder: BlockchainConfigBuilder
 ) extends Actor
@@ -206,7 +208,9 @@ object RegularSync {
       blacklist: Blacklist,
       syncConfig: SyncConfig,
       ommersPool: ActorRef,
-      pendingTransactionsManager: ActorRef,
+      pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
+        com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
+      ],
       scheduler: Scheduler,
       configBuilder: BlockchainConfigBuilder
   ): Props =

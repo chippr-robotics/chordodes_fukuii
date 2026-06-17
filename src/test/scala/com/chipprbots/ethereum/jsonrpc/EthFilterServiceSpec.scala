@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.jsonrpc
 
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe
 import org.apache.pekko.actor.typed.ActorRef
 
 import cats.effect.unsafe.IORuntime
@@ -21,7 +22,6 @@ import com.chipprbots.ethereum.jsonrpc.EthFilterService.*
 import com.chipprbots.ethereum.jsonrpc.FilterManager as FM
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.FilterConfig
-import org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe
 
 class EthFilterServiceSpec
     extends ScalaTestWithActorTestKit

@@ -8,6 +8,8 @@ import java.util.concurrent.atomic.AtomicReference
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
@@ -240,11 +242,11 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
   // Integration-test fake peer — PendingTransactionsManager isn't exercised by the sync harness,
   // so an actor that discards everything suffices to satisfy the ctor requirement added with the
   // txpool_* namespace.
-  lazy val pendingTransactionsManagerStub: ActorRef =
-    system.actorOf(
-      org.apache.pekko.actor.Props(new org.apache.pekko.actor.Actor {
-        def receive: Receive = { case _ => () }
-      }),
+  lazy val pendingTransactionsManagerStub: org.apache.pekko.actor.typed.ActorRef[
+    com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
+  ] =
+    system.spawn(
+      Behaviors.ignore[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
       s"pending-txs-stub-${System.nanoTime()}"
     )
 

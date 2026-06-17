@@ -112,8 +112,8 @@ object RegularSyncItSpecUtils {
 
     lazy val ommersPool: ActorRef = system.actorOf(OmmersPool.props(blockchainReader, 1), "ommers-pool")
 
-    lazy val pendingTransactionsManager: ActorRef = system.actorOf(
-      PendingTransactionsManager.props(TxPoolConfig(config), peerManager, etcPeerManager, peerEventBus),
+    lazy val pendingTransactionsManager: typed.ActorRef[PendingTransactionsManager.Command] = system.spawn(
+      PendingTransactionsManager(TxPoolConfig(config), peerManager, etcPeerManager, peerEventBus),
       "pending-transactions-manager"
     )
 

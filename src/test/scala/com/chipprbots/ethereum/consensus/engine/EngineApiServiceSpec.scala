@@ -1,5 +1,6 @@
 package com.chipprbots.ethereum.consensus.engine
 
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
@@ -151,7 +152,15 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         blockValidation
       )
       lazy val forkChoiceManager = new ForkChoiceManager(blockchainReader, blockchainWriter)
-      lazy val pendingTxManager = org.apache.pekko.actor.ActorRef.noSender
+      lazy val pendingTxManager: org.apache.pekko.actor.typed.ActorRef[
+        com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
+      ] = system.spawn(
+        org.apache.pekko.actor.typed.scaladsl.Behaviors.ignore[
+          com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
+        ],
+        "ptm-ignore-engine-spec"
+      )
+      implicit lazy val typedScheduler: org.apache.pekko.actor.typed.Scheduler = system.toTyped.scheduler
 
       lazy val engineApi = new EngineApiService(
         blockchainReader,
@@ -159,7 +168,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         blockExec,
         forkChoiceManager,
         pendingTxManager
-      )(blockchainConfig)
+      )(blockchainConfig, typedScheduler)
 
       // Build a post-merge genesis block with accounts
       private val genesisStateRoot = {

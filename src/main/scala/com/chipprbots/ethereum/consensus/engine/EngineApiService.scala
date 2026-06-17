@@ -27,11 +27,12 @@ class EngineApiService(
     blockchainWriter: BlockchainWriter,
     blockExecution: BlockExecution,
     forkChoiceManager: ForkChoiceManager,
-    pendingTransactionsManager: org.apache.pekko.actor.ActorRef
-)(implicit blockchainConfig: BlockchainConfig)
+    pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
+      com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
+    ]
+)(implicit blockchainConfig: BlockchainConfig, typedScheduler: org.apache.pekko.actor.typed.Scheduler)
     extends Logger {
 
-  import org.apache.pekko.pattern.ask
   import org.apache.pekko.util.Timeout
   import scala.concurrent.duration.*
   import scala.concurrent.Await
@@ -553,8 +554,11 @@ class EngineApiService(
                     val (pendingTxs, blobTxRawBytesFromPool): (Seq[SignedTransaction], Map[ByteString, ByteString]) =
                       try {
                         import com.chipprbots.ethereum.transactions.PendingTransactionsManager.*
+                        import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
                         val future =
-                          (pendingTransactionsManager ? GetPendingTransactions).mapTo[PendingTransactionsResponse]
+                          pendingTransactionsManager.ask[PendingTransactionsResponse](ref =>
+                            GetPendingTransactionsReq(ref)
+                          )
                         val response = Await.result(future, 3.seconds)
                         val expectedChainId = blockchainConfig.chainId
                         val filtered = response.pendingTransactions.map(_.stx.tx).filter { stx =>

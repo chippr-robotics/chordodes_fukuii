@@ -4,7 +4,7 @@ import org.apache.pekko.actor.Actor
 import org.apache.pekko.actor.ActorLogging
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.Props
-import org.apache.pekko.pattern.ask
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
@@ -42,12 +42,16 @@ class BlockchainHostActor(
     peerConfiguration: PeerConfiguration,
     peerEventBusActor: ActorRef,
     networkPeerManagerActor: ActorRef,
-    pendingTransactionsManager: ActorRef
+    pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
+      com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
+    ]
 ) extends Actor
     with ActorLogging {
 
   import context.dispatcher
   implicit val timeout: Timeout = Timeout(3.seconds)
+  implicit private val typedScheduler: org.apache.pekko.actor.typed.Scheduler =
+    context.system.toTyped.scheduler
 
   private val requestMsgsCodes =
     Set(
@@ -90,8 +94,9 @@ class BlockchainHostActor(
       peerId: com.chipprbots.ethereum.network.PeerId
   ): Unit = {
     val hashSet = txHashes.toSet
-    (pendingTransactionsManager ? PendingTransactionsManager.GetPendingTransactions)
-      .mapTo[PendingTransactionsResponse]
+    import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
+    pendingTransactionsManager
+      .ask[PendingTransactionsResponse](ref => PendingTransactionsManager.GetPendingTransactionsReq(ref))
       .foreach { response =>
         val matchingTxs = response.pendingTransactions
           .map(_.stx.tx)
@@ -300,7 +305,9 @@ object BlockchainHostActor {
       peerConfiguration: PeerConfiguration,
       peerEventBusActor: ActorRef,
       networkPeerManagerActor: ActorRef,
-      pendingTransactionsManager: ActorRef
+      pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
+        com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
+      ]
   ): Props =
     Props(
       new BlockchainHostActor(

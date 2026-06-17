@@ -2,11 +2,13 @@ package com.chipprbots.ethereum.faucet.jsonrpc
 
 import org.apache.pekko.actor.ActorSystem as ClassicSystem
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
 
+import scala.concurrent.Future
 import scala.concurrent.duration.*
 
 import org.bouncycastle.util.encoders.Hex
@@ -21,6 +23,8 @@ import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.faucet.FaucetConfig
 import com.chipprbots.ethereum.faucet.FaucetHandler
 import com.chipprbots.ethereum.faucet.FaucetHandler.Command
+import com.chipprbots.ethereum.faucet.FaucetHandler.Command.SendFunds
+import com.chipprbots.ethereum.faucet.FaucetHandler.Command.Status
 import com.chipprbots.ethereum.faucet.FaucetHandler.FaucetHandlerResponse.FaucetIsUnavailable
 import com.chipprbots.ethereum.faucet.FaucetHandler.FaucetHandlerResponse.StatusResponse
 import com.chipprbots.ethereum.faucet.FaucetHandler.FaucetHandlerResponse.TransactionSent
@@ -29,24 +33,10 @@ import com.chipprbots.ethereum.faucet.FaucetStatus.WalletAvailable
 import com.chipprbots.ethereum.faucet.RpcClientConfig
 import com.chipprbots.ethereum.faucet.SupervisorConfig
 import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.SendFundsRequest
+import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.SendFundsResponse
 import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.StatusRequest
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError
 import com.chipprbots.ethereum.testing.Tags.*
-import scala.concurrent.Future
-import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.SendFundsResponse
-import com.chipprbots.ethereum.faucet.FaucetHandler.Command.SendFunds
-import scala.concurrent.Future
-import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.SendFundsResponse
-import com.chipprbots.ethereum.faucet.FaucetHandler.Command.SendFunds
-import scala.concurrent.Future
-import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.SendFundsResponse
-import com.chipprbots.ethereum.faucet.FaucetHandler.Command.SendFunds
-import scala.concurrent.Future
-import com.chipprbots.ethereum.faucet.FaucetHandler.Command.Status
-import scala.concurrent.Future
-import com.chipprbots.ethereum.faucet.FaucetHandler.Command.Status
-import org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe
-import org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe
 
 class FaucetRpcServiceSpec
     extends ScalaTestWithActorTestKit
@@ -117,7 +107,8 @@ class FaucetRpcServiceSpec
     UnitTest,
     RPCTest
   ) in new TestSetup {
-    val future: Future[Either[JsonRpcError, FaucetDomain.StatusResponse]] = faucetRpcService.status(StatusRequest()).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, FaucetDomain.StatusResponse]] =
+      faucetRpcService.status(StatusRequest()).unsafeToFuture()
     val cmd: Status = handlerProbe.expectMessageType[Command.Status]
     cmd.replyTo ! FaucetIsUnavailable
 
@@ -132,7 +123,8 @@ class FaucetRpcServiceSpec
     UnitTest,
     RPCTest
   ) in new TestSetup {
-    val future: Future[Either[JsonRpcError, FaucetDomain.StatusResponse]] = faucetRpcService.status(StatusRequest()).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, FaucetDomain.StatusResponse]] =
+      faucetRpcService.status(StatusRequest()).unsafeToFuture()
     val cmd: Status = handlerProbe.expectMessageType[Command.Status]
     cmd.replyTo ! StatusResponse(WalletAvailable)
 

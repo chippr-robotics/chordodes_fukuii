@@ -53,7 +53,9 @@ class SyncController(
     consensus: ConsensusAdapter,
     validators: Validators,
     peerEventBus: ActorRef,
-    pendingTransactionsManager: ActorRef,
+    pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
+      com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
+    ],
     ommersPool: ActorRef,
     networkPeerManager: ActorRef,
     blacklist: Blacklist,
@@ -1907,7 +1909,9 @@ object SyncController {
       consensus: ConsensusAdapter,
       validators: Validators,
       peerEventBus: ActorRef,
-      pendingTransactionsManager: ActorRef,
+      pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
+        com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
+      ],
       ommersPool: ActorRef,
       networkPeerManager: ActorRef,
       blacklist: Blacklist,

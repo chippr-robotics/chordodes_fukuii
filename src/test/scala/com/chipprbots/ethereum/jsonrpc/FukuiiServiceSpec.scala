@@ -2,6 +2,7 @@ package com.chipprbots.ethereum.jsonrpc
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
@@ -51,6 +52,11 @@ class FukuiiServiceSpec
       with SyncControllerRefBuilder {
     lazy val pendingTransactionsManagerProbe: TestProbe = TestProbe()
     override lazy val pendingTransactionsManager: ActorRef = pendingTransactionsManagerProbe.ref
+    override lazy val pendingTransactionsManagerTyped: org.apache.pekko.actor.typed.ActorRef[
+      com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
+    ] = pendingTransactionsManagerProbe.ref.toTyped[
+      com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
+    ]
 
     override lazy val syncController: ActorRef = TestProbe().ref
   }

@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestActor.AutoPilot
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
@@ -305,7 +306,8 @@ class RegularSyncSpec
                 syncConfig,
                 ommersPool.ref,
                 importerBroadcaster.ref,
-                pendingTransactionsManager.ref,
+                pendingTransactionsManager.ref
+                  .toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
                 importerSupervisor.ref,
                 this
               ),

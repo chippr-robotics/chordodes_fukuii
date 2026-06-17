@@ -2,6 +2,7 @@ package com.chipprbots.ethereum.blockchain.sync
 
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.Props
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.ExplicitlyTriggeredScheduler
 import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestProbe
@@ -343,7 +344,8 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
           consensusAdapter,
           validators,
           peerMessageBus.ref,
-          pendingTransactionsManager.ref,
+          pendingTransactionsManager.ref
+            .toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
           ommersPool.ref,
           networkPeerManager.ref,
           blacklist,
