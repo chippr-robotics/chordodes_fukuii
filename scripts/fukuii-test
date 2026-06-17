@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# fukuii-test — run sbt test tier with full persistent log
+#
+# Usage: fukuii-test [essential|standard|comprehensive]
+#
+# Logs land in $FUKUII_DATA_DIR/test-logs/.
+# Override via: export FUKUII_DATA_DIR=/your/path
+# Default: ${XDG_DATA_HOME:-$HOME/.local/share}/fukuii
+
+set -euo pipefail
+
+TIER="${1:-essential}"
+case "$TIER" in
+  only|o)          shift; CMD="testOnly $*" ;;
+  quick|q)         CMD="crypto / test" ;;
+  essential|e)     CMD="testEssential" ;;
+  standard|s)      CMD="testStandard" ;;
+  comprehensive|c) CMD="testComprehensive" ;;
+  *)
+    echo "Usage: fukuii-test [only <patterns>|quick|essential|standard|comprehensive]" >&2
+    echo "  only <patterns>  ~sec  — targeted: testOnly *HealingTaskSpec *BlockBroadcastSpec" >&2
+    echo "  quick            ~20 sec  — crypto sub-module only" >&2
+    echo "  essential        ~24 min  — Tier 1 unit tests" >&2
+    echo "  standard         ~30 min  — Tier 2 unit + integration" >&2
+    echo "  comprehensive    ~3 hr    — full ethereum compliance suite" >&2
+    exit 1
+    ;;
+esac
+
+FUKUII_DATA_DIR="${FUKUII_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/fukuii}"
+LOGDIR="$FUKUII_DATA_DIR/test-logs"
+mkdir -p "$LOGDIR"
+# Sanitize CMD for use in filename (strip leading "testOnly ", replace spaces/globs)
+LABEL=$(echo "$CMD" | sed 's/\*//g; s/^testOnly /only-/; s/ /_/g; s/__*/_/g; s/_$//')
+LOGFILE="$LOGDIR/${LABEL}-$(date +%Y%m%d-%H%M%S).log"
+
+case "$TIER" in
+  only|o)      HINT="targeted run" ;;
+  quick|q)     HINT="~65 tests, ~20 sec" ;;
+  essential|e) HINT="~5039 lines, ~24 min — wc -l $LOGFILE to check progress" ;;
+  standard|s)  HINT="~30 min — wc -l $LOGFILE to check progress" ;;
+  *)           HINT="~3 hr — wc -l $LOGFILE to check progress" ;;
+esac
+echo "==> sbt $CMD — logging to $LOGFILE"
+echo "==> $HINT"
+
+sbt "$CMD" 2>&1 | tee "$LOGFILE"
+EXIT="${PIPESTATUS[0]}"
+
+echo ""
+echo "==> Log saved: $LOGFILE  ($(wc -l < "$LOGFILE") lines)"
+echo "==> Scan for smoke: grep -iE '^\[(warn|error)\]' $LOGFILE"
+echo "==> Delete when clean: rm $LOGFILE"
+
+exit "$EXIT"
