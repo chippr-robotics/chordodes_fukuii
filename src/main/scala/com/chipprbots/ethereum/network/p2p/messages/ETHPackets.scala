@@ -103,7 +103,7 @@ object ETHPackets {
         val result = new scala.collection.mutable.ArrayBuffer[RLPEncodeable](encodables.size)
         var i = 0
         val items = encodables match {
-          case indexed: IndexedSeq[RLPEncodeable] => indexed
+          case indexed: IndexedSeq[RLPEncodeable @unchecked] => indexed
           case other                              => other.toIndexedSeq
         }
         val len = items.size

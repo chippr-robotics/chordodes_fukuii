@@ -58,14 +58,14 @@ object Dependencies {
   )
 
   val enumeratum: Seq[ModuleID] = Seq(
-    "com.beachape" %% "enumeratum" % "1.9.7",
-    "com.beachape" %% "enumeratum-cats" % "1.9.7",
-    "com.beachape" %% "enumeratum-scalacheck" % "1.9.7" % Test
+    "com.beachape" %% "enumeratum" % "1.9.8",
+    "com.beachape" %% "enumeratum-cats" % "1.9.8",
+    "com.beachape" %% "enumeratum-scalacheck" % "1.9.8" % Test
   )
 
   val testing: Seq[ModuleID] = Seq(
-    "org.scalatest" %% "scalatest" % "3.2.19" % "it,test",
-    "org.scalamock" %% "scalamock" % "7.3.2" % "it,test",
+    "org.scalatest" %% "scalatest" % "3.2.20" % "it,test",
+    "org.scalamock" %% "scalamock" % "7.3.3" % "it,test",
     "org.scalatestplus" %% "scalacheck-1-18" % "3.2.19.0" % "test",
     "org.scalatestplus" %% "mockito-5-12" % "3.2.19.0" % "it,test",
     "org.mockito" % "mockito-core" % "5.23.0" % "it,test",
@@ -76,7 +76,7 @@ object Dependencies {
 
   val cats: Seq[ModuleID] = {
     val catsVersion = "2.13.0"
-    val catsEffectVersion = "3.6.1"
+    val catsEffectVersion = "3.6.3"
     Seq(
       "org.typelevel" %% "mouse" % "1.4.0",
       "org.typelevel" %% "cats-core" % catsVersion,
@@ -88,7 +88,7 @@ object Dependencies {
   val monix = Seq.empty[ModuleID]
 
   val fs2: Seq[ModuleID] = {
-    val fs2Version = "3.12.0" // requires cats-effect 3.6+
+    val fs2Version = "3.12.2" // requires cats-effect 3.6+
     Seq(
       "co.fs2" %% "fs2-core" % fs2Version,
       "co.fs2" %% "fs2-io" % fs2Version,
@@ -127,9 +127,9 @@ object Dependencies {
   )
 
   val logging = Seq(
-    "ch.qos.logback" % "logback-classic" % "1.5.32",
+    "ch.qos.logback" % "logback-classic" % "1.5.34",
     "com.typesafe.scala-logging" %% "scala-logging" % "3.9.6",
-    "net.logstash.logback" % "logstash-logback-encoder" % "8.1",
+    "net.logstash.logback" % "logstash-logback-encoder" % "8.1", // 9.x requires Jackson 3; blocked by json4s/circe transitive Jackson 2.x
     "org.codehaus.janino" % "janino" % "3.1.12",
     "org.typelevel" %% "log4cats-core" % "2.8.0",
     "org.typelevel" %% "log4cats-slf4j" % "2.8.0"
@@ -154,9 +154,9 @@ object Dependencies {
     "org.apache.httpcomponents.client5" % "httpclient5" % "5.6.1" // For JupnP UPnP transport without URLStreamHandlerFactory
   )
 
-  val jline = "org.jline" % "jline" % "3.30.13"
+  val jline = "org.jline" % "jline" % "3.30.13" // 4.x is a major API change — deferred
 
-  val jna = "net.java.dev.jna" % "jna" % "5.18.1"
+  val jna = "net.java.dev.jna" % "jna" % "5.19.1"
 
   val dependencies = Seq(
     jline,
@@ -182,7 +182,7 @@ object Dependencies {
 
   // Prometheus Java client 1.x (replaces legacy simpleclient 0.x)
   val prometheus: Seq[ModuleID] = {
-    val version = "1.3.5"
+    val version = "1.3.10" // 1.8.0 is a major bump — deferred
     Seq(
       "io.prometheus" % "prometheus-metrics-core" % version,
       "io.prometheus" % "prometheus-metrics-instrumentation-jvm" % version,
@@ -192,7 +192,7 @@ object Dependencies {
 
   val micrometer: Seq[ModuleID] = {
     val provider = "io.micrometer"
-    val version = "1.16.5"
+    val version = "1.16.6" // 1.17.0 is a minor bump — deferred
     Seq(
       // Required to compile metrics library https://github.com/micrometer-metrics/micrometer/issues/1133#issuecomment-452434205
       "com.google.code.findbugs" % "jsr305" % "3.0.2" % Optional,

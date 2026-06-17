@@ -155,7 +155,7 @@ tiered tests keep the feedback loop fast locally and exhaustive in CI.
 
 ### IV. Idiomatic, Formatted Scala 3
 
-The codebase is Scala 3.3.7 LTS only, under the `com.chipprbots.ethereum`
+The codebase is Scala 3.x LTS only, under the `com.chipprbots.ethereum`
 package root.
 
 Rules:
@@ -229,7 +229,7 @@ trust that a version number and changelog accurately describe what changed.
 
 ## Technology & Architecture Constraints
 
-- **Language/Runtime**: Scala 3.3.7 LTS on JDK 25 (OpenJDK); build with sbt
+- **Language/Runtime**: Scala 3.x LTS on JDK 25 (OpenJDK); build with sbt
   1.10.7+. No Scala 2 and no cross-build.
 - **Core libraries**: Apache Pekko (actors/HTTP), Cats Effect (`IO`), Monix,
   RocksDB for storage, BouncyCastle for crypto. New dependencies MUST be Scala 3
