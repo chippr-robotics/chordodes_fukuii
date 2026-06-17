@@ -89,6 +89,10 @@ class BlockBroadcast(val networkPeerManager: ActorRef, val isPoWChain: Boolean =
           Some(blockToBroadcast.as63) // PoW: send NewBlock with TD — ECBP-1100 chain weight signal
         case Capability.ETH69 =>
           None // PoS: no NewBlock — go-ethereum aligned
+        case Capability.ETH70 if isPoWChain =>
+          Some(blockToBroadcast.as63) // PoW: send NewBlock with TD — same as ETH69
+        case Capability.ETH70 =>
+          None // PoS: no NewBlock — same as ETH69
         case Capability.SNAP1 =>
           Some(blockToBroadcast.as63)
       }

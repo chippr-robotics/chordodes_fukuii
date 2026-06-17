@@ -104,6 +104,7 @@ class SyncStateSchedulerActor(
     case Capability.ETH63 | Capability.ETH64 | Capability.ETH65 | Capability.ETH66 | Capability.ETH67 => true
     case Capability.ETH68                                                                             => false
     case Capability.ETH69                                                                             => false
+    case Capability.ETH70                                                                             => false
     case Capability.SNAP1                                                                             => false
   }
 
