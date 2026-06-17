@@ -10,8 +10,8 @@ import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.consensus.engine.ForkChoiceManager
 import com.chipprbots.ethereum.consensus.mining.Mining
-import com.chipprbots.ethereum.domain.BlockHeaderImplicits.BlockHeaderEnc
 import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain.BlockHeaderImplicits.BlockHeaderEnc
 import com.chipprbots.ethereum.ledger.BlockQueue
 import com.chipprbots.ethereum.rlp
 import com.chipprbots.ethereum.utils.BlockchainConfig
@@ -343,8 +343,7 @@ class EthBlocksService(
     }
 
   def blobBaseFee(@unused req: BlobBaseFeeRequest): ServiceResponse[BlobBaseFeeResponse] = IO {
-    val fee = blockchainReader
-      .getBestBlock
+    val fee = blockchainReader.getBestBlock
       .flatMap(b => b.header.excessBlobGas.map(eg => (eg, b.header.unixTimestamp)))
       .map { case (eg, ts) =>
         com.chipprbots.ethereum.consensus.engine.BlobGasUtils.getBlobGasPrice(eg, ts, blockchainConfig)

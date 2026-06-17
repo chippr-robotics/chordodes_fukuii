@@ -4,8 +4,8 @@ import java.net.InetSocketAddress
 import java.net.URI
 import java.util.Collections.newSetFromMap
 
-import org.apache.pekko.actor.SupervisorStrategy.Stop
 import org.apache.pekko.actor.*
+import org.apache.pekko.actor.SupervisorStrategy.Stop
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 

@@ -33,24 +33,24 @@ import com.chipprbots.ethereum.crypto.generateKeyPair
 import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.forkid.ForkId
+import com.chipprbots.ethereum.network.*
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
 import com.chipprbots.ethereum.network.PeerActor.GetStatus
 import com.chipprbots.ethereum.network.PeerActor.Status.Handshaked
 import com.chipprbots.ethereum.network.PeerActor.StatusResponse
 import com.chipprbots.ethereum.network.PeerManagerActor.FastSyncHostConfiguration
 import com.chipprbots.ethereum.network.PeerManagerActor.PeerConfiguration
-import com.chipprbots.ethereum.network.*
 import com.chipprbots.ethereum.network.handshaker.NetworkHandshaker
 import com.chipprbots.ethereum.network.handshaker.NetworkHandshakerConfiguration
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.Status68 as Status
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.Status68.Status68Enc
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.{Status68 as Status}
+import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.*
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect.DisconnectEnc
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect.Reasons
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Hello.HelloEnc
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Pong.PongEnc
-import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.*
 import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler
 import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.RLPxConfiguration
 import com.chipprbots.ethereum.security.SecureRandomBuilder

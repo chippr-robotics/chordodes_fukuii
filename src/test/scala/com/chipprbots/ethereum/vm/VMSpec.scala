@@ -1,13 +1,13 @@
 package com.chipprbots.ethereum.vm
 
 import org.apache.pekko.util.ByteString
-import org.apache.pekko.util.ByteString.{empty as bEmpty}
+import org.apache.pekko.util.ByteString.empty as bEmpty
 
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.Fixtures.{Blocks as BlockFixtures}
+import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.MockWorldState.*

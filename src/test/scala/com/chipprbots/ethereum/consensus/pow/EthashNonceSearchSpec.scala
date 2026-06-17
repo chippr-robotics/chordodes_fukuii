@@ -15,7 +15,6 @@ import com.chipprbots.ethereum.testing.Tags.*
   */
 class EthashNonceSearchSpec extends AnyFlatSpec with Matchers {
 
-
   private val ecip1099Block: Long = 2_520_000L
   private val epoch0: Long = EthashUtils.epoch(0L, ecip1099Block)
   private val epoch0Seed = EthashUtils.seed(0L, ecip1099Block)

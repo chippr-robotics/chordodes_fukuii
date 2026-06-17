@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.extvm
 
 import org.apache.pekko.util.ByteString
 
-import com.google.protobuf.{ByteString as GByteString}
+import com.google.protobuf.ByteString as GByteString
 
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.UInt256

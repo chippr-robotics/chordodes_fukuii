@@ -21,13 +21,13 @@ import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.SignedTransactionWithSender
+import com.chipprbots.ethereum.jsonrpc.EthInfoService.CallTx
 import com.chipprbots.ethereum.jsonrpc.TraceService.*
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ledger.StxLedger
 import com.chipprbots.ethereum.ledger.TxResult
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.ExecutionTracer
-import com.chipprbots.ethereum.jsonrpc.EthInfoService.CallTx
 
 /** Unit tests for TraceService.
   *

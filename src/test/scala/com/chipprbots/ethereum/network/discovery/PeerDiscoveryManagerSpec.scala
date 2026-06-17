@@ -20,8 +20,8 @@ import scala.math.Ordering.Implicits.*
 import scala.util.control.NoStackTrace
 
 import com.chipprbots.scalanet.discovery.crypto.PublicKey
+import com.chipprbots.scalanet.discovery.ethereum.Node as ENode
 import com.chipprbots.scalanet.discovery.ethereum.v4.DiscoveryService
-import com.chipprbots.scalanet.discovery.ethereum.{Node as ENode}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.ScalaFutures

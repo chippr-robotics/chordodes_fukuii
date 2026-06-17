@@ -9,14 +9,14 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import com.chipprbots.ethereum.Mocks.MockValidatorsAlwaysSucceed
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
+import com.chipprbots.ethereum.consensus.engine.ForkChoiceManager.BeaconHead
 import com.chipprbots.ethereum.consensus.engine.PayloadStatus.*
 import com.chipprbots.ethereum.consensus.validators.std.StdValidators
 import com.chipprbots.ethereum.crypto.kec256
-import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
 import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
 import com.chipprbots.ethereum.ledger.*
 import com.chipprbots.ethereum.testing.Tags.*
-import com.chipprbots.ethereum.consensus.engine.ForkChoiceManager.BeaconHead
 
 // scalastyle:off magic.number
 class EngineApiServiceSpec extends AnyWordSpec with Matchers {
@@ -574,7 +574,8 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         finalizedBlockHash = ByteString(new Array[Byte](32))
       )
 
-      val response: Either[String, ForkchoiceUpdatedResponse] = engineApi.forkchoiceUpdated(state, payloadAttributes = None).unsafeRunSync()
+      val response: Either[String, ForkchoiceUpdatedResponse] =
+        engineApi.forkchoiceUpdated(state, payloadAttributes = None).unsafeRunSync()
       response.isRight shouldBe true
       response.toOption.get.payloadStatus.status shouldBe Syncing
 

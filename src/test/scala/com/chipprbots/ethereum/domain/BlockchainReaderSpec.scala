@@ -137,7 +137,8 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     val gWeight: ChainWeight = ChainWeight.zero.increase(genesis.header)
     blockchainWriter.save(genesis, Nil, gWeight, saveAsBestBlock = true)
 
-    val pivotHeader: BlockHeader = Fixtures.Blocks.Genesis.header.copy(parentHash = genesis.header.hash, number = etcBestNum)
+    val pivotHeader: BlockHeader =
+      Fixtures.Blocks.Genesis.header.copy(parentHash = genesis.header.hash, number = etcBestNum)
     val pivotBlock: Block = Block(pivotHeader, Fixtures.Blocks.Genesis.body)
     val pivotWeight: ChainWeight = ChainWeight.totalDifficultyOnly(etcBestTD)
     blockchainWriter.save(pivotBlock, Nil, pivotWeight, saveAsBestBlock = true)
@@ -162,7 +163,8 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     val genesis: Block = Block(Fixtures.Blocks.Genesis.header, Fixtures.Blocks.Genesis.body)
     blockchainWriter.save(genesis, Nil, ChainWeight.zero.increase(genesis.header), saveAsBestBlock = true)
 
-    val pivotHeader: BlockHeader = Fixtures.Blocks.Genesis.header.copy(parentHash = genesis.header.hash, number = etcBestNum)
+    val pivotHeader: BlockHeader =
+      Fixtures.Blocks.Genesis.header.copy(parentHash = genesis.header.hash, number = etcBestNum)
     val pivotBlock: Block = Block(pivotHeader, Fixtures.Blocks.Genesis.body)
     blockchainWriter.save(pivotBlock, Nil, ChainWeight.totalDifficultyOnly(etcBestTD), saveAsBestBlock = true)
 

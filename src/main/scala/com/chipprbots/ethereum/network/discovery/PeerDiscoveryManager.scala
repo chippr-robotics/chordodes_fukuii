@@ -18,8 +18,8 @@ import scala.util.Random
 import scala.util.Success
 
 import com.chipprbots.scalanet.discovery.crypto.PublicKey
+import com.chipprbots.scalanet.discovery.ethereum.Node as ENode
 import com.chipprbots.scalanet.discovery.ethereum.v4
-import com.chipprbots.scalanet.discovery.ethereum.{Node as ENode}
 import fs2.Stream
 import org.bouncycastle.util.encoders.Hex
 import scodec.bits.BitVector

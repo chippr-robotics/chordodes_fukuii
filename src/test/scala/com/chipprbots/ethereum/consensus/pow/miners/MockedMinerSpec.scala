@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.consensus.pow.miners
 
-import org.apache.pekko.actor.{ActorSystem as ClassicSystem}
+import org.apache.pekko.actor.ActorSystem as ClassicSystem
 import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestKit
 
@@ -93,7 +93,8 @@ class MockedMinerSpec
       "Unable to get parent block for mining" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
         val parentHash = origin.hash
 
-        val errorMsg: String = s"Unable to get parent block with hash ${ByteStringUtils.hash2string(parentHash)} for mining"
+        val errorMsg: String =
+          s"Unable to get parent block with hash ${ByteStringUtils.hash2string(parentHash)} for mining"
 
         blockchainReader.getBlockByHash.expects(parentHash).returns(None)
 

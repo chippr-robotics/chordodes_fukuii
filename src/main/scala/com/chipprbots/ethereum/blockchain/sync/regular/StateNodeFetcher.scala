@@ -1,11 +1,11 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 
+import org.apache.pekko.actor.ActorRef as ClassicActorRef
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.AbstractBehavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.actor.{ActorRef as ClassicActorRef}
 import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime

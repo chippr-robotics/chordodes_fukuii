@@ -9,7 +9,7 @@ import scala.util.Try
 import io.micrometer.core.instrument.*
 import io.micrometer.core.instrument.binder.logging.LogbackMetrics
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
-import io.prometheus.metrics.exporter.httpserver.{HTTPServer as PrometheusHTTPServer}
+import io.prometheus.metrics.exporter.httpserver.HTTPServer as PrometheusHTTPServer
 import io.prometheus.metrics.instrumentation.jvm.JvmMetrics
 import kamon.Kamon
 import org.slf4j.LoggerFactory

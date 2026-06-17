@@ -15,8 +15,7 @@ trait EphemBlockchainTestSetup extends ScenarioSetup {
 
   // + cake overrides
   override lazy val vm: VMImpl = new VMImpl
-  override lazy val storagesInstance
-      : EphemDataSourceComponent & LocalPruningConfigBuilder & Storages.DefaultStorages =
+  override lazy val storagesInstance: EphemDataSourceComponent & LocalPruningConfigBuilder & Storages.DefaultStorages =
     new EphemDataSourceComponent
       with LocalPruningConfigBuilder
       with Storages.DefaultStorages

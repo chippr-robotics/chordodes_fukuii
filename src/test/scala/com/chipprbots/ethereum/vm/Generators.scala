@@ -5,7 +5,7 @@ import org.apache.pekko.util.ByteString
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
 
-import com.chipprbots.ethereum.Fixtures.{Blocks as BlockFixtures}
+import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.ObjectGenerators
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address

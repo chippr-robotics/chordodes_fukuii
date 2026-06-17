@@ -475,7 +475,9 @@ class JsonRpcControllerEthSpec
   it should "eth_getUncleCountByBlockNumber" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
     // MIGRATION: Scala 3 scalamock macro drops Option[ForkChoiceManager] type arg — use concrete stub
     val mockEthBlocksService: EthBlocksService = new EthBlocksService(null, null, null, null) {
-      override def getUncleCountByBlockNumber(req: EthBlocksService.GetUncleCountByBlockNumberRequest): ServiceResponse[GetUncleCountByBlockNumberResponse] =
+      override def getUncleCountByBlockNumber(
+          req: EthBlocksService.GetUncleCountByBlockNumberRequest
+      ): ServiceResponse[GetUncleCountByBlockNumberResponse] =
         IO.pure(Right(GetUncleCountByBlockNumberResponse(2)))
     }
     override val jsonRpcController: JsonRpcController =
@@ -495,7 +497,9 @@ class JsonRpcControllerEthSpec
   it should "eth_getUncleCountByBlockHash " taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
     // MIGRATION: Scala 3 scalamock macro drops Option[ForkChoiceManager] type arg — use concrete stub
     val mockEthBlocksService: EthBlocksService = new EthBlocksService(null, null, null, null) {
-      override def getUncleCountByBlockHash(req: EthBlocksService.GetUncleCountByBlockHashRequest): ServiceResponse[GetUncleCountByBlockHashResponse] =
+      override def getUncleCountByBlockHash(
+          req: EthBlocksService.GetUncleCountByBlockHashRequest
+      ): ServiceResponse[GetUncleCountByBlockHashResponse] =
         IO.pure(Right(GetUncleCountByBlockHashResponse(3)))
     }
     override val jsonRpcController: JsonRpcController =

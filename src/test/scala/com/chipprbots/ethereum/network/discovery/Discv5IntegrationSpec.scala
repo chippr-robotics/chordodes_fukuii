@@ -6,10 +6,10 @@ import java.util.concurrent.atomic.AtomicReference
 
 import com.chipprbots.scalanet.discovery.crypto.SigAlg
 import com.chipprbots.scalanet.discovery.ethereum.EthereumNodeRecord
+import com.chipprbots.scalanet.discovery.ethereum.Node as ScNode
 import com.chipprbots.scalanet.discovery.ethereum.codecs.DefaultCodecs
 import com.chipprbots.scalanet.discovery.ethereum.v4
 import com.chipprbots.scalanet.discovery.ethereum.v5
-import com.chipprbots.scalanet.discovery.ethereum.{Node as ScNode}
 import com.chipprbots.scalanet.peergroup.udp.StaticUDPPeerGroup
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers

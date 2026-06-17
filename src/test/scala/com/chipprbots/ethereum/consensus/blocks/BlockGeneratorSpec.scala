@@ -19,8 +19,8 @@ import com.chipprbots.ethereum.consensus.pow.validators.ValidatorsExecutor
 import com.chipprbots.ethereum.consensus.validators.*
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.crypto.*
-import com.chipprbots.ethereum.domain.SignedTransaction.FirstByteOfAddress
 import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain.SignedTransaction.FirstByteOfAddress
 import com.chipprbots.ethereum.ledger.BlockExecution
 import com.chipprbots.ethereum.ledger.BlockQueue
 import com.chipprbots.ethereum.ledger.BlockValidation

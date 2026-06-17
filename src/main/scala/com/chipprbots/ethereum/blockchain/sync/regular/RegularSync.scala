@@ -8,8 +8,8 @@ import org.apache.pekko.actor.Cancellable
 import org.apache.pekko.actor.Props
 import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.actor.SupervisorStrategy
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.actor.typed.{ActorRef as TypedActorRef}
 
 import scala.concurrent.duration.*
 

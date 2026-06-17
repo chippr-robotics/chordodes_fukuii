@@ -194,8 +194,7 @@ class EthTxService(
   //     ETC/Mordor post-Olympia: max(≥1 gwei, 1 gwei) + 1 gwei = ≥ 2 gwei
   //     ETH post-London:         baseFee (dynamic) + 1 gwei (minTip default)
   private[jsonrpc] def minimumGasPrice(): BigInt = {
-    val minViable = blockchainReader
-      .getBestBlock
+    val minViable = blockchainReader.getBestBlock
       .flatMap(_.header.baseFee) match {
       case Some(baseFee) => baseFee.max(blockchainConfig.baseFeeFloor) + blockchainConfig.minTip
       case None          => BigInt(0) // floor set by .max(1) below

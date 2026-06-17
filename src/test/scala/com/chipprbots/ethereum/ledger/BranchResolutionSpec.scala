@@ -260,7 +260,8 @@ class BranchResolutionSpec
       branchResolution.messConfig = Some(deactivatedConfig)
 
       // proposedTD=200 — MESS deactivated at this block → ACCEPT
-      val newHeader: BlockHeader = getBlock(number = BigInt(20_000_000), difficulty = 200, parent = commonParentHash).header
+      val newHeader: BlockHeader =
+        getBlock(number = BigInt(20_000_000), difficulty = 200, parent = commonParentHash).header
       branchResolution.compareBranch(NonEmptyList.one(newHeader)) shouldEqual NewBetterBranch(List(deactivatedBlock))
     }
 
@@ -283,7 +284,8 @@ class BranchResolutionSpec
       branchResolution.messConfig = Some(olympiaConfig)
 
       // proposedTD=200 → rejected because MESS is active again in Olympia window
-      val newHeader: BlockHeader = getBlock(number = BigInt(25_000_001), difficulty = 200, parent = commonParentHash).header
+      val newHeader: BlockHeader =
+        getBlock(number = BigInt(25_000_001), difficulty = 200, parent = commonParentHash).header
       branchResolution.compareBranch(NonEmptyList.one(newHeader)) shouldEqual NoChainSwitch
     }
 

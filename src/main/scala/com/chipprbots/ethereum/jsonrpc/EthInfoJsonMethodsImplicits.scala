@@ -3,9 +3,9 @@ package com.chipprbots.ethereum.jsonrpc
 import org.apache.pekko.util.ByteString
 
 import org.bouncycastle.util.encoders.Hex
+import org.json4s.*
 import org.json4s.JsonAST.*
 import org.json4s.JsonDSL.*
-import org.json4s.*
 
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.jsonrpc.EthInfoService.*

@@ -4,7 +4,7 @@ import org.apache.pekko.util.ByteString
 
 import com.chipprbots.scalanet.discovery.crypto.Signature
 import com.chipprbots.scalanet.discovery.ethereum.EthereumNodeRecord
-import org.bouncycastle.util.encoders.{Hex as BCHex}
+import org.bouncycastle.util.encoders.Hex as BCHex
 import org.scalatest.matchers.should.*
 import org.scalatest.wordspec.AnyWordSpec
 import scodec.bits.BitVector

@@ -6,9 +6,9 @@ import boopickle.DefaultBasic.*
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
-import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Picklers.*
 

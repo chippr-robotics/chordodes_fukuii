@@ -63,8 +63,7 @@ class MockedMiner(
               sender() ! MiningError(error)
           }
         case None =>
-          blockchainReader
-            .getBestBlock
+          blockchainReader.getBestBlock
             .fold {
               sender() ! MiningError("Unable to get best block for mining")
             } { parentBlock =>

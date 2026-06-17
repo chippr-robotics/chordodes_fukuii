@@ -5,8 +5,8 @@ import cats.effect.unsafe.IORuntime
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
+import com.chipprbots.ethereum.utils.Config
 
 /** Base spec for running ethereum/tests blockchain tests
   *

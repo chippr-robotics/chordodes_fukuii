@@ -6,9 +6,9 @@ import cats.implicits.*
 
 import scala.util.Try
 
+import org.json4s.*
 import org.json4s.JsonAST.*
 import org.json4s.JsonDSL.*
-import org.json4s.*
 
 import com.chipprbots.ethereum.blockchain.data.GenesisAccount
 import com.chipprbots.ethereum.domain.UInt256

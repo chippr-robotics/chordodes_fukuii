@@ -13,8 +13,8 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.*
 
+import com.typesafe.config.Config as TypesafeConfig
 import com.typesafe.config.ConfigFactory
-import com.typesafe.config.{Config as TypesafeConfig}
 import org.json4s.*
 import org.json4s.native.JsonMethods.*
 

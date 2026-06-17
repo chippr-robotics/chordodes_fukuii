@@ -42,9 +42,9 @@ import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockBodies
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockBodies
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockBodies.GetBlockBodiesEnc
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{GetBlockHeaders as ETH62GetBlockHeaders}
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{GetReceipts as ETH63GetReceipts}
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{NodeData as ETH63NodeData}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders as ETH62GetBlockHeaders
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetReceipts as ETH63GetReceipts
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NodeData as ETH63NodeData
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig

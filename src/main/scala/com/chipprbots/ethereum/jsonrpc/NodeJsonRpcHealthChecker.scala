@@ -9,7 +9,7 @@ import org.apache.pekko.util.Timeout
 import cats.effect.IO
 import cats.syntax.parallel.*
 
-import com.typesafe.config.{Config as TypesafeConfig}
+import com.typesafe.config.Config as TypesafeConfig
 
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.*

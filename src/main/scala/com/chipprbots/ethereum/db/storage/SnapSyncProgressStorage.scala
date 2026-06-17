@@ -7,7 +7,7 @@ import cats.effect.unsafe.IORuntime
 import scala.collection.immutable.ArraySeq
 
 import io.circe.*
-import io.circe.parser.{decode as circeDecoder}
+import io.circe.parser.decode as circeDecoder
 import io.circe.syntax.*
 
 import com.chipprbots.ethereum.db.dataSource.DataSource

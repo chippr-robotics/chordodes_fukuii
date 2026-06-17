@@ -2,6 +2,7 @@ package com.chipprbots.ethereum.blockchain.checkpoint
 
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.nio.file.Path
 
 import org.apache.pekko.util.ByteString
 
@@ -11,18 +12,14 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 import com.chipprbots.ethereum.Fixtures
+import com.chipprbots.ethereum.blockchain.checkpoint.CheckpointImporter.ImportError
+import com.chipprbots.ethereum.blockchain.checkpoint.CheckpointImporter.ImportResult
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
+import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
 import com.chipprbots.ethereum.domain.ChainWeight
-import com.chipprbots.ethereum.testing.Tags.UnitTest
-import com.chipprbots.ethereum.blockchain.checkpoint.CheckpointImporter.ImportResult
 import com.chipprbots.ethereum.domain.appstate.BlockInfo
-import com.chipprbots.ethereum.blockchain.checkpoint.CheckpointImporter.ImportError
-import com.chipprbots.ethereum.blockchain.checkpoint.CheckpointImporter.ImportResult
-import com.chipprbots.ethereum.blockchain.checkpoint.CheckpointImporter.ImportError
-import com.chipprbots.ethereum.blockchain.checkpoint.CheckpointImporter.ImportResult
-import java.nio.file.Path
-import com.chipprbots.ethereum.domain.BlockchainReader
+import com.chipprbots.ethereum.testing.Tags.UnitTest
 
 class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues with OptionValues {
 
@@ -89,7 +86,8 @@ class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues
         freshStorage.storages.appStateStorage
       )
       // expect chainId 9999; archive declares 61
-      val result: Either[ImportError, ImportResult] = importer.importFromStream(new ByteArrayInputStream(bytes), Some(9999L))
+      val result: Either[ImportError, ImportResult] =
+        importer.importFromStream(new ByteArrayInputStream(bytes), Some(9999L))
       result shouldBe Left(CheckpointImporter.ChainIdMismatch(9999L, checkpointChainId))
 
       // Best block must remain at 0 on rejection

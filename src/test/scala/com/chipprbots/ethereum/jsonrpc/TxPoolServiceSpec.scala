@@ -6,6 +6,7 @@ import org.apache.pekko.testkit.TestProbe
 
 import cats.effect.unsafe.IORuntime
 
+import scala.concurrent.Future
 import scala.concurrent.duration.*
 
 import org.scalatest.concurrent.ScalaFutures
@@ -22,26 +23,6 @@ import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTr
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.TxPoolConfig
-import scala.concurrent.Future
-import scala.concurrent.Future
-import scala.concurrent.Future
-import scala.concurrent.Future
-import scala.concurrent.Future
-import scala.concurrent.Future
-import scala.concurrent.Future
-import scala.concurrent.Future
-import scala.concurrent.Future
-import scala.concurrent.Future
-import scala.concurrent.Future
-import scala.concurrent.Future
-import scala.concurrent.Future
-import scala.concurrent.Future
-import scala.concurrent.Future
-import scala.concurrent.Future
-import scala.concurrent.Future
-import scala.concurrent.Future
-import scala.concurrent.Future
-import scala.concurrent.Future
 
 /** Unit tests for TxPoolService.
   *
@@ -90,7 +71,8 @@ class TxPoolServiceSpec
   "TxPoolService.besuTransactions" should "return all pending transactions" taggedAs UnitTest in new TestSetup {
     val pts: Seq[PendingTransaction] = txList.map(makePendingTx(_))
 
-    val future: Future[Either[JsonRpcError, TxPoolBesuTransactionsResponse]] = service.besuTransactions(TxPoolBesuTransactionsRequest()).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolBesuTransactionsResponse]] =
+      service.besuTransactions(TxPoolBesuTransactionsRequest()).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(pts))
@@ -101,7 +83,8 @@ class TxPoolServiceSpec
   }
 
   it should "return empty list when pool is empty" taggedAs UnitTest in new TestSetup {
-    val future: Future[Either[JsonRpcError, TxPoolBesuTransactionsResponse]] = service.besuTransactions(TxPoolBesuTransactionsRequest()).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolBesuTransactionsResponse]] =
+      service.besuTransactions(TxPoolBesuTransactionsRequest()).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(Seq.empty))
@@ -114,7 +97,8 @@ class TxPoolServiceSpec
   "TxPoolService.besuStatistics" should "count remote txs (receivedFromLocalSource=false)" taggedAs UnitTest in new TestSetup {
     val pts: Seq[PendingTransaction] = txList.map(makePendingTx(_)) // all remote (default)
 
-    val future: Future[Either[JsonRpcError, TxPoolBesuStatisticsResponse]] = service.besuStatistics(TxPoolBesuStatisticsRequest()).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolBesuStatisticsResponse]] =
+      service.besuStatistics(TxPoolBesuStatisticsRequest()).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(pts))
@@ -132,7 +116,8 @@ class TxPoolServiceSpec
     val localPt: PendingTransaction = makePendingTx(txList.head, local = true)
     val remotePts: Seq[PendingTransaction] = txList.tail.map(makePendingTx(_))
 
-    val future: Future[Either[JsonRpcError, TxPoolBesuStatisticsResponse]] = service.besuStatistics(TxPoolBesuStatisticsRequest()).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolBesuStatisticsResponse]] =
+      service.besuStatistics(TxPoolBesuStatisticsRequest()).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(localPt +: remotePts))
@@ -146,7 +131,8 @@ class TxPoolServiceSpec
   }
 
   it should "report all counts=0 for an empty pool" taggedAs UnitTest in new TestSetup {
-    val future: Future[Either[JsonRpcError, TxPoolBesuStatisticsResponse]] = service.besuStatistics(TxPoolBesuStatisticsRequest()).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolBesuStatisticsResponse]] =
+      service.besuStatistics(TxPoolBesuStatisticsRequest()).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(Seq.empty))
@@ -291,7 +277,8 @@ class TxPoolServiceSpec
   "TxPoolService.content" should "group pending txs by sender → nonce with empty queued" taggedAs UnitTest in new TestSetup {
     val pts: Seq[PendingTransaction] = txList.map(makePendingTx(_))
 
-    val future: Future[Either[JsonRpcError, TxPoolContentResponse]] = service.content(TxPoolContentRequest()).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolContentResponse]] =
+      service.content(TxPoolContentRequest()).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(pts))
@@ -309,7 +296,8 @@ class TxPoolServiceSpec
   }
 
   it should "return empty pending and queued for an empty pool" taggedAs UnitTest in new TestSetup {
-    val future: Future[Either[JsonRpcError, TxPoolContentResponse]] = service.content(TxPoolContentRequest()).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolContentResponse]] =
+      service.content(TxPoolContentRequest()).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(Seq.empty))
@@ -323,7 +311,8 @@ class TxPoolServiceSpec
     val pts: Seq[PendingTransaction] = txList.map(makePendingTx(_))
     val target = pts.head.stx.senderAddress
 
-    val future: Future[Either[JsonRpcError, TxPoolContentFromResponse]] = service.contentFrom(TxPoolContentFromRequest(target)).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolContentFromResponse]] =
+      service.contentFrom(TxPoolContentFromRequest(target)).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(pts))
@@ -344,7 +333,8 @@ class TxPoolServiceSpec
     val pts: Seq[PendingTransaction] = txList.map(makePendingTx(_))
     val absent: Address = Address("0x1234567890123456789012345678901234567890")
 
-    val future: Future[Either[JsonRpcError, TxPoolContentFromResponse]] = service.contentFrom(TxPoolContentFromRequest(absent)).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolContentFromResponse]] =
+      service.contentFrom(TxPoolContentFromRequest(absent)).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(pts))
@@ -357,7 +347,8 @@ class TxPoolServiceSpec
   "TxPoolService.status" should "return pending count and queued=0" taggedAs UnitTest in new TestSetup {
     val pts: Seq[PendingTransaction] = txList.map(makePendingTx(_))
 
-    val future: Future[Either[JsonRpcError, TxPoolStatusResponse]] = service.status(TxPoolStatusRequest()).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolStatusResponse]] =
+      service.status(TxPoolStatusRequest()).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(pts))
@@ -366,7 +357,8 @@ class TxPoolServiceSpec
   }
 
   it should "return 0/0 for an empty pool" taggedAs UnitTest in new TestSetup {
-    val future: Future[Either[JsonRpcError, TxPoolStatusResponse]] = service.status(TxPoolStatusRequest()).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolStatusResponse]] =
+      service.status(TxPoolStatusRequest()).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(Seq.empty))
@@ -379,7 +371,8 @@ class TxPoolServiceSpec
   "TxPoolService.inspect" should "produce summary strings in core-geth format" taggedAs UnitTest in new TestSetup {
     val pts: Seq[PendingTransaction] = txList.map(makePendingTx(_))
 
-    val future: Future[Either[JsonRpcError, TxPoolInspectResponse]] = service.inspect(TxPoolInspectRequest()).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolInspectResponse]] =
+      service.inspect(TxPoolInspectRequest()).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(pts))
@@ -403,7 +396,8 @@ class TxPoolServiceSpec
     // that real txs (which all have recipients) produce the "0x<addr>: ..." format, not "contract creation"
     val pts: Seq[PendingTransaction] = txList.map(makePendingTx(_))
 
-    val future: Future[Either[JsonRpcError, TxPoolInspectResponse]] = service.inspect(TxPoolInspectRequest()).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolInspectResponse]] =
+      service.inspect(TxPoolInspectRequest()).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(pts))

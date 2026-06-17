@@ -15,8 +15,8 @@ import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MineBlocks
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerResponse
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerResponses
 import com.chipprbots.ethereum.db.storage.AppStateStorage
-import com.chipprbots.ethereum.jsonrpc.QAService.MineBlocksResponse.MinerResponseType.*
 import com.chipprbots.ethereum.jsonrpc.QAService.*
+import com.chipprbots.ethereum.jsonrpc.QAService.MineBlocksResponse.MinerResponseType.*
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
 import com.chipprbots.ethereum.nodebuilder.ApisBuilder
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder

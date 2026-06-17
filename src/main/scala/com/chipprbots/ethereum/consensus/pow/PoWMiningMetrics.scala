@@ -2,8 +2,9 @@ package com.chipprbots.ethereum.consensus.pow
 
 import java.util.concurrent.atomic.AtomicLong
 
-import com.chipprbots.ethereum.metrics.MetricsContainer
 import io.micrometer.core.instrument.Gauge
+
+import com.chipprbots.ethereum.metrics.MetricsContainer
 
 /** Prometheus metrics for PoW mining operations. Exposed via /metrics endpoint for Grafana dashboards.
   *

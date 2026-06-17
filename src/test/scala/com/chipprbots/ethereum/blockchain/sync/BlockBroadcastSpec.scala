@@ -25,18 +25,12 @@ import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.ETH69
+import com.chipprbots.ethereum.network.p2p.messages.ETH69.BlockRangeUpdate
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.BlockHash
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes
 import com.chipprbots.ethereum.testing.Tags.*
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
-import com.chipprbots.ethereum.network.p2p.messages.ETH69.BlockRangeUpdate
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
-import com.chipprbots.ethereum.network.p2p.messages.ETH69.BlockRangeUpdate
 
 class BlockBroadcastSpec
     extends TestKit(ActorSystem("BlockBroadcastSpec_System"))

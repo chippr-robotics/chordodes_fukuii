@@ -16,6 +16,7 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.Mocks.MockValidatorsAlwaysSucceed
 import com.chipprbots.ethereum.blockchain.sync.CacheBasedBlacklist
+import com.chipprbots.ethereum.consensus.mining.TestMining
 import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.appstate.BlockInfo
 import com.chipprbots.ethereum.ledger.VMImpl
@@ -24,7 +25,6 @@ import com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeer
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterChainWeightCalibrationTarget
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config.SyncConfig
-import com.chipprbots.ethereum.consensus.mining.TestMining
 
 // scalastyle:off magic.number
 /** Tests for Fix B interpolation math (T5-T6), multi-restart drift regression (T7), and integration scenarios (T8).

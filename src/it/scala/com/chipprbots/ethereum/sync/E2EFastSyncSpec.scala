@@ -261,13 +261,11 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
       _ <- peer1.waitForFastSyncFinish()
     } yield {
       // Use getOrElse with meaningful error messages instead of .get
-      val peer1BestBlock = peer1.blockchainReader
-        .getBestBlock
+      val peer1BestBlock = peer1.blockchainReader.getBestBlock
         .getOrElse(
           fail("Peer 1 should have a best block after fast sync")
         )
-      val _ = peer2.blockchainReader
-        .getBestBlock
+      val _ = peer2.blockchainReader.getBestBlock
         .getOrElse(
           fail("Peer 2 should have a best block")
         )
@@ -401,8 +399,7 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
       _ <- peer1.waitForFastSyncFinish()
     } yield {
       // Use getOrElse with meaningful error messages instead of .get
-      val peer1BestBlock = peer1.blockchainReader
-        .getBestBlock
+      val peer1BestBlock = peer1.blockchainReader.getBestBlock
         .getOrElse(
           fail("Peer 1 should have a best block after fast sync")
         )

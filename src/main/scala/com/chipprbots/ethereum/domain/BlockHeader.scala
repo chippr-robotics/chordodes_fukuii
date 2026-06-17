@@ -9,8 +9,8 @@ import com.chipprbots.ethereum.rlp.RLPEncodeable
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPSerializable
+import com.chipprbots.ethereum.rlp.encode as rlpEncode
 import com.chipprbots.ethereum.rlp.rawDecode
-import com.chipprbots.ethereum.rlp.{encode as rlpEncode}
 import com.chipprbots.ethereum.utils.ByteStringUtils
 
 import BlockHeader.HeaderExtraFields

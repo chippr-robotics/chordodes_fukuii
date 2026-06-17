@@ -16,6 +16,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.blockchain.sync.PeersClient
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.BestSnapPeerExcluding
+import com.chipprbots.ethereum.blockchain.sync.PeersClient.Request
 import com.chipprbots.ethereum.blockchain.sync.TestSyncConfig
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcher.FetchCommand
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcher.FetchedStateNode
@@ -23,9 +24,6 @@ import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NodeData
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetByteCodes
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetTrieNodes
 import com.chipprbots.ethereum.testing.Tags.*
-import com.chipprbots.ethereum.blockchain.sync.PeersClient.Request
-import com.chipprbots.ethereum.blockchain.sync.PeersClient.Request
-import com.chipprbots.ethereum.blockchain.sync.PeersClient.Request
 
 /** Targeted tests for the Bug 30 StateNodeFetcher fixes:
   *
@@ -66,7 +64,8 @@ class StateNodeFetcherSpec
   private trait TestSetup {
     val peersClientProbe: TestProbe = TestProbe()
     val replyToProbe: TestProbe = TestProbe()
-    val supervisorProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[FetchCommand] = typedKit.createTestProbe[FetchCommand]()
+    val supervisorProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[FetchCommand] =
+      typedKit.createTestProbe[FetchCommand]()
 
     val fetcher: ActorRef[StateNodeFetcher.StateNodeFetcherCommand] =
       typedKit.spawn(

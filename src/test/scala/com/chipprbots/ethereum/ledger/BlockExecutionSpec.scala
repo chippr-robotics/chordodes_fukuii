@@ -21,6 +21,8 @@ import com.chipprbots.ethereum.consensus.validators.BlockHeaderValidator
 import com.chipprbots.ethereum.consensus.validators.BlockValidator
 import com.chipprbots.ethereum.consensus.validators.Validators
 import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator
+import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.BlockError
+import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.BlockValid
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.ledger.BlockRewardCalculatorOps.*
@@ -28,10 +30,6 @@ import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.ByteStringUtils.*
 import com.chipprbots.ethereum.utils.Hex
 import com.chipprbots.ethereum.vm.OutOfGas
-import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.BlockError
-import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.BlockValid
-import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.BlockError
-import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.BlockValid
 
 // SCALA 3 MIGRATION: Fixed by having test class extend MockFactory, which satisfies inner trait self-type constraints
 // scalastyle:off magic.number
@@ -466,9 +464,15 @@ class BlockExecutionSpec
 
       object validatorsFailsBlockValidatorWithReceipts extends Mocks.MockValidatorsAlwaysSucceed {
         override val blockValidator: BlockValidator = new BlockValidator {
-          override def validateHeaderAndBody(blockHeader: BlockHeader, blockBody: BlockBody): Either[BlockError, BlockValid] =
+          override def validateHeaderAndBody(
+              blockHeader: BlockHeader,
+              blockBody: BlockBody
+          ): Either[BlockError, BlockValid] =
             Right(StdBlockValidator.BlockValid)
-          override def validateBlockAndReceipts(blockHeader: BlockHeader, receipts: Seq[Receipt]): Either[BlockError, BlockValid] =
+          override def validateBlockAndReceipts(
+              blockHeader: BlockHeader,
+              receipts: Seq[Receipt]
+          ): Either[BlockError, BlockValid] =
             Left(StdBlockValidator.BlockTransactionsHashError)
         }
       }
@@ -488,7 +492,8 @@ class BlockExecutionSpec
       val blockReward: BigInt =
         mining.blockPreparator.blockRewardCalculator.calculateMiningReward(validBlockHeader.number, 0)
 
-      val changes: Seq[(Address, UpdateBalance)] = Seq(minerAddress -> UpdateBalance(UInt256(blockReward))) // Paying miner for block processing
+      val changes: Seq[(Address, UpdateBalance)] =
+        Seq(minerAddress -> UpdateBalance(UInt256(blockReward))) // Paying miner for block processing
       val correctStateRoot: ByteString = applyChanges(validBlockParentHeader.stateRoot, changes)
 
       val correctGasUsed: BigInt = 0

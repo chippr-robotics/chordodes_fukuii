@@ -2,8 +2,8 @@ package com.chipprbots.ethereum.blockchain.sync.snap
 
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
+import java.util.concurrent.Future as JFuture
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.{Future as JFuture}
 
 import org.apache.pekko.util.ByteString
 

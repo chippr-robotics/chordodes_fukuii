@@ -5,6 +5,7 @@ import org.apache.pekko.actor.Props
 import org.apache.pekko.testkit.ExplicitlyTriggeredScheduler
 import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestProbe
+import org.apache.pekko.util.ByteString
 
 import scala.concurrent.Await
 import scala.concurrent.duration.*
@@ -16,6 +17,7 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.Mocks.MockValidatorsAlwaysSucceed
 import com.chipprbots.ethereum.blockchain.sync.CacheBasedBlacklist
+import com.chipprbots.ethereum.consensus.mining.TestMining
 import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.appstate.BlockInfo
 import com.chipprbots.ethereum.ledger.VMImpl
@@ -24,8 +26,6 @@ import com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeer
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterChainWeightCalibrationTarget
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config.SyncConfig
-import com.chipprbots.ethereum.consensus.mining.TestMining
-import org.apache.pekko.util.ByteString
 
 // scalastyle:off magic.number
 class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
@@ -143,7 +143,8 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
     new RegularSyncSetup {
       val anchorTD: BigInt = BigInt("7000000000000000") // 7×10^15 > 7 × 10^13 → plausible anchor
       val chain: Vector[BlockHeader] = buildParentHashChain(startNum = 7, length = 4) // h7, h8, h9, h10
-      val h7: BlockHeader = chain(0); val h8: BlockHeader = chain(1); val h9: BlockHeader = chain(2); val h10: BlockHeader = chain(3)
+      val h7: BlockHeader = chain(0); val h8: BlockHeader = chain(1); val h9: BlockHeader = chain(2);
+      val h10: BlockHeader = chain(3)
 
       // h7 has the valid anchor TD
       blockchainWriter.storeChainWeight(h7.hash, ChainWeight.totalDifficultyOnly(anchorTD)).commit()

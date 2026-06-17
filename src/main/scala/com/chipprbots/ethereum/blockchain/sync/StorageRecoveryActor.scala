@@ -23,8 +23,8 @@ import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.db.storage.FlatSlotStorage
 import com.chipprbots.ethereum.db.storage.StateStorage
 import com.chipprbots.ethereum.domain.Account
-import com.chipprbots.ethereum.mpt.MptVisitors.*
 import com.chipprbots.ethereum.mpt.*
+import com.chipprbots.ethereum.mpt.MptVisitors.*
 
 /** Storage recovery actor for Bug 20 hardening.
   *

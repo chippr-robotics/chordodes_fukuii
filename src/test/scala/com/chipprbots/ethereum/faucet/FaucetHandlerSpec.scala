@@ -28,6 +28,7 @@ import com.chipprbots.ethereum.jsonrpc.client.RpcClient.ParserError
 import com.chipprbots.ethereum.jsonrpc.client.RpcClient.RpcClientError
 import com.chipprbots.ethereum.keystore.KeyStore.DecryptionFailed
 import com.chipprbots.ethereum.keystore.Wallet
+import org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe
 
 class FaucetHandlerSpec
     extends ScalaTestWithActorTestKit
@@ -117,7 +118,7 @@ class FaucetHandlerSpec
     val handler: ActorRef[FaucetHandler.Command] =
       testKit.spawn(FaucetHandler.testBehavior(walletService, faucetConfig, () => ()))
 
-    val responseProbe = testKit.createTestProbe[FaucetHandlerResponse]()
+    val responseProbe: TestProbe[FaucetHandlerResponse] = testKit.createTestProbe[FaucetHandlerResponse]()
 
     val walletKeyPair: AsymmetricCipherKeyPair = generateKeyPair(new SecureRandom)
     val (prvKey, pubKey) = keyPairToByteStrings(walletKeyPair)

@@ -8,7 +8,7 @@ import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-import com.chipprbots.ethereum.Fixtures.{Blocks as BlockFixtures}
+import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address

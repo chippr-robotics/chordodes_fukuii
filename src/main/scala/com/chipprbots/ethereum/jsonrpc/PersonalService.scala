@@ -114,8 +114,7 @@ class PersonalService(
   }
 
   def listAccounts(request: ListAccountsRequest): ServiceResponse[ListAccountsResponse] = IO {
-    keyStore
-      .listAccounts
+    keyStore.listAccounts
       .map(ListAccountsResponse.apply)
       .left
       .map(handleError)

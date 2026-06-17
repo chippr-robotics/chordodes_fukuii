@@ -7,8 +7,8 @@ import org.scalacheck.Gen
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.crypto.zksnark.FiniteField.Ops.*
 import com.chipprbots.ethereum.crypto.zksnark.*
+import com.chipprbots.ethereum.crypto.zksnark.FiniteField.Ops.*
 import com.chipprbots.ethereum.testing.Tags.*
 
 abstract class FieldSpec[T: FiniteField] extends AnyFunSuite with ScalaCheckPropertyChecks {

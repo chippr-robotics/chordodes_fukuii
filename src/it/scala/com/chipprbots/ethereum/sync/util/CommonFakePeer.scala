@@ -66,8 +66,8 @@ import com.chipprbots.ethereum.nodebuilder.PruningConfigBuilder
 import com.chipprbots.ethereum.security.SecureRandomBuilder
 import com.chipprbots.ethereum.sync.util.SyncCommonItSpec.*
 import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils.*
-import com.chipprbots.ethereum.utils.ServerStatus.Listening
 import com.chipprbots.ethereum.utils.*
+import com.chipprbots.ethereum.utils.ServerStatus.Listening
 import com.chipprbots.ethereum.vm.EvmConfig
 
 abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCustomConfig)

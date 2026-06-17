@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.consensus.pow
 
 import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.{ActorSystem as ClassicSystem}
+import org.apache.pekko.actor.ActorSystem as ClassicSystem
 import org.apache.pekko.testkit.TestActor
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString

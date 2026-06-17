@@ -23,21 +23,15 @@ import com.chipprbots.ethereum.jsonrpc.EthUserService.GetBalanceRequest
 import com.chipprbots.ethereum.jsonrpc.EthUserService.GetBalanceResponse
 import com.chipprbots.ethereum.jsonrpc.EthUserService.GetStorageAtRequest
 import com.chipprbots.ethereum.jsonrpc.EthUserService.GetTransactionCountRequest
+import com.chipprbots.ethereum.jsonrpc.EthUserService.GetTransactionCountResponse
 import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofRequest
+import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofResponse
+import com.chipprbots.ethereum.jsonrpc.ProofService.ProofAccount
 import com.chipprbots.ethereum.jsonrpc.ProofService.StorageProofKey
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.defaultByteArraySerializable
 import com.chipprbots.ethereum.nodebuilder.ApisBuilder
 import com.chipprbots.ethereum.testing.Tags.*
-import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofResponse
-import com.chipprbots.ethereum.jsonrpc.EthUserService.GetTransactionCountResponse
-import com.chipprbots.ethereum.jsonrpc.ProofService.ProofAccount
-import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofResponse
-import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofResponse
-import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofResponse
-import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofResponse
-import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofResponse
-import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofResponse
 
 class EthProofServiceSpec
     extends TestKit(ActorSystem("EthGetProofSpec_ActorSystem"))
@@ -101,7 +95,8 @@ class EthProofServiceSpec
     RPCTest
   ) in new TestSetup {
     val wrongAddress: Address = Address(666)
-    val result: Either[JsonRpcError, GetProofResponse] = fetchProof(wrongAddress, storageKeys, blockNumber).unsafeRunSync()
+    val result: Either[JsonRpcError, GetProofResponse] =
+      fetchProof(wrongAddress, storageKeys, blockNumber).unsafeRunSync()
     result.isLeft shouldBe true
     result.fold(l => l.message should include("No account found for Address"), r => r)
   }
@@ -111,7 +106,8 @@ class EthProofServiceSpec
     RPCTest
   ) in new TestSetup {
     val wrongStorageKey: Seq[StorageProofKey] = Seq(StorageProofKey(321))
-    val result: Either[JsonRpcError, GetProofResponse] = fetchProof(address, wrongStorageKey, blockNumber).unsafeRunSync()
+    val result: Either[JsonRpcError, GetProofResponse] =
+      fetchProof(address, wrongStorageKey, blockNumber).unsafeRunSync()
     result.isRight shouldBe true
     result.fold(
       l => l,

@@ -7,9 +7,9 @@ import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.Timeout
 
-import scala.annotation.unused
-
 import cats.effect.IO
+
+import scala.annotation.unused
 
 import com.chipprbots.ethereum.faucet.FaucetConfig
 import com.chipprbots.ethereum.faucet.FaucetHandler

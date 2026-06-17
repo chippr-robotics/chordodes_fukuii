@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import scala.concurrent.duration.*
 
-import com.typesafe.config.{Config as TypesafeConfig}
+import com.typesafe.config.Config as TypesafeConfig
 
 import com.chipprbots.ethereum.db.dataSource.RocksDbConfig
 import com.chipprbots.ethereum.network.NetworkProtocolConfig

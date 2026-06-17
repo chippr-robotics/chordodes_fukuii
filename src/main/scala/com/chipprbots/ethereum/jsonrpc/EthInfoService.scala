@@ -280,8 +280,7 @@ class EthInfoService(
       val fromAddress = req.tx.from
         .map(Address.apply) // `from` param, if specified
         .getOrElse(
-          keyStore
-            .listAccounts
+          keyStore.listAccounts
             .getOrElse(Nil)
             .headOption // first account, if exists and `from` param not specified
             .getOrElse(Address(0))

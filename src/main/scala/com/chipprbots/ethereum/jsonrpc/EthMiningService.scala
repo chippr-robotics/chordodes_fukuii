@@ -13,8 +13,8 @@ import cats.effect.IO
 import cats.syntax.parallel.*
 
 import scala.annotation.unused
+import scala.collection.concurrent.Map as ConcurrentMap
 import scala.collection.concurrent.TrieMap
-import scala.collection.concurrent.{Map as ConcurrentMap}
 import scala.concurrent.duration.FiniteDuration
 
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol

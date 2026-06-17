@@ -9,8 +9,8 @@ import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
+import com.typesafe.config.Config as TypesafeConfig
 import com.typesafe.config.ConfigFactory
-import com.typesafe.config.{Config as TypesafeConfig}
 
 import com.chipprbots.ethereum.db.storage.pruning.ArchivePruning
 import com.chipprbots.ethereum.db.storage.pruning.BasicPruning

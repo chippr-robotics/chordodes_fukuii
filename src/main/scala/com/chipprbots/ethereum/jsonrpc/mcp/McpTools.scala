@@ -128,7 +128,9 @@ object BlockchainInfoTool {
 
 object SyncStatusTool {
   val name = "mcp_sync_status"
-  val description: Some[String] = Some("Get detailed synchronization status including mode, progress, and remaining blocks")
+  val description: Some[String] = Some(
+    "Get detailed synchronization status including mode, progress, and remaining blocks"
+  )
 
   def execute(deps: McpDependencies)(implicit timeout: Timeout, @unused ec: ExecutionContext): IO[String] =
     deps.syncController
@@ -171,7 +173,9 @@ object SyncStatusTool {
 
 object PeerListTool {
   val name = "mcp_peer_list"
-  val description: Some[String] = Some("List all connected peers with their addresses, status, and connection direction")
+  val description: Some[String] = Some(
+    "List all connected peers with their addresses, status, and connection direction"
+  )
 
   def execute(deps: McpDependencies)(implicit timeout: Timeout, @unused ec: ExecutionContext): IO[String] =
     deps.peerManager
@@ -352,7 +356,9 @@ object GetAccountTool {
 
 object DetectReorgTool {
   val name = "detect_reorg"
-  val description: Some[String] = Some("Check recent blocks for chain reorganization by verifying parent hash consistency")
+  val description: Some[String] = Some(
+    "Check recent blocks for chain reorganization by verifying parent hash consistency"
+  )
 
   val inputSchema: JValue =
     ("type" -> "object") ~
@@ -424,7 +430,9 @@ object ConvertUnitsTool {
 
 object GetEtcEmissionTool {
   val name = "get_etc_emission"
-  val description: Some[String] = Some("Get the ETC emission schedule and current era information based on the best block number")
+  val description: Some[String] = Some(
+    "Get the ETC emission schedule and current era information based on the best block number"
+  )
 
   def execute(deps: McpDependencies): IO[String] = IO {
     val bestBlock = deps.blockchainReader.getBestBlockNumber

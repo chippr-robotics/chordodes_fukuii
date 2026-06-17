@@ -23,17 +23,14 @@ import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.ETH69
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.Status68
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Hello
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Hello.HelloEnc
 import com.chipprbots.ethereum.security.SecureRandomBuilder
 import com.chipprbots.ethereum.testing.Tags.*
-import com.chipprbots.ethereum.utils.ByteStringUtils.*
 import com.chipprbots.ethereum.utils.*
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.Status68
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.Status68
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.Status68
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.Status68
+import com.chipprbots.ethereum.utils.ByteStringUtils.*
 
 class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matchers {
 

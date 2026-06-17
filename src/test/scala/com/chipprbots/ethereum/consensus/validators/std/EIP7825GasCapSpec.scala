@@ -4,18 +4,18 @@ import java.security.SecureRandom
 
 import org.apache.pekko.util.ByteString
 
+import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.consensus.validators.SignedTransactionError.*
 import com.chipprbots.ethereum.crypto
-import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
 import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
-import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 
 /** EIP-7825: Validate per-transaction gas limit cap of 2^24 (16,777,216) post-Olympia. */
 class EIP7825GasCapSpec

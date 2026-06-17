@@ -7,8 +7,8 @@ import scala.annotation.tailrec
 import com.chipprbots.ethereum.consensus.validators.SignedTransactionError.TransactionSignatureError
 import com.chipprbots.ethereum.consensus.validators.SignedTransactionValidator
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
-import com.chipprbots.ethereum.domain.UInt256.*
 import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain.UInt256.*
 import com.chipprbots.ethereum.ledger.BlockExecutionError.StateBeforeFailure
 import com.chipprbots.ethereum.ledger.BlockExecutionError.TxsExecutionError
 import com.chipprbots.ethereum.utils.BlockchainConfig

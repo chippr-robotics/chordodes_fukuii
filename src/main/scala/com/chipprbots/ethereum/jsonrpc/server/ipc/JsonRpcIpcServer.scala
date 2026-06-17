@@ -12,8 +12,8 @@ import scala.annotation.tailrec
 import scala.concurrent.duration.*
 import scala.util.Try
 
-import org.json4s.JsonAST.JValue
 import org.json4s.*
+import org.json4s.JsonAST.JValue
 import org.json4s.native
 import org.json4s.native.JsonMethods.*
 import org.json4s.native.Serialization

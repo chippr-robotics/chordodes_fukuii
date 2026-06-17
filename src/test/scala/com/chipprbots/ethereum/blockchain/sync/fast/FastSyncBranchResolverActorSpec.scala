@@ -39,8 +39,8 @@ import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.Capability
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{BlockHeaders as ETHBlockHeaders}
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{GetBlockHeaders as ETHGetBlockHeaders}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders as ETHBlockHeaders
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders as ETHGetBlockHeaders
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Logger
 

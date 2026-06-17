@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.vm
 
 import org.apache.pekko.util.ByteString
-import org.apache.pekko.util.ByteString.{empty as bEmpty}
+import org.apache.pekko.util.ByteString.empty as bEmpty
 
 import org.bouncycastle.util.encoders.Hex
 import org.scalacheck.Arbitrary

@@ -17,7 +17,7 @@ import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.BlockHelpers
-import com.chipprbots.ethereum.Fixtures.{Blocks as FixtureBlocks}
+import com.chipprbots.ethereum.Fixtures.Blocks as FixtureBlocks
 import com.chipprbots.ethereum.Mocks.MockValidatorsAlwaysSucceed
 import com.chipprbots.ethereum.Mocks.MockValidatorsFailingOnBlockBodies
 import com.chipprbots.ethereum.Timeouts
@@ -38,13 +38,13 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.Codes
 import com.chipprbots.ethereum.network.p2p.messages.ETH69
+import com.chipprbots.ethereum.network.p2p.messages.ETH69.BlockRangeUpdate
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
 import com.chipprbots.ethereum.security.SecureRandomBuilder
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.Config.SyncConfig
-import com.chipprbots.ethereum.network.p2p.messages.ETH69.BlockRangeUpdate
 
 class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfterEach with SecureRandomBuilder {
 
@@ -302,7 +302,8 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
     ) in new TestSetup {
       startFetcher()
       // ETH/69 peer announces latest block at 100; fetcher should immediately request headers
-      val update: BlockRangeUpdate = ETH69.BlockRangeUpdate(BigInt(0), BigInt(100), org.apache.pekko.util.ByteString.empty)
+      val update: BlockRangeUpdate =
+        ETH69.BlockRangeUpdate(BigInt(0), BigInt(100), org.apache.pekko.util.ByteString.empty)
       blockFetcher ! AdaptedMessageFromEventBus(update, fakePeer.id)
       peersClient.expectMsgPF() {
         case PeersClient.Request(msg: ETHPackets.GetBlockHeaders, _, _) if msg.block == Left(1) => ()
@@ -326,8 +327,9 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
       val singleHeader = singleBlock.header
       initSender ! PeersClient.Response(fakePeer, ETHPackets.BlockHeaders(BigInt(0), List(singleHeader)))
       // BlockFetcher now requests bodies for block 6
-      val bodiesSender: org.apache.pekko.actor.ActorRef = peersClient.expectMsgPF() { case PeersClient.Request(_: ETHPackets.GetBlockBodies, _, _) =>
-        peersClient.lastSender
+      val bodiesSender: org.apache.pekko.actor.ActorRef = peersClient.expectMsgPF() {
+        case PeersClient.Request(_: ETHPackets.GetBlockBodies, _, _) =>
+          peersClient.lastSender
       }
       bodiesSender ! PeersClient.Response(fakePeer, ETHPackets.BlockBodies(BigInt(0), List(singleBlock.body)))
       // Importer picks the block; this advances lastBlock to 6 so isOnTop becomes true.

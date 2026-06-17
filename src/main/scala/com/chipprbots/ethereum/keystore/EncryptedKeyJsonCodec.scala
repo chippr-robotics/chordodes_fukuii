@@ -7,11 +7,11 @@ import org.apache.pekko.util.ByteString
 import scala.util.Try
 
 import org.bouncycastle.util.encoders.Hex
+import org.json4s.*
 import org.json4s.JsonAST.JObject
 import org.json4s.JsonAST.JString
 import org.json4s.JsonAST.JValue
 import org.json4s.JsonDSL.*
-import org.json4s.*
 import org.json4s.native.JsonMethods.*
 
 import com.chipprbots.ethereum.domain.Address

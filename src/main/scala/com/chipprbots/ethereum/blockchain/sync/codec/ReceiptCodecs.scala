@@ -2,12 +2,12 @@ package com.chipprbots.ethereum.blockchain.sync.codec
 
 import org.apache.pekko.util.ByteString
 
-import com.chipprbots.ethereum.domain.Transaction.TransactionTypeValidator
 import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain.Transaction.TransactionTypeValidator
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.TypedTransaction.*
+import com.chipprbots.ethereum.rlp.*
 import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
-import com.chipprbots.ethereum.rlp.*
 import com.chipprbots.ethereum.utils.ByteUtils
 
 /** RLP codecs for Receipt and TxLogEntry (storage and wire format).

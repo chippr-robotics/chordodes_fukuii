@@ -8,7 +8,7 @@ import ch.qos.logback.core.Appender
 import ch.qos.logback.core.ConsoleAppender
 import org.slf4j.LoggerFactory
 
-import com.chipprbots.ethereum.utils.{Logger as FukuiiLogger}
+import com.chipprbots.ethereum.utils.Logger as FukuiiLogger
 
 /** Log suppression mechanism using Logback.
   *

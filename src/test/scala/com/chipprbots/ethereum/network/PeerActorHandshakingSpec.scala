@@ -26,11 +26,11 @@ import com.chipprbots.ethereum.network.PeerActor.ConnectTo
 import com.chipprbots.ethereum.network.PeerActor.GetStatus
 import com.chipprbots.ethereum.network.PeerActor.Status.Handshaked
 import com.chipprbots.ethereum.network.PeerActor.StatusResponse
-import com.chipprbots.ethereum.network.handshaker.Handshaker.NextMessage
 import com.chipprbots.ethereum.network.handshaker.*
+import com.chipprbots.ethereum.network.handshaker.Handshaker.NextMessage
 import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.messages.Capability
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.{Status68 as Status}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.Status68 as Status
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Hello
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Pong

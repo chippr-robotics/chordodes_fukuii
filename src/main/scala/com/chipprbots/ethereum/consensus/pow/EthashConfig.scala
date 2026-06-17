@@ -4,7 +4,7 @@ package pow
 
 import scala.concurrent.duration.*
 
-import com.typesafe.config.{Config as TypesafeConfig}
+import com.typesafe.config.Config as TypesafeConfig
 
 import com.chipprbots.ethereum.consensus.mining.Protocol
 

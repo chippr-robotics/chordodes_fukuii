@@ -5,7 +5,7 @@ import org.apache.pekko.util.ByteString
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters.*
 
-import com.typesafe.config.{Config as TypesafeConfig}
+import com.typesafe.config.Config as TypesafeConfig
 
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValidator
 import com.chipprbots.ethereum.domain.Address

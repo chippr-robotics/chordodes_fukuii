@@ -10,9 +10,9 @@ import com.chipprbots.ethereum.domain.TxLogEntry
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.domain.UInt256.*
 import com.chipprbots.ethereum.utils.ByteStringUtils.Padding
+import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.*
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EtcForks.EtcFork
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EthForks.EthFork
-import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.*
 
 // scalastyle:off magic.number
 // scalastyle:off number.of.types

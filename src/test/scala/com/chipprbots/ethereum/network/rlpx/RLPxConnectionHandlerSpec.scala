@@ -21,7 +21,9 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Timeouts
 import com.chipprbots.ethereum.WithActorSystemShutDown
+import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.MessageDecoder
+import com.chipprbots.ethereum.network.p2p.MessageDecoder.DecodingError
 import com.chipprbots.ethereum.network.p2p.MessageSerializable
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Hello
@@ -32,8 +34,6 @@ import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.InitialHelloRe
 import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.RLPxConfiguration
 import com.chipprbots.ethereum.security.SecureRandomBuilder
 import com.chipprbots.ethereum.testing.Tags.*
-import com.chipprbots.ethereum.network.p2p.MessageDecoder.DecodingError
-import com.chipprbots.ethereum.network.p2p.Message
 
 // SCALA 3 MIGRATION: Fixed by creating manual stub implementation for AuthHandshaker
 // @Ignore - Un-ignored per issue to identify test failures

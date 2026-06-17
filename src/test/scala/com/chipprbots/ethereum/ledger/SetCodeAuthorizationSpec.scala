@@ -12,9 +12,9 @@ import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.crypto.generateKeyPair
 import com.chipprbots.ethereum.crypto.kec256
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
 import com.chipprbots.ethereum.domain.SetCodeTransaction.addressToDelegation
-import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.rlp.PrefixedRLPEncodable
 import com.chipprbots.ethereum.rlp.RLPImplicitConversions.toEncodeable
 import com.chipprbots.ethereum.rlp.RLPImplicits.given

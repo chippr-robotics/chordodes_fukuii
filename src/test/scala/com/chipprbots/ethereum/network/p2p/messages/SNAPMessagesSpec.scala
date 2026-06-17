@@ -6,6 +6,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 import com.chipprbots.ethereum.domain.Account
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.AccountRange.AccountRangeDec
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.AccountRange.AccountRangeEnc
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.ByteCodes.ByteCodesDec
@@ -22,7 +23,6 @@ import com.chipprbots.ethereum.network.p2p.messages.SNAP.StorageRanges.StorageRa
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.StorageRanges.StorageRangesEnc
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.TrieNodes.TrieNodesDec
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.TrieNodes.TrieNodesEnc
-import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPValue
 import com.chipprbots.ethereum.rlp.rawDecode

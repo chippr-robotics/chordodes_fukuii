@@ -4,8 +4,8 @@ import java.net.InetSocketAddress
 import java.net.URI
 
 import org.apache.pekko.NotUsed
-import org.apache.pekko.actor.SupervisorStrategy.Escalate
 import org.apache.pekko.actor.*
+import org.apache.pekko.actor.SupervisorStrategy.Escalate
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.util.ByteString
 

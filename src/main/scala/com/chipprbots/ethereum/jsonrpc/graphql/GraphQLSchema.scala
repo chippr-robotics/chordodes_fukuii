@@ -983,8 +983,7 @@ object GraphQLSchema {
                       }
                     case _ =>
                       // Pending tx — fetch raw stx
-                      c.ctx.blockchainReader
-                        .getBestBlock
+                      c.ctx.blockchainReader.getBestBlock
                         .flatMap { _ =>
                           c.ctx.ethTxService
                             .getRawTransactionByHash(

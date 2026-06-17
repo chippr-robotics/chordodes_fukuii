@@ -149,7 +149,8 @@ class NetServiceSpec extends AnyFlatSpec with Matchers with ScalaFutures with No
 
   it should "connect to a new peer" taggedAs (UnitTest, RPCTest) in new TestSetup {
     val uri = "enode://abcd1234@192.168.1.100:30303"
-    val result: Either[JsonRpcError, ConnectToPeerResponse] = netService.connectToPeer(ConnectToPeerRequest(uri)).unsafeRunSync()
+    val result: Either[JsonRpcError, ConnectToPeerResponse] =
+      netService.connectToPeer(ConnectToPeerRequest(uri)).unsafeRunSync()
 
     result.isRight shouldBe true
     result.toOption.get.success shouldBe true
@@ -158,7 +159,8 @@ class NetServiceSpec extends AnyFlatSpec with Matchers with ScalaFutures with No
 
   it should "reject invalid peer URI" taggedAs (UnitTest, RPCTest) in new TestSetup {
     // Using a URI with invalid characters that will throw URISyntaxException
-    val result: Either[JsonRpcError, ConnectToPeerResponse] = netService.connectToPeer(ConnectToPeerRequest("enode://not valid uri")).unsafeRunSync()
+    val result: Either[JsonRpcError, ConnectToPeerResponse] =
+      netService.connectToPeer(ConnectToPeerRequest("enode://not valid uri")).unsafeRunSync()
 
     result.isLeft shouldBe true
   }
@@ -171,7 +173,8 @@ class NetServiceSpec extends AnyFlatSpec with Matchers with ScalaFutures with No
     blacklist.add(PeerManagerActor.PeerAddress("192.168.1.100"), 60.seconds, BlacklistReason.UselessPeer)
     blacklist.add(PeerManagerActor.PeerAddress("192.168.1.101"), 120.seconds, BlacklistReason.UselessPeer)
 
-    val result: Either[JsonRpcError, ListBlacklistedPeersResponse] = netService.listBlacklistedPeers(ListBlacklistedPeersRequest()).unsafeRunSync()
+    val result: Either[JsonRpcError, ListBlacklistedPeersResponse] =
+      netService.listBlacklistedPeers(ListBlacklistedPeersRequest()).unsafeRunSync()
 
     result.isRight shouldBe true
     val blacklistedPeers = result.toOption.get.blacklistedPeers

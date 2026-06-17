@@ -1,5 +1,6 @@
 package com.chipprbots.ethereum.blockchain.checkpoint
 import java.nio.file.Files
+import java.nio.file.Path
 
 import org.apache.pekko.util.ByteString
 
@@ -13,26 +14,20 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 import com.chipprbots.ethereum.Fixtures
+import com.chipprbots.ethereum.blockchain.checkpoint.CheckpointExporter.ExportError
+import com.chipprbots.ethereum.blockchain.checkpoint.CheckpointExporter.ExportResult
+import com.chipprbots.ethereum.blockchain.checkpoint.CheckpointImporter.ImportResult
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.crypto
+import com.chipprbots.ethereum.db.storage.MptStorage
 import com.chipprbots.ethereum.domain.Account
+import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.testing.Tags.UnitTest
-import com.chipprbots.ethereum.domain.BlockHeader
-import java.nio.file.Path
-import com.chipprbots.ethereum.blockchain.checkpoint.CheckpointExporter.ExportResult
-import com.chipprbots.ethereum.blockchain.checkpoint.CheckpointImporter.ImportResult
-import com.chipprbots.ethereum.blockchain.checkpoint.CheckpointExporter.ExportError
-import com.chipprbots.ethereum.blockchain.checkpoint.CheckpointExporter.ExportResult
-import com.chipprbots.ethereum.db.storage.MptStorage
-import com.chipprbots.ethereum.domain.BlockHeader
-import java.nio.file.Path
-import com.chipprbots.ethereum.blockchain.checkpoint.CheckpointExporter.ExportResult
-import com.chipprbots.ethereum.blockchain.checkpoint.CheckpointImporter.ImportResult
 
 class CheckpointExporterSpec
     extends AnyWordSpec
@@ -133,10 +128,11 @@ class CheckpointExporterSpec
       importedTrie.get(crypto.kec256(addr3)).value.nonce shouldBe UInt256(1)
 
       // Storage trie reachable from account 2
-      val importedStorageTrie: MerklePatriciaTrie[Array[Byte], Array[Byte]] = MerklePatriciaTrie[Array[Byte], Array[Byte]](
-        storageRoot.toArray,
-        targetStorages.storages.stateStorage.getBackingStorage(0)
-      )
+      val importedStorageTrie: MerklePatriciaTrie[Array[Byte], Array[Byte]] =
+        MerklePatriciaTrie[Array[Byte], Array[Byte]](
+          storageRoot.toArray,
+          targetStorages.storages.stateStorage.getBackingStorage(0)
+        )
       importedStorageTrie
         .get(crypto.kec256(Hex.decode("0000000000000000000000000000000000000000000000000000000000000001")))
         .map(_.toSeq) shouldBe Some(Hex.decode("aa").toSeq)
@@ -159,7 +155,8 @@ class CheckpointExporterSpec
         sourceReader,
         chainId = 1L
       )
-      val r: Either[ExportError, ExportResult] = exporter.exportArchive(blockNumber = 9999, output = tmpRoot.resolve("nope.checkpoint"))
+      val r: Either[ExportError, ExportResult] =
+        exporter.exportArchive(blockNumber = 9999, output = tmpRoot.resolve("nope.checkpoint"))
       r shouldBe Left(CheckpointExporter.NoSuchBlock(9999))
     }
 
@@ -177,9 +174,10 @@ class CheckpointExporterSpec
       val addr2: Array[Byte] = Hex.decode("11111111111111111111111111111111111111aa")
       // Use a non-zero block number so ReferenceCountNodeStorage tags writes properly.
       val sourceBackingStorage: MptStorage = sourceStorages.storages.stateStorage.getBackingStorage(100)
-      val accountTrie: MerklePatriciaTrie[Array[Byte], Account] = MerklePatriciaTrie[Array[Byte], Account](sourceBackingStorage)
-        .put(crypto.kec256(addr1), Account(nonce = UInt256(0), balance = UInt256(100), codeHash = codeAHash))
-        .put(crypto.kec256(addr2), Account(nonce = UInt256(1), balance = UInt256(1)))
+      val accountTrie: MerklePatriciaTrie[Array[Byte], Account] =
+        MerklePatriciaTrie[Array[Byte], Account](sourceBackingStorage)
+          .put(crypto.kec256(addr1), Account(nonce = UInt256(0), balance = UInt256(100), codeHash = codeAHash))
+          .put(crypto.kec256(addr2), Account(nonce = UInt256(1), balance = UInt256(1)))
       val stateRoot: ByteString = ByteString(accountTrie.getRootHash)
 
       val header: BlockHeader = Fixtures.Blocks.Block3125369.header.copy(stateRoot = stateRoot, number = 100)

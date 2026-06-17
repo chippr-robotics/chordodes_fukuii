@@ -25,8 +25,8 @@ import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.Codes
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{BlockHeaders as ETH68BlockHeaders}
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{GetBlockHeaders as ETH68GetBlockHeaders}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders as ETH68BlockHeaders
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders as ETH68GetBlockHeaders
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 class FastSyncBranchResolverActor(

@@ -1,5 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 
+import org.apache.pekko.actor.ActorRef as ClassicActorRef
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.AbstractBehavior
@@ -7,7 +8,6 @@ import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.actor.{ActorRef as ClassicActorRef}
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 

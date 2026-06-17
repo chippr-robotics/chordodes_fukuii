@@ -4,8 +4,8 @@ import org.apache.pekko.util.ByteString
 
 import scala.util.Try
 
-import com.chipprbots.ethereum.crypto.Secp256r1
 import com.chipprbots.ethereum.crypto.*
+import com.chipprbots.ethereum.crypto.Secp256r1
 import com.chipprbots.ethereum.crypto.zksnark.BN128.BN128G1
 import com.chipprbots.ethereum.crypto.zksnark.BN128.BN128G2
 import com.chipprbots.ethereum.crypto.zksnark.BN128Fp

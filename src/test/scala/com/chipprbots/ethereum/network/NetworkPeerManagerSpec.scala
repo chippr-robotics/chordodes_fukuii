@@ -32,16 +32,15 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.*
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.Codes
+import com.chipprbots.ethereum.network.p2p.messages.ETH69.BlockRangeUpdate
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.BlockHash
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
-import com.chipprbots.ethereum.network.p2p.messages.ETH69.BlockRangeUpdate
-import com.chipprbots.ethereum.network.p2p.messages.ETH69.BlockRangeUpdate
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders
 
 class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
 

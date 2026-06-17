@@ -10,15 +10,15 @@ import com.chipprbots.ethereum.consensus.pow.validators.OmmersValidator
 import com.chipprbots.ethereum.consensus.pow.validators.OmmersValidator.OmmersError.OmmersHeaderError
 import com.chipprbots.ethereum.consensus.pow.validators.OmmersValidator.OmmersValid
 import com.chipprbots.ethereum.consensus.pow.validators.ValidatorsExecutor
+import com.chipprbots.ethereum.consensus.validators.*
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderDifficultyError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderNumberError
-import com.chipprbots.ethereum.consensus.validators.*
 import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.BlockError
 import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.BlockTransactionsHashError
 import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.BlockValid
 import com.chipprbots.ethereum.domain.*
-import com.chipprbots.ethereum.ledger.BlockExecutionError.ValidationAfterExecError
 import com.chipprbots.ethereum.ledger.*
+import com.chipprbots.ethereum.ledger.BlockExecutionError.ValidationAfterExecError
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
 import com.chipprbots.ethereum.network.handshaker.ConnectedState

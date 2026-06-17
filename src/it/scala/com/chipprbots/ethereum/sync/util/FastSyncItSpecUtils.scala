@@ -19,8 +19,8 @@ import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.mpt.HashNode
 import com.chipprbots.ethereum.mpt.MptNode
 import com.chipprbots.ethereum.mpt.MptTraversals
-import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils.FakePeerCustomConfig.defaultConfig
 import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils.*
+import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils.FakePeerCustomConfig.defaultConfig
 import com.chipprbots.ethereum.utils.ByteUtils
 object FastSyncItSpecUtils {
 

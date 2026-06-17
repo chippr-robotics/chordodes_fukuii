@@ -4,7 +4,7 @@ import org.apache.pekko.util.ByteString
 
 import com.chipprbots.scalanet.discovery.crypto.Signature
 import com.chipprbots.scalanet.discovery.ethereum.EthereumNodeRecord
-import org.bouncycastle.util.encoders.{Hex as BCHex}
+import org.bouncycastle.util.encoders.Hex as BCHex
 import org.scalatest.matchers.should.*
 import org.scalatest.wordspec.AnyWordSpec
 import scodec.bits.BitVector
@@ -13,8 +13,8 @@ import scodec.bits.ByteVector
 import com.chipprbots.ethereum.forkid.ForkId
 import com.chipprbots.ethereum.forkid.ForkId.*
 import com.chipprbots.ethereum.rlp.*
-import com.chipprbots.ethereum.utils.Config.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
+import com.chipprbots.ethereum.utils.Config.*
 
 class ForkIdTagSpec extends AnyWordSpec with Matchers {
 

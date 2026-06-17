@@ -6,8 +6,8 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
-import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource.IterationError
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Tests for FlatAccountStorage — O(1) account reads by keccak256(address).
   *
@@ -62,7 +62,8 @@ class FlatAccountStorageSpec extends AnyFlatSpec with Matchers {
     storage.put(hash, rlpAccount).commit()
 
     // EphemDataSource is not RocksDB — seekFrom falls through to Stream.empty
-    val results: Vector[Either[IterationError, (ByteString, ByteString)]] = storage.seekFrom(ByteString(Array.fill(32)(0x00.toByte))).compile.toVector.unsafeRunSync()
+    val results: Vector[Either[IterationError, (ByteString, ByteString)]] =
+      storage.seekFrom(ByteString(Array.fill(32)(0x00.toByte))).compile.toVector.unsafeRunSync()
     results shouldBe empty
   }
 

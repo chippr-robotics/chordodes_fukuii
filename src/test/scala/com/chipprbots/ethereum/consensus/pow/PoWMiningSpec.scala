@@ -3,12 +3,14 @@ package com.chipprbots.ethereum.consensus.pow
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.testkit.TestKit
 
+import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.consensus.mining.FullMiningConfig
+import com.chipprbots.ethereum.consensus.mining.MiningConfig
 import com.chipprbots.ethereum.consensus.mining.MiningConfigs
 import com.chipprbots.ethereum.consensus.mining.MiningConfigs.ethashConfig
 import com.chipprbots.ethereum.consensus.mining.Protocol
@@ -22,11 +24,6 @@ import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.nodebuilder.StdNode
 import com.chipprbots.ethereum.testing.Tags.*
-import org.bouncycastle.crypto.AsymmetricCipherKeyPair
-import com.chipprbots.ethereum.consensus.mining.MiningConfig
-import com.chipprbots.ethereum.consensus.mining.MiningConfig
-import com.chipprbots.ethereum.consensus.mining.MiningConfig
-import com.chipprbots.ethereum.consensus.mining.MiningConfig
 
 class PoWMiningSpec
     extends TestKit(ActorSystem("PoWMiningSpec_System"))

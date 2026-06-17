@@ -9,8 +9,8 @@ import org.bouncycastle.util.encoders.Hex
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.mpt.ByteArraySerializable
 import com.chipprbots.ethereum.rlp
-import com.chipprbots.ethereum.rlp.RLPImplicits.given
 import com.chipprbots.ethereum.rlp.*
+import com.chipprbots.ethereum.rlp.RLPImplicits.given
 import com.chipprbots.ethereum.utils.ByteUtils
 
 object Account {

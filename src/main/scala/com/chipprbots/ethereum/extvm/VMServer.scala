@@ -18,7 +18,7 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
-import com.google.protobuf.{ByteString as GByteString}
+import com.google.protobuf.ByteString as GByteString
 import com.typesafe.config.ConfigFactory
 
 import com.chipprbots.ethereum.domain.Address

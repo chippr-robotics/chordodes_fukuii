@@ -17,13 +17,13 @@ import scala.util.Random
 
 import org.bouncycastle.util.encoders.Hex
 
-import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason.*
+import com.chipprbots.ethereum.blockchain.sync.*
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.*
+import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason.*
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
 import com.chipprbots.ethereum.blockchain.sync.PeerRateTracker
 import com.chipprbots.ethereum.blockchain.sync.PeerRequestHandler.ResponseReceived
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
-import com.chipprbots.ethereum.blockchain.sync.*
 import com.chipprbots.ethereum.blockchain.sync.fast.ReceiptsValidator.ReceiptsValidationResult
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncBlocksValidator.BlockBodyValidationResult
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateSchedulerActor.RestartRequested

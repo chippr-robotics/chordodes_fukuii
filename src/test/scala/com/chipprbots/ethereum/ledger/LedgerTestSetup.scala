@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.ledger
 
 import org.apache.pekko.util.ByteString
-import org.apache.pekko.util.ByteString.{empty as bEmpty}
+import org.apache.pekko.util.ByteString.empty as bEmpty
 
 import cats.data.NonEmptyList
 import cats.effect.unsafe.IORuntime

@@ -8,8 +8,8 @@ import org.apache.pekko.http.cors.scaladsl.CorsDirectives.*
 import org.apache.pekko.http.cors.scaladsl.model.HttpOriginMatcher
 import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 import org.apache.pekko.http.scaladsl.model.*
-import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.http.scaladsl.server.*
+import org.apache.pekko.http.scaladsl.server.Directives.*
 
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
@@ -17,7 +17,7 @@ import cats.syntax.all.*
 
 import scala.concurrent.duration.*
 
-import com.typesafe.config.{Config as TypesafeConfig}
+import com.typesafe.config.Config as TypesafeConfig
 import org.json4s.DefaultFormats
 import org.json4s.Formats
 import org.json4s.JInt

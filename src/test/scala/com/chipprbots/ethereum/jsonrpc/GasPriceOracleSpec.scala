@@ -21,9 +21,9 @@ import com.chipprbots.ethereum.*
 import com.chipprbots.ethereum.consensus.mining.Mining
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
-import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.branch.BestBranch
 import com.chipprbots.ethereum.domain.branch.EmptyBranch
 import com.chipprbots.ethereum.jsonrpc.EthBlocksService.*
