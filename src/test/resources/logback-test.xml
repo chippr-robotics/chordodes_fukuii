@@ -9,6 +9,17 @@
     <!-- Silent by default - enable specific loggers when troubleshooting tests -->
     <logger name="com.chipprbots.ethereum.vm.VM" level="OFF" />
 
+    <!-- ScopedVerificationObservabilitySpec asserts the TrieNodeHealingCoordinator's INFO
+         `[HEAL-VERIFY-SCOPED]` logs via Pekko's TestEventListener + EventFilter. The test
+         system runs under the Slf4jLoggingFilter (the test application.conf default that the
+         per-suite parseString override does not reliably displace at the ActorSystem layer),
+         and that filter gates EventStream publication on the SLF4J/logback level for the
+         actor's logger. With the root at ERROR the INFO event is dropped before it reaches
+         the EventStream, so EventFilter.info(...).intercept{} times out. Admitting INFO for
+         this logger lets the filter publish the event so the assertion can capture it. -->
+    <logger name="com.chipprbots.ethereum.blockchain.sync.snap.actors.TrieNodeHealingCoordinator"
+            level="INFO" />
+
     <root level="ERROR">
         <appender-ref ref="STDOUT" />
     </root>
