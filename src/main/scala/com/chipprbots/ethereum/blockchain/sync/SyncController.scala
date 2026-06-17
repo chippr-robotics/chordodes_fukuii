@@ -70,6 +70,9 @@ class SyncController(
   private case object PollRecoveryPeers
   // Self-ping: the recovery recent-root header bootstrap for this generation took too long → decline the roll.
   private case class RecentRootTimeout(generation: Int)
+  // spec 004 (Decoupled Heal Serve-Root) T012: self-ping for the HEALING serve-root header bootstrap. Distinct
+  // from RecentRootTimeout so the healing serve-root request never contends with storage recovery's requester.
+  private case class HealingServeRootTimeout(generation: Int)
 
   // Generation counters for actor names to prevent Pekko name collisions
   // (context.stop is async — new actors can race with still-stopping ones).
@@ -83,6 +86,15 @@ class SyncController(
   private var recentRootRequester: Option[ActorRef] = None
   private var recentRootBootstrap: Option[(ActorRef, ActorRef)] = None // (peersClient, headerBootstrap)
   private var recentRootGeneration: Int = 0
+
+  // spec 004 (Decoupled Heal Serve-Root) T012: a SEPARATE requester slot + bootstrap + generation for the HEALING
+  // serve-root request, so it never contends with `recentRootRequester` (storage recovery's single slot). During
+  // healing, SNAPSyncController (the child) asks for a newest-servable root via RequestHealingServeRoot; we fetch
+  // a recent header with a dedicated PivotHeaderBootstrap (inline in `runningSnapSync` — no transition into the
+  // deadlock-prone bootstrap state) and reply HealingServeRoot to the child. Only one is serviced at a time.
+  private var healingServeRootRequester: Option[ActorRef] = None
+  private var healingServeRootBootstrap: Option[(ActorRef, ActorRef)] = None // (peersClient, headerBootstrap)
+  private var healingServeRootGeneration: Int = 0
   // Roll the download root this many blocks back from the network head — comfortably inside core-geth's
   // ~128-block snapshot serve window so peers can serve the recent root, yet recent enough that ~all
   // cold contracts' storage is unchanged since the original pivot (and thus content-identical).
@@ -197,6 +209,9 @@ class SyncController(
       syncConfig.fastSyncRestartCooloff
     )
 
+    // spec 004 MUST-FIX: this is reachable from runningSnapSync (RestartFastSyncNow). Clear the healing serve-root
+    // latch before we tear down sync children and become(runningFastSync), so no stale requester/bootstrap lingers.
+    abortHealingServeRootRequest("restart fast sync — leaving snap sync")
     stopSyncChildren()
     appStateStorage.clearFastSyncDone().and(appStateStorage.putFastSyncCooldownUntilMillis(cooldownUntil)).commit()
     fastSyncStateStorage.purge()
@@ -287,6 +302,9 @@ class SyncController(
           s"pivot-header-bootstrap-$gen"
         )
 
+      // spec 004 MUST-FIX: clear any in-flight healing serve-root request as part of the transition so no healing
+      // bootstrap survives into runningPivotHeaderBootstrap (where its Completed/Failed/Timeout would dead-letter).
+      abortHealingServeRootRequest("entering pivot header bootstrap")
       context.become(runningPivotHeaderBootstrap(peersClient, headerBootstrap, targetBlock, snapSync))
 
     case StartRegularSyncBootstrapByHash(headHash) =>
@@ -314,6 +332,10 @@ class SyncController(
       // `block == targetBlock` is bypassed in by-hash mode by using a wildcard handler;
       // the resolved Completed.targetBlock is preserved when handed to SNAP via
       // BootstrapComplete.
+      // spec 004 MUST-FIX: abort any in-flight healing serve-root request BEFORE entering the by-hash bootstrap.
+      // With targetBlock == 0 the bootstrap's `Completed` guard accepts ANY block, so a stray healing `Completed`
+      // could otherwise be mis-consumed as the pivot header. Clearing here also prevents the dead-letter wedge.
+      abortHealingServeRootRequest("entering by-hash pivot header bootstrap")
       context.become(
         runningPivotHeaderBootstrap(peersClient, headerBootstrap, targetBlock = BigInt(0), snapSync)
       )
@@ -322,6 +344,8 @@ class SyncController(
       log.info(
         s"SNAP state finalised at pivot=$pivot. Starting regular sync; chain backfill continues in background."
       )
+      // spec 004 MUST-FIX: clear the healing serve-root latch on every exit from runningSnapSync.
+      abortHealingServeRootRequest("SNAP finalised — leaving snap sync")
       resetSnapFastCycleCount()
       // SNAPSyncController already owns the live ChainDownloader child via its
       // `completedWithBackfill` state — don't spawn a duplicate standalone resumer (#1169).
@@ -335,12 +359,16 @@ class SyncController(
       // treat as a legacy "SNAP done" signal.
       snapSync ! PoisonPill
       log.info("SNAP sync completed (legacy Done path), transitioning to regular sync")
+      // spec 004 MUST-FIX: clear the healing serve-root latch on every exit from runningSnapSync.
+      abortHealingServeRootRequest("SNAP done (legacy) — leaving snap sync")
       resetSnapFastCycleCount()
       startRegularSync()
 
     case com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.FallbackToFastSync =>
       snapSync ! PoisonPill
       log.warning("SNAP sync failed repeatedly, falling back to fast sync")
+      // spec 004 MUST-FIX: clear the healing serve-root latch on every exit from runningSnapSync.
+      abortHealingServeRootRequest("SNAP fallback to fast sync — leaving snap sync")
       snapFastCycleCount += 1
       appStateStorage.putSnapFastCycleCount(snapFastCycleCount).commit()
       log.info("SNAP<->Fast cycle count: {}", snapFastCycleCount)
@@ -353,6 +381,9 @@ class SyncController(
       log.warning(
         "SNAP finalization aborted (state root mismatch). Clearing sync state and restarting SNAP with a fresh pivot."
       )
+      // spec 004 MUST-FIX: clear the healing serve-root latch on every exit from runningSnapSync. The new SNAP
+      // actor started below gets a fresh latch, so the stale requester here must not linger.
+      abortHealingServeRootRequest("SNAP healing impossible — restarting snap sync")
       appStateStorage.clearSnapSyncDone().commit()
       appStateStorage.clearFastSyncDone().commit()
       startSnapSync()
@@ -363,9 +394,112 @@ class SyncController(
     case bh: ForkChoiceManager.BeaconHead =>
       handleBeaconHead(bh, snapSyncOpt = Some(snapSync))
 
+    // spec 004 (Decoupled Heal Serve-Root) T012: the healing coordinator (via SNAPSyncController) asks for a
+    // newest-servable root to fetch missing nodes against, while its completeness walk stays pinned to the walk
+    // root. Fetch a recent header via a DEDICATED bootstrap slot (never the storage-recovery `recentRootRequester`)
+    // and reply HealingServeRoot to the child. Run inline — no transition into the deadlock-prone bootstrap state.
+    case SNAPSyncController.RequestHealingServeRoot =>
+      if (healingServeRootRequester.isEmpty && healingServeRootBootstrap.isEmpty) {
+        healingServeRootRequester = Some(sender())
+        log.info("[HEAL-SERVE-ROOT] Healing requested a newest-servable root. Polling peers for the network head.")
+        networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeers
+      } else {
+        log.debug("[HEAL-SERVE-ROOT] Healing serve-root request already in flight; ignoring duplicate.")
+      }
+
+    // Peer snapshot used both to feed snap peers and (if waiting) to start the healing serve-root bootstrap.
+    case com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers(peers)
+        if healingServeRootRequester.isDefined && healingServeRootBootstrap.isEmpty =>
+      maybeStartHealingServeRootBootstrap(peers)
+
+    case PivotHeaderBootstrap.Completed(block, header) if healingServeRootRequester.isDefined =>
+      val rootHex = header.stateRoot.take(4).toArray.map("%02x".format(_)).mkString
+      log.info(s"[HEAL-SERVE-ROOT] Fetched header for block $block (root $rootHex). Replying to healing.")
+      stopHealingServeRootBootstrap()
+      healingServeRootRequester.foreach(
+        _ ! SNAPSyncController.HealingServeRoot(block, Some(header.stateRoot))
+      )
+      healingServeRootRequester = None
+
+    case PivotHeaderBootstrap.Failed(reason) if healingServeRootRequester.isDefined =>
+      log.warning(s"[HEAL-SERVE-ROOT] Serve-root bootstrap failed ($reason). Replying None (serve root kept).")
+      stopHealingServeRootBootstrap()
+      healingServeRootRequester.foreach(_ ! SNAPSyncController.HealingServeRoot(0, None))
+      healingServeRootRequester = None
+
+    // spec 004 MUST-FIX: the guard (gen == healingServeRootGeneration && requester.isDefined) makes a late timeout a
+    // no-op after abortHealingServeRootRequest — abort clears the requester, and the next request bumps the generation.
+    case HealingServeRootTimeout(gen) if gen == healingServeRootGeneration && healingServeRootRequester.isDefined =>
+      log.warning("[HEAL-SERVE-ROOT] Serve-root bootstrap timed out. Replying None (serve root kept).")
+      stopHealingServeRootBootstrap()
+      healingServeRootRequester.foreach(_ ! SNAPSyncController.HealingServeRoot(0, None))
+      healingServeRootRequester = None
+
     case msg =>
       snapSync.forward(msg)
   }
+
+  /** spec 004 T012: start a one-shot header bootstrap for a newest-servable block (margin back from the network head)
+    * on the dedicated healing serve-root slot, and arm a timeout. On `Completed` we reply
+    * [[snap.SNAPSyncController.HealingServeRoot]] to the waiting child; if no peer height is known yet, reply None so
+    * the child keeps its current serve root (U2). Mirrors `maybeStartRecentRootBootstrap` but on a separate slot.
+    */
+  private def maybeStartHealingServeRootBootstrap(
+      peers: Map[com.chipprbots.ethereum.network.Peer, com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo]
+  ): Unit = {
+    val snapHeights = peers.values.filter(_.remoteStatus.supportsSnap).map(_.maxBlockNumber)
+    SyncController.recentRootTarget(snapHeights, RecentRootMarginBlocks) match {
+      case Some(recentBlock) =>
+        healingServeRootGeneration += 1
+        val gen = healingServeRootGeneration
+        val peersClient = context.actorOf(
+          PeersClient.props(networkPeerManager, peerEventBus, blacklist, syncConfig, scheduler),
+          s"healing-serve-root-peers-$gen"
+        )
+        val bootstrap = context.actorOf(
+          PivotHeaderBootstrap
+            .props(peersClient, blockchainWriter, recentBlock, syncConfig, scheduler, preferSnapPeers = true),
+          s"healing-serve-root-bootstrap-$gen"
+        )
+        healingServeRootBootstrap = Some((peersClient, bootstrap))
+        log.info(s"[HEAL-SERVE-ROOT] Fetching header for newest-servable block $recentBlock.")
+        scheduler.scheduleOnce(20.seconds, self, HealingServeRootTimeout(gen))(context.dispatcher, self)
+      case None =>
+        log.info("[HEAL-SERVE-ROOT] No usable peer height yet; replying None (serve root kept).")
+        healingServeRootRequester.foreach(_ ! SNAPSyncController.HealingServeRoot(0, None))
+        healingServeRootRequester = None
+    }
+  }
+
+  private def stopHealingServeRootBootstrap(): Unit = {
+    healingServeRootBootstrap.foreach { case (peersClient, bootstrap) =>
+      bootstrap ! PoisonPill
+      peersClient ! PoisonPill
+    }
+    healingServeRootBootstrap = None
+  }
+
+  /** spec 004 (Decoupled Heal Serve-Root) MUST-FIX: abort any in-flight healing serve-root request before the parent
+    * leaves `runningSnapSync` for `runningPivotHeaderBootstrap`. The healing handlers (`HandshakedPeers`,
+    * `PivotHeaderBootstrap.Completed|Failed`, `HealingServeRootTimeout`) live ONLY in `runningSnapSync`; if a
+    * concurrent pivot refresh transitions into `runningPivotHeaderBootstrap` with a healing bootstrap still in flight,
+    * those messages would hit that state's catch-all, be forwarded to the child, and dead-letter — leaving
+    * `healingServeRootRequester = Some(...)` here and the child's `healingServeRootRequestInFlight = true` forever,
+    * silently freezing every future serve-root refresh (the pre-spec-004 deadlock). It also eliminates the ETH by-hash
+    * hazard where a `targetBlock == 0` pivot bootstrap could mis-consume the healing `Completed` as its pivot header.
+    * We reply `HealingServeRoot(0, None)`: the child clears its latch (SNAPSyncController.scala ~637) and keeps its
+    * current serve root (U2), retrying on a later healing tick. Safe no-op when nothing is in flight.
+    */
+  private def abortHealingServeRootRequest(reason: String): Unit =
+    if (healingServeRootRequester.isDefined || healingServeRootBootstrap.isDefined) {
+      log.info(s"[HEAL-SERVE-ROOT] Aborting in-flight serve-root request ($reason) — replying None (serve root kept).")
+      stopHealingServeRootBootstrap()
+      // A HealingServeRootTimeout self-message scheduled by maybeStartHealingServeRootBootstrap may still be in
+      // flight, but it is generation-guarded (gen == healingServeRootGeneration && healingServeRootRequester.isDefined):
+      // clearing the requester below — and the generation bump on the next request — makes any late timeout a no-op.
+      healingServeRootRequester.foreach(_ ! SNAPSyncController.HealingServeRoot(0, None))
+      healingServeRootRequester = None
+    }
 
   def runningRegularSync(regularSync: ActorRef): Receive = { case other =>
     other match {
@@ -647,6 +781,14 @@ class SyncController(
 
     case bh: ForkChoiceManager.BeaconHead =>
       handleBeaconHead(bh, snapSyncOpt = Some(originalSnapSyncRef))
+
+    // spec 004 T012: a healing serve-root request that lands during the brief pivot-header bootstrap window
+    // (a concurrent pivot refresh) is declined immediately so the child's in-flight latch clears and it can
+    // retry on a later healing tick. We never start a second bootstrap here (the pivot bootstrap is already
+    // using the slot). U2: declining keeps the child's current serve root.
+    case SNAPSyncController.RequestHealingServeRoot =>
+      log.debug("[HEAL-SERVE-ROOT] Request arrived during pivot header bootstrap — declining (serve root kept).")
+      sender() ! SNAPSyncController.HealingServeRoot(0, None)
 
     case msg =>
       // Forward coordinator and protocol messages to SNAP sync during the brief bootstrap.

@@ -8,7 +8,7 @@ import scala.concurrent.ExecutionContext
 import scala.collection.mutable
 import scala.util.Try
 
-import com.chipprbots.ethereum.blockchain.sync.{Blacklist, PeerListSupportNg, SyncProtocol}
+import com.chipprbots.ethereum.blockchain.sync.{Blacklist, PeerListSupportNg, SyncController, SyncProtocol}
 import com.chipprbots.ethereum.db.storage.{
   AppStateStorage,
   BfsQueueStorage,
@@ -282,6 +282,16 @@ class SNAPSyncController(
   private var forceCompleteStorageSent: Boolean = false
   private var trieWalkInProgress: Boolean = false
   private var healingRoundCount: Int = 0
+  // spec 004 (Decoupled Heal Serve-Root) T011: serve-root refresh bookkeeping. The healing coordinator fetches
+  // missing nodes against an advancing SERVE root while its completeness walk stays pinned to the walk root. We
+  // ask the parent for a newest-servable root (networkBest − RecentRootMarginBlocks) on the healing tick when the
+  // current serve root has aged > HealingServeRootMarginBlocks behind the network head. A single in-flight latch
+  // (the bootstrap is a ~1s peer round-trip — never per-block) and a block number of the last pushed serve root.
+  private var healingServeRootRequestInFlight: Boolean = false
+  private var lastHealingServeRootBlock: Option[BigInt] = None
+  // The serve root is considered stale when it is more than this many blocks behind the network head. Matches
+  // SyncController.RecentRootMarginBlocks (64) so the refreshed root lands comfortably inside peers' serve window.
+  private val HealingServeRootMarginBlocks: BigInt = BigInt(64)
   // Suppress duplicate ConnectToPeer for snap-server-peers for 60s after a send attempt.
   // Prevents the race where the reconnect timer fires within the 5s peersScanInterval
   // window after STATUS_EXCHANGE completes (peer in ETH handshake but not yet in handshakedPeers).
@@ -610,7 +620,35 @@ class SNAPSyncController(
       // the validation Future and would feed a coordinator that's supposed to
       // be quiescent. The phase gate is defensive; we also cancel the
       // scheduler explicitly in `validateState()` callers.
-      if (currentPhase == StateHealing) requestTrieNodeHealing()
+      if (currentPhase == StateHealing) {
+        requestTrieNodeHealing()
+        // spec 004 T011/U1: piggyback the serve-root staleness check on the existing 1-s healing tick (the only
+        // dispatch hook already present during healing). This does NOT issue a request per block — it only fires
+        // the ~1s parent bootstrap when the serve root is > HealingServeRootMarginBlocks behind the network head
+        // and no request is already in flight.
+        maybeRequestHealingServeRoot()
+      }
+
+    // spec 004 T011/T012: parent's reply to RequestHealingServeRoot. Push the newest-servable root to the healing
+    // coordinator as HealingServeRootRefresh — NOT HealingPivotRefreshed (which would mutate the walk root). U2: a
+    // None/zero reply means no servable root could be fetched; KEEP the current serve root (do not push), and clear
+    // the in-flight latch so a later tick can retry.
+    case SNAPSyncController.HealingServeRoot(blockNumber, rootOpt) =>
+      healingServeRootRequestInFlight = false
+      rootOpt match {
+        case Some(root) if root.nonEmpty =>
+          lastHealingServeRootBlock = Some(blockNumber)
+          log.info(
+            s"[HEAL-SERVE-ROOT] Pushing newest-servable serve root ${root.take(4).toHex} (block $blockNumber) " +
+              s"to healing coordinator (walk root unchanged)."
+          )
+          trieNodeHealingCoordinator.foreach(_ ! actors.Messages.HealingServeRootRefresh(root))
+        case _ =>
+          log.info(
+            "[HEAL-SERVE-ROOT] Parent could not fetch a newest-servable root (no peers / bootstrap failed). " +
+              "Keeping the current serve root; will retry on a later healing tick."
+          )
+      }
 
     case EnsureSnapServerPeersConnected =>
       ensureSnapServerPeersConnected()
@@ -3380,7 +3418,9 @@ class SNAPSyncController(
               frontierHighWater = snapSyncConfig.healingFrontierHighWater,
               frontierLowWater = snapSyncConfig.healingFrontierLowWater,
               scopedHealVerification = snapSyncConfig.scopedHealVerification,
-              scopedHealMaxPaths = snapSyncConfig.scopedHealMaxPaths
+              scopedHealMaxPaths = snapSyncConfig.scopedHealMaxPaths,
+              decoupledHealServeRoot = snapSyncConfig.decoupledHealServeRoot,
+              decoupledHealMaxAttemptsNoRefresh = snapSyncConfig.decoupledHealMaxAttemptsNoRefresh
             )
             .withDispatcher("sync-dispatcher"),
           s"trie-node-healing-coordinator-$coordinatorGeneration"
@@ -3445,7 +3485,9 @@ class SNAPSyncController(
                   frontierHighWater = snapSyncConfig.healingFrontierHighWater,
                   frontierLowWater = snapSyncConfig.healingFrontierLowWater,
                   scopedHealVerification = snapSyncConfig.scopedHealVerification,
-                  scopedHealMaxPaths = snapSyncConfig.scopedHealMaxPaths
+                  scopedHealMaxPaths = snapSyncConfig.scopedHealMaxPaths,
+                  decoupledHealServeRoot = snapSyncConfig.decoupledHealServeRoot,
+                  decoupledHealMaxAttemptsNoRefresh = snapSyncConfig.decoupledHealMaxAttemptsNoRefresh
                 )
                 .withDispatcher("sync-dispatcher"),
               s"trie-node-healing-coordinator-$coordinatorGeneration"
@@ -3511,6 +3553,50 @@ class SNAPSyncController(
       } else {
         snapPeers.foreach { peer =>
           coordinator ! actors.Messages.HealingPeerAvailable(peer)
+        }
+      }
+    }
+
+  /** spec 004 T011/U1: ask the parent for a newest-servable serve root when (and only when) the current serve root has
+    * aged > HealingServeRootMarginBlocks behind the network head and no request is already in flight. Reuses the
+    * parent's RecentRoot/PivotHeaderBootstrap plumbing via a dedicated requester slot (T012), so it never contends with
+    * StorageRecoveryActor's recent-root requester or mutates the walk root. No-op when decoupling is disabled, when not
+    * healing, or when no network head / serve target can be computed (U2: keep current serve root rather than pushing
+    * an empty one).
+    */
+  private def maybeRequestHealingServeRoot(): Unit =
+    if (
+      snapSyncConfig.decoupledHealServeRoot &&
+      currentPhase == StateHealing &&
+      trieNodeHealingCoordinator.isDefined &&
+      !healingServeRootRequestInFlight &&
+      // Don't contend with a pivot-refresh header bootstrap: while one is pending the parent is (or is about to be)
+      // in runningPivotHeaderBootstrap, where a concurrent serve-root bootstrap completion could be mis-routed.
+      // The request will fire on a later tick once the refresh settles.
+      pendingPivotRefresh.isEmpty
+    ) {
+      currentNetworkBestFromSnapPeers().foreach { networkBest =>
+        // Target a root inside peers' serve window: networkBest − margin (≥1). recentRootTarget caps at 1.
+        val serveTarget = SyncController.recentRootTarget(Seq(networkBest), HealingServeRootMarginBlocks)
+        serveTarget.foreach { target =>
+          // Refresh cadence (U1): a serve root is fetched at `networkBest − margin`, so it STARTS `margin` blocks
+          // behind the head. We refresh only once it has drifted a FULL window further back — i.e. when it is
+          // > 2×margin behind the current head — giving ~margin blocks of runway between the ~1s peer round-trips
+          // (never per-block). An unset lastHealingServeRootBlock means the coordinator is still fetching against
+          // the walk root (coupled), so engage immediately.
+          val stale = lastHealingServeRootBlock match {
+            case Some(lastBlock) => (networkBest - lastBlock) > (HealingServeRootMarginBlocks * 2)
+            case None            => true
+          }
+          if (stale) {
+            healingServeRootRequestInFlight = true
+            log.info(
+              s"[HEAL-SERVE-ROOT] Requesting newest-servable serve root: networkBest=$networkBest target=$target " +
+                s"(margin=$HealingServeRootMarginBlocks, lastServeBlock=${lastHealingServeRootBlock.getOrElse("none")}). " +
+                s"Routing via parent RecentRoot bootstrap."
+            )
+            context.parent ! SNAPSyncController.RequestHealingServeRoot
+          }
         }
       }
     }
@@ -4060,6 +4146,10 @@ class SNAPSyncController(
     proactiveRollNeedsProbe = false
     probeAttemptCount = 0
     lastProbeAttemptMs = 0L
+    // spec 004 T011: a full restart spawns a fresh healing coordinator (serveRoot re-inits to the walk root);
+    // clear the serve-root bookkeeping so the first healing tick re-engages decoupling against the new round.
+    healingServeRootRequestInFlight = false
+    lastHealingServeRootBlock = None
 
     // NOTE: do NOT reset consecutivePivotRefreshes here. restartSnapSync is often called
     // from refreshPivotInPlace when no new pivot is available, which means the counter would
@@ -4630,6 +4720,20 @@ object SNAPSyncController {
   case object StateValidationComplete
   case object GetProgress
 
+  /** spec 004 (Decoupled Heal Serve-Root) T011/T012: SNAPSyncController → SyncController (parent). During healing, ask
+    * the parent to fetch a newest-servable canonical header (networkBest − RecentRootMarginBlocks) via its own
+    * dedicated PivotHeaderBootstrap slot — distinct from `StartRegularSyncBootstrap` (which is the pivot-refresh path
+    * that mutates the walk root) and from `StorageRecoveryActor`'s recent-root requester. The parent replies with
+    * `HealingServeRoot`.
+    */
+  case object RequestHealingServeRoot
+
+  /** spec 004 T012: SyncController → SNAPSyncController reply with a newest-servable `(blockNumber, stateRoot)`, or
+    * `stateRoot = None` if none could be fetched (no peers / bootstrap failed / timeout). On `None`, the controller
+    * keeps the current serve root (U2) and does NOT push a HealingServeRootRefresh.
+    */
+  final case class HealingServeRoot(blockNumber: BigInt, stateRoot: Option[ByteString])
+
   /** Signal from coordinators that the current pivot/stateRoot is likely not serveable by peers.
     *
     * This is analogous to Nethermind's ExpiredRootHash detection (empty payload + empty proofs).
@@ -4794,6 +4898,14 @@ case class SNAPSyncConfig(
     // Upper bound on the in-memory healed-paths set (spec 003 FR-011). Over-bound rounds fall back to
     // full-root verification rather than growing the set, bounding its worst-case heap.
     scopedHealMaxPaths: Int = 200000,
+    // Decoupled heal serve-root (spec 004 FR-008). When true (default), the healing fetch targets an advancing
+    // newest-servable serve root while the completeness walk stays pinned to the fixed walk root. Off ⇒ coupled
+    // behaviour (fetch uses the walk root), byte-identical to today. Consensus-safety rests on the unchanged
+    // content-hash check at handleResponse (a node is stored only if keccak256 == the walk root's task hash).
+    decoupledHealServeRoot: Boolean = true,
+    // FR-006 surfacing threshold: after this many unsatisfied heal attempts with no serve-root advance in
+    // between, the coordinator surfaces the stuck task (log + metric). NEVER force-completes.
+    decoupledHealMaxAttemptsNoRefresh: Int = 12,
     stateValidationEnabled: Boolean = true,
     maxRetries: Int = 3,
     timeout: FiniteDuration = 30.seconds,
@@ -4931,6 +5043,14 @@ object SNAPSyncConfig {
         if (snapConfig.hasPath("scoped-heal-max-paths"))
           snapConfig.getInt("scoped-heal-max-paths")
         else 200000,
+      decoupledHealServeRoot =
+        if (snapConfig.hasPath("decoupled-heal-serve-root"))
+          snapConfig.getBoolean("decoupled-heal-serve-root")
+        else true,
+      decoupledHealMaxAttemptsNoRefresh =
+        if (snapConfig.hasPath("decoupled-heal-max-attempts-no-refresh"))
+          snapConfig.getInt("decoupled-heal-max-attempts-no-refresh")
+        else 12,
       stateValidationEnabled = snapConfig.getBoolean("state-validation-enabled"),
       maxRetries = snapConfig.getInt("max-retries"),
       timeout = snapConfig.getDuration("timeout").toMillis.millis,
