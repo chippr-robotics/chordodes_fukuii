@@ -54,7 +54,7 @@ trait FaucetRpcServiceBuilder {
     )
   val walletService = new WalletService(walletRpcClient, keyStore, faucetConfig)
   val faucetSupervisor: FaucetSupervisor = new FaucetSupervisor(walletService, faucetConfig, shutdown)
-  val faucetRpcService = new FaucetRpcService(faucetConfig)
+  val faucetRpcService = new FaucetRpcService(faucetConfig, faucetSupervisor.handler)
 }
 
 trait FaucetJsonRpcHealthCheckBuilder {

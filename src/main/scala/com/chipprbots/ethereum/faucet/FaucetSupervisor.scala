@@ -1,12 +1,10 @@
 package com.chipprbots.ethereum.faucet
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.actor.OneForOneStrategy
-import org.apache.pekko.actor.Props
-import org.apache.pekko.actor.SupervisorStrategy
-import org.apache.pekko.pattern.BackoffOpts
-import org.apache.pekko.pattern.BackoffSupervisor
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.SupervisorStrategy
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 
 import cats.effect.unsafe.IORuntime
 
@@ -25,32 +23,24 @@ class FaucetSupervisor(walletService: WalletService, config: FaucetConfig, shutd
     runtime: IORuntime
 ) extends Logger {
 
-  val childProps: Props = FaucetHandler.props(walletService, config)
-
   val minBackoff: FiniteDuration = config.supervisor.minBackoff
   val maxBackoff: FiniteDuration = config.supervisor.maxBackoff
   val randomFactor: Double = config.supervisor.randomFactor
   val autoReset: FiniteDuration = config.supervisor.autoReset
 
-  val supervisorProps: Props = BackoffSupervisor.props(
-    BackoffOpts
-      .onFailure(
-        childProps,
-        childName = FaucetHandler.name,
-        minBackoff = minBackoff,
-        maxBackoff = maxBackoff,
-        randomFactor = randomFactor
-      )
-      .withAutoReset(autoReset)
-      .withSupervisorStrategy(OneForOneStrategy() {
-        case error: WalletException =>
-          log.error(s"Stop ${FaucetHandler.name}", error)
-          shutdown()
-          SupervisorStrategy.Stop
-        case error =>
-          log.error(s"Restart ${FaucetHandler.name}", error)
-          SupervisorStrategy.Restart
-      })
-  )
-  val supervisor: ActorRef = system.actorOf(supervisorProps, FaucetSupervisor.name)
+  val handler: ActorRef[FaucetHandler.Command] =
+    system.spawn(
+      Behaviors
+        .supervise(
+          Behaviors
+            .supervise(FaucetHandler(walletService, config, shutdown))
+            .onFailure[WalletException](SupervisorStrategy.stop)
+        )
+        .onFailure[Exception](
+          SupervisorStrategy
+            .restartWithBackoff(minBackoff, maxBackoff, randomFactor)
+            .withResetBackoffAfter(autoReset)
+        ),
+      FaucetHandler.name
+    )
 }

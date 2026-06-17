@@ -1,12 +1,10 @@
 package com.chipprbots.ethereum.faucet.jsonrpc
 
-import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.TestKit
-import org.apache.pekko.testkit.TestProbe
+import org.apache.pekko.actor.ActorSystem as ClassicSystem
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
-import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 
 import scala.concurrent.duration.*
@@ -19,11 +17,11 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.NormalPatience
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.faucet.FaucetConfig
-import com.chipprbots.ethereum.faucet.FaucetHandler.FaucetHandlerMsg
+import com.chipprbots.ethereum.faucet.FaucetHandler
+import com.chipprbots.ethereum.faucet.FaucetHandler.Command
+import com.chipprbots.ethereum.faucet.FaucetHandler.FaucetHandlerResponse
 import com.chipprbots.ethereum.faucet.FaucetHandler.FaucetHandlerResponse.FaucetIsUnavailable
 import com.chipprbots.ethereum.faucet.FaucetHandler.FaucetHandlerResponse.StatusResponse
 import com.chipprbots.ethereum.faucet.FaucetHandler.FaucetHandlerResponse.TransactionSent
@@ -34,18 +32,15 @@ import com.chipprbots.ethereum.faucet.SupervisorConfig
 import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.SendFundsRequest
 import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.StatusRequest
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError
-import com.chipprbots.ethereum.testing.ActorsTesting.simpleAutoPilot
 import com.chipprbots.ethereum.testing.Tags.*
 
 class FaucetRpcServiceSpec
-    extends TestKit(ActorSystem("ActorSystem_DebugFaucetRpcServiceSpec"))
+    extends ScalaTestWithActorTestKit
     with AnyFlatSpecLike
-    with WithActorSystemShutDown
     with Matchers
     with ScalaFutures
     with OptionValues
     with MockFactory
-    with NormalPatience
     with TypeCheckedTripleEquals {
 
   implicit val runtime: IORuntime = IORuntime.global
@@ -55,13 +50,14 @@ class FaucetRpcServiceSpec
     RPCTest
   ) in new TestSetup {
     val address: Address = Address("0x00")
-    val request: SendFundsRequest = SendFundsRequest(address)
+    val request = SendFundsRequest(address)
     val txHash: ByteString = ByteString(Hex.decode("112233"))
 
-    faucetHandler.setAutoPilot(simpleAutoPilot { case FaucetHandlerMsg.SendFunds(`address`) =>
-      TransactionSent(txHash)
-    })
-    faucetRpcService.sendFunds(request).unsafeRunSync() match {
+    val future = faucetRpcService.sendFunds(request).unsafeToFuture()
+    val cmd = handlerProbe.expectMessageType[Command.SendFunds]
+    cmd.replyTo ! TransactionSent(txHash)
+
+    future.futureValue match {
       case Left(error)     => fail(s"failure with error: $error")
       case Right(response) => response.txId shouldBe txHash
     }
@@ -72,13 +68,14 @@ class FaucetRpcServiceSpec
     RPCTest
   ) in new TestSetup {
     val address: Address = Address("0x00")
-    val request: SendFundsRequest = SendFundsRequest(address)
-    val clientError: String = "Parser error"
+    val request = SendFundsRequest(address)
+    val clientError = "Parser error"
 
-    faucetHandler.setAutoPilot(simpleAutoPilot { case FaucetHandlerMsg.SendFunds(`address`) =>
-      WalletRpcClientError(clientError)
-    })
-    faucetRpcService.sendFunds(request).unsafeRunSync() match {
+    val future = faucetRpcService.sendFunds(request).unsafeToFuture()
+    val cmd = handlerProbe.expectMessageType[Command.SendFunds]
+    cmd.replyTo ! WalletRpcClientError(clientError)
+
+    future.futureValue match {
       case Right(_)    => fail()
       case Left(error) => error shouldBe JsonRpcError.LogicError(s"Faucet error: $clientError")
     }
@@ -89,12 +86,13 @@ class FaucetRpcServiceSpec
     RPCTest
   ) in new TestSetup {
     val address: Address = Address("0x00")
-    val request: SendFundsRequest = SendFundsRequest(address)
+    val request = SendFundsRequest(address)
 
-    faucetHandler.setAutoPilot(simpleAutoPilot { case FaucetHandlerMsg.SendFunds(`address`) =>
-      FaucetIsUnavailable
-    })
-    faucetRpcService.sendFunds(request).unsafeRunSync() match {
+    val future = faucetRpcService.sendFunds(request).unsafeToFuture()
+    val cmd = handlerProbe.expectMessageType[Command.SendFunds]
+    cmd.replyTo ! FaucetIsUnavailable
+
+    future.futureValue match {
       case Right(_) => fail()
       case Left(error) =>
         error shouldBe JsonRpcError.LogicError("Faucet is unavailable: Please try again in a few more seconds")
@@ -105,10 +103,11 @@ class FaucetRpcServiceSpec
     UnitTest,
     RPCTest
   ) in new TestSetup {
-    faucetHandler.setAutoPilot(simpleAutoPilot { case FaucetHandlerMsg.Status =>
-      FaucetIsUnavailable
-    })
-    faucetRpcService.status(StatusRequest()).unsafeRunSync() match {
+    val future = faucetRpcService.status(StatusRequest()).unsafeToFuture()
+    val cmd = handlerProbe.expectMessageType[Command.Status]
+    cmd.replyTo ! FaucetIsUnavailable
+
+    future.futureValue match {
       case Right(_) => fail()
       case Left(error) =>
         error shouldBe JsonRpcError.LogicError("Faucet is unavailable: Please try again in a few more seconds")
@@ -119,10 +118,11 @@ class FaucetRpcServiceSpec
     UnitTest,
     RPCTest
   ) in new TestSetup {
-    faucetHandler.setAutoPilot(simpleAutoPilot { case FaucetHandlerMsg.Status =>
-      StatusResponse(WalletAvailable)
-    })
-    faucetRpcService.status(StatusRequest()).unsafeRunSync() match {
+    val future = faucetRpcService.status(StatusRequest()).unsafeToFuture()
+    val cmd = handlerProbe.expectMessageType[Command.Status]
+    cmd.replyTo ! StatusResponse(WalletAvailable)
+
+    future.futureValue match {
       case Left(error)     => fail(s"failure with error: $error")
       case Right(response) => response shouldBe FaucetDomain.StatusResponse(WalletAvailable)
     }
@@ -133,9 +133,9 @@ class FaucetRpcServiceSpec
     RPCTest
   ) in new TestSetup {
     val address: Address = Address("0x00")
-    val request: SendFundsRequest = SendFundsRequest(address)
+    val request = SendFundsRequest(address)
 
-    faucetRpcServiceWithoutFaucetHandler.sendFunds(request).unsafeRunSync() match {
+    faucetRpcServiceWithoutFaucetHandler.sendFunds(request).unsafeToFuture().futureValue match {
       case Right(_) => fail()
       case Left(error) =>
         error shouldBe JsonRpcError.InternalError
@@ -146,17 +146,15 @@ class FaucetRpcServiceSpec
     UnitTest,
     RPCTest
   ) in new TestSetup {
-    val address: Address = Address("0x00")
-    SendFundsRequest(address)
-
-    faucetRpcServiceWithoutFaucetHandler.status(StatusRequest()).unsafeRunSync() match {
+    faucetRpcServiceWithoutFaucetHandler.status(StatusRequest()).unsafeToFuture().futureValue match {
       case Right(_) => fail()
       case Left(error) =>
         error shouldBe JsonRpcError.InternalError
     }
   }
 
-  class TestSetup(implicit system: ActorSystem) {
+  class TestSetup {
+    implicit val classicSystem: ClassicSystem = FaucetRpcServiceSpec.this.system.toClassic
 
     val config: FaucetConfig = FaucetConfig(
       walletAddress = Address("0x99"),
@@ -172,17 +170,13 @@ class FaucetRpcServiceSpec
       shutdownTimeout = 15.seconds
     )
 
-    val faucetHandler: TestProbe = TestProbe()
+    val handlerProbe = testKit.createTestProbe[FaucetHandler.Command]()
+    val faucetRpcService = new FaucetRpcService(config, handlerProbe.ref)
 
-    val faucetRpcService: FaucetRpcService = new FaucetRpcService(config) {
-      override def selectFaucetHandler()(implicit system: ActorSystem): IO[ActorRef] =
-        IO(faucetHandler.ref)
-    }
-
-    val faucetRpcServiceWithoutFaucetHandler: FaucetRpcService = new FaucetRpcService(config) {
-      override def selectFaucetHandler()(implicit system: ActorSystem): IO[ActorRef] =
-        IO.raiseError(new RuntimeException("time out"))
-    }
+    val shortTimeoutConfig: FaucetConfig =
+      config.copy(actorCommunicationMargin = 50.millis, rpcClient = config.rpcClient.copy(timeout = 50.millis))
+    val silentProbe = testKit.createTestProbe[FaucetHandler.Command]()
+    val faucetRpcServiceWithoutFaucetHandler: FaucetRpcService =
+      new FaucetRpcService(shortTimeoutConfig, silentProbe.ref)
   }
-
 }
