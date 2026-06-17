@@ -4,14 +4,6 @@ import java.util.concurrent.atomic.AtomicLong
 
 import com.chipprbots.ethereum.metrics.MetricsContainer
 import io.micrometer.core.instrument.Gauge
-import io.micrometer.core.instrument.Gauge
-import io.micrometer.core.instrument.Gauge
-import io.micrometer.core.instrument.Gauge
-import io.micrometer.core.instrument.Gauge
-import io.micrometer.core.instrument.Gauge
-import io.micrometer.core.instrument.Gauge
-import io.micrometer.core.instrument.Gauge
-import io.micrometer.core.instrument.Gauge
 
 /** Prometheus metrics for Engine API interactions. Exposed via /metrics endpoint for Grafana dashboards.
   */
