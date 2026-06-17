@@ -110,10 +110,10 @@ for r in scala3 pekko; do
 done
 ```
 
-| Repo | Path | What to check |
-|------|------|---------------|
-| scala3 | `.claude/repo-references/scala3` | `changelogs/` — patterns that moved to "idiomatic" since last inventory (may remove from the debt list rather than add to it) |
-| pekko | `.claude/repo-references/pekko` | `CHANGELOG.md` — verify remaining Classic API is still migration-targeted; check if any Typed patterns have changed |
+| Repo | GitHub | What to check |
+|------|--------|---------------|
+| scala3 | https://github.com/scala/scala3 | `changelogs/` — patterns that moved to "idiomatic" since last inventory (may remove from the debt list rather than add to it) |
+| pekko | https://github.com/apache/pekko | `CHANGELOG.md` — verify remaining Classic API is still migration-targeted; check if any Typed patterns have changed |
 
 Full index: [`.claude/skills/REFERENCES.md`](../REFERENCES.md)
 

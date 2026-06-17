@@ -102,9 +102,9 @@ REFS=$(git rev-parse --show-toplevel)/.claude/repo-references
 git -C "$REFS/spec-kit" pull --ff-only 2>/dev/null | grep -v "Already up to date" || true
 ```
 
-| Repo | Path | What to check |
-|------|------|---------------|
-| spec-kit | `.claude/repo-references/spec-kit` | `CHANGELOG.md` before starting a new spec or plan; `templates/` for the latest spec templates; `AGENTS.md` for integration architecture changes; `docs/` for workflow guidance |
+| Repo | GitHub | What to check |
+|------|--------|---------------|
+| spec-kit | https://github.com/github/spec-kit | `CHANGELOG.md` before starting a new spec or plan; `templates/` for the latest spec templates; `AGENTS.md` for integration architecture changes; `docs/` for workflow guidance |
 
 Full index: [`.claude/skills/REFERENCES.md`](REFERENCES.md)
 

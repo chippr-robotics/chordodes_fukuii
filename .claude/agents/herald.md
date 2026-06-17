@@ -140,9 +140,9 @@ REFS=$(git rev-parse --show-toplevel)/.claude/repo-references
 git -C "$REFS/pekko" pull --ff-only 2>/dev/null | grep -v "Already up to date" || true
 ```
 
-| Repo | Path | What to check |
-|------|------|---------------|
-| pekko | `.claude/repo-references/pekko` | `stream/src/main/scala/` for Pekko Streams backpressure patterns; `actor-typed/src/` for typed actor patterns in the network layer |
+| Repo | GitHub | What to check |
+|------|--------|---------------|
+| pekko | https://github.com/apache/pekko | `stream/src/main/scala/` for Pekko Streams backpressure patterns; `actor-typed/src/` for typed actor patterns in the network layer |
 
 Full index: [`.claude/agents/REFERENCES.md`](REFERENCES.md)
 

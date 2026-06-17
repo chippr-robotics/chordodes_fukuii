@@ -36,10 +36,10 @@ for r in pekko virtuslab/pekko-serialization-helper; do
 done
 ```
 
-| Repo | Path | What to check |
-|------|------|---------------|
-| pekko | `.claude/repo-references/pekko` | `AGENTS.md` for MiMa binary-compat and formatting rules; `actor-typed/src/main/scala/` for canonical Typed API patterns; `CHANGELOG.md` for API changes since the last migration session |
-| pekko-serialization-helper | `.claude/repo-references/virtuslab/pekko-serialization-helper` | `README.md` and `core/src/` for `@SerializabilityTrait` — **read before migrating any actor flagged "Assess" or "Run pre-flight" in the serialization table below** |
+| Repo | GitHub | What to check |
+|------|--------|---------------|
+| pekko | https://github.com/apache/pekko | `AGENTS.md` for MiMa binary-compat and formatting rules; `actor-typed/src/main/scala/` for canonical Typed API patterns; `CHANGELOG.md` for API changes since the last migration session |
+| pekko-serialization-helper | https://github.com/VirtusLab/pekko-serialization-helper | `README.md` and `core/src/` for `@SerializabilityTrait` — **read before migrating any actor flagged "Assess" or "Run pre-flight" in the serialization table below** |
 
 Full index: [`.claude/agents/REFERENCES.md`](REFERENCES.md)
 

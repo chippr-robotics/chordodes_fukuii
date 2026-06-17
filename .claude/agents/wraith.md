@@ -28,10 +28,10 @@ for r in scala3 scala2; do
 done
 ```
 
-| Repo | Path | What to check |
-|------|------|---------------|
-| scala3 | `.claude/repo-references/scala3` | `AGENTS.md` for test annotation conventions (`// error`); `changelogs/` for new Scala 2→3 migration patterns not yet listed in this file |
-| scala2 | `.claude/repo-references/scala2` | `AGENTS.md` for Scala 2 stdlib guidance; `src/library/` to recognize source patterns during migration |
+| Repo | GitHub | What to check |
+|------|--------|---------------|
+| scala3 | https://github.com/scala/scala3 | `AGENTS.md` for test annotation conventions (`// error`); `changelogs/` for new Scala 2→3 migration patterns not yet listed in this file |
+| scala2 | https://github.com/scala/scala | `AGENTS.md` for Scala 2 stdlib guidance; `src/library/` to recognize source patterns during migration |
 
 Full index: [`.claude/agents/REFERENCES.md`](REFERENCES.md)
 

@@ -28,11 +28,11 @@ for r in scala3 docs.scala-lang virtuslab/scala-skill; do
 done
 ```
 
-| Repo | Path | What to check |
-|------|------|---------------|
-| scala3 | `.claude/repo-references/scala3` | `AGENTS.md` for compiler rules; `changelogs/` for new idioms, deprecated patterns, and breaking changes |
-| docs.scala-lang | `.claude/repo-references/docs.scala-lang` | `_overviews/scala3-migration/` for migration cookbook; `_overviews/scala3-book/` for idiomatic examples |
-| virtuslab/scala-skill | `.claude/repo-references/virtuslab/scala-skill` | `README.md` for IDE-integrated patterns to cross-reference when proposing editor-visible refactors |
+| Repo | GitHub | What to check |
+|------|--------|---------------|
+| scala3 | https://github.com/scala/scala3 | `AGENTS.md` for compiler rules; `changelogs/` for new idioms, deprecated patterns, and breaking changes |
+| docs.scala-lang | https://github.com/scala/docs.scala-lang | `_overviews/scala3-migration/` for migration cookbook; `_overviews/scala3-book/` for idiomatic examples |
+| virtuslab/scala-skill | https://github.com/VirtusLab/scala-skill | `README.md` for IDE-integrated patterns to cross-reference when proposing editor-visible refactors |
 
 Full index: [`.claude/agents/REFERENCES.md`](REFERENCES.md)
 

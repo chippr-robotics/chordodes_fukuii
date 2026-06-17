@@ -71,9 +71,9 @@ git -C "$REFS/scala3" pull --ff-only 2>/dev/null | grep -v "Already up to date" 
 # Then review: ls "$REFS/scala3/changelogs/"
 ```
 
-| Repo | Path | What to check |
-|------|------|---------------|
-| scala3 | `.claude/repo-references/scala3` | `changelogs/` for compiler-level deprecations that affect project dependencies — cross-reference against what `sbt dependencyUpdates` surfaces |
+| Repo | GitHub | What to check |
+|------|--------|---------------|
+| scala3 | https://github.com/scala/scala3 | `changelogs/` for compiler-level deprecations that affect project dependencies — cross-reference against what `sbt dependencyUpdates` surfaces |
 
 Full index: [`.claude/skills/REFERENCES.md`](../REFERENCES.md)
 

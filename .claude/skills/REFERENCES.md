@@ -12,7 +12,7 @@ For clone instructions and the full sync command, see [agents/REFERENCES.md](../
 
 | Repo | Clone as | What to check |
 |------|----------|--------------|
-| Spec Kit | `repo-references/spec-kit` | `CHANGELOG.md` before starting a new spec/plan session; `templates/` for latest spec templates; `AGENTS.md` for integration architecture updates; `docs/` for workflow guidance |
+| Spec Kit | https://github.com/github/spec-kit | `CHANGELOG.md` before starting a new spec/plan session; `templates/` for latest spec templates; `AGENTS.md` for integration architecture updates; `docs/` for workflow guidance |
 
 **Sync before a speckit session:**
 ```bash
@@ -26,9 +26,9 @@ git -C "$REFS/spec-kit" pull --ff-only 2>/dev/null | grep -v "Already up to date
 
 | Repo | Clone as | What to check |
 |------|----------|--------------|
-| Scala 3 | `repo-references/scala3` | `changelogs/` — new idioms that should now be flagged as modern (remove from debt list); `AGENTS.md` for test-annotation patterns |
-| Scala 2 | `repo-references/scala2` | `src/library/` — stdlib patterns to recognise as legacy during inventory |
-| Apache Pekko | `repo-references/pekko` | `actor-typed/src/` — current Typed API surface to distinguish from Classic patterns being inventoried |
+| Scala 3 | https://github.com/scala/scala3 | `changelogs/` — new idioms that should now be flagged as modern (remove from debt list); `AGENTS.md` for test-annotation patterns |
+| Scala 2 | https://github.com/scala/scala | `src/library/` — stdlib patterns to recognise as legacy during inventory |
+| Apache Pekko | https://github.com/apache/pekko | `actor-typed/src/` — current Typed API surface to distinguish from Classic patterns being inventoried |
 
 ---
 
@@ -36,7 +36,7 @@ git -C "$REFS/spec-kit" pull --ff-only 2>/dev/null | grep -v "Already up to date
 
 | Repo | Clone as | What to check |
 |------|----------|--------------|
-| Scala 3 | `repo-references/scala3` | `changelogs/` — compiler-level deprecations to cross-reference against project dependencies |
+| Scala 3 | https://github.com/scala/scala3 | `changelogs/` — compiler-level deprecations to cross-reference against project dependencies |
 
 ---
 
