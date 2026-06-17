@@ -5,6 +5,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import cats.effect.IO
@@ -32,13 +33,13 @@ import com.chipprbots.ethereum.consensus.ConsensusImpl
 import com.chipprbots.ethereum.consensus.mess.MESSConfig
 import com.chipprbots.ethereum.consensus.mining.MiningBuilder
 import com.chipprbots.ethereum.consensus.mining.MiningConfigBuilder
-import com.chipprbots.ethereum.db.components.Storages.PruningModeComponent
 import com.chipprbots.ethereum.db.components.*
+import com.chipprbots.ethereum.db.components.Storages.PruningModeComponent
 import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.db.storage.pruning.PruningMode
 import com.chipprbots.ethereum.domain.*
-import com.chipprbots.ethereum.jsonrpc.NetService.NetServiceConfig
 import com.chipprbots.ethereum.jsonrpc.*
+import com.chipprbots.ethereum.jsonrpc.NetService.NetServiceConfig
 import com.chipprbots.ethereum.jsonrpc.server.controllers.ApisBase
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
 import com.chipprbots.ethereum.jsonrpc.server.http.JsonRpcHttpServer
@@ -46,9 +47,9 @@ import com.chipprbots.ethereum.jsonrpc.server.ipc.JsonRpcIpcServer
 import com.chipprbots.ethereum.keystore.KeyStore
 import com.chipprbots.ethereum.keystore.KeyStoreImpl
 import com.chipprbots.ethereum.ledger.*
+import com.chipprbots.ethereum.network.*
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.PeerManagerActor.PeerConfiguration
-import com.chipprbots.ethereum.network.*
 import com.chipprbots.ethereum.network.discovery.DiscoveryConfig
 import com.chipprbots.ethereum.network.discovery.DiscoveryServiceBuilder
 import com.chipprbots.ethereum.network.discovery.PeerDiscoveryManager
@@ -62,8 +63,8 @@ import com.chipprbots.ethereum.security.SSLContextBuilder
 import com.chipprbots.ethereum.security.SecureRandomBuilder
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import com.chipprbots.ethereum.transactions.TransactionHistoryService
-import com.chipprbots.ethereum.utils.Config.SyncConfig
 import com.chipprbots.ethereum.utils.*
+import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 // scalastyle:off number.of.types
 trait BlockchainConfigBuilder {
@@ -492,9 +493,9 @@ trait FilterManagerBuilder {
     with TxPoolConfigBuilder
     with MiningBuilder =>
 
-  lazy val filterManager: ActorRef =
-    system.actorOf(
-      FilterManager.props(
+  lazy val filterManager: org.apache.pekko.actor.typed.ActorRef[FilterManager.Command] =
+    system.spawn(
+      FilterManager(
         blockchainReader,
         mining.blockGenerator,
         keyStore,
@@ -625,13 +626,13 @@ trait EthUserServiceBuilder {
 }
 
 trait EthFilterServiceBuilder {
-  self: FilterManagerBuilder with FilterConfigBuilder with BlockchainBuilder =>
+  self: FilterManagerBuilder with FilterConfigBuilder with BlockchainBuilder with ActorSystemBuilder =>
 
   lazy val ethFilterService = new EthFilterService(
     filterManager,
     filterConfig,
     blockchainReader
-  )
+  )(system)
 }
 
 trait PersonalServiceBuilder {
@@ -964,9 +965,9 @@ trait JSONRpcIpcServerBuilder {
 trait SubscriptionManagerBuilder {
   self: ActorSystemBuilder with BlockchainBuilder =>
 
-  lazy val subscriptionManager: ActorRef =
-    system.actorOf(
-      com.chipprbots.ethereum.jsonrpc.SubscriptionManager.props(blockchainReader),
+  lazy val subscriptionManager: org.apache.pekko.actor.typed.ActorRef[SubscriptionManager.Command] =
+    system.spawn(
+      SubscriptionManager(blockchainReader),
       "subscription-manager"
     )
 }

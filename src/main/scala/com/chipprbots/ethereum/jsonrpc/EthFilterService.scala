@@ -1,17 +1,22 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Scheduler
+import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
+
+import cats.effect.IO
 
 import scala.annotation.unused
 
 import com.chipprbots.ethereum.domain.*
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
+import com.chipprbots.ethereum.jsonrpc.FilterManager as FM
 import com.chipprbots.ethereum.jsonrpc.FilterManager.FilterChanges
 import com.chipprbots.ethereum.jsonrpc.FilterManager.FilterLogs
 import com.chipprbots.ethereum.jsonrpc.FilterManager.LogFilterLogs
-import com.chipprbots.ethereum.jsonrpc.{FilterManager as FM}
 import com.chipprbots.ethereum.utils.*
 
 object EthFilterService {
@@ -43,62 +48,63 @@ object EthFilterService {
 }
 
 class EthFilterService(
-    filterManager: ActorRef,
+    filterManager: ActorRef[FM.Command],
     filterConfig: FilterConfig,
     blockchainReader: com.chipprbots.ethereum.domain.BlockchainReader
-) {
+)(implicit system: ActorSystem) {
   import EthFilterService.*
   implicit lazy val timeout: Timeout = Timeout(filterConfig.filterManagerQueryTimeout)
+  implicit lazy val scheduler: Scheduler = system.toTyped.scheduler
 
   def newFilter(req: NewFilterRequest): ServiceResponse[NewFilterResponse] = {
     import req.filter.*
 
-    filterManager
-      .askFor[FM.NewFilterResponse](FM.NewLogFilter(fromBlock, toBlock, address, topics))
-      .map { resp =>
-        Right(NewFilterResponse(resp.id))
-      }
+    IO.fromFuture(
+      IO(filterManager.ask[FM.NewFilterResponse](replyTo => FM.NewLogFilter(fromBlock, toBlock, address, topics, replyTo)))
+    ).map { resp =>
+      Right(NewFilterResponse(resp.id))
+    }
   }
 
   def newBlockFilter(@unused req: NewBlockFilterRequest): ServiceResponse[NewFilterResponse] =
-    filterManager
-      .askFor[FM.NewFilterResponse](FM.NewBlockFilter)
-      .map { resp =>
-        Right(NewFilterResponse(resp.id))
-      }
+    IO.fromFuture(
+      IO(filterManager.ask[FM.NewFilterResponse](replyTo => FM.NewBlockFilter(replyTo)))
+    ).map { resp =>
+      Right(NewFilterResponse(resp.id))
+    }
 
   def newPendingTransactionFilter(@unused req: NewPendingTransactionFilterRequest): ServiceResponse[NewFilterResponse] =
-    filterManager
-      .askFor[FM.NewFilterResponse](FM.NewPendingTransactionFilter)
-      .map { resp =>
-        Right(NewFilterResponse(resp.id))
-      }
+    IO.fromFuture(
+      IO(filterManager.ask[FM.NewFilterResponse](replyTo => FM.NewPendingTransactionFilter(replyTo)))
+    ).map { resp =>
+      Right(NewFilterResponse(resp.id))
+    }
 
   def uninstallFilter(req: UninstallFilterRequest): ServiceResponse[UninstallFilterResponse] =
-    filterManager
-      .askFor[FM.UninstallFilterResponse.type](FM.UninstallFilter(req.filterId))
-      .map(_ => Right(UninstallFilterResponse(success = true)))
+    IO.fromFuture(
+      IO(filterManager.ask[FM.UninstallFilterResponse.type](replyTo => FM.UninstallFilter(req.filterId, replyTo)))
+    ).map(_ => Right(UninstallFilterResponse(success = true)))
 
   def getFilterChanges(req: GetFilterChangesRequest): ServiceResponse[GetFilterChangesResponse] =
-    filterManager
-      .askFor[FM.FilterChanges](FM.GetFilterChanges(req.filterId))
-      .map { filterChanges =>
-        Right(GetFilterChangesResponse(filterChanges))
-      }
+    IO.fromFuture(
+      IO(filterManager.ask[FM.FilterChanges](replyTo => FM.GetFilterChanges(req.filterId, replyTo)))
+    ).map { filterChanges =>
+      Right(GetFilterChangesResponse(filterChanges))
+    }
 
   def getFilterLogs(req: GetFilterLogsRequest): ServiceResponse[GetFilterLogsResponse] =
-    filterManager
-      .askFor[FM.FilterLogs](FM.GetFilterLogs(req.filterId))
-      .map { filterLogs =>
-        Right(GetFilterLogsResponse(filterLogs))
-      }
+    IO.fromFuture(
+      IO(filterManager.ask[FM.FilterLogs](replyTo => FM.GetFilterLogs(req.filterId, replyTo)))
+    ).map { filterLogs =>
+      Right(GetFilterLogsResponse(filterLogs))
+    }
 
   def getLogs(req: GetLogsRequest): ServiceResponse[GetLogsResponse] = {
     import req.filter.*
 
     // Validate: blockHash cannot be combined with fromBlock/toBlock
     if (blockHash.isDefined && (fromBlock.isDefined || toBlock.isDefined)) {
-      return cats.effect.IO.pure(
+      return IO.pure(
         Left(JsonRpcError.InvalidParams("cannot specify both blockHash and fromBlock/toBlock"))
       )
     }
@@ -110,12 +116,12 @@ class EthFilterService(
 
     // Validate: block range must not exceed current head
     if (fromNum > bestBlockNum || toNum > bestBlockNum) {
-      return cats.effect.IO.pure(Left(JsonRpcError.InvalidParams("block range extends beyond current head block")))
+      return IO.pure(Left(JsonRpcError.InvalidParams("block range extends beyond current head block")))
     }
 
     // Validate: fromBlock must be <= toBlock
     if (fromNum > toNum) {
-      return cats.effect.IO.pure(Left(JsonRpcError.InvalidParams("invalid block range params")))
+      return IO.pure(Left(JsonRpcError.InvalidParams("invalid block range params")))
     }
 
     // If blockHash specified, resolve to block number and use as from=to
@@ -126,14 +132,14 @@ class EthFilterService(
           val bp = Some(BlockParam.WithNumber(n))
           (bp, bp)
         case None =>
-          return cats.effect.IO.pure(Right(GetLogsResponse(FM.LogFilterLogs(Nil))))
+          return IO.pure(Right(GetLogsResponse(FM.LogFilterLogs(Nil))))
       }
     } else (fromBlock, toBlock)
 
-    filterManager
-      .askFor[FM.LogFilterLogs](FM.GetLogs(resolvedFrom, resolvedTo, address, topics))
-      .map { filterLogs =>
-        Right(GetLogsResponse(filterLogs))
-      }
+    IO.fromFuture(
+      IO(filterManager.ask[FM.LogFilterLogs](replyTo => FM.GetLogs(resolvedFrom, resolvedTo, address, topics, replyTo)))
+    ).map { filterLogs =>
+      Right(GetLogsResponse(filterLogs))
+    }
   }
 }

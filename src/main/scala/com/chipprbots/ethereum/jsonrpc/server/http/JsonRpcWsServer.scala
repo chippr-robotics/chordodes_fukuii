@@ -2,8 +2,11 @@ package com.chipprbots.ethereum.jsonrpc.server.http
 
 import java.util.UUID
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Scheduler
+import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.model.ws.Message
 import org.apache.pekko.http.scaladsl.model.ws.TextMessage
@@ -28,6 +31,7 @@ import org.json4s.native.JsonMethods.*
 import org.json4s.native.Serialization
 
 import com.chipprbots.ethereum.jsonrpc.JsonRpcRequest
+import com.chipprbots.ethereum.jsonrpc.SubscriptionManager
 import com.chipprbots.ethereum.jsonrpc.SubscriptionManager.*
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController
@@ -48,7 +52,7 @@ import com.chipprbots.ethereum.utils.Logger
   */
 class JsonRpcWsServer(
     jsonRpcController: JsonRpcBaseController,
-    subscriptionManager: ActorRef,
+    subscriptionManager: ActorRef[SubscriptionManager.Command],
     config: JsonRpcWsServer.JsonRpcWsServerConfig
 )(implicit system: ActorSystem)
     extends Logger {
@@ -56,11 +60,10 @@ class JsonRpcWsServer(
   implicit val mat: Materializer = Materializer(system)
   implicit val ec: ExecutionContext = system.dispatcher
   implicit val timeout: Timeout = Timeout(30.seconds)
+  implicit val scheduler: Scheduler = system.toTyped.scheduler
   implicit val runtime: IORuntime = IORuntime.global
   implicit val formats: Formats = DefaultFormats + JsonSerializers.RpcErrorJsonSerializer
   implicit val serialization: Serialization.type = org.json4s.native.Serialization
-
-  import org.apache.pekko.pattern.ask
 
   private val route: Route =
     (pathEndOrSingleSlash | path("ws")) {
@@ -149,7 +152,7 @@ class JsonRpcWsServer(
               case None =>
                 sendResponse(errorResponse(id, -32602, "Invalid params: missing subscription type"))
               case Some(t) =>
-                (subscriptionManager ? Subscribe(connId, t, subParams)).foreach {
+                subscriptionManager.ask[SubscribeResponse](replyTo => Subscribe(connId, t, subParams, replyTo)).foreach {
                   case SubscribeResponse(Right(subId)) =>
                     val hex = "0x" + subId.toHexString
                     sendResponse(
@@ -165,8 +168,6 @@ class JsonRpcWsServer(
                     )
                   case SubscribeResponse(Left(err)) =>
                     sendResponse(errorResponse(id, -32602, err))
-                  case _ =>
-                    sendResponse(errorResponse(id, -32603, "Internal error"))
                 }
             }
 
@@ -182,7 +183,7 @@ class JsonRpcWsServer(
               case None =>
                 sendResponse(errorResponse(id, -32602, "Invalid params: missing subscription id"))
               case Some(subId) =>
-                (subscriptionManager ? Unsubscribe(connId, subId)).foreach {
+                subscriptionManager.ask[UnsubscribeResponse](replyTo => Unsubscribe(connId, subId, replyTo)).foreach {
                   case UnsubscribeResponse(found) =>
                     sendResponse(
                       compact(
@@ -195,8 +196,6 @@ class JsonRpcWsServer(
                         )
                       )
                     )
-                  case _ =>
-                    sendResponse(errorResponse(id, -32603, "Internal error"))
                 }
             }
 

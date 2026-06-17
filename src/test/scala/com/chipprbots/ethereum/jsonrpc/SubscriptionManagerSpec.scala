@@ -1,14 +1,16 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.OverflowStrategy
 import org.apache.pekko.stream.scaladsl.Sink
 import org.apache.pekko.stream.scaladsl.Source
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.stream.scaladsl.SourceQueueWithComplete
 
 import scala.concurrent.Await
+import scala.concurrent.Future
 import scala.concurrent.duration.*
 
 import org.json4s.*
@@ -19,14 +21,10 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.NormalPatience
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.jsonrpc.SubscriptionManager.*
 import com.chipprbots.ethereum.testing.Tags.*
-import org.apache.pekko.NotUsed
-import org.apache.pekko.stream.scaladsl.SourceQueueWithComplete
-import scala.concurrent.Future
 
 /** Unit tests for SubscriptionManager actor.
   *
@@ -38,33 +36,44 @@ import scala.concurrent.Future
   * Tests cover: connection lifecycle, subscribe/unsubscribe, push notification dispatch.
   */
 class SubscriptionManagerSpec
-    extends TestKit(ActorSystem("SubscriptionManagerSpec"))
+    extends ScalaTestWithActorTestKit
     with AnyFlatSpecLike
-    with WithActorSystemShutDown
     with Matchers
     with ScalaFutures
     with NormalPatience {
 
-  import org.apache.pekko.pattern.ask
-  implicit val timeout: org.apache.pekko.util.Timeout = org.apache.pekko.util.Timeout(5.seconds)
-  implicit val mat: Materializer = Materializer(system)
+  implicit val mat: Materializer = Materializer(testKit.system.classicSystem)
   implicit val formats: org.json4s.Formats = org.json4s.DefaultFormats
 
   val fixtureBlock: Block = Block(Fixtures.Blocks.Block3125369.header, Fixtures.Blocks.Block3125369.body)
 
   // ── helpers ────────────────────────────────────────────────────────────────
 
-  def makeManager(): ActorRef =
-    system.actorOf(SubscriptionManager.props(new EphemBlockchainTestSetup {}.blockchainReader))
+  def makeManager(): ActorRef[SubscriptionManager.Command] =
+    testKit.spawn(SubscriptionManager(new EphemBlockchainTestSetup {}.blockchainReader))
 
   /** Returns a preMaterialized queue + source pair. */
   def makeQueue(): (SourceQueueWithComplete[String], Source[String, NotUsed]) = Source
     .queue[String](64, OverflowStrategy.dropHead)
-    .preMaterialize()
+    .preMaterialize()(mat)
 
   /** Collects N messages from the queue source into a Future[Seq[String]]. */
   def collectN(source: org.apache.pekko.stream.scaladsl.Source[String, Any], n: Int): Future[Seq[String]] =
-    source.take(n).runWith(Sink.seq)
+    source.take(n).runWith(Sink.seq)(mat)
+
+  // ── helpers for typed ask ──────────────────────────────────────────────────
+
+  def subscribe(mgr: ActorRef[SubscriptionManager.Command], connId: String, subType: String, params: Option[JValue] = None): SubscribeResponse = {
+    val probe = testKit.createTestProbe[SubscribeResponse]()
+    mgr ! Subscribe(connId, subType, params, probe.ref)
+    probe.receiveMessage(5.seconds)
+  }
+
+  def unsubscribe(mgr: ActorRef[SubscriptionManager.Command], connId: String, subId: Long): UnsubscribeResponse = {
+    val probe = testKit.createTestProbe[UnsubscribeResponse]()
+    mgr ! Unsubscribe(connId, subId, probe.ref)
+    probe.receiveMessage(5.seconds)
+  }
 
   // ── connection lifecycle ───────────────────────────────────────────────────
 
@@ -72,9 +81,6 @@ class SubscriptionManagerSpec
     val mgr = makeManager()
     val (queue, _) = makeQueue()
     mgr ! RegisterConnection("conn-1", queue)
-    // No assertion needed — the actor would log an error if this failed.
-    // Actor mailbox is FIFO: any subsequent ask will queue after this tell,
-    // so no sleep is required to confirm delivery.
     succeed
   }
 
@@ -84,23 +90,14 @@ class SubscriptionManagerSpec
     val connId = "conn-cleanup"
 
     mgr ! RegisterConnection(connId, queue)
-    val subResp = Await.result(
-      (mgr ? Subscribe(connId, "newHeads", None)).mapTo[SubscribeResponse],
-      5.seconds
-    )
+    val subResp = subscribe(mgr, connId, "newHeads")
     subResp.result.isRight shouldBe true
 
-    // Close connection — subscription should be removed.
-    // Actor mailbox is FIFO: the subsequent Unsubscribe ask will only be processed
-    // after ConnectionClosed, so no sleep is needed for synchronisation.
     mgr ! ConnectionClosed(connId)
 
     // Unsubscribe after close returns false (not found)
     val subId = subResp.result.toOption.get
-    val unsubResp = Await.result(
-      (mgr ? Unsubscribe(connId, subId)).mapTo[UnsubscribeResponse],
-      5.seconds
-    )
+    val unsubResp = unsubscribe(mgr, connId, subId)
     unsubResp.found shouldBe false
   }
 
@@ -112,10 +109,7 @@ class SubscriptionManagerSpec
     val connId = "conn-newheads"
 
     mgr ! RegisterConnection(connId, queue)
-    val resp = Await.result(
-      (mgr ? Subscribe(connId, "newHeads", None)).mapTo[SubscribeResponse],
-      5.seconds
-    )
+    val resp = subscribe(mgr, connId, "newHeads")
 
     resp.result.isRight shouldBe true
     resp.result.toOption.get should be > 0L
@@ -127,10 +121,7 @@ class SubscriptionManagerSpec
     val connId = "conn-logs"
 
     mgr ! RegisterConnection(connId, queue)
-    val resp = Await.result(
-      (mgr ? Subscribe(connId, "logs", None)).mapTo[SubscribeResponse],
-      5.seconds
-    )
+    val resp = subscribe(mgr, connId, "logs")
 
     resp.result.isRight shouldBe true
   }
@@ -141,10 +132,7 @@ class SubscriptionManagerSpec
     val connId = "conn-pending"
 
     mgr ! RegisterConnection(connId, queue)
-    val resp = Await.result(
-      (mgr ? Subscribe(connId, "newPendingTransactions", None)).mapTo[SubscribeResponse],
-      5.seconds
-    )
+    val resp = subscribe(mgr, connId, "newPendingTransactions")
 
     resp.result.isRight shouldBe true
   }
@@ -155,10 +143,7 @@ class SubscriptionManagerSpec
     val connId = "conn-unknown"
 
     mgr ! RegisterConnection(connId, queue)
-    val resp = Await.result(
-      (mgr ? Subscribe(connId, "bogusType", None)).mapTo[SubscribeResponse],
-      5.seconds
-    )
+    val resp = subscribe(mgr, connId, "bogusType")
 
     resp.result.isLeft shouldBe true
     resp.result.swap.toOption.get should include("Unknown subscription type")
@@ -170,19 +155,9 @@ class SubscriptionManagerSpec
     val connId = "conn-unsub"
 
     mgr ! RegisterConnection(connId, queue)
-    val subId = Await
-      .result(
-        (mgr ? Subscribe(connId, "newHeads", None)).mapTo[SubscribeResponse],
-        5.seconds
-      )
-      .result
-      .toOption
-      .get
+    val subId = subscribe(mgr, connId, "newHeads").result.toOption.get
 
-    val resp = Await.result(
-      (mgr ? Unsubscribe(connId, subId)).mapTo[UnsubscribeResponse],
-      5.seconds
-    )
+    val resp = unsubscribe(mgr, connId, subId)
     resp.found shouldBe true
   }
 
@@ -193,20 +168,10 @@ class SubscriptionManagerSpec
 
     mgr ! RegisterConnection("conn-a", queue1)
     mgr ! RegisterConnection("conn-b", queue2)
-    val subId = Await
-      .result(
-        (mgr ? Subscribe("conn-a", "newHeads", None)).mapTo[SubscribeResponse],
-        5.seconds
-      )
-      .result
-      .toOption
-      .get
+    val subId = subscribe(mgr, "conn-a", "newHeads").result.toOption.get
 
     // conn-b trying to unsubscribe conn-a's subscription
-    val resp = Await.result(
-      (mgr ? Unsubscribe("conn-b", subId)).mapTo[UnsubscribeResponse],
-      5.seconds
-    )
+    val resp = unsubscribe(mgr, "conn-b", subId)
     resp.found shouldBe false
   }
 
@@ -219,12 +184,10 @@ class SubscriptionManagerSpec
     val messages = collectN(source, 1)
 
     mgr ! RegisterConnection(connId, queue)
-    Await.result(
-      (mgr ? Subscribe(connId, "newHeads", None)).mapTo[SubscribeResponse],
-      5.seconds
-    )
+    subscribe(mgr, connId, "newHeads")
 
-    system.eventStream.publish(NewBlockImported(fixtureBlock))
+    // Classic eventStream publish reaches the Typed messageAdapter
+    testKit.system.classicSystem.eventStream.publish(NewBlockImported(fixtureBlock))
 
     val received = Await.result(messages, 5.seconds)
     received should have size 1
@@ -247,16 +210,13 @@ class SubscriptionManagerSpec
     mgr ! RegisterConnection(connId2, queue2)
 
     // Only conn1 subscribes
-    Await.result(
-      (mgr ? Subscribe(connId1, "newHeads", None)).mapTo[SubscribeResponse],
-      5.seconds
-    )
+    subscribe(mgr, connId1, "newHeads")
 
-    system.eventStream.publish(NewBlockImported(fixtureBlock))
+    testKit.system.classicSystem.eventStream.publish(NewBlockImported(fixtureBlock))
 
     // conn2 should receive nothing — add a brief wait and drain
     Thread.sleep(200)
-    val messages2 = source2.take(0).runWith(Sink.seq)
+    val messages2 = source2.take(0).runWith(Sink.seq)(mat)
     val received2 = Await.result(messages2, 1.second)
     received2 shouldBe empty
   }

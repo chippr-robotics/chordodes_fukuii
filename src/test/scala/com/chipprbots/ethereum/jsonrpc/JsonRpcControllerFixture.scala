@@ -1,6 +1,8 @@
 package com.chipprbots.ethereum.jsonrpc
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -23,8 +25,8 @@ import com.chipprbots.ethereum.consensus.blocks.PendingBlockAndState
 import com.chipprbots.ethereum.consensus.mining.CoinbaseProvider
 import com.chipprbots.ethereum.consensus.mining.MiningConfigs
 import com.chipprbots.ethereum.consensus.mining.TestMining
-import com.chipprbots.ethereum.consensus.pow.blocks.PoWBlockGenerator
 import com.chipprbots.ethereum.consensus.pow.blocks.*
+import com.chipprbots.ethereum.consensus.pow.blocks.PoWBlockGenerator
 import com.chipprbots.ethereum.consensus.pow.validators.ValidatorsExecutor
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.db.storage.AppStateStorage
@@ -151,7 +153,8 @@ class JsonRpcControllerFixture(implicit system: ActorSystem, mockFactory: org.sc
 
   val pendingTransactionsManager: TestProbe = TestProbe()
   val ommersPool: TestProbe = TestProbe()
-  val filterManager: TestProbe = TestProbe()
+  val filterManager: org.apache.pekko.actor.typed.ActorRef[FilterManager.Command] =
+    system.spawn(Behaviors.ignore[FilterManager.Command], "filter-manager-stub")
 
   val ethashConfig = MiningConfigs.ethashConfig
   override lazy val miningConfig = MiningConfigs.miningConfig
@@ -215,10 +218,10 @@ class JsonRpcControllerFixture(implicit system: ActorSystem, mockFactory: org.sc
   )
 
   val ethFilterService = new EthFilterService(
-    filterManager.ref,
+    filterManager,
     filterConfig,
     blockchainReader
-  )
+  )(system)
   val personalService: TestPersonalService = new TestPersonalService
   val debugService: DebugService = mock[DebugService]
   val qaService: QAService = mock[QAService]

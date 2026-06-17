@@ -1,6 +1,8 @@
 package com.chipprbots.ethereum.jsonrpc.graphql
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
@@ -10,6 +12,7 @@ import cats.effect.unsafe.IORuntime
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
 
+import io.circe.ACursor
 import io.circe.Json
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.ScalaFutures
@@ -35,10 +38,10 @@ import com.chipprbots.ethereum.jsonrpc.EthFilterService
 import com.chipprbots.ethereum.jsonrpc.EthInfoService
 import com.chipprbots.ethereum.jsonrpc.EthTxService
 import com.chipprbots.ethereum.jsonrpc.EthUserService
+import com.chipprbots.ethereum.jsonrpc.FilterManager
 import com.chipprbots.ethereum.keystore.KeyStore
 import com.chipprbots.ethereum.ledger.StxLedger
 import com.chipprbots.ethereum.network.p2p.messages.Capability
-import io.circe.ACursor
 
 class GraphQLServiceSpec
     extends TestKit(ActorSystem("GraphQLServiceSpec_ActorSystem"))
@@ -137,7 +140,8 @@ class GraphQLServiceSpec
     val keyStore: KeyStore = mock[KeyStore]
     val syncProbe: TestProbe = TestProbe()
     val pendingTxProbe: TestProbe = TestProbe()
-    val filterManagerProbe: TestProbe = TestProbe()
+    val filterManager: org.apache.pekko.actor.typed.ActorRef[FilterManager.Command] =
+      system.spawn(Behaviors.ignore[FilterManager.Command], "filter-manager-stub")
 
     lazy val ethBlocksService = new EthBlocksService(
       blockchain,
@@ -172,7 +176,7 @@ class GraphQLServiceSpec
       this
     )
     lazy val ethFilterService = new EthFilterService(
-      filterManagerProbe.ref,
+      filterManager,
       new com.chipprbots.ethereum.utils.FilterConfig {
         override val filterTimeout: FiniteDuration = 10.seconds
         override val filterManagerQueryTimeout: FiniteDuration = 2.seconds

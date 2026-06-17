@@ -3,6 +3,8 @@ package com.chipprbots.ethereum.jsonrpc.graphql
 import java.util.concurrent.TimeUnit
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.http.cors.scaladsl.model.HttpOriginMatcher
 import org.apache.pekko.http.scaladsl.model.*
 import org.apache.pekko.http.scaladsl.server.Route
@@ -33,6 +35,7 @@ import com.chipprbots.ethereum.jsonrpc.EthFilterService
 import com.chipprbots.ethereum.jsonrpc.EthInfoService
 import com.chipprbots.ethereum.jsonrpc.EthTxService
 import com.chipprbots.ethereum.jsonrpc.EthUserService
+import com.chipprbots.ethereum.jsonrpc.FilterManager
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError
 import com.chipprbots.ethereum.jsonrpc.JsonRpcHealthChecker
 import com.chipprbots.ethereum.jsonrpc.JsonRpcRequest
@@ -131,7 +134,8 @@ class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRoute
     val keyStore: KeyStore = mock[KeyStore]
     val syncProbe: TestProbe = TestProbe()
     val pendingTxProbe: TestProbe = TestProbe()
-    val filterManagerProbe: TestProbe = TestProbe()
+    val filterManager: org.apache.pekko.actor.typed.ActorRef[FilterManager.Command] =
+      system.spawn(Behaviors.ignore[FilterManager.Command], "filter-manager-stub")
 
     lazy val ethBlocksService = new EthBlocksService(blockchain, blockchainReader, mining, blockQueue)
     lazy val ethTxService = new EthTxService(
@@ -161,7 +165,7 @@ class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRoute
       this
     )
     lazy val ethFilterService = new EthFilterService(
-      filterManagerProbe.ref,
+      filterManager,
       new FilterConfig {
         override val filterTimeout: FiniteDuration = 10.seconds
         override val filterManagerQueryTimeout: FiniteDuration = 2.seconds
