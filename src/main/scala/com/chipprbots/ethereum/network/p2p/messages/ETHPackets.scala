@@ -104,7 +104,7 @@ object ETHPackets {
         var i = 0
         val items = encodables match {
           case indexed: IndexedSeq[RLPEncodeable @unchecked] => indexed
-          case other                              => other.toIndexedSeq
+          case other                                         => other.toIndexedSeq
         }
         val len = items.size
         while (i < len)
