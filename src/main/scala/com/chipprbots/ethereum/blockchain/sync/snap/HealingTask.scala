@@ -21,10 +21,10 @@ import org.apache.pekko.util.ByteString
   * @param nodeData
   *   The RLP-encoded trie node data once retrieved
   */
-case class HealingTask(
-    path: Seq[ByteString],
-    hash: ByteString,
-    rootHash: ByteString,
+class HealingTask(
+    val path: Seq[ByteString],
+    val hash: ByteString,
+    val rootHash: ByteString,
     var pending: Boolean = true,
     var done: Boolean = false,
     var nodeData: Option[ByteString] = None
@@ -61,6 +61,21 @@ object HealingTask {
     */
   def apply(path: Seq[ByteString], hash: ByteString, rootHash: ByteString): HealingTask =
     new HealingTask(path, hash, rootHash)
+
+  def apply(
+      path: Seq[ByteString],
+      hash: ByteString,
+      rootHash: ByteString,
+      pending: Boolean,
+      done: Boolean,
+      nodeData: Option[ByteString] = None
+  ): HealingTask = {
+    val task = new HealingTask(path, hash, rootHash)
+    task.pending = pending
+    task.done = done
+    task.nodeData = nodeData
+    task
+  }
 
   /** Creates healing tasks from a list of missing node paths and hashes.
     *
