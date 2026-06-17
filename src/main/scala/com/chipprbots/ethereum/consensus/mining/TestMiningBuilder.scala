@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.consensus.mining
 
-import com.chipprbots.ethereum.nodebuilder.*
+import com.chipprbots.ethereum.nodebuilder._
 import com.chipprbots.ethereum.security.SecureRandomBuilder
 import com.chipprbots.ethereum.utils.Logger
 

@@ -5,23 +5,22 @@ import java.net.InetSocketAddress
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
 import org.apache.pekko.actor.typed.ActorRef
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
+import org.apache.pekko.actor.typed.scaladsl.adapter._
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.BlockHelpers
-import com.chipprbots.ethereum.Fixtures.Blocks as FixtureBlocks
+import com.chipprbots.ethereum.Fixtures.{Blocks => FixtureBlocks}
 import com.chipprbots.ethereum.Mocks.MockValidatorsAlwaysSucceed
 import com.chipprbots.ethereum.Mocks.MockValidatorsFailingOnBlockBodies
 import com.chipprbots.ethereum.Timeouts
-import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
 import com.chipprbots.ethereum.blockchain.sync.PeersClient
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.BlacklistPeer
@@ -37,13 +36,15 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
 import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.MessageClassifier
 import com.chipprbots.ethereum.network.PeerId
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
 import com.chipprbots.ethereum.network.p2p.messages.Codes
 import com.chipprbots.ethereum.network.p2p.messages.ETH69
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
 import com.chipprbots.ethereum.security.SecureRandomBuilder
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.Config.SyncConfig
+import com.chipprbots.ethereum.network.p2p.messages.ETH69.BlockRangeUpdate
 
 class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfterEach with SecureRandomBuilder {
 
@@ -164,7 +165,7 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
       // senders. Use the stashed bodies sender for the partial replies.
       handleFirstBlockBatchHeaders()
 
-      val firstBodiesSender = pendingBodiesSender
+      val firstBodiesSender: org.apache.pekko.actor.ActorRef = pendingBodiesSender
         .getOrElse(fail("Expected GetBlockBodies sender captured by handleFirstBlockBatchHeaders"))
 
       // It will receive all the requested bodies, but splitted in 2 parts.
@@ -199,7 +200,7 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
 
       handleFirstBlockBatchHeaders()
 
-      val firstBodiesSender = pendingBodiesSender
+      val firstBodiesSender: org.apache.pekko.actor.ActorRef = pendingBodiesSender
         .getOrElse(fail("Expected GetBlockBodies sender captured by handleFirstBlockBatchHeaders"))
 
       // It will receive part of the requested bodies.
@@ -238,9 +239,9 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
       handleFirstBlockBatchHeaders()
 
       // handleFirstBlockBatchHeaders has captured both follow-up senders.
-      val refForAnswerFirstBodiesReq = pendingBodiesSender
+      val refForAnswerFirstBodiesReq: org.apache.pekko.actor.ActorRef = pendingBodiesSender
         .getOrElse(fail("Expected GetBlockBodies sender captured"))
-      val refForAnswerSecondHeaderReq = prefetchHeadersSender
+      val refForAnswerSecondHeaderReq: org.apache.pekko.actor.ActorRef = prefetchHeadersSender
         .getOrElse(fail("Expected GetBlockHeaders prefetch sender captured"))
 
       // Block 16 is mined (we could have reached this stage due to invalidation messages sent to the fetcher)
@@ -286,7 +287,7 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
     // BF-1A: ETH/69 head-following via BlockRangeUpdate
     "should include BlockRangeUpdateCode in peer event subscription" taggedAs (UnitTest, SyncTest) in new TestSetup {
       blockFetcher ! BlockFetcher.Start(importer.ref, 0)
-      val sub = peerEventBus.expectMsgClass(classOf[Subscribe])
+      val sub: Subscribe = peerEventBus.expectMsgClass(classOf[Subscribe])
       sub.to match {
         case MessageClassifier(codes, _) =>
           codes should contain(Codes.BlockRangeUpdateCode)
@@ -301,7 +302,7 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
     ) in new TestSetup {
       startFetcher()
       // ETH/69 peer announces latest block at 100; fetcher should immediately request headers
-      val update = ETH69.BlockRangeUpdate(BigInt(0), BigInt(100), org.apache.pekko.util.ByteString.empty)
+      val update: BlockRangeUpdate = ETH69.BlockRangeUpdate(BigInt(0), BigInt(100), org.apache.pekko.util.ByteString.empty)
       blockFetcher ! AdaptedMessageFromEventBus(update, fakePeer.id)
       peersClient.expectMsgPF() {
         case PeersClient.Request(msg: ETHPackets.GetBlockHeaders, _, _) if msg.block == Left(1) => ()
@@ -314,18 +315,18 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
       // Start from block 5; knownTop initialises to 6 so fetcher immediately requests block 6
       startFetcher(fromBlock = 5)
       // Consume the initial GetBlockHeaders(6) request triggered by fetchBlocks at Start
-      val initSender = peersClient.expectMsgPF() {
+      val initSender: org.apache.pekko.actor.ActorRef = peersClient.expectMsgPF() {
         case PeersClient.Request(msg: ETHPackets.GetBlockHeaders, _, _) if msg.block == Left(BigInt(6)) =>
           peersClient.lastSender
       }
       // Reply with a single header at block 6 — partial batch (blockHeadersPerRequest=10).
       // Generate a parent block at number 5 so the chain starts at 6.
-      val parentAt5 = BlockHelpers.generateChain(5, FixtureBlocks.Genesis.block).last
-      val singleBlock = BlockHelpers.generateChain(1, parentAt5).head
+      val parentAt5: Block = BlockHelpers.generateChain(5, FixtureBlocks.Genesis.block).last
+      val singleBlock: Block = BlockHelpers.generateChain(1, parentAt5).head
       val singleHeader = singleBlock.header
       initSender ! PeersClient.Response(fakePeer, ETHPackets.BlockHeaders(BigInt(0), List(singleHeader)))
       // BlockFetcher now requests bodies for block 6
-      val bodiesSender = peersClient.expectMsgPF() { case PeersClient.Request(_: ETHPackets.GetBlockBodies, _, _) =>
+      val bodiesSender: org.apache.pekko.actor.ActorRef = peersClient.expectMsgPF() { case PeersClient.Request(_: ETHPackets.GetBlockBodies, _, _) =>
         peersClient.lastSender
       }
       bodiesSender ! PeersClient.Response(fakePeer, ETHPackets.BlockBodies(BigInt(0), List(singleBlock.body)))
@@ -351,12 +352,12 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
       startFetcher()
       // Trigger to set knownTop=1000 (high, so fetcher knows more blocks exist)
       triggerFetching(1000)
-      val requestSender = peersClient.expectMsgPF() {
+      val requestSender: org.apache.pekko.actor.ActorRef = peersClient.expectMsgPF() {
         case PeersClient.Request(msg: ETHPackets.GetBlockHeaders, _, _) if msg.block == Left(1) =>
           peersClient.lastSender
       }
       // Reply with a partial batch (fewer than blockHeadersPerRequest=10 headers, stopping at block 5)
-      val partialBatch = BlockHelpers.generateChain(5, FixtureBlocks.Genesis.block)
+      val partialBatch: List[Block] = BlockHelpers.generateChain(5, FixtureBlocks.Genesis.block)
       requestSender ! PeersClient.Response(fakePeer, ETHPackets.BlockHeaders(BigInt(0), partialBatch.map(_.header)))
       // After a partial batch, fetcher should request the next window starting at block 6
       peersClient.fishForSpecificMessage() {

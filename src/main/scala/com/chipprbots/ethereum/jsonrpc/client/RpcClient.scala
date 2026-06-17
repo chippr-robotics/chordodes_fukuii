@@ -7,7 +7,7 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.ConnectionContext
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.HttpsConnectionContext
-import org.apache.pekko.http.scaladsl.model.*
+import org.apache.pekko.http.scaladsl.model._
 import org.apache.pekko.http.scaladsl.settings.ClientConnectionSettings
 import org.apache.pekko.http.scaladsl.settings.ConnectionPoolSettings
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
@@ -17,12 +17,12 @@ import org.apache.pekko.stream.scaladsl.TcpIdleTimeoutException
 import cats.effect.IO
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import io.circe.Decoder
 import io.circe.Json
 import io.circe.parser.parse
-import io.circe.syntax.*
+import io.circe.syntax._
 
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError
 import com.chipprbots.ethereum.security.SSLError

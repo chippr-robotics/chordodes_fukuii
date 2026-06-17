@@ -12,9 +12,9 @@ import org.apache.pekko.util.ByteString
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
-import cats.implicits.*
+import cats.implicits._
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
@@ -23,24 +23,25 @@ import com.chipprbots.ethereum.blockchain.sync.regular.BlockBroadcasterActor.Bro
 import com.chipprbots.ethereum.blockchain.sync.regular.RegularSync.ProgressProtocol
 import com.chipprbots.ethereum.consensus.ConsensusAdapter
 import com.chipprbots.ethereum.crypto.kec256
-import com.chipprbots.ethereum.db.storage.{EvmCodeStorage, StateStorage}
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.db.storage.EvmCodeStorage
+import com.chipprbots.ethereum.db.storage.StateStorage
 import com.chipprbots.ethereum.domain.BlockchainWriter
-import com.chipprbots.ethereum.ledger.*
-import com.chipprbots.ethereum.mpt.*
+import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.jsonrpc.NewBlockImported
+import com.chipprbots.ethereum.ledger._
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingAccountNodeException
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingStorageNodeException
+import com.chipprbots.ethereum.mpt._
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.ommers.OmmersPool.AddOmmers
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.AddUncheckedTransactions
-import com.chipprbots.ethereum.jsonrpc.NewBlockImported
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.RemoveTransactions
 import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.Config.SyncConfig
-import com.chipprbots.ethereum.utils.FunctorOps.*
+import com.chipprbots.ethereum.utils.FunctorOps._
 
 class BlockImporter(
     fetcher: ActorRef,
@@ -140,14 +141,14 @@ class BlockImporter(
       val node = nodeData.values.head
       val hash = kec256(node)
       log.info("Saving late-arriving fetched state node {}", ByteStringUtils.hash2string(hash))
-      stateStorage.saveNode(hash, node.toArray, blockchainReader.getBestBlockNumber())
+      stateStorage.saveNode(hash, node.toArray, blockchainReader.getBestBlockNumber)
       // Also save as contract code in case this was a bytecode fetch
       try evmCodeStorage.put(hash, node).commit()
       catch { case _: Exception => () }
 
     case StartForkRecovery(failedBlockNumber) =>
       val currentBest = bestKnownBlockNumber
-      val snapPivot = blockchainReader.getSnapSyncPivotBlock().getOrElse(BigInt(0))
+      val snapPivot = blockchainReader.getSnapSyncPivotBlock.getOrElse(BigInt(0))
       val floor = (currentBest - MaxForkAncestryDepth).max(snapPivot)
       blockchainReader.getBlockHeaderByNumber(floor) match {
         case Some(floorHeader) =>
@@ -600,7 +601,7 @@ class BlockImporter(
         // written once during SNAP sync and never cleared; reorgs above the pivot are
         // safe (state exists for all blocks above it). getOrElse(0) covers non-SNAP nodes,
         // giving genesis as the floor — the same fallback geth uses.
-        val floor = blockchainReader.getSnapSyncPivotBlock().getOrElse(BigInt(0))
+        val floor = blockchainReader.getSnapSyncPivotBlock.getOrElse(BigInt(0))
         val goingBackTo = (currentBlock - syncConfig.branchResolutionRequestSize).max(floor)
         if (goingBackTo >= currentBlock) {
           // At the pivot floor after SNAP sync — skip branch resolution and import directly.
@@ -644,7 +645,7 @@ class BlockImporter(
           try
             // Look up the account directly via blockchainReader
             blockchainReader
-              .getAccount(blockchainReader.getBestBranch(), address, parentBlockNumber)
+              .getAccount(blockchainReader.getBestBranch, address, parentBlockNumber)
               .flatMap { account =>
                 if (account.codeHash != Account.EmptyCodeHash) {
                   evmCodeStorage.get(account.codeHash) match {
@@ -674,7 +675,7 @@ class BlockImporter(
       .nextOption()
   }
 
-  private def bestKnownBlockNumber: BigInt = blockchainReader.getBestBlockNumber()
+  private def bestKnownBlockNumber: BigInt = blockchainReader.getBestBlockNumber
 
   private def getBehavior(newBehavior: NewBehavior, blockImportType: BlockImportType): Behavior = newBehavior match {
     case Running =>

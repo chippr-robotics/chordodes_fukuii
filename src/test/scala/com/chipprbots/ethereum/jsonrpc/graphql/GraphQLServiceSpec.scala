@@ -7,8 +7,10 @@ import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
 
-import io.circe.Json
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 
+import io.circe.Json
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpecLike
@@ -26,7 +28,8 @@ import com.chipprbots.ethereum.consensus.mining.TestMining
 import com.chipprbots.ethereum.consensus.pow.blocks.PoWBlockGenerator
 import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage
-import com.chipprbots.ethereum.domain.{Block, ChainWeight}
+import com.chipprbots.ethereum.domain.Block
+import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.jsonrpc.EthBlocksService
 import com.chipprbots.ethereum.jsonrpc.EthFilterService
 import com.chipprbots.ethereum.jsonrpc.EthInfoService
@@ -35,9 +38,7 @@ import com.chipprbots.ethereum.jsonrpc.EthUserService
 import com.chipprbots.ethereum.keystore.KeyStore
 import com.chipprbots.ethereum.ledger.StxLedger
 import com.chipprbots.ethereum.network.p2p.messages.Capability
-
-import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.*
+import io.circe.ACursor
 
 class GraphQLServiceSpec
     extends TestKit(ActorSystem("GraphQLServiceSpec_ActorSystem"))
@@ -55,7 +56,7 @@ class GraphQLServiceSpec
   "GraphQLService" should "answer { chainID } with the configured chain id as 0x-hex" in new GraphQLTestSetup {
     val (status, body) = service.execute("{ chainID }", None, None).unsafeRunSync()
     status shouldBe 200
-    val chainHex = body.hcursor.downField("data").downField("chainID").as[String].toOption.get
+    val chainHex: String = body.hcursor.downField("data").downField("chainID").as[String].toOption.get
     chainHex should startWith("0x")
     // Any valid non-negative hex is acceptable here — the fixture's chain id depends on the test chain.
   }
@@ -66,15 +67,15 @@ class GraphQLServiceSpec
 
     val (status, body) = service.execute("{ block { number hash } }", None, None).unsafeRunSync()
     status shouldBe 200
-    val data = body.hcursor.downField("data").downField("block")
+    val data: ACursor = body.hcursor.downField("data").downField("block")
     data.downField("number").as[String].toOption.get shouldBe "0x" + block.header.number.toString(16)
-    val gotHash = data.downField("hash").as[String].toOption.get
+    val gotHash: String = data.downField("hash").as[String].toOption.get
     gotHash shouldBe "0x" + block.header.hash.toArray.map("%02x".format(_)).mkString
   }
 
   it should "return null for an unknown transaction" in new GraphQLTestSetup {
-    val unknown = "0x" + ("00" * 32)
-    val query = s"""{ transaction(hash: \"$unknown\") { hash } }"""
+    val unknown: String = "0x" + ("00" * 32)
+    val query: String = s"""{ transaction(hash: \"$unknown\") { hash } }"""
     val (status, body) = service.execute(query, None, None).unsafeRunSync()
     status shouldBe 200
     body.hcursor.downField("data").downField("transaction").focus.get shouldBe Json.Null
@@ -83,7 +84,7 @@ class GraphQLServiceSpec
   it should "reject a syntactically invalid query with HTTP 400" in new GraphQLTestSetup {
     val (status, body) = service.execute("{ not valid graphql", None, None).unsafeRunSync()
     status shouldBe 400
-    val errs = body.hcursor.downField("errors").as[List[Json]].toOption.get
+    val errs: List[Json] = body.hcursor.downField("errors").as[List[Json]].toOption.get
     errs should not be empty
   }
 
@@ -134,9 +135,9 @@ class GraphQLServiceSpec
       storagesInstance.storages.transactionMappingStorage
     override lazy val stxLedger: StxLedger = mock[StxLedger]
     val keyStore: KeyStore = mock[KeyStore]
-    val syncProbe = TestProbe()
-    val pendingTxProbe = TestProbe()
-    val filterManagerProbe = TestProbe()
+    val syncProbe: TestProbe = TestProbe()
+    val pendingTxProbe: TestProbe = TestProbe()
+    val filterManagerProbe: TestProbe = TestProbe()
 
     lazy val ethBlocksService = new EthBlocksService(
       blockchain,
@@ -179,7 +180,7 @@ class GraphQLServiceSpec
       blockchainReader
     )
 
-    val ctx = GraphQLContext(
+    val ctx: GraphQLContext = GraphQLContext(
       blockchain,
       blockchainReader,
       mining,

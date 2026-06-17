@@ -6,21 +6,21 @@ import org.apache.pekko.actor.typed.scaladsl.AbstractBehavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.actor.ActorRef as ClassicActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.actor.{ActorRef => ClassicActorRef}
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
 import cats.data.NonEmptyList
 import cats.effect.unsafe.IORuntime
-import cats.instances.option.*
+import cats.instances.option._
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
-import mouse.all.*
+import mouse.all._
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
-import com.chipprbots.ethereum.blockchain.sync.PeersClient.*
+import com.chipprbots.ethereum.blockchain.sync.PeersClient._
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcherState.AwaitingBodiesToBeIgnored
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcherState.HeadersNotFormingSeq
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcherState.HeadersNotMatchingReadyBlocks
@@ -29,7 +29,7 @@ import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcherState.MaxConc
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockImporter.ImportNewBlock
 import com.chipprbots.ethereum.blockchain.sync.regular.RegularSync.ProgressProtocol
 import com.chipprbots.ethereum.consensus.validators.BlockValidator
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerEventBusActor
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
@@ -39,12 +39,12 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.messages.Codes
+import com.chipprbots.ethereum.network.p2p.messages.ETH69
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes
-import com.chipprbots.ethereum.network.p2p.messages.ETH69
 import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.Config.SyncConfig
-import com.chipprbots.ethereum.utils.FunctorOps.*
+import com.chipprbots.ethereum.utils.FunctorOps._
 
 class BlockFetcher(
     val peersClient: ClassicActorRef,

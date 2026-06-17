@@ -1,8 +1,8 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import scala.collection.mutable
-
 import org.apache.pekko.util.ByteString
+
+import scala.collection.mutable
 
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
 import com.chipprbots.ethereum.network.PeerId

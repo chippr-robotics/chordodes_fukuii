@@ -11,16 +11,16 @@ import cats.effect.IO
 import scala.util.Try
 
 import com.chipprbots.ethereum.crypto
-import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockchainReader
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
-import com.chipprbots.ethereum.jsonrpc.JsonRpcError.*
-import com.chipprbots.ethereum.jsonrpc.PersonalService.*
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
+import com.chipprbots.ethereum.jsonrpc.JsonRpcError._
+import com.chipprbots.ethereum.jsonrpc.PersonalService._
 import com.chipprbots.ethereum.keystore.KeyStore
 import com.chipprbots.ethereum.keystore.Wallet
+import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.AddOrOverrideTransaction
@@ -115,7 +115,7 @@ class PersonalService(
 
   def listAccounts(request: ListAccountsRequest): ServiceResponse[ListAccountsResponse] = IO {
     keyStore
-      .listAccounts()
+      .listAccounts
       .map(ListAccountsResponse.apply)
       .left
       .map(handleError)
@@ -213,7 +213,7 @@ class PersonalService(
         request.gasPrice.getOrElse(ethTxService.suggestGasPrice())
       )
 
-      val stx = if (blockchainReader.getBestBlockNumber() >= blockchainConfig.forkBlockNumbers.eip155BlockNumber) {
+      val stx = if (blockchainReader.getBestBlockNumber >= blockchainConfig.forkBlockNumbers.eip155BlockNumber) {
         wallet.signTx(tx, Some(blockchainConfig.chainId))
       } else {
         wallet.signTx(tx, None)
@@ -227,7 +227,7 @@ class PersonalService(
   }
 
   private def getCurrentAccount(address: Address): Option[Account] =
-    blockchainReader.getAccount(blockchainReader.getBestBranch(), address, blockchainReader.getBestBlockNumber())
+    blockchainReader.getAccount(blockchainReader.getBestBranch, address, blockchainReader.getBestBlockNumber)
 
   private def getMessageToSign(message: ByteString) = {
     val prefixed: Array[Byte] =

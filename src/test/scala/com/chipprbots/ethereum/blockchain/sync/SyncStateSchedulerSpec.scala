@@ -2,6 +2,7 @@ package com.chipprbots.ethereum.blockchain.sync
 
 import org.apache.pekko.util.ByteString
 
+import org.scalacheck.Gen
 import org.scalactic.anyvals.PosInt
 import org.scalatest.EitherValues
 import org.scalatest.flatspec.AnyFlatSpec
@@ -10,14 +11,16 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.SuperSlow
-import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.blockchain.sync.StateSyncUtils.MptNodeData
 import com.chipprbots.ethereum.blockchain.sync.StateSyncUtils.TrieProvider
 import com.chipprbots.ethereum.blockchain.sync.StateSyncUtils.checkAllDataExists
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.AlreadyProcessedItem
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.CannotDecodeMptNode
+import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.CriticalError
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.NotRequestedItem
+import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.ProcessingStatistics
+import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.ResponseProcessingError
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.SchedulerState
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.SyncResponse
 import com.chipprbots.ethereum.db.components.EphemDataSourceComponent
@@ -26,11 +29,8 @@ import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.vm.Generators.genMultipleNodeData
-import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.CriticalError
-import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.ProcessingStatistics
-import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.ResponseProcessingError
-import org.scalacheck.Gen
 
 class SyncStateSchedulerSpec
     extends AnyFlatSpec
@@ -325,7 +325,7 @@ class SyncStateSchedulerSpec
         BlockchainImpl,
         BlockchainWriter,
         BlockchainReader,
-        EphemDataSourceComponent with LocalPruningConfigBuilder with Storages.DefaultStorages
+        EphemDataSourceComponent & LocalPruningConfigBuilder & Storages.DefaultStorages
     ) = {
       val freshStorage = getNewStorages
       val freshBlockchainReader = BlockchainReader(freshStorage.storages)

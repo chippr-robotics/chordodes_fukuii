@@ -3,7 +3,7 @@ package com.chipprbots.ethereum
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
 
 // scalastyle:off magic.number

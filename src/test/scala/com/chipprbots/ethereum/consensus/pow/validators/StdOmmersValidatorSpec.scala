@@ -9,11 +9,11 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.ObjectGenerators
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
-import com.chipprbots.ethereum.consensus.pow.validators.OmmersValidator.OmmersError.*
+import com.chipprbots.ethereum.consensus.pow.validators.OmmersValidator.OmmersError._
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks with ObjectGenerators {
 
@@ -91,7 +91,7 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
     val getNBlocksBack: (ByteString, Int) => List[Block] =
       (_, n) =>
         ((ommersBlockNumber - n) until ommersBlockNumber).toList
-          .flatMap(nb => blockchainReader.getBlockByNumber(blockchainReader.getBestBranch(), nb))
+          .flatMap(nb => blockchainReader.getBlockByNumber(blockchainReader.getBestBranch, nb))
 
     ommersValidator.validateOmmersAncestors(
       ommersBlockParentHash,

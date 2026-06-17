@@ -17,14 +17,13 @@ import scala.concurrent.duration.FiniteDuration
 
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.LoggerContext
-
 import org.slf4j.LoggerFactory
 
 import com.chipprbots.ethereum.domain.Block.BlockDec
 import com.chipprbots.ethereum.domain.Block.BlockEnc
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.branch.BestBranch
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
 import com.chipprbots.ethereum.network.BlockedIPRegistry
 import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.utils.BlockchainConfig
@@ -165,7 +164,7 @@ class AdminService(
     val nodeId = Hex.toHexString(status.nodeId)
 
     val genesisHash = "0x" + Hex.toHexString(blockchainReader.genesisHeader.hash.toArray)
-    val (headHash, headNumber) = blockchainReader.getBestBranch() match {
+    val (headHash, headNumber) = blockchainReader.getBestBranch match {
       case BestBranch(h, n) => (h, n)
       case _                => (org.apache.pekko.util.ByteString.empty, BigInt(0))
     }
@@ -332,7 +331,7 @@ class AdminService(
   def exportChain(req: AdminExportChainRequest): ServiceResponse[AdminExportChainResponse] = IO {
     try {
       val first = req.first.getOrElse(BigInt(0))
-      val last = req.last.getOrElse(blockchainReader.getBestBlockNumber())
+      val last = req.last.getOrElse(blockchainReader.getBestBlockNumber)
       val out = new BufferedOutputStream(new FileOutputStream(req.file))
       try {
         var i = first

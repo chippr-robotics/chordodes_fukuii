@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.sync
 
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import com.typesafe.config.ConfigValueFactory
 import org.scalatest.BeforeAndAfterAll
@@ -12,10 +12,9 @@ import com.chipprbots.ethereum.FreeSpecBase
 import com.chipprbots.ethereum.metrics.Metrics
 import com.chipprbots.ethereum.metrics.MetricsConfig
 import com.chipprbots.ethereum.sync.util.RegularSyncItSpecUtils.FakePeer
-import com.chipprbots.ethereum.sync.util.SyncCommonItSpec.*
+import com.chipprbots.ethereum.sync.util.SyncCommonItSpec._
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.Config
-
-import com.chipprbots.ethereum.testing.Tags.*
 
 class RegularSyncItSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll {
   implicit val testRuntime: IORuntime = IORuntime.global
@@ -42,7 +41,7 @@ class RegularSyncItSpec extends FreeSpecBase with Matchers with BeforeAndAfterAl
         _ <- peer2.startRegularSync()
         _ <- peer2.connectToPeers(Set(peer1.node))
         _ <- peer2.waitForRegularSyncLoadLastBlock(blockNumber)
-      } yield assert(peer1.blockchainReader.getBestBlock().get.hash == peer2.blockchainReader.getBestBlock().get.hash)
+      } yield assert(peer1.blockchainReader.getBestBlock.get.hash == peer2.blockchainReader.getBestBlock.get.hash)
     }
 
     "given a previously mined blockchain" taggedAs (IntegrationTest, SyncTest, SlowTest) in customTestCaseResourceM(
@@ -56,7 +55,7 @@ class RegularSyncItSpec extends FreeSpecBase with Matchers with BeforeAndAfterAl
         _ <- peer2.startRegularSync()
         _ <- peer2.connectToPeers(Set(peer1.node))
         _ <- peer2.waitForRegularSyncLoadLastBlock(blockHeadersPerRequest + 1)
-      } yield assert(peer1.blockchainReader.getBestBlock().get.hash == peer2.blockchainReader.getBestBlock().get.hash)
+      } yield assert(peer1.blockchainReader.getBestBlock.get.hash == peer2.blockchainReader.getBestBlock.get.hash)
     }
   }
 
@@ -78,7 +77,7 @@ class RegularSyncItSpec extends FreeSpecBase with Matchers with BeforeAndAfterAl
       _ <- peer1.waitForRegularSyncLoadLastBlock(blockNumer + 2)
       _ <- peer1.mineNewBlocks(100.milliseconds, 2)(IdentityUpdate)
       _ <- peer2.waitForRegularSyncLoadLastBlock(blockNumer + 4)
-    } yield assert(peer1.blockchainReader.getBestBlock().get.hash == peer2.blockchainReader.getBestBlock().get.hash)
+    } yield assert(peer1.blockchainReader.getBestBlock.get.hash == peer2.blockchainReader.getBestBlock.get.hash)
   }
 
   "peers with divergent chains will be forced to resolve branches" taggedAs (
@@ -104,15 +103,15 @@ class RegularSyncItSpec extends FreeSpecBase with Matchers with BeforeAndAfterAl
     } yield {
       assert(
         peer1.blockchainReader.getChainWeightByHash(
-          peer1.blockchainReader.getBestBlock().get.hash
+          peer1.blockchainReader.getBestBlock.get.hash
         ) == peer2.blockchainReader
           .getChainWeightByHash(
-            peer2.blockchainReader.getBestBlock().get.hash
+            peer2.blockchainReader.getBestBlock.get.hash
           )
       )
       (
-        peer1.blockchainReader.getBlockByNumber(peer1.blockchainReader.getBestBranch(), blockNumer + 1),
-        peer2.blockchainReader.getBlockByNumber(peer2.blockchainReader.getBestBranch(), blockNumer + 1)
+        peer1.blockchainReader.getBlockByNumber(peer1.blockchainReader.getBestBranch, blockNumer + 1),
+        peer2.blockchainReader.getBlockByNumber(peer2.blockchainReader.getBestBranch, blockNumer + 1)
       ) match {
         case (Some(blockP1), Some(blockP2)) =>
           assert(

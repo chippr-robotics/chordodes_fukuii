@@ -4,7 +4,6 @@ import org.apache.pekko.util.ByteString
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-
 import sangria.ast
 
 class GraphQLScalarsSpec extends AnyFlatSpec with Matchers {

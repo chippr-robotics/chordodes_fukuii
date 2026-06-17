@@ -7,21 +7,21 @@ import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.util.ByteString
 
-import com.typesafe.config.ConfigFactory
-
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
-import cats.implicits.*
+import cats.implicits._
 
 import scala.concurrent.Future
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
+import com.typesafe.config.ConfigFactory
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 
-import com.chipprbots.ethereum.blockchain.data.{ChainImporter, GenesisDataLoader}
+import com.chipprbots.ethereum.blockchain.data.ChainImporter
+import com.chipprbots.ethereum.blockchain.data.GenesisDataLoader
 import com.chipprbots.ethereum.blockchain.sync.Blacklist
 import com.chipprbots.ethereum.blockchain.sync.BlockchainHostActor
 import com.chipprbots.ethereum.blockchain.sync.CacheBasedBlacklist
@@ -33,28 +33,28 @@ import com.chipprbots.ethereum.consensus.mess.MESSConfig
 import com.chipprbots.ethereum.consensus.mining.MiningBuilder
 import com.chipprbots.ethereum.consensus.mining.MiningConfigBuilder
 import com.chipprbots.ethereum.db.components.Storages.PruningModeComponent
-import com.chipprbots.ethereum.db.components.*
+import com.chipprbots.ethereum.db.components._
 import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.db.storage.pruning.PruningMode
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.jsonrpc.NetService.NetServiceConfig
-import com.chipprbots.ethereum.jsonrpc.*
+import com.chipprbots.ethereum.jsonrpc._
 import com.chipprbots.ethereum.jsonrpc.server.controllers.ApisBase
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
 import com.chipprbots.ethereum.jsonrpc.server.http.JsonRpcHttpServer
 import com.chipprbots.ethereum.jsonrpc.server.ipc.JsonRpcIpcServer
 import com.chipprbots.ethereum.keystore.KeyStore
 import com.chipprbots.ethereum.keystore.KeyStoreImpl
-import com.chipprbots.ethereum.ledger.*
+import com.chipprbots.ethereum.ledger._
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.PeerManagerActor.PeerConfiguration
-import com.chipprbots.ethereum.network.*
+import com.chipprbots.ethereum.network._
 import com.chipprbots.ethereum.network.discovery.DiscoveryConfig
 import com.chipprbots.ethereum.network.discovery.DiscoveryServiceBuilder
 import com.chipprbots.ethereum.network.discovery.PeerDiscoveryManager
+import com.chipprbots.ethereum.network.handshaker.Handshaker
 import com.chipprbots.ethereum.network.handshaker.NetworkHandshaker
 import com.chipprbots.ethereum.network.handshaker.NetworkHandshakerConfiguration
-import com.chipprbots.ethereum.network.handshaker.Handshaker
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.rlpx.AuthHandshaker
 import com.chipprbots.ethereum.ommers.OmmersPool
@@ -63,7 +63,7 @@ import com.chipprbots.ethereum.security.SecureRandomBuilder
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import com.chipprbots.ethereum.transactions.TransactionHistoryService
 import com.chipprbots.ethereum.utils.Config.SyncConfig
-import com.chipprbots.ethereum.utils.*
+import com.chipprbots.ethereum.utils._
 
 // scalastyle:off number.of.types
 trait BlockchainConfigBuilder {
@@ -142,7 +142,7 @@ trait DiscoveryConfigBuilder extends BlockchainConfigBuilder with StorageBuilder
     val enrFilter = new com.chipprbots.ethereum.network.discovery.DnsDiscovery.EnrForkIdFilter(
       genesisHash = () => reader.genesisHeader.hash,
       blockchainConfig = blockchainConfig,
-      currentBestBlock = () => reader.getBestBlockNumber()
+      currentBestBlock = () => reader.getBestBlockNumber
     )
     DiscoveryConfig(
       instanceConfig.config,
@@ -190,7 +190,7 @@ trait PeerDiscoveryManagerBuilder {
           new com.chipprbots.ethereum.network.discovery.ForkIdTag(
             genesisHash = () => blockchainReader.genesisHeader.hash,
             blockchainConfig = blockchainConfig,
-            currentBestBlock = () => blockchainReader.getBestBlockNumber()
+            currentBestBlock = () => blockchainReader.getBestBlockNumber
           )
         )
       ),

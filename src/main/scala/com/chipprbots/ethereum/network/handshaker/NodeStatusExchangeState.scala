@@ -45,7 +45,7 @@ trait NodeStatusExchangeState[T <: Message] extends InProgressState[PeerInfo] wi
   }
 
   protected def getBestBlockHeader(): BlockHeader = {
-    val bestBlockNumber = blockchainReader.getBestBlockNumber()
+    val bestBlockNumber = blockchainReader.getBestBlockNumber
     blockchainReader.getBlockHeaderByNumber(bestBlockNumber).getOrElse(blockchainReader.genesisHeader)
   }
 

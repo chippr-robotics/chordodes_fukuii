@@ -8,7 +8,7 @@ import org.scalatest.matchers.must.Matchers
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.SchedulerState
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.StateNode
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.StateNodeRequest
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 class SchedulerStateSpec extends AnyFlatSpec with Matchers {
   "SchedulerState" should "schedule node hashes for retrieval" taggedAs (UnitTest, SyncTest) in new TestSetup {

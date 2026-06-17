@@ -6,7 +6,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.crypto.kec256
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 class AccountTaskSpec extends AnyFlatSpec with Matchers {
 

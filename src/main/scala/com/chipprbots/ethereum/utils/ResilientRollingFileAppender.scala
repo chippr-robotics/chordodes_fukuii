@@ -1,7 +1,8 @@
 package com.chipprbots.ethereum.utils
 
-import ch.qos.logback.core.rolling.RollingFileAppender
 import java.io.File
+
+import ch.qos.logback.core.rolling.RollingFileAppender
 
 /** RollingFileAppender that recreates the log file if deleted while running.
   *

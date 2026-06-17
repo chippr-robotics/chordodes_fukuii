@@ -5,9 +5,9 @@ import org.apache.pekko.util.ByteString
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.MptStorage
 import com.chipprbots.ethereum.domain.Account
-import com.chipprbots.ethereum.domain.Account.*
-import com.chipprbots.ethereum.mpt.*
-import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
+import com.chipprbots.ethereum.domain.Account._
+import com.chipprbots.ethereum.mpt._
+import com.chipprbots.ethereum.network.p2p.messages.SNAP._
 import com.chipprbots.ethereum.rlp
 import com.chipprbots.ethereum.rlp.RLPEncodeable
 import com.chipprbots.ethereum.rlp.RLPList

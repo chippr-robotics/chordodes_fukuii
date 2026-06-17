@@ -4,14 +4,14 @@ import java.net.InetSocketAddress
 import java.net.URI
 import java.util.concurrent.TimeUnit
 
-import org.apache.pekko.actor.*
+import org.apache.pekko.actor._
 import org.apache.pekko.testkit.ExplicitlyTriggeredScheduler
 import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import com.github.blemale.scaffeine.Cache
 import com.github.blemale.scaffeine.Scaffeine
@@ -53,10 +53,10 @@ import com.chipprbots.ethereum.network.PeerManagerActor.SendMessage
 import com.chipprbots.ethereum.network.discovery.DiscoveryConfig
 import com.chipprbots.ethereum.network.discovery.Node
 import com.chipprbots.ethereum.network.discovery.PeerDiscoveryManager
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
 import com.chipprbots.ethereum.network.p2p.messages.Capability
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.Config
 
 import Arbitrary.arbitrary
@@ -370,8 +370,8 @@ class PeerManagerSpec
     UnitTest,
     NetworkTest
   ) in new TestSetup {
-    val hexNodeId = "aa" * 64 // 64-byte node ID as 128-char hex
-    val nodeIdBytes = ByteString(Hex.decode(hexNodeId))
+    val hexNodeId: String = "aa" * 64 // 64-byte node ID as 128-char hex
+    val nodeIdBytes: ByteString = ByteString(Hex.decode(hexNodeId))
     val maintainedUri = new URI(s"enode://$hexNodeId@127.0.0.5:30303")
 
     start()
@@ -413,8 +413,8 @@ class PeerManagerSpec
     UnitTest,
     NetworkTest
   ) in new TestSetup {
-    val hexNodeId = "bb" * 64
-    val nodeIdBytes = ByteString(Hex.decode(hexNodeId))
+    val hexNodeId: String = "bb" * 64
+    val nodeIdBytes: ByteString = ByteString(Hex.decode(hexNodeId))
     val maintainedUri = new URI(s"enode://$hexNodeId@127.0.0.5:30303")
 
     start()
@@ -473,7 +473,7 @@ class PeerManagerSpec
     UnitTest,
     NetworkTest
   ) in new TestSetup {
-    val hexNodeId = "cc" * 64
+    val hexNodeId: String = "cc" * 64
     val maintainedUri = new URI(s"enode://$hexNodeId@127.0.0.6:30303")
 
     start()
@@ -494,8 +494,8 @@ class PeerManagerSpec
     UnitTest,
     NetworkTest
   ) in new TestSetup {
-    val hexNodeId = "dd" * 64
-    val nodeIdBytes = ByteString(Hex.decode(hexNodeId))
+    val hexNodeId: String = "dd" * 64
+    val nodeIdBytes: ByteString = ByteString(Hex.decode(hexNodeId))
     val maintainedUri = new URI(s"enode://$hexNodeId@127.0.0.7:30303")
 
     start()
@@ -535,7 +535,7 @@ class PeerManagerSpec
     UnitTest,
     NetworkTest
   ) in new TestSetup {
-    val hexNodeId = "ee" * 64
+    val hexNodeId: String = "ee" * 64
     val maintainedUri = new URI(s"enode://$hexNodeId@127.0.0.8:30303")
     val maintainedHost = "127.0.0.8"
 
@@ -553,7 +553,7 @@ class PeerManagerSpec
     }
 
     // Inbound from the maintained peer host arrives (ephemeral port — different from 30303)
-    val inboundTcp = TestProbe()
+    val inboundTcp: TestProbe = TestProbe()
     val inboundAddress = new InetSocketAddress(maintainedHost, 54321)
     peerManager ! PeerManagerActor.HandlePeerConnection(inboundTcp.ref, inboundAddress)
     createdPeers(1).probe.expectMsg(PeerActor.HandleConnection(inboundTcp.ref, inboundAddress))
@@ -572,8 +572,8 @@ class PeerManagerSpec
     UnitTest,
     NetworkTest
   ) in new TestSetup {
-    val hexNodeId = "ff" * 64
-    val nodeIdBytes = ByteString(Hex.decode(hexNodeId))
+    val hexNodeId: String = "ff" * 64
+    val nodeIdBytes: ByteString = ByteString(Hex.decode(hexNodeId))
     val maintainedUri = new URI(s"enode://$hexNodeId@127.0.0.9:30303")
 
     start()
@@ -597,7 +597,7 @@ class PeerManagerSpec
     )
 
     // Step 3: inbound from the same maintained peer host arrives simultaneously
-    val inboundTcp = TestProbe()
+    val inboundTcp: TestProbe = TestProbe()
     val inboundAddress = new InetSocketAddress("127.0.0.9", 55555)
     peerManager ! PeerManagerActor.HandlePeerConnection(inboundTcp.ref, inboundAddress)
     createdPeers(1).probe.expectMsg(PeerActor.HandleConnection(inboundTcp.ref, inboundAddress))
@@ -635,8 +635,8 @@ class PeerManagerSpec
     UnitTest,
     NetworkTest
   ) in new TestSetup {
-    val hexNodeId = "ff" * 64
-    val nodeIdBytes = ByteString(Hex.decode(hexNodeId))
+    val hexNodeId: String = "ff" * 64
+    val nodeIdBytes: ByteString = ByteString(Hex.decode(hexNodeId))
     val maintainedUri = new URI(s"enode://$hexNodeId@127.0.0.9:30303")
 
     start()
@@ -666,7 +666,7 @@ class PeerManagerSpec
     )
 
     // Step 3: inbound from the same maintained peer host
-    val inboundTcp = TestProbe()
+    val inboundTcp: TestProbe = TestProbe()
     val inboundAddress = new InetSocketAddress("127.0.0.9", 55555)
     peerManager ! PeerManagerActor.HandlePeerConnection(inboundTcp.ref, inboundAddress)
     createdPeers(1).probe.expectMsg(PeerActor.HandleConnection(inboundTcp.ref, inboundAddress))
@@ -1009,7 +1009,7 @@ class PeerManagerSpec
       .maximumSize(
         10
       )
-      .ticker(ticker.read)
+      .ticker(() => ticker.read())
       .build[BlacklistId, BlacklistReason.BlacklistReasonType]()
     val blacklist: CacheBasedBlacklist = CacheBasedBlacklist(cache)
 

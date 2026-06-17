@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.db.storage
 
 import org.apache.pekko.util.ByteString
 
-import boopickle.Default.*
+import boopickle.Default._
 
 import com.chipprbots.ethereum.db.dataSource.DataSource
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage.TransactionLocation

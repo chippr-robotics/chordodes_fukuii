@@ -20,19 +20,19 @@ import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.keystore.KeyStore.DecryptionFailed
 import com.chipprbots.ethereum.keystore.KeyStore.IOError
 import com.chipprbots.ethereum.keystore.KeyStore.KeyNotFound
-import com.chipprbots.ethereum.keystore.KeyStore.PassPhraseTooShort
 import com.chipprbots.ethereum.keystore.KeyStore.KeyStoreError
+import com.chipprbots.ethereum.keystore.KeyStore.PassPhraseTooShort
 import com.chipprbots.ethereum.security.SecureRandomBuilder
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.KeyStoreConfig
-import com.chipprbots.ethereum.testing.Tags.*
 
 class KeyStoreImplSpec extends AnyFlatSpec with Matchers with BeforeAndAfter with SecureRandomBuilder {
 
   before(clearKeyStore())
 
   "KeyStoreImpl" should "import and list accounts" taggedAs (UnitTest) in new TestSetup {
-    val listBeforeImport: List[Address] = keyStore.listAccounts().toOption.get
+    val listBeforeImport: List[Address] = keyStore.listAccounts.toOption.get
     listBeforeImport shouldEqual Nil
 
     // Small delay between imports to ensure different file timestamps (ISO_DATE_TIME format includes milliseconds)
@@ -46,7 +46,7 @@ class KeyStoreImplSpec extends AnyFlatSpec with Matchers with BeforeAndAfter wit
     res2 shouldEqual addr2
     res3 shouldEqual addr3
 
-    val listAfterImport: List[Address] = keyStore.listAccounts().toOption.get
+    val listAfterImport: List[Address] = keyStore.listAccounts.toOption.get
     // result should be ordered by creation date
     listAfterImport shouldEqual List(addr1, addr2, addr3)
   }
@@ -59,7 +59,7 @@ class KeyStoreImplSpec extends AnyFlatSpec with Matchers with BeforeAndAfter wit
     resAfterDupImport shouldBe Left(KeyStore.DuplicateKeySaved)
 
     // Only the first import succeeded
-    val listAfterImport: List[Address] = keyStore.listAccounts().toOption.get
+    val listAfterImport: List[Address] = keyStore.listAccounts.toOption.get
     listAfterImport.toSet shouldEqual Set(addr1)
     listAfterImport.length shouldEqual 1
   }
@@ -68,7 +68,7 @@ class KeyStoreImplSpec extends AnyFlatSpec with Matchers with BeforeAndAfter wit
     val newAddr1: Address = keyStore.newAccount("aaaaaaaa").toOption.get
     val newAddr2: Address = keyStore.newAccount("bbbbbbbb").toOption.get
 
-    val listOfNewAccounts: List[Address] = keyStore.listAccounts().toOption.get
+    val listOfNewAccounts: List[Address] = keyStore.listAccounts.toOption.get
     listOfNewAccounts.toSet shouldEqual Set(newAddr1, newAddr2)
     listOfNewAccounts.length shouldEqual 2
   }
@@ -117,7 +117,7 @@ class KeyStoreImplSpec extends AnyFlatSpec with Matchers with BeforeAndAfter wit
     val res2: Either[KeyStoreError, Address] = keyStore.newAccount("aaaaaaaa")
     res2 should matchPattern { case Left(IOError(_)) => }
 
-    val res3: Either[KeyStoreError, List[Address]] = keyStore.listAccounts()
+    val res3: Either[KeyStoreError, List[Address]] = keyStore.listAccounts
     res3 should matchPattern { case Left(IOError(_)) => }
   }
 

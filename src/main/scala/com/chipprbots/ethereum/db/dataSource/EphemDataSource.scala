@@ -6,7 +6,7 @@ import cats.effect.IO
 
 import fs2.Stream
 
-import com.chipprbots.ethereum.db.dataSource.DataSource.*
+import com.chipprbots.ethereum.db.dataSource.DataSource._
 import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource.IterationError
 
 class EphemDataSource(var storage: Map[ByteBuffer, Array[Byte]]) extends DataSource {

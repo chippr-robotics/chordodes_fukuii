@@ -49,7 +49,7 @@ class ConsensusAdapter(
     // imports dead-end on `getBestBlock() == None` and the consumer retries
     // forever with `BlockImportFailed("Couldn't find the current best block")`.
     val bestHeaderOpt =
-      blockchainReader.getBestBlock().map(_.header).orElse(blockchainReader.getBestBlockHeader())
+      blockchainReader.getBestBlock.map(_.header).orElse(blockchainReader.getBestBlockHeader)
     bestHeaderOpt match {
       case Some(bestHeader) =>
         if (isBlockADuplicate(block.header, bestHeader.number)) {

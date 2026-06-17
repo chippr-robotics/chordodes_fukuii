@@ -4,8 +4,8 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.consensus.pow.difficulty.OscillationFixtures
-import com.chipprbots.ethereum.consensus.pow.difficulty.OscillationFixtures.*
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.consensus.pow.difficulty.OscillationFixtures._
+import com.chipprbots.ethereum.testing.Tags._
 
 // scalastyle:off magic.number
 /** Tests for POW_SCALING chain-weight estimation accuracy across ETH protocol eras.

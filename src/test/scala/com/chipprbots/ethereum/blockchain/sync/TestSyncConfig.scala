@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import com.chipprbots.ethereum.nodebuilder.SyncConfigBuilder
 import com.chipprbots.ethereum.utils.Config.SyncConfig

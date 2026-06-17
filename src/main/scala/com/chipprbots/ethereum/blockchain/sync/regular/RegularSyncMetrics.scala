@@ -3,7 +3,6 @@ package com.chipprbots.ethereum.blockchain.sync.regular
 import scala.concurrent.duration.NANOSECONDS
 
 import com.google.common.util.concurrent.AtomicDouble
-
 import io.micrometer.core.instrument.Timer
 
 import com.chipprbots.ethereum.metrics.MetricsContainer

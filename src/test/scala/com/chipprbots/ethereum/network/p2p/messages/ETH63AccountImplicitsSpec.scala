@@ -1,15 +1,17 @@
 package com.chipprbots.ethereum.network.p2p.messages
 
 import org.apache.pekko.util.ByteString
+
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.domain.Account
-import com.chipprbots.ethereum.domain.Account.*
+import com.chipprbots.ethereum.domain.Account._
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.rlp
-import com.chipprbots.ethereum.rlp.{RLPList, RLPValue}
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.rlp.RLPList
+import com.chipprbots.ethereum.rlp.RLPValue
+import com.chipprbots.ethereum.testing.Tags._
 
 class ETH63AccountImplicitsSpec extends AnyFlatSpec with Matchers {
 

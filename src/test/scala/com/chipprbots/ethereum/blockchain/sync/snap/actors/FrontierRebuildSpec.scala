@@ -1,13 +1,13 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
+import java.nio.ByteBuffer
+
 import org.apache.pekko.util.ByteString
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags.*
-
-import java.nio.ByteBuffer
+import com.chipprbots.ethereum.testing.Tags._
 
 /** Unit tests for the heap-bounded `visited` set used by the post-SNAP frontier-rebuild DFS
   * (`TrieNodeHealingCoordinator.boundedVisitedSet`).

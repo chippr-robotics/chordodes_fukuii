@@ -2,32 +2,32 @@ package com.chipprbots.ethereum.jsonrpc
 
 import cats.effect.IO
 
-import org.json4s.JsonDSL.*
+import org.json4s.JsonDSL._
 
+import com.chipprbots.ethereum.jsonrpc.AdminService._
 import com.chipprbots.ethereum.jsonrpc.DebugService.ListPeersInfoRequest
 import com.chipprbots.ethereum.jsonrpc.DebugService.ListPeersInfoResponse
-import com.chipprbots.ethereum.jsonrpc.EthBlocksService.*
-import com.chipprbots.ethereum.jsonrpc.EthFilterService.*
-import com.chipprbots.ethereum.jsonrpc.EthInfoService.*
-import com.chipprbots.ethereum.jsonrpc.EthMiningService.*
-import com.chipprbots.ethereum.jsonrpc.EthTxService.*
-import com.chipprbots.ethereum.jsonrpc.EthUserService.*
+import com.chipprbots.ethereum.jsonrpc.EthBlocksService._
+import com.chipprbots.ethereum.jsonrpc.EthFilterService._
+import com.chipprbots.ethereum.jsonrpc.EthInfoService._
+import com.chipprbots.ethereum.jsonrpc.EthMiningService._
+import com.chipprbots.ethereum.jsonrpc.EthSimulateService._
+import com.chipprbots.ethereum.jsonrpc.EthTxService._
+import com.chipprbots.ethereum.jsonrpc.EthUserService._
 import com.chipprbots.ethereum.jsonrpc.FukuiiService.GetAccountTransactionsRequest
 import com.chipprbots.ethereum.jsonrpc.FukuiiService.GetAccountTransactionsResponse
 import com.chipprbots.ethereum.jsonrpc.FukuiiService.ResetFastSyncRequest
 import com.chipprbots.ethereum.jsonrpc.FukuiiService.ResetFastSyncResponse
 import com.chipprbots.ethereum.jsonrpc.FukuiiService.RestartFastSyncRequest
 import com.chipprbots.ethereum.jsonrpc.FukuiiService.RestartFastSyncResponse
-import com.chipprbots.ethereum.jsonrpc.McpService.*
-import com.chipprbots.ethereum.jsonrpc.NetService.*
-import com.chipprbots.ethereum.jsonrpc.PersonalService.*
+import com.chipprbots.ethereum.jsonrpc.McpService._
+import com.chipprbots.ethereum.jsonrpc.NetService._
+import com.chipprbots.ethereum.jsonrpc.PersonalService._
 import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofRequest
 import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofResponse
-import com.chipprbots.ethereum.jsonrpc.EthSimulateService.*
-import com.chipprbots.ethereum.jsonrpc.TestService.*
-import com.chipprbots.ethereum.jsonrpc.Web3Service.*
-import com.chipprbots.ethereum.jsonrpc.AdminService.*
-import com.chipprbots.ethereum.jsonrpc.TxPoolService.*
+import com.chipprbots.ethereum.jsonrpc.TestService._
+import com.chipprbots.ethereum.jsonrpc.TxPoolService._
+import com.chipprbots.ethereum.jsonrpc.Web3Service._
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
 import com.chipprbots.ethereum.nodebuilder.ApisBuilder

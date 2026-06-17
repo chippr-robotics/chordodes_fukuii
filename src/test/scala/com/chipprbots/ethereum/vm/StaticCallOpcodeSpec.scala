@@ -4,9 +4,9 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.vm.Fixtures.blockchainConfig
-import com.chipprbots.ethereum.vm.MockWorldState.*
+import com.chipprbots.ethereum.vm.MockWorldState._
 
 // scalastyle:off object.name
 class StaticCallOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckPropertyChecks {

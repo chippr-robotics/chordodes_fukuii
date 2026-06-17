@@ -17,9 +17,9 @@ import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.ledger.BlockQueue.Leaf
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.Config.SyncConfig
-import com.chipprbots.ethereum.testing.Tags.*
 
 class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory {
 
@@ -177,7 +177,7 @@ class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory {
     val blockQueue: BlockQueue = BlockQueue(blockchainReader, syncConfig)
 
     def setBestBlockNumber(n: BigInt): CallHandler0[BigInt] =
-      blockchainReader.getBestBlockNumber.expects().returning(n)
+      (() => blockchainReader.getBestBlockNumber).expects().returning(n)
 
     def setChainWeightForParent(
         block: Block,

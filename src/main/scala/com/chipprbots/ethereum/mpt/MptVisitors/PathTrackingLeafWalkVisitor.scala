@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.mpt.MptVisitors
 import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.db.storage.MptStorage
-import com.chipprbots.ethereum.mpt.*
+import com.chipprbots.ethereum.mpt._
 
 /** Visitor that walks an MPT and invokes a callback for each leaf node, providing the full key path (nibbles
   * concatenated from root to leaf).

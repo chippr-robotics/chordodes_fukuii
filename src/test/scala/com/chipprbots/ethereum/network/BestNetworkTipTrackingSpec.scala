@@ -2,8 +2,6 @@ package com.chipprbots.ethereum.network
 
 import java.net.InetSocketAddress
 
-import scala.concurrent.duration.*
-
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.Props
 import org.apache.pekko.testkit.TestActorRef
@@ -19,18 +17,20 @@ import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.ChainWeight
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor.*
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor._
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerHandshakeSuccessful
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
 import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
-import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.*
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier._
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
-import com.chipprbots.ethereum.network.p2p.messages.Codes
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.Config
+import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockHeader
 
 // scalastyle:off magic.number
 class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
@@ -61,8 +61,8 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
     setupNewPeer(peer1, mkInfo(Capability.ETH68, td = BigInt(150), blockNum = 0))
 
     // NewBlock arrives with higher TD and exact block number
-    val newBlockHeader = Fixtures.Blocks.Genesis.header.copy(number = BigInt(1000))
-    val nb = NewBlock(Block(newBlockHeader, BlockBody(Nil, Nil)), BigInt(300))
+    val newBlockHeader: BlockHeader = Fixtures.Blocks.Genesis.header.copy(number = BigInt(1000))
+    val nb: NewBlock = NewBlock(Block(newBlockHeader, BlockBody(Nil, Nil)), BigInt(300))
     peersInfoHolder ! MessageFromPeer(nb, peer1.id)
 
     peersInfoHolder ! RegisterChainWeightCalibrationTarget(calibrationTarget.ref)
@@ -122,11 +122,11 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
     setupNewPeer(peer1, mkInfo(Capability.ETH68, td = BigInt(1000), blockNum = BigInt(5000)))
 
     // High-TD NewBlock arrives first
-    val hdrHigh = Fixtures.Blocks.Genesis.header.copy(number = BigInt(5000))
+    val hdrHigh: BlockHeader = Fixtures.Blocks.Genesis.header.copy(number = BigInt(5000))
     peersInfoHolder ! MessageFromPeer(NewBlock(Block(hdrHigh, BlockBody(Nil, Nil)), BigInt(1500)), peer1.id)
 
     // Lower-TD NewBlock — must NOT downgrade bestNetworkTip
-    val hdrLow = Fixtures.Blocks.Genesis.header.copy(number = BigInt(4800))
+    val hdrLow: BlockHeader = Fixtures.Blocks.Genesis.header.copy(number = BigInt(4800))
     peersInfoHolder ! MessageFromPeer(NewBlock(Block(hdrLow, BlockBody(Nil, Nil)), BigInt(100)), peer1.id)
 
     peersInfoHolder ! RegisterChainWeightCalibrationTarget(calibrationTarget.ref)

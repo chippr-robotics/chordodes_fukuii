@@ -1,5 +1,4 @@
 package com.chipprbots.ethereum.security
-
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileInputStream
@@ -7,21 +6,23 @@ import java.io.FileOutputStream
 import java.security.KeyStore
 import java.security.SecureRandom
 import javax.net.ssl.KeyManager
+import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 
+import scala.compiletime.uninitialized
 import scala.io.BufferedSource
 
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import javax.net.ssl.SSLContext
-import com.chipprbots.ethereum.testing.Tags.*
+
+import com.chipprbots.ethereum.testing.Tags._
 
 class SSLContextFactorySpec extends AnyFlatSpec with Matchers with MockFactory with BeforeAndAfterAll {
 
   val fileName: String = "temp.txt"
-  var file: File = _
+  var file: File = uninitialized
 
   override def beforeAll(): Unit = {
     new FileOutputStream(fileName, false).getFD

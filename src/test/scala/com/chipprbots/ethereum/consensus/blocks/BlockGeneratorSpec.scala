@@ -16,18 +16,18 @@ import com.chipprbots.ethereum.blockchain.data.GenesisDataLoader
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.consensus.mining.MiningConfig
 import com.chipprbots.ethereum.consensus.pow.validators.ValidatorsExecutor
-import com.chipprbots.ethereum.consensus.validators.*
+import com.chipprbots.ethereum.consensus.validators._
 import com.chipprbots.ethereum.crypto
-import com.chipprbots.ethereum.crypto.*
+import com.chipprbots.ethereum.crypto._
 import com.chipprbots.ethereum.domain.SignedTransaction.FirstByteOfAddress
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.ledger.BlockExecution
 import com.chipprbots.ethereum.ledger.BlockQueue
 import com.chipprbots.ethereum.ledger.BlockValidation
-import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MPTException
-import com.chipprbots.ethereum.utils.*
 import com.chipprbots.ethereum.ledger.TxResult
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MPTException
+import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.utils._
 
 class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
   implicit val testContext: IORuntime = IORuntime.global
@@ -57,7 +57,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
       fullBlock.header,
       blockchainReader.getBlockHeaderByHash
     ) shouldBe Right(BlockHeaderValid)
-    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[_, Seq[Receipt]]]
+    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
     fullBlock.header.extraData shouldBe headerExtraData
   }
 
@@ -85,7 +85,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
       fullBlock.header,
       blockchainReader.getBlockHeaderByHash
     ) shouldBe Right(BlockHeaderValid)
-    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[_, Seq[Receipt]]]
+    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
     fullBlock.header.extraData shouldBe headerExtraData
   }
 
@@ -118,7 +118,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
 
     // Create new pending block, with updated stateRootHash
     val pendBlockAndState: PendingBlockAndState = blockGenerator.generateBlock(
-      blockchainReader.getBestBlock().get,
+      blockchainReader.getBestBlock.get,
       Seq(signedTransaction),
       Address(testAddress),
       blockGenerator.emptyX,
@@ -172,7 +172,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
       blockchainReader.getBlockHeaderByHash
     ) shouldBe Right(BlockHeaderValid)
 
-    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[_, Seq[Receipt]]]
+    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
     fullBlock.body.transactionList shouldBe Seq(signedTransaction)
     fullBlock.header.extraData shouldBe headerExtraData
   }
@@ -214,7 +214,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
       fullBlock.header,
       blockchainReader.getBlockHeaderByHash
     ) shouldBe Right(BlockHeaderValid)
-    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[_, Seq[Receipt]]]
+    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
     fullBlock.body.transactionList shouldBe Seq(signedTransaction)
     fullBlock.header.extraData shouldBe headerExtraData
   }
@@ -284,7 +284,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
       fullBlock.header,
       blockchainReader.getBlockHeaderByHash
     ) shouldBe Right(BlockHeaderValid)
-    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[_, Seq[Receipt]]]
+    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
     fullBlock.body.transactionList shouldBe Seq(generalTx)
     fullBlock.header.extraData shouldBe headerExtraData
   }
@@ -342,7 +342,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
         .generateBlock(bestBlock.get, Seq(generalTx), Address(testAddress), blockGenerator.emptyX, None)
         .pendingBlock
 
-    blockExecution.executeAndValidateBlock(generatedBlock.block, true) shouldBe a[Right[_, Seq[Receipt]]]
+    blockExecution.executeAndValidateBlock(generatedBlock.block, true) shouldBe a[Right[?, Seq[Receipt]]]
   }
 
   it should "generate block after eip155 and allow both chain specific and general transactions" taggedAs (
@@ -381,7 +381,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
     validators.blockHeaderValidator.validate(fullBlock.header, blockchainReader.getBlockHeaderByHash) shouldBe Right(
       BlockHeaderValid
     )
-    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[_, Seq[Receipt]]]
+    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
     fullBlock.body.transactionList shouldBe Seq(signedTransaction, generalTx)
     fullBlock.header.extraData shouldBe headerExtraData
   }
@@ -419,7 +419,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
     validators.blockHeaderValidator.validate(fullBlock.header, blockchainReader.getBlockHeaderByHash) shouldBe Right(
       BlockHeaderValid
     )
-    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[_, Seq[Receipt]]]
+    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
     fullBlock.body.transactionList shouldBe Seq(signedTransaction, nextTransaction)
     fullBlock.header.extraData shouldBe headerExtraData
   }
@@ -473,7 +473,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
     validators.blockHeaderValidator.validate(fullBlock.header, blockchainReader.getBlockHeaderByHash) shouldBe Right(
       BlockHeaderValid
     )
-    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[_, Seq[Receipt]]]
+    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
     fullBlock.body.transactionList shouldBe Seq(signedTransaction, nextTransaction)
     fullBlock.header.extraData shouldBe headerExtraData
   }
@@ -513,7 +513,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
     validators.blockHeaderValidator.validate(fullBlock.header, blockchainReader.getBlockHeaderByHash) shouldBe Right(
       BlockHeaderValid
     )
-    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[_, Seq[Receipt]]]
+    blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
     fullBlock.body.transactionList shouldBe Seq(signedTransaction)
     fullBlock.header.extraData shouldBe headerExtraData
   }
@@ -595,7 +595,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
       )
     genesisDataLoader.loadGenesisData()
 
-    val bestBlock: Option[Block] = blockchainReader.getBestBlock()
+    val bestBlock: Option[Block] = blockchainReader.getBestBlock
 
     lazy val blockTimestampProvider = new FakeBlockTimestampProvider
 

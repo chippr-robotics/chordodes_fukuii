@@ -21,12 +21,13 @@ import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.SignedTransactionWithSender
-import com.chipprbots.ethereum.jsonrpc.DebugTracingService.*
+import com.chipprbots.ethereum.jsonrpc.DebugTracingService._
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ledger.StxLedger
 import com.chipprbots.ethereum.ledger.TxResult
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.vm.ExecutionTracer
+import com.chipprbots.ethereum.jsonrpc.EthInfoService.CallTx
 
 /** Unit tests for DebugTracingService.
   *
@@ -53,7 +54,7 @@ class DebugTracingServiceSpec
       val unknownHash: ByteString = ByteString(Array.fill(32)(0xff.toByte))
       txMappingStorage.get.expects(unknownHash).returning(None)
 
-      val result = service
+      val result: Either[JsonRpcError, TraceTransactionResponse] = service
         .traceTransaction(TraceTransactionRequest(unknownHash))
         .unsafeRunSync()
 
@@ -63,10 +64,10 @@ class DebugTracingServiceSpec
   it should "return InvalidParams when block hash is not in storage" taggedAs (UnitTest, RPCTest) in
     new TestSetup {
       val txHash: ByteString = block.body.transactionList.head.hash
-      val missingBlockHash = ByteString(Array.fill(32)(0xee.toByte))
+      val missingBlockHash: ByteString = ByteString(Array.fill(32)(0xee.toByte))
       txMappingStorage.get.expects(txHash).returning(Some(TransactionLocation(missingBlockHash, 0)))
 
-      val result = service
+      val result: Either[JsonRpcError, TraceTransactionResponse] = service
         .traceTransaction(TraceTransactionRequest(txHash))
         .unsafeRunSync()
 
@@ -96,7 +97,7 @@ class DebugTracingServiceSpec
         .expects(*, *, *, *)
         .returning(null.asInstanceOf[TxResult])
 
-      val result = service
+      val result: Either[JsonRpcError, TraceTransactionResponse] = service
         .traceTransaction(TraceTransactionRequest(txHash))
         .unsafeRunSync()
 
@@ -109,7 +110,7 @@ class DebugTracingServiceSpec
     "return InvalidParams when block is not found" taggedAs (UnitTest, RPCTest) in new TestSetup {
       val unknownHash: ByteString = ByteString(Array.fill(32)(0xdd.toByte))
 
-      val result = service
+      val result: Either[JsonRpcError, TraceBlockByHashResponse] = service
         .traceBlockByHash(TraceBlockByHashRequest(unknownHash))
         .unsafeRunSync()
 
@@ -118,13 +119,13 @@ class DebugTracingServiceSpec
 
   it should "return an empty trace list for a block with no transactions" taggedAs (UnitTest, RPCTest) in
     new TestSetup {
-      val emptyBlock = block.copy(body = block.body.copy(transactionList = Seq.empty))
+      val emptyBlock: Block = block.copy(body = block.body.copy(transactionList = Seq.empty))
       blockchainWriter.storeBlock(emptyBlock).commit()
       storagesInstance.storages.blockHeadersStorage
         .put(emptyBlock.header.parentHash, emptyBlock.header.copy(number = emptyBlock.header.number - 1))
         .commit()
 
-      val result = service
+      val result: Either[JsonRpcError, TraceBlockByHashResponse] = service
         .traceBlockByHash(TraceBlockByHashRequest(emptyBlock.header.hash))
         .unsafeRunSync()
 
@@ -136,7 +137,7 @@ class DebugTracingServiceSpec
   "DebugTracingService.traceBlockByNumber" should
     "return an empty trace list for a block with no transactions" taggedAs (UnitTest, RPCTest) in
     new TestSetup {
-      val emptyBlock = block.copy(body = block.body.copy(transactionList = Seq.empty))
+      val emptyBlock: Block = block.copy(body = block.body.copy(transactionList = Seq.empty))
       blockchainWriter.save(
         emptyBlock,
         Nil,
@@ -147,7 +148,7 @@ class DebugTracingServiceSpec
         .put(emptyBlock.header.parentHash, emptyBlock.header.copy(number = emptyBlock.header.number - 1))
         .commit()
 
-      val result = service
+      val result: Either[JsonRpcError, TraceBlockByNumberResponse] = service
         .traceBlockByNumber(TraceBlockByNumberRequest(BlockParam.WithNumber(emptyBlock.header.number)))
         .unsafeRunSync()
 
@@ -175,7 +176,7 @@ class DebugTracingServiceSpec
         .expects(*, *, *, *)
         .returning(null.asInstanceOf[TxResult])
 
-      val callTx = EthInfoService.CallTx(
+      val callTx: CallTx = EthInfoService.CallTx(
         from = None,
         to = None,
         gas = None,
@@ -183,7 +184,7 @@ class DebugTracingServiceSpec
         value = 0,
         data = ByteString.empty
       )
-      val result = service
+      val result: Either[JsonRpcError, TraceCallResponse] = service
         .traceCall(TraceCallRequest(callTx, BlockParam.Latest))
         .unsafeRunSync()
 
@@ -195,7 +196,7 @@ class DebugTracingServiceSpec
   "DebugTracingService.intermediateRoots" should
     "return InvalidParams when block is not found" taggedAs (UnitTest, RPCTest) in new TestSetup {
       import com.chipprbots.ethereum.jsonrpc.DebugTracingService.IntermediateRootsRequest
-      val result = service
+      val result: Either[JsonRpcError, IntermediateRootsResponse] = service
         .intermediateRoots(IntermediateRootsRequest(block.header.hash))
         .unsafeRunSync()
       result.isLeft shouldBe true
@@ -204,13 +205,13 @@ class DebugTracingServiceSpec
 
   it should "return empty list for a block with no transactions" taggedAs (UnitTest, RPCTest) in new TestSetup {
     import com.chipprbots.ethereum.jsonrpc.DebugTracingService.{IntermediateRootsRequest, IntermediateRootsResponse}
-    val emptyBlock = block.copy(body = block.body.copy(transactionList = Seq.empty))
+    val emptyBlock: Block = block.copy(body = block.body.copy(transactionList = Seq.empty))
     blockchainWriter.storeBlock(emptyBlock).commit()
     storagesInstance.storages.blockHeadersStorage
       .put(emptyBlock.header.parentHash, emptyBlock.header.copy(number = emptyBlock.header.number - 1))
       .commit()
 
-    val result = service
+    val result: Either[JsonRpcError, IntermediateRootsResponse] = service
       .intermediateRoots(IntermediateRootsRequest(emptyBlock.header.hash))
       .unsafeRunSync()
 
@@ -225,7 +226,7 @@ class DebugTracingServiceSpec
 
     val mockLedger: StxLedger = mock[StxLedger]
     val txMappingStorage: TransactionMappingStorage = mock[TransactionMappingStorage]
-    val mockWorld = null.asInstanceOf[com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy]
+    val mockWorld: InMemoryWorldStateProxy = null.asInstanceOf[com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy]
 
     lazy val service: DebugTracingService = new DebugTracingService(
       blockchain,

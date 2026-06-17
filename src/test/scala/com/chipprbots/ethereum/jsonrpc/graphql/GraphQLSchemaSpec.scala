@@ -2,7 +2,6 @@ package com.chipprbots.ethereum.jsonrpc.graphql
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-
 import sangria.renderer.SchemaRenderer
 
 class GraphQLSchemaSpec extends AnyFlatSpec with Matchers {

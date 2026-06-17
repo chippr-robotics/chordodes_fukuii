@@ -1,5 +1,7 @@
 package com.chipprbots.ethereum.consensus.engine
 
+import org.apache.pekko.util.ByteString
+
 import cats.effect.IO
 
 import org.json4s.JArray
@@ -7,9 +9,8 @@ import org.json4s.JNull
 import org.json4s.JObject
 import org.json4s.JString
 import org.json4s.JValue
-import org.json4s.JsonAST.{JBool, JInt}
-
-import org.apache.pekko.util.ByteString
+import org.json4s.JsonAST.JBool
+import org.json4s.JsonAST.JInt
 
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.Block

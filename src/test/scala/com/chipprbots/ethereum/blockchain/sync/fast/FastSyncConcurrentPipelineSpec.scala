@@ -2,11 +2,11 @@ package com.chipprbots.ethereum.blockchain.sync.fast
 
 import java.net.InetSocketAddress
 
-import scala.io.Source
-
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
+
+import scala.io.Source
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -26,8 +26,7 @@ import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockBodies
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 /** Queue-level regression and isolation tests for FastSync's three concurrent fetch pipelines (ARCH-002 / [11b]).
   *
@@ -145,9 +144,9 @@ class FastSyncConcurrentPipelineSpec extends AnyFlatSpec with Matchers {
     val peer2: PeerWithInfo = mkPeer("peer-2")
 
     val hash32: ByteString = ByteString(Array.fill(32)(0.toByte))
-    private val bloom256 = ByteString(Array.fill(256)(0.toByte))
-    private val beneficiary = ByteString(Array.fill(20)(0.toByte))
-    private val nonce8 = ByteString(Array.fill(8)(0.toByte))
+    ByteString(Array.fill(256)(0.toByte))
+    ByteString(Array.fill(20)(0.toByte))
+    ByteString(Array.fill(8)(0.toByte))
 
     private val remoteStatus = RemoteStatus(
       capability = Capability.ETH69,

@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum
 
-import com.typesafe.config.Config as TypesafeConfig
+import com.typesafe.config.{Config => TypesafeConfig}
 
 import com.chipprbots.ethereum.utils.Logger
 

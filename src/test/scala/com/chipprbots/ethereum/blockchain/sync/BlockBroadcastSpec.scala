@@ -11,7 +11,6 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.WithActorSystemShutDown
-import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockBroadcast
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockBroadcast.BlockToBroadcast
@@ -25,10 +24,19 @@ import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.Capability
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.BlockHash
 import com.chipprbots.ethereum.network.p2p.messages.ETH69
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.BlockHash
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes
+import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
+import com.chipprbots.ethereum.network.p2p.messages.ETH69.BlockRangeUpdate
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
+import com.chipprbots.ethereum.network.p2p.messages.ETH69.BlockRangeUpdate
 
 class BlockBroadcastSpec
     extends TestKit(ActorSystem("BlockBroadcastSpec_System"))
@@ -44,9 +52,9 @@ class BlockBroadcastSpec
     // Block that should be sent as it's total difficulty is higher than known by peer
     val blockHeader: BlockHeader = baseBlockHeader.copy(number = initialPeerInfo.maxBlockNumber - 3)
     val newBlockNewHashes: NewBlockHashes = NewBlockHashes(Seq(BlockHash(blockHeader.hash, blockHeader.number)))
-    val chainWeight = initialPeerInfo.chainWeight.increaseTotalDifficulty(2)
-    val block = Block(blockHeader, BlockBody(Nil, Nil))
-    val newBlockMsg = ETHPackets.NewBlock(block, chainWeight.totalDifficulty)
+    val chainWeight: ChainWeight = initialPeerInfo.chainWeight.increaseTotalDifficulty(2)
+    val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
+    val newBlockMsg: NewBlock = ETHPackets.NewBlock(block, chainWeight.totalDifficulty)
 
     // when
     blockBroadcast.broadcastBlock(
@@ -71,8 +79,8 @@ class BlockBroadcastSpec
     val peerInfo: PeerInfo = initialPeerInfo
       .copy(remoteStatus = peerStatus.copy(capability = Capability.ETH63))
       .withChainWeight(ChainWeight.totalDifficultyOnly(initialPeerInfo.chainWeight.totalDifficulty))
-    val block = Block(blockHeader, BlockBody(Nil, Nil))
-    val newBlockMsg = ETHPackets.NewBlock(block, peerInfo.chainWeight.totalDifficulty + 2)
+    val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
+    val newBlockMsg: NewBlock = ETHPackets.NewBlock(block, peerInfo.chainWeight.totalDifficulty + 2)
 
     // when
     blockBroadcast.broadcastBlock(
@@ -93,8 +101,8 @@ class BlockBroadcastSpec
     // given
     // Block that shouldn't be sent as it's number and total difficulty is lower than known by peer
     val blockHeader: BlockHeader = baseBlockHeader.copy(number = initialPeerInfo.maxBlockNumber - 2)
-    val chainWeight = initialPeerInfo.chainWeight.increaseTotalDifficulty(-2)
-    val block = Block(blockHeader, BlockBody(Nil, Nil))
+    val chainWeight: ChainWeight = initialPeerInfo.chainWeight.increaseTotalDifficulty(-2)
+    val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
 
     // when
     blockBroadcast.broadcastBlock(
@@ -113,9 +121,9 @@ class BlockBroadcastSpec
     // given
     val blockHeader: BlockHeader = baseBlockHeader.copy(number = initialPeerInfo.maxBlockNumber + 4)
     val newBlockNewHashes: NewBlockHashes = NewBlockHashes(Seq(BlockHash(blockHeader.hash, blockHeader.number)))
-    val chainWeight = initialPeerInfo.chainWeight.increaseTotalDifficulty(-2)
-    val block = Block(blockHeader, BlockBody(Nil, Nil))
-    val newBlockMsg = ETHPackets.NewBlock(block, chainWeight.totalDifficulty)
+    val chainWeight: ChainWeight = initialPeerInfo.chainWeight.increaseTotalDifficulty(-2)
+    val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
+    val newBlockMsg: NewBlock = ETHPackets.NewBlock(block, chainWeight.totalDifficulty)
 
     // when
     blockBroadcast.broadcastBlock(
@@ -136,8 +144,8 @@ class BlockBroadcastSpec
     // given
     // Block should already be known by the peer due to max block known
     val blockHeader: BlockHeader = baseBlockHeader.copy(number = initialPeerInfo.maxBlockNumber - 2)
-    val chainWeight = initialPeerInfo.chainWeight.increaseTotalDifficulty(-2)
-    val block = Block(blockHeader, BlockBody(Nil, Nil))
+    val chainWeight: ChainWeight = initialPeerInfo.chainWeight.increaseTotalDifficulty(-2)
+    val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
 
     // when
     blockBroadcast.broadcastBlock(
@@ -156,9 +164,9 @@ class BlockBroadcastSpec
     // given
     val firstHeader: BlockHeader = baseBlockHeader.copy(number = initialPeerInfo.maxBlockNumber + 4)
     val firstBlockNewHashes: NewBlockHashes = NewBlockHashes(Seq(BlockHash(firstHeader.hash, firstHeader.number)))
-    val firstChainWeight = initialPeerInfo.chainWeight.increaseTotalDifficulty(-2)
-    val firstBlock = Block(firstHeader, BlockBody(Nil, Nil))
-    val firstBlockMsg = ETHPackets.NewBlock(firstBlock, firstChainWeight.totalDifficulty)
+    val firstChainWeight: ChainWeight = initialPeerInfo.chainWeight.increaseTotalDifficulty(-2)
+    val firstBlock: Block = Block(firstHeader, BlockBody(Nil, Nil))
+    val firstBlockMsg: NewBlock = ETHPackets.NewBlock(firstBlock, firstChainWeight.totalDifficulty)
 
     val peer2Probe: TestProbe = TestProbe()
     val peer2: Peer = Peer(PeerId("peer2"), new InetSocketAddress("127.0.0.1", 0), peer2Probe.ref, false)
@@ -200,9 +208,9 @@ class BlockBroadcastSpec
     // Demonstrates the pre-fix bug: ETH69 chainWeight was a block-number proxy (~20M).
     // Our new block's actual TD (~10^26) was always > the proxy, so every ETH69 peer
     // was spammed. After the fix, only block-number comparison is used for ETH69.
-    val peerLatestBlock = BigInt(20_000_000)
-    val actualTD = ChainWeight.totalDifficultyOnly(BigInt("100000000000000000000000000"))
-    val eth69Status = RemoteStatus(
+    val peerLatestBlock: BigInt = BigInt(20_000_000)
+    val actualTD: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt("100000000000000000000000000"))
+    val eth69Status: RemoteStatus = RemoteStatus(
       capability = Capability.ETH69,
       networkId = 1,
       chainWeight = actualTD,
@@ -210,7 +218,7 @@ class BlockBroadcastSpec
       genesisHash = Fixtures.Blocks.Genesis.header.hash,
       latestBlock = Some(peerLatestBlock)
     )
-    val eth69PeerInfo = PeerInfo(
+    val eth69PeerInfo: PeerInfo = PeerInfo(
       remoteStatus = eth69Status,
       chainWeight = actualTD,
       forkAccepted = true,
@@ -218,9 +226,9 @@ class BlockBroadcastSpec
       bestBlockHash = eth69Status.bestHash
     )
     // Our block is behind the peer — should NOT be sent
-    val blockHeader = baseBlockHeader.copy(number = peerLatestBlock - 100)
-    val ourChainWeight = ChainWeight.totalDifficultyOnly(BigInt("99000000000000000000000000"))
-    val block = Block(blockHeader, BlockBody(Nil, Nil))
+    val blockHeader: BlockHeader = baseBlockHeader.copy(number = peerLatestBlock - 100)
+    val ourChainWeight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt("99000000000000000000000000"))
+    val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
 
     blockBroadcast.broadcastBlock(
       BlockToBroadcast(block, ourChainWeight),
@@ -234,9 +242,9 @@ class BlockBroadcastSpec
     UnitTest,
     SyncTest
   ) in new TestSetup {
-    val peerLatestBlock = BigInt(20_000_000)
-    val actualTD = ChainWeight.totalDifficultyOnly(BigInt("100000000000000000000000000"))
-    val eth69Status = RemoteStatus(
+    val peerLatestBlock: BigInt = BigInt(20_000_000)
+    val actualTD: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt("100000000000000000000000000"))
+    val eth69Status: RemoteStatus = RemoteStatus(
       capability = Capability.ETH69,
       networkId = 1,
       chainWeight = actualTD,
@@ -244,7 +252,7 @@ class BlockBroadcastSpec
       genesisHash = Fixtures.Blocks.Genesis.header.hash,
       latestBlock = Some(peerLatestBlock)
     )
-    val eth69PeerInfo = PeerInfo(
+    val eth69PeerInfo: PeerInfo = PeerInfo(
       remoteStatus = eth69Status,
       chainWeight = actualTD,
       forkAccepted = true,
@@ -252,18 +260,18 @@ class BlockBroadcastSpec
       bestBlockHash = eth69Status.bestHash
     )
     // Our block is ahead of the peer — should be sent
-    val blockHeader = baseBlockHeader.copy(number = peerLatestBlock + 1)
-    val newBlockHashes = NewBlockHashes(Seq(BlockHash(blockHeader.hash, blockHeader.number)))
-    val ourChainWeight = ChainWeight.totalDifficultyOnly(BigInt("101000000000000000000000000"))
-    val block = Block(blockHeader, BlockBody(Nil, Nil))
-    val newBlockMsg = ETHPackets.NewBlock(block, ourChainWeight.totalDifficulty)
+    val blockHeader: BlockHeader = baseBlockHeader.copy(number = peerLatestBlock + 1)
+    val newBlockHashes: NewBlockHashes = NewBlockHashes(Seq(BlockHash(blockHeader.hash, blockHeader.number)))
+    val ourChainWeight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt("101000000000000000000000000"))
+    val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
+    val newBlockMsg: NewBlock = ETHPackets.NewBlock(block, ourChainWeight.totalDifficulty)
 
     blockBroadcast.broadcastBlock(
       BlockToBroadcast(block, ourChainWeight),
       Map(peer.id -> PeerWithInfo(peer, eth69PeerInfo))
     )
 
-    val expectedBru = ETH69.BlockRangeUpdate(BigInt(0), blockHeader.number, blockHeader.hash)
+    val expectedBru: BlockRangeUpdate = ETH69.BlockRangeUpdate(BigInt(0), blockHeader.number, blockHeader.hash)
     networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessage(newBlockMsg, peer.id))
     networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessage(newBlockHashes, peer.id))
     networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessage(expectedBru, peer.id))
@@ -274,10 +282,10 @@ class BlockBroadcastSpec
     UnitTest,
     SyncTest
   ) in new TestSetup {
-    val peerLatestBlock = BigInt(20_000_000)
+    val peerLatestBlock: BigInt = BigInt(20_000_000)
     // Peer has actual TD stored (local lookup succeeded); our new block is at the same number
-    val peerActualTD = ChainWeight.totalDifficultyOnly(BigInt("100000000000000000000000000"))
-    val eth69Status = RemoteStatus(
+    val peerActualTD: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt("100000000000000000000000000"))
+    val eth69Status: RemoteStatus = RemoteStatus(
       capability = Capability.ETH69,
       networkId = 1,
       chainWeight = peerActualTD,
@@ -285,16 +293,16 @@ class BlockBroadcastSpec
       genesisHash = Fixtures.Blocks.Genesis.header.hash,
       latestBlock = Some(peerLatestBlock)
     )
-    val eth69PeerInfo = PeerInfo(
+    val eth69PeerInfo: PeerInfo = PeerInfo(
       remoteStatus = eth69Status,
       chainWeight = peerActualTD,
       forkAccepted = true,
       maxBlockNumber = peerLatestBlock,
       bestBlockHash = eth69Status.bestHash
     )
-    val blockHeader = baseBlockHeader.copy(number = peerLatestBlock) // same block number
-    val ourChainWeight = ChainWeight.totalDifficultyOnly(BigInt("100000000000000000000000001"))
-    val block = Block(blockHeader, BlockBody(Nil, Nil))
+    val blockHeader: BlockHeader = baseBlockHeader.copy(number = peerLatestBlock) // same block number
+    val ourChainWeight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt("100000000000000000000000001"))
+    val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
 
     blockBroadcast.broadcastBlock(
       BlockToBroadcast(block, ourChainWeight),
@@ -313,17 +321,17 @@ class BlockBroadcastSpec
     // Short-fork scenario: we are one block behind on a heavier chain.
     // ETH68 peer can see we have a heavier chain (TD comparison). ETH69 peer cannot
     // because TD comparison is disabled for ETH69 — only block number matters.
-    val sharedBlockNr = BigInt(1000)
-    val peerTD = ChainWeight.totalDifficultyOnly(BigInt(9999))
+    val sharedBlockNr: BigInt = BigInt(1000)
+    val peerTD: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt(9999))
 
-    val eth68Status = RemoteStatus(
+    val eth68Status: RemoteStatus = RemoteStatus(
       capability = Capability.ETH68,
       networkId = 1,
       chainWeight = peerTD,
       bestHash = Fixtures.Blocks.Block3125369.header.hash,
       genesisHash = Fixtures.Blocks.Genesis.header.hash
     )
-    val eth68PeerInfo = PeerInfo(
+    val eth68PeerInfo: PeerInfo = PeerInfo(
       remoteStatus = eth68Status,
       chainWeight = peerTD,
       forkAccepted = true,
@@ -331,7 +339,7 @@ class BlockBroadcastSpec
       bestBlockHash = eth68Status.bestHash
     )
 
-    val eth69Status = RemoteStatus(
+    val eth69Status: RemoteStatus = RemoteStatus(
       capability = Capability.ETH69,
       networkId = 1,
       chainWeight = peerTD,
@@ -339,7 +347,7 @@ class BlockBroadcastSpec
       genesisHash = Fixtures.Blocks.Genesis.header.hash,
       latestBlock = Some(sharedBlockNr + 1) // same position as ETH68 peer
     )
-    val eth69PeerInfo = PeerInfo(
+    val eth69PeerInfo: PeerInfo = PeerInfo(
       remoteStatus = eth69Status,
       chainWeight = peerTD,
       forkAccepted = true,
@@ -347,15 +355,15 @@ class BlockBroadcastSpec
       bestBlockHash = eth69Status.bestHash
     )
 
-    val peer2Probe = TestProbe()
-    val peer2 = Peer(PeerId("peer2"), new java.net.InetSocketAddress("127.0.0.1", 0), peer2Probe.ref, false)
+    val peer2Probe: TestProbe = TestProbe()
+    val peer2: Peer = Peer(PeerId("peer2"), new java.net.InetSocketAddress("127.0.0.1", 0), peer2Probe.ref, false)
 
     // Our block is at sharedBlockNr (behind both peers by 1) but with heavier TD
-    val ourBlockHdr = baseBlockHeader.copy(number = sharedBlockNr)
-    val ourChainWeight = ChainWeight.totalDifficultyOnly(BigInt(10001)) // heavier than peerTD
-    val ourBlock = Block(ourBlockHdr, BlockBody(Nil, Nil))
-    val newBlockMsg = ETHPackets.NewBlock(ourBlock, ourChainWeight.totalDifficulty)
-    val newBlockHashes = NewBlockHashes(Seq(BlockHash(ourBlockHdr.hash, ourBlockHdr.number)))
+    val ourBlockHdr: BlockHeader = baseBlockHeader.copy(number = sharedBlockNr)
+    val ourChainWeight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt(10001)) // heavier than peerTD
+    val ourBlock: Block = Block(ourBlockHdr, BlockBody(Nil, Nil))
+    val newBlockMsg: NewBlock = ETHPackets.NewBlock(ourBlock, ourChainWeight.totalDifficulty)
+    val newBlockHashes: NewBlockHashes = NewBlockHashes(Seq(BlockHash(ourBlockHdr.hash, ourBlockHdr.number)))
 
     blockBroadcast.broadcastBlock(
       BlockToBroadcast(ourBlock, ourChainWeight),
@@ -377,17 +385,17 @@ class BlockBroadcastSpec
     UnitTest,
     SyncTest
   ) in new TestSetup {
-    val peerBlockNr = BigInt(999)
-    val peerTD = ChainWeight.totalDifficultyOnly(BigInt(9000))
+    val peerBlockNr: BigInt = BigInt(999)
+    val peerTD: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt(9000))
 
-    val eth68Status = RemoteStatus(
+    val eth68Status: RemoteStatus = RemoteStatus(
       capability = Capability.ETH68,
       networkId = 1,
       chainWeight = peerTD,
       bestHash = Fixtures.Blocks.Block3125369.header.hash,
       genesisHash = Fixtures.Blocks.Genesis.header.hash
     )
-    val eth68PeerInfo = PeerInfo(
+    val eth68PeerInfo: PeerInfo = PeerInfo(
       remoteStatus = eth68Status,
       chainWeight = peerTD,
       forkAccepted = true,
@@ -395,7 +403,7 @@ class BlockBroadcastSpec
       bestBlockHash = eth68Status.bestHash
     )
 
-    val eth69Status = RemoteStatus(
+    val eth69Status: RemoteStatus = RemoteStatus(
       capability = Capability.ETH69,
       networkId = 1,
       chainWeight = peerTD,
@@ -403,7 +411,7 @@ class BlockBroadcastSpec
       genesisHash = Fixtures.Blocks.Genesis.header.hash,
       latestBlock = Some(peerBlockNr)
     )
-    val eth69PeerInfo = PeerInfo(
+    val eth69PeerInfo: PeerInfo = PeerInfo(
       remoteStatus = eth69Status,
       chainWeight = peerTD,
       forkAccepted = true,
@@ -411,14 +419,14 @@ class BlockBroadcastSpec
       bestBlockHash = eth69Status.bestHash
     )
 
-    val peer2Probe = TestProbe()
-    val peer2 = Peer(PeerId("peer2"), new java.net.InetSocketAddress("127.0.0.1", 0), peer2Probe.ref, false)
+    val peer2Probe: TestProbe = TestProbe()
+    val peer2: Peer = Peer(PeerId("peer2"), new java.net.InetSocketAddress("127.0.0.1", 0), peer2Probe.ref, false)
 
     // Our block is ahead of both peers
-    val ourBlockHdr = baseBlockHeader.copy(number = peerBlockNr + 1)
-    val ourChainWeight = ChainWeight.totalDifficultyOnly(BigInt(9001))
-    val ourBlock = Block(ourBlockHdr, BlockBody(Nil, Nil))
-    val newBlockHashes = NewBlockHashes(Seq(BlockHash(ourBlockHdr.hash, ourBlockHdr.number)))
+    val ourBlockHdr: BlockHeader = baseBlockHeader.copy(number = peerBlockNr + 1)
+    val ourChainWeight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt(9001))
+    val ourBlock: Block = Block(ourBlockHdr, BlockBody(Nil, Nil))
+    val newBlockHashes: NewBlockHashes = NewBlockHashes(Seq(BlockHash(ourBlockHdr.hash, ourBlockHdr.number)))
 
     blockBroadcast.broadcastBlock(
       BlockToBroadcast(ourBlock, ourChainWeight),
@@ -432,7 +440,7 @@ class BlockBroadcastSpec
     // and the ETH69 peer gets a BlockRangeUpdate — 4 messages total.
     // Collect all 4 messages (order non-deterministic).
     import scala.concurrent.duration.*
-    val messages = (1 to 4).map(_ => networkPeerManagerProbe.receiveOne(3.seconds)).toSet
+    val messages: Set[Object] = (1 to 4).map(_ => networkPeerManagerProbe.receiveOne(3.seconds)).toSet
 
     // One NewBlock to either peer
     messages.count {
@@ -443,15 +451,15 @@ class BlockBroadcastSpec
     } shouldBe 1
 
     // NewBlockHashes to both peers
-    val hashRecipients = messages.collect {
+    val hashRecipients: Set[PeerId] = messages.collect {
       case NetworkPeerManagerActor.SendMessage(msg, id) if msg.underlyingMsg == newBlockHashes => id
     }
     hashRecipients should contain(peer.id)
     hashRecipients should contain(peer2.id)
 
     // BlockRangeUpdate to the ETH69 peer only
-    val expectedBru = ETH69.BlockRangeUpdate(BigInt(0), ourBlockHdr.number, ourBlockHdr.hash)
-    val bruRecipients = messages.collect {
+    val expectedBru: BlockRangeUpdate = ETH69.BlockRangeUpdate(BigInt(0), ourBlockHdr.number, ourBlockHdr.hash)
+    val bruRecipients: Set[PeerId] = messages.collect {
       case NetworkPeerManagerActor.SendMessage(msg, id) if msg.underlyingMsg == expectedBru => id
     }
     bruRecipients should contain(peer2.id)
@@ -466,11 +474,11 @@ class BlockBroadcastSpec
     UnitTest,
     SyncTest
   ) in new TestSetup {
-    val peerLatestBlock = BigInt(1000)
-    val eth69PeerInfo = eth69PeerInfoAt(peerLatestBlock)
-    val blockHeader = baseBlockHeader.copy(number = peerLatestBlock + 1)
-    val ourWeight = ChainWeight.totalDifficultyOnly(BigInt(99999))
-    val block = Block(blockHeader, BlockBody(Nil, Nil))
+    val peerLatestBlock: BigInt = BigInt(1000)
+    val eth69PeerInfo: PeerInfo = eth69PeerInfoAt(peerLatestBlock)
+    val blockHeader: BlockHeader = baseBlockHeader.copy(number = peerLatestBlock + 1)
+    val ourWeight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt(99999))
+    val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
 
     // isPoWChain=true is set on the default TestSetup blockBroadcast
     blockBroadcast.broadcastBlock(
@@ -479,8 +487,8 @@ class BlockBroadcastSpec
     )
 
     import scala.concurrent.duration.*
-    val messages = networkPeerManagerProbe.receiveN(3, 3.seconds)
-    val newBlocks = messages.collect {
+    val messages: Seq[AnyRef] = networkPeerManagerProbe.receiveN(3, 3.seconds)
+    val newBlocks: Seq[PeerId] = messages.collect {
       case NetworkPeerManagerActor.SendMessage(msg, id) if msg.underlyingMsg.isInstanceOf[ETHPackets.NewBlock] => id
     }
     newBlocks should contain(peer.id) // ETH69 peer gets NewBlock on PoW chain
@@ -490,11 +498,11 @@ class BlockBroadcastSpec
     UnitTest,
     SyncTest
   ) in new PoSTestSetup {
-    val peerLatestBlock = BigInt(1000)
-    val eth69PeerInfo = eth69PeerInfoAt(peerLatestBlock)
-    val blockHeader = baseBlockHeader.copy(number = peerLatestBlock + 1)
-    val ourWeight = ChainWeight.totalDifficultyOnly(BigInt(99999))
-    val block = Block(blockHeader, BlockBody(Nil, Nil))
+    val peerLatestBlock: BigInt = BigInt(1000)
+    val eth69PeerInfo: PeerInfo = eth69PeerInfoAt(peerLatestBlock)
+    val blockHeader: BlockHeader = baseBlockHeader.copy(number = peerLatestBlock + 1)
+    val ourWeight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt(99999))
+    val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
 
     // isPoWChain=false → no NewBlock to ETH69 peers
     blockBroadcast.broadcastBlock(
@@ -504,7 +512,7 @@ class BlockBroadcastSpec
 
     import scala.concurrent.duration.*
     // Only NewBlockHashes + BRU should arrive (no NewBlock)
-    val messages = (1 to 2).map(_ => networkPeerManagerProbe.receiveOne(2.seconds))
+    val messages: IndexedSeq[Object] = (1 to 2).map(_ => networkPeerManagerProbe.receiveOne(2.seconds))
     messages.foreach {
       case NetworkPeerManagerActor.SendMessage(msg, _) =>
         msg.underlyingMsg should not be an[ETHPackets.NewBlock]
@@ -519,12 +527,12 @@ class BlockBroadcastSpec
     UnitTest,
     SyncTest
   ) in new TestSetup {
-    val peerLatestBlock = BigInt(999)
-    val eth69PeerInfo = eth69PeerInfoAt(peerLatestBlock)
-    val ourWeight = ChainWeight.totalDifficultyOnly(BigInt(9999))
+    val peerLatestBlock: BigInt = BigInt(999)
+    val eth69PeerInfo: PeerInfo = eth69PeerInfoAt(peerLatestBlock)
+    val ourWeight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt(9999))
 
     // Broadcast 3 consecutive blocks
-    val blocks = (1 to 3).map { i =>
+    val blocks: IndexedSeq[Block] = (1 to 3).map { i =>
       val hdr = baseBlockHeader.copy(number = peerLatestBlock + i)
       Block(hdr, BlockBody(Nil, Nil))
     }
@@ -536,8 +544,8 @@ class BlockBroadcastSpec
     }
 
     import scala.concurrent.duration.*
-    val allMessages = networkPeerManagerProbe.receiveN(9, 5.seconds) // 3 × (NewBlock + Hashes + BRU)
-    val bruCount = allMessages.count {
+    val allMessages: Seq[AnyRef] = networkPeerManagerProbe.receiveN(9, 5.seconds) // 3 × (NewBlock + Hashes + BRU)
+    val bruCount: Int = allMessages.count {
       case NetworkPeerManagerActor.SendMessage(msg, _) =>
         msg.underlyingMsg.isInstanceOf[ETH69.BlockRangeUpdate]
       case _ => false
@@ -551,9 +559,9 @@ class BlockBroadcastSpec
     SyncTest
   ) in new PoSTestSetup {
     // Start from block 1 so the peer is behind on all 33 blocks
-    val startBlock = BigInt(0)
-    val eth69PeerInfo = eth69PeerInfoAt(startBlock)
-    val ourWeight = ChainWeight.totalDifficultyOnly(BigInt(9999))
+    val startBlock: BigInt = BigInt(0)
+    val eth69PeerInfo: PeerInfo = eth69PeerInfoAt(startBlock)
+    val ourWeight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt(9999))
 
     def broadcastAt(n: Int): Unit = {
       val hdr = baseBlockHeader.copy(number = BigInt(n))
@@ -569,8 +577,8 @@ class BlockBroadcastSpec
     // Blocks 1–31: no BRU (not at epoch boundary)
     (1 to 31).foreach(broadcastAt)
     // Each block → NewBlockHashes only (PoS: no NewBlock, no BRU until block 32)
-    val pre32Messages = (1 to 31).map(_ => networkPeerManagerProbe.receiveN(1, 2.seconds)).flatten
-    val pre32Brus = pre32Messages.count {
+    val pre32Messages: IndexedSeq[Object] = (1 to 31).map(_ => networkPeerManagerProbe.receiveN(1, 2.seconds)).flatten
+    val pre32Brus: Int = pre32Messages.count {
       case NetworkPeerManagerActor.SendMessage(msg, _) => msg.underlyingMsg.isInstanceOf[ETH69.BlockRangeUpdate]
       case _                                           => false
     }
@@ -578,8 +586,8 @@ class BlockBroadcastSpec
 
     // Block 32: BRU fires
     broadcastAt(32)
-    val block32Messages = networkPeerManagerProbe.receiveN(2, 2.seconds) // Hashes + BRU
-    val block32Brus = block32Messages.count {
+    val block32Messages: Seq[AnyRef] = networkPeerManagerProbe.receiveN(2, 2.seconds) // Hashes + BRU
+    val block32Brus: Int = block32Messages.count {
       case NetworkPeerManagerActor.SendMessage(msg, _) => msg.underlyingMsg.isInstanceOf[ETH69.BlockRangeUpdate]
       case _                                           => false
     }
@@ -594,35 +602,35 @@ class BlockBroadcastSpec
     // Both PoW and PoS configurations must send NewBlock to ETH68 peers
     for (isPoW <- Seq(true, false))
       new TestKit(ActorSystem(s"BlockBroadcastSpec_eth68_$isPoW")) {
-        val pm = TestProbe()
+        val pm: TestProbe = TestProbe()
         val bb = new BlockBroadcast(pm.ref, isPoWChain = isPoW)
 
-        val blockHeader = Fixtures.Blocks.Block3125369.header.copy(number = BigInt(1001))
-        val ourWeight = ChainWeight.totalDifficultyOnly(BigInt(99999))
-        val block = Block(blockHeader, BlockBody(Nil, Nil))
+        val blockHeader: BlockHeader = Fixtures.Blocks.Block3125369.header.copy(number = BigInt(1001))
+        val ourWeight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt(99999))
+        val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
 
-        val eth68Status = RemoteStatus(
+        val eth68Status: RemoteStatus = RemoteStatus(
           capability = Capability.ETH68,
           networkId = 1,
           chainWeight = ChainWeight.totalDifficultyOnly(BigInt(1000)),
           bestHash = Fixtures.Blocks.Block3125369.header.hash,
           genesisHash = Fixtures.Blocks.Genesis.header.hash
         )
-        val eth68PeerInfo = PeerInfo(
+        val eth68PeerInfo: PeerInfo = PeerInfo(
           remoteStatus = eth68Status,
           chainWeight = eth68Status.chainWeight,
           forkAccepted = true,
           maxBlockNumber = BigInt(1000),
           bestBlockHash = eth68Status.bestHash
         )
-        val p =
+        val p: Peer =
           Peer(PeerId(s"eth68peer-$isPoW"), new java.net.InetSocketAddress("127.0.0.1", 0), TestProbe().ref, false)
 
         bb.broadcastBlock(BlockToBroadcast(block, ourWeight), Map(p.id -> PeerWithInfo(p, eth68PeerInfo)))
 
         import scala.concurrent.duration.*
-        val messages = pm.receiveN(2, 3.seconds)
-        val hasNewBlock = messages.exists {
+        val messages: Seq[AnyRef] = pm.receiveN(2, 3.seconds)
+        val hasNewBlock: Boolean = messages.exists {
           case NetworkPeerManagerActor.SendMessage(msg, _) => msg.underlyingMsg.isInstanceOf[ETHPackets.NewBlock]
           case _                                           => false
         }
@@ -637,9 +645,9 @@ class BlockBroadcastSpec
     SyncTest
   ) in new TestSetup {
     // ETH68 peer — should get NewBlock + NewBlockHashes, but NO BlockRangeUpdate
-    val blockHeader = baseBlockHeader.copy(number = initialPeerInfo.maxBlockNumber + 1)
-    val ourWeight = ChainWeight.totalDifficultyOnly(initialPeerInfo.chainWeight.totalDifficulty + 1)
-    val block = Block(blockHeader, BlockBody(Nil, Nil))
+    val blockHeader: BlockHeader = baseBlockHeader.copy(number = initialPeerInfo.maxBlockNumber + 1)
+    val ourWeight: ChainWeight = ChainWeight.totalDifficultyOnly(initialPeerInfo.chainWeight.totalDifficulty + 1)
+    val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
 
     blockBroadcast.broadcastBlock(
       BlockToBroadcast(block, ourWeight),
@@ -647,8 +655,8 @@ class BlockBroadcastSpec
     )
 
     import scala.concurrent.duration.*
-    val messages = networkPeerManagerProbe.receiveN(2, 3.seconds)
-    val hasBru = messages.exists {
+    val messages: Seq[AnyRef] = networkPeerManagerProbe.receiveN(2, 3.seconds)
+    val hasBru: Boolean = messages.exists {
       case NetworkPeerManagerActor.SendMessage(msg, _) => msg.underlyingMsg.isInstanceOf[ETH69.BlockRangeUpdate]
       case _                                           => false
     }

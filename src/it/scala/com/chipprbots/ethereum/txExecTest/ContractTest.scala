@@ -4,20 +4,19 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.dsl.ResultOfATypeInvocation
 import org.scalatest.matchers.should.Matchers
 
+import com.chipprbots.ethereum.domain.BlockchainStorages
 import com.chipprbots.ethereum.domain.Receipt
 import com.chipprbots.ethereum.ledger.BlockExecution
 import com.chipprbots.ethereum.ledger.BlockQueue
 import com.chipprbots.ethereum.ledger.BlockValidation
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.txExecTest.util.FixtureProvider
 import com.chipprbots.ethereum.utils.Config
-import com.chipprbots.ethereum.domain.BlockchainStorages
-
-import com.chipprbots.ethereum.testing.Tags.*
 
 class ContractTest extends AnyFlatSpec with Matchers {
   val blockchainConfig = Config.blockchains.blockchainConfig
   val syncConfig: Config.SyncConfig = Config.SyncConfig(Config.config)
-  val noErrors: ResultOfATypeInvocation[Right[_, Seq[Receipt]]] = a[Right[_, Seq[Receipt]]]
+  val noErrors: ResultOfATypeInvocation[Right[?, Seq[Receipt]]] = a[Right[?, Seq[Receipt]]]
 
   // IGNORED: Fixture data from original Mantis codebase has corrupted account codeHash values.
   // The purchaseContract fixture was created via DumpChainApp from a private Parity testnet,

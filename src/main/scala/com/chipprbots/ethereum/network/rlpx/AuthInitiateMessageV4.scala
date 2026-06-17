@@ -4,8 +4,8 @@ import org.apache.pekko.util.ByteString
 
 import org.bouncycastle.math.ec.ECPoint
 
-import com.chipprbots.ethereum.crypto.*
-import com.chipprbots.ethereum.rlp.*
+import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.rlp._
 
 object AuthInitiateMessageV4 extends AuthInitiateEcdsaCodec {
 

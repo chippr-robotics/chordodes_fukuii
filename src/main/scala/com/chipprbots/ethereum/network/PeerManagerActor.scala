@@ -5,17 +5,17 @@ import java.net.URI
 import java.util.Collections.newSetFromMap
 
 import org.apache.pekko.actor.SupervisorStrategy.Stop
-import org.apache.pekko.actor.*
+import org.apache.pekko.actor._
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
-import cats.syntax.parallel.*
+import cats.syntax.parallel._
 
 import scala.collection.mutable
-import scala.concurrent.duration.*
-import scala.jdk.CollectionConverters.*
+import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 
 import org.bouncycastle.util.encoders.Hex
 
@@ -24,12 +24,11 @@ import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistId
 import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.TaskActorOps
 import com.chipprbots.ethereum.network.PeerActor.PeerClosedConnection
 import com.chipprbots.ethereum.network.PeerActor.Status.Handshaked
-import com.chipprbots.ethereum.network.PeerEventBusActor.*
+import com.chipprbots.ethereum.network.PeerEventBusActor._
 import com.chipprbots.ethereum.network.PeerManagerActor.PeerConfiguration
 import com.chipprbots.ethereum.network.discovery.DiscoveryConfig
 import com.chipprbots.ethereum.network.discovery.Node
 import com.chipprbots.ethereum.network.discovery.PeerDiscoveryManager
-
 import com.chipprbots.ethereum.network.handshaker.Handshaker
 import com.chipprbots.ethereum.network.handshaker.Handshaker.HandshakeResult
 import com.chipprbots.ethereum.network.p2p.MessageSerializable

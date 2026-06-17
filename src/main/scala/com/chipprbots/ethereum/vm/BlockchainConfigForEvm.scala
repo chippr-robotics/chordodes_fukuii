@@ -8,8 +8,8 @@ import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EtcForks.BeforeAtlantis
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EtcForks.EtcFork
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EtcForks.Magneto
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EtcForks.Mystique
-import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EtcForks.Phoenix
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EtcForks.Olympia
+import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EtcForks.Phoenix
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EtcForks.Spiral
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EthForks.BeforeByzantium
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EthForks.Berlin

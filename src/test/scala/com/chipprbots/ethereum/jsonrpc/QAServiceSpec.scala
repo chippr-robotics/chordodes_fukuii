@@ -7,14 +7,14 @@ import cats.effect.IO
 
 import org.scalamock.scalatest.AsyncMockFactory
 
-import com.chipprbots.ethereum.*
+import com.chipprbots.ethereum._
 import com.chipprbots.ethereum.consensus.mining.Mining
 import com.chipprbots.ethereum.consensus.pow.EthashConfig
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MineBlocks
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerResponses.MiningOrdered
-import com.chipprbots.ethereum.jsonrpc.QAService.*
+import com.chipprbots.ethereum.jsonrpc.QAService._
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 class QAServiceSpec
     extends TestKit(ActorSystem("QAServiceSpec_ActorSystem"))

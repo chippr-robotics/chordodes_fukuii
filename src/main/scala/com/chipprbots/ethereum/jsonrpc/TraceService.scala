@@ -5,11 +5,12 @@ import org.apache.pekko.util.ByteString
 import cats.effect.IO
 
 import org.json4s.JValue
-import org.json4s.JsonAST.*
-import org.json4s.JsonDSL.*
+import org.json4s.JsonAST._
+import org.json4s.JsonDSL._
 import org.json4s.jvalue2monadic
 
 import com.chipprbots.ethereum.consensus.mining.Mining
+import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage.TransactionLocation
 import com.chipprbots.ethereum.domain.Address
@@ -18,7 +19,6 @@ import com.chipprbots.ethereum.domain.Blockchain
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.LegacyTransaction
 import com.chipprbots.ethereum.domain.SignedTransactionWithSender
-import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.ledger.StxLedger
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.utils.BlockchainConfig
@@ -441,7 +441,7 @@ class TraceService(
         allTraces = (fromNum to toNum).flatMap { blockNum =>
           if (blockNum == 0) Nil // skip genesis — no parent state
           else {
-            val branch = blockchainReader.getBestBranch()
+            val branch = blockchainReader.getBestBranch
             blockchainReader
               .getBlockByNumber(branch, blockNum)
               .flatMap { block =>

@@ -1,12 +1,16 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
-import org.apache.pekko.actor.{Actor, ActorLogging, ActorRef, Props, Stash}
+import org.apache.pekko.actor.Actor
+import org.apache.pekko.actor.ActorLogging
+import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.Props
+import org.apache.pekko.actor.Stash
 
-import com.chipprbots.ethereum.blockchain.sync.snap.*
-import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.blockchain.sync.snap._
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
+import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.p2p.MessageSerializable
-import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
+import com.chipprbots.ethereum.network.p2p.messages.SNAP._
 
 /** ByteCodeWorker fetches bytecodes from a peer.
   *

@@ -12,17 +12,16 @@ import cats.effect.IO
 import cats.effect.Resource
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 import scala.util.Failure
 import scala.util.Random
 import scala.util.Success
 
-import org.bouncycastle.util.encoders.Hex
-
 import com.chipprbots.scalanet.discovery.crypto.PublicKey
 import com.chipprbots.scalanet.discovery.ethereum.v4
-import com.chipprbots.scalanet.discovery.ethereum.Node as ENode
+import com.chipprbots.scalanet.discovery.ethereum.{Node => ENode}
 import fs2.Stream
+import org.bouncycastle.util.encoders.Hex
 import scodec.bits.BitVector
 
 import com.chipprbots.ethereum.db.storage.KnownNodesStorage
@@ -80,7 +79,7 @@ class PeerDiscoveryManager(
       val knownNodes: Set[Node] =
         if (!discoveryConfig.discoveryEnabled) Set.empty
         else
-          knownNodesStorage.getKnownNodes().map(Node.fromUri)
+          knownNodesStorage.getKnownNodes.map(Node.fromUri)
 
       (bootstrapNodes ++ knownNodes).filterNot(isLocalNode).toVector
     }

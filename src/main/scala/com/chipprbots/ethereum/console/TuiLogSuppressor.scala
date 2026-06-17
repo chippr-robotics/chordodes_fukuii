@@ -1,15 +1,14 @@
 package com.chipprbots.ethereum.console
 
+import scala.jdk.CollectionConverters._
+
 import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.Appender
 import ch.qos.logback.core.ConsoleAppender
-
-import scala.jdk.CollectionConverters.*
-
 import org.slf4j.LoggerFactory
 
-import com.chipprbots.ethereum.utils.Logger as FukuiiLogger
+import com.chipprbots.ethereum.utils.{Logger => FukuiiLogger}
 
 /** Log suppression mechanism using Logback.
   *

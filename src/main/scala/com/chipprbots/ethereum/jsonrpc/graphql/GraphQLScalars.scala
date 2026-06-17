@@ -3,7 +3,6 @@ package com.chipprbots.ethereum.jsonrpc.graphql
 import org.apache.pekko.util.ByteString
 
 import org.bouncycastle.util.encoders.Hex
-
 import sangria.ast
 import sangria.schema.ScalarType
 import sangria.validation.ValueCoercionViolation

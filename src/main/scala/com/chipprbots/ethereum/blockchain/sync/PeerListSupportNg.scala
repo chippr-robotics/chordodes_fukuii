@@ -6,7 +6,7 @@ import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.Scheduler
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import org.bouncycastle.util.encoders.Hex
 

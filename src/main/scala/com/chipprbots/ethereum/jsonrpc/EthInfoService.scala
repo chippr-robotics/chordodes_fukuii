@@ -5,25 +5,24 @@ import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
-import cats.syntax.either.*
+import cats.syntax.either._
 
+import scala.annotation.unused
 import scala.reflect.ClassTag
 
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
 import com.chipprbots.ethereum.consensus.mining.Mining
-import com.chipprbots.ethereum.crypto.*
-import com.chipprbots.ethereum.domain.*
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
+import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
 import com.chipprbots.ethereum.keystore.KeyStore
+import com.chipprbots.ethereum.ledger.BlockExecution.HistoryStorageAddress
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ledger.StxLedger
-import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
-import com.chipprbots.ethereum.ledger.BlockExecution.HistoryStorageAddress
-
-import scala.annotation.unused
+import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.vm.PrecompiledContracts
 
@@ -177,7 +176,7 @@ class EthInfoService(
       .sortBy(_._2)
       .distinctBy(_._2) // deduplicate by block number
 
-    val currentBlock = blockchainReader.getBestBlockNumber()
+    val currentBlock = blockchainReader.getBestBlockNumber
 
     def toForkConfig(
         @unused name: String,
@@ -282,7 +281,7 @@ class EthInfoService(
         .map(Address.apply) // `from` param, if specified
         .getOrElse(
           keyStore
-            .listAccounts()
+            .listAccounts
             .getOrElse(Nil)
             .headOption // first account, if exists and `from` param not specified
             .getOrElse(Address(0))

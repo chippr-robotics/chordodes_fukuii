@@ -5,7 +5,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.ledger.BlockExecution
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 import BlockchainConfigForEvm.EtcForks.EtcFork
 import Fixtures.blockchainConfig

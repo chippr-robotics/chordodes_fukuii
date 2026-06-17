@@ -3,12 +3,12 @@ package com.chipprbots.ethereum.jsonrpc
 import org.apache.pekko.util.ByteString
 
 import org.bouncycastle.util.encoders.Hex
-import org.json4s.JsonAST.*
-import org.json4s.JsonDSL.*
-import org.json4s.*
+import org.json4s.JsonAST._
+import org.json4s.JsonDSL._
+import org.json4s._
 
 import com.chipprbots.ethereum.domain.Address
-import com.chipprbots.ethereum.jsonrpc.EthInfoService.*
+import com.chipprbots.ethereum.jsonrpc.EthInfoService._
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError.InvalidParams
 import com.chipprbots.ethereum.jsonrpc.PersonalService.SendTransactionRequest
 import com.chipprbots.ethereum.jsonrpc.PersonalService.SendTransactionResponse

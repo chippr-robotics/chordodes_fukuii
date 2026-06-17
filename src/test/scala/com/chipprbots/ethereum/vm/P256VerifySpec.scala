@@ -6,7 +6,7 @@ import org.bouncycastle.util.encoders.Hex
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.vm.PrecompiledContracts.P256Verify
 
 /** EIP-7951: secp256r1 (P-256) precompile execution behavioral tests.

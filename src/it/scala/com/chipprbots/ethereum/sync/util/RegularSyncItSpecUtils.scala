@@ -2,14 +2,14 @@ package com.chipprbots.ethereum.sync.util
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
+import org.apache.pekko.actor.typed.scaladsl.adapter._
 import org.apache.pekko.util.ByteString
 
 import cats.effect.IO
 import cats.effect.Resource
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import com.chipprbots.ethereum.Mocks.MockValidatorsAlwaysSucceed
 import com.chipprbots.ethereum.blockchain.sync.PeersClient
@@ -31,15 +31,15 @@ import com.chipprbots.ethereum.consensus.pow
 import com.chipprbots.ethereum.consensus.pow.EthashConfig
 import com.chipprbots.ethereum.consensus.pow.PoWMining
 import com.chipprbots.ethereum.consensus.pow.validators.ValidatorsExecutor
-import com.chipprbots.ethereum.domain.*
-import com.chipprbots.ethereum.ledger.*
+import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.ledger._
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.nodebuilder.VmSetup
 import com.chipprbots.ethereum.ommers.OmmersPool
 import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils.FakePeerCustomConfig.defaultConfig
-import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils.*
+import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils._
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
-import com.chipprbots.ethereum.utils.*
+import com.chipprbots.ethereum.utils._
 
 object RegularSyncItSpecUtils {
 
@@ -187,9 +187,9 @@ object RegularSyncItSpecUtils {
       IO(blockNumber match {
         case Some(bNumber) =>
           blockchainReader
-            .getBlockByNumber(blockchainReader.getBestBranch(), bNumber)
+            .getBlockByNumber(blockchainReader.getBestBranch, bNumber)
             .getOrElse(throw new RuntimeException(s"block by number: $bNumber doesn't exist"))
-        case None => blockchainReader.getBestBlock().get
+        case None => blockchainReader.getBestBlock.get
       }).flatMap { block =>
         IO {
           val currentWeight = blockchainReader
@@ -207,7 +207,7 @@ object RegularSyncItSpecUtils {
       val baseRetries = 90
       val additionalRetries = if (blockNumber > 1000) ((blockNumber - 1000) / 20).toInt else 0
       val maxRetries = baseRetries + additionalRetries
-      retryUntilWithDelay(IO(blockchainReader.getBestBlockNumber() == blockNumber), 1.second, maxRetries)(isDone =>
+      retryUntilWithDelay(IO(blockchainReader.getBestBlockNumber == blockNumber), 1.second, maxRetries)(isDone =>
         isDone
       )
     }
@@ -215,7 +215,7 @@ object RegularSyncItSpecUtils {
     def mineNewBlock(
         plusDifficulty: BigInt = 0
     )(updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy): IO[Unit] = IO {
-      val block: Block = blockchainReader.getBestBlock().get
+      val block: Block = blockchainReader.getBestBlock.get
       val currentWeight = blockchainReader
         .getChainWeightByHash(block.hash)
         .getOrElse(throw new RuntimeException(s"ChainWeight by hash: ${block.hash} doesn't exist"))

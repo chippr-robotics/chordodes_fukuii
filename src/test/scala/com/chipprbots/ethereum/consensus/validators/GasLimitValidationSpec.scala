@@ -7,14 +7,14 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.consensus.difficulty.DifficultyCalculator
-import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.*
+import com.chipprbots.ethereum.consensus.validators.BlockHeaderError._
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
 import com.chipprbots.ethereum.domain.UInt256
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
 import com.chipprbots.ethereum.utils.MonetaryPolicyConfig
-import com.chipprbots.ethereum.testing.Tags.*
 
 // scalastyle:off magic.number
 /** Validates gas limit boundary enforcement in the block header validator.

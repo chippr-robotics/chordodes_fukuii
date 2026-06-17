@@ -10,11 +10,11 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
-import com.chipprbots.ethereum.db.storage.*
+import com.chipprbots.ethereum.db.storage._
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.defaultByteArraySerializable
 import com.chipprbots.ethereum.mpt.MptVisitors.LeafWalkVisitor
 import com.chipprbots.ethereum.mpt.MptVisitors.PathTrackingLeafWalkVisitor
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 /** Unit tests for LeafWalkVisitor and PathTrackingLeafWalkVisitor.
   *

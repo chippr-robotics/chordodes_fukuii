@@ -4,11 +4,12 @@ import java.io.File
 
 import scala.sys
 
+import com.typesafe.config.ConfigFactory
+
 import com.chipprbots.ethereum.cli.CliLauncher
 import com.chipprbots.ethereum.crypto.SignatureValidator
 import com.chipprbots.ethereum.faucet.Faucet
 import com.chipprbots.ethereum.utils.Logger
-import com.typesafe.config.ConfigFactory
 
 object App extends Logger {
 

@@ -4,19 +4,18 @@ import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.FlatSpecBase
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.sync.util.FastSyncItSpecUtils.FakePeer
-import com.chipprbots.ethereum.sync.util.SyncCommonItSpec.*
-import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils.*
-
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.sync.util.SyncCommonItSpec._
+import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils._
+import com.chipprbots.ethereum.testing.Tags._
 
 /** End-to-End test suite for Fast Sync functionality.
   *
@@ -70,12 +69,12 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
       _ <- peer1.waitForFastSyncFinish()
     } yield {
       val expectedBlockNumber = blockNumber - peer1.testSyncConfig.pivotBlockOffset
-      val actualBlockNumber = peer1.blockchainReader.getBestBlockNumber()
+      val actualBlockNumber = peer1.blockchainReader.getBestBlockNumber
 
       actualBlockNumber shouldBe expectedBlockNumber
 
       // Verify headers are downloaded
-      val peer1BestBlock = peer1.blockchainReader.getBestBlock()
+      val peer1BestBlock = peer1.blockchainReader.getBestBlock
       peer1BestBlock shouldBe defined
     }
   }
@@ -111,7 +110,7 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
 
       // Verify block number
       val expectedBlockNumber = blockNumber - peer1.testSyncConfig.pivotBlockOffset
-      peer1.blockchainReader.getBestBlockNumber() shouldBe expectedBlockNumber
+      peer1.blockchainReader.getBestBlockNumber shouldBe expectedBlockNumber
     }
   }
 
@@ -169,13 +168,13 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
       _ <- peer1.waitForFastSyncFinish()
     } yield {
       val expectedPivotBlock = blockNumber - pivotOffset
-      val actualBestBlock = peer1.blockchainReader.getBestBlockNumber()
+      val actualBestBlock = peer1.blockchainReader.getBestBlockNumber
 
       // Verify pivot block calculation
       actualBestBlock shouldBe expectedPivotBlock
 
       // Verify the pivot block exists and is valid
-      val pivotBlock = peer1.blockchainReader.getBlockByNumber(peer1.blockchainReader.getBestBranch(), actualBestBlock)
+      val pivotBlock = peer1.blockchainReader.getBlockByNumber(peer1.blockchainReader.getBestBranch, actualBestBlock)
       pivotBlock shouldBe defined
     }
   }
@@ -224,15 +223,15 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
       _ <- peer1.startFastSync().delayBy(50.milliseconds)
       _ <- peer1.waitForFastSyncFinish()
     } yield {
-      val bestBlockNumber = peer1.blockchainReader.getBestBlockNumber()
+      val bestBlockNumber = peer1.blockchainReader.getBestBlockNumber
 
       // Verify chain continuity - all blocks should be linked
       for (i <- 1 to bestBlockNumber.toInt) {
-        val block = peer1.blockchainReader.getBlockByNumber(peer1.blockchainReader.getBestBranch(), i)
+        val block = peer1.blockchainReader.getBlockByNumber(peer1.blockchainReader.getBestBranch, i)
         block shouldBe defined
 
         if (i > 1) {
-          val prevBlock = peer1.blockchainReader.getBlockByNumber(peer1.blockchainReader.getBestBranch(), i - 1)
+          val prevBlock = peer1.blockchainReader.getBlockByNumber(peer1.blockchainReader.getBestBranch, i - 1)
           prevBlock shouldBe defined
           // Use getOrElse with meaningful error message instead of .get
           val currentBlock = block.getOrElse(fail(s"Block at height $i should be defined"))
@@ -263,12 +262,12 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
     } yield {
       // Use getOrElse with meaningful error messages instead of .get
       val peer1BestBlock = peer1.blockchainReader
-        .getBestBlock()
+        .getBestBlock
         .getOrElse(
           fail("Peer 1 should have a best block after fast sync")
         )
       val _ = peer2.blockchainReader
-        .getBestBlock()
+        .getBestBlock
         .getOrElse(
           fail("Peer 2 should have a best block")
         )
@@ -301,12 +300,12 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
       _ <- peer1.waitForFastSyncFinish()
     } yield {
       // Verify fast sync completed successfully
-      val peer1BestBlock = peer1.blockchainReader.getBestBlock()
+      val peer1BestBlock = peer1.blockchainReader.getBestBlock
       peer1BestBlock shouldBe defined
 
       // Verify we're close to the target
       val expectedBlock = blockNumber - peer1.testSyncConfig.pivotBlockOffset
-      peer1.blockchainReader.getBestBlockNumber() shouldBe expectedBlock
+      peer1.blockchainReader.getBestBlockNumber shouldBe expectedBlock
     }
   }
 
@@ -345,7 +344,7 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
       trie shouldBe defined
 
       // Verify state was downloaded
-      val bestBlock = peer1.blockchainReader.getBestBlock()
+      val bestBlock = peer1.blockchainReader.getBestBlock
       bestBlock shouldBe defined
     }
   }
@@ -403,12 +402,12 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
     } yield {
       // Use getOrElse with meaningful error messages instead of .get
       val peer1BestBlock = peer1.blockchainReader
-        .getBestBlock()
+        .getBestBlock
         .getOrElse(
           fail("Peer 1 should have a best block after fast sync")
         )
       val peer2SameBlock = peer2.blockchainReader
-        .getBlockByNumber(peer2.blockchainReader.getBestBranch(), peer1BestBlock.number)
+        .getBlockByNumber(peer2.blockchainReader.getBestBranch, peer1BestBlock.number)
         .getOrElse(
           fail(s"Peer 2 should have block at height ${peer1BestBlock.number}")
         )

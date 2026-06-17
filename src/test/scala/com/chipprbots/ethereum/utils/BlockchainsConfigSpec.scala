@@ -1,19 +1,19 @@
 package com.chipprbots.ethereum.utils
-
 import java.io.File
 import java.nio.file.Files
 
+import scala.compiletime.uninitialized
+
+import com.typesafe.config.ConfigFactory
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.typesafe.config.ConfigFactory
-
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 class BlockchainsConfigSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEach {
 
-  var tempDir: File = _
+  var tempDir: File = uninitialized
 
   override def beforeEach(): Unit = {
     tempDir = Files.createTempDirectory("fukuii-test-chains").toFile

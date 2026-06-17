@@ -1,13 +1,13 @@
 package com.chipprbots.ethereum.rlp
 
-import org.scalatest.funsuite.AnyFunSuite
-
 import org.apache.pekko.util.ByteString
+
+import org.scalatest.funsuite.AnyFunSuite
 
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.rlp.UInt256RLPImplicits.*
+import com.chipprbots.ethereum.rlp.UInt256RLPImplicits._
 
 class UInt256RlpEncodingSpec extends AnyFunSuite {
 

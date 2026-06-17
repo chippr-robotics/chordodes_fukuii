@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
 import java.lang.management.ManagementFactory
 
-import scala.jdk.CollectionConverters.*
+import scala.jdk.CollectionConverters._
 
 /** Windowed JVM garbage-collection pressure sampler for the post-SNAP frontier-rebuild walk (US2 / FR-007).
   *

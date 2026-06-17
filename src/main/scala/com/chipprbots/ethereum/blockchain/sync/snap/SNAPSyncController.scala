@@ -1,33 +1,45 @@
 package com.chipprbots.ethereum.blockchain.sync.snap
 
-import org.apache.pekko.actor.{Actor, ActorLogging, ActorRef, Props, Scheduler, Cancellable}
+import org.apache.pekko.actor.Actor
+import org.apache.pekko.actor.ActorLogging
+import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.Cancellable
+import org.apache.pekko.actor.Props
+import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration.*
-import scala.concurrent.ExecutionContext
 import scala.collection.mutable
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 import scala.util.Try
 
-import com.chipprbots.ethereum.blockchain.sync.{Blacklist, PeerListSupportNg, SyncController, SyncProtocol}
-import com.chipprbots.ethereum.db.storage.{
-  AppStateStorage,
-  BfsQueueStorage,
-  EvmCodeStorage,
-  FlatSlotStorage,
-  HealingFrontierStorage,
-  MptStorage,
-  Namespaces,
-  PathNodeStorage,
-  RocksDbBfsQueueStorage,
-  SnapSyncProgressStorage,
-  StateStorage
-}
-import com.chipprbots.ethereum.domain.{Block, BlockBody, BlockHeader, BlockchainReader, BlockchainWriter, ChainWeight}
-import com.chipprbots.ethereum.network.p2p.messages.{Capability, SNAP}
+import com.chipprbots.ethereum.blockchain.sync.Blacklist
+import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg
+import com.chipprbots.ethereum.blockchain.sync.SyncController
+import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
+import com.chipprbots.ethereum.db.storage.AppStateStorage
+import com.chipprbots.ethereum.db.storage.BfsQueueStorage
+import com.chipprbots.ethereum.db.storage.EvmCodeStorage
+import com.chipprbots.ethereum.db.storage.FlatSlotStorage
+import com.chipprbots.ethereum.db.storage.HealingFrontierStorage
+import com.chipprbots.ethereum.db.storage.MptStorage
+import com.chipprbots.ethereum.db.storage.Namespaces
+import com.chipprbots.ethereum.db.storage.PathNodeStorage
+import com.chipprbots.ethereum.db.storage.RocksDbBfsQueueStorage
+import com.chipprbots.ethereum.db.storage.SnapSyncProgressStorage
+import com.chipprbots.ethereum.db.storage.StateStorage
+import com.chipprbots.ethereum.domain.Block
+import com.chipprbots.ethereum.domain.BlockBody
+import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockchainReader
+import com.chipprbots.ethereum.domain.BlockchainWriter
+import com.chipprbots.ethereum.domain.ChainWeight
+import com.chipprbots.ethereum.network.p2p.messages.Capability
+import com.chipprbots.ethereum.network.p2p.messages.SNAP
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
-import com.chipprbots.ethereum.utils.Hex
-import com.chipprbots.ethereum.utils.Config.SyncConfig
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
+import com.chipprbots.ethereum.utils.Config.SyncConfig
+import com.chipprbots.ethereum.utils.Hex
 
 class SNAPSyncController(
     blockchainReader: BlockchainReader,

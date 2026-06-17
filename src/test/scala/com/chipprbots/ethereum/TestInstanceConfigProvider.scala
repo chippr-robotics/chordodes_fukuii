@@ -1,6 +1,8 @@
 package com.chipprbots.ethereum
 
-import com.chipprbots.ethereum.utils.{Config, InstanceConfig, InstanceConfigProvider}
+import com.chipprbots.ethereum.utils.Config
+import com.chipprbots.ethereum.utils.InstanceConfig
+import com.chipprbots.ethereum.utils.InstanceConfigProvider
 
 /** Default InstanceConfigProvider for test fixtures. Provides the singleton Config as the instanceConfig, making all
   * cake pattern traits work in tests without changes.

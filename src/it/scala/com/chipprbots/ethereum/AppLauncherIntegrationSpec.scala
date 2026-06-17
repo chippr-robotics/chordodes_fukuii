@@ -1,10 +1,10 @@
 package com.chipprbots.ethereum
 
+import org.scalatest.BeforeAndAfterEach
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.BeforeAndAfterEach
 
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 /** Integration tests for App launcher command line argument parsing. These tests verify that the launcher correctly
   * handles different argument combinations for network selection and modifiers.

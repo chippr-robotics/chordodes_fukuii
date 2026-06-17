@@ -1,8 +1,7 @@
 package com.chipprbots.ethereum.ethtest
 
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
-
-import com.chipprbots.ethereum.testing.Tags.*
 
 /** Simple smoke test to validate ethereum/tests infrastructure
   *

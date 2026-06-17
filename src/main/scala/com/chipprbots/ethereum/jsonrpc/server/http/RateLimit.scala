@@ -6,7 +6,7 @@ import org.apache.pekko.NotUsed
 import org.apache.pekko.http.scaladsl.model.RemoteAddress
 import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.apache.pekko.http.scaladsl.server.Directive0
-import org.apache.pekko.http.scaladsl.server.Directives.*
+import org.apache.pekko.http.scaladsl.server.Directives._
 import org.apache.pekko.http.scaladsl.server.Route
 
 import com.google.common.base.Ticker

@@ -2,19 +2,20 @@ package com.chipprbots.ethereum.ledger
 
 import org.apache.pekko.util.ByteString
 
-import cats.implicits.*
+import cats.implicits._
 
 import scala.annotation.tailrec
 
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.ledger.BlockExecutionError.MissingParentError
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MPTException
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.DaoForkConfig
-import com.chipprbots.ethereum.vm.{EvmConfig, ProgramContext}
 import com.chipprbots.ethereum.utils.Logger
+import com.chipprbots.ethereum.vm.EvmConfig
+import com.chipprbots.ethereum.vm.ProgramContext
 
 class BlockExecution(
     blockchain: BlockchainImpl,

@@ -2,6 +2,8 @@ package com.chipprbots.ethereum.mpt
 
 import java.util.concurrent.Executors
 
+import org.apache.pekko.util.ByteString
+
 import scala.collection.mutable
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext
@@ -9,14 +11,12 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Random
 
-import org.apache.pekko.util.ByteString
-
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.crypto.kec256
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.testing.TestMptStorage
-import com.chipprbots.ethereum.testing.Tags.*
 
 /** Tests for [[StackTrie]].
   *

@@ -8,7 +8,9 @@ import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
+
+import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist
 import com.chipprbots.ethereum.network.PeerId
@@ -17,7 +19,6 @@ import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.NodeStatus
 import com.chipprbots.ethereum.utils.ServerStatus.Listening
 import com.chipprbots.ethereum.utils.ServerStatus.NotListening
-import org.bouncycastle.util.encoders.Hex
 
 object NetService {
   case class VersionRequest()

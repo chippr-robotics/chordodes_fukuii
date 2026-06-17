@@ -4,7 +4,7 @@ import org.apache.pekko.util.ByteString
 
 import org.bouncycastle.util.encoders.Hex
 
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 
 object Fixtures {
 

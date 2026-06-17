@@ -16,7 +16,7 @@ trait FastSyncBranchResolver {
   protected def blockchainReader: BlockchainReader
 
   def discardBlocksAfter(lastValidBlock: BigInt): Unit =
-    discardBlocks(lastValidBlock, blockchainReader.getBestBlockNumber())
+    discardBlocks(lastValidBlock, blockchainReader.getBestBlockNumber)
 
   private def discardBlocks(fromBlock: BigInt, toBlock: BigInt): Unit = {
     val blocksToBeRemoved = childOf(fromBlock).to(toBlock).reverse.toList

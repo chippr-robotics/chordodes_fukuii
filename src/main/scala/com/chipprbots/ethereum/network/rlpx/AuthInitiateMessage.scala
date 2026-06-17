@@ -4,7 +4,7 @@ import org.apache.pekko.util.ByteString
 
 import org.bouncycastle.math.ec.ECPoint
 
-import com.chipprbots.ethereum.crypto.*
+import com.chipprbots.ethereum.crypto._
 
 object AuthInitiateMessage extends AuthInitiateEcdsaCodec {
   val NonceLength = 32

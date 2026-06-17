@@ -7,8 +7,8 @@ import scala.collection.mutable
 import org.slf4j.LoggerFactory
 
 import com.chipprbots.ethereum.db.storage.MptStorage
-import com.chipprbots.ethereum.mpt.*
 import com.chipprbots.ethereum.domain.Account
+import com.chipprbots.ethereum.mpt._
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 
 class StateValidator(mptStorage: MptStorage) {

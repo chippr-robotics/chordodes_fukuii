@@ -1,12 +1,12 @@
 package com.chipprbots.ethereum.consensus.validators.std
 
+import org.scalatest.ParallelTestExecution
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.ParallelTestExecution
 
 import com.chipprbots.ethereum.Fixtures
-import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.*
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator._
+import com.chipprbots.ethereum.testing.Tags._
 
 /** EIP-7934: Verify block RLP size cap validation. */
 class BlockRLPSizeCapSpec extends AnyFlatSpec with Matchers with ParallelTestExecution {

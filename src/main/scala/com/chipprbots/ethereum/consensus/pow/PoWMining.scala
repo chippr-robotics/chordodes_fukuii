@@ -4,22 +4,22 @@ package pow
 
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.DispatcherSelector
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
+import org.apache.pekko.actor.typed.scaladsl.adapter._
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import com.chipprbots.ethereum.consensus.blocks.TestBlockGenerator
 import com.chipprbots.ethereum.consensus.difficulty.DifficultyCalculator
 import com.chipprbots.ethereum.consensus.mining.FullMiningConfig
 import com.chipprbots.ethereum.consensus.mining.Protocol
 import com.chipprbots.ethereum.consensus.mining.Protocol.AdditionalPoWProtocolData
+import com.chipprbots.ethereum.consensus.mining.Protocol.EngineApi
 import com.chipprbots.ethereum.consensus.mining.Protocol.MockedPow
 import com.chipprbots.ethereum.consensus.mining.Protocol.NoAdditionalPoWData
 import com.chipprbots.ethereum.consensus.mining.Protocol.PoW
-import com.chipprbots.ethereum.consensus.mining.Protocol.EngineApi
 import com.chipprbots.ethereum.consensus.mining.Protocol.RestrictedPoW
 import com.chipprbots.ethereum.consensus.mining.Protocol.RestrictedPoWMinerData
 import com.chipprbots.ethereum.consensus.mining.TestMining

@@ -14,6 +14,7 @@ import org.apache.pekko.util.ByteString
 
 import scala.concurrent.duration.FiniteDuration
 
+import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
@@ -30,9 +31,9 @@ import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.HelloCodec
 import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.InitialHelloReceived
 import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.RLPxConfiguration
 import com.chipprbots.ethereum.security.SecureRandomBuilder
-
-import org.bouncycastle.crypto.AsymmetricCipherKeyPair
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.network.p2p.MessageDecoder.DecodingError
+import com.chipprbots.ethereum.network.p2p.Message
 
 // SCALA 3 MIGRATION: Fixed by creating manual stub implementation for AuthHandshaker
 // @Ignore - Un-ignored per issue to identify test failures
@@ -110,7 +111,7 @@ class RLPxConnectionHandlerSpec
     rlpxConnection ! RLPxConnectionHandler.SendMessage(Ping())
     connection.expectMsg(Tcp.Write(ByteString("ping encoded"), RLPxConnectionHandler.Ack))
 
-    val expectedHello = rlpxConnectionParent.expectMsgType[InitialHelloReceived]
+    val expectedHello: InitialHelloReceived = rlpxConnectionParent.expectMsgType[InitialHelloReceived]
     expectedHello.message shouldBe a[Hello]
 
     // The rlpx connection is closed after a timeout happens (after rlpxConfiguration.waitForTcpAckTimeout) and it is processed
@@ -156,7 +157,7 @@ class RLPxConnectionHandlerSpec
     mockHandshaker.handleInitialMessageHandler = Some(_ => throw new Exception("MAC invalid"))
     mockHandshaker.handleInitialMessageV4Handler = Some(_ => throw new Exception("MAC invalid"))
 
-    val data = ByteString((0 until AuthHandshaker.InitiatePacketLength).map(_.toByte).toArray)
+    val data: ByteString = ByteString((0 until AuthHandshaker.InitiatePacketLength).map(_.toByte).toArray)
     rlpxConnection ! Tcp.Received(data)
     rlpxConnectionParent.expectMsg(RLPxConnectionHandler.ConnectionFailed)
     rlpxConnectionParent.expectTerminated(rlpxConnection)
@@ -171,7 +172,7 @@ class RLPxConnectionHandlerSpec
     tcpActorProbe.expectMsg(Tcp.Connect(inetAddress))
 
     // The TCP connection results are handled
-    val initPacket = ByteString("Init packet")
+    val initPacket: ByteString = ByteString("Init packet")
     mockHandshaker.initiateHandler = Some(_ => initPacket -> mockHandshaker)
 
     tcpActorProbe.reply(Tcp.Connected(inetAddress, inetAddress))
@@ -182,7 +183,7 @@ class RLPxConnectionHandlerSpec
     mockHandshaker.handleResponseMessageHandler = Some(_ => throw new Exception("MAC invalid"))
     mockHandshaker.handleResponseMessageV4Handler = Some(_ => throw new Exception("MAC invalid"))
 
-    val data = ByteString((0 until AuthHandshaker.ResponsePacketLength).map(_.toByte).toArray)
+    val data: ByteString = ByteString((0 until AuthHandshaker.ResponsePacketLength).map(_.toByte).toArray)
     rlpxConnection ! Tcp.Received(data)
     rlpxConnectionParent.expectMsg(RLPxConnectionHandler.ConnectionFailed)
     rlpxConnectionParent.expectTerminated(rlpxConnection)
@@ -194,7 +195,7 @@ class RLPxConnectionHandlerSpec
     connection.expectMsgClass(classOf[Tcp.Register])
 
     // AuthHandshaker handles initial message and fails (simulating auth failure scenario)
-    val data = ByteString((0 until AuthHandshaker.InitiatePacketLength).map(_.toByte).toArray)
+    val data: ByteString = ByteString((0 until AuthHandshaker.InitiatePacketLength).map(_.toByte).toArray)
 
     // Configure the test double to fail authentication
     mockHandshaker.handleInitialMessageHandler = Some(_ => throw new Exception("Auth failed"))
@@ -230,7 +231,7 @@ class RLPxConnectionHandlerSpec
 
     // Send a late Hello message - this should NOT go through MessageCodec.encodeMessage
     // Instead, it should be written directly using frameCodec to avoid compression
-    val lateHello = Hello(
+    val lateHello: Hello = Hello(
       p2pVersion = 5,
       clientId = "test-client",
       capabilities = Seq(Capability.ETH63),
@@ -366,7 +367,7 @@ class RLPxConnectionHandlerSpec
 
     // Mock parameters for RLPxConnectionHandler
     val mockMessageDecoder: MessageDecoder = new MessageDecoder {
-      override def fromBytes(`type`: Int, payload: Array[Byte]) =
+      override def fromBytes(`type`: Int, payload: Array[Byte]): Either[DecodingError, Message] =
         throw new Exception("Mock message decoder fails to decode all messages")
     }
     val protocolVersion = Capability.ETH63

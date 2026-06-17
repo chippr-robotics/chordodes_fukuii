@@ -1,12 +1,12 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.blockchain.sync.TestSyncConfig
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 class FetchRequestSpec extends AnyFreeSpec with Matchers with TestSyncConfig {
 

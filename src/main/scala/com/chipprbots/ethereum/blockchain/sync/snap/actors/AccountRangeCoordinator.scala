@@ -1,35 +1,43 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
-import org.apache.pekko.actor.{
-  Actor,
-  ActorLogging,
-  ActorRef,
-  Cancellable,
-  Props,
-  SupervisorStrategy,
-  OneForOneStrategy,
-  Status,
-  Terminated
-}
-import org.apache.pekko.actor.SupervisorStrategy.*
+import java.io.BufferedOutputStream
+import java.io.FileOutputStream
+import java.io.RandomAccessFile
+import java.nio.file.Files
+import java.nio.file.Path
+
+import org.apache.pekko.actor.Actor
+import org.apache.pekko.actor.ActorLogging
+import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.Cancellable
+import org.apache.pekko.actor.OneForOneStrategy
+import org.apache.pekko.actor.Props
+import org.apache.pekko.actor.Status
+import org.apache.pekko.actor.SupervisorStrategy
+import org.apache.pekko.actor.SupervisorStrategy._
+import org.apache.pekko.actor.Terminated
 import org.apache.pekko.util.ByteString
 
-import java.io.{BufferedOutputStream, FileOutputStream, RandomAccessFile}
-import java.nio.file.{Files, Path}
-
 import scala.collection.mutable
-import scala.concurrent.{ExecutionContext, Future, blocking}
-import scala.concurrent.duration.*
-import scala.util.{Success, Failure}
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
+import scala.concurrent.blocking
+import scala.concurrent.duration._
+import scala.util.Failure
+import scala.util.Success
 
-import com.chipprbots.ethereum.blockchain.sync.snap.*
-import com.chipprbots.ethereum.db.storage.{MptStorage, PathNodeStorage}
-import com.chipprbots.ethereum.domain.Account
-import com.chipprbots.ethereum.network.Peer
-import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
-import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
-import com.google.common.hash.{BloomFilter, Funnel, PrimitiveSink}
+import com.google.common.hash.BloomFilter
+import com.google.common.hash.Funnel
+import com.google.common.hash.PrimitiveSink
+
 import com.chipprbots.ethereum.blockchain.sync.ProgressMilestones
+import com.chipprbots.ethereum.blockchain.sync.snap._
+import com.chipprbots.ethereum.db.storage.MptStorage
+import com.chipprbots.ethereum.db.storage.PathNodeStorage
+import com.chipprbots.ethereum.domain.Account
+import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
+import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 
 /** AccountRangeCoordinator manages account range download workers.
   *

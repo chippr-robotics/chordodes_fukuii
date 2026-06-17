@@ -1,26 +1,26 @@
 package com.chipprbots.ethereum.consensus.engine
 
-import scala.concurrent.ExecutionContext
-import scala.concurrent.Future
-import scala.concurrent.Await
-import scala.concurrent.duration.*
-
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
-import org.apache.pekko.http.scaladsl.model.*
-import org.apache.pekko.http.scaladsl.server.Directives.*
+import org.apache.pekko.http.scaladsl.model._
+import org.apache.pekko.http.scaladsl.server.Directives._
 import org.apache.pekko.http.scaladsl.server.Route
-
-import com.typesafe.config.{Config as TypesafeConfig, ConfigFactory}
 
 import cats.effect.unsafe.IORuntime
 
-import org.json4s.*
-import org.json4s.native.JsonMethods.*
+import scala.concurrent.Await
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
+import scala.concurrent.duration._
 
+import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config => TypesafeConfig}
+import org.json4s._
+import org.json4s.native.JsonMethods._
+
+import com.chipprbots.ethereum.jsonrpc.JsonRpcError
 import com.chipprbots.ethereum.jsonrpc.JsonRpcRequest
 import com.chipprbots.ethereum.jsonrpc.JsonRpcResponse
-import com.chipprbots.ethereum.jsonrpc.JsonRpcError
 import com.chipprbots.ethereum.utils.Logger
 
 /** Separate HTTP server for the Engine API on the authrpc port (default 8551). JWT-authenticated, accepts only engine_*

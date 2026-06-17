@@ -1,9 +1,10 @@
 package com.chipprbots.ethereum.ethtest
 
 import org.apache.pekko.util.ByteString
+
 import org.bouncycastle.util.encoders.Hex
 
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 /** Converts ethereum/tests JSON format to internal domain objects

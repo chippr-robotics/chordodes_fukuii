@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.ObjectGenerators
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
 import com.chipprbots.ethereum.security.SecureRandomBuilder
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks with SecureRandomBuilder {
 
@@ -24,7 +24,7 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     forAll(ObjectGenerators.newBlockGen(secureRandom, chainId)) { case NewBlock(block, weight) =>
       blockchainWriter.save(block, Nil, ChainWeight(weight), true)
 
-      blockchainReader.getBestBlock() shouldBe Some(block)
+      blockchainReader.getBestBlock shouldBe Some(block)
     }
   }
 
@@ -32,12 +32,12 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     UnitTest,
     StateTest
   ) in new EphemBlockchainTestSetup {
-    val genesis = Block(Fixtures.Blocks.Genesis.header, Fixtures.Blocks.Genesis.body)
-    val genesisWeight = ChainWeight.zero.increase(genesis.header)
+    val genesis: Block = Block(Fixtures.Blocks.Genesis.header, Fixtures.Blocks.Genesis.body)
+    val genesisWeight: ChainWeight = ChainWeight.zero.increase(genesis.header)
     blockchainWriter.save(genesis, Nil, genesisWeight, saveAsBestBlock = true)
 
-    val block1 = genesis.copy(header = genesis.header.copy(parentHash = genesis.header.hash, number = 1))
-    val block1Weight = genesisWeight.increase(block1.header)
+    val block1: Block = genesis.copy(header = genesis.header.copy(parentHash = genesis.header.hash, number = 1))
+    val block1Weight: ChainWeight = genesisWeight.increase(block1.header)
     blockchainWriter.save(block1, Nil, block1Weight, saveAsBestBlock = true)
 
     val (cw, source) =
@@ -50,16 +50,16 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     UnitTest,
     StateTest
   ) in new EphemBlockchainTestSetup {
-    val genesis = Block(Fixtures.Blocks.Genesis.header, Fixtures.Blocks.Genesis.body)
-    val genesisWeight = ChainWeight.zero.increase(genesis.header)
+    val genesis: Block = Block(Fixtures.Blocks.Genesis.header, Fixtures.Blocks.Genesis.body)
+    val genesisWeight: ChainWeight = ChainWeight.zero.increase(genesis.header)
     blockchainWriter.save(genesis, Nil, genesisWeight, saveAsBestBlock = true)
 
-    val block1 = genesis.copy(header = genesis.header.copy(parentHash = genesis.header.hash, number = 1))
-    val block1Weight = genesisWeight.increase(block1.header)
+    val block1: Block = genesis.copy(header = genesis.header.copy(parentHash = genesis.header.hash, number = 1))
+    val block1Weight: ChainWeight = genesisWeight.increase(block1.header)
     blockchainWriter.save(block1, Nil, block1Weight, saveAsBestBlock = true)
 
     // Peer advertises a different block hash at height 1 — not in our chain
-    val unknownPeerHash = ByteString(Array.fill(32)(0xab.toByte))
+    val unknownPeerHash: ByteString = ByteString(Array.fill(32)(0xab.toByte))
     unknownPeerHash should not be block1.header.hash
 
     val (cw, source) =
@@ -72,11 +72,11 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     UnitTest,
     StateTest
   ) in new EphemBlockchainTestSetup {
-    val genesis = Block(Fixtures.Blocks.Genesis.header, Fixtures.Blocks.Genesis.body)
+    val genesis: Block = Block(Fixtures.Blocks.Genesis.header, Fixtures.Blocks.Genesis.body)
     blockchainWriter.save(genesis, Nil, ChainWeight.zero.increase(genesis.header), saveAsBestBlock = false)
 
-    val unknownHash = ByteString(Array.fill(32)(0xcd.toByte))
-    val peerBlockNum = BigInt(5_000_000)
+    val unknownHash: ByteString = ByteString(Array.fill(32)(0xcd.toByte))
+    val peerBlockNum: BigInt = BigInt(5_000_000)
 
     val (cw, source) = blockchainReader.resolveETH69ChainWeight(unknownHash, peerBlockNum, isPoWChain = true)
     source shouldBe "COLD_START"
@@ -87,16 +87,16 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     UnitTest,
     StateTest
   ) in new EphemBlockchainTestSetup {
-    val genesis = Block(Fixtures.Blocks.Genesis.header, Fixtures.Blocks.Genesis.body)
-    val genesisWeight = ChainWeight.zero.increase(genesis.header)
+    val genesis: Block = Block(Fixtures.Blocks.Genesis.header, Fixtures.Blocks.Genesis.body)
+    val genesisWeight: ChainWeight = ChainWeight.zero.increase(genesis.header)
     blockchainWriter.save(genesis, Nil, genesisWeight, saveAsBestBlock = true)
 
-    val block1 = genesis.copy(header = genesis.header.copy(parentHash = genesis.header.hash, number = 1))
-    val block1Weight = genesisWeight.increase(block1.header)
+    val block1: Block = genesis.copy(header = genesis.header.copy(parentHash = genesis.header.hash, number = 1))
+    val block1Weight: ChainWeight = genesisWeight.increase(block1.header)
     blockchainWriter.save(block1, Nil, block1Weight, saveAsBestBlock = true)
 
-    val unknownHash = ByteString(Array.fill(32)(0xcd.toByte))
-    val peerBlockNum = BigInt(1_000_000)
+    val unknownHash: ByteString = ByteString(Array.fill(32)(0xcd.toByte))
+    val peerBlockNum: BigInt = BigInt(1_000_000)
 
     val (cw, source) = blockchainReader.resolveETH69ChainWeight(unknownHash, peerBlockNum, isPoWChain = true)
     source shouldBe "POW_SCALING"
@@ -104,8 +104,8 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     // head.number=1 < 10000 → insufficient-history fallback: rate = headTd / headNumber
     val ourBestTD = block1Weight.totalDifficulty
     val ourBestNum = block1.header.number
-    val gap = (peerBlockNum - ourBestNum).max(BigInt(0))
-    val rate = ourBestTD / ourBestNum
+    val gap: BigInt = (peerBlockNum - ourBestNum).max(BigInt(0))
+    val rate: BigInt = ourBestTD / ourBestNum
     cw.totalDifficulty shouldBe ourBestTD + rate * gap
   }
 
@@ -113,12 +113,12 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     UnitTest,
     StateTest
   ) in new EphemBlockchainTestSetup {
-    val genesis = Block(Fixtures.Blocks.Genesis.header, Fixtures.Blocks.Genesis.body)
-    val genesisWeight = ChainWeight.zero.increase(genesis.header)
+    val genesis: Block = Block(Fixtures.Blocks.Genesis.header, Fixtures.Blocks.Genesis.body)
+    val genesisWeight: ChainWeight = ChainWeight.zero.increase(genesis.header)
     blockchainWriter.save(genesis, Nil, genesisWeight, saveAsBestBlock = true)
 
-    val unknownHash = ByteString(Array.fill(32)(0xef.toByte))
-    val peerBlockNum = BigInt(21_000_000)
+    val unknownHash: ByteString = ByteString(Array.fill(32)(0xef.toByte))
+    val peerBlockNum: BigInt = BigInt(21_000_000)
 
     val (cw, source) = blockchainReader.resolveETH69ChainWeight(unknownHash, peerBlockNum, isPoWChain = false)
     source shouldBe "POS_PROXY"
@@ -133,24 +133,24 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     UnitTest,
     StateTest
   ) in new EphemBlockchainTestSetup {
-    val genesis = Block(Fixtures.Blocks.Genesis.header, Fixtures.Blocks.Genesis.body)
-    val gWeight = ChainWeight.zero.increase(genesis.header)
+    val genesis: Block = Block(Fixtures.Blocks.Genesis.header, Fixtures.Blocks.Genesis.body)
+    val gWeight: ChainWeight = ChainWeight.zero.increase(genesis.header)
     blockchainWriter.save(genesis, Nil, gWeight, saveAsBestBlock = true)
 
-    val pivotHeader = Fixtures.Blocks.Genesis.header.copy(parentHash = genesis.header.hash, number = etcBestNum)
-    val pivotBlock = Block(pivotHeader, Fixtures.Blocks.Genesis.body)
-    val pivotWeight = ChainWeight.totalDifficultyOnly(etcBestTD)
+    val pivotHeader: BlockHeader = Fixtures.Blocks.Genesis.header.copy(parentHash = genesis.header.hash, number = etcBestNum)
+    val pivotBlock: Block = Block(pivotHeader, Fixtures.Blocks.Genesis.body)
+    val pivotWeight: ChainWeight = ChainWeight.totalDifficultyOnly(etcBestTD)
     blockchainWriter.save(pivotBlock, Nil, pivotWeight, saveAsBestBlock = true)
 
     // Peer is 151 blocks ahead — unknown hash, canonical lookup misses (peer ahead of our head)
-    val peerBlock = etcBestNum + 151
-    val unknownHash = ByteString(Array.fill(32)(0xfe.toByte))
+    val peerBlock: BigInt = etcBestNum + 151
+    val unknownHash: ByteString = ByteString(Array.fill(32)(0xfe.toByte))
 
     val (cw, source) = blockchainReader.resolveETH69ChainWeight(unknownHash, peerBlock, isPoWChain = true)
     source shouldBe "POW_SCALING"
 
     val estimate = cw.totalDifficulty
-    val tolerance = etcBestTD / 1000 // 0.1%
+    val tolerance: BigInt = etcBestTD / 1000 // 0.1%
     estimate should be >= (etcBestTD - tolerance)
     estimate should be <= (etcBestTD + tolerance)
   }
@@ -159,17 +159,17 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     UnitTest,
     StateTest
   ) in new EphemBlockchainTestSetup {
-    val genesis = Block(Fixtures.Blocks.Genesis.header, Fixtures.Blocks.Genesis.body)
+    val genesis: Block = Block(Fixtures.Blocks.Genesis.header, Fixtures.Blocks.Genesis.body)
     blockchainWriter.save(genesis, Nil, ChainWeight.zero.increase(genesis.header), saveAsBestBlock = true)
 
-    val pivotHeader = Fixtures.Blocks.Genesis.header.copy(parentHash = genesis.header.hash, number = etcBestNum)
-    val pivotBlock = Block(pivotHeader, Fixtures.Blocks.Genesis.body)
+    val pivotHeader: BlockHeader = Fixtures.Blocks.Genesis.header.copy(parentHash = genesis.header.hash, number = etcBestNum)
+    val pivotBlock: Block = Block(pivotHeader, Fixtures.Blocks.Genesis.body)
     blockchainWriter.save(pivotBlock, Nil, ChainWeight.totalDifficultyOnly(etcBestTD), saveAsBestBlock = true)
 
     // Peer at our head height with unknown hash:
     // Tier 1 (DB_LOOKUP) misses — hash unknown
     // Tier 2 (CANONICAL_NUMBER) hits — returns exact real TD from our canonical chain
-    val unknownHash = ByteString(Array.fill(32)(0xff.toByte))
+    val unknownHash: ByteString = ByteString(Array.fill(32)(0xff.toByte))
     val (cw, source) = blockchainReader.resolveETH69ChainWeight(unknownHash, etcBestNum, isPoWChain = true)
     source shouldBe "CANONICAL_NUMBER"
     cw.totalDifficulty shouldBe etcBestTD // exact real TD — no inflation

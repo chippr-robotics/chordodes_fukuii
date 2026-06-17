@@ -7,7 +7,7 @@ import cats.effect.unsafe.IORuntime
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
 import org.scalatest.BeforeAndAfterEach
@@ -18,7 +18,7 @@ import org.scalatest.time.Seconds
 import org.scalatest.time.Span
 
 import com.chipprbots.ethereum.network.discovery.DiscoveryConfig
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 /** Tests for the PortForwardingBuilder trait to validate correct port forwarding initialization and prevent multiple
   * UPnP service allocations.

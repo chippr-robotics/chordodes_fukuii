@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.testing
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 /** KPI Baselines for Fukuii Test Suite
   *

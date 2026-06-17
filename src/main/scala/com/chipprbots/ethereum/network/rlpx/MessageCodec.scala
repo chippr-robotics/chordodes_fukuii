@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.network.rlpx
 
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.pekko.util.ByteString
 
@@ -8,14 +9,13 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
-import org.xerial.snappy.Snappy
 import org.bouncycastle.util.encoders.Hex
+import org.xerial.snappy.Snappy
 
 import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.MessageDecoder
 import com.chipprbots.ethereum.network.p2p.MessageDecoder.DecodingError
 import com.chipprbots.ethereum.network.p2p.MessageSerializable
-
 import com.chipprbots.ethereum.utils.Logger
 
 object MessageCodec {

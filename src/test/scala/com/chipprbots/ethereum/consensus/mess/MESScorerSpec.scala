@@ -1,10 +1,10 @@
 package com.chipprbots.ethereum.consensus.mess
 
+import org.scalatest.ParallelTestExecution
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.ParallelTestExecution
 
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 class MESSConfigSpec extends AnyFlatSpec with Matchers with ParallelTestExecution {
 

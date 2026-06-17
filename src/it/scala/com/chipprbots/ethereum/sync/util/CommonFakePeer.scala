@@ -14,7 +14,7 @@ import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 
@@ -43,10 +43,10 @@ import com.chipprbots.ethereum.domain.BlockchainWriter
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.ForkResolver
 import com.chipprbots.ethereum.network.KnownNodesManager
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.PeerEventBusActor
 import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.network.PeerManagerActor.FastSyncHostConfiguration
@@ -56,18 +56,18 @@ import com.chipprbots.ethereum.network.ServerActor
 import com.chipprbots.ethereum.network.discovery.DiscoveryConfig
 import com.chipprbots.ethereum.network.discovery.Node
 import com.chipprbots.ethereum.network.discovery.PeerDiscoveryManager.DiscoveredNodesInfo
+import com.chipprbots.ethereum.network.handshaker.Handshaker
 import com.chipprbots.ethereum.network.handshaker.NetworkHandshaker
 import com.chipprbots.ethereum.network.handshaker.NetworkHandshakerConfiguration
-import com.chipprbots.ethereum.network.handshaker.Handshaker
 import com.chipprbots.ethereum.network.rlpx.AuthHandshaker
 import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.RLPxConfiguration
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.nodebuilder.PruningConfigBuilder
 import com.chipprbots.ethereum.security.SecureRandomBuilder
-import com.chipprbots.ethereum.sync.util.SyncCommonItSpec.*
-import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils.*
+import com.chipprbots.ethereum.sync.util.SyncCommonItSpec._
+import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils._
 import com.chipprbots.ethereum.utils.ServerStatus.Listening
-import com.chipprbots.ethereum.utils.*
+import com.chipprbots.ethereum.utils._
 import com.chipprbots.ethereum.vm.EvmConfig
 
 abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCustomConfig)
@@ -121,7 +121,7 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
   }
 
   lazy val nodeStatusHolder = new AtomicReference(nodeStatus)
-  lazy val storagesInstance: RocksDbDataSourceComponent with LocalPruningConfigBuilder with Storages.DefaultStorages =
+  lazy val storagesInstance: RocksDbDataSourceComponent & LocalPruningConfigBuilder & Storages.DefaultStorages =
     new RocksDbDataSourceComponent
       with LocalPruningConfigBuilder
       with Storages.DefaultStorages
@@ -308,7 +308,7 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
     broadcasterActor ! BroadcastBlock(BlockToBroadcast(block, weight))
 
   def getCurrentState(): BlockchainState = {
-    val bestBlock = blockchainReader.getBestBlock().get
+    val bestBlock = blockchainReader.getBestBlock.get
     val currentWorldState = getMptForBlock(bestBlock)
     val currentWeight = blockchainReader.getChainWeightByHash(bestBlock.hash).get
     BlockchainState(bestBlock, currentWorldState, currentWeight)
@@ -345,7 +345,7 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
       _ <- IO {
         peerManager ! DiscoveredNodesInfo(nodes)
       }
-      _ <- retryUntilWithDelay(IO(storagesInstance.storages.knownNodesStorage.getKnownNodes()), 1.second, maxRetries) {
+      _ <- retryUntilWithDelay(IO(storagesInstance.storages.knownNodesStorage.getKnownNodes), 1.second, maxRetries) {
         knownNodes =>
           val requestedNodes = nodes.map(_.id)
           val currentNodes = knownNodes.map(Node.fromUri).map(_.id)
@@ -418,7 +418,7 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
   def importBlocksUntil(
       n: BigInt
   )(updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy): IO[Unit] =
-    IO(blockchainReader.getBestBlock()).flatMap { block =>
+    IO(blockchainReader.getBestBlock).flatMap { block =>
       if (block.get.number >= n) {
         IO(())
       } else {
@@ -430,7 +430,7 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
       from: BigInt,
       to: BigInt
   )(updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy): IO[Unit] =
-    IO(blockchainReader.getBestBlock()).flatMap { block =>
+    IO(blockchainReader.getBestBlock).flatMap { block =>
       if (block.get.number >= to) {
         IO(())
       } else if (block.get.number >= from) {
@@ -449,7 +449,7 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
       from: BigInt,
       to: BigInt
   )(updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy): IO[Unit] =
-    IO(blockchainReader.getBestBlock()).flatMap { block =>
+    IO(blockchainReader.getBestBlock).flatMap { block =>
       if (block.get.number >= to) {
         IO(())
       } else if (block.get.number >= from) {

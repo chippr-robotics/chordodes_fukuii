@@ -19,7 +19,7 @@ object NodeClientType {
   case object Erigon extends ClientType { val name = "erigon" }
   case object Reth extends ClientType { val name = "reth" }
   case object Fukuii extends ClientType { val name = "fukuii" }
-  final case class Other(raw: String) extends ClientType { val name = s"other($raw)" }
+  final case class Other(raw: String) extends ClientType { val name: String = s"other($raw)" }
 
   /** Classify a raw `clientId` string from the P2P Hello message into a known client type.
     *

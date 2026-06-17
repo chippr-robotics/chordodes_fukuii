@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.network
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import com.typesafe.config.ConfigValueFactory
 import org.scalatest.BeforeAndAfterAll
@@ -13,9 +13,8 @@ import com.chipprbots.ethereum.FreeSpecBase
 import com.chipprbots.ethereum.metrics.Metrics
 import com.chipprbots.ethereum.metrics.MetricsConfig
 import com.chipprbots.ethereum.sync.util.RegularSyncItSpecUtils.FakePeer
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.Config
-
-import com.chipprbots.ethereum.testing.Tags.*
 
 /** End-to-End test suite for P2P handshake functionality.
   *
@@ -158,8 +157,8 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
           _ <- IO.sleep(2.seconds)
         } yield {
           // Both peers should have the same genesis block
-          val peer1Genesis = peer1.blockchainReader.getBlockByNumber(peer1.blockchainReader.getBestBranch(), 0)
-          val peer2Genesis = peer2.blockchainReader.getBlockByNumber(peer2.blockchainReader.getBestBranch(), 0)
+          val peer1Genesis = peer1.blockchainReader.getBlockByNumber(peer1.blockchainReader.getBestBranch, 0)
+          val peer2Genesis = peer2.blockchainReader.getBlockByNumber(peer2.blockchainReader.getBestBranch, 0)
 
           peer1Genesis shouldBe defined
           peer2Genesis shouldBe defined
@@ -316,7 +315,7 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
           _ <- IO.sleep(3.seconds)
         } yield {
           // Handshake should succeed with peer at genesis
-          val peer2BestBlock = peer2.blockchainReader.getBestBlockNumber()
+          val peer2BestBlock = peer2.blockchainReader.getBestBlockNumber
           peer2BestBlock shouldBe 0
           succeed
         }
@@ -334,7 +333,7 @@ class E2EHandshakeSpec extends FreeSpecBase with Matchers with BeforeAndAfterAll
           _ <- IO.sleep(3.seconds)
         } yield {
           // Peers should exchange total difficulty during handshake
-          val peer1BestBlock = peer1.blockchainReader.getBestBlock().get
+          val peer1BestBlock = peer1.blockchainReader.getBestBlock.get
           val peer1Difficulty = peer1.blockchainReader.getChainWeightByHash(peer1BestBlock.hash)
           peer1Difficulty shouldBe defined
           succeed

@@ -19,7 +19,7 @@ import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerProto
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerResponse
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerResponses.MinerNotExist
 import com.chipprbots.ethereum.consensus.pow.validators.ValidatorsExecutor
-import com.chipprbots.ethereum.consensus.validators.*
+import com.chipprbots.ethereum.consensus.validators._
 import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator
 import com.chipprbots.ethereum.consensus.validators.std.StdSignedTransactionValidator
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
@@ -34,7 +34,7 @@ import com.chipprbots.ethereum.ledger.BlockExecutionSuccess
 import com.chipprbots.ethereum.ledger.BlockPreparator
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ledger.VMImpl
-import com.chipprbots.ethereum.nodebuilder.*
+import com.chipprbots.ethereum.nodebuilder._
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 class TestmodeMining(

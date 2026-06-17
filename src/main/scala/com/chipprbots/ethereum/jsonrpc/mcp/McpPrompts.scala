@@ -1,13 +1,13 @@
 package com.chipprbots.ethereum.jsonrpc.mcp
 
-import org.json4s.JsonAST.*
-import org.json4s.JsonDSL.*
+import org.json4s.JsonAST._
+import org.json4s.JsonDSL._
 
 /** Node health check prompt for MCP. Guides users through a comprehensive health check.
   */
 object NodeHealthCheckPrompt {
   val name = "mcp_node_health_check"
-  val description = Some("Perform a comprehensive health check of the Fukuii node")
+  val description: Some[String] = Some("Perform a comprehensive health check of the Fukuii node")
 
   def get(): (String, List[JValue]) = {
     val text = """Please check the health of my Fukuii ETC node. Use the available tools to verify:
@@ -28,7 +28,7 @@ object NodeHealthCheckPrompt {
   */
 object SyncTroubleshootingPrompt {
   val name = "mcp_sync_troubleshooting"
-  val description = Some("Troubleshoot blockchain synchronization issues")
+  val description: Some[String] = Some("Troubleshoot blockchain synchronization issues")
 
   def get(): (String, List[JValue]) = {
     val text = """My Fukuii node seems to be having sync issues. Please diagnose:
@@ -50,7 +50,7 @@ object SyncTroubleshootingPrompt {
   */
 object PeerManagementPrompt {
   val name = "mcp_peer_management"
-  val description = Some("Manage and optimize peer connections")
+  val description: Some[String] = Some("Manage and optimize peer connections")
 
   def get(): (String, List[JValue]) = {
     val text = """Help me manage peer connections for my Fukuii node:
@@ -72,7 +72,7 @@ object PeerManagementPrompt {
   */
 object MiningOperationsPrompt {
   val name = "mcp_mining_operations"
-  val description = Some("Validate Node1 mining RPC endpoints and control the miner")
+  val description: Some[String] = Some("Validate Node1 mining RPC endpoints and control the miner")
 
   def get(): (String, List[JValue]) = {
     val text = """Use the verified mining RPC endpoints on Node1 (http://127.0.0.1:8545):

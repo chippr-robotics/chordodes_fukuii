@@ -4,8 +4,9 @@ import java.net.InetAddress
 import java.util.concurrent.TimeUnit
 
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.http.scaladsl.model.*
-import org.apache.pekko.http.scaladsl.model.headers.*
+import org.apache.pekko.http.cors.scaladsl.model.HttpOriginMatcher
+import org.apache.pekko.http.scaladsl.model._
+import org.apache.pekko.http.scaladsl.model.headers._
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.http.scaladsl.testkit.ScalatestRouteTest
 import org.apache.pekko.util.ByteString
@@ -14,26 +15,25 @@ import cats.effect.IO
 
 import scala.concurrent.duration.FiniteDuration
 
-import org.apache.pekko.http.cors.scaladsl.model.HttpOriginMatcher
 import org.json4s.DefaultFormats
 import org.json4s.Extraction
 import org.json4s.JsonAST.JInt
 import org.json4s.JsonAST.JNothing
 import org.json4s.JsonAST.JString
 import org.json4s.native.JsonMethods
-import org.json4s.native.JsonMethods.*
+import org.json4s.native.JsonMethods._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.healthcheck.HealthcheckResponse
 import com.chipprbots.ethereum.healthcheck.HealthcheckResult
-import com.chipprbots.ethereum.jsonrpc.*
+import com.chipprbots.ethereum.jsonrpc._
 import com.chipprbots.ethereum.jsonrpc.server.controllers.ApisBase
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
 import com.chipprbots.ethereum.jsonrpc.server.http.JsonRpcHttpServer.JsonRpcHttpServerConfig
-import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.jsonrpc.server.http.JsonRpcHttpServer.RateLimitConfig
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.BuildInfo
 import com.chipprbots.ethereum.utils.Logger
 
@@ -64,11 +64,11 @@ class JsonRpcHttpServerSpec
   implicit val mockFactoryInstance: org.scalamock.scalatest.MockFactory = this
 
   it should "respond to healthcheck" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    mockJsonRpcHealthChecker.healthCheck
+    (() => mockJsonRpcHealthChecker.healthCheck)
       .expects()
       .returning(IO.pure(HealthcheckResponse(List(HealthcheckResult.ok("peerCount", Some("2"))))))
 
-    val getRequest = HttpRequest(HttpMethods.GET, uri = "/healthcheck")
+    val getRequest: HttpRequest = HttpRequest(HttpMethods.GET, uri = "/healthcheck")
 
     getRequest ~> Route.seal(mockJsonRpcHttpServer.route) ~> check {
       status shouldEqual StatusCodes.OK
@@ -84,7 +84,7 @@ class JsonRpcHttpServerSpec
     UnitTest,
     RPCTest
   ) in new TestSetup {
-    mockJsonRpcHealthChecker.healthCheck
+    (() => mockJsonRpcHealthChecker.healthCheck)
       .expects()
       .returning(
         IO.pure(
@@ -97,7 +97,7 @@ class JsonRpcHttpServerSpec
         )
       )
 
-    val getRequest = HttpRequest(HttpMethods.GET, uri = "/healthcheck")
+    val getRequest: HttpRequest = HttpRequest(HttpMethods.GET, uri = "/healthcheck")
 
     getRequest ~> Route.seal(mockJsonRpcHttpServer.route) ~> check {
       status shouldEqual StatusCodes.InternalServerError
@@ -111,7 +111,7 @@ class JsonRpcHttpServerSpec
   }
 
   it should "respond to buildinfo" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    val buildInfoRequest = HttpRequest(HttpMethods.GET, uri = "/buildinfo")
+    val buildInfoRequest: HttpRequest = HttpRequest(HttpMethods.GET, uri = "/buildinfo")
 
     buildInfoRequest ~> Route.seal(mockJsonRpcHttpServer.route) ~> check {
       status shouldEqual StatusCodes.OK
@@ -131,7 +131,7 @@ class JsonRpcHttpServerSpec
       .expects(*)
       .returning(IO.pure(jsonRpcResponseSuccessful))
 
-    val postRequest =
+    val postRequest: HttpRequest =
       HttpRequest(HttpMethods.POST, uri = "/", entity = HttpEntity(MediaTypes.`application/json`, jsonRequest))
 
     postRequest ~> Route.seal(mockJsonRpcHttpServer.route) ~> check {
@@ -149,9 +149,9 @@ class JsonRpcHttpServerSpec
       .twice()
       .returning(IO.pure(jsonRpcResponseSuccessful))
 
-    val jsonRequests =
+    val jsonRequests: ByteString =
       ByteString("""[{"jsonrpc":"2.0", "method": "asd", "id": "1"}, {"jsonrpc":"2.0", "method": "asd", "id": "2"}]""")
-    val postRequest =
+    val postRequest: HttpRequest =
       HttpRequest(HttpMethods.POST, uri = "/", entity = HttpEntity(MediaTypes.`application/json`, jsonRequests))
 
     postRequest ~> Route.seal(mockJsonRpcHttpServer.route) ~> check {
@@ -161,8 +161,8 @@ class JsonRpcHttpServerSpec
   }
 
   it should "return BadRequest when malformed request is received" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    val jsonRequestInvalid = ByteString("""{"jsonrpc":"2.0", "method": "this is not a valid json""")
-    val postRequest =
+    val jsonRequestInvalid: ByteString = ByteString("""{"jsonrpc":"2.0", "method": "this is not a valid json""")
+    val postRequest: HttpRequest =
       HttpRequest(HttpMethods.POST, uri = "/", entity = HttpEntity(MediaTypes.`application/json`, jsonRequestInvalid))
 
     postRequest ~> Route.seal(mockJsonRpcHttpServer.route) ~> check {
@@ -171,7 +171,7 @@ class JsonRpcHttpServerSpec
   }
 
   it should "return a CORS Error" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    val postRequest = HttpRequest(
+    val postRequest: HttpRequest = HttpRequest(
       HttpMethods.POST,
       uri = "/",
       headers = Origin(HttpOrigin("http://non_accepted_origin.com")) :: Nil,
@@ -190,7 +190,7 @@ class JsonRpcHttpServerSpec
       .expects(*)
       .returning(IO.pure(jsonRpcResponseSuccessful))
 
-    val postRequest = HttpRequest(
+    val postRequest: HttpRequest = HttpRequest(
       HttpMethods.POST,
       uri = "/",
       headers = Origin(corsAllowedOrigin) :: Nil,
@@ -210,7 +210,7 @@ class JsonRpcHttpServerSpec
       .expects(*)
       .returning(IO.pure(jsonRpcResponseSuccessful))
 
-    val postRequest =
+    val postRequest: HttpRequest =
       HttpRequest(HttpMethods.POST, uri = "/", entity = HttpEntity(MediaTypes.`application/json`, jsonRequest))
 
     postRequest ~> Route.seal(mockJsonRpcHttpServerWithRateLimit.route) ~> check {
@@ -227,7 +227,7 @@ class JsonRpcHttpServerSpec
       .expects(*)
       .returning(IO.pure(jsonRpcResponseSuccessful))
 
-    val postRequest =
+    val postRequest: HttpRequest =
       HttpRequest(HttpMethods.POST, uri = "/", entity = HttpEntity(MediaTypes.`application/json`, jsonRequest))
 
     postRequest ~> Route.seal(mockJsonRpcHttpServerWithRateLimit.route) ~> check {
@@ -247,9 +247,9 @@ class JsonRpcHttpServerSpec
     RPCTest
   ) in new TestSetup {
     // When rate limiting is enabled, batch requests should be rejected without calling handleRequest
-    val jsonRequests =
+    val jsonRequests: ByteString =
       ByteString("""[{"jsonrpc":"2.0", "method": "asd", "id": "1"}, {"jsonrpc":"2.0", "method": "asd", "id": "2"}]""")
-    val postRequest =
+    val postRequest: HttpRequest =
       HttpRequest(HttpMethods.POST, uri = "/", entity = HttpEntity(MediaTypes.`application/json`, jsonRequests))
 
     postRequest ~> Route.seal(mockJsonRpcHttpServerWithRateLimit.route) ~> check {
@@ -266,7 +266,7 @@ class JsonRpcHttpServerSpec
       .twice()
       .returning(IO.pure(jsonRpcResponseSuccessful))
 
-    val postRequest =
+    val postRequest: HttpRequest =
       HttpRequest(HttpMethods.POST, uri = "/", entity = HttpEntity(MediaTypes.`application/json`, jsonRequest))
 
     postRequest ~> Route.seal(mockJsonRpcHttpServerWithRateLimit.route) ~> check {
@@ -300,10 +300,10 @@ class JsonRpcHttpServerSpec
       .twice()
       .returning(IO.pure(jsonRpcResponseSuccessful))
 
-    val postRequest =
+    val postRequest: HttpRequest =
       HttpRequest(HttpMethods.POST, uri = "/", entity = HttpEntity(MediaTypes.`application/json`, jsonRequest))
 
-    val postRequest2 =
+    val postRequest2: HttpRequest =
       HttpRequest(
         HttpMethods.POST,
         uri = "/",
@@ -328,7 +328,7 @@ class JsonRpcHttpServerSpec
   }
 
   it should "return status code OK when throw LogicError" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    val jsonRpcError = JsonRpcError.LogicError("Faucet error: Connection not established")
+    val jsonRpcError: JsonRpcError = JsonRpcError.LogicError("Faucet error: Connection not established")
     mockJsonRpcController.handleRequest
       .expects(*)
       .returning(
@@ -342,7 +342,7 @@ class JsonRpcHttpServerSpec
         )
       )
 
-    val postRequest =
+    val postRequest: HttpRequest =
       HttpRequest(HttpMethods.POST, uri = "/", entity = HttpEntity(MediaTypes.`application/json`, jsonRequest))
 
     postRequest ~> Route.seal(mockJsonRpcHttpServer.route) ~> check {
@@ -377,7 +377,7 @@ class JsonRpcHttpServerSpec
         )
       )
 
-    val postRequest =
+    val postRequest: HttpRequest =
       HttpRequest(HttpMethods.POST, uri = "/", entity = HttpEntity(MediaTypes.`application/json`, jsonRequest))
 
     postRequest ~> Route.seal(mockJsonRpcHttpServer.route) ~> check {
@@ -405,7 +405,7 @@ class JsonRpcHttpServerSpec
         )
       )
 
-    val postRequest =
+    val postRequest: HttpRequest =
       HttpRequest(HttpMethods.POST, uri = "/", entity = HttpEntity(MediaTypes.`application/json`, jsonRequest))
 
     postRequest ~> Route.seal(mockJsonRpcHttpServer.route) ~> check {
@@ -421,7 +421,7 @@ class JsonRpcHttpServerSpec
     UnitTest,
     RPCTest
   ) in new TestSetup {
-    val error = JsonRpcError.InvalidParams()
+    val error: JsonRpcError = JsonRpcError.InvalidParams()
     mockJsonRpcController.handleRequest
       .expects(*)
       .returning(
@@ -435,7 +435,7 @@ class JsonRpcHttpServerSpec
         )
       )
 
-    val postRequest =
+    val postRequest: HttpRequest =
       HttpRequest(HttpMethods.POST, uri = "/", entity = HttpEntity(MediaTypes.`application/json`, jsonRequest))
 
     postRequest ~> Route.seal(mockJsonRpcHttpServer.route) ~> check {

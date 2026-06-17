@@ -4,14 +4,14 @@ import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
-import cats.implicits.*
+import cats.implicits._
 
 import scala.collection.immutable.NumericRange
 import scala.concurrent.duration.FiniteDuration
 
 import fs2.Stream
 
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.TaskActorOps
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransaction
 import com.chipprbots.ethereum.transactions.TransactionHistoryService.ExtendedTransactionData
@@ -31,7 +31,7 @@ class TransactionHistoryService(
   )(implicit blockchainConfig: BlockchainConfig): IO[List[ExtendedTransactionData]] = {
     val txnsFromBlocks = Stream
       .emits(fromBlocks.reverse.toSeq)
-      .parEvalMap(10)(blockNr => IO(blockchainReader.getBlockByNumber(blockchainReader.getBestBranch(), blockNr)))
+      .parEvalMap(10)(blockNr => IO(blockchainReader.getBlockByNumber(blockchainReader.getBestBranch, blockNr)))
       .collect { case Some(block) => block }
       .flatMap { block =>
         val getBlockReceipts = IO {

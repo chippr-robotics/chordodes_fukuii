@@ -14,9 +14,8 @@ import com.chipprbots.ethereum.db.dataSource.DataSource.Key
 import com.chipprbots.ethereum.db.dataSource.DataSource.Namespace
 import com.chipprbots.ethereum.db.dataSource.DataSource.Value
 import com.chipprbots.ethereum.db.dataSource.DataSourceUpdate
-import com.chipprbots.ethereum.utils.ByteStringUtils.*
-
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.utils.ByteStringUtils._
 
 trait DataSourceIntegrationTestBehavior extends ScalaCheckPropertyChecks with ObjectGenerators {
 

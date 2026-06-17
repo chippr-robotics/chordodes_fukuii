@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync.snap
 
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
+import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.testkit.TestActorRef
@@ -14,8 +14,6 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import java.net.InetSocketAddress
-
 import com.chipprbots.ethereum.blockchain.sync.PeerRequestHandler.ResponseReceived
 import com.chipprbots.ethereum.blockchain.sync.TestSyncConfig
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
@@ -24,7 +22,8 @@ import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerId
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
+import com.chipprbots.ethereum.testing.Tags._
 
 class ChainDownloaderSpec
     extends TestKit(ActorSystem("ChainDownloaderSpec"))

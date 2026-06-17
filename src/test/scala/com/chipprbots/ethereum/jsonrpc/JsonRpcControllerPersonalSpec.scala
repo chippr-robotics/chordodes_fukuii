@@ -10,8 +10,8 @@ import cats.effect.unsafe.IORuntime
 import org.bouncycastle.util.encoders.Hex
 import org.json4s.DefaultFormats
 import org.json4s.Formats
-import org.json4s.JsonAST.*
-import org.json4s.JsonDSL.*
+import org.json4s.JsonAST._
+import org.json4s.JsonDSL._
 import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpecLike
@@ -20,12 +20,12 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.LongPatience
 import com.chipprbots.ethereum.WithActorSystemShutDown
-import com.chipprbots.ethereum.domain.*
-import com.chipprbots.ethereum.jsonrpc.PersonalService.*
+import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.jsonrpc.PersonalService._
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers.OptionNoneToJNullSerializer
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers.QuantitiesSerializer
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers.UnformattedDataJsonSerializer
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 class JsonRpcControllerPersonalSpec
     extends TestKit(ActorSystem("JsonRpcControllerPersonalSpec_System"))

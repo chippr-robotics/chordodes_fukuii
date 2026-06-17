@@ -2,18 +2,19 @@ package com.chipprbots.ethereum.blockchain.sync.snap
 
 import org.apache.pekko.util.ByteString
 
+import scala.annotation.unused
+
 import com.chipprbots.ethereum.domain.Account
+import com.chipprbots.ethereum.mpt.BranchNode
+import com.chipprbots.ethereum.mpt.ExtensionNode
+import com.chipprbots.ethereum.mpt.HashNode
+import com.chipprbots.ethereum.mpt.LeafNode
 import com.chipprbots.ethereum.mpt.MptNode
 import com.chipprbots.ethereum.mpt.MptTraversals
-import com.chipprbots.ethereum.mpt.ProofTrieInserter
 import com.chipprbots.ethereum.mpt.Node
-import com.chipprbots.ethereum.mpt.LeafNode
-import com.chipprbots.ethereum.mpt.ExtensionNode
-import com.chipprbots.ethereum.mpt.BranchNode
-import com.chipprbots.ethereum.mpt.HashNode
 import com.chipprbots.ethereum.mpt.NullNode
+import com.chipprbots.ethereum.mpt.ProofTrieInserter
 import com.chipprbots.ethereum.utils.Logger
-import scala.annotation.unused
 
 /** Merkle proof verifier for SNAP sync.
   *

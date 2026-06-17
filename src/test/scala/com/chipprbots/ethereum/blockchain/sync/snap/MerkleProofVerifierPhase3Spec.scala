@@ -1,6 +1,9 @@
 package com.chipprbots.ethereum.blockchain.sync.snap
 
-import java.util.concurrent.{Callable, Executors, Future as JFuture, TimeUnit}
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.{Future => JFuture}
 
 import org.apache.pekko.util.ByteString
 
@@ -9,8 +12,10 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Account
-import com.chipprbots.ethereum.mpt.{MerklePatriciaTrie, MptTraversals, byteStringSerializer}
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
+import com.chipprbots.ethereum.mpt.MptTraversals
+import com.chipprbots.ethereum.mpt.byteStringSerializer
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.testing.TestMptStorage
 
 /** Reference-behavioral test suite for MerkleProofVerifier Phase 3 (leaf insertion).
@@ -307,7 +312,7 @@ class MerkleProofVerifierPhase3Spec extends AnyFlatSpec with Matchers {
       proof = Seq.empty,
       startHash = ZeroKey,
       endHash = MaxKey
-    ) shouldBe a[Left[_, _]]
+    ) shouldBe a[Left[?, ?]]
   }
 
   // ── Group 6: Bad proof mutations — go-ethereum TestBadRangeProof ──────────────
@@ -329,7 +334,7 @@ class MerkleProofVerifierPhase3Spec extends AnyFlatSpec with Matchers {
       badProofFull,
       badProofAccts.head._1,
       badProofAccts.last._1
-    ) shouldBe a[Left[_, _]]
+    ) shouldBe a[Left[?, ?]]
   }
 
   it should "detect tampered value in the middle of a valid range" taggedAs UnitTest in {
@@ -340,7 +345,7 @@ class MerkleProofVerifierPhase3Spec extends AnyFlatSpec with Matchers {
       badProofFull,
       badProofAccts.head._1,
       badProofAccts.last._1
-    ) shouldBe a[Left[_, _]]
+    ) shouldBe a[Left[?, ?]]
   }
 
   it should "detect omitted account (gap) in the middle of a valid range" taggedAs UnitTest in {
@@ -350,7 +355,7 @@ class MerkleProofVerifierPhase3Spec extends AnyFlatSpec with Matchers {
       badProofFull,
       badProofAccts.head._1,
       badProofAccts.last._1
-    ) shouldBe a[Left[_, _]]
+    ) shouldBe a[Left[?, ?]]
   }
 
   it should "detect out-of-order accounts (swap two adjacent entries)" taggedAs UnitTest in {
@@ -362,7 +367,7 @@ class MerkleProofVerifierPhase3Spec extends AnyFlatSpec with Matchers {
       badProofFull,
       badProofAccts.head._1,
       badProofAccts.last._1
-    ) shouldBe a[Left[_, _]]
+    ) shouldBe a[Left[?, ?]]
   }
 
   it should "detect proof built from different trie (wrong proof nodes)" taggedAs UnitTest in {
@@ -374,7 +379,7 @@ class MerkleProofVerifierPhase3Spec extends AnyFlatSpec with Matchers {
       wrongProof,
       badProofAccts.head._1,
       badProofAccts.last._1
-    ) shouldBe a[Left[_, _]]
+    ) shouldBe a[Left[?, ?]]
   }
 
   it should "detect extra fabricated account added to the range" taggedAs UnitTest in {
@@ -385,7 +390,7 @@ class MerkleProofVerifierPhase3Spec extends AnyFlatSpec with Matchers {
       badProofFull,
       badProofAccts.head._1,
       badProofAccts.last._1
-    ) shouldBe a[Left[_, _]]
+    ) shouldBe a[Left[?, ?]]
   }
 
   // ── Group 7: Gapped range — go-ethereum TestGappedRangeProof ─────────────────
@@ -409,7 +414,7 @@ class MerkleProofVerifierPhase3Spec extends AnyFlatSpec with Matchers {
     val missingKey = ByteString(Array.fill(31)(0.toByte) :+ 5.toByte)
     val gapped = subRange.filterNot(_._1 == missingKey)
     MerkleProofVerifier(root)
-      .verifyAccountRange(gapped, proof, subRange.head._1, subRange.last._1) shouldBe a[Left[_, _]]
+      .verifyAccountRange(gapped, proof, subRange.head._1, subRange.last._1) shouldBe a[Left[?, ?]]
   }
 
   // ── Group 8: Shared-prefix keys — go-ethereum TestRangeProofKeysWithSharedPrefix ──

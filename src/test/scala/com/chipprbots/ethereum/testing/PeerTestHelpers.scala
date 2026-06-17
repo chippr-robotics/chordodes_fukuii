@@ -4,7 +4,8 @@ import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorRef
 
-import com.chipprbots.ethereum.network.{Peer, PeerId}
+import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.PeerId
 
 /** Test utilities for creating mock Peer instances in unit tests */
 object PeerTestHelpers {

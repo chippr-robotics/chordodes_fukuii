@@ -20,7 +20,7 @@ import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxyStorage
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.VmConfig
-import com.chipprbots.ethereum.vm.*
+import com.chipprbots.ethereum.vm._
 
 /** HIBERNATED: External VM features are currently in hibernation. This component is experimental and not core to
   * fukuii's functioning. Use vm.mode = "internal" in configuration (default setting).

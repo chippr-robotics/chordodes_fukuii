@@ -10,7 +10,7 @@ import org.apache.pekko.pattern.BackoffSupervisor
 
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import com.chipprbots.ethereum.faucet.FaucetHandler.WalletException
 import com.chipprbots.ethereum.faucet.jsonrpc.WalletService

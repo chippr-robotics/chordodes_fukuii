@@ -8,8 +8,10 @@ import org.apache.pekko.actor.Cancellable
 import org.apache.pekko.actor.Props
 import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.actor.SupervisorStrategy
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.actor.typed.{ActorRef => TypedActorRef}
+
+import scala.concurrent.duration._
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
@@ -20,14 +22,13 @@ import com.chipprbots.ethereum.blockchain.sync.regular.RegularSync.ProgressProto
 import com.chipprbots.ethereum.blockchain.sync.regular.RegularSync.ProgressState
 import com.chipprbots.ethereum.consensus.ConsensusAdapter
 import com.chipprbots.ethereum.consensus.validators.BlockValidator
-import com.chipprbots.ethereum.db.storage.{EvmCodeStorage, StateStorage}
+import com.chipprbots.ethereum.db.storage.EvmCodeStorage
+import com.chipprbots.ethereum.db.storage.StateStorage
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
 import com.chipprbots.ethereum.ledger.BranchResolution
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.utils.Config.SyncConfig
-
-import scala.concurrent.duration.*
 
 class RegularSync(
     peersClient: ActorRef,

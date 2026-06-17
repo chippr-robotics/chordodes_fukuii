@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 /** Tests that BlockHeaderValidatorSkeleton enforces extraFields and baseFee at the Olympia fork boundary.
@@ -93,7 +93,7 @@ class OlympiaBlockHeaderValidationSpec
           extraFields = HefPostOlympia(InitialBaseFee)
         )
         val result = validate(wrongChild, parent)
-        result shouldBe a[Left[_, _]]
+        result shouldBe a[Left[?, ?]]
         result.left.toOption.get shouldBe a[HeaderExtraFieldsError]
       }
     }
@@ -113,7 +113,7 @@ class OlympiaBlockHeaderValidationSpec
         val parent = preOlympiaHeader(olympiaBlock - 1, timestamp = 1000L)
         val wrongFee = firstOlympiaHeader(timestamp = 2000L, baseFee = InitialBaseFee + 1)
         val result = validate(wrongFee, parent)
-        result shouldBe a[Left[_, _]]
+        result shouldBe a[Left[?, ?]]
         result.left.toOption.get shouldBe a[HeaderBaseFeeError]
       }
 
@@ -138,7 +138,7 @@ class OlympiaBlockHeaderValidationSpec
           extraFields = HefEmpty
         )
         val result = validate(noFeeChild, parent)
-        result shouldBe a[Left[_, _]]
+        result shouldBe a[Left[?, ?]]
         result.left.toOption.get shouldBe a[HeaderExtraFieldsError]
       }
     }
@@ -177,7 +177,7 @@ class OlympiaBlockHeaderValidationSpec
           extraFields = HefEmpty
         )
         val result = validate(missingFee, firstBlock)
-        result shouldBe a[Left[_, _]]
+        result shouldBe a[Left[?, ?]]
         result.left.toOption.get shouldBe a[HeaderExtraFieldsError]
       }
     }

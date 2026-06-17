@@ -6,16 +6,16 @@ import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.BlockBody.BlockBodyRLPEncodableDec
-import com.chipprbots.ethereum.domain.BlockHeaderImplicits.*
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain.BlockHeaderImplicits._
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.forkid.ForkId
-import com.chipprbots.ethereum.forkid.ForkId.*
+import com.chipprbots.ethereum.forkid.ForkId._
 import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.MessageSerializableImplicit
 import com.chipprbots.ethereum.rlp.RLPCodec.Ops
-import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
+import com.chipprbots.ethereum.rlp.RLPImplicitConversions._
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
-import com.chipprbots.ethereum.rlp.*
+import com.chipprbots.ethereum.rlp._
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 import com.chipprbots.ethereum.utils.ByteUtils
 

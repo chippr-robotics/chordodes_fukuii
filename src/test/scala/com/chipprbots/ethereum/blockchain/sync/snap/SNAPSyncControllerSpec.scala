@@ -2,13 +2,13 @@ package com.chipprbots.ethereum.blockchain.sync.snap
 
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.db.storage.MptStorage
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.testing.TestMptStorage
 
 class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {

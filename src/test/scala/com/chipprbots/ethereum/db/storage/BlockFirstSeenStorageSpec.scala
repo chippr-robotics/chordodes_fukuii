@@ -2,12 +2,12 @@ package com.chipprbots.ethereum.db.storage
 
 import org.apache.pekko.util.ByteString
 
+import scala.collection.mutable
+
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags.*
-
-import scala.collection.mutable
+import com.chipprbots.ethereum.testing.Tags._
 
 class BlockFirstSeenStorageSpec extends AnyFlatSpec with Matchers {
 

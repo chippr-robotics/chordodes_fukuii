@@ -1,33 +1,33 @@
 package com.chipprbots.ethereum.network
 
-import scala.concurrent.duration.*
-
 import org.apache.pekko.actor.Actor
 import org.apache.pekko.actor.ActorLogging
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.Props
 import org.apache.pekko.util.ByteString
 
+import scala.concurrent.duration._
+
 import com.chipprbots.ethereum.db.storage.AppStateStorage
+import com.chipprbots.ethereum.domain.Account._
 import com.chipprbots.ethereum.domain.ChainWeight
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor.*
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor._
 import com.chipprbots.ethereum.network.PeerActor.DisconnectPeer
-import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.*
+import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent._
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
 import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
-import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.*
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier._
 import com.chipprbots.ethereum.network.PeerEventBusActor.Unsubscribe
 import com.chipprbots.ethereum.network.handshaker.Handshaker.HandshakeResult
 import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.MessageSerializable
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.Codes
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes
 import com.chipprbots.ethereum.network.p2p.messages.ETH69
-import com.chipprbots.ethereum.domain.Account.*
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes
 import com.chipprbots.ethereum.network.p2p.messages.SNAP
-import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
+import com.chipprbots.ethereum.network.p2p.messages.SNAP._
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect
 import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
@@ -286,7 +286,7 @@ class NetworkPeerManagerActor(
       // becomes the primary correction path.
       if (!coldStartCompleted) {
         blockchainReader.foreach { reader =>
-          if (reader.getBestBlockNumber() > 0) {
+          if (reader.getBestBlockNumber > 0) {
             coldStartCompleted = true
             var updatedPeers = peersWithInfo
             var refreshCount = 0
@@ -525,7 +525,7 @@ class NetworkPeerManagerActor(
         // by definition; no post-SNAP node can have a best block of exactly 0.
         if (peerInfo.remoteStatus.capability != com.chipprbots.ethereum.network.p2p.messages.Capability.ETH69) {
           val peerTD = peerInfo.remoteStatus.chainWeight.totalDifficulty
-          reader.getBestBlock().foreach { ourBest =>
+          reader.getBestBlock.foreach { ourBest =>
             reader.getChainWeightByHash(ourBest.header.hash).foreach { ourWeight =>
               if (peerTD > ourWeight.totalDifficulty) {
                 val ratio = peerTD / ourWeight.totalDifficulty
@@ -948,7 +948,7 @@ class NetworkPeerManagerActor(
   private var freshRootCacheTip: BigInt = BigInt(-1)
 
   private def refreshFreshRootCache(reader: com.chipprbots.ethereum.domain.BlockchainReader): Unit = {
-    val tip = reader.getBestBlockNumber()
+    val tip = reader.getBestBlockNumber
     if (tip != freshRootCacheTip) {
       val window = BigInt(128)
       val from = (tip - window).max(BigInt(0))

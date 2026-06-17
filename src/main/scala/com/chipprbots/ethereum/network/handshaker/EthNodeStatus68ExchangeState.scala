@@ -64,7 +64,7 @@ case class EthNodeStatus68ExchangeState(
       forkId
     )
 
-    val localBestBlock = blockchainReader.getBestBlockNumber()
+    val localBestBlock = blockchainReader.getBestBlockNumber
     val localGenesisHash = blockchainReader.genesisHeader.hash
     val storedTimestamp = blockchainReader.getBlockHeaderByNumber(localBestBlock).map(_.unixTimestamp).getOrElse(0L)
     val localBestTimestamp = if (storedTimestamp == 0L) System.currentTimeMillis() / 1000 else storedTimestamp
@@ -98,7 +98,7 @@ case class EthNodeStatus68ExchangeState(
       (for {
         validationResult <-
           ForkIdValidator.validatePeer[SyncIO](blockchainReader.genesisHeader.hash, blockchainConfig)(
-            blockchainReader.getBestBlockNumber(),
+            blockchainReader.getBestBlockNumber,
             forkId
           )
       } yield {
@@ -140,7 +140,7 @@ case class EthNodeStatus68ExchangeState(
 
   override protected def createStatusMsg(): MessageSerializable = {
     val bestBlockHeader = getBestBlockHeader()
-    val bestBlockNumber = blockchainReader.getBestBlockNumber()
+    val bestBlockNumber = blockchainReader.getBestBlockNumber
 
     // ChainWeightStorage isn't populated for blocks reached via SNAP sync (the pivot block
     // has no upstream PoW chain in our DB to sum difficulties over). On post-merge chains

@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.consensus.pow.miners
 
-import org.apache.pekko.actor.ActorRef as ClassicActorRef
+import org.apache.pekko.actor.{ActorRef => ClassicActorRef}
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.Future

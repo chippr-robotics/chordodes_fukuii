@@ -1,5 +1,4 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
-
 import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorRef
@@ -16,9 +15,10 @@ import cats.Eq
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
-import cats.implicits.*
+import cats.implicits._
 
 import scala.collection.mutable
+import scala.compiletime.uninitialized
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.duration.FiniteDuration
 import scala.math.BigInt
@@ -30,12 +30,13 @@ import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.BlockHelpers
-import com.chipprbots.ethereum.blockchain.sync.*
+import com.chipprbots.ethereum.blockchain.sync._
 import com.chipprbots.ethereum.consensus.ConsensusAdapter
-import com.chipprbots.ethereum.db.storage.{EvmCodeStorage, StateStorage}
-import com.chipprbots.ethereum.domain.BlockHeaderImplicits.*
-import com.chipprbots.ethereum.domain.*
-import com.chipprbots.ethereum.ledger.*
+import com.chipprbots.ethereum.db.storage.EvmCodeStorage
+import com.chipprbots.ethereum.db.storage.StateStorage
+import com.chipprbots.ethereum.domain.BlockHeaderImplicits._
+import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.ledger._
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
 import com.chipprbots.ethereum.network.Peer
@@ -46,11 +47,12 @@ import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockBodies
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetNodeData
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NodeData
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders as ETHGetBlockHeaders
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockBodies as ETHGetBlockBodies
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{BlockHeaders, BlockBodies}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{GetBlockBodies => ETHGetBlockBodies}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{GetBlockHeaders => ETHGetBlockHeaders}
 import com.chipprbots.ethereum.ommers.OmmersPool
 import com.chipprbots.ethereum.security.SecureRandomBuilder
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
@@ -432,7 +434,7 @@ trait RegularSyncFixtures { self: Matchers with AsyncMockFactory =>
 
     override lazy val consensusAdapter: ConsensusAdapter = stub[ConsensusAdapter]
 
-    var blockFetcher: ActorRef = _
+    var blockFetcher: ActorRef = uninitialized
 
     var importedNewBlock = false
     var importedLastTestBlock = false

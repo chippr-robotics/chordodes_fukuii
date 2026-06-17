@@ -3,17 +3,18 @@ package com.chipprbots.ethereum.vm
 import java.security.SecureRandom
 
 import org.apache.pekko.util.ByteString
+
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
+import com.chipprbots.ethereum.Fixtures.{Blocks => BlockFixtures}
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.Config
 
 /** Tests for EIP-3860: Limit and meter initcode https://eips.ethereum.org/EIPS/eip-3860
@@ -30,7 +31,7 @@ class Eip3860Spec extends AnyWordSpec with Matchers {
 
   // EIP-3860 constants
   val MaxCodeSize = 24576 // EIP-170
-  val MaxInitCodeSize = MaxCodeSize * 2 // 49152 bytes
+  val MaxInitCodeSize: Int = MaxCodeSize * 2 // 49152 bytes
   val InitCodeWordCost = 2 // Gas per 32-byte word
 
   object fxt {

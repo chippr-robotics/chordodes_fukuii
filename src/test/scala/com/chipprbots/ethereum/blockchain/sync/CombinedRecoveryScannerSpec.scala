@@ -16,7 +16,7 @@ import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.defaultByteArraySerializable
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 /** CombinedRecoveryScanner is the cohesive integration of ShardEnumerator (#1) + CombinedRecoveryScan (#2) +
   * RecoveryProgress (#3). Its correctness bar:
@@ -32,7 +32,7 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite {
 
   /** A fresh in-memory state + EVM store with helpers to plant present/missing bytecode and storage. */
   private class Fixture {
-    val ds = EphemDataSource()
+    val ds: EphemDataSource = EphemDataSource()
     val (stateStorage, _, _) = StateStorage.createTestStateStorage(ds)
     val evm = new EvmCodeStorage(ds)
     private val build = stateStorage.getBackingStorage(0)

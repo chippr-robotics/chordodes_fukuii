@@ -6,7 +6,7 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.security.SecureRandomBuilder
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 class EncryptedKeySpec extends AnyFlatSpec with Matchers with SecureRandomBuilder {
 

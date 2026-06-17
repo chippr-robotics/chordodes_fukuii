@@ -3,14 +3,14 @@ package com.chipprbots.ethereum.network.rlpx
 import java.net.InetSocketAddress
 import java.net.URI
 
-import org.apache.pekko.actor.*
+import org.apache.pekko.actor._
 import org.apache.pekko.io.IO
 import org.apache.pekko.io.Tcp
-import org.apache.pekko.io.Tcp.*
+import org.apache.pekko.io.Tcp._
 import org.apache.pekko.util.ByteString
 
 import scala.collection.immutable.Queue
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
@@ -21,7 +21,7 @@ import com.chipprbots.ethereum.network.handshaker.HelloExchangeState
 import com.chipprbots.ethereum.network.p2p.EthereumMessageDecoder
 import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.MessageDecoder
-import com.chipprbots.ethereum.network.p2p.MessageDecoder.*
+import com.chipprbots.ethereum.network.p2p.MessageDecoder._
 import com.chipprbots.ethereum.network.p2p.MessageSerializable
 import com.chipprbots.ethereum.network.p2p.NetworkMessageDecoder
 import com.chipprbots.ethereum.network.p2p.SNAPMessageDecoder
@@ -31,7 +31,6 @@ import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Hello.HelloEnc
 import com.chipprbots.ethereum.network.rlpx.MessageCodec.CompressionPolicy
 import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.HelloCodec
 import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.RLPxConfiguration
-
 import com.chipprbots.ethereum.utils.ByteUtils
 
 /** This actors takes care of initiating a secure connection (auth handshake) between peers. Once such connection is

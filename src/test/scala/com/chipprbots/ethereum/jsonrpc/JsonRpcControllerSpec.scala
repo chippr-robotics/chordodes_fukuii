@@ -6,7 +6,7 @@ import org.apache.pekko.testkit.TestKit
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import org.json4s.DefaultFormats
 import org.json4s.Formats
@@ -37,7 +37,7 @@ import com.chipprbots.ethereum.jsonrpc.server.ipc.JsonRpcIpcServer
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
 import com.chipprbots.ethereum.network.p2p.messages.Capability
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 class JsonRpcControllerSpec
     extends TestKit(ActorSystem("JsonRpcControllerSpec_System"))

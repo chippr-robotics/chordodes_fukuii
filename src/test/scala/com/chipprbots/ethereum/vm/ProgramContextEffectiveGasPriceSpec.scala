@@ -5,14 +5,14 @@ import org.apache.pekko.util.ByteString
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.Fixtures as CommonFixtures
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.SignedTransaction
-import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.domain.TransactionWithDynamicFee
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.domain.UInt256
+import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.{Fixtures => CommonFixtures}
 
 /** Regression for `ProgramContext.apply` setting `gasPrice` to the EIP-1559 effective gas price (min(maxFeePerGas,
   * baseFee + maxPriorityFeePerGas)) rather than the raw `tx.gasPrice` (which for Type-2 returns maxFeePerGas).

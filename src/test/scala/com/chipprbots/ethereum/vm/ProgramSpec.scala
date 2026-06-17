@@ -7,8 +7,9 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import Generators.*
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
+
+import Generators._
 
 class ProgramSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks {
 

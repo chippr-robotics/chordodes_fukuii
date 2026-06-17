@@ -1,14 +1,15 @@
 package com.chipprbots.ethereum.network
 
 import java.time.Instant
-import scala.concurrent.duration.*
+
+import scala.concurrent.duration._
 
 import org.scalacheck.Gen
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 /** Multi-step feedback loop tests for PeerScore.
   *

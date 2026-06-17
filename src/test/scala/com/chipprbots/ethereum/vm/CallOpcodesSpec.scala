@@ -6,12 +6,12 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.crypto.*
+import com.chipprbots.ethereum.crypto._
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.utils.ByteUtils
-import com.chipprbots.ethereum.vm.MockWorldState.*
+import com.chipprbots.ethereum.vm.MockWorldState._
 
 import Fixtures.blockchainConfig
 

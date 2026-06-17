@@ -6,19 +6,18 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
+import com.chipprbots.ethereum.domain.BlockchainStorages
 import com.chipprbots.ethereum.domain.BlockchainWriter
 import com.chipprbots.ethereum.domain.Receipt
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.ledger.BlockExecution
 import com.chipprbots.ethereum.ledger.BlockQueue
 import com.chipprbots.ethereum.ledger.BlockValidation
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.txExecTest.util.FixtureProvider
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
 import com.chipprbots.ethereum.utils.MonetaryPolicyConfig
-import com.chipprbots.ethereum.domain.BlockchainStorages
-
-import com.chipprbots.ethereum.testing.Tags.*
 
 class ECIP1017Test extends AnyFlatSpec with Matchers {
 
@@ -46,7 +45,7 @@ class ECIP1017Test extends AnyFlatSpec with Matchers {
       ethCompatibleStorage = true,
       gasTieBreaker = false
     )
-    val noErrors: ResultOfATypeInvocation[Right[_, Seq[Receipt]]] = a[Right[_, Seq[Receipt]]]
+    val noErrors: ResultOfATypeInvocation[Right[?, Seq[Receipt]]] = a[Right[?, Seq[Receipt]]]
   }
 
   /** Tests the block reward calculation through out all the monetary policy through all the eras till block mining

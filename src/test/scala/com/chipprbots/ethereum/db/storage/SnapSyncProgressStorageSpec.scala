@@ -1,15 +1,16 @@
 package com.chipprbots.ethereum.db.storage
 
+import java.io.File
+import java.nio.file.Files
+
 import org.apache.pekko.util.ByteString
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.db.dataSource.{RocksDbConfig, RocksDbDataSource}
-import com.chipprbots.ethereum.testing.Tags.*
-
-import java.io.File
-import java.nio.file.Files
+import com.chipprbots.ethereum.db.dataSource.RocksDbConfig
+import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource
+import com.chipprbots.ethereum.testing.Tags._
 
 /** Tests for [[SnapSyncProgressStorage]] — SNAP download cursor persistence (account + storage cursors). */
 class SnapSyncProgressStorageSpec extends AnyFlatSpec with Matchers {

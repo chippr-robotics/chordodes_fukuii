@@ -5,7 +5,7 @@ import java.net.InetSocketAddress
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 import org.bouncycastle.crypto.params.ECPublicKeyParameters
 
-import com.chipprbots.ethereum.network.*
+import com.chipprbots.ethereum.network._
 
 sealed trait ServerStatus
 object ServerStatus {

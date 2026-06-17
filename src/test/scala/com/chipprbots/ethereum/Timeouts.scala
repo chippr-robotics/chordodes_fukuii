@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 object Timeouts {
 

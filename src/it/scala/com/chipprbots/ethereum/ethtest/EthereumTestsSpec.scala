@@ -1,9 +1,12 @@
 package com.chipprbots.ethereum.ethtest
 
 import cats.effect.unsafe.IORuntime
+
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+
 import com.chipprbots.ethereum.utils.Config
+import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 
 /** Base spec for running ethereum/tests blockchain tests
   *
@@ -76,7 +79,7 @@ abstract class EthereumTestsSpec extends AnyFlatSpec with Matchers {
   }
 
   /** Set up initial state for a test */
-  def setupTestState(test: BlockchainTest) =
+  def setupTestState(test: BlockchainTest): Either[String, InMemoryWorldStateProxy] =
     EthereumTestExecutor.setupInitialStateForTest(test)
 
   /** Parse address from hex string */

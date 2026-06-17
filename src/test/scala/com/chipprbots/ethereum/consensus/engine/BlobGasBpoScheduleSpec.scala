@@ -1,12 +1,12 @@
 package com.chipprbots.ethereum.consensus.engine
 
+import org.scalatest.ParallelTestExecution
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.ParallelTestExecution
 
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
-import com.chipprbots.ethereum.testing.Tags.*
 
 /** EIP-7892 (Blob Parameter Only forks) — verify that fork-aware blob target / max selection picks the active BPO rung
   * instead of the Prague defaults. Without this, post-Osaka Sepolia blocks fail Engine API validation with

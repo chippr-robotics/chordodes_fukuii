@@ -1,9 +1,10 @@
 package com.chipprbots.ethereum.jsonrpc
 
 import org.apache.pekko.util.ByteString
-import org.json4s.JsonAST.*
 
-import com.chipprbots.ethereum.jsonrpc.EthUserService.*
+import org.json4s.JsonAST._
+
+import com.chipprbots.ethereum.jsonrpc.EthUserService._
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError.InvalidParams
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonEncoder
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder

@@ -9,7 +9,7 @@ import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import com.typesafe.config.ConfigFactory
 import org.scalatest.BeforeAndAfter
@@ -36,12 +36,13 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.
 import com.chipprbots.ethereum.network.PeerEventBusActor.Unsubscribe
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.Message
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.Codes
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{BlockHeaders, GetBlockHeaders}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.Config.SyncConfig
-import com.chipprbots.ethereum.testing.Tags.*
 
 class PivotBlockSelectorSpec
     extends TestKit(

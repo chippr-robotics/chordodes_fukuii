@@ -7,19 +7,34 @@ import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
 
+import scala.concurrent.duration._
+
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-
-import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.branch.EmptyBranch
 import com.chipprbots.ethereum.network.BlockedIPRegistry
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.NodeStatus
 import com.chipprbots.ethereum.utils.ServerStatus
+import com.chipprbots.ethereum.jsonrpc.AdminService.AdminNodeInfoResponse
+import com.chipprbots.ethereum.jsonrpc.AdminService.AdminNodeInfoResponse
+import com.chipprbots.ethereum.jsonrpc.AdminService.EthProtocolInfo
+import com.chipprbots.ethereum.jsonrpc.AdminService.AdminNodeInfoResponse
+import com.chipprbots.ethereum.jsonrpc.AdminService.AdminNodeInfoResponse
+import com.chipprbots.ethereum.jsonrpc.AdminService.AdminChangeLogLevelResponse
+import com.chipprbots.ethereum.jsonrpc.AdminService.AdminChangeLogLevelResponse
+import com.chipprbots.ethereum.jsonrpc.AdminService.AdminChangeLogLevelResponse
+import com.chipprbots.ethereum.jsonrpc.AdminService.AdminBlockIPResponse
+import com.chipprbots.ethereum.jsonrpc.AdminService.AdminListBlockedIPsResponse
+import com.chipprbots.ethereum.jsonrpc.AdminService.AdminUnblockIPResponse
+import com.chipprbots.ethereum.jsonrpc.AdminService.AdminListBlockedIPsResponse
+import com.chipprbots.ethereum.jsonrpc.AdminService.AdminUnblockIPResponse
+import com.chipprbots.ethereum.jsonrpc.AdminService.AdminDatadirResponse
+import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 
 /** Unit tests for AdminService — Besu admin_* namespace.
   *
@@ -31,9 +46,9 @@ class AdminServiceSpec extends AnyFlatSpec with Matchers {
   implicit val runtime: IORuntime = IORuntime.global
 
   "AdminService.nodeInfo" should "return P2P info when server is listening" taggedAs UnitTest in new TestSetup {
-    val result = service.nodeInfo(AdminService.AdminNodeInfoRequest()).unsafeRunSync()
+    val result: Either[JsonRpcError, AdminNodeInfoResponse] = service.nodeInfo(AdminService.AdminNodeInfoRequest()).unsafeRunSync()
 
-    result shouldBe a[Right[_, _]]
+    result shouldBe a[Right[?, ?]]
     val info = result.toOption.get
     info.enode shouldBe defined
     info.enode.get should startWith("enode://")
@@ -44,10 +59,10 @@ class AdminServiceSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "return protocols.eth with genesis, head, difficulty, network" taggedAs UnitTest in new TestSetup {
-    val result = service.nodeInfo(AdminService.AdminNodeInfoRequest()).unsafeRunSync()
+    val result: Either[JsonRpcError, AdminNodeInfoResponse] = service.nodeInfo(AdminService.AdminNodeInfoRequest()).unsafeRunSync()
     val info = result.toOption.get
     (info.protocols should contain).key("eth")
-    val eth = info.protocols("eth")
+    val eth: EthProtocolInfo = info.protocols("eth")
     eth.genesis should startWith("0x")
     eth.head should startWith("0x")
     eth.difficulty should startWith("0x")
@@ -55,13 +70,13 @@ class AdminServiceSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "return activeFork as a non-empty string" taggedAs UnitTest in new TestSetup {
-    val result = service.nodeInfo(AdminService.AdminNodeInfoRequest()).unsafeRunSync()
+    val result: Either[JsonRpcError, AdminNodeInfoResponse] = service.nodeInfo(AdminService.AdminNodeInfoRequest()).unsafeRunSync()
     val info = result.toOption.get
     info.activeFork should not be empty
   }
 
   it should "return minimal info when server is not listening" taggedAs UnitTest in new TestSetup {
-    val notListeningStatus = NodeStatus(
+    val notListeningStatus: NodeStatus = NodeStatus(
       com.chipprbots.ethereum.crypto.generateKeyPair(new java.security.SecureRandom),
       ServerStatus.NotListening,
       ServerStatus.NotListening
@@ -76,7 +91,7 @@ class AdminServiceSpec extends AnyFlatSpec with Matchers {
       "/tmp",
       new BlockedIPRegistry(Set.empty)
     )
-    val result = svc.nodeInfo(AdminService.AdminNodeInfoRequest()).unsafeRunSync()
+    val result: Either[JsonRpcError, AdminNodeInfoResponse] = svc.nodeInfo(AdminService.AdminNodeInfoRequest()).unsafeRunSync()
 
     val info = result.toOption.get
     info.enode shouldBe None
@@ -85,59 +100,59 @@ class AdminServiceSpec extends AnyFlatSpec with Matchers {
   }
 
   "AdminService.changeLogLevel" should "accept valid log level INFO" taggedAs UnitTest in new TestSetup {
-    val result = service.changeLogLevel(AdminService.AdminChangeLogLevelRequest("INFO", None)).unsafeRunSync()
-    result shouldBe a[Right[_, _]]
+    val result: Either[JsonRpcError, AdminChangeLogLevelResponse] = service.changeLogLevel(AdminService.AdminChangeLogLevelRequest("INFO", None)).unsafeRunSync()
+    result shouldBe a[Right[?, ?]]
   }
 
   it should "accept valid log level DEBUG with package filter" taggedAs UnitTest in new TestSetup {
-    val result = service
+    val result: Either[JsonRpcError, AdminChangeLogLevelResponse] = service
       .changeLogLevel(
         AdminService.AdminChangeLogLevelRequest("DEBUG", Some(List("com.chipprbots")))
       )
       .unsafeRunSync()
-    result shouldBe a[Right[_, _]]
+    result shouldBe a[Right[?, ?]]
   }
 
   it should "reject invalid log level" taggedAs UnitTest in new TestSetup {
-    val result = service.changeLogLevel(AdminService.AdminChangeLogLevelRequest("VERBOSE", None)).unsafeRunSync()
-    result shouldBe a[Left[_, _]]
+    val result: Either[JsonRpcError, AdminChangeLogLevelResponse] = service.changeLogLevel(AdminService.AdminChangeLogLevelRequest("VERBOSE", None)).unsafeRunSync()
+    result shouldBe a[Left[?, ?]]
   }
 
   "AdminService.blockIP / unblockIP / listBlockedIPs" should "manage blocklist correctly" taggedAs UnitTest in new TestSetup {
-    val blockResult = service.blockIP(AdminService.AdminBlockIPRequest("1.2.3.4")).unsafeRunSync()
+    val blockResult: Either[JsonRpcError, AdminBlockIPResponse] = service.blockIP(AdminService.AdminBlockIPRequest("1.2.3.4")).unsafeRunSync()
     blockResult shouldBe Right(AdminService.AdminBlockIPResponse(true))
 
-    val listResult = service.listBlockedIPs(AdminService.AdminListBlockedIPsRequest()).unsafeRunSync()
+    val listResult: Either[JsonRpcError, AdminListBlockedIPsResponse] = service.listBlockedIPs(AdminService.AdminListBlockedIPsRequest()).unsafeRunSync()
     listResult.toOption.get.ips should contain("1.2.3.4")
 
-    val unblockResult = service.unblockIP(AdminService.AdminUnblockIPRequest("1.2.3.4")).unsafeRunSync()
+    val unblockResult: Either[JsonRpcError, AdminUnblockIPResponse] = service.unblockIP(AdminService.AdminUnblockIPRequest("1.2.3.4")).unsafeRunSync()
     unblockResult shouldBe Right(AdminService.AdminUnblockIPResponse(true))
 
-    val listAfter = service.listBlockedIPs(AdminService.AdminListBlockedIPsRequest()).unsafeRunSync()
+    val listAfter: Either[JsonRpcError, AdminListBlockedIPsResponse] = service.listBlockedIPs(AdminService.AdminListBlockedIPsRequest()).unsafeRunSync()
     listAfter.toOption.get.ips should not contain "1.2.3.4"
   }
 
   it should "return false when unblocking an IP not in the list" taggedAs UnitTest in new TestSetup {
-    val result = service.unblockIP(AdminService.AdminUnblockIPRequest("9.9.9.9")).unsafeRunSync()
+    val result: Either[JsonRpcError, AdminUnblockIPResponse] = service.unblockIP(AdminService.AdminUnblockIPRequest("9.9.9.9")).unsafeRunSync()
     result shouldBe Right(AdminService.AdminUnblockIPResponse(false))
   }
 
   "AdminService.getDatadir" should "return configured datadir" taggedAs UnitTest in new TestSetup {
-    val result = service.getDatadir(AdminService.AdminDatadirRequest()).unsafeRunSync()
+    val result: Either[JsonRpcError, AdminDatadirResponse] = service.getDatadir(AdminService.AdminDatadirRequest()).unsafeRunSync()
     result shouldBe Right(AdminService.AdminDatadirResponse("/tmp/test-datadir"))
   }
 
   trait TestSetup {
-    val keyPair = com.chipprbots.ethereum.crypto.generateKeyPair(new java.security.SecureRandom)
+    val keyPair: AsymmetricCipherKeyPair = com.chipprbots.ethereum.crypto.generateKeyPair(new java.security.SecureRandom)
     val listenAddr = new InetSocketAddress("127.0.0.1", 30305)
-    val nodeStatus = NodeStatus(keyPair, ServerStatus.Listening(listenAddr), ServerStatus.NotListening)
+    val nodeStatus: NodeStatus = NodeStatus(keyPair, ServerStatus.Listening(listenAddr), ServerStatus.NotListening)
     val nodeStatusHolder = new AtomicReference(nodeStatus)
     val registry = new BlockedIPRegistry(Set.empty)
 
     /** Minimal BlockchainReader stub — only overrides the three methods used by nodeInfo. */
     val stubBlockchainReader: BlockchainReader = new BlockchainReader(null, null, null, null, null, null, null) {
       override val genesisHeader = Fixtures.Blocks.Block3125369.header
-      override def getBestBranch() = EmptyBranch
+      override def getBestBranch = EmptyBranch
       override def getChainWeightByHash(hash: ByteString) = None
     }
 

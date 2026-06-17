@@ -8,7 +8,7 @@ import cats.effect.unsafe.IORuntime
 
 import scala.annotation.tailrec
 
-import com.chipprbots.ethereum.consensus.Consensus.*
+import com.chipprbots.ethereum.consensus.Consensus._
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
@@ -54,7 +54,7 @@ class ConsensusImpl(
     // then fall back to header-only — that's the state right after PivotHeaderBootstrap
     // completes. handleBranchImport only consumes header.hash and header.number,
     // so a header is sufficient. Closes #1201's post-bootstrap follow-up.
-    blockchainReader.getBestBlock().map(_.header).orElse(blockchainReader.getBestBlockHeader()) match {
+    blockchainReader.getBestBlock.map(_.header).orElse(blockchainReader.getBestBlockHeader) match {
       case Some(bestHeader) =>
         blockchainReader.getChainWeightByHash(bestHeader.hash) match {
           case Some(weight) => handleBranchImport(branch, bestHeader, weight)
@@ -231,7 +231,7 @@ class ConsensusImpl(
   private def collectOldBranch(parent: ByteString, fromNumber: BigInt): List[BlockData] = {
     @tailrec
     def go(parent: ByteString, fromNumber: BigInt, acc: List[BlockData]): List[BlockData] =
-      blockchainReader.getBlockByNumber(blockchainReader.getBestBranch(), fromNumber) match {
+      blockchainReader.getBlockByNumber(blockchainReader.getBestBranch, fromNumber) match {
         case Some(block) if block.header.hash == parent || fromNumber == 0 =>
           acc
 

@@ -3,8 +3,8 @@ package com.chipprbots.ethereum.mpt
 import java.io.File
 import java.nio.file.Files
 
-import com.chipprbots.ethereum.db.dataSource.*
-import com.chipprbots.ethereum.db.storage.*
+import com.chipprbots.ethereum.db.dataSource._
+import com.chipprbots.ethereum.db.storage._
 
 trait PersistentStorage {
 

@@ -41,7 +41,7 @@ object ECDSASignature {
     // v must be treated as unsigned byte when converting to BigInt
     // For EIP-155 chains, v can be >= 128 (e.g., v=157 for ETC mainnet with chainId=61)
     // Byte type is signed, so 157 becomes -99. We need to convert as unsigned.
-    ECDSASignature(BigInt(1, r.toArray), BigInt(1, s.toArray), BigInt(v & 0xFF))
+    ECDSASignature(BigInt(1, r.toArray), BigInt(1, s.toArray), BigInt(v & 0xff))
 
   def fromBytes(bytes65: ByteString): Option[ECDSASignature] =
     if (bytes65.length == EncodedLength)
@@ -63,9 +63,11 @@ object ECDSASignature {
     val components = signer.generateSignature(messageHash)
     val r = BigInt(components(0))
     val s = ECDSASignature.canonicalise(BigInt(components(1)))
-    val v = BigInt(ECDSASignature
-      .calculateV(r, s, keyPair, messageHash)
-      .getOrElse(throw new RuntimeException("Failed to calculate signature rec id")))
+    val v = BigInt(
+      ECDSASignature
+        .calculateV(r, s, keyPair, messageHash)
+        .getOrElse(throw new RuntimeException("Failed to calculate signature rec id"))
+    )
 
     ECDSASignature(r, s, v)
   }

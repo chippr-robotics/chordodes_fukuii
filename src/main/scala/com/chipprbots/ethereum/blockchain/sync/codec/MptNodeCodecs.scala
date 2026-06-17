@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.blockchain.sync.codec
 
 import com.chipprbots.ethereum.mpt.MptNode
 import com.chipprbots.ethereum.mpt.MptTraversals
-import com.chipprbots.ethereum.rlp.*
+import com.chipprbots.ethereum.rlp._
 
 /** RLP codecs for Merkle Patricia Trie nodes.
   *

@@ -10,11 +10,11 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.consensus.validators.SignedTransactionError.TransactionSyntaxError
 import com.chipprbots.ethereum.crypto
-import com.chipprbots.ethereum.domain.*
-import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
+import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 /** Verifies that Type-2 (EIP-1559 dynamic-fee) and Type-4 (EIP-7702 set-code) transactions are rejected on ETC before
@@ -121,31 +121,31 @@ class OlympiaTxTypeAdmissionSpec
     ConsensusTest
   ) in {
     val result = validate(signType2(), preOlympiaHeader)
-    result shouldBe a[Left[_, _]]
+    result shouldBe a[Left[?, ?]]
     result.left.toOption.get shouldBe a[TransactionSyntaxError]
     result.left.toOption.get.asInstanceOf[TransactionSyntaxError].reason should include("TYPE_2_TX_NOT_SUPPORTED")
   }
 
   it should "reject Type-4 (SetCodeTransaction) pre-Olympia on ETC" taggedAs (OlympiaTest, ConsensusTest) in {
     val result = validate(signType4(), preOlympiaHeader)
-    result shouldBe a[Left[_, _]]
+    result shouldBe a[Left[?, ?]]
     result.left.toOption.get shouldBe a[TransactionSyntaxError]
     result.left.toOption.get.asInstanceOf[TransactionSyntaxError].reason should include("TYPE_4_TX_NOT_SUPPORTED")
   }
 
   it should "accept Type-2 at Olympia on ETC" taggedAs (OlympiaTest, ConsensusTest) in {
     val result = validate(signType2(), olympiaHeader)
-    result shouldBe a[Right[_, _]]
+    result shouldBe a[Right[?, ?]]
   }
 
   it should "accept Type-4 at Olympia on ETC" taggedAs (OlympiaTest, ConsensusTest) in {
     val result = validate(signType4(), olympiaHeader)
-    result shouldBe a[Right[_, _]]
+    result shouldBe a[Right[?, ?]]
   }
 
   it should "not reject legacy tx pre-Olympia" taggedAs (OlympiaTest, ConsensusTest) in {
     val result = validate(signLegacy(), preOlympiaHeader)
-    result shouldBe a[Right[_, _]]
+    result shouldBe a[Right[?, ?]]
   }
 
   private def signLegacyContractCreate(): SignedTransaction = {
@@ -175,32 +175,32 @@ class OlympiaTxTypeAdmissionSpec
   }
 
   "OlympiaAllTxTypes" should "accept Type 0 (legacy) pre-Olympia" taggedAs (OlympiaTest, ConsensusTest) in {
-    validate(signLegacy(), preOlympiaHeader) shouldBe a[Right[_, _]]
+    validate(signLegacy(), preOlympiaHeader) shouldBe a[Right[?, ?]]
   }
 
   it should "accept Type 0 (legacy) post-Olympia (backward compat after EIP-1559)" taggedAs (
     OlympiaTest,
     ConsensusTest
   ) in {
-    validate(signLegacy(), olympiaHeader) shouldBe a[Right[_, _]]
+    validate(signLegacy(), olympiaHeader) shouldBe a[Right[?, ?]]
   }
 
   it should "accept Type 0 contract deployment (to=None) pre-Olympia" taggedAs (OlympiaTest, ConsensusTest) in {
-    validate(signLegacyContractCreate(), preOlympiaHeader) shouldBe a[Right[_, _]]
+    validate(signLegacyContractCreate(), preOlympiaHeader) shouldBe a[Right[?, ?]]
   }
 
   it should "accept Type 0 contract deployment (to=None) post-Olympia" taggedAs (OlympiaTest, ConsensusTest) in {
-    validate(signLegacyContractCreate(), olympiaHeader) shouldBe a[Right[_, _]]
+    validate(signLegacyContractCreate(), olympiaHeader) shouldBe a[Right[?, ?]]
   }
 
   it should "accept Type 1 (EIP-2930 access list) pre-Olympia" taggedAs (OlympiaTest, ConsensusTest) in {
-    validate(signType1(), preOlympiaHeader) shouldBe a[Right[_, _]]
+    validate(signType1(), preOlympiaHeader) shouldBe a[Right[?, ?]]
   }
 
   it should "accept Type 1 (EIP-2930 access list) post-Olympia (backward compat after EIP-1559)" taggedAs (
     OlympiaTest,
     ConsensusTest
   ) in {
-    validate(signType1(), olympiaHeader) shouldBe a[Right[_, _]]
+    validate(signType1(), olympiaHeader) shouldBe a[Right[?, ?]]
   }
 }

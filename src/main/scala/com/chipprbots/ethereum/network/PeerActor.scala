@@ -5,13 +5,15 @@ import java.net.URI
 
 import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.SupervisorStrategy.Escalate
-import org.apache.pekko.actor.*
+import org.apache.pekko.actor._
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.util.ByteString
 
+import scala.annotation.unused
+
 import org.bouncycastle.util.encoders.Hex
 
-import com.chipprbots.ethereum.network.PeerActor.Status.*
+import com.chipprbots.ethereum.network.PeerActor.Status._
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerHandshakeSuccessful
 import com.chipprbots.ethereum.network.PeerEventBusActor.Publish
@@ -21,15 +23,13 @@ import com.chipprbots.ethereum.network.handshaker.Handshaker.HandshakeComplete.H
 import com.chipprbots.ethereum.network.handshaker.Handshaker.HandshakeComplete.HandshakeSuccess
 import com.chipprbots.ethereum.network.handshaker.Handshaker.HandshakeResult
 import com.chipprbots.ethereum.network.handshaker.Handshaker.NextMessage
-import com.chipprbots.ethereum.network.p2p.*
+import com.chipprbots.ethereum.network.p2p._
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.Codes
-import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.*
+import com.chipprbots.ethereum.network.p2p.messages.WireProtocol._
 import com.chipprbots.ethereum.network.rlpx.AuthHandshaker
 import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler
 import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.RLPxConfiguration
-
-import scala.annotation.unused
 import com.chipprbots.ethereum.utils.Logger
 
 /** Peer actor is responsible for initiating and handling high-level connection with peer. It creates child

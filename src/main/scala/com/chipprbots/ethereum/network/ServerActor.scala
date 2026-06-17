@@ -4,8 +4,6 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicReference
 
-import scala.concurrent.Future
-
 import org.apache.pekko.actor.Actor
 import org.apache.pekko.actor.ActorLogging
 import org.apache.pekko.actor.ActorRef
@@ -18,6 +16,8 @@ import org.apache.pekko.io.Tcp.Close
 import org.apache.pekko.io.Tcp.CommandFailed
 import org.apache.pekko.io.Tcp.Connected
 import org.apache.pekko.pattern.pipe
+
+import scala.concurrent.Future
 
 import org.bouncycastle.util.encoders.Hex
 

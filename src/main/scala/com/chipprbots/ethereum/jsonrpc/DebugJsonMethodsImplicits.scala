@@ -1,6 +1,8 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.json4s.JsonAST.{JArray, JString, JValue}
+import org.json4s.JsonAST.JArray
+import org.json4s.JsonAST.JString
+import org.json4s.JsonAST.JValue
 
 import com.chipprbots.ethereum.jsonrpc.DebugService.ListPeersInfoRequest
 import com.chipprbots.ethereum.jsonrpc.DebugService.ListPeersInfoResponse

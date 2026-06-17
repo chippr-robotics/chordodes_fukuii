@@ -11,6 +11,12 @@ import com.chipprbots.scalanet.discovery.ethereum.EthereumNodeRecord
 import com.chipprbots.scalanet.discovery.ethereum.Node
 import com.chipprbots.scalanet.discovery.ethereum.v4.Packet
 import com.chipprbots.scalanet.discovery.ethereum.v4.Payload
+import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.ENRRequest
+import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.ENRResponse
+import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.FindNode
+import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.Neighbors
+import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.Ping
+import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.Pong
 import com.chipprbots.scalanet.discovery.hash.Hash
 import org.scalactic.Equality
 import org.scalatest.Assertion
@@ -25,13 +31,7 @@ import com.chipprbots.ethereum.rlp.RLPEncodeable
 import com.chipprbots.ethereum.rlp.RLPEncoder
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPValue
-import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.Ping
-import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.Pong
-import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.FindNode
-import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.Neighbors
-import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.ENRRequest
-import com.chipprbots.scalanet.discovery.ethereum.v4.Payload.ENRResponse
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 class RLPCodecsSpec extends AnyFlatSpec with Matchers {
   import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*

@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.blockchain.sync
 
 import java.util.concurrent.ThreadLocalRandom
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 /** Exponential backoff retry strategy with jitter
   *

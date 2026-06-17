@@ -1,31 +1,31 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import scala.concurrent.Await
-import scala.concurrent.duration.*
-
-import com.typesafe.config.ConfigFactory
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.Props
 import org.apache.pekko.testkit.ExplicitlyTriggeredScheduler
 import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestProbe
 
+import scala.concurrent.Await
+import scala.concurrent.duration._
+
+import com.typesafe.config.ConfigFactory
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures
-import com.chipprbots.ethereum.Mocks
 import com.chipprbots.ethereum.Mocks.MockValidatorsAlwaysSucceed
 import com.chipprbots.ethereum.blockchain.sync.CacheBasedBlacklist
-import com.chipprbots.ethereum.domain.*
-import com.chipprbots.ethereum.ledger.VMImpl
-import com.chipprbots.ethereum.utils.Config.SyncConfig
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.domain.appstate.BlockInfo
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor
+import com.chipprbots.ethereum.ledger.VMImpl
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.CalibrateChainWeightNow
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeers
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterChainWeightCalibrationTarget
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.utils.Config.SyncConfig
+import com.chipprbots.ethereum.consensus.mining.TestMining
+import org.apache.pekko.util.ByteString
 
 // scalastyle:off magic.number
 class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
@@ -37,13 +37,13 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       setupBestBlock(blockNum = BigInt(24720000))
       drainRegistration()
 
-      val peerTD = BigInt("24000000000000000000000")
-      val peerMaxBlock = BigInt(25000000)
+      val peerTD: BigInt = BigInt("24000000000000000000000")
+      val peerMaxBlock: BigInt = BigInt(25000000)
       syncController ! SyncProtocol.CalibrateChainWeightFromPeer(peerTD, peerMaxBlock)
 
-      val expected = peerTD * BigInt(24720000) / peerMaxBlock
-      val stored = blockchainReader.getChainWeightByHash(
-        blockchainReader.getBestBlockHeader().get.hash
+      val expected: BigInt = peerTD * BigInt(24720000) / peerMaxBlock
+      val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(
+        blockchainReader.getBestBlockHeader.get.hash
       )
       stored shouldBe defined
       stored.get.totalDifficulty shouldBe expected
@@ -55,11 +55,11 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       setupBestBlock(blockNum = BigInt(24720000))
       drainRegistration()
 
-      val peerTD = BigInt("24000000000000000000000")
+      val peerTD: BigInt = BigInt("24000000000000000000000")
       syncController ! SyncProtocol.CalibrateChainWeightFromPeer(peerTD, BigInt(0))
 
-      val stored = blockchainReader.getChainWeightByHash(
-        blockchainReader.getBestBlockHeader().get.hash
+      val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(
+        blockchainReader.getBestBlockHeader.get.hash
       )
       stored shouldBe defined
       stored.get.totalDifficulty shouldBe peerTD
@@ -112,8 +112,8 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       setupBestBlock(blockNum = BigInt(1))
       drainRegistration()
 
-      val beforeHash = blockchainReader.getBestBlockHeader().get.hash
-      val beforeWeight = blockchainReader.getChainWeightByHash(beforeHash)
+      val beforeHash = blockchainReader.getBestBlockHeader.get.hash
+      val beforeWeight: Option[ChainWeight] = blockchainReader.getChainWeightByHash(beforeHash)
 
       syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(100), BigInt(100000))
 
@@ -127,11 +127,11 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       drainRegistration()
 
       // 24e21 * 24720000 / 25000000 ≈ 2.37×10^22 >> 1.7×10^13 threshold
-      val peerTD = BigInt("24000000000000000000000")
+      val peerTD: BigInt = BigInt("24000000000000000000000")
       syncController ! SyncProtocol.CalibrateChainWeightFromPeer(peerTD, BigInt(25000000))
 
-      val stored = blockchainReader.getChainWeightByHash(
-        blockchainReader.getBestBlockHeader().get.hash
+      val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(
+        blockchainReader.getBestBlockHeader.get.hash
       )
       stored shouldBe defined
       stored.get.totalDifficulty should be > BigInt("17179869184000")
@@ -141,9 +141,9 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
   "calibrateTDFromLocalChain" should
     "find the anchor at h7 and accumulate h8+h9+h10 difficulties" taggedAs (UnitTest, SyncTest) in
     new RegularSyncSetup {
-      val anchorTD = BigInt("7000000000000000") // 7×10^15 > 7 × 10^13 → plausible anchor
-      val chain = buildParentHashChain(startNum = 7, length = 4) // h7, h8, h9, h10
-      val h7 = chain(0); val h8 = chain(1); val h9 = chain(2); val h10 = chain(3)
+      val anchorTD: BigInt = BigInt("7000000000000000") // 7×10^15 > 7 × 10^13 → plausible anchor
+      val chain: Vector[BlockHeader] = buildParentHashChain(startNum = 7, length = 4) // h7, h8, h9, h10
+      val h7: BlockHeader = chain(0); val h8: BlockHeader = chain(1); val h9: BlockHeader = chain(2); val h10: BlockHeader = chain(3)
 
       // h7 has the valid anchor TD
       blockchainWriter.storeChainWeight(h7.hash, ChainWeight.totalDifficultyOnly(anchorTD)).commit()
@@ -157,8 +157,8 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
 
       // Expected: anchorTD + h8.difficulty + h9.difficulty + h10.difficulty
-      val expectedTD = anchorTD + h8.difficulty + h9.difficulty + h10.difficulty
-      val stored = blockchainReader.getChainWeightByHash(h10.hash)
+      val expectedTD: BigInt = anchorTD + h8.difficulty + h9.difficulty + h10.difficulty
+      val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(h10.hash)
       stored shouldBe defined
       stored.get.totalDifficulty shouldBe expectedTD
     }
@@ -183,9 +183,9 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
   it should "be idempotent when bestBlock already has a plausible stored TD" taggedAs (UnitTest, SyncTest) in
     new RegularSyncSetup {
       // bestBlock h10 has anchorTD that passes the plausibility check already
-      val correctTD = BigInt("24000000000000000000000") // 24e21 >> 10 × 10^13
-      val chain = buildParentHashChain(startNum = 10, length = 1)
-      val h10 = chain(0)
+      val correctTD: BigInt = BigInt("24000000000000000000000") // 24e21 >> 10 × 10^13
+      val chain: Vector[BlockHeader] = buildParentHashChain(startNum = 10, length = 1)
+      val h10: BlockHeader = chain(0)
       blockchainWriter.storeChainWeight(h10.hash, ChainWeight.totalDifficultyOnly(correctTD)).commit()
       setBestBlockHeader(h10)
       drainRegistration()
@@ -193,7 +193,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       // Walk finds anchor at h10 itself (zero gap), re-writes same value
       syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
 
-      val stored = blockchainReader.getChainWeightByHash(h10.hash)
+      val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(h10.hash)
       stored.get.totalDifficulty shouldBe correctTD
 
       // No retry needed — success
@@ -205,7 +205,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
   it should "abort without writing when parentHash lookup returns None" taggedAs (UnitTest, SyncTest) in
     new RegularSyncSetup {
       // Build h10 whose parentHash points to a header that is NOT stored
-      val h10 = Fixtures.Blocks.Genesis.header.copy(
+      val h10: BlockHeader = Fixtures.Blocks.Genesis.header.copy(
         number = BigInt(10),
         parentHash = fakeMissingHash // parentHash for a header that doesn't exist
       )
@@ -214,7 +214,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       setBestBlockHeader(h10)
       drainRegistration()
 
-      val beforeWeight = blockchainReader.getChainWeightByHash(h10.hash)
+      val beforeWeight: Option[ChainWeight] = blockchainReader.getChainWeightByHash(h10.hash)
 
       syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
 
@@ -230,7 +230,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
   it should "not write when accumulated TD is below genesisWeight × 1000" taggedAs (UnitTest, SyncTest) in
     new RegularSyncSetup {
       // Anchor at h1 with absurdly low anchorTD — accumulated result < genesis × 1000
-      val tinyAnchorTD = BigInt("1000000000000") // 10^12 < 1 × 10^13 → but wait, h1 has number=1
+      : BigIntBigInt("1000000000000") // 10^12 < 1 × 10^13 → but wait, h1 has number=1
       // Actually 1×10^12 < 1×10^13 → NOT a plausible anchor! So the walk will abort, not return a below-threshold result.
       // Instead: use a large-numbered block with barely-above-threshold anchor that still leads to below-genesis*1000 result.
       // Simplest: anchor with TD=1 (passes BigInt check), but 1 < genesis*1000 → plausibility rejects it.
@@ -243,14 +243,14 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       //   genesisWeight * 1000 ≈ 1.7×10^13
       // So min plausible anchorTD ≈ 10^13 + ε, which is right around the threshold.
       // For blockNum=1: anchorTD must be > 10^13. Threshold is 1.7×10^13. If anchorTD=1.1×10^13 → write gate rejects.
-      val tightAnchor = BigInt("11000000000000") // 1.1×10^13 > 1×10^13 → found as anchor
-      val chain = buildParentHashChain(startNum = 1, length = 1)
-      val h1 = chain(0)
+      val tightAnchor: BigInt = BigInt("11000000000000") // 1.1×10^13 > 1×10^13 → found as anchor
+      val chain: Vector[BlockHeader] = buildParentHashChain(startNum = 1, length = 1)
+      val h1: BlockHeader = chain(0)
       blockchainWriter.storeChainWeight(h1.hash, ChainWeight.totalDifficultyOnly(tightAnchor)).commit()
       setBestBlockHeader(h1)
       drainRegistration()
 
-      val beforeWeight = blockchainReader.getChainWeightByHash(h1.hash)
+      val beforeWeight: Option[ChainWeight] = blockchainReader.getChainWeightByHash(h1.hash)
       syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
 
       // 1.1×10^13 < 1.7×10^13 (genesisWeight × 1000) → write gate rejects → weight unchanged
@@ -265,8 +265,8 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
     new RegularSyncSetup {
       val MaxWalk = 10000
       // Build chain: h1 (anchor), h2...h10001 (10000 headers above anchor)
-      val anchorTD = BigInt("10000000000000000") // 10^16 >> threshold
-      val chain = buildParentHashChain(startNum = 1, length = MaxWalk + 1) // h1..h10001
+      val anchorTD: BigInt = BigInt("10000000000000000") // 10^16 >> threshold
+      val chain: Vector[BlockHeader] = buildParentHashChain(startNum = 1, length = MaxWalk + 1) // h1..h10001
       val anchor = chain.head
       val bestHdr = chain.last
 
@@ -280,9 +280,9 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
 
       syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
 
-      val stored = blockchainReader.getChainWeightByHash(bestHdr.hash)
+      val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(bestHdr.hash)
       stored shouldBe defined
-      val expectedTD = anchorTD + chain.tail.foldLeft(BigInt(0))((acc, h) => acc + h.difficulty)
+      val expectedTD: BigInt = anchorTD + chain.tail.foldLeft(BigInt(0))((acc, h) => acc + h.difficulty)
       stored.get.totalDifficulty shouldBe expectedTD
     }
 
@@ -291,10 +291,10 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
     new RegularSyncSetup {
       val MaxWalk = 10000
       // Chain of MaxWalk+2 headers; anchor is at head (h1), gap = MaxWalk+1
-      val chain = buildParentHashChain(startNum = 1, length = MaxWalk + 2)
+      val chain: Vector[BlockHeader] = buildParentHashChain(startNum = 1, length = MaxWalk + 2)
       val anchor = chain.head
       val bestHdr = chain.last
-      val anchorTD = BigInt("10000000000000000")
+      val anchorTD: BigInt = BigInt("10000000000000000")
 
       blockchainWriter.storeChainWeight(anchor.hash, ChainWeight.totalDifficultyOnly(anchorTD)).commit()
       chain.tail.foreach { h =>
@@ -303,7 +303,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       setBestBlockHeader(bestHdr)
       drainRegistration()
 
-      val beforeWeight = blockchainReader.getChainWeightByHash(bestHdr.hash)
+      val beforeWeight: Option[ChainWeight] = blockchainReader.getChainWeightByHash(bestHdr.hash)
       syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
 
       blockchainReader.getChainWeightByHash(bestHdr.hash) shouldBe beforeWeight
@@ -315,10 +315,10 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
   it should "stop at the first plausible anchor encountered while walking backward" taggedAs (UnitTest, SyncTest) in
     new RegularSyncSetup {
       // h5 and h10 both have plausible TDs; walk from h15 should find h10 first
-      val anchorTD_5 = BigInt("5000000000000000") // would give wrong lower td
-      val anchorTD_10 = BigInt("10000000000000000") // correct anchor (first hit from h15)
-      val chain = buildParentHashChain(startNum = 5, length = 11) // h5..h15
-      val h5 = chain(0); val h10 = chain(5); val h15 = chain(10)
+      val anchorTD_5: BigInt = BigInt("5000000000000000") // would give wrong lower td
+      val anchorTD_10: BigInt = BigInt("10000000000000000") // correct anchor (first hit from h15)
+      val chain: Vector[BlockHeader] = buildParentHashChain(startNum = 5, length = 11) // h5..h15
+      val h5: BlockHeader = chain(0); val h10: BlockHeader = chain(5); val h15: BlockHeader = chain(10)
 
       // Store plausible TDs at h5 and h10; implausible at everything else
       blockchainWriter.storeChainWeight(h5.hash, ChainWeight.totalDifficultyOnly(anchorTD_5)).commit()
@@ -332,11 +332,11 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
 
       // Should use anchorTD_10 (found first walking back from h15), NOT anchorTD_5
-      val stored = blockchainReader.getChainWeightByHash(h15.hash)
+      val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(h15.hash)
       stored shouldBe defined
       // accumulated = anchorTD_10 + h11.difficulty + ... + h15.difficulty (5 headers)
-      val gapHeaders = chain.slice(6, 11) // h11..h15
-      val expectedTD = anchorTD_10 + gapHeaders.foldLeft(BigInt(0))(_ + _.difficulty)
+      val gapHeaders: Vector[BlockHeader] = chain.slice(6, 11) // h11..h15
+      val expectedTD: BigInt = anchorTD_10 + gapHeaders.foldLeft(BigInt(0))(_ + _.difficulty)
       stored.get.totalDifficulty shouldBe expectedTD
     }
 
@@ -370,9 +370,9 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       networkPeerManager.expectMsg(CalibrateChainWeightNow)
 
       // Now install an anchor that makes attempt 2 succeed
-      val anchorTD = BigInt("24000000000000000000000")
-      val chain = buildParentHashChain(startNum = 24720000, length = 1)
-      val bestHdr = chain(0)
+      val anchorTD: BigInt = BigInt("24000000000000000000000")
+      val chain: Vector[BlockHeader] = buildParentHashChain(startNum = 24720000, length = 1)
+      val bestHdr: BlockHeader = chain(0)
       blockchainWriter.storeChainWeight(bestHdr.hash, ChainWeight.totalDifficultyOnly(anchorTD)).commit()
       setBestBlockHeader(bestHdr)
 
@@ -394,11 +394,11 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       networkPeerManager.expectMsg(CalibrateChainWeightNow)
 
       // Attempt 2: ETH68 peer data (tier 2) — no retry expected
-      val peerTD = BigInt("24000000000000000000000")
+      val peerTD: BigInt = BigInt("24000000000000000000000")
       syncController ! SyncProtocol.CalibrateChainWeightFromPeer(peerTD, BigInt(0))
 
-      val stored = blockchainReader.getChainWeightByHash(
-        blockchainReader.getBestBlockHeader().get.hash
+      val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(
+        blockchainReader.getBestBlockHeader.get.hash
       )
       stored.get.totalDifficulty shouldBe peerTD
 
@@ -425,7 +425,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
 
     override lazy val vm: VMImpl = new VMImpl
     override lazy val validators = new MockValidatorsAlwaysSucceed
-    override lazy val mining = buildTestMining().withValidators(validators)
+    override lazy val mining: TestMining = buildTestMining().withValidators(validators)
 
     override def defaultSyncConfig: SyncConfig = super.defaultSyncConfig.copy(
       doFastSync = false,
@@ -478,7 +478,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
     blockchainWriter.storeChainWeight(Fixtures.Blocks.Genesis.header.parentHash, ChainWeight.zero).commit()
 
     // Fake parentHash used in T3.4 (a header that's never stored in DB)
-    val fakeMissingHash = org.apache.pekko.util.ByteString(
+    val fakeMissingHash: ByteString = org.apache.pekko.util.ByteString(
       Array.fill(32)(0xff.toByte)
     )
 

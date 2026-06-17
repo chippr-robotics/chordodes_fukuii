@@ -2,12 +2,12 @@ package com.chipprbots.ethereum.faucet.jsonrpc
 
 import org.apache.pekko.actor.ActorSystem
 
-import com.typesafe.config.ConfigFactory
-
 import cats.effect.unsafe.IORuntime
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContextExecutor
+
+import com.typesafe.config.ConfigFactory
 
 import com.chipprbots.ethereum.faucet.FaucetConfigBuilder
 import com.chipprbots.ethereum.faucet.FaucetSupervisor

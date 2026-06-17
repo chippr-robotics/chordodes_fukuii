@@ -1,14 +1,16 @@
 package com.chipprbots.ethereum.ethtest
 
-import org.scalatest.flatspec.AnyFlatSpec
-import org.scalatest.matchers.should.Matchers
 import java.io.File
-import io.circe.*
-import io.circe.parser.*
+
 import scala.io.Source
 import scala.util.Using
 
-import com.chipprbots.ethereum.testing.Tags.*
+import io.circe._
+import io.circe.parser._
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
+
+import com.chipprbots.ethereum.testing.Tags._
 
 /** Test suite for ethereum/tests TransactionTests category
   *
@@ -40,7 +42,7 @@ class TransactionTestsSpec extends AnyFlatSpec with Matchers {
     .getOrElse(new File(System.getProperty("user.dir"), "ets/tests/TransactionTests").getPath)
 
   // Supported networks (pre-Spiral fork only)
-  val supportedNetworks = Set(
+  val supportedNetworks: Set[String] = Set(
     "Frontier",
     "Homestead",
     "EIP150", // Tangerine Whistle

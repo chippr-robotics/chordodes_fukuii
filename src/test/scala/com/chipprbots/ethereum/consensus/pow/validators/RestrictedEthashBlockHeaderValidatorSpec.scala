@@ -2,11 +2,13 @@ package com.chipprbots.ethereum.consensus.pow.validators
 
 import org.apache.pekko.util.ByteString
 
+import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.consensus.pow.RestrictedPoWSigner
+import com.chipprbots.ethereum.consensus.validators.BlockHeaderError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderPoWError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.RestrictedPoWHeaderExtraDataError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
@@ -15,12 +17,10 @@ import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.security.SecureRandomBuilder
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
-import org.bouncycastle.crypto.AsymmetricCipherKeyPair
-import com.chipprbots.ethereum.consensus.validators.BlockHeaderError
-import com.chipprbots.ethereum.testing.Tags.*
 
 class RestrictedEthashBlockHeaderValidatorSpec
     extends AnyFlatSpec

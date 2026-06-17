@@ -10,7 +10,7 @@ import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.Await
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import com.typesafe.config.ConfigFactory
 import org.bouncycastle.util.encoders.Hex
@@ -21,9 +21,8 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures
-import com.chipprbots.ethereum.Mocks
 import com.chipprbots.ethereum.LongPatience
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.Mocks
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSync.SyncState
 import com.chipprbots.ethereum.consensus.mining.GetBlockHeaderByHash
 import com.chipprbots.ethereum.consensus.mining.TestMining
@@ -33,19 +32,21 @@ import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderPoWEr
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValidator
 import com.chipprbots.ethereum.consensus.validators.Validators
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.ledger.VMImpl
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.SendMessage
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{BlockBodies, GetBlockBodies}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockBodies
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockBodies
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockBodies.GetBlockBodiesEnc
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders as ETH62GetBlockHeaders
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetReceipts as ETH63GetReceipts
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NodeData as ETH63NodeData
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{GetBlockHeaders => ETH62GetBlockHeaders}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{GetReceipts => ETH63GetReceipts}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{NodeData => ETH63NodeData}
 import com.chipprbots.ethereum.rlp.RLPList
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
@@ -102,7 +103,7 @@ class SyncControllerSpec
       val children = syncController.children
       assert(storagesInstance.storages.appStateStorage.isFastSyncDone())
       assert(children.exists(ref => ref.path.name.startsWith("regular-sync")))
-      assert(blockchainReader.getBestBlockNumber() == defaultPivotBlockHeader.number)
+      assert(blockchainReader.getBestBlockNumber == defaultPivotBlockHeader.number)
     }
   }
 
@@ -136,7 +137,7 @@ class SyncControllerSpec
       // switch to regular download
       val children = syncController.children
       assert(children.exists(ref => ref.path.name.startsWith("regular-sync")))
-      assert(blockchainReader.getBestBlockNumber() == defaultPivotBlockHeader.number)
+      assert(blockchainReader.getBestBlockNumber == defaultPivotBlockHeader.number)
     }
   }
 
@@ -425,7 +426,7 @@ class SyncControllerSpec
       // switch to regular download
       val children = syncController.children
       assert(children.exists(ref => ref.path.name.startsWith("regular-sync")))
-      assert(blockchainReader.getBestBlockNumber() == freshHeader1.number)
+      assert(blockchainReader.getBestBlockNumber == freshHeader1.number)
     }
   }
 
@@ -458,7 +459,7 @@ class SyncControllerSpec
         // switch to regular download
         val children = syncController.children
         assert(children.exists(ref => ref.path.name.startsWith("regular-sync")))
-        assert(blockchainReader.getBestBlockNumber() == defaultPivotBlockHeader.number)
+        assert(blockchainReader.getBestBlockNumber == defaultPivotBlockHeader.number)
       }
   }
 
@@ -523,7 +524,7 @@ class SyncControllerSpec
       val children = syncController.children
       assert(storagesInstance.storages.appStateStorage.isFastSyncDone())
       assert(children.exists(ref => ref.path.name.startsWith("regular-sync")))
-      assert(blockchainReader.getBestBlockNumber() == newPivot.number)
+      assert(blockchainReader.getBestBlockNumber == newPivot.number)
     }
   }
 

@@ -13,7 +13,7 @@ import org.apache.pekko.util.ByteString
 
 import scala.util.Try
 
-import com.chipprbots.ethereum.crypto.*
+import com.chipprbots.ethereum.crypto._
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.utils.KeyStoreConfig
 import com.chipprbots.ethereum.utils.Logger
@@ -35,7 +35,7 @@ trait KeyStore {
 
   def importPrivateKey(key: ByteString, passphrase: String): Either[KeyStoreError, Address]
 
-  def listAccounts(): Either[KeyStoreError, List[Address]]
+  def listAccounts: Either[KeyStoreError, List[Address]]
 
   def unlockAccount(address: Address, passphrase: String): Either[KeyStoreError, Wallet]
 }
@@ -76,7 +76,7 @@ class KeyStoreImpl(keyStoreConfig: KeyStoreConfig, secureRandom: SecureRandom) e
     _ <- save(encKey)
   } yield encKey.address
 
-  def listAccounts(): Either[KeyStoreError, List[Address]] = {
+  def listAccounts: Either[KeyStoreError, List[Address]] = {
     val dir = new File(keyStoreConfig.keyStoreDir)
     Try {
       if (!dir.exists() || !dir.isDirectory())

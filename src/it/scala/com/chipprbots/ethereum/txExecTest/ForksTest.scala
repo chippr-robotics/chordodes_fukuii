@@ -6,19 +6,18 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
+import com.chipprbots.ethereum.domain.BlockchainStorages
 import com.chipprbots.ethereum.domain.BlockchainWriter
 import com.chipprbots.ethereum.domain.Receipt
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.ledger.BlockExecution
 import com.chipprbots.ethereum.ledger.BlockQueue
 import com.chipprbots.ethereum.ledger.BlockValidation
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.txExecTest.util.FixtureProvider
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
 import com.chipprbots.ethereum.utils.MonetaryPolicyConfig
-import com.chipprbots.ethereum.domain.BlockchainStorages
-
-import com.chipprbots.ethereum.testing.Tags.*
 
 class ForksTest extends AnyFlatSpec with Matchers {
 
@@ -44,7 +43,7 @@ class ForksTest extends AnyFlatSpec with Matchers {
       gasTieBreaker = false,
       ethCompatibleStorage = true
     )
-    val noErrors: ResultOfATypeInvocation[Right[_, Seq[Receipt]]] = a[Right[_, Seq[Receipt]]]
+    val noErrors: ResultOfATypeInvocation[Right[?, Seq[Receipt]]] = a[Right[?, Seq[Receipt]]]
   }
 
   "Ledger" should "execute blocks with respect to forks" taggedAs (IntegrationTest, VMTest, SlowTest) in new TestSetup {

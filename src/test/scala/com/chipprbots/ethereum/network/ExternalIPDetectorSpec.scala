@@ -5,7 +5,7 @@ import java.nio.ByteBuffer
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 class ExternalIPDetectorSpec extends AnyFlatSpec with Matchers {
 

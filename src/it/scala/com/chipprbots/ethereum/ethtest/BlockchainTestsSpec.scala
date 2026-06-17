@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.ethtest
 
 import java.io.File
 
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 /** Test suite for ethereum/tests BlockchainTests category
   *
@@ -21,7 +21,7 @@ import com.chipprbots.ethereum.testing.Tags.*
 class BlockchainTestsSpec extends EthereumTestsSpec {
 
   // Supported networks — all forks through Prague
-  val supportedNetworks = Set(
+  val supportedNetworks: Set[String] = Set(
     "Frontier",
     "Homestead",
     "EIP150", // Tangerine Whistle

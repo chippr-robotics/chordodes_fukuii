@@ -10,7 +10,8 @@ import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration.*
+import scala.concurrent.Future
+import scala.concurrent.duration._
 
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpec
@@ -19,16 +20,15 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.NormalPatience
 import com.chipprbots.ethereum.blockchain.sync.CacheBasedBlacklist
 import com.chipprbots.ethereum.crypto
-import com.chipprbots.ethereum.jsonrpc.NetService.*
+import com.chipprbots.ethereum.jsonrpc.NetService._
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerActor
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.security.SecureRandomBuilder
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.NodeStatus
 import com.chipprbots.ethereum.utils.ServerStatus
-import scala.concurrent.Future
 
 class NetServiceSpec extends AnyFlatSpec with Matchers with ScalaFutures with NormalPatience with SecureRandomBuilder {
 
@@ -62,10 +62,10 @@ class NetServiceSpec extends AnyFlatSpec with Matchers with ScalaFutures with No
   }
 
   it should "return node info with enode when listening" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    val response = netService.nodeInfo(NodeInfoRequest()).unsafeRunSync()
+    val response: Either[JsonRpcError, NodeInfoResponse] = netService.nodeInfo(NodeInfoRequest()).unsafeRunSync()
     response.isRight shouldBe true
     val info = response.toOption.get
-    val expectedId = nodeStatusRef.get().nodeId.map("%02x".format(_)).mkString
+    val expectedId: String = nodeStatusRef.get().nodeId.map("%02x".format(_)).mkString
     info.id shouldBe expectedId
     info.listening shouldBe true
     info.enode shouldBe defined
@@ -75,11 +75,11 @@ class NetServiceSpec extends AnyFlatSpec with Matchers with ScalaFutures with No
   }
 
   it should "report not listening when server is offline" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    val current = nodeStatusRef.get()
+    val current: NodeStatus = nodeStatusRef.get()
     nodeStatusRef.set(current.copy(serverStatus = ServerStatus.NotListening))
 
-    val response = netService.nodeInfo(NodeInfoRequest()).unsafeRunSync()
-    val expectedId = current.nodeId.map("%02x".format(_)).mkString
+    val response: Either[JsonRpcError, NodeInfoResponse] = netService.nodeInfo(NodeInfoRequest()).unsafeRunSync()
+    val expectedId: String = current.nodeId.map("%02x".format(_)).mkString
     response shouldBe Right(
       NodeInfoResponse(
         id = expectedId,
@@ -149,7 +149,7 @@ class NetServiceSpec extends AnyFlatSpec with Matchers with ScalaFutures with No
 
   it should "connect to a new peer" taggedAs (UnitTest, RPCTest) in new TestSetup {
     val uri = "enode://abcd1234@192.168.1.100:30303"
-    val result = netService.connectToPeer(ConnectToPeerRequest(uri)).unsafeRunSync()
+    val result: Either[JsonRpcError, ConnectToPeerResponse] = netService.connectToPeer(ConnectToPeerRequest(uri)).unsafeRunSync()
 
     result.isRight shouldBe true
     result.toOption.get.success shouldBe true
@@ -158,7 +158,7 @@ class NetServiceSpec extends AnyFlatSpec with Matchers with ScalaFutures with No
 
   it should "reject invalid peer URI" taggedAs (UnitTest, RPCTest) in new TestSetup {
     // Using a URI with invalid characters that will throw URISyntaxException
-    val result = netService.connectToPeer(ConnectToPeerRequest("enode://not valid uri")).unsafeRunSync()
+    val result: Either[JsonRpcError, ConnectToPeerResponse] = netService.connectToPeer(ConnectToPeerRequest("enode://not valid uri")).unsafeRunSync()
 
     result.isLeft shouldBe true
   }
@@ -171,7 +171,7 @@ class NetServiceSpec extends AnyFlatSpec with Matchers with ScalaFutures with No
     blacklist.add(PeerManagerActor.PeerAddress("192.168.1.100"), 60.seconds, BlacklistReason.UselessPeer)
     blacklist.add(PeerManagerActor.PeerAddress("192.168.1.101"), 120.seconds, BlacklistReason.UselessPeer)
 
-    val result = netService.listBlacklistedPeers(ListBlacklistedPeersRequest()).unsafeRunSync()
+    val result: Either[JsonRpcError, ListBlacklistedPeersResponse] = netService.listBlacklistedPeers(ListBlacklistedPeersRequest()).unsafeRunSync()
 
     result.isRight shouldBe true
     val blacklistedPeers = result.toOption.get.blacklistedPeers
@@ -220,7 +220,7 @@ class NetServiceSpec extends AnyFlatSpec with Matchers with ScalaFutures with No
 
     val peerManager: TestProbe = TestProbe()
 
-    val blacklist = CacheBasedBlacklist.empty(100)
+    val blacklist: CacheBasedBlacklist = CacheBasedBlacklist.empty(100)
 
     private val nodeKey = crypto.generateKeyPair(secureRandom)
     val nodeStatusRef: AtomicReference[NodeStatus] = new AtomicReference[

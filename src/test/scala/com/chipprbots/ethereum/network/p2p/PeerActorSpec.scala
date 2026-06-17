@@ -5,6 +5,7 @@ import java.net.URI
 import java.security.SecureRandom
 import java.util.concurrent.atomic.AtomicReference
 
+import org.apache.pekko.actor.Actor
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.PoisonPill
@@ -16,7 +17,7 @@ import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 import scala.language.postfixOps
 
 import com.typesafe.config.ConfigFactory
@@ -26,39 +27,38 @@ import org.bouncycastle.util.encoders.Hex
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.*
+import com.chipprbots.ethereum._
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.crypto.generateKeyPair
 import com.chipprbots.ethereum.db.storage.AppStateStorage
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.forkid.ForkId
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
 import com.chipprbots.ethereum.network.PeerActor.GetStatus
 import com.chipprbots.ethereum.network.PeerActor.Status.Handshaked
 import com.chipprbots.ethereum.network.PeerActor.StatusResponse
 import com.chipprbots.ethereum.network.PeerManagerActor.FastSyncHostConfiguration
 import com.chipprbots.ethereum.network.PeerManagerActor.PeerConfiguration
-import com.chipprbots.ethereum.network.*
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.network._
 import com.chipprbots.ethereum.network.handshaker.NetworkHandshaker
 import com.chipprbots.ethereum.network.handshaker.NetworkHandshakerConfiguration
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.Status68.Status68Enc
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.Status68 as Status
-import com.chipprbots.ethereum.forkid.ForkId
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.Status68.Status68Enc
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.{Status68 => Status}
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect.DisconnectEnc
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect.Reasons
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Hello.HelloEnc
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Pong.PongEnc
-import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.*
+import com.chipprbots.ethereum.network.p2p.messages.WireProtocol._
 import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler
 import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.RLPxConfiguration
 import com.chipprbots.ethereum.security.SecureRandomBuilder
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.NodeStatus
 import com.chipprbots.ethereum.utils.ServerStatus
-import org.apache.pekko.actor.Actor
 
 class PeerActorSpec
     extends TestKit(
@@ -190,7 +190,7 @@ class PeerActorSpec
     val completeUri = new URI(s"enode://${Hex.toHexString(remoteNodeId.toArray[Byte])}@127.0.0.1:9000?discport=9000")
 
     // Ensure local chain is past the fork so ForkId validation succeeds by persisting the DAO fork block as best
-    val daoForkChainWeight = ChainWeight.totalDifficultyOnly(daoForkBlockChainTotalDifficulty)
+    val daoForkChainWeight: ChainWeight = ChainWeight.totalDifficultyOnly(daoForkBlockChainTotalDifficulty)
     blockchainWriter.save(
       Fixtures.Blocks.DaoForkBlock.block,
       Seq.empty,
@@ -328,7 +328,7 @@ class PeerActorSpec
     )
 
     // Handshake complete — verify peer is Handshaked
-    val probe = TestProbe()
+    val probe: TestProbe = TestProbe()
     probe.send(peer, GetStatus)
     probe.expectMsg(StatusResponse(Handshaked))
 
@@ -428,7 +428,7 @@ class PeerActorSpec
     UnitTest,
     NetworkTest
   ) in new TestSetup {
-    val parentProbe = TestProbe()
+    val parentProbe: TestProbe = TestProbe()
 
     val peerWithParent: TestActorRef[Nothing] = TestActorRef(
       Props(

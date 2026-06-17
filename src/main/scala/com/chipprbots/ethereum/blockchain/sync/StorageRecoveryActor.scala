@@ -1,21 +1,30 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import org.apache.pekko.actor.{Actor, ActorLogging, ActorRef, Cancellable, Props, Terminated}
+import org.apache.pekko.actor.Actor
+import org.apache.pekko.actor.ActorLogging
+import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.Cancellable
+import org.apache.pekko.actor.Props
+import org.apache.pekko.actor.Terminated
 import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
 import scala.concurrent.Future
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
+import scala.util.Failure
+import scala.util.Success
 
-import scala.util.{Success, Failure}
-
-import com.chipprbots.ethereum.db.storage.{AppStateStorage, FlatSlotStorage, StateStorage}
-import com.chipprbots.ethereum.domain.Account
-import com.chipprbots.ethereum.mpt.*
-import com.chipprbots.ethereum.mpt.MptVisitors.*
-import com.chipprbots.ethereum.blockchain.sync.snap.{SNAPSyncConfig, SNAPSyncController, StorageTask}
-import com.chipprbots.ethereum.blockchain.sync.snap.actors
 import com.chipprbots.ethereum.blockchain.sync.ProgressMilestones
+import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncConfig
+import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController
+import com.chipprbots.ethereum.blockchain.sync.snap.StorageTask
+import com.chipprbots.ethereum.blockchain.sync.snap.actors
+import com.chipprbots.ethereum.db.storage.AppStateStorage
+import com.chipprbots.ethereum.db.storage.FlatSlotStorage
+import com.chipprbots.ethereum.db.storage.StateStorage
+import com.chipprbots.ethereum.domain.Account
+import com.chipprbots.ethereum.mpt.MptVisitors._
+import com.chipprbots.ethereum.mpt._
 
 /** Storage recovery actor for Bug 20 hardening.
   *

@@ -1,21 +1,22 @@
 package com.chipprbots.ethereum.blockchain.sync.snap
 
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.{TestKit, TestProbe}
+import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
+
+import scala.concurrent.duration._
 
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import scala.concurrent.duration.*
-
 import com.chipprbots.ethereum.blockchain.sync.PeerRateTracker
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.network.Peer
-import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
-import com.chipprbots.ethereum.testing.Tags.*
-import com.chipprbots.ethereum.testing.PeerTestHelpers.*
+import com.chipprbots.ethereum.network.p2p.messages.SNAP._
+import com.chipprbots.ethereum.testing.PeerTestHelpers._
+import com.chipprbots.ethereum.testing.Tags._
 
 class SNAPRequestTrackerSpec
     extends TestKit(ActorSystem("SNAPRequestTrackerSpec"))
@@ -159,7 +160,7 @@ class SNAPRequestTrackerSpec
     )
 
     val result = tracker.validateAccountRange(response)
-    result shouldBe a[Left[_, _]]
+    result shouldBe a[Left[?, ?]]
     result.left.get should include("not monotonically increasing")
   }
 
@@ -174,7 +175,7 @@ class SNAPRequestTrackerSpec
     )
 
     val result = tracker.validateAccountRange(response)
-    result shouldBe a[Left[_, _]]
+    result shouldBe a[Left[?, ?]]
     result.left.get should include("No pending request")
   }
 
@@ -219,7 +220,7 @@ class SNAPRequestTrackerSpec
     )
 
     val result = tracker.validateStorageRanges(response)
-    result shouldBe a[Left[_, _]]
+    result shouldBe a[Left[?, ?]]
     result.left.get should include("not monotonically increasing")
   }
 

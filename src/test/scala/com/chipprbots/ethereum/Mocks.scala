@@ -2,6 +2,8 @@ package com.chipprbots.ethereum
 
 import org.apache.pekko.util.ByteString
 
+import scala.language.adhocExtensions
+
 import com.chipprbots.ethereum.consensus.mining.GetBlockHeaderByHash
 import com.chipprbots.ethereum.consensus.mining.GetNBlocksBack
 import com.chipprbots.ethereum.consensus.pow.validators.OmmersValidator
@@ -10,13 +12,13 @@ import com.chipprbots.ethereum.consensus.pow.validators.OmmersValidator.OmmersVa
 import com.chipprbots.ethereum.consensus.pow.validators.ValidatorsExecutor
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderDifficultyError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderNumberError
-import com.chipprbots.ethereum.consensus.validators.*
+import com.chipprbots.ethereum.consensus.validators._
 import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.BlockError
 import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.BlockTransactionsHashError
 import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.BlockValid
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.ledger.BlockExecutionError.ValidationAfterExecError
-import com.chipprbots.ethereum.ledger.*
+import com.chipprbots.ethereum.ledger._
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
 import com.chipprbots.ethereum.network.handshaker.ConnectedState
@@ -24,7 +26,7 @@ import com.chipprbots.ethereum.network.handshaker.DisconnectedState
 import com.chipprbots.ethereum.network.handshaker.Handshaker
 import com.chipprbots.ethereum.network.handshaker.HandshakerState
 import com.chipprbots.ethereum.utils.BlockchainConfig
-import com.chipprbots.ethereum.vm.*
+import com.chipprbots.ethereum.vm._
 
 object Mocks {
   private val defaultProgramResult: PC => PR = context =>
@@ -62,7 +64,7 @@ object Mocks {
     }
   }
 
-  class MockValidatorsAlwaysSucceed extends ValidatorsExecutor {
+  open class MockValidatorsAlwaysSucceed extends ValidatorsExecutor {
 
     override val blockValidator: BlockValidator = new BlockValidator {
       override def validateBlockAndReceipts(

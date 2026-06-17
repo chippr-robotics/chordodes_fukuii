@@ -6,8 +6,8 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
-import com.chipprbots.ethereum.domain.UInt256.*
-import com.chipprbots.ethereum.vm.Generators.*
+import com.chipprbots.ethereum.domain.UInt256._
+import com.chipprbots.ethereum.vm.Generators._
 
 import Fixtures.blockchainConfig
 

@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.ledger
 
 import org.apache.pekko.util.ByteString
-import org.apache.pekko.util.ByteString.empty as bEmpty
+import org.apache.pekko.util.ByteString.{empty => bEmpty}
 
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 import org.bouncycastle.crypto.params.ECPublicKeyParameters
@@ -21,8 +21,9 @@ import com.chipprbots.ethereum.consensus.validators.SignedTransactionValid
 import com.chipprbots.ethereum.consensus.validators.SignedTransactionValidator
 import com.chipprbots.ethereum.crypto.generateKeyPair
 import com.chipprbots.ethereum.crypto.kec256
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.ledger.VMImpl
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.vm.InvalidJump
 import com.chipprbots.ethereum.vm.InvalidOpCode
@@ -31,7 +32,6 @@ import com.chipprbots.ethereum.vm.ProgramError
 import com.chipprbots.ethereum.vm.RevertOccurs
 import com.chipprbots.ethereum.vm.StackOverflow
 import com.chipprbots.ethereum.vm.StackUnderflow
-import com.chipprbots.ethereum.testing.Tags.*
 
 // scalastyle:off magic.number
 class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPropertyChecks {
@@ -108,7 +108,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
         val result: Either[BlockExecutionError.TxsExecutionError, BlockResult] =
           mining.blockPreparator.executeTransactions(Seq(stx.tx), initialWorld, header)
 
-        result shouldBe a[Right[_, BlockResult]]
+        result shouldBe a[Right[?, BlockResult]]
         result.map { br =>
           br.receipts.last.postTransactionStateHash shouldBe a[HashOutcome]
         }
@@ -132,7 +132,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
         val result: Either[BlockExecutionError.TxsExecutionError, BlockResult] =
           mining.blockPreparator.executeTransactions(Seq(stx), initialWorld, header)
 
-        result shouldBe a[Right[_, BlockResult]]
+        result shouldBe a[Right[?, BlockResult]]
         result.map(_.receipts.last.postTransactionStateHash shouldBe SuccessOutcome)
       }
 
@@ -164,7 +164,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
         val result: Either[BlockExecutionError.TxsExecutionError, BlockResult] =
           testMining.blockPreparator.executeTransactions(Seq(stx.tx), initialWorld, header)
 
-        result shouldBe a[Right[_, BlockResult]]
+        result shouldBe a[Right[?, BlockResult]]
         result.map(_.receipts.last.postTransactionStateHash shouldBe FailureOutcome)
       }
     }
@@ -281,7 +281,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
         defaultBlockHeader
       )
 
-    result shouldBe a[Right[_, BlockResult]]
+    result shouldBe a[Right[?, BlockResult]]
     result.map(br => br.worldState.getAccount(newAccountAddress)) shouldBe Right(Some(Account(nonce = 1)))
   }
 
@@ -379,7 +379,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
     val result: Either[BlockExecutionError.TxsExecutionError, BlockResult] =
       mining.blockPreparator.executeTransactions(Seq(stx), initialWorld, header)
 
-    result shouldBe a[Right[_, BlockResult]]
+    result shouldBe a[Right[?, BlockResult]]
     result.map { br =>
       br.receipts.last.postTransactionStateHash shouldBe a[HashOutcome]
     }
@@ -403,7 +403,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
     val result: Either[BlockExecutionError.TxsExecutionError, BlockResult] =
       mining.blockPreparator.executeTransactions(Seq(stx), initialWorld, header)
 
-    result shouldBe a[Right[_, BlockResult]]
+    result shouldBe a[Right[?, BlockResult]]
     result.map(_.receipts.last.postTransactionStateHash shouldBe SuccessOutcome)
   }
 
@@ -432,7 +432,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
     val result: Either[BlockExecutionError.TxsExecutionError, BlockResult] =
       testMining.blockPreparator.executeTransactions(Seq(stx), initialWorld, header)
 
-    result shouldBe a[Right[_, BlockResult]]
+    result shouldBe a[Right[?, BlockResult]]
     result.map(_.receipts.last.postTransactionStateHash shouldBe FailureOutcome)
   }
 }

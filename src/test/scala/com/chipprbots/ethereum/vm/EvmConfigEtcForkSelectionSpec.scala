@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.vm
 
 import org.scalatest.funsuite.AnyFunSuite
 
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 class EvmConfigEtcForkSelectionSpec extends AnyFunSuite {
 

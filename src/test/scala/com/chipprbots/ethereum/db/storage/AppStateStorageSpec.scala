@@ -7,7 +7,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.ObjectGenerators
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 class AppStateStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with ObjectGenerators {
 
@@ -123,9 +123,9 @@ class AppStateStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
     }
 
     "insert and get bootstrap pivot block properly" taggedAs (UnitTest, DatabaseTest) in new Fixtures {
-      val storage = newAppStateStorage()
-      val pivotNumber = BigInt(10500000)
-      val pivotHash = ByteString(Array.fill[Byte](32)(0xab.toByte))
+      val storage: AppStateStorage = newAppStateStorage()
+      val pivotNumber: BigInt = BigInt(10500000)
+      val pivotHash: ByteString = ByteString(Array.fill[Byte](32)(0xab.toByte))
 
       storage.putBootstrapPivotBlock(pivotNumber, pivotHash).commit()
 
@@ -137,24 +137,24 @@ class AppStateStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
       UnitTest,
       DatabaseTest
     ) in new Fixtures {
-      val storage = newAppStateStorage()
+      val storage: AppStateStorage = newAppStateStorage()
       assert(storage.getBootstrapPivotBlock() == 0)
       assert(storage.getBootstrapPivotBlockHash() == ByteString.empty)
     }
 
     "insert and get SNAP sync progress properly" taggedAs (UnitTest, DatabaseTest) in new Fixtures {
-      val storage = newAppStateStorage()
+      val storage: AppStateStorage = newAppStateStorage()
       val progressJson = """{"phase":"AccountRangeSync","accountsSynced":1000,"bytecodes":0}"""
 
       storage.putSnapSyncProgress(progressJson).commit()
 
-      val retrieved = storage.getSnapSyncProgress()
+      val retrieved: Option[String] = storage.getSnapSyncProgress()
       assert(retrieved.isDefined)
       assert(retrieved.get == progressJson)
     }
 
     "get None for SNAP sync progress when storage is empty" taggedAs (UnitTest, DatabaseTest) in new Fixtures {
-      val storage = newAppStateStorage()
+      val storage: AppStateStorage = newAppStateStorage()
       assert(storage.getSnapSyncProgress().isEmpty)
     }
 
@@ -164,7 +164,7 @@ class AppStateStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
       UnitTest,
       DatabaseTest
     ) in new Fixtures {
-      val storage = newAppStateStorage()
+      val storage: AppStateStorage = newAppStateStorage()
 
       // Empty storage — neither in-progress nor done.
       assert(!storage.isSnapSyncInProgress())
@@ -185,7 +185,7 @@ class AppStateStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
       UnitTest,
       DatabaseTest
     ) in new Fixtures {
-      val storage = newAppStateStorage()
+      val storage: AppStateStorage = newAppStateStorage()
       storage.snapSyncDone().commit()
       assert(!storage.isSnapSyncInProgress())
       assert(storage.isSnapSyncDone())
@@ -199,7 +199,7 @@ class AppStateStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
       UnitTest,
       DatabaseTest
     ) in new Fixtures {
-      val storage = newAppStateStorage()
+      val storage: AppStateStorage = newAppStateStorage()
       storage.putSnapSyncPivotBlock(BigInt(123456)).commit()
       assert(storage.isSnapSyncInProgress())
       assert(!storage.isSnapSyncDone())
@@ -209,7 +209,7 @@ class AppStateStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
       UnitTest,
       DatabaseTest
     ) in new Fixtures {
-      val storage = newAppStateStorage()
+      val storage: AppStateStorage = newAppStateStorage()
       storage.putSnapSyncStateRoot(ByteString(Array.fill[Byte](32)(0xab.toByte))).commit()
       assert(storage.isSnapSyncInProgress())
       assert(!storage.isSnapSyncDone())
@@ -218,7 +218,7 @@ class AppStateStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
     // ---- J10: SNAP phase completion flag round-trips ----------------------------
 
     "round-trip isSnapSyncAccountsComplete flag" taggedAs (UnitTest, DatabaseTest) in new Fixtures {
-      val storage = newAppStateStorage()
+      val storage: AppStateStorage = newAppStateStorage()
       assert(!storage.isSnapSyncAccountsComplete())
       storage.putSnapSyncAccountsComplete(true).commit()
       assert(storage.isSnapSyncAccountsComplete())
@@ -227,14 +227,14 @@ class AppStateStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
     }
 
     "round-trip isSnapSyncStorageComplete flag" taggedAs (UnitTest, DatabaseTest) in new Fixtures {
-      val storage = newAppStateStorage()
+      val storage: AppStateStorage = newAppStateStorage()
       assert(!storage.isSnapSyncStorageComplete())
       storage.putSnapSyncStorageComplete(true).commit()
       assert(storage.isSnapSyncStorageComplete())
     }
 
     "round-trip isSnapSyncBytecodeComplete flag" taggedAs (UnitTest, DatabaseTest) in new Fixtures {
-      val storage = newAppStateStorage()
+      val storage: AppStateStorage = newAppStateStorage()
       assert(!storage.isSnapSyncBytecodeComplete())
       storage.putSnapSyncBytecodeComplete(true).commit()
       assert(storage.isSnapSyncBytecodeComplete())
@@ -244,7 +244,7 @@ class AppStateStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
       UnitTest,
       DatabaseTest
     ) in new Fixtures {
-      val storage = newAppStateStorage()
+      val storage: AppStateStorage = newAppStateStorage()
       storage.putSnapSyncAccountsComplete(true).commit()
       assert(storage.isSnapSyncAccountsComplete())
       assert(!storage.isSnapSyncStorageComplete())
@@ -257,22 +257,22 @@ class AppStateStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
     }
 
     "persist and retrieve codeHashes file path" taggedAs (UnitTest, DatabaseTest) in new Fixtures {
-      val storage = newAppStateStorage()
+      val storage: AppStateStorage = newAppStateStorage()
       assert(storage.getSnapSyncCodeHashesPath().isEmpty)
       storage.putSnapSyncCodeHashesPath("/data/tmp/snap-code-hashes-abc123.bin").commit()
       assert(storage.getSnapSyncCodeHashesPath() == Some("/data/tmp/snap-code-hashes-abc123.bin"))
     }
 
     "persist and retrieve storage file path" taggedAs (UnitTest, DatabaseTest) in new Fixtures {
-      val storage = newAppStateStorage()
+      val storage: AppStateStorage = newAppStateStorage()
       assert(storage.getSnapSyncStorageFilePath().isEmpty)
       storage.putSnapSyncStorageFilePath("/data/tmp/contract-storage.bin").commit()
       assert(storage.getSnapSyncStorageFilePath() == Some("/data/tmp/contract-storage.bin"))
     }
 
     "persist and retrieve finalized state root" taggedAs (UnitTest, DatabaseTest) in new Fixtures {
-      val storage = newAppStateStorage()
-      val root = ByteString(Array.fill[Byte](32)(0xde.toByte))
+      val storage: AppStateStorage = newAppStateStorage()
+      val root: ByteString = ByteString(Array.fill[Byte](32)(0xde.toByte))
       assert(storage.getSnapSyncFinalizedRoot().isEmpty)
       storage.putSnapSyncFinalizedRoot(root).commit()
       assert(storage.getSnapSyncFinalizedRoot() == Some(root))
@@ -283,8 +283,8 @@ class AppStateStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
     // to resume (resume path) or start fresh (clean path). This test locks the lifecycle
     // so a storage refactor cannot silently break the recovery guard.
     "SNAP lifecycle: fresh → pivot → progress → done → cleared" taggedAs (UnitTest, DatabaseTest) in new Fixtures {
-      val storage = newAppStateStorage()
-      val root = ByteString(Array.fill[Byte](32)(0xca.toByte))
+      val storage: AppStateStorage = newAppStateStorage()
+      val root: ByteString = ByteString(Array.fill[Byte](32)(0xca.toByte))
 
       // Fresh: nothing persisted → not in-progress, not done
       assert(!storage.isSnapSyncInProgress())
@@ -330,7 +330,7 @@ class AppStateStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
     // ========================================
 
     "round-trip backfill target / header / body / receipt cursors" taggedAs (UnitTest, DatabaseTest) in new Fixtures {
-      val storage = newAppStateStorage()
+      val storage: AppStateStorage = newAppStateStorage()
 
       // Empty storage — every getter returns 0.
       assert(storage.getBackfillTarget() == 0)
@@ -352,7 +352,7 @@ class AppStateStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
     }
 
     "clearBackfillCursors removes all four backfill keys" taggedAs (UnitTest, DatabaseTest) in new Fixtures {
-      val storage = newAppStateStorage()
+      val storage: AppStateStorage = newAppStateStorage()
       storage
         .putBackfillTarget(BigInt(100))
         .and(storage.putBackfillBestHeader(BigInt(50)))
@@ -369,14 +369,14 @@ class AppStateStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
     }
 
     "needsBackfillResume — false when SNAP is not done" taggedAs (UnitTest, DatabaseTest) in new Fixtures {
-      val storage = newAppStateStorage()
+      val storage: AppStateStorage = newAppStateStorage()
       // Even with cursors set, no SNAP-done flag means no resume.
       storage.putBackfillTarget(BigInt(100)).commit()
       assert(!storage.needsBackfillResume())
     }
 
     "needsBackfillResume — false when no target was persisted" taggedAs (UnitTest, DatabaseTest) in new Fixtures {
-      val storage = newAppStateStorage()
+      val storage: AppStateStorage = newAppStateStorage()
       storage.snapSyncDone().commit()
       assert(!storage.needsBackfillResume())
     }
@@ -385,9 +385,9 @@ class AppStateStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
       UnitTest,
       DatabaseTest
     ) in new Fixtures {
-      val storage = newAppStateStorage()
+      val storage: AppStateStorage = newAppStateStorage()
       storage.snapSyncDone().commit()
-      val target = BigInt(1000)
+      val target: BigInt = BigInt(1000)
       storage
         .putBackfillTarget(target)
         .and(storage.putBackfillBestHeader(target))
@@ -398,9 +398,9 @@ class AppStateStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
     }
 
     "needsBackfillResume — true when any cursor lags target" taggedAs (UnitTest, DatabaseTest) in new Fixtures {
-      val storage = newAppStateStorage()
+      val storage: AppStateStorage = newAppStateStorage()
       storage.snapSyncDone().commit()
-      val target = BigInt(1000)
+      val target: BigInt = BigInt(1000)
 
       // Header behind.
       storage
@@ -439,9 +439,9 @@ class AppStateStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
     }
 
     "round-trip recovery progress (completed shards + gaps)" taggedAs (UnitTest, DatabaseTest) in new Fixtures {
-      val storage = newAppStateStorage()
-      val root = ByteString(Array.fill[Byte](32)(0xab.toByte))
-      val progress = RecoveryProgress(
+      val storage: AppStateStorage = newAppStateStorage()
+      val root: ByteString = ByteString(Array.fill[Byte](32)(0xab.toByte))
+      val progress: RecoveryProgress = RecoveryProgress(
         scanRoot = root,
         shardCount = 16,
         completedShards = Set(0, 5, 9),
@@ -461,10 +461,10 @@ class AppStateStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
       UnitTest,
       DatabaseTest
     ) in new Fixtures {
-      val storage = newAppStateStorage()
-      val root = ByteString(Array.fill[Byte](32)(0xcd.toByte))
-      val other = ByteString(Array.fill[Byte](32)(0xef.toByte))
-      val progress = RecoveryProgress(root, 16, Set(1, 2), Vector.empty, Vector.empty)
+      val storage: AppStateStorage = newAppStateStorage()
+      val root: ByteString = ByteString(Array.fill[Byte](32)(0xcd.toByte))
+      val other: ByteString = ByteString(Array.fill[Byte](32)(0xef.toByte))
+      val progress: RecoveryProgress = RecoveryProgress(root, 16, Set(1, 2), Vector.empty, Vector.empty)
       storage.putRecoveryProgress(progress).commit()
 
       assert(storage.getRecoveryProgressFor(root, 16).contains(progress)) // matching tag
@@ -473,8 +473,8 @@ class AppStateStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
     }
 
     "clearRecoveryProgress removes the persisted progress" taggedAs (UnitTest, DatabaseTest) in new Fixtures {
-      val storage = newAppStateStorage()
-      val root = ByteString(Array.fill[Byte](32)(0x11.toByte))
+      val storage: AppStateStorage = newAppStateStorage()
+      val root: ByteString = ByteString(Array.fill[Byte](32)(0x11.toByte))
       storage.putRecoveryProgress(RecoveryProgress(root, 16, Set(0), Vector.empty, Vector.empty)).commit()
       assert(storage.getRecoveryProgress().isDefined)
 
@@ -485,7 +485,7 @@ class AppStateStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
     // Flaky-system resilience: a torn/corrupt write must NOT surface as a wrong (partial) gap set —
     // it must read back as None so the caller falls through to a correct fresh scan.
     "getRecoveryProgress returns None for a corrupt stored value" taggedAs (UnitTest, DatabaseTest) in new Fixtures {
-      val storage = newAppStateStorage()
+      val storage: AppStateStorage = newAppStateStorage()
       storage.put(AppStateStorage.Keys.RecoveryProgress, "garbage-not-a-real-progress-blob").commit()
       assert(storage.getRecoveryProgress().isEmpty)
     }
@@ -496,8 +496,8 @@ class AppStateStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
       UnitTest,
       DatabaseTest
     ) in new Fixtures {
-      val storage = newAppStateStorage()
-      val root = ByteString(Array.fill[Byte](32)(0x22.toByte))
+      val storage: AppStateStorage = newAppStateStorage()
+      val root: ByteString = ByteString(Array.fill[Byte](32)(0x22.toByte))
       storage.putRecoveryProgress(RecoveryProgress(root, 16, Set(0, 1), Vector.empty, Vector.empty)).commit()
       assert(!storage.isBytecodeRecoveryDone())
       assert(!storage.isStorageRecoveryDone())

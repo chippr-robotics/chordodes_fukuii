@@ -6,9 +6,9 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.prop.TableFor2
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.domain.UInt256.*
-import com.chipprbots.ethereum.testing.Tags.*
-import com.chipprbots.ethereum.vm.Generators.*
+import com.chipprbots.ethereum.domain.UInt256._
+import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.vm.Generators._
 
 class UInt256Spec extends AnyFunSuite with ScalaCheckPropertyChecks {
 

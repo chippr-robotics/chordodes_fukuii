@@ -13,13 +13,13 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.*
+import com.chipprbots.ethereum._
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
-import com.chipprbots.ethereum.domain.*
-import com.chipprbots.ethereum.jsonrpc.EthUserService.*
+import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.jsonrpc.EthUserService._
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
-import com.chipprbots.ethereum.testing.Tags.*
-import com.chipprbots.ethereum.utils.*
+import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.utils._
 
 class EthUserServiceSpec
     extends TestKit(ActorSystem("EthServiceSpec_ActorSystem"))

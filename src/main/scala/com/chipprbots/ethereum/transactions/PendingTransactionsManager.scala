@@ -7,8 +7,8 @@ import org.apache.pekko.actor.Props
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
-import scala.concurrent.duration.*
-import scala.jdk.CollectionConverters.*
+import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 
 import com.google.common.cache.Cache
 import com.google.common.cache.CacheBuilder
@@ -17,6 +17,7 @@ import com.google.common.cache.RemovalNotification
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.domain.SignedTransactionWithSender
+import com.chipprbots.ethereum.jsonrpc.NewPendingTransaction
 import com.chipprbots.ethereum.metrics.MetricsContainer
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.Peer
@@ -25,10 +26,9 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.PeerManagerActor
-import com.chipprbots.ethereum.jsonrpc.NewPendingTransaction
 import com.chipprbots.ethereum.network.p2p.messages.Codes
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetPooledTransactions.*
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetPooledTransactions._
 import com.chipprbots.ethereum.transactions.SignedTransactionsFilterActor.ProperSignedTransactions
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
@@ -369,7 +369,7 @@ class PendingTransactionsManager(
     // 2. ECIP-1122: reject if effectiveTip < minTip.
     // Pre-Olympia (Spiral): 1 wei floor — matches core-geth txpool.pricelimit default.
     // At/after Olympia: blockchainConfig.minTip (1 gwei per ECIP-1122).
-    val bestBlockOpt = Option(blockchainReader).flatMap(_.getBestBlock())
+    val bestBlockOpt = Option(blockchainReader).flatMap(_.getBestBlock)
     val currentBaseFee = bestBlockOpt.flatMap(_.header.baseFee).getOrElse(blockchainConfig.baseFeeFloor)
     val isOlympiaActive =
       bestBlockOpt.exists(_.header.number >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber)
@@ -395,7 +395,7 @@ class PendingTransactionsManager(
       import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
       import MerklePatriciaTrie.defaultByteArraySerializable
 
-      val bestBlockOpt = blockchainReader.getBestBlock()
+      val bestBlockOpt = blockchainReader.getBestBlock
       bestBlockOpt match {
         case Some(bestBlock) =>
           val mptStorage = stateStorage.getReadOnlyStorage

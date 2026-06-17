@@ -1,12 +1,12 @@
 package com.chipprbots.ethereum.consensus.mess
 
+import com.typesafe.config.ConfigFactory
+import com.typesafe.config.ConfigValueFactory
+import org.scalatest.ParallelTestExecution
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.ParallelTestExecution
 
-import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 /** L8 — MESSConfig.reactivationBlock parsing: olympia-block-number fallback.

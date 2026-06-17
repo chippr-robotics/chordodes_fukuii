@@ -8,7 +8,7 @@ import org.apache.pekko.actor.Props
 import org.apache.pekko.testkit.ExplicitlyTriggeredScheduler
 import org.apache.pekko.testkit.TestProbe
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import com.typesafe.config.ConfigFactory
 import org.scalatest.flatspec.AnyFlatSpec
@@ -16,7 +16,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.network.KnownNodesManager.KnownNodesManagerConfig
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 class KnownNodesManagerSpec extends AnyFlatSpec with Matchers {
 
@@ -31,13 +31,13 @@ class KnownNodesManagerSpec extends AnyFlatSpec with Matchers {
     knownNodesManager.tell(KnownNodesManager.AddKnownNode(uri(2)), client.ref)
     knownNodesManager.tell(KnownNodesManager.GetKnownNodes, client.ref)
     client.expectMsg(KnownNodesManager.KnownNodes(Set(uri(1), uri(2))))
-    storagesInstance.storages.knownNodesStorage.getKnownNodes() shouldBe Set.empty
+    storagesInstance.storages.knownNodesStorage.getKnownNodes shouldBe Set.empty
 
     testScheduler.timePasses(config.persistInterval + 10.seconds)
 
     knownNodesManager.tell(KnownNodesManager.GetKnownNodes, client.ref)
     client.expectMsg(KnownNodesManager.KnownNodes(Set(uri(1), uri(2))))
-    storagesInstance.storages.knownNodesStorage.getKnownNodes() shouldBe Set(uri(1), uri(2))
+    storagesInstance.storages.knownNodesStorage.getKnownNodes shouldBe Set(uri(1), uri(2))
 
     knownNodesManager.tell(KnownNodesManager.AddKnownNode(uri(3)), client.ref)
     knownNodesManager.tell(KnownNodesManager.AddKnownNode(uri(4)), client.ref)
@@ -49,7 +49,7 @@ class KnownNodesManagerSpec extends AnyFlatSpec with Matchers {
     knownNodesManager.tell(KnownNodesManager.GetKnownNodes, client.ref)
     client.expectMsg(KnownNodesManager.KnownNodes(Set(uri(2), uri(3))))
 
-    storagesInstance.storages.knownNodesStorage.getKnownNodes() shouldBe Set(uri(2), uri(3))
+    storagesInstance.storages.knownNodesStorage.getKnownNodes shouldBe Set(uri(2), uri(3))
   }
 
   it should "respect max nodes limit" taggedAs (UnitTest, NetworkTest) in new TestSetup {
@@ -64,7 +64,7 @@ class KnownNodesManagerSpec extends AnyFlatSpec with Matchers {
     knownNodesManager.tell(KnownNodesManager.GetKnownNodes, client.ref)
     client.expectMsgClass(classOf[KnownNodesManager.KnownNodes])
 
-    storagesInstance.storages.knownNodesStorage.getKnownNodes().size shouldBe 5
+    storagesInstance.storages.knownNodesStorage.getKnownNodes.size shouldBe 5
   }
 
   trait TestSetup extends EphemBlockchainTestSetup {

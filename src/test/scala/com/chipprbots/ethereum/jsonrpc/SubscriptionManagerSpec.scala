@@ -8,23 +8,25 @@ import org.apache.pekko.stream.scaladsl.Sink
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.testkit.TestKit
 
+import scala.concurrent.Await
+import scala.concurrent.duration._
+
+import org.json4s._
+import org.json4s.native.JsonMethods._
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
-
-import scala.concurrent.Await
-import scala.concurrent.duration.*
-
-import org.json4s.*
-import org.json4s.native.JsonMethods.*
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.NormalPatience
 import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.domain.Block
-import com.chipprbots.ethereum.jsonrpc.SubscriptionManager.*
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.jsonrpc.SubscriptionManager._
+import com.chipprbots.ethereum.testing.Tags._
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.scaladsl.SourceQueueWithComplete
+import scala.concurrent.Future
 
 /** Unit tests for SubscriptionManager actor.
   *
@@ -56,12 +58,12 @@ class SubscriptionManagerSpec
     system.actorOf(SubscriptionManager.props(new EphemBlockchainTestSetup {}.blockchainReader))
 
   /** Returns a preMaterialized queue + source pair. */
-  def makeQueue() = Source
+  def makeQueue(): (SourceQueueWithComplete[String], Source[String, NotUsed]) = Source
     .queue[String](64, OverflowStrategy.dropHead)
     .preMaterialize()
 
   /** Collects N messages from the queue source into a Future[Seq[String]]. */
-  def collectN(source: org.apache.pekko.stream.scaladsl.Source[String, Any], n: Int) =
+  def collectN(source: org.apache.pekko.stream.scaladsl.Source[String, Any], n: Int): Future[Seq[String]] =
     source.take(n).runWith(Sink.seq)
 
   // ── connection lifecycle ───────────────────────────────────────────────────

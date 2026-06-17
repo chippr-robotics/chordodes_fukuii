@@ -1,15 +1,22 @@
 package com.chipprbots.ethereum.ethtest
 
 import org.apache.pekko.util.ByteString
-import com.chipprbots.ethereum.db.cache.{AppCaches, LruCache}
+
+import com.chipprbots.ethereum.db.cache.AppCaches
+import com.chipprbots.ethereum.db.cache.LruCache
 import com.chipprbots.ethereum.db.components.EphemDataSourceComponent
-import com.chipprbots.ethereum.db.storage.*
 import com.chipprbots.ethereum.db.storage.NodeStorage.NodeHash
-import com.chipprbots.ethereum.db.storage.pruning.{ArchivePruning, PruningMode}
-import com.chipprbots.ethereum.domain.*
-import com.chipprbots.ethereum.ledger.{BlockExecution, BlockQueue, BlockValidation, InMemoryWorldStateProxy}
+import com.chipprbots.ethereum.db.storage._
+import com.chipprbots.ethereum.db.storage.pruning.ArchivePruning
+import com.chipprbots.ethereum.db.storage.pruning.PruningMode
+import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.ledger.BlockExecution
+import com.chipprbots.ethereum.ledger.BlockQueue
+import com.chipprbots.ethereum.ledger.BlockValidation
+import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.txExecTest.ScenarioSetup
-import com.chipprbots.ethereum.utils.{BlockchainConfig, Config}
+import com.chipprbots.ethereum.utils.BlockchainConfig
+import com.chipprbots.ethereum.utils.Config
 
 /** Helper for executing blocks with the test infrastructure */
 class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup {

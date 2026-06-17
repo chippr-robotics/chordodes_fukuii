@@ -2,13 +2,13 @@ package com.chipprbots.ethereum.network
 
 import java.net.InetSocketAddress
 
-import scala.concurrent.duration.*
-
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.Props
 import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
+
+import scala.concurrent.duration._
 
 import org.bouncycastle.util.encoders.Hex
 import org.scalatest.flatspec.AnyFlatSpec
@@ -22,23 +22,26 @@ import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.ChainWeight
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor.*
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor._
 import com.chipprbots.ethereum.network.PeerActor.DisconnectPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerHandshakeSuccessful
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
 import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
-import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.*
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier._
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.Codes
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.BlockHash
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.Config
+import com.chipprbots.ethereum.network.p2p.messages.ETH69.BlockRangeUpdate
+import com.chipprbots.ethereum.network.p2p.messages.ETH69.BlockRangeUpdate
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders
 
 class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
 
@@ -134,9 +137,9 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     expectInitialSubscriptions()
     setupNewPeer(peer1, peer1Probe, peer1Info)
 
-    val newLatestBlock = peer1Info.maxBlockNumber + 7
-    val newLatestBlockHash = ByteString(Array.fill(32)(0xab.toByte))
-    val blockRangeUpdate = ETH69.BlockRangeUpdate(
+    val newLatestBlock: BigInt = peer1Info.maxBlockNumber + 7
+    val newLatestBlockHash: ByteString = ByteString(Array.fill(32)(0xab.toByte))
+    val blockRangeUpdate: BlockRangeUpdate = ETH69.BlockRangeUpdate(
       earliestBlock = BigInt(0),
       latestBlock = newLatestBlock,
       latestBlockHash = newLatestBlockHash
@@ -160,8 +163,8 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     setupNewPeer(peer1, peer1Probe, peer1Info)
 
     // Send a BlockRangeUpdate with a lower block number — peer info should not regress
-    val staleLatestBlock = peer1Info.maxBlockNumber - 1
-    val blockRangeUpdate = ETH69.BlockRangeUpdate(
+    val staleLatestBlock: BigInt = peer1Info.maxBlockNumber - 1
+    val blockRangeUpdate: BlockRangeUpdate = ETH69.BlockRangeUpdate(
       earliestBlock = BigInt(0),
       latestBlock = staleLatestBlock,
       latestBlockHash = ByteString(Array.fill(32)(0xcc.toByte))
@@ -366,8 +369,8 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
 
     // peer1Info is built with capability = ETH63 above; override to ETH68 (modern peer)
     // and pin maxBlockNumber to 0 so we exercise the not-yet-known-number path.
-    val eth68Status = peer1Info.remoteStatus.copy(capability = Capability.ETH68)
-    val eth68Info = peer1Info.copy(remoteStatus = eth68Status, maxBlockNumber = 0)
+    val eth68Status: RemoteStatus = peer1Info.remoteStatus.copy(capability = Capability.ETH68)
+    val eth68Info: PeerInfo = peer1Info.copy(remoteStatus = eth68Status, maxBlockNumber = 0)
 
     peersInfoHolder ! PeerHandshakeSuccessful(peer1, eth68Info)
 
@@ -376,12 +379,12 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     peerEventBus.expectMsgClass(classOf[Subscribe])
 
     // The probe should land on the peerManager TestProbe as a SendMessage to peer1.
-    val sent = peerManager.expectMsgClass(classOf[PeerManagerActor.SendMessage])
+    val sent: PeerManagerActor.SendMessage = peerManager.expectMsgClass(classOf[PeerManagerActor.SendMessage])
     sent.peerId shouldBe peer1.id
     sent.message.code shouldBe Codes.GetBlockHeadersCode
     // ETH/66+ uses request-id-prefixed envelope.
     sent.message.underlyingMsg shouldBe a[com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders]
-    val gbh =
+    val gbh: GetBlockHeaders =
       sent.message.underlyingMsg.asInstanceOf[com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders]
     gbh.block shouldBe Right(eth68Info.remoteStatus.bestHash)
     gbh.maxHeaders shouldBe BigInt(1)
@@ -395,8 +398,8 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
   ) in new TestSetup {
     expectInitialSubscriptions()
 
-    val eth69Status = peer1Info.remoteStatus.copy(capability = Capability.ETH69)
-    val eth69Info = peer1Info.copy(remoteStatus = eth69Status)
+    val eth69Status: RemoteStatus = peer1Info.remoteStatus.copy(capability = Capability.ETH69)
+    val eth69Info: PeerInfo = peer1Info.copy(remoteStatus = eth69Status)
 
     peersInfoHolder ! PeerHandshakeSuccessful(peer1, eth69Info)
 
@@ -416,19 +419,19 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     expectInitialSubscriptions()
 
     // ETH/68 peer with no known block number yet.
-    val eth68Status = peer1Info.remoteStatus.copy(capability = Capability.ETH68)
-    val eth68Info = peer1Info.copy(remoteStatus = eth68Status, maxBlockNumber = 0)
+    val eth68Status: RemoteStatus = peer1Info.remoteStatus.copy(capability = Capability.ETH68)
+    val eth68Info: PeerInfo = peer1Info.copy(remoteStatus = eth68Status, maxBlockNumber = 0)
 
     setupNewPeer(peer1, peer1Probe, eth68Info)
 
     // Probe response arrives via the existing BlockHeadersCode subscription. The
     // header carries the bestHash from STATUS and a real block number; updateMaxBlock
     // should pick up the number and write it into PeerInfo.maxBlockNumber.
-    val probeReply = baseBlockHeader.copy(number = 24463116)
+    val probeReply: BlockHeader = baseBlockHeader.copy(number = 24463116)
     peersInfoHolder ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(probeReply)), peer1.id)
 
     requestSender.send(peersInfoHolder, PeerInfoRequest(peer1.id))
-    val resp = requestSender.expectMsgType[PeerInfoResponse]
+    val resp: PeerInfoResponse = requestSender.expectMsgType[PeerInfoResponse]
     resp.peerInfo.map(_.maxBlockNumber) shouldBe Some(BigInt(24463116))
   }
 
@@ -447,24 +450,24 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     // Create SNAP protocol messages
     import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
 
-    val accountRange = AccountRange(
+    val accountRange: AccountRange = AccountRange(
       requestId = BigInt(1),
       accounts = Seq.empty,
       proof = Seq.empty
     )
 
-    val storageRanges = StorageRanges(
+    val storageRanges: StorageRanges = StorageRanges(
       requestId = BigInt(2),
       slots = Seq.empty,
       proof = Seq.empty
     )
 
-    val trieNodes = TrieNodes(
+    val trieNodes: TrieNodes = TrieNodes(
       requestId = BigInt(3),
       nodes = Seq.empty
     )
 
-    val byteCodes = ByteCodes(
+    val byteCodes: ByteCodes = ByteCodes(
       requestId = BigInt(4),
       codes = Seq.empty
     )
@@ -494,7 +497,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     // Create a SNAP protocol message
     import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
 
-    val accountRange = AccountRange(
+    val accountRange: AccountRange = AccountRange(
       requestId = BigInt(1),
       accounts = Seq.empty,
       proof = Seq.empty

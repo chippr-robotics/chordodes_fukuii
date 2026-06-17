@@ -6,7 +6,8 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource.IterationError
 
 /** Tests for FlatAccountStorage — O(1) account reads by keccak256(address).
   *
@@ -16,20 +17,20 @@ import com.chipprbots.ethereum.testing.Tags.*
 class FlatAccountStorageSpec extends AnyFlatSpec with Matchers {
 
   "FlatAccountStorage" should "store and retrieve an account by hash" taggedAs UnitTest in new TestSetup {
-    val hash = ByteString(Array.fill(32)(0xaa.toByte))
-    val rlpAccount = ByteString(Array.fill(64)(0x01.toByte))
+    val hash: ByteString = ByteString(Array.fill(32)(0xaa.toByte))
+    val rlpAccount: ByteString = ByteString(Array.fill(64)(0x01.toByte))
 
     storage.put(hash, rlpAccount).commit()
     storage.getAccount(hash) shouldBe Some(rlpAccount)
   }
 
   it should "return None for missing hash" taggedAs UnitTest in new TestSetup {
-    val hash = ByteString(Array.fill(32)(0xbb.toByte))
+    val hash: ByteString = ByteString(Array.fill(32)(0xbb.toByte))
     storage.getAccount(hash) shouldBe None
   }
 
   it should "store multiple accounts in batch" taggedAs UnitTest in new TestSetup {
-    val accounts = (1 to 5).map { i =>
+    val accounts: IndexedSeq[(ByteString, ByteString)] = (1 to 5).map { i =>
       ByteString(Array.fill(32)(i.toByte)) -> ByteString(Array.fill(64)(i.toByte))
     }
 
@@ -41,9 +42,9 @@ class FlatAccountStorageSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "overwrite existing account on re-put" taggedAs UnitTest in new TestSetup {
-    val hash = ByteString(Array.fill(32)(0xcc.toByte))
-    val v1 = ByteString(Array.fill(64)(0x01.toByte))
-    val v2 = ByteString(Array.fill(64)(0x02.toByte))
+    val hash: ByteString = ByteString(Array.fill(32)(0xcc.toByte))
+    val v1: ByteString = ByteString(Array.fill(64)(0x01.toByte))
+    val v2: ByteString = ByteString(Array.fill(64)(0x02.toByte))
 
     storage.put(hash, v1).commit()
     storage.getAccount(hash) shouldBe Some(v1)
@@ -56,17 +57,17 @@ class FlatAccountStorageSpec extends AnyFlatSpec with Matchers {
     import cats.effect.unsafe.IORuntime
     implicit val runtime: IORuntime = IORuntime.global
 
-    val hash = ByteString(Array.fill(32)(0xaa.toByte))
-    val rlpAccount = ByteString(Array.fill(64)(0x01.toByte))
+    val hash: ByteString = ByteString(Array.fill(32)(0xaa.toByte))
+    val rlpAccount: ByteString = ByteString(Array.fill(64)(0x01.toByte))
     storage.put(hash, rlpAccount).commit()
 
     // EphemDataSource is not RocksDB — seekFrom falls through to Stream.empty
-    val results = storage.seekFrom(ByteString(Array.fill(32)(0x00.toByte))).compile.toVector.unsafeRunSync()
+    val results: Vector[Either[IterationError, (ByteString, ByteString)]] = storage.seekFrom(ByteString(Array.fill(32)(0x00.toByte))).compile.toVector.unsafeRunSync()
     results shouldBe empty
   }
 
   trait TestSetup {
-    val dataSource = EphemDataSource()
+    val dataSource: EphemDataSource = EphemDataSource()
     val storage = new FlatAccountStorage(dataSource)
   }
 }

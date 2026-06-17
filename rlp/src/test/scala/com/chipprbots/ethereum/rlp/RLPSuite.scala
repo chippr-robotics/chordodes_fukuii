@@ -12,9 +12,9 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
-import com.chipprbots.ethereum.rlp.RLPImplicits.{*, given}
-import com.chipprbots.ethereum.utils.Hex
+import com.chipprbots.ethereum.rlp.RLPImplicits.given
 import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.utils.Hex
 
 class RLPSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ScalaCheckDrivenPropertyChecks {
 
@@ -639,7 +639,7 @@ class RLPSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ScalaCheck
     assert(decoded3.equals(Seq("cat", "Lorem ipsum dolor sit amet, consectetur adipisicing elit")))
   }
 
-  implicit def emptySeqEncDec: RLPEncoder[Seq[Any]] with RLPDecoder[Seq[Any]] = new RLPEncoder[Seq[Any]]
+  implicit def emptySeqEncDec: RLPEncoder[Seq[Any]] & RLPDecoder[Seq[Any]] = new RLPEncoder[Seq[Any]]
     with RLPDecoder[Seq[Any]] {
     override def encode(obj: Seq[Any]): RLPEncodeable = RLPList()
 
@@ -649,7 +649,7 @@ class RLPSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ScalaCheck
     }
   }
 
-  implicit val stringSeqEncDec: RLPEncoder[Seq[String]] with RLPDecoder[Seq[String]] = new RLPEncoder[Seq[String]]
+  implicit val stringSeqEncDec: RLPEncoder[Seq[String]] & RLPDecoder[Seq[String]] = new RLPEncoder[Seq[String]]
     with RLPDecoder[Seq[String]] {
     override def encode(strings: Seq[String]): RLPEncodeable = RLPList(strings.map(stringEncDec.encode)*)
 
@@ -662,7 +662,7 @@ class RLPSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ScalaCheck
   implicit def stringSeqFromEncodeable(rlp: RLPEncodeable)(implicit dec: RLPDecoder[Seq[String]]): Seq[String] =
     dec.decode(rlp)
 
-  implicit val intSeqEncDec: RLPEncoder[Seq[Int]] with RLPDecoder[Seq[Int]] = new RLPEncoder[Seq[Int]]
+  implicit val intSeqEncDec: RLPEncoder[Seq[Int]] & RLPDecoder[Seq[Int]] = new RLPEncoder[Seq[Int]]
     with RLPDecoder[Seq[Int]] {
     override def encode(ints: Seq[Int]): RLPEncodeable = toRlpList(ints)
 
@@ -677,7 +677,7 @@ class RLPSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ScalaCheck
   case class MultiList1(number: Int, seq1: Seq[String], string: String, seq2: Seq[Int])
 
   object MultiList1 {
-    implicit val encDec: RLPEncoder[MultiList1] with RLPDecoder[MultiList1] = new RLPEncoder[MultiList1]
+    implicit val encDec: RLPEncoder[MultiList1] & RLPDecoder[MultiList1] = new RLPEncoder[MultiList1]
       with RLPDecoder[MultiList1] {
       override def encode(obj: MultiList1): RLPEncodeable = {
         import obj.*
@@ -700,7 +700,7 @@ class RLPSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ScalaCheck
   case class MultiList2(seq1: Seq[String], seq2: Seq[Int], seq3: Seq[Any] = Seq())
 
   object MultiList2 {
-    implicit val encDec: RLPEncoder[MultiList2] with RLPDecoder[MultiList2] = new RLPEncoder[MultiList2]
+    implicit val encDec: RLPEncoder[MultiList2] & RLPDecoder[MultiList2] = new RLPEncoder[MultiList2]
       with RLPDecoder[MultiList2] {
       override def encode(obj: MultiList2): RLPEncodeable = {
         import obj.*
@@ -724,7 +724,7 @@ class RLPSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ScalaCheck
   object EmptyListOfList {
     val instance: Seq[RLPList] = Seq(RLPList(RLPList(), RLPList()), RLPList())
 
-    implicit val encDec: RLPEncoder[EmptyListOfList] with RLPDecoder[EmptyListOfList] = new RLPEncoder[EmptyListOfList]
+    implicit val encDec: RLPEncoder[EmptyListOfList] & RLPDecoder[EmptyListOfList] = new RLPEncoder[EmptyListOfList]
       with RLPDecoder[EmptyListOfList] {
       override def encode(obj: EmptyListOfList): RLPEncodeable = RLPList(instance*)
 
@@ -744,7 +744,7 @@ class RLPSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ScalaCheck
   object RepOfTwoListOfList {
     val instance: Seq[RLPList] = Seq(RLPList(), RLPList(RLPList()), RLPList(RLPList(), RLPList(RLPList())))
 
-    implicit val encDec: RLPEncoder[RepOfTwoListOfList] with RLPDecoder[RepOfTwoListOfList] =
+    implicit val encDec: RLPEncoder[RepOfTwoListOfList] & RLPDecoder[RepOfTwoListOfList] =
       new RLPEncoder[RepOfTwoListOfList] with RLPDecoder[RepOfTwoListOfList] {
         override def encode(obj: RepOfTwoListOfList): RLPEncodeable = RLPList(instance*)
 
@@ -781,7 +781,7 @@ class RLPSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ScalaCheck
   private case class TestSimpleTransaction(id: Int, name: String)
 
   private object TestSimpleTransaction {
-    implicit val encDec: RLPEncoder[TestSimpleTransaction] with RLPDecoder[TestSimpleTransaction] =
+    implicit val encDec: RLPEncoder[TestSimpleTransaction] & RLPDecoder[TestSimpleTransaction] =
       new RLPEncoder[TestSimpleTransaction] with RLPDecoder[TestSimpleTransaction] {
         override def encode(obj: TestSimpleTransaction): RLPEncodeable = {
           import obj.*
@@ -814,7 +814,7 @@ class RLPSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ScalaCheck
   )
 
   private object TestSimpleBlock {
-    implicit val encDec: RLPEncoder[TestSimpleBlock] with RLPDecoder[TestSimpleBlock] = new RLPEncoder[TestSimpleBlock]
+    implicit val encDec: RLPEncoder[TestSimpleBlock] & RLPDecoder[TestSimpleBlock] = new RLPEncoder[TestSimpleBlock]
       with RLPDecoder[TestSimpleBlock] {
       override def encode(obj: TestSimpleBlock): RLPEncodeable = {
         import obj.*

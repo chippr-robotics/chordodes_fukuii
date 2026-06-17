@@ -21,7 +21,12 @@ import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.nodebuilder.StdNode
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
+import org.bouncycastle.crypto.AsymmetricCipherKeyPair
+import com.chipprbots.ethereum.consensus.mining.MiningConfig
+import com.chipprbots.ethereum.consensus.mining.MiningConfig
+import com.chipprbots.ethereum.consensus.mining.MiningConfig
+import com.chipprbots.ethereum.consensus.mining.MiningConfig
 
 class PoWMiningSpec
     extends TestKit(ActorSystem("PoWMiningSpec_System"))
@@ -35,7 +40,7 @@ class PoWMiningSpec
     ConsensusTest,
     SlowTest
   ) in new TestSetup {
-    val powMining = PoWMining(
+    val powMining: PoWMining = PoWMining(
       vm,
       storagesInstance.storages.evmCodeStorage,
       blockchain,
@@ -54,9 +59,9 @@ class PoWMiningSpec
     SlowTest
   ) in new TestSetup {
     // MIGRATION: Can't mock Java classes in Scala 3 - use real instance instead
-    val key = com.chipprbots.ethereum.crypto.generateKeyPair(new java.security.SecureRandom)
+    val key: AsymmetricCipherKeyPair = com.chipprbots.ethereum.crypto.generateKeyPair(new java.security.SecureRandom)
 
-    val powMining = PoWMining(
+    val powMining: PoWMining = PoWMining(
       vm,
       evmCodeStorage,
       blockchain,
@@ -70,10 +75,10 @@ class PoWMiningSpec
   }
 
   it should "not start a miner when miningEnabled=false" taggedAs (UnitTest, ConsensusTest, SlowTest) in new TestSetup {
-    val configNoMining = miningConfig.copy(miningEnabled = false)
-    val fullMiningConfig = FullMiningConfig(configNoMining, ethashConfig)
+    val configNoMining: MiningConfig = miningConfig.copy(miningEnabled = false)
+    val fullMiningConfig: FullMiningConfig[EthashConfig] = FullMiningConfig(configNoMining, ethashConfig)
 
-    val powMining = PoWMining(
+    val powMining: PoWMining = PoWMining(
       vm,
       evmCodeStorage,
       blockchain,
@@ -93,10 +98,10 @@ class PoWMiningSpec
     ConsensusTest,
     SlowTest
   ) in new TestSetup {
-    val configNoMining = miningConfig.copy(miningEnabled = true, protocol = Protocol.MockedPow)
-    val fullMiningConfig = FullMiningConfig(configNoMining, ethashConfig)
+    val configNoMining: MiningConfig = miningConfig.copy(miningEnabled = true, protocol = Protocol.MockedPow)
+    val fullMiningConfig: FullMiningConfig[EthashConfig] = FullMiningConfig(configNoMining, ethashConfig)
 
-    val powMining = PoWMining(
+    val powMining: PoWMining = PoWMining(
       vm,
       evmCodeStorage,
       blockchain,
@@ -116,10 +121,10 @@ class PoWMiningSpec
     ConsensusTest,
     SlowTest
   ) in new TestSetup {
-    val configNoMining = miningConfig.copy(miningEnabled = true, protocol = Protocol.PoW)
-    val fullMiningConfig = FullMiningConfig(configNoMining, ethashConfig)
+    val configNoMining: MiningConfig = miningConfig.copy(miningEnabled = true, protocol = Protocol.PoW)
+    val fullMiningConfig: FullMiningConfig[EthashConfig] = FullMiningConfig(configNoMining, ethashConfig)
 
-    val powMining = PoWMining(
+    val powMining: PoWMining = PoWMining(
       vm,
       evmCodeStorage,
       blockchain,
@@ -139,10 +144,10 @@ class PoWMiningSpec
     ConsensusTest,
     SlowTest
   ) in new TestSetup {
-    val configNoMining = miningConfig.copy(miningEnabled = true, protocol = Protocol.RestrictedPoW)
-    val fullMiningConfig = FullMiningConfig(configNoMining, ethashConfig)
+    val configNoMining: MiningConfig = miningConfig.copy(miningEnabled = true, protocol = Protocol.RestrictedPoW)
+    val fullMiningConfig: FullMiningConfig[EthashConfig] = FullMiningConfig(configNoMining, ethashConfig)
 
-    val powMining = PoWMining(
+    val powMining: PoWMining = PoWMining(
       vm,
       evmCodeStorage,
       blockchain,

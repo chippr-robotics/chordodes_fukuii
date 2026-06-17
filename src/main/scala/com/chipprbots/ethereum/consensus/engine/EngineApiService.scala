@@ -1,21 +1,21 @@
 package com.chipprbots.ethereum.consensus.engine
 
+import java.security.MessageDigest
+
 import org.apache.pekko.util.ByteString
 
 import cats.effect.IO
 
-import java.security.MessageDigest
-
-import com.chipprbots.ethereum.consensus.engine.PayloadStatus.*
+import com.chipprbots.ethereum.consensus.engine.PayloadStatus._
 import com.chipprbots.ethereum.consensus.validators.std.MptListValidator
 import com.chipprbots.ethereum.crypto.kec256
-import com.chipprbots.ethereum.domain.*
-import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
-import com.chipprbots.ethereum.domain.Withdrawal.*
+import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields._
+import com.chipprbots.ethereum.domain.Withdrawal._
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.ledger.BlockExecution
 import com.chipprbots.ethereum.mpt.ByteArraySerializable
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
-import com.chipprbots.ethereum.rlp.encode as rlpEncode
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions._
+import com.chipprbots.ethereum.rlp.{encode => rlpEncode}
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Logger
 
@@ -92,7 +92,7 @@ class EngineApiService(
 
   /** Return the latest block number from the blockchain storage. */
   def getLatestBlockNumber: BigInt =
-    blockchainReader.getBestBlockNumber()
+    blockchainReader.getBestBlockNumber
 
   /** engine_newPayloadV1/V2/V3/V4 — Validate and execute a new payload from the CL.
     *

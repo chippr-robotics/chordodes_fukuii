@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.db.dataSource.DataSource.Key
 import com.chipprbots.ethereum.db.dataSource.DataSource.Namespace
 import com.chipprbots.ethereum.db.dataSource.DataSource.Value
 import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource.RocksDbDataSourceClosedException
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 trait DataSourceTestBehavior extends ScalaCheckPropertyChecks with ObjectGenerators {
   this: AnyFlatSpec =>

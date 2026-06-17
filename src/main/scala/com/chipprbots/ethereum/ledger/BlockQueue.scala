@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.ledger
 import org.apache.pekko.util.ByteString
 
 import scala.annotation.tailrec
-import scala.jdk.CollectionConverters.*
+import scala.jdk.CollectionConverters._
 
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockchainReader
@@ -47,7 +47,7 @@ class BlockQueue(
     *   if the newly enqueued block is part of a known branch (rooted somewhere on the main chain), return the leaf hash
     *   and its total difficulty, otherwise None
     */
-  def enqueueBlock(block: Block, bestBlockNumber: BigInt = blockchainReader.getBestBlockNumber()): Option[Leaf] = {
+  def enqueueBlock(block: Block, bestBlockNumber: BigInt = blockchainReader.getBestBlockNumber): Option[Leaf] = {
     import block.header.*
 
     cleanUp(bestBlockNumber)

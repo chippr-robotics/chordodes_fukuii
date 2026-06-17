@@ -2,13 +2,13 @@ package com.chipprbots.ethereum.db.storage
 
 import org.apache.pekko.util.ByteString
 
-import scala.collection.immutable.ArraySeq
-
 import cats.effect.unsafe.IORuntime
 
-import io.circe.*
-import io.circe.parser.decode as circeDecoder
-import io.circe.syntax.*
+import scala.collection.immutable.ArraySeq
+
+import io.circe._
+import io.circe.parser.{decode => circeDecoder}
+import io.circe.syntax._
 
 import com.chipprbots.ethereum.db.dataSource.DataSource
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps

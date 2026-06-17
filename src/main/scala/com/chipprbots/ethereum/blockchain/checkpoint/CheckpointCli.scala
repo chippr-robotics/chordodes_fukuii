@@ -3,9 +3,9 @@ package com.chipprbots.ethereum.blockchain.checkpoint
 import java.nio.file.Path
 import java.nio.file.Paths
 
-import scala.collection.immutable.ArraySeq
+import cats.implicits._
 
-import cats.implicits.*
+import scala.collection.immutable.ArraySeq
 
 import com.monovore.decline.Command
 import com.monovore.decline.Opts
@@ -19,6 +19,7 @@ import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.InstanceConfig
 import com.chipprbots.ethereum.utils.InstanceConfigProvider
 import com.chipprbots.ethereum.utils.Logger
+import com.chipprbots.ethereum.db.components.Storages.DefaultStorages
 
 /** Operator CLI for producing `.checkpoint` archives.
   *
@@ -109,7 +110,7 @@ object CheckpointCli extends Logger {
     */
   final private class ExportBuilder extends InstanceConfigProvider with BlockchainConfigBuilder {
     override def instanceConfig: InstanceConfig = Config
-    lazy val storagesInstance =
+    lazy val storagesInstance: RocksDbDataSourceComponent & InstanceConfigProvider & (PruningConfigBuilder & DefaultStorages) =
       new RocksDbDataSourceComponent
         with PruningConfigBuilder
         with Storages.DefaultStorages

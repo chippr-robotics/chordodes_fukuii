@@ -17,14 +17,15 @@ import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.LegacyTransaction
 import com.chipprbots.ethereum.domain.SignedTransactionWithSender
 import com.chipprbots.ethereum.jsonrpc.FukuiiService.GetAccountTransactionsRequest
 import com.chipprbots.ethereum.jsonrpc.FukuiiService.GetAccountTransactionsResponse
 import com.chipprbots.ethereum.nodebuilder.ApisBuilder
-import com.chipprbots.ethereum.nodebuilder.JSONRpcConfigBuilder
 import com.chipprbots.ethereum.nodebuilder.FukuiiServiceBuilder
+import com.chipprbots.ethereum.nodebuilder.JSONRpcConfigBuilder
 import com.chipprbots.ethereum.nodebuilder.PendingTransactionsManagerBuilder
 import com.chipprbots.ethereum.nodebuilder.SyncControllerRefBuilder
 import com.chipprbots.ethereum.nodebuilder.TransactionHistoryServiceBuilder
@@ -33,7 +34,6 @@ import com.chipprbots.ethereum.transactions.TransactionHistoryService
 import com.chipprbots.ethereum.transactions.TransactionHistoryService.ExtendedTransactionData
 import com.chipprbots.ethereum.transactions.TransactionHistoryService.MinedTransactionData
 import com.chipprbots.ethereum.utils.BlockchainConfig
-import com.chipprbots.ethereum.domain.Block
 
 class FukuiiServiceSpec
     extends TestKit(ActorSystem("FukuiiServiceSpec"))

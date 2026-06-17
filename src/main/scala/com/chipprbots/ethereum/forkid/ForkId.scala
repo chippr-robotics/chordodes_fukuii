@@ -4,13 +4,13 @@ import java.util.zip.CRC32
 
 import org.apache.pekko.util.ByteString
 
-import com.chipprbots.ethereum.rlp.*
-import com.chipprbots.ethereum.utils.BigIntExtensionMethods.*
+import com.chipprbots.ethereum.rlp._
+import com.chipprbots.ethereum.utils.BigIntExtensionMethods._
 import com.chipprbots.ethereum.utils.BlockchainConfig
-import com.chipprbots.ethereum.utils.ByteUtils.*
+import com.chipprbots.ethereum.utils.ByteUtils._
 import com.chipprbots.ethereum.utils.Hex
 
-import RLPImplicitConversions.*
+import RLPImplicitConversions._
 import RLPImplicits.given
 
 case class ForkId(hash: BigInt, next: Option[BigInt]) {

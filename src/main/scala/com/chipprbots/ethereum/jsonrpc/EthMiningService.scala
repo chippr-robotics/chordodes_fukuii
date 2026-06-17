@@ -10,27 +10,27 @@ import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
-import cats.syntax.parallel.*
+import cats.syntax.parallel._
 
 import scala.annotation.unused
 import scala.collection.concurrent.TrieMap
-import scala.collection.concurrent.Map as ConcurrentMap
+import scala.collection.concurrent.{Map => ConcurrentMap}
 import scala.concurrent.duration.FiniteDuration
 
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.consensus.blocks.PendingBlockAndState
 import com.chipprbots.ethereum.consensus.mining.CoinbaseProvider
-import com.chipprbots.ethereum.consensus.pow.PoWMiningMetrics
-import com.chipprbots.ethereum.consensus.pow.WorkNotifier
 import com.chipprbots.ethereum.consensus.mining.Mining
 import com.chipprbots.ethereum.consensus.mining.RichMining
 import com.chipprbots.ethereum.consensus.pow.EthashUtils
+import com.chipprbots.ethereum.consensus.pow.PoWMiningMetrics
+import com.chipprbots.ethereum.consensus.pow.WorkNotifier
 import com.chipprbots.ethereum.consensus.pow.miners.MinerProtocol
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.ommers.OmmersPool
@@ -107,7 +107,7 @@ class EthMiningService(
     mining.ifEthash { ethash =>
       PoWMiningMetrics.recordGetWork()
       reportActive()
-      blockchainReader.getBestBlock() match {
+      blockchainReader.getBestBlock match {
         case Some(block) =>
           (getOmmersFromPool(block.hash), getTransactionsFromPool).parMapN { case (ommers, pendingTxs) =>
             val blockGenerator = ethash.blockGenerator
@@ -148,7 +148,7 @@ class EthMiningService(
       IO {
         ethash.blockGenerator.getPrepared(req.powHeaderHash) match {
           case Some(pendingBlock) =>
-            val bestBlockNum = blockchainReader.getBestBlockNumber()
+            val bestBlockNum = blockchainReader.getBestBlockNumber
             val staleThreshold = ethash.config.generic.staleThreshold
             // core-geth reference: consensus/ethash/sealer.go staleThreshold check
             if (bestBlockNum - pendingBlock.block.header.number > staleThreshold) {

@@ -7,7 +7,7 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.model.ws.Message
 import org.apache.pekko.http.scaladsl.model.ws.TextMessage
-import org.apache.pekko.http.scaladsl.server.Directives.*
+import org.apache.pekko.http.scaladsl.server.Directives._
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.OverflowStrategy
@@ -19,16 +19,16 @@ import org.apache.pekko.util.Timeout
 import cats.effect.unsafe.IORuntime
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 import scala.util.Failure
 import scala.util.Success
 
-import org.json4s.*
-import org.json4s.native.JsonMethods.*
+import org.json4s._
+import org.json4s.native.JsonMethods._
 import org.json4s.native.Serialization
 
 import com.chipprbots.ethereum.jsonrpc.JsonRpcRequest
-import com.chipprbots.ethereum.jsonrpc.SubscriptionManager.*
+import com.chipprbots.ethereum.jsonrpc.SubscriptionManager._
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController
 import com.chipprbots.ethereum.utils.Logger

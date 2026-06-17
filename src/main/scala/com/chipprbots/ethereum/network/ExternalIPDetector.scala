@@ -1,18 +1,26 @@
 package com.chipprbots.ethereum.network
 
-import java.net.{DatagramPacket, DatagramSocket, Inet4Address, InetAddress, NetworkInterface}
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.Inet4Address
+import java.net.InetAddress
+import java.net.NetworkInterface
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.{CompletableFuture, TimeUnit}
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 
-import scala.jdk.CollectionConverters.*
-import scala.util.{Try, Using}
+import scala.jdk.CollectionConverters._
+import scala.util.Try
+import scala.util.Using
 
 import org.jupnp.UpnpServiceImpl
 import org.jupnp.model.action.ActionInvocation
 import org.jupnp.model.message.UpnpResponse
-import org.jupnp.model.meta.{LocalDevice, RemoteDevice}
-import org.jupnp.registry.{Registry, RegistryListener}
+import org.jupnp.model.meta.LocalDevice
+import org.jupnp.model.meta.RemoteDevice
+import org.jupnp.registry.Registry
+import org.jupnp.registry.RegistryListener
 import org.jupnp.support.igd.callback.GetExternalIP
 
 /** Detects the node's externally reachable IP address via a best-effort cascade:

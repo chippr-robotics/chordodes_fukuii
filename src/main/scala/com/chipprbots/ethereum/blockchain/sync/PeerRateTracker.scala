@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.blockchain.sync
 
 import scala.collection.mutable
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import com.chipprbots.ethereum.utils.Logger
 

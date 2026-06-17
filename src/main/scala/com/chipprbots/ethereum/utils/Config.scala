@@ -5,12 +5,12 @@ import java.io.File
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
-import scala.concurrent.duration.*
-import scala.jdk.CollectionConverters.*
+import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 import scala.util.Try
 
 import com.typesafe.config.ConfigFactory
-import com.typesafe.config.Config as TypesafeConfig
+import com.typesafe.config.{Config => TypesafeConfig}
 
 import com.chipprbots.ethereum.db.storage.pruning.ArchivePruning
 import com.chipprbots.ethereum.db.storage.pruning.BasicPruning
@@ -19,7 +19,7 @@ import com.chipprbots.ethereum.db.storage.pruning.PruningMode
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.utils.VmConfig.VmMode
 
-import ConfigUtils.*
+import ConfigUtils._
 
 /** Singleton Config for backward compatibility. All existing code that references `Config.xxx` continues to work
   * unchanged. For multi-instance mode, create new `InstanceConfig` instances instead.

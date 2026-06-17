@@ -4,7 +4,7 @@ import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.consensus.pow.blocks.OmmersSeqEnc
 import com.chipprbots.ethereum.consensus.validators.BlockValidator
-import com.chipprbots.ethereum.crypto.*
+import com.chipprbots.ethereum.crypto._
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.domain.Withdrawal.WithdrawalBytesDec
 import com.chipprbots.ethereum.domain.Withdrawal.WithdrawalEnc
 import com.chipprbots.ethereum.ledger.BloomFilter
 import com.chipprbots.ethereum.mpt.ByteArraySerializable
-import com.chipprbots.ethereum.rlp.encode as rlpEncode
+import com.chipprbots.ethereum.rlp.{encode => rlpEncode}
 import com.chipprbots.ethereum.utils.ByteUtils.or
 
 object StdBlockValidator extends BlockValidator {

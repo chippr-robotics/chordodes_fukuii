@@ -6,7 +6,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.ledger.BlockPreparator
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 /** EIP-7623: Verify floor data gas calculation. */
 class EIP7623FloorDataGasSpec extends AnyFlatSpec with Matchers {

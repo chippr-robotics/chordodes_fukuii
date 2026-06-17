@@ -14,7 +14,7 @@ import org.apache.pekko.util.Timeout
 import cats.effect.Deferred
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
-import cats.implicits.*
+import cats.implicits._
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.duration.FiniteDuration
@@ -26,8 +26,7 @@ import org.scalatest.freespec.AnyFreeSpecLike
 import com.chipprbots.ethereum.BlockHelpers
 import com.chipprbots.ethereum.NormalPatience
 import com.chipprbots.ethereum.WithActorSystemShutDown
-import com.chipprbots.ethereum.testing.Tags.*
-import com.chipprbots.ethereum.blockchain.sync.*
+import com.chipprbots.ethereum.blockchain.sync._
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSyncBranchResolverActor.BranchResolutionFailed
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSyncBranchResolverActor.BranchResolutionFailed.NoCommonBlockFound
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSyncBranchResolverActor.BranchResolvedSuccessful
@@ -35,15 +34,14 @@ import com.chipprbots.ethereum.blockchain.sync.fast.FastSyncBranchResolverActor.
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor.*
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor._
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.Capability
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{
-  BlockHeaders as ETHBlockHeaders,
-  GetBlockHeaders as ETHGetBlockHeaders
-}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{BlockHeaders => ETHBlockHeaders}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{GetBlockHeaders => ETHGetBlockHeaders}
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.Logger
 
 class FastSyncBranchResolverActorSpec
@@ -65,7 +63,7 @@ class FastSyncBranchResolverActorSpec
         implicit override lazy val system = self.system
         implicit override lazy val ioRuntime: IORuntime = IORuntime.global
 
-        val sender = TestProbe("sender")
+        val sender: TestProbe = TestProbe("sender")
 
         val commonBlocks: List[Block] = BlockHelpers.generateChain(
           5,
@@ -91,15 +89,15 @@ class FastSyncBranchResolverActorSpec
         val blocksSentFromPeer: Map[Int, List[Block]] = Map(1 -> firstBatchBlockHeaders)
 
         saveBlocks(blocksSaved)
-        val networkPeerManager = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
-        val fastSyncBranchResolver =
+        val networkPeerManager: ActorRef = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
+        val fastSyncBranchResolver: ActorRef =
           creatFastSyncBranchResolver(sender.ref, networkPeerManager, CacheBasedBlacklist.empty(BlacklistMaxElements))
 
         val expectation: PartialFunction[Any, BranchResolvedSuccessful] = {
           case r @ BranchResolvedSuccessful(num, _) if num == BigInt(5) => r
         }
 
-        val response = (for {
+        val response: BranchResolvedSuccessful = (for {
           _ <- IO(sender.send(fastSyncBranchResolver, StartBranchResolver))
           response <- IO(sender.expectMsgPF(branchResolutionTimeout)(expectation))
           _ <- IO(stopController(fastSyncBranchResolver))
@@ -112,13 +110,13 @@ class FastSyncBranchResolverActorSpec
           implicit override lazy val system = self.system
           implicit override lazy val ioRuntime: IORuntime = IORuntime.global
 
-          val sender = TestProbe("sender")
+          val sender: TestProbe = TestProbe("sender")
 
           val commonBlocks: List[Block] = BlockHelpers.generateChain(5, BlockHelpers.genesis)
           val blocksSaved: List[Block] = commonBlocks :++ BlockHelpers.generateChain(5, commonBlocks.last)
           val blocksSavedInPeer: List[Block] = commonBlocks :++ BlockHelpers.generateChain(6, commonBlocks.last)
 
-          val firstBatchBlockHeaders =
+          val firstBatchBlockHeaders: List[Block] =
             blocksSavedInPeer.slice(blocksSavedInPeer.size - syncConfig.blockHeadersPerRequest, blocksSavedInPeer.size)
 
           val blocksSentFromPeer: Map[Int, List[Block]] = Map(
@@ -130,15 +128,15 @@ class FastSyncBranchResolverActorSpec
           )
 
           saveBlocks(blocksSaved)
-          val networkPeerManager = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
-          val fastSyncBranchResolver =
+          val networkPeerManager: ActorRef = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
+          val fastSyncBranchResolver: ActorRef =
             creatFastSyncBranchResolver(sender.ref, networkPeerManager, CacheBasedBlacklist.empty(BlacklistMaxElements))
 
           val expectation: PartialFunction[Any, BranchResolvedSuccessful] = {
             case r @ BranchResolvedSuccessful(num, _) if num == BigInt(5) => r
           }
 
-          val response = (for {
+          val response: BranchResolvedSuccessful = (for {
             _ <- IO(sender.send(fastSyncBranchResolver, StartBranchResolver))
             response <- IO(sender.expectMsgPF(branchResolutionTimeout)(expectation))
             _ <- IO(stopController(fastSyncBranchResolver))
@@ -149,13 +147,13 @@ class FastSyncBranchResolverActorSpec
           implicit override lazy val system = self.system
           implicit override lazy val ioRuntime: IORuntime = IORuntime.global
 
-          val sender = TestProbe("sender")
+          val sender: TestProbe = TestProbe("sender")
 
           val commonBlocks: List[Block] = BlockHelpers.generateChain(3, BlockHelpers.genesis)
           val blocksSaved: List[Block] = commonBlocks :++ BlockHelpers.generateChain(7, commonBlocks.last)
           val blocksSavedInPeer: List[Block] = commonBlocks :++ BlockHelpers.generateChain(8, commonBlocks.last)
 
-          val firstBatchBlockHeaders =
+          val firstBatchBlockHeaders: List[Block] =
             blocksSavedInPeer.slice(blocksSavedInPeer.size - syncConfig.blockHeadersPerRequest, blocksSavedInPeer.size)
 
           val blocksSentFromPeer: Map[Int, List[Block]] = Map(
@@ -168,15 +166,15 @@ class FastSyncBranchResolverActorSpec
           )
 
           saveBlocks(blocksSaved)
-          val networkPeerManager = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
-          val fastSyncBranchResolver =
+          val networkPeerManager: ActorRef = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
+          val fastSyncBranchResolver: ActorRef =
             creatFastSyncBranchResolver(sender.ref, networkPeerManager, CacheBasedBlacklist.empty(BlacklistMaxElements))
 
           val expectation: PartialFunction[Any, BranchResolvedSuccessful] = {
             case r @ BranchResolvedSuccessful(num, _) if num == BigInt(3) => r
           }
 
-          val response = (for {
+          val response: BranchResolvedSuccessful = (for {
             _ <- IO(sender.send(fastSyncBranchResolver, StartBranchResolver))
             response <- IO(sender.expectMsgPF(branchResolutionTimeout)(expectation))
             _ <- IO(stopController(fastSyncBranchResolver))
@@ -188,13 +186,13 @@ class FastSyncBranchResolverActorSpec
           implicit override lazy val system = self.system
           implicit override lazy val ioRuntime: IORuntime = IORuntime.global
 
-          val sender = TestProbe("sender")
+          val sender: TestProbe = TestProbe("sender")
 
           val commonBlocks: List[Block] = BlockHelpers.generateChain(6, BlockHelpers.genesis)
           val blocksSaved: List[Block] = commonBlocks :++ BlockHelpers.generateChain(4, commonBlocks.last)
           val blocksSavedInPeer: List[Block] = commonBlocks :++ BlockHelpers.generateChain(5, commonBlocks.last)
 
-          val firstBatchBlockHeaders =
+          val firstBatchBlockHeaders: List[Block] =
             blocksSavedInPeer.slice(blocksSavedInPeer.size - syncConfig.blockHeadersPerRequest, blocksSavedInPeer.size)
 
           val blocksSentFromPeer: Map[Int, List[Block]] = Map(
@@ -206,15 +204,15 @@ class FastSyncBranchResolverActorSpec
           )
 
           saveBlocks(blocksSaved)
-          val networkPeerManager = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
-          val fastSyncBranchResolver =
+          val networkPeerManager: ActorRef = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
+          val fastSyncBranchResolver: ActorRef =
             creatFastSyncBranchResolver(sender.ref, networkPeerManager, CacheBasedBlacklist.empty(BlacklistMaxElements))
 
           val expectation: PartialFunction[Any, BranchResolvedSuccessful] = {
             case r @ BranchResolvedSuccessful(num, _) if num == BigInt(6) => r
           }
 
-          val response = (for {
+          val response: BranchResolvedSuccessful = (for {
             _ <- IO(sender.send(fastSyncBranchResolver, StartBranchResolver))
             response <- IO(sender.expectMsgPF(branchResolutionTimeout)(expectation))
             _ <- IO(stopController(fastSyncBranchResolver))
@@ -227,13 +225,13 @@ class FastSyncBranchResolverActorSpec
         implicit override lazy val system = self.system
         implicit override lazy val ioRuntime: IORuntime = IORuntime.global
 
-        val sender = TestProbe("sender")
+        val sender: TestProbe = TestProbe("sender")
 
         // same genesis block but no common blocks
         val blocksSaved: List[Block] = BlockHelpers.generateChain(5, BlockHelpers.genesis)
         val blocksSavedInPeer: List[Block] = BlockHelpers.generateChain(6, BlockHelpers.genesis)
 
-        val firstBatchBlockHeaders =
+        val firstBatchBlockHeaders: List[Block] =
           blocksSavedInPeer.slice(blocksSavedInPeer.size - syncConfig.blockHeadersPerRequest, blocksSavedInPeer.size)
 
         val blocksSentFromPeer: Map[Int, List[Block]] = Map(
@@ -244,8 +242,8 @@ class FastSyncBranchResolverActorSpec
         )
 
         saveBlocks(blocksSaved)
-        val networkPeerManager = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
-        val fastSyncBranchResolver =
+        val networkPeerManager: ActorRef = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
+        val fastSyncBranchResolver: ActorRef =
           creatFastSyncBranchResolver(sender.ref, networkPeerManager, CacheBasedBlacklist.empty(BlacklistMaxElements))
 
         log.debug(s"*** peers: ${handshakedPeers.map(p => (p._1.id, p._2.maxBlockNumber))}")

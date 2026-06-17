@@ -1,8 +1,7 @@
 package com.chipprbots.ethereum.ethtest
 
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
-
-import com.chipprbots.ethereum.testing.Tags.*
 
 /** Comprehensive state test suite using official Ethereum execution specs.
   *
@@ -137,7 +136,7 @@ class ExecutionSpecsStateTestsSpec extends EthereumTestsSpec {
 
     suite.tests.foreach { case (_, test) =>
       val result = executeTest(test)
-      result shouldBe a[Right[_, _]]
+      result shouldBe a[Right[?, ?]]
     }
   }
 
@@ -197,7 +196,7 @@ class ExecutionSpecsStateTestsSpec extends EthereumTestsSpec {
       val suite = loadTestSuite(testPath)
       suite.tests.foreach { case (_, test) =>
         val result = executeTest(test)
-        result shouldBe a[Right[_, _]]
+        result shouldBe a[Right[?, ?]]
       }
     }
   }
@@ -234,7 +233,7 @@ class ExecutionSpecsStateTestsSpec extends EthereumTestsSpec {
 
     suite.tests.foreach { case (_, test) =>
       val result = executeTest(test)
-      result shouldBe a[Right[_, _]]
+      result shouldBe a[Right[?, ?]]
     }
   }
 

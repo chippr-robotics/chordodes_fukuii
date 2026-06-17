@@ -1,13 +1,12 @@
 package com.chipprbots.ethereum.network.discovery.codecs
 
 import com.chipprbots.scalanet.discovery.ethereum.v5.Payload
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 import scodec.Codec
 import scodec.bits.ByteVector
 
-import org.scalatest.flatspec.AnyFlatSpec
-import org.scalatest.matchers.should.Matchers
-
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 /** Tests for [[V5RLPCodecs]]. The wire shape per discv5-wire.md:
   *   - Each message has a 1-byte type discriminator followed by RLP fields

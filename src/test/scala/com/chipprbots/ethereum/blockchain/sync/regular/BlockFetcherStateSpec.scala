@@ -12,9 +12,9 @@ import org.scalatest.wordspec.AnyWordSpecLike
 import com.chipprbots.ethereum.BlockHelpers
 import com.chipprbots.ethereum.Mocks.MockValidatorsAlwaysSucceed
 import com.chipprbots.ethereum.WithActorSystemShutDown
-import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcherState.HeadersNotMatchingReadyBlocks
 import com.chipprbots.ethereum.network.PeerId
+import com.chipprbots.ethereum.testing.Tags._
 
 class BlockFetcherStateSpec
     extends TestKit(ActorSystem("BlockFetcherStateSpec_System"))

@@ -8,7 +8,7 @@ import org.apache.pekko.util.ByteString
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 import scala.util.Try
 
 import com.google.protobuf.CodedInputStream

@@ -2,8 +2,8 @@ package com.chipprbots.ethereum.network
 
 import java.time.Clock
 
-import cats.*
-import cats.implicits.*
+import cats._
+import cats.implicits._
 
 import scala.annotation.tailrec
 import scala.concurrent.duration.Duration

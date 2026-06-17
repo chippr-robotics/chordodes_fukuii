@@ -6,14 +6,14 @@ import scala.annotation.tailrec
 
 import scalapb.UnknownFieldSet
 
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Logger
 import com.chipprbots.ethereum.utils.VmConfig
 import com.chipprbots.ethereum.vm
-import com.chipprbots.ethereum.vm.*
+import com.chipprbots.ethereum.vm._
 
-import Implicits.*
+import Implicits._
 
 /** @param testMode
   *   \- if enabled the client will send blockchain configuration with each configuration. This is useful to override

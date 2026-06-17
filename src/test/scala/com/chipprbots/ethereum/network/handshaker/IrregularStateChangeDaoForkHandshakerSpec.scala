@@ -11,25 +11,29 @@ import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.crypto.generateKeyPair
 import com.chipprbots.ethereum.db.storage.AppStateStorage
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.forkid.ForkId
+import com.chipprbots.ethereum.network.ForkResolver
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
-import com.chipprbots.ethereum.network.ForkResolver
 import com.chipprbots.ethereum.network.PeerManagerActor.PeerConfiguration
 import com.chipprbots.ethereum.network.handshaker.Handshaker.HandshakeComplete.HandshakeFailure
 import com.chipprbots.ethereum.network.handshaker.Handshaker.HandshakeComplete.HandshakeSuccess
 import com.chipprbots.ethereum.network.p2p.messages.Capability
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders
 import com.chipprbots.ethereum.network.p2p.messages.ETH69
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Hello
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Hello.HelloEnc
 import com.chipprbots.ethereum.security.SecureRandomBuilder
-import com.chipprbots.ethereum.testing.Tags.*
-import com.chipprbots.ethereum.utils.ByteStringUtils.*
-import com.chipprbots.ethereum.utils.*
+import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.utils.ByteStringUtils._
+import com.chipprbots.ethereum.utils._
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.Status68
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.Status68
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.Status68
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.Status68
 
 class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matchers {
 
@@ -76,7 +80,7 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
 
     blockchainWriter.save(firstBlock, Nil, newChainWeight, saveAsBestBlock = true)
 
-    val newLocalStatusMsg =
+    val newLocalStatusMsg: Status68 =
       localStatusMsg.copy(totalDifficulty = newChainWeight.totalDifficulty, bestHash = firstBlock.header.hash)
 
     initHandshakerWithoutResolver.nextMessage.map(_.messageToSend) shouldBe Right(localHello: HelloEnc)
@@ -105,7 +109,7 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
 
     blockchainWriter.save(firstBlock, Nil, newChainWeight, saveAsBestBlock = true)
 
-    val newLocalStatusMsg =
+    val newLocalStatusMsg: Status68 =
       localStatusMsg
         .copy(
           bestHash = firstBlock.header.hash,
@@ -142,7 +146,7 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
 
     blockchainWriter.save(firstBlock, Nil, newChainWeight, saveAsBestBlock = true)
 
-    val newLocalStatusMsg =
+    val newLocalStatusMsg: Status68 =
       localStatusMsg
         .copy(
           bestHash = firstBlock.header.hash,
@@ -152,7 +156,7 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
 
     initHandshakerWithoutResolver.nextMessage.map(_.messageToSend) shouldBe Right(localHello: HelloEnc)
 
-    val newRemoteStatusMsg =
+    val newRemoteStatusMsg: Status68 =
       remoteStatusMsg
         .copy(
           forkId = ForkId(1, None) // ForkId that is incompatible with our chain
@@ -188,7 +192,7 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
     blockchainWriter.save(firstBlock, Nil, newChainWeight, saveAsBestBlock = true)
 
     // Use a handshaker WITH fork resolver configured
-    val eth64HandshakerWithResolver = NetworkHandshaker(networkHandshakerConfigurationWithResolver)
+    val eth64HandshakerWithResolver: NetworkHandshaker = NetworkHandshaker(networkHandshakerConfigurationWithResolver)
 
     // Complete Hello exchange
     val handshakerAfterHelloOpt: Option[Handshaker[PeerInfo]] = eth64HandshakerWithResolver.applyMessage(remoteHello)
@@ -247,7 +251,7 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
     UnitTest,
     NetworkTest
   ) in new RemotePeerETH69Setup {
-    val helloWithSnap = remoteHello.copy(capabilities = Seq(Capability.ETH69, Capability.SNAP1))
+    val helloWithSnap: Hello = remoteHello.copy(capabilities = Seq(Capability.ETH69, Capability.SNAP1))
     val handshakerAfterHelloOpt: Option[Handshaker[PeerInfo]] =
       initHandshakerWithoutResolver.applyMessage(helloWithSnap)
     assert(handshakerAfterHelloOpt.isDefined)
@@ -343,8 +347,8 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
     // This test verifies our implementation matches core-geth behavior.
 
     // Advance blockchain to a low block number
-    val lowBlockNumber = BigInt(1000)
-    val lowBlock = firstBlock.copy(header = firstBlock.header.copy(number = lowBlockNumber))
+    val lowBlockNumber: BigInt = BigInt(1000)
+    val lowBlock: Block = firstBlock.copy(header = firstBlock.header.copy(number = lowBlockNumber))
     val lowBlockWeight: ChainWeight = genesisWeight.increase(lowBlock.header)
     blockchainWriter.save(lowBlock, Nil, lowBlockWeight, saveAsBestBlock = true)
 
@@ -392,8 +396,8 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
     // This test verifies the behavior at high block numbers matches core-geth.
 
     // Advance blockchain to a high block number
-    val highBlockNumber = BigInt(19200000)
-    val highBlock = firstBlock.copy(header = firstBlock.header.copy(number = highBlockNumber))
+    val highBlockNumber: BigInt = BigInt(19200000)
+    val highBlock: Block = firstBlock.copy(header = firstBlock.header.copy(number = highBlockNumber))
     val highBlockWeight: ChainWeight = genesisWeight.increase(highBlock.header)
     blockchainWriter.save(highBlock, Nil, highBlockWeight, saveAsBestBlock = true)
 

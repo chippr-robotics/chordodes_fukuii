@@ -1,25 +1,28 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import org.apache.pekko.actor.{Actor, ActorLogging, ActorRef, Props, Scheduler}
+import org.apache.pekko.actor.Actor
+import org.apache.pekko.actor.ActorLogging
+import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.Props
+import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.pattern.ask
-import org.apache.pekko.util.{ByteString, Timeout}
+import org.apache.pekko.util.ByteString
+import org.apache.pekko.util.Timeout
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
+import com.chipprbots.ethereum.blockchain.sync.PeersClient.BestPeer
+import com.chipprbots.ethereum.blockchain.sync.PeersClient.BestPeerWithMinBlockExcluding
+import com.chipprbots.ethereum.blockchain.sync.PeersClient.BestSnapPeer
+import com.chipprbots.ethereum.blockchain.sync.PeersClient.BestSnapPeerWithMinBlockExcluding
+import com.chipprbots.ethereum.blockchain.sync.PeersClient.NoSuitablePeer
+import com.chipprbots.ethereum.blockchain.sync.PeersClient.Request
+import com.chipprbots.ethereum.blockchain.sync.PeersClient.RequestFailed
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainWriter
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
-import com.chipprbots.ethereum.blockchain.sync.PeersClient.{
-  BestPeer,
-  BestPeerWithMinBlockExcluding,
-  BestSnapPeer,
-  BestSnapPeerWithMinBlockExcluding,
-  NoSuitablePeer,
-  Request,
-  RequestFailed
-}
 import com.chipprbots.ethereum.network.PeerId
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 /** Fetches and persists a single pivot header so SNAP can start without importing blocks.

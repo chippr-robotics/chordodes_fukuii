@@ -6,7 +6,7 @@ import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 import scala.util.Failure
 
 import org.slf4j.Logger
@@ -20,7 +20,7 @@ import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.utils.Config.SyncConfig
-import com.chipprbots.ethereum.utils.FunctorOps.*
+import com.chipprbots.ethereum.utils.FunctorOps._
 
 trait FetchRequest[A] {
   val peersClient: ActorRef

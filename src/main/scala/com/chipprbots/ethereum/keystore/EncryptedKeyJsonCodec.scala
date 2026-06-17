@@ -10,12 +10,12 @@ import org.bouncycastle.util.encoders.Hex
 import org.json4s.JsonAST.JObject
 import org.json4s.JsonAST.JString
 import org.json4s.JsonAST.JValue
-import org.json4s.JsonDSL.*
-import org.json4s.*
-import org.json4s.native.JsonMethods.*
+import org.json4s.JsonDSL._
+import org.json4s._
+import org.json4s.native.JsonMethods._
 
 import com.chipprbots.ethereum.domain.Address
-import com.chipprbots.ethereum.keystore.EncryptedKey.*
+import com.chipprbots.ethereum.keystore.EncryptedKey._
 
 object EncryptedKeyJsonCodec {
 

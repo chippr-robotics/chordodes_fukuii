@@ -1,16 +1,16 @@
 package com.chipprbots.ethereum.consensus.pow.miners
 
-import org.apache.pekko.actor.ActorSystem as ClassicSystem
+import org.apache.pekko.actor.{ActorSystem => ClassicSystem}
 import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestKit
 
 import cats.effect.IO
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import org.scalamock.handlers.CallHandler4
 import org.scalamock.handlers.CallHandler6
-import org.scalatest.*
+import org.scalatest._
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
@@ -21,17 +21,16 @@ import com.chipprbots.ethereum.consensus.pow.MinerSpecSetup
 import com.chipprbots.ethereum.consensus.pow.PoWBlockCreator
 import com.chipprbots.ethereum.consensus.pow.blocks.PoWBlockGenerator
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MineBlocks
-import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerResponses.*
+import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerResponses._
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.MptStorage
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.jsonrpc.EthMiningService
 import com.chipprbots.ethereum.jsonrpc.EthMiningService.SubmitHashRateResponse
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteStringUtils
-
-import com.chipprbots.ethereum.testing.Tags.*
 
 // SCALA 3 MIGRATION: Fixed by refactoring MinerSpecSetup to use abstract mock members pattern.
 // ACTOR SYSTEM FIX: TestSetup now overrides classicSystem to use TestKit's actor system,
@@ -54,7 +53,7 @@ class MockedMinerSpec
 
     "not mine block and return MinerNotSupport msg" when {
       "the request comes before miner started" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
-        val msg = MineBlocks(1, false, None)
+        val msg: MineBlocks = MineBlocks(1, false, None)
         sendToMiner(msg)
         expectNoNewBlockMsg(noMessageTimeOut)
         parentActor.expectMsg(MinerNotSupported(msg))
@@ -64,7 +63,7 @@ class MockedMinerSpec
     "stop mining in case of error" when {
       "Unable to get block for mining" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
         val parent = origin
-        val bfm1 = createBlockForMining(parent, Seq.empty)
+        val bfm1: Block = createBlockForMining(parent, Seq.empty)
 
         blockCreatorBehaviour(parent, withTransactions = false, bfm1)
 
@@ -94,7 +93,7 @@ class MockedMinerSpec
       "Unable to get parent block for mining" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
         val parentHash = origin.hash
 
-        val errorMsg = s"Unable to get parent block with hash ${ByteStringUtils.hash2string(parentHash)} for mining"
+        val errorMsg: String = s"Unable to get parent block with hash ${ByteStringUtils.hash2string(parentHash)} for mining"
 
         blockchainReader.getBlockByHash.expects(parentHash).returns(None)
 
@@ -111,7 +110,7 @@ class MockedMinerSpec
     "return MinerIsWorking to requester" when {
       "miner is working during next mine request" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
         val parent = origin
-        val bfm = createBlockForMining(parent, Seq.empty)
+        val bfm: Block = createBlockForMining(parent, Seq.empty)
 
         blockCreatorBehaviour(parent, withTransactions = false, bfm)
 
@@ -137,7 +136,7 @@ class MockedMinerSpec
       ) in new TestSetup {
         val parent = origin
         val parentHash = origin.hash
-        val bfm = createBlockForMining(parent, Seq.empty)
+        val bfm: Block = createBlockForMining(parent, Seq.empty)
 
         blockchainReader.getBlockByHash.expects(parentHash).returns(Some(parent))
 
@@ -156,7 +155,7 @@ class MockedMinerSpec
 
       "there is request for one block without transactions" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
         val parent = origin
-        val bfm = createBlockForMining(parent, Seq.empty)
+        val bfm: Block = createBlockForMining(parent, Seq.empty)
 
         blockCreatorBehaviour(parent, withTransactions = false, bfm)
 
@@ -173,7 +172,7 @@ class MockedMinerSpec
 
       "there is request for one block with transactions" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
         val parent = origin
-        val bfm = createBlockForMining(parent)
+        val bfm: Block = createBlockForMining(parent)
 
         blockCreatorBehaviour(parent, withTransactions = true, bfm)
 
@@ -190,8 +189,8 @@ class MockedMinerSpec
 
       "there is request for few blocks without transactions" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
         val parent = origin
-        val bfm1 = createBlockForMining(parent, Seq.empty)
-        val bfm2 = createBlockForMining(bfm1, Seq.empty)
+        val bfm1: Block = createBlockForMining(parent, Seq.empty)
+        val bfm2: Block = createBlockForMining(bfm1, Seq.empty)
 
         blockCreatorBehaviour(parent, withTransactions = false, bfm1)
 
@@ -212,8 +211,8 @@ class MockedMinerSpec
 
       "there is request for few blocks with transactions" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
         val parent = origin
-        val bfm1 = createBlockForMining(parent)
-        val bfm2 = createBlockForMining(bfm1, Seq.empty)
+        val bfm1: Block = createBlockForMining(parent)
+        val bfm2: Block = createBlockForMining(bfm1, Seq.empty)
 
         blockCreatorBehaviour(parent, withTransactions = true, bfm1)
 
@@ -259,7 +258,7 @@ class MockedMinerSpec
     )
 
     // Allow getBestBlock to be called 0 or more times since some tests use getBlockByHash instead
-    blockchainReader.getBestBlock.expects().returns(Some(origin)).anyNumberOfTimes()
+    (() => blockchainReader.getBestBlock).expects().returns(Some(origin)).anyNumberOfTimes()
 
     // Implement abstract expectation methods
     // NOTE: MockedMiner tests use createBlockForMining() which doesn't call this method,

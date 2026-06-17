@@ -1,7 +1,8 @@
 package com.chipprbots.ethereum.network
 
 import java.time.Instant
-import scala.concurrent.duration.*
+
+import scala.concurrent.duration._
 
 /** Peer scoring system for enhanced peer selection
   *

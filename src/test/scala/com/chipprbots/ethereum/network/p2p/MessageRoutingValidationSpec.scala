@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.network.p2p
 
 import org.apache.pekko.util.ByteString
+
 import org.bouncycastle.util.encoders.Hex
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -9,7 +10,7 @@ import com.chipprbots.ethereum.forkid.ForkId
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.Codes
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 /** Validates that ETH68 and ETH69 messages are correctly routed to their decoders. ETH62-67 decoder routing removed:
   * Fukuii only negotiates ETH68 and ETH69.

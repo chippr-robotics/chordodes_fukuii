@@ -8,22 +8,23 @@ import scala.annotation.unused
 import scala.concurrent.ExecutionContext
 import scala.util.Try
 
-import org.json4s.JsonAST.*
-import org.json4s.JsonDSL.*
-import org.json4s.jvalue2monadic
-import org.json4s.jvalue2extractable
 import org.json4s.DefaultFormats
+import org.json4s.JsonAST._
+import org.json4s.JsonDSL._
+import org.json4s.jvalue2extractable
+import org.json4s.jvalue2monadic
 
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.domain.Address
-import com.chipprbots.ethereum.jsonrpc.{AkkaTaskOps, McpDependencies}
-import com.chipprbots.ethereum.jsonrpc.McpService.*
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps
+import com.chipprbots.ethereum.jsonrpc.McpDependencies
+import com.chipprbots.ethereum.jsonrpc.McpService._
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.utils.BuildInfo
 import com.chipprbots.ethereum.utils.ByteStringUtils
 
-import AkkaTaskOps.*
+import AkkaTaskOps._
 
 implicit private val formats: org.json4s.Formats = DefaultFormats
 
@@ -31,7 +32,7 @@ implicit private val formats: org.json4s.Formats = DefaultFormats
 
 object NodeInfoTool {
   val name = "mcp_node_info"
-  val description = Some(
+  val description: Some[String] = Some(
     "Get detailed information about the Fukuii ETC node including version, network, and build info"
   )
 
@@ -58,7 +59,7 @@ object NodeInfoTool {
 
 object NodeStatusTool {
   val name = "mcp_node_status"
-  val description = Some(
+  val description: Some[String] = Some(
     "Get the current status of the Fukuii node including sync state, peer count, and block numbers"
   )
 
@@ -70,7 +71,7 @@ object NodeStatusTool {
       syncStatus <- syncStatusIO.recover { case _ => SyncProtocol.Status.NotSyncing }
       peers <- peersIO.recover { case _ => PeerManagerActor.Peers(Map.empty) }
     } yield {
-      val bestBlock = deps.blockchainReader.getBestBlockNumber()
+      val bestBlock = deps.blockchainReader.getBestBlockNumber
       val peerCount = peers.peers.size
       val handshakedCount = peers.handshaked.size
       val (syncState, progress) = syncStatus match {
@@ -93,13 +94,13 @@ object NodeStatusTool {
 
 object BlockchainInfoTool {
   val name = "mcp_blockchain_info"
-  val description = Some(
+  val description: Some[String] = Some(
     "Get information about the blockchain state including best block, total difficulty, and genesis hash"
   )
 
   def execute(deps: McpDependencies): IO[String] = IO {
-    val bestBlockNum = deps.blockchainReader.getBestBlockNumber()
-    val bestBlock = deps.blockchainReader.getBestBlock()
+    val bestBlockNum = deps.blockchainReader.getBestBlockNumber
+    val bestBlock = deps.blockchainReader.getBestBlock
     val bestHash = bestBlock.map(b => ByteStringUtils.hash2string(b.header.hash)).getOrElse("unknown")
     val td = bestBlock
       .flatMap(b => deps.blockchainReader.getChainWeightByHash(b.header.hash))
@@ -127,7 +128,7 @@ object BlockchainInfoTool {
 
 object SyncStatusTool {
   val name = "mcp_sync_status"
-  val description = Some("Get detailed synchronization status including mode, progress, and remaining blocks")
+  val description: Some[String] = Some("Get detailed synchronization status including mode, progress, and remaining blocks")
 
   def execute(deps: McpDependencies)(implicit timeout: Timeout, @unused ec: ExecutionContext): IO[String] =
     deps.syncController
@@ -136,7 +137,7 @@ object SyncStatusTool {
         SyncProtocol.Status.NotSyncing
       }
       .map { status =>
-        val bestBlock = deps.blockchainReader.getBestBlockNumber()
+        val bestBlock = deps.blockchainReader.getBestBlockNumber
         status match {
           case SyncProtocol.Status.Syncing(start, blocks, stateNodes) =>
             val remaining = blocks.target - blocks.current
@@ -170,7 +171,7 @@ object SyncStatusTool {
 
 object PeerListTool {
   val name = "mcp_peer_list"
-  val description = Some("List all connected peers with their addresses, status, and connection direction")
+  val description: Some[String] = Some("List all connected peers with their addresses, status, and connection direction")
 
   def execute(deps: McpDependencies)(implicit timeout: Timeout, @unused ec: ExecutionContext): IO[String] =
     deps.peerManager
@@ -202,7 +203,7 @@ object PeerListTool {
 
 object SetEtherbaseTool {
   val name = "mcp_etherbase_info"
-  val description = Some(
+  val description: Some[String] = Some(
     "Get information about setting the etherbase (coinbase) address for mining rewards via JSON-RPC"
   )
 
@@ -217,7 +218,7 @@ object SetEtherbaseTool {
 
 object MiningRpcSummaryTool {
   val name = "mcp_mining_rpc_summary"
-  val description = Some("List mining RPC endpoints and their usage")
+  val description: Some[String] = Some("List mining RPC endpoints and their usage")
 
   def execute(): IO[String] =
     IO.pure("""Mining RPC Endpoints:
@@ -237,7 +238,7 @@ object MiningRpcSummaryTool {
 
 object GetBlockTool {
   val name = "get_block"
-  val description = Some(
+  val description: Some[String] = Some(
     "Get block information by number, hash, or 'latest'. Returns header details including hash, parent, miner, gas, and timestamps."
   )
 
@@ -250,7 +251,7 @@ object GetBlockTool {
     val blockArg = args.flatMap(a => (a \ "block").extractOpt[String]).getOrElse("latest")
     val headerOpt = blockArg.toLowerCase match {
       case "latest" =>
-        deps.blockchainReader.getBestBlock().map(_.header)
+        deps.blockchainReader.getBestBlock.map(_.header)
       case s if s.startsWith("0x") && s.length > 10 =>
         val hash = org.apache.pekko.util.ByteString(org.bouncycastle.util.encoders.Hex.decode(s.drop(2)))
         deps.blockchainReader.getBlockByHash(hash).map(_.header)
@@ -279,7 +280,7 @@ object GetBlockTool {
 
 object GetTransactionTool {
   val name = "get_transaction"
-  val description = Some(
+  val description: Some[String] = Some(
     "Get transaction location by hash. Returns the block hash and transaction index where the transaction was included."
   )
 
@@ -310,7 +311,7 @@ object GetTransactionTool {
 
 object GetAccountTool {
   val name = "get_account"
-  val description = Some(
+  val description: Some[String] = Some(
     "Get account state (nonce, balance) at the current best block. May fail during sync if state is unavailable."
   )
 
@@ -324,8 +325,8 @@ object GetAccountTool {
     Try {
       val addrBytes = org.bouncycastle.util.encoders.Hex.decode(addrStr.stripPrefix("0x"))
       val address = Address(org.apache.pekko.util.ByteString(addrBytes))
-      val blockNum = deps.blockchainReader.getBestBlockNumber()
-      val accountOpt = deps.blockchainReader.getAccount(deps.blockchainReader.getBestBranch(), address, blockNum)
+      val blockNum = deps.blockchainReader.getBestBlockNumber
+      val accountOpt = deps.blockchainReader.getAccount(deps.blockchainReader.getBestBranch, address, blockNum)
       accountOpt match {
         case Some(account) =>
           val balanceEtc = BigDecimal(account.balance.toBigInt) / BigDecimal("1000000000000000000")
@@ -351,7 +352,7 @@ object GetAccountTool {
 
 object DetectReorgTool {
   val name = "detect_reorg"
-  val description = Some("Check recent blocks for chain reorganization by verifying parent hash consistency")
+  val description: Some[String] = Some("Check recent blocks for chain reorganization by verifying parent hash consistency")
 
   val inputSchema: JValue =
     ("type" -> "object") ~
@@ -360,7 +361,7 @@ object DetectReorgTool {
 
   def execute(args: Option[JValue], deps: McpDependencies): IO[String] = IO {
     val depth = args.flatMap(a => (a \ "depth").extractOpt[Int]).getOrElse(20)
-    val bestNum = deps.blockchainReader.getBestBlockNumber()
+    val bestNum = deps.blockchainReader.getBestBlockNumber
     val startNum = (bestNum - depth).max(0)
 
     val headers = (startNum to bestNum).flatMap(n => deps.blockchainReader.getBlockHeaderByNumber(n))
@@ -385,7 +386,7 @@ object DetectReorgTool {
 
 object ConvertUnitsTool {
   val name = "convert_units"
-  val description = Some("Convert between ETC denominations: wei, gwei, and etc")
+  val description: Some[String] = Some("Convert between ETC denominations: wei, gwei, and etc")
 
   val inputSchema: JValue =
     ("type" -> "object") ~
@@ -423,10 +424,10 @@ object ConvertUnitsTool {
 
 object GetEtcEmissionTool {
   val name = "get_etc_emission"
-  val description = Some("Get the ETC emission schedule and current era information based on the best block number")
+  val description: Some[String] = Some("Get the ETC emission schedule and current era information based on the best block number")
 
   def execute(deps: McpDependencies): IO[String] = IO {
-    val bestBlock = deps.blockchainReader.getBestBlockNumber()
+    val bestBlock = deps.blockchainReader.getBestBlockNumber
     val eraLength = BigInt(5000000)
     val currentEra = (bestBlock / eraLength).toInt
     val blocksInEra = bestBlock % eraLength
@@ -448,11 +449,11 @@ object GetEtcEmissionTool {
 
 object GetEtcForksTool {
   val name = "get_etc_forks"
-  val description = Some("Get the ECIP hard fork history and activation blocks for this network")
+  val description: Some[String] = Some("Get the ECIP hard fork history and activation blocks for this network")
 
   def execute(deps: McpDependencies): IO[String] = IO {
     val forks = deps.blockchainConfig.forkBlockNumbers
-    val bestBlock = deps.blockchainReader.getBestBlockNumber()
+    val bestBlock = deps.blockchainReader.getBestBlockNumber
 
     def status(block: BigInt): String =
       if (block <= bestBlock) "ACTIVE" else s"PENDING (in ${block - bestBlock} blocks)"
@@ -474,7 +475,7 @@ object GetEtcForksTool {
 
 object GetChainConfigTool {
   val name = "get_chain_config"
-  val description = Some(
+  val description: Some[String] = Some(
     "Get the blockchain configuration as structured output including chain ID, network ID, and monetary policy"
   )
 

@@ -1,8 +1,8 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import org.apache.pekko.util.ByteString
-
 import java.util.concurrent.Executors
+
+import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
 import scala.concurrent.Await

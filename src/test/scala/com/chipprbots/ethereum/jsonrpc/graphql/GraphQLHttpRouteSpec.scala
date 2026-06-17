@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.cors.scaladsl.model.HttpOriginMatcher
-import org.apache.pekko.http.scaladsl.model.*
+import org.apache.pekko.http.scaladsl.model._
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.http.scaladsl.testkit.ScalatestRouteTest
 import org.apache.pekko.testkit.TestProbe
@@ -12,14 +12,13 @@ import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
 
-import io.circe.parser.parse
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 
+import io.circe.parser.parse
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-
-import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
@@ -41,13 +40,14 @@ import com.chipprbots.ethereum.jsonrpc.JsonRpcResponse
 import com.chipprbots.ethereum.jsonrpc.server.controllers.ApisBase
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
-import com.chipprbots.ethereum.jsonrpc.server.http.{JsonRpcHttpServer, RateLimit}
+import com.chipprbots.ethereum.jsonrpc.server.http.JsonRpcHttpServer
 import com.chipprbots.ethereum.jsonrpc.server.http.JsonRpcHttpServer.JsonRpcHttpServerConfig
 import com.chipprbots.ethereum.jsonrpc.server.http.JsonRpcHttpServer.RateLimitConfig
+import com.chipprbots.ethereum.jsonrpc.server.http.RateLimit
 import com.chipprbots.ethereum.keystore.KeyStore
 import com.chipprbots.ethereum.ledger.StxLedger
 import com.chipprbots.ethereum.network.p2p.messages.Capability
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.FilterConfig
 import com.chipprbots.ethereum.utils.Logger
 
@@ -66,7 +66,7 @@ class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRoute
   ) in new TestSetup {
     val body =
       """{"query":"{ chainID }"}"""
-    val req = HttpRequest(
+    val req: HttpRequest = HttpRequest(
       method = HttpMethods.POST,
       uri = "/graphql",
       entity = HttpEntity(ContentTypes.`application/json`, body)
@@ -80,7 +80,7 @@ class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRoute
   }
 
   it should "return 400 on invalid JSON body" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    val req = HttpRequest(
+    val req: HttpRequest = HttpRequest(
       method = HttpMethods.POST,
       uri = "/graphql",
       entity = HttpEntity(ContentTypes.`application/json`, "not json")
@@ -92,7 +92,7 @@ class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRoute
 
   it should "return 400 for syntactically invalid GraphQL" taggedAs (UnitTest, RPCTest) in new TestSetup {
     val body = """{"query":"{ not valid graphql"}"""
-    val req = HttpRequest(
+    val req: HttpRequest = HttpRequest(
       method = HttpMethods.POST,
       uri = "/graphql",
       entity = HttpEntity(ContentTypes.`application/json`, body)
@@ -106,7 +106,7 @@ class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRoute
     false
   ) {
     val body = """{"query":"{ chainID }"}"""
-    val req = HttpRequest(
+    val req: HttpRequest = HttpRequest(
       method = HttpMethods.POST,
       uri = "/graphql",
       entity = HttpEntity(ContentTypes.`application/json`, body)
@@ -129,9 +129,9 @@ class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRoute
     val appStateStorage: AppStateStorage = mock[AppStateStorage]
     override lazy val stxLedger: StxLedger = mock[StxLedger]
     val keyStore: KeyStore = mock[KeyStore]
-    val syncProbe = TestProbe()
-    val pendingTxProbe = TestProbe()
-    val filterManagerProbe = TestProbe()
+    val syncProbe: TestProbe = TestProbe()
+    val pendingTxProbe: TestProbe = TestProbe()
+    val filterManagerProbe: TestProbe = TestProbe()
 
     lazy val ethBlocksService = new EthBlocksService(blockchain, blockchainReader, mining, blockQueue)
     lazy val ethTxService = new EthTxService(

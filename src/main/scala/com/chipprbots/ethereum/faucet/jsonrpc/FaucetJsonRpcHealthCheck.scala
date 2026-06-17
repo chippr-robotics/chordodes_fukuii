@@ -14,7 +14,7 @@ class FaucetJsonRpcHealthCheck(faucetRpcService: FaucetRpcService) extends JsonR
   final val statusHC: IO[JsonRpcHealthcheck[FaucetDomain.StatusResponse]] =
     JsonRpcHealthcheck.fromServiceResponse("status", faucetRpcService.status(StatusRequest()))
 
-  override def healthCheck(): IO[HealthcheckResponse] = {
+  override def healthCheck: IO[HealthcheckResponse] = {
     val statusF = statusHC.map(_.toResult)
     val responseF = statusF.map(check => HealthcheckResponse(List(check)))
 
@@ -23,5 +23,5 @@ class FaucetJsonRpcHealthCheck(faucetRpcService: FaucetRpcService) extends JsonR
 
   override def readinessCheck(): IO[HealthcheckResponse] =
     // For faucet, readiness is the same as health
-    healthCheck()
+    healthCheck
 }

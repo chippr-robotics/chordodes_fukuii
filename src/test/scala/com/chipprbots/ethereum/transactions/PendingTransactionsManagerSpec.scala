@@ -9,7 +9,7 @@ import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 import org.scalatest.BeforeAndAfterEach
@@ -20,8 +20,8 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.NormalPatience
 import com.chipprbots.ethereum.Timeouts
-import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.consensus.eip1559.BaseFeeCalculator
+import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
@@ -32,19 +32,19 @@ import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.domain.SignedTransactionWithSender
 import com.chipprbots.ethereum.domain.TransactionWithDynamicFee
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.SendMessage
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.handshaker.Handshaker.HandshakeResult
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions
 import com.chipprbots.ethereum.security.SecureRandomBuilder
-import com.chipprbots.ethereum.transactions.PendingTransactionsManager.*
-import com.chipprbots.ethereum.transactions.SignedTransactionsFilterActor.ProperSignedTransactions
-import com.chipprbots.ethereum.utils.TxPoolConfig
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor.SendMessage
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.testing.Tags.OlympiaTest
 import com.chipprbots.ethereum.testing.Tags.UnitTest
+import com.chipprbots.ethereum.transactions.PendingTransactionsManager._
+import com.chipprbots.ethereum.transactions.SignedTransactionsFilterActor.ProperSignedTransactions
+import com.chipprbots.ethereum.utils.TxPoolConfig
 
 /** Test suite for PendingTransactionsManager actor.
   *
@@ -333,7 +333,7 @@ class PendingTransactionsManagerSpec
       case m: NetworkPeerManagerActor.SendMessage => m
     }
     announces.foreach(_.peerId shouldBe peer1.id)
-    val announcedHashes = announces
+    val announcedHashes: Set[ByteString] = announces
       .flatMap(_.message.underlyingMsg match {
         case ETHPackets.NewPooledTransactionHashes(_, _, hashes) => hashes
         case SignedTransactions(txs)                             => txs.map(_.hash)
@@ -356,7 +356,7 @@ class PendingTransactionsManagerSpec
 
     // On handshake the pool replays its current contents to the new peer as a
     // NewPooledTransactionHashes announce; the peer pulls bodies on demand.
-    val replayed = etcPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage]
+    val replayed: SendMessage = etcPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage]
     replayed.peerId shouldBe peer1.id
     replayed.message.underlyingMsg match {
       case ETHPackets.NewPooledTransactionHashes(_, _, hashes) => hashes shouldBe Seq(stx.tx.hash)
@@ -412,7 +412,7 @@ class PendingTransactionsManagerSpec
     UnitTest,
     OlympiaTest
   ) in new TestSetup {
-    val zeroTipLegacy = LegacyTransaction(
+    val zeroTipLegacy: LegacyTransaction = LegacyTransaction(
       nonce = BigInt(0),
       gasPrice = BigInt(0), // tip = gasPrice - baseFee = 0 - 0 = 0 < minTip(1)
       gasLimit = BigInt(21_000),
@@ -420,7 +420,7 @@ class PendingTransactionsManagerSpec
       value = BigInt(0),
       payload = ByteString.empty
     )
-    val stx = newStx(0, zeroTipLegacy)
+    val stx: SignedTransactionWithSender = newStx(0, zeroTipLegacy)
     pendingTransactionsManager ! AddTransactions(stx)
     eventually {
       val resp = (pendingTransactionsManager ? GetPendingTransactions).mapTo[PendingTransactionsResponse].futureValue
@@ -432,7 +432,7 @@ class PendingTransactionsManagerSpec
     UnitTest,
     OlympiaTest
   ) in new TestSetup {
-    val validLegacy = LegacyTransaction(
+    val validLegacy: LegacyTransaction = LegacyTransaction(
       nonce = BigInt(0),
       gasPrice = BigInt(1), // tip = 1 - 0 = 1 >= minTip(1)
       gasLimit = BigInt(21_000),
@@ -440,7 +440,7 @@ class PendingTransactionsManagerSpec
       value = BigInt(0),
       payload = ByteString.empty
     )
-    val stx = newStx(0, validLegacy)
+    val stx: SignedTransactionWithSender = newStx(0, validLegacy)
     pendingTransactionsManager ! AddTransactions(stx)
     eventually {
       val resp = (pendingTransactionsManager ? GetPendingTransactions).mapTo[PendingTransactionsResponse].futureValue
@@ -455,7 +455,7 @@ class PendingTransactionsManagerSpec
     UnitTest,
     OlympiaTest
   ) in new TestSetupWithBaseFee {
-    val zeroTipType2 = TransactionWithDynamicFee(
+    val zeroTipType2: TransactionWithDynamicFee = TransactionWithDynamicFee(
       chainId = BigInt(61),
       nonce = BigInt(0),
       maxPriorityFeePerGas = BigInt(0), // tip = 0 < minTip(1)
@@ -466,7 +466,7 @@ class PendingTransactionsManagerSpec
       payload = ByteString.empty,
       accessList = Nil
     )
-    val stx = newDynamicStx(BigInt(0), zeroTipType2)
+    val stx: SignedTransactionWithSender = newDynamicStx(BigInt(0), zeroTipType2)
     pendingTransactionsManager ! AddTransactions(stx)
     eventually {
       val resp = (pendingTransactionsManager ? GetPendingTransactions).mapTo[PendingTransactionsResponse].futureValue
@@ -478,7 +478,7 @@ class PendingTransactionsManagerSpec
     UnitTest,
     OlympiaTest
   ) in new TestSetupWithBaseFee {
-    val validType2 = TransactionWithDynamicFee(
+    val validType2: TransactionWithDynamicFee = TransactionWithDynamicFee(
       chainId = BigInt(61),
       nonce = BigInt(0),
       maxPriorityFeePerGas = BigInt(1), // effectiveTip = min(1, 1gwei+1 - 1gwei) = 1 >= minTip(1)
@@ -489,7 +489,7 @@ class PendingTransactionsManagerSpec
       payload = ByteString.empty,
       accessList = Nil
     )
-    val stx = newDynamicStx(BigInt(0), validType2)
+    val stx: SignedTransactionWithSender = newDynamicStx(BigInt(0), validType2)
     pendingTransactionsManager ! AddTransactions(stx)
     eventually {
       val resp = (pendingTransactionsManager ? GetPendingTransactions).mapTo[PendingTransactionsResponse].futureValue
@@ -502,7 +502,7 @@ class PendingTransactionsManagerSpec
     OlympiaTest
   ) in new TestSetupWithBaseFee {
     val baseFee = BaseFeeCalculator.InitialBaseFee
-    val zeroTip = TransactionWithDynamicFee(
+    val zeroTip: TransactionWithDynamicFee = TransactionWithDynamicFee(
       chainId = BigInt(61),
       nonce = BigInt(0),
       maxPriorityFeePerGas = BigInt(0),
@@ -513,7 +513,7 @@ class PendingTransactionsManagerSpec
       payload = ByteString.empty,
       accessList = Nil
     )
-    val validTip = TransactionWithDynamicFee(
+    val validTip: TransactionWithDynamicFee = TransactionWithDynamicFee(
       chainId = BigInt(61),
       nonce = BigInt(0),
       maxPriorityFeePerGas = BigInt(1),
@@ -524,10 +524,10 @@ class PendingTransactionsManagerSpec
       payload = ByteString.empty,
       accessList = Nil
     )
-    val keyPair = crypto.generateKeyPair(secureRandom)
-    val rejectedStx =
+    val keyPair: AsymmetricCipherKeyPair = crypto.generateKeyPair(secureRandom)
+    val rejectedStx: SignedTransactionWithSender =
       SignedTransactionWithSender(SignedTransaction.sign(zeroTip, keyPair, Some(0x3d)), Address(keyPair))
-    val acceptedStx =
+    val acceptedStx: SignedTransactionWithSender =
       SignedTransactionWithSender(SignedTransaction.sign(validTip, keyPair, Some(0x3d)), Address(keyPair))
 
     pendingTransactionsManager ! AddTransactions(rejectedStx)
@@ -554,7 +554,7 @@ class PendingTransactionsManagerSpec
 
     private val fakeBlockchainReader: BlockchainReader =
       new BlockchainReader(null, null, null, null, null, null, null) {
-        override def getBestBlock(): Option[Block] = Some(blockWithBaseFee)
+        override def getBestBlock: Option[Block] = Some(blockWithBaseFee)
       }
 
     override val pendingTransactionsManager: ActorRef = system.actorOf(

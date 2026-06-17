@@ -1,13 +1,15 @@
 package com.chipprbots.ethereum.db.storage
 
+import java.io.File
+import java.nio.file.Files
+
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.db.dataSource.{EphemDataSource, RocksDbConfig, RocksDbDataSource}
-import com.chipprbots.ethereum.testing.Tags.*
-
-import java.io.File
-import java.nio.file.Files
+import com.chipprbots.ethereum.db.dataSource.EphemDataSource
+import com.chipprbots.ethereum.db.dataSource.RocksDbConfig
+import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource
+import com.chipprbots.ethereum.testing.Tags._
 
 /** BfsQueueStorage over a real RocksDB instance — exercises the native range-tombstone delete path
   * (`DataSource.deleteRange`) that replaced per-key tombstone batches. The per-key implementation wrote ~140M
@@ -210,7 +212,6 @@ class BfsQueueStorageSpec extends AnyFlatSpec with Matchers {
       it.next().size shouldBe 10 // consume only the first chunk, then drop `it`
       // withRocksDb's finally destroys the DataSource; a leaked open native iterator would error there.
       // scanRange closes its iterator per chunk, so nothing is open between chunks. Reaching here is the assertion.
-      succeed
     }
 
   "EphemDataSource.scanRange" should "return sorted, namespace-isolated entries within [from,to) (US5/FR-017)" taggedAs UnitTest in {

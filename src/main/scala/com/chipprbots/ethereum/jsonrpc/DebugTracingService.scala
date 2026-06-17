@@ -7,17 +7,17 @@ import cats.effect.IO
 import org.json4s.JValue
 
 import com.chipprbots.ethereum.consensus.mining.Mining
-import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage.TransactionLocation
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.Blockchain
 import com.chipprbots.ethereum.domain.BlockchainReader
-import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.domain.SignedTransactionWithSender
 import com.chipprbots.ethereum.ledger.StxLedger
+import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.utils.BlockchainConfig
+import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.vm.CallTracer
 import com.chipprbots.ethereum.vm.ExecutionTracer
@@ -355,7 +355,7 @@ class DebugTracingService(
         toNum = toResolved.block.header.number.toLong
         _ <- Either.cond(toNum > fromNum, (), JsonRpcError.InvalidParams("end block must come after start block"))
         results = ((fromNum + 1) to toNum).flatMap { blockNum =>
-          val branch = blockchainReader.getBestBranch()
+          val branch = blockchainReader.getBestBranch
           blockchainReader.getBlockByNumber(branch, blockNum).flatMap { block =>
             blockchainReader.getBlockHeaderByHash(block.header.parentHash).map { parentHeader =>
               val stxs = SignedTransactionWithSender.getSignedTransactions(block.body.transactionList)

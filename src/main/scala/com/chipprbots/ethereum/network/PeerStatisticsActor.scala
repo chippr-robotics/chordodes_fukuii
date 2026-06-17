@@ -2,11 +2,11 @@ package com.chipprbots.ethereum.network
 
 import java.time.Clock
 
-import org.apache.pekko.actor.*
+import org.apache.pekko.actor._
 
 import scala.concurrent.duration.FiniteDuration
 
-import com.chipprbots.ethereum.network.PeerEventBusActor.*
+import com.chipprbots.ethereum.network.PeerEventBusActor._
 import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.messages.Codes
 

@@ -1,12 +1,12 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 
-import org.apache.pekko.event.Logging.*
+import org.apache.pekko.event.Logging._
 import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.network.PeerId
-import com.chipprbots.ethereum.utils.ByteStringUtils.*
+import com.chipprbots.ethereum.utils.ByteStringUtils._
 
 sealed abstract class ImportMessages(block: Block) {
   import ImportMessages.*

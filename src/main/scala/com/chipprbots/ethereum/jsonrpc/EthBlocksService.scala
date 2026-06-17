@@ -4,19 +4,18 @@ import org.apache.pekko.util.ByteString
 
 import cats.effect.IO
 
+import scala.annotation.unused
+
 import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.consensus.engine.ForkChoiceManager
 import com.chipprbots.ethereum.consensus.mining.Mining
-import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.BlockHeaderImplicits.BlockHeaderEnc
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.ledger.BlockQueue
 import com.chipprbots.ethereum.rlp
-
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
-
-import scala.annotation.unused
 
 object EthBlocksService {
   case class BestBlockNumberRequest()
@@ -94,7 +93,7 @@ class EthBlocksService(
     *   Current block number the client is on.
     */
   def bestBlockNumber(@unused req: BestBlockNumberRequest): ServiceResponse[BestBlockNumberResponse] = IO {
-    Right(BestBlockNumberResponse(blockchainReader.getBestBlockNumber()))
+    Right(BestBlockNumberResponse(blockchainReader.getBestBlockNumber))
   }
 
   /** Implements the eth_getBlockTransactionCountByHash method that fetches the number of txs that a certain block has.
@@ -270,7 +269,7 @@ class EthBlocksService(
   }
 
   def feeHistory(req: FeeHistoryRequest): ServiceResponse[FeeHistoryResponse] = IO {
-    val bestBlock = blockchainReader.getBestBlockNumber()
+    val bestBlock = blockchainReader.getBestBlockNumber
     val newestBlockNum = resolveBlock(req.newestBlock).toOption.map(_.block.header.number).getOrElse(bestBlock)
     val count = req.blockCount.min(1024).toInt
     val oldestBlock = (newestBlockNum - count + 1).max(0)
@@ -345,7 +344,7 @@ class EthBlocksService(
 
   def blobBaseFee(@unused req: BlobBaseFeeRequest): ServiceResponse[BlobBaseFeeResponse] = IO {
     val fee = blockchainReader
-      .getBestBlock()
+      .getBestBlock
       .flatMap(b => b.header.excessBlobGas.map(eg => (eg, b.header.unixTimestamp)))
       .map { case (eg, ts) =>
         com.chipprbots.ethereum.consensus.engine.BlobGasUtils.getBlobGasPrice(eg, ts, blockchainConfig)

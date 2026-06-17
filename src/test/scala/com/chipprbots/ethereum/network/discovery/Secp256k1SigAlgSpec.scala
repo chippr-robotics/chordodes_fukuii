@@ -2,12 +2,13 @@ package com.chipprbots.ethereum.network.discovery
 
 import scala.util.Random
 
+import com.chipprbots.scalanet.discovery.crypto.PublicKey
+import com.chipprbots.scalanet.discovery.crypto.Signature
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scodec.bits.BitVector
-import com.chipprbots.scalanet.discovery.crypto.PublicKey
-import com.chipprbots.scalanet.discovery.crypto.Signature
-import com.chipprbots.ethereum.testing.Tags.*
+
+import com.chipprbots.ethereum.testing.Tags._
 
 class Secp256k1SigAlgSpec extends AnyFlatSpec with Matchers {
   behavior.of("Secp256k1SigAlg")

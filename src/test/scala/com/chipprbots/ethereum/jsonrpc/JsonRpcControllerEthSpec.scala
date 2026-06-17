@@ -11,12 +11,13 @@ import org.bouncycastle.util.encoders.Hex
 import org.json4s.DefaultFormats
 import org.json4s.Extraction
 import org.json4s.Formats
-import org.json4s.JsonAST.*
-import org.json4s.JsonDSL.*
+import org.json4s.JsonAST._
+import org.json4s.JsonDSL._
 import org.json4s.jvalue2monadic
 import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpecLike
+import org.scalatest.prop.TableFor1
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.Fixtures
@@ -27,14 +28,14 @@ import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
 import com.chipprbots.ethereum.consensus.blocks.PendingBlock
 import com.chipprbots.ethereum.consensus.blocks.PendingBlockAndState
 import com.chipprbots.ethereum.crypto.kec256
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.jsonrpc.EthBlocksService.GetUncleCountByBlockHashResponse
 import com.chipprbots.ethereum.jsonrpc.EthBlocksService.GetUncleCountByBlockNumberResponse
-import com.chipprbots.ethereum.jsonrpc.EthFilterService.*
-import com.chipprbots.ethereum.jsonrpc.EthInfoService.*
-import com.chipprbots.ethereum.jsonrpc.EthUserService.*
+import com.chipprbots.ethereum.jsonrpc.EthFilterService._
+import com.chipprbots.ethereum.jsonrpc.EthInfoService._
+import com.chipprbots.ethereum.jsonrpc.EthUserService._
 import com.chipprbots.ethereum.jsonrpc.FilterManager.LogFilterLogs
-import com.chipprbots.ethereum.jsonrpc.PersonalService.*
+import com.chipprbots.ethereum.jsonrpc.PersonalService._
 import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofRequest
 import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofResponse
 import com.chipprbots.ethereum.jsonrpc.ProofService.ProofAccount
@@ -46,9 +47,8 @@ import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers.Unformatted
 import com.chipprbots.ethereum.ommers.OmmersPool
 import com.chipprbots.ethereum.ommers.OmmersPool.Ommers
 import com.chipprbots.ethereum.testing.ActorsTesting.simpleAutoPilot
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
-import org.scalatest.prop.TableFor1
 
 // scalastyle:off magic.number
 class JsonRpcControllerEthSpec
@@ -392,7 +392,7 @@ class JsonRpcControllerEthSpec
   }
 
   it should "eth_call" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
-    val mockEthInfoService = mock[EthInfoService]
+    val mockEthInfoService: EthInfoService = mock[EthInfoService]
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethInfoService = mockEthInfoService)
 
@@ -416,7 +416,7 @@ class JsonRpcControllerEthSpec
   }
 
   it should "eth_estimateGas" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
-    val mockEthInfoService = mock[EthInfoService]
+    val mockEthInfoService: EthInfoService = mock[EthInfoService]
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethInfoService = mockEthInfoService)
 
@@ -452,7 +452,7 @@ class JsonRpcControllerEthSpec
   }
 
   it should "eth_getCode" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
-    val mockEthUserService = mock[EthUserService]
+    val mockEthUserService: EthUserService = mock[EthUserService]
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethUserService = mockEthUserService)
 
@@ -474,8 +474,8 @@ class JsonRpcControllerEthSpec
 
   it should "eth_getUncleCountByBlockNumber" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
     // MIGRATION: Scala 3 scalamock macro drops Option[ForkChoiceManager] type arg — use concrete stub
-    val mockEthBlocksService = new EthBlocksService(null, null, null, null) {
-      override def getUncleCountByBlockNumber(req: EthBlocksService.GetUncleCountByBlockNumberRequest) =
+    val mockEthBlocksService: EthBlocksService = new EthBlocksService(null, null, null, null) {
+      override def getUncleCountByBlockNumber(req: EthBlocksService.GetUncleCountByBlockNumberRequest): ServiceResponse[GetUncleCountByBlockNumberResponse] =
         IO.pure(Right(GetUncleCountByBlockNumberResponse(2)))
     }
     override val jsonRpcController: JsonRpcController =
@@ -494,8 +494,8 @@ class JsonRpcControllerEthSpec
 
   it should "eth_getUncleCountByBlockHash " taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
     // MIGRATION: Scala 3 scalamock macro drops Option[ForkChoiceManager] type arg — use concrete stub
-    val mockEthBlocksService = new EthBlocksService(null, null, null, null) {
-      override def getUncleCountByBlockHash(req: EthBlocksService.GetUncleCountByBlockHashRequest) =
+    val mockEthBlocksService: EthBlocksService = new EthBlocksService(null, null, null, null) {
+      override def getUncleCountByBlockHash(req: EthBlocksService.GetUncleCountByBlockHashRequest): ServiceResponse[GetUncleCountByBlockHashResponse] =
         IO.pure(Right(GetUncleCountByBlockHashResponse(3)))
     }
     override val jsonRpcController: JsonRpcController =
@@ -521,7 +521,7 @@ class JsonRpcControllerEthSpec
   }
 
   it should "eth_getBalance" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
-    val mockEthUserService = mock[EthUserService]
+    val mockEthUserService: EthUserService = mock[EthUserService]
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethUserService = mockEthUserService)
 
@@ -548,7 +548,7 @@ class JsonRpcControllerEthSpec
     RPCTest,
     DisabledTest
   ) in new JsonRpcControllerFixture {
-    val mockEthUserService = mock[EthUserService]
+    val mockEthUserService: EthUserService = mock[EthUserService]
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethUserService = mockEthUserService)
 
@@ -569,7 +569,7 @@ class JsonRpcControllerEthSpec
   }
 
   it should "eth_getStorageAt" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
-    val mockEthUserService = mock[EthUserService]
+    val mockEthUserService: EthUserService = mock[EthUserService]
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethUserService = mockEthUserService)
 
@@ -589,8 +589,8 @@ class JsonRpcControllerEthSpec
     val response: JsonRpcResponse = jsonRpcController.handleRequest(request).unsafeRunSync()
     // eth_getStorageAt's result is a 32-byte storage slot value; short values
     // are left-padded with zeros per the JSON-RPC DATA convention.
-    val raw = ByteString("response").toArray[Byte]
-    val padded = Array.fill[Byte](32 - raw.length)(0) ++ raw
+    val raw: Array[Byte] = ByteString("response").toArray[Byte]
+    val padded: Array[Byte] = Array.fill[Byte](32 - raw.length)(0) ++ raw
     response should haveResult(JString("0x" + Hex.toHexString(padded)))
   }
 
@@ -613,7 +613,7 @@ class JsonRpcControllerEthSpec
   }
 
   it should "eth_newFilter" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
-    val mockEthFilterService = mock[EthFilterService]
+    val mockEthFilterService: EthFilterService = mock[EthFilterService]
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethFilterService = mockEthFilterService)
 
@@ -638,7 +638,7 @@ class JsonRpcControllerEthSpec
   }
 
   it should "eth_newBlockFilter" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
-    val mockEthFilterService = mock[EthFilterService]
+    val mockEthFilterService: EthFilterService = mock[EthFilterService]
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethFilterService = mockEthFilterService)
 
@@ -658,7 +658,7 @@ class JsonRpcControllerEthSpec
   }
 
   it should "eth_newPendingTransactionFilter" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
-    val mockEthFilterService = mock[EthFilterService]
+    val mockEthFilterService: EthFilterService = mock[EthFilterService]
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethFilterService = mockEthFilterService)
 
@@ -676,7 +676,7 @@ class JsonRpcControllerEthSpec
   }
 
   it should "eth_uninstallFilter" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
-    val mockEthFilterService = mock[EthFilterService]
+    val mockEthFilterService: EthFilterService = mock[EthFilterService]
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethFilterService = mockEthFilterService)
 
@@ -694,7 +694,7 @@ class JsonRpcControllerEthSpec
   }
 
   it should "eth_getFilterChanges" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
-    val mockEthFilterService = mock[EthFilterService]
+    val mockEthFilterService: EthFilterService = mock[EthFilterService]
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethFilterService = mockEthFilterService)
 
@@ -797,7 +797,7 @@ class JsonRpcControllerEthSpec
     )
 
     // setup
-    val mockEthProofService = mock[EthProofService]
+    val mockEthProofService: EthProofService = mock[EthProofService]
     override val jsonRpcController: JsonRpcController = super.jsonRpcController.copy(proofService = mockEthProofService)
     mockEthProofService.getProof
       .expects(expectedDecodedRequest)
@@ -841,7 +841,7 @@ class JsonRpcControllerEthSpec
     RPCTest,
     DisabledTest
   ) in new JsonRpcControllerFixture {
-    val mockEthProofService = mock[EthProofService]
+    val mockEthProofService: EthProofService = mock[EthProofService]
     override val jsonRpcController: JsonRpcController = super.jsonRpcController.copy(proofService = mockEthProofService)
 
     mockEthProofService.getProof
@@ -863,7 +863,7 @@ class JsonRpcControllerEthSpec
   }
 
   it should "eth_getFilterLogs" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
-    val mockEthFilterService = mock[EthFilterService]
+    val mockEthFilterService: EthFilterService = mock[EthFilterService]
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethFilterService = mockEthFilterService)
 
@@ -893,7 +893,7 @@ class JsonRpcControllerEthSpec
   }
 
   it should "eth_getLogs" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
-    val mockEthFilterService = mock[EthFilterService]
+    val mockEthFilterService: EthFilterService = mock[EthFilterService]
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethFilterService = mockEthFilterService)
 

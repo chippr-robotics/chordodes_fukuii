@@ -9,14 +9,14 @@ import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.consensus.blocks.PendingBlockAndState
 import com.chipprbots.ethereum.consensus.mining.wrongMiningArgument
 import com.chipprbots.ethereum.consensus.pow.PoWBlockCreator
 import com.chipprbots.ethereum.consensus.pow.PoWMining
-import com.chipprbots.ethereum.consensus.pow.miners.MinerProtocol.*
+import com.chipprbots.ethereum.consensus.pow.miners.MinerProtocol._
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MineBlock
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MineBlocks
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerProtocol
@@ -64,7 +64,7 @@ class MockedMiner(
           }
         case None =>
           blockchainReader
-            .getBestBlock()
+            .getBestBlock
             .fold {
               sender() ! MiningError("Unable to get best block for mining")
             } { parentBlock =>

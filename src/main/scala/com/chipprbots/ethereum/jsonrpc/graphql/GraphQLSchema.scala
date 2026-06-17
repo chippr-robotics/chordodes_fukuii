@@ -6,51 +6,47 @@ import cats.effect.unsafe.IORuntime
 
 import scala.concurrent.Future
 
-import sangria.schema.{
-  Argument,
-  Field,
-  InputField,
-  InputObjectType,
-  ListInputType,
-  ListType,
-  ObjectType,
-  OptionInputType,
-  OptionType,
-  Schema,
-  fields
-}
+import sangria.schema.Argument
+import sangria.schema.Field
+import sangria.schema.InputField
+import sangria.schema.InputObjectType
+import sangria.schema.ListInputType
+import sangria.schema.ListType
+import sangria.schema.ObjectType
+import sangria.schema.OptionInputType
+import sangria.schema.OptionType
+import sangria.schema.Schema
+import sangria.schema.fields
 
 import com.chipprbots.ethereum.consensus.engine.BlobGasUtils
 import com.chipprbots.ethereum.crypto.kec256
-import com.chipprbots.ethereum.domain.{
-  AccessListItem,
-  Address,
-  Block,
-  BlockHeader,
-  BlobTransaction,
-  FailureOutcome,
-  HashOutcome,
-  LegacyTransaction,
-  Receipt,
-  SetCodeTransaction,
-  SignedTransaction,
-  SuccessOutcome,
-  Transaction,
-  TransactionWithAccessList,
-  TransactionWithDynamicFee,
-  TxLogEntry,
-  UInt256,
-  Withdrawal
-}
+import com.chipprbots.ethereum.domain.AccessListItem
+import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.BlobTransaction
+import com.chipprbots.ethereum.domain.Block
+import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeaderImplicits.BlockHeaderEnc
-import com.chipprbots.ethereum.jsonrpc.{BlockParam, EthInfoService}
+import com.chipprbots.ethereum.domain.FailureOutcome
+import com.chipprbots.ethereum.domain.HashOutcome
+import com.chipprbots.ethereum.domain.LegacyTransaction
+import com.chipprbots.ethereum.domain.Receipt
+import com.chipprbots.ethereum.domain.SetCodeTransaction
+import com.chipprbots.ethereum.domain.SignedTransaction
+import com.chipprbots.ethereum.domain.SuccessOutcome
+import com.chipprbots.ethereum.domain.Transaction
+import com.chipprbots.ethereum.domain.TransactionWithAccessList
+import com.chipprbots.ethereum.domain.TransactionWithDynamicFee
+import com.chipprbots.ethereum.domain.TxLogEntry
+import com.chipprbots.ethereum.domain.UInt256
+import com.chipprbots.ethereum.domain.Withdrawal
+import com.chipprbots.ethereum.jsonrpc.BlockParam
+import com.chipprbots.ethereum.jsonrpc.EthInfoService
+import com.chipprbots.ethereum.jsonrpc.graphql.GraphQLScalars._
+import com.chipprbots.ethereum.jsonrpc.graphql.GraphQLTypes._
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.rlp
 import com.chipprbots.ethereum.rlp.RLPList
-
-import com.chipprbots.ethereum.jsonrpc.graphql.GraphQLTypes.*
-import com.chipprbots.ethereum.jsonrpc.graphql.GraphQLScalars.*
 
 /** Sangria schema implementing EIP-1767, adapted from geth's `graphql/schema.go`.
   *
@@ -186,7 +182,7 @@ object GraphQLSchema {
     }
 
   private def worldStateAt(ctx: GraphQLContext, blockNumber: BigInt): Option[InMemoryWorldStateProxy] =
-    ctx.blockchainReader.getBlockByNumber(ctx.blockchainReader.getBestBranch(), blockNumber).map { b =>
+    ctx.blockchainReader.getBlockByNumber(ctx.blockchainReader.getBestBranch, blockNumber).map { b =>
       InMemoryWorldStateProxy(
         ctx.evmCodeStorage,
         ctx.blockchain.getBackingMptStorage(b.header.number),
@@ -441,7 +437,7 @@ object GraphQLSchema {
   ): Option[com.chipprbots.ethereum.domain.Account] =
     try
       ctx.blockchainReader
-        .getAccount(ctx.blockchainReader.getBestBranch(), Address(address), blockNumber)
+        .getAccount(ctx.blockchainReader.getBestBranch, Address(address), blockNumber)
     catch {
       case _: MissingNodeException => None
     }
@@ -465,7 +461,7 @@ object GraphQLSchema {
               case None =>
                 c.value.parent.blockInfo
                   .map(_.block.header.number)
-                  .getOrElse(c.ctx.blockchainReader.getBestBlockNumber())
+                  .getOrElse(c.ctx.blockchainReader.getBestBlockNumber)
             }
             GAccount(c.value.log.loggerAddress.bytes, blockNum)
           }
@@ -495,7 +491,7 @@ object GraphQLSchema {
             val blockNum = c.arg(BlockNumberArg) match {
               case Some(n) => BigInt(n)
               case None =>
-                c.value.blockInfo.map(_.block.header.number).getOrElse(c.ctx.blockchainReader.getBestBlockNumber())
+                c.value.blockInfo.map(_.block.header.number).getOrElse(c.ctx.blockchainReader.getBestBlockNumber)
             }
             val sender = SignedTransaction.getSender(c.value.stx).getOrElse(Address(0))
             GAccount(sender.bytes, blockNum)
@@ -512,7 +508,7 @@ object GraphQLSchema {
                 case None =>
                   c.value.blockInfo
                     .map(_.block.header.number)
-                    .getOrElse(c.ctx.blockchainReader.getBestBlockNumber())
+                    .getOrElse(c.ctx.blockchainReader.getBestBlockNumber)
               }
               GAccount(addr.bytes, blockNum)
             }
@@ -860,7 +856,7 @@ object GraphQLSchema {
           "account",
           AccountType,
           arguments = List(AddressArg),
-          resolve = c => GAccount(c.arg(AddressArg), c.ctx.blockchainReader.getBestBlockNumber())
+          resolve = c => GAccount(c.arg(AddressArg), c.ctx.blockchainReader.getBestBlockNumber)
         ),
         Field(
           "call",
@@ -924,7 +920,7 @@ object GraphQLSchema {
               // post-Cancun block in the hive graphql fixture, which we deliberately don't
               // advance the head into) remain queryable by number.
               val blockOpt = reader
-                .getBlockByNumber(reader.getBestBranch(), bn)
+                .getBlockByNumber(reader.getBestBranch, bn)
                 .orElse {
                   for {
                     header <- reader.getBlockHeaderByNumber(bn)
@@ -945,7 +941,7 @@ object GraphQLSchema {
                   throw GraphQLDataFetchingError.notFound("block", s"Block hash $hex was not found")
               }
             case (None, None) =>
-              reader.getBestBlock().map(b => buildGBlock(c.ctx, b))
+              reader.getBestBlock.map(b => buildGBlock(c.ctx, b))
           }
         }
       ),
@@ -955,14 +951,14 @@ object GraphQLSchema {
         arguments = List(FromArg, ToArg),
         resolve = { c =>
           val reader = c.ctx.blockchainReader
-          val best = reader.getBestBlockNumber()
+          val best = reader.getBestBlockNumber
           val from = c.arg(FromArg).map(BigInt(_)).getOrElse(BigInt(0))
           val to = c.arg(ToArg).map(BigInt(_)).getOrElse(best)
           // Hive test 43 (byWrongRange): `to < from` is Invalid params, not an empty list.
           if (to < from) throw GraphQLDataFetchingError.invalidParams("blocks")
           val count = (to - from + 1).min(MaxBlocksPerRange).toInt
           (0 until count).flatMap { i =>
-            reader.getBlockByNumber(reader.getBestBranch(), from + i).map(b => buildGBlock(c.ctx, b))
+            reader.getBlockByNumber(reader.getBestBranch, from + i).map(b => buildGBlock(c.ctx, b))
           }
         }
       ),
@@ -988,7 +984,7 @@ object GraphQLSchema {
                     case _ =>
                       // Pending tx — fetch raw stx
                       c.ctx.blockchainReader
-                        .getBestBlock()
+                        .getBestBlock
                         .flatMap { _ =>
                           c.ctx.ethTxService
                             .getRawTransactionByHash(
@@ -1023,14 +1019,14 @@ object GraphQLSchema {
               .getOrElse(Vector.empty)
               .map(_.toSeq)
           val reader = c.ctx.blockchainReader
-          val best = reader.getBestBlockNumber()
+          val best = reader.getBestBlockNumber
           val from = fromBlock.getOrElse(best)
           val to = toBlock.getOrElse(best)
           val out = scala.collection.mutable.ArrayBuffer.empty[GLog]
           if (to >= from) {
             val maxBlocks = (to - from + 1).min(MaxBlocksPerRange).toInt
             (0 until maxBlocks).foreach { i =>
-              reader.getBlockByNumber(reader.getBestBranch(), from + i).foreach { block =>
+              reader.getBlockByNumber(reader.getBestBranch, from + i).foreach { block =>
                 val receipts = reader.getReceiptsByHash(block.header.hash).getOrElse(Seq.empty)
                 val txs = block.body.transactionList
                 var baseLogIndex = 0
@@ -1139,11 +1135,11 @@ object GraphQLSchema {
 
               val sender = senderOpt.get
               val reader = c.ctx.blockchainReader
-              val bestNum = reader.getBestBlockNumber()
+              val bestNum = reader.getBestBlockNumber
               val currentNonce =
                 try
                   reader
-                    .getAccount(reader.getBestBranch(), sender, bestNum)
+                    .getAccount(reader.getBestBranch, sender, bestNum)
                     .map(_.nonce.toBigInt)
                     .getOrElse(c.ctx.blockchainConfig.accountStartNonce.toBigInt)
                 catch {

@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.jsonrpc
 import org.apache.pekko.util.ByteString
 
 import cats.effect.IO
-import cats.implicits.*
+import cats.implicits._
 
 import com.chipprbots.ethereum.consensus.blocks.BlockGenerator
 import com.chipprbots.ethereum.domain.Account
@@ -182,12 +182,12 @@ class EthProofService(
     for {
       blockNumber <- resolveBlock(block).map(_.block.number)
       account <- Either.fromOption(
-        blockchainReader.getAccount(blockchainReader.getBestBranch(), address, blockNumber),
+        blockchainReader.getAccount(blockchainReader.getBestBranch, address, blockNumber),
         noAccount(address, blockNumber)
       )
       accountProof <- Either.fromOption(
         blockchainReader
-          .getAccountProof(blockchainReader.getBestBranch(), address, blockNumber)
+          .getAccountProof(blockchainReader.getBestBranch, address, blockNumber)
           .map(_.map(asRlpSerializedNode)),
         noAccountProof(address, blockNumber)
       )
@@ -221,12 +221,12 @@ class EthProofService(
   private def resolveBlock(blockParam: BlockParam): Either[JsonRpcError, ResolvedBlock] = {
     def getBlock(number: BigInt): Either[JsonRpcError, Block] =
       blockchainReader
-        .getBlockByNumber(blockchainReader.getBestBranch(), number)
+        .getBlockByNumber(blockchainReader.getBestBranch, number)
         .toRight(JsonRpcError.InvalidParams(s"Block $number not found"))
 
     def getLatestBlock(): Either[JsonRpcError, Block] =
       blockchainReader
-        .getBestBlock()
+        .getBestBlock
         .toRight(JsonRpcError.InvalidParams("Latest block not found"))
 
     blockParam match {

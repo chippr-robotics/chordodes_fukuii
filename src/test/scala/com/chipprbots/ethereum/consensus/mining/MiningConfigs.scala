@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.consensus.mining
 
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import com.chipprbots.ethereum.Timeouts
 import com.chipprbots.ethereum.consensus.pow.EthashConfig

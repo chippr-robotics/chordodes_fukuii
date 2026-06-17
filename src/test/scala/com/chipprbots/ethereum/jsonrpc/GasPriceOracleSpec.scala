@@ -17,19 +17,19 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.*
+import com.chipprbots.ethereum._
 import com.chipprbots.ethereum.consensus.mining.Mining
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage
-import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields
-import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
+import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields._
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.domain.branch.BestBranch
 import com.chipprbots.ethereum.domain.branch.EmptyBranch
-import com.chipprbots.ethereum.jsonrpc.EthBlocksService.*
-import com.chipprbots.ethereum.jsonrpc.EthTxService.*
+import com.chipprbots.ethereum.jsonrpc.EthBlocksService._
+import com.chipprbots.ethereum.jsonrpc.EthTxService._
 import com.chipprbots.ethereum.ledger.BlockQueue
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 
@@ -136,9 +136,9 @@ class GasPriceOracleSpec
   ): BlockchainReader = {
     val r = mock[BlockchainReader]
     val branch = if (bestNum > 0) BestBranch(zeroHash, bestNum) else EmptyBranch
-    r.getBestBlockNumber.expects().returning(bestNum).anyNumberOfTimes()
-    r.getBestBranch.expects().returning(branch).anyNumberOfTimes()
-    r.getBestBlock.expects().returning(bestBlock).anyNumberOfTimes()
+    (() => r.getBestBlockNumber).expects().returning(bestNum).anyNumberOfTimes()
+    (() => r.getBestBranch).expects().returning(branch).anyNumberOfTimes()
+    (() => r.getBestBlock).expects().returning(bestBlock).anyNumberOfTimes()
     window.foreach { case (n, bOpt) =>
       r.getBlockByNumber.expects(branch, n).returning(bOpt).anyNumberOfTimes()
     }
@@ -405,7 +405,7 @@ class GasPriceOracleSpec
   "getGetGasPrice()" should "return Right(GetGasPriceResponse(v)) where v ≥ 1" taggedAs (UnitTest, RPCTest) in {
     val r = mockReader(bestNum = 5, window = emptyWindow(5), bestBlock = None)
     val response = svc(r).getGetGasPrice(GetGasPriceRequest()).unsafeRunSync()
-    response shouldBe a[Right[_, _]]
+    response shouldBe a[Right[?, ?]]
     response.toOption.value.price should be >= BigInt(1)
   }
 
@@ -430,7 +430,7 @@ class GasPriceOracleSpec
 
   "maxPriorityFeePerGas()" should "return Right(MaxPriorityFeePerGasResponse(...))" taggedAs (UnitTest, RPCTest) in {
     val response = blocksSvc().maxPriorityFeePerGas(MaxPriorityFeePerGasRequest()).unsafeRunSync()
-    response shouldBe a[Right[_, _]]
+    response shouldBe a[Right[?, ?]]
   }
 
   it should "return the value from blockchainConfig.minTip (not a hardcoded literal)" taggedAs (UnitTest, RPCTest) in {

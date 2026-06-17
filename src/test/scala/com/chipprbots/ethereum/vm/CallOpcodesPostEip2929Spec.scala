@@ -6,13 +6,13 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
+import com.chipprbots.ethereum.Fixtures.{Blocks => BlockFixtures}
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.testing.Tags.*
-import com.chipprbots.ethereum.vm.MockWorldState.*
+import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.vm.MockWorldState._
 
 import Fixtures.blockchainConfig
 

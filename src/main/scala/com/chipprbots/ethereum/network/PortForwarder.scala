@@ -5,10 +5,10 @@ import java.util.concurrent.ExecutorService
 
 import cats.effect.IO
 import cats.effect.Resource
-import cats.implicits.*
+import cats.implicits._
 
-import scala.jdk.CollectionConverters.*
-import scala.util.chaining.*
+import scala.jdk.CollectionConverters._
+import scala.util.chaining._
 
 import org.jupnp.DefaultUpnpServiceConfiguration
 import org.jupnp.QueueingThreadPoolExecutor

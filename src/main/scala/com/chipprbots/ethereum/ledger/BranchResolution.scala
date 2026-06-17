@@ -22,7 +22,7 @@ class BranchResolution(blockchainReader: BlockchainReader) extends Logger {
     } else {
       val knownParentOrGenesis = blockchainReader
         .isInChain(
-          blockchainReader.getBestBranch(),
+          blockchainReader.getBestBranch,
           headers.head.parentHash
         ) || headers.head.hash == blockchainReader.genesisHeader.hash
 
@@ -164,8 +164,8 @@ class BranchResolution(blockchainReader: BlockchainReader) extends Logger {
     }
 
   private def getTopBlocksFromNumber(from: BigInt): List[Block] = {
-    val bestBranch = blockchainReader.getBestBranch()
-    (from to blockchainReader.getBestBlockNumber())
+    val bestBranch = blockchainReader.getBestBranch
+    (from to blockchainReader.getBestBlockNumber)
       .flatMap(nb => blockchainReader.getBlockByNumber(bestBranch, nb))
       .toList
   }

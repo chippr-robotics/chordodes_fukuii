@@ -4,10 +4,10 @@ import java.nio.BufferUnderflowException
 
 import org.apache.pekko.util.ByteString
 
-import boopickle.Default.*
+import boopickle.Default._
 
 import com.chipprbots.ethereum.db.dataSource.DataSource
-import com.chipprbots.ethereum.db.storage.ChainWeightStorage.*
+import com.chipprbots.ethereum.db.storage.ChainWeightStorage._
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.utils.ByteUtils.byteSequenceToBuffer
 import com.chipprbots.ethereum.utils.ByteUtils.compactPickledBytes

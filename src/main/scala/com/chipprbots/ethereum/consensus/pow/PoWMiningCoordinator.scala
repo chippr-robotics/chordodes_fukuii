@@ -4,7 +4,7 @@ import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.AbstractBehavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.actor.ActorRef as ClassicActorRef
+import org.apache.pekko.actor.{ActorRef => ClassicActorRef}
 
 import cats.effect.unsafe.IORuntime
 
@@ -98,9 +98,9 @@ class PoWMiningCoordinator private (
     case MineNext =>
       log.debug("Received message MineNext")
       blockchainReader
-        .getBestBlock()
+        .getBestBlock
         .fold {
-          log.error("Unable to get block for mining: blockchainReader.getBestBlock() returned None")
+          log.error("Unable to get block for mining: blockchainReader.getBestBlock returned None")
           context.self ! MineNext
         } { block =>
           mineWithEthash(block)

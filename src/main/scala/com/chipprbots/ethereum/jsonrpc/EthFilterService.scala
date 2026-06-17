@@ -4,15 +4,15 @@ import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
-import com.chipprbots.ethereum.domain.*
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
+import scala.annotation.unused
+
+import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
 import com.chipprbots.ethereum.jsonrpc.FilterManager.FilterChanges
 import com.chipprbots.ethereum.jsonrpc.FilterManager.FilterLogs
 import com.chipprbots.ethereum.jsonrpc.FilterManager.LogFilterLogs
-import com.chipprbots.ethereum.jsonrpc.FilterManager as FM
-import com.chipprbots.ethereum.utils.*
-
-import scala.annotation.unused
+import com.chipprbots.ethereum.jsonrpc.{FilterManager => FM}
+import com.chipprbots.ethereum.utils._
 
 object EthFilterService {
   case class NewFilterRequest(filter: Filter)
@@ -104,7 +104,7 @@ class EthFilterService(
     }
 
     // Resolve block numbers for range validation
-    val bestBlockNum = blockchainReader.getBestBlockNumber()
+    val bestBlockNum = blockchainReader.getBestBlockNumber
     val fromNum = fromBlock.collect { case BlockParam.WithNumber(n) => n }.getOrElse(BigInt(0))
     val toNum = toBlock.collect { case BlockParam.WithNumber(n) => n }.getOrElse(bestBlockNum)
 

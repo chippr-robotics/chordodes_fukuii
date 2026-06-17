@@ -2,9 +2,9 @@ package com.chipprbots.ethereum.utils
 
 import java.net.InetSocketAddress
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
-import com.typesafe.config.Config as TypesafeConfig
+import com.typesafe.config.{Config => TypesafeConfig}
 
 import com.chipprbots.ethereum.db.dataSource.RocksDbConfig
 import com.chipprbots.ethereum.network.NetworkProtocolConfig

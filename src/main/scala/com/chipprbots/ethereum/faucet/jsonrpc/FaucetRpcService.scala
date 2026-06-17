@@ -4,6 +4,8 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.pattern.RetrySupport
 import org.apache.pekko.util.Timeout
 
+import scala.annotation.unused
+
 import com.chipprbots.ethereum.faucet.FaucetConfig
 import com.chipprbots.ethereum.faucet.FaucetConfigBuilder
 import com.chipprbots.ethereum.faucet.FaucetHandler.FaucetHandlerMsg
@@ -12,9 +14,7 @@ import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.SendFundsRequest
 import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.SendFundsResponse
 import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.StatusRequest
 import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.StatusResponse
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
-
-import scala.annotation.unused
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError
 import com.chipprbots.ethereum.jsonrpc.ServiceResponse
 import com.chipprbots.ethereum.utils.Logger

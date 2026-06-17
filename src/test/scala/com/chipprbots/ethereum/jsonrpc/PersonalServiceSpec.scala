@@ -9,6 +9,7 @@ import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
 
+import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 import scala.reflect.ClassTag
 
@@ -25,27 +26,26 @@ import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.NormalPatience
 import com.chipprbots.ethereum.Timeouts
 import com.chipprbots.ethereum.WithActorSystemShutDown
-import com.chipprbots.ethereum.crypto.ECDSASignature
-import com.chipprbots.ethereum.domain.*
-import com.chipprbots.ethereum.domain.branch.EmptyBranch
-import com.chipprbots.ethereum.testing.Tags.*
-import com.chipprbots.ethereum.jsonrpc.JsonRpcError.*
-import com.chipprbots.ethereum.jsonrpc.PersonalService.*
 import com.chipprbots.ethereum.consensus.mining.Mining
+import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage
+import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.branch.EmptyBranch
+import com.chipprbots.ethereum.jsonrpc.JsonRpcError._
+import com.chipprbots.ethereum.jsonrpc.PersonalService._
 import com.chipprbots.ethereum.keystore.KeyStore
 import com.chipprbots.ethereum.keystore.KeyStore.DecryptionFailed
 import com.chipprbots.ethereum.keystore.KeyStore.IOError
 import com.chipprbots.ethereum.keystore.Wallet
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
-import com.chipprbots.ethereum.transactions.PendingTransactionsManager.*
+import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.transactions.PendingTransactionsManager._
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
 import com.chipprbots.ethereum.utils.MonetaryPolicyConfig
 import com.chipprbots.ethereum.utils.TxPoolConfig
-import scala.concurrent.Future
 
 class PersonalServiceSpec
     extends TestKit(ActorSystem("JsonRpcControllerEthSpec_System"))
@@ -89,7 +89,7 @@ class PersonalServiceSpec
 
   it should "list accounts" taggedAs (UnitTest, RPCTest) in new TestSetup {
     val addresses: List[Address] = List(123, 42, 1).map(Address(_))
-    keyStore.listAccounts.expects().returning(Right(addresses))
+    (() => keyStore.listAccounts).expects().returning(Right(addresses))
 
     val res: Either[JsonRpcError, ListAccountsResponse] = personal.listAccounts(ListAccountsRequest()).unsafeRunSync()
 
@@ -97,7 +97,7 @@ class PersonalServiceSpec
   }
 
   it should "translate KeyStore errors to JsonRpc errors" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    keyStore.listAccounts.expects().returning(Left(IOError("boom!")))
+    (() => keyStore.listAccounts).expects().returning(Left(IOError("boom!")))
     val res1: Either[JsonRpcError, ListAccountsResponse] = personal.listAccounts(ListAccountsRequest()).unsafeRunSync()
     res1 shouldEqual Left(LogicError("boom!"))
 
@@ -133,9 +133,9 @@ class PersonalServiceSpec
       .expects(address, passphrase)
       .returning(Right(wallet))
 
-    blockchainReader.getBestBlockNumber.expects().returning(1234)
+    (() => blockchainReader.getBestBlockNumber).expects().returning(1234)
     blockchainReader.getAccount.expects(*, address, BigInt(1234)).returning(Some(Account(nonce, 2 * txValue)))
-    blockchainReader.getBestBlockNumber.expects().returning(forkBlockNumbers.eip155BlockNumber - 1)
+    (() => blockchainReader.getBestBlockNumber).expects().returning(forkBlockNumbers.eip155BlockNumber - 1)
 
     val req: SendTransactionWithPassphraseRequest = SendTransactionWithPassphraseRequest(tx, passphrase)
     val res: Future[Either[JsonRpcError, SendTransactionWithPassphraseResponse]] =
@@ -158,9 +158,9 @@ class PersonalServiceSpec
       .expects(address, passphrase)
       .returning(Right(wallet))
 
-    blockchainReader.getBestBlockNumber.expects().returning(1234)
+    (() => blockchainReader.getBestBlockNumber).expects().returning(1234)
     blockchainReader.getAccount.expects(*, address, BigInt(1234)).returning(Some(Account(nonce, 2 * txValue)))
-    blockchainReader.getBestBlockNumber.expects().returning(forkBlockNumbers.eip155BlockNumber - 1)
+    (() => blockchainReader.getBestBlockNumber).expects().returning(forkBlockNumbers.eip155BlockNumber - 1)
 
     val req: SendTransactionWithPassphraseRequest = SendTransactionWithPassphraseRequest(tx, passphrase)
     val res: Future[Either[JsonRpcError, SendTransactionWithPassphraseResponse]] =
@@ -195,9 +195,9 @@ class PersonalServiceSpec
 
     personal.unlockAccount(UnlockAccountRequest(address, passphrase, None)).unsafeRunSync()
 
-    blockchainReader.getBestBlockNumber.expects().returning(1234)
+    (() => blockchainReader.getBestBlockNumber).expects().returning(1234)
     blockchainReader.getAccount.expects(*, address, BigInt(1234)).returning(Some(Account(nonce, 2 * txValue)))
-    blockchainReader.getBestBlockNumber.expects().returning(forkBlockNumbers.eip155BlockNumber - 1)
+    (() => blockchainReader.getBestBlockNumber).expects().returning(forkBlockNumbers.eip155BlockNumber - 1)
 
     val req: SendTransactionRequest = SendTransactionRequest(tx)
     val res: Future[Either[JsonRpcError, SendTransactionResponse]] = personal.sendTransaction(req).unsafeToFuture()
@@ -362,9 +362,9 @@ class PersonalServiceSpec
       .expects(address, passphrase)
       .returning(Right(wallet))
 
-    blockchainReader.getBestBlockNumber.expects().returning(1234)
+    (() => blockchainReader.getBestBlockNumber).expects().returning(1234)
     blockchainReader.getAccount.expects(*, address, BigInt(1234)).returning(Some(Account(nonce, 2 * txValue)))
-    blockchainReader.getBestBlockNumber.expects().returning(forkBlockNumbers.eip155BlockNumber - 1)
+    (() => blockchainReader.getBestBlockNumber).expects().returning(forkBlockNumbers.eip155BlockNumber - 1)
 
     val req: SendTransactionWithPassphraseRequest = SendTransactionWithPassphraseRequest(tx, passphrase)
     val res: Future[Either[JsonRpcError, SendTransactionWithPassphraseResponse]] =
@@ -382,10 +382,10 @@ class PersonalServiceSpec
       .expects(address, passphrase)
       .returning(Right(wallet))
 
-    blockchainReader.getBestBlockNumber.expects().returning(1234)
+    (() => blockchainReader.getBestBlockNumber).expects().returning(1234)
     blockchainReader.getAccount.expects(*, address, BigInt(1234)).returning(Some(Account(nonce, 2 * txValue)))
     new Block(Fixtures.Blocks.Block3125369.header, Fixtures.Blocks.Block3125369.body)
-    blockchainReader.getBestBlockNumber.expects().returning(forkBlockNumbers.eip155BlockNumber)
+    (() => blockchainReader.getBestBlockNumber).expects().returning(forkBlockNumbers.eip155BlockNumber)
 
     val req: SendTransactionWithPassphraseRequest = SendTransactionWithPassphraseRequest(tx, passphrase)
     val res: Future[Either[JsonRpcError, SendTransactionWithPassphraseResponse]] =
@@ -406,7 +406,7 @@ class PersonalServiceSpec
       .expects(address, passphrase)
       .returning(Right(wallet))
 
-    blockchainReader.getBestBlockNumber.expects().returning(1234)
+    (() => blockchainReader.getBestBlockNumber).expects().returning(1234)
     blockchainReader.getAccount
       .expects(*, address, BigInt(1234))
       .throwing(new MissingNodeException(ByteString(new Array[Byte](32))))
@@ -431,7 +431,7 @@ class PersonalServiceSpec
 
     personal.unlockAccount(UnlockAccountRequest(address, passphrase, None)).unsafeRunSync()
 
-    blockchainReader.getBestBlockNumber.expects().returning(1234)
+    (() => blockchainReader.getBestBlockNumber).expects().returning(1234)
     blockchainReader.getAccount
       .expects(*, address, BigInt(1234))
       .throwing(new MissingNodeException(ByteString(new Array[Byte](32))))
@@ -525,7 +525,7 @@ class PersonalServiceSpec
 
     val txPool: TestProbe = TestProbe()
     val blockchainReader: BlockchainReader = mock[BlockchainReader]
-    blockchainReader.getBestBranch.expects().returning(EmptyBranch).anyNumberOfTimes()
+    (() => blockchainReader.getBestBranch).expects().returning(EmptyBranch).anyNumberOfTimes()
     val blockchain: BlockchainImpl = mock[BlockchainImpl]
 
     // suggestGasPrice() is private[jsonrpc] — ScalaMock generates its proxy outside the package

@@ -11,7 +11,7 @@ import cats.effect.IO
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.Duration
 
-import io.circe.syntax.*
+import io.circe.syntax._
 
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.jsonrpc.client.RpcClient

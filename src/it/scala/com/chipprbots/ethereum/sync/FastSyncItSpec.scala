@@ -4,20 +4,19 @@ import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.FlatSpecBase
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
-import com.chipprbots.ethereum.sync.FastSyncItSpec.*
+import com.chipprbots.ethereum.sync.FastSyncItSpec._
 import com.chipprbots.ethereum.sync.util.FastSyncItSpecUtils.FakePeer
-import com.chipprbots.ethereum.sync.util.SyncCommonItSpec.*
-import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils.*
-
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.sync.util.SyncCommonItSpec._
+import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils._
+import com.chipprbots.ethereum.testing.Tags._
 
 class FastSyncItSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll {
   implicit val testRuntime: IORuntime = IORuntime.global
@@ -42,11 +41,11 @@ class FastSyncItSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll {
     } yield {
       assert(
         peer1.blockchainReader
-          .getBestBlockNumber() == peer2.blockchainReader.getBestBlockNumber() - peer2.testSyncConfig.pivotBlockOffset
+          .getBestBlockNumber == peer2.blockchainReader.getBestBlockNumber - peer2.testSyncConfig.pivotBlockOffset
       )
       assert(
         peer1.blockchainReader
-          .getBestBlockNumber() == peer3.blockchainReader.getBestBlockNumber() - peer3.testSyncConfig.pivotBlockOffset
+          .getBestBlockNumber == peer3.blockchainReader.getBestBlockNumber - peer3.testSyncConfig.pivotBlockOffset
       )
     }
   }
@@ -71,11 +70,11 @@ class FastSyncItSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll {
       // state, so peer1 can get whole trie from both of them.
       assert(
         peer1.blockchainReader
-          .getBestBlockNumber() == peer2.blockchainReader.getBestBlockNumber() - peer2.testSyncConfig.pivotBlockOffset
+          .getBestBlockNumber == peer2.blockchainReader.getBestBlockNumber - peer2.testSyncConfig.pivotBlockOffset
       )
       assert(
         peer1.blockchainReader
-          .getBestBlockNumber() == peer3.blockchainReader.getBestBlockNumber() - peer3.testSyncConfig.pivotBlockOffset
+          .getBestBlockNumber == peer3.blockchainReader.getBestBlockNumber - peer3.testSyncConfig.pivotBlockOffset
       )
       assert(trie.isDefined)
       assert(synchronizingPeerHaveAllData)
@@ -108,11 +107,11 @@ class FastSyncItSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll {
         // state, so peer1 can get whole trie from both of them.
         assert(
           peer1.blockchainReader
-            .getBestBlockNumber() == peer3.blockchainReader.getBestBlockNumber() - peer3.testSyncConfig.pivotBlockOffset
+            .getBestBlockNumber == peer3.blockchainReader.getBestBlockNumber - peer3.testSyncConfig.pivotBlockOffset
         )
         assert(
           peer1.blockchainReader
-            .getBestBlockNumber() == peer4.blockchainReader.getBestBlockNumber() - peer4.testSyncConfig.pivotBlockOffset
+            .getBestBlockNumber == peer4.blockchainReader.getBestBlockNumber - peer4.testSyncConfig.pivotBlockOffset
         )
         assert(trie.isDefined)
         assert(synchronizingPeerHaveAllData)
@@ -145,11 +144,11 @@ class FastSyncItSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll {
         // state, so peer1 can get whole trie from both of them.
         assert(
           peer1.blockchainReader
-            .getBestBlockNumber() == peer3.blockchainReader.getBestBlockNumber() - peer3.testSyncConfig.pivotBlockOffset
+            .getBestBlockNumber == peer3.blockchainReader.getBestBlockNumber - peer3.testSyncConfig.pivotBlockOffset
         )
         assert(
           peer1.blockchainReader
-            .getBestBlockNumber() == peer4.blockchainReader.getBestBlockNumber() - peer4.testSyncConfig.pivotBlockOffset
+            .getBestBlockNumber == peer4.blockchainReader.getBestBlockNumber - peer4.testSyncConfig.pivotBlockOffset
         )
         assert(trie.isDefined)
         assert(synchronizingPeerHaveAllData)
@@ -167,7 +166,7 @@ class FastSyncItSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll {
       _ <- peer1.waitForFastSyncFinish()
     } yield assert(
       peer1.blockchainReader
-        .getBestBlockNumber() == peer2.blockchainReader.getBestBlockNumber() - peer2.testSyncConfig.pivotBlockOffset
+        .getBestBlockNumber == peer2.blockchainReader.getBestBlockNumber - peer2.testSyncConfig.pivotBlockOffset
     )
   }
 
@@ -186,7 +185,7 @@ class FastSyncItSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll {
       _ <- peer1.waitForFastSyncFinish()
     } yield assert(
       peer1.blockchainReader
-        .getBestBlockNumber() == peer2.blockchainReader.getBestBlockNumber() - peer2.testSyncConfig.pivotBlockOffset
+        .getBestBlockNumber == peer2.blockchainReader.getBestBlockNumber - peer2.testSyncConfig.pivotBlockOffset
     )
   }
 
@@ -207,7 +206,7 @@ class FastSyncItSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll {
       _ <- peer1.waitForFastSyncFinish()
     } yield assert(
       peer1.blockchainReader
-        .getBestBlockNumber() == peer2.blockchainReader.getBestBlockNumber() - peer2.testSyncConfig.pivotBlockOffset
+        .getBestBlockNumber == peer2.blockchainReader.getBestBlockNumber - peer2.testSyncConfig.pivotBlockOffset
     )
   }
 
@@ -233,11 +232,11 @@ class FastSyncItSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll {
       // state, so peer1 can get whole trie from both of them.
       assert(
         peer1.blockchainReader
-          .getBestBlockNumber() == peer3.blockchainReader.getBestBlockNumber() - peer3.testSyncConfig.pivotBlockOffset
+          .getBestBlockNumber == peer3.blockchainReader.getBestBlockNumber - peer3.testSyncConfig.pivotBlockOffset
       )
       assert(
         peer1.blockchainReader
-          .getBestBlockNumber() == peer4.blockchainReader.getBestBlockNumber() - peer4.testSyncConfig.pivotBlockOffset
+          .getBestBlockNumber == peer4.blockchainReader.getBestBlockNumber - peer4.testSyncConfig.pivotBlockOffset
       )
       assert(trie.isDefined)
       assert(synchronizingPeerHaveAllData)
@@ -259,7 +258,7 @@ class FastSyncItSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll {
       _ <- peer1.waitForFastSyncFinish()
     } yield assert(
       peer1.blockchainReader
-        .getBestBlockNumber() == peer3.blockchainReader.getBestBlockNumber() - peer3.testSyncConfig.pivotBlockOffset
+        .getBestBlockNumber == peer3.blockchainReader.getBestBlockNumber - peer3.testSyncConfig.pivotBlockOffset
     )
   }
 }

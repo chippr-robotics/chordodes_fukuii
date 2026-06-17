@@ -6,7 +6,7 @@ import cats.effect.IO
 
 import com.chipprbots.ethereum.consensus.mining.Mining
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
@@ -79,7 +79,7 @@ class EthUserService(
       resolveBlock(blockParam)
         .map { case ResolvedBlock(block, _) =>
           blockchainReader
-            .getAccount(blockchainReader.getBestBranch(), address, block.header.number)
+            .getAccount(blockchainReader.getBestBranch, address, block.header.number)
             .getOrElse(Account.empty(blockchainConfig.accountStartNonce))
         }
         .map(makeResponse)

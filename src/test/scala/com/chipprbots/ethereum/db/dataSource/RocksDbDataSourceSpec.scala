@@ -11,7 +11,7 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.db.dataSource.DataSource.Key
 import com.chipprbots.ethereum.db.dataSource.DataSource.Value
 import com.chipprbots.ethereum.db.storage.Namespaces
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 /** spec 002 US2 (T016): RocksDB block-cache statistics wiring on [[RocksDbDataSource]].
   *

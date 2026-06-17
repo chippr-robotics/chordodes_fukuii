@@ -7,6 +7,7 @@ import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
 
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.duration.FiniteDuration
 
@@ -40,7 +41,7 @@ import com.chipprbots.ethereum.domain.BlockHeader.getEncodedWithoutNonce
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.jsonrpc.EthMiningService.*
+import com.chipprbots.ethereum.jsonrpc.EthMiningService._
 import com.chipprbots.ethereum.jsonrpc.NodeJsonRpcHealthChecker.JsonRpcHealthConfig
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
 import com.chipprbots.ethereum.jsonrpc.server.http.JsonRpcHttpServer.JsonRpcHttpServerConfig
@@ -50,12 +51,12 @@ import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.nodebuilder.ApisBuilder
 import com.chipprbots.ethereum.ommers.OmmersPool
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.Config
-import scala.concurrent.Future
+import com.chipprbots.ethereum.consensus.mining.MiningConfig
 
 class EthMiningServiceSpec
     extends TestKit(ActorSystem("EthMiningServiceSpec_ActorSystem"))
@@ -192,7 +193,7 @@ class EthMiningServiceSpec
 
     // Wait for the result
     import scala.concurrent.Await
-    val response = Await.result(workFuture, 10.seconds)
+    val response: Either[JsonRpcError, GetWorkResponse] = Await.result(workFuture, 10.seconds)
 
     response shouldEqual Right(GetWorkResponse(powHash, seedHash, target, block.header.number))
   }
@@ -321,7 +322,7 @@ class EthMiningServiceSpec
   it should "return detailed miner status" taggedAs (UnitTest, RPCTest) in new TestSetup {
     // Initially not mining
     val response1: ServiceResponse[GetMinerStatusResponse] = ethMiningService.getMinerStatus(GetMinerStatusRequest())
-    val status1 = response1.unsafeRunSync()
+    val status1: Either[JsonRpcError, GetMinerStatusResponse] = response1.unsafeRunSync()
     status1 shouldBe Symbol("right")
     status1.toOption.get.isMining shouldBe false
     status1.toOption.get.coinbase shouldEqual miningConfig.coinbase
@@ -330,7 +331,7 @@ class EthMiningServiceSpec
     // Submit a hashrate and check status
     ethMiningService.submitHashRate(SubmitHashRateRequest(100, ByteString("miner1"))).unsafeRunSync()
     val response2: ServiceResponse[GetMinerStatusResponse] = ethMiningService.getMinerStatus(GetMinerStatusRequest())
-    val status2 = response2.unsafeRunSync()
+    val status2: Either[JsonRpcError, GetMinerStatusResponse] = response2.unsafeRunSync()
     status2 shouldBe Symbol("right")
     status2.toOption.get.isMining shouldBe true
     status2.toOption.get.hashRate shouldEqual BigInt(100)
@@ -351,7 +352,7 @@ class EthMiningServiceSpec
 
     blockchainWriter.save(parentBlock, Nil, ChainWeight.totalDifficultyOnly(parentBlock.header.difficulty), true)
 
-    val workFuture = ethMiningService.getWork(GetWorkRequest()).unsafeToFuture()
+    val workFuture: Future[Either[JsonRpcError, GetWorkResponse]] = ethMiningService.getWork(GetWorkRequest()).unsafeToFuture()
 
     pendingTransactionsManager.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     pendingTransactionsManager.reply(PendingTransactionsManager.PendingTransactionsResponse(Nil))
@@ -359,7 +360,7 @@ class EthMiningServiceSpec
     ommersPool.reply(OmmersPool.Ommers(Nil))
 
     import scala.concurrent.Await
-    val result = Await.result(workFuture, 10.seconds)
+    val result: Either[JsonRpcError, GetWorkResponse] = Await.result(workFuture, 10.seconds)
 
     result shouldBe Symbol("right")
     val workResponse = result.toOption.get
@@ -372,7 +373,7 @@ class EthMiningServiceSpec
   // core-geth alignment: submitWork rejects shares older than staleThreshold blocks
   it should "reject submitWork when submission is beyond stale threshold" taggedAs (UnitTest, RPCTest) in
     new TestSetup {
-      override lazy val miningConfig = MiningConfigs.miningConfig.copy(staleThreshold = 0)
+      override lazy val miningConfig: MiningConfig = MiningConfigs.miningConfig.copy(staleThreshold = 0)
 
       // Save both blocks so best = block.number (1)
       blockchainWriter.save(parentBlock, Nil, ChainWeight.totalDifficultyOnly(parentBlock.header.difficulty), true)
@@ -381,7 +382,7 @@ class EthMiningServiceSpec
       // getPrepared returns parentBlock (number=0); best=1; diff=1 > threshold=0 → stale
       blockGenerator.getPrepared.expects(*).returning(Some(PendingBlock(parentBlock, Nil)))
 
-      val result = ethMiningService
+      val result: Either[JsonRpcError, SubmitWorkResponse] = ethMiningService
         .submitWork(
           SubmitWorkRequest(ByteString("nonce"), ByteString(Hex.decode("01" * 32)), ByteString(Hex.decode("01" * 32)))
         )
@@ -400,7 +401,7 @@ class EthMiningServiceSpec
 
     blockGenerator.getPrepared.expects(*).returning(Some(PendingBlock(block, Nil)))
 
-    val result = ethMiningService
+    val result: Either[JsonRpcError, SubmitWorkResponse] = ethMiningService
       .submitWork(
         SubmitWorkRequest(ByteString("nonce"), ByteString(Hex.decode("01" * 32)), ByteString(Hex.decode("01" * 32)))
       )
@@ -427,7 +428,7 @@ class EthMiningServiceSpec
     // Verify miner status shows new coinbase
     val statusResponse: ServiceResponse[GetMinerStatusResponse] =
       ethMiningService.getMinerStatus(GetMinerStatusRequest())
-    val status = statusResponse.unsafeRunSync()
+    val status: Either[JsonRpcError, GetMinerStatusResponse] = statusResponse.unsafeRunSync()
     status shouldBe Symbol("right")
     status.toOption.get.coinbase shouldEqual testEtherbaseAddress
   }
@@ -463,7 +464,7 @@ class EthMiningServiceSpec
 
     // Wait for the result
     import scala.concurrent.Await
-    val response = Await.result(workFuture, 10.seconds)
+    val response: Either[JsonRpcError, GetWorkResponse] = Await.result(workFuture, 10.seconds)
 
     response shouldBe Symbol("right")
   }

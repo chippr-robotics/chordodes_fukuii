@@ -2,17 +2,16 @@ package com.chipprbots.ethereum.consensus
 
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 import scala.language.postfixOps
-
-import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.flatspec.AnyFlatSpec
-import org.scalatest.matchers.should.Matchers
 
 import org.scalamock.handlers.CallHandler0
 import org.scalamock.handlers.CallHandler1
 import org.scalamock.handlers.CallHandler2
 import org.scalamock.handlers.CallHandler4
+import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Mocks
 import com.chipprbots.ethereum.Mocks.MockValidatorsAlwaysSucceed
@@ -21,12 +20,12 @@ import com.chipprbots.ethereum.blockchain.sync.regular.BlockImportFailed
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockImportedToTop
 import com.chipprbots.ethereum.blockchain.sync.regular.ChainReorganised
 import com.chipprbots.ethereum.blockchain.sync.regular.DuplicateBlock
-import com.chipprbots.ethereum.consensus.mining.*
+import com.chipprbots.ethereum.consensus.mining._
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderDifficultyError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderParentNotFoundError
-import com.chipprbots.ethereum.consensus.validators.*
+import com.chipprbots.ethereum.consensus.validators._
 import com.chipprbots.ethereum.db.storage.MptStorage
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.domain.branch.Branch
 import com.chipprbots.ethereum.domain.branch.EmptyBranch
 import com.chipprbots.ethereum.ledger.BlockData
@@ -39,7 +38,7 @@ import com.chipprbots.ethereum.ledger.OmmersTestSetup
 import com.chipprbots.ethereum.ledger.TestSetupWithVmAndValidators
 import com.chipprbots.ethereum.mpt.LeafNode
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 class ConsensusAdapterSpec
@@ -81,8 +80,8 @@ class ConsensusAdapterSpec
     setBestBlock(bestBlock)
     setChainWeightForBlock(bestBlock, currentWeight)
 
-    val newWeight = currentWeight.increaseTotalDifficulty(difficulty)
-    val blockData = BlockData(block, Seq.empty[Receipt], newWeight)
+    val newWeight: ChainWeight = currentWeight.increaseTotalDifficulty(difficulty)
+    val blockData: BlockData = BlockData(block, Seq.empty[Receipt], newWeight)
 
     // Just to bypass metrics needs
     blockchainReader.getBlockByHash.expects(*).anyNumberOfTimes().returning(None)
@@ -119,8 +118,8 @@ class ConsensusAdapterSpec
       .returning(Some(Leaf(hash, currentWeight.increase(block.header))))
     blockQueue.getBranch.expects(hash, true).returning(List(block))
 
-    val mptStorage = mock[MptStorage]
-    val mptNode = LeafNode(
+    val mptStorage: MptStorage = mock[MptStorage]
+    val mptNode: LeafNode = LeafNode(
       ByteString(MerklePatriciaTrie.EmptyRootHash),
       ByteString(MerklePatriciaTrie.EmptyRootHash),
       Some(MerklePatriciaTrie.EmptyRootHash),
@@ -151,8 +150,8 @@ class ConsensusAdapterSpec
     // After the post-PivotHeaderBootstrap fix, evaluateBranchBlock falls back to
     // getBestBlockHeader() when the full block isn't available. Both must report
     // None for the "no best block" scenario.
-    blockchainReader.getBestBlock.expects().returning(None)
-    blockchainReader.getBestBlockHeader.expects().returning(None)
+    (() => blockchainReader.getBestBlock).expects().returning(None)
+    (() => blockchainReader.getBestBlockHeader).expects().returning(None)
     setChainWeightForBlock(bestBlock, currentWeight)
 
     whenReady(consensusAdapter.evaluateBranchBlock(block).unsafeToFuture())(
@@ -198,11 +197,11 @@ class ConsensusAdapterSpec
     val oldBlock2: Block = getBlock(bestNum - 1, difficulty = 102, parent = block1.header.hash)
     val oldBlock3: Block = getBlock(bestNum, difficulty = 103, parent = oldBlock2.header.hash)
 
-    val weight1 = ChainWeight.totalDifficultyOnly(block1.header.difficulty + 999)
-    val newWeight2 = weight1.increase(newBlock2.header)
-    val newWeight3 = newWeight2.increase(newBlock3.header)
-    val oldWeight2 = weight1.increase(oldBlock2.header)
-    val oldWeight3 = oldWeight2.increase(oldBlock3.header)
+    val weight1: ChainWeight = ChainWeight.totalDifficultyOnly(block1.header.difficulty + 999)
+    val newWeight2: ChainWeight = weight1.increase(newBlock2.header)
+    val newWeight3: ChainWeight = newWeight2.increase(newBlock3.header)
+    val oldWeight2: ChainWeight = weight1.increase(oldBlock2.header)
+    val oldWeight3: ChainWeight = oldWeight2.increase(oldBlock3.header)
 
     blockchainWriter.save(block1, Nil, weight1, saveAsBestBlock = true)
     blockchainWriter.save(oldBlock2, receipts, oldWeight2, saveAsBestBlock = true)
@@ -211,18 +210,18 @@ class ConsensusAdapterSpec
     val ancestorForValidation: Block = getBlock(0, difficulty = 1)
     blockchainWriter.save(ancestorForValidation, Nil, ChainWeight.totalDifficultyOnly(1), saveAsBestBlock = false)
 
-    val oldBranch = List(oldBlock2, oldBlock3)
-    val newBranch = List(newBlock2, newBlock3)
-    val blockData2 = BlockData(newBlock2, Seq.empty[Receipt], newWeight2)
-    val blockData3 = BlockData(newBlock3, Seq.empty[Receipt], newWeight3)
+    val oldBranch: List[Block] = List(oldBlock2, oldBlock3)
+    val newBranch: List[Block] = List(newBlock2, newBlock3)
+    val blockData2: BlockData = BlockData(newBlock2, Seq.empty[Receipt], newWeight2)
+    val blockData3: BlockData = BlockData(newBlock3, Seq.empty[Receipt], newWeight3)
 
-    val mockExecution = mock[BlockExecution]
+    val mockExecution: BlockExecution = mock[BlockExecution]
     (mockExecution
       .executeAndValidateBlocks(_: List[Block], _: ChainWeight)(_: BlockchainConfig))
       .expects(newBranch, *, *)
       .returning((List(blockData2, blockData3), None))
 
-    val withMockedBlockExecution = blockImportWithMockedBlockExecution(mockExecution)
+    val withMockedBlockExecution: ConsensusAdapter = blockImportWithMockedBlockExecution(mockExecution)
     whenReady(withMockedBlockExecution.evaluateBranchBlock(newBlock3).unsafeToFuture())(
       _ shouldEqual BlockEnqueued
     )
@@ -234,7 +233,7 @@ class ConsensusAdapterSpec
     blockchainWriter.save(blockData2.block, blockData2.receipts, blockData2.weight, saveAsBestBlock = true)
     blockchainWriter.save(blockData3.block, blockData3.receipts, blockData3.weight, saveAsBestBlock = true)
 
-    blockchainReader.getBestBlock().get shouldEqual newBlock3
+    blockchainReader.getBestBlock.get shouldEqual newBlock3
     blockchainReader.getChainWeightByHash(newBlock3.header.hash) shouldEqual Some(newWeight3)
 
     blockQueue.isQueued(oldBlock2.header.hash) shouldBe true
@@ -248,11 +247,11 @@ class ConsensusAdapterSpec
     val oldBlock2: Block = getBlock(bestNum - 1, difficulty = 102, parent = block1.header.hash)
     val oldBlock3: Block = getBlock(bestNum, difficulty = 103, parent = oldBlock2.header.hash)
 
-    val weight1 = ChainWeight.totalDifficultyOnly(block1.header.difficulty + 999)
-    val newWeight2 = weight1.increase(newBlock2.header)
+    val weight1: ChainWeight = ChainWeight.totalDifficultyOnly(block1.header.difficulty + 999)
+    val newWeight2: ChainWeight = weight1.increase(newBlock2.header)
     newWeight2.increase(newBlock3.header)
-    val oldWeight2 = weight1.increase(oldBlock2.header)
-    val oldWeight3 = oldWeight2.increase(oldBlock3.header)
+    val oldWeight2: ChainWeight = weight1.increase(oldBlock2.header)
+    val oldWeight3: ChainWeight = oldWeight2.increase(oldBlock3.header)
 
     blockchainWriter.save(block1, Nil, weight1, saveAsBestBlock = true)
     blockchainWriter.save(oldBlock2, receipts, oldWeight2, saveAsBestBlock = true)
@@ -261,10 +260,10 @@ class ConsensusAdapterSpec
     val ancestorForValidation: Block = getBlock(0, difficulty = 1)
     blockchainWriter.save(ancestorForValidation, Nil, ChainWeight.totalDifficultyOnly(1), saveAsBestBlock = false)
 
-    val newBranch = List(newBlock2, newBlock3)
-    val blockData2 = BlockData(newBlock2, Seq.empty[Receipt], newWeight2)
+    val newBranch: List[Block] = List(newBlock2, newBlock3)
+    val blockData2: BlockData = BlockData(newBlock2, Seq.empty[Receipt], newWeight2)
 
-    val mockExecution = mock[BlockExecution]
+    val mockExecution: BlockExecution = mock[BlockExecution]
     // simulate execute-first: the mock must persist newBlock2 (the block that succeeds)
     // exactly as real executeAndValidateBlocks does — otherwise saveBestKnownBlocks updates
     // the chain pointer to a hash that isn't in the DB and getBestBlock() returns None
@@ -276,7 +275,7 @@ class ConsensusAdapterSpec
         (List(blockData2), Some(execError))
       }
 
-    val withMockedBlockExecution = blockImportWithMockedBlockExecution(mockExecution)
+    val withMockedBlockExecution: ConsensusAdapter = blockImportWithMockedBlockExecution(mockExecution)
     whenReady(withMockedBlockExecution.evaluateBranchBlock(newBlock3).unsafeToFuture())(
       _ shouldEqual BlockEnqueued
     )
@@ -285,7 +284,7 @@ class ConsensusAdapterSpec
     }
 
     // execute-first: chain advances to the last successfully executed block, not reverted
-    blockchainReader.getBestBlock().get shouldEqual newBlock2
+    blockchainReader.getBestBlock.get shouldEqual newBlock2
     blockchainReader.getChainWeightByHash(newBlock2.header.hash) shouldEqual Some(newWeight2)
 
     blockQueue.isQueued(newBlock2.header.hash) shouldBe true
@@ -336,7 +335,7 @@ class ConsensusAdapterSpec
     UnitTest,
     ConsensusTest
   ) in new ImportBlockTestSetupImpl {
-    val genesisBlock = Block(genesisHeader, BlockBody.empty)
+    val genesisBlock: Block = Block(genesisHeader, BlockBody.empty)
 
     setBestBlock(genesisBlock)
     setBlockExists(genesisBlock, inChain = true, inQueue = true)
@@ -358,12 +357,12 @@ class ConsensusAdapterSpec
     val newBlock3WithOmmer: Block =
       getBlock(bestNum, difficulty = 105, parent = newBlock2.header.hash, ommers = Seq(ommerBlock.header))
 
-    val weight1 = ChainWeight.totalDifficultyOnly(block1.header.difficulty + 999)
-    val oldWeight2 = weight1.increase(oldBlock2.header)
-    val oldWeight3 = oldWeight2.increase(oldBlock3.header)
+    val weight1: ChainWeight = ChainWeight.totalDifficultyOnly(block1.header.difficulty + 999)
+    val oldWeight2: ChainWeight = weight1.increase(oldBlock2.header)
+    val oldWeight3: ChainWeight = oldWeight2.increase(oldBlock3.header)
 
-    val newWeight2 = weight1.increase(newBlock2.header)
-    val newWeight3 = newWeight2.increase(newBlock3WithOmmer.header)
+    val newWeight2: ChainWeight = weight1.increase(newBlock2.header)
+    val newWeight3: ChainWeight = newWeight2.increase(newBlock3WithOmmer.header)
 
     blockchainWriter.save(ancestorForValidation, Nil, ChainWeight.totalDifficultyOnly(1), saveAsBestBlock = false)
     blockchainWriter.save(ancestorForValidation1, Nil, ChainWeight.totalDifficultyOnly(3), saveAsBestBlock = false)
@@ -373,18 +372,18 @@ class ConsensusAdapterSpec
     blockchainWriter.save(oldBlock2, receipts, oldWeight2, saveAsBestBlock = true)
     blockchainWriter.save(oldBlock3, Nil, oldWeight3, saveAsBestBlock = true)
 
-    val oldBranch = List(oldBlock2, oldBlock3)
-    val newBranch = List(newBlock2, newBlock3WithOmmer)
-    val blockData2 = BlockData(newBlock2, Seq.empty[Receipt], newWeight2)
-    val blockData3 = BlockData(newBlock3WithOmmer, Seq.empty[Receipt], newWeight3)
+    val oldBranch: List[Block] = List(oldBlock2, oldBlock3)
+    val newBranch: List[Block] = List(newBlock2, newBlock3WithOmmer)
+    val blockData2: BlockData = BlockData(newBlock2, Seq.empty[Receipt], newWeight2)
+    val blockData3: BlockData = BlockData(newBlock3WithOmmer, Seq.empty[Receipt], newWeight3)
 
-    val mockExecution = mock[BlockExecution]
+    val mockExecution: BlockExecution = mock[BlockExecution]
     (mockExecution
       .executeAndValidateBlocks(_: List[Block], _: ChainWeight)(_: BlockchainConfig))
       .expects(newBranch, *, *)
       .returning((List(blockData2, blockData3), None))
 
-    val withMockedBlockExecution = blockImportWithMockedBlockExecution(mockExecution)
+    val withMockedBlockExecution: ConsensusAdapter = blockImportWithMockedBlockExecution(mockExecution)
     whenReady(withMockedBlockExecution.evaluateBranchBlock(newBlock2).unsafeToFuture())(
       _ shouldEqual BlockEnqueued
     )
@@ -396,17 +395,17 @@ class ConsensusAdapterSpec
     blockchainWriter.save(blockData2.block, blockData2.receipts, blockData2.weight, saveAsBestBlock = true)
     blockchainWriter.save(blockData3.block, blockData3.receipts, blockData3.weight, saveAsBestBlock = true)
 
-    blockchainReader.getBestBlock().get shouldEqual newBlock3WithOmmer
+    blockchainReader.getBestBlock.get shouldEqual newBlock3WithOmmer
   }
 
   it should "dequeue blocks where there is an execution error" taggedAs (
     UnitTest,
     ConsensusTest
   ) in new EphemBlockchain {
-    val mockExecution = mock[BlockExecution]
+    val mockExecution: BlockExecution = mock[BlockExecution]
 
     val currentBestBlock: Block = getBlock(bestNum - 2)
-    val block1Weight = ChainWeight.totalDifficultyOnly(currentBestBlock.header.difficulty + 999)
+    val block1Weight: ChainWeight = ChainWeight.totalDifficultyOnly(currentBestBlock.header.difficulty + 999)
 
     blockchainWriter.save(currentBestBlock, Nil, block1Weight, saveAsBestBlock = true)
 
@@ -417,7 +416,7 @@ class ConsensusAdapterSpec
       .executeAndValidateBlocks(_: List[Block], _: ChainWeight)(_: BlockchainConfig))
       .expects(List(newBlock1, newBlock2), *, *)
       .returning((Nil, Some(execError)))
-    val consensusAdapterWithFailingExecution = blockImportWithMockedBlockExecution(mockExecution)
+    val consensusAdapterWithFailingExecution: ConsensusAdapter = blockImportWithMockedBlockExecution(mockExecution)
 
     whenReady(consensusAdapterWithFailingExecution.evaluateBranchBlock(newBlock2).unsafeToFuture()) { result =>
       result shouldEqual BlockEnqueued
@@ -435,7 +434,7 @@ class ConsensusAdapterSpec
     UnitTest,
     ConsensusTest
   ) in new EphemBlockchain {
-    val mockExecution = mock[BlockExecution]
+    val mockExecution: BlockExecution = mock[BlockExecution]
 
     val currentBestBlock: Block = getBlock(bestNum)
 
@@ -449,7 +448,7 @@ class ConsensusAdapterSpec
       .executeAndValidateBlocks(_: List[Block], _: ChainWeight)(_: BlockchainConfig))
       .expects(List(newBlock1, newBlock2), *, *)
       .returning((Nil, Some(execError)))
-    val consensusAdapterWithFailingExecution = blockImportWithMockedBlockExecution(mockExecution)
+    val consensusAdapterWithFailingExecution: ConsensusAdapter = blockImportWithMockedBlockExecution(mockExecution)
 
     whenReady(consensusAdapterWithFailingExecution.evaluateBranchBlock(newBlock2).unsafeToFuture()) { result =>
       result shouldEqual BlockEnqueued
@@ -470,7 +469,7 @@ class ConsensusAdapterSpec
   }
 
   it should "dequeue blocks that are children of a failing block taggedAs (UnitTest, ConsensusTest) in case of partial execution" in new EphemBlockchain {
-    val mockExecution = mock[BlockExecution]
+    val mockExecution: BlockExecution = mock[BlockExecution]
 
     val currentBestBlock: Block = getBlock(bestNum)
 
@@ -485,7 +484,7 @@ class ConsensusAdapterSpec
       .executeAndValidateBlocks(_: List[Block], _: ChainWeight)(_: BlockchainConfig))
       .expects(List(newBlock1, newBlock2, newBlock3), *, *)
       .returning((List(BlockData(newBlock1, Nil, currentWeight.increase(newBlock1.header))), Some(execError)))
-    val consensusAdapterWithFailingExecution = blockImportWithMockedBlockExecution(mockExecution)
+    val consensusAdapterWithFailingExecution: ConsensusAdapter = blockImportWithMockedBlockExecution(mockExecution)
 
     whenReady(consensusAdapterWithFailingExecution.evaluateBranchBlock(newBlock2).unsafeToFuture()) { result =>
       result shouldEqual BlockEnqueued
@@ -509,7 +508,7 @@ class ConsensusAdapterSpec
   }
 
   it should "dequeue blocks that are children of a failing block taggedAs (UnitTest, ConsensusTest) in case of partial execution during a reorganisation" in new EphemBlockchain {
-    val mockExecution = mock[BlockExecution]
+    val mockExecution: BlockExecution = mock[BlockExecution]
 
     val currentBestBlock: Block = getBlock(bestNum)
     val block1: Block = getBlock(bestNum + 1, difficulty = 101, parent = currentBestBlock.header.hash)
@@ -526,7 +525,7 @@ class ConsensusAdapterSpec
       .executeAndValidateBlocks(_: List[Block], _: ChainWeight)(_: BlockchainConfig))
       .expects(List(badBlock, newBlock3), *, *)
       .returning((Nil, Some(execError)))
-    val consensusAdapterWithFailingExecution = blockImportWithMockedBlockExecution(mockExecution)
+    val consensusAdapterWithFailingExecution: ConsensusAdapter = blockImportWithMockedBlockExecution(mockExecution)
 
     whenReady(consensusAdapterWithFailingExecution.evaluateBranchBlock(newBlock3).unsafeToFuture()) { result =>
       result shouldEqual BlockEnqueued
@@ -553,7 +552,7 @@ class ConsensusAdapterSpec
     override lazy val mockBlockQueue: BlockQueue = mock[BlockQueue]
 
     // Setup default expectations
-    blockchainReader.getBestBranch.expects().anyNumberOfTimes().returning(EmptyBranch)
+    (() => blockchainReader.getBestBranch).expects().anyNumberOfTimes().returning(EmptyBranch)
 
     // Helper methods implementation (have MockFactory context here)
     override def setBlockExists(block: Block, inChain: Boolean, inQueue: Boolean): CallHandler1[ByteString, Boolean] = {
@@ -565,12 +564,12 @@ class ConsensusAdapterSpec
     }
 
     override def setBestBlock(block: Block): CallHandler0[BigInt] = {
-      blockchainReader.getBestBlock.expects().anyNumberOfTimes().returning(Some(block))
-      blockchainReader.getBestBlockNumber.expects().anyNumberOfTimes().returning(block.header.number)
+      (() => blockchainReader.getBestBlock).expects().anyNumberOfTimes().returning(Some(block))
+      (() => blockchainReader.getBestBlockNumber).expects().anyNumberOfTimes().returning(block.header.number)
     }
 
     override def setBestBlockNumber(num: BigInt): CallHandler0[BigInt] =
-      blockchainReader.getBestBlockNumber.expects().returning(num)
+      (() => blockchainReader.getBestBlockNumber).expects().returning(num)
 
     override def setChainWeightForBlock(
         block: Block,

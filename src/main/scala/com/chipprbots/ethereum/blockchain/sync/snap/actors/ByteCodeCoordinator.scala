@@ -1,27 +1,25 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
-import org.apache.pekko.actor.{
-  Actor,
-  ActorLogging,
-  ActorRef,
-  Cancellable,
-  Props,
-  SupervisorStrategy,
-  OneForOneStrategy,
-  Terminated
-}
-import org.apache.pekko.actor.SupervisorStrategy.*
+import org.apache.pekko.actor.Actor
+import org.apache.pekko.actor.ActorLogging
+import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.Cancellable
+import org.apache.pekko.actor.OneForOneStrategy
+import org.apache.pekko.actor.Props
+import org.apache.pekko.actor.SupervisorStrategy
+import org.apache.pekko.actor.SupervisorStrategy._
+import org.apache.pekko.actor.Terminated
 import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
-import com.chipprbots.ethereum.blockchain.sync.snap.*
+import com.chipprbots.ethereum.blockchain.sync.snap._
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
+import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.ByteCodes
-import com.chipprbots.ethereum.domain.Account
 
 /** ByteCodeCoordinator manages bytecode download workers.
   *

@@ -12,13 +12,13 @@ import org.bouncycastle.util.encoders.Hex
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.crypto.*
+import com.chipprbots.ethereum.crypto._
 import com.chipprbots.ethereum.network.rlpx.AuthHandshakeSuccess
 import com.chipprbots.ethereum.network.rlpx.AuthHandshaker
 import com.chipprbots.ethereum.network.rlpx.AuthResponseMessage
 import com.chipprbots.ethereum.network.rlpx.Secrets
 import com.chipprbots.ethereum.security.SecureRandomBuilder
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 class AuthHandshakerSpec extends AnyFlatSpec with Matchers with SecureRandomBuilder {
 

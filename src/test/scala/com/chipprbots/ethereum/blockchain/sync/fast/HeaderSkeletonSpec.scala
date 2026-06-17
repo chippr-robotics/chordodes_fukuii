@@ -1,10 +1,10 @@
 package com.chipprbots.ethereum.blockchain.sync.fast
 
+import org.scalatest.ParallelTestExecution
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.ParallelTestExecution
 
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 class HeaderSkeletonSpec extends AnyWordSpec with Matchers with ParallelTestExecution {
 

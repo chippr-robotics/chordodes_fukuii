@@ -12,7 +12,7 @@ import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.Codes
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.security.SecureRandomBuilder
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 /** Verifies that EthereumMessageDecoder dispatches to ETH68/ETH69 decoders.
   *
@@ -55,12 +55,12 @@ class MessageDecodersSpec extends AnyFlatSpec with Matchers with SecureRandomBui
   it should "reject GetNodeData in ETH68 (EIP-4938 removal)" taggedAs (UnitTest, NetworkTest) in {
     // GetNodeData was removed in ETH68. The decoder returns a MalformedMessageError.
     val result = decode(Capability.ETH68).fromBytes(Codes.GetNodeDataCode, Array.emptyByteArray)
-    result shouldBe a[Left[_, _]]
+    result shouldBe a[Left[?, ?]]
   }
 
   it should "reject NodeData in ETH68 (EIP-4938 removal)" taggedAs (UnitTest, NetworkTest) in {
     val result = decode(Capability.ETH68).fromBytes(Codes.NodeDataCode, Array.emptyByteArray)
-    result shouldBe a[Left[_, _]]
+    result shouldBe a[Left[?, ?]]
   }
 
   it should "decode NewBlock in ETH68" taggedAs (UnitTest, NetworkTest) in {
@@ -76,6 +76,6 @@ class MessageDecodersSpec extends AnyFlatSpec with Matchers with SecureRandomBui
   }
 
   it should "return error for unknown message code in ETH68" taggedAs (UnitTest, NetworkTest) in {
-    decode(Capability.ETH68).fromBytes(0xff, Array.emptyByteArray) shouldBe a[Left[_, _]]
+    decode(Capability.ETH68).fromBytes(0xff, Array.emptyByteArray) shouldBe a[Left[?, ?]]
   }
 }

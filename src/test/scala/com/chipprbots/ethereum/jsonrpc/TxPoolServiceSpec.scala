@@ -6,22 +6,42 @@ import org.apache.pekko.testkit.TestProbe
 
 import cats.effect.unsafe.IORuntime
 
+import scala.concurrent.duration._
+
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import scala.concurrent.duration.*
-
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.NormalPatience
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.domain.SignedTransactionWithSender
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransaction
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransactionsResponse
-import com.chipprbots.ethereum.domain.SignedTransactionWithSender
-import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.BlockchainConfig
+import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.TxPoolConfig
+import scala.concurrent.Future
+import scala.concurrent.Future
+import scala.concurrent.Future
+import scala.concurrent.Future
+import scala.concurrent.Future
+import scala.concurrent.Future
+import scala.concurrent.Future
+import scala.concurrent.Future
+import scala.concurrent.Future
+import scala.concurrent.Future
+import scala.concurrent.Future
+import scala.concurrent.Future
+import scala.concurrent.Future
+import scala.concurrent.Future
+import scala.concurrent.Future
+import scala.concurrent.Future
+import scala.concurrent.Future
+import scala.concurrent.Future
+import scala.concurrent.Future
+import scala.concurrent.Future
 
 /** Unit tests for TxPoolService.
   *
@@ -61,27 +81,27 @@ class TxPoolServiceSpec
   }
 
   trait TestSetup {
-    val probe = TestProbe()
+    val probe: TestProbe = TestProbe()
     val service = new TxPoolService(probe.ref, 5.seconds, txPoolConfig)
   }
 
   // ── besuTransactions ────────────────────────────────────────────────────────
 
   "TxPoolService.besuTransactions" should "return all pending transactions" taggedAs UnitTest in new TestSetup {
-    val pts = txList.map(makePendingTx(_))
+    val pts: Seq[PendingTransaction] = txList.map(makePendingTx(_))
 
-    val future = service.besuTransactions(TxPoolBesuTransactionsRequest()).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolBesuTransactionsResponse]] = service.besuTransactions(TxPoolBesuTransactionsRequest()).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
-    result shouldBe a[Right[_, _]]
+    result shouldBe a[Right[?, ?]]
     result.toOption.get.pendingTransactions should have size 4
   }
 
   it should "return empty list when pool is empty" taggedAs UnitTest in new TestSetup {
-    val future = service.besuTransactions(TxPoolBesuTransactionsRequest()).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolBesuTransactionsResponse]] = service.besuTransactions(TxPoolBesuTransactionsRequest()).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(Seq.empty))
@@ -92,15 +112,15 @@ class TxPoolServiceSpec
   // ── besuStatistics ──────────────────────────────────────────────────────────
 
   "TxPoolService.besuStatistics" should "count remote txs (receivedFromLocalSource=false)" taggedAs UnitTest in new TestSetup {
-    val pts = txList.map(makePendingTx(_)) // all remote (default)
+    val pts: Seq[PendingTransaction] = txList.map(makePendingTx(_)) // all remote (default)
 
-    val future = service.besuStatistics(TxPoolBesuStatisticsRequest()).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolBesuStatisticsResponse]] = service.besuStatistics(TxPoolBesuStatisticsRequest()).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
-    result shouldBe a[Right[_, _]]
+    result shouldBe a[Right[?, ?]]
     val stats = result.toOption.get
     stats.maxSize shouldBe 4096L
     stats.localCount shouldBe 0L
@@ -109,16 +129,16 @@ class TxPoolServiceSpec
 
   it should "count local txs (receivedFromLocalSource=true) separately from remote" taggedAs UnitTest in new TestSetup {
     // 1 local (via AddOrOverrideTransaction), 3 remote (via AddTransactions)
-    val localPt = makePendingTx(txList.head, local = true)
-    val remotePts = txList.tail.map(makePendingTx(_))
+    val localPt: PendingTransaction = makePendingTx(txList.head, local = true)
+    val remotePts: Seq[PendingTransaction] = txList.tail.map(makePendingTx(_))
 
-    val future = service.besuStatistics(TxPoolBesuStatisticsRequest()).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolBesuStatisticsResponse]] = service.besuStatistics(TxPoolBesuStatisticsRequest()).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(localPt +: remotePts))
 
     val result = future.futureValue
-    result shouldBe a[Right[_, _]]
+    result shouldBe a[Right[?, ?]]
     val stats = result.toOption.get
     stats.maxSize shouldBe 4096L
     stats.localCount shouldBe 1L
@@ -126,7 +146,7 @@ class TxPoolServiceSpec
   }
 
   it should "report all counts=0 for an empty pool" taggedAs UnitTest in new TestSetup {
-    val future = service.besuStatistics(TxPoolBesuStatisticsRequest()).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolBesuStatisticsResponse]] = service.besuStatistics(TxPoolBesuStatisticsRequest()).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(Seq.empty))
@@ -139,41 +159,41 @@ class TxPoolServiceSpec
   // ── besuPendingTransactions ─────────────────────────────────────────────────
 
   "TxPoolService.besuPendingTransactions" should "return all txs when no limit or filter given" taggedAs UnitTest in new TestSetup {
-    val pts = txList.map(makePendingTx(_))
+    val pts: Seq[PendingTransaction] = txList.map(makePendingTx(_))
 
-    val future =
+    val future: Future[Either[JsonRpcError, TxPoolBesuPendingTransactionsResponse]] =
       service.besuPendingTransactions(TxPoolBesuPendingTransactionsRequest(None)).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
-    result shouldBe a[Right[_, _]]
+    result shouldBe a[Right[?, ?]]
     result.toOption.get.pendingTransactions should have size 4
   }
 
   it should "honour the limit parameter" taggedAs UnitTest in new TestSetup {
-    val pts = txList.map(makePendingTx(_))
+    val pts: Seq[PendingTransaction] = txList.map(makePendingTx(_))
 
-    val future =
+    val future: Future[Either[JsonRpcError, TxPoolBesuPendingTransactionsResponse]] =
       service.besuPendingTransactions(TxPoolBesuPendingTransactionsRequest(Some(1))).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
-    result shouldBe a[Right[_, _]]
+    result shouldBe a[Right[?, ?]]
     result.toOption.get.pendingTransactions should have size 1
   }
 
   it should "filter by nonce eq" taggedAs UnitTest in new TestSetup {
-    val pts = txList.map(makePendingTx(_))
+    val pts: Seq[PendingTransaction] = txList.map(makePendingTx(_))
     // nonces are 438550, 438551, 438552, 438553 — eq 438551 returns 1 tx
-    val params = TxPoolBesuPendingTransactionsParams(
+    val params: TxPoolBesuPendingTransactionsParams = TxPoolBesuPendingTransactionsParams(
       Seq(TxPoolFilter("nonce", Eq, "438551"))
     )
 
-    val future =
+    val future: Future[Either[JsonRpcError, TxPoolBesuPendingTransactionsResponse]] =
       service
         .besuPendingTransactions(TxPoolBesuPendingTransactionsRequest(None, Some(params)))
         .unsafeToFuture()
@@ -182,18 +202,18 @@ class TxPoolServiceSpec
     probe.reply(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
-    result shouldBe a[Right[_, _]]
+    result shouldBe a[Right[?, ?]]
     result.toOption.get.pendingTransactions should have size 1
   }
 
   it should "filter by nonce gt" taggedAs UnitTest in new TestSetup {
-    val pts = txList.map(makePendingTx(_))
+    val pts: Seq[PendingTransaction] = txList.map(makePendingTx(_))
     // nonces 438550-438553; gt 438551 returns 438552 and 438553
-    val params = TxPoolBesuPendingTransactionsParams(
+    val params: TxPoolBesuPendingTransactionsParams = TxPoolBesuPendingTransactionsParams(
       Seq(TxPoolFilter("nonce", Gt, "438551"))
     )
 
-    val future =
+    val future: Future[Either[JsonRpcError, TxPoolBesuPendingTransactionsResponse]] =
       service
         .besuPendingTransactions(TxPoolBesuPendingTransactionsRequest(None, Some(params)))
         .unsafeToFuture()
@@ -202,18 +222,18 @@ class TxPoolServiceSpec
     probe.reply(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
-    result shouldBe a[Right[_, _]]
+    result shouldBe a[Right[?, ?]]
     result.toOption.get.pendingTransactions should have size 2
   }
 
   it should "filter by gasLimit eq (hex)" taggedAs UnitTest in new TestSetup {
-    val pts = txList.map(makePendingTx(_))
+    val pts: Seq[PendingTransaction] = txList.map(makePendingTx(_))
     // all txs have gasLimit=50000=0xC350
-    val params = TxPoolBesuPendingTransactionsParams(
+    val params: TxPoolBesuPendingTransactionsParams = TxPoolBesuPendingTransactionsParams(
       Seq(TxPoolFilter("gas", Eq, "0xC350"))
     )
 
-    val future =
+    val future: Future[Either[JsonRpcError, TxPoolBesuPendingTransactionsResponse]] =
       service
         .besuPendingTransactions(TxPoolBesuPendingTransactionsRequest(None, Some(params)))
         .unsafeToFuture()
@@ -222,18 +242,18 @@ class TxPoolServiceSpec
     probe.reply(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
-    result shouldBe a[Right[_, _]]
+    result shouldBe a[Right[?, ?]]
     result.toOption.get.pendingTransactions should have size 4
   }
 
   it should "filter by to action (contract creation) returns empty when all txs have recipients" taggedAs UnitTest in new TestSetup {
-    val pts = txList.map(makePendingTx(_))
+    val pts: Seq[PendingTransaction] = txList.map(makePendingTx(_))
     // all Block3125369 txs have receivingAddress — none are contract creation
-    val params = TxPoolBesuPendingTransactionsParams(
+    val params: TxPoolBesuPendingTransactionsParams = TxPoolBesuPendingTransactionsParams(
       Seq(TxPoolFilter("to", Action, "deploy"))
     )
 
-    val future =
+    val future: Future[Either[JsonRpcError, TxPoolBesuPendingTransactionsResponse]] =
       service
         .besuPendingTransactions(TxPoolBesuPendingTransactionsRequest(None, Some(params)))
         .unsafeToFuture()
@@ -242,18 +262,18 @@ class TxPoolServiceSpec
     probe.reply(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
-    result shouldBe a[Right[_, _]]
+    result shouldBe a[Right[?, ?]]
     result.toOption.get.pendingTransactions should have size 0
   }
 
   it should "apply filter and limit together" taggedAs UnitTest in new TestSetup {
-    val pts = txList.map(makePendingTx(_))
+    val pts: Seq[PendingTransaction] = txList.map(makePendingTx(_))
     // nonce gt 438550 returns 3 txs (438551, 438552, 438553); limit=2 keeps first 2
-    val params = TxPoolBesuPendingTransactionsParams(
+    val params: TxPoolBesuPendingTransactionsParams = TxPoolBesuPendingTransactionsParams(
       Seq(TxPoolFilter("nonce", Gt, "438550"))
     )
 
-    val future =
+    val future: Future[Either[JsonRpcError, TxPoolBesuPendingTransactionsResponse]] =
       service
         .besuPendingTransactions(TxPoolBesuPendingTransactionsRequest(Some(2), Some(params)))
         .unsafeToFuture()
@@ -262,22 +282,22 @@ class TxPoolServiceSpec
     probe.reply(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
-    result shouldBe a[Right[_, _]]
+    result shouldBe a[Right[?, ?]]
     result.toOption.get.pendingTransactions should have size 2
   }
 
   // ── content (geth-compat) ────────────────────────────────────────────────────
 
   "TxPoolService.content" should "group pending txs by sender → nonce with empty queued" taggedAs UnitTest in new TestSetup {
-    val pts = txList.map(makePendingTx(_))
+    val pts: Seq[PendingTransaction] = txList.map(makePendingTx(_))
 
-    val future = service.content(TxPoolContentRequest()).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolContentResponse]] = service.content(TxPoolContentRequest()).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
-    result shouldBe a[Right[_, _]]
+    result shouldBe a[Right[?, ?]]
     val resp = result.toOption.get
     resp.queued shouldBe empty
     // all 4 txs are present across senders
@@ -289,7 +309,7 @@ class TxPoolServiceSpec
   }
 
   it should "return empty pending and queued for an empty pool" taggedAs UnitTest in new TestSetup {
-    val future = service.content(TxPoolContentRequest()).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolContentResponse]] = service.content(TxPoolContentRequest()).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(Seq.empty))
@@ -300,16 +320,16 @@ class TxPoolServiceSpec
   // ── contentFrom (geth-compat) ────────────────────────────────────────────────
 
   "TxPoolService.contentFrom" should "return only txs from the requested sender" taggedAs UnitTest in new TestSetup {
-    val pts = txList.map(makePendingTx(_))
+    val pts: Seq[PendingTransaction] = txList.map(makePendingTx(_))
     val target = pts.head.stx.senderAddress
 
-    val future = service.contentFrom(TxPoolContentFromRequest(target)).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolContentFromResponse]] = service.contentFrom(TxPoolContentFromRequest(target)).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
-    result shouldBe a[Right[_, _]]
+    result shouldBe a[Right[?, ?]]
     val resp = result.toOption.get
     resp.queued shouldBe empty
     // all returned txs belong to target sender
@@ -321,10 +341,10 @@ class TxPoolServiceSpec
 
   it should "return empty maps for an address not in the pool" taggedAs UnitTest in new TestSetup {
     import com.chipprbots.ethereum.domain.Address
-    val pts = txList.map(makePendingTx(_))
-    val absent = Address("0x1234567890123456789012345678901234567890")
+    val pts: Seq[PendingTransaction] = txList.map(makePendingTx(_))
+    val absent: Address = Address("0x1234567890123456789012345678901234567890")
 
-    val future = service.contentFrom(TxPoolContentFromRequest(absent)).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolContentFromResponse]] = service.contentFrom(TxPoolContentFromRequest(absent)).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(pts))
@@ -335,9 +355,9 @@ class TxPoolServiceSpec
   // ── status (geth-compat) ──────────────────────────────────────────────────────
 
   "TxPoolService.status" should "return pending count and queued=0" taggedAs UnitTest in new TestSetup {
-    val pts = txList.map(makePendingTx(_))
+    val pts: Seq[PendingTransaction] = txList.map(makePendingTx(_))
 
-    val future = service.status(TxPoolStatusRequest()).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolStatusResponse]] = service.status(TxPoolStatusRequest()).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(pts))
@@ -346,7 +366,7 @@ class TxPoolServiceSpec
   }
 
   it should "return 0/0 for an empty pool" taggedAs UnitTest in new TestSetup {
-    val future = service.status(TxPoolStatusRequest()).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolStatusResponse]] = service.status(TxPoolStatusRequest()).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(Seq.empty))
@@ -357,15 +377,15 @@ class TxPoolServiceSpec
   // ── inspect (geth-compat) ──────────────────────────────────────────────────────
 
   "TxPoolService.inspect" should "produce summary strings in core-geth format" taggedAs UnitTest in new TestSetup {
-    val pts = txList.map(makePendingTx(_))
+    val pts: Seq[PendingTransaction] = txList.map(makePendingTx(_))
 
-    val future = service.inspect(TxPoolInspectRequest()).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolInspectResponse]] = service.inspect(TxPoolInspectRequest()).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
-    result shouldBe a[Right[_, _]]
+    result shouldBe a[Right[?, ?]]
     val resp = result.toOption.get
     resp.queued shouldBe empty
     // all 4 txs appear across senders
@@ -381,15 +401,15 @@ class TxPoolServiceSpec
     // Build a contract creation tx (no receivingAddress) using the first Block3125369 tx as template
     // We reuse the fixtures tx but verify the summary branch; the simplest approach is to verify
     // that real txs (which all have recipients) produce the "0x<addr>: ..." format, not "contract creation"
-    val pts = txList.map(makePendingTx(_))
+    val pts: Seq[PendingTransaction] = txList.map(makePendingTx(_))
 
-    val future = service.inspect(TxPoolInspectRequest()).unsafeToFuture()
+    val future: Future[Either[JsonRpcError, TxPoolInspectResponse]] = service.inspect(TxPoolInspectRequest()).unsafeToFuture()
 
     probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
     probe.reply(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
-    result shouldBe a[Right[_, _]]
+    result shouldBe a[Right[?, ?]]
     // Block3125369 txs all have recipients — no "contract creation" in any summary
     result.toOption.get.pending.values.flatMap(_.values).foreach { summary =>
       (summary should not).startWith("contract creation")

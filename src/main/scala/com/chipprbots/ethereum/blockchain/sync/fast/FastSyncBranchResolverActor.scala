@@ -8,7 +8,7 @@ import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.actor.Terminated
 import org.apache.pekko.actor.Timers
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
@@ -25,8 +25,8 @@ import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.Codes
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders as ETH68BlockHeaders
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders as ETH68GetBlockHeaders
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{BlockHeaders => ETH68BlockHeaders}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{GetBlockHeaders => ETH68GetBlockHeaders}
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 class FastSyncBranchResolverActor(
@@ -61,9 +61,9 @@ class FastSyncBranchResolverActor(
         log.debug(
           "Starting branch resolution now with peer {} and block number {}",
           peerWithInfo,
-          blockchainReader.getBestBlockNumber()
+          blockchainReader.getBestBlockNumber
         )
-        requestRecentBlockHeaders(peer, blockchainReader.getBestBlockNumber())
+        requestRecentBlockHeaders(peer, blockchainReader.getBestBlockNumber)
       case None =>
         log.info("Waiting for peers, rescheduling StartBranchResolver")
         timers.startSingleTimer(RestartTimerKey, StartBranchResolver, 1.second)

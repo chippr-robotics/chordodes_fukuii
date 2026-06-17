@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.jsonrpc
 
 import cats.effect.IO
 
-import com.chipprbots.ethereum.jsonrpc.NetService.*
+import com.chipprbots.ethereum.jsonrpc.NetService._
 
 /** Manual test double for NetServiceAPI.
   *

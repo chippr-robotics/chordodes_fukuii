@@ -1,11 +1,13 @@
 package com.chipprbots.ethereum.ethtest
 
 import java.io.File
-import io.circe.parser.*
+
 import scala.io.Source
 import scala.util.Using
 
-import com.chipprbots.ethereum.testing.Tags.*
+import io.circe.parser._
+
+import com.chipprbots.ethereum.testing.Tags._
 
 /** Test suite for ethereum/tests VMTests category
   *
@@ -44,7 +46,7 @@ class VMTestsSpec extends EthereumTestsSpec {
     )
 
   // Supported networks (pre-Spiral fork only)
-  val supportedNetworks = Set(
+  val supportedNetworks: Set[String] = Set(
     "Frontier",
     "Homestead",
     "EIP150", // Tangerine Whistle

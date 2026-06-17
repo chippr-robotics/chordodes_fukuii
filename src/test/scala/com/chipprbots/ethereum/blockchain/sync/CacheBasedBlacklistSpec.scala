@@ -2,16 +2,16 @@ package com.chipprbots.ethereum.blockchain.sync
 
 import java.util.concurrent.TimeUnit
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import com.github.blemale.scaffeine.Scaffeine
 import com.google.common.testing.FakeTicker
+import org.scalatest.ParallelTestExecution
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
-import org.scalatest.ParallelTestExecution
 
-import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.network.PeerId
+import com.chipprbots.ethereum.testing.Tags._
 
 class CacheBasedBlacklistSpec extends AnyWordSpecLike with Matchers with ParallelTestExecution {
   import Blacklist.*

@@ -1,5 +1,4 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
-
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
 import org.apache.pekko.actor.typed.ActorRef
@@ -7,7 +6,8 @@ import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration.*
+import scala.compiletime.uninitialized
+import scala.concurrent.duration._
 
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.BeforeAndAfterEach
@@ -22,7 +22,10 @@ import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcher.FetchedState
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NodeData
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetByteCodes
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetTrieNodes
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.blockchain.sync.PeersClient.Request
+import com.chipprbots.ethereum.blockchain.sync.PeersClient.Request
+import com.chipprbots.ethereum.blockchain.sync.PeersClient.Request
 
 /** Targeted tests for the Bug 30 StateNodeFetcher fixes:
   *
@@ -44,7 +47,7 @@ class StateNodeFetcherSpec
     with TestSyncConfig {
 
   // Each test gets its own typed test kit, shut down after the test.
-  private var typedKit: ActorTestKit = _
+  private var typedKit: ActorTestKit = uninitialized
 
   override def beforeEach(): Unit =
     typedKit = ActorTestKit("StateNodeFetcherTest-" + System.nanoTime())
@@ -63,7 +66,7 @@ class StateNodeFetcherSpec
   private trait TestSetup {
     val peersClientProbe: TestProbe = TestProbe()
     val replyToProbe: TestProbe = TestProbe()
-    val supervisorProbe = typedKit.createTestProbe[FetchCommand]()
+    val supervisorProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[FetchCommand] = typedKit.createTestProbe[FetchCommand]()
 
     val fetcher: ActorRef[StateNodeFetcher.StateNodeFetcherCommand] =
       typedKit.spawn(
@@ -91,7 +94,7 @@ class StateNodeFetcherSpec
       // targeting the BestSnapPeer selector. Earlier, this same input went through
       // GetNodeData (BestNodeDataPeer) — which is unavailable on ETH68-only peer sets and
       // is the failure mode Bug 30's bytecode-recovery layer fixes.
-      val req = peersClientProbe.expectMsgClass(3.seconds, classOf[PeersClient.Request[_]])
+      val req: Request[?] = peersClientProbe.expectMsgClass(3.seconds, classOf[PeersClient.Request[?]])
       req.message shouldBe a[GetByteCodes]
       req.message.asInstanceOf[GetByteCodes].hashes shouldBe Seq(targetHash)
       // First attempt excludes nothing; on empty/wrong responses the responding peer is added to
@@ -111,7 +114,7 @@ class StateNodeFetcherSpec
         isByteCode = false
       )
 
-      val req = peersClientProbe.expectMsgClass(3.seconds, classOf[PeersClient.Request[_]])
+      val req: Request[?] = peersClientProbe.expectMsgClass(3.seconds, classOf[PeersClient.Request[?]])
       req.message shouldBe a[GetTrieNodes]
       req.message.asInstanceOf[GetTrieNodes].rootHash shouldBe stateRoot
       req.peerSelector shouldBe BestSnapPeerExcluding(Set.empty)
@@ -124,12 +127,12 @@ class StateNodeFetcherSpec
         originalSender = replyToProbe.ref,
         isByteCode = true
       )
-      peersClientProbe.expectMsgClass(3.seconds, classOf[PeersClient.Request[_]])
+      peersClientProbe.expectMsgClass(3.seconds, classOf[PeersClient.Request[?]])
 
       // Second fetch for the SAME hash from a different sender — must NOT fire another request.
       // BlockImporter's resolvingMissingNode 30s ReceiveTimeout retries on the same hash; without
       // de-dup, every retry spawns a parallel SNAP request and overwrites the requester.
-      val secondReplyTo = TestProbe()
+      val secondReplyTo: TestProbe = TestProbe()
       fetcher ! StateNodeFetcher.FetchStateNode(
         hash = targetHash,
         originalSender = secondReplyTo.ref,
@@ -145,19 +148,19 @@ class StateNodeFetcherSpec
         originalSender = replyToProbe.ref,
         isByteCode = true
       )
-      peersClientProbe.expectMsgClass(3.seconds, classOf[PeersClient.Request[_]])
+      peersClientProbe.expectMsgClass(3.seconds, classOf[PeersClient.Request[?]])
 
       // Different hash — overwrites the in-flight requester (the previous one is abandoned in
       // favour of the new caller). This is the legitimate "give up old, start new" path,
       // distinct from the de-dup case above.
-      val otherHash = ByteString(Array.fill[Byte](32)(0xcd.toByte))
+      val otherHash: ByteString = ByteString(Array.fill[Byte](32)(0xcd.toByte))
       fetcher ! StateNodeFetcher.FetchStateNode(
         hash = otherHash,
         originalSender = replyToProbe.ref,
         isByteCode = true
       )
 
-      val req = peersClientProbe.expectMsgClass(3.seconds, classOf[PeersClient.Request[_]])
+      val req: Request[?] = peersClientProbe.expectMsgClass(3.seconds, classOf[PeersClient.Request[?]])
       req.message.asInstanceOf[GetByteCodes].hashes shouldBe Seq(otherHash)
     }
 
@@ -167,7 +170,7 @@ class StateNodeFetcherSpec
         originalSender = replyToProbe.ref,
         isByteCode = true
       )
-      peersClientProbe.expectMsgClass(3.seconds, classOf[PeersClient.Request[_]])
+      peersClientProbe.expectMsgClass(3.seconds, classOf[PeersClient.Request[?]])
 
       // Drive the retry counter directly — each RetryStateNodeRequest resets the rotation set and
       // increments attempts via retryOrExhaust. The MaxStateNodeFetchRetries-th call hits the
@@ -188,7 +191,7 @@ class StateNodeFetcherSpec
         originalSender = replyToProbe.ref,
         isByteCode = true
       )
-      peersClientProbe.expectMsgClass(3.seconds, classOf[PeersClient.Request[_]])
+      peersClientProbe.expectMsgClass(3.seconds, classOf[PeersClient.Request[?]])
 
       // Send fewer than MaxStateNodeFetchRetries — BlockImporter must NOT see an empty
       // response yet, otherwise the 5-min backoff fires prematurely and progress stalls.

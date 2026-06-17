@@ -8,14 +8,14 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.Mocks
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
-import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.ledger.BlockExecution.HistoryServeWindow
 import com.chipprbots.ethereum.ledger.BlockExecution.HistoryStorageAddress
 import com.chipprbots.ethereum.ledger.BlockExecution.HistoryStorageCode
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.Config.SyncConfig
@@ -41,7 +41,7 @@ class BlockHashHistorySpec extends AnyFlatSpec with Matchers {
 
     private lazy val blockchainConfig0: BlockchainConfig = Config.blockchains.blockchainConfig
 
-    override lazy val blockQueue = BlockQueue(blockchainReader, SyncConfig(Config.config))
+    override lazy val blockQueue: BlockQueue = BlockQueue(blockchainReader, SyncConfig(Config.config))
 
     override lazy val blockValidation = new BlockValidation(
       mining.withValidators(Mocks.MockValidatorsAlwaysSucceed),
@@ -88,9 +88,9 @@ class BlockHashHistorySpec extends AnyFlatSpec with Matchers {
     ConsensusTest
   ) in new TestSetup {
     val parentHash: ByteString = ByteString(Array.fill(32)(0xab.toByte))
-    val world = runBlock(makeBlock(olympiaBlock, parentHash))
+    val world: InMemoryWorldStateProxy = runBlock(makeBlock(olympiaBlock, parentHash))
 
-    val slot = (olympiaBlock - 1) % Window
+    val slot: BigInt = (olympiaBlock - 1) % Window
     world.getStorage(HistoryStorageAddress).load(slot) shouldBe UInt256(parentHash).toBigInt
   }
 
@@ -98,7 +98,7 @@ class BlockHashHistorySpec extends AnyFlatSpec with Matchers {
     OlympiaTest,
     ConsensusTest
   ) in new TestSetup {
-    val world = runBlock(makeBlock(olympiaBlock, ByteString(Array.fill(32)(0x01.toByte))))
+    val world: InMemoryWorldStateProxy = runBlock(makeBlock(olympiaBlock, ByteString(Array.fill(32)(0x01.toByte))))
     world.getCode(HistoryStorageAddress) shouldBe HistoryStorageCode
   }
 
@@ -106,13 +106,13 @@ class BlockHashHistorySpec extends AnyFlatSpec with Matchers {
     OlympiaTest,
     ConsensusTest
   ) in new TestSetup {
-    val hashA = ByteString(Array.fill(32)(0xaa.toByte))
-    val hashB = ByteString(Array.fill(32)(0xbb.toByte))
+    val hashA: ByteString = ByteString(Array.fill(32)(0xaa.toByte))
+    val hashB: ByteString = ByteString(Array.fill(32)(0xbb.toByte))
 
-    val world1 = runBlock(makeBlock(olympiaBlock, hashA))
-    val world2 = runBlock(makeBlock(olympiaBlock + Window, hashB), world1)
+    val world1: InMemoryWorldStateProxy = runBlock(makeBlock(olympiaBlock, hashA))
+    val world2: InMemoryWorldStateProxy = runBlock(makeBlock(olympiaBlock + Window, hashB), world1)
 
-    val slot = (olympiaBlock - 1) % Window
+    val slot: BigInt = (olympiaBlock - 1) % Window
     world2.getStorage(HistoryStorageAddress).load(slot) shouldBe UInt256(hashB).toBigInt
   }
 
@@ -120,11 +120,11 @@ class BlockHashHistorySpec extends AnyFlatSpec with Matchers {
     OlympiaTest,
     ConsensusTest
   ) in new TestSetup {
-    val world = runBlock(
+    val world: InMemoryWorldStateProxy = runBlock(
       makeBlock(olympiaBlock - 1, ByteString(Array.fill(32)(0xdd.toByte)), isOlympia = false)
     )
 
-    val slot = (olympiaBlock - 2) % Window
+    val slot: BigInt = (olympiaBlock - 2) % Window
     world.getStorage(HistoryStorageAddress).load(slot) shouldBe BigInt(0)
     world.getCode(HistoryStorageAddress) shouldBe ByteString.empty
   }

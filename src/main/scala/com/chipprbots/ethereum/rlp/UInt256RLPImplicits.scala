@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.rlp
 import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.rlp.RLP.*
+import com.chipprbots.ethereum.rlp.RLP._
 
 object UInt256RLPImplicits {
 

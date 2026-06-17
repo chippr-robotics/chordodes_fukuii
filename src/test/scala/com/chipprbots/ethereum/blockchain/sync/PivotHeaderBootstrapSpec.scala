@@ -1,10 +1,16 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import org.apache.pekko.actor.{Actor, ActorRef, ActorSystem, Props}
-import org.apache.pekko.testkit.{ImplicitSender, TestKit, TestProbe}
-
 import java.net.InetSocketAddress
-import scala.concurrent.duration.*
+
+import org.apache.pekko.actor.Actor
+import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.Props
+import org.apache.pekko.testkit.ImplicitSender
+import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.testkit.TestProbe
+
+import scala.concurrent.duration._
 
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
@@ -12,11 +18,14 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
-import com.chipprbots.ethereum.db.dataSource.{DataSourceBatchUpdate, EphemDataSource}
-import com.chipprbots.ethereum.domain.{BlockHeader, BlockchainWriter}
-import com.chipprbots.ethereum.network.{Peer, PeerId}
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.db.dataSource.DataSourceBatchUpdate
+import com.chipprbots.ethereum.db.dataSource.EphemDataSource
+import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockchainWriter
+import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
+import com.chipprbots.ethereum.testing.Tags._
 
 class PivotHeaderBootstrapSpec
     extends TestKit(ActorSystem("PivotHeaderBootstrapSpec"))
@@ -31,8 +40,8 @@ class PivotHeaderBootstrapSpec
   val correctHeader: BlockHeader = Fixtures.Blocks.Block3125369.header.copy(number = targetBlock)
   val wrongHeader: BlockHeader = Fixtures.Blocks.Block3125369.header.copy(number = BigInt(999))
 
-  val ds = EphemDataSource()
-  val noopBatch = DataSourceBatchUpdate(ds, Array.empty)
+  val ds: EphemDataSource = EphemDataSource()
+  val noopBatch: DataSourceBatchUpdate = DataSourceBatchUpdate(ds, Array.empty)
 
   val noopWriter: BlockchainWriter = new BlockchainWriter(null, null, null, null, null, null, null) {
     override def storeBlockHeader(blockHeader: BlockHeader): DataSourceBatchUpdate = noopBatch

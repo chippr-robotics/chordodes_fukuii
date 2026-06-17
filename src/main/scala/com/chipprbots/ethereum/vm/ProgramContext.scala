@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.vm
 
 import org.apache.pekko.util.ByteString
 
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 
 object ProgramContext {
   def apply[W <: WorldStateProxy[W, S], S <: Storage[S]](

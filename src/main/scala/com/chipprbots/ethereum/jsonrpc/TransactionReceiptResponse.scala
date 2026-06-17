@@ -3,13 +3,13 @@ package com.chipprbots.ethereum.jsonrpc
 import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.crypto.kec256
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.jsonrpc.FilterManager.TxLog
 import com.chipprbots.ethereum.rlp
-import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
+import com.chipprbots.ethereum.rlp.RLPImplicitConversions._
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
 import com.chipprbots.ethereum.rlp.RLPList
-import com.chipprbots.ethereum.rlp.UInt256RLPImplicits.*
+import com.chipprbots.ethereum.rlp.UInt256RLPImplicits._
 
 /** Params docs copied from - https://eth.wiki/json-rpc/API
   *

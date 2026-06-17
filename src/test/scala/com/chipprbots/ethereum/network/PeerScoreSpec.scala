@@ -1,12 +1,13 @@
 package com.chipprbots.ethereum.network
 
 import java.time.Instant
-import scala.concurrent.duration.*
+
+import scala.concurrent.duration._
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 class PeerScoreSpec extends AnyFlatSpec with Matchers {
 

@@ -9,8 +9,8 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.testing.Tags.*
-import com.chipprbots.ethereum.vm.Generators.*
+import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.vm.Generators._
 
 class MemorySpec extends AnyFunSuite with ScalaCheckPropertyChecks with Matchers {
 

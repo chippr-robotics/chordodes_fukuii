@@ -7,16 +7,16 @@ import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
-import cats.syntax.parallel.*
+import cats.syntax.parallel._
 
-import com.typesafe.config.Config as TypesafeConfig
+import com.typesafe.config.{Config => TypesafeConfig}
 
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
-import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.*
+import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status._
 import com.chipprbots.ethereum.healthcheck.HealthcheckResponse
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
 import com.chipprbots.ethereum.jsonrpc.EthBlocksService.BlockByNumberRequest
-import com.chipprbots.ethereum.jsonrpc.NetService.*
+import com.chipprbots.ethereum.jsonrpc.NetService._
 import com.chipprbots.ethereum.jsonrpc.NodeJsonRpcHealthChecker.JsonRpcHealthConfig
 import com.chipprbots.ethereum.utils.AsyncConfig
 
@@ -80,7 +80,7 @@ class NodeJsonRpcHealthChecker(
         case _                                                   => "SYNCED"
       })
 
-  override def healthCheck(): IO[HealthcheckResponse] = {
+  override def healthCheck: IO[HealthcheckResponse] = {
     val responseTask = List(
       peerCountHC,
       storedBlockHC,

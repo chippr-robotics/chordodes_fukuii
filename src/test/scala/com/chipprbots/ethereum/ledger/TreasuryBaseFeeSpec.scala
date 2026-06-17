@@ -9,10 +9,10 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.Mocks.MockVM
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
-import com.chipprbots.ethereum.domain.*
-import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
+import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields._
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 
@@ -73,37 +73,37 @@ class TreasuryBaseFeeSpec extends AnyFlatSpec with Matchers with MockFactory {
     OlympiaTest,
     ConsensusTest
   ) in new TestSetup {
-    val baseFee = BigInt(1000000000) // 1 gwei
-    val gasUsed = BigInt(21000)
-    val block = makeBlock(olympiaBlock, gasUsed, Some(baseFee))
+    val baseFee: BigInt = BigInt(1000000000) // 1 gwei
+    val gasUsed: BigInt = BigInt(21000)
+    val block: Block = makeBlock(olympiaBlock, gasUsed, Some(baseFee))
 
-    val treasuryBalBefore = worldState.getGuaranteedAccount(treasuryAddr).balance
-    val afterWorld = mining.blockPreparator.payBlockReward(block, worldState)
-    val treasuryBalAfter = afterWorld.getGuaranteedAccount(treasuryAddr).balance
+    val treasuryBalBefore: UInt256 = worldState.getGuaranteedAccount(treasuryAddr).balance
+    val afterWorld: InMemoryWorldStateProxy = mining.blockPreparator.payBlockReward(block, worldState)
+    val treasuryBalAfter: UInt256 = afterWorld.getGuaranteedAccount(treasuryAddr).balance
 
-    val expectedCredit = baseFee * gasUsed // 21_000_000_000_000
+    val expectedCredit: BigInt = baseFee * gasUsed // 21_000_000_000_000
     // Post-Olympia: treasury receives only baseFee * gasUsed (no 80/20 block reward split)
     (treasuryBalAfter - treasuryBalBefore) shouldBe UInt256(expectedCredit)
   }
 
   it should "not credit baseFee to treasury pre-Olympia" taggedAs (OlympiaTest, ConsensusTest) in new TestSetup {
-    val block = makeBlock(olympiaBlock - 1, gasUsed = 21000)
+    val block: Block = makeBlock(olympiaBlock - 1, gasUsed = 21000)
 
-    val treasuryBalBefore = worldState.getGuaranteedAccount(treasuryAddr).balance
-    val afterWorld = mining.blockPreparator.payBlockReward(block, worldState)
-    val treasuryBalAfter = afterWorld.getGuaranteedAccount(treasuryAddr).balance
+    val treasuryBalBefore: UInt256 = worldState.getGuaranteedAccount(treasuryAddr).balance
+    val afterWorld: InMemoryWorldStateProxy = mining.blockPreparator.payBlockReward(block, worldState)
+    val treasuryBalAfter: UInt256 = afterWorld.getGuaranteedAccount(treasuryAddr).balance
 
     // Pre-Olympia: treasury receives nothing (no baseFee redirect)
     (treasuryBalAfter - treasuryBalBefore) shouldBe UInt256.Zero
   }
 
   it should "not credit baseFee when gasUsed is zero" taggedAs (OlympiaTest, ConsensusTest) in new TestSetup {
-    val baseFee = BigInt(1000000000)
-    val block = makeBlock(olympiaBlock, gasUsed = 0, Some(baseFee))
+    val baseFee: BigInt = BigInt(1000000000)
+    val block: Block = makeBlock(olympiaBlock, gasUsed = 0, Some(baseFee))
 
-    val treasuryBalBefore = worldState.getGuaranteedAccount(treasuryAddr).balance
-    val afterWorld = mining.blockPreparator.payBlockReward(block, worldState)
-    val treasuryBalAfter = afterWorld.getGuaranteedAccount(treasuryAddr).balance
+    val treasuryBalBefore: UInt256 = worldState.getGuaranteedAccount(treasuryAddr).balance
+    val afterWorld: InMemoryWorldStateProxy = mining.blockPreparator.payBlockReward(block, worldState)
+    val treasuryBalAfter: UInt256 = afterWorld.getGuaranteedAccount(treasuryAddr).balance
 
     // baseFee * 0 = 0, treasury receives nothing
     (treasuryBalAfter - treasuryBalBefore) shouldBe UInt256.Zero
@@ -120,13 +120,13 @@ class TreasuryBaseFeeSpec extends AnyFlatSpec with Matchers with MockFactory {
         )
       )
 
-    val baseFee = BigInt(1000000000)
-    val block = makeBlock(olympiaBlock, gasUsed = 21000, Some(baseFee))
+    val baseFee: BigInt = BigInt(1000000000)
+    val block: Block = makeBlock(olympiaBlock, gasUsed = 21000, Some(baseFee))
 
-    val afterWorld = mining.blockPreparator.payBlockReward(block, worldState)
+    val afterWorld: InMemoryWorldStateProxy = mining.blockPreparator.payBlockReward(block, worldState)
     // creditBaseFeeToTreasury checks: treasuryAddress != Address(0)
     // So Address(0) receives nothing — baseFee is effectively burned
-    val zeroAddrBalance = afterWorld.getAccount(Address(0)).map(_.balance).getOrElse(UInt256.Zero)
+    val zeroAddrBalance: UInt256 = afterWorld.getAccount(Address(0)).map(_.balance).getOrElse(UInt256.Zero)
     zeroAddrBalance shouldBe UInt256.Zero
   }
 }

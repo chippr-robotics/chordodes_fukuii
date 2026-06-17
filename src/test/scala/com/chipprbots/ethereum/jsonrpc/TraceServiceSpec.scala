@@ -21,12 +21,13 @@ import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.SignedTransactionWithSender
-import com.chipprbots.ethereum.jsonrpc.TraceService.*
+import com.chipprbots.ethereum.jsonrpc.TraceService._
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ledger.StxLedger
 import com.chipprbots.ethereum.ledger.TxResult
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.vm.ExecutionTracer
+import com.chipprbots.ethereum.jsonrpc.EthInfoService.CallTx
 
 /** Unit tests for TraceService.
   *
@@ -53,7 +54,7 @@ class TraceServiceSpec
       val unknownHash: ByteString = ByteString(Array.fill(32)(0xff.toByte))
       txMappingStorage.get.expects(unknownHash).returning(None)
 
-      val result = service
+      val result: Either[JsonRpcError, TraceTransactionResponse] = service
         .traceTransaction(TraceTransactionRequest(unknownHash))
         .unsafeRunSync()
 
@@ -81,7 +82,7 @@ class TraceServiceSpec
       .expects(*, *, *, *)
       .returning(null.asInstanceOf[TxResult])
 
-    val result = service
+    val result: Either[JsonRpcError, TraceTransactionResponse] = service
       .traceTransaction(TraceTransactionRequest(txHash))
       .unsafeRunSync()
 
@@ -92,13 +93,13 @@ class TraceServiceSpec
 
   "TraceService.traceBlock" should
     "return empty trace list for a block with no transactions" taggedAs (UnitTest, RPCTest) in new TestSetup {
-      val emptyBlock = block.copy(body = block.body.copy(transactionList = Seq.empty))
+      val emptyBlock: Block = block.copy(body = block.body.copy(transactionList = Seq.empty))
       blockchainWriter.storeBlock(emptyBlock).commit()
       storagesInstance.storages.blockHeadersStorage
         .put(emptyBlock.header.parentHash, emptyBlock.header.copy(number = emptyBlock.header.number - 1))
         .commit()
 
-      val result = service
+      val result: Either[JsonRpcError, TraceBlockResponse] = service
         .traceBlock(TraceBlockRequest(BlockParam.WithHash(emptyBlock.header.hash)))
         .unsafeRunSync()
 
@@ -112,7 +113,7 @@ class TraceServiceSpec
       val unknownHash: ByteString = ByteString(Array.fill(32)(0xee.toByte))
       txMappingStorage.get.expects(unknownHash).returning(None)
 
-      val result = service
+      val result: Either[JsonRpcError, TraceReplayTransactionResponse] = service
         .replayTransaction(TraceReplayTransactionRequest(unknownHash, TraceOptions(trace = true)))
         .unsafeRunSync()
 
@@ -141,7 +142,7 @@ class TraceServiceSpec
       .returning(null.asInstanceOf[TxResult])
       .anyNumberOfTimes()
 
-    val result = service
+    val result: Either[JsonRpcError, TraceReplayTransactionResponse] = service
       .replayTransaction(TraceReplayTransactionRequest(txHash, TraceOptions(trace = true)))
       .unsafeRunSync()
 
@@ -152,14 +153,14 @@ class TraceServiceSpec
 
   "TraceService.replayBlockTransactions" should
     "return empty list for a block with no transactions" taggedAs (UnitTest, RPCTest) in new TestSetup {
-      val emptyBlock = block.copy(body = block.body.copy(transactionList = Seq.empty))
+      val emptyBlock: Block = block.copy(body = block.body.copy(transactionList = Seq.empty))
       blockchainWriter.storeBlock(emptyBlock).commit()
       storagesInstance.storages.blockHeadersStorage
         .put(emptyBlock.header.parentHash, emptyBlock.header.copy(number = emptyBlock.header.number - 1))
         .commit()
       blockchainWriter.saveBestKnownBlocks(emptyBlock.header.hash, emptyBlock.header.number)
 
-      val result = service
+      val result: Either[JsonRpcError, TraceReplayBlockTransactionsResponse] = service
         .replayBlockTransactions(
           TraceReplayBlockTransactionsRequest(
             BlockParam.WithNumber(emptyBlock.header.number),
@@ -192,7 +193,7 @@ class TraceServiceSpec
         .expects(*, *, *, *)
         .returning(null.asInstanceOf[TxResult])
 
-      val callTx = EthInfoService.CallTx(
+      val callTx: CallTx = EthInfoService.CallTx(
         from = None,
         to = None,
         gas = None,
@@ -200,7 +201,7 @@ class TraceServiceSpec
         value = 0,
         data = ByteString.empty
       )
-      val result = service
+      val result: Either[JsonRpcError, TraceCallResponse] = service
         .traceCall(TraceCallRequest(callTx, TraceOptions(trace = true), BlockParam.Latest))
         .unsafeRunSync()
 
@@ -211,13 +212,13 @@ class TraceServiceSpec
 
   "TraceService.traceFilter" should
     "return InvalidParams when fromBlock is after toBlock" taggedAs (UnitTest, RPCTest) in new TestSetup {
-      val emptyBlock = block.copy(body = block.body.copy(transactionList = Seq.empty))
+      val emptyBlock: Block = block.copy(body = block.body.copy(transactionList = Seq.empty))
       // parentBlock gets a different hash because number changed in the header
-      val parentBlock = emptyBlock.copy(header = emptyBlock.header.copy(number = emptyBlock.header.number - 1))
+      val parentBlock: Block = emptyBlock.copy(header = emptyBlock.header.copy(number = emptyBlock.header.number - 1))
       blockchainWriter.storeBlock(emptyBlock).commit()
       blockchainWriter.storeBlock(parentBlock).commit()
 
-      val result = service
+      val result: Either[JsonRpcError, TraceFilterResponse] = service
         .traceFilter(
           TraceFilterRequest(
             fromBlock = BlockParam.WithHash(emptyBlock.header.hash), // N = 3125369
@@ -230,7 +231,7 @@ class TraceServiceSpec
     }
 
   it should "return empty trace list for a block with no transactions" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    val emptyBlock = block.copy(body = block.body.copy(transactionList = Seq.empty))
+    val emptyBlock: Block = block.copy(body = block.body.copy(transactionList = Seq.empty))
     blockchainWriter.save(
       emptyBlock,
       Nil,
@@ -241,7 +242,7 @@ class TraceServiceSpec
       .put(emptyBlock.header.parentHash, emptyBlock.header.copy(number = emptyBlock.header.number - 1))
       .commit()
 
-    val result = service
+    val result: Either[JsonRpcError, TraceFilterResponse] = service
       .traceFilter(
         TraceFilterRequest(
           fromBlock = BlockParam.Latest,
@@ -261,7 +262,7 @@ class TraceServiceSpec
 
     val mockLedger: StxLedger = mock[StxLedger]
     val txMappingStorage: TransactionMappingStorage = mock[TransactionMappingStorage]
-    val mockWorld = null.asInstanceOf[com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy]
+    val mockWorld: InMemoryWorldStateProxy = null.asInstanceOf[com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy]
 
     lazy val service: TraceService = new TraceService(
       blockchain,

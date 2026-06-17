@@ -1,7 +1,8 @@
 package com.chipprbots.ethereum.jsonrpc.serialization
 import org.json4s.JArray
-import com.chipprbots.ethereum.jsonrpc.JsonRpcError
 import org.json4s.JValue
+
+import com.chipprbots.ethereum.jsonrpc.JsonRpcError
 
 trait JsonMethodCodec[Req, Res] extends JsonMethodDecoder[Req] with JsonEncoder[Res]
 object JsonMethodCodec {

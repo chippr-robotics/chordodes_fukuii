@@ -2,13 +2,13 @@ package com.chipprbots.ethereum.consensus.validators.std
 
 import org.apache.pekko.util.ByteString
 
-import org.bouncycastle.util.encoders.Hex
-
 import scala.annotation.unused
+
+import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.consensus.mining.GetBlockHeaderByHash
 import com.chipprbots.ethereum.consensus.mining.GetNBlocksBack
-import com.chipprbots.ethereum.consensus.validators.*
+import com.chipprbots.ethereum.consensus.validators._
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.Receipt
 import com.chipprbots.ethereum.ledger.BlockExecutionError

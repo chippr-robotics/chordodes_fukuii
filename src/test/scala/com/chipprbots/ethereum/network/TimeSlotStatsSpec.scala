@@ -3,10 +3,10 @@ package com.chipprbots.ethereum.network
 import java.time.Clock
 
 import cats.data.State
-import cats.implicits.*
+import cats.implicits._
 import cats.kernel.Monoid
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
@@ -16,7 +16,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.MockClock
 
 import Arbitrary.arbitrary
@@ -261,7 +261,7 @@ object TimeSlotStatsSpec {
         v <- arbitrary[V]
       } yield (d, k, v)
       events <- Gen.listOfN(eventCount, event)
-      empty = TimeSlotStats[K, V](slotDuration, slotCount)(Monoid[V], clock).get
+      empty = TimeSlotStats[K, V](slotDuration, slotCount).get
       stats = events.foldLeft(empty) { case (stats, (duration, key, stat)) =>
         clock.windByMillis(duration.toMillis)
         stats.add(key, stat)

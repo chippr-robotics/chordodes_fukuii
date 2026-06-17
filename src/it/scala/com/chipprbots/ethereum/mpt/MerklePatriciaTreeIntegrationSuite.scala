@@ -10,10 +10,9 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.ObjectGenerators
-import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.*
+import com.chipprbots.ethereum.mpt.MerklePatriciaTrie._
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.Logger
-
-import com.chipprbots.ethereum.testing.Tags.*
 
 class MerklePatriciaTreeIntegrationSuite
     extends AnyFunSuite

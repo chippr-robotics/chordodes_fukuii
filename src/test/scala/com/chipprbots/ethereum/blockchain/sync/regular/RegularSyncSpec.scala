@@ -1,5 +1,5 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
-
+import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.testkit.TestActor.AutoPilot
 import org.apache.pekko.testkit.TestKit
@@ -10,12 +10,13 @@ import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.Resource
 import cats.effect.unsafe.IORuntime
-import cats.syntax.traverse.*
+import cats.syntax.traverse._
 
+import scala.compiletime.uninitialized
 import scala.concurrent.Await
 import scala.concurrent.Future
 import scala.concurrent.Promise
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 import scala.math.BigInt
 
 import org.scalamock.scalatest.AsyncMockFactory
@@ -27,17 +28,17 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.BlockHelpers
 import com.chipprbots.ethereum.ResourceFixtures
 import com.chipprbots.ethereum.WordSpecBase
-import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
 import com.chipprbots.ethereum.blockchain.sync.PeersClient
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
+import com.chipprbots.ethereum.blockchain.sync.regular.RegularSync
 import com.chipprbots.ethereum.consensus.ConsensusAdapter
 import com.chipprbots.ethereum.crypto.kec256
-import com.chipprbots.ethereum.domain.BlockHeaderImplicits.*
-import com.chipprbots.ethereum.domain.*
-import com.chipprbots.ethereum.ledger.*
+import com.chipprbots.ethereum.domain.BlockHeaderImplicits._
+import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.ledger._
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeers
@@ -49,20 +50,21 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPe
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
 import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.MessageClassifier
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.Codes
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.{NewBlockHashes, BlockHash}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockBodies
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetNodeData
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.BlockHash
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NodeData
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders as ETHGetBlockHeaders
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockBodies as ETHGetBlockBodies
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{BlockHeaders, BlockBodies}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{GetBlockBodies => ETHGetBlockBodies}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{GetBlockHeaders => ETHGetBlockHeaders}
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config.SyncConfig
-import com.chipprbots.ethereum.blockchain.sync.regular.RegularSync
-import org.apache.pekko.actor.ActorRef
 
 class RegularSyncSpec
     extends WordSpecBase
@@ -79,7 +81,7 @@ class RegularSyncSpec
   val fixtureResource: Resource[IO, Fixture] = actorSystemResource.map(new Fixture(_))
 
   // Used only in sync tests
-  var testSystem: ActorSystem = _
+  var testSystem: ActorSystem = uninitialized
   override def beforeEach(): Unit =
     testSystem = ActorSystem()
   override def afterEach(): Unit =
@@ -163,7 +165,7 @@ class RegularSyncSpec
         SyncTest
       ) in sync(
         new Fixture(testSystem) {
-          var blockFetcher: ActorRef = _
+          var blockFetcher: ActorRef = uninitialized
 
           regularSync ! SyncProtocol.Start
           peerEventBus.expectMsgClass(classOf[Subscribe])
@@ -282,12 +284,12 @@ class RegularSyncSpec
       ) in sync(
         new Fixture(testSystem) {
           override lazy val blockchainReader: BlockchainReader = stub[BlockchainReader]
-          blockchainReader.getBestBlockNumber.when().returns(BigInt(1000))
-          blockchainReader.getSnapSyncPivotBlock.when().returns(None)
+          (() => blockchainReader.getBestBlockNumber).when().returns(BigInt(1000))
+          (() => blockchainReader.getSnapSyncPivotBlock).when().returns(None)
 
-          val importerFetcher = TestProbe("importerFetcher")
-          val importerSupervisor = TestProbe("importerSupervisor")
-          val importerBroadcaster = TestProbe("importerBroadcaster")
+          val importerFetcher: TestProbe = TestProbe("importerFetcher")
+          val importerSupervisor: TestProbe = TestProbe("importerSupervisor")
+          val importerBroadcaster: TestProbe = TestProbe("importerBroadcaster")
 
           for (depth <- List(1, 5, 64, 128)) {
             val lca = BigInt(depth)
@@ -331,8 +333,8 @@ class RegularSyncSpec
         new Fixture(testSystem) {
           override lazy val blockchain: BlockchainImpl = stub[BlockchainImpl]
           override lazy val blockchainReader: BlockchainReader = stub[BlockchainReader]
-          blockchainReader.getBestBlockNumber.when().onCall(() => bestBlock.number)
-          blockchainReader.getSnapSyncPivotBlock.when().returns(None) // no SNAP sync pivot
+          (() => blockchainReader.getBestBlockNumber).when().onCall(() => bestBlock.number)
+          (() => blockchainReader.getSnapSyncPivotBlock).when().returns(None) // no SNAP sync pivot
           override lazy val consensusAdapter: ConsensusAdapter = stub[ConsensusAdapter]
           (consensusAdapter
             .evaluateBranchBlock(_: Block)(_: IORuntime, _: BlockchainConfig))
@@ -399,8 +401,8 @@ class RegularSyncSpec
       new Fixture(testSystem) {
         override lazy val blockchainReader: BlockchainReader = stub[BlockchainReader]
         override lazy val blockchain: BlockchainImpl = stub[BlockchainImpl]
-        blockchainReader.getBestBlockNumber.when().onCall(() => bestBlock.number)
-        blockchainReader.getSnapSyncPivotBlock.when().returns(None) // no SNAP sync pivot
+        (() => blockchainReader.getBestBlockNumber).when().onCall(() => bestBlock.number)
+        (() => blockchainReader.getSnapSyncPivotBlock).when().returns(None) // no SNAP sync pivot
         override lazy val consensusAdapter: ConsensusAdapter = stub[ConsensusAdapter]
         (consensusAdapter
           .evaluateBranchBlock(_: Block)(_: IORuntime, _: BlockchainConfig))
@@ -543,8 +545,8 @@ class RegularSyncSpec
         val failingBlock: Block = testBlocksChunked.head.head
         peersClient.setAutoPilot(new PeersClientAutoPilot)
         override lazy val branchResolution: BranchResolution = stub[BranchResolution]
-        blockchainReader.getBestBlockNumber.when().returns(0)
-        blockchainReader.getSnapSyncPivotBlock.when().returns(None) // no SNAP sync pivot
+        (() => blockchainReader.getBestBlockNumber).when().returns(0)
+        (() => blockchainReader.getSnapSyncPivotBlock).when().returns(None) // no SNAP sync pivot
         branchResolution.resolveBranch.when(*).returns(NewBetterBranch(Nil)).atLeastOnce()
         (consensusAdapter
           .evaluateBranchBlock(_: Block)(_: IORuntime, _: BlockchainConfig))
@@ -553,7 +555,7 @@ class RegularSyncSpec
 
         var saveNodeWasCalled: Boolean = false
         val nodeData: List[ByteString] = List(ByteString(failingBlock.header.toBytes: Array[Byte]))
-        blockchainReader.getBestBlockNumber.when().returns(0)
+        (() => blockchainReader.getBestBlockNumber).when().returns(0)
         blockchainReader.getBlockHeaderByNumber.when(*).returns(Some(BlockHelpers.genesis.header))
         stateStorage.saveNode
           .when(*, *, *)

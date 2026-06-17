@@ -12,11 +12,16 @@ import com.chipprbots.scalanet.discovery.crypto.PrivateKey
 import com.chipprbots.scalanet.discovery.crypto.PublicKey
 import com.chipprbots.scalanet.discovery.crypto.SigAlg
 import com.chipprbots.scalanet.discovery.ethereum.EthereumNodeRecord
+import com.chipprbots.scalanet.discovery.ethereum.EthereumNodeRecord.Content
 import com.chipprbots.scalanet.discovery.ethereum.v4
-import com.chipprbots.scalanet.discovery.ethereum.Node as ENode
+import com.chipprbots.scalanet.discovery.ethereum.v4.Packet
+import com.chipprbots.scalanet.discovery.ethereum.v5
+import com.chipprbots.scalanet.discovery.ethereum.{Node => ENode}
+import com.chipprbots.scalanet.discovery.ethereum.{Node => ScNode}
 import com.chipprbots.scalanet.peergroup.ExternalAddressResolver
 import com.chipprbots.scalanet.peergroup.InetMultiAddress
 import com.chipprbots.scalanet.peergroup.udp.StaticUDPPeerGroup
+import com.chipprbots.scalanet.peergroup.udp.V5DemuxResponder
 import scodec.Codec
 import scodec.bits.BitVector
 
@@ -27,11 +32,6 @@ import com.chipprbots.ethereum.network.discovery.codecs.V5RLPCodecs
 import com.chipprbots.ethereum.utils.Logger
 import com.chipprbots.ethereum.utils.NodeStatus
 import com.chipprbots.ethereum.utils.ServerStatus
-import com.chipprbots.scalanet.discovery.ethereum.v4.Packet
-import com.chipprbots.scalanet.discovery.ethereum.v5
-import com.chipprbots.scalanet.discovery.ethereum.Node as ScNode
-import com.chipprbots.scalanet.discovery.ethereum.EthereumNodeRecord.Content
-import com.chipprbots.scalanet.peergroup.udp.V5DemuxResponder
 
 trait DiscoveryServiceBuilder extends Logger {
 
@@ -186,7 +186,7 @@ trait DiscoveryServiceBuilder extends Logger {
     for {
       reusedKnownNodes <-
         if (discoveryConfig.reuseKnownNodes)
-          IO(knownNodesStorage.getKnownNodes().map(Node.fromUri))
+          IO(knownNodesStorage.getKnownNodes.map(Node.fromUri))
         else
           IO.pure(Set.empty[Node])
       // Discovery is going to enroll with all the bootstrap nodes passed to it.

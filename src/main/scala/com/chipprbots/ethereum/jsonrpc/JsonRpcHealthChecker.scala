@@ -5,7 +5,7 @@ import cats.effect.IO
 import com.chipprbots.ethereum.healthcheck.HealthcheckResponse
 
 trait JsonRpcHealthChecker {
-  def healthCheck(): IO[HealthcheckResponse]
+  def healthCheck: IO[HealthcheckResponse]
 
   def readinessCheck(): IO[HealthcheckResponse]
 

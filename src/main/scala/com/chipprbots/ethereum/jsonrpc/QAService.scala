@@ -2,18 +2,18 @@ package com.chipprbots.ethereum.jsonrpc
 
 import org.apache.pekko.util.ByteString
 
-import cats.implicits.*
+import cats.implicits._
 
-import enumeratum.*
-import mouse.all.*
+import enumeratum._
+import mouse.all._
 
 import com.chipprbots.ethereum.consensus.mining.Mining
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MineBlocks
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerResponse
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerResponses
-import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerResponses.*
+import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerResponses._
 import com.chipprbots.ethereum.jsonrpc.QAService.MineBlocksResponse.MinerResponseType
-import com.chipprbots.ethereum.jsonrpc.QAService.*
+import com.chipprbots.ethereum.jsonrpc.QAService._
 import com.chipprbots.ethereum.utils.Logger
 
 class QAService(

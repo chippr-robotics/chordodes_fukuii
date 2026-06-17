@@ -140,7 +140,6 @@ class PathNodeStorage(val dataSource: DataSource) {
 
   private def deleteByPrefix(ns: IndexedSeq[Byte], prefix: Array[Byte]): Unit = {
     import cats.effect.unsafe.implicits.global
-    import fs2.Stream
 
     // Collect keys matching prefix, then batch-delete them.
     val keys: Vector[Array[Byte]] = dataSource

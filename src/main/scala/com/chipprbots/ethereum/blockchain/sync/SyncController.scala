@@ -10,17 +10,16 @@ import org.apache.pekko.actor.Terminated
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSync
 import com.chipprbots.ethereum.blockchain.sync.regular.RegularSync
-import com.chipprbots.ethereum.blockchain.sync.snap.{SNAPSyncController, SNAPSyncConfig}
-import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.{
-  StartRegularSyncBootstrap,
-  StartRegularSyncBootstrapByHash,
-  BootstrapComplete,
-  PivotBootstrapFailed
-}
+import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncConfig
+import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController
+import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.BootstrapComplete
+import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.PivotBootstrapFailed
+import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.StartRegularSyncBootstrap
+import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.StartRegularSyncBootstrapByHash
 import com.chipprbots.ethereum.consensus.ConsensusAdapter
 import com.chipprbots.ethereum.consensus.engine.ForkChoiceManager
 import com.chipprbots.ethereum.consensus.mess.MESSConfig
@@ -536,7 +535,7 @@ class SyncController(
         //   Tier 3 (peerTD = 0): pure ETH69 sentinel — compute from local chain DB via parentHash traversal
         if (peerTD > BigInt(0)) {
           // Tier 1 or 2: ETH68 peer TD available
-          blockchainReader.getBestBlock().foreach { bestBlock =>
+          blockchainReader.getBestBlock.foreach { bestBlock =>
             val genesisWeight = blockchainReader
               .getChainWeightByHash(blockchainReader.genesisHeader.hash)
               .map(_.totalDifficulty)
@@ -1731,7 +1730,7 @@ class SyncController(
     // RegularSync wrong TDs built on a proxy base.
     val MinTDPerBlock = BigInt("10000000000000")
 
-    blockchainReader.getBestBlockHeader() match {
+    blockchainReader.getBestBlockHeader match {
       case None =>
         log.warning("TIMED_CALIBRATION_LOCAL: no best block header — skipping (attempt={})", tdCalibrationAttempt)
         false
@@ -1841,7 +1840,7 @@ class SyncController(
     context.system.scheduler.scheduleOnce(30.minutes) {
       networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.CalibrateChainWeightNow
     }(context.dispatcher)
-    val bestBlockNum = blockchainReader.getBestBlockHeader().map(_.number).getOrElse(BigInt(0))
+    val bestBlockNum = blockchainReader.getBestBlockHeader.map(_.number).getOrElse(BigInt(0))
     log.info(
       "TIMED_CALIBRATION_LOCAL: retry #{} scheduled in 30min (ChainDownloader advancing, current bestBlock={})",
       tdCalibrationAttempt + 1,

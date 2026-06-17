@@ -3,28 +3,27 @@ package com.chipprbots.ethereum.blockchain.sync.fast
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
-import org.apache.pekko.actor.*
+import org.apache.pekko.actor._
 import org.apache.pekko.util.ByteString
 
 import cats.data.NonEmptyList
-import cats.implicits.*
+import cats.implicits._
 
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 import scala.util.Random
 
 import org.bouncycastle.util.encoders.Hex
 
-import com.chipprbots.ethereum.domain.appstate.BlockInfo
-import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason.*
-import com.chipprbots.ethereum.blockchain.sync.Blacklist.*
+import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason._
+import com.chipprbots.ethereum.blockchain.sync.Blacklist._
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
+import com.chipprbots.ethereum.blockchain.sync.PeerRateTracker
 import com.chipprbots.ethereum.blockchain.sync.PeerRequestHandler.ResponseReceived
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
-import com.chipprbots.ethereum.blockchain.sync.*
-import com.chipprbots.ethereum.blockchain.sync.PeerRateTracker
+import com.chipprbots.ethereum.blockchain.sync._
 import com.chipprbots.ethereum.blockchain.sync.fast.ReceiptsValidator.ReceiptsValidationResult
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncBlocksValidator.BlockBodyValidationResult
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateSchedulerActor.RestartRequested
@@ -38,7 +37,8 @@ import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.FastSyncStateStorage
 import com.chipprbots.ethereum.db.storage.NodeStorage
 import com.chipprbots.ethereum.db.storage.StateStorage
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.appstate.BlockInfo
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.Peer
@@ -100,7 +100,7 @@ class FastSync(
     // Check if headers in RocksDB go beyond the persisted bestBlockHeaderNumber.
     // This happens when SyncState was persisted mid-download but the node restarted —
     // headers continued being written to RocksDB past the last SyncState snapshot.
-    val existingBestHeader = blockchainReader.getBestBlockNumber()
+    val existingBestHeader = blockchainReader.getBestBlockNumber
     val updatedState =
       if (existingBestHeader > syncState.bestBlockHeaderNumber && existingBestHeader <= syncState.pivotBlock.number) {
         log.info(
@@ -153,7 +153,7 @@ class FastSync(
       } else {
         // Check if headers already exist in RocksDB from a previous sync run.
         // This avoids re-downloading millions of headers that survived a restart.
-        val existingBestHeader = blockchainReader.getBestBlockNumber()
+        val existingBestHeader = blockchainReader.getBestBlockNumber
         val bootstrappedHeaderNumber =
           if (existingBestHeader > 0 && existingBestHeader <= pivotBlockHeader.number) {
             log.info(
@@ -858,7 +858,7 @@ class FastSync(
       val dtSeconds = ((nowMs - lastProgressLogMs).toDouble / 1000.0).max(0.001)
 
       // Prefer the persisted fast-sync view of progress (lastFullBlockNumber), but also show current best.
-      val bestBlockNow = blockchainReader.getBestBlockNumber()
+      val bestBlockNow = blockchainReader.getBestBlockNumber
       val lastFull = syncState.lastFullBlockNumber.max(bestBlockNow)
 
       val deltaBlocks = (lastFull - lastLoggedFullBlock).toDouble
@@ -1252,7 +1252,7 @@ class FastSync(
 
       if (fullBlocks.nonEmpty) {
         val bestReceivedBlock = fullBlocks.maxBy(_.number)
-        val lastStoredBestBlockNumber = blockchainReader.getBestBlockNumber()
+        val lastStoredBestBlockNumber = blockchainReader.getBestBlockNumber
         if (lastStoredBestBlockNumber < bestReceivedBlock.number) {
           // Set best block info with BOTH hash and number (putBestBlockNumber only
           // sets the number, leaving getBestBlockInfo().hash stale/empty).

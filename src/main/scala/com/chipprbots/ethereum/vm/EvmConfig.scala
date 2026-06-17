@@ -9,7 +9,7 @@ import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.vm
 
-import EvmConfig.*
+import EvmConfig._
 
 // scalastyle:off magic.number
 object EvmConfig {

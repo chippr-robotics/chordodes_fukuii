@@ -3,6 +3,12 @@ package com.chipprbots.ethereum.consensus.pow
 import java.util.concurrent.atomic.AtomicLong
 
 import com.chipprbots.ethereum.metrics.MetricsContainer
+import io.micrometer.core.instrument.Gauge
+import io.micrometer.core.instrument.Gauge
+import io.micrometer.core.instrument.Gauge
+import io.micrometer.core.instrument.Gauge
+import io.micrometer.core.instrument.Gauge
+import io.micrometer.core.instrument.Gauge
 
 /** Prometheus metrics for PoW mining operations. Exposed via /metrics endpoint for Grafana dashboards.
   *
@@ -19,22 +25,22 @@ object PoWMiningMetrics extends MetricsContainer {
   private val _lastMiningDurationMs = new AtomicLong(0)
 
   // Note: Metrics.mkName adds "app_" prefix, so "pow_foo" becomes "app_pow_foo" in Prometheus
-  val workRequestsTotal =
+  val workRequestsTotal: Gauge =
     metrics.gauge("pow_getwork_total", () => _workRequestsTotal.get().toDouble)
 
-  val blocksMinedTotal =
+  val blocksMinedTotal: Gauge =
     metrics.gauge("pow_blocks_mined_total", () => _blocksMinedTotal.get().toDouble)
 
-  val staleSharesTotal =
+  val staleSharesTotal: Gauge =
     metrics.gauge("pow_stale_shares_total", () => _staleSharesTotal.get().toDouble)
 
-  val currentHashrate =
+  val currentHashrate: Gauge =
     metrics.gauge("pow_hashrate_current", () => _currentHashrate.get().toDouble)
 
-  val lastBlockMinedAt =
+  val lastBlockMinedAt: Gauge =
     metrics.gauge("pow_last_block_mined_timestamp", () => _lastBlockMinedAt.get().toDouble)
 
-  val lastMiningDurationMs =
+  val lastMiningDurationMs: Gauge =
     metrics.gauge("pow_last_mining_duration_ms", () => _lastMiningDurationMs.get().toDouble)
 
   def recordGetWork(): Unit =

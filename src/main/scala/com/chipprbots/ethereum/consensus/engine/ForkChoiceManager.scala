@@ -1,9 +1,9 @@
 package com.chipprbots.ethereum.consensus.engine
 
+import java.util.concurrent.atomic.AtomicReference
+
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.util.ByteString
-
-import java.util.concurrent.atomic.AtomicReference
 
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader

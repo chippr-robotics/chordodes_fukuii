@@ -8,7 +8,7 @@ import org.apache.pekko.util.ByteString
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.crypto.SymmetricCipher
 import com.chipprbots.ethereum.domain.Address
-import com.chipprbots.ethereum.keystore.EncryptedKey.*
+import com.chipprbots.ethereum.keystore.EncryptedKey._
 
 object EncryptedKey {
   val AES128CTR = "aes-128-ctr"

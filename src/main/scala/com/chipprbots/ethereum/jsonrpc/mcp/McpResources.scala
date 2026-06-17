@@ -10,21 +10,22 @@ import scala.util.Try
 
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.domain.Address
-import com.chipprbots.ethereum.jsonrpc.{AkkaTaskOps, McpDependencies}
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps
+import com.chipprbots.ethereum.jsonrpc.McpDependencies
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.utils.BuildInfo
 import com.chipprbots.ethereum.utils.ByteStringUtils
 
-import AkkaTaskOps.*
+import AkkaTaskOps._
 
 // --- Static Resources ---
 
 object NodeStatusResource {
   val uri = "fukuii://node/status"
   val name = "Node Status"
-  val description = Some("Current status of the Fukuii node including sync state and peer count")
-  val mimeType = Some("application/json")
+  val description: Some[String] = Some("Current status of the Fukuii node including sync state and peer count")
+  val mimeType: Some[String] = Some("application/json")
 
   def read(deps: McpDependencies)(implicit timeout: Timeout, @unused ec: ExecutionContext): IO[String] = {
     val syncStatusIO = deps.syncController.askFor[SyncProtocol.Status](SyncProtocol.GetStatus)
@@ -34,7 +35,7 @@ object NodeStatusResource {
       syncStatus <- syncStatusIO.recover { case _ => SyncProtocol.Status.NotSyncing }
       peers <- peersIO.recover { case _ => PeerManagerActor.Peers(Map.empty) }
     } yield {
-      val bestBlock = deps.blockchainReader.getBestBlockNumber()
+      val bestBlock = deps.blockchainReader.getBestBlockNumber
       val peerCount = peers.peers.size
       val handshakedCount = peers.handshaked.size
       val (syncing, syncState) = syncStatus match {
@@ -63,8 +64,8 @@ object NodeStatusResource {
 object NodeConfigResource {
   val uri = "fukuii://node/config"
   val name = "Node Configuration"
-  val description = Some("Current node configuration including chain ID, network, and monetary policy")
-  val mimeType = Some("application/json")
+  val description: Some[String] = Some("Current node configuration including chain ID, network, and monetary policy")
+  val mimeType: Some[String] = Some("application/json")
 
   def read(deps: McpDependencies): IO[String] = IO {
     val cfg = deps.blockchainConfig
@@ -92,8 +93,8 @@ object NodeConfigResource {
 object SyncStatusResource {
   val uri = "fukuii://sync/status"
   val name = "Sync Status"
-  val description = Some("Current blockchain synchronization status and progress")
-  val mimeType = Some("application/json")
+  val description: Some[String] = Some("Current blockchain synchronization status and progress")
+  val mimeType: Some[String] = Some("application/json")
 
   def read(deps: McpDependencies)(implicit timeout: Timeout, @unused ec: ExecutionContext): IO[String] =
     deps.syncController
@@ -102,7 +103,7 @@ object SyncStatusResource {
         SyncProtocol.Status.NotSyncing
       }
       .map { status =>
-        val bestBlock = deps.blockchainReader.getBestBlockNumber()
+        val bestBlock = deps.blockchainReader.getBestBlockNumber
         status match {
           case SyncProtocol.Status.Syncing(start, blocks, stateNodes) =>
             val pct = if (blocks.target > 0) f"${(blocks.current.toDouble / blocks.target.toDouble * 100)}%.2f" else "0"
@@ -140,8 +141,8 @@ object SyncStatusResource {
 object ConnectedPeersResource {
   val uri = "fukuii://peers/connected"
   val name = "Connected Peers"
-  val description = Some("List of currently connected peers with addresses and status")
-  val mimeType = Some("application/json")
+  val description: Some[String] = Some("List of currently connected peers with addresses and status")
+  val mimeType: Some[String] = Some("application/json")
 
   def read(deps: McpDependencies)(implicit timeout: Timeout, @unused ec: ExecutionContext): IO[String] =
     deps.peerManager
@@ -175,8 +176,8 @@ object ConnectedPeersResource {
 object MiningRpcResource {
   val uri = "fukuii://mining/rpc"
   val name = "Mining RPC Endpoints"
-  val description = Some("Mining JSON-RPC method coverage and usage information")
-  val mimeType = Some("application/json")
+  val description: Some[String] = Some("Mining JSON-RPC method coverage and usage information")
+  val mimeType: Some[String] = Some("application/json")
 
   def read(): IO[String] =
     IO.pure("""{
@@ -197,11 +198,11 @@ object MiningRpcResource {
 object LatestBlockResource {
   val uri = "fukuii://blockchain/latest"
   val name = "Latest Block"
-  val description = Some("Information about the latest block on the chain")
-  val mimeType = Some("application/json")
+  val description: Some[String] = Some("Information about the latest block on the chain")
+  val mimeType: Some[String] = Some("application/json")
 
   def read(deps: McpDependencies): IO[String] = IO {
-    val bestBlock = deps.blockchainReader.getBestBlock()
+    val bestBlock = deps.blockchainReader.getBestBlock
     bestBlock match {
       case Some(block) =>
         val h = block.header
@@ -235,8 +236,8 @@ object LatestBlockResource {
 object BlockByNumberResource {
   val uri = "fukuii://block/{number}"
   val name = "Block by Number"
-  val description = Some("Get a specific block by its number")
-  val mimeType = Some("application/json")
+  val description: Some[String] = Some("Get a specific block by its number")
+  val mimeType: Some[String] = Some("application/json")
 
   def read(number: BigInt, deps: McpDependencies): IO[String] = IO {
     deps.blockchainReader.getBlockHeaderByNumber(number) match {
@@ -267,8 +268,8 @@ object BlockByNumberResource {
 object TransactionByHashResource {
   val uri = "fukuii://tx/{hash}"
   val name = "Transaction by Hash"
-  val description = Some("Get transaction location by its hash")
-  val mimeType = Some("application/json")
+  val description: Some[String] = Some("Get transaction location by its hash")
+  val mimeType: Some[String] = Some("application/json")
 
   def read(hashStr: String, deps: McpDependencies): IO[String] = IO {
     val hashBytes =
@@ -293,15 +294,15 @@ object TransactionByHashResource {
 object AccountByAddressResource {
   val uri = "fukuii://account/{address}"
   val name = "Account by Address"
-  val description = Some("Get account state (nonce, balance) by address at the latest block")
-  val mimeType = Some("application/json")
+  val description: Some[String] = Some("Get account state (nonce, balance) by address at the latest block")
+  val mimeType: Some[String] = Some("application/json")
 
   def read(addrStr: String, deps: McpDependencies): IO[String] = IO {
     Try {
       val addrBytes = org.bouncycastle.util.encoders.Hex.decode(addrStr.stripPrefix("0x"))
       val address = Address(org.apache.pekko.util.ByteString(addrBytes))
-      val blockNum = deps.blockchainReader.getBestBlockNumber()
-      val accountOpt = deps.blockchainReader.getAccount(deps.blockchainReader.getBestBranch(), address, blockNum)
+      val blockNum = deps.blockchainReader.getBestBlockNumber
+      val accountOpt = deps.blockchainReader.getAccount(deps.blockchainReader.getBestBranch, address, blockNum)
       accountOpt match {
         case Some(account) =>
           val balanceEtc = BigDecimal(account.balance.toBigInt) / BigDecimal("1000000000000000000")

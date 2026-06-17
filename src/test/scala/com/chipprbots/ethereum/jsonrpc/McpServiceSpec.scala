@@ -3,12 +3,13 @@ package com.chipprbots.ethereum.jsonrpc
 import java.util.concurrent.atomic.AtomicReference
 
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.{TestKit, TestProbe}
+import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.Timeout
 
 import cats.effect.unsafe.implicits.global
 
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
@@ -16,8 +17,8 @@ import org.scalatest.wordspec.AnyWordSpecLike
 
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage
 import com.chipprbots.ethereum.domain.BlockchainReader
-import com.chipprbots.ethereum.jsonrpc.McpService.*
-import com.chipprbots.ethereum.utils.*
+import com.chipprbots.ethereum.jsonrpc.McpService._
+import com.chipprbots.ethereum.utils._
 
 class McpServiceSpec
     extends TestKit(ActorSystem("McpServiceSpec"))
@@ -31,10 +32,10 @@ class McpServiceSpec
   implicit val timeout: Timeout = Timeout(3.seconds)
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
 
-  val peerManagerProbe = TestProbe()
-  val syncControllerProbe = TestProbe()
+  val peerManagerProbe: TestProbe = TestProbe()
+  val syncControllerProbe: TestProbe = TestProbe()
 
-  val testBlockchainConfig = BlockchainConfig(
+  val testBlockchainConfig: BlockchainConfig = BlockchainConfig(
     chainId = BigInt(61),
     networkId = 1,
     maxCodeSize = None,

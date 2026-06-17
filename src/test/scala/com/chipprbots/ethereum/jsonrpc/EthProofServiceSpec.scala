@@ -15,10 +15,10 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.*
+import com.chipprbots.ethereum._
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.consensus.pow.blocks.PoWBlockGenerator
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.jsonrpc.EthUserService.GetBalanceRequest
 import com.chipprbots.ethereum.jsonrpc.EthUserService.GetBalanceResponse
 import com.chipprbots.ethereum.jsonrpc.EthUserService.GetStorageAtRequest
@@ -28,7 +28,16 @@ import com.chipprbots.ethereum.jsonrpc.ProofService.StorageProofKey
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.defaultByteArraySerializable
 import com.chipprbots.ethereum.nodebuilder.ApisBuilder
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofResponse
+import com.chipprbots.ethereum.jsonrpc.EthUserService.GetTransactionCountResponse
+import com.chipprbots.ethereum.jsonrpc.ProofService.ProofAccount
+import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofResponse
+import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofResponse
+import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofResponse
+import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofResponse
+import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofResponse
+import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofResponse
 
 class EthProofServiceSpec
     extends TestKit(ActorSystem("EthGetProofSpec_ActorSystem"))
@@ -45,15 +54,15 @@ class EthProofServiceSpec
   implicit val runtime: IORuntime = IORuntime.global
 
   "EthProofService" should "handle getStorageAt request" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    val request = GetProofRequest(address, storageKeys, blockNumber)
-    val result = ethGetProof.getProof(request)
+    val request: GetProofRequest = GetProofRequest(address, storageKeys, blockNumber)
+    val result: cats.effect.IO[Either[JsonRpcError, GetProofResponse]] = ethGetProof.getProof(request)
 
     val balanceResponse: GetBalanceResponse = ethUserService
       .getBalance(GetBalanceRequest(address, BlockParam.Latest))
       .unsafeRunSync()
       .getOrElse(fail("ethUserService.getBalance did not get valid response"))
 
-    val transactionCountResponse = ethUserService
+    val transactionCountResponse: GetTransactionCountResponse = ethUserService
       .getTransactionCount(GetTransactionCountRequest(address, BlockParam.Latest))
       .unsafeRunSync()
       .getOrElse(fail("ethUserService.getTransactionCount did not get valid response"))
@@ -66,7 +75,7 @@ class EthProofServiceSpec
         .value
     }
 
-    val givenResult = result
+    val givenResult: ProofAccount = result
       .unsafeRunSync()
       .getOrElse(fail())
       .proofAccount
@@ -91,8 +100,8 @@ class EthProofServiceSpec
     UnitTest,
     RPCTest
   ) in new TestSetup {
-    val wrongAddress = Address(666)
-    val result = fetchProof(wrongAddress, storageKeys, blockNumber).unsafeRunSync()
+    val wrongAddress: Address = Address(666)
+    val result: Either[JsonRpcError, GetProofResponse] = fetchProof(wrongAddress, storageKeys, blockNumber).unsafeRunSync()
     result.isLeft shouldBe true
     result.fold(l => l.message should include("No account found for Address"), r => r)
   }
@@ -101,8 +110,8 @@ class EthProofServiceSpec
     UnitTest,
     RPCTest
   ) in new TestSetup {
-    val wrongStorageKey = Seq(StorageProofKey(321))
-    val result = fetchProof(address, wrongStorageKey, blockNumber).unsafeRunSync()
+    val wrongStorageKey: Seq[StorageProofKey] = Seq(StorageProofKey(321))
+    val result: Either[JsonRpcError, GetProofResponse] = fetchProof(address, wrongStorageKey, blockNumber).unsafeRunSync()
     result.isRight shouldBe true
     result.fold(
       l => l,
@@ -132,8 +141,8 @@ class EthProofServiceSpec
     UnitTest,
     RPCTest
   ) in new TestSetup {
-    val storageKey = Seq(StorageProofKey(key))
-    val result = fetchProof(address, storageKey, blockNumber).unsafeRunSync()
+    val storageKey: Seq[StorageProofKey] = Seq(StorageProofKey(key))
+    val result: Either[JsonRpcError, GetProofResponse] = fetchProof(address, storageKey, blockNumber).unsafeRunSync()
     result.isRight shouldBe true
     result.fold(
       l => l,
@@ -163,9 +172,9 @@ class EthProofServiceSpec
     UnitTest,
     RPCTest
   ) in new TestSetup {
-    val storageKey = Seq(StorageProofKey(key), StorageProofKey(key2))
-    val expectedValueStorageKey = Seq(BigInt(value), BigInt(value2))
-    val result = fetchProof(address, storageKey, blockNumber).unsafeRunSync()
+    val storageKey: Seq[StorageProofKey] = Seq(StorageProofKey(key), StorageProofKey(key2))
+    val expectedValueStorageKey: Seq[BigInt] = Seq(BigInt(value), BigInt(value2))
+    val result: Either[JsonRpcError, GetProofResponse] = fetchProof(address, storageKey, blockNumber).unsafeRunSync()
     result.isRight shouldBe true
     result.fold(
       l => l,
@@ -196,10 +205,10 @@ class EthProofServiceSpec
     UnitTest,
     RPCTest
   ) in new TestSetup {
-    val wrongStorageKey = StorageProofKey(321)
-    val storageKey = Seq(StorageProofKey(key), StorageProofKey(key2)) :+ wrongStorageKey
-    val expectedValueStorageKey = Seq(BigInt(value), BigInt(value2), BigInt(0))
-    val result = fetchProof(address, storageKey, blockNumber).unsafeRunSync()
+    val wrongStorageKey: StorageProofKey = StorageProofKey(321)
+    val storageKey: Seq[StorageProofKey] = Seq(StorageProofKey(key), StorageProofKey(key2)) :+ wrongStorageKey
+    val expectedValueStorageKey: Seq[BigInt] = Seq(BigInt(value), BigInt(value2), BigInt(0))
+    val result: Either[JsonRpcError, GetProofResponse] = fetchProof(address, storageKey, blockNumber).unsafeRunSync()
     result.isRight shouldBe true
     result.fold(
       l => l,
@@ -227,7 +236,7 @@ class EthProofServiceSpec
     UnitTest,
     RPCTest
   ) in new TestSetup {
-    val result = fetchProof(address, Seq.empty, blockNumber).unsafeRunSync()
+    val result: Either[JsonRpcError, GetProofResponse] = fetchProof(address, Seq.empty, blockNumber).unsafeRunSync()
     result.isRight shouldBe true
     result.fold(
       l => l,

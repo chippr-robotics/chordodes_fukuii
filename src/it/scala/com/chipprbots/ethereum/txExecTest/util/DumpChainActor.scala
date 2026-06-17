@@ -3,20 +3,22 @@ package com.chipprbots.ethereum.txExecTest.util
 import java.io.FileWriter
 import java.net.URI
 
-import org.apache.pekko.actor.*
+import org.apache.pekko.actor._
 import org.apache.pekko.util.ByteString
 
 import scala.collection.immutable.HashMap
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 import scala.language.postfixOps
 
 import org.bouncycastle.util.encoders.Hex
 
+import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs._
+import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs._
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
-import com.chipprbots.ethereum.domain.BlockHeaderImplicits.*
+import com.chipprbots.ethereum.domain.BlockHeaderImplicits._
 import com.chipprbots.ethereum.domain.Receipt
 import com.chipprbots.ethereum.mpt.BranchNode
 import com.chipprbots.ethereum.mpt.ExtensionNode
@@ -32,11 +34,8 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.
 import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.network.PeerManagerActor.GetPeers
 import com.chipprbots.ethereum.network.PeerManagerActor.Peers
-import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs.*
-import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs.*
 import com.chipprbots.ethereum.network.p2p.messages.Codes
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.TypedTransaction.*
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockBodies
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockBodies
@@ -45,8 +44,9 @@ import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetNodeData
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetReceipts
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NodeData
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Receipts68
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.TypedTransaction._
 import com.chipprbots.ethereum.rlp.RLPList
-import com.chipprbots.ethereum.txExecTest.util.DumpChainActor.*
+import com.chipprbots.ethereum.txExecTest.util.DumpChainActor._
 
 /** Actor used for obtaining all the blockchain data (blocks, receipts, nodes) from the blocks [startBlock, maxBlocks]
   * from a peer bootstrapNode. The bootstrapNode is assumed to respond to all the messages and properly, so no

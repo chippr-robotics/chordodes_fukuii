@@ -1,7 +1,9 @@
 package com.chipprbots.ethereum.utils
 
 import ch.qos.logback.core.PropertyDefinerBase
-import com.typesafe.config.{Config, ConfigException, ConfigFactory}
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigException
+import com.typesafe.config.ConfigFactory
 
 /** PropertyDefiner for logback that loads values from TypeSafe Config.
   *

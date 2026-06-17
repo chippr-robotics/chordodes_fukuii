@@ -1,31 +1,36 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
-import org.apache.pekko.actor.{Actor, ActorLogging, ActorRef, Props, SupervisorStrategy, OneForOneStrategy}
-import org.apache.pekko.actor.SupervisorStrategy.*
+import org.apache.pekko.actor.Actor
+import org.apache.pekko.actor.ActorLogging
+import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.OneForOneStrategy
+import org.apache.pekko.actor.Props
+import org.apache.pekko.actor.SupervisorStrategy
+import org.apache.pekko.actor.SupervisorStrategy._
 import org.apache.pekko.util.ByteString
-import org.bouncycastle.util.encoders.Hex
 
 import scala.collection.mutable
+import scala.concurrent.Await
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.*
-import scala.jdk.CollectionConverters.*
-
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 
-import com.chipprbots.ethereum.blockchain.sync.snap.*
+import org.bouncycastle.util.encoders.Hex
+
 import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController
-import com.chipprbots.ethereum.db.storage.{
-  BfsEntry,
-  BfsQueueStorage,
-  HealingFrontierStorage,
-  InMemoryBfsQueueStorage,
-  MptStorage,
-  PathNodeStorage
-}
-import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.blockchain.sync.snap._
+import com.chipprbots.ethereum.db.storage.BfsEntry
+import com.chipprbots.ethereum.db.storage.BfsQueueStorage
+import com.chipprbots.ethereum.db.storage.HealingFrontierStorage
+import com.chipprbots.ethereum.db.storage.InMemoryBfsQueueStorage
+import com.chipprbots.ethereum.db.storage.MptStorage
+import com.chipprbots.ethereum.db.storage.PathNodeStorage
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
-import com.chipprbots.ethereum.network.p2p.messages.SNAP.{GetTrieNodes, TrieNodes}
+import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetTrieNodes
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.TrieNodes
 
 /** TrieNodeHealingCoordinator manages the healing phase of SNAP sync.
   *

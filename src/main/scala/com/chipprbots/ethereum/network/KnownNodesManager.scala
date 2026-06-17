@@ -8,7 +8,7 @@ import org.apache.pekko.actor.Props
 import org.apache.pekko.actor.Scheduler
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
 import com.chipprbots.ethereum.db.storage.KnownNodesStorage
 import com.chipprbots.ethereum.network.KnownNodesManager.KnownNodesManagerConfig
@@ -24,7 +24,7 @@ class KnownNodesManager(
 
   private def scheduler = externalSchedulerOpt.getOrElse(context.system.scheduler)
 
-  var knownNodes: Set[URI] = knownNodesStorage.getKnownNodes()
+  var knownNodes: Set[URI] = knownNodesStorage.getKnownNodes
 
   var toAdd: Set[URI] = Set.empty
 

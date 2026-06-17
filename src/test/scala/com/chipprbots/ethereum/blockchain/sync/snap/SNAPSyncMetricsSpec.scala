@@ -4,7 +4,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.metrics.Metrics
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 /** Setter round-trip for the spec 002 US2 healing-walk observability gauges (T019). The `SNAPSyncMetrics` push gauges
   * are registered directly on the (static default) `SimpleMeterRegistry` via `registry.gauge(name, AtomicLong)`, so the

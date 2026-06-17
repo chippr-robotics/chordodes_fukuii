@@ -5,7 +5,7 @@ import org.apache.pekko.util.ByteString
 import com.chipprbots.ethereum.consensus.mining.GetBlockHeaderByHash
 import com.chipprbots.ethereum.consensus.mining.GetNBlocksBack
 import com.chipprbots.ethereum.consensus.pow.validators.OmmersValidator.OmmersError
-import com.chipprbots.ethereum.consensus.pow.validators.OmmersValidator.OmmersError.*
+import com.chipprbots.ethereum.consensus.pow.validators.OmmersValidator.OmmersError._
 import com.chipprbots.ethereum.consensus.pow.validators.OmmersValidator.OmmersValid
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid

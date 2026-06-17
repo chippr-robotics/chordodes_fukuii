@@ -1,15 +1,14 @@
 package com.chipprbots.ethereum.blockchain.checkpoint
-
 import java.net.InetSocketAddress
 import java.nio.file.Files
 import java.nio.file.Path
 
+import scala.compiletime.uninitialized
 import scala.util.Using
 
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpHandler
 import com.sun.net.httpserver.HttpServer
-
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.EitherValues
 import org.scalatest.matchers.should.Matchers
@@ -19,9 +18,9 @@ import com.chipprbots.ethereum.testing.Tags.UnitTest
 
 class CheckpointDownloaderSpec extends AnyWordSpec with Matchers with EitherValues with BeforeAndAfterEach {
 
-  private var server: HttpServer = _
-  private var port: Int = _
-  private var tmpDir: Path = _
+  private var server: HttpServer = uninitialized
+  private var port: Int = uninitialized
+  private var tmpDir: Path = uninitialized
 
   override def beforeEach(): Unit = {
     tmpDir = Files.createTempDirectory("checkpoint-download-spec")

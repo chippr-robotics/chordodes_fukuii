@@ -1,9 +1,10 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
 import org.apache.pekko.util.ByteString
+
+import com.chipprbots.ethereum.blockchain.sync.snap._
 import com.chipprbots.ethereum.network.Peer
-import com.chipprbots.ethereum.blockchain.sync.snap.*
-import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
+import com.chipprbots.ethereum.network.p2p.messages.SNAP._
 
 /** Message protocols for SNAP sync actors */
 object Messages {

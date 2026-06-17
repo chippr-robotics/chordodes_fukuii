@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.ledger
 
 import org.apache.pekko.util.ByteString
-import org.apache.pekko.util.ByteString.empty as bEmpty
+import org.apache.pekko.util.ByteString.{empty => bEmpty}
 
 import cats.data.NonEmptyList
 import cats.effect.unsafe.IORuntime
@@ -28,7 +28,7 @@ import com.chipprbots.ethereum.crypto.generateKeyPair
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.MptStorage
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.ledger.BlockExecutionError.ValidationAfterExecError
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.security.SecureRandomBuilder

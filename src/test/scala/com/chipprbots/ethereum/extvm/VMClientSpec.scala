@@ -12,24 +12,26 @@ import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.domain.UInt256
+import com.chipprbots.ethereum.extvm.msg.BlockHeader
+import com.chipprbots.ethereum.extvm.msg.Blockhash
+import com.chipprbots.ethereum.extvm.msg.CallContext
 import com.chipprbots.ethereum.extvm.msg.CallContext.Config
 import com.chipprbots.ethereum.extvm.msg.CallResult
+import com.chipprbots.ethereum.extvm.msg.Code
+import com.chipprbots.ethereum.extvm.msg.GetAccount
+import com.chipprbots.ethereum.extvm.msg.GetBlockhash
+import com.chipprbots.ethereum.extvm.msg.GetCode
+import com.chipprbots.ethereum.extvm.msg.GetStorageData
+import com.chipprbots.ethereum.extvm.msg.Hello
+import com.chipprbots.ethereum.extvm.msg.StorageData
 import com.chipprbots.ethereum.extvm.msg.VMQuery
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
 import com.chipprbots.ethereum.utils.VmConfig
-import com.chipprbots.ethereum.vm.*
+import com.chipprbots.ethereum.vm._
 import com.chipprbots.ethereum.vm.utils.MockVmInput
-import com.chipprbots.ethereum.extvm.msg.BlockHeader
-import com.chipprbots.ethereum.extvm.msg.CallContext
-import com.chipprbots.ethereum.extvm.msg.GetAccount
-import com.chipprbots.ethereum.extvm.msg.GetStorageData
-import com.chipprbots.ethereum.extvm.msg.StorageData
-import com.chipprbots.ethereum.extvm.msg.GetCode
-import com.chipprbots.ethereum.extvm.msg.Code
-import com.chipprbots.ethereum.extvm.msg.GetBlockhash
-import com.chipprbots.ethereum.extvm.msg.Blockhash
-import com.chipprbots.ethereum.extvm.msg.Hello
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.extvm.msg.EthereumConfig
+import com.chipprbots.ethereum.extvm.msg.Hello.Config.EthereumConfig
 
 class VMClientSpec extends AnyFlatSpec with Matchers with MockFactory {
 
@@ -176,7 +178,7 @@ class VMClientSpec extends AnyFlatSpec with Matchers with MockFactory {
   it should "send hello msg" taggedAs (UnitTest, VMTest) in new TestSetup {
     val blockchainConfig = com.chipprbots.ethereum.utils.Config.blockchains.blockchainConfig
     val forkBlockNumbers: ForkBlockNumbers = blockchainConfig.forkBlockNumbers
-    val expectedEthereumConfig = msg.EthereumConfig(
+    val expectedEthereumConfig: EthereumConfig = msg.EthereumConfig(
       frontierBlockNumber = forkBlockNumbers.frontierBlockNumber,
       homesteadBlockNumber = forkBlockNumbers.homesteadBlockNumber,
       eip150BlockNumber = forkBlockNumbers.eip150BlockNumber,
@@ -191,8 +193,8 @@ class VMClientSpec extends AnyFlatSpec with Matchers with MockFactory {
       accountStartNonce = blockchainConfig.accountStartNonce,
       chainId = ByteString(blockchainConfig.chainId)
     )
-    val expectedHelloConfigMsg = msg.Hello.Config.EthereumConfig(expectedEthereumConfig)
-    val expectedHelloMsg = msg.Hello(version = "testVersion", config = expectedHelloConfigMsg)
+    val expectedHelloConfigMsg: EthereumConfig = msg.Hello.Config.EthereumConfig(expectedEthereumConfig)
+    val expectedHelloMsg: Hello = msg.Hello(version = "testVersion", config = expectedHelloConfigMsg)
     messageHandler.sendMessage.expects(expectedHelloMsg)
     vmClient.sendHello("testVersion", blockchainConfig)
   }

@@ -1,8 +1,8 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.json4s.JsonAST.*
+import org.json4s.JsonAST._
 
-import com.chipprbots.ethereum.jsonrpc.DebugTracingService.*
+import com.chipprbots.ethereum.jsonrpc.DebugTracingService._
 import com.chipprbots.ethereum.jsonrpc.EthJsonMethodsImplicits.extractCall
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodCodec
 

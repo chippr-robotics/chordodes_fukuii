@@ -11,8 +11,8 @@ import org.bouncycastle.util.encoders.Hex
 import org.json4s.DefaultFormats
 import org.json4s.Extraction
 import org.json4s.Formats
-import org.json4s.JsonAST.*
-import org.json4s.JsonDSL.*
+import org.json4s.JsonAST._
+import org.json4s.JsonDSL._
 import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpecLike
@@ -23,17 +23,17 @@ import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.LongPatience
 import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.crypto.ECDSASignature
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.jsonrpc.EthBlocksService.GetBlockTransactionCountByNumberResponse
-import com.chipprbots.ethereum.jsonrpc.EthTxService.*
-import com.chipprbots.ethereum.jsonrpc.EthUserService.*
+import com.chipprbots.ethereum.jsonrpc.EthTxService._
+import com.chipprbots.ethereum.jsonrpc.EthUserService._
 import com.chipprbots.ethereum.jsonrpc.FilterManager.TxLog
-import com.chipprbots.ethereum.jsonrpc.PersonalService.*
+import com.chipprbots.ethereum.jsonrpc.PersonalService._
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers.OptionNoneToJNullSerializer
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers.QuantitiesSerializer
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers.UnformattedDataJsonSerializer
+import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransaction
-import com.chipprbots.ethereum.testing.Tags.*
 
 // scalastyle:off magic.number
 class JsonRpcControllerEthLegacyTransactionSpec
@@ -104,7 +104,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
   }
 
   it should "handle eth_getRawTransactionByHash request" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
-    val mockEthTxService = mock[EthTxService]
+    val mockEthTxService: EthTxService = mock[EthTxService]
     override val jsonRpcController: JsonRpcController = super.jsonRpcController.copy(ethTxService = mockEthTxService)
 
     val txResponse: SignedTransaction = Fixtures.Blocks.Block3125369.body.transactionList.head
@@ -300,7 +300,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
   }
 
   it should "eth_getTransactionByHash" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
-    val mockEthTxService = mock[EthTxService]
+    val mockEthTxService: EthTxService = mock[EthTxService]
     override val jsonRpcController: JsonRpcController = super.jsonRpcController.copy(ethTxService = mockEthTxService)
 
     val txResponse: TransactionResponse = TransactionResponse(Fixtures.Blocks.Block3125369.body.transactionList.head)
@@ -320,7 +320,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
   }
 
   it should "eth_getTransactionCount" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
-    val mockEthUserService = mock[EthUserService]
+    val mockEthUserService: EthUserService = mock[EthUserService]
     override val jsonRpcController: JsonRpcController =
       super.jsonRpcController.copy(ethUserService = mockEthUserService)
 
@@ -342,8 +342,8 @@ class JsonRpcControllerEthLegacyTransactionSpec
 
   it should "eth_getBlockTransactionCountByNumber " taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
     // MIGRATION: Scala 3 scalamock macro drops Option[ForkChoiceManager] type arg — use concrete stub
-    val mockEthBlocksService = new EthBlocksService(null, null, null, null) {
-      override def getBlockTransactionCountByNumber(req: EthBlocksService.GetBlockTransactionCountByNumberRequest) =
+    val mockEthBlocksService: EthBlocksService = new EthBlocksService(null, null, null, null) {
+      override def getBlockTransactionCountByNumber(req: EthBlocksService.GetBlockTransactionCountByNumberRequest): ServiceResponse[GetBlockTransactionCountByNumberResponse] =
         IO.pure(Right(GetBlockTransactionCountByNumberResponse(17)))
     }
     override val jsonRpcController: JsonRpcController =
@@ -380,7 +380,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
   }
 
   it should "eth_getTransactionReceipt post byzantium" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
-    val mockEthTxService = mock[EthTxService]
+    val mockEthTxService: EthTxService = mock[EthTxService]
     override val jsonRpcController: JsonRpcController = super.jsonRpcController.copy(ethTxService = mockEthTxService)
 
     val arbitraryValue = 42
@@ -470,7 +470,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
   }
 
   it should "eth_getTransactionReceipt pre byzantium" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
-    val mockEthTxService = mock[EthTxService]
+    val mockEthTxService: EthTxService = mock[EthTxService]
     override val jsonRpcController: JsonRpcController = super.jsonRpcController.copy(ethTxService = mockEthTxService)
 
     val arbitraryValue = 42
@@ -562,7 +562,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
     UnitTest,
     RPCTest
   ) in new JsonRpcControllerFixture {
-    val mockEthTxService = mock[EthTxService]
+    val mockEthTxService: EthTxService = mock[EthTxService]
     mockEthTxService.ethPendingTransactions
       .expects(*)
       .returning(IO.pure(Right(EthPendingTransactionsResponse(List()))))
@@ -604,7 +604,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
       PendingTransaction(fakeTransaction, System.currentTimeMillis)
     }
 
-    val mockEthTxService = mock[EthTxService]
+    val mockEthTxService: EthTxService = mock[EthTxService]
     mockEthTxService.ethPendingTransactions
       .expects(*)
       .returning(IO.pure(Right(EthPendingTransactionsResponse(transactions))))

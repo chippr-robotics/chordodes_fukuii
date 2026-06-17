@@ -16,7 +16,7 @@ import scala.concurrent.ExecutionContext
 import scala.util.Random
 
 import com.chipprbots.ethereum.consensus.blocks.BlockGenerator
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.TaskActorOps
 import com.chipprbots.ethereum.keystore.KeyStore
 import com.chipprbots.ethereum.ledger.BloomFilter
@@ -77,7 +77,7 @@ class FilterManager(
 
   private def addFilterAndSendResponse(filter: Filter): Unit = {
     filters += (filter.id -> filter)
-    lastCheckBlocks += (filter.id -> blockchainReader.getBestBlockNumber())
+    lastCheckBlocks += (filter.id -> blockchainReader.getBestBlockNumber)
     lastCheckTimestamps += (filter.id -> System.currentTimeMillis())
     resetTimeout(filter.id)
     sender() ! NewFilterResponse(filter.id)
@@ -95,7 +95,7 @@ class FilterManager(
   private def getFilterLogs(id: BigInt): Unit = {
     val filterOpt = filters.get(id)
     filterOpt.foreach { _ =>
-      lastCheckBlocks += (id -> blockchainReader.getBestBlockNumber())
+      lastCheckBlocks += (id -> blockchainReader.getBestBlockNumber)
       lastCheckTimestamps += (id -> System.currentTimeMillis())
     }
     resetTimeout(id)
@@ -150,7 +150,7 @@ class FilterManager(
         }
       }
 
-    val bestBlockNumber = blockchainReader.getBestBlockNumber()
+    val bestBlockNumber = blockchainReader.getBestBlockNumber
 
     val fromBlockNumber =
       startingBlockNumber.getOrElse(resolveBlockNumber(filter.fromBlock.getOrElse(BlockParam.Latest), bestBlockNumber))
@@ -166,7 +166,7 @@ class FilterManager(
   }
 
   private def getFilterChanges(id: BigInt): Unit = {
-    val bestBlockNumber = blockchainReader.getBestBlockNumber()
+    val bestBlockNumber = blockchainReader.getBestBlockNumber
     val lastCheckBlock = lastCheckBlocks.getOrElse(id, bestBlockNumber)
     val lastCheckTimestamp = lastCheckTimestamps.getOrElse(id, System.currentTimeMillis())
 
@@ -245,7 +245,7 @@ class FilterManager(
       filterTopics.zip(logTopics).forall { case (filter, log) => filter.isEmpty || filter.contains(log) }
 
   private def getBlockHashesAfter(blockNumber: BigInt): Seq[ByteString] = {
-    val bestBlock = blockchainReader.getBestBlockNumber()
+    val bestBlock = blockchainReader.getBestBlockNumber
 
     @tailrec
     def recur(currentBlockNumber: BigInt, hashesSoFar: Seq[ByteString]): Seq[ByteString] =
@@ -264,7 +264,7 @@ class FilterManager(
     pendingTransactionsManager
       .askFor[PendingTransactionsManager.PendingTransactionsResponse](PendingTransactionsManager.GetPendingTransactions)
       .flatMap { response =>
-        keyStore.listAccounts() match {
+        keyStore.listAccounts match {
           case Right(accounts) =>
             IO.pure(
               response.pendingTransactions.filter(pt => accounts.contains(pt.stx.senderAddress))

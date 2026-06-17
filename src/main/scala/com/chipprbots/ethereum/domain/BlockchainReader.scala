@@ -83,20 +83,20 @@ class BlockchainReader(
   def getReceiptsByHash(blockhash: ByteString): Option[Seq[Receipt]] = receiptStorage.get(blockhash)
 
   /** get the current best stored branch */
-  def getBestBranch(): Branch = {
-    val number = getBestBlockNumber()
+  def getBestBranch: Branch = {
+    val number = getBestBlockNumber
     blockNumberMappingStorage
       .get(number)
       .map(hash => BestBranch(hash, number))
       .getOrElse(EmptyBranch)
   }
 
-  def getBestBlockNumber(): BigInt = appStateStorage.getBestBlockNumber()
+  def getBestBlockNumber: BigInt = appStateStorage.getBestBlockNumber()
 
-  def getSnapSyncPivotBlock(): Option[BigInt] = appStateStorage.getSnapSyncPivotBlock()
+  def getSnapSyncPivotBlock: Option[BigInt] = appStateStorage.getSnapSyncPivotBlock()
 
   // returns the best known block if it's available in the storage
-  def getBestBlock(): Option[Block] = {
+  def getBestBlock: Option[Block] = {
     val bestKnownBlockinfo = appStateStorage.getBestBlockInfo()
     log.debug("Trying to get best block with number {}", bestKnownBlockinfo.number)
     val bestBlock = getBlockByHash(bestKnownBlockinfo.hash)
@@ -116,7 +116,7 @@ class BlockchainReader(
     * ConsensusAdapter for branch-resolution) should prefer this over `getBestBlock()`, which returns None in that state
     * and forces them into a `BlockImportFailed` retry loop. Closes #1201's post-bootstrap follow-up.
     */
-  def getBestBlockHeader(): Option[BlockHeader] = {
+  def getBestBlockHeader: Option[BlockHeader] = {
     val bestKnownBlockinfo = appStateStorage.getBestBlockInfo()
     getBlockHeaderByHash(bestKnownBlockinfo.hash)
   }
@@ -212,8 +212,8 @@ class BlockchainReader(
         getBlockHeaderByNumber(latestBlock).flatMap(h => getChainWeightByHash(h.hash)) match {
           case Some(cw) => (cw, "CANONICAL_NUMBER")
           case None =>
-            val ourBestNum = getBestBlockNumber()
-            val bestHeaderOpt = getBestBlockHeader()
+            val ourBestNum = getBestBlockNumber
+            val bestHeaderOpt = getBestBlockHeader
             val ourBestTD = bestHeaderOpt
               .flatMap(h => getChainWeightByHash(h.hash))
               .map(_.totalDifficulty)

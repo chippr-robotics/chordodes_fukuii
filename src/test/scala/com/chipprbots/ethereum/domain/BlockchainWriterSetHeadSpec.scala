@@ -5,7 +5,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.BlockHelpers
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 /** Tests for BlockchainWriter.setCanonicalChainHead — the SYNC-FORK rollback mechanism (008c).
   *
@@ -18,12 +18,12 @@ class BlockchainWriterSetHeadSpec extends AnyFlatSpec with Matchers {
     UnitTest,
     StateTest
   ) in new EphemBlockchainTestSetup {
-    val chain = BlockHelpers.generateChain(5, BlockHelpers.genesis)
+    val chain: List[Block] = BlockHelpers.generateChain(5, BlockHelpers.genesis)
     chain.foreach { b =>
       blockchainWriter.save(b, Nil, ChainWeight.totalDifficultyOnly(b.number), saveAsBestBlock = true)
     }
 
-    val targetBlock = chain(1) // block 2 (0-indexed)
+    val targetBlock: Block = chain(1) // block 2 (0-indexed)
     val currentBest = chain.last.number
 
     blockchainWriter.setCanonicalChainHead(targetBlock.number, targetBlock.hash, currentBest)
@@ -33,27 +33,27 @@ class BlockchainWriterSetHeadSpec extends AnyFlatSpec with Matchers {
     blockchainReader.getBlockHeaderByNumber(chain.last.number) shouldBe None
 
     // Target itself is still the canonical head
-    blockchainReader.getBestBlockNumber() shouldBe targetBlock.number
+    blockchainReader.getBestBlockNumber shouldBe targetBlock.number
   }
 
   it should "update the best-block pointer to the target block" taggedAs (UnitTest, StateTest) in
     new EphemBlockchainTestSetup {
-      val chain = BlockHelpers.generateChain(4, BlockHelpers.genesis)
+      val chain: List[Block] = BlockHelpers.generateChain(4, BlockHelpers.genesis)
       chain.foreach { b =>
         blockchainWriter.save(b, Nil, ChainWeight.totalDifficultyOnly(b.number), saveAsBestBlock = true)
       }
 
-      val target = chain(0) // block 1
+      val target: Block = chain(0) // block 1
       blockchainWriter.setCanonicalChainHead(target.number, target.hash, chain.last.number)
 
-      blockchainReader.getBestBlockNumber() shouldBe target.number
+      blockchainReader.getBestBlockNumber shouldBe target.number
     }
 
   it should "leave block headers accessible by hash (soft delete — headers are not removed)" taggedAs (
     UnitTest,
     StateTest
   ) in new EphemBlockchainTestSetup {
-    val chain = BlockHelpers.generateChain(3, BlockHelpers.genesis)
+    val chain: List[Block] = BlockHelpers.generateChain(3, BlockHelpers.genesis)
     chain.foreach { b =>
       blockchainWriter.save(b, Nil, ChainWeight.totalDifficultyOnly(b.number), saveAsBestBlock = true)
     }
@@ -71,7 +71,7 @@ class BlockchainWriterSetHeadSpec extends AnyFlatSpec with Matchers {
 
   it should "be a no-op when currentBest equals targetNumber" taggedAs (UnitTest, StateTest) in
     new EphemBlockchainTestSetup {
-      val chain = BlockHelpers.generateChain(3, BlockHelpers.genesis)
+      val chain: List[Block] = BlockHelpers.generateChain(3, BlockHelpers.genesis)
       chain.foreach { b =>
         blockchainWriter.save(b, Nil, ChainWeight.totalDifficultyOnly(b.number), saveAsBestBlock = true)
       }
@@ -80,13 +80,13 @@ class BlockchainWriterSetHeadSpec extends AnyFlatSpec with Matchers {
       // currentBest == targetNumber → no-op
       blockchainWriter.setCanonicalChainHead(best.number, best.hash, best.number)
 
-      blockchainReader.getBestBlockNumber() shouldBe best.number
+      blockchainReader.getBestBlockNumber shouldBe best.number
       blockchainReader.getBlockHeaderByNumber(best.number) shouldBe Some(best.header)
     }
 
   it should "be a no-op when currentBest is less than targetNumber" taggedAs (UnitTest, StateTest) in
     new EphemBlockchainTestSetup {
-      val chain = BlockHelpers.generateChain(2, BlockHelpers.genesis)
+      val chain: List[Block] = BlockHelpers.generateChain(2, BlockHelpers.genesis)
       chain.foreach { b =>
         blockchainWriter.save(b, Nil, ChainWeight.totalDifficultyOnly(b.number), saveAsBestBlock = true)
       }
@@ -95,19 +95,19 @@ class BlockchainWriterSetHeadSpec extends AnyFlatSpec with Matchers {
       // Pass currentBest lower than targetNumber — guard must prevent any write
       blockchainWriter.setCanonicalChainHead(best.number + 5, best.hash, best.number)
 
-      blockchainReader.getBestBlockNumber() shouldBe best.number
+      blockchainReader.getBestBlockNumber shouldBe best.number
     }
 
   it should "remove all intermediate number→hash entries between target and currentBest" taggedAs (
     UnitTest,
     StateTest
   ) in new EphemBlockchainTestSetup {
-    val chain = BlockHelpers.generateChain(6, BlockHelpers.genesis)
+    val chain: List[Block] = BlockHelpers.generateChain(6, BlockHelpers.genesis)
     chain.foreach { b =>
       blockchainWriter.save(b, Nil, ChainWeight.totalDifficultyOnly(b.number), saveAsBestBlock = true)
     }
 
-    val target = chain(1) // block 2
+    val target: Block = chain(1) // block 2
     val currentBest = chain.last.number
     blockchainWriter.setCanonicalChainHead(target.number, target.hash, currentBest)
 

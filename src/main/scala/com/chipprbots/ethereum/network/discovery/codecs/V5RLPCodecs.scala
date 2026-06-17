@@ -4,15 +4,18 @@ import scala.util.Try
 
 import com.chipprbots.scalanet.discovery.ethereum.EthereumNodeRecord
 import com.chipprbots.scalanet.discovery.ethereum.v5.Payload
-
-import scodec.{Attempt, Codec, DecodeResult, Err}
-import scodec.bits.{BitVector, ByteVector}
+import scodec.Attempt
+import scodec.Codec
+import scodec.DecodeResult
+import scodec.Err
+import scodec.bits.BitVector
+import scodec.bits.ByteVector
 
 import com.chipprbots.ethereum.rlp
 import com.chipprbots.ethereum.rlp.RLPCodec
 import com.chipprbots.ethereum.rlp.RLPCodec.Ops
 import com.chipprbots.ethereum.rlp.RLPEncoder
-import com.chipprbots.ethereum.rlp.RLPImplicitDerivations.*
+import com.chipprbots.ethereum.rlp.RLPImplicitDerivations._
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
 import com.chipprbots.ethereum.rlp.RLPList
 

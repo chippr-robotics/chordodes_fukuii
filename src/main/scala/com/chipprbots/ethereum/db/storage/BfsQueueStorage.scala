@@ -5,8 +5,10 @@ import java.util.concurrent.atomic.AtomicLong
 
 import scala.collection.mutable
 
-import com.chipprbots.ethereum.db.dataSource.{DataSource, DataSourceUpdateOptimized, RocksDbDataSource}
+import com.chipprbots.ethereum.db.dataSource.DataSource
 import com.chipprbots.ethereum.db.dataSource.DataSource.Namespace
+import com.chipprbots.ethereum.db.dataSource.DataSourceUpdateOptimized
+import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource
 
 /** One decoded entry from the BFS level queue. */
 final case class BfsEntry(hash: Array[Byte], pathset: Seq[Array[Byte]], isStorage: Boolean)

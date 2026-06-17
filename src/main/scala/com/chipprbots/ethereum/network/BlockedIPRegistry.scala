@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.network
 
-import scala.jdk.CollectionConverters.*
+import scala.jdk.CollectionConverters._
 
 /** Thread-safe runtime IP blocklist.
   *

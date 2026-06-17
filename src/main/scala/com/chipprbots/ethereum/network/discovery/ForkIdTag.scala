@@ -1,17 +1,21 @@
 package com.chipprbots.ethereum.network.discovery
 
-import cats.effect.SyncIO
 import org.apache.pekko.util.ByteString
-import scodec.bits.ByteVector
 
-import com.chipprbots.ethereum.forkid.{Connect, ForkId, ForkIdValidator}
-import com.chipprbots.ethereum.forkid.ForkId.*
-import com.chipprbots.ethereum.rlp.*
-import com.chipprbots.ethereum.utils.BlockchainConfig
-import com.chipprbots.scalanet.discovery.ethereum.EthereumNodeRecord
-import com.chipprbots.scalanet.discovery.ethereum.KeyValueTag
+import cats.effect.SyncIO
 
 import scala.util.Try
+
+import com.chipprbots.scalanet.discovery.ethereum.EthereumNodeRecord
+import com.chipprbots.scalanet.discovery.ethereum.KeyValueTag
+import scodec.bits.ByteVector
+
+import com.chipprbots.ethereum.forkid.Connect
+import com.chipprbots.ethereum.forkid.ForkId
+import com.chipprbots.ethereum.forkid.ForkId._
+import com.chipprbots.ethereum.forkid.ForkIdValidator
+import com.chipprbots.ethereum.rlp._
+import com.chipprbots.ethereum.utils.BlockchainConfig
 
 /** ENR-based forkId filter (EIP-2124). Rejects peers on incompatible chains before TCP is dialed by reading the `eth`
   * ENR key. Network-aware: derives fork ID from the runtime genesis hash and the selected network's fork schedule

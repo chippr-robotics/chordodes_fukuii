@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.domain
 import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.db.dataSource.DataSourceBatchUpdate
-import com.chipprbots.ethereum.db.storage.*
+import com.chipprbots.ethereum.db.storage._
 import com.chipprbots.ethereum.domain
 import com.chipprbots.ethereum.domain.appstate.BlockInfo
 import com.chipprbots.ethereum.jsonrpc.ProofService.StorageProof
@@ -147,7 +147,7 @@ class BlockchainImpl(
     val txList = block.body.transactionList
 
     val blockNumberMappingUpdates =
-      if (blockchainReader.getHashByBlockNumber(blockchainReader.getBestBranch(), block.number).contains(blockHash))
+      if (blockchainReader.getHashByBlockNumber(blockchainReader.getBestBranch, block.number).contains(blockHash))
         removeBlockNumberMapping(block.number)
       else blockNumberMappingStorage.emptyBatchUpdate
 

@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.jsonrpc
 
 import com.chipprbots.ethereum.consensus.engine.ForkChoiceManager
 import com.chipprbots.ethereum.consensus.mining.Mining
-import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain._
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 
 sealed trait BlockParam
@@ -71,11 +71,11 @@ trait ResolveBlock {
 
   private def getBlock(number: BigInt): Either[JsonRpcError, Block] =
     blockchainReader
-      .getBlockByNumber(blockchainReader.getBestBranch(), number)
+      .getBlockByNumber(blockchainReader.getBestBranch, number)
       .toRight(JsonRpcError.InvalidParams(s"Block $number not found"))
 
   private def getLatestBlock(): Either[JsonRpcError, Block] =
     blockchainReader
-      .getBestBlock()
+      .getBestBlock
       .toRight(JsonRpcError.InvalidParams("Latest block not found"))
 }

@@ -131,7 +131,7 @@ class EthTxService(
         // advanced past it). (a) alone is true right after newPayload's storeBlock but
         // (b) flips only when the subsequent FCU updates saveBestKnownBlocks.
         _ <- blockchainReader.getBlockHeaderByNumber(header.number).filter(_.hash == blockHash)
-        bestNum = blockchainReader.getBestBlockNumber() if header.number <= bestNum
+        bestNum = blockchainReader.getBestBlockNumber if header.number <= bestNum
         stx <- body.transactionList.lift(txIndex)
         receipts <- blockchainReader.getReceiptsByHash(blockHash)
         receipt: Receipt <- receipts.lift(txIndex)
@@ -195,7 +195,7 @@ class EthTxService(
   //     ETH post-London:         baseFee (dynamic) + 1 gwei (minTip default)
   private[jsonrpc] def minimumGasPrice(): BigInt = {
     val minViable = blockchainReader
-      .getBestBlock()
+      .getBestBlock
       .flatMap(_.header.baseFee) match {
       case Some(baseFee) => baseFee.max(blockchainConfig.baseFeeFloor) + blockchainConfig.minTip
       case None          => BigInt(0) // floor set by .max(1) below
@@ -213,8 +213,8 @@ class EthTxService(
   //   - Fall back to minimumGasPrice() when no transactions are available (never returns 0).
   private[jsonrpc] def suggestGasPrice(): BigInt = {
     val floor = minimumGasPrice()
-    val bestBlock = blockchainReader.getBestBlockNumber()
-    val bestBranch = blockchainReader.getBestBranch()
+    val bestBlock = blockchainReader.getBestBlockNumber
+    val bestBranch = blockchainReader.getBestBranch
 
     val gasPrices = ((bestBlock - GasPriceCheckBlocks + 1).max(BigInt(0)) to bestBlock)
       .flatMap(nb => blockchainReader.getBlockByNumber(bestBranch, nb))
@@ -255,8 +255,8 @@ class EthTxService(
           // per-EVM-config maximum. Derived from the CURRENT chain tip's fork state. Must
           // use the timestamp-aware forBlock variant — Shanghai activates by timestamp on
           // post-merge chains, not block number.
-          val tip = blockchainReader.getBestBlock().map(_.header)
-          val bestNum = tip.map(_.number).getOrElse(blockchainReader.getBestBlockNumber())
+          val tip = blockchainReader.getBestBlock.map(_.header)
+          val bestNum = tip.map(_.number).getOrElse(blockchainReader.getBestBlockNumber)
           val ts = tip.map(_.unixTimestamp).getOrElse(0L)
           val evmConfig = com.chipprbots.ethereum.vm.EvmConfig.forBlock(bestNum, ts, blockchainConfig)
           val tx = signedTransaction.tx

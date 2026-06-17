@@ -6,13 +6,13 @@ import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.util.ByteString
 
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.ParallelTestExecution
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.ParallelTestExecution
 
 import com.chipprbots.ethereum.BlockHelpers
 import com.chipprbots.ethereum.Fixtures
-import com.chipprbots.ethereum.blockchain.sync.fast.BinarySearchSupport.*
+import com.chipprbots.ethereum.blockchain.sync.fast.BinarySearchSupport._
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSyncBranchResolver.SearchState
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockHeader
@@ -21,7 +21,7 @@ import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerId
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 class FastSyncBranchResolverSpec extends AnyWordSpec with Matchers with MockFactory with ParallelTestExecution {
 
@@ -53,7 +53,7 @@ class FastSyncBranchResolverSpec extends AnyWordSpec with Matchers with MockFact
       val headers = headersMap(amount = 3, parent = Block(ValidBlock.header.copy(number = 97), ValidBlock.body))
 
       inSequence {
-        mockedBlockchainReader.getBestBlockNumber.expects().returning(BigInt(100)).once()
+        (() => mockedBlockchainReader.getBestBlockNumber).expects().returning(BigInt(100)).once()
         mockedBlockchainReader.getBlockHeaderByNumber.expects(BigInt(100)).returning(headers.get(100))
         mockedBlockchain.removeBlock.expects(headers(100).hash).returning(())
         mockedBlockchainReader.getBlockHeaderByNumber.expects(BigInt(99)).returning(headers.get(99))

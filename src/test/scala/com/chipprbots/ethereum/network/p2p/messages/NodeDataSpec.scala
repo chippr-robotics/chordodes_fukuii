@@ -6,10 +6,10 @@ import org.bouncycastle.util.encoders.Hex
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.crypto.*
+import com.chipprbots.ethereum.crypto._
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NodeData
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NodeData.*
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NodeData._
+import com.chipprbots.ethereum.testing.Tags._
 
 /** ETHPackets.NodeData encode/decode tests.
   *

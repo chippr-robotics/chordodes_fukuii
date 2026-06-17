@@ -1,8 +1,8 @@
 package com.chipprbots.ethereum.blockchain.sync.snap
 
-import scala.collection.mutable
-
 import org.apache.pekko.util.ByteString
+
+import scala.collection.mutable
 
 import com.chipprbots.ethereum.mpt.StackTrie
 

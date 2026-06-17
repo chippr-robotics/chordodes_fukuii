@@ -1,16 +1,19 @@
 package com.chipprbots.ethereum.vm
 
 import org.apache.pekko.util.ByteString
+
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
+import com.chipprbots.ethereum.Fixtures.{Blocks => BlockFixtures}
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 import Fixtures.blockchainConfig
+import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BlockHeader
 
 /** Tests for EIP-6049: Deprecate SELFDESTRUCT https://eips.ethereum.org/EIPS/eip-6049
   *
@@ -30,8 +33,8 @@ class Eip6049Spec extends AnyWordSpec with Matchers {
     val beneficiaryAddr: Address = Address(0xface)
     val otherAddr: Address = Address(0x9999)
 
-    val fakeHeaderPreEip6049 = BlockFixtures.ValidBlock.header.copy(number = Fixtures.MystiqueBlockNumber)
-    val fakeHeaderWithEip6049 = BlockFixtures.ValidBlock.header.copy(number = Fixtures.SpiralBlockNumber)
+    val fakeHeaderPreEip6049: BlockHeader = BlockFixtures.ValidBlock.header.copy(number = Fixtures.MystiqueBlockNumber)
+    val fakeHeaderWithEip6049: BlockHeader = BlockFixtures.ValidBlock.header.copy(number = Fixtures.SpiralBlockNumber)
 
     // Code that calls SELFDESTRUCT
     val codeWithSelfDestruct: Assembly = Assembly(

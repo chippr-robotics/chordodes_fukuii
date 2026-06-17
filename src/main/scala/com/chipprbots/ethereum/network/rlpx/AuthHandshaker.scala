@@ -17,12 +17,12 @@ import org.bouncycastle.math.ec.ECPoint
 import org.bouncycastle.util.encoders.Hex
 import org.slf4j.LoggerFactory
 
-import com.chipprbots.ethereum.crypto.*
-import com.chipprbots.ethereum.network.*
+import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.network._
 import com.chipprbots.ethereum.rlp
-import com.chipprbots.ethereum.utils.ByteUtils.*
+import com.chipprbots.ethereum.utils.ByteUtils._
 
-import AuthInitiateMessageV4.*
+import AuthInitiateMessageV4._
 
 sealed trait AuthHandshakeResult
 case object AuthHandshakeError extends AuthHandshakeResult

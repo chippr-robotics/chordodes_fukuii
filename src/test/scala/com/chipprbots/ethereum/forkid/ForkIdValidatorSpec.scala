@@ -6,12 +6,12 @@ import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 
 import org.bouncycastle.util.encoders.Hex
-import org.scalatest.matchers.should.*
+import org.scalatest.matchers.should._
 import org.scalatest.wordspec.AnyWordSpec
 
-import com.chipprbots.ethereum.utils.Config.*
+import com.chipprbots.ethereum.utils.Config._
 
-import ForkIdValidator.*
+import ForkIdValidator._
 
 class ForkIdValidatorSpec extends AnyWordSpec with Matchers {
 

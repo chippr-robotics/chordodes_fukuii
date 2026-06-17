@@ -1,9 +1,11 @@
 package com.chipprbots.ethereum.testing
 
+import scala.concurrent.duration._
+
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import scala.concurrent.duration.*
-import com.chipprbots.ethereum.testing.Tags.*
+
+import com.chipprbots.ethereum.testing.Tags._
 
 /** Test suite to validate KPI baselines are properly defined and accessible.
   *

@@ -5,14 +5,15 @@ import java.util.Hashtable
 import javax.naming.Context
 import javax.naming.directory.InitialDirContext
 
+import org.apache.pekko.util.ByteString
+
+import cats.effect.SyncIO
+
 import scala.collection.mutable
 import scala.util.Try
 
 import org.bouncycastle.crypto.params.ECPublicKeyParameters
 import org.bouncycastle.util.encoders.Hex
-
-import cats.effect.SyncIO
-import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.forkid.Connect

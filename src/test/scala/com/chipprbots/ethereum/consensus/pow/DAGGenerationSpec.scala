@@ -1,11 +1,12 @@
 package com.chipprbots.ethereum.consensus.pow
 
 import org.apache.pekko.util.ByteString
+
 import org.bouncycastle.util.encoders.Hex
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.testing.Tags._
 
 /** SlowTest: verifies Ethash cache and DAG parameter generation for Mordor (ECIP-1099).
   *

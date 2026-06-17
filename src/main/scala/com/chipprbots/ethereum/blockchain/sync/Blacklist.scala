@@ -1,9 +1,9 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import scala.concurrent.duration.*
-import scala.jdk.CollectionConverters.*
-import scala.jdk.DurationConverters.*
-import scala.jdk.OptionConverters.*
+import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
+import scala.jdk.DurationConverters._
+import scala.jdk.OptionConverters._
 
 import com.github.blemale.scaffeine.Cache
 import com.github.blemale.scaffeine.Scaffeine
@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.network.NetworkMetrics
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect
 import com.chipprbots.ethereum.utils.Logger
 
-import Blacklist.*
+import Blacklist._
 
 trait Blacklist {
   def isBlacklisted(id: BlacklistId): Boolean

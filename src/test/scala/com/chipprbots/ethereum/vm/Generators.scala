@@ -5,12 +5,12 @@ import org.apache.pekko.util.ByteString
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
 
-import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
+import com.chipprbots.ethereum.Fixtures.{Blocks => BlockFixtures}
 import com.chipprbots.ethereum.ObjectGenerators
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.vm.MockWorldState.*
+import com.chipprbots.ethereum.vm.MockWorldState._
 
 import Fixtures.blockchainConfig
 

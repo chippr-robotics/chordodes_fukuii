@@ -3,6 +3,15 @@ package com.chipprbots.ethereum.consensus.engine
 import java.util.concurrent.atomic.AtomicLong
 
 import com.chipprbots.ethereum.metrics.MetricsContainer
+import io.micrometer.core.instrument.Gauge
+import io.micrometer.core.instrument.Gauge
+import io.micrometer.core.instrument.Gauge
+import io.micrometer.core.instrument.Gauge
+import io.micrometer.core.instrument.Gauge
+import io.micrometer.core.instrument.Gauge
+import io.micrometer.core.instrument.Gauge
+import io.micrometer.core.instrument.Gauge
+import io.micrometer.core.instrument.Gauge
 
 /** Prometheus metrics for Engine API interactions. Exposed via /metrics endpoint for Grafana dashboards.
   */
@@ -19,19 +28,19 @@ object EngineApiMetrics extends MetricsContainer {
   private val _latestPayloadTimestamp = new AtomicLong(0)
 
   // Note: Metrics.mkName adds "app_" prefix, so "engine_foo" becomes "app_engine_foo" in Prometheus
-  val newPayloadTotal = metrics.gauge("engine_newpayload_total", () => _newPayloadCount.get().toDouble)
-  val newPayloadValid = metrics.gauge("engine_newpayload_valid", () => _newPayloadValidCount.get().toDouble)
-  val newPayloadSyncing = metrics.gauge("engine_newpayload_syncing", () => _newPayloadSyncingCount.get().toDouble)
-  val newPayloadInvalid = metrics.gauge("engine_newpayload_invalid", () => _newPayloadInvalidCount.get().toDouble)
+  val newPayloadTotal: Gauge = metrics.gauge("engine_newpayload_total", () => _newPayloadCount.get().toDouble)
+  val newPayloadValid: Gauge = metrics.gauge("engine_newpayload_valid", () => _newPayloadValidCount.get().toDouble)
+  val newPayloadSyncing: Gauge = metrics.gauge("engine_newpayload_syncing", () => _newPayloadSyncingCount.get().toDouble)
+  val newPayloadInvalid: Gauge = metrics.gauge("engine_newpayload_invalid", () => _newPayloadInvalidCount.get().toDouble)
 
-  val forkchoiceUpdatedTotal =
+  val forkchoiceUpdatedTotal: Gauge =
     metrics.gauge("engine_forkchoice_total", () => _forkchoiceUpdatedCount.get().toDouble)
-  val forkchoiceValid = metrics.gauge("engine_forkchoice_valid", () => _forkchoiceValidCount.get().toDouble)
-  val forkchoiceSyncing = metrics.gauge("engine_forkchoice_syncing", () => _forkchoiceSyncingCount.get().toDouble)
+  val forkchoiceValid: Gauge = metrics.gauge("engine_forkchoice_valid", () => _forkchoiceValidCount.get().toDouble)
+  val forkchoiceSyncing: Gauge = metrics.gauge("engine_forkchoice_syncing", () => _forkchoiceSyncingCount.get().toDouble)
 
-  val latestPayloadBlock =
+  val latestPayloadBlock: Gauge =
     metrics.gauge("engine_latest_payload_block", () => _latestPayloadBlockNumber.get().toDouble)
-  val latestPayloadTimestamp =
+  val latestPayloadTimestamp: Gauge =
     metrics.gauge("engine_latest_payload_timestamp", () => _latestPayloadTimestamp.get().toDouble)
 
   def recordNewPayload(status: String, blockNumber: Long, timestamp: Long): Unit = {

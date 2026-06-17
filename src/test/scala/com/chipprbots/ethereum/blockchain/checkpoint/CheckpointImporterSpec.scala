@@ -15,6 +15,14 @@ import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.domain.BlockchainWriter
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.testing.Tags.UnitTest
+import com.chipprbots.ethereum.blockchain.checkpoint.CheckpointImporter.ImportResult
+import com.chipprbots.ethereum.domain.appstate.BlockInfo
+import com.chipprbots.ethereum.blockchain.checkpoint.CheckpointImporter.ImportError
+import com.chipprbots.ethereum.blockchain.checkpoint.CheckpointImporter.ImportResult
+import com.chipprbots.ethereum.blockchain.checkpoint.CheckpointImporter.ImportError
+import com.chipprbots.ethereum.blockchain.checkpoint.CheckpointImporter.ImportResult
+import java.nio.file.Path
+import com.chipprbots.ethereum.domain.BlockchainReader
 
 class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues with OptionValues {
 
@@ -22,15 +30,15 @@ class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues
 
     "import a single-account archive end-to-end" taggedAs UnitTest in new Setup {
       val header = checkpointHeader
-      val nodes = Seq(
+      val nodes: Seq[(ByteString, Array[Byte])] = Seq(
         (hash("rootNode"), Array.fill[Byte](48)(0xab.toByte)),
         (hash("storageRoot"), Array.fill[Byte](64)(0xcd.toByte))
       )
-      val bytecodes = Seq(
+      val bytecodes: Seq[(ByteString, Array[Byte])] = Seq(
         (hash("code1"), "bytecode1".getBytes("UTF-8")),
         (hash("code2"), "bytecode2".getBytes("UTF-8"))
       )
-      val bytes = encodeArchive(header, nodes, bytecodes)
+      val bytes: Array[Byte] = encodeArchive(header, nodes, bytecodes)
 
       val importer = new CheckpointImporter(
         writer,
@@ -38,7 +46,7 @@ class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues
         freshStorage.storages.evmCodeStorage,
         freshStorage.storages.appStateStorage
       )
-      val result =
+      val result: ImportResult =
         importer.importFromStream(new ByteArrayInputStream(bytes), Some(checkpointChainId)).value
 
       result.blockNumber shouldBe header.blockHeader.number
@@ -46,7 +54,7 @@ class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues
       result.bytecodesImported shouldBe bytecodes.length
 
       // Best-block pointers
-      val best = freshStorage.storages.appStateStorage.getBestBlockInfo()
+      val best: BlockInfo = freshStorage.storages.appStateStorage.getBestBlockInfo()
       best.number shouldBe header.blockHeader.number
       best.hash shouldBe header.blockHeader.hash
 
@@ -72,7 +80,7 @@ class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues
 
     "reject an archive with a mismatched chainId" taggedAs UnitTest in new Setup {
       val header = checkpointHeader
-      val bytes = encodeArchive(header, Nil, Nil)
+      val bytes: Array[Byte] = encodeArchive(header, Nil, Nil)
 
       val importer = new CheckpointImporter(
         writer,
@@ -81,7 +89,7 @@ class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues
         freshStorage.storages.appStateStorage
       )
       // expect chainId 9999; archive declares 61
-      val result = importer.importFromStream(new ByteArrayInputStream(bytes), Some(9999L))
+      val result: Either[ImportError, ImportResult] = importer.importFromStream(new ByteArrayInputStream(bytes), Some(9999L))
       result shouldBe Left(CheckpointImporter.ChainIdMismatch(9999L, checkpointChainId))
 
       // Best block must remain at 0 on rejection
@@ -91,8 +99,8 @@ class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues
 
     "reject a corrupted archive without committing state" taggedAs UnitTest in new Setup {
       val header = checkpointHeader
-      val nodes = Seq((hash("n1"), Array.fill[Byte](32)(0x11)))
-      val bytes = encodeArchive(header, nodes, Nil)
+      val nodes: Seq[(ByteString, Array[Byte])] = Seq((hash("n1"), Array.fill[Byte](32)(0x11)))
+      val bytes: Array[Byte] = encodeArchive(header, nodes, Nil)
       // Flip the CRC trailer to ensure a CRC error
       bytes(bytes.length - 1) = (bytes(bytes.length - 1) ^ 0xff).toByte
 
@@ -102,7 +110,7 @@ class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues
         freshStorage.storages.evmCodeStorage,
         freshStorage.storages.appStateStorage
       )
-      val result = importer.importFromStream(new ByteArrayInputStream(bytes), None)
+      val result: Either[ImportError, ImportResult] = importer.importFromStream(new ByteArrayInputStream(bytes), None)
       result.isLeft shouldBe true
 
       // Phase flags must remain unset on failure (we want the next start to be able to retry)
@@ -117,11 +125,11 @@ class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues
       import java.util.zip.GZIPOutputStream
 
       val header = checkpointHeader
-      val nodes = Seq((hash("rootNode"), Array.fill[Byte](32)(0xaa.toByte)))
-      val bytes = encodeArchive(header, nodes, Nil)
+      val nodes: Seq[(ByteString, Array[Byte])] = Seq((hash("rootNode"), Array.fill[Byte](32)(0xaa.toByte)))
+      val bytes: Array[Byte] = encodeArchive(header, nodes, Nil)
 
       // Write the archive to a temp file WITH gzip compression but WITHOUT .gz suffix
-      val tmp = Files.createTempFile("checkpoint-bug35", ".checkpoint")
+      val tmp: Path = Files.createTempFile("checkpoint-bug35", ".checkpoint")
       try {
         val out = new GZIPOutputStream(Files.newOutputStream(tmp))
         try out.write(bytes)
@@ -144,7 +152,7 @@ class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues
     val checkpointChainId: Long = 61L
     val freshStorage = getNewStorages
     val writer: BlockchainWriter = BlockchainWriter(freshStorage.storages)
-    val blockReader =
+    val blockReader: BlockchainReader =
       com.chipprbots.ethereum.domain.BlockchainReader(freshStorage.storages)
 
     val checkpointHeader: CheckpointArchive.Header =

@@ -3,18 +3,22 @@ package com.chipprbots.ethereum.jsonrpc.graphql
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 
-import io.circe.Json
-
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 import scala.util.Failure
 import scala.util.Success
 
+import io.circe.Json
 import sangria.ast.Document
-import sangria.execution.{ErrorWithResolver, Executor, HandledException, QueryAnalysisError, QueryReducer}
+import sangria.execution.ErrorWithResolver
+import sangria.execution.Executor
+import sangria.execution.HandledException
+import sangria.execution.QueryAnalysisError
+import sangria.execution.QueryReducer
 import sangria.marshalling.ResultMarshaller
-import sangria.marshalling.circe.*
-import sangria.parser.{QueryParser, SyntaxError}
+import sangria.marshalling.circe._
+import sangria.parser.QueryParser
+import sangria.parser.SyntaxError
 
 import com.chipprbots.ethereum.utils.Logger
 

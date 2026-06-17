@@ -16,8 +16,9 @@ import com.google.common.hash.PrimitiveSink
 import fs2.Stream
 import io.vavr.collection.PriorityQueue
 
+import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs.MptNodeDec
 import com.chipprbots.ethereum.blockchain.sync.fast.LoadableBloomFilter.BloomFilterLoadingResult
-import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.*
+import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler._
 import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource.IterationError
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.NodeStorage
@@ -27,11 +28,10 @@ import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.mpt.BranchNode
 import com.chipprbots.ethereum.mpt.ExtensionNode
 import com.chipprbots.ethereum.mpt.HashNode
-import com.chipprbots.ethereum.mpt.LeafNode
 import com.chipprbots.ethereum.mpt.HexPrefix
+import com.chipprbots.ethereum.mpt.LeafNode
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.mpt.MptNode
-import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs.MptNodeDec
 
 /** Scheduler which traverses Merkle patricia trie in DFS fashion, while also creating requests for nodes missing in
   * traversed trie. Traversal example: Merkle Patricia Trie with 2 leaf child nodes, each with non empty code value.

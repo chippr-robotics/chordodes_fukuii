@@ -3,12 +3,12 @@ package com.chipprbots.ethereum.forkid
 import org.apache.pekko.util.ByteString
 
 import org.bouncycastle.util.encoders.Hex
-import org.scalatest.matchers.should.*
+import org.scalatest.matchers.should._
 import org.scalatest.wordspec.AnyWordSpec
 
-import com.chipprbots.ethereum.forkid.ForkId.*
-import com.chipprbots.ethereum.rlp.*
-import com.chipprbots.ethereum.utils.Config.*
+import com.chipprbots.ethereum.forkid.ForkId._
+import com.chipprbots.ethereum.rlp._
+import com.chipprbots.ethereum.utils.Config._
 
 class ForkIdSpec extends AnyWordSpec with Matchers {
 

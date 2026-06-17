@@ -102,7 +102,7 @@ case class EthNodeStatus69ExchangeState(
       (for {
         validationResult <-
           ForkIdValidator.validatePeer[SyncIO](blockchainReader.genesisHeader.hash, blockchainConfig)(
-            blockchainReader.getBestBlockNumber(),
+            blockchainReader.getBestBlockNumber,
             forkId
           )
       } yield {
@@ -146,7 +146,7 @@ case class EthNodeStatus69ExchangeState(
 
   override protected def createStatusMsg(): MessageSerializable = {
     val bestBlockHeader = getBestBlockHeader()
-    val bestBlockNumber = blockchainReader.getBestBlockNumber()
+    val bestBlockNumber = blockchainReader.getBestBlockNumber
     val genesisHash = blockchainReader.genesisHeader.hash
 
     // Compute ForkId from current block (same as ETH64-68)
