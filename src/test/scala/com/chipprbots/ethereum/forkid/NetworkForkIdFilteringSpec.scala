@@ -4,16 +4,16 @@ import org.apache.pekko.util.ByteString
 
 import com.chipprbots.scalanet.discovery.crypto.Signature
 import com.chipprbots.scalanet.discovery.ethereum.EthereumNodeRecord
-import org.bouncycastle.util.encoders.{Hex => BCHex}
-import org.scalatest.matchers.should._
+import org.bouncycastle.util.encoders.{Hex as BCHex}
+import org.scalatest.matchers.should.*
 import org.scalatest.wordspec.AnyWordSpec
 import scodec.bits.BitVector
 import scodec.bits.ByteVector
 
-import com.chipprbots.ethereum.forkid.ForkId._
+import com.chipprbots.ethereum.forkid.ForkId.*
 import com.chipprbots.ethereum.network.discovery.ForkIdTag
-import com.chipprbots.ethereum.rlp._
-import com.chipprbots.ethereum.utils.Config._
+import com.chipprbots.ethereum.rlp.*
+import com.chipprbots.ethereum.utils.Config.*
 
 /** Cross-chain ForkId filtering tests — the networkId=1 collision case.
   *

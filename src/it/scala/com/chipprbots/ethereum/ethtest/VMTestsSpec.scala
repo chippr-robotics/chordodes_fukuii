@@ -5,9 +5,9 @@ import java.io.File
 import scala.io.Source
 import scala.util.Using
 
-import io.circe.parser._
+import io.circe.parser.*
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Test suite for ethereum/tests VMTests category
   *

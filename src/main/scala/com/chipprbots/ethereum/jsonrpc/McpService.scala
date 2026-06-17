@@ -9,7 +9,7 @@ import cats.effect.IO
 
 import scala.annotation.unused
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.json4s.JsonAST.JValue
 

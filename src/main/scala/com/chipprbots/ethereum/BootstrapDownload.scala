@@ -4,7 +4,7 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.net.URL
-import java.nio.file._
+import java.nio.file.*
 import java.security.DigestInputStream
 import java.security.MessageDigest
 import java.util.zip.ZipInputStream

@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.consensus.pow.miners
 
 import cats.effect.IO
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.bouncycastle.util.encoders.Hex
 import org.scalamock.handlers.CallHandler4
@@ -26,11 +26,11 @@ import com.chipprbots.ethereum.consensus.pow.validators.PoWBlockHeaderValidator
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.MptStorage
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.jsonrpc.EthMiningService
 import com.chipprbots.ethereum.jsonrpc.EthMiningService.SubmitHashRateResponse
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 // SCALA 3 MIGRATION: Fixed by refactoring MinerSpecSetup to use abstract mock members pattern.

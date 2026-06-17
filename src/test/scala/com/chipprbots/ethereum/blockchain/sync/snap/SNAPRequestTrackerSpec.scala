@@ -5,7 +5,7 @@ import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
@@ -14,9 +14,9 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.blockchain.sync.PeerRateTracker
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.network.Peer
-import com.chipprbots.ethereum.network.p2p.messages.SNAP._
-import com.chipprbots.ethereum.testing.PeerTestHelpers._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
+import com.chipprbots.ethereum.testing.PeerTestHelpers.*
+import com.chipprbots.ethereum.testing.Tags.*
 
 class SNAPRequestTrackerSpec
     extends TestKit(ActorSystem("SNAPRequestTrackerSpec"))

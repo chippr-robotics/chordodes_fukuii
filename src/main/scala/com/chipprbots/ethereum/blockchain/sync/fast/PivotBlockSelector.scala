@@ -9,7 +9,7 @@ import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason.InvalidPivotBlockElectionResponse

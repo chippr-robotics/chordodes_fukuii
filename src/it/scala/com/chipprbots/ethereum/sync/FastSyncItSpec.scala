@@ -4,19 +4,19 @@ import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.FlatSpecBase
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
-import com.chipprbots.ethereum.sync.FastSyncItSpec._
+import com.chipprbots.ethereum.sync.FastSyncItSpec.*
 import com.chipprbots.ethereum.sync.util.FastSyncItSpecUtils.FakePeer
-import com.chipprbots.ethereum.sync.util.SyncCommonItSpec._
-import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.sync.util.SyncCommonItSpec.*
+import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils.*
+import com.chipprbots.ethereum.testing.Tags.*
 
 class FastSyncItSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll {
   implicit val testRuntime: IORuntime = IORuntime.global

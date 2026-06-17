@@ -7,7 +7,7 @@ import org.apache.pekko.util.ByteString
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Unit tests for the heap-bounded `visited` set used by the post-SNAP frontier-rebuild DFS
   * (`TrieNodeHealingCoordinator.boundedVisitedSet`).

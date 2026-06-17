@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.ledger
 
 import org.apache.pekko.util.ByteString
 
-import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.crypto.*
 import com.chipprbots.ethereum.domain.TxLogEntry
 import com.chipprbots.ethereum.utils.ByteUtils
 import com.chipprbots.ethereum.utils.ByteUtils.or

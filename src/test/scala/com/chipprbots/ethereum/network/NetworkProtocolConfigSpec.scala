@@ -7,7 +7,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.network.p2p.messages.Capability
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.InstanceConfig
 

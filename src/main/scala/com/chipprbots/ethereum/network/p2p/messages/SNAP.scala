@@ -3,11 +3,11 @@ package com.chipprbots.ethereum.network.p2p.messages
 import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.domain.Account
-import com.chipprbots.ethereum.domain.Account._
+import com.chipprbots.ethereum.domain.Account.*
 import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.MessageSerializableImplicit
 import com.chipprbots.ethereum.rlp
-import com.chipprbots.ethereum.rlp._
+import com.chipprbots.ethereum.rlp.*
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 import com.chipprbots.ethereum.utils.ByteUtils
 

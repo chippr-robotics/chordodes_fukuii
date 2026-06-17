@@ -8,7 +8,7 @@ import org.apache.pekko.util.ByteString
 import cats.effect.unsafe.IORuntime
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import io.circe.Json
 import org.scalamock.scalatest.MockFactory

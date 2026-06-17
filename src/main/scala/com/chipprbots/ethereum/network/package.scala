@@ -13,7 +13,7 @@ import org.bouncycastle.crypto.params.ECPublicKeyParameters
 import org.bouncycastle.math.ec.ECPoint
 import org.bouncycastle.util.encoders.Hex
 
-import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.crypto.*
 
 package object network {
 

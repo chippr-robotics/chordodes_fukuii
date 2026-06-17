@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.jsonrpc
 
 import org.apache.pekko.util.ByteString
 
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 

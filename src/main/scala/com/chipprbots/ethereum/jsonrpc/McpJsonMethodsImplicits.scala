@@ -1,11 +1,11 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.json4s.JsonAST._
-import org.json4s.JsonDSL._
+import org.json4s.JsonAST.*
+import org.json4s.JsonDSL.*
 import org.json4s.jvalue2extractable
 import org.json4s.jvalue2monadic
 
-import com.chipprbots.ethereum.jsonrpc.McpService._
+import com.chipprbots.ethereum.jsonrpc.McpService.*
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonEncoder
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodCodec
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder

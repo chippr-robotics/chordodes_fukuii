@@ -5,11 +5,11 @@ import org.apache.pekko.util.ByteString
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-import com.chipprbots.ethereum.Fixtures.{Blocks => BlockFixtures}
+import com.chipprbots.ethereum.Fixtures.{Blocks as BlockFixtures}
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 import Fixtures.blockchainConfig
 import com.chipprbots.ethereum.domain.BlockHeader

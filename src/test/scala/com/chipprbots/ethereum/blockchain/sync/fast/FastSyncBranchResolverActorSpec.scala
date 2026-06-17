@@ -14,7 +14,7 @@ import org.apache.pekko.util.Timeout
 import cats.effect.Deferred
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
-import cats.implicits._
+import cats.implicits.*
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.duration.FiniteDuration
@@ -26,7 +26,7 @@ import org.scalatest.freespec.AnyFreeSpecLike
 import com.chipprbots.ethereum.BlockHelpers
 import com.chipprbots.ethereum.NormalPatience
 import com.chipprbots.ethereum.WithActorSystemShutDown
-import com.chipprbots.ethereum.blockchain.sync._
+import com.chipprbots.ethereum.blockchain.sync.*
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSyncBranchResolverActor.BranchResolutionFailed
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSyncBranchResolverActor.BranchResolutionFailed.NoCommonBlockFound
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSyncBranchResolverActor.BranchResolvedSuccessful
@@ -34,14 +34,14 @@ import com.chipprbots.ethereum.blockchain.sync.fast.FastSyncBranchResolverActor.
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor._
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.*
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.Capability
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{BlockHeaders => ETHBlockHeaders}
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{GetBlockHeaders => ETHGetBlockHeaders}
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{BlockHeaders as ETHBlockHeaders}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{GetBlockHeaders as ETHGetBlockHeaders}
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Logger
 
 class FastSyncBranchResolverActorSpec

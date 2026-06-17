@@ -5,9 +5,9 @@ import org.apache.pekko.actor.ActorLogging
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.Props
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import com.chipprbots.ethereum.blockchain.sync.snap._
+import com.chipprbots.ethereum.blockchain.sync.snap.*
 
 /** TrieNodeHealingWorker fetches trie nodes from a peer.
   *

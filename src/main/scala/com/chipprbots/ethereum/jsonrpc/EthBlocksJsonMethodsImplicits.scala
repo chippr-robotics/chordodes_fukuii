@@ -1,13 +1,13 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.json4s.JsonAST._
+import org.json4s.JsonAST.*
 import org.json4s.jvalue2monadic
 
-import com.chipprbots.ethereum.jsonrpc.EthBlocksService._
+import com.chipprbots.ethereum.jsonrpc.EthBlocksService.*
 import com.chipprbots.ethereum.jsonrpc.EthTxJsonMethodsImplicits.transactionResponseJsonEncoder
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError.InvalidParams
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonEncoder
-import com.chipprbots.ethereum.jsonrpc.serialization.JsonEncoder.OptionToNull._
+import com.chipprbots.ethereum.jsonrpc.serialization.JsonEncoder.OptionToNull.*
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder.NoParamsMethodDecoder
 

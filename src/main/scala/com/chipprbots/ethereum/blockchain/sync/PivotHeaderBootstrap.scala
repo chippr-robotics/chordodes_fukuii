@@ -10,7 +10,7 @@ import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.BestPeer
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.BestPeerWithMinBlockExcluding

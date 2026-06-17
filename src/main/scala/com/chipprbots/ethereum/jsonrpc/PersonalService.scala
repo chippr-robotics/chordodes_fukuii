@@ -15,9 +15,9 @@ import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockchainReader
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
-import com.chipprbots.ethereum.jsonrpc.JsonRpcError._
-import com.chipprbots.ethereum.jsonrpc.PersonalService._
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
+import com.chipprbots.ethereum.jsonrpc.JsonRpcError.*
+import com.chipprbots.ethereum.jsonrpc.PersonalService.*
 import com.chipprbots.ethereum.keystore.KeyStore
 import com.chipprbots.ethereum.keystore.Wallet
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException

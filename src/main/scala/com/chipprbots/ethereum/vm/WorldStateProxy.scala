@@ -9,7 +9,7 @@ import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.rlp
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPValue
-import com.chipprbots.ethereum.rlp.UInt256RLPImplicits._
+import com.chipprbots.ethereum.rlp.UInt256RLPImplicits.*
 
 /** This is a single entry point to all VM interactions with the persisted state. Implementations are meant to be
   * immutable so that rolling back a transaction is equivalent to discarding resulting changes. The changes to state

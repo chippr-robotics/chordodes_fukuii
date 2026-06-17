@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.vm
 
 import org.apache.pekko.util.ByteString
 
-import org.json4s.JsonAST._
+import org.json4s.JsonAST.*
 
 import com.chipprbots.ethereum.domain.UInt256
 

@@ -31,7 +31,7 @@ import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.HelloCodec
 import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.InitialHelloReceived
 import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.RLPxConfiguration
 import com.chipprbots.ethereum.security.SecureRandomBuilder
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.network.p2p.MessageDecoder.DecodingError
 import com.chipprbots.ethereum.network.p2p.Message
 

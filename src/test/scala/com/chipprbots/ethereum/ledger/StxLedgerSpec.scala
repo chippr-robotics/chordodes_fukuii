@@ -9,11 +9,11 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.Block.BlockDec
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MPTException
-import com.chipprbots.ethereum.testing.Tags._
-import com.chipprbots.ethereum.utils._
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.utils.*
 
 class StxLedgerSpec extends AnyFlatSpec with Matchers with Logger {
 

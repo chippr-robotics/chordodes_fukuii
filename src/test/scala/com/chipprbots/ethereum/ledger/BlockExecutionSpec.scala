@@ -22,10 +22,10 @@ import com.chipprbots.ethereum.consensus.validators.BlockValidator
 import com.chipprbots.ethereum.consensus.validators.Validators
 import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator
 import com.chipprbots.ethereum.crypto.ECDSASignature
-import com.chipprbots.ethereum.domain._
-import com.chipprbots.ethereum.ledger.BlockRewardCalculatorOps._
-import com.chipprbots.ethereum.testing.Tags._
-import com.chipprbots.ethereum.utils.ByteStringUtils._
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.ledger.BlockRewardCalculatorOps.*
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.utils.ByteStringUtils.*
 import com.chipprbots.ethereum.utils.Hex
 import com.chipprbots.ethereum.vm.OutOfGas
 import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.BlockError

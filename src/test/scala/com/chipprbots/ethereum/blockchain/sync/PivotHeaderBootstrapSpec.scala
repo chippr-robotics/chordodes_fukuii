@@ -10,7 +10,7 @@ import org.apache.pekko.testkit.ImplicitSender
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
@@ -25,7 +25,7 @@ import com.chipprbots.ethereum.domain.BlockchainWriter
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class PivotHeaderBootstrapSpec
     extends TestKit(ActorSystem("PivotHeaderBootstrapSpec"))

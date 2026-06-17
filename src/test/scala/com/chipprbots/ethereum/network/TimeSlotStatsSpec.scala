@@ -3,10 +3,10 @@ package com.chipprbots.ethereum.network
 import java.time.Clock
 
 import cats.data.State
-import cats.implicits._
+import cats.implicits.*
 import cats.kernel.Monoid
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
@@ -16,7 +16,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.MockClock
 
 import Arbitrary.arbitrary

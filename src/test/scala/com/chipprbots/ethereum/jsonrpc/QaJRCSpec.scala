@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.jsonrpc
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 
-import org.json4s.JsonAST._
+import org.json4s.JsonAST.*
 import org.scalamock.handlers.CallHandler1
 import org.scalatest.concurrent.PatienceConfiguration
 import org.scalatest.matchers.should.Matchers
@@ -15,8 +15,8 @@ import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MineBlocks
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerResponse
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MockedMinerResponses
 import com.chipprbots.ethereum.db.storage.AppStateStorage
-import com.chipprbots.ethereum.jsonrpc.QAService.MineBlocksResponse.MinerResponseType._
-import com.chipprbots.ethereum.jsonrpc.QAService._
+import com.chipprbots.ethereum.jsonrpc.QAService.MineBlocksResponse.MinerResponseType.*
+import com.chipprbots.ethereum.jsonrpc.QAService.*
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
 import com.chipprbots.ethereum.nodebuilder.ApisBuilder
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder

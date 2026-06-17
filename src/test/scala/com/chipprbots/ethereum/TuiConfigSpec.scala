@@ -3,8 +3,8 @@ package com.chipprbots.ethereum
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.console._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.console.*
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Tests for TuiConfig - configuration for the TUI module. */
 class TuiConfigSpec extends AnyFlatSpec with Matchers {

@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.network.p2p.messages
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Regression tests for the Capability.negotiate strict-intersection fix (commit e674303aa).
   *

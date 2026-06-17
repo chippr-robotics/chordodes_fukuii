@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.SendFundsRequest
 import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.SendFundsResponse
 import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.StatusRequest
 import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.StatusResponse
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError
 import com.chipprbots.ethereum.jsonrpc.ServiceResponse
 import com.chipprbots.ethereum.utils.Logger

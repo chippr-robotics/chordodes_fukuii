@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.mpt.MptVisitors
 import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.db.storage.MptStorage
-import com.chipprbots.ethereum.mpt._
+import com.chipprbots.ethereum.mpt.*
 
 /** Visitor that walks an MPT and invokes a callback for each leaf node. Does not accumulate results in memory —
   * suitable for walking large tries (e.g. 85M+ accounts in Ethereum state trie).

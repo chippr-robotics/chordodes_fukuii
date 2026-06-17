@@ -17,7 +17,7 @@ import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.security.SecureRandomBuilder
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.ForkBlockNumbers

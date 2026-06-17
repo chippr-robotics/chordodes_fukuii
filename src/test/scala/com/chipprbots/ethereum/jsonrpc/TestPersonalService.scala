@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.jsonrpc
 
 import cats.effect.IO
 
-import com.chipprbots.ethereum.jsonrpc.PersonalService._
+import com.chipprbots.ethereum.jsonrpc.PersonalService.*
 
 /** Manual test double for PersonalServiceAPI.
   *

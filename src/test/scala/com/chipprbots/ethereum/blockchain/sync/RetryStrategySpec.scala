@@ -1,12 +1,12 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.ParallelTestExecution
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class RetryStrategySpec extends AnyFlatSpec with Matchers with ParallelTestExecution {
 

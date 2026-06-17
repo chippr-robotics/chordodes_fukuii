@@ -1,16 +1,16 @@
 package com.chipprbots.ethereum.vm
 
 import org.apache.pekko.util.ByteString
-import org.apache.pekko.util.ByteString.{empty => bEmpty}
+import org.apache.pekko.util.ByteString.{empty as bEmpty}
 
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.Fixtures.{Blocks => BlockFixtures}
-import com.chipprbots.ethereum.domain._
-import com.chipprbots.ethereum.testing.Tags._
-import com.chipprbots.ethereum.vm.MockWorldState._
+import com.chipprbots.ethereum.Fixtures.{Blocks as BlockFixtures}
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.vm.MockWorldState.*
 
 class VMSpec extends AnyWordSpec with ScalaCheckPropertyChecks with Matchers {
 

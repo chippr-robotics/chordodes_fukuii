@@ -17,7 +17,7 @@ import scodec.Codec
 import scodec.bits.BitVector
 
 import com.chipprbots.ethereum.network.discovery.codecs.RLPCodecs
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class Discv4SyncResponderSpec extends AnyFlatSpec with Matchers {
 

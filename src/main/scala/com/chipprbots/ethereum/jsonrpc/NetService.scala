@@ -8,7 +8,7 @@ import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.bouncycastle.util.encoders.Hex
 

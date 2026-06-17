@@ -10,7 +10,7 @@ import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.apache.pekko.http.scaladsl.model.headers.Authorization
 import org.apache.pekko.http.scaladsl.model.headers.OAuth2BearerToken
 import org.apache.pekko.http.scaladsl.server.Directive1
-import org.apache.pekko.http.scaladsl.server.Directives._
+import org.apache.pekko.http.scaladsl.server.Directives.*
 
 import scala.reflect.ClassTag
 

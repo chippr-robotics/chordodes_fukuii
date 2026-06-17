@@ -25,7 +25,7 @@ import scalapb.GeneratedMessageCompanion
 import scalapb.descriptors.FieldDescriptor
 import scalapb.descriptors.PValue
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.Generators
 
 class MessageHandlerSpec extends AnyFlatSpec with Matchers with MockFactory with ScalaCheckPropertyChecks {

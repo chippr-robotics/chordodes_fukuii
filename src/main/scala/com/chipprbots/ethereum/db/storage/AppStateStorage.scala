@@ -8,7 +8,7 @@ import scala.collection.immutable.ArraySeq
 
 import com.chipprbots.ethereum.db.dataSource.DataSource
 import com.chipprbots.ethereum.db.dataSource.DataSourceBatchUpdate
-import com.chipprbots.ethereum.db.storage.AppStateStorage._
+import com.chipprbots.ethereum.db.storage.AppStateStorage.*
 import com.chipprbots.ethereum.domain.appstate.BlockInfo
 import com.chipprbots.ethereum.utils.Hex
 

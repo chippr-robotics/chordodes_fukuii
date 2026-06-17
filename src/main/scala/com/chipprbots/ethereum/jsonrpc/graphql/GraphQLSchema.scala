@@ -41,8 +41,8 @@ import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.domain.Withdrawal
 import com.chipprbots.ethereum.jsonrpc.BlockParam
 import com.chipprbots.ethereum.jsonrpc.EthInfoService
-import com.chipprbots.ethereum.jsonrpc.graphql.GraphQLScalars._
-import com.chipprbots.ethereum.jsonrpc.graphql.GraphQLTypes._
+import com.chipprbots.ethereum.jsonrpc.graphql.GraphQLScalars.*
+import com.chipprbots.ethereum.jsonrpc.graphql.GraphQLTypes.*
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.rlp

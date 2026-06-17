@@ -6,13 +6,13 @@ import org.apache.pekko.util.Timeout
 
 import scala.annotation.unused
 
-import com.chipprbots.ethereum.domain._
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
 import com.chipprbots.ethereum.jsonrpc.FilterManager.FilterChanges
 import com.chipprbots.ethereum.jsonrpc.FilterManager.FilterLogs
 import com.chipprbots.ethereum.jsonrpc.FilterManager.LogFilterLogs
-import com.chipprbots.ethereum.jsonrpc.{FilterManager => FM}
-import com.chipprbots.ethereum.utils._
+import com.chipprbots.ethereum.jsonrpc.{FilterManager as FM}
+import com.chipprbots.ethereum.utils.*
 
 object EthFilterService {
   case class NewFilterRequest(filter: Filter)

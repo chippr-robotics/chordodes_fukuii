@@ -4,12 +4,12 @@ package pow
 
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.DispatcherSelector
-import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.consensus.blocks.TestBlockGenerator
 import com.chipprbots.ethereum.consensus.difficulty.DifficultyCalculator

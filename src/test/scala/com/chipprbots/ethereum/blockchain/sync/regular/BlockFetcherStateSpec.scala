@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.Mocks.MockValidatorsAlwaysSucceed
 import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcherState.HeadersNotMatchingReadyBlocks
 import com.chipprbots.ethereum.network.PeerId
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class BlockFetcherStateSpec
     extends TestKit(ActorSystem("BlockFetcherStateSpec_System"))

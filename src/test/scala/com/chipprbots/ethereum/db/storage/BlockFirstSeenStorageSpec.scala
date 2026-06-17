@@ -7,7 +7,7 @@ import scala.collection.mutable
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class BlockFirstSeenStorageSpec extends AnyFlatSpec with Matchers {
 

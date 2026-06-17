@@ -13,7 +13,7 @@ import org.apache.pekko.util.ByteString
 
 import scala.util.Try
 
-import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.crypto.*
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.utils.KeyStoreConfig
 import com.chipprbots.ethereum.utils.Logger

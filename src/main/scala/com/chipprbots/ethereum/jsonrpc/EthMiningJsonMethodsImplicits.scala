@@ -6,7 +6,7 @@ import org.json4s.JsonAST.JBool
 import org.json4s.JsonAST.JString
 import org.json4s.JsonAST.JValue
 
-import com.chipprbots.ethereum.jsonrpc.EthMiningService._
+import com.chipprbots.ethereum.jsonrpc.EthMiningService.*
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError.InvalidParams
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonEncoder
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder

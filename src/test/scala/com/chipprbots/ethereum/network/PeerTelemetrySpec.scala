@@ -5,7 +5,7 @@ import java.net.InetSocketAddress
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.util.ByteString
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 import io.micrometer.core.instrument.Meter
 import org.scalatest.BeforeAndAfterAll
@@ -17,7 +17,7 @@ import com.chipprbots.ethereum.metrics.Metrics
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
 import com.chipprbots.ethereum.network.p2p.messages.Capability
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Unit tests for [[PeerTelemetry]] — the per-peer Prometheus series that feed the network-explore dashboard.
   *

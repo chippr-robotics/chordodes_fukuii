@@ -17,7 +17,7 @@ import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.utils.BuildInfo
 import com.chipprbots.ethereum.utils.ByteStringUtils
 
-import AkkaTaskOps._
+import AkkaTaskOps.*
 
 // --- Static Resources ---
 

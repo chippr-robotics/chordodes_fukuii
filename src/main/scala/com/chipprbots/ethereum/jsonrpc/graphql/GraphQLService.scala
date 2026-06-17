@@ -4,7 +4,7 @@ import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Failure
 import scala.util.Success
 
@@ -16,7 +16,7 @@ import sangria.execution.HandledException
 import sangria.execution.QueryAnalysisError
 import sangria.execution.QueryReducer
 import sangria.marshalling.ResultMarshaller
-import sangria.marshalling.circe._
+import sangria.marshalling.circe.*
 import sangria.parser.QueryParser
 import sangria.parser.SyntaxError
 

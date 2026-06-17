@@ -9,9 +9,9 @@ import com.chipprbots.ethereum.db.dataSource.DataSource
 import com.chipprbots.ethereum.db.dataSource.DataSourceUpdate
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
-import com.chipprbots.ethereum.rlp.{decode => rlpDecode}
-import com.chipprbots.ethereum.rlp.{encode => rlpEncode}
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.rlp.{decode as rlpDecode}
+import com.chipprbots.ethereum.rlp.{encode as rlpEncode}
+import com.chipprbots.ethereum.testing.Tags.*
 
 class TransactionalKeyValueStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ObjectGenerators {
   val iterationsNumber = 100

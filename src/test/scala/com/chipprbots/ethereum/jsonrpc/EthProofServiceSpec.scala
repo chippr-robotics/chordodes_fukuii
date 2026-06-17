@@ -15,10 +15,10 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum._
+import com.chipprbots.ethereum.*
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.consensus.pow.blocks.PoWBlockGenerator
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.jsonrpc.EthUserService.GetBalanceRequest
 import com.chipprbots.ethereum.jsonrpc.EthUserService.GetBalanceResponse
 import com.chipprbots.ethereum.jsonrpc.EthUserService.GetStorageAtRequest
@@ -28,7 +28,7 @@ import com.chipprbots.ethereum.jsonrpc.ProofService.StorageProofKey
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.defaultByteArraySerializable
 import com.chipprbots.ethereum.nodebuilder.ApisBuilder
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofResponse
 import com.chipprbots.ethereum.jsonrpc.EthUserService.GetTransactionCountResponse
 import com.chipprbots.ethereum.jsonrpc.ProofService.ProofAccount

@@ -16,18 +16,18 @@ import com.chipprbots.ethereum.blockchain.data.GenesisDataLoader
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.consensus.mining.MiningConfig
 import com.chipprbots.ethereum.consensus.pow.validators.ValidatorsExecutor
-import com.chipprbots.ethereum.consensus.validators._
+import com.chipprbots.ethereum.consensus.validators.*
 import com.chipprbots.ethereum.crypto
-import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.crypto.*
 import com.chipprbots.ethereum.domain.SignedTransaction.FirstByteOfAddress
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.ledger.BlockExecution
 import com.chipprbots.ethereum.ledger.BlockQueue
 import com.chipprbots.ethereum.ledger.BlockValidation
 import com.chipprbots.ethereum.ledger.TxResult
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MPTException
-import com.chipprbots.ethereum.testing.Tags._
-import com.chipprbots.ethereum.utils._
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.utils.*
 
 class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
   implicit val testContext: IORuntime = IORuntime.global

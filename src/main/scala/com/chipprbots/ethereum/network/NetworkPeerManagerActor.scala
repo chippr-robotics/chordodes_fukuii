@@ -6,17 +6,17 @@ import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.Props
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.db.storage.AppStateStorage
-import com.chipprbots.ethereum.domain.Account._
+import com.chipprbots.ethereum.domain.Account.*
 import com.chipprbots.ethereum.domain.ChainWeight
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor._
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.*
 import com.chipprbots.ethereum.network.PeerActor.DisconnectPeer
-import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent._
+import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.*
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
 import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
-import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier._
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.*
 import com.chipprbots.ethereum.network.PeerEventBusActor.Unsubscribe
 import com.chipprbots.ethereum.network.handshaker.Handshaker.HandshakeResult
 import com.chipprbots.ethereum.network.p2p.Message
@@ -27,7 +27,7 @@ import com.chipprbots.ethereum.network.p2p.messages.ETH69
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes
 import com.chipprbots.ethereum.network.p2p.messages.SNAP
-import com.chipprbots.ethereum.network.p2p.messages.SNAP._
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect
 import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps

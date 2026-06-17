@@ -5,8 +5,8 @@ import java.util.concurrent.TimeUnit
 
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.cors.scaladsl.model.HttpOriginMatcher
-import org.apache.pekko.http.scaladsl.model._
-import org.apache.pekko.http.scaladsl.model.headers._
+import org.apache.pekko.http.scaladsl.model.*
+import org.apache.pekko.http.scaladsl.model.headers.*
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.http.scaladsl.testkit.ScalatestRouteTest
 import org.apache.pekko.util.ByteString
@@ -21,19 +21,19 @@ import org.json4s.JsonAST.JInt
 import org.json4s.JsonAST.JNothing
 import org.json4s.JsonAST.JString
 import org.json4s.native.JsonMethods
-import org.json4s.native.JsonMethods._
+import org.json4s.native.JsonMethods.*
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.healthcheck.HealthcheckResponse
 import com.chipprbots.ethereum.healthcheck.HealthcheckResult
-import com.chipprbots.ethereum.jsonrpc._
+import com.chipprbots.ethereum.jsonrpc.*
 import com.chipprbots.ethereum.jsonrpc.server.controllers.ApisBase
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
 import com.chipprbots.ethereum.jsonrpc.server.http.JsonRpcHttpServer.JsonRpcHttpServerConfig
 import com.chipprbots.ethereum.jsonrpc.server.http.JsonRpcHttpServer.RateLimitConfig
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BuildInfo
 import com.chipprbots.ethereum.utils.Logger
 

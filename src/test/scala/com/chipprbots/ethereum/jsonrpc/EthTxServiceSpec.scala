@@ -18,16 +18,16 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum._
+import com.chipprbots.ethereum.*
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.db.storage.AppStateStorage
-import com.chipprbots.ethereum.domain._
-import com.chipprbots.ethereum.jsonrpc.EthTxService._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.jsonrpc.EthTxService.*
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
-import com.chipprbots.ethereum.transactions.PendingTransactionsManager._
-import com.chipprbots.ethereum.utils._
+import com.chipprbots.ethereum.transactions.PendingTransactionsManager.*
+import com.chipprbots.ethereum.utils.*
 
 class EthTxServiceSpec
     extends TestKit(ActorSystem("EthServiceSpec_ActorSystem"))

@@ -6,7 +6,7 @@ import org.apache.pekko.testkit.TestProbe
 
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpecLike
@@ -15,7 +15,7 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.NormalPatience
 import com.chipprbots.ethereum.domain.SignedTransactionWithSender
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransaction
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransactionsResponse

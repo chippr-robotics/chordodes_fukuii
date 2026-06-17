@@ -5,7 +5,7 @@ import org.apache.pekko.testkit.ImplicitSender
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
@@ -13,8 +13,8 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.blockchain.sync.snap.actors.Messages
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
-import com.chipprbots.ethereum.network.p2p.messages.SNAP._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Smoke tests verifying SNAPFakePeer infrastructure works as expected.
   *

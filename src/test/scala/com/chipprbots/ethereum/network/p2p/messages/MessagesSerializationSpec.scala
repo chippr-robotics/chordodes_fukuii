@@ -14,10 +14,10 @@ import com.chipprbots.ethereum.network.p2p.EthereumMessageDecoder
 import com.chipprbots.ethereum.network.p2p.NetworkMessageDecoder
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.BlockHash
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions._
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.{Status68 => Status68Class}
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets._
-import com.chipprbots.ethereum.network.p2p.messages.WireProtocol._
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.{Status68 as Status68Class}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.*
+import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.*
 
 /** Serialization round-trip tests for ETH68+ wire messages.
   *

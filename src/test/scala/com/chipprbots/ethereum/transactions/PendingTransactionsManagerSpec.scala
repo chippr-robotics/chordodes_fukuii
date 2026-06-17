@@ -9,7 +9,7 @@ import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 import org.scalatest.BeforeAndAfterEach
@@ -42,7 +42,7 @@ import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransaction
 import com.chipprbots.ethereum.security.SecureRandomBuilder
 import com.chipprbots.ethereum.testing.Tags.OlympiaTest
 import com.chipprbots.ethereum.testing.Tags.UnitTest
-import com.chipprbots.ethereum.transactions.PendingTransactionsManager._
+import com.chipprbots.ethereum.transactions.PendingTransactionsManager.*
 import com.chipprbots.ethereum.transactions.SignedTransactionsFilterActor.ProperSignedTransactions
 import com.chipprbots.ethereum.utils.TxPoolConfig
 

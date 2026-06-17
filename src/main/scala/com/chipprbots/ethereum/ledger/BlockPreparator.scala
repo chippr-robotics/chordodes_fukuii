@@ -7,15 +7,15 @@ import scala.annotation.tailrec
 import com.chipprbots.ethereum.consensus.validators.SignedTransactionError.TransactionSignatureError
 import com.chipprbots.ethereum.consensus.validators.SignedTransactionValidator
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
-import com.chipprbots.ethereum.domain.UInt256._
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.UInt256.*
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.ledger.BlockExecutionError.StateBeforeFailure
 import com.chipprbots.ethereum.ledger.BlockExecutionError.TxsExecutionError
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 import com.chipprbots.ethereum.utils.DebugTrace
 import com.chipprbots.ethereum.utils.Logger
-import com.chipprbots.ethereum.vm.{PC => _, _}
+import com.chipprbots.ethereum.vm.{PC as _, *}
 
 /** This is used from a [[com.chipprbots.ethereum.consensus.blocks.BlockGenerator BlockGenerator]].
   */

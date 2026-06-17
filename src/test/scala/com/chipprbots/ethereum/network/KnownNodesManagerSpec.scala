@@ -8,7 +8,7 @@ import org.apache.pekko.actor.Props
 import org.apache.pekko.testkit.ExplicitlyTriggeredScheduler
 import org.apache.pekko.testkit.TestProbe
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.typesafe.config.ConfigFactory
 import org.scalatest.flatspec.AnyFlatSpec
@@ -16,7 +16,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.network.KnownNodesManager.KnownNodesManagerConfig
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class KnownNodesManagerSpec extends AnyFlatSpec with Matchers {
 

@@ -8,9 +8,9 @@ import org.apache.pekko.pattern.ask
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs._
+import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs.*
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader

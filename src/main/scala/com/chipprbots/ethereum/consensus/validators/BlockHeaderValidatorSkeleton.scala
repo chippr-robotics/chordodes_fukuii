@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.consensus.validators
 import com.chipprbots.ethereum.consensus.difficulty.DifficultyCalculator
 import com.chipprbots.ethereum.consensus.eip1559.BaseFeeCalculator
 import com.chipprbots.ethereum.consensus.mining.GetBlockHeaderByHash
-import com.chipprbots.ethereum.consensus.validators.BlockHeaderError._
+import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.*
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostCancun

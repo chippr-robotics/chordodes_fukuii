@@ -2,9 +2,9 @@ package com.chipprbots.ethereum
 package consensus
 package pow
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import com.typesafe.config.{Config => TypesafeConfig}
+import com.typesafe.config.{Config as TypesafeConfig}
 
 import com.chipprbots.ethereum.consensus.mining.Protocol
 

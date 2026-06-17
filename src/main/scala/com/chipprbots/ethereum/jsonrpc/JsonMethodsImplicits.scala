@@ -8,14 +8,14 @@ import scala.util.Try
 
 import org.bouncycastle.util.encoders.Hex
 import org.json4s.Formats
-import org.json4s.JsonAST._
-import org.json4s.JsonDSL._
+import org.json4s.JsonAST.*
+import org.json4s.JsonDSL.*
 
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError.InvalidParams
-import com.chipprbots.ethereum.jsonrpc.NetService._
-import com.chipprbots.ethereum.jsonrpc.PersonalService._
+import com.chipprbots.ethereum.jsonrpc.NetService.*
+import com.chipprbots.ethereum.jsonrpc.PersonalService.*
 import com.chipprbots.ethereum.jsonrpc.Web3Service.ClientVersionRequest
 import com.chipprbots.ethereum.jsonrpc.Web3Service.ClientVersionResponse
 import com.chipprbots.ethereum.jsonrpc.Web3Service.Sha3Request

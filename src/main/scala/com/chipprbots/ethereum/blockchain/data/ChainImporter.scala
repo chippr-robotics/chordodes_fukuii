@@ -4,7 +4,7 @@ import java.io.File
 import java.io.FileInputStream
 
 import com.chipprbots.ethereum.domain.Block.BlockDec
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.ledger.BlockExecution
 import com.chipprbots.ethereum.ledger.BlockValidation
 import com.chipprbots.ethereum.rlp.nextElementIndex

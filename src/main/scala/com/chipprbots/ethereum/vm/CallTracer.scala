@@ -4,8 +4,8 @@ import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
 
-import org.json4s.JsonAST._
-import org.json4s.JsonDSL._
+import org.json4s.JsonAST.*
+import org.json4s.JsonDSL.*
 
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.utils.Hex

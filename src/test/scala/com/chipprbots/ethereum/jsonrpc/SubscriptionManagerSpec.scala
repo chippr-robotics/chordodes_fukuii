@@ -9,10 +9,10 @@ import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.testkit.TestKit
 
 import scala.concurrent.Await
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import org.json4s._
-import org.json4s.native.JsonMethods._
+import org.json4s.*
+import org.json4s.native.JsonMethods.*
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
@@ -22,8 +22,8 @@ import com.chipprbots.ethereum.NormalPatience
 import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.domain.Block
-import com.chipprbots.ethereum.jsonrpc.SubscriptionManager._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.jsonrpc.SubscriptionManager.*
+import com.chipprbots.ethereum.testing.Tags.*
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.SourceQueueWithComplete
 import scala.concurrent.Future

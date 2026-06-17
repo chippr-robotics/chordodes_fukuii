@@ -17,7 +17,7 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class SSLContextFactorySpec extends AnyFlatSpec with Matchers with MockFactory with BeforeAndAfterAll {
 

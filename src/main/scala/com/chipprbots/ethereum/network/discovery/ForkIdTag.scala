@@ -12,9 +12,9 @@ import scodec.bits.ByteVector
 
 import com.chipprbots.ethereum.forkid.Connect
 import com.chipprbots.ethereum.forkid.ForkId
-import com.chipprbots.ethereum.forkid.ForkId._
+import com.chipprbots.ethereum.forkid.ForkId.*
 import com.chipprbots.ethereum.forkid.ForkIdValidator
-import com.chipprbots.ethereum.rlp._
+import com.chipprbots.ethereum.rlp.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 /** ENR-based forkId filter (EIP-2124). Rejects peers on incompatible chains before TCP is dialed by reading the `eth`

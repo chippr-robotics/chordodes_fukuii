@@ -3,7 +3,7 @@ package com.chipprbots.scalanet.peergroup
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.util.concurrent.DefaultPromise

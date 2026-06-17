@@ -4,11 +4,11 @@ import org.apache.pekko.util.ByteString
 
 import org.bouncycastle.math.ec.ECPoint
 
-import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.crypto.*
 import com.chipprbots.ethereum.rlp.RLPDecoder
 import com.chipprbots.ethereum.rlp.RLPEncodeable
 import com.chipprbots.ethereum.rlp.RLPEncoder
-import com.chipprbots.ethereum.rlp.RLPImplicitConversions._
+import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPValue

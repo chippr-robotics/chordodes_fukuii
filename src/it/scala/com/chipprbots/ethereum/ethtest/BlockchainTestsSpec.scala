@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.ethtest
 
 import java.io.File
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Test suite for ethereum/tests BlockchainTests category
   *

@@ -8,17 +8,17 @@ import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist
-import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason._
+import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason.*
 import com.chipprbots.ethereum.blockchain.sync.CacheBasedBlacklist
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
 import com.chipprbots.ethereum.blockchain.sync.PeerRequestHandler
 import com.chipprbots.ethereum.blockchain.sync.PeerRequestHandler.RequestFailed
 import com.chipprbots.ethereum.blockchain.sync.PeerRequestHandler.ResponseReceived
-import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs._
+import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs.*
 import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
@@ -34,7 +34,7 @@ import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockBodies.Ge
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders.GetBlockHeadersEnc
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetReceipts.GetReceiptsEnc
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetReceipts70.GetReceipts70Enc
-import com.chipprbots.ethereum.rlp._
+import com.chipprbots.ethereum.rlp.*
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 /** Downloads block headers, bodies, and receipts from genesis to a target block in parallel with SNAP state sync.

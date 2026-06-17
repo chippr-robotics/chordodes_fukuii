@@ -7,7 +7,7 @@ import org.scalatest.funsuite.AnyFunSuite
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.rlp.UInt256RLPImplicits._
+import com.chipprbots.ethereum.rlp.UInt256RLPImplicits.*
 
 class UInt256RlpEncodingSpec extends AnyFunSuite {
 

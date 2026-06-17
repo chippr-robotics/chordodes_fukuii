@@ -5,7 +5,7 @@ import org.apache.pekko.util.ByteString
 import scala.collection.mutable
 
 import com.chipprbots.ethereum.db.storage.MptStorage
-import com.chipprbots.ethereum.mpt._
+import com.chipprbots.ethereum.mpt.*
 
 /** Simple in-memory test storage for MPT nodes
   *

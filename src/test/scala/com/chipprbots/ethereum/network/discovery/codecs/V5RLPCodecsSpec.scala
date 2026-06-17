@@ -6,7 +6,7 @@ import org.scalatest.matchers.should.Matchers
 import scodec.Codec
 import scodec.bits.ByteVector
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Tests for [[V5RLPCodecs]]. The wire shape per discv5-wire.md:
   *   - Each message has a 1-byte type discriminator followed by RLP fields

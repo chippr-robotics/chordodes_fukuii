@@ -17,7 +17,7 @@ import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.ledger.BlockQueue.Leaf
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 

@@ -10,10 +10,10 @@ import scala.collection.mutable
 import scala.util.control.NonFatal
 
 import fs2.Stream
-import org.rocksdb._
+import org.rocksdb.*
 
-import com.chipprbots.ethereum.db.dataSource.DataSource._
-import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource._
+import com.chipprbots.ethereum.db.dataSource.DataSource.*
+import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource.*
 import com.chipprbots.ethereum.utils.Logger
 import com.chipprbots.ethereum.utils.TryWithResources.withResources
 

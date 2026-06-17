@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.metrics
 
-import io.micrometer.core.instrument._
+import io.micrometer.core.instrument.*
 import io.micrometer.core.instrument.composite.CompositeMeterRegistry
 import io.micrometer.core.instrument.config.MeterFilter
 import io.micrometer.jmx.JmxMeterRegistry

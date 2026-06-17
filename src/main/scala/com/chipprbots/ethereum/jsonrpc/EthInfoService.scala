@@ -5,7 +5,7 @@ import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
-import cats.syntax.either._
+import cats.syntax.either.*
 
 import scala.annotation.unused
 import scala.reflect.ClassTag
@@ -14,9 +14,9 @@ import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
 import com.chipprbots.ethereum.consensus.mining.Mining
-import com.chipprbots.ethereum.crypto._
-import com.chipprbots.ethereum.domain._
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
+import com.chipprbots.ethereum.crypto.*
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
 import com.chipprbots.ethereum.keystore.KeyStore
 import com.chipprbots.ethereum.ledger.BlockExecution.HistoryStorageAddress
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy

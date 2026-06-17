@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.domain
 
-import com.chipprbots.ethereum.rlp.RLPImplicitConversions._
-import com.chipprbots.ethereum.rlp._
+import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
+import com.chipprbots.ethereum.rlp.*
 import com.chipprbots.ethereum.utils.ByteUtils
 
 /** EIP-4895: Beacon chain push withdrawals as operations.

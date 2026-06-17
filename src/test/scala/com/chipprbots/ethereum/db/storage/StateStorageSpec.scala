@@ -21,7 +21,7 @@ import com.chipprbots.ethereum.db.storage.pruning.ArchivePruning
 import com.chipprbots.ethereum.db.storage.pruning.BasicPruning
 import com.chipprbots.ethereum.db.storage.pruning.InMemoryPruning
 import com.chipprbots.ethereum.mpt.NodesKeyValueStorage
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.NodeCacheConfig
 
 class StateStorageSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks with ObjectGenerators {

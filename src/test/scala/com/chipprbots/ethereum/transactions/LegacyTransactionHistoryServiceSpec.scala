@@ -10,10 +10,10 @@ import cats.effect.IO
 import com.softwaremill.diffx.scalatest.DiffMatcher
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum._
+import com.chipprbots.ethereum.*
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.crypto.generateKeyPair
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.transactions.TransactionHistoryService.ExtendedTransactionData
 import com.chipprbots.ethereum.transactions.TransactionHistoryService.MinedTransactionData
 import com.chipprbots.ethereum.transactions.testing.PendingTransactionsManagerAutoPilot

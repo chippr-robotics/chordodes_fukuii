@@ -10,7 +10,7 @@ import fs2.Stream
 import com.chipprbots.ethereum.FlatSpecBase
 import com.chipprbots.ethereum.blockchain.sync.fast.LoadableBloomFilter
 import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource.IterationError
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class LoadableBloomFilterSpec extends FlatSpecBase {
   implicit object LongFun extends Funnel[Long] {

@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.db.components
 
-import com.chipprbots.ethereum.db.storage._
+import com.chipprbots.ethereum.db.storage.*
 import com.chipprbots.ethereum.db.storage.pruning.PruningMode
 import com.chipprbots.ethereum.domain.BlockchainStorages
 

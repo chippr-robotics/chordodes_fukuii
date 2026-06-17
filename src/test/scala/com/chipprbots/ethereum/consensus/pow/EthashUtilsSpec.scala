@@ -9,7 +9,7 @@ import org.scalatest.prop.TableFor2
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.SuperSlow
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.ByteStringUtils
 
 class EthashUtilsSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks with SuperSlow {

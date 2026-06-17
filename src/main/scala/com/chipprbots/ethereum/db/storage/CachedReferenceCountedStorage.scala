@@ -6,7 +6,7 @@ import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
 
-import boopickle.Default._
+import boopickle.Default.*
 import com.google.common.cache.RemovalNotification
 
 import com.chipprbots.ethereum.db.cache.Cache

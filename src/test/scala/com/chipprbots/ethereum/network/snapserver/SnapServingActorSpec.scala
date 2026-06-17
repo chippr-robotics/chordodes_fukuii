@@ -6,7 +6,7 @@ import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.BeforeAndAfterAll
@@ -19,13 +19,13 @@ import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.BlockchainReader
-import com.chipprbots.ethereum.mpt._
+import com.chipprbots.ethereum.mpt.*
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.PeerManagerActor
-import com.chipprbots.ethereum.network.p2p.messages.SNAP._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestMptStorage
 
 // ── K9: Actor-level integration tests for NetworkPeerManagerActor's SNAP serving path.

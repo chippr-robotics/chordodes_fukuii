@@ -1,18 +1,18 @@
 package com.chipprbots.ethereum.network
 
-import org.apache.pekko.actor._
+import org.apache.pekko.actor.*
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.WithActorSystemShutDown
-import com.chipprbots.ethereum.network.PeerEventBusActor._
+import com.chipprbots.ethereum.network.PeerEventBusActor.*
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.MockClock
 
 class PeerStatisticsSpec

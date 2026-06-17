@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.ledger
 
 import org.apache.pekko.util.ByteString
-import org.apache.pekko.util.ByteString.{empty => bEmpty}
+import org.apache.pekko.util.ByteString.{empty as bEmpty}
 
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 import org.bouncycastle.crypto.params.ECPublicKeyParameters
@@ -21,9 +21,9 @@ import com.chipprbots.ethereum.consensus.validators.SignedTransactionValid
 import com.chipprbots.ethereum.consensus.validators.SignedTransactionValidator
 import com.chipprbots.ethereum.crypto.generateKeyPair
 import com.chipprbots.ethereum.crypto.kec256
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.ledger.VMImpl
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.vm.InvalidJump
 import com.chipprbots.ethereum.vm.InvalidOpCode

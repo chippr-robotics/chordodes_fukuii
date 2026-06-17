@@ -10,10 +10,10 @@ import org.scalatest.compatible.Assertion
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import scodec.Codec
-import scodec.bits._
+import scodec.bits.*
 
 import com.chipprbots.ethereum.network.discovery.Secp256k1SigAlg
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class EIP8CodecsSpec extends AnyFlatSpec with Matchers {
 

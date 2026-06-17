@@ -27,9 +27,9 @@ import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.jsonrpc.EthBlocksService._
+import com.chipprbots.ethereum.jsonrpc.EthBlocksService.*
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class EthBlocksServiceSpec
     extends TestKit(ActorSystem("EthBlocksServiceSpec_ActorSystem"))

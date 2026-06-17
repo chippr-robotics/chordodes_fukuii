@@ -10,7 +10,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.db.dataSource.RocksDbConfig
 import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Tests for [[SnapSyncProgressStorage]] — SNAP download cursor persistence (account + storage cursors). */
 class SnapSyncProgressStorageSpec extends AnyFlatSpec with Matchers {

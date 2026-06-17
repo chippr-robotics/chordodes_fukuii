@@ -10,7 +10,7 @@ import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.Await
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.typesafe.config.ConfigFactory
 import org.bouncycastle.util.encoders.Hex
@@ -32,7 +32,7 @@ import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderPoWEr
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValidator
 import com.chipprbots.ethereum.consensus.validators.Validators
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.ledger.VMImpl
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers
@@ -42,11 +42,11 @@ import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockBodies
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockBodies
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockBodies.GetBlockBodiesEnc
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{GetBlockHeaders => ETH62GetBlockHeaders}
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{GetReceipts => ETH63GetReceipts}
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{NodeData => ETH63NodeData}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{GetBlockHeaders as ETH62GetBlockHeaders}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{GetReceipts as ETH63GetReceipts}
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.{NodeData as ETH63NodeData}
 import com.chipprbots.ethereum.rlp.RLPList
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 

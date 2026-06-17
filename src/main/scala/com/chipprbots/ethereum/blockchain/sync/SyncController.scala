@@ -10,7 +10,7 @@ import org.apache.pekko.actor.Terminated
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSync
 import com.chipprbots.ethereum.blockchain.sync.regular.RegularSync

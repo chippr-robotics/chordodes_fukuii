@@ -10,8 +10,8 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.xerial.snappy.Snappy
 
-import com.chipprbots.ethereum.domain.Block._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.domain.Block.*
+import com.chipprbots.ethereum.testing.Tags.*
 
 class MessageCompressionSpec extends AnyFlatSpec with Matchers with MockFactory {
 

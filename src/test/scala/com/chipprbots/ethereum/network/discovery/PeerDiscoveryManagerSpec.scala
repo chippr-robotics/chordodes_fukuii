@@ -16,12 +16,12 @@ import cats.effect.Resource
 import cats.effect.unsafe.IORuntime
 
 import scala.concurrent.Future
-import scala.math.Ordering.Implicits._
+import scala.math.Ordering.Implicits.*
 import scala.util.control.NoStackTrace
 
 import com.chipprbots.scalanet.discovery.crypto.PublicKey
 import com.chipprbots.scalanet.discovery.ethereum.v4.DiscoveryService
-import com.chipprbots.scalanet.discovery.ethereum.{Node => ENode}
+import com.chipprbots.scalanet.discovery.ethereum.{Node as ENode}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.ScalaFutures
@@ -32,7 +32,7 @@ import scodec.bits.BitVector
 import com.chipprbots.ethereum.LongPatience
 import com.chipprbots.ethereum.Timeouts
 import com.chipprbots.ethereum.db.storage.KnownNodesStorage
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 
 class PeerDiscoveryManagerSpec

@@ -10,7 +10,7 @@ import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.LegacyReceipt
 import com.chipprbots.ethereum.domain.Receipt
 import com.chipprbots.ethereum.domain.TxLogEntry
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class BloomFilterSpec extends AnyFlatSpec with Matchers {
 

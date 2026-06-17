@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.ledger
 import org.apache.pekko.util.ByteString
 
 import scala.annotation.tailrec
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockchainReader

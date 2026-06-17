@@ -13,7 +13,7 @@ import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.ledger.BlockExecution
 import com.chipprbots.ethereum.ledger.BlockQueue
 import com.chipprbots.ethereum.ledger.BlockValidation
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.txExecTest.util.FixtureProvider
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ForkBlockNumbers

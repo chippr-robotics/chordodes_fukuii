@@ -20,9 +20,9 @@ import com.chipprbots.ethereum.NormalPatience
 import com.chipprbots.ethereum.Timeouts
 import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.domain.BlockchainReader
-import com.chipprbots.ethereum.jsonrpc.EthFilterService._
-import com.chipprbots.ethereum.jsonrpc.{FilterManager => FM}
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.jsonrpc.EthFilterService.*
+import com.chipprbots.ethereum.jsonrpc.{FilterManager as FM}
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.FilterConfig
 
 class EthFilterServiceSpec

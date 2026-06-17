@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.domain
 
 import org.apache.pekko.util.ByteString
 
-import com.chipprbots.ethereum.domain.BlockHeaderImplicits._
+import com.chipprbots.ethereum.domain.BlockHeaderImplicits.*
 import com.chipprbots.ethereum.rlp.RLPEncodeable
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPSerializable

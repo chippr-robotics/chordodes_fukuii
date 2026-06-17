@@ -9,8 +9,8 @@ import org.bouncycastle.crypto.params.ECPublicKeyParameters
 import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.crypto
-import com.chipprbots.ethereum.crypto._
-import com.chipprbots.ethereum.network._
+import com.chipprbots.ethereum.crypto.*
+import com.chipprbots.ethereum.network.*
 import com.chipprbots.ethereum.network.rlpx.AuthHandshakeSuccess
 import com.chipprbots.ethereum.network.rlpx.AuthHandshaker
 import com.chipprbots.ethereum.network.rlpx.Secrets

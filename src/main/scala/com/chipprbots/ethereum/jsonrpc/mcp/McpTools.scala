@@ -9,8 +9,8 @@ import scala.concurrent.ExecutionContext
 import scala.util.Try
 
 import org.json4s.DefaultFormats
-import org.json4s.JsonAST._
-import org.json4s.JsonDSL._
+import org.json4s.JsonAST.*
+import org.json4s.JsonDSL.*
 import org.json4s.jvalue2extractable
 import org.json4s.jvalue2monadic
 
@@ -18,13 +18,13 @@ import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps
 import com.chipprbots.ethereum.jsonrpc.McpDependencies
-import com.chipprbots.ethereum.jsonrpc.McpService._
+import com.chipprbots.ethereum.jsonrpc.McpService.*
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.utils.BuildInfo
 import com.chipprbots.ethereum.utils.ByteStringUtils
 
-import AkkaTaskOps._
+import AkkaTaskOps.*
 
 implicit private val formats: org.json4s.Formats = DefaultFormats
 

@@ -12,7 +12,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import com.chipprbots.ethereum.BlockHelpers
 import com.chipprbots.ethereum.Fixtures
-import com.chipprbots.ethereum.blockchain.sync.fast.BinarySearchSupport._
+import com.chipprbots.ethereum.blockchain.sync.fast.BinarySearchSupport.*
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSyncBranchResolver.SearchState
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockHeader
@@ -21,7 +21,7 @@ import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerId
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class FastSyncBranchResolverSpec extends AnyWordSpec with Matchers with MockFactory with ParallelTestExecution {
 

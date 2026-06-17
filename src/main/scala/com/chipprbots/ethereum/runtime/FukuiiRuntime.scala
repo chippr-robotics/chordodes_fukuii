@@ -1,9 +1,9 @@
 package com.chipprbots.ethereum.runtime
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
-import com.typesafe.config.{Config => TypesafeConfig}
+import com.typesafe.config.{Config as TypesafeConfig}
 
 import com.chipprbots.ethereum.utils.InstanceConfig
 import com.chipprbots.ethereum.utils.Logger

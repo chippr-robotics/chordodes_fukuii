@@ -7,14 +7,14 @@ import org.apache.pekko.actor.Cancellable
 import org.apache.pekko.actor.OneForOneStrategy
 import org.apache.pekko.actor.Props
 import org.apache.pekko.actor.SupervisorStrategy
-import org.apache.pekko.actor.SupervisorStrategy._
+import org.apache.pekko.actor.SupervisorStrategy.*
 import org.apache.pekko.actor.Terminated
 import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import com.chipprbots.ethereum.blockchain.sync.snap._
+import com.chipprbots.ethereum.blockchain.sync.snap.*
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.domain.Account

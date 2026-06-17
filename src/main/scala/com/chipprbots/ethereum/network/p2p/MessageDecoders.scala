@@ -4,13 +4,13 @@ import scala.util.Try
 
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.Codes
-import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect._
-import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Hello._
-import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Ping._
-import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Pong._
-import com.chipprbots.ethereum.network.p2p.messages.WireProtocol._
+import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect.*
+import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Hello.*
+import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Ping.*
+import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Pong.*
+import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.*
 
-import MessageDecoder._
+import MessageDecoder.*
 
 object NetworkMessageDecoder extends MessageDecoder {
 

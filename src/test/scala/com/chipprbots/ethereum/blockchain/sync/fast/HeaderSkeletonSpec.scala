@@ -4,7 +4,7 @@ import org.scalatest.ParallelTestExecution
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class HeaderSkeletonSpec extends AnyWordSpec with Matchers with ParallelTestExecution {
 

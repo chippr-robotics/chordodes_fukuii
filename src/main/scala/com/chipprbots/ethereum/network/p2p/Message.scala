@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.network.p2p
 
-import cats.implicits._
+import cats.implicits.*
 
 import com.chipprbots.ethereum.utils.Logger
 

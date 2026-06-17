@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import org.apache.pekko.actor._
+import org.apache.pekko.actor.*
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.FiniteDuration

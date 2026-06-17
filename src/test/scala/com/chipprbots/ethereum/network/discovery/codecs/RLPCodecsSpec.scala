@@ -31,7 +31,7 @@ import com.chipprbots.ethereum.rlp.RLPEncodeable
 import com.chipprbots.ethereum.rlp.RLPEncoder
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPValue
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class RLPCodecsSpec extends AnyFlatSpec with Matchers {
   import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*

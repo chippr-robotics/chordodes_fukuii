@@ -9,7 +9,7 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.db.dataSource.RocksDbConfig
 import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** BfsQueueStorage over a real RocksDB instance — exercises the native range-tombstone delete path
   * (`DataSource.deleteRange`) that replaced per-key tombstone batches. The per-key implementation wrote ~140M

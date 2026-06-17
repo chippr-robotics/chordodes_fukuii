@@ -5,7 +5,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.BlockHelpers
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Tests for BlockchainWriter.setCanonicalChainHead — the SYNC-FORK rollback mechanism (008c).
   *

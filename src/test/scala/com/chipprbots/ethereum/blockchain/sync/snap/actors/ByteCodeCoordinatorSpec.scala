@@ -7,19 +7,19 @@ import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.blockchain.sync.snap._
+import com.chipprbots.ethereum.blockchain.sync.snap.*
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.ByteCodes
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetByteCodes.GetByteCodesEnc
 import com.chipprbots.ethereum.testing.PeerTestHelpers
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestEvmCodeStorage
 
 class ByteCodeCoordinatorSpec

@@ -1,9 +1,9 @@
 package com.chipprbots.ethereum.consensus.validators
 package std
 
-import com.chipprbots.ethereum.consensus.validators.SignedTransactionError._
+import com.chipprbots.ethereum.consensus.validators.SignedTransactionError.*
 import com.chipprbots.ethereum.crypto.ECDSASignature
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.vm.EvmConfig
 

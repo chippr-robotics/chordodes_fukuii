@@ -6,10 +6,10 @@ import org.bouncycastle.util.encoders.Hex
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EtcForks
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm.EthForks
-import com.chipprbots.ethereum.vm.PrecompiledContracts._
+import com.chipprbots.ethereum.vm.PrecompiledContracts.*
 
 /** EIP-2537: BLS12-381 precompile execution behavioral tests.
   *

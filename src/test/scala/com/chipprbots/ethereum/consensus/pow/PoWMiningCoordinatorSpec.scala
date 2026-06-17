@@ -4,8 +4,8 @@ import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.testkit.typed.scaladsl.LoggingTestKit
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed
-import org.apache.pekko.actor.typed.scaladsl.adapter._
-import org.apache.pekko.actor.{ActorSystem => ClassicSystem}
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
+import org.apache.pekko.actor.{ActorSystem as ClassicSystem}
 import org.apache.pekko.testkit.TestActor
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
@@ -14,7 +14,7 @@ import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.bouncycastle.util.encoders.Hex
 import org.scalamock.handlers.CallHandler4
@@ -28,18 +28,18 @@ import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.MinedBlock
 import com.chipprbots.ethereum.consensus.blocks.PendingBlock
 import com.chipprbots.ethereum.consensus.blocks.PendingBlockAndState
 import com.chipprbots.ethereum.consensus.mining.CoinbaseProvider
-import com.chipprbots.ethereum.consensus.pow.PoWMiningCoordinator._
+import com.chipprbots.ethereum.consensus.pow.PoWMiningCoordinator.*
 import com.chipprbots.ethereum.consensus.pow.blocks.PoWBlockGenerator
 import com.chipprbots.ethereum.consensus.pow.miners.Miner
 import com.chipprbots.ethereum.consensus.pow.miners.MinerProtocol
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.MptStorage
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.jsonrpc.EthMiningService
 import com.chipprbots.ethereum.jsonrpc.EthMiningService.SubmitHashRateResponse
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ommers.OmmersPool
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import com.chipprbots.ethereum.utils.BlockchainConfig
 

@@ -12,9 +12,9 @@ import com.chipprbots.ethereum.consensus.validators.SignedTransactionError.Trans
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 /** Verifies that Type-2 (EIP-1559 dynamic-fee) and Type-4 (EIP-7702 set-code) transactions are rejected on ETC before

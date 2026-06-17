@@ -5,7 +5,7 @@ import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
@@ -21,7 +21,7 @@ import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.defaultByteArraySerializable
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** The scan-actor wrapper must run the combined parallel scan once and emit BOTH gap sets to its parent, exactly as the
   * underlying scanner computes them — so the controller can drive the downloads.

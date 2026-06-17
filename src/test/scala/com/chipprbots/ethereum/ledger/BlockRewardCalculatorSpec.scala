@@ -4,8 +4,8 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.chipprbots.ethereum.ledger.BlockRewardCalculatorOps._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.ledger.BlockRewardCalculatorOps.*
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.MonetaryPolicyConfig
 
 // scalastyle:off magic.number

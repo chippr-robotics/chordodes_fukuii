@@ -4,12 +4,12 @@ import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
-import cats.syntax.traverse._
+import cats.syntax.traverse.*
 
 import scala.annotation.unused
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
 import com.chipprbots.ethereum.jsonrpc.DebugService.ListPeersInfoRequest
 import com.chipprbots.ethereum.jsonrpc.DebugService.ListPeersInfoResponse
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor

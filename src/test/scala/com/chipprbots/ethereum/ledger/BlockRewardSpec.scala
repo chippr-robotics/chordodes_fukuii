@@ -10,11 +10,11 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.Mocks.MockVM
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
-import com.chipprbots.ethereum.domain._
-import com.chipprbots.ethereum.ledger.BlockRewardCalculatorOps._
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.ledger.BlockRewardCalculatorOps.*
 import com.chipprbots.ethereum.ledger.VMImpl
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.ForkBlockNumbers

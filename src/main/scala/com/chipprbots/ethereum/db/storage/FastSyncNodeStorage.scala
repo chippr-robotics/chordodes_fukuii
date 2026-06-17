@@ -4,7 +4,7 @@ import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.db.storage.NodeStorage.NodeEncoded
 import com.chipprbots.ethereum.db.storage.NodeStorage.NodeHash
-import com.chipprbots.ethereum.db.storage.encoding._
+import com.chipprbots.ethereum.db.storage.encoding.*
 
 /** This class is specialization of ReferenceCountNodeStorage. It Uses the same serialization format as
   * ReferenceCountNodeStorage, but omits all logic regarding reference counting. It is possible to do that as during

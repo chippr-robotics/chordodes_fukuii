@@ -7,7 +7,7 @@ import org.apache.pekko.util.ByteString
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 import org.bouncycastle.util.encoders.Hex
@@ -16,7 +16,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.crypto
-import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.crypto.*
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.LegacyTransaction
 import com.chipprbots.ethereum.domain.SignedTransactionWithSender
@@ -32,7 +32,7 @@ import com.chipprbots.ethereum.keystore.Wallet
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.SignedTransactionEnc
 import com.chipprbots.ethereum.rlp
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 // SCALA 3 MIGRATION: Fixed by creating manual stub implementation for WalletRpcClient
 class WalletServiceSpec extends AnyFlatSpec with Matchers with MockFactory {

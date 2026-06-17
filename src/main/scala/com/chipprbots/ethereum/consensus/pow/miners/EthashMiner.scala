@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.consensus.pow.miners
 
-import org.apache.pekko.actor.{ActorRef => ClassicActorRef}
+import org.apache.pekko.actor.{ActorRef as ClassicActorRef}
 import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
@@ -14,12 +14,12 @@ import com.chipprbots.ethereum.consensus.pow.EthashUtils
 import com.chipprbots.ethereum.consensus.pow.PoWBlockCreator
 import com.chipprbots.ethereum.consensus.pow.PoWMiningCoordinator
 import com.chipprbots.ethereum.consensus.pow.PoWMiningCoordinator.CoordinatorProtocol
-import com.chipprbots.ethereum.consensus.pow.miners.MinerProtocol._
+import com.chipprbots.ethereum.consensus.pow.miners.MinerProtocol.*
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.jsonrpc.EthMiningService
-import com.chipprbots.ethereum.utils.BigIntExtensionMethods._
+import com.chipprbots.ethereum.utils.BigIntExtensionMethods.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteUtils
 import com.chipprbots.ethereum.utils.Logger

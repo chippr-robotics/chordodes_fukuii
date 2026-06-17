@@ -10,8 +10,8 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.domain.BlockHeader
-import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.consensus.engine.ForkChoiceManager.BeaconHead
 import com.chipprbots.ethereum.consensus.engine.ForkChoiceManager.BeaconHead
 

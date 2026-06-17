@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.blockchain.checkpoint
 import java.nio.file.Path
 import java.nio.file.Paths
 
-import cats.implicits._
+import cats.implicits.*
 
 import scala.collection.immutable.ArraySeq
 

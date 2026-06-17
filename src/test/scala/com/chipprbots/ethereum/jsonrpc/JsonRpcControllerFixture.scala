@@ -4,7 +4,7 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.bouncycastle.util.encoders.Hex
 import org.json4s.JsonAST.JArray
@@ -24,7 +24,7 @@ import com.chipprbots.ethereum.consensus.mining.CoinbaseProvider
 import com.chipprbots.ethereum.consensus.mining.MiningConfigs
 import com.chipprbots.ethereum.consensus.mining.TestMining
 import com.chipprbots.ethereum.consensus.pow.blocks.PoWBlockGenerator
-import com.chipprbots.ethereum.consensus.pow.blocks._
+import com.chipprbots.ethereum.consensus.pow.blocks.*
 import com.chipprbots.ethereum.consensus.pow.validators.ValidatorsExecutor
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.db.storage.AppStateStorage

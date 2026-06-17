@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.faucet.jsonrpc
 
 import cats.effect.IO
 
-import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain._
+import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.*
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError
 import com.chipprbots.ethereum.jsonrpc.JsonRpcRequest
 import com.chipprbots.ethereum.jsonrpc.JsonRpcResponse

@@ -11,8 +11,8 @@ import org.bouncycastle.util.encoders.Hex
 import org.json4s.DefaultFormats
 import org.json4s.Extraction
 import org.json4s.Formats
-import org.json4s.JsonAST._
-import org.json4s.JsonDSL._
+import org.json4s.JsonAST.*
+import org.json4s.JsonDSL.*
 import org.json4s.jvalue2monadic
 import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.ScalaFutures
@@ -28,14 +28,14 @@ import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
 import com.chipprbots.ethereum.consensus.blocks.PendingBlock
 import com.chipprbots.ethereum.consensus.blocks.PendingBlockAndState
 import com.chipprbots.ethereum.crypto.kec256
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.jsonrpc.EthBlocksService.GetUncleCountByBlockHashResponse
 import com.chipprbots.ethereum.jsonrpc.EthBlocksService.GetUncleCountByBlockNumberResponse
-import com.chipprbots.ethereum.jsonrpc.EthFilterService._
-import com.chipprbots.ethereum.jsonrpc.EthInfoService._
-import com.chipprbots.ethereum.jsonrpc.EthUserService._
+import com.chipprbots.ethereum.jsonrpc.EthFilterService.*
+import com.chipprbots.ethereum.jsonrpc.EthInfoService.*
+import com.chipprbots.ethereum.jsonrpc.EthUserService.*
 import com.chipprbots.ethereum.jsonrpc.FilterManager.LogFilterLogs
-import com.chipprbots.ethereum.jsonrpc.PersonalService._
+import com.chipprbots.ethereum.jsonrpc.PersonalService.*
 import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofRequest
 import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofResponse
 import com.chipprbots.ethereum.jsonrpc.ProofService.ProofAccount
@@ -47,7 +47,7 @@ import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers.Unformatted
 import com.chipprbots.ethereum.ommers.OmmersPool
 import com.chipprbots.ethereum.ommers.OmmersPool.Ommers
 import com.chipprbots.ethereum.testing.ActorsTesting.simpleAutoPilot
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 
 // scalastyle:off magic.number

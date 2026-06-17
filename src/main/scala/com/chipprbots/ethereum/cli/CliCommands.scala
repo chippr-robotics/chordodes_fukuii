@@ -2,14 +2,14 @@ package com.chipprbots.ethereum.cli
 
 import java.security.SecureRandom
 
-import cats.implicits._
+import cats.implicits.*
 
 import com.monovore.decline.Command
 import com.monovore.decline.Opts
 import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.crypto
-import com.chipprbots.ethereum.crypto._
+import com.chipprbots.ethereum.crypto.*
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.keystore.EncryptedKey
 import com.chipprbots.ethereum.keystore.EncryptedKeyJsonCodec

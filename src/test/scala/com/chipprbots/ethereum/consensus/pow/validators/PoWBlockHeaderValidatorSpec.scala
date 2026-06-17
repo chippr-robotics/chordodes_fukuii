@@ -8,7 +8,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
 import com.chipprbots.ethereum.domain.BlockHeader
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 
 class PoWBlockHeaderValidatorSpec extends AnyFlatSpecLike with Matchers {

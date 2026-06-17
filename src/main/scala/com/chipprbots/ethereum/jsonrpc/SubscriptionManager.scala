@@ -10,8 +10,8 @@ import org.apache.pekko.util.ByteString
 
 import scala.concurrent.ExecutionContext
 
-import org.json4s._
-import org.json4s.native.JsonMethods._
+import org.json4s.*
+import org.json4s.native.JsonMethods.*
 
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.Block

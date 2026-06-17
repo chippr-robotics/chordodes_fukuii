@@ -2,12 +2,12 @@ package com.chipprbots.ethereum.jsonrpc
 
 import org.apache.pekko.util.ByteString
 
-import org.json4s.JsonAST._
+import org.json4s.JsonAST.*
 import org.json4s.jvalue2extractable
 import org.json4s.jvalue2monadic
 
-import com.chipprbots.ethereum.domain._
-import com.chipprbots.ethereum.jsonrpc.EthSimulateService._
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.jsonrpc.EthSimulateService.*
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError.InvalidParams
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonEncoder
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder

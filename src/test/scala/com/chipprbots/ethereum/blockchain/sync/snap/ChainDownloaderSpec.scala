@@ -23,7 +23,7 @@ import com.chipprbots.ethereum.domain.BlockchainWriter
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class ChainDownloaderSpec
     extends TestKit(ActorSystem("ChainDownloaderSpec"))

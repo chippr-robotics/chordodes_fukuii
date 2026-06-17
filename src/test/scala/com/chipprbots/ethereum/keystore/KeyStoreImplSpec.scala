@@ -23,7 +23,7 @@ import com.chipprbots.ethereum.keystore.KeyStore.KeyNotFound
 import com.chipprbots.ethereum.keystore.KeyStore.KeyStoreError
 import com.chipprbots.ethereum.keystore.KeyStore.PassPhraseTooShort
 import com.chipprbots.ethereum.security.SecureRandomBuilder
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.KeyStoreConfig
 

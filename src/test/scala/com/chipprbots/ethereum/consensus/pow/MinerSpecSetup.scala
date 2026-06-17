@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.consensus.pow
 
 import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.{ActorSystem => ClassicSystem}
+import org.apache.pekko.actor.{ActorSystem as ClassicSystem}
 import org.apache.pekko.testkit.TestActor
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
@@ -27,7 +27,7 @@ import com.chipprbots.ethereum.consensus.pow.difficulty.EthashDifficultyCalculat
 import com.chipprbots.ethereum.consensus.pow.validators.ValidatorsExecutor
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.MptStorage
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.jsonrpc.EthMiningService
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ledger.VMImpl

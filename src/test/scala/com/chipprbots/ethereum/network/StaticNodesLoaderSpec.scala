@@ -6,7 +6,7 @@ import java.nio.file.Path
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Unit tests for StaticNodesLoader.
   *

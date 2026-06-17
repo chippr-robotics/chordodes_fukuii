@@ -14,7 +14,7 @@ import org.apache.pekko.actor.OneForOneStrategy
 import org.apache.pekko.actor.Props
 import org.apache.pekko.actor.Status
 import org.apache.pekko.actor.SupervisorStrategy
-import org.apache.pekko.actor.SupervisorStrategy._
+import org.apache.pekko.actor.SupervisorStrategy.*
 import org.apache.pekko.actor.Terminated
 import org.apache.pekko.util.ByteString
 
@@ -22,7 +22,7 @@ import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.blocking
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Failure
 import scala.util.Success
 
@@ -31,7 +31,7 @@ import com.google.common.hash.Funnel
 import com.google.common.hash.PrimitiveSink
 
 import com.chipprbots.ethereum.blockchain.sync.ProgressMilestones
-import com.chipprbots.ethereum.blockchain.sync.snap._
+import com.chipprbots.ethereum.blockchain.sync.snap.*
 import com.chipprbots.ethereum.db.storage.MptStorage
 import com.chipprbots.ethereum.db.storage.PathNodeStorage
 import com.chipprbots.ethereum.domain.Account

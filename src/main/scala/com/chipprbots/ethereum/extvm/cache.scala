@@ -7,7 +7,7 @@ import scala.collection.mutable
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.extvm.Implicits._
+import com.chipprbots.ethereum.extvm.Implicits.*
 import com.chipprbots.ethereum.utils.Logger
 
 class AccountCache(messageHandler: MessageHandler) extends Logger {

@@ -9,8 +9,8 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
-import com.chipprbots.ethereum.testing.Tags._
-import com.chipprbots.ethereum.vm.Generators._
+import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.vm.Generators.*
 
 class ArbitraryIntegerMptSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks {
 

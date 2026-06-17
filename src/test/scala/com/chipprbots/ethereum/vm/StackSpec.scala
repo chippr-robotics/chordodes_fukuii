@@ -6,7 +6,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class StackSpec extends AnyFunSuite with Matchers with ScalaCheckPropertyChecks {
 

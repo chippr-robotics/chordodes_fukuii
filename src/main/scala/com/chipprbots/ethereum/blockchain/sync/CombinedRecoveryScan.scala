@@ -9,7 +9,7 @@ import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.MptStorage
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.mpt.MptVisitors.PathTrackingLeafWalkVisitor
-import com.chipprbots.ethereum.mpt._
+import com.chipprbots.ethereum.mpt.*
 
 /** Single-pass post-SNAP recovery scan: ONE walk of the account trie that checks BOTH the contract bytecode
   * (`evmCodeStorage`) and the contract storage-root node (`mptStorage`) per account leaf.

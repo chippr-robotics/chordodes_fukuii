@@ -13,20 +13,20 @@ import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.blockchain.sync.snap._
+import com.chipprbots.ethereum.blockchain.sync.snap.*
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.db.dataSource.RocksDbConfig
 import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource
 import com.chipprbots.ethereum.db.storage.HealingFrontierStorage
 import com.chipprbots.ethereum.db.storage.Namespaces
 import com.chipprbots.ethereum.mpt.LeafNode
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestMptStorage
 
 /** Layer-2 resume behaviour of [[TrieNodeHealingCoordinator]] — `sync.snap-sync.healing-frontier-persistence`.

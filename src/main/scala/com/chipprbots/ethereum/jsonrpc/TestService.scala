@@ -7,7 +7,7 @@ import org.apache.pekko.util.Timeout
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
@@ -21,7 +21,7 @@ import com.chipprbots.ethereum.blockchain.sync.regular.BlockEnqueued
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockImportResult
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockImportedToTop
 import com.chipprbots.ethereum.blockchain.sync.regular.ChainReorganised
-import com.chipprbots.ethereum.consensus.blocks._
+import com.chipprbots.ethereum.consensus.blocks.*
 import com.chipprbots.ethereum.consensus.mining.MiningConfig
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.crypto.kec256
@@ -32,12 +32,12 @@ import com.chipprbots.ethereum.domain
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.Block
-import com.chipprbots.ethereum.domain.Block._
+import com.chipprbots.ethereum.domain.Block.*
 import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.jsonrpc.JsonMethodsImplicits._
+import com.chipprbots.ethereum.jsonrpc.JsonMethodsImplicits.*
 import com.chipprbots.ethereum.nodebuilder.TestNode
 import com.chipprbots.ethereum.rlp
 import com.chipprbots.ethereum.rlp.RLPList

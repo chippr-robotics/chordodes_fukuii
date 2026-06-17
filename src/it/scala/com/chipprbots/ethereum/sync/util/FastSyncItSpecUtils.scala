@@ -7,7 +7,7 @@ import cats.effect.IO
 import cats.effect.Resource
 
 import scala.annotation.tailrec
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Try
 
 import com.chipprbots.ethereum.Mocks.MockValidatorsAlwaysSucceed
@@ -20,7 +20,7 @@ import com.chipprbots.ethereum.mpt.HashNode
 import com.chipprbots.ethereum.mpt.MptNode
 import com.chipprbots.ethereum.mpt.MptTraversals
 import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils.FakePeerCustomConfig.defaultConfig
-import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils._
+import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils.*
 import com.chipprbots.ethereum.utils.ByteUtils
 object FastSyncItSpecUtils {
 

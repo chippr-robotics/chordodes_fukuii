@@ -11,8 +11,8 @@ import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.db.storage.MptStorage
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.mpt._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.mpt.*
+import com.chipprbots.ethereum.testing.Tags.*
 
 class StateValidatorSpec extends AnyFlatSpec with Matchers {
 

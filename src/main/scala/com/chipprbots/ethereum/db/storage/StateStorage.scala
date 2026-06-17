@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import scala.concurrent.duration.FiniteDuration
 
-import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs._
+import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs.*
 import com.chipprbots.ethereum.db.cache.LruCache
 import com.chipprbots.ethereum.db.cache.MapCache
 import com.chipprbots.ethereum.db.dataSource.DataSource

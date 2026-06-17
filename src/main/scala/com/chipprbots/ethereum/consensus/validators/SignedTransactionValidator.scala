@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.consensus.validators
 
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 trait SignedTransactionValidator {

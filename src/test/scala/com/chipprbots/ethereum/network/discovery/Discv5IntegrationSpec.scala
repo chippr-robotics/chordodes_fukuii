@@ -9,7 +9,7 @@ import com.chipprbots.scalanet.discovery.ethereum.EthereumNodeRecord
 import com.chipprbots.scalanet.discovery.ethereum.codecs.DefaultCodecs
 import com.chipprbots.scalanet.discovery.ethereum.v4
 import com.chipprbots.scalanet.discovery.ethereum.v5
-import com.chipprbots.scalanet.discovery.ethereum.{Node => ScNode}
+import com.chipprbots.scalanet.discovery.ethereum.{Node as ScNode}
 import com.chipprbots.scalanet.peergroup.udp.StaticUDPPeerGroup
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -18,7 +18,7 @@ import scodec.bits.BitVector
 import scodec.bits.ByteVector
 
 import com.chipprbots.ethereum.network.discovery.codecs.V5RLPCodecs
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** End-to-end integration test: two real StaticUDPPeerGroup instances on loopback exchange a discv5
   * PING/WHOAREYOU/HANDSHAKE/PONG flow using the production V5RLPCodecs + Discv5SyncResponder.

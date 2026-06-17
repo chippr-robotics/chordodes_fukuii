@@ -2,8 +2,8 @@ package com.chipprbots.ethereum.consensus.engine
 
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.Http
-import org.apache.pekko.http.scaladsl.model._
-import org.apache.pekko.http.scaladsl.server.Directives._
+import org.apache.pekko.http.scaladsl.model.*
+import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.http.scaladsl.server.Route
 
 import cats.effect.unsafe.IORuntime
@@ -11,12 +11,12 @@ import cats.effect.unsafe.IORuntime
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.typesafe.config.ConfigFactory
-import com.typesafe.config.{Config => TypesafeConfig}
-import org.json4s._
-import org.json4s.native.JsonMethods._
+import com.typesafe.config.{Config as TypesafeConfig}
+import org.json4s.*
+import org.json4s.native.JsonMethods.*
 
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError
 import com.chipprbots.ethereum.jsonrpc.JsonRpcRequest

@@ -16,8 +16,8 @@ import com.chipprbots.scalanet.discovery.ethereum.EthereumNodeRecord.Content
 import com.chipprbots.scalanet.discovery.ethereum.v4
 import com.chipprbots.scalanet.discovery.ethereum.v4.Packet
 import com.chipprbots.scalanet.discovery.ethereum.v5
-import com.chipprbots.scalanet.discovery.ethereum.{Node => ENode}
-import com.chipprbots.scalanet.discovery.ethereum.{Node => ScNode}
+import com.chipprbots.scalanet.discovery.ethereum.{Node as ENode}
+import com.chipprbots.scalanet.discovery.ethereum.{Node as ScNode}
 import com.chipprbots.scalanet.peergroup.ExternalAddressResolver
 import com.chipprbots.scalanet.peergroup.InetMultiAddress
 import com.chipprbots.scalanet.peergroup.udp.StaticUDPPeerGroup

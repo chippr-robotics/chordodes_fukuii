@@ -6,12 +6,12 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures
-import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator._
+import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.*
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostShanghai
 import com.chipprbots.ethereum.domain.Withdrawal
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Direct coverage for EIP-4895 withdrawal-validation additions to `StdBlockValidator`:
   *   - `validateWithdrawalsPresence` — reject body-only withdrawals with a pre-Shanghai header.

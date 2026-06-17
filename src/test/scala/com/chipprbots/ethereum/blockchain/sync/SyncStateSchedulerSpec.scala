@@ -29,7 +29,7 @@ import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.Generators.genMultipleNodeData
 
 class SyncStateSchedulerSpec

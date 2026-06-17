@@ -6,12 +6,12 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.domain.Account
-import com.chipprbots.ethereum.domain.Account._
+import com.chipprbots.ethereum.domain.Account.*
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.rlp
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPValue
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class ETH63AccountImplicitsSpec extends AnyFlatSpec with Matchers {
 

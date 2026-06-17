@@ -3,8 +3,8 @@ package com.chipprbots.ethereum.domain
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.Fixtures.Blocks._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.Fixtures.Blocks.*
+import com.chipprbots.ethereum.testing.Tags.*
 
 class BlockSpec extends AnyFlatSpec with Matchers {
   "Block size" should "be correct" taggedAs (UnitTest) in {

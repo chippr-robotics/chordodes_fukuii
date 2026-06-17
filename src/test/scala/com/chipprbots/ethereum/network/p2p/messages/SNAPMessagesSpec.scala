@@ -22,7 +22,7 @@ import com.chipprbots.ethereum.network.p2p.messages.SNAP.StorageRanges.StorageRa
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.StorageRanges.StorageRangesEnc
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.TrieNodes.TrieNodesDec
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.TrieNodes.TrieNodesEnc
-import com.chipprbots.ethereum.network.p2p.messages.SNAP._
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPValue
 import com.chipprbots.ethereum.rlp.rawDecode

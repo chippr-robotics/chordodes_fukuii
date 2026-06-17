@@ -7,7 +7,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.domain.Transaction
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class RLPSpec extends AnyFlatSpec with ScalaCheckPropertyChecks with Matchers {
 

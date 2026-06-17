@@ -9,13 +9,13 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import com.chipprbots.ethereum.Mocks.MockValidatorsAlwaysSucceed
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
-import com.chipprbots.ethereum.consensus.engine.PayloadStatus._
+import com.chipprbots.ethereum.consensus.engine.PayloadStatus.*
 import com.chipprbots.ethereum.consensus.validators.std.StdValidators
 import com.chipprbots.ethereum.crypto.kec256
-import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields._
-import com.chipprbots.ethereum.domain._
-import com.chipprbots.ethereum.ledger._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.ledger.*
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.consensus.engine.ForkChoiceManager.BeaconHead
 
 // scalastyle:off magic.number

@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.blockchain.sync.snap
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.{Future => JFuture}
+import java.util.concurrent.{Future as JFuture}
 
 import org.apache.pekko.util.ByteString
 
@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.mpt.MptTraversals
 import com.chipprbots.ethereum.mpt.byteStringSerializer
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestMptStorage
 
 /** Reference-behavioral test suite for MerkleProofVerifier Phase 3 (leaf insertion).

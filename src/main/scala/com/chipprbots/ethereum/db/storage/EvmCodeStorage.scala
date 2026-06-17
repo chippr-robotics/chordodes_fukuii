@@ -8,7 +8,7 @@ import fs2.Stream
 
 import com.chipprbots.ethereum.db.dataSource.DataSource
 import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource.IterationError
-import com.chipprbots.ethereum.db.storage.EvmCodeStorage._
+import com.chipprbots.ethereum.db.storage.EvmCodeStorage.*
 
 /** This class is used to store the EVM Code, by using: Key: hash of the code Value: the code
   */

@@ -3,8 +3,8 @@ package com.chipprbots.ethereum.ethtest
 import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.db.components.EphemDataSourceComponent
-import com.chipprbots.ethereum.db.storage._
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.db.storage.*
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config

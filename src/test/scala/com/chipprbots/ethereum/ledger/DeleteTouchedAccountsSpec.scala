@@ -12,7 +12,7 @@ import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.ledger.VMImpl
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 import com.chipprbots.ethereum.vm.BlockchainConfigForEvm

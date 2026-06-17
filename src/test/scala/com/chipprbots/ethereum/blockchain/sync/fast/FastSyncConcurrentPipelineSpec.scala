@@ -26,7 +26,7 @@ import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockBodies
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Queue-level regression and isolation tests for FastSync's three concurrent fetch pipelines (ARCH-002 / [11b]).
   *

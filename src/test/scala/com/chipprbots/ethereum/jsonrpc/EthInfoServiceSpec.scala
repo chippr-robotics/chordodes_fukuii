@@ -15,7 +15,7 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum._
+import com.chipprbots.ethereum.*
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
@@ -23,15 +23,15 @@ import com.chipprbots.ethereum.consensus.mining.MiningConfigs
 import com.chipprbots.ethereum.consensus.mining.TestMining
 import com.chipprbots.ethereum.consensus.pow.blocks.PoWBlockGenerator
 import com.chipprbots.ethereum.db.storage.AppStateStorage
-import com.chipprbots.ethereum.domain._
-import com.chipprbots.ethereum.jsonrpc.EthInfoService._
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.jsonrpc.EthInfoService.*
 import com.chipprbots.ethereum.keystore.KeyStore
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ledger.StxLedger
 import com.chipprbots.ethereum.ledger.TxResult
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.testing.ActorsTesting.simpleAutoPilot
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class EthServiceSpec
     extends TestKit(ActorSystem("EthInfoServiceSpec_ActorSystem"))

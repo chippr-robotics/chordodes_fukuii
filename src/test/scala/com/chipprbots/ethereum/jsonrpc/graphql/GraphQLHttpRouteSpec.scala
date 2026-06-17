@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.cors.scaladsl.model.HttpOriginMatcher
-import org.apache.pekko.http.scaladsl.model._
+import org.apache.pekko.http.scaladsl.model.*
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.http.scaladsl.testkit.ScalatestRouteTest
 import org.apache.pekko.testkit.TestProbe
@@ -13,7 +13,7 @@ import org.apache.pekko.util.ByteString
 import cats.effect.unsafe.IORuntime
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import io.circe.parser.parse
 import org.scalamock.scalatest.MockFactory
@@ -47,7 +47,7 @@ import com.chipprbots.ethereum.jsonrpc.server.http.RateLimit
 import com.chipprbots.ethereum.keystore.KeyStore
 import com.chipprbots.ethereum.ledger.StxLedger
 import com.chipprbots.ethereum.network.p2p.messages.Capability
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.FilterConfig
 import com.chipprbots.ethereum.utils.Logger
 

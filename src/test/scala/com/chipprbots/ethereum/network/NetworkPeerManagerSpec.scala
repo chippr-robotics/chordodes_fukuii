@@ -8,7 +8,7 @@ import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.bouncycastle.util.encoders.Hex
 import org.scalatest.flatspec.AnyFlatSpec
@@ -22,14 +22,14 @@ import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.ChainWeight
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor._
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.*
 import com.chipprbots.ethereum.network.PeerActor.DisconnectPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerHandshakeSuccessful
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
 import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
-import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier._
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.*
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.Codes
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders
@@ -37,7 +37,7 @@ import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.BlockHash
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.network.p2p.messages.ETH69.BlockRangeUpdate
 import com.chipprbots.ethereum.network.p2p.messages.ETH69.BlockRangeUpdate

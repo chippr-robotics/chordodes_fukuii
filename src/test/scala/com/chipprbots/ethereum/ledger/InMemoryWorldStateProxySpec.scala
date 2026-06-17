@@ -13,7 +13,7 @@ import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MPTException
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.EvmConfig
 import com.chipprbots.ethereum.vm.Generators
 

@@ -18,7 +18,7 @@ import com.chipprbots.ethereum.jsonrpc.ServiceResponse
 import com.chipprbots.ethereum.jsonrpc.TransactionData
 import com.chipprbots.ethereum.ledger.BlockQueue
 import com.chipprbots.ethereum.utils.BlockchainConfig
-import com.chipprbots.ethereum.utils.ByteStringUtils._
+import com.chipprbots.ethereum.utils.ByteStringUtils.*
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.Logger
 

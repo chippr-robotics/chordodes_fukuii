@@ -23,7 +23,7 @@ import com.chipprbots.ethereum.domain.Block.BlockDec
 import com.chipprbots.ethereum.domain.Block.BlockEnc
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.branch.BestBranch
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps._
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
 import com.chipprbots.ethereum.network.BlockedIPRegistry
 import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.utils.BlockchainConfig

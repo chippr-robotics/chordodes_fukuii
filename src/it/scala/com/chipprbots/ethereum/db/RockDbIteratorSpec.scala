@@ -8,7 +8,7 @@ import cats.effect.Deferred
 import cats.effect.IO
 import cats.effect.Ref
 import cats.effect.Resource
-import cats.syntax.parallel._
+import cats.syntax.parallel.*
 
 import scala.util.Random
 
@@ -23,7 +23,7 @@ import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.Namespaces
 import com.chipprbots.ethereum.db.storage.NodeStorage
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class RockDbIteratorSpec extends FlatSpecBase with ResourceFixtures with Matchers {
   type Fixture = RocksDbDataSource

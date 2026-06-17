@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.mpt.LeafNode
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.mpt.MptTraversals
 import com.chipprbots.ethereum.mpt.byteStringSerializer
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestMptStorage
 
 class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers {

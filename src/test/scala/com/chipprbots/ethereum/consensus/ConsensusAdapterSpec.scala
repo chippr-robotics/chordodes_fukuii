@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.consensus
 
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.language.postfixOps
 
 import org.scalamock.handlers.CallHandler0
@@ -20,12 +20,12 @@ import com.chipprbots.ethereum.blockchain.sync.regular.BlockImportFailed
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockImportedToTop
 import com.chipprbots.ethereum.blockchain.sync.regular.ChainReorganised
 import com.chipprbots.ethereum.blockchain.sync.regular.DuplicateBlock
-import com.chipprbots.ethereum.consensus.mining._
+import com.chipprbots.ethereum.consensus.mining.*
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderDifficultyError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderParentNotFoundError
-import com.chipprbots.ethereum.consensus.validators._
+import com.chipprbots.ethereum.consensus.validators.*
 import com.chipprbots.ethereum.db.storage.MptStorage
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.branch.Branch
 import com.chipprbots.ethereum.domain.branch.EmptyBranch
 import com.chipprbots.ethereum.ledger.BlockData
@@ -38,7 +38,7 @@ import com.chipprbots.ethereum.ledger.OmmersTestSetup
 import com.chipprbots.ethereum.ledger.TestSetupWithVmAndValidators
 import com.chipprbots.ethereum.mpt.LeafNode
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 class ConsensusAdapterSpec

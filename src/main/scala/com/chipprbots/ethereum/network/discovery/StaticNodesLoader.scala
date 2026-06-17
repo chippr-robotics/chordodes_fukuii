@@ -8,8 +8,8 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
-import org.json4s._
-import org.json4s.native.JsonMethods._
+import org.json4s.*
+import org.json4s.native.JsonMethods.*
 
 import com.chipprbots.ethereum.utils.Logger
 

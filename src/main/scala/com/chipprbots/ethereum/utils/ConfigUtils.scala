@@ -5,11 +5,11 @@ import java.util.Map.Entry
 import org.apache.pekko.http.cors.scaladsl.model.HttpOriginMatcher
 import org.apache.pekko.http.scaladsl.model.headers.HttpOrigin
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
 import com.typesafe.config.ConfigValue
-import com.typesafe.config.{Config => TypesafeConfig}
+import com.typesafe.config.{Config as TypesafeConfig}
 
 object ConfigUtils {
 

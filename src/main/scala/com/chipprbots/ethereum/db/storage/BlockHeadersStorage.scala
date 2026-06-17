@@ -10,7 +10,7 @@ import com.chipprbots.ethereum.db.storage.BlockHeadersStorage.BlockHeaderHash
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.utils.ByteUtils.byteSequenceToBuffer
 import com.chipprbots.ethereum.utils.ByteUtils.compactPickledBytes
-import com.chipprbots.ethereum.utils.Picklers._
+import com.chipprbots.ethereum.utils.Picklers.*
 
 /** This class is used to store the BlockHeader, by using: Key: hash of the block to which the BlockHeader belong Value:
   * the block header

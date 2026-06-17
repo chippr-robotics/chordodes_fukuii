@@ -5,7 +5,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.domain.UInt256
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.Fixtures.blockchainConfig
 
 class Push0Spec extends AnyFunSuite with OpCodeTesting with Matchers with ScalaCheckPropertyChecks {

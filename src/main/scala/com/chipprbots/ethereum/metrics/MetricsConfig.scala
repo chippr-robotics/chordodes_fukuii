@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.metrics
 
-import com.typesafe.config.{Config => TypesafeConfig}
+import com.typesafe.config.{Config as TypesafeConfig}
 
 final case class MetricsConfig(
     enabled: Boolean,

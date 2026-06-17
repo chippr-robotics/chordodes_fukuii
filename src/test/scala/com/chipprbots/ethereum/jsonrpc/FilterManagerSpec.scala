@@ -10,7 +10,7 @@ import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.typesafe.config.ConfigFactory
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair
@@ -26,7 +26,7 @@ import com.chipprbots.ethereum.consensus.blocks.BlockGenerator
 import com.chipprbots.ethereum.consensus.blocks.PendingBlock
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.crypto.generateKeyPair
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.jsonrpc.FilterManager.BlockFilterChanges
 import com.chipprbots.ethereum.jsonrpc.FilterManager.BlockFilterLogs
 import com.chipprbots.ethereum.jsonrpc.FilterManager.FilterLogs
@@ -37,7 +37,7 @@ import com.chipprbots.ethereum.jsonrpc.FilterManager.PendingTransactionFilterLog
 import com.chipprbots.ethereum.keystore.KeyStore
 import com.chipprbots.ethereum.ledger.BloomFilter
 import com.chipprbots.ethereum.security.SecureRandomBuilder
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransaction
 import com.chipprbots.ethereum.utils.FilterConfig

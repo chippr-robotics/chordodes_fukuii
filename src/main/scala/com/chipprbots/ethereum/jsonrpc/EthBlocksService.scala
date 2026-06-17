@@ -11,7 +11,7 @@ import org.bouncycastle.util.encoders.Hex
 import com.chipprbots.ethereum.consensus.engine.ForkChoiceManager
 import com.chipprbots.ethereum.consensus.mining.Mining
 import com.chipprbots.ethereum.domain.BlockHeaderImplicits.BlockHeaderEnc
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.ledger.BlockQueue
 import com.chipprbots.ethereum.rlp
 import com.chipprbots.ethereum.utils.BlockchainConfig

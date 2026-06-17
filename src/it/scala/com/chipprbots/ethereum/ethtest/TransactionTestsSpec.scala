@@ -5,12 +5,12 @@ import java.io.File
 import scala.io.Source
 import scala.util.Using
 
-import io.circe._
-import io.circe.parser._
+import io.circe.*
+import io.circe.parser.*
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Test suite for ethereum/tests TransactionTests category
   *

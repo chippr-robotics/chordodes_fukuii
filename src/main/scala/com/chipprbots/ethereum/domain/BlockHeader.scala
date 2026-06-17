@@ -10,12 +10,12 @@ import com.chipprbots.ethereum.rlp.RLPImplicits.given
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPSerializable
 import com.chipprbots.ethereum.rlp.rawDecode
-import com.chipprbots.ethereum.rlp.{encode => rlpEncode}
+import com.chipprbots.ethereum.rlp.{encode as rlpEncode}
 import com.chipprbots.ethereum.utils.ByteStringUtils
 
 import BlockHeader.HeaderExtraFields
-import BlockHeader.HeaderExtraFields._
-import BlockHeaderImplicits._
+import BlockHeader.HeaderExtraFields.*
+import BlockHeaderImplicits.*
 
 case class BlockHeader(
     parentHash: ByteString,

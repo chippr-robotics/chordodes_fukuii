@@ -10,7 +10,7 @@ import org.scalatest.time.Span
 
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class ExpiringMapSpec extends AnyFlatSpec with Matchers with Eventually {
 

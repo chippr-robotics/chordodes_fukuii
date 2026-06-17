@@ -5,8 +5,8 @@ import cats.effect.unsafe.IORuntime
 
 import scala.io.Source
 
-import io.circe._
-import io.circe.parser._
+import io.circe.*
+import io.circe.parser.*
 
 /** Adapter for running ethereum/tests JSON blockchain tests
   *

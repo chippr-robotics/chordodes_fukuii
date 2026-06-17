@@ -17,13 +17,13 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import com.chipprbots.ethereum.ObjectGenerators
 import com.chipprbots.ethereum.db.dataSource.DataSourceUpdate
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
-import com.chipprbots.ethereum.db.storage._
+import com.chipprbots.ethereum.db.storage.*
 import com.chipprbots.ethereum.db.storage.pruning.BasicPruning
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MPTException
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.defaultByteArraySerializable
 import com.chipprbots.ethereum.proof.MptProofVerifier
 import com.chipprbots.ethereum.proof.ProofVerifyResult.ValidProof
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class MerklePatriciaTrieSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ObjectGenerators {
 

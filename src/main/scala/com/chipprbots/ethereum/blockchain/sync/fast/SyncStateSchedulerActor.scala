@@ -12,7 +12,7 @@ import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
@@ -28,7 +28,7 @@ import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.CriticalE
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.ProcessingStatistics
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.SchedulerState
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.SyncResponse
-import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateSchedulerActor._
+import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateSchedulerActor.*
 import com.chipprbots.ethereum.mpt.HexPrefix
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.p2p.messages.Capability

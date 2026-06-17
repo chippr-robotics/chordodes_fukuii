@@ -12,9 +12,9 @@ import org.apache.pekko.util.ByteString
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
-import cats.implicits._
+import cats.implicits.*
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
@@ -26,13 +26,13 @@ import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.StateStorage
 import com.chipprbots.ethereum.domain.BlockchainWriter
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.jsonrpc.NewBlockImported
-import com.chipprbots.ethereum.ledger._
+import com.chipprbots.ethereum.ledger.*
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingAccountNodeException
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingStorageNodeException
-import com.chipprbots.ethereum.mpt._
+import com.chipprbots.ethereum.mpt.*
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.ommers.OmmersPool.AddOmmers
@@ -41,7 +41,7 @@ import com.chipprbots.ethereum.transactions.PendingTransactionsManager.AddUnchec
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.RemoveTransactions
 import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.Config.SyncConfig
-import com.chipprbots.ethereum.utils.FunctorOps._
+import com.chipprbots.ethereum.utils.FunctorOps.*
 
 class BlockImporter(
     fetcher: ActorRef,

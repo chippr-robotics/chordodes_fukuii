@@ -25,13 +25,12 @@ import com.chipprbots.ethereum.extvm.msg.GetStorageData
 import com.chipprbots.ethereum.extvm.msg.Hello
 import com.chipprbots.ethereum.extvm.msg.StorageData
 import com.chipprbots.ethereum.extvm.msg.VMQuery
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
 import com.chipprbots.ethereum.utils.VmConfig
-import com.chipprbots.ethereum.vm._
+import com.chipprbots.ethereum.vm.*
 import com.chipprbots.ethereum.vm.utils.MockVmInput
 import com.chipprbots.ethereum.extvm.msg.EthereumConfig
-import com.chipprbots.ethereum.extvm.msg.Hello.Config.EthereumConfig
 
 class VMClientSpec extends AnyFlatSpec with Matchers with MockFactory {
 
@@ -193,7 +192,7 @@ class VMClientSpec extends AnyFlatSpec with Matchers with MockFactory {
       accountStartNonce = blockchainConfig.accountStartNonce,
       chainId = ByteString(blockchainConfig.chainId)
     )
-    val expectedHelloConfigMsg: EthereumConfig = msg.Hello.Config.EthereumConfig(expectedEthereumConfig)
+    val expectedHelloConfigMsg: msg.Hello.Config.EthereumConfig = msg.Hello.Config.EthereumConfig(expectedEthereumConfig)
     val expectedHelloMsg: Hello = msg.Hello(version = "testVersion", config = expectedHelloConfigMsg)
     messageHandler.sendMessage.expects(expectedHelloMsg)
     vmClient.sendHello("testVersion", blockchainConfig)

@@ -4,12 +4,12 @@ import org.apache.pekko.util.ByteString
 
 import scala.util.Try
 
-import io.circe._
-import io.circe.syntax._
+import io.circe.*
+import io.circe.syntax.*
 import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.domain.Address
-import com.chipprbots.ethereum.utils.NumericUtils._
+import com.chipprbots.ethereum.utils.NumericUtils.*
 import com.chipprbots.ethereum.utils.StringUtils
 
 object CommonJsonCodecs {

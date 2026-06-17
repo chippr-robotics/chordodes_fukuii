@@ -32,7 +32,7 @@ import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPValue
 import com.chipprbots.ethereum.rlp.encode
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.ByteUtils
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 import com.chipprbots.ethereum.utils.GenOps.GenOps

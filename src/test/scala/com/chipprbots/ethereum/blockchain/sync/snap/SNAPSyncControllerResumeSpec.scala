@@ -13,7 +13,7 @@ import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource
 import com.chipprbots.ethereum.db.storage.Namespaces
 import com.chipprbots.ethereum.db.storage.SnapSyncProgress
 import com.chipprbots.ethereum.db.storage.SnapSyncProgressStorage
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Hex
 
 /** Tests for the persistence contract that [[SNAPSyncController]] relies on:

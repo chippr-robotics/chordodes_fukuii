@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.network.discovery
 
-import java.net._
+import java.net.*
 
 import org.apache.pekko.util.ByteString
 

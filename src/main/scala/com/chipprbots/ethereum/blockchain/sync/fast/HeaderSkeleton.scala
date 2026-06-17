@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync.fast
 
-import com.chipprbots.ethereum.blockchain.sync.fast.HeaderSkeleton._
+import com.chipprbots.ethereum.blockchain.sync.fast.HeaderSkeleton.*
 import com.chipprbots.ethereum.domain.BlockHeader
 
 /** This class contains the state of the current skeleton being downloaded. This state is represented as the downloaded

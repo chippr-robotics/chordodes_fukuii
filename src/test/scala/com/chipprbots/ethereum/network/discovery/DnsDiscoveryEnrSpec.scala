@@ -5,8 +5,8 @@ import java.util.Base64
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.rlp._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.rlp.*
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Unit tests for ENR parsing in DnsDiscovery.
   *

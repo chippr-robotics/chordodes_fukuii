@@ -6,9 +6,9 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.domain.BlockHeader
-import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields._
+import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 class BaseFeeCalculatorSpec

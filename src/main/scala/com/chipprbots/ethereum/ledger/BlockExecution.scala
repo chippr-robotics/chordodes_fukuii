@@ -2,12 +2,12 @@ package com.chipprbots.ethereum.ledger
 
 import org.apache.pekko.util.ByteString
 
-import cats.implicits._
+import cats.implicits.*
 
 import scala.annotation.tailrec
 
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.ledger.BlockExecutionError.MissingParentError
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MPTException
 import com.chipprbots.ethereum.utils.BlockchainConfig

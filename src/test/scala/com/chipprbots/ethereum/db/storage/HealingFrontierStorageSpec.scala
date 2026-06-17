@@ -10,7 +10,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.db.dataSource.RocksDbConfig
 import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 /** Tests for [[HealingFrontierStorage]] — the Layer-2 persisted healing frontier (node hash -> pathset).
   *

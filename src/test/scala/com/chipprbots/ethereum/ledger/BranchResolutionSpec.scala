@@ -25,7 +25,7 @@ import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.Receipt
 import com.chipprbots.ethereum.domain.branch.Branch
 import com.chipprbots.ethereum.domain.branch.EmptyBranch
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class BranchResolutionSpec
     extends AnyWordSpec

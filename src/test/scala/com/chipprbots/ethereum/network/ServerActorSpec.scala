@@ -10,7 +10,7 @@ import org.apache.pekko.testkit.ImplicitSender
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
@@ -18,7 +18,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist
 import com.chipprbots.ethereum.blockchain.sync.CacheBasedBlacklist
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.NodeStatus
 import com.chipprbots.ethereum.utils.ServerStatus
 

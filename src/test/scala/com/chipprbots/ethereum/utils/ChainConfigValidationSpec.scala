@@ -4,7 +4,7 @@ import com.typesafe.config.ConfigFactory
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 // scalastyle:off magic.number
 /** Validates that ETC mainnet and Mordor chain configurations load correctly from HOCON config files and contain the

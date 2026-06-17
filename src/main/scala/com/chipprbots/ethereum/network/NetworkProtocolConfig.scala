@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.network
 
-import com.typesafe.config.{Config => TypesafeConfig}
+import com.typesafe.config.{Config as TypesafeConfig}
 
 /** Per-network protocol capability gating.
   *

@@ -14,18 +14,18 @@ import com.chipprbots.scalanet.discovery.hash.Hash
 import com.chipprbots.scalanet.discovery.hash.Keccak256
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import scodec.bits._
+import scodec.bits.*
 
 import com.chipprbots.ethereum.network.discovery.Secp256k1SigAlg
 import com.chipprbots.ethereum.rlp
 import com.chipprbots.ethereum.rlp.RLPDecoder
 import com.chipprbots.ethereum.rlp.RLPEncodeable
 import com.chipprbots.ethereum.rlp.RLPEncoder
-import com.chipprbots.ethereum.rlp.RLPImplicitConversions._
+import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPValue
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class ENRCodecsSpec extends AnyFlatSpec with Matchers {
 

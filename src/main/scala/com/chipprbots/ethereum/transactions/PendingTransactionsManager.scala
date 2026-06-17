@@ -7,8 +7,8 @@ import org.apache.pekko.actor.Props
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
-import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
+import scala.concurrent.duration.*
+import scala.jdk.CollectionConverters.*
 
 import com.google.common.cache.Cache
 import com.google.common.cache.CacheBuilder
@@ -28,7 +28,7 @@ import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.network.p2p.messages.Codes
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetPooledTransactions._
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetPooledTransactions.*
 import com.chipprbots.ethereum.transactions.SignedTransactionsFilterActor.ProperSignedTransactions
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps

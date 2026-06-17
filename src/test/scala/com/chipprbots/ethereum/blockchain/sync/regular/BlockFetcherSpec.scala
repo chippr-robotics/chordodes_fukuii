@@ -5,19 +5,19 @@ import java.net.InetSocketAddress
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
 import org.apache.pekko.actor.typed.ActorRef
-import org.apache.pekko.actor.typed.scaladsl.adapter._
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.BlockHelpers
-import com.chipprbots.ethereum.Fixtures.{Blocks => FixtureBlocks}
+import com.chipprbots.ethereum.Fixtures.{Blocks as FixtureBlocks}
 import com.chipprbots.ethereum.Mocks.MockValidatorsAlwaysSucceed
 import com.chipprbots.ethereum.Mocks.MockValidatorsFailingOnBlockBodies
 import com.chipprbots.ethereum.Timeouts
@@ -41,7 +41,7 @@ import com.chipprbots.ethereum.network.p2p.messages.ETH69
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
 import com.chipprbots.ethereum.security.SecureRandomBuilder
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 import com.chipprbots.ethereum.network.p2p.messages.ETH69.BlockRangeUpdate

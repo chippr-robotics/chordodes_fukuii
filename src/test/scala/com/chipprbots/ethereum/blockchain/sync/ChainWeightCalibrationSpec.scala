@@ -7,7 +7,7 @@ import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestProbe
 
 import scala.concurrent.Await
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.typesafe.config.ConfigFactory
 import org.scalatest.flatspec.AnyFlatSpec
@@ -16,13 +16,13 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.Mocks.MockValidatorsAlwaysSucceed
 import com.chipprbots.ethereum.blockchain.sync.CacheBasedBlacklist
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.appstate.BlockInfo
 import com.chipprbots.ethereum.ledger.VMImpl
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.CalibrateChainWeightNow
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeers
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterChainWeightCalibrationTarget
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 import com.chipprbots.ethereum.consensus.mining.TestMining
 import org.apache.pekko.util.ByteString
@@ -230,7 +230,6 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
   it should "not write when accumulated TD is below genesisWeight × 1000" taggedAs (UnitTest, SyncTest) in
     new RegularSyncSetup {
       // Anchor at h1 with absurdly low anchorTD — accumulated result < genesis × 1000
-      : BigIntBigInt("1000000000000") // 10^12 < 1 × 10^13 → but wait, h1 has number=1
       // Actually 1×10^12 < 1×10^13 → NOT a plausible anchor! So the walk will abort, not return a below-threshold result.
       // Instead: use a large-numbered block with barely-above-threshold anchor that still leads to below-genesis*1000 result.
       // Simplest: anchor with TD=1 (passes BigInt check), but 1 < genesis*1000 → plausibility rejects it.

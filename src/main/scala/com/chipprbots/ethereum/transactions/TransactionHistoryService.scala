@@ -4,14 +4,14 @@ import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
-import cats.implicits._
+import cats.implicits.*
 
 import scala.collection.immutable.NumericRange
 import scala.concurrent.duration.FiniteDuration
 
 import fs2.Stream
 
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.TaskActorOps
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransaction
 import com.chipprbots.ethereum.transactions.TransactionHistoryService.ExtendedTransactionData

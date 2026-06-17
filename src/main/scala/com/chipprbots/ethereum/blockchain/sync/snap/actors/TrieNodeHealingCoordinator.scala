@@ -6,7 +6,7 @@ import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.OneForOneStrategy
 import org.apache.pekko.actor.Props
 import org.apache.pekko.actor.SupervisorStrategy
-import org.apache.pekko.actor.SupervisorStrategy._
+import org.apache.pekko.actor.SupervisorStrategy.*
 import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
@@ -14,13 +14,13 @@ import scala.concurrent.Await
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
-import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
+import scala.concurrent.duration.*
+import scala.jdk.CollectionConverters.*
 
 import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController
-import com.chipprbots.ethereum.blockchain.sync.snap._
+import com.chipprbots.ethereum.blockchain.sync.snap.*
 import com.chipprbots.ethereum.db.storage.BfsEntry
 import com.chipprbots.ethereum.db.storage.BfsQueueStorage
 import com.chipprbots.ethereum.db.storage.HealingFrontierStorage

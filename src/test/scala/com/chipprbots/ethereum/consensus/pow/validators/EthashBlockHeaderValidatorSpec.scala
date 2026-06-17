@@ -15,12 +15,12 @@ import com.chipprbots.ethereum.SuperSlow
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.consensus.pow.difficulty.EthashDifficultyCalculator
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError
-import com.chipprbots.ethereum.consensus.validators.BlockHeaderError._
+import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.*
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
-import com.chipprbots.ethereum.consensus.validators.BlockHeaderValidator._
+import com.chipprbots.ethereum.consensus.validators.BlockHeaderValidator.*
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValidatorSkeleton
-import com.chipprbots.ethereum.domain._
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.DaoForkConfig
 import com.chipprbots.ethereum.utils.ForkBlockNumbers

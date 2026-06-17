@@ -11,8 +11,8 @@ import org.bouncycastle.util.encoders.Hex
 import org.json4s.DefaultFormats
 import org.json4s.Extraction
 import org.json4s.Formats
-import org.json4s.JsonAST._
-import org.json4s.JsonDSL._
+import org.json4s.JsonAST.*
+import org.json4s.JsonDSL.*
 import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpecLike
@@ -23,16 +23,16 @@ import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.LongPatience
 import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.crypto.ECDSASignature
-import com.chipprbots.ethereum.domain._
+import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.jsonrpc.EthBlocksService.GetBlockTransactionCountByNumberResponse
-import com.chipprbots.ethereum.jsonrpc.EthTxService._
-import com.chipprbots.ethereum.jsonrpc.EthUserService._
+import com.chipprbots.ethereum.jsonrpc.EthTxService.*
+import com.chipprbots.ethereum.jsonrpc.EthUserService.*
 import com.chipprbots.ethereum.jsonrpc.FilterManager.TxLog
-import com.chipprbots.ethereum.jsonrpc.PersonalService._
+import com.chipprbots.ethereum.jsonrpc.PersonalService.*
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers.OptionNoneToJNullSerializer
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers.QuantitiesSerializer
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers.UnformattedDataJsonSerializer
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransaction
 
 // scalastyle:off magic.number

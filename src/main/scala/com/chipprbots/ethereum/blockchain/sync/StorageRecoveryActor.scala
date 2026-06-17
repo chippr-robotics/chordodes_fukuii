@@ -10,7 +10,7 @@ import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Failure
 import scala.util.Success
 
@@ -23,8 +23,8 @@ import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.db.storage.FlatSlotStorage
 import com.chipprbots.ethereum.db.storage.StateStorage
 import com.chipprbots.ethereum.domain.Account
-import com.chipprbots.ethereum.mpt.MptVisitors._
-import com.chipprbots.ethereum.mpt._
+import com.chipprbots.ethereum.mpt.MptVisitors.*
+import com.chipprbots.ethereum.mpt.*
 
 /** Storage recovery actor for Bug 20 hardening.
   *

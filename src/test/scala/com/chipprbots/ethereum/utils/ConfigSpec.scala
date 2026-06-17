@@ -4,7 +4,7 @@ import com.typesafe.config.ConfigFactory
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class ConfigSpec extends AnyFlatSpec with Matchers {
   "clientId" should "by default come from VersionInfo" taggedAs (UnitTest) in {

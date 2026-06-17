@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.blockchain.sync
 
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.pattern._
+import org.apache.pekko.pattern.*
 import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestKit
 
@@ -17,7 +17,7 @@ import com.chipprbots.ethereum.blockchain.sync.fast.StateStorageActor
 import com.chipprbots.ethereum.blockchain.sync.fast.StateStorageActor.GetStorage
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.db.storage.FastSyncStateStorage
-import com.chipprbots.ethereum.testing.Tags._
+import com.chipprbots.ethereum.testing.Tags.*
 
 class StateStorageActorSpec
     extends TestKit(ActorSystem("FastSyncStateActorSpec_System"))
