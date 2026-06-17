@@ -249,6 +249,15 @@ object Messages {
     */
   case class HealingPivotRefreshed(newStateRoot: ByteString) extends TrieNodeHealingCoordinatorMessage
 
+  /** spec 004 (Decoupled Heal Serve-Root): advance the SERVE root used to fetch missing nodes (GetTrieNodes) WITHOUT
+    * touching the completeness WALK root. The handler sets `serveRoot = newServeRoot` and resets the FR-006 per-task
+    * attempt counters; it does NOTHING else — it MUST NOT mutate `stateRoot` (the walk root), clear pendingTasks /
+    * frontier, reset `verificationPassComplete`, or re-seed the walk. No-op when `decoupledHealServeRoot` is disabled.
+    * Contrast `HealingPivotRefreshed`, which deliberately mutates the walk root and resets the completeness state and
+    * MUST NOT be reused for a serve-root advance.
+    */
+  final case class HealingServeRootRefresh(newServeRoot: ByteString) extends TrieNodeHealingCoordinatorMessage
+
   /** Sent by coordinator after MaxConsecutiveStagnations consecutive 2-min HEAL-PULSE cycles with zero healed nodes.
     * Controller should stop coordinator, clear walk checkpoint, refresh pivot.
     */

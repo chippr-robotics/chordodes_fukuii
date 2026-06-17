@@ -237,6 +237,34 @@ object SNAPSyncMetrics extends MetricsContainer {
   final private val HealingScopedDurationMsGauge =
     metrics.registry.gauge("snapsync.healing.scoped_duration_ms.gauge", new AtomicLong(0L))
 
+  // ===== Decoupled Heal Serve-Root (spec 004 C9/FR-010 — observation-only) =====
+  //
+  // Distinguish the fixed completeness WALK root from the advancing SERVE root used to fetch missing nodes,
+  // and report cross-root heals and currently-unservable tasks. These NEVER gate any consensus or completion
+  // decision — pure instrumentation pushed by `TrieNodeHealingCoordinator`. The root gauges carry the leading
+  // 8 bytes of each root hash as an (unsigned-ish) long "short label" so an operator can eyeball-correlate them
+  // with the `[HEAL]` log lines (which print the first 4 bytes); 0 = not yet set / feature off.
+
+  /** 1 = decoupled serve-root is engaged (feature on); 0 = single-root (coupled) heal. */
+  final private val HealingDecoupledEngagedGauge =
+    metrics.registry.gauge("snapsync.healing.decoupled.engaged.gauge", new AtomicLong(0L))
+
+  /** Leading 8 bytes of the fixed completeness WALK root (`stateRoot`), as a short numeric label. */
+  final private val HealingWalkRootGauge =
+    metrics.registry.gauge("snapsync.healing.decoupled.walk_root.gauge", new AtomicLong(0L))
+
+  /** Leading 8 bytes of the advancing SERVE root used to fetch missing nodes, as a short numeric label. */
+  final private val HealingServeRootGauge =
+    metrics.registry.gauge("snapsync.healing.decoupled.serve_root.gauge", new AtomicLong(0L))
+
+  /** Count of nodes healed via a serve root that differs from the walk root (cross-root heals). */
+  final private val HealingCrossRootHealsGauge =
+    metrics.registry.gauge("snapsync.healing.decoupled.cross_root_heals.gauge", new AtomicLong(0L))
+
+  /** Count of heal tasks currently unservable (over the FR-006 attempts-without-refresh threshold). */
+  final private val HealingUnservableTasksGauge =
+    metrics.registry.gauge("snapsync.healing.decoupled.unservable_tasks.gauge", new AtomicLong(0L))
+
   // ===== Peer Performance Metrics =====
 
   /** Number of SNAP-capable peers currently connected */
@@ -417,6 +445,13 @@ object SNAPSyncMetrics extends MetricsContainer {
   def setHealingScopedVerification(scoped: Long): Unit = HealingScopedVerificationGauge.set(scoped)
   def setHealingScopedSubtrees(count: Long): Unit = HealingScopedSubtreesGauge.set(count)
   def setHealingScopedDurationMs(ms: Long): Unit = HealingScopedDurationMsGauge.set(ms)
+
+  // spec 004 C9/T019 — decoupled heal serve-root (observation-only)
+  def setHealingDecoupledEngaged(engaged: Boolean): Unit = HealingDecoupledEngagedGauge.set(if (engaged) 1L else 0L)
+  def setHealingWalkRoot(shortLabel: Long): Unit = HealingWalkRootGauge.set(shortLabel)
+  def setHealingServeRoot(shortLabel: Long): Unit = HealingServeRootGauge.set(shortLabel)
+  def setHealingCrossRootHeals(count: Long): Unit = HealingCrossRootHealsGauge.set(count)
+  def setHealingUnservableTasks(count: Long): Unit = HealingUnservableTasksGauge.set(count)
 
   // ===== Peer and Network Metrics =====
 

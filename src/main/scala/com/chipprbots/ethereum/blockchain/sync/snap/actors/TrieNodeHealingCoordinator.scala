@@ -58,7 +58,14 @@ class TrieNodeHealingCoordinator(
     frontierLowWater: Int = TrieNodeHealingCoordinator.DefaultFrontierLowWater,
     frontierBackpressureMaxWaitMs: Long = TrieNodeHealingCoordinator.FrontierBackpressureMaxWaitMs,
     scopedHealVerification: Boolean = true,
-    scopedHealMaxPaths: Int = TrieNodeHealingCoordinator.DefaultScopedHealMaxPaths
+    scopedHealMaxPaths: Int = TrieNodeHealingCoordinator.DefaultScopedHealMaxPaths,
+    // spec 004 (Decoupled Heal Serve-Root). When true, the GetTrieNodes fetch targets `serveRoot` (an advancing
+    // newest-servable root) instead of the walk root `stateRoot`; when false, the fetch uses `stateRoot` (coupled,
+    // byte-identical to pre-spec-004). Completeness is ALWAYS judged against `stateRoot`, regardless of this flag.
+    decoupledHealServeRoot: Boolean = false,
+    // FR-006 surfacing threshold: after this many unsatisfied attempts with no serve-root advance, surface (log +
+    // metric). Never force-completes.
+    decoupledHealMaxAttemptsNoRefresh: Int = TrieNodeHealingCoordinator.DefaultDecoupledHealMaxAttemptsNoRefresh
 ) extends Actor
     with ActorLogging {
 
@@ -239,6 +246,13 @@ class TrieNodeHealingCoordinator(
     pendingBackpressure.set(pendingTasks.size)
     SNAPSyncMetrics.setHealingFrontierPending(pendingTasks.size.toLong)
     SNAPSyncMetrics.setHealingActiveRequests(activeRequests.size.toLong)
+    // spec 004 T019/FR-010: refresh the decoupling observability gauges on every pulse (cheap O(1) reads).
+    if (decoupledHealServeRoot) {
+      SNAPSyncMetrics.setHealingCrossRootHeals(crossRootHealCount)
+      SNAPSyncMetrics.setHealingUnservableTasks(
+        healAttempts.count { case (_, n) => n > decoupledHealMaxAttemptsNoRefresh }.toLong
+      )
+    }
   }
 
   /** Frontier-emission backpressure, called from the BFS walk thread (healingWriterEc) before each FrontierRebuilt
@@ -314,6 +328,68 @@ class TrieNodeHealingCoordinator(
     healedPathsRoot = ByteString.empty
     healedPathsOverflowed = false
   }
+
+  // --- spec 004: decoupled heal serve-root (FR-001/FR-002) ---
+  // T008: the SERVE root used to fetch missing nodes (GetTrieNodes). Initialized to the walk root so that when
+  // the feature is OFF (or before any serve-root has been obtained) the fetch is byte-identical to the coupled
+  // path. Advances ONLY via the HealingServeRootRefresh handler; read ONLY at the fetch build site in
+  // requestNextBatch (and only when `decoupledHealServeRoot` is true). The completeness walk and gate never read
+  // it — they key off `stateRoot` (the walk root) exclusively, preserving FR-007 parity by construction.
+  private var serveRoot: ByteString = stateRoot
+  // T015 / FR-006: per-task count of fetch attempts that did not satisfy the task (content-mismatch drop, empty
+  // response, or timeout re-queue). Bounded by the pending-task set (an entry is only ever incremented for a hash
+  // that is being re-queued, and the whole map is cleared on every serve-root advance). A task that exceeds
+  // `decoupledHealMaxAttemptsNoRefresh` with no serve-root advance in between is surfaced (log + metric) — it is
+  // NEVER force-completed: the content-hash check guarantees a wrong/missing node can never be accepted, so a stuck
+  // node simply keeps the walk from finding zero, which is the correct (no-false-completion) behaviour.
+  private val healAttempts = mutable.Map.empty[ByteString, Int]
+  // T019 / FR-010: count of nodes healed via a serve root that differs from the walk root (cross-root heals).
+  private var crossRootHealCount: Long = 0L
+  // T020: number of serve-root refreshes engaged this coordinator lifetime (observability only).
+  private var serveRootRefreshCount: Long = 0L
+
+  /** spec 004 T019: encode the leading 8 bytes of a root hash as a numeric "short label" gauge value so an operator can
+    * eyeball-correlate the walk-root / serve-root gauges with the `[HEAL]` log lines (which print 4 bytes). This is
+    * observation-only — never read by any walk / completeness / fetch decision. Empty ⇒ 0.
+    */
+  private def shortRootLabel(root: ByteString): Long = {
+    var acc = 0L
+    val n = root.length.min(8)
+    var i = 0
+    while (i < n) {
+      acc = (acc << 8) | (root(i) & 0xffL)
+      i += 1
+    }
+    acc
+  }
+
+  /** spec 004 T015/C5/FR-006: record one unsatisfied fetch attempt for a heal task (content-mismatch drop, empty
+    * response, or timeout re-queue). When a task crosses `decoupledHealMaxAttemptsNoRefresh` attempts WITHOUT a
+    * serve-root advance in between (a serve-root refresh clears the whole map), surface it once at the crossing (WARN
+    * log + unservable-count metric). This is OBSERVATION ONLY — it MUST NOT force-complete, abandon, or declare
+    * completion: the content-hash check (C4) guarantees a wrong/missing node can never be accepted, so a stuck node
+    * simply keeps the walk from finding zero, which is the correct no-false-completion behaviour (SC-002). The map is
+    * bounded by the pending-task set (only ever keyed by hashes being re-queued; cleared on every serve-root advance
+    * and decayed when a task is satisfied). No-op when decoupling is disabled — the coupled path's behaviour is
+    * byte-identical to today (SC-006).
+    */
+  private def noteUnservableAttempt(hash: ByteString): Unit =
+    if (decoupledHealServeRoot) {
+      val attempts = healAttempts.getOrElse(hash, 0) + 1
+      healAttempts.update(hash, attempts)
+      if (attempts == decoupledHealMaxAttemptsNoRefresh + 1) {
+        // Crossed the threshold for the first time since the last serve-root advance — surface it once.
+        val unservable = healAttempts.count { case (_, n) => n > decoupledHealMaxAttemptsNoRefresh }
+        log.warning(
+          s"[HEAL-SERVE-ROOT] Heal task ${Hex.toHexString(hash.take(4).toArray)} unservable after $attempts " +
+            s"attempts with no serve-root advance (threshold=$decoupledHealMaxAttemptsNoRefresh). " +
+            s"NOT force-completing (content-hash check keeps completion gated on the walk). " +
+            s"unservable-now=$unservable serve=${Hex.toHexString(serveRoot.take(4).toArray)} " +
+            s"walk=${Hex.toHexString(stateRoot.take(4).toArray)}"
+        )
+        SNAPSyncMetrics.setHealingUnservableTasks(unservable.toLong)
+      }
+    }
 
   // Stateless peer tracking (geth-aligned: peers that return empty TrieNodes for current root)
   private val statelessPeers = mutable.Set[String]()
@@ -439,6 +515,20 @@ class TrieNodeHealingCoordinator(
 
   override def preStart(): Unit = {
     log.info(s"TrieNodeHealingCoordinator starting (concurrency=$concurrency)")
+    // spec 004 T020/T019: surface the decoupling mode once at start, and seed the walk-root / serve-root gauges.
+    // serveRoot == stateRoot here (T008 init), so until the controller pushes a HealingServeRootRefresh the fetch
+    // stays on the walk root (coupled) even when the feature is on.
+    if (decoupledHealServeRoot)
+      log.info(
+        s"[HEAL-SERVE-ROOT] Decoupled heal serve-root ENABLED — completeness walk pinned to walk root " +
+          s"${Hex.toHexString(stateRoot.take(4).toArray)}; missing nodes fetched against an advancing serve root " +
+          s"(content-hash-verified before store). max-attempts-no-refresh=$decoupledHealMaxAttemptsNoRefresh"
+      )
+    else
+      log.info("[HEAL-SERVE-ROOT] Decoupling disabled — using single-root heal (fetch uses the walk root)")
+    SNAPSyncMetrics.setHealingDecoupledEngaged(decoupledHealServeRoot)
+    SNAPSyncMetrics.setHealingWalkRoot(shortRootLabel(stateRoot))
+    SNAPSyncMetrics.setHealingServeRoot(shortRootLabel(serveRoot))
     context.system.scheduler.scheduleWithFixedDelay(2.minutes, 2.minutes, self, HealingStagnationCheck)(
       context.dispatcher,
       ActorRef.noSender
@@ -612,19 +702,33 @@ class TrieNodeHealingCoordinator(
       if (newLimit > 0) tryRedispatchPendingTasks()
 
     case HealingForceComplete =>
-      log.warning(
-        s"[HEAL-FORCE-COMPLETE] Pivot advanced beyond SNAP serve window — " +
-          s"clearing ${pendingTasks.size} pending tasks + ${activeRequests.size} in-flight. " +
-          s"Signaling completion with $totalNodesHealed healed nodes."
-      )
-      clearPersistedFrontier() // Layer 2: healing abandoned — drop the persisted frontier so a restart won't resume it
-      activeRequests.keys.foreach(requestTracker.completeRequest(_, 0))
-      activeRequests.clear()
-      pendingTasks.clear()
-      pendingHashSet.clear()
-      clearHealedPathsSet() // spec 003 C1: abandonment — drop the scoped-verification scope (hygiene)
-      snapSyncController ! SNAPSyncController.StateHealingComplete
-      context.stop(self)
+      // spec 004 T016/C5/SC-002: under decoupling, HealingForceComplete must NEVER declare completion while any
+      // task is unsatisfied. Its original purpose — abandon pending tasks because the pivot aged beyond the SNAP
+      // serve window (Besu reloadTrieHeal) — is exactly what decoupling makes obsolete: the serve root advances
+      // independently, so an aged serve window is no longer a reason to abandon the walk root's missing nodes.
+      // Abandoning here would send StateHealingComplete with a real gap (consensus-unsafe). Refuse: keep the
+      // frontier, keep healing; the serve-root refresh path supplies a servable root. (Flag off ⇒ unchanged.)
+      if (decoupledHealServeRoot && !isComplete) {
+        log.warning(
+          s"[HEAL-FORCE-COMPLETE] IGNORED under decoupled-heal-serve-root: ${pendingTasks.size} pending + " +
+            s"${activeRequests.size} in-flight task(s) still unsatisfied. NOT declaring completion (SC-002) — " +
+            s"healing continues against the walk root; serve-root refresh supplies a servable fetch root."
+        )
+      } else {
+        log.warning(
+          s"[HEAL-FORCE-COMPLETE] Pivot advanced beyond SNAP serve window — " +
+            s"clearing ${pendingTasks.size} pending tasks + ${activeRequests.size} in-flight. " +
+            s"Signaling completion with $totalNodesHealed healed nodes."
+        )
+        clearPersistedFrontier() // Layer 2: healing abandoned — drop the persisted frontier so a restart won't resume it
+        activeRequests.keys.foreach(requestTracker.completeRequest(_, 0))
+        activeRequests.clear()
+        pendingTasks.clear()
+        pendingHashSet.clear()
+        clearHealedPathsSet() // spec 003 C1: abandonment — drop the scoped-verification scope (hygiene)
+        snapSyncController ! SNAPSyncController.StateHealingComplete
+        context.stop(self)
+      }
 
     case HealingPivotRefreshed(newStateRoot) =>
       // FR-003: a same-root refresh is a no-op. ByteString `==` is full 32-byte value equality (NOT the
@@ -698,6 +802,43 @@ class TrieNodeHealingCoordinator(
             startVerificationBFS(newStateRoot, pivotReseedPath)
           }
         }
+      }
+
+    case HealingServeRootRefresh(newServeRoot) =>
+      // spec 004 T009/C2: advance the SERVE root ONLY. This is the narrow, side-effect-free counterpart to
+      // HealingPivotRefreshed: it MUST NOT touch the walk root (`stateRoot`), the frontier (`pendingTasks` /
+      // persisted frontier), `verificationPassComplete`, or re-seed the walk. Completeness stays anchored to the
+      // unchanged walk root (FR-001), so byte-for-byte completion parity with the coupled path is preserved by
+      // construction. No-op when the feature is disabled (the fetch would ignore `serveRoot` anyway, but skipping
+      // keeps the observability/counter state inert so the OFF path is byte-identical to today, SC-006).
+      if (!decoupledHealServeRoot) {
+        log.debug("[HEAL-SERVE-ROOT] HealingServeRootRefresh ignored — decoupled-heal-serve-root disabled")
+      } else if (newServeRoot.isEmpty || newServeRoot == serveRoot) {
+        // T011 U2: never adopt an empty/zero serve root; a same-root refresh is a no-op (no counter churn).
+        log.debug(
+          s"[HEAL-SERVE-ROOT] No-op serve-root refresh (empty=${newServeRoot.isEmpty}, " +
+            s"same=${newServeRoot == serveRoot})"
+        )
+      } else {
+        val oldServe = Hex.toHexString(serveRoot.take(4).toArray)
+        val newServe = Hex.toHexString(newServeRoot.take(4).toArray)
+        serveRoot = newServeRoot
+        serveRootRefreshCount += 1
+        // T015 / FR-006: a serve-root advance is the legitimate retry trigger — clear the per-task attempt
+        // counters so a node that was unservable under the old serve root gets a fresh budget under the new one.
+        healAttempts.clear()
+        // T020: engagement log (old -> new serve root). The walk root is logged for contrast so an operator can
+        // see the two roots diverge. blocks-behind-head is not known here (the controller picks the target);
+        // the controller's own T011 log carries it.
+        log.info(
+          s"[HEAL-SERVE-ROOT] Serve root advanced $oldServe -> $newServe " +
+            s"(walk root held at ${Hex.toHexString(stateRoot.take(4).toArray)}, refresh #$serveRootRefreshCount). " +
+            s"Walk/frontier/completeness untouched."
+        )
+        SNAPSyncMetrics.setHealingServeRoot(shortRootLabel(serveRoot))
+        SNAPSyncMetrics.setHealingUnservableTasks(0L) // counters just cleared
+        // Nodes still pending may now be servable by the new serve root — nudge dispatch (does not re-seed).
+        tryRedispatchPendingTasks()
       }
 
     case HealingResumeDispatch =>
@@ -1075,9 +1216,14 @@ class TrieNodeHealingCoordinator(
     // Build the paths list for GetTrieNodes — each entry's pathset is a Seq[ByteString]
     val paths = batch.map(_.pathset)
 
+    // spec 004 T010/C3: the ONLY behavioral fetch change. When decoupling is enabled, fetch missing nodes against
+    // the advancing SERVE root (which peers can still serve); otherwise (or before a serve root is obtained,
+    // `serveRoot == stateRoot` by the T008 init) fetch against the walk root, byte-identical to the coupled path.
+    // GetTrieNodes is path-addressed, so the returned node is content-verified (keccak == task hash) downstream
+    // before it is ever stored — see handleResponse (C4). The walk root used for completeness is unchanged.
     val request = GetTrieNodes(
       requestId = requestId,
-      rootHash = stateRoot,
+      rootHash = if (decoupledHealServeRoot) serveRoot else stateRoot,
       paths = paths,
       responseBytes = responseBytes
     )
@@ -1134,6 +1280,13 @@ class TrieNodeHealingCoordinator(
       if (nodeData.nonEmpty) {
         keccak.reset()
         val nodeHash = ByteString(keccak.digest(nodeData.toArray))
+        // ┌─ CONSENSUS-SAFETY INVARIANT (spec 004 T014/C4/FR-004 — DO NOT WEAKEN OR BYPASS) ─────────────────────┐
+        // │ A node returned by ANY serve root is accepted IFF its keccak256 equals a requested task hash (the     │
+        // │ walk root's expectation). GetTrieNodes is path-addressed, so a serve root may resolve a path to a     │
+        // │ DIFFERENT-content node; that node fails this hash match and is dropped (never stored, never counted   │
+        // │ as healed). This is the single guardrail that makes decoupled (cross-root) fetching safe — it holds   │
+        // │ identically on the coupled and decoupled paths. No decoupled branch may skip it.                      │
+        // └──────────────────────────────────────────────────────────────────────────────────────────────────────┘
         if (taskByHash.contains(nodeHash)) {
           storageScheme match {
             case StorageScheme.Hash =>
@@ -1153,10 +1306,17 @@ class TrieNodeHealingCoordinator(
           }
           healedCount += 1
           totalNodesHealed += 1
+          // spec 004 T019/FR-010: count a heal sourced from a serve root that differs from the walk root.
+          // Observation-only; never affects completion. (Equal roots ⇒ coupled-equivalent, not counted.)
+          if (decoupledHealServeRoot && serveRoot != stateRoot) crossRootHealCount += 1
+          // T015 / FR-006: this task is satisfied — drop its attempt counter (bounded by pendingTasks).
+          healAttempts.remove(nodeHash)
           // spec 003 C1/FR-001: capture this healed node's HealingEntry as a scoped-verification seed.
           // This is the ONLY site that increments totalNodesHealed for network-served nodes, so the
           // accumulator is exactly {nodes whose bytes were written this round}. Tag the round's root on
           // first capture (F5), dedup by hash, and latch overflow at scopedHealMaxPaths (F4/FR-011).
+          // spec 004 T017: healedPathsRoot is tagged with the WALK root `stateRoot` (NOT `serveRoot`), so the
+          // scoped-verification F5 predicate `healedPathsRoot == stateRoot` is unaffected by decoupling.
           taskByHash.get(nodeHash).foreach { task =>
             if (healedPathsThisRound.isEmpty) healedPathsRoot = stateRoot
             if (!healedPathsOverflowed && !healedPathsThisRound.contains(task.hash)) {
@@ -1185,6 +1345,10 @@ class TrieNodeHealingCoordinator(
       if (!healedHashes.contains(task.hash)) {
         pendingHashSet += task.hash
         pendingTasks += task
+        // spec 004 T015/FR-006: an unsatisfied task (server skipped it / content-mismatch drop) bumps its
+        // attempt counter and may surface if it stays unservable across the bounded threshold WITHOUT a
+        // serve-root advance (which clears the map). This NEVER force-completes — see noteUnservableAttempt.
+        noteUnservableAttempt(task.hash)
       }
     }
 
@@ -1272,6 +1436,8 @@ class TrieNodeHealingCoordinator(
       pendingHashSet += task.hash
       pendingTasks += task
       requeued += 1
+      // spec 004 T015/FR-006: a timed-out task is unsatisfied — bump its attempt counter (surfacing only).
+      noteUnservableAttempt(task.hash)
     }
 
     if (requeued > 0) {
@@ -1897,6 +2063,13 @@ object TrieNodeHealingCoordinator {
     */
   val DefaultScopedHealMaxPaths: Int = 200_000
 
+  /** Default FR-006 surfacing threshold (spec 004): after this many unsatisfied heal attempts with no serve-root
+    * advance in between, the coordinator surfaces the stuck task (log + metric). It NEVER force-completes — a task no
+    * serve root can supply keeps the completeness walk from finding zero, so completion can never be falsely declared.
+    * Operator-tunable via `sync.snap-sync.decoupled-heal-max-attempts-no-refresh`.
+    */
+  val DefaultDecoupledHealMaxAttemptsNoRefresh: Int = 12
+
   /** Operator-configurable ceiling for BFS level parallelism. Effective parallelism is `min(DefaultBfsParallelism,
     * max(1, availableProcessors - 2))` so large levels are split across sub-ranges on `healingWriterEc`. See
     * `healing-traversal-parallelism` in `sync.conf`.
@@ -1975,7 +2148,9 @@ object TrieNodeHealingCoordinator {
       frontierLowWater: Int = DefaultFrontierLowWater,
       frontierBackpressureMaxWaitMs: Long = FrontierBackpressureMaxWaitMs,
       scopedHealVerification: Boolean = true,
-      scopedHealMaxPaths: Int = DefaultScopedHealMaxPaths
+      scopedHealMaxPaths: Int = DefaultScopedHealMaxPaths,
+      decoupledHealServeRoot: Boolean = false,
+      decoupledHealMaxAttemptsNoRefresh: Int = DefaultDecoupledHealMaxAttemptsNoRefresh
   ): Props =
     Props(
       new TrieNodeHealingCoordinator(
@@ -2000,7 +2175,9 @@ object TrieNodeHealingCoordinator {
         frontierLowWater,
         frontierBackpressureMaxWaitMs,
         scopedHealVerification,
-        scopedHealMaxPaths
+        scopedHealMaxPaths,
+        decoupledHealServeRoot,
+        decoupledHealMaxAttemptsNoRefresh
       )
     )
 }

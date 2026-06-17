@@ -141,10 +141,14 @@ Read it before planning or implementing. Highlights:
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/003-scoped-heal-verification/plan.md` (scope the post-SNAP heal completion
-verification to re-walk only the healed subtrees instead of re-seeding the state
-root and re-walking the whole ~90M-node trie — reuse the BFS kernel with multi-seed,
-mandatory full-root fallback when full coverage isn't durably proven, byte-for-byte
-completion parity (FR-007). Consensus-adjacent; forge-reviewed; builds on the
-hold-pivot livelock fix #1357). Prior plan: `specs/002-bfs-heal-performance/plan.md`.
+`specs/004-decoupled-heal-serve-root/plan.md` (decouple the post-SNAP heal's local
+completeness walk from the serve-window-bound node fetch: hold the WALK root fixed for
+the whole walk (a local read needing no peers) while fetching missing nodes from an
+advancing SERVE root that stays inside peers' ~128-block snap serve window. Trie nodes
+are content-addressed and the fetched node is verified keccak256==hash before store
+(the load-bearing guardrail), so a newer servable root safely supplies the deep nodes.
+Cures the serve-window-vs-walk-time deadlock that stalls heal at ~99%. Consensus-adjacent;
+forge-reviewed; byte-for-byte completion parity (FR-007); default-on; composes with the
+hold-pivot fix #1357 as its durable generalization. Needs build + one redeploy.) Prior
+plans: `specs/003-scoped-heal-verification/plan.md`, `specs/002-bfs-heal-performance/plan.md`.
 <!-- SPECKIT END -->
