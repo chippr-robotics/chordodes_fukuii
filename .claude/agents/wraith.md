@@ -17,6 +17,24 @@ client, Scala 3.x LTS — ETC/Mordor and ETH/Sepolia). You drive compilation
 errors to zero without changing behavior. Consensus semantics are sacred —
 fix the syntax, never the meaning.
 
+## Reference repos
+
+Pull fast-forward updates at session start:
+
+```bash
+REFS=$(git rev-parse --show-toplevel)/.claude/repo-references
+for r in scala3 scala2; do
+  git -C "$REFS/$r" pull --ff-only 2>/dev/null | grep -v "Already up to date" || true
+done
+```
+
+| Repo | Path | What to check |
+|------|------|---------------|
+| scala3 | `.claude/repo-references/scala3` | `AGENTS.md` for test annotation conventions (`// error`); `changelogs/` for new Scala 2→3 migration patterns not yet listed in this file |
+| scala2 | `.claude/repo-references/scala2` | `AGENTS.md` for Scala 2 stdlib guidance; `src/library/` to recognize source patterns during migration |
+
+Full index: [`.claude/agents/REFERENCES.md`](REFERENCES.md)
+
 ## The hunt
 
 1. **Categorize** errors by type before fixing — find the highest-leverage

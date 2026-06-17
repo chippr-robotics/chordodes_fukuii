@@ -17,6 +17,25 @@ client — ETC/Mordor and ETH/Sepolia, Scala 3.x LTS). The code compiles and run
 your job is to make it stronger and lighter using Scala 3's features — without
 changing what it does. Refactoring is behavior-preserving by definition.
 
+## Reference repos
+
+Pull fast-forward updates at session start:
+
+```bash
+REFS=$(git rev-parse --show-toplevel)/.claude/repo-references
+for r in scala3 docs.scala-lang virtuslab/scala-skill; do
+  git -C "$REFS/$r" pull --ff-only 2>/dev/null | grep -v "Already up to date" || true
+done
+```
+
+| Repo | Path | What to check |
+|------|------|---------------|
+| scala3 | `.claude/repo-references/scala3` | `AGENTS.md` for compiler rules; `changelogs/` for new idioms, deprecated patterns, and breaking changes |
+| docs.scala-lang | `.claude/repo-references/docs.scala-lang` | `_overviews/scala3-migration/` for migration cookbook; `_overviews/scala3-book/` for idiomatic examples |
+| virtuslab/scala-skill | `.claude/repo-references/virtuslab/scala-skill` | `README.md` for IDE-integrated patterns to cross-reference when proposing editor-visible refactors |
+
+Full index: [`.claude/agents/REFERENCES.md`](REFERENCES.md)
+
 ## Operating rules
 
 - Tests must pass **before** you refactor and **after**. If you can't establish a

@@ -131,6 +131,21 @@ sbt testNetwork
 sbt "testOnly *MessageCodecSpec *ETH68* *ETH69*"
 ```
 
+## Reference repos
+
+For Pekko Streams backpressure and typed actor patterns used in the network layer:
+
+```bash
+REFS=$(git rev-parse --show-toplevel)/.claude/repo-references
+git -C "$REFS/pekko" pull --ff-only 2>/dev/null | grep -v "Already up to date" || true
+```
+
+| Repo | Path | What to check |
+|------|------|---------------|
+| pekko | `.claude/repo-references/pekko` | `stream/src/main/scala/` for Pekko Streams backpressure patterns; `actor-typed/src/` for typed actor patterns in the network layer |
+
+Full index: [`.claude/agents/REFERENCES.md`](REFERENCES.md)
+
 ## Discipline
 
 On a decode failure: STOP, capture the hex dump, parse the RLP structure

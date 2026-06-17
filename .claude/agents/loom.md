@@ -25,6 +25,24 @@ transaction pool, test harness). The sacred modules (`consensus/`, `vm/`,
 `crypto/`, `domain/`) are out of scope — if you touch them, stop and invoke
 `forge` (ETC) or `beacon` (ETH) before proceeding.
 
+## Reference repos
+
+Pull fast-forward updates at session start:
+
+```bash
+REFS=$(git rev-parse --show-toplevel)/.claude/repo-references
+for r in pekko virtuslab/pekko-serialization-helper; do
+  git -C "$REFS/$r" pull --ff-only 2>/dev/null | grep -v "Already up to date" || true
+done
+```
+
+| Repo | Path | What to check |
+|------|------|---------------|
+| pekko | `.claude/repo-references/pekko` | `AGENTS.md` for MiMa binary-compat and formatting rules; `actor-typed/src/main/scala/` for canonical Typed API patterns; `CHANGELOG.md` for API changes since the last migration session |
+| pekko-serialization-helper | `.claude/repo-references/virtuslab/pekko-serialization-helper` | `README.md` and `core/src/` for `@SerializabilityTrait` — **read before migrating any actor flagged "Assess" or "Run pre-flight" in the serialization table below** |
+
+Full index: [`.claude/agents/REFERENCES.md`](REFERENCES.md)
+
 ## When you are invoked
 
 You are called once per actor migration thread. Your deliverables per session:
