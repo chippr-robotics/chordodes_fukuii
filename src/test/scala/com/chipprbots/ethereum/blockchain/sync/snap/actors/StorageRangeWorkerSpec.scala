@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.ImplicitSender
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
@@ -36,11 +37,11 @@ class StorageRangeWorkerSpec
     last = maxHash
   )
 
-  private def makeWorker(coordinator: TestProbe): org.apache.pekko.actor.ActorRef = {
+  private def makeWorker(coordinator: TestProbe): org.apache.pekko.actor.typed.ActorRef[StorageRangeWorker.Command] = {
     val networkPeerManager = TestProbe()
     val requestTracker = new SNAPRequestTracker()(system.scheduler)
-    system.actorOf(
-      StorageRangeWorker.props(coordinator.ref, networkPeerManager.ref, requestTracker)
+    system.spawnAnonymous(
+      StorageRangeWorker(coordinator.ref, networkPeerManager.ref, requestTracker)
     )
   }
 

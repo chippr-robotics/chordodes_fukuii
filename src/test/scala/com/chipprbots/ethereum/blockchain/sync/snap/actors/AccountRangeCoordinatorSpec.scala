@@ -2,6 +2,7 @@ package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.Status
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.ImplicitSender
 import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestKit
@@ -367,9 +368,11 @@ class AccountRangeCoordinatorSpec
       rootHash = rootHash
     )
     task.pending = true
-    ua.workers += workerProbe.ref
-    ua.idleWorkers -= workerProbe.ref
-    ua.activeTasks.put(reqId, (task, workerProbe.ref, peer))
+    // Coordinator pool now holds Typed worker refs; wrap the Classic TestProbe via the adapter.
+    val typedWorker = workerProbe.ref.toTyped[AccountRangeWorker.Command]
+    ua.workers += typedWorker
+    ua.idleWorkers -= typedWorker
+    ua.activeTasks.put(reqId, (task, typedWorker, peer))
     (task, workerProbe)
   }
 
@@ -401,8 +404,8 @@ class AccountRangeCoordinatorSpec
     workerB1.expectNoMessage(300.millis)
 
     // Drained workers are back in idleWorkers, ready for reuse.
-    ua.idleWorkers should contain(workerA1.ref)
-    ua.idleWorkers should contain(workerA2.ref)
+    ua.idleWorkers should contain(workerA1.ref.toTyped[AccountRangeWorker.Command])
+    ua.idleWorkers should contain(workerA2.ref.toTyped[AccountRangeWorker.Command])
 
     system.stop(coord)
   }
@@ -767,7 +770,7 @@ class AccountRangeCoordinatorSpec
     val peerProbe = TestProbe()
     val peer = PeerTestHelpers.createTestPeer("requeue-peer", peerProbe.ref)
 
-    val coordinator = system.actorOf(
+    val coordinator = TestActorRef[AccountRangeCoordinator](
       AccountRangeCoordinator.props(
         stateRoot = stateRoot,
         networkPeerManager = networkPeerManager.ref,
@@ -786,9 +789,11 @@ class AccountRangeCoordinatorSpec
     // Route failures through the worker so it properly transitions to idle before each re-dispatch:
     //   test → workerRef ! WorkerPeerDisconnected → worker ! TaskFailed("Peer disconnected") → coordinator
     // This skips cooldown and stateless marking, allowing immediate re-dispatch each iteration.
+    // The worker is now Typed, so its ref no longer surfaces as `lastSender` on the network probe;
+    // fetch it from the coordinator's single active task instead (concurrency = 1).
     for (_ <- 1 to (AccountRangeCoordinator.MaxRequeuesPerTask + 1)) {
       networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](2.seconds)
-      val workerRef = networkPeerManager.lastSender
+      val workerRef = coordinator.underlyingActor.activeTasks.values.head._2
       workerRef ! Messages.WorkerPeerDisconnected(peer.id.value)
     }
 
@@ -874,7 +879,8 @@ class AccountRangeCoordinatorSpec
 
     val sendMsg1 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](2.seconds)
     val reqId1 = sendMsg1.message.asInstanceOf[GetAccountRangeEnc].underlyingMsg.requestId
-    val workerRef = networkPeerManager.lastSender
+    // Typed worker ref no longer surfaces as `lastSender`; fetch it from the active task.
+    val workerRef = ua.activeTasks(reqId1)._2
 
     // Pre-seed 4 strikes so the next TaskFailed is strike 5 (EmptyResponseStrikeThreshold).
     // Avoids repeating 4 full request cycles; the coordinator still processes the final
@@ -962,7 +968,8 @@ class AccountRangeCoordinatorSpec
 
     val sendMsg1 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](2.seconds)
     val reqId1 = sendMsg1.message.asInstanceOf[GetAccountRangeEnc].underlyingMsg.requestId
-    val workerRef = networkPeerManager.lastSender
+    // Typed worker ref no longer surfaces as `lastSender`; fetch it from the active task.
+    val workerRef = ua.activeTasks(reqId1)._2
 
     // Pre-seed 4 strikes; the next TaskFailed is strike 5 (EmptyResponseStrikeThreshold).
     ua.emptyResponseStrikes(peer.id) = 4
@@ -1017,7 +1024,6 @@ class AccountRangeCoordinatorSpec
     coordinator ! Messages.StartAccountRangeSync(root)
     coordinator ! Messages.PeerAvailable(peer1)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](2.seconds)
-    val _ = networkPeerManager.lastSender
 
     // Peer1 disconnects mid-flight:
     // coordinator sends WorkerPeerDisconnected to the worker; worker fires TaskFailed back;
@@ -1043,7 +1049,7 @@ class AccountRangeCoordinatorSpec
     val peerProbe = TestProbe()
     val peer = PeerTestHelpers.createTestPeer("late-resp-peer", peerProbe.ref)
 
-    val coordinator = system.actorOf(
+    val coordinator = TestActorRef[AccountRangeCoordinator](
       AccountRangeCoordinator.props(
         stateRoot = root,
         networkPeerManager = networkPeerManager.ref,
@@ -1057,11 +1063,13 @@ class AccountRangeCoordinatorSpec
 
     coordinator ! Messages.StartAccountRangeSync(root)
     coordinator ! Messages.PeerAvailable(peer)
-    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](2.seconds)
-    val worker = networkPeerManager.lastSender
+    val sendMsg = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](2.seconds)
+    val reqId = sendMsg.message.asInstanceOf[GetAccountRangeEnc].underlyingMsg.requestId
+    // Typed worker ref no longer surfaces as `lastSender`; fetch it from the active task.
+    val worker = coordinator.underlyingActor.activeTasks(reqId)._2
 
     // Worker times out — fires TaskFailed("Request timeout") to coordinator
-    worker ! Messages.RequestTimeout(BigInt(1))
+    worker ! Messages.RequestTimeout(reqId)
 
     // Coordinator requeues; controller receives no escalation (not enough retries)
     snapSyncController.expectNoMessage(300.millis)
@@ -1070,7 +1078,7 @@ class AccountRangeCoordinatorSpec
     // coordinator must NOT receive a second TaskFailed or TaskComplete for this request.
     import com.chipprbots.ethereum.network.p2p.messages.SNAP.AccountRange
     worker ! Messages.AccountRangeResponseMsg(
-      AccountRange(requestId = BigInt(1), accounts = Seq.empty, proof = Seq.empty)
+      AccountRange(requestId = reqId, accounts = Seq.empty, proof = Seq.empty)
     )
 
     // The only message the snapSyncController should ever see is nothing (no double completion)
@@ -1096,7 +1104,7 @@ class AccountRangeCoordinatorSpec
     val peer1 = PeerTestHelpers.createTestPeer("cooldown-peer-1", peerProbe1.ref)
     val peer2 = PeerTestHelpers.createTestPeer("cooldown-peer-2", peerProbe2.ref)
 
-    val coordinator = system.actorOf(
+    val coordinator = TestActorRef[AccountRangeCoordinator](
       AccountRangeCoordinator.props(
         stateRoot = root,
         networkPeerManager = networkPeerManager.ref,
@@ -1113,7 +1121,8 @@ class AccountRangeCoordinatorSpec
 
     val sendMsg1 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](2.seconds)
     val reqId1 = sendMsg1.message.asInstanceOf[GetAccountRangeEnc].underlyingMsg.requestId
-    val worker1 = networkPeerManager.lastSender
+    // Typed worker ref no longer surfaces as `lastSender`; fetch it from the active task.
+    val worker1 = coordinator.underlyingActor.activeTasks(reqId1)._2
 
     // peer1 times out — enters cooldown via recordPeerCooldown
     worker1 ! Messages.RequestTimeout(reqId1)

@@ -157,7 +157,7 @@ object FilterManager {
               .map { case (log, localIdx) => (log, blockLogIndex + localIdx) }
               .filter { case (log, _) =>
                 filter.address.forall(addrs => addrs.contains(log.loggerAddress)) &&
-                  topicsMatch(log.logTopics, filter.topics)
+                topicsMatch(log.logTopics, filter.topics)
               }
               .map { case (log, logIndex) =>
                 val tx = block.body.transactionList(txIndex)
@@ -221,7 +221,9 @@ object FilterManager {
 
       val bestBlockNumber = blockchainReader.getBestBlockNumber
       val fromBlockNumber =
-        startingBlockNumber.getOrElse(resolveBlockNumber(filter.fromBlock.getOrElse(BlockParam.Latest), bestBlockNumber))
+        startingBlockNumber.getOrElse(
+          resolveBlockNumber(filter.fromBlock.getOrElse(BlockParam.Latest), bestBlockNumber)
+        )
       val toBlockNumber = resolveBlockNumber(filter.toBlock.getOrElse(BlockParam.Latest), bestBlockNumber)
       val logs = recur(fromBlockNumber, toBlockNumber, Nil)
 
@@ -247,7 +249,9 @@ object FilterManager {
 
     def getPendingTransactions(): IO[Seq[PendingTransaction]] =
       pendingTransactionsManager
-        .askFor[PendingTransactionsManager.PendingTransactionsResponse](PendingTransactionsManager.GetPendingTransactions)
+        .askFor[PendingTransactionsManager.PendingTransactionsResponse](
+          PendingTransactionsManager.GetPendingTransactions
+        )
         .flatMap { response =>
           keyStore.listAccounts match {
             case Right(accounts) =>

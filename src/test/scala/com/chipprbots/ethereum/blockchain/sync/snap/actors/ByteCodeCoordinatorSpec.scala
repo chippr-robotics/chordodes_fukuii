@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.ImplicitSender
 import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestKit
@@ -749,7 +750,7 @@ class ByteCodeCoordinatorSpec
 
     // Get the worker ref and stop it permanently (bypasses supervisor restart)
     val workerRef = coordinator.underlyingActor.workers.head
-    system.stop(workerRef)
+    system.stop(workerRef.toClassic)
 
     // Terminated propagates asynchronously — wait for coordinator to process it
     within(3.seconds) {
@@ -791,7 +792,7 @@ class ByteCodeCoordinatorSpec
     // Let the worker become idle by marking the task complete
     coordinator ! Messages.NoMoreByteCodeTasks
 
-    system.stop(workerRef)
+    system.stop(workerRef.toClassic)
 
     // Pool should shrink without any exception — coordinator stays operational
     within(3.seconds) {

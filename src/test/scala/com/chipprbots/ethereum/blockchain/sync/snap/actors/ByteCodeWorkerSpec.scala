@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.ImplicitSender
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
@@ -35,10 +36,13 @@ class ByteCodeWorkerSpec
   private def makeTask(hashes: Seq[ByteString] = Seq(codeHash1)): ByteCodeTask =
     ByteCodeTask.createTask(hashes)
 
-  private def makeWorker(coordinator: TestProbe, networkPeerManager: TestProbe): org.apache.pekko.actor.ActorRef = {
+  private def makeWorker(
+      coordinator: TestProbe,
+      networkPeerManager: TestProbe
+  ): org.apache.pekko.actor.typed.ActorRef[ByteCodeWorker.Command] = {
     val requestTracker = new SNAPRequestTracker()(system.scheduler)
-    system.actorOf(
-      ByteCodeWorker.props(coordinator.ref, networkPeerManager.ref, requestTracker)
+    system.spawnAnonymous(
+      ByteCodeWorker(coordinator.ref, networkPeerManager.ref, requestTracker)
     )
   }
 

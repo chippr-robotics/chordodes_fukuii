@@ -9,6 +9,7 @@ import org.apache.pekko.actor.Props
 import org.apache.pekko.actor.SupervisorStrategy
 import org.apache.pekko.actor.SupervisorStrategy.*
 import org.apache.pekko.actor.Terminated
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
@@ -65,6 +66,10 @@ class ByteCodeCoordinator(
   import Messages.*
   implicit private val ec: scala.concurrent.ExecutionContext = context.dispatcher
 
+  // Typed leaf worker (Group W1). The coordinator stays Classic and spawns Typed children via the
+  // classic→typed adapter; it holds typed refs and sends commands with the typed `!`.
+  private type WorkerRef = org.apache.pekko.actor.typed.ActorRef[ByteCodeWorker.Command]
+
   // Per-peer concurrency budget — dynamically adjusted by SNAPSyncController via UpdateMaxInFlightPerPeer.
   // Shadows cooldownConfig.maxInFlightPerPeer so budget updates don't require config mutation.
   private var maxInFlightPerPeer: Int = cooldownConfig.maxInFlightPerPeer
@@ -116,7 +121,7 @@ class ByteCodeCoordinator(
   private[actors] val pendingTasks = mutable.Queue[ByteCodeTask]()
   final private[actors] case class ActiveByteCodeRequest(
       task: ByteCodeTask,
-      worker: ActorRef,
+      worker: WorkerRef,
       peer: Peer,
       requestedBytes: BigInt,
       startedAtMillis: Long
@@ -138,9 +143,9 @@ class ByteCodeCoordinator(
   private[actors] var backpressureActive: Boolean = false
 
   // Worker pool
-  private[actors] val workers = mutable.ArrayBuffer[ActorRef]()
+  private[actors] val workers = mutable.ArrayBuffer[WorkerRef]()
   private val maxWorkers = 32
-  private[actors] val idleWorkers = mutable.LinkedHashSet.empty[ActorRef]
+  private[actors] val idleWorkers = mutable.LinkedHashSet.empty[WorkerRef]
 
   // Sentinel: when true, no more AddByteCodeTasks will arrive (all accounts downloaded).
   // Completion is only reported after this is set AND pending+active tasks drain.
@@ -208,6 +213,10 @@ class ByteCodeCoordinator(
     )
   }
 
+  // Supervision strategy retained for any Classic children. The Typed ByteCodeWorker children
+  // (Group W1) are NOT governed by this strategy — a Typed actor uses its own supervision and, by
+  // default, STOPS on failure. That stop is caught by the `Terminated` handler below, which removes
+  // the dead worker from the pool and re-queues its in-flight task.
   override val supervisorStrategy: SupervisorStrategy =
     OneForOneStrategy(maxNrOfRetries = 3, withinTimeRange = 1.minute) { case _: Exception =>
       log.warning("ByteCode worker failed, restarting")
@@ -391,7 +400,10 @@ class ByteCodeCoordinator(
       log.info("Bytecode sync force-completed (promoting to healing/recovery phase)")
       snapSyncController ! SNAPSyncController.ByteCodeSyncComplete
 
-    case Terminated(worker) if workers.contains(worker) =>
+    // `Terminated.actor` is a Classic ActorRef; the pool holds Typed worker refs, so match on the
+    // underlying classic ref via `.toClassic`.
+    case Terminated(classicWorker) if workers.exists(_.toClassic == classicWorker) =>
+      val worker: WorkerRef = workers.find(_.toClassic == classicWorker).get
       log.warning(
         s"ByteCode worker terminated permanently — removing from pool. " +
           s"Remaining workers: ${workers.size - 1}, idle: ${idleWorkers.size}"
@@ -466,7 +478,7 @@ class ByteCodeCoordinator(
     }
   }
 
-  private def assignTaskToWorker(worker: ActorRef, peer: Peer): Unit = {
+  private def assignTaskToWorker(worker: WorkerRef, peer: Peer): Unit = {
     if (pendingTasks.isEmpty) return
 
     // Mark worker busy.
@@ -494,7 +506,7 @@ class ByteCodeCoordinator(
     // without overloading any single neighbor.
     var inflight = inFlightForPeer(peer)
     while (pendingTasks.nonEmpty && inflight < maxInFlightPerPeer) {
-      val workerOpt: Option[ActorRef] =
+      val workerOpt: Option[WorkerRef] =
         idleWorkers.headOption.orElse {
           if (workers.size < maxWorkers) Some(createWorker()) else None
         }
@@ -718,24 +730,23 @@ class ByteCodeCoordinator(
       snapSyncController ! SNAPSyncController.ByteCodeSyncComplete
     }
 
-  private def createWorker(): ActorRef = {
-    val worker = context.actorOf(
-      ByteCodeWorker
-        .props(
-          coordinator = self,
-          networkPeerManager = networkPeerManager,
-          requestTracker = requestTracker
-        )
-        .withDispatcher("sync-dispatcher")
+  private def createWorker(): WorkerRef = {
+    val worker: WorkerRef = context.spawnAnonymous(
+      ByteCodeWorker(
+        coordinator = self,
+        networkPeerManager = networkPeerManager,
+        requestTracker = requestTracker
+      ),
+      org.apache.pekko.actor.typed.Props.empty.withDispatcherFromConfig("sync-dispatcher")
     )
-    context.watch(worker)
+    context.watch(worker.toClassic)
     workers += worker
     idleWorkers += worker
     log.debug(s"Created bytecode worker, total: ${workers.size}")
     worker
   }
 
-  private def markWorkerIdle(worker: ActorRef): Unit =
+  private def markWorkerIdle(worker: WorkerRef): Unit =
     // Only track workers we created.
     if (workers.contains(worker)) {
       idleWorkers += worker

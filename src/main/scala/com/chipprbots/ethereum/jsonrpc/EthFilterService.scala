@@ -60,7 +60,11 @@ class EthFilterService(
     import req.filter.*
 
     IO.fromFuture(
-      IO(filterManager.ask[FM.NewFilterResponse](replyTo => FM.NewLogFilter(fromBlock, toBlock, address, topics, replyTo)))
+      IO(
+        filterManager.ask[FM.NewFilterResponse](replyTo =>
+          FM.NewLogFilter(fromBlock, toBlock, address, topics, replyTo)
+        )
+      )
     ).map { resp =>
       Right(NewFilterResponse(resp.id))
     }

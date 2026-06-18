@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.ImplicitSender
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
@@ -46,10 +47,10 @@ class AccountRangeWorkerSpec
   private def makeWorker(
       coordinator: TestProbe,
       networkPeerManager: TestProbe
-  ): org.apache.pekko.actor.ActorRef = {
+  ): org.apache.pekko.actor.typed.ActorRef[AccountRangeWorker.Command] = {
     val requestTracker = new SNAPRequestTracker()(system.scheduler)
-    system.actorOf(
-      AccountRangeWorker.props(coordinator.ref, networkPeerManager.ref, requestTracker)
+    system.spawnAnonymous(
+      AccountRangeWorker(coordinator.ref, networkPeerManager.ref, requestTracker)
     )
   }
 

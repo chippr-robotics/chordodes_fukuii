@@ -16,6 +16,7 @@ import org.apache.pekko.actor.Status
 import org.apache.pekko.actor.SupervisorStrategy
 import org.apache.pekko.actor.SupervisorStrategy.*
 import org.apache.pekko.actor.Terminated
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
@@ -86,6 +87,10 @@ class AccountRangeCoordinator(
 
   import Messages.*
   import SNAPSyncController.PivotStateUnservable
+
+  // Typed leaf worker (Group W1). The coordinator stays Classic and spawns Typed children via the
+  // classic→typed adapter; it holds typed refs and sends commands with the typed `!`.
+  private type WorkerRef = org.apache.pekko.actor.typed.ActorRef[AccountRangeWorker.Command]
 
   // Mutable state root — updated in-place when the controller refreshes the pivot.
   private var stateRoot: ByteString = initialStateRoot
@@ -298,12 +303,12 @@ class AccountRangeCoordinator(
     Ordering.by[AccountTask, BigInt](_.remainingKeyspace).reverse
   )
   // requestId -> (task, worker, peer)
-  private[actors] val activeTasks = mutable.Map[BigInt, (AccountTask, ActorRef, Peer)]()
+  private[actors] val activeTasks = mutable.Map[BigInt, (AccountTask, WorkerRef, Peer)]()
   private val completedTasks = mutable.ArrayBuffer[AccountTask]()
 
   // Worker pool
-  private[actors] val workers = mutable.ArrayBuffer[ActorRef]()
-  private[actors] val idleWorkers = mutable.LinkedHashSet.empty[ActorRef]
+  private[actors] val workers = mutable.ArrayBuffer[WorkerRef]()
+  private[actors] val idleWorkers = mutable.LinkedHashSet.empty[WorkerRef]
 
   // #1184: dispatch-stalled detector — silent peers (no FIN/RST) leave activeTasks slots
   // held forever; the worker→TaskFailed cascade depends on a response that never arrives.
@@ -351,7 +356,7 @@ class AccountRangeCoordinator(
     *   number of slots drained
     */
   private def drainActiveTasks(reason: String, peerFilter: Option[String] = None): Int = {
-    val toDrain: Seq[(BigInt, AccountTask, ActorRef, Peer)] = activeTasks.toSeq.collect {
+    val toDrain: Seq[(BigInt, AccountTask, WorkerRef, Peer)] = activeTasks.toSeq.collect {
       case (reqId, (task, worker, peer)) if peerFilter.forall(_ == peer.id.value) =>
         (reqId, task, worker, peer)
     }
@@ -594,7 +599,11 @@ class AccountRangeCoordinator(
     snapSyncController ! AccountRangeProgress(progress)
   }
 
-  // Supervision strategy: Restart worker on failure
+  // Supervision strategy retained for any Classic children. The Typed AccountRangeWorker children
+  // (Group W1) are NOT governed by this strategy — a Typed actor uses its own supervision and, by
+  // default, STOPS on failure. That stop is caught by the `Terminated` handler below, which removes
+  // the dead worker from the pool and re-queues its in-flight task. Stop+re-queue is the intended
+  // recovery path here; a restart would silently lose the worker's `currentTask` state.
   override val supervisorStrategy: SupervisorStrategy =
     OneForOneStrategy(maxNrOfRetries = 3, withinTimeRange = 1.minute) { case _: Exception =>
       log.warning("Worker failed, restarting")
@@ -738,13 +747,16 @@ class AccountRangeCoordinator(
         tryRedispatchPendingTasks()
       }
 
-    case Terminated(worker) if workers.contains(worker) =>
+    // `Terminated.actor` is a Classic ActorRef; the pool holds Typed worker refs, so match on the
+    // underlying classic ref via `.toClassic`.
+    case Terminated(classicWorker) if workers.exists(_.toClassic == classicWorker) =>
       // Worker actor terminated unexpectedly (e.g., exception in proof verification).
       // Without this handler the task stays in activeTasks forever — the coordinator never
       // gets TaskFailed/TaskComplete so it waits for a response that will never arrive.
       // Restored from may-sprint-backup where context.watch(worker) caught this path.
+      val worker: WorkerRef = workers.find(_.toClassic == classicWorker).get
       log.warning(
-        s"[ACCOUNT-COORD] Worker ${worker.path.name} terminated — removing from pool and re-queuing task. " +
+        s"[ACCOUNT-COORD] Worker ${classicWorker.path.name} terminated — removing from pool and re-queuing task. " +
           s"Pool: ${workers.size - 1} total, ${idleWorkers.size} idle, ${activeTasks.size} active tasks"
       )
       workers -= worker
@@ -972,24 +984,23 @@ class AccountRangeCoordinator(
   private def maxWorkers: Int =
     math.max(concurrency, knownAvailablePeers.count(!isPeerStateless(_))) * maxInFlightPerPeer
 
-  private def createWorker(): ActorRef = {
-    val worker = context.actorOf(
-      AccountRangeWorker
-        .props(
-          coordinator = self,
-          networkPeerManager = networkPeerManager,
-          requestTracker = requestTracker
-        )
-        .withDispatcher("sync-dispatcher")
+  private def createWorker(): WorkerRef = {
+    val worker: WorkerRef = context.spawnAnonymous(
+      AccountRangeWorker(
+        coordinator = self,
+        networkPeerManager = networkPeerManager,
+        requestTracker = requestTracker
+      ),
+      org.apache.pekko.actor.typed.Props.empty.withDispatcherFromConfig("sync-dispatcher")
     )
-    context.watch(worker)
+    context.watch(worker.toClassic)
     workers += worker
     idleWorkers += worker
     log.debug(s"Created worker ${worker.path.name}, total workers: ${workers.size}")
     worker
   }
 
-  private def markWorkerIdle(worker: ActorRef): Unit =
+  private def markWorkerIdle(worker: WorkerRef): Unit =
     if (workers.contains(worker)) {
       idleWorkers += worker
     }
@@ -1007,7 +1018,7 @@ class AccountRangeCoordinator(
 
     var inflight = inFlightForPeer(peer)
     while (pendingTasks.nonEmpty && inflight < maxInFlightPerPeer) {
-      val workerOpt: Option[ActorRef] =
+      val workerOpt: Option[WorkerRef] =
         idleWorkers.headOption.orElse {
           if (workers.size < maxWorkers) Some(createWorker()) else None
         }
@@ -1051,7 +1062,7 @@ class AccountRangeCoordinator(
     }
   }
 
-  private def dispatchNextTaskToWorker(worker: ActorRef, peer: Peer): Unit = {
+  private def dispatchNextTaskToWorker(worker: WorkerRef, peer: Peer): Unit = {
     if (pendingTasks.isEmpty) {
       return
     }

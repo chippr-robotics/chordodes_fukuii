@@ -152,23 +152,25 @@ class JsonRpcWsServer(
               case None =>
                 sendResponse(errorResponse(id, -32602, "Invalid params: missing subscription type"))
               case Some(t) =>
-                subscriptionManager.ask[SubscribeResponse](replyTo => Subscribe(connId, t, subParams, replyTo)).foreach {
-                  case SubscribeResponse(Right(subId)) =>
-                    val hex = "0x" + subId.toHexString
-                    sendResponse(
-                      compact(
-                        render(
-                          JObject(
-                            "jsonrpc" -> JString("2.0"),
-                            "id" -> id,
-                            "result" -> JString(hex)
+                subscriptionManager
+                  .ask[SubscribeResponse](replyTo => Subscribe(connId, t, subParams, replyTo))
+                  .foreach {
+                    case SubscribeResponse(Right(subId)) =>
+                      val hex = "0x" + subId.toHexString
+                      sendResponse(
+                        compact(
+                          render(
+                            JObject(
+                              "jsonrpc" -> JString("2.0"),
+                              "id" -> id,
+                              "result" -> JString(hex)
+                            )
                           )
                         )
                       )
-                    )
-                  case SubscribeResponse(Left(err)) =>
-                    sendResponse(errorResponse(id, -32602, err))
-                }
+                    case SubscribeResponse(Left(err)) =>
+                      sendResponse(errorResponse(id, -32602, err))
+                  }
             }
 
           case "eth_unsubscribe" =>
