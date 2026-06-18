@@ -188,9 +188,11 @@ object StorageRecoveryActor {
             val coordinator: ActorRef = coordinatorForTesting.getOrElse {
               val requestTracker = new snap.SNAPRequestTracker()(ctx.system.classicSystem.scheduler)
               val mptStorage = stateStorage.getBackingStorage(pivotBlockNumber)
-              ctx.toClassic.actorOf(
-                actors.StorageRangeCoordinator
-                  .props(
+              // S3: StorageRangeCoordinator is now Typed. Spawn it from this Typed context and adapt
+              // the ref back to Classic so the rest of this actor (which stores ActorRef) is unchanged.
+              ctx
+                .spawn(
+                  actors.StorageRangeCoordinator(
                     stateRoot = stateRoot,
                     networkPeerManager = networkPeerManager,
                     requestTracker = requestTracker,
@@ -202,10 +204,11 @@ object StorageRecoveryActor {
                     snapSyncController = ctx.self.toClassic,
                     initialResponseBytes = snapSyncConfig.storageInitialResponseBytes,
                     minResponseBytes = snapSyncConfig.storageMinResponseBytes
-                  )
-                  .withDispatcher("sync-dispatcher"),
-                "storage-recovery-coordinator"
-              )
+                  ),
+                  "storage-recovery-coordinator",
+                  org.apache.pekko.actor.typed.DispatcherSelector.fromConfig("sync-dispatcher")
+                )
+                .toClassic
             }
 
             ctx.watchWith(coordinator.toTyped[Nothing], CoordinatorTerminated)

@@ -1,8 +1,11 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.Props
+import org.apache.pekko.actor.testkit.typed.scaladsl.BehaviorTestKit
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.ImplicitSender
-import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
@@ -37,6 +40,92 @@ class StorageRangeCoordinatorSpec
   override def afterAll(): Unit =
     TestKit.shutdownActorSystem(system)
 
+  // StorageRangeCoordinator is a Typed actor (Group S3). These tests run in a Classic ActorSystem so they can keep
+  // the established `system.actorOf` / `expectMsg` machinery; the coordinator is spawned through PropsAdapter to
+  // bridge the Classic system to the Typed Behavior. Mirrors the `.props(...)` factory the actor previously exposed.
+  private def srcProps(
+      stateRoot: ByteString,
+      networkPeerManager: org.apache.pekko.actor.ActorRef,
+      requestTracker: SNAPRequestTracker,
+      mptStorage: TestMptStorage,
+      flatSlotStorage: FlatSlotStorage,
+      maxAccountsPerBatch: Int,
+      maxInFlightRequests: Int,
+      requestTimeout: FiniteDuration,
+      snapSyncController: org.apache.pekko.actor.ActorRef,
+      initialMaxInFlightPerPeer: Int = 5,
+      backpressureHighWatermark: Int = 100000,
+      backpressureLowWatermark: Int = 50000
+  ): Props =
+    PropsAdapter(
+      StorageRangeCoordinator(
+        stateRoot = stateRoot,
+        networkPeerManager = networkPeerManager,
+        requestTracker = requestTracker,
+        mptStorage = mptStorage,
+        flatSlotStorage = flatSlotStorage,
+        maxAccountsPerBatch = maxAccountsPerBatch,
+        maxInFlightRequests = maxInFlightRequests,
+        requestTimeout = requestTimeout,
+        snapSyncController = snapSyncController,
+        initialMaxInFlightPerPeer = initialMaxInFlightPerPeer,
+        backpressureHighWatermark = backpressureHighWatermark,
+        backpressureLowWatermark = backpressureLowWatermark
+      )
+    )
+
+  // Typed `StorageGetProgress` carries a `replyTo: ActorRef[SyncStatistics]`. In these Classic tests the reply target
+  // is the test actor (ImplicitSender); adapt it to a typed ref so the coordinator can reply.
+  private def getProgress: Messages.StorageGetProgress =
+    Messages.StorageGetProgress(testActor.toTyped[StorageRangeCoordinator.SyncStatistics])
+
+  // White-box helper: build the `StorageRangeCoordinatorImpl` directly through a synchronous `BehaviorTestKit`,
+  // capturing the Impl instance so tests can drive `private[actors]` accumulator/counter logic in isolation (the
+  // Typed coordinator has no `.underlyingActor`). `kit.run(msg)` processes a Command synchronously on the same Impl.
+  // `flatBatchEcOverride` defaults to `Some(parasitic)` because `StorageRangeCoordinatorImpl` evaluates
+  // `flatBatchEc` eagerly in its constructor; under BehaviorTestKit `context.system.classicSystem` is unavailable,
+  // so the production `storage-writer-dispatcher` lookup must never be reached. Parasitic also keeps any flush the
+  // test does trigger synchronous (see `newCoordWithFlatBatch`).
+  private def newImpl(
+      stateRoot: ByteString,
+      flatSlotStorage: FlatSlotStorage,
+      snapSyncControllerRef: org.apache.pekko.actor.ActorRef,
+      flatBatchEntryThreshold: Int = 1000,
+      flatBatchEcOverride: Option[scala.concurrent.ExecutionContext] = Some(
+        scala.concurrent.ExecutionContext.parasitic
+      ),
+      maxAccountsPerBatch: Int = 8,
+      maxInFlightRequests: Int = 8,
+      backpressureHighWatermark: Int = 100000,
+      backpressureLowWatermark: Int = 50000
+  ): (StorageRangeCoordinatorImpl, BehaviorTestKit[StorageRangeCoordinator.Command]) = {
+    var captured: StorageRangeCoordinatorImpl = null
+    val behavior = Behaviors.setup[StorageRangeCoordinator.Command] { ctx =>
+      Behaviors.withTimers { timers =>
+        captured = new StorageRangeCoordinatorImpl(
+          ctx,
+          timers,
+          initialStateRoot = stateRoot,
+          networkPeerManager = TestProbe().ref,
+          requestTracker = new SNAPRequestTracker()(system.scheduler),
+          mptStorage = new TestMptStorage(),
+          flatSlotStorage = flatSlotStorage,
+          maxAccountsPerBatch = maxAccountsPerBatch,
+          maxInFlightRequests = maxInFlightRequests,
+          requestTimeout = 30.seconds,
+          snapSyncController = snapSyncControllerRef,
+          flatBatchEntryThreshold = flatBatchEntryThreshold,
+          flatBatchEcOverride = flatBatchEcOverride,
+          backpressureHighWatermark = backpressureHighWatermark,
+          backpressureLowWatermark = backpressureLowWatermark
+        )
+        captured.start()
+      }
+    }
+    val kit = BehaviorTestKit(behavior)
+    (captured, kit)
+  }
+
   "StorageRangeCoordinator" should "initialize correctly" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
@@ -45,7 +134,7 @@ class StorageRangeCoordinatorSpec
     val snapSyncController = TestProbe()
 
     val coordinator = system.actorOf(
-      StorageRangeCoordinator.props(
+      srcProps(
         stateRoot = stateRoot,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -72,7 +161,7 @@ class StorageRangeCoordinatorSpec
     val peer = PeerTestHelpers.createTestPeer("test-peer", peerProbe.ref)
 
     val coordinator = system.actorOf(
-      StorageRangeCoordinator.props(
+      srcProps(
         stateRoot = stateRoot,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -89,7 +178,7 @@ class StorageRangeCoordinatorSpec
     coordinator ! Messages.StoragePeerAvailable(peer)
 
     // Should handle peer availability (may or may not send request depending on tasks)
-    coordinator ! Messages.StorageGetProgress
+    coordinator ! getProgress
     expectMsgType[Any](3.seconds)
   }
 
@@ -101,7 +190,7 @@ class StorageRangeCoordinatorSpec
     val snapSyncController = TestProbe()
 
     val coordinator = system.actorOf(
-      StorageRangeCoordinator.props(
+      srcProps(
         stateRoot = stateRoot,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -117,7 +206,7 @@ class StorageRangeCoordinatorSpec
     coordinator ! Messages.StorageTaskComplete(BigInt(123), Right(10))
 
     // Coordinator should handle completion
-    coordinator ! Messages.StorageGetProgress
+    coordinator ! getProgress
     expectMsgType[Any](3.seconds)
   }
 
@@ -129,7 +218,7 @@ class StorageRangeCoordinatorSpec
     val snapSyncController = TestProbe()
 
     val coordinator = system.actorOf(
-      StorageRangeCoordinator.props(
+      srcProps(
         stateRoot = stateRoot,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -161,7 +250,7 @@ class StorageRangeCoordinatorSpec
     val snapSyncController = TestProbe()
 
     val coordinator = system.actorOf(
-      StorageRangeCoordinator.props(
+      srcProps(
         stateRoot = stateRoot,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -177,7 +266,7 @@ class StorageRangeCoordinatorSpec
     coordinator ! Messages.StorageTaskFailed(BigInt(123), "Test failure")
 
     // Coordinator should still be operational
-    coordinator ! Messages.StorageGetProgress
+    coordinator ! getProgress
     expectMsgType[Any](3.seconds)
   }
 
@@ -189,7 +278,7 @@ class StorageRangeCoordinatorSpec
     val snapSyncController = TestProbe()
 
     val coordinator = system.actorOf(
-      StorageRangeCoordinator.props(
+      srcProps(
         stateRoot = stateRoot,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -209,7 +298,7 @@ class StorageRangeCoordinatorSpec
     coordinator ! Messages.AddStorageTasks(Seq(task))
 
     // Should remain operational after adding tasks
-    coordinator ! Messages.StorageGetProgress
+    coordinator ! getProgress
     expectMsgType[Any](3.seconds)
   }
 
@@ -221,7 +310,7 @@ class StorageRangeCoordinatorSpec
     val snapSyncController = TestProbe()
 
     val coordinator = system.actorOf(
-      StorageRangeCoordinator.props(
+      srcProps(
         stateRoot = stateRoot,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -238,7 +327,7 @@ class StorageRangeCoordinatorSpec
     coordinator ! Messages.StoragePivotRefreshed(newStateRoot)
 
     // Coordinator should still respond to progress queries after pivot refresh
-    coordinator ! Messages.StorageGetProgress
+    coordinator ! getProgress
     expectMsgType[Any](3.seconds)
   }
 
@@ -252,7 +341,7 @@ class StorageRangeCoordinatorSpec
     val snapSyncController = TestProbe()
 
     val coordinator = system.actorOf(
-      StorageRangeCoordinator.props(
+      srcProps(
         stateRoot = stateRoot,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -300,7 +389,7 @@ class StorageRangeCoordinatorSpec
     // initialMaxInFlightPerPeer=1 ensures only one request is in-flight at a time so the
     // second request is sent only after the first is resolved.
     val coordinator = system.actorOf(
-      StorageRangeCoordinator.props(
+      srcProps(
         stateRoot = stateRoot,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -354,7 +443,7 @@ class StorageRangeCoordinatorSpec
     val snapSyncController = TestProbe()
 
     val coordinator = system.actorOf(
-      StorageRangeCoordinator.props(
+      srcProps(
         stateRoot = stateRoot,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -396,7 +485,7 @@ class StorageRangeCoordinatorSpec
     val peer = PeerTestHelpers.createTestPeer("storage-peer-nostall", peerProbe.ref)
 
     val coordinator = system.actorOf(
-      StorageRangeCoordinator.props(
+      srcProps(
         stateRoot = stateRoot,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -429,33 +518,22 @@ class StorageRangeCoordinatorSpec
 
   it should "reset consecutiveTaskFailures to 0 on StoragePivotRefreshed" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("reset-consec-root"))
-    val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
-    val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
 
-    val coordinator = TestActorRef[StorageRangeCoordinator](
-      StorageRangeCoordinator.props(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-        maxAccountsPerBatch = 8,
-        maxInFlightRequests = 8,
-        requestTimeout = 30.seconds,
-        snapSyncController = snapSyncController.ref
-      )
+    val (impl, kit) = newImpl(
+      stateRoot = stateRoot,
+      flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
+      snapSyncControllerRef = snapSyncController.ref
     )
 
     // Simulate failures accumulated during AccountRange phase (before storage phase begins)
-    coordinator.underlyingActor.consecutiveTaskFailures = 50
+    impl.consecutiveTaskFailures = 50
 
     val newStateRoot = kec256(ByteString("pivot-reset-root"))
-    coordinator ! Messages.StoragePivotRefreshed(newStateRoot)
+    kit.run(Messages.StoragePivotRefreshed(newStateRoot))
 
-    // TestActorRef processes synchronously — counter must be 0 immediately after
-    coordinator.underlyingActor.consecutiveTaskFailures shouldBe 0
+    // BehaviorTestKit processes synchronously — counter must be 0 immediately after
+    impl.consecutiveTaskFailures shouldBe 0
   }
 
   it should "not trigger ForceCompleteStorage when failures accumulated before a pivot are reset" taggedAs UnitTest in {
@@ -465,35 +543,24 @@ class StorageRangeCoordinatorSpec
     // With the reset, a pivot refresh zeroes the counter so failures before and after a pivot
     // are counted independently — only a sustained run of 100 failures from one pivot epoch triggers.
     val stateRoot = kec256(ByteString("no-force-after-pivot-root"))
-    val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
-    val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
 
-    val coordinator = TestActorRef[StorageRangeCoordinator](
-      StorageRangeCoordinator.props(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-        maxAccountsPerBatch = 8,
-        maxInFlightRequests = 8,
-        requestTimeout = 30.seconds,
-        snapSyncController = snapSyncController.ref
-      )
+    val (impl, kit) = newImpl(
+      stateRoot = stateRoot,
+      flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
+      snapSyncControllerRef = snapSyncController.ref
     )
 
     // Accumulate 99 failures — one below the 100-failure force-complete threshold
-    coordinator.underlyingActor.consecutiveTaskFailures = 99
+    impl.consecutiveTaskFailures = 99
 
     // Pivot refresh (mirrors what happens when SNAPSyncController updates the pivot block)
     val newRoot = kec256(ByteString("mid-session-pivot"))
-    coordinator ! Messages.StoragePivotRefreshed(newRoot)
+    kit.run(Messages.StoragePivotRefreshed(newRoot))
 
     // Counter is now 0. Set it to 99 again (simulating another near-threshold accumulation
     // after the pivot — still one below the threshold from this epoch).
-    coordinator.underlyingActor.consecutiveTaskFailures = 99
+    impl.consecutiveTaskFailures = 99
 
     // No ForceCompleteStorage should have been sent across either epoch
     snapSyncController.expectNoMessage(300.millis)
@@ -503,31 +570,28 @@ class StorageRangeCoordinatorSpec
   // Flat-batch aggregator (issue #1165)
   // ========================================
 
-  /** Helper: build a TestActorRef with the override EC and small threshold so flat-batch behaviour is observable
-    * without spinning up the storage-writer-dispatcher.
+  /** Helper: build the Impl synchronously (via `newImpl`/BehaviorTestKit) with an override EC and small threshold so
+    * flat-batch behaviour is observable without spinning up the storage-writer-dispatcher. Returns the Impl (for
+    * white-box field access), the BehaviorTestKit (for synchronous `kit.run(msg)` message processing), and the
+    * controller probe.
     */
   private def newCoordWithFlatBatch(
       flatSlotStorage: FlatSlotStorage,
       threshold: Int,
       stateRootArg: ByteString = kec256(ByteString("flat-batch-test-root"))
-  ): (TestActorRef[StorageRangeCoordinator], TestProbe) = {
+  ): (StorageRangeCoordinatorImpl, BehaviorTestKit[StorageRangeCoordinator.Command], TestProbe) = {
     val controller = TestProbe()
-    val ref = TestActorRef[StorageRangeCoordinator](
-      StorageRangeCoordinator.props(
-        stateRoot = stateRootArg,
-        networkPeerManager = TestProbe().ref,
-        requestTracker = new SNAPRequestTracker()(system.scheduler),
-        mptStorage = new TestMptStorage(),
-        flatSlotStorage = flatSlotStorage,
-        maxAccountsPerBatch = 8,
-        maxInFlightRequests = 8,
-        requestTimeout = 30.seconds,
-        snapSyncController = controller.ref,
-        flatBatchEntryThreshold = threshold,
-        flatBatchEcOverride = Some(system.dispatcher)
-      )
+    // `parasitic` runs the flush Future + its onComplete callback inline, so the resulting
+    // `FlatBatchFlushComplete` is already in the BehaviorTestKit self-inbox when the staging call returns.
+    // `kit.runOne()` then processes it synchronously (decrementing inFlightFlatBatches).
+    val (impl, kit) = newImpl(
+      stateRoot = stateRootArg,
+      flatSlotStorage = flatSlotStorage,
+      snapSyncControllerRef = controller.ref,
+      flatBatchEntryThreshold = threshold,
+      flatBatchEcOverride = Some(scala.concurrent.ExecutionContext.parasitic)
     )
-    (ref, controller)
+    (impl, kit, controller)
   }
 
   /** Helper: synthesize an account-hash + slots payload of `slotsPerAccount` entries. */
@@ -547,33 +611,37 @@ class StorageRangeCoordinatorSpec
     (accountHash, slots)
   }
 
+  // Drain all self-sent Commands sitting in the BehaviorTestKit's self-inbox (e.g. FlatBatchFlushComplete
+  // produced by the parasitic flush, plus chained StorageCheckCompletion ticks), processing each on the Impl.
+  private def drainSelf(kit: BehaviorTestKit[StorageRangeCoordinator.Command]): Unit =
+    while (kit.selfInbox().hasMessages) kit.runOne()
+
   it should "buffer small-contract slots in the accumulator without immediate commit" taggedAs UnitTest in {
     val flatSlots = new FlatSlotStorage(EphemDataSource())
-    val (coord, _) = newCoordWithFlatBatch(flatSlots, threshold = 100)
+    val (impl, _, _) = newCoordWithFlatBatch(flatSlots, threshold = 100)
 
     val (accountHash, slots) = fakeContract(seed = 1, slotsPerAccount = 3)
-    coord.underlyingActor.stageFlatSlotChunk(accountHash, slots.toSeq)
+    impl.stageFlatSlotChunk(accountHash, slots.toSeq)
 
-    coord.underlyingActor.pendingFlatBatchEntries shouldBe 3
-    coord.underlyingActor.pendingFlatBatchAccounts.size shouldBe 1
-    coord.underlyingActor.inFlightFlatBatches shouldBe 0
+    impl.pendingFlatBatchEntries shouldBe 3
+    impl.pendingFlatBatchAccounts.size shouldBe 1
+    impl.inFlightFlatBatches shouldBe 0
 
     // Nothing was committed — FlatSlotStorage is still empty for our keys.
     flatSlots.getSlot(accountHash, slots.head._1) shouldBe None
-
-    system.stop(coord)
   }
 
   it should "flush exactly once when the threshold is crossed and persist all buffered slots" taggedAs UnitTest in {
     val flatSlots = new FlatSlotStorage(EphemDataSource())
-    val (coord, _) = newCoordWithFlatBatch(flatSlots, threshold = 5)
+    val (impl, kit, _) = newCoordWithFlatBatch(flatSlots, threshold = 5)
 
     // Three contracts, 2 slots each = 6 total slots, crossing the 5-entry threshold.
     val contracts = (1 to 3).map(i => fakeContract(seed = i, slotsPerAccount = 2))
-    contracts.foreach { case (h, s) => coord.underlyingActor.stageFlatSlotChunk(h, s.toSeq) }
+    contracts.foreach { case (h, s) => impl.stageFlatSlotChunk(h, s.toSeq) }
 
-    // Flush is async on system.dispatcher; the 1-s deadline is generous.
-    awaitAssert(coord.underlyingActor.inFlightFlatBatches shouldBe 0, max = 1.second)
+    // The parasitic flush already persisted the batch and enqueued FlatBatchFlushComplete; drain it.
+    drainSelf(kit)
+    impl.inFlightFlatBatches shouldBe 0
 
     // After flush, all 6 slots are durable.
     contracts.foreach { case (accountHash, slots) =>
@@ -583,102 +651,96 @@ class StorageRangeCoordinatorSpec
     }
 
     // Accumulator was reset.
-    coord.underlyingActor.pendingFlatBatchAccounts shouldBe empty
-    coord.underlyingActor.pendingFlatBatchEntries shouldBe 0
-
-    system.stop(coord)
+    impl.pendingFlatBatchAccounts shouldBe empty
+    impl.pendingFlatBatchEntries shouldBe 0
   }
 
   it should "not trigger a flush when accumulator stays below threshold" taggedAs UnitTest in {
     val flatSlots = new FlatSlotStorage(EphemDataSource())
-    val (coord, _) = newCoordWithFlatBatch(flatSlots, threshold = 1000)
+    val (impl, _, _) = newCoordWithFlatBatch(flatSlots, threshold = 1000)
 
     val (accountHash, slots) = fakeContract(seed = 42, slotsPerAccount = 50)
-    coord.underlyingActor.stageFlatSlotChunk(accountHash, slots.toSeq)
+    impl.stageFlatSlotChunk(accountHash, slots.toSeq)
 
-    coord.underlyingActor.pendingFlatBatchEntries shouldBe 50
-    coord.underlyingActor.inFlightFlatBatches shouldBe 0
+    impl.pendingFlatBatchEntries shouldBe 50
+    impl.inFlightFlatBatches shouldBe 0
     flatSlots.getSlot(accountHash, slots.head._1) shouldBe None
-
-    system.stop(coord)
   }
 
   it should "flush remaining accumulator on ForceCompleteStorage" taggedAs UnitTest in {
     val flatSlots = new FlatSlotStorage(EphemDataSource())
-    val (coord, controller) = newCoordWithFlatBatch(flatSlots, threshold = 1000)
+    val (impl, kit, controller) = newCoordWithFlatBatch(flatSlots, threshold = 1000)
 
     val (accountHash, slots) = fakeContract(seed = 99, slotsPerAccount = 4)
-    coord.underlyingActor.stageFlatSlotChunk(accountHash, slots.toSeq)
-    coord.underlyingActor.pendingFlatBatchEntries shouldBe 4
+    impl.stageFlatSlotChunk(accountHash, slots.toSeq)
+    impl.pendingFlatBatchEntries shouldBe 4
 
-    coord ! Messages.ForceCompleteStorage
+    kit.run(Messages.ForceCompleteStorage)
 
-    awaitAssert(coord.underlyingActor.inFlightFlatBatches shouldBe 0, max = 1.second)
+    drainSelf(kit)
+    impl.inFlightFlatBatches shouldBe 0
     slots.foreach { case (slotHash, value) =>
       flatSlots.getSlot(accountHash, slotHash) shouldBe Some(value)
     }
     controller.expectMsg(3.seconds, SNAPSyncController.StorageRangeSyncForceCompleted)
-
-    system.stop(coord)
   }
 
   it should "drop bookkeeping for FlatBatchFlushComplete from a stale state root" taggedAs UnitTest in {
     val flatSlots = new FlatSlotStorage(EphemDataSource())
-    val (coord, _) = newCoordWithFlatBatch(flatSlots, threshold = 1000)
+    val (impl, kit, _) = newCoordWithFlatBatch(flatSlots, threshold = 1000)
 
-    coord.underlyingActor.inFlightFlatBatches = 1
+    impl.inFlightFlatBatches = 1
     val staleRoot = kec256(ByteString("a-stale-root"))
 
-    coord ! Messages.FlatBatchFlushComplete(staleRoot, entryCount = 7, elapsedMs = 5L)
+    kit.run(Messages.FlatBatchFlushComplete(staleRoot, entryCount = 7, elapsedMs = 5L))
 
-    coord.underlyingActor.inFlightFlatBatches shouldBe 0
-
-    system.stop(coord)
+    impl.inFlightFlatBatches shouldBe 0
   }
 
   it should "flush the accumulator before mutating stateRoot on StoragePivotRefreshed" taggedAs UnitTest in {
     val flatSlots = new FlatSlotStorage(EphemDataSource())
     val oldRoot = kec256(ByteString("old-root"))
     val newRoot = kec256(ByteString("new-root"))
-    val (coord, _) = newCoordWithFlatBatch(flatSlots, threshold = 1000, stateRootArg = oldRoot)
+    val (impl, kit, _) = newCoordWithFlatBatch(flatSlots, threshold = 1000, stateRootArg = oldRoot)
 
     // Buffer some data while stateRoot == oldRoot.
     val (accountHash, slots) = fakeContract(seed = 7, slotsPerAccount = 4)
-    coord.underlyingActor.stageFlatSlotChunk(accountHash, slots.toSeq)
-    coord.underlyingActor.pendingFlatBatchEntries shouldBe 4
+    impl.stageFlatSlotChunk(accountHash, slots.toSeq)
+    impl.pendingFlatBatchEntries shouldBe 4
 
     // Pivot refresh: must commit the accumulator THEN advance the root.
-    coord ! Messages.StoragePivotRefreshed(newRoot)
+    kit.run(Messages.StoragePivotRefreshed(newRoot))
 
-    awaitAssert(coord.underlyingActor.inFlightFlatBatches shouldBe 0, max = 1.second)
+    drainSelf(kit)
+    impl.inFlightFlatBatches shouldBe 0
 
     // Data made it to disk despite the pivot refresh.
     slots.foreach { case (slotHash, value) =>
       flatSlots.getSlot(accountHash, slotHash) shouldBe Some(value)
     }
-    coord.underlyingActor.pendingFlatBatchAccounts shouldBe empty
-
-    system.stop(coord)
+    impl.pendingFlatBatchAccounts shouldBe empty
   }
 
   it should "decrement in-flight count on FlatBatchFlushFailed and stay operational" taggedAs UnitTest in {
     val flatSlots = new FlatSlotStorage(EphemDataSource())
-    val (coord, _) = newCoordWithFlatBatch(flatSlots, threshold = 1000)
+    val (impl, kit, _) = newCoordWithFlatBatch(flatSlots, threshold = 1000)
 
-    coord.underlyingActor.inFlightFlatBatches = 2
+    impl.inFlightFlatBatches = 2
 
-    coord ! Messages.FlatBatchFlushFailed(
-      forStateRoot = kec256(ByteString("flat-batch-test-root")),
-      entryCount = 11,
-      error = "synthetic write failure"
+    kit.run(
+      Messages.FlatBatchFlushFailed(
+        forStateRoot = kec256(ByteString("flat-batch-test-root")),
+        entryCount = 11,
+        error = "synthetic write failure"
+      )
     )
 
-    coord.underlyingActor.inFlightFlatBatches shouldBe 1
+    impl.inFlightFlatBatches shouldBe 1
 
-    coord ! Messages.StorageGetProgress
-    expectMsgType[Any](3.seconds)
-
-    system.stop(coord)
+    // Still operational: a progress query yields a reply via the typed replyTo probe.
+    val probe = org.apache.pekko.actor.testkit.typed.scaladsl.TestInbox[StorageRangeCoordinator.SyncStatistics]()
+    kit.run(Messages.StorageGetProgress(probe.ref))
+    probe.receiveMessage()
   }
 
   // -----------------------------------------------------------------------
@@ -697,7 +759,7 @@ class StorageRangeCoordinatorSpec
     val snapSyncController = TestProbe()
 
     val coordinator = system.actorOf(
-      StorageRangeCoordinator.props(
+      srcProps(
         stateRoot = stateRoot,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -714,7 +776,7 @@ class StorageRangeCoordinatorSpec
 
     // Smoke: accept the basic lifecycle messages without error.
     coordinator ! Messages.StartStorageRangeSync(stateRoot)
-    coordinator ! Messages.StorageGetProgress
+    coordinator ! getProgress
     expectMsgType[Any](3.seconds)
 
     system.stop(coordinator)
@@ -737,7 +799,7 @@ class StorageRangeCoordinatorSpec
 
     // Tiny watermarks so the test can drive the transition without enqueuing 100K tasks.
     val coordinator = system.actorOf(
-      StorageRangeCoordinator.props(
+      srcProps(
         stateRoot = stateRoot,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -774,28 +836,17 @@ class StorageRangeCoordinatorSpec
 
   it should "release back-pressure once the queue drains below the low-water mark" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("backpressure-release-root"))
-    val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
-    val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
 
-    val coordinator = TestActorRef[StorageRangeCoordinator](
-      StorageRangeCoordinator.props(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-        maxAccountsPerBatch = 8,
-        maxInFlightRequests = 8,
-        requestTimeout = 30.seconds,
-        snapSyncController = snapSyncController.ref,
-        backpressureHighWatermark = 5,
-        backpressureLowWatermark = 2
-      )
+    val (impl, kit) = newImpl(
+      stateRoot = stateRoot,
+      flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
+      snapSyncControllerRef = snapSyncController.ref,
+      backpressureHighWatermark = 5,
+      backpressureLowWatermark = 2
     )
 
-    coordinator ! Messages.StartStorageRangeSync(stateRoot)
+    kit.run(Messages.StartStorageRangeSync(stateRoot))
 
     // Drive across the high-water mark first.
     val tasks =
@@ -805,14 +856,14 @@ class StorageRangeCoordinatorSpec
           storageRoot = kec256(ByteString(s"root-$i"))
         )
       )
-    coordinator ! Messages.AddStorageTasks(tasks)
+    kit.run(Messages.AddStorageTasks(tasks))
     snapSyncController.expectMsg(3.seconds, SNAPSyncController.StorageBackpressureChanged(paused = true))
 
     // Drain the underlying queue to 2 entries (≤ low-water mark) and trigger a check.
-    val q = coordinator.underlyingActor.tasks
+    val q = impl.tasks
     while (q.size > 2) q.dequeue()
 
-    coordinator ! Messages.StorageCheckCompletion
+    kit.run(Messages.StorageCheckCompletion)
     snapSyncController.expectMsg(3.seconds, SNAPSyncController.StorageBackpressureChanged(paused = false))
   }
 
@@ -829,161 +880,93 @@ class StorageRangeCoordinatorSpec
   // ========================================
 
   it should "start with empty accountSubtaskCounters (no subtask tracking before any response)" taggedAs UnitTest in {
-    val stateRoot = kec256(ByteString("subtask-init-root"))
-    val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
-    val networkPeerManager = TestProbe()
-    val snapSyncController = TestProbe()
-
-    val coordinator = TestActorRef[StorageRangeCoordinator](
-      StorageRangeCoordinator.props(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-        maxAccountsPerBatch = 8,
-        maxInFlightRequests = 8,
-        requestTimeout = 30.seconds,
-        snapSyncController = snapSyncController.ref
-      )
+    val (impl, _) = newImpl(
+      stateRoot = kec256(ByteString("subtask-init-root")),
+      flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
+      snapSyncControllerRef = TestProbe().ref
     )
 
-    coordinator.underlyingActor.accountSubtaskCounters shouldBe empty
-    coordinator.underlyingActor.completedAccountCount shouldBe 0L
+    impl.accountSubtaskCounters shouldBe empty
+    impl.completedAccountCount shouldBe 0L
   }
 
   it should "increment completedAccountCount only once when all subtasks for an account complete" taggedAs UnitTest in {
-    val stateRoot = kec256(ByteString("subtask-complete-root"))
-    val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
-    val networkPeerManager = TestProbe()
-    val snapSyncController = TestProbe()
     val accountHash = kec256(ByteString("large-contract"))
-
-    val coordinator = TestActorRef[StorageRangeCoordinator](
-      StorageRangeCoordinator.props(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-        maxAccountsPerBatch = 8,
-        maxInFlightRequests = 8,
-        requestTimeout = 30.seconds,
-        snapSyncController = snapSyncController.ref
-      )
+    val (impl, _) = newImpl(
+      stateRoot = kec256(ByteString("subtask-complete-root")),
+      flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
+      snapSyncControllerRef = TestProbe().ref
     )
 
-    coordinator ! Messages.StartStorageRangeSync(stateRoot)
-
-    val actor = coordinator.underlyingActor
-
     // Simulate: 3 subtasks registered for a large-storage account
-    actor.accountSubtaskCounters(accountHash) = (3, 0)
-    actor.completedAccountCount shouldBe 0L
+    impl.accountSubtaskCounters(accountHash) = (3, 0)
+    impl.completedAccountCount shouldBe 0L
 
     // First subtask completes — still 2 remaining; count must NOT advance
-    actor.recordSubtaskCompletion(accountHash)
-    actor.completedAccountCount shouldBe 0L
-    actor.accountSubtaskCounters.get(accountHash) shouldBe Some((3, 1))
+    impl.recordSubtaskCompletion(accountHash)
+    impl.completedAccountCount shouldBe 0L
+    impl.accountSubtaskCounters.get(accountHash) shouldBe Some((3, 1))
 
     // Second subtask completes — 1 remaining
-    actor.recordSubtaskCompletion(accountHash)
-    actor.completedAccountCount shouldBe 0L
-    actor.accountSubtaskCounters.get(accountHash) shouldBe Some((3, 2))
+    impl.recordSubtaskCompletion(accountHash)
+    impl.completedAccountCount shouldBe 0L
+    impl.accountSubtaskCounters.get(accountHash) shouldBe Some((3, 2))
 
     // Third (final) subtask completes — all done; count advances and entry is removed
-    actor.recordSubtaskCompletion(accountHash)
-    actor.completedAccountCount shouldBe 1L
-    actor.accountSubtaskCounters.get(accountHash) shouldBe None
+    impl.recordSubtaskCompletion(accountHash)
+    impl.completedAccountCount shouldBe 1L
+    impl.accountSubtaskCounters.get(accountHash) shouldBe None
   }
 
   it should "increment completedAccountCount directly (no subtasks) when no counter entry exists" taggedAs UnitTest in {
-    val stateRoot = kec256(ByteString("subtask-nosplit-root"))
-    val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
-    val networkPeerManager = TestProbe()
-    val snapSyncController = TestProbe()
     val accountHash = kec256(ByteString("small-contract"))
-
-    val coordinator = TestActorRef[StorageRangeCoordinator](
-      StorageRangeCoordinator.props(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-        maxAccountsPerBatch = 8,
-        maxInFlightRequests = 8,
-        requestTimeout = 30.seconds,
-        snapSyncController = snapSyncController.ref
-      )
+    val (impl, _) = newImpl(
+      stateRoot = kec256(ByteString("subtask-nosplit-root")),
+      flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
+      snapSyncControllerRef = TestProbe().ref
     )
 
-    coordinator ! Messages.StartStorageRangeSync(stateRoot)
-
-    val actor = coordinator.underlyingActor
-
     // No subtask entry for this account — small contract, single task, no split
-    actor.accountSubtaskCounters shouldBe empty
+    impl.accountSubtaskCounters shouldBe empty
 
-    actor.recordSubtaskCompletion(accountHash)
-    actor.completedAccountCount shouldBe 1L
-    actor.accountSubtaskCounters shouldBe empty
+    impl.recordSubtaskCompletion(accountHash)
+    impl.completedAccountCount shouldBe 1L
+    impl.accountSubtaskCounters shouldBe empty
   }
 
   it should "handle independent subtask completions for two large-storage contracts without cross-contamination" taggedAs UnitTest in {
-    val stateRoot = kec256(ByteString("subtask-two-accts-root"))
-    val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
-    val networkPeerManager = TestProbe()
-    val snapSyncController = TestProbe()
     val acctA = kec256(ByteString("contract-A"))
     val acctB = kec256(ByteString("contract-B"))
-
-    val coordinator = TestActorRef[StorageRangeCoordinator](
-      StorageRangeCoordinator.props(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-        maxAccountsPerBatch = 8,
-        maxInFlightRequests = 8,
-        requestTimeout = 30.seconds,
-        snapSyncController = snapSyncController.ref
-      )
+    val (impl, _) = newImpl(
+      stateRoot = kec256(ByteString("subtask-two-accts-root")),
+      flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
+      snapSyncControllerRef = TestProbe().ref
     )
 
-    coordinator ! Messages.StartStorageRangeSync(stateRoot)
-
-    val actor = coordinator.underlyingActor
-
     // Register 2 subtasks for A, 3 for B
-    actor.accountSubtaskCounters(acctA) = (2, 0)
-    actor.accountSubtaskCounters(acctB) = (3, 0)
+    impl.accountSubtaskCounters(acctA) = (2, 0)
+    impl.accountSubtaskCounters(acctB) = (3, 0)
 
     // Complete A subtask 1 → A not done; B not done
-    actor.recordSubtaskCompletion(acctA)
-    actor.completedAccountCount shouldBe 0L
-    actor.accountSubtaskCounters.get(acctA) shouldBe Some((2, 1))
+    impl.recordSubtaskCompletion(acctA)
+    impl.completedAccountCount shouldBe 0L
+    impl.accountSubtaskCounters.get(acctA) shouldBe Some((2, 1))
 
     // Complete B subtask 1 → nothing done
-    actor.recordSubtaskCompletion(acctB)
-    actor.completedAccountCount shouldBe 0L
+    impl.recordSubtaskCompletion(acctB)
+    impl.completedAccountCount shouldBe 0L
 
     // Complete A subtask 2 → A done; count=1; B still incomplete
-    actor.recordSubtaskCompletion(acctA)
-    actor.completedAccountCount shouldBe 1L
-    actor.accountSubtaskCounters.get(acctA) shouldBe None
-    actor.accountSubtaskCounters.get(acctB).isDefined shouldBe true
+    impl.recordSubtaskCompletion(acctA)
+    impl.completedAccountCount shouldBe 1L
+    impl.accountSubtaskCounters.get(acctA) shouldBe None
+    impl.accountSubtaskCounters.get(acctB).isDefined shouldBe true
 
     // Complete B subtasks 2 and 3 → B done; count=2
-    actor.recordSubtaskCompletion(acctB)
-    actor.recordSubtaskCompletion(acctB)
-    actor.completedAccountCount shouldBe 2L
-    actor.accountSubtaskCounters.get(acctB) shouldBe None
+    impl.recordSubtaskCompletion(acctB)
+    impl.recordSubtaskCompletion(acctB)
+    impl.completedAccountCount shouldBe 2L
+    impl.accountSubtaskCounters.get(acctB) shouldBe None
   }
 
   it should "bound per-account streaming trie memory across continuation responses" taggedAs UnitTest in {

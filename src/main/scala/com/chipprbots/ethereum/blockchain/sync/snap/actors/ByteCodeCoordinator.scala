@@ -18,9 +18,9 @@ import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.ByteCodes
 
-/** ByteCodeCoordinator manages bytecode download workers. Contains ALL business logic previously in
-  * ByteCodeDownloader: maintains the pending-task queue, distributes tasks to worker actors, verifies bytecode hashes,
-  * stores bytecodes to EvmCodeStorage, reports progress to SNAPSyncController, and handles worker failures.
+/** ByteCodeCoordinator manages bytecode download workers. Contains ALL business logic previously in ByteCodeDownloader:
+  * maintains the pending-task queue, distributes tasks to worker actors, verifies bytecode hashes, stores bytecodes to
+  * EvmCodeStorage, reports progress to SNAPSyncController, and handles worker failures.
   *
   * Pekko Typed actor (Group S3). The coordinator spawns Typed `ByteCodeWorker` children and holds typed refs; it
   * receives a sealed `Command` ADT (see Messages.scala — `ByteCodeCoordinatorMessage` extends `Command`).

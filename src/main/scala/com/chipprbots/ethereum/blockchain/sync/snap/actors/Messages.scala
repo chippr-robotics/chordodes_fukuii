@@ -181,7 +181,10 @@ object Messages {
   // StorageRange Messages
   // ========================================
 
-  sealed trait StorageRangeCoordinatorMessage
+  // Extends StorageRangeCoordinator.Command (Group S3): the coordinator is now a Typed actor with a (non-sealed,
+  // cross-file) Command ADT. All StorageRangeCoordinatorMessage cases are therefore Commands; SSC and
+  // StorageRecoveryActor (still Classic / Classic-spawned) send them via the Classic `!`.
+  sealed trait StorageRangeCoordinatorMessage extends StorageRangeCoordinator.Command
 
   case class StartStorageRangeSync(stateRoot: ByteString) extends StorageRangeCoordinatorMessage
   case class AddStorageTasks(tasks: Seq[StorageTask]) extends StorageRangeCoordinatorMessage
@@ -190,12 +193,16 @@ object Messages {
   case class StoragePeerUnavailable(peerId: String) extends StorageRangeCoordinatorMessage
   case class StorageTaskComplete(requestId: BigInt, result: Either[String, Int]) extends StorageRangeCoordinatorMessage
   case class StorageTaskFailed(requestId: BigInt, reason: String) extends StorageRangeCoordinatorMessage
-  case object StorageGetProgress extends StorageRangeCoordinatorMessage
+  case class StorageGetProgress(replyTo: org.apache.pekko.actor.typed.ActorRef[StorageRangeCoordinator.SyncStatistics])
+      extends StorageRangeCoordinatorMessage
   case object StorageCheckCompletion extends StorageRangeCoordinatorMessage
 
   sealed trait StorageRangeWorkerMessage
   case class FetchStorageRanges(task: StorageTask, peer: Peer) extends StorageRangeWorkerMessage
-  case class StorageRangesResponseMsg(response: StorageRanges) extends StorageRangeWorkerMessage
+  // Sent to the now-Typed coordinator (SSC forwards it via the Classic `!`), so it is also a Command.
+  case class StorageRangesResponseMsg(response: StorageRanges)
+      extends StorageRangeWorkerMessage
+      with StorageRangeCoordinator.Command
   case class StorageRequestTimeout(requestId: BigInt) extends StorageRangeWorkerMessage
   case object StorageCheckIdle extends StorageRangeWorkerMessage
 

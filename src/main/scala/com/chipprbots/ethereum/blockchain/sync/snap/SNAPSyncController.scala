@@ -2011,25 +2011,29 @@ class SNAPSyncController(
               forceCompleteStorageSent = false
               storageRangeCoordinator = Some(
                 context.actorOf(
-                  actors.StorageRangeCoordinator
-                    .props(
-                      stateRoot = rootBs,
-                      networkPeerManager = networkPeerManager,
-                      requestTracker = requestTracker,
-                      mptStorage = storage,
-                      flatSlotStorage = flatSlotStorage,
-                      maxAccountsPerBatch = snapSyncConfig.storageBatchSize,
-                      maxInFlightRequests = snapSyncConfig.storageConcurrency,
-                      requestTimeout = snapSyncConfig.timeout,
-                      snapSyncController = self,
-                      initialMaxInFlightPerPeer = 3, // Recovery: accounts done, storage gets 3 of 5 per-peer budget
-                      initialResponseBytes = snapSyncConfig.storageInitialResponseBytes,
-                      minResponseBytes = snapSyncConfig.storageMinResponseBytes,
-                      deferredMerkleization = snapSyncConfig.deferredMerkleization,
-                      maxConcurrentStorageAccounts = snapSyncConfig.maxConcurrentStorageAccounts,
-                      snapProgressStorage = Some(snapProgressStorage),
-                      storageScheme = snapSyncConfig.storageScheme,
-                      pathNodeStorage = pathNodeStorageOpt
+                  // S3: StorageRangeCoordinator is now Typed. SSC is still Classic, so spawn via PropsAdapter
+                  // and keep the ref as a Classic ActorRef; Classic `!` routes Command-typed messages.
+                  org.apache.pekko.actor.typed.scaladsl.adapter
+                    .PropsAdapter(
+                      actors.StorageRangeCoordinator(
+                        stateRoot = rootBs,
+                        networkPeerManager = networkPeerManager,
+                        requestTracker = requestTracker,
+                        mptStorage = storage,
+                        flatSlotStorage = flatSlotStorage,
+                        maxAccountsPerBatch = snapSyncConfig.storageBatchSize,
+                        maxInFlightRequests = snapSyncConfig.storageConcurrency,
+                        requestTimeout = snapSyncConfig.timeout,
+                        snapSyncController = self,
+                        initialMaxInFlightPerPeer = 3, // Recovery: accounts done, storage gets 3 of 5 per-peer budget
+                        initialResponseBytes = snapSyncConfig.storageInitialResponseBytes,
+                        minResponseBytes = snapSyncConfig.storageMinResponseBytes,
+                        deferredMerkleization = snapSyncConfig.deferredMerkleization,
+                        maxConcurrentStorageAccounts = snapSyncConfig.maxConcurrentStorageAccounts,
+                        snapProgressStorage = Some(snapProgressStorage),
+                        storageScheme = snapSyncConfig.storageScheme,
+                        pathNodeStorage = pathNodeStorageOpt
+                      )
                     )
                     .withDispatcher("sync-dispatcher"),
                   s"storage-range-coordinator-$coordinatorGeneration"
@@ -3101,33 +3105,37 @@ class SNAPSyncController(
       forceCompleteStorageSent = false
       storageRangeCoordinator = Some(
         context.actorOf(
-          actors.StorageRangeCoordinator
-            .props(
-              stateRoot = rootHash,
-              networkPeerManager = networkPeerManager,
-              requestTracker = requestTracker,
-              mptStorage = storage,
-              flatSlotStorage = flatSlotStorage,
-              maxAccountsPerBatch = snapSyncConfig.storageBatchSize,
-              maxInFlightRequests = snapSyncConfig.storageConcurrency,
-              requestTimeout = snapSyncConfig.timeout,
-              snapSyncController = self,
-              // 2-per-peer during AccountRangeSync. Original design used 0 here to defer storage
-              // dispatch until accounts completed (prevents stale-root timeouts triggering false
-              // pivot refreshes). That assumption breaks on huge chains like sepolia: account
-              // ranges never complete within a pivot serve window, so storage never gets a
-              // non-zero budget and the queue grows unbounded until OOM. PR #1237's strike-counted
-              // stateless detection + PR #1241's backpressure-release-on-pivot now make stale-root
-              // timeouts a recoverable event rather than a failure cascade. Bump default ensures
-              // storage can drain concurrently with account.
-              initialMaxInFlightPerPeer = 2,
-              initialResponseBytes = snapSyncConfig.storageInitialResponseBytes,
-              minResponseBytes = snapSyncConfig.storageMinResponseBytes,
-              deferredMerkleization = snapSyncConfig.deferredMerkleization,
-              maxConcurrentStorageAccounts = snapSyncConfig.maxConcurrentStorageAccounts,
-              snapProgressStorage = Some(snapProgressStorage),
-              storageScheme = snapSyncConfig.storageScheme,
-              pathNodeStorage = pathNodeStorageOpt
+          // S3: StorageRangeCoordinator is now Typed. SSC is still Classic, so spawn via PropsAdapter
+          // and keep the ref as a Classic ActorRef; Classic `!` routes Command-typed messages.
+          org.apache.pekko.actor.typed.scaladsl.adapter
+            .PropsAdapter(
+              actors.StorageRangeCoordinator(
+                stateRoot = rootHash,
+                networkPeerManager = networkPeerManager,
+                requestTracker = requestTracker,
+                mptStorage = storage,
+                flatSlotStorage = flatSlotStorage,
+                maxAccountsPerBatch = snapSyncConfig.storageBatchSize,
+                maxInFlightRequests = snapSyncConfig.storageConcurrency,
+                requestTimeout = snapSyncConfig.timeout,
+                snapSyncController = self,
+                // 2-per-peer during AccountRangeSync. Original design used 0 here to defer storage
+                // dispatch until accounts completed (prevents stale-root timeouts triggering false
+                // pivot refreshes). That assumption breaks on huge chains like sepolia: account
+                // ranges never complete within a pivot serve window, so storage never gets a
+                // non-zero budget and the queue grows unbounded until OOM. PR #1237's strike-counted
+                // stateless detection + PR #1241's backpressure-release-on-pivot now make stale-root
+                // timeouts a recoverable event rather than a failure cascade. Bump default ensures
+                // storage can drain concurrently with account.
+                initialMaxInFlightPerPeer = 2,
+                initialResponseBytes = snapSyncConfig.storageInitialResponseBytes,
+                minResponseBytes = snapSyncConfig.storageMinResponseBytes,
+                deferredMerkleization = snapSyncConfig.deferredMerkleization,
+                maxConcurrentStorageAccounts = snapSyncConfig.maxConcurrentStorageAccounts,
+                snapProgressStorage = Some(snapProgressStorage),
+                storageScheme = snapSyncConfig.storageScheme,
+                pathNodeStorage = pathNodeStorageOpt
+              )
             )
             .withDispatcher("sync-dispatcher"),
           s"storage-range-coordinator-$coordinatorGeneration"
@@ -3332,8 +3340,18 @@ class SNAPSyncController(
           }
         case ByteCodeAndStorageSync =>
           storageRangeCoordinator.foreach { coordinator =>
-            (coordinator ? actors.Messages.StorageGetProgress)
-              .mapTo[actors.StorageRangeCoordinator.SyncStatistics]
+            // S3: StorageRangeCoordinator is Typed. StorageGetProgress now carries a typed replyTo, so use the
+            // Typed AskPattern (view the Classic ref as typed) instead of the Classic `?`. Scheduler/timeout
+            // come from the Classic system via `.toTyped`.
+            import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
+            import org.apache.pekko.actor.typed.scaladsl.adapter.*
+            implicit val typedScheduler: org.apache.pekko.actor.typed.Scheduler =
+              context.system.toTyped.scheduler
+            coordinator
+              .toTyped[actors.StorageRangeCoordinator.Command]
+              .ask[actors.StorageRangeCoordinator.SyncStatistics](replyTo =>
+                actors.Messages.StorageGetProgress(replyTo)
+              )
               .map(StorageCoordinatorProgress.apply)
               .recover { case _ =>
                 StorageCoordinatorProgress(
