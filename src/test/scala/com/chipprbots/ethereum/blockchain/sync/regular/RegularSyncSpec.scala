@@ -295,21 +295,23 @@ class RegularSyncSpec
           for (depth <- List(1, 5, 64, 128)) {
             val lca = BigInt(depth)
             val importer = system.actorOf(
-              BlockImporter.props(
-                importerFetcher.ref,
-                consensusAdapter,
-                blockchainReader,
-                blockchainWriter,
-                stateStorage,
-                evmCodeStorage,
-                branchResolution,
-                syncConfig,
-                ommersPool.ref,
-                importerBroadcaster.ref,
-                pendingTransactionsManager.ref
-                  .toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
-                importerSupervisor.ref,
-                this
+              org.apache.pekko.actor.typed.scaladsl.adapter.PropsAdapter(
+                BlockImporter.apply(
+                  importerFetcher.ref.toTyped[BlockFetcher.FetchCommand],
+                  consensusAdapter,
+                  blockchainReader,
+                  blockchainWriter,
+                  stateStorage,
+                  evmCodeStorage,
+                  branchResolution,
+                  syncConfig,
+                  ommersPool.ref.toTyped[com.chipprbots.ethereum.ommers.OmmersPool.Command],
+                  importerBroadcaster.ref,
+                  pendingTransactionsManager.ref
+                    .toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
+                  importerSupervisor.ref,
+                  this
+                )
               ),
               s"test-importer-depth-$depth"
             )

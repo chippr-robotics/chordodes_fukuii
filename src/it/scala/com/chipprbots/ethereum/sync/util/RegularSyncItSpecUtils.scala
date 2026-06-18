@@ -120,18 +120,17 @@ object RegularSyncItSpecUtils {
 
     lazy val validators: ValidatorsExecutor = buildEthashMining().validators
 
-    val broadcasterRef: ActorRef = system.actorOf(
-      BlockBroadcasterActor
-        .props(
+    val broadcasterRef: typed.ActorRef[BlockBroadcasterActor.BroadcasterMsg] =
+      system.spawn(
+        BlockBroadcasterActor.apply(
           new BlockBroadcast(etcPeerManager),
           peerEventBus,
           etcPeerManager,
           blacklist,
-          syncConfig,
-          system.scheduler
+          syncConfig
         ),
-      "block-broadcaster"
-    )
+        "block-broadcaster"
+      )
 
     val fetcher: typed.ActorRef[BlockFetcher.FetchCommand] =
       system.spawn(
@@ -139,23 +138,25 @@ object RegularSyncItSpecUtils {
         "block-fetcher"
       )
 
-    lazy val blockImporter: ActorRef = system.actorOf(
-      BlockImporter.props(
-        fetcher.toClassic,
-        consensusAdapter,
-        blockchainReader,
-        blockchainWriter,
-        storagesInstance.storages.stateStorage,
-        storagesInstance.storages.evmCodeStorage,
-        new BranchResolution(blockchainReader),
-        syncConfig,
-        ommersPool,
-        broadcasterRef,
-        pendingTransactionsManager,
-        regularSync,
-        this
+    lazy val blockImporter: typed.ActorRef[Any] =
+      system.spawn(
+        BlockImporter.apply(
+          fetcher,
+          consensusAdapter,
+          blockchainReader,
+          blockchainWriter,
+          storagesInstance.storages.stateStorage,
+          storagesInstance.storages.evmCodeStorage,
+          new BranchResolution(blockchainReader),
+          syncConfig,
+          ommersPool,
+          broadcasterRef.toClassic,
+          pendingTransactionsManager,
+          regularSync,
+          this
+        ),
+        "block-importer"
       )
-    )
 
     lazy val regularSync: ActorRef = system.actorOf(
       RegularSync.props(
@@ -173,7 +174,6 @@ object RegularSyncItSpecUtils {
         testSyncConfig,
         ommersPool,
         pendingTransactionsManager,
-        system.scheduler,
         this
       )
     )

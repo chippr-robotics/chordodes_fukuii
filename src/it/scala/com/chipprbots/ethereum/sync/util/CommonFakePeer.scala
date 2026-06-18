@@ -314,9 +314,11 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
 
   lazy val broadcaster = new BlockBroadcast(etcPeerManager)
 
-  lazy val broadcasterActor: ActorRef = system.actorOf(
-    BlockBroadcasterActor.props(broadcaster, peerEventBus, etcPeerManager, blacklist, testSyncConfig, system.scheduler)
-  )
+  lazy val broadcasterActor: org.apache.pekko.actor.typed.ActorRef[BlockBroadcasterActor.BroadcasterMsg] =
+    system.spawn(
+      BlockBroadcasterActor.apply(broadcaster, peerEventBus, etcPeerManager, blacklist, testSyncConfig),
+      "block-broadcaster"
+    )
 
   private def getMptForBlock(block: Block) =
     InMemoryWorldStateProxy(

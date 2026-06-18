@@ -1,12 +1,14 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 
-import org.apache.pekko.actor.Actor
-import org.apache.pekko.actor.Actor.Receive
-import org.apache.pekko.actor.ActorLogging
 import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.NotInfluenceReceiveTimeout
-import org.apache.pekko.actor.Props
-import org.apache.pekko.actor.ReceiveTimeout
+import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.scaladsl.ActorContext
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+import org.apache.pekko.event.Logging
+import org.apache.pekko.event.LoggingAdapter
 import org.apache.pekko.util.ByteString
 
 import cats.data.NonEmptyList
@@ -35,6 +37,7 @@ import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingStorageNodeException
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
+import com.chipprbots.ethereum.ommers.OmmersPool
 import com.chipprbots.ethereum.ommers.OmmersPool.AddOmmers
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.AddUncheckedTransactions
@@ -43,8 +46,122 @@ import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 import com.chipprbots.ethereum.utils.FunctorOps.*
 
-class BlockImporter(
-    fetcher: ActorRef,
+object BlockImporter {
+  // After this many consecutive state-node-fetch exhausts on the same block, regular sync
+  // is deemed terminally stuck and we escalate to SNAP re-sync via SyncProtocol.RegularSyncStuck.
+  // 3 × 5-min backoff = ~15 minutes of bounded retry before invoking the escape valve.
+  val StuckEscapeThreshold: Int = 3
+
+  // How far back to rewind the canonical chain index during fork recovery (SYNC-FORK path).
+  // 128 blocks provides enough depth to cover common shallow forks without resyncing the
+  // entire chain; deeper forks fall back to SNAP re-sync via RegularSyncStuck.
+  val MaxForkAncestryDepth: Int = 128
+
+  // Exhaust counter that outlives individual actor instances so Pekko Restarts don't reset
+  // the progress toward StuckEscapeThreshold. Zeroed in apply() (fresh regular-sync session).
+  private[regular] var survivedExhausts: Int = 0
+
+  private[regular] case object SyncRetryTick
+  private[regular] val RetryKey = "BlockImporterRetry"
+
+  // scalastyle:off parameter.number
+  def apply(
+      fetcher: TypedActorRef[BlockFetcher.FetchCommand],
+      consensus: ConsensusAdapter,
+      blockchainReader: BlockchainReader,
+      blockchainWriter: BlockchainWriter,
+      stateStorage: StateStorage,
+      evmCodeStorage: EvmCodeStorage,
+      branchResolution: BranchResolution,
+      syncConfig: SyncConfig,
+      ommersPool: TypedActorRef[OmmersPool.Command],
+      broadcaster: ActorRef,
+      pendingTransactionsManager: TypedActorRef[PendingTransactionsManager.Command],
+      supervisor: ActorRef,
+      configBuilder: BlockchainConfigBuilder
+  ): Behavior[Any] =
+    Behaviors.setup { ctx =>
+      Behaviors.withTimers { timers =>
+        BlockImporter.survivedExhausts = 0
+        val logic = new BlockImporterLogic(
+          ctx,
+          timers,
+          fetcher,
+          consensus,
+          blockchainReader,
+          blockchainWriter,
+          stateStorage,
+          evmCodeStorage,
+          branchResolution,
+          syncConfig,
+          ommersPool,
+          broadcaster,
+          pendingTransactionsManager,
+          supervisor,
+          configBuilder
+        )
+        timers.startTimerWithFixedDelay(RetryKey, SyncRetryTick, syncConfig.syncRetryInterval)
+        logic.idle
+      }
+    }
+
+  sealed trait ImporterMsg
+  case object Start extends ImporterMsg
+  case class MinedBlock(block: Block) extends ImporterMsg
+  case class ImportNewBlock(block: Block, peerId: PeerId) extends ImporterMsg
+  case class ImportDone(newBehavior: NewBehavior, blockImportType: BlockImportType) extends ImporterMsg
+  case object PickBlocks extends ImporterMsg
+  case object PrintStatus extends ImporterMsg
+  case class StartForkRecovery(failedBlockNumber: BigInt) extends ImporterMsg
+
+  sealed trait NewBehavior
+  case object Running extends NewBehavior
+  case class ResolvingMissingNode(blocksToRetry: NonEmptyList[Block]) extends NewBehavior
+  case class ResolvingBranch(from: BigInt) extends NewBehavior
+
+  sealed trait BlockImportType {
+    def recordMetric(nanos: Long): Unit
+  }
+
+  case object MinedBlockImport extends BlockImportType {
+    override def recordMetric(nanos: Long): Unit = RegularSyncMetrics.recordMinedBlockPropagationTimer(nanos)
+  }
+
+  case object NewBlockImport extends BlockImportType {
+    override def recordMetric(nanos: Long): Unit = RegularSyncMetrics.recordImportNewBlockPropagationTimer(nanos)
+  }
+
+  case object DefaultBlockImport extends BlockImportType {
+    override def recordMetric(nanos: Long): Unit = RegularSyncMetrics.recordDefaultBlockPropagationTimer(nanos)
+  }
+
+  case class ImporterState(
+      importing: Boolean,
+      resolvingBranchFrom: Option[BigInt]
+  ) {
+    def importingBlocks(): ImporterState = copy(importing = true)
+
+    def notImportingBlocks(): ImporterState = copy(importing = false)
+
+    def resolvingBranch(from: BigInt): ImporterState = copy(resolvingBranchFrom = Some(from))
+
+    def branchResolved(): ImporterState = copy(resolvingBranchFrom = None)
+
+    def isResolvingBranch: Boolean = resolvingBranchFrom.isDefined
+  }
+
+  object ImporterState {
+    def initial: ImporterState = ImporterState(
+      importing = false,
+      resolvingBranchFrom = None
+    )
+  }
+}
+
+final private class BlockImporterLogic(
+    ctx: ActorContext[Any],
+    timers: TimerScheduler[Any],
+    fetcher: TypedActorRef[BlockFetcher.FetchCommand],
     consensus: ConsensusAdapter,
     blockchainReader: BlockchainReader,
     blockchainWriter: BlockchainWriter,
@@ -52,224 +169,221 @@ class BlockImporter(
     evmCodeStorage: EvmCodeStorage,
     branchResolution: BranchResolution,
     syncConfig: SyncConfig,
-    ommersPool: org.apache.pekko.actor.typed.ActorRef[com.chipprbots.ethereum.ommers.OmmersPool.Command],
+    ommersPool: TypedActorRef[OmmersPool.Command],
     broadcaster: ActorRef,
-    pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
-      com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
-    ],
+    pendingTransactionsManager: TypedActorRef[PendingTransactionsManager.Command],
     supervisor: ActorRef,
     configBuilder: BlockchainConfigBuilder
-) extends Actor
-    with ActorLogging {
-
+) {
   import BlockImporter.*
   import configBuilder.*
 
   implicit val runtime: IORuntime = IORuntime.global
 
-  context.setReceiveTimeout(syncConfig.syncRetryInterval)
+  private val log: LoggingAdapter = Logging(ctx.system.classicSystem, classOf[BlockImporterImpl])
+  private val selfRef = ctx.self
+  private val selfClassic = ctx.self.toClassic
+  private val eventStream = ctx.system.classicSystem.eventStream
 
   private var pendingStateNodeHash: Option[ByteString] = None
-
-  // Consecutive UnknownParent failures per block hash — for FORK-DETECT / bad-block eviction.
   private var unknownParentStrikes: Map[ByteString, Int] = Map.empty
-  private val BadBlockEvictionThreshold = 3 // blacklist the delivering peer
-  private val ForkDetectThreshold = 5 // escalate to WARN (must be >= eviction threshold)
+  private val BadBlockEvictionThreshold = 3
+  private val ForkDetectThreshold = 5
 
-  // Reset the companion-object exhaust counter on fresh actor creation.
-  // On Pekko Restart, only postRestart() fires — preStart() is skipped — so
-  // survivedExhausts is preserved across restarts and only zeroed for a new
-  // BlockImporter actor (new regular-sync session).
-  override def preStart(): Unit = {
-    super.preStart()
-    BlockImporter.survivedExhausts = 0
-  }
+  def idle: Behavior[Any] =
+    Behaviors.receiveMessage {
+      case Start => start()
+      case _     => Behaviors.same
+    }
 
-  override def receive: Receive = idle
+  def running(state: ImporterState): Behavior[Any] =
+    Behaviors.receiveMessage {
+      case SyncRetryTick =>
+        selfRef ! PickBlocks
+        Behaviors.same
 
-  override def postRestart(reason: Throwable): Unit =
-    // Intentionally skip super.postRestart() — that would call preStart() and
-    // reset survivedExhausts, defeating its purpose of surviving Pekko Restarts.
-    start()
+      case BlockFetcher.PickedBlocks(blocks: NonEmptyList[Block @unchecked]) =>
+        SignedTransaction.retrieveSendersInBackGround(blocks.toList.map(_.body))
+        importBlocks(blocks, DefaultBlockImport)(state)
 
-  private def idle: Receive = { case Start =>
-    start()
-  }
+      case MinedBlock(block) if !state.importing =>
+        importBlock(
+          block,
+          new MinedBlockImportMessages(block),
+          MinedBlockImport,
+          informFetcherOnFail = false,
+          internally = true
+        )(state)
 
-  private def running(state: ImporterState): Receive = {
-    case ReceiveTimeout => self ! PickBlocks
+      case _: MinedBlock => Behaviors.same
 
-    case BlockFetcher.PickedBlocks(blocks) =>
-      SignedTransaction.retrieveSendersInBackGround(blocks.toList.map(_.body))
-      importBlocks(blocks, DefaultBlockImport)(state)
+      case ImportNewBlock(block, peerId) if !state.importing =>
+        importBlock(
+          block,
+          new NewBlockImportMessages(block, peerId),
+          NewBlockImport,
+          informFetcherOnFail = true,
+          internally = false
+        )(state)
 
-    case MinedBlock(block) if !state.importing =>
-      importBlock(
-        block,
-        new MinedBlockImportMessages(block),
-        MinedBlockImport,
-        informFetcherOnFail = false,
-        internally = true
-      )(state)
+      case _: ImportNewBlock => Behaviors.same
 
-    case ImportNewBlock(block, peerId) if !state.importing =>
-      importBlock(
-        block,
-        new NewBlockImportMessages(block, peerId),
-        NewBlockImport,
-        informFetcherOnFail = true,
-        internally = false
-      )(state)
+      case ImportDone(newBehavior, importType) =>
+        val newState = state.notImportingBlocks().branchResolved()
+        newBehavior match {
+          case Running =>
+            selfRef ! PickBlocks
+          case r: ResolvingBranch =>
+            log.info(
+              "Branch resolution dispatch: StrictPickBlocks from={} bestKnown={}",
+              r.from,
+              bestKnownBlockNumber
+            )
+            selfRef ! PickBlocks
+          case _ =>
+        }
+        nextBehavior(newBehavior, importType, newState)
 
-    case ImportDone(newBehavior, importType) =>
-      val newState = state.notImportingBlocks().branchResolved()
-      val behavior: Behavior = getBehavior(newBehavior, importType)
-      newBehavior match {
-        case Running =>
-          self ! PickBlocks
-        case r: ResolvingBranch =>
-          log.info("Branch resolution dispatch: StrictPickBlocks from={} bestKnown={}", r.from, bestKnownBlockNumber)
-          self ! PickBlocks
-        case _ =>
-      }
-      context.become(behavior(newState))
+      case PickBlocks if !state.importing =>
+        pickBlocks(state)
+        Behaviors.same
 
-    case PickBlocks if !state.importing => pickBlocks(state)
+      case PickBlocks => Behaviors.same
 
-    // Late-arriving state node from a previous resolvingMissingNode phase.
-    // ReceiveTimeout may have moved us back to running before the fetch completed.
-    // Save the node so the next import attempt finds it in storage.
-    case BlockFetcher.FetchedStateNode(nodeData) if nodeData.values.nonEmpty =>
-      val node = nodeData.values.head
-      val hash = kec256(node)
-      log.info("Saving late-arriving fetched state node {}", ByteStringUtils.hash2string(hash))
-      stateStorage.saveNode(hash, node.toArray, blockchainReader.getBestBlockNumber)
-      // Also save as contract code in case this was a bytecode fetch
-      try evmCodeStorage.put(hash, node).commit()
-      catch { case _: Exception => () }
+      // Late-arriving state node from a previous resolvingMissingNode phase.
+      // ReceiveTimeout may have moved us back to running before the fetch completed.
+      // Save the node so the next import attempt finds it in storage.
+      case BlockFetcher.FetchedStateNode(nodeData) if nodeData.values.nonEmpty =>
+        val node = nodeData.values.head
+        val hash = kec256(node)
+        log.info("Saving late-arriving fetched state node {}", ByteStringUtils.hash2string(hash))
+        stateStorage.saveNode(hash, node.toArray, blockchainReader.getBestBlockNumber)
+        // Also save as contract code in case this was a bytecode fetch
+        try evmCodeStorage.put(hash, node).commit()
+        catch { case _: Exception => () }
+        Behaviors.same
 
-    case StartForkRecovery(failedBlockNumber) =>
-      val currentBest = bestKnownBlockNumber
-      val snapPivot = blockchainReader.getSnapSyncPivotBlock.getOrElse(BigInt(0))
-      val floor = (currentBest - MaxForkAncestryDepth).max(snapPivot)
-      blockchainReader.getBlockHeaderByNumber(floor) match {
-        case Some(floorHeader) =>
-          log.warning(
-            "SYNC-FORK: repeated UnknownParent on block {} — rolling back canonical chain from {} to {} (snapPivot={})",
-            failedBlockNumber,
-            currentBest,
-            floor,
-            snapPivot
-          )
-          blockchainWriter.setCanonicalChainHead(floor, floorHeader.hash, currentBest)
-          unknownParentStrikes = Map.empty
-          log.info(
-            "SYNC-FORK: chain rewound to bno={} hash={} — restarting header sync from {}",
-            floor,
-            ByteStringUtils.hash2string(floorHeader.hash).take(8),
-            floor + 1
-          )
-          fetcher ! BlockFetcher.InvalidateBlocksFrom(floor + 1, "SYNC-FORK rollback", shouldBlacklist = false)
-        case None =>
-          log.warning(
-            "SYNC-FORK: no header at fork recovery floor bno={} — escalating to SNAP re-sync",
-            floor
-          )
-          supervisor ! SyncProtocol.RegularSyncStuck(failedBlockNumber, s"no header at fork recovery floor $floor")
-      }
-  }
+      case StartForkRecovery(failedBlockNumber: BigInt) =>
+        handleForkRecovery(failedBlockNumber)
+        Behaviors.same
+
+      case _ => Behaviors.same
+    }
 
   private def resolvingMissingNode(blocksToRetry: NonEmptyList[Block], blockImportType: BlockImportType)(
       state: ImporterState
-  ): Receive = {
-    case BlockFetcher.FetchedStateNode(nodeData) if nodeData.values.isEmpty =>
-      // StateNodeFetcher exhausted MaxStateNodeFetchRetries on this missing node — no current peer
-      // can serve it via SNAP GetTrieNodes (typical: pivot fell out of the 128-block serve window
-      // on every connected peer).
-      val blockNum = blocksToRetry.head.number
-      BlockImporter.survivedExhausts += 1
-      val missingHashStr = pendingStateNodeHash.map(ByteStringUtils.hash2string).getOrElse("<unknown>")
+  ): Behavior[Any] =
+    Behaviors.receiveMessage {
+      case BlockFetcher.FetchedStateNode(nodeData) if nodeData.values.isEmpty =>
+        // StateNodeFetcher exhausted MaxStateNodeFetchRetries on this missing node — no current peer
+        // can serve it via SNAP GetTrieNodes (typical: pivot fell out of the 128-block serve window
+        // on every connected peer).
+        val blockNum = blocksToRetry.head.number
+        BlockImporter.survivedExhausts += 1
+        val missingHashStr = pendingStateNodeHash.map(ByteStringUtils.hash2string).getOrElse("<unknown>")
 
-      if (BlockImporter.survivedExhausts >= BlockImporter.StuckEscapeThreshold) {
-        // Multiple consecutive exhausts mean peers genuinely don't have our parent state and
-        // never will (we're far behind their snap-serve window). The only recovery is to re-pivot
-        // via SNAP. Reset our local counter so we don't re-fire if SyncController bounces us back
-        // to regular sync; the SnapFastEscapeHatch handles cycle limits.
-        log.error(
-          "Regular sync stuck on block {} after {} consecutive state-node exhausts (missing {}); requesting SNAP re-sync",
-          blockNum,
-          BlockImporter.survivedExhausts,
-          missingHashStr
+        if (BlockImporter.survivedExhausts >= BlockImporter.StuckEscapeThreshold) {
+          // Multiple consecutive exhausts mean peers genuinely don't have our parent state and
+          // never will (we're far behind their snap-serve window). The only recovery is to re-pivot
+          // via SNAP. Reset our local counter so we don't re-fire if SyncController bounces us back
+          // to regular sync; the SnapFastEscapeHatch handles cycle limits.
+          log.error(
+            "Regular sync stuck on block {} after {} consecutive state-node exhausts (missing {}); requesting SNAP re-sync",
+            blockNum,
+            BlockImporter.survivedExhausts,
+            missingHashStr
+          )
+          BlockImporter.survivedExhausts = 0
+          pendingStateNodeHash = None
+          supervisor ! SyncProtocol.RegularSyncStuck(blockNum, missingHashStr)
+          // Don't transition further — SyncController will PoisonPill regular sync.
+          Behaviors.same
+        } else {
+          log.error(
+            "State node recovery failed after max retries for block {} (consecutive exhausts: {}/{}) — backing off {}s before retry",
+            blockNum,
+            BlockImporter.survivedExhausts,
+            BlockImporter.StuckEscapeThreshold,
+            5.minutes.toSeconds
+          )
+          fetcher ! BlockFetcher.InvalidateBlocksFrom(
+            blockNum,
+            "state node unrecoverable after max retries",
+            shouldBlacklist = false
+          )
+          // Don't self ! PickBlocks — that would immediately retry the same block.
+          timers.startTimerWithFixedDelay(RetryKey, SyncRetryTick, 5.minutes)
+          running(state)
+        }
+
+      case BlockFetcher.FetchedStateNode(nodeData) =>
+        val node = nodeData.values.head
+        val hash = kec256(node)
+        log.info(
+          "Received missing state node {}, saving and retrying block {}",
+          ByteStringUtils.hash2string(hash),
+          blocksToRetry.head.number
         )
+        stateStorage.saveNode(hash, node.toArray, blocksToRetry.head.number)
+        // Also save as contract code — if this was a code fetch, the hash is the codeHash
+        // and the data is the bytecode. EvmCodeStorage is keyed by codeHash, same as the fetch.
+        try evmCodeStorage.put(hash, node).commit()
+        catch { case _: Exception => () }
+        // Successful state-node delivery — reset stuck-counter so a later transient failure on a
+        // different block doesn't escalate to SNAP re-sync prematurely.
         BlockImporter.survivedExhausts = 0
         pendingStateNodeHash = None
-        supervisor ! SyncProtocol.RegularSyncStuck(blockNum, missingHashStr)
-        // Don't transition further — SyncController will PoisonPill regular sync.
-      } else {
-        log.error(
-          "State node recovery failed after max retries for block {} (consecutive exhausts: {}/{}) — backing off {}s before retry",
-          blockNum,
-          BlockImporter.survivedExhausts,
-          BlockImporter.StuckEscapeThreshold,
-          5.minutes.toSeconds
+        importBlocks(blocksToRetry, blockImportType)(state)
+
+      case SyncRetryTick =>
+        log.warning(
+          "Timed out waiting for missing state node for block {}, retrying import",
+          blocksToRetry.head.number
         )
-        fetcher ! BlockFetcher.InvalidateBlocksFrom(
-          blockNum,
-          "state node unrecoverable after max retries",
-          shouldBlacklist = false
-        )
-        // Don't self ! PickBlocks — that would immediately retry the same block.
-        context.setReceiveTimeout(5.minutes)
-        context.become(running(state))
-      }
+        // Retry the same blocks directly — don't PickBlocks, which would fetch from wherever the
+        // fetcher is now (potentially far beyond the pivot). After SNAP sync, only the pivot header
+        // has a number→hash mapping, so branch resolution would fail for any other starting point.
+        BlockImporter.survivedExhausts += 1
+        importBlocks(blocksToRetry, blockImportType)(state)
 
-    case BlockFetcher.FetchedStateNode(nodeData) =>
-      val node = nodeData.values.head
-      val hash = kec256(node)
-      log.info(
-        "Received missing state node {}, saving and retrying block {}",
-        ByteStringUtils.hash2string(hash),
-        blocksToRetry.head.number
-      )
-      stateStorage.saveNode(hash, node.toArray, blocksToRetry.head.number)
-      // Also save as contract code — if this was a code fetch, the hash is the codeHash
-      // and the data is the bytecode. EvmCodeStorage is keyed by codeHash, same as the fetch.
-      try evmCodeStorage.put(hash, node).commit()
-      catch { case _: Exception => () }
-      // Successful state-node delivery — reset stuck-counter so a later transient failure on a
-      // different block doesn't escalate to SNAP re-sync prematurely.
-      BlockImporter.survivedExhausts = 0
-      pendingStateNodeHash = None
-      importBlocks(blocksToRetry, blockImportType)(state)
+      case _ => Behaviors.same
+    }
 
-    case ReceiveTimeout =>
-      log.warning("Timed out waiting for missing state node for block {}, retrying import", blocksToRetry.head.number)
-      // Retry the same blocks directly — don't PickBlocks, which would fetch from wherever the
-      // fetcher is now (potentially far beyond the pivot). After SNAP sync, only the pivot header
-      // has a number→hash mapping, so branch resolution would fail for any other starting point.
-      BlockImporter.survivedExhausts += 1
-      importBlocks(blocksToRetry, blockImportType)(state)
-  }
-
-  private def resolvingBranch(from: BigInt)(state: ImporterState): Receive =
-    running(state.resolvingBranch(from))
-
-  private def start(): Unit = {
+  private def start(): Behavior[Any] = {
     log.info("Starting Regular Sync, current best block is {}", bestKnownBlockNumber)
-    fetcher ! BlockFetcher.Start(self, bestKnownBlockNumber)
+    fetcher ! BlockFetcher.Start(selfClassic, bestKnownBlockNumber)
     supervisor ! ProgressProtocol.StartingFrom(bestKnownBlockNumber)
-    context.become(running(ImporterState.initial))
+    running(ImporterState.initial)
   }
+
+  private def nextBehavior(
+      newBehavior: NewBehavior,
+      blockImportType: BlockImportType,
+      state: ImporterState
+  ): Behavior[Any] =
+    newBehavior match {
+      case Running =>
+        timers.startTimerWithFixedDelay(RetryKey, SyncRetryTick, syncConfig.syncRetryInterval)
+        running(state)
+      case ResolvingMissingNode(blocksToRetry) =>
+        timers.startTimerWithFixedDelay(RetryKey, SyncRetryTick, 30.seconds)
+        resolvingMissingNode(blocksToRetry, blockImportType)(state)
+      case ResolvingBranch(from) =>
+        timers.startTimerWithFixedDelay(RetryKey, SyncRetryTick, syncConfig.syncRetryInterval)
+        running(state.resolvingBranch(from))
+    }
 
   private def pickBlocks(state: ImporterState): Unit = {
     val msg = state.resolvingBranchFrom.fold[BlockFetcher.FetchCommand](
-      BlockFetcher.PickBlocks(syncConfig.blocksBatchSize, self)
-    )(from => BlockFetcher.StrictPickBlocks(from, bestKnownBlockNumber, self))
+      BlockFetcher.PickBlocks(syncConfig.blocksBatchSize, selfClassic)
+    )(from => BlockFetcher.StrictPickBlocks(from, bestKnownBlockNumber, selfClassic))
 
     fetcher ! msg
   }
 
-  private def importBlocks(blocks: NonEmptyList[Block], blockImportType: BlockImportType): ImportFn = importWith(
+  private def importBlocks(blocks: NonEmptyList[Block], blockImportType: BlockImportType)(
+      state: ImporterState
+  ): Behavior[Any] = importWith(
     IO
       .pure {
         log.debug(
@@ -284,7 +398,7 @@ class BlockImporter(
         case Left(resolvingFrom)   => IO.pure(ResolvingBranch(resolvingFrom))
       },
     blockImportType
-  )
+  )(state)
 
   private def handleBlocksImport(blocks: List[Block]): IO[NewBehavior] =
     tryImportBlocks(blocks)
@@ -340,7 +454,7 @@ class BlockImporter(
                   e.location.isDefined
                 )
                 pendingStateNodeHash = Some(e.hash)
-                fetcher ! BlockFetcher.FetchStateNode(e.hash, self, parentStateRoot, paths)
+                fetcher ! BlockFetcher.FetchStateNode(e.hash, selfClassic, parentStateRoot, paths)
                 ResolvingMissingNode(NonEmptyList(notImportedBlocks.head, notImportedBlocks.tail))
               case e: MissingStorageNodeException =>
                 val failedBlock = notImportedBlocks.head
@@ -369,7 +483,7 @@ class BlockImporter(
                   e.location.isDefined
                 )
                 pendingStateNodeHash = Some(e.hash)
-                fetcher ! BlockFetcher.FetchStateNode(e.hash, self, parentStateRoot, paths)
+                fetcher ! BlockFetcher.FetchStateNode(e.hash, selfClassic, parentStateRoot, paths)
                 ResolvingMissingNode(NonEmptyList(notImportedBlocks.head, notImportedBlocks.tail))
               case e: MissingNodeException =>
                 val failedBlock = notImportedBlocks.head
@@ -389,7 +503,7 @@ class BlockImporter(
                   e.location.isDefined
                 )
                 pendingStateNodeHash = Some(e.hash)
-                fetcher ! BlockFetcher.FetchStateNode(e.hash, self, parentStateRoot, paths)
+                fetcher ! BlockFetcher.FetchStateNode(e.hash, selfClassic, parentStateRoot, paths)
                 ResolvingMissingNode(NonEmptyList(notImportedBlocks.head, notImportedBlocks.tail))
               case _ if err.toString.contains("Block has invalid gas used") =>
                 // Gas mismatch after execution — likely missing contract code from
@@ -413,7 +527,7 @@ class BlockImporter(
                     // instead of the legacy GetNodeData path (which has no peers on modern networks).
                     fetcher ! BlockFetcher.FetchStateNode(
                       codeHash,
-                      self,
+                      selfClassic,
                       parentStateRoot,
                       paths = None,
                       isByteCode = true
@@ -502,7 +616,7 @@ class BlockImporter(
                   s"Received parent hash: ${ByteStringUtils.hash2string(failedBlock.header.parentHash)}. " +
                   "Triggering chain rollback and header re-sync."
               )
-              self ! StartForkRecovery(failedBlock.number)
+              selfRef ! StartForkRecovery(failedBlock.number)
             }
             IO.pure((importedBlocks, Some(err)))
         }
@@ -514,7 +628,7 @@ class BlockImporter(
       blockImportType: BlockImportType,
       informFetcherOnFail: Boolean,
       internally: Boolean
-  ): ImportFn = {
+  )(state: ImporterState): Behavior[Any] = {
     def doLog(entry: ImportMessages.LogEntry): Unit = log.log(entry._1, entry._2)
     importWith(
       IO(doLog(importMessages.preImport()))
@@ -525,12 +639,12 @@ class BlockImporter(
             val (blocks, weights) = importedBlocksData.map(data => (data.block, data.weight)).unzip
             broadcastBlocks(blocks, weights)
             updateTxPool(importedBlocksData.map(_.block), Seq.empty)
-            blocks.foreach(b => context.system.eventStream.publish(NewBlockImported(b)))
+            blocks.foreach(b => eventStream.publish(NewBlockImported(b)))
             supervisor ! ProgressProtocol.ImportedBlock(block.number, internally)
           case ChainReorganised(oldBranch, newBranch, weights) =>
             updateTxPool(newBranch, oldBranch)
             broadcastBlocks(newBranch, weights)
-            newBranch.foreach(b => context.system.eventStream.publish(NewBlockImported(b)))
+            newBranch.foreach(b => eventStream.publish(NewBlockImported(b)))
             newBranch.lastOption.foreach(block => supervisor ! ProgressProtocol.ImportedBlock(block.number, internally))
           case BlockImportFailedDueToMissingNode(missingNodeException) if syncConfig.redownloadMissingStateNodes =>
             // state node re-download will be handled when downloading headers
@@ -543,7 +657,7 @@ class BlockImporter(
         }
         .map(_ => Running),
       blockImportType
-    )
+    )(state)
   }
 
   private def broadcastBlocks(blocks: List[Block], weights: List[ChainWeight]): Unit = {
@@ -558,18 +672,18 @@ class BlockImporter(
 
   private def importWith(importTask: IO[NewBehavior], blockImportType: BlockImportType)(
       state: ImporterState
-  ): Unit = {
-    context.become(running(state.importingBlocks()))
-
+  ): Behavior[Any] = {
+    val ref = selfRef
     importTask
-      .map(self ! ImportDone(_, blockImportType))
+      .map(nb => ref ! ImportDone(nb, blockImportType))
       .handleError { ex =>
         log.error(ex, "Block import failed unexpectedly: {}", ex.getMessage)
-        self ! ImportDone(Running, blockImportType)
+        ref ! ImportDone(Running, blockImportType)
       }
       .timed
       .map { case (timeTaken, _) => blockImportType.recordMetric(timeTaken.toNanos) }
       .unsafeRunAndForget()
+    running(state.importingBlocks())
   }
 
   // Either block from which we try resolve branch or list of blocks to be imported
@@ -677,126 +791,39 @@ class BlockImporter(
       .nextOption()
   }
 
+  private def handleForkRecovery(failedBlockNumber: BigInt): Unit = {
+    val currentBest = bestKnownBlockNumber
+    val snapPivot = blockchainReader.getSnapSyncPivotBlock.getOrElse(BigInt(0))
+    val floor = (currentBest - MaxForkAncestryDepth).max(snapPivot)
+    blockchainReader.getBlockHeaderByNumber(floor) match {
+      case Some(floorHeader) =>
+        log.warning(
+          "SYNC-FORK: repeated UnknownParent on block {} — rolling back canonical chain from {} to {} (snapPivot={})",
+          failedBlockNumber,
+          currentBest,
+          floor,
+          snapPivot
+        )
+        blockchainWriter.setCanonicalChainHead(floor, floorHeader.hash, currentBest)
+        unknownParentStrikes = Map.empty
+        log.info(
+          "SYNC-FORK: chain rewound to bno={} hash={} — restarting header sync from {}",
+          floor,
+          ByteStringUtils.hash2string(floorHeader.hash).take(8),
+          floor + 1
+        )
+        fetcher ! BlockFetcher.InvalidateBlocksFrom(floor + 1, "SYNC-FORK rollback", shouldBlacklist = false)
+      case None =>
+        log.warning(
+          "SYNC-FORK: no header at fork recovery floor bno={} — escalating to SNAP re-sync",
+          floor
+        )
+        supervisor ! SyncProtocol.RegularSyncStuck(failedBlockNumber, s"no header at fork recovery floor $floor")
+    }
+  }
+
   private def bestKnownBlockNumber: BigInt = blockchainReader.getBestBlockNumber
-
-  private def getBehavior(newBehavior: NewBehavior, blockImportType: BlockImportType): Behavior = newBehavior match {
-    case Running =>
-      context.setReceiveTimeout(syncConfig.syncRetryInterval)
-      running
-    case ResolvingMissingNode(blocksToRetry) =>
-      // Give ample time for the SNAP GetTrieNodes fetch to complete
-      context.setReceiveTimeout(30.seconds)
-      resolvingMissingNode(blocksToRetry, blockImportType)
-    case ResolvingBranch(from) =>
-      context.setReceiveTimeout(syncConfig.syncRetryInterval)
-      resolvingBranch(from)
-  }
 }
 
-object BlockImporter {
-  // After this many consecutive state-node-fetch exhausts on the same block, regular sync
-  // is deemed terminally stuck and we escalate to SNAP re-sync via SyncProtocol.RegularSyncStuck.
-  // 3 × 5-min backoff = ~15 minutes of bounded retry before invoking the escape valve.
-  val StuckEscapeThreshold: Int = 3
-
-  // How far back to rewind the canonical chain index during fork recovery (SYNC-FORK path).
-  // 128 blocks provides enough depth to cover common shallow forks without resyncing the
-  // entire chain; deeper forks fall back to SNAP re-sync via RegularSyncStuck.
-  val MaxForkAncestryDepth: Int = 128
-
-  // Exhaust counter that outlives individual actor instances so Pekko Restarts don't reset
-  // the progress toward StuckEscapeThreshold. Zeroed by preStart() (fresh regular-sync session)
-  // but NOT by postRestart() (same logical actor restarted after a crash).
-  private[regular] var survivedExhausts: Int = 0
-
-  // scalastyle:off parameter.number
-  def props(
-      fetcher: ActorRef,
-      consensus: ConsensusAdapter,
-      blockchainReader: BlockchainReader,
-      blockchainWriter: BlockchainWriter,
-      stateStorage: StateStorage,
-      evmCodeStorage: EvmCodeStorage,
-      branchResolution: BranchResolution,
-      syncConfig: SyncConfig,
-      ommersPool: org.apache.pekko.actor.typed.ActorRef[com.chipprbots.ethereum.ommers.OmmersPool.Command],
-      broadcaster: ActorRef,
-      pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
-        com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
-      ],
-      supervisor: ActorRef,
-      configBuilder: BlockchainConfigBuilder
-  ): Props =
-    Props(
-      new BlockImporter(
-        fetcher,
-        consensus,
-        blockchainReader,
-        blockchainWriter,
-        stateStorage,
-        evmCodeStorage,
-        branchResolution,
-        syncConfig,
-        ommersPool,
-        broadcaster,
-        pendingTransactionsManager,
-        supervisor,
-        configBuilder
-      )
-    )
-
-  type Behavior = ImporterState => Receive
-  type ImportFn = ImporterState => Unit
-
-  sealed trait ImporterMsg
-  case object Start extends ImporterMsg
-  case class MinedBlock(block: Block) extends ImporterMsg
-  case class ImportNewBlock(block: Block, peerId: PeerId) extends ImporterMsg
-  case class ImportDone(newBehavior: NewBehavior, blockImportType: BlockImportType) extends ImporterMsg
-  case object PickBlocks extends ImporterMsg
-  case object PrintStatus extends ImporterMsg with NotInfluenceReceiveTimeout
-  case class StartForkRecovery(failedBlockNumber: BigInt) extends ImporterMsg
-
-  sealed trait NewBehavior
-  case object Running extends NewBehavior
-  case class ResolvingMissingNode(blocksToRetry: NonEmptyList[Block]) extends NewBehavior
-  case class ResolvingBranch(from: BigInt) extends NewBehavior
-
-  sealed trait BlockImportType {
-    def recordMetric(nanos: Long): Unit
-  }
-
-  case object MinedBlockImport extends BlockImportType {
-    override def recordMetric(nanos: Long): Unit = RegularSyncMetrics.recordMinedBlockPropagationTimer(nanos)
-  }
-
-  case object NewBlockImport extends BlockImportType {
-    override def recordMetric(nanos: Long): Unit = RegularSyncMetrics.recordImportNewBlockPropagationTimer(nanos)
-  }
-
-  case object DefaultBlockImport extends BlockImportType {
-    override def recordMetric(nanos: Long): Unit = RegularSyncMetrics.recordDefaultBlockPropagationTimer(nanos)
-  }
-
-  case class ImporterState(
-      importing: Boolean,
-      resolvingBranchFrom: Option[BigInt]
-  ) {
-    def importingBlocks(): ImporterState = copy(importing = true)
-
-    def notImportingBlocks(): ImporterState = copy(importing = false)
-
-    def resolvingBranch(from: BigInt): ImporterState = copy(resolvingBranchFrom = Some(from))
-
-    def branchResolved(): ImporterState = copy(resolvingBranchFrom = None)
-
-    def isResolvingBranch: Boolean = resolvingBranchFrom.isDefined
-  }
-
-  object ImporterState {
-    def initial: ImporterState = ImporterState(
-      importing = false,
-      resolvingBranchFrom = None
-    )
-  }
-}
+// Logger name anchor — never instantiated
+final private class BlockImporterImpl

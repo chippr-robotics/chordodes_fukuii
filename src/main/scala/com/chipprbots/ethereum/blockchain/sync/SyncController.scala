@@ -1281,7 +1281,6 @@ class SyncController(
           syncConfig,
           ommersPool,
           pendingTransactionsManager,
-          scheduler,
           configBuilder
         )
         .withDispatcher("sync-dispatcher"),
@@ -1889,7 +1888,6 @@ class SyncController(
         syncConfig,
         ommersPool,
         pendingTransactionsManager,
-        scheduler,
         configBuilder
       ),
       "regular-sync-bootstrap"

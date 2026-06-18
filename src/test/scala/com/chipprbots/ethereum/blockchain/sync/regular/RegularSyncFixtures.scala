@@ -105,7 +105,6 @@ trait RegularSyncFixtures { self: Matchers with AsyncMockFactory =>
           ommersPool.ref.toTyped[com.chipprbots.ethereum.ommers.OmmersPool.Command],
           pendingTransactionsManager.ref
             .toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
-          system.scheduler,
           this
         )
         .withDispatcher("pekko.actor.default-dispatcher")
