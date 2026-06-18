@@ -71,7 +71,7 @@ class DecoupledHealObservabilitySpec
   ): (ActorRef, TestProbe) = {
     val networkPeerManager = TestProbe()
     val coordinator = system.actorOf(
-      TrieNodeHealingCoordinator.props(
+      HealingTrieFixtures.coordinatorProps(
         stateRoot = stateRoot,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = new SNAPRequestTracker()(system.scheduler),

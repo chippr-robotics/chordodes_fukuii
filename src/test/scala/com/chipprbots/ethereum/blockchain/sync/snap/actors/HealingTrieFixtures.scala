@@ -1,8 +1,18 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
+import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.Props
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
+import scala.concurrent.ExecutionContext
+
+import com.chipprbots.ethereum.blockchain.sync.snap.*
 import com.chipprbots.ethereum.crypto.kec256
+import com.chipprbots.ethereum.db.storage.BfsQueueStorage
+import com.chipprbots.ethereum.db.storage.HealingFrontierStorage
+import com.chipprbots.ethereum.db.storage.MptStorage
+import com.chipprbots.ethereum.db.storage.PathNodeStorage
 import com.chipprbots.ethereum.mpt.BranchNode
 import com.chipprbots.ethereum.mpt.ExtensionNode
 import com.chipprbots.ethereum.mpt.HashNode
@@ -33,6 +43,67 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   * path where intermediate children are stored separately and referenced by 32-byte hash.
   */
 object HealingTrieFixtures {
+
+  /** Test-only `Props` shim for the now-Typed [[TrieNodeHealingCoordinator]] (Group S3). The coordinator's production
+    * factory is `apply(...): Behavior[Command]`; these Classic `TestKit` specs spawn it through `PropsAdapter` so they
+    * keep the established `system.actorOf` / `expectMsg` machinery. Mirrors the named params of the former
+    * `HealingTrieFixtures.coordinatorProps(...)` so the call sites only needed the object renamed. The `PropsAdapter`
+    * wrapper lives here (test tree) rather than in production, matching the BCC/SRC/ARC convention.
+    */
+  def coordinatorProps(
+      stateRoot: ByteString,
+      networkPeerManager: ActorRef,
+      requestTracker: SNAPRequestTracker,
+      mptStorage: MptStorage,
+      batchSize: Int,
+      snapSyncController: ActorRef,
+      concurrency: Int = 16,
+      visitedCap: Int = TrieNodeHealingCoordinator.DefaultVisitedCap,
+      healingFrontierStorage: Option[HealingFrontierStorage] = None,
+      healingWriterEcOverride: Option[ExecutionContext] = None,
+      healingReaderEcOverride: Option[ExecutionContext] = None,
+      traversalParallelism: Int = TrieNodeHealingCoordinator.DefaultBfsParallelism,
+      healingMinParallelism: Int = TrieNodeHealingCoordinator.DefaultMinParallelism,
+      healingReservedCores: Int = TrieNodeHealingCoordinator.DefaultReservedCores,
+      bfsQueueStorageOpt: Option[BfsQueueStorage] = None,
+      storageScheme: StorageScheme = StorageScheme.Hash,
+      pathNodeStorageOpt: Option[PathNodeStorage] = None,
+      frontierHighWater: Int = TrieNodeHealingCoordinator.DefaultFrontierHighWater,
+      frontierLowWater: Int = TrieNodeHealingCoordinator.DefaultFrontierLowWater,
+      frontierBackpressureMaxWaitMs: Long = TrieNodeHealingCoordinator.FrontierBackpressureMaxWaitMs,
+      scopedHealVerification: Boolean = true,
+      scopedHealMaxPaths: Int = TrieNodeHealingCoordinator.DefaultScopedHealMaxPaths,
+      decoupledHealServeRoot: Boolean = false,
+      decoupledHealMaxAttemptsNoRefresh: Int = TrieNodeHealingCoordinator.DefaultDecoupledHealMaxAttemptsNoRefresh
+  ): Props =
+    PropsAdapter(
+      TrieNodeHealingCoordinator(
+        stateRoot = stateRoot,
+        networkPeerManager = networkPeerManager,
+        requestTracker = requestTracker,
+        mptStorage = mptStorage,
+        batchSize = batchSize,
+        snapSyncController = snapSyncController,
+        concurrency = concurrency,
+        visitedCap = visitedCap,
+        healingFrontierStorage = healingFrontierStorage,
+        healingWriterEcOverride = healingWriterEcOverride,
+        healingReaderEcOverride = healingReaderEcOverride,
+        traversalParallelism = traversalParallelism,
+        healingMinParallelism = healingMinParallelism,
+        healingReservedCores = healingReservedCores,
+        bfsQueueStorageOpt = bfsQueueStorageOpt,
+        storageScheme = storageScheme,
+        pathNodeStorageOpt = pathNodeStorageOpt,
+        frontierHighWater = frontierHighWater,
+        frontierLowWater = frontierLowWater,
+        frontierBackpressureMaxWaitMs = frontierBackpressureMaxWaitMs,
+        scopedHealVerification = scopedHealVerification,
+        scopedHealMaxPaths = scopedHealMaxPaths,
+        decoupledHealServeRoot = decoupledHealServeRoot,
+        decoupledHealMaxAttemptsNoRefresh = decoupledHealMaxAttemptsNoRefresh
+      )
+    )
 
   /** A stored synthetic state trie plus the hash of a deliberately-missing node.
     *

@@ -115,7 +115,7 @@ class ScopedVerificationParitySpec
     val nodes = (0 until 3).map(cleanLeaf)
     val controller = TestProbe()
     val coordinator: ActorRef = system.actorOf(
-      TrieNodeHealingCoordinator.props(
+      HealingTrieFixtures.coordinatorProps(
         stateRoot = root,
         networkPeerManager = TestProbe().ref,
         requestTracker = new SNAPRequestTracker()(system.scheduler),

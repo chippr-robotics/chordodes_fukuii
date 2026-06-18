@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
 import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.testkit.ImplicitSender
 import org.apache.pekko.testkit.TestKit
@@ -74,13 +75,13 @@ class RebuildFrontierBfsMultiSeedSpec
 
   private def pendingTasks(coordinator: ActorRef): Int = {
     val probe = TestProbe()
-    coordinator.tell(Messages.HealingGetProgress, probe.ref)
+    coordinator ! Messages.HealingGetProgress(probe.ref.toTyped[HealingStatistics])
     probe.expectMsgType[HealingStatistics](2.seconds).pendingTasks
   }
 
   private def runSingleSeedWalk(storage: TestMptStorage, root: ByteString): Int = {
     val coordinator = system.actorOf(
-      TrieNodeHealingCoordinator.props(
+      HealingTrieFixtures.coordinatorProps(
         stateRoot = root,
         networkPeerManager = TestProbe().ref,
         requestTracker = new SNAPRequestTracker()(system.scheduler),

@@ -6,6 +6,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.testkit.ImplicitSender
 import org.apache.pekko.testkit.TestKit
@@ -105,7 +106,7 @@ class HealingFrontierResumeSpec
     val storage = new TestMptStorage()
     val root = if (rootInStorage) storedRoot(storage) else kec256(ByteString("write-on-queue-root"))
     val coordinator = system.actorOf(
-      TrieNodeHealingCoordinator.props(
+      HealingTrieFixtures.coordinatorProps(
         stateRoot = root,
         networkPeerManager = TestProbe().ref,
         requestTracker = new SNAPRequestTracker()(system.scheduler),
@@ -137,7 +138,7 @@ class HealingFrontierResumeSpec
     // the suite runs with test parallelism — one test's awaitAssert can consume another test's
     // HealingStatistics (observed as a deterministic-looking "0 was not equal to 7").
     val probe = TestProbe()
-    coordinator.tell(Messages.HealingGetProgress, probe.ref)
+    coordinator ! Messages.HealingGetProgress(probe.ref.toTyped[HealingStatistics])
     probe.expectMsgType[HealingStatistics](2.seconds).pendingTasks
   }
 

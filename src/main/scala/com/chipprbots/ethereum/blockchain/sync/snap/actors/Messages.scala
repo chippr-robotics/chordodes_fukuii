@@ -279,7 +279,11 @@ object Messages {
   // TrieNodeHealing Messages
   // ========================================
 
-  sealed trait TrieNodeHealingCoordinatorMessage
+  // Extends TrieNodeHealingCoordinator.Command (Group S3): the coordinator is now a Typed actor with a (non-sealed,
+  // cross-file) Command ADT. All TrieNodeHealingCoordinatorMessage cases are therefore Commands; SSC (still Classic)
+  // sends them via the Classic `!`. (HealingStagnated is the one exception — it is OUTBOUND to SSC, not a Command;
+  // it is declared standalone below.)
+  sealed trait TrieNodeHealingCoordinatorMessage extends TrieNodeHealingCoordinator.Command
 
   case class StartTrieNodeHealing(stateRoot: ByteString) extends TrieNodeHealingCoordinatorMessage
 
@@ -294,7 +298,13 @@ object Messages {
   case class HealingTaskComplete(requestId: BigInt, result: Either[String, Int])
       extends TrieNodeHealingCoordinatorMessage
   case class HealingTaskFailed(requestId: BigInt, reason: String) extends TrieNodeHealingCoordinatorMessage
-  case object HealingGetProgress extends TrieNodeHealingCoordinatorMessage
+
+  /** Typed status query: report healing progress to `replyTo`. Replaces the Classic `sender()` reply on the prior `case
+    * object HealingGetProgress` after the TrieNodeHealingCoordinator migration to Pekko Typed. Mirrors the same
+    * convention as `ByteCodeGetProgress` / `StorageGetProgress` / `AccountGetProgress`.
+    */
+  case class HealingGetProgress(replyTo: org.apache.pekko.actor.typed.ActorRef[HealingStatistics])
+      extends TrieNodeHealingCoordinatorMessage
   case object HealingCheckCompletion extends TrieNodeHealingCoordinatorMessage
 
   /** Sent by SNAPSyncController when a fresher pivot has been selected during healing. Coordinator updates state root,
@@ -314,7 +324,9 @@ object Messages {
   /** Sent by coordinator after MaxConsecutiveStagnations consecutive 2-min HEAL-PULSE cycles with zero healed nodes.
     * Controller should stop coordinator, clear walk checkpoint, refresh pivot.
     */
-  case class HealingStagnated(healed: Long, pending: Long) extends TrieNodeHealingCoordinatorMessage
+  // OUTBOUND to SNAPSyncController (Classic), never received by the coordinator. Therefore it is NOT a
+  // TrieNodeHealingCoordinator.Command — declared standalone so it does not enter the Typed Command ADT.
+  case class HealingStagnated(healed: Long, pending: Long)
 
   /** Sent by SNAPSyncController in reply to a `HealingStagnated` it chose NOT to act on by rolling the pivot
     * (`heal-hold-pivot-on-stagnation = true`). It tells the coordinator to clear the in-flight `pivotRefreshRequested`
@@ -335,7 +347,15 @@ object Messages {
 
   sealed trait TrieNodeHealingWorkerMessage
   case class FetchTrieNodes(task: HealingTask, peer: Peer) extends TrieNodeHealingWorkerMessage
-  case class TrieNodesResponseMsg(response: TrieNodes) extends TrieNodeHealingWorkerMessage
-  case class HealingRequestTimeout(requestId: BigInt) extends TrieNodeHealingWorkerMessage
+  // Sent to the now-Typed coordinator (TrieNodeHealingWorker / SSC forward it via the Classic `!`), so it is also a
+  // Command.
+  case class TrieNodesResponseMsg(response: TrieNodes)
+      extends TrieNodeHealingWorkerMessage
+      with TrieNodeHealingCoordinator.Command
+  // Self-sent by the coordinator from the request-tracker timeout callback (`self ! HealingRequestTimeout`), so it is
+  // also a Command.
+  case class HealingRequestTimeout(requestId: BigInt)
+      extends TrieNodeHealingWorkerMessage
+      with TrieNodeHealingCoordinator.Command
   case object HealingCheckIdle extends TrieNodeHealingWorkerMessage
 }

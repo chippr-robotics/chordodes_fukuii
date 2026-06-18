@@ -6,6 +6,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.testkit.ImplicitSender
 import org.apache.pekko.testkit.TestKit
@@ -78,7 +79,7 @@ class TrieNodeHealingScopeCaptureSpec
 
   private def pendingTasks(coordinator: ActorRef): Int = {
     val probe = TestProbe()
-    coordinator.tell(Messages.HealingGetProgress, probe.ref)
+    coordinator ! Messages.HealingGetProgress(probe.ref.toTyped[HealingStatistics])
     probe.expectMsgType[HealingStatistics](2.seconds).pendingTasks
   }
 
@@ -121,7 +122,7 @@ class TrieNodeHealingScopeCaptureSpec
 
     val controllerProbe = TestProbe()
     val coordinator = system.actorOf(
-      TrieNodeHealingCoordinator.props(
+      HealingTrieFixtures.coordinatorProps(
         stateRoot = stateRoot,
         networkPeerManager = TestProbe().ref,
         requestTracker = new SNAPRequestTracker()(system.scheduler),

@@ -6,6 +6,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.testkit.ImplicitSender
 import org.apache.pekko.testkit.TestKit
@@ -69,7 +70,7 @@ class DecoupledHealSafetySpec
 
   private def stats(coordinator: ActorRef): HealingStatistics = {
     val probe = TestProbe()
-    coordinator.tell(Messages.HealingGetProgress, probe.ref)
+    coordinator ! Messages.HealingGetProgress(probe.ref.toTyped[HealingStatistics])
     probe.expectMsgType[HealingStatistics](2.seconds)
   }
 
@@ -113,7 +114,7 @@ class DecoupledHealSafetySpec
       val networkPeerManager = TestProbe()
       val snapSyncController = TestProbe()
       val coordinator = system.actorOf(
-        TrieNodeHealingCoordinator.props(
+        HealingTrieFixtures.coordinatorProps(
           stateRoot = stateRoot,
           networkPeerManager = networkPeerManager.ref,
           requestTracker = new SNAPRequestTracker()(system.scheduler),
@@ -167,7 +168,7 @@ class DecoupledHealSafetySpec
       val networkPeerManager = TestProbe()
       val snapSyncController = TestProbe()
       val coordinator = system.actorOf(
-        TrieNodeHealingCoordinator.props(
+        HealingTrieFixtures.coordinatorProps(
           stateRoot = stateRoot,
           networkPeerManager = networkPeerManager.ref,
           requestTracker = new SNAPRequestTracker()(system.scheduler),
@@ -269,7 +270,7 @@ class DecoupledHealSafetySpec
     val nodes = (0 until 3).map(cleanLeaf)
     val controller = TestProbe()
     val coordinator = system.actorOf(
-      TrieNodeHealingCoordinator.props(
+      HealingTrieFixtures.coordinatorProps(
         stateRoot = root,
         networkPeerManager = TestProbe().ref,
         requestTracker = new SNAPRequestTracker()(system.scheduler),

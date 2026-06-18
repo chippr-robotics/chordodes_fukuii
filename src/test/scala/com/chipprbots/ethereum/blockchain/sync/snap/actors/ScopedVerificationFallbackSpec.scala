@@ -120,7 +120,7 @@ class ScopedVerificationFallbackSpec
     val root = storedRoot(storage)
     val controller = TestProbe()
     val coordinator = system.actorOf(
-      TrieNodeHealingCoordinator.props(
+      HealingTrieFixtures.coordinatorProps(
         stateRoot = root,
         networkPeerManager = TestProbe().ref,
         requestTracker = new SNAPRequestTracker()(system.scheduler),
