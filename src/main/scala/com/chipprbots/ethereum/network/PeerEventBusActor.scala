@@ -4,7 +4,10 @@ import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.Actor
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.Props
-import org.apache.pekko.actor.Terminated
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.event.ActorEventBus
 import org.apache.pekko.stream.OverflowStrategy
 import org.apache.pekko.stream.scaladsl.Source
@@ -18,6 +21,15 @@ import com.chipprbots.ethereum.network.handshaker.Handshaker.HandshakeResult
 import com.chipprbots.ethereum.network.p2p.Message
 
 object PeerEventBusActor {
+
+  /** Classic-facing factory. Existing Classic callers (PeerActor, PeerManagerActor, PeerRequestHandler,
+    * PivotBlockSelector, PeersClient, PeerListSupportNg) and the Akka-Streams [[messageSource]] keep working
+    * unchanged through this shell: it captures `sender()` (the subscriber) and `Terminated`, enriches the wire
+    * messages with the explicit subscriber, and forwards them to the Typed dispatch core spawned as a child.
+    *
+    * The dispatch logic lives in the Typed [[behavior]]; this Classic shell exists only as the `sender()` bridge and
+    * is removed once the last Classic subscriber migrates (Group NET).
+    */
   def props: Props = Props(new PeerEventBusActor)
 
   /** Handle subscription to the peer event bus via Akka Streams.
@@ -247,28 +259,88 @@ object PeerEventBusActor {
   case class Unsubscribe(from: Option[SubscriptionClassifier] = None)
 
   case class Publish(ev: PeerEvent)
+
+  /** Typed dispatch protocol.
+    *
+    * The Classic wire messages [[Subscribe]] / [[Unsubscribe]] / [[Publish]] carry no subscriber — the subscriber is
+    * the Classic `sender()`. The Typed core cannot observe `sender()`, so each subscriber is carried explicitly.
+    * Subscribers are held as Classic [[ActorRef]] because the dispatch class [[PeerEventBus]] delivers to Classic refs;
+    * a Typed subscriber supplies one via `messageAdapter[PeerEvent](...).toClassic` (the established HERALD-2 path).
+    */
+  sealed trait Command
+
+  /** Subscribe `subscriber` to events matching `to`. */
+  final case class SubscribeCmd(to: SubscriptionClassifier, subscriber: ActorRef) extends Command
+
+  /** Unsubscribe `subscriber` from events matching `from`. */
+  final case class UnsubscribeCmd(from: SubscriptionClassifier, subscriber: ActorRef) extends Command
+
+  /** Unsubscribe `subscriber` from all events. */
+  final case class UnsubscribeAllCmd(subscriber: ActorRef) extends Command
+
+  /** Publish `ev` to all interested subscribers. */
+  final case class PublishCmd(ev: PeerEvent) extends Command
+
+  /** Internal: a watched subscriber terminated; drop all its subscriptions. */
+  final private case class SubscriberTerminated(subscriber: ActorRef) extends Command
+
+  /** Typed dispatch core. Holds the classifier state in a [[PeerEventBus]] and watches subscribers so their
+    * subscriptions are dropped on termination (replacing the Classic `context.watch` + `Terminated`).
+    */
+  def behavior(): Behavior[Command] =
+    Behaviors.setup { ctx =>
+      val peerEventBus: PeerEventBus = new PeerEventBus
+
+      Behaviors.receiveMessage {
+        case SubscribeCmd(to, subscriber) =>
+          peerEventBus.subscribe(subscriber, to)
+          // watchWith lifts the subscriber's death into a typed Command (no Classic Terminated in Typed).
+          ctx.watchWith(subscriber.toTyped[Nothing], SubscriberTerminated(subscriber))
+          Behaviors.same
+
+        case UnsubscribeCmd(from, subscriber) =>
+          peerEventBus.unsubscribe(subscriber, from)
+          Behaviors.same
+
+        case UnsubscribeAllCmd(subscriber) =>
+          peerEventBus.unsubscribe(subscriber)
+          Behaviors.same
+
+        case PublishCmd(ev) =>
+          peerEventBus.publish(ev)
+          Behaviors.same
+
+        case SubscriberTerminated(subscriber) =>
+          peerEventBus.unsubscribe(subscriber)
+          Behaviors.same
+      }
+    }
 }
 
+/** Classic `sender()` bridge over the Typed [[PeerEventBusActor.behavior]] dispatch core.
+  *
+  * Classic callers send the wire messages [[PeerEventBusActor.Subscribe]] / [[PeerEventBusActor.Unsubscribe]] /
+  * [[PeerEventBusActor.Publish]] with no subscriber field — the subscriber is `sender()`. This actor captures
+  * `sender()` and forwards an enriched [[PeerEventBusActor.Command]] to the Typed core (spawned as a child). The
+  * Typed core owns subscriber lifecycle watching, so this shell holds no subscription state of its own.
+  */
 class PeerEventBusActor extends Actor {
   import PeerEventBusActor.*
 
-  val peerEventBus: PeerEventBus = new PeerEventBus
+  private val core: TypedActorRef[Command] =
+    context.spawn(PeerEventBusActor.behavior(), "core")
 
   override def receive: Receive = {
     case Subscribe(to) =>
-      peerEventBus.subscribe(sender(), to)
-      context.watch(sender())
+      core ! SubscribeCmd(to, sender())
 
     case Unsubscribe(Some(from)) =>
-      peerEventBus.unsubscribe(sender(), from)
+      core ! UnsubscribeCmd(from, sender())
 
     case Unsubscribe(None) =>
-      peerEventBus.unsubscribe(sender())
+      core ! UnsubscribeAllCmd(sender())
 
     case Publish(ev: PeerEvent) =>
-      peerEventBus.publish(ev)
-
-    case Terminated(ref) =>
-      peerEventBus.unsubscribe(ref)
+      core ! PublishCmd(ev)
   }
 }
