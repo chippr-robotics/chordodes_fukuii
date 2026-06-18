@@ -5,8 +5,9 @@ description: >-
   client (devp2p / RLPx / ETH wire protocol, ETC/Mordor and ETH/Sepolia). Use
   PROACTIVELY when diagnosing peer disconnects, message encode/decode errors,
   Snappy compression failures, ForkId/handshake problems, or reference-client
-  interoperability issues, or devp2p v4/v5 peer discovery (PeerDiscoveryManager,
-  DnsDiscovery, ENR records). ETH68, ETH69, ETH70 (EIP-7706) — ETH63-67 are removed.
+  interoperability issues, devp2p v4/v5 peer discovery (PeerDiscoveryManager,
+  DnsDiscovery, ENR records), or TCP server infrastructure (ServerActor, TCP
+  binding, ExternalIPDetector). ETH68, ETH69, ETH70 (EIP-7706) — ETH63-67 are removed.
 tools: Read, Grep, Glob, Edit, Bash
 model: sonnet
 color: blue
@@ -144,6 +145,12 @@ list (`0xc0+0x30`); `0xc0` = empty list.
 sbt testNetwork
 sbt "testOnly *MessageCodecSpec *ETH68* *ETH69* *ETH70*"
 ```
+
+## TCP server infrastructure
+
+- `src/main/scala/com/chipprbots/ethereum/network/ServerActor.scala` — Pekko Typed (migrated W2-P2b). Binds the TCP listener port, bridges `Tcp.Bound`/`Tcp.Connected` events into the peer manager, routes `DetectedIP`. **Use `ServerActor.TcpBound` directly in tests** — do not go through `TcpEventBridge` (different-sender ordering breaks Typed message delivery).
+- `ExternalIPDetector` — detects public IP via STUN or HTTP probes; feeds `DetectedIP` to `ServerActor`.
+- Key lesson from W2-P2b fix: Classic `Tcp.Bound` arrived via `TcpEventBridge` (different sender) after Typed migration, causing `DetectedIP(None)` to arrive first and be dropped. Tests must inject `ServerActor.TcpBound` from the test thread to preserve same-sender ordering.
 
 ## Network discovery
 
