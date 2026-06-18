@@ -324,7 +324,7 @@ sbt compile-all   # must be green before starting
 | File under `consensus/`, `vm/`, `crypto/`, `domain/` would be modified | **STOP** — invoke `forge` (ETC) or `beacon` (ETH) first |
 | eventStream types cross network boundary | **STOP** — run `@SerializabilityTrait` pre-flight |
 | Compile fails after 2 targeted fix attempts | **STOP** — delegate to `wraith` |
-| `sbt testEssential` drops below 3,601 tests | **STOP** — surface to user before continuing |
+| `sbt testEssential` drops below 3,519 tests | **STOP** — surface to user before continuing |
 | More than one actor is being migrated without explicit user instruction | **STOP** — scope to one actor unless the handoff prompt explicitly authorizes a helper + proof-of-concept pair (as in PLN + FastSyncBranchResolverActor) |
 
 After implementation:
@@ -350,8 +350,8 @@ Current group status (read SPRINT-QUEUE.md Part 6 table for full state):
 | S2 | ✅ DONE | StateStorageActor, FastSyncBranchResolverActor |
 | PLN | ✅ DONE | PeerListHelper (shared infrastructure) |
 | S6 | ✅ DONE | ChainDownloader |
-| S5 | ⬜ next | BlockBroadcasterActor → BlockImporter → RegularSync |
-| NET | ⬜ gated | PeerEventBusActor + core network (HERALD pre-flight required) |
+| S5 | ✅ DONE `5d29511d4` | BlockBroadcasterActor (Behavior[BroadcasterMsg]), BlockImporter + RegularSync (Behavior[Any] — mixed Classic/Typed sources); PeerListHelper replaces PeerListSupportNg. 69 jsonrpc failures fixed `92584a07b`. Baseline: 3,519/0. |
+| NET | ⬜ NEXT — HERALD-1 pre-flight required | PeerEventBusActor + core network ×5 (PeerDiscoveryManager, RLPxConnectionHandler, PeerActor, PeerManagerActor) |
 | S3/S4/S7 | ⬜ post-NET | SNAP coordinators, fast sync actors, PeersClient |
 | NET2/SNAP1/SNAP2/ROOT | ⬜ | Final groups → capstone root flip |
 
