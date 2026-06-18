@@ -1319,22 +1319,24 @@ class SyncController(
       val snapSyncConfig = loadSnapSyncConfig()
       syncGeneration += 1
       import com.chipprbots.ethereum.blockchain.sync.snap.ChainDownloader
-      val resumer = context.actorOf(
-        ChainDownloader
-          .props(
+      // ChainDownloader is Pekko Typed (Group S6). Spawn it via the Classic→Typed adapter and convert the
+      // resulting Typed ref back to Classic so the existing `! ChainDownloader.X` sends below keep compiling.
+      val resumer = context
+        .spawn(
+          ChainDownloader(
             blockchainReader,
             blockchainWriter,
             appStateStorage,
             networkPeerManager,
             peerEventBus,
             syncConfig,
-            scheduler,
             snapSyncConfig.chainBackfillConcurrentRequests,
             snapSyncConfig.chainDownloadTimeout
-          )
-          .withDispatcher("sync-dispatcher"),
-        s"backfill-resumer-$syncGeneration"
-      )
+          ),
+          s"backfill-resumer-$syncGeneration",
+          DispatcherSelector.fromConfig("sync-dispatcher")
+        )
+        .toClassic
       context.watch(resumer)
       resumer ! ChainDownloader.Start(target)
       context.become(runningRegularSyncWithStandaloneBackfill(regularSync, resumer))

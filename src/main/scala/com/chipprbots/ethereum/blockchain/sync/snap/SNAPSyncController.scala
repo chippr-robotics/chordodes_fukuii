@@ -4657,23 +4657,28 @@ class SNAPSyncController(
         val snapServerNodeIds = snapSyncConfig.snapServerPeers.flatMap { uri =>
           scala.util.Try(ByteString(org.bouncycastle.util.encoders.Hex.decode(uri.getUserInfo))).toOption
         }.toSet
-        val downloader = context.actorOf(
-          ChainDownloader
-            .props(
+        // ChainDownloader is Pekko Typed (Group S6). Spawn it via the Classic→Typed adapter and convert the
+        // resulting Typed ref back to Classic so the existing `chainDownloader ! ChainDownloader.X` sends
+        // (Pause/Resume/UpdateTarget/YieldToRegularSync/…) keep compiling against the `Option[ActorRef]` field.
+        import org.apache.pekko.actor.typed.DispatcherSelector
+        import org.apache.pekko.actor.typed.scaladsl.adapter.*
+        val downloader = context
+          .spawn(
+            ChainDownloader(
               blockchainReader,
               blockchainWriter,
               appStateStorage,
               networkPeerManager,
               peerEventBus,
               syncConfig,
-              scheduler,
               snapSyncConfig.chainDownloadMaxConcurrentRequests,
               snapSyncConfig.chainDownloadTimeout,
               snapServerNodeIds
-            )
-            .withDispatcher("sync-dispatcher"),
-          s"chain-downloader-$coordinatorGeneration"
-        )
+            ),
+            s"chain-downloader-$coordinatorGeneration",
+            DispatcherSelector.fromConfig("sync-dispatcher")
+          )
+          .toClassic
         downloader ! ChainDownloader.Start(pivot)
         chainDownloader = Some(downloader)
         chainDownloadComplete = false
