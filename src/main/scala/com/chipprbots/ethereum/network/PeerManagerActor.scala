@@ -731,10 +731,14 @@ class PeerManagerActor(
   }
 
   private def getPeerStatus(peer: Peer): IO[Option[(Peer, PeerActor.Status)]] = {
+    import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
+    import org.apache.pekko.actor.typed.scaladsl.adapter.*
     implicit val timeout: Timeout = Timeout(2.seconds)
-    peer.ref
-      .askFor[PeerActor.StatusResponse](PeerActor.GetStatus)
-      .map(sr => Some((peer, sr.status)))
+    implicit val typedScheduler: org.apache.pekko.actor.typed.Scheduler = context.system.toTyped.scheduler
+    val typedRef = peer.ref.toTyped[PeerActor.Command]
+    IO.fromFuture(
+      IO(typedRef.ask[PeerActor.StatusResponse](replyTo => PeerActor.GetStatus(replyTo)))
+    ).map(sr => Some((peer, sr.status)))
       .handleErrorWith {
         case _: java.util.concurrent.TimeoutException =>
           IO.pure(None) // Expected timeout, no logging needed

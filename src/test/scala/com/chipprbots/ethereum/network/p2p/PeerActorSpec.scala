@@ -5,12 +5,11 @@ import java.net.URI
 import java.security.SecureRandom
 import java.util.concurrent.atomic.AtomicReference
 
-import org.apache.pekko.actor.Actor
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.PoisonPill
-import org.apache.pekko.actor.Props
 import org.apache.pekko.actor.Terminated
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.ExplicitlyTriggeredScheduler
 import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestKit
@@ -77,7 +76,7 @@ class PeerActorSpec
     peer ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
 
     rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.send(peer, RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
 
     rlpxConnection.expectMsgPF() { case RLPxConnectionHandler.SendMessage(_: HelloEnc) =>
       ()
@@ -92,7 +91,7 @@ class PeerActorSpec
     (0 to 3).foreach { _ =>
       testScheduler.timePasses(5.seconds)
       rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-      rlpxConnection.reply(RLPxConnectionHandler.ConnectionFailed)
+      rlpxConnection.send(peer, RLPxConnectionHandler.ConnectionFailed)
     }
 
     rlpxConnection.expectMsgClass(classOf[Terminated])
@@ -110,19 +109,18 @@ class PeerActorSpec
     var rlpxConnection: TestProbe = TestProbe() // var as we actually need new instances
     val knownNodesManager: TestProbe = TestProbe()
 
-    val peer: TestActorRef[Actor] = TestActorRef(
-      Props(
-        new PeerActor(
+    val peer: TestActorRef[Nothing] = TestActorRef(
+      PropsAdapter(
+        PeerActor.apply(
           new InetSocketAddress("127.0.0.1", 0),
           _ => {
             rlpxConnection = TestProbe()
-            rlpxConnection.ref
+            rlpxConnection.ref.toTyped[RLPxConnectionHandler.Command]
           },
           peerConf,
           peerMessageBus,
           knownNodesManager.ref,
           false,
-          Some(testScheduler),
           handshaker
         )
       )
@@ -131,7 +129,7 @@ class PeerActorSpec
     peer ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
 
     rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.send(peer, RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
 
     rlpxConnection.expectMsgPF() { case RLPxConnectionHandler.SendMessage(_: HelloEnc) =>
       ()
@@ -153,7 +151,7 @@ class PeerActorSpec
     peer ! PeerActor.ConnectTo(uri)
 
     rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.send(peer, RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
 
     eth68Handshake(
       remoteHello = Hello(4, "test-client", Seq(Capability.ETH68), 9000, ByteString("unused")),
@@ -174,7 +172,7 @@ class PeerActorSpec
     peer ! PeerActor.ConnectTo(uri)
 
     rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.send(peer, RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
 
     eth68Handshake(
       remoteHello = Hello(4, "test-client", Seq(Capability.ETH68), 9000, ByteString("unused")),
@@ -202,7 +200,7 @@ class PeerActorSpec
     peer ! PeerActor.ConnectTo(uri)
 
     rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.send(peer, RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
 
     // Hello exchange
     val remoteHello: Hello =
@@ -242,7 +240,7 @@ class PeerActorSpec
     peer ! PeerActor.ConnectTo(uri)
 
     rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.send(peer, RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
 
     eth68Handshake(
       remoteHello = Hello(4, "test-client", Seq(Capability.ETH68), 9000, ByteString("unused")),
@@ -264,7 +262,7 @@ class PeerActorSpec
     peer ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
 
     rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.send(peer, RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
 
     eth68Handshake(
       remoteHello = Hello(4, "test-client", Seq(Capability.ETH68), 9000, ByteString("unused")),
@@ -283,7 +281,7 @@ class PeerActorSpec
     peer ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
 
     rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.send(peer, RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
 
     eth68Handshake(
       remoteHello = Hello(4, "test-client", Seq(Capability.ETH68), 9000, ByteString("unused")),
@@ -299,7 +297,7 @@ class PeerActorSpec
     peer ! PeerActor.HandleConnection(connection.ref, new InetSocketAddress("localhost", 9000))
 
     rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.HandleConnection])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.send(peer, RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
     rlpxConnection.expectMsgPF() { case RLPxConnectionHandler.SendMessage(_: HelloEnc) => () }
     testScheduler.timePasses(5.seconds)
     rlpxConnection.expectMsg(
@@ -320,7 +318,7 @@ class PeerActorSpec
     peer ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
 
     rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.send(peer, RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
 
     eth68Handshake(
       remoteHello = Hello(4, "test-client", Seq(Capability.ETH68), 9000, ByteString("unused")),
@@ -329,7 +327,7 @@ class PeerActorSpec
 
     // Handshake complete — verify peer is Handshaked
     val probe: TestProbe = TestProbe()
-    probe.send(peer, GetStatus)
+    peer ! GetStatus(probe.ref.toTyped[StatusResponse])
     probe.expectMsg(StatusResponse(Handshaked))
 
     // And responds to pings normally
@@ -344,7 +342,7 @@ class PeerActorSpec
     peer ! PeerActor.DisconnectPeer(Disconnect.Reasons.TooManyPeers)
 
     rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.send(peer, RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
 
     eth68Handshake(
       remoteHello = Hello(4, "test-client", Seq(Capability.ETH68), 9000, ByteString("unused")),
@@ -367,16 +365,15 @@ class PeerActorSpec
       genesisHash = Fixtures.Blocks.Genesis.header.hash
     )
 
-    val peerActor: TestActorRef[Actor] = TestActorRef(
-      Props(
-        new PeerActor(
+    val peerActor: TestActorRef[Nothing] = TestActorRef(
+      PropsAdapter(
+        PeerActor.apply(
           new InetSocketAddress("127.0.0.1", 0),
-          _ => rlpxConnection.ref,
+          _ => rlpxConnection.ref.toTyped[RLPxConnectionHandler.Command],
           peerConf,
           peerMessageBus,
           knownNodesManager.ref,
           false,
-          None,
           Mocks.MockHandshakerAlwaysSucceeds(remoteStatus, 0, false)
         )
       )
@@ -385,7 +382,7 @@ class PeerActorSpec
     peerActor ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
 
     rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.send(peerActor, RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
 
     rlpxConnection.send(peerActor, RLPxConnectionHandler.MessageReceived(Ping()))
     rlpxConnection.expectMsgPF() { case RLPxConnectionHandler.SendMessage(_: PongEnc) => () }
@@ -397,7 +394,7 @@ class PeerActorSpec
     peer ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
 
     rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.send(peer, RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
 
     eth68Handshake(
       remoteHello = Hello(4, "test-client", Seq(Capability.ETH68), 9000, ByteString("unused")),
@@ -406,7 +403,7 @@ class PeerActorSpec
 
     // Test that the handshake succeeded
     val sender: TestProbe = TestProbe()(system)
-    sender.send(peer, GetStatus)
+    peer ! GetStatus(sender.ref.toTyped[StatusResponse])
     sender.expectMsg(StatusResponse(Handshaked))
 
     // Test peer terminated after peerConf.disconnectPoisonPillTimeout
@@ -431,15 +428,14 @@ class PeerActorSpec
     val parentProbe: TestProbe = TestProbe()
 
     val peerWithParent: TestActorRef[Nothing] = TestActorRef(
-      Props(
-        new PeerActor(
+      PropsAdapter(
+        PeerActor.apply(
           new InetSocketAddress("127.0.0.1", 0),
-          _ => rlpxConnection.ref,
+          _ => rlpxConnection.ref.toTyped[RLPxConnectionHandler.Command],
           peerConf,
           peerMessageBus,
           knownNodesManager.ref,
           false,
-          Some(testScheduler),
           handshaker
         )
       ),
@@ -448,7 +444,7 @@ class PeerActorSpec
 
     peerWithParent ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
     rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.reply(RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.send(peerWithParent, RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
     rlpxConnection.expectMsgPF() { case RLPxConnectionHandler.SendMessage(_: HelloEnc) => () }
 
     rlpxConnection.send(peerWithParent, RLPxConnectionHandler.MessageReceived(Disconnect(Reasons.AlreadyConnected)))
@@ -562,15 +558,14 @@ class PeerActorSpec
     val knownNodesManager: TestProbe = TestProbe()
 
     val peer: TestActorRef[Nothing] = TestActorRef(
-      Props(
-        new PeerActor(
+      PropsAdapter(
+        PeerActor.apply(
           new InetSocketAddress("127.0.0.1", 0),
-          _ => rlpxConnection.ref,
+          _ => rlpxConnection.ref.toTyped[RLPxConnectionHandler.Command],
           peerConf,
           peerMessageBus,
           knownNodesManager.ref,
           false,
-          Some(testScheduler),
           handshaker
         )
       )
