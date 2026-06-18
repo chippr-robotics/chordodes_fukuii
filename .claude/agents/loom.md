@@ -56,7 +56,16 @@ You are called once per actor migration thread. Your deliverables per session:
    where `sender()` was used. Show the new types, get confirmation.
 3. **Implementation** — migrate the actor, update all callers, adapt spawning
    sites. One file at a time; compile after each file.
-4. **Verify** — `sbt compile-all && sbt scalafmtAll`. Report result.
+4. **Verify** — `sbt compile-all` after every file; `sbt scalafmtAll` after formatting phases; `testOnly *<Actor>*` after logic phases; full `./local/scripts/fukuii-test` once at thread end only. See Verification section.
+
+**At session start:**
+1. Check `.local/docs/continuations/` for a loom continuation file — if one exists for this actor, read it before anything else.
+2. Read prior group summaries: `ls .local/docs/moderization-review-june/implementation-sprint/summaries/` — key patterns documented there (BCC: non-sealed ADT; SRC: `log.warning`→`log.warn`; ARC when complete: two-behavior pattern). Do not re-research what is already recorded.
+
+**If turns run low mid-migration:** follow the continuation protocol in CLAUDE.md — write `.local/docs/continuations/loom-<ActorName>.md` before the session ends.
+
+The summaries directory is the authoritative record of observed findings.
+Use it to avoid re-discovering known patterns mid-migration.
 
 ## Migration pattern library
 
@@ -298,6 +307,10 @@ Do NOT delete `PeerListSupportNg` — other unmigrated actors still mix it.
 
 ## Pre-flight checklist (run before touching any file)
 
+> Full pre-flight protocol: `~/.claude/agent-protocols/pre-migration-checklist.md`
+> Pekko Typed API preferences: `~/.claude/agent-protocols/pekko-typed-api.md`
+> Inline cleanup rules: `~/.claude/agent-protocols/inline-cleanup.md`
+
 ```bash
 # 1. Confirm wildcard imports are already migrated (prerequisite):
 grep -rn "import .*\._" src/main/scala/ --include="*.scala" | wc -l
@@ -353,8 +366,8 @@ Current group status (read SPRINT-QUEUE.md Part 6 table for full state):
 | PLN | ✅ DONE | PeerListHelper (shared infrastructure) |
 | S6 | ✅ DONE | ChainDownloader |
 | S5 | ✅ DONE `5d29511d4` | BlockBroadcasterActor (Behavior[BroadcasterMsg]), BlockImporter + RegularSync (Behavior[Any] — mixed Classic/Typed sources); PeerListHelper replaces PeerListSupportNg. 69 jsonrpc failures fixed `92584a07b`. |
-| NET | 🔄 IN PROGRESS | **RLPxConnectionHandler** ✅ `f8a127870`. **PeerActor** ✅ `e6ccc5ac1`. **PeerEventBusActor** ✅ `59f7a1f11`. **PeerDiscoveryManager** ✅ `81eb751f3`. **PeerManagerActor** ✅ `05e0c003b`+`0e9952f06` — shell+core split (8 Classic ? callers in NPMA can't see replyTo, pure PropsAdapter not viable); PEA subscription via messageAdapter; PDM periodic discovery → self-post RequestDiscoveredNodes (off-thread timer); scalafmt reverted churn on PEA/PDM files; baseline 3,621/0. HERALD-3 confirmed: NPMA needs same shell+core when it migrates (9+ var fields, 3 self-ticks, 2 ask-paths, Classic ActorRef for SNAP+calibration refs). **BlockchainHostActor** ⬜ NEXT (323 LOC, 0 sender(), subscribe-only). |
-| S3 | ⬜ post-NET | SNAP coordinators ×4. HERALD-5 ✅ CONDITIONAL. Pre-migration: fix 1 return (ByteCodeCoordinator) + 10 returns (TrieNodeHealingCoordinator) in standalone commits first. Migration order: ByteCode→Storage→AccountRange→TrieNodeHealing. SSC+NPMA stay Classic ActorRef at S3 time. ARC has 2 Typed behaviors (receive + finalizing). TNHC: drop @volatile, capture context.self before Futures. HealingStagnated is outbound tell to SSC — not in TNHC Command ADT. |
+| NET | ✅ DONE | RLPxCH ✅ `f8a127870`. PeerActor ✅ `e6ccc5ac1`. PEA ✅ `59f7a1f11`. PDM ✅ `81eb751f3`. PMA ✅ `05e0c003b`+`0e9952f06` (shell+core; 8 sender→replyTo; PDM self-post timer). **BlockchainHostActor** ✅ `8ef6a4601` — pure Behavior[Command], no shell; 1-case ADT (PeerEventReceived); messageAdapter+tell subscription; 4 helpers→local defs; 3 spawn sites (NodeBuilder+CommonFakePeer+Spec); test required PeerEventReceived wrapping for 12 direct tells; 3,621/0. |
+| S3 | 🔄 IN PROGRESS | SNAP coordinators ×4. HERALD-5 ✅ CONDITIONAL. **ByteCodeCoordinator** ✅ `4f214db16`+`86930f9b1` — 4 returns removed (not 1 — lines 482/503/523/533; broader grep needed); Command non-sealed (multi-file ADT, same as other S-series); BytecodeRecoveryActor already Typed (spawn via PropsAdapter); dead PeerAvailable handler dropped; SSC ask → AskPattern(.toTyped); 21/21 BCC tests + 263/263 SNAP suite; 3,621/0. **StorageRangeCoordinator** ✅ `368c03560`+`0b43de007` — 21 returns removed (Phase 0); no child workers (dispatches GetStorageRanges directly to NPMA Classic); 1 sender() → replyTo on StorageGetProgress; SSC stagnation ask → AskPattern(.toTyped) mirrors BCC; 3 scheduler calls converted (preStart recurring → startTimerWithFixedDelay, 2× scheduleOnce → context.scheduleOnce); log.warning → log.warn (15 sites, SLF4J); files: SRC.scala + Messages.scala + SSC.scala + StorageRecoveryActor.scala + Spec; 28/28 SRC tests; 3,621/0. **AccountRangeCoordinator** ⬜ NEXT (2 Typed behaviors: receive→initial + finalizing; 6 sender() paths; 9 replyTo fields in Messages.scala). TNHC: pre-migration fix needed (10 returns) + drop @volatile. HealingStagnated outbound to SSC — not in TNHC Command ADT. |
 | S4/S7 | ⬜ post-NET | SyncStateSchedulerActor + PivotBlockSelector (S4), PeersClient + PeerRequestHandler (S7) |
 | NET2 | ⬜ post-NET+S3 | NetworkPeerManagerActor. HERALD-3 ✅ CONDITIONAL. 1 state (handleMessages), 8 var fields on Impl class, 2 sender() paths, Classic shell required (SSC uses Classic ask), SNAP ref stays Option[ActorRef], 3 scheduler calls → withTimers. |
 | SNAP1/SNAP2/ROOT/CAPSTONE | ⬜ post-W1+S3+S4/S7+NET+NET2 | HERALD-4 ✅ CONDITIONAL. SSC: 5,178 LOC, 6 named behaviors, 11 sender() → replyTo (pure status queries), ~58 var→Impl fields, 13 timers (1 untracked raw scheduler at L4058 → keyed timer), 2 .orElse partials → explicit helpers, 1 aroundReceive (stagnation dispatcher L3191 → inline in syncing), 4 hard constraints. See `.local/docs/moderization-review-june/HERALD-4-SSC-preflight.md`. Requires SPECKIT specify session to define ADT before LOOM starts. |
@@ -391,20 +404,27 @@ for the full diff before starting any new migration.
 
 ## Verification
 
-```bash
-sbt compile-all    # zero errors
-sbt scalafmtAll    # no formatting drift — use scalafmtAll, NOT formatAll
-                   # (formatAll runs scalafixAll which aborts on pre-existing
-                   #  DisableSyntax violations in untouched files)
+**Test cadence — do not run testEssential between phases:**
 
-# Run targeted tests for the migrated actor's subsystem only:
-sbt "testOnly *OmmersPool*"          # or whichever actor was migrated
-# Full suite at end of sprint only — ~24 min:
-sbt testEssential
+```bash
+# After EVERY file edit (seconds):
+sbt compile-all
+
+# After formatting-only phases (Phase 0: returns, Phase 1: Messages.scala):
+sbt scalafmtAll    # formatting check only — no tests needed, no logic changed
+                   # use scalafmtAll NOT formatAll (see CLAUDE.md build commands)
+
+# After Phase 2 (main migration) and Phase 3 (callers) — targeted, seconds:
+./local/scripts/fukuii-test <ActorName>Spec
+./local/scripts/fukuii-test SNAPSuite    # if SSC or SNAP callers were touched
+
+# END OF THREAD ONLY — once, after all phases complete (~24 min):
+./local/scripts/fukuii-test             # full testEssential baseline
 ```
+
+Do not run `testEssential` (or `./local/scripts/fukuii-test` without arguments) between phases
+— 24 minutes of stall per run compounds across a multi-phase thread.
 
 **E003 vs E165:** Track `E003` (Classic actor deprecation — `extends Actor`) to measure
 migration progress. `E165` is "unmatchable type in pattern match on Any" — it rises
 when migrating to `Behavior[Any]` and is NOT a signal of Classic actor count.
-
-After each actor migration: compile + scalafmtAll = done. Full suite at sprint end.

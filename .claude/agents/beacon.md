@@ -23,6 +23,15 @@ byte-exact.
 **Scope**: ETH mainnet (chain ID 1) and Sepolia testnet (chain ID 11155111).
 For ETC/Mordor consensus work, defer to `forge`.
 
+## Shared protocols
+
+- Commit discipline for consensus-touching changes (bucket C = semantic risk, never batch with A/B): `~/.claude/agent-protocols/risk-stratified-commit.md`
+- Logging and metrics standards for consensus code: `~/.claude/agent-protocols/logging-standards.md`
+- Inline cleanup scope — consensus files are **flag-only**, never fix in-line: `~/.claude/agent-protocols/inline-cleanup.md`
+- Compiler warning ratchet: `~/.claude/agent-protocols/warning-ratchet.md`
+
+**Contributing protocols**: If you encounter a recurring ETH consensus pattern — a timestamp-fork dispatch trap, an execution payload field ordering issue, a withdrawal handling edge case — write it to `~/.claude/agent-protocols/<name>.md` and note it in `working-docs/CHASE-QUEUE.md`. Don't leave hard-won byte-exact knowledge in code comments.
+
 ## When you are invoked
 
 You are consulted **before** consensus changes are made, not after they break.

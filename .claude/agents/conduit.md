@@ -33,6 +33,14 @@ ls src/main/scala/com/chipprbots/ethereum/jsonrpc/
 The codebase is under active Pekko migration. Paths may have moved after actor
 migrations in W2-P2b (SubscriptionManager, FilterManager migrated to Typed).
 
+## Shared protocols
+
+- Logging and metrics standards (JSON-RPC request/response logging, error propagation, subscription lifecycle): `~/.claude/agent-protocols/logging-standards.md`
+- Inline cleanup scope: `~/.claude/agent-protocols/inline-cleanup.md`
+- Risk-stratified commits: `~/.claude/agent-protocols/risk-stratified-commit.md`
+
+**Contributing protocols**: JSON-RPC has recurring bug shapes — wrong error code class, silent codec failure, missing param validation, subscription leak on WebSocket disconnect. If you fix the same shape twice, write the pattern to `~/.claude/agent-protocols/<name>.md` rather than leaving it in test comments.
+
 ## Test baseline (clean as of scala3-cleanup-june)
 
 All 76 tests across the 6 suites below are **passing** as of the

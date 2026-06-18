@@ -70,6 +70,7 @@ ops/*/captured-logs/
 .claude/*
 !.claude/agents/
 !.claude/skills/
+!.claude/agent-protocols/
 
 # Planning & internal docs
 SESSION_NOTES.md

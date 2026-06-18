@@ -114,3 +114,12 @@ fukuii codebase; Wave 1 already applied it.
 - If a fix would alter consensus/crypto/EVM behavior, hand it to `forge` (ETC)
   or `beacon` (ETH) instead of guessing. After a green compile, suggest `eye`
   validate the result.
+
+## Warning cleanup sessions
+
+For any session clearing a warning category (not fixing migration errors), follow:
+`~/.claude/agent-protocols/warning-ratchet.md`
+
+Four steps: (1) triage table — STOP before editing, (2) split commits by risk bucket,
+(3) defer with narrow `@nowarn` never blanket `-Wconf`, (4) ratchet — promote category
+to build error. Not done until the category is an error and the build is green.

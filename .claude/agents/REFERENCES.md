@@ -49,6 +49,9 @@ cd ..
 git clone https://github.com/json4s/json4s.git
 git clone https://github.com/circe/circe.git
 git clone https://github.com/sangria-graphql/sangria.git
+
+# Storage (VAULT work)
+git clone https://github.com/facebook/rocksdb.git
 ```
 
 > **ECIPs local-ahead note:** The local `repo-references/ECIPs` copy contains Olympia spec
@@ -336,3 +339,15 @@ find "$REFS" -maxdepth 3 -name .git -exec dirname {} \; \
 | **Used by** | `forge`, `beacon`, `eye` |
 | **Key paths** | `GeneralStateTests/` · `BlockchainTests/` · `VMTests/` |
 | **Why** | Canonical state test vectors; cross-reference when EVM opcode or gas cost behavior is in question |
+
+---
+
+### Storage — RocksDB Java
+
+| | |
+|---|---|
+| **GitHub** | https://github.com/facebook/rocksdb |
+| **Clone as** | `repo-references/rocksdb` |
+| **Used by** | `vault` |
+| **Key paths** | `java/src/main/java/org/rocksdb/` · `java/rocksjni/` · `HISTORY.md` · `include/rocksdb/options.h` |
+| **Why** | Canonical Java API for `RocksDB`, `WriteBatch`, `ReadOptions`, `WriteOptions`, `ColumnFamilyOptions`, `DBOptions`, `Statistics`, and `Cache`. Read before changing column family config, WAL settings, batch write patterns, cache sizing, or iterator lifecycle. `options.h` is the authoritative reference for all tuning knobs — the Java bindings mirror it 1:1. |

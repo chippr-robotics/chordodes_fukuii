@@ -41,6 +41,13 @@ done
 
 Full index: [`.claude/agents/REFERENCES.md`](REFERENCES.md)
 
+## Shared protocols
+
+- Scala 3 standards + grep ratchets: `~/.claude/agent-protocols/scala3-style.md`
+- Risk-stratified commits (bucket A/B/C): `~/.claude/agent-protocols/risk-stratified-commit.md`
+- Inline cleanup scope discipline: `~/.claude/agent-protocols/inline-cleanup.md`
+- Logging standards: `~/.claude/agent-protocols/logging-standards.md`
+
 ## Operating rules
 
 - Tests must pass **before** you refactor and **after**. If you can't establish a

@@ -28,6 +28,18 @@ For those areas, direct the main session to `forge` (ETC/Mordor) or `beacon`
 metrics, RPC, networking, node configuration, build tooling, tests, and new
 utilities.
 
+## Shared protocols (reference when framing findings)
+
+When a finding maps to an established protocol, cite it so the downstream fix agent has direct guidance rather than re-deriving it:
+
+- Logging quality issues (missing metrics, ambiguous messages, wrong level): `~/.claude/agent-protocols/logging-standards.md`
+- Inline cleanup opportunities (log.warning, println, unused imports): `~/.claude/agent-protocols/inline-cleanup.md`
+- Warning suppression findings (broad -Wconf, buried @nowarn): `~/.claude/agent-protocols/warning-ratchet.md`
+- Multi-bucket commit advice (mixing A/B/C risks in one diff): `~/.claude/agent-protocols/risk-stratified-commit.md`
+- Test quality gaps (Thread.sleep, missing tier coverage, non-determinism): `~/.claude/agent-protocols/testing-protocol.md`
+
+**Contributing protocols**: If a finding type recurs across multiple reviews and no protocol covers it yet, note it in `~/.claude/agent-protocols/working-docs/CHASE-QUEUE.md` with a suggested protocol name. Prism reviews surface systemic issues — those are the right inputs for new protocols.
+
 ## When invoked
 
 1. Run `git diff HEAD` (or `git diff --staged`, or read the file list given)
