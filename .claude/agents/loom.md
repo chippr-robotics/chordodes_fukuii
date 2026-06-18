@@ -353,9 +353,11 @@ Current group status (read SPRINT-QUEUE.md Part 6 table for full state):
 | PLN | ✅ DONE | PeerListHelper (shared infrastructure) |
 | S6 | ✅ DONE | ChainDownloader |
 | S5 | ✅ DONE `5d29511d4` | BlockBroadcasterActor (Behavior[BroadcasterMsg]), BlockImporter + RegularSync (Behavior[Any] — mixed Classic/Typed sources); PeerListHelper replaces PeerListSupportNg. 69 jsonrpc failures fixed `92584a07b`. |
-| NET | 🔄 IN PROGRESS | **RLPxConnectionHandler** ✅ `f8a127870` — TCP bridge; awaitInitialHello() params; PropsAdapter co-existence; Command non-sealed. **PeerActor** ✅ `e6ccc5ac1` — 6 states → named behaviors; withStash(100); Command non-sealed (RLPx extends cross-file); RLPx child per connection + watchWith; PropsAdapter preserved; GetStatus → Typed ask in PMA. Baseline: 3,621/0. **PeerEventBusActor** 🔄 parallel. **PeerDiscoveryManager** ⬜ NEXT (independent). **PeerManagerActor** ⬜ blocked on PEA. HERALD-2 CONDITIONAL constraints recorded in SPRINT-QUEUE.md. |
-| S3/S4/S7 | ⬜ post-NET | SNAP coordinators, fast sync actors, PeersClient |
-| NET2/SNAP1/SNAP2/ROOT | ⬜ | Final groups → capstone root flip |
+| NET | 🔄 IN PROGRESS | **RLPxConnectionHandler** ✅ `f8a127870`. **PeerActor** ✅ `e6ccc5ac1`. **PeerEventBusActor** ✅ `59f7a1f11` (Typed core + Classic bridge shell — bridge is intentional co-existence scaffolding, not incomplete). **PeerDiscoveryManager** ✅ `81eb751f3`. **PeerManagerActor** ⬜ IN PROGRESS. **BlockchainHostActor** ⬜ post-PMA (323 LOC, 0 sender(), subscribe-only — gates on PEA ✅; gap found by HERALD-4 audit; add to NET group). |
+| S3 | ⬜ post-NET | SNAP coordinators ×4. HERALD-5 ✅ CONDITIONAL. Pre-migration: fix 1 return (ByteCodeCoordinator) + 10 returns (TrieNodeHealingCoordinator) in standalone commits first. Migration order: ByteCode→Storage→AccountRange→TrieNodeHealing. SSC+NPMA stay Classic ActorRef at S3 time. ARC has 2 Typed behaviors (receive + finalizing). TNHC: drop @volatile, capture context.self before Futures. HealingStagnated is outbound tell to SSC — not in TNHC Command ADT. |
+| S4/S7 | ⬜ post-NET | SyncStateSchedulerActor + PivotBlockSelector (S4), PeersClient + PeerRequestHandler (S7) |
+| NET2 | ⬜ post-NET+S3 | NetworkPeerManagerActor. HERALD-3 ✅ CONDITIONAL. 1 state (handleMessages), 8 var fields on Impl class, 2 sender() paths, Classic shell required (SSC uses Classic ask), SNAP ref stays Option[ActorRef], 3 scheduler calls → withTimers. |
+| SNAP1/SNAP2/ROOT/CAPSTONE | ⬜ | Final groups → capstone root flip (ActorSystem[Nothing], bridge removal) |
 
 SNAP1 (SNAPSyncController, 5173 LOC, 22 states) requires a SPECKIT specify session
 to define its ADT before LOOM starts. Do not begin SNAP1 without that session.
