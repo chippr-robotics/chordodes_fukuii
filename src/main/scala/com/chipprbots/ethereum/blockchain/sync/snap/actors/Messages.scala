@@ -25,7 +25,10 @@ object Messages {
   // AccountRange Messages
   // ========================================
 
-  sealed trait AccountRangeCoordinatorMessage
+  // Extends AccountRangeCoordinator.Command (Group S3): the coordinator is now a Typed actor with a (non-sealed)
+  // Command ADT. All AccountRangeCoordinatorMessage cases are therefore Commands; SSC (still Classic) sends them via
+  // the Classic `!`.
+  sealed trait AccountRangeCoordinatorMessage extends AccountRangeCoordinator.Command
 
   case class StartAccountRangeSync(stateRoot: ByteString) extends AccountRangeCoordinatorMessage
   case class PeerAvailable(peer: Peer) extends AccountRangeCoordinatorMessage
@@ -36,9 +39,26 @@ object Messages {
   case class TaskFailed(requestId: BigInt, reason: String) extends AccountRangeCoordinatorMessage
   case class PeerUnavailable(peerId: String) extends AccountRangeCoordinatorMessage
   case object GetProgress extends AccountRangeCoordinatorMessage
+
+  /** Typed status query: report account-range progress to `replyTo`. Replaces the Classic `sender()` reply on
+    * `GetProgress` after the AccountRangeCoordinator migration to Pekko Typed. A distinct name (not `GetProgress`) is
+    * required because Scala 3 forbids a `case class` and a `case object` sharing a name in the same scope — same
+    * convention as `ByteCodeGetProgress` / `StorageGetProgress`.
+    */
+  case class AccountGetProgress(replyTo: org.apache.pekko.actor.typed.ActorRef[AccountRangeStats])
+      extends AccountRangeCoordinatorMessage
   case object GetContractAccounts extends AccountRangeCoordinatorMessage
+
+  /** Typed status query: report contract accounts to `replyTo`. */
+  case class AccountGetContractAccounts(replyTo: org.apache.pekko.actor.typed.ActorRef[ContractAccountsResponse])
+      extends AccountRangeCoordinatorMessage
   case class ContractAccountsResponse(accounts: Seq[(ByteString, ByteString)]) extends AccountRangeCoordinatorMessage
   case object GetContractStorageAccounts extends AccountRangeCoordinatorMessage
+
+  /** Typed status query: report contract-storage accounts to `replyTo`. */
+  case class AccountGetContractStorageAccounts(
+      replyTo: org.apache.pekko.actor.typed.ActorRef[ContractStorageAccountsResponse]
+  ) extends AccountRangeCoordinatorMessage
   case class ContractStorageAccountsResponse(accounts: Seq[(ByteString, ByteString)])
       extends AccountRangeCoordinatorMessage
 
@@ -46,14 +66,26 @@ object Messages {
     * (~64MB) instead of 73.5M raw entries (4.7GB). Bug 20 fix.
     */
   case object GetUniqueCodeHashes extends AccountRangeCoordinatorMessage
+
+  /** Typed status query: report unique codeHashes to `replyTo`. */
+  case class AccountGetUniqueCodeHashes(replyTo: org.apache.pekko.actor.typed.ActorRef[UniqueCodeHashesResponse])
+      extends AccountRangeCoordinatorMessage
   case class UniqueCodeHashesResponse(codeHashes: Seq[ByteString])
 
   /** Request storage file metadata for async streaming. Returns instantly (no file read). */
   case object GetStorageFileInfo extends AccountRangeCoordinatorMessage
+
+  /** Typed status query: report storage file metadata to `replyTo`. */
+  case class AccountGetStorageFileInfo(replyTo: org.apache.pekko.actor.typed.ActorRef[StorageFileInfoResponse])
+      extends AccountRangeCoordinatorMessage
   case class StorageFileInfoResponse(filePath: java.nio.file.Path, count: Long)
 
   /** Request codeHashes file metadata for bytecode recovery. Returns instantly (no file read). */
   case object GetCodeHashesFileInfo extends AccountRangeCoordinatorMessage
+
+  /** Typed status query: report codeHashes file metadata to `replyTo`. */
+  case class AccountGetCodeHashesFileInfo(replyTo: org.apache.pekko.actor.typed.ActorRef[CodeHashesFileInfoResponse])
+      extends AccountRangeCoordinatorMessage
   case class CodeHashesFileInfoResponse(filePath: java.nio.file.Path, count: Long)
   case object CheckCompletion extends AccountRangeCoordinatorMessage
 
@@ -112,7 +144,12 @@ object Messages {
       requestId: BigInt,
       responseBytes: BigInt = BigInt(512 * 1024)
   ) extends AccountRangeWorkerMessage
-  case class AccountRangeResponseMsg(response: AccountRange) extends AccountRangeWorkerMessage
+  // Dual-typed: a worker message (sent coordinator → worker) AND an AccountRangeCoordinator.Command
+  // (sent SNAPSyncController → coordinator, which forwards to the owning worker). Mirrors BCC's
+  // `ByteCodesResponseMsg`. Lets the now-Typed coordinator receive it in its Command mailbox.
+  case class AccountRangeResponseMsg(response: AccountRange)
+      extends AccountRangeWorkerMessage
+      with AccountRangeCoordinator.Command
   case class RequestTimeout(requestId: BigInt) extends AccountRangeWorkerMessage
   case class WorkerPeerDisconnected(peerId: String) extends AccountRangeWorkerMessage
 

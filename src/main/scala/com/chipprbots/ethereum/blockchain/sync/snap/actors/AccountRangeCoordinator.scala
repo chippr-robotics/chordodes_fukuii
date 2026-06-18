@@ -6,16 +6,11 @@ import java.io.RandomAccessFile
 import java.nio.file.Files
 import java.nio.file.Path
 
-import org.apache.pekko.actor.Actor
-import org.apache.pekko.actor.ActorLogging
 import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.Cancellable
-import org.apache.pekko.actor.OneForOneStrategy
-import org.apache.pekko.actor.Props
-import org.apache.pekko.actor.Status
-import org.apache.pekko.actor.SupervisorStrategy
-import org.apache.pekko.actor.SupervisorStrategy.*
-import org.apache.pekko.actor.Terminated
+import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.scaladsl.ActorContext
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
@@ -68,7 +63,9 @@ import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
   * @param snapSyncController
   *   Parent controller to notify of completion
   */
-class AccountRangeCoordinator(
+private class AccountRangeCoordinatorImpl(
+    ctx: ActorContext[AccountRangeCoordinator.Command],
+    timers: TimerScheduler[AccountRangeCoordinator.Command],
     initialStateRoot: ByteString,
     networkPeerManager: ActorRef,
     requestTracker: SNAPRequestTracker,
@@ -82,14 +79,20 @@ class AccountRangeCoordinator(
     accountTrieEcOverride: Option[ExecutionContext] = None,
     storageScheme: StorageScheme = StorageScheme.Hash,
     pathNodeStorage: Option[PathNodeStorage] = None
-) extends Actor
-    with ActorLogging {
+) {
 
   import Messages.*
   import SNAPSyncController.PivotStateUnservable
+  import AccountRangeCoordinator.*
 
-  // Typed leaf worker (Group W1). The coordinator stays Classic and spawns Typed children via the
-  // classic→typed adapter; it holds typed refs and sends commands with the typed `!`.
+  // `ctx.log` is thread-confined and must NOT be captured inside the trie-finalisation Future
+  // (see `finalizeTrie`). For the actor-thread code below we use `ctx.log`; the Future uses
+  // `futureLog` (a plain SLF4J logger) instead.
+  private val log = ctx.log
+  private val futureLog = org.slf4j.LoggerFactory.getLogger(classOf[AccountRangeCoordinatorImpl])
+
+  // Typed leaf worker (Group W1). The coordinator is now Typed and spawns Typed children directly;
+  // it holds typed refs and sends commands with the typed `!`.
   private type WorkerRef = org.apache.pekko.actor.typed.ActorRef[AccountRangeWorker.Command]
 
   // Mutable state root — updated in-place when the controller refreshes the pivot.
@@ -208,7 +211,7 @@ class AccountRangeCoordinator(
         pivotRefreshRequested = true
         lastPivotRefreshTimeMs = System.currentTimeMillis()
         consecutiveUnproductiveRefreshes += 1
-        log.warning(
+        log.warn(
           s"All ${knownAvailablePeers.size} known peers are SNAPLESS (no snapshot tree). " +
             "SNAP-range download cannot make progress on this peer pool. " +
             s"Requesting pivot refresh from controller (attempt=$consecutiveUnproductiveRefreshes). " +
@@ -239,13 +242,12 @@ class AccountRangeCoordinator(
                 "Will retry after backoff."
             )
             // Schedule a re-check after the remaining backoff period
-            import context.dispatcher
-            context.system.scheduler.scheduleOnce((backoffMs - elapsed).millis, self, CheckCompletion)
+            ctx.scheduleOnce((backoffMs - elapsed).millis, ctx.self, CheckCompletion)
           } else {
             pivotRefreshRequested = true
             lastPivotRefreshTimeMs = now
             consecutiveUnproductiveRefreshes += 1
-            log.warning(
+            log.warn(
               s"All ${statelessPeers.size} known peers are stateless for root ${stateRoot.take(4).toHex}. " +
                 s"Requesting pivot refresh from controller (attempt=$consecutiveUnproductiveRefreshes, backoff=${backoffMs / 1000}s)."
             )
@@ -318,7 +320,8 @@ class AccountRangeCoordinator(
   private[actors] var lastDispatchOrResponseMs: Long = System.currentTimeMillis()
   private val noActivityTimeoutMs: Long = 90_000L
   private val dispatchStallCheckInterval: FiniteDuration = 30.seconds
-  private var stallCheckTask: Option[Cancellable] = None
+  // (Was `stallCheckTask: Option[Cancellable]` — now a keyed timer owned by `Behaviors.withTimers`,
+  //  auto-cancelled when the behavior stops; no manual field/cancel needed.)
   // Counts consecutive CheckDispatchStalled ticks where pendingTasks.nonEmpty && activeTasks.isEmpty.
   // The standard `lastDispatchOrResponseMs` timer resets on every drain (peer cycling) and response,
   // making it blind to the "tasks pending but no eligible peers" stall. A tick counter is immune to
@@ -527,15 +530,17 @@ class AccountRangeCoordinator(
   // `finalizeTrie` (10+ minutes on mainnet) runs here so it can't squeeze the global pool or
   // sync-dispatcher.
   private val accountTrieEc: ExecutionContext =
-    accountTrieEcOverride.getOrElse(context.system.dispatchers.lookup("account-trie-dispatcher"))
+    accountTrieEcOverride.getOrElse(
+      ctx.system.dispatchers.lookup(
+        org.apache.pekko.actor.typed.DispatcherSelector.fromConfig("account-trie-dispatcher")
+      )
+    )
 
   // Generation token. Bumped at finalisation spawn. Async result messages carry the generation
   // they were spawned under and are ignored if it no longer matches — defensive guard so a stale
   // completion can't apply against the wrong assumption. Mirrors the validateState() async pattern.
   // Package-private so unit tests can verify generation behaviour.
   private[actors] var trieFlushGeneration: Long = 0L
-
-  import AccountRangeCoordinator.TrieFlushComplete
 
   // Per-task StackTrie state.
   // Keyed by `task.last` — each AccountTask has a unique end-of-range boundary.
@@ -546,7 +551,8 @@ class AccountRangeCoordinator(
   // `private[actors]` so the test spec can verify the per-task lifecycle.
   private[actors] val taskStackTries: mutable.Map[ByteString, SnapTrie] = mutable.Map.empty
 
-  override def preStart(): Unit = {
+  /** Equivalent of the Classic `preStart`: invoked once by the behavior factory before the first message. */
+  def onStart(): Unit = {
     if (skippedTasks.nonEmpty) {
       log.info(
         s"AccountRangeCoordinator starting with $concurrency workers — " +
@@ -557,20 +563,17 @@ class AccountRangeCoordinator(
     }
     // #1184: schedule the periodic dispatch-stalled detector. Fires every 30 s; the
     // 90 s `noActivityTimeoutMs` ensures we drain stuck slots before the controller's
-    // 180 s `Account stall detected` watchdog escalates to a pivot refresh.
-    import context.dispatcher
-    stallCheckTask = Some(
-      context.system.scheduler
-        .scheduleAtFixedRate(dispatchStallCheckInterval, dispatchStallCheckInterval, self, CheckDispatchStalled)
-    )
+    // 180 s `Account stall detected` watchdog escalates to a pivot refresh. Timer lifetime is
+    // owned by `Behaviors.withTimers` — no manual cancel needed on stop.
+    timers.startTimerWithFixedDelay(CheckDispatchStalled, dispatchStallCheckInterval, dispatchStallCheckInterval)
     // If all tasks were already completed, report completion immediately
     if (pendingTasks.isEmpty && activeTasks.isEmpty) {
-      context.system.scheduler.scheduleOnce(100.millis, self, CheckCompletion)
+      ctx.scheduleOnce(100.millis, ctx.self, CheckCompletion)
     }
   }
 
-  override def postStop(): Unit = {
-    stallCheckTask.foreach(_.cancel())
+  /** Equivalent of the Classic `postStop`: invoked from the `PostStop` signal handler. */
+  def onStop(): Unit = {
     // Send final progress snapshot so controller can resume from saved positions on restart
     sendProgressSnapshot()
     // Close and delete temporary files.
@@ -600,383 +603,449 @@ class AccountRangeCoordinator(
     snapSyncController ! AccountRangeProgress(progress)
   }
 
-  // Supervision strategy retained for any Classic children. The Typed AccountRangeWorker children
-  // (Group W1) are NOT governed by this strategy — a Typed actor uses its own supervision and, by
-  // default, STOPS on failure. That stop is caught by the `Terminated` handler below, which removes
-  // the dead worker from the pool and re-queues its in-flight task. Stop+re-queue is the intended
-  // recovery path here; a restart would silently lose the worker's `currentTask` state.
-  override val supervisorStrategy: SupervisorStrategy =
-    OneForOneStrategy(maxNrOfRetries = 3, withinTimeRange = 1.minute) { case _: Exception =>
-      log.warning("Worker failed, restarting")
-      Restart
+  // Typed AccountRangeWorker children (Group W1) STOP on failure by default. The stop is caught by
+  // the `WorkerTerminated` command (via `ctx.watchWith`), which removes the dead worker from the
+  // pool and re-queues its in-flight task. Stop+re-queue is the intended recovery path; a restart
+  // would silently lose the worker's `currentTask` state. (Was a Classic `OneForOneStrategy`.)
+
+  /** Primary behavior — account-range download in progress. Most commands mutate `Impl` state and stay in the same
+    * behavior; only the account-complete path transitions to [[finalizing]].
+    */
+  def receive(): Behavior[Command] = Behaviors
+    .receiveMessage[Command] { msg =>
+      msg match {
+        case StartAccountRangeSync(root) =>
+          log.info(s"Starting account range sync for state root ${root.take(8).toHex}")
+          // Tasks already initialized in constructor
+          Behaviors.same
+
+        case AccountRangeResponseMsg(response) =>
+          activeTasks.get(response.requestId) match {
+            case None =>
+              log.debug(s"Received AccountRange response for unknown or completed request ${response.requestId}")
+
+            case Some((_, worker, _)) =>
+              // Forward to the specific worker that owns this requestId so it can validate/complete the request.
+              worker ! AccountRangeResponseMsg(response)
+          }
+          Behaviors.same
+
+        case PivotRefreshed(newStateRoot) =>
+          log.info(s"Pivot refreshed: ${stateRoot.take(4).toHex} -> ${newStateRoot.take(4).toHex}")
+          stateRoot = newStateRoot
+
+          // #1184: drain unconditionally instead of relying on the worker → TaskFailed cascade
+          // that misses silent peers. Drain BEFORE re-applying the root so all drained tasks
+          // land in pendingTasks first, then pendingTasks.foreach re-tags them to the new root.
+          drainActiveTasks(s"pivot refresh to ${newStateRoot.take(4).toHex}")
+          pendingTasks.foreach(_.rootHash = newStateRoot)
+
+          // Clear stateless AND snapless tracking — peers get a fresh slate at the new root.
+          //
+          // Previous policy (PR #1197) intentionally preserved snaplessPeers across pivots:
+          // a peer without a snapshot tree won't grow one within a single sync session, so
+          // clearing was thought to waste a redispatch cycle re-classifying them. That logic
+          // breaks on small peer pools (sepolia's 2-8 SNAP-capable peers): if all peers
+          // accumulate confirmed-snapless across a few pivots, eligible=0 and the account
+          // coordinator stalls indefinitely. Observed sepolia 2026-05-14 (PR #1254
+          // instrumentation): workers-known=3, snapless=2, stateless=2 → eligible=0 → stall.
+          //
+          // Cost of clearing on pivot: peers genuinely without a snap tree get re-tested for
+          // 3 strikes per pivot cycle (≈ 9 dispatched-then-empty responses per peer per pivot).
+          // At sepolia's ~3-min pivot cadence that's ~3 wasted requests / min / lying peer.
+          // Acceptable trade-off vs total stall.
+          //
+          // Strike counter IS cleared: the new root is a fresh opportunity and a peer with 1-2
+          // strikes deserves another shot.
+          statelessPeers.clear()
+          snaplessPeers.clear()
+          emptyResponseStrikes.clear()
+          pivotRefreshRequested = false
+
+          // Clear per-peer adaptive state (new root = new response characteristics)
+          peerResponseBytesTarget.clear()
+          peerCooldownUntilMs.clear()
+          // Note: do NOT reset consecutiveUnproductiveRefreshes here.
+          // Only reset when we receive real account data (proof the new root is servable).
+
+          // #1184: always reset the activity timer — we're starting a fresh phase.
+          lastDispatchOrResponseMs = System.currentTimeMillis()
+
+          // Resume dispatching with the fresh root. tryRedispatchPendingTasks() guards on
+          // pendingTasks.nonEmpty; also fan out explicitly so peers receive work the moment
+          // tasks arrive from in-flight root-mismatch re-queues — matching go-ethereum's
+          // immediate idle-pool restoration after pivot (sync.go revertAccountRequest).
+          tryRedispatchPendingTasks()
+          knownAvailablePeers.filterNot(isPeerStateless).foreach(dispatchIfPossible)
+          Behaviors.same
+
+        case PeerAvailable(peer) =>
+          // Evict stale entry for same physical node (reconnection creates new PeerId).
+          // Only clear stateless marking for peers that actually reconnected with a NEW ID.
+          // If the same peer is re-reported (same id), preserve its stateless marking —
+          // otherwise PeerAvailable from SNAPSyncController clears stateless every ~1s,
+          // bypassing the backoff mechanism entirely (Bug 24).
+          val wasAlreadyKnown = knownAvailablePeers.exists(_.id == peer.id)
+          val evicted = knownAvailablePeers.filter(_.remoteAddress == peer.remoteAddress)
+          knownAvailablePeers --= evicted
+          evicted.foreach { p =>
+            if (p.id != peer.id) {
+              statelessPeers -= p.id
+            }
+          }
+          // Genuine reconnect (new PeerId from same address, or first-seen peer) gets a clean
+          // slate. Bug 24 protection preserved: re-announced same-id peers have wasAlreadyKnown=true
+          // and are not cleared, keeping the ~1s SNAPSyncController re-announce from bypassing backoff.
+          if (!wasAlreadyKnown) {
+            statelessPeers -= peer.id
+            // snaplessPeers is NOT cleared here: same PeerId = same physical node = same lack-of-snapshot.
+            // Clearing on reconnect would allow known-snapless ETH-mainnet peers to consume dispatch
+            // slots and hash-failure budget before re-accumulating strikes (#1197).
+            emptyResponseStrikes.remove(peer.id)
+          }
+          knownAvailablePeers += peer
+          if (isPeerStateless(peer)) {
+            log.debug(s"Ignoring PeerAvailable(${peer.id.value}) - peer is stateless for current root")
+          } else if (isPeerSnapless(peer)) {
+            log.debug(s"Ignoring PeerAvailable(${peer.id.value}) - peer is snapless (no snapshot tree)")
+          } else if (isPeerCoolingDown(peer)) {
+            log.debug(s"Ignoring PeerAvailable(${peer.id.value}) - peer is cooling down")
+          } else if (pendingTasks.isEmpty) {
+            log.debug("No pending tasks")
+          } else {
+            // Route through the sorted redispatch path so the fairness ordering
+            // (least-in-flight first) applies to every dispatch trigger, not just
+            // the periodic tryRedispatchPendingTasks calls. Without this, the
+            // SNAPSyncController's per-peer PeerAvailable re-announcements drive
+            // greedy dispatchIfPossible for a single peer, starving idle peers.
+            tryRedispatchPendingTasks()
+          }
+          Behaviors.same
+
+        case UpdateMaxInFlightPerPeer(newLimit) =>
+          log.info(s"AccountRange per-peer budget: $maxInFlightPerPeer -> $newLimit")
+          maxInFlightPerPeer = newLimit
+          if (newLimit > 0) tryRedispatchPendingTasks()
+          Behaviors.same
+
+        case StorageQueuePressure(paused) =>
+          applyBackpressureChange(source = "storage", paused = paused)
+          Behaviors.same
+
+        case ByteCodeQueuePressure(paused) =>
+          applyBackpressureChange(source = "bytecode", paused = paused)
+          Behaviors.same
+
+        case PeerUnavailable(peerId) =>
+          // Peer disconnected — remove from available set and re-queue in-flight tasks.
+          // go-ethereum eth/protocols/snap/sync.go:1621 (revertRequests) and Besu
+          // AbstractRetryingPeerTask.java:158 both treat disconnect as transient re-queue, not failure.
+          knownAvailablePeers.find(_.id.value == peerId).foreach(knownAvailablePeers -= _)
+          peerCooldownUntilMs.remove(peerId)
+          // Drop strike counter — a reconnect under the same id should start fresh.
+          knownAvailablePeers.find(_.id.value == peerId).foreach(p => emptyResponseStrikes.remove(p.id))
+          // Note: snaplessPeers entry is preserved per #1197 — if the peer reconnects under a
+          // NEW PeerId, that's handled by PeerAvailable's stale-id-eviction path; same id =
+          // same physical node = same lack-of-snapshot.
+          // #1184: drain the slots ourselves rather than relying on the worker → TaskFailed
+          // cascade. drainActiveTasks sends WorkerRequestCancelled to each affected worker so they
+          // leave `working` state cleanly and don't reject redispatch with TaskFailed(0, "Worker
+          // busy"). Subsumes the legacy WorkerPeerDisconnected flow.
+          val drained = drainActiveTasks(s"peer $peerId unavailable", Some(peerId))
+          if (drained > 0) {
+            lastDispatchOrResponseMs = System.currentTimeMillis()
+            tryRedispatchPendingTasks()
+          }
+          Behaviors.same
+
+        // Typed worker death watch (was Classic `Terminated`): `ctx.watchWith(worker, WorkerTerminated(worker))`
+        // in `createWorker` delivers this when a worker stops unexpectedly.
+        case WorkerTerminated(worker) if workers.contains(worker) =>
+          // Worker actor terminated unexpectedly (e.g., exception in proof verification).
+          // Without this handler the task stays in activeTasks forever — the coordinator never
+          // gets TaskFailed/TaskComplete so it waits for a response that will never arrive.
+          log.warn(
+            s"[ACCOUNT-COORD] Worker ${worker.path.name} terminated — removing from pool and re-queuing task. " +
+              s"Pool: ${workers.size - 1} total, ${idleWorkers.size} idle, ${activeTasks.size} active tasks"
+          )
+          workers -= worker
+          idleWorkers -= worker
+          activeTasks.find { case (_, (_, w, _)) => w == worker }.foreach { case (reqId, (task, _, _)) =>
+            log.warn(
+              s"[ACCOUNT-COORD] Re-queuing task ${task.rangeString} from terminated worker (reqId=$reqId)"
+            )
+            activeTasks -= reqId
+            task.pending = false
+            pendingTasks.enqueue(task)
+            tryRedispatchPendingTasks()
+          }
+          Behaviors.same
+
+        case WorkerTerminated(_) =>
+          // Death watch for a worker that was already removed from the pool — nothing to do.
+          Behaviors.same
+
+        case RecoverStalledAccountTasks =>
+          // #1184: controller-side stall watchdog hook. The controller only sends this when it
+          // already thinks we're stuck, so reset the activity timer unconditionally to give us a
+          // fresh window before the next 180 s tick.
+          drainActiveTasks("controller-side stall recovery")
+          lastDispatchOrResponseMs = System.currentTimeMillis()
+          tryRedispatchPendingTasks()
+          Behaviors.same
+
+        case CheckDispatchStalled =>
+          val now = System.currentTimeMillis()
+          val stalled = activeTasks.nonEmpty && (now - lastDispatchOrResponseMs) > noActivityTimeoutMs
+          if (stalled) {
+            pendingButIdleTicks = 0
+            val idleSec = (now - lastDispatchOrResponseMs) / 1000
+            log.warn(
+              s"Account dispatch stalled: ${activeTasks.size} active, ${pendingTasks.size} pending, " +
+                s"no activity for ${idleSec}s. Draining stale slots."
+            )
+            drainActiveTasks(s"dispatch stalled (no activity ${idleSec}s)")
+            // Always reset — give dispatch a clean window so the detector doesn't re-fire on the
+            // next 30 s tick. If dispatch can't proceed (no eligible peers) we'll detect that
+            // next time anyway.
+            lastDispatchOrResponseMs = System.currentTimeMillis()
+            tryRedispatchPendingTasks()
+          } else if (pendingTasks.nonEmpty && activeTasks.isEmpty) {
+            // Tasks are pending but nothing is in-flight — no eligible peers to dispatch to.
+            // `lastDispatchOrResponseMs` resets on every drain (peer cycling) so the time-based
+            // check above is blind to this condition. Use a tick counter instead.
+            pendingButIdleTicks += 1
+            val nowMs = System.currentTimeMillis()
+            val soonestCooldownSec = peerCooldownUntilMs.values.minOption
+              .map(t => math.max(0L, (t - nowMs) / 1000))
+              .getOrElse(-1L)
+            log.warn(
+              s"[ACCOUNT-IDLE] tick $pendingButIdleTicks/3: ${pendingTasks.size} tasks pending, " +
+                s"0 active. Pool: ${knownAvailablePeers.size} known, " +
+                s"${statelessPeers.size} stateless, ${snaplessPeers.size} snapless, " +
+                s"${peerCooldownUntilMs.size} cooling" +
+                (if (soonestCooldownSec >= 0) s" (soonest ready in ${soonestCooldownSec}s)" else "") +
+                s". root=${stateRoot.take(4).toHex}"
+            )
+            if (pendingButIdleTicks >= 3) {
+              // 3 × 30 s = 90 s of consecutive ticks with pending tasks and zero dispatches.
+              log.warn(
+                s"[ACCOUNT-STALL] ${pendingTasks.size} tasks pending, no active dispatches for " +
+                  s"$pendingButIdleTicks watchdog ticks " +
+                  s"(${dispatchStallCheckInterval.toSeconds * pendingButIdleTicks}s). " +
+                  s"Attempting floor recovery then pivot refresh if needed."
+              )
+              pendingButIdleTicks = 0
+              tryRedispatchPendingTasks()
+              // If floor revival also couldn't dispatch anything, escalate.
+              if (activeTasks.isEmpty && !pivotRefreshRequested) {
+                pivotRefreshRequested = true
+                lastPivotRefreshTimeMs = System.currentTimeMillis()
+                consecutiveUnproductiveRefreshes += 1
+                log.warn(
+                  s"[ACCOUNT-STALL] Floor revival exhausted — ${knownAvailablePeers.size} known peers, " +
+                    s"${statelessPeers.size} stateless, ${peerCooldownUntilMs.size} cooling. " +
+                    s"Requesting pivot refresh (attempt=$consecutiveUnproductiveRefreshes)."
+                )
+                snapSyncController ! PivotStateUnservable(
+                  rootHash = stateRoot,
+                  reason =
+                    s"tasks pending but no eligible peers after ${consecutiveUnproductiveRefreshes} stall cycles",
+                  consecutiveEmptyResponses = knownAvailablePeers.size
+                )
+              }
+            }
+          } else {
+            pendingButIdleTicks = 0
+          }
+          Behaviors.same
+
+        case TaskComplete(requestId, result) =>
+          handleTaskComplete(requestId, result)
+          Behaviors.same
+
+        case TaskFailed(requestId, reason) =>
+          handleTaskFailed(requestId, reason)
+          Behaviors.same
+
+        case AccountGetProgress(replyTo) =>
+          replyTo ! calculateProgress()
+          Behaviors.same
+
+        case AccountGetContractAccounts(replyTo) =>
+          replyTo ! ContractAccountsResponse(
+            readContractFile(contractAccountsFile, contractAccountsOut, contractAccountsCount)
+          )
+          Behaviors.same
+
+        case AccountGetContractStorageAccounts(replyTo) =>
+          replyTo ! ContractStorageAccountsResponse(
+            readContractFile(contractStorageFile, contractStorageOut, contractStorageCount)
+          )
+          Behaviors.same
+
+        case AccountGetUniqueCodeHashes(replyTo) =>
+          replyTo ! UniqueCodeHashesResponse(readUniqueCodeHashes())
+          Behaviors.same
+
+        case AccountGetStorageFileInfo(replyTo) =>
+          contractStorageOut.flush()
+          replyTo ! StorageFileInfoResponse(contractStorageFile, contractStorageCount)
+          Behaviors.same
+
+        case AccountGetCodeHashesFileInfo(replyTo) =>
+          uniqueCodeHashesOut.flush()
+          replyTo ! CodeHashesFileInfoResponse(uniqueCodeHashesFile, uniqueCodeHashesCount)
+          Behaviors.same
+
+        case StoreAccountChunk(task, remaining, totalCount, storedSoFar, isTaskRangeComplete) =>
+          handleStoreAccountChunk(task, remaining, totalCount, storedSoFar, isTaskRangeComplete)
+          Behaviors.same
+
+        case CheckCompletion =>
+          computeKeyspaceEstimate().foreach { est =>
+            snapSyncController ! SNAPSyncController.ProgressAccountEstimate(est)
+          }
+          if (isComplete) {
+            log.info("Account range sync complete!")
+            log.info(
+              s"[SNAP-PROGRESS] ACCOUNT-RANGE 100% — $accountsDownloaded accounts downloaded — COMPLETE"
+            )
+
+            // Signal controller IMMEDIATELY so storage+bytecode phases can start in parallel
+            // with trie finalization. These phases don't need the finalized account trie —
+            // they operate on their own state roots. This saves 50s-25min of serial blocking.
+            snapSyncController ! SNAPSyncController.AccountRangeSyncComplete
+
+            log.info(s"Starting async trie finalization for $accountsDownloaded accounts...")
+            // Notify controller so progress monitor shows finalization status
+            snapSyncController ! SNAPSyncController.ProgressAccountsFinalizingTrie
+
+            // Run the expensive flush (O(n*log(n)) trie collapse + RocksDB write) on the
+            // dedicated `account-trie-dispatcher` so it can't squeeze the global pool or
+            // sync-dispatcher. Generation token added defensively (mirrors PR #1163).
+            trieFlushGeneration += 1
+            val gen = trieFlushGeneration
+            val selfRef = ctx.self
+            Future {
+              blocking(finalizeTrie())
+            }(accountTrieEc)
+              .onComplete {
+                case Success(result) => selfRef ! TrieFlushComplete(gen, result)
+                // `Status.Failure` is Classic ask protocol with no Typed equivalent — route the
+                // exception through an explicit internal Command instead.
+                case Failure(ex) => selfRef ! TrieFlushFailed(gen, ex.getMessage)
+              }(accountTrieEc)
+            // Switch to finalizing state so no message can touch the trie during flush.
+            finalizing()
+          } else {
+            Behaviors.same
+          }
+
+        case other =>
+          // Defensive catch-all for the non-sealed `Command` trait (Messages.scala package-boundary
+          // constraint — Scala 3 forbids sealing across source files). Surfaces any unexpected message.
+          log.warn(s"[ACCOUNT-COORD] Unhandled command in receive: $other")
+          Behaviors.same
+      }
+    }
+    .receiveSignal { case (_, org.apache.pekko.actor.typed.PostStop) =>
+      // Formerly `postStop`: snapshot progress + close temp files. The recurring stall-check timer
+      // auto-cancels with the behavior.
+      onStop()
+      Behaviors.same
     }
 
-  override def receive: Receive = {
-    case StartAccountRangeSync(root) =>
-      log.info(s"Starting account range sync for state root ${root.take(8).toHex}")
-    // Tasks already initialized in constructor
-
-    case AccountRangeResponseMsg(response) =>
-      activeTasks.get(response.requestId) match {
-        case None =>
-          log.debug(s"Received AccountRange response for unknown or completed request ${response.requestId}")
-
-        case Some((_, worker, _)) =>
-          // Forward to the specific worker that owns this requestId so it can validate/complete the request.
-          worker ! AccountRangeResponseMsg(response)
-      }
-
-    case PivotRefreshed(newStateRoot) =>
-      log.info(s"Pivot refreshed: ${stateRoot.take(4).toHex} -> ${newStateRoot.take(4).toHex}")
-      stateRoot = newStateRoot
-
-      // #1184: drain unconditionally instead of relying on the worker → TaskFailed cascade
-      // that misses silent peers. Drain BEFORE re-applying the root so all drained tasks
-      // land in pendingTasks first, then pendingTasks.foreach re-tags them to the new root.
-      drainActiveTasks(s"pivot refresh to ${newStateRoot.take(4).toHex}")
-      pendingTasks.foreach(_.rootHash = newStateRoot)
-
-      // Clear stateless AND snapless tracking — peers get a fresh slate at the new root.
-      //
-      // Previous policy (PR #1197) intentionally preserved snaplessPeers across pivots:
-      // a peer without a snapshot tree won't grow one within a single sync session, so
-      // clearing was thought to waste a redispatch cycle re-classifying them. That logic
-      // breaks on small peer pools (sepolia's 2-8 SNAP-capable peers): if all peers
-      // accumulate confirmed-snapless across a few pivots, eligible=0 and the account
-      // coordinator stalls indefinitely. Observed sepolia 2026-05-14 (PR #1254
-      // instrumentation): workers-known=3, snapless=2, stateless=2 → eligible=0 → stall.
-      //
-      // Cost of clearing on pivot: peers genuinely without a snap tree get re-tested for
-      // 3 strikes per pivot cycle (≈ 9 dispatched-then-empty responses per peer per pivot).
-      // At sepolia's ~3-min pivot cadence that's ~3 wasted requests / min / lying peer.
-      // Acceptable trade-off vs total stall.
-      //
-      // Strike counter IS cleared: the new root is a fresh opportunity and a peer with 1-2
-      // strikes deserves another shot.
-      statelessPeers.clear()
-      snaplessPeers.clear()
-      emptyResponseStrikes.clear()
-      pivotRefreshRequested = false
-
-      // Clear per-peer adaptive state (new root = new response characteristics)
-      peerResponseBytesTarget.clear()
-      peerCooldownUntilMs.clear()
-      // Note: do NOT reset consecutiveUnproductiveRefreshes here.
-      // Only reset when we receive real account data (proof the new root is servable).
-
-      // #1184: always reset the activity timer — we're starting a fresh phase.
-      lastDispatchOrResponseMs = System.currentTimeMillis()
-
-      // Resume dispatching with the fresh root. tryRedispatchPendingTasks() guards on
-      // pendingTasks.nonEmpty; also fan out explicitly so peers receive work the moment
-      // tasks arrive from in-flight root-mismatch re-queues — matching go-ethereum's
-      // immediate idle-pool restoration after pivot (sync.go revertAccountRequest).
-      tryRedispatchPendingTasks()
-      knownAvailablePeers.filterNot(isPeerStateless).foreach(dispatchIfPossible)
-
-    case PeerAvailable(peer) =>
-      // Evict stale entry for same physical node (reconnection creates new PeerId).
-      // Only clear stateless marking for peers that actually reconnected with a NEW ID.
-      // If the same peer is re-reported (same id), preserve its stateless marking —
-      // otherwise PeerAvailable from SNAPSyncController clears stateless every ~1s,
-      // bypassing the backoff mechanism entirely (Bug 24).
-      val wasAlreadyKnown = knownAvailablePeers.exists(_.id == peer.id)
-      val evicted = knownAvailablePeers.filter(_.remoteAddress == peer.remoteAddress)
-      knownAvailablePeers --= evicted
-      evicted.foreach { p =>
-        if (p.id != peer.id) {
-          statelessPeers -= p.id
-        }
-      }
-      // Genuine reconnect (new PeerId from same address, or first-seen peer) gets a clean
-      // slate. Bug 24 protection preserved: re-announced same-id peers have wasAlreadyKnown=true
-      // and are not cleared, keeping the ~1s SNAPSyncController re-announce from bypassing backoff.
-      if (!wasAlreadyKnown) {
-        statelessPeers -= peer.id
-        // snaplessPeers is NOT cleared here: same PeerId = same physical node = same lack-of-snapshot.
-        // Clearing on reconnect would allow known-snapless ETH-mainnet peers to consume dispatch
-        // slots and hash-failure budget before re-accumulating strikes (#1197).
-        emptyResponseStrikes.remove(peer.id)
-      }
-      knownAvailablePeers += peer
-      if (isPeerStateless(peer)) {
-        log.debug(s"Ignoring PeerAvailable(${peer.id.value}) - peer is stateless for current root")
-      } else if (isPeerSnapless(peer)) {
-        log.debug(s"Ignoring PeerAvailable(${peer.id.value}) - peer is snapless (no snapshot tree)")
-      } else if (isPeerCoolingDown(peer)) {
-        log.debug(s"Ignoring PeerAvailable(${peer.id.value}) - peer is cooling down")
-      } else if (pendingTasks.isEmpty) {
-        log.debug("No pending tasks")
-      } else {
-        // Route through the sorted redispatch path so the fairness ordering
-        // (least-in-flight first) applies to every dispatch trigger, not just
-        // the periodic tryRedispatchPendingTasks calls. Without this, the
-        // SNAPSyncController's per-peer PeerAvailable re-announcements drive
-        // greedy dispatchIfPossible for a single peer, starving idle peers.
-        tryRedispatchPendingTasks()
-      }
-
-    case UpdateMaxInFlightPerPeer(newLimit) =>
-      log.info(s"AccountRange per-peer budget: $maxInFlightPerPeer -> $newLimit")
-      maxInFlightPerPeer = newLimit
-      if (newLimit > 0) tryRedispatchPendingTasks()
-
-    case StorageQueuePressure(paused) =>
-      applyBackpressureChange(source = "storage", paused = paused)
-
-    case ByteCodeQueuePressure(paused) =>
-      applyBackpressureChange(source = "bytecode", paused = paused)
-
-    case PeerUnavailable(peerId) =>
-      // Peer disconnected — remove from available set and re-queue in-flight tasks.
-      // go-ethereum eth/protocols/snap/sync.go:1621 (revertRequests) and Besu
-      // AbstractRetryingPeerTask.java:158 both treat disconnect as transient re-queue, not failure.
-      knownAvailablePeers.find(_.id.value == peerId).foreach(knownAvailablePeers -= _)
-      peerCooldownUntilMs.remove(peerId)
-      // Drop strike counter — a reconnect under the same id should start fresh.
-      knownAvailablePeers.find(_.id.value == peerId).foreach(p => emptyResponseStrikes.remove(p.id))
-      // Note: snaplessPeers entry is preserved per #1197 — if the peer reconnects under a
-      // NEW PeerId, that's handled by PeerAvailable's stale-id-eviction path; same id =
-      // same physical node = same lack-of-snapshot.
-      // #1184: drain the slots ourselves rather than relying on the worker → TaskFailed
-      // cascade. drainActiveTasks sends WorkerRequestCancelled to each affected worker so they
-      // leave `working` state cleanly and don't reject redispatch with TaskFailed(0, "Worker
-      // busy"). Subsumes the legacy WorkerPeerDisconnected flow.
-      val drained = drainActiveTasks(s"peer $peerId unavailable", Some(peerId))
-      if (drained > 0) {
-        lastDispatchOrResponseMs = System.currentTimeMillis()
-        tryRedispatchPendingTasks()
-      }
-
-    // `Terminated.actor` is a Classic ActorRef; the pool holds Typed worker refs, so match on the
-    // underlying classic ref via `.toClassic`.
-    case Terminated(classicWorker) if workers.exists(_.toClassic == classicWorker) =>
-      // Worker actor terminated unexpectedly (e.g., exception in proof verification).
-      // Without this handler the task stays in activeTasks forever — the coordinator never
-      // gets TaskFailed/TaskComplete so it waits for a response that will never arrive.
-      // Restored from may-sprint-backup where context.watch(worker) caught this path.
-      val worker: WorkerRef = workers.find(_.toClassic == classicWorker).get
-      log.warning(
-        s"[ACCOUNT-COORD] Worker ${classicWorker.path.name} terminated — removing from pool and re-queuing task. " +
-          s"Pool: ${workers.size - 1} total, ${idleWorkers.size} idle, ${activeTasks.size} active tasks"
-      )
-      workers -= worker
-      idleWorkers -= worker
-      activeTasks.find { case (_, (_, w, _)) => w == worker }.foreach { case (reqId, (task, _, _)) =>
-        log.warning(
-          s"[ACCOUNT-COORD] Re-queuing task ${task.rangeString} from terminated worker (reqId=$reqId)"
-        )
-        activeTasks -= reqId
-        task.pending = false
-        pendingTasks.enqueue(task)
-        tryRedispatchPendingTasks()
-      }
-
-    case RecoverStalledAccountTasks =>
-      // #1184: controller-side stall watchdog hook. The controller only sends this when it
-      // already thinks we're stuck, so reset the activity timer unconditionally to give us a
-      // fresh window before the next 180 s tick.
-      drainActiveTasks("controller-side stall recovery")
-      lastDispatchOrResponseMs = System.currentTimeMillis()
-      tryRedispatchPendingTasks()
-
-    case CheckDispatchStalled =>
-      val now = System.currentTimeMillis()
-      val stalled = activeTasks.nonEmpty && (now - lastDispatchOrResponseMs) > noActivityTimeoutMs
-      if (stalled) {
-        pendingButIdleTicks = 0
-        val idleSec = (now - lastDispatchOrResponseMs) / 1000
-        log.warning(
-          s"Account dispatch stalled: ${activeTasks.size} active, ${pendingTasks.size} pending, " +
-            s"no activity for ${idleSec}s. Draining stale slots."
-        )
-        drainActiveTasks(s"dispatch stalled (no activity ${idleSec}s)")
-        // Always reset — give dispatch a clean window so the detector doesn't re-fire on the
-        // next 30 s tick. If dispatch can't proceed (no eligible peers) we'll detect that
-        // next time anyway.
-        lastDispatchOrResponseMs = System.currentTimeMillis()
-        tryRedispatchPendingTasks()
-      } else if (pendingTasks.nonEmpty && activeTasks.isEmpty) {
-        // Tasks are pending but nothing is in-flight — no eligible peers to dispatch to.
-        // `lastDispatchOrResponseMs` resets on every drain (peer cycling) so the time-based
-        // check above is blind to this condition. Use a tick counter instead.
-        pendingButIdleTicks += 1
-        val nowMs = System.currentTimeMillis()
-        val soonestCooldownSec = peerCooldownUntilMs.values.minOption
-          .map(t => math.max(0L, (t - nowMs) / 1000))
-          .getOrElse(-1L)
-        log.warning(
-          s"[ACCOUNT-IDLE] tick $pendingButIdleTicks/3: ${pendingTasks.size} tasks pending, " +
-            s"0 active. Pool: ${knownAvailablePeers.size} known, " +
-            s"${statelessPeers.size} stateless, ${snaplessPeers.size} snapless, " +
-            s"${peerCooldownUntilMs.size} cooling" +
-            (if (soonestCooldownSec >= 0) s" (soonest ready in ${soonestCooldownSec}s)" else "") +
-            s". root=${stateRoot.take(4).toHex}"
-        )
-        if (pendingButIdleTicks >= 3) {
-          // 3 × 30 s = 90 s of consecutive ticks with pending tasks and zero dispatches.
-          log.warning(
-            s"[ACCOUNT-STALL] ${pendingTasks.size} tasks pending, no active dispatches for " +
-              s"$pendingButIdleTicks watchdog ticks " +
-              s"(${dispatchStallCheckInterval.toSeconds * pendingButIdleTicks}s). " +
-              s"Attempting floor recovery then pivot refresh if needed."
-          )
-          pendingButIdleTicks = 0
-          tryRedispatchPendingTasks()
-          // If floor revival also couldn't dispatch anything, escalate.
-          if (activeTasks.isEmpty && !pivotRefreshRequested) {
-            pivotRefreshRequested = true
-            lastPivotRefreshTimeMs = System.currentTimeMillis()
-            consecutiveUnproductiveRefreshes += 1
-            log.warning(
-              s"[ACCOUNT-STALL] Floor revival exhausted — ${knownAvailablePeers.size} known peers, " +
-                s"${statelessPeers.size} stateless, ${peerCooldownUntilMs.size} cooling. " +
-                s"Requesting pivot refresh (attempt=$consecutiveUnproductiveRefreshes)."
-            )
-            snapSyncController ! PivotStateUnservable(
-              rootHash = stateRoot,
-              reason = s"tasks pending but no eligible peers after ${consecutiveUnproductiveRefreshes} stall cycles",
-              consecutiveEmptyResponses = knownAvailablePeers.size
-            )
-          }
-        }
-      } else {
-        pendingButIdleTicks = 0
-      }
-
-    case TaskComplete(requestId, result) =>
-      handleTaskComplete(requestId, result)
-
-    case TaskFailed(requestId, reason) =>
-      handleTaskFailed(requestId, reason)
-
-    case GetProgress =>
-      val progress = calculateProgress()
-      sender() ! progress
-
-    case GetContractAccounts =>
-      sender() ! ContractAccountsResponse(
-        readContractFile(contractAccountsFile, contractAccountsOut, contractAccountsCount)
-      )
-
-    case GetContractStorageAccounts =>
-      sender() ! ContractStorageAccountsResponse(
-        readContractFile(contractStorageFile, contractStorageOut, contractStorageCount)
-      )
-
-    case GetUniqueCodeHashes =>
-      sender() ! UniqueCodeHashesResponse(readUniqueCodeHashes())
-
-    case GetStorageFileInfo =>
-      contractStorageOut.flush()
-      sender() ! StorageFileInfoResponse(contractStorageFile, contractStorageCount)
-
-    case GetCodeHashesFileInfo =>
-      uniqueCodeHashesOut.flush()
-      sender() ! CodeHashesFileInfoResponse(uniqueCodeHashesFile, uniqueCodeHashesCount)
-
-    case StoreAccountChunk(task, remaining, totalCount, storedSoFar, isTaskRangeComplete) =>
-      handleStoreAccountChunk(task, remaining, totalCount, storedSoFar, isTaskRangeComplete)
-
-    case CheckCompletion =>
-      computeKeyspaceEstimate().foreach { est =>
-        snapSyncController ! SNAPSyncController.ProgressAccountEstimate(est)
-      }
-      if (isComplete) {
-        log.info("Account range sync complete!")
-        log.info(
-          s"[SNAP-PROGRESS] ACCOUNT-RANGE 100% — $accountsDownloaded accounts downloaded — COMPLETE"
-        )
-
-        // Signal controller IMMEDIATELY so storage+bytecode phases can start in parallel
-        // with trie finalization. These phases don't need the finalized account trie —
-        // they operate on their own state roots. This saves 50s-25min of serial blocking.
-        snapSyncController ! SNAPSyncController.AccountRangeSyncComplete
-
-        log.info(s"Starting async trie finalization for $accountsDownloaded accounts...")
-        // Notify controller so progress monitor shows finalization status
-        snapSyncController ! SNAPSyncController.ProgressAccountsFinalizingTrie
-        // Switch to finalizing state so no message can touch the trie during flush
-        context.become(finalizing)
-
-        // Run the expensive flush (O(n*log(n)) trie collapse + RocksDB write) on the
-        // dedicated `account-trie-dispatcher` so it can't squeeze the global pool or
-        // sync-dispatcher. Generation token added defensively (mirrors PR #1163).
-        trieFlushGeneration += 1
-        val gen = trieFlushGeneration
-        val selfRef = self
-        Future {
-          blocking(finalizeTrie())
-        }(accountTrieEc)
-          .onComplete {
-            case Success(result) => selfRef ! TrieFlushComplete(gen, result)
-            case Failure(ex)     => selfRef ! Status.Failure(ex)
-          }(context.dispatcher)
-      }
-  }
-
-  /** Receive state during async trie finalization. The StackTrie finalize is running on `account-trie-dispatcher`.
-    * Package-private so tests can `become(finalizing)` directly without driving the heavy finalisation work.
+  /** Behavior during async trie finalization. The StackTrie finalize is running on `account-trie-dispatcher`.
+    * Package-private so tests can drive the finalisation phase directly.
     */
-  private[actors] def finalizing: Receive = {
-    // Stale-generation drop. A completion arriving for a generation that's been bumped
-    // since spawn (e.g., the actor restarted finalisation) is silently ignored — data
-    // is on disk either way, and the in-flight Future can't be cancelled.
-    case TrieFlushComplete(gen, _) if gen != trieFlushGeneration =>
-      log.debug(s"Dropping stale TrieFlushComplete (gen=$gen, current=$trieFlushGeneration)")
+  private[actors] def finalizing(): Behavior[Command] = Behaviors
+    .receiveMessage[Command] {
+      // Stale-generation drop. A completion arriving for a generation that's been bumped
+      // since spawn (e.g., the actor restarted finalisation) is silently ignored — data
+      // is on disk either way, and the in-flight Future can't be cancelled.
+      case TrieFlushComplete(gen, _) if gen != trieFlushGeneration =>
+        log.debug(s"Dropping stale TrieFlushComplete (gen=$gen, current=$trieFlushGeneration)")
+        Behaviors.same
 
-    case TrieFlushComplete(_, Right(finalizedRoot)) =>
-      log.info(
-        "State trie finalized successfully with root {}",
-        finalizedRoot.take(8).toArray.map("%02x".format(_)).mkString
-      )
-      snapSyncController ! SNAPSyncController.AccountTrieFinalized(finalizedRoot)
-      snapSyncController ! SNAPSyncController.ProgressAccountsTrieFinalized
-      context.stop(self)
+      case TrieFlushComplete(_, Right(finalizedRoot)) =>
+        log.info(
+          "State trie finalized successfully with root {}",
+          finalizedRoot.take(8).toArray.map("%02x".format(_)).mkString
+        )
+        snapSyncController ! SNAPSyncController.AccountTrieFinalized(finalizedRoot)
+        snapSyncController ! SNAPSyncController.ProgressAccountsTrieFinalized
+        Behaviors.stopped
 
-    case TrieFlushComplete(_, Left(error)) =>
-      log.error(s"Failed to finalize trie: $error")
-      snapSyncController ! SNAPSyncController.AccountTrieFinalizationFailed(error)
-      context.stop(self)
+      case TrieFlushComplete(_, Left(error)) =>
+        log.error(s"Failed to finalize trie: $error")
+        snapSyncController ! SNAPSyncController.AccountTrieFinalizationFailed(error)
+        Behaviors.stopped
 
-    case Status.Failure(ex) =>
-      log.error(ex, s"Trie finalization failed with exception: ${ex.getMessage}")
-      snapSyncController ! SNAPSyncController.AccountTrieFinalizationFailed(ex.getMessage)
-      context.stop(self)
+      // Stale-generation drop for the failure path too — a failure for a superseded generation
+      // is ignored, mirroring the TrieFlushComplete stale-drop above.
+      case TrieFlushFailed(gen, _) if gen != trieFlushGeneration =>
+        log.debug(s"Dropping stale TrieFlushFailed (gen=$gen, current=$trieFlushGeneration)")
+        Behaviors.same
 
-    case _: PeerAvailable =>
-    // Ignore — no more tasks to dispatch during finalization
+      case TrieFlushFailed(_, error) =>
+        log.error(s"Trie finalization failed with exception: $error")
+        snapSyncController ! SNAPSyncController.AccountTrieFinalizationFailed(error)
+        Behaviors.stopped
 
-    case _: PivotRefreshed =>
-      log.info("Ignoring PivotRefreshed during trie finalization")
+      case _: PeerAvailable =>
+        // Ignore — no more tasks to dispatch during finalization
+        Behaviors.same
 
-    case GetProgress =>
-      sender() ! calculateProgress()
+      case _: PivotRefreshed =>
+        log.info("Ignoring PivotRefreshed during trie finalization")
+        Behaviors.same
 
-    case GetContractAccounts =>
-      sender() ! ContractAccountsResponse(
-        readContractFile(contractAccountsFile, contractAccountsOut, contractAccountsCount)
-      )
+      case AccountGetProgress(replyTo) =>
+        replyTo ! calculateProgress()
+        Behaviors.same
 
-    case GetContractStorageAccounts =>
-      sender() ! ContractStorageAccountsResponse(
-        readContractFile(contractStorageFile, contractStorageOut, contractStorageCount)
-      )
+      case AccountGetContractAccounts(replyTo) =>
+        replyTo ! ContractAccountsResponse(
+          readContractFile(contractAccountsFile, contractAccountsOut, contractAccountsCount)
+        )
+        Behaviors.same
 
-    case GetUniqueCodeHashes =>
-      sender() ! UniqueCodeHashesResponse(readUniqueCodeHashes())
+      case AccountGetContractStorageAccounts(replyTo) =>
+        replyTo ! ContractStorageAccountsResponse(
+          readContractFile(contractStorageFile, contractStorageOut, contractStorageCount)
+        )
+        Behaviors.same
 
-    case GetStorageFileInfo =>
-      contractStorageOut.flush()
-      sender() ! StorageFileInfoResponse(contractStorageFile, contractStorageCount)
+      case AccountGetUniqueCodeHashes(replyTo) =>
+        replyTo ! UniqueCodeHashesResponse(readUniqueCodeHashes())
+        Behaviors.same
 
-    case GetCodeHashesFileInfo =>
-      uniqueCodeHashesOut.flush()
-      sender() ! CodeHashesFileInfoResponse(uniqueCodeHashesFile, uniqueCodeHashesCount)
+      case AccountGetStorageFileInfo(replyTo) =>
+        contractStorageOut.flush()
+        replyTo ! StorageFileInfoResponse(contractStorageFile, contractStorageCount)
+        Behaviors.same
 
-    case CheckCompletion =>
-    // Already finalizing, ignore
-  }
+      case AccountGetCodeHashesFileInfo(replyTo) =>
+        uniqueCodeHashesOut.flush()
+        replyTo ! CodeHashesFileInfoResponse(uniqueCodeHashesFile, uniqueCodeHashesCount)
+        Behaviors.same
+
+      case CheckCompletion =>
+        // Already finalizing, ignore
+        Behaviors.same
+
+      case _ =>
+        // Ignore all other commands during finalisation (no tasks to dispatch). Also covers the
+        // non-sealed Command trait exhaustiveness gap.
+        Behaviors.same
+    }
+    .receiveSignal { case (_, org.apache.pekko.actor.typed.PostStop) =>
+      // The coordinator stops from this behavior after trie finalisation (`Behaviors.stopped`).
+      // Run the same teardown as the primary behavior's PostStop.
+      onStop()
+      Behaviors.same
+    }
 
   // Cap total workers to activePeerCount * maxInFlightPerPeer — enough to saturate all peers.
   // Dynamic: use current SNAP peer count instead of the creation-time concurrency value, so
@@ -986,15 +1055,18 @@ class AccountRangeCoordinator(
     math.max(concurrency, knownAvailablePeers.count(!isPeerStateless(_))) * maxInFlightPerPeer
 
   private def createWorker(): WorkerRef = {
-    val worker: WorkerRef = context.spawnAnonymous(
+    val worker: WorkerRef = ctx.spawnAnonymous(
       AccountRangeWorker(
-        coordinator = self,
+        // AccountRangeWorker.coordinator is a Classic ActorRef; the worker replies via the Classic
+        // adapter. Pass our own Typed self adapted back to Classic.
+        coordinator = ctx.self.toClassic,
         networkPeerManager = networkPeerManager,
         requestTracker = requestTracker
       ),
       org.apache.pekko.actor.typed.Props.empty.withDispatcherFromConfig("sync-dispatcher")
     )
-    context.watch(worker.toClassic)
+    // Typed death watch — delivers WorkerTerminated(worker) to our mailbox if the worker stops.
+    ctx.watchWith(worker, WorkerTerminated(worker))
     workers += worker
     idleWorkers += worker
     log.debug(s"Created worker ${worker.path.name}, total workers: ${workers.size}")
@@ -1093,7 +1165,7 @@ class AccountRangeCoordinator(
         // Task was drained (PeerUnavailable, pivot refresh) before the worker's response arrived.
         // The response is discarded and the task is already in pendingTasks via drainActiveTasks.
         // Log at WARNING so Run-N monitoring can distinguish this from a worker crash.
-        log.warning(
+        log.warn(
           s"[ACCOUNT-COORD] TaskComplete for unknown reqId=$requestId — task was already drained. Ignored."
         )
       case Some((task, worker, peer)) =>
@@ -1155,11 +1227,17 @@ class AccountRangeCoordinator(
 
               // Start chunked async storage - this yields back to the actor mailbox between chunks
               // so the coordinator can still process PeerAvailable, AccountRangeResponseMsg, etc.
-              self ! StoreAccountChunk(task, accounts, accountCount, storedSoFar = 0, isTaskRangeComplete = isTaskDone)
+              ctx.self ! StoreAccountChunk(
+                task,
+                accounts,
+                accountCount,
+                storedSoFar = 0,
+                isTaskRangeComplete = isTaskDone
+              )
             }
 
           case Left(error) =>
-            log.warning(s"Task completed with error: $error")
+            log.warn(s"Task completed with error: $error")
             // Re-queue task for retry
             task.pending = false
             requeueOrEscalate(task, s"task completed with error: $error")
@@ -1242,13 +1320,13 @@ class AccountRangeCoordinator(
         s"(proofNodes=$proofNodes, ${completedTasks.size}/$concurrency ranges done, $accountsDownloaded accounts total)"
     )
     sendProgressSnapshot()
-    self ! CheckCompletion
+    ctx.self ! CheckCompletion
   }
 
   private def handleTaskFailed(requestId: BigInt, reason: String): Unit =
     activeTasks.remove(requestId) match {
       case None =>
-        log.warning(
+        log.warn(
           s"[ACCOUNT-COORD] TaskFailed for unknown reqId=$requestId (reason: $reason) — task already drained. Ignored."
         )
       case Some((task, worker, peer)) =>
@@ -1266,7 +1344,7 @@ class AccountRangeCoordinator(
               s"(task root ${task.rootHash.take(4).toHex} != current ${stateRoot.take(4).toHex})"
           )
         }
-        log.warning(s"Task failed: $reason")
+        log.warn(s"Task failed: $reason")
         task.pending = false
         task.rootHash = stateRoot
 
@@ -1445,7 +1523,7 @@ class AccountRangeCoordinator(
       if (rest.nonEmpty) {
         log.debug(s"Stored chunk: $newStored/$totalCount accounts (${rest.size} remaining)")
         // Yield to actor mailbox - other messages (PeerAvailable, responses) process before next chunk
-        self ! StoreAccountChunk(task, rest, totalCount, newStored, isTaskRangeComplete)
+        ctx.self ! StoreAccountChunk(task, rest, totalCount, newStored, isTaskRangeComplete)
       } else {
         // Mark task done / re-enqueue BEFORE potentially spawning async flush — so the
         // task tracking is up to date by the time we re-enter `receive` after flushing.
@@ -1481,11 +1559,11 @@ class AccountRangeCoordinator(
         // Each task's SnapHashTrie batches its emissions and flushes to RocksDB at the 8 MiB
         // threshold (or on task-complete commit). No global flush required.
         log.debug(s"Stored all $totalCount accounts via StackTrie ($accountsDownloaded total)")
-        self ! CheckCompletion
+        ctx.self ! CheckCompletion
       }
     } catch {
       case e: Exception =>
-        log.error(e, s"Failed to store account chunk: ${e.getMessage}")
+        log.error(s"Failed to store account chunk: ${e.getMessage}", e)
         // Re-queue task for retry
         task.pending = false
         task.done = false
@@ -1586,14 +1664,16 @@ class AccountRangeCoordinator(
     *   Either error message or success
     */
   private def finalizeTrie(): Either[String, ByteString] =
+    // Runs inside a Future on `account-trie-dispatcher` — uses `futureLog` (plain SLF4J), NOT
+    // the thread-confined `ctx.log`.
     try {
-      log.info("Finalizing state trie...")
+      futureLog.info("Finalizing state trie...")
       // StackTrie path: each task's SnapHashTrie was committed on task-complete in
       // `handleStoreAccountChunk`, flushing its right boundary + remaining batch to
       // RocksDB. Defensively commit any stragglers (should be empty unless a task
       // finished after its `isTaskRangeComplete` branch was missed).
       if (taskStackTries.nonEmpty) {
-        log.warning(s"Finalising ${taskStackTries.size} uncommitted task StackTries (unexpected)")
+        futureLog.warn(s"Finalising ${taskStackTries.size} uncommitted task StackTries (unexpected)")
         taskStackTries.values.foreach { trie =>
           val _ = trie.commit()
         }
@@ -1602,14 +1682,14 @@ class AccountRangeCoordinator(
       // Use the pivot's claimed root as the "finalized root". With per-task fragments
       // there is no single computed root; healing reconciles the on-disk trie against
       // `stateRoot` regardless.
-      log.info(
+      futureLog.info(
         s"State trie finalization complete (StackTrie path, 16 fragments). " +
           s"Reported root: ${stateRoot.take(8).toArray.map("%02x".format(_)).mkString}..."
       )
       Right(stateRoot)
     } catch {
       case e: Exception =>
-        log.error(e, s"Failed to finalize trie: ${e.getMessage}")
+        futureLog.error(s"Failed to finalize trie: ${e.getMessage}", e)
         Left(s"Trie finalization error: ${e.getMessage}")
     }
 
@@ -1721,6 +1801,13 @@ class AccountRangeCoordinator(
 
 object AccountRangeCoordinator {
 
+  /** Coordinator command protocol (Group S3). Non-sealed: `AccountRangeCoordinatorMessage` and
+    * `AccountRangeResponseMsg` extend this from `Messages.scala`, which spans the SNAP actors package boundary — Scala
+    * 3 forbids sealing a trait across source files. The defensive catch-all in `receive`/`finalizing` covers the lost
+    * compile-time exhaustiveness. Same constraint as `ByteCodeCoordinator.Command` / `StorageRangeCoordinator.Command`.
+    */
+  trait Command
+
   /** Hard cap on consecutive re-queues for a single account task before the coordinator escalates to the controller via
     * `PivotStateUnservable`. On ETC mainnet with 1-5 SNAP peers, serve-window gaps can last 5-10 minutes. At 5s
     * cooldown (empty-without-proof) 20 requeues covers ~100s; at 30s timeout, ~10 minutes. Previously 8 — too tight for
@@ -1731,9 +1818,20 @@ object AccountRangeCoordinator {
   /** Async trie-finalisation result. `generation` matches `trieFlushGeneration` at spawn time so stale completions
     * (after a state transition / restart) can be dropped without applying against the wrong assumption.
     */
-  private[actors] case class TrieFlushComplete(generation: Long, result: Either[String, ByteString])
+  private[actors] case class TrieFlushComplete(generation: Long, result: Either[String, ByteString]) extends Command
 
-  def props(
+  /** Internal command: async trie finalisation failed. Replaces the Classic `Status.Failure` self-send (which has no
+    * Typed equivalent). Carries the finalisation `generation` for stale-drop, mirroring `TrieFlushComplete`.
+    */
+  private[actors] case class TrieFlushFailed(generation: Long, error: String) extends Command
+
+  /** Internal command: a Typed `AccountRangeWorker` child stopped (via `ctx.watchWith`). Replaces the Classic
+    * `Terminated` signal. The coordinator removes the dead worker from the pool and re-queues its in-flight task.
+    */
+  private[actors] case class WorkerTerminated(worker: org.apache.pekko.actor.typed.ActorRef[AccountRangeWorker.Command])
+      extends Command
+
+  def apply(
       stateRoot: ByteString,
       networkPeerManager: ActorRef,
       requestTracker: SNAPRequestTracker,
@@ -1747,24 +1845,30 @@ object AccountRangeCoordinator {
       accountTrieEcOverride: Option[ExecutionContext] = None,
       storageScheme: StorageScheme = StorageScheme.Hash,
       pathNodeStorage: Option[PathNodeStorage] = None
-  ): Props =
-    Props(
-      new AccountRangeCoordinator(
-        initialStateRoot = stateRoot,
-        networkPeerManager,
-        requestTracker,
-        mptStorage,
-        concurrency,
-        snapSyncController,
-        resumeProgress,
-        initialMaxInFlightPerPeer,
-        initialResponseBytes,
-        minResponseBytes,
-        accountTrieEcOverride,
-        storageScheme = storageScheme,
-        pathNodeStorage = pathNodeStorage
-      )
-    )
+  ): Behavior[Command] =
+    Behaviors.withTimers { timers =>
+      Behaviors.setup { ctx =>
+        val impl = new AccountRangeCoordinatorImpl(
+          ctx = ctx,
+          timers = timers,
+          initialStateRoot = stateRoot,
+          networkPeerManager = networkPeerManager,
+          requestTracker = requestTracker,
+          mptStorage = mptStorage,
+          concurrency = concurrency,
+          snapSyncController = snapSyncController,
+          resumeProgress = resumeProgress,
+          initialMaxInFlightPerPeer = initialMaxInFlightPerPeer,
+          initialResponseBytesConfig = initialResponseBytes,
+          minResponseBytesConfig = minResponseBytes,
+          accountTrieEcOverride = accountTrieEcOverride,
+          storageScheme = storageScheme,
+          pathNodeStorage = pathNodeStorage
+        )
+        impl.onStart()
+        impl.receive()
+      }
+    }
 }
 
 case class AccountRangeStats(

@@ -1042,19 +1042,27 @@ class SNAPSyncController(
         // Persist temp file paths for crash recovery (non-blocking ask — if this fails,
         // recovery will do a full restart which is acceptable since account trie data survives)
         accountRangeCoordinator.foreach { coordinator =>
-          import org.apache.pekko.pattern.ask
+          // S3: AccountRangeCoordinator is Typed. The file-info queries now carry a typed replyTo, so use the
+          // Typed AskPattern (view the Classic ref as typed) instead of the Classic `?`.
+          import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
+          import org.apache.pekko.actor.typed.scaladsl.adapter.*
           import org.apache.pekko.util.Timeout
           implicit val timeout: Timeout = Timeout(5.seconds)
-          (coordinator ? actors.Messages.GetStorageFileInfo)
-            .mapTo[actors.Messages.StorageFileInfoResponse]
+          implicit val typedScheduler: org.apache.pekko.actor.typed.Scheduler =
+            context.system.toTyped.scheduler
+          val typedCoordinator = coordinator.toTyped[actors.AccountRangeCoordinator.Command]
+          typedCoordinator
+            .ask[actors.Messages.StorageFileInfoResponse](replyTo => actors.Messages.AccountGetStorageFileInfo(replyTo))
             .foreach { info =>
               if (info.filePath != null) {
                 appStateStorage.putSnapSyncStorageFilePath(info.filePath.toString).commit()
                 log.info(s"Persisted storage file path for recovery: ${info.filePath} (${info.count} entries)")
               }
             }
-          (coordinator ? actors.Messages.GetCodeHashesFileInfo)
-            .mapTo[actors.Messages.CodeHashesFileInfoResponse]
+          typedCoordinator
+            .ask[actors.Messages.CodeHashesFileInfoResponse](replyTo =>
+              actors.Messages.AccountGetCodeHashesFileInfo(replyTo)
+            )
             .foreach { info =>
               if (info.filePath != null) {
                 appStateStorage.putSnapSyncCodeHashesPath(info.filePath.toString).commit()
@@ -3027,21 +3035,25 @@ class SNAPSyncController(
 
     accountRangeCoordinator = Some(
       context.actorOf(
-        actors.AccountRangeCoordinator
-          .props(
-            stateRoot = rootHash,
-            networkPeerManager = networkPeerManager,
-            requestTracker = requestTracker,
-            mptStorage = storage,
-            concurrency = effectiveConcurrency,
-            snapSyncController = self,
-            resumeProgress = resumeProgress,
-            initialMaxInFlightPerPeer =
-              5, // Full per-peer budget during AccountRangeSync (storage+bytecode deferred to 0)
-            initialResponseBytes = snapSyncConfig.accountInitialResponseBytes,
-            minResponseBytes = snapSyncConfig.accountMinResponseBytes,
-            storageScheme = snapSyncConfig.storageScheme,
-            pathNodeStorage = pathNodeStorageOpt
+        // S3: AccountRangeCoordinator is now Typed. SSC is still Classic, so spawn via PropsAdapter
+        // and keep the ref as a Classic ActorRef; Classic `!` routes Command-typed messages.
+        org.apache.pekko.actor.typed.scaladsl.adapter
+          .PropsAdapter(
+            actors.AccountRangeCoordinator(
+              stateRoot = rootHash,
+              networkPeerManager = networkPeerManager,
+              requestTracker = requestTracker,
+              mptStorage = storage,
+              concurrency = effectiveConcurrency,
+              snapSyncController = self,
+              resumeProgress = resumeProgress,
+              initialMaxInFlightPerPeer =
+                5, // Full per-peer budget during AccountRangeSync (storage+bytecode deferred to 0)
+              initialResponseBytes = snapSyncConfig.accountInitialResponseBytes,
+              minResponseBytes = snapSyncConfig.accountMinResponseBytes,
+              storageScheme = snapSyncConfig.storageScheme,
+              pathNodeStorage = pathNodeStorageOpt
+            )
           )
           .withDispatcher("sync-dispatcher"),
         s"account-range-coordinator-$coordinatorGeneration"
@@ -3328,8 +3340,16 @@ class SNAPSyncController(
       currentPhase match {
         case AccountRangeSync =>
           accountRangeCoordinator.foreach { coordinator =>
-            (coordinator ? actors.Messages.GetProgress)
-              .mapTo[actors.AccountRangeStats]
+            // S3: AccountRangeCoordinator is Typed. AccountGetProgress now carries a typed replyTo, so use the
+            // Typed AskPattern (view the Classic ref as typed) instead of the Classic `?`. Scheduler/timeout
+            // come from the Classic system via `.toTyped`.
+            import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
+            import org.apache.pekko.actor.typed.scaladsl.adapter.*
+            implicit val typedScheduler: org.apache.pekko.actor.typed.Scheduler =
+              context.system.toTyped.scheduler
+            coordinator
+              .toTyped[actors.AccountRangeCoordinator.Command]
+              .ask[actors.AccountRangeStats](replyTo => actors.Messages.AccountGetProgress(replyTo))
               .map(AccountCoordinatorProgress.apply)
               .recover { case _ =>
                 AccountCoordinatorProgress(
