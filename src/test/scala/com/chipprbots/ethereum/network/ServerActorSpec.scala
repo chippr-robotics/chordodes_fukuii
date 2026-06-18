@@ -80,8 +80,12 @@ class ServerActorSpec
     val localAddr = new InetSocketAddress("0.0.0.0", 30304)
     val detectedIp = InetAddress.getByName("5.6.7.8")
     actor ! ServerActor.StartServer(localAddr, None)
-    val bindHandler = tcpProbe.expectMsgType[Tcp.Bind].handler
-    bindHandler ! Tcp.Bound(localAddr)
+    // Confirm StartServer was processed, then inject TcpBound directly to preserve
+    // same-sender ordering with the DetectedIP message that follows immediately.
+    // (Using bindHandler would route through TcpEventBridge — a different sender —
+    // breaking FIFO ordering guarantees with the subsequent DetectedIP send.)
+    tcpProbe.expectMsgType[Tcp.Bind]
+    actor ! ServerActor.TcpBound(localAddr)
 
     // Simulate the Future result returning from the async IP detection
     actor ! ServerActor.DetectedIP(Some(detectedIp))
@@ -106,8 +110,9 @@ class ServerActorSpec
 
     val localAddr = new InetSocketAddress("0.0.0.0", 30305)
     actor ! ServerActor.StartServer(localAddr, None)
-    val bindHandler = tcpProbe.expectMsgType[Tcp.Bind].handler
-    bindHandler ! Tcp.Bound(localAddr)
+    // Inject TcpBound directly (same-sender ordering guarantee — see test 2 comment).
+    tcpProbe.expectMsgType[Tcp.Bind]
+    actor ! ServerActor.TcpBound(localAddr)
     actor ! ServerActor.DetectedIP(None)
 
     awaitCond(

@@ -155,7 +155,7 @@ class JsonRpcControllerFixture(implicit system: ActorSystem, mockFactory: org.sc
   val pendingTransactionsManager: TestProbe = TestProbe()
   val ommersPool: TestProbe = TestProbe()
   val filterManager: org.apache.pekko.actor.typed.ActorRef[FilterManager.Command] =
-    system.spawn(Behaviors.ignore[FilterManager.Command], "filter-manager-stub")
+    system.spawnAnonymous(Behaviors.ignore[FilterManager.Command])
 
   val ethashConfig = MiningConfigs.ethashConfig
   override lazy val miningConfig = MiningConfigs.miningConfig

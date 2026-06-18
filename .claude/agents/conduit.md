@@ -7,9 +7,7 @@ description: >-
   issues, WebSocket subscription lifecycle, IPC transport bugs, GraphQL endpoint
   errors, request serialization/deserialization (JSON4S/circe), rate limiting,
   or controller logic in `jsonrpc/` (79 files). Does NOT touch consensus logic
-  (use forge or beacon) or P2P wire protocol (use herald). Note: 69 pre-existing
-  test failures from W2-P2b LOOM migration live in JsonRpcControllerSpec — treat
-  as known baseline, not regressions from your changes.
+  (use forge or beacon) or P2P wire protocol (use herald).
 tools: Read, Grep, Glob, Edit, Bash
 model: sonnet
 color: green
@@ -35,27 +33,19 @@ ls src/main/scala/com/chipprbots/ethereum/jsonrpc/
 The codebase is under active Pekko migration. Paths may have moved after actor
 migrations in W2-P2b (SubscriptionManager, FilterManager migrated to Typed).
 
-## Known baseline: 69 pre-existing test failures
+## Test baseline (clean as of scala3-cleanup-june)
 
-As of S5 migration commit `5d29511d4`, these failures exist and are NOT
-regressions from your work:
+All 76 tests across the 6 suites below are **passing** as of the
+`scala3-cleanup-june` branch. Root causes of the former 69 failures (now fixed):
 
-| Spec | Status |
-|------|--------|
-| JsonRpcControllerSpec | 69 failures (total across all specs below) |
-| JsonRpcControllerEthSpec | included above |
-| JsonRpcControllerPersonalSpec | included above |
-| JsonRpcControllerEthLegacyTransactionSpec | included above |
-| GraphQLHttpRouteSpec | included above |
-| ServerActorSpec | included above |
+| Root cause | Fix |
+|---|---|
+| `filter-manager-stub` hardcoded actor name collision across test fixtures | `system.spawnAnonymous(...)` in `JsonRpcControllerFixture`, `GraphQLHttpRouteSpec`, `GraphQLServiceSpec` |
+| `ServerActorSpec` test 3: `DetectedIP(None)` arrived before `TcpBound` (different-sender ordering break) | Inject `ServerActor.TcpBound` directly from test thread; skip the Classic TcpEventBridge hop |
 
-These trace to the W2-P2b LOOM session (ServerActor + SubscriptionManager
-migration). When you are tasked with fixing them, address them as a standalone
-session; do not mix with other feature work.
-
-Verify current test status before starting any work:
+Verify test status before starting any work:
 ```bash
-sbt "testOnly *JsonRpcController* *GraphQL* *ServerActor*" 2>&1 | tail -20
+fukuii-test only "*JsonRpcController* *GraphQL* *ServerActor*"
 ```
 
 ## Package structure
@@ -114,8 +104,8 @@ W2-P2b. Their public API (ask patterns from controllers) did not change, but
 the internal actor type is now `Behaviors.receive`. Do NOT add `extends Actor`
 or `sender()` to these files — they are migrated.
 
-`ServerActor` was also migrated in W2-P2b (this is the source of the 69 test
-failures — the test fixtures expect Classic behavior).
+`ServerActor` was also migrated in W2-P2b. The test failures this caused are
+now fixed (see Test baseline section above).
 
 ## Verification
 
