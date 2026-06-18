@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.blockchain.sync
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.actor.Props
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
@@ -76,16 +76,17 @@ class StorageRecoveryActorSpec
     * probes. Returns the actor plus the storages so the test can assert the done-flag.
     */
   private def downloadingActor(
+      testLabel: String,
       syncController: TestProbe,
       coordinator: TestProbe,
       abandonAfter: FiniteDuration,
       maxRolls: Int = 8
   ): (ActorRef, AppStateStorage) = {
-    val networkPeerManager = TestProbe("npm")
+    val networkPeerManager = TestProbe(s"npm_$testLabel")
     val (stateStorage, appStateStorage, flatSlots) = newStorages()
-    val actor = system.actorOf(
-      Props(
-        new StorageRecoveryActor(
+    val actor = system
+      .spawn(
+        StorageRecoveryActor.testApply(
           stateRoot = fakeStateRoot,
           stateStorage = stateStorage,
           appStateStorage = appStateStorage,
@@ -94,11 +95,12 @@ class StorageRecoveryActorSpec
           syncController = syncController.ref,
           pivotBlockNumber = BigInt(100),
           snapSyncConfig = newConfig(abandonAfter, maxRolls),
-          preloadedMissingForTesting = Some(missingOne),
+          preloaded = Some(missingOne),
           coordinatorForTesting = Some(coordinator.ref)
-        )
+        ),
+        s"storage-recovery-spec-$testLabel"
       )
-    )
+      .toClassic
     // The actor enters `downloading` and immediately hands the missing list to the coordinator.
     coordinator.expectMsgType[actors.Messages.AddStorageTasks](2.seconds)
     (actor, appStateStorage)
@@ -111,7 +113,8 @@ class StorageRecoveryActorSpec
     ) in {
       val syncController = TestProbe("syncController_abandon")
       val coordinator = TestProbe("coordinator_abandon")
-      val (actor, appStateStorage) = downloadingActor(syncController, coordinator, abandonAfter = 600.millis)
+      val (actor, appStateStorage) =
+        downloadingActor("abandon", syncController, coordinator, abandonAfter = 600.millis)
 
       (1 to 5).foreach(_ => actor ! pivotUnservable())
       // The actor tries to roll off the aged pivot first; decline (no recent root) → abandon path.
@@ -130,7 +133,7 @@ class StorageRecoveryActorSpec
     val syncController = TestProbe("syncController_roll")
     val coordinator = TestProbe("coordinator_roll")
     // Long abandon window so the test asserts the roll (not a race with abandon).
-    val (actor, appStateStorage) = downloadingActor(syncController, coordinator, abandonAfter = 5.seconds)
+    val (actor, appStateStorage) = downloadingActor("roll", syncController, coordinator, abandonAfter = 5.seconds)
 
     actor ! pivotUnservable()
     syncController.expectMsg(2.seconds, StorageRecoveryActor.RequestRecentRoot)
@@ -152,7 +155,8 @@ class StorageRecoveryActorSpec
   ) in {
     val syncController = TestProbe("syncController_sameroot")
     val coordinator = TestProbe("coordinator_sameroot")
-    val (actor, appStateStorage) = downloadingActor(syncController, coordinator, abandonAfter = 600.millis)
+    val (actor, appStateStorage) =
+      downloadingActor("sameroot", syncController, coordinator, abandonAfter = 600.millis)
 
     actor ! pivotUnservable()
     syncController.expectMsg(2.seconds, StorageRecoveryActor.RequestRecentRoot)
@@ -172,7 +176,7 @@ class StorageRecoveryActorSpec
   ) in {
     val syncController = TestProbe("syncController_bound")
     val coordinator = TestProbe("coordinator_bound")
-    val (actor, _) = downloadingActor(syncController, coordinator, abandonAfter = 700.millis, maxRolls = 1)
+    val (actor, _) = downloadingActor("bound", syncController, coordinator, abandonAfter = 700.millis, maxRolls = 1)
 
     actor ! pivotUnservable()
     syncController.expectMsg(2.seconds, StorageRecoveryActor.RequestRecentRoot) // roll 1 requested
@@ -192,7 +196,8 @@ class StorageRecoveryActorSpec
     val syncController = TestProbe("syncController_noAbandon")
     val coordinator = TestProbe("coordinator_noAbandon")
     val abandonAfter = 500.millis
-    val (actor, appStateStorage) = downloadingActor(syncController, coordinator, abandonAfter)
+    val (actor, appStateStorage) =
+      downloadingActor("noAbandon", syncController, coordinator, abandonAfter)
 
     actor ! pivotUnservable()
     syncController.expectMsg(2.seconds, StorageRecoveryActor.RequestRecentRoot) // consume the roll request

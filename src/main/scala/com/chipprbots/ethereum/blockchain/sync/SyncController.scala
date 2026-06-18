@@ -7,6 +7,8 @@ import org.apache.pekko.actor.PoisonPill
 import org.apache.pekko.actor.Props
 import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.actor.Terminated
+import org.apache.pekko.actor.typed.DispatcherSelector
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -1399,11 +1401,18 @@ class SyncController(
           RecoveryMetrics.setStoragePhase(
             if (needStorage) RecoveryMetrics.PhaseScanning else RecoveryMetrics.PhaseComplete
           )
-          context.actorOf(
-            CombinedRecoveryScanActor
-              .props(stateRoot, stateStorage, evmCodeStorage, appStateStorage, self, pivotBlock, snapSyncConfig)
-              .withDispatcher("sync-dispatcher"),
-            s"combined-recovery-scan-$syncGeneration"
+          context.spawn(
+            CombinedRecoveryScanActor(
+              stateRoot,
+              stateStorage,
+              evmCodeStorage,
+              appStateStorage,
+              self,
+              pivotBlock,
+              snapSyncConfig
+            ),
+            s"combined-recovery-scan-$syncGeneration",
+            DispatcherSelector.fromConfig("sync-dispatcher")
           )
           context.become(runningCombinedScan(needBytecode, needStorage, stateRoot, pivotBlock, snapSyncConfig))
         } else {
@@ -1411,9 +1420,9 @@ class SyncController(
           val bytecodeActor =
             if (needBytecode)
               Some(
-                context.actorOf(
-                  BytecodeRecoveryActor
-                    .props(
+                context
+                  .spawn(
+                    BytecodeRecoveryActor(
                       stateRoot,
                       stateStorage,
                       evmCodeStorage,
@@ -1422,18 +1431,19 @@ class SyncController(
                       self,
                       pivotBlock,
                       snapSyncConfig
-                    )
-                    .withDispatcher("sync-dispatcher"),
-                  s"bytecode-recovery-$syncGeneration"
-                )
+                    ),
+                    s"bytecode-recovery-$syncGeneration",
+                    DispatcherSelector.fromConfig("sync-dispatcher")
+                  )
+                  .toClassic
               )
             else None
           val storageActor =
             if (needStorage)
               Some(
-                context.actorOf(
-                  StorageRecoveryActor
-                    .props(
+                context
+                  .spawn(
+                    StorageRecoveryActor(
                       stateRoot,
                       stateStorage,
                       appStateStorage,
@@ -1442,10 +1452,11 @@ class SyncController(
                       self,
                       pivotBlock,
                       snapSyncConfig
-                    )
-                    .withDispatcher("sync-dispatcher"),
-                  s"storage-recovery-$syncGeneration"
-                )
+                    ),
+                    s"storage-recovery-$syncGeneration",
+                    DispatcherSelector.fromConfig("sync-dispatcher")
+                  )
+                  .toClassic
               )
             else None
           beginRecoveryDownloads(
@@ -1485,9 +1496,9 @@ class SyncController(
       val bytecodeActor =
         if (needBytecode && effByte.nonEmpty)
           Some(
-            context.actorOf(
-              BytecodeRecoveryActor
-                .propsPreloaded(
+            context
+              .spawn(
+                BytecodeRecoveryActor.applyPreloaded(
                   stateRoot,
                   stateStorage,
                   evmCodeStorage,
@@ -1497,18 +1508,19 @@ class SyncController(
                   pivotBlock,
                   snapSyncConfig,
                   effByte
-                )
-                .withDispatcher("sync-dispatcher"),
-              s"bytecode-recovery-dl-$syncGeneration"
-            )
+                ),
+                s"bytecode-recovery-dl-$syncGeneration",
+                DispatcherSelector.fromConfig("sync-dispatcher")
+              )
+              .toClassic
           )
         else None
       val storageActor =
         if (needStorage && effStor.nonEmpty)
           Some(
-            context.actorOf(
-              StorageRecoveryActor
-                .propsPreloaded(
+            context
+              .spawn(
+                StorageRecoveryActor.applyPreloaded(
                   stateRoot,
                   stateStorage,
                   appStateStorage,
@@ -1518,10 +1530,11 @@ class SyncController(
                   pivotBlock,
                   snapSyncConfig,
                   effStor
-                )
-                .withDispatcher("sync-dispatcher"),
-              s"storage-recovery-dl-$syncGeneration"
-            )
+                ),
+                s"storage-recovery-dl-$syncGeneration",
+                DispatcherSelector.fromConfig("sync-dispatcher")
+              )
+              .toClassic
           )
         else None
       // A phase with no download actor is finished (no gaps / already done) — show Complete, not idle. Phases that

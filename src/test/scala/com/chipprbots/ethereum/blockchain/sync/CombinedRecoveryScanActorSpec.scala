@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.blockchain.sync
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
@@ -82,8 +83,8 @@ class CombinedRecoveryScanActorSpec
     val (stateStorage, evm, appState, root, expectedCode, expectedStorageRoots) = fixtures()
     val parent = TestProbe("parent")
 
-    parent.childActorOf(
-      CombinedRecoveryScanActor.props(
+    system.spawn(
+      CombinedRecoveryScanActor(
         stateRoot = root,
         stateStorage = stateStorage,
         evmCodeStorage = evm,
@@ -91,7 +92,8 @@ class CombinedRecoveryScanActorSpec
         syncController = parent.ref,
         pivotBlockNumber = BigInt(0),
         snapSyncConfig = SNAPSyncConfig(recoveryScanConcurrency = 2, recoveryScanShardDepth = 1)
-      )
+      ),
+      "combined-recovery-scan-spec-t1"
     )
 
     val msg = parent.expectMsgType[CombinedRecoveryScanActor.CombinedScanComplete](10.seconds)
