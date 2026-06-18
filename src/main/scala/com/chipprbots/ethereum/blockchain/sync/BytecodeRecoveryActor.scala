@@ -169,14 +169,19 @@ object BytecodeRecoveryActor {
             RecoveryMetrics.setBytecodePhase(RecoveryMetrics.PhaseDownloading)
             val coordinator: ActorRef = coordinatorForTesting.getOrElse {
               val requestTracker = new snap.SNAPRequestTracker()(ctx.system.classicSystem.scheduler)
+              // S3: ByteCodeCoordinator is now Typed. This actor stays Behavior[Any] and keeps a Classic ref
+              // (it sends StartByteCodeSync / ByteCodePeerAvailable via Classic .tell and watches via .toTyped),
+              // so spawn through PropsAdapter rather than ctx.spawn.
               ctx.toClassic.actorOf(
-                snap.actors.ByteCodeCoordinator
-                  .props(
-                    evmCodeStorage = evmCodeStorage,
-                    networkPeerManager = networkPeerManager,
-                    requestTracker = requestTracker,
-                    batchSize = snap.ByteCodeTask.DEFAULT_BATCH_SIZE,
-                    snapSyncController = ctx.self.toClassic
+                org.apache.pekko.actor.typed.scaladsl.adapter
+                  .PropsAdapter(
+                    snap.actors.ByteCodeCoordinator(
+                      evmCodeStorage = evmCodeStorage,
+                      networkPeerManager = networkPeerManager,
+                      requestTracker = requestTracker,
+                      batchSize = snap.ByteCodeTask.DEFAULT_BATCH_SIZE,
+                      snapSyncController = ctx.self.toClassic
+                    )
                   )
                   .withDispatcher("sync-dispatcher"),
                 "bytecode-recovery-coordinator"

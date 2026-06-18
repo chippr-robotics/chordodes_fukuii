@@ -1,9 +1,9 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.Props
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.ImplicitSender
-import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
@@ -45,6 +45,44 @@ class ByteCodeCoordinatorSpec
     exponentCap = 3
   )
 
+  // ByteCodeCoordinator is a Typed actor (Group S3). These tests run in a Classic ActorSystem so they can use
+  // the established `system.actorOf` / `expectMsg` / `actorSelection` machinery against the coordinator and its
+  // (Typed) worker children; the coordinator is spawned through PropsAdapter to bridge the Classic system to the
+  // Typed Behavior. Mirrors the `.props(...)` factory the actor previously exposed.
+  private def bccProps(
+      evmCodeStorage: TestEvmCodeStorage,
+      networkPeerManager: org.apache.pekko.actor.ActorRef,
+      requestTracker: SNAPRequestTracker,
+      batchSize: Int,
+      snapSyncController: org.apache.pekko.actor.ActorRef,
+      cooldownConfig: ByteCodeCoordinator.ByteCodePeerCooldownConfig =
+        ByteCodeCoordinator.ByteCodePeerCooldownConfig.default,
+      backpressureHighWatermark: Int = 50000,
+      backpressureLowWatermark: Int = 25000
+  ): Props =
+    PropsAdapter(
+      ByteCodeCoordinator(
+        evmCodeStorage = evmCodeStorage,
+        networkPeerManager = networkPeerManager,
+        requestTracker = requestTracker,
+        batchSize = batchSize,
+        snapSyncController = snapSyncController,
+        cooldownConfig = cooldownConfig,
+        backpressureHighWatermark = backpressureHighWatermark,
+        backpressureLowWatermark = backpressureLowWatermark
+      )
+    )
+
+  // Resolve the coordinator's single worker child by selection. Replaces the former
+  // `coordinator.underlyingActor.workers.head`, which is unavailable on the Typed coordinator.
+  private def resolveWorkerChild(coordinator: org.apache.pekko.actor.ActorRef): org.apache.pekko.actor.ActorRef = {
+    import scala.concurrent.Await
+    Await.result(
+      system.actorSelection(coordinator.path / "*").resolveOne(3.seconds),
+      3.seconds
+    )
+  }
+
   "ByteCodeCoordinator" should "initialize with empty task queue" taggedAs UnitTest in {
     val evmCodeStorage = new TestEvmCodeStorage()
     val requestTracker = new SNAPRequestTracker()(system.scheduler)
@@ -52,7 +90,7 @@ class ByteCodeCoordinatorSpec
     val snapSyncController = TestProbe()
 
     val coordinator = system.actorOf(
-      ByteCodeCoordinator.props(
+      bccProps(
         evmCodeStorage = evmCodeStorage,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -71,7 +109,7 @@ class ByteCodeCoordinatorSpec
     val snapSyncController = TestProbe()
 
     val coordinator = system.actorOf(
-      ByteCodeCoordinator.props(
+      bccProps(
         evmCodeStorage = evmCodeStorage,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -88,7 +126,7 @@ class ByteCodeCoordinatorSpec
     coordinator ! Messages.StartByteCodeSync(codeHashes)
 
     // Coordinator should queue the contracts
-    coordinator ! Messages.ByteCodeGetProgress
+    coordinator ! Messages.ByteCodeGetProgress(self.toTyped[Messages.ByteCodeProgress])
     expectMsgType[Any](3.seconds)
   }
 
@@ -102,7 +140,7 @@ class ByteCodeCoordinatorSpec
     val peer = PeerTestHelpers.createTestPeer("test-peer", peerProbe.ref)
 
     val coordinator = system.actorOf(
-      ByteCodeCoordinator.props(
+      bccProps(
         evmCodeStorage = evmCodeStorage,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -127,7 +165,7 @@ class ByteCodeCoordinatorSpec
     val snapSyncController = TestProbe()
 
     val coordinator = system.actorOf(
-      ByteCodeCoordinator.props(
+      bccProps(
         evmCodeStorage = evmCodeStorage,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -139,7 +177,7 @@ class ByteCodeCoordinatorSpec
     coordinator ! Messages.ByteCodeTaskComplete(BigInt(123), Right(5))
 
     // Coordinator should handle completion
-    coordinator ! Messages.ByteCodeGetProgress
+    coordinator ! Messages.ByteCodeGetProgress(self.toTyped[Messages.ByteCodeProgress])
     expectMsgType[Any](3.seconds)
   }
 
@@ -156,8 +194,8 @@ class ByteCodeCoordinatorSpec
 
     // maxInFlightPerPeer=1 ensures only 1 task in flight at a time, leaving the 2nd pending
     val peerCooldown = testCooldownConfig.copy(maxInFlightPerPeer = 1)
-    val coordinator = TestActorRef[ByteCodeCoordinator](
-      ByteCodeCoordinator.props(
+    val coordinator = system.actorOf(
+      bccProps(
         evmCodeStorage = evmCodeStorage,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -172,23 +210,17 @@ class ByteCodeCoordinatorSpec
     coordinator ! Messages.NoMoreByteCodeTasks
     coordinator ! Messages.ByteCodePeerAvailable(peer)
 
-    // Only the first task is dispatched (maxInFlightPerPeer=1)
-    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
+    // Only the first task is dispatched (maxInFlightPerPeer=1). The SendMessage proves the active task
+    // exists and carries its requestId — read it here instead of inspecting coordinator internal state
+    // (the Typed coordinator exposes no `.underlyingActor`).
+    val send1 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
+    val reqId = send1.message.asInstanceOf[GetByteCodesEnc].underlyingMsg.requestId
 
-    within(3.seconds) {
-      awaitAssert {
-        coordinator.underlyingActor.activeTasks.size shouldBe 1
-        coordinator.underlyingActor.pendingTasks should have size 1
-      }
-    }
-    val activeEntry = coordinator.underlyingActor.activeTasks.head
-    val reqId = activeEntry._1
-    val worker = activeEntry._2.worker
-
-    // ByteCodeWorker uses context.become(working) and stashes ByteCodeWorkerFetchTask in that
-    // state. Release it first so the worker transitions to idle; the coordinator's subsequent
-    // tryRedispatchPendingTasks() dispatch will then be accepted rather than stashed.
-    worker ! Messages.ByteCodeWorkerRelease(reqId)
+    // ByteCodeWorker uses a `working` behavior and stashes ByteCodeWorkerFetchTask in that state.
+    // Release it first so the worker transitions to idle; the coordinator's subsequent
+    // tryRedispatchPendingTasks() dispatch will then be accepted rather than stashed. The single
+    // worker child is reachable via the coordinator's child selection.
+    system.actorSelection(coordinator.path / "*") ! Messages.ByteCodeWorkerRelease(reqId)
 
     // Complete the in-flight task at coordinator level — calls markWorkerIdle + tryRedispatchPendingTasks()
     coordinator ! Messages.ByteCodeTaskComplete(reqId, Right(1))
@@ -204,7 +236,7 @@ class ByteCodeCoordinatorSpec
     val snapSyncController = TestProbe()
 
     val coordinator = system.actorOf(
-      ByteCodeCoordinator.props(
+      bccProps(
         evmCodeStorage = evmCodeStorage,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -231,7 +263,7 @@ class ByteCodeCoordinatorSpec
     val snapSyncController = TestProbe()
 
     val coordinator = system.actorOf(
-      ByteCodeCoordinator.props(
+      bccProps(
         evmCodeStorage = evmCodeStorage,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -243,7 +275,7 @@ class ByteCodeCoordinatorSpec
     coordinator ! Messages.ByteCodeTaskFailed(BigInt(123), "Test failure")
 
     // Coordinator should still be operational
-    coordinator ! Messages.ByteCodeGetProgress
+    coordinator ! Messages.ByteCodeGetProgress(self.toTyped[Messages.ByteCodeProgress])
     expectMsgType[Any](3.seconds)
   }
 
@@ -257,7 +289,7 @@ class ByteCodeCoordinatorSpec
     val peer = PeerTestHelpers.createTestPeer("test-peer", peerProbe.ref)
 
     val coordinator = system.actorOf(
-      ByteCodeCoordinator.props(
+      bccProps(
         evmCodeStorage = evmCodeStorage,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -307,7 +339,7 @@ class ByteCodeCoordinatorSpec
     val peer = PeerTestHelpers.createTestPeer("test-peer", peerProbe.ref)
 
     val coordinator = system.actorOf(
-      ByteCodeCoordinator.props(
+      bccProps(
         evmCodeStorage = evmCodeStorage,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -365,7 +397,7 @@ class ByteCodeCoordinatorSpec
     val peer = PeerTestHelpers.createTestPeer("test-peer", peerProbe.ref)
 
     val coordinator = system.actorOf(
-      ByteCodeCoordinator.props(
+      bccProps(
         evmCodeStorage = evmCodeStorage,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -417,7 +449,7 @@ class ByteCodeCoordinatorSpec
     val peer = PeerTestHelpers.createTestPeer("test-peer", peerProbe.ref)
 
     val coordinator = system.actorOf(
-      ByteCodeCoordinator.props(
+      bccProps(
         evmCodeStorage = evmCodeStorage,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -462,7 +494,7 @@ class ByteCodeCoordinatorSpec
     val peer = PeerTestHelpers.createTestPeer("pivot-peer", peerProbe.ref)
 
     val coordinator = system.actorOf(
-      ByteCodeCoordinator.props(
+      bccProps(
         evmCodeStorage = evmCodeStorage,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -507,7 +539,7 @@ class ByteCodeCoordinatorSpec
     val peer = PeerTestHelpers.createTestPeer("retained-peer", peerProbe.ref)
 
     val coordinator = system.actorOf(
-      ByteCodeCoordinator.props(
+      bccProps(
         evmCodeStorage = evmCodeStorage,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -553,7 +585,7 @@ class ByteCodeCoordinatorSpec
     val peer = PeerTestHelpers.createTestPeer("corrupt-peer", peerProbe.ref)
 
     val coordinator = system.actorOf(
-      ByteCodeCoordinator.props(
+      bccProps(
         evmCodeStorage = evmCodeStorage,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -607,7 +639,7 @@ class ByteCodeCoordinatorSpec
     val snapSyncController = TestProbe()
 
     val coordinator = system.actorOf(
-      ByteCodeCoordinator.props(
+      bccProps(
         evmCodeStorage = evmCodeStorage,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -646,8 +678,8 @@ class ByteCodeCoordinatorSpec
 
     // batchSize=1 + maxInFlightPerPeer=2 → 2 tasks dispatched concurrently; 1 left pending
     val peerCooldown = testCooldownConfig.copy(maxInFlightPerPeer = 2)
-    val coordinator = TestActorRef[ByteCodeCoordinator](
-      ByteCodeCoordinator.props(
+    val coordinator = system.actorOf(
+      bccProps(
         evmCodeStorage = evmCodeStorage,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -662,30 +694,22 @@ class ByteCodeCoordinatorSpec
     coordinator ! Messages.NoMoreByteCodeTasks
     coordinator ! Messages.ByteCodePeerAvailable(peer)
 
+    // Two tasks dispatched concurrently (the two SendMessages prove 2 active in-flight requests).
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
 
-    within(3.seconds) {
-      awaitAssert {
-        coordinator.underlyingActor.activeTasks.size shouldBe 2
-        coordinator.underlyingActor.idleWorkers shouldBe empty
-      }
-    }
-
-    // Force-complete fires while 2 tasks are still in flight and 1 is pending
+    // Force-complete fires while 2 tasks are still in flight and 1 is pending. The Typed coordinator
+    // exposes no `.underlyingActor`, so the pool invariant (active drained, workers returned to idle)
+    // is verified indirectly: the parent receives ByteCodeSyncComplete, and the coordinator remains
+    // operational and idle afterwards (a follow-up GetProgress returns 100% with no pending/active work).
     coordinator ! Messages.ForceCompleteByteCodes
-
-    within(3.seconds) {
-      awaitAssert {
-        // Active tasks drained; workers returned to idle pool (line 362 markWorkerIdle)
-        coordinator.underlyingActor.activeTasks shouldBe empty
-        coordinator.underlyingActor.idleWorkers.size shouldBe 2
-        // Pool invariant: workers.size == idleWorkers.size when activeTasks.isEmpty
-        coordinator.underlyingActor.workers.size shouldBe coordinator.underlyingActor.idleWorkers.size
-      }
-    }
-
     snapSyncController.expectMsg(3.seconds, SNAPSyncController.ByteCodeSyncComplete)
+
+    // ByteCodeGetProgress now carries a typed replyTo; route the reply to the Classic test actor via .toTyped.
+    coordinator ! Messages.ByteCodeGetProgress(self.toTyped[Messages.ByteCodeProgress])
+    val progress = expectMsgType[Messages.ByteCodeProgress](3.seconds)
+    // All queues drained by force-complete → progress reports complete (no pending/active tasks remain).
+    progress.progress shouldBe 1.0
   }
 
   it should "handle ForceCompleteByteCodes when queues are already empty" taggedAs UnitTest in {
@@ -695,7 +719,7 @@ class ByteCodeCoordinatorSpec
     val snapSyncController = TestProbe()
 
     val coordinator = system.actorOf(
-      ByteCodeCoordinator.props(
+      bccProps(
         evmCodeStorage = evmCodeStorage,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -731,8 +755,8 @@ class ByteCodeCoordinatorSpec
 
     val peer = PeerTestHelpers.createTestPeer("term-peer", peerProbe.ref)
 
-    val coordinator = TestActorRef[ByteCodeCoordinator](
-      ByteCodeCoordinator.props(
+    val coordinator = system.actorOf(
+      bccProps(
         evmCodeStorage = evmCodeStorage,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -748,16 +772,13 @@ class ByteCodeCoordinatorSpec
     // Worker created and request dispatched
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
 
-    // Get the worker ref and stop it permanently (bypasses supervisor restart)
-    val workerRef = coordinator.underlyingActor.workers.head
-    system.stop(workerRef.toClassic)
+    // Resolve the single worker child via selection (the Typed coordinator exposes no `.underlyingActor`)
+    // and stop it permanently. `context.watchWith` delivers WorkerTerminated to the coordinator.
+    val workerRef = resolveWorkerChild(coordinator)
+    system.stop(workerRef)
 
-    // Terminated propagates asynchronously — wait for coordinator to process it
-    within(3.seconds) {
-      awaitAssert(coordinator.underlyingActor.workers.isEmpty)
-    }
-
-    // Task was re-queued — providing peer again triggers re-dispatch
+    // Task was re-queued after WorkerTerminated handling — providing peer again triggers re-dispatch,
+    // which is observable proof the dead worker was removed and the task re-queued.
     coordinator ! Messages.ByteCodePeerAvailable(peer)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
   }
@@ -771,8 +792,8 @@ class ByteCodeCoordinatorSpec
 
     val peer = PeerTestHelpers.createTestPeer("term-idle-peer", peerProbe.ref)
 
-    val coordinator = TestActorRef[ByteCodeCoordinator](
-      ByteCodeCoordinator.props(
+    val coordinator = system.actorOf(
+      bccProps(
         evmCodeStorage = evmCodeStorage,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -787,19 +808,15 @@ class ByteCodeCoordinatorSpec
     coordinator ! Messages.ByteCodePeerAvailable(peer)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
 
-    // Complete the task so the worker is now idle (no active task)
-    val workerRef = coordinator.underlyingActor.workers.head
-    // Let the worker become idle by marking the task complete
+    // Resolve the worker child, then mark the sync done and stop the worker. The coordinator must
+    // process WorkerTerminated without exception and stay operational (no `.underlyingActor` access).
+    val workerRef = resolveWorkerChild(coordinator)
     coordinator ! Messages.NoMoreByteCodeTasks
 
-    system.stop(workerRef.toClassic)
+    system.stop(workerRef)
 
-    // Pool should shrink without any exception — coordinator stays operational
-    within(3.seconds) {
-      awaitAssert(coordinator.underlyingActor.workers.isEmpty)
-    }
-
-    coordinator ! Messages.ByteCodeGetProgress
+    // Coordinator stays operational after the worker stops — a GetProgress query still returns.
+    coordinator ! Messages.ByteCodeGetProgress(self.toTyped[Messages.ByteCodeProgress])
     expectMsgType[Messages.ByteCodeProgress](3.seconds)
   }
 
@@ -821,8 +838,8 @@ class ByteCodeCoordinatorSpec
 
     // batchSize=1 so each hash → one task; maxInFlightPerPeer=3 → up to 3 concurrent workers
     val peerCooldown = testCooldownConfig.copy(maxInFlightPerPeer = 3)
-    val coordinator = TestActorRef[ByteCodeCoordinator](
-      ByteCodeCoordinator.props(
+    val coordinator = system.actorOf(
+      bccProps(
         evmCodeStorage = evmCodeStorage,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,
@@ -837,28 +854,18 @@ class ByteCodeCoordinatorSpec
     coordinator ! Messages.StartByteCodeSync(hashes)
     coordinator ! Messages.ByteCodePeerAvailable(peer)
 
-    // Three tasks dispatched — one worker per task
+    // Three tasks dispatched — one worker per task. The three SendMessages prove 3 active in-flight
+    // requests (formerly `workers.size == 3, idleWorkers empty` on internal state).
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
 
-    // All 3 workers active, none idle
-    within(3.seconds) {
-      awaitAssert(coordinator.underlyingActor.workers.size == 3)
-    }
-    coordinator.underlyingActor.idleWorkers shouldBe empty
-
-    // Peer disconnects — ByteCodePeerUnavailable must release all in-flight workers back to idle
+    // Peer disconnects — ByteCodePeerUnavailable must release all in-flight workers back to idle.
     coordinator ! Messages.ByteCodePeerUnavailable(peerId)
 
-    // All 3 workers must be returned to idleWorkers (the P-0 fix: markWorkerIdle after release)
-    within(3.seconds) {
-      awaitAssert {
-        coordinator.underlyingActor.idleWorkers.size shouldBe 3
-      }
-    }
-
-    // Dispatch must succeed — idle workers available, tasks re-queued
+    // Observable proof of the P-0 fix (markWorkerIdle after release): dispatch succeeds again because
+    // the released workers are back in the idle pool and the tasks were re-queued. Without the fix the
+    // idle pool would be empty and no SendMessage would follow.
     coordinator ! Messages.ByteCodePeerAvailable(peer)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
   }
@@ -872,7 +879,7 @@ class ByteCodeCoordinatorSpec
     // Tiny watermarks: high=4, low=2. batchSize=1 so one hash → one task → one queue entry,
     // letting us drive the transition with a handful of hashes.
     val coordinator = system.actorOf(
-      ByteCodeCoordinator.props(
+      bccProps(
         evmCodeStorage = evmCodeStorage,
         networkPeerManager = networkPeerManager.ref,
         requestTracker = requestTracker,

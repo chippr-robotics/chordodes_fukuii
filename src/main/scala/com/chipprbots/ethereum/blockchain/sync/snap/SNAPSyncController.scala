@@ -1985,13 +1985,17 @@ class SNAPSyncController(
             if (!bytecodeAlreadyDone) {
               bytecodeCoordinator = Some(
                 context.actorOf(
-                  actors.ByteCodeCoordinator
-                    .props(
-                      evmCodeStorage = evmCodeStorage,
-                      networkPeerManager = networkPeerManager,
-                      requestTracker = requestTracker,
-                      batchSize = ByteCodeTask.DEFAULT_BATCH_SIZE,
-                      snapSyncController = self
+                  // S3: ByteCodeCoordinator is now Typed. SSC is still Classic, so spawn via PropsAdapter
+                  // and keep the ref as a Classic ActorRef; Classic `!` routes Command-typed messages.
+                  org.apache.pekko.actor.typed.scaladsl.adapter
+                    .PropsAdapter(
+                      actors.ByteCodeCoordinator(
+                        evmCodeStorage = evmCodeStorage,
+                        networkPeerManager = networkPeerManager,
+                        requestTracker = requestTracker,
+                        batchSize = ByteCodeTask.DEFAULT_BATCH_SIZE,
+                        snapSyncController = self
+                      )
                     )
                     .withDispatcher("sync-dispatcher"),
                   s"bytecode-coordinator-$coordinatorGeneration"
@@ -3067,13 +3071,17 @@ class SNAPSyncController(
     if (bytecodeCoordinator.isEmpty) {
       bytecodeCoordinator = Some(
         context.actorOf(
-          actors.ByteCodeCoordinator
-            .props(
-              evmCodeStorage = evmCodeStorage,
-              networkPeerManager = networkPeerManager,
-              requestTracker = requestTracker,
-              batchSize = ByteCodeTask.DEFAULT_BATCH_SIZE,
-              snapSyncController = self
+          // S3: ByteCodeCoordinator is now Typed. SSC is still Classic, so spawn via PropsAdapter
+          // and keep the ref as a Classic ActorRef; Classic `!` routes Command-typed messages.
+          org.apache.pekko.actor.typed.scaladsl.adapter
+            .PropsAdapter(
+              actors.ByteCodeCoordinator(
+                evmCodeStorage = evmCodeStorage,
+                networkPeerManager = networkPeerManager,
+                requestTracker = requestTracker,
+                batchSize = ByteCodeTask.DEFAULT_BATCH_SIZE,
+                snapSyncController = self
+              )
             )
             .withDispatcher("sync-dispatcher"),
           s"bytecode-coordinator-$coordinatorGeneration"
@@ -3336,8 +3344,16 @@ class SNAPSyncController(
           }
           if (!bytecodePhaseComplete) {
             bytecodeCoordinator.foreach { coordinator =>
-              (coordinator ? actors.Messages.ByteCodeGetProgress)
-                .mapTo[actors.Messages.ByteCodeProgress]
+              // S3: ByteCodeCoordinator is Typed. ByteCodeGetProgress now carries a typed replyTo, so use the
+              // Typed AskPattern (view the Classic ref as typed) instead of the Classic `?`. Scheduler/timeout
+              // come from the Classic system via `.toTyped`.
+              import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
+              import org.apache.pekko.actor.typed.scaladsl.adapter.*
+              implicit val typedScheduler: org.apache.pekko.actor.typed.Scheduler =
+                context.system.toTyped.scheduler
+              coordinator
+                .toTyped[actors.ByteCodeCoordinator.Command]
+                .ask[actors.Messages.ByteCodeProgress](replyTo => actors.Messages.ByteCodeGetProgress(replyTo))
                 .map(ByteCodeCoordinatorProgress.apply)
                 .recover { case _ =>
                   ByteCodeCoordinatorProgress(
