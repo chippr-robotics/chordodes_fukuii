@@ -160,10 +160,37 @@ trait KnownNodesManagerBuilder {
   lazy val knownNodesManagerConfig: KnownNodesManager.KnownNodesManagerConfig =
     KnownNodesManager.KnownNodesManagerConfig(instanceConfig.config)
 
-  lazy val knownNodesManager: ActorRef = system.actorOf(
-    KnownNodesManager.props(knownNodesManagerConfig, storagesInstance.storages.knownNodesStorage),
-    "known-nodes-manager"
-  )
+  // Typed ref — for in-scope callers and direct Typed wiring.
+  lazy val knownNodesManagerTyped: org.apache.pekko.actor.typed.ActorRef[KnownNodesManager.Command] =
+    system.spawn(
+      KnownNodesManager(knownNodesManagerConfig, storagesInstance.storages.knownNodesStorage),
+      "known-nodes-manager-typed"
+    )
+
+  // Classic bridge actor for out-of-scope Classic callers (PeerManagerActor, PeerActor).
+  // Translates the legacy GetKnownNodes case object to the Typed ask pattern (replying to the
+  // original sender), and forwards all other KnownNodesManager Commands directly.
+  lazy val knownNodesManager: ActorRef =
+    system.actorOf(
+      org.apache.pekko.actor.Props(new org.apache.pekko.actor.Actor {
+        implicit private val scheduler: org.apache.pekko.actor.typed.Scheduler =
+          context.system.toTyped.scheduler
+        implicit private val bridgeTimeout: org.apache.pekko.util.Timeout =
+          org.apache.pekko.util.Timeout(10.seconds)
+
+        def receive: Receive = {
+          case KnownNodesManager.GetKnownNodes =>
+            val s = sender()
+            import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
+            knownNodesManagerTyped
+              .ask(ref => KnownNodesManager.GetKnownNodesReq(ref))
+              .foreach(s ! _)(context.dispatcher)
+          case cmd: KnownNodesManager.Command =>
+            knownNodesManagerTyped ! cmd
+        }
+      }),
+      "known-nodes-manager"
+    )
 }
 
 trait PeerDiscoveryManagerBuilder {
@@ -319,8 +346,8 @@ trait PeerStatisticsBuilder {
 
   implicit val clock: Clock = Clock.systemUTC()
 
-  lazy val peerStatistics: ActorRef = system.actorOf(
-    PeerStatisticsActor.props(
+  lazy val peerStatistics: org.apache.pekko.actor.typed.ActorRef[PeerStatisticsActor.Command] = system.spawn(
+    PeerStatisticsActor(
       peerEventBus,
       // `slotCount * slotDuration` should be set so that it's at least as long
       // as any client of the `PeerStatisticsActor` requires.
@@ -425,7 +452,8 @@ trait ServerActorBuilder {
 
   lazy val networkConfig = instanceConfig.Network
 
-  lazy val server: ActorRef = system.actorOf(ServerActor.props(nodeStatusHolder, peerManager, blacklist), "server")
+  lazy val server: org.apache.pekko.actor.typed.ActorRef[ServerActor.Command] =
+    system.spawn(ServerActor(nodeStatusHolder, peerManager, blacklist), "server")
 
 }
 

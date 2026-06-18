@@ -140,12 +140,34 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
   lazy val knownNodesManagerConfig: KnownNodesManager.KnownNodesManagerConfig =
     KnownNodesManager.KnownNodesManagerConfig(config).copy(persistInterval = 1.seconds)
 
-  lazy val knownNodesManager: ActorRef = system.actorOf(
-    KnownNodesManager.props(
-      knownNodesManagerConfig,
-      storagesInstance.storages.knownNodesStorage
+  lazy val knownNodesManagerTyped: org.apache.pekko.actor.typed.ActorRef[KnownNodesManager.Command] =
+    system.spawn(
+      KnownNodesManager(knownNodesManagerConfig, storagesInstance.storages.knownNodesStorage),
+      "known-nodes-manager-typed"
     )
-  )
+
+  // Classic bridge for PeerManagerActor (still Classic) that sends the legacy GetKnownNodes case object.
+  lazy val knownNodesManager: ActorRef =
+    system.actorOf(
+      org.apache.pekko.actor.Props(new org.apache.pekko.actor.Actor {
+        implicit private val scheduler: org.apache.pekko.actor.typed.Scheduler =
+          context.system.toTyped.scheduler
+        implicit private val bridgeTimeout: org.apache.pekko.util.Timeout =
+          org.apache.pekko.util.Timeout(10.seconds)
+
+        def receive: Receive = {
+          case KnownNodesManager.GetKnownNodes =>
+            val s = sender()
+            import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
+            knownNodesManagerTyped
+              .ask(ref => KnownNodesManager.GetKnownNodesReq(ref))
+              .foreach(s ! _)(context.dispatcher)
+          case cmd: KnownNodesManager.Command =>
+            knownNodesManagerTyped ! cmd
+        }
+      }),
+      "known-nodes-manager"
+    )
 
   val blockchainReader: BlockchainReader = BlockchainReader(storagesInstance.storages)
   val blockchainWriter: BlockchainWriter = BlockchainWriter(storagesInstance.storages)
@@ -213,8 +235,8 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
 
   lazy val authHandshaker: AuthHandshaker = AuthHandshaker(nodeKey, secureRandom)
 
-  lazy val peerStatistics: ActorRef =
-    system.actorOf(PeerStatisticsActor.props(peerEventBus, slotDuration = 1.minute, slotCount = 30))
+  lazy val peerStatistics: org.apache.pekko.actor.typed.ActorRef[PeerStatisticsActor.Command] =
+    system.spawn(PeerStatisticsActor(peerEventBus, slotDuration = 1.minute, slotCount = 30), "peer-statistics")
 
   lazy val blacklist: CacheBasedBlacklist = CacheBasedBlacklist.empty(1000)
 
@@ -264,7 +286,8 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
       "blockchain-host"
     )
 
-  lazy val server: ActorRef = system.actorOf(ServerActor.props(nodeStatusHolder, peerManager, blacklist), "server")
+  lazy val server: org.apache.pekko.actor.typed.ActorRef[ServerActor.Command] =
+    system.spawn(ServerActor(nodeStatusHolder, peerManager, blacklist), "server")
 
   val listenAddress: InetSocketAddress = randomAddress()
 

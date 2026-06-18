@@ -42,7 +42,7 @@ class PeerManagerActor(
     peerDiscoveryManager: ActorRef,
     peerConfiguration: PeerConfiguration,
     knownNodesManager: ActorRef,
-    peerStatistics: ActorRef,
+    peerStatistics: typed.ActorRef[PeerStatisticsActor.Command],
     peerFactory: (ActorContext, InetSocketAddress, Boolean) => ActorRef,
     discoveryConfig: DiscoveryConfig,
     val blacklist: Blacklist,
@@ -646,14 +646,24 @@ class PeerManagerActor(
 
   private def handlePruning(connectedPeers: ConnectedPeers): Receive = {
     case SchedulePruneIncomingPeers =>
+      import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
+      import org.apache.pekko.actor.typed.scaladsl.adapter.*
       implicit val timeout: Timeout = Timeout(peerConfiguration.updateNodesInterval)
+      implicit val typedScheduler: org.apache.pekko.actor.typed.Scheduler = context.system.toTyped.scheduler
 
       // Ask for the whole statistics duration, we'll use averages to make it fair.
       val window = peerConfiguration.statSlotCount * peerConfiguration.statSlotDuration
 
-      val task = peerStatistics
-        .askFor[PeerStatisticsActor.StatsForAll](PeerStatisticsActor.GetStatsForAll(window))
-        .map(PruneIncomingPeers.apply)
+      // Typed ask from this Classic actor via the adapter; lift the resulting Future into IO so the
+      // existing pipeToRecipient(self)(IO) plumbing (Status.Failure on error) is preserved unchanged.
+      val task: IO[PruneIncomingPeers] =
+        IO.fromFuture(
+          IO(
+            peerStatistics.ask[PeerStatisticsActor.StatsForAll](
+              PeerStatisticsActor.GetStatsForAll(window, _)
+            )
+          )
+        ).map(PruneIncomingPeers.apply)
 
       pipeToRecipient(self)(task)
 
@@ -768,7 +778,7 @@ object PeerManagerActor {
       peerConfiguration: PeerConfiguration,
       peerMessageBus: ActorRef,
       knownNodesManager: ActorRef,
-      peerStatistics: ActorRef,
+      peerStatistics: typed.ActorRef[PeerStatisticsActor.Command],
       handshaker: Handshaker[R],
       authHandshaker: AuthHandshaker,
       discoveryConfig: DiscoveryConfig,

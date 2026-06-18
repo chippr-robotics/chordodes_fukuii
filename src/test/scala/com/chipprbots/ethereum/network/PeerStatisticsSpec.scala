@@ -1,7 +1,8 @@
 package com.chipprbots.ethereum.network
 
-import org.apache.pekko.actor.*
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe as TypedTestProbe
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.testkit.TestProbe
 
 import scala.concurrent.duration.*
@@ -9,19 +10,18 @@ import scala.concurrent.duration.*
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.network.PeerEventBusActor.*
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.MockClock
 
-class PeerStatisticsSpec
-    extends TestKit(ActorSystem("PeerStatisticsSpec_System"))
-    with AnyFlatSpecLike
-    with WithActorSystemShutDown
-    with Matchers {
+class PeerStatisticsSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
 
   import PeerStatisticsActor.*
+
+  // Classic ActorSystem bridge for the (still Classic) PeerEventBus TestProbe.
+  implicit val classicSystem: org.apache.pekko.actor.ActorSystem =
+    system.classicSystem
 
   val TICK: Long = 50
   val mockClock: MockClock = new MockClock(0L) {
@@ -34,30 +34,31 @@ class PeerStatisticsSpec
   behavior.of("PeerStatisticsActor")
 
   it should "subscribe to peer events" taggedAs (UnitTest, NetworkTest) in new Fixture {
+    // Subscriptions are sent to the Classic bus via the message adapter; the payloads are unchanged.
     peerEventBus.expectMsg(Subscribe(PeerStatisticsActor.MessageSubscriptionClassifier))
     peerEventBus.expectMsg(Subscribe(SubscriptionClassifier.PeerDisconnectedClassifier(PeerSelector.AllPeers)))
   }
 
   it should "initially return default stats for unknown peers" taggedAs (UnitTest, NetworkTest) in new Fixture {
     val peerId: PeerId = PeerId("Alice")
-    peerStatistics ! GetStatsForPeer(1.minute, peerId)
-    sender.expectMsg(StatsForPeer(peerId, PeerStat.empty))
+    peerStatistics ! GetStatsForPeer(1.minute, peerId, statsForPeerProbe.ref)
+    statsForPeerProbe.expectMessage(StatsForPeer(peerId, PeerStat.empty))
   }
 
   it should "initially return default stats when there are no peers" taggedAs (UnitTest, NetworkTest) in new Fixture {
-    peerStatistics ! GetStatsForAll(1.minute)
-    sender.expectMsg(StatsForAll(Map.empty))
+    peerStatistics ! GetStatsForAll(1.minute, statsForAllProbe.ref)
+    statsForAllProbe.expectMessage(StatsForAll(Map.empty))
   }
 
   it should "count received messages" taggedAs (UnitTest, NetworkTest) in new Fixture {
     val alice: PeerId = PeerId("Alice")
     val bob: PeerId = PeerId("Bob")
-    peerStatistics ! PeerEvent.MessageFromPeer(NewBlockHashes(Seq.empty), alice)
-    peerStatistics ! PeerEvent.MessageFromPeer(NewBlockHashes(Seq.empty), bob)
-    peerStatistics ! PeerEvent.MessageFromPeer(NewBlockHashes(Seq.empty), alice)
-    peerStatistics ! GetStatsForAll(1.minute)
+    peerStatistics ! PeerStatisticsActor.PeerMessageReceived(NewBlockHashes(Seq.empty), alice)
+    peerStatistics ! PeerStatisticsActor.PeerMessageReceived(NewBlockHashes(Seq.empty), bob)
+    peerStatistics ! PeerStatisticsActor.PeerMessageReceived(NewBlockHashes(Seq.empty), alice)
+    peerStatistics ! GetStatsForAll(1.minute, statsForAllProbe.ref)
 
-    val stats: StatsForAll = sender.expectMsgType[StatsForAll]
+    val stats: StatsForAll = statsForAllProbe.expectMessageType[StatsForAll]
     stats.stats should not be empty
 
     val statA: PeerStat = stats.stats(alice)
@@ -74,11 +75,11 @@ class PeerStatisticsSpec
   }
 
   trait Fixture {
-    val sender: TestProbe = TestProbe()
-    implicit val senderRef: ActorRef = sender.ref
+    val statsForAllProbe: TypedTestProbe[StatsForAll] = testKit.createTestProbe[StatsForAll]()
+    val statsForPeerProbe: TypedTestProbe[StatsForPeer] = testKit.createTestProbe[StatsForPeer]()
 
     val peerEventBus: TestProbe = TestProbe()
-    val peerStatistics: ActorRef =
-      system.actorOf(PeerStatisticsActor.props(peerEventBus.ref, slotDuration = 1.minute, slotCount = 30)(mockClock))
+    val peerStatistics: TypedActorRef[Command] =
+      testKit.spawn(PeerStatisticsActor(peerEventBus.ref, slotDuration = 1.minute, slotCount = 30)(mockClock))
   }
 }

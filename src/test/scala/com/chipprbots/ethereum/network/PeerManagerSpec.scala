@@ -5,6 +5,7 @@ import java.net.URI
 import java.util.concurrent.TimeUnit
 
 import org.apache.pekko.actor.*
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.ExplicitlyTriggeredScheduler
 import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestKit
@@ -245,11 +246,12 @@ class PeerManagerSpec
 
     peerEventBus.expectMsg(Publish(PeerDisconnected(PeerId(probe3.ref.path.name))))
 
-    // TooManyPeers should also trigger a pruning cycle.
-    peerStatistics.expectMsg(
-      PeerStatisticsActor.GetStatsForAll(peerConfiguration.statSlotDuration * peerConfiguration.statSlotCount)
-    )
-    peerStatistics.reply(PeerStatisticsActor.StatsForAll(Map.empty))
+    // TooManyPeers should also trigger a pruning cycle. The Typed GetStatsForAll carries a replyTo
+    // ActorRef (the ephemeral ask target); reply directly to it rather than via Classic sender().
+    val statsRequest: PeerStatisticsActor.GetStatsForAll =
+      peerStatistics.expectMsgType[PeerStatisticsActor.GetStatsForAll]
+    statsRequest.window shouldBe (peerConfiguration.statSlotDuration * peerConfiguration.statSlotCount)
+    statsRequest.replyTo ! PeerStatisticsActor.StatsForAll(Map.empty)
     // There's only one connection that can be pruned.
     probe2.expectMsg(PeerActor.DisconnectPeer(Disconnect.Reasons.TooManyPeers))
   }
@@ -1035,7 +1037,7 @@ class PeerManagerSpec
           peerDiscoveryManager.ref,
           peerConfiguration,
           knownNodesManager.ref,
-          peerStatistics.ref,
+          peerStatistics.ref.toTyped[PeerStatisticsActor.Command],
           peerFactory,
           discoveryConfig,
           blacklist,

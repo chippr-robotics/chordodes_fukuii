@@ -5,6 +5,7 @@ import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicReference
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.io.Tcp
 import org.apache.pekko.testkit.ImplicitSender
 import org.apache.pekko.testkit.TestKit
@@ -46,13 +47,14 @@ class ServerActorSpec
     val pm = TestProbe()
     // TCP probe absorbs the Bind request so no real socket binding happens.
     val tcpProbe = TestProbe()
-    val actor = system.actorOf(ServerActor.testProps(holder, pm.ref, blacklist, tcpProbe.ref))
+    val actor = system.spawn(ServerActor.testApply(holder, pm.ref, blacklist, tcpProbe.ref), "server-test-1")
 
     val explicit = InetAddress.getByName("1.2.3.4")
     val localAddr = new InetSocketAddress("0.0.0.0", 30303)
     actor ! ServerActor.StartServer(localAddr, Some(explicit))
-    tcpProbe.expectMsgType[Tcp.Bind]
-    actor ! Tcp.Bound(localAddr)
+    // The Bind carries the bridge handler ref that receives the Bound/CommandFailed/Connected events.
+    val bindHandler = tcpProbe.expectMsgType[Tcp.Bind].handler
+    bindHandler ! Tcp.Bound(localAddr)
 
     awaitCond(
       holder.get().serverStatus.isInstanceOf[ServerStatus.Listening],
@@ -73,13 +75,13 @@ class ServerActorSpec
     val holder = freshHolder()
     val pm = TestProbe()
     val tcpProbe = TestProbe()
-    val actor = system.actorOf(ServerActor.testProps(holder, pm.ref, blacklist, tcpProbe.ref))
+    val actor = system.spawn(ServerActor.testApply(holder, pm.ref, blacklist, tcpProbe.ref), "server-test-2")
 
     val localAddr = new InetSocketAddress("0.0.0.0", 30304)
     val detectedIp = InetAddress.getByName("5.6.7.8")
     actor ! ServerActor.StartServer(localAddr, None)
-    tcpProbe.expectMsgType[Tcp.Bind]
-    actor ! Tcp.Bound(localAddr)
+    val bindHandler = tcpProbe.expectMsgType[Tcp.Bind].handler
+    bindHandler ! Tcp.Bound(localAddr)
 
     // Simulate the Future result returning from the async IP detection
     actor ! ServerActor.DetectedIP(Some(detectedIp))
@@ -100,12 +102,12 @@ class ServerActorSpec
     val holder = freshHolder()
     val pm = TestProbe()
     val tcpProbe = TestProbe()
-    val actor = system.actorOf(ServerActor.testProps(holder, pm.ref, blacklist, tcpProbe.ref))
+    val actor = system.spawn(ServerActor.testApply(holder, pm.ref, blacklist, tcpProbe.ref), "server-test-3")
 
     val localAddr = new InetSocketAddress("0.0.0.0", 30305)
     actor ! ServerActor.StartServer(localAddr, None)
-    tcpProbe.expectMsgType[Tcp.Bind]
-    actor ! Tcp.Bound(localAddr)
+    val bindHandler = tcpProbe.expectMsgType[Tcp.Bind].handler
+    bindHandler ! Tcp.Bound(localAddr)
     actor ! ServerActor.DetectedIP(None)
 
     awaitCond(
