@@ -478,64 +478,63 @@ class ByteCodeCoordinator(
     }
   }
 
-  private def assignTaskToWorker(worker: WorkerRef, peer: Peer): Unit = {
-    if (pendingTasks.isEmpty) return
+  private def assignTaskToWorker(worker: WorkerRef, peer: Peer): Unit =
+    if (pendingTasks.nonEmpty) {
+      // Mark worker busy.
+      idleWorkers -= worker
 
-    // Mark worker busy.
-    idleWorkers -= worker
+      val task = pendingTasks.dequeue()
+      val requestId = requestTracker.generateRequestId()
 
-    val task = pendingTasks.dequeue()
-    val requestId = requestTracker.generateRequestId()
+      val requestedBytes = responseBytesTargetFor(peer)
 
-    val requestedBytes = responseBytesTargetFor(peer)
+      task.pending = true
+      activeTasks.put(
+        requestId,
+        ActiveByteCodeRequest(task, worker, peer, requestedBytes = requestedBytes, startedAtMillis = nowMillis)
+      )
 
-    task.pending = true
-    activeTasks.put(
-      requestId,
-      ActiveByteCodeRequest(task, worker, peer, requestedBytes = requestedBytes, startedAtMillis = nowMillis)
-    )
+      log.debug(s"Assigning bytecode task (${task.codeHashes.size} hashes) to worker for peer ${peer.id}")
+      worker ! ByteCodeWorkerFetchTask(task, peer, requestId, requestedBytes)
+    }
 
-    log.debug(s"Assigning bytecode task (${task.codeHashes.size} hashes) to worker for peer ${peer.id}")
-    worker ! ByteCodeWorkerFetchTask(task, peer, requestId, requestedBytes)
-  }
+  private def dispatchIfPossible(peer: Peer): Unit =
+    if (pendingTasks.nonEmpty) {
+      // Keep a small bounded number of inflight requests per peer to maximize throughput
+      // without overloading any single neighbor.
+      var inflight = inFlightForPeer(peer)
+      var blocked = false
+      while (!blocked && pendingTasks.nonEmpty && inflight < maxInFlightPerPeer) {
+        val workerOpt: Option[WorkerRef] =
+          idleWorkers.headOption.orElse {
+            if (workers.size < maxWorkers) Some(createWorker()) else None
+          }
 
-  private def dispatchIfPossible(peer: Peer): Unit = {
-    if (pendingTasks.isEmpty) return
-
-    // Keep a small bounded number of inflight requests per peer to maximize throughput
-    // without overloading any single neighbor.
-    var inflight = inFlightForPeer(peer)
-    while (pendingTasks.nonEmpty && inflight < maxInFlightPerPeer) {
-      val workerOpt: Option[WorkerRef] =
-        idleWorkers.headOption.orElse {
-          if (workers.size < maxWorkers) Some(createWorker()) else None
+        workerOpt match {
+          case Some(worker) =>
+            assignTaskToWorker(worker, peer)
+            inflight += 1
+          case None =>
+            log.warning(
+              s"ByteCode dispatch blocked: workers=${workers.size}/$maxWorkers, idle=${idleWorkers.size}, " +
+                s"pending=${pendingTasks.size}, peer=${peer.id.value}"
+            )
+            blocked = true
         }
-
-      workerOpt match {
-        case Some(worker) =>
-          assignTaskToWorker(worker, peer)
-          inflight += 1
-        case None =>
-          log.warning(
-            s"ByteCode dispatch blocked: workers=${workers.size}/$maxWorkers, idle=${idleWorkers.size}, " +
-              s"pending=${pendingTasks.size}, peer=${peer.id.value}"
-          )
-          return
       }
     }
-  }
 
   /** Re-dispatch pending tasks to all known peers. Includes both peers with active tasks and known available peers from
     * PeerAvailable events — handles the activeTasks=empty case that previously blocked dispatch after simultaneous peer
     * cooldowns.
     */
-  private def tryRedispatchPendingTasks(): Unit = {
-    if (pendingTasks.isEmpty) return
-    val peersFromActive = activeTasks.values.map(_.peer).toSet
-    val allKnown = peersFromActive ++ knownAvailablePeers
-    for (peer <- allKnown if pendingTasks.nonEmpty && !isPeerCoolingDown(peer))
-      dispatchIfPossible(peer)
-  }
+  private def tryRedispatchPendingTasks(): Unit =
+    if (pendingTasks.nonEmpty) {
+      val peersFromActive = activeTasks.values.map(_.peer).toSet
+      val allKnown = peersFromActive ++ knownAvailablePeers
+      for (peer <- allKnown if pendingTasks.nonEmpty && !isPeerCoolingDown(peer))
+        dispatchIfPossible(peer)
+    }
 
   private def handleByteCodesResponse(response: ByteCodes): Unit = {
     activeTasks.get(response.requestId) match {
