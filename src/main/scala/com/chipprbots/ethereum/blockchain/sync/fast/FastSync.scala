@@ -4,6 +4,8 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.pekko.actor.*
+import org.apache.pekko.actor.typed.DispatcherSelector
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import cats.data.NonEmptyList
@@ -198,8 +200,16 @@ class FastSync(
     private val headerResponseBuffer = mutable.SortedMap.empty[BigInt, Seq[BlockHeader]]
     private var headerQueueHighWatermark: BigInt = syncState.bestBlockHeaderNumber
 
-    private val syncStateStorageActor = context.actorOf(Props[StateStorageActor](), s"$countActor-state-storage")
-    syncStateStorageActor ! fastSyncStateStorage
+    // Pekko Typed migration (Group S2): StateStorageActor is now a Typed Behavior. FastSync is still Classic, so we spawn
+    // via the Classic->Typed adapter and hold the ref as Classic. Messages use the explicit Command ADT (Init/Persist).
+    private val syncStateStorageActor = context
+      .spawn(
+        StateStorageActor(),
+        s"$countActor-state-storage",
+        DispatcherSelector.fromConfig("sync-dispatcher")
+      )
+      .toClassic
+    syncStateStorageActor ! StateStorageActor.Init(fastSyncStateStorage)
 
     private val syncStateScheduler = context.actorOf(
       SyncStateSchedulerActor
@@ -816,9 +826,11 @@ class FastSync(
     }
 
     private def persistSyncState(): Unit =
-      syncStateStorageActor ! syncState.copy(
-        blockBodiesQueue = requestedBlockBodies.values.flatten.toSeq.distinct ++ syncState.blockBodiesQueue,
-        receiptsQueue = requestedReceipts.values.flatten.toSeq.distinct ++ syncState.receiptsQueue
+      syncStateStorageActor ! StateStorageActor.Persist(
+        syncState.copy(
+          blockBodiesQueue = requestedBlockBodies.values.flatten.toSeq.distinct ++ syncState.blockBodiesQueue,
+          receiptsQueue = requestedReceipts.values.flatten.toSeq.distinct ++ syncState.receiptsQueue
+        )
       )
 
     private def printStatus(): Unit = {
@@ -1108,7 +1120,9 @@ class FastSync(
       heartBeat.cancel()
       syncStatePersistCancellable.cancel()
       printStatusCancellable.cancel()
-      syncStateStorageActor ! PoisonPill
+      // StateStorageActor is now Typed; PoisonPill is a Classic-only protocol message it would silently drop. Stop the
+      // classic-adapted ref directly so the child terminates.
+      context.stop(syncStateStorageActor)
       fastSyncStateStorage.purge()
     }
 
