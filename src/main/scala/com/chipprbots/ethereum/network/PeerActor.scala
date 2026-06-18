@@ -418,9 +418,11 @@ object PeerActor {
       rlpxConfiguration: RLPxConfiguration,
       capabilities: List[Capability]
   ): ActorContext => ActorRef = { ctx =>
+    import org.apache.pekko.actor.typed.scaladsl.adapter.*
+    val typedParent = ctx.self.toTyped[PeerActor.Command]
     ctx.actorOf(
       RLPxConnectionHandler
-        .props(capabilities, authHandshaker, rlpxConfiguration),
+        .props(capabilities, authHandshaker, rlpxConfiguration, typedParent),
       "rlpx-connection"
     )
   }
@@ -448,7 +450,11 @@ object PeerActor {
 
   case class StatusResponse(status: Status)
 
-  case class DisconnectPeer(reason: Int)
+  // Parent-direction message trait — subtypes are the messages RLPxConnectionHandler sends to PeerActor.
+  // Not yet sealed: becomes sealed when PeerActor migrates to Typed.
+  trait Command
+
+  case class DisconnectPeer(reason: Int) extends Command
 
   sealed trait Status
 

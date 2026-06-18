@@ -6,11 +6,14 @@ import java.net.URI
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.Props
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.io.Tcp
 import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
+
+import com.chipprbots.ethereum.network.PeerActor
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -65,13 +68,13 @@ class RLPxConnectionHandlerSpec
     // Send first message
     rlpxConnection ! RLPxConnectionHandler.SendMessage(Ping())
     connection.expectMsg(Tcp.Write(ByteString("ping encoded"), RLPxConnectionHandler.Ack))
-    rlpxConnection ! RLPxConnectionHandler.Ack
+    connection.reply(RLPxConnectionHandler.Ack)
     connection.expectNoMessage()
 
     // Send second message
     rlpxConnection ! RLPxConnectionHandler.SendMessage(Ping())
     connection.expectMsg(Tcp.Write(ByteString("ping encoded"), RLPxConnectionHandler.Ack))
-    rlpxConnection ! RLPxConnectionHandler.Ack
+    connection.reply(RLPxConnectionHandler.Ack)
     connection.expectNoMessage()
   }
 
@@ -93,12 +96,12 @@ class RLPxConnectionHandlerSpec
     connection.expectNoMessage()
 
     // Send Ack, second message should now be sent through TCP connection
-    rlpxConnection ! RLPxConnectionHandler.Ack
+    connection.reply(RLPxConnectionHandler.Ack)
     connection.expectMsg(Tcp.Write(ByteString("ping encoded"), RLPxConnectionHandler.Ack))
     connection.expectNoMessage()
 
     // Send Ack, third message should now be sent through TCP connection
-    rlpxConnection ! RLPxConnectionHandler.Ack
+    connection.reply(RLPxConnectionHandler.Ack)
     connection.expectMsg(Tcp.Write(ByteString("ping encoded"), RLPxConnectionHandler.Ack))
     connection.expectNoMessage()
   }
@@ -133,7 +136,7 @@ class RLPxConnectionHandlerSpec
     connection.expectMsg(Tcp.Write(ByteString("ping encoded"), RLPxConnectionHandler.Ack))
 
     // Upon Ack, the next message is sent
-    rlpxConnection ! RLPxConnectionHandler.Ack
+    connection.reply(RLPxConnectionHandler.Ack)
     connection.expectMsg(Tcp.Write(ByteString("ping encoded"), RLPxConnectionHandler.Ack))
 
     // AckTimeout for the first Ping is received
@@ -141,7 +144,7 @@ class RLPxConnectionHandlerSpec
 
     // Connection should continue to work perfectly
     rlpxConnection ! RLPxConnectionHandler.SendMessage(Ping())
-    rlpxConnection ! RLPxConnectionHandler.Ack
+    connection.reply(RLPxConnectionHandler.Ack)
     connection.expectMsg(Tcp.Write(ByteString("ping encoded"), RLPxConnectionHandler.Ack))
   }
 
@@ -152,13 +155,14 @@ class RLPxConnectionHandlerSpec
     // Incomming connection arrives
     rlpxConnection ! RLPxConnectionHandler.HandleConnection(connection.ref)
     connection.expectMsgClass(classOf[Tcp.Register])
+    val bridge = connection.lastSender
 
     // AuthHandshaker throws exception on initial message
     mockHandshaker.handleInitialMessageHandler = Some(_ => throw new Exception("MAC invalid"))
     mockHandshaker.handleInitialMessageV4Handler = Some(_ => throw new Exception("MAC invalid"))
 
     val data: ByteString = ByteString((0 until AuthHandshaker.InitiatePacketLength).map(_.toByte).toArray)
-    rlpxConnection ! Tcp.Received(data)
+    bridge ! Tcp.Received(data)
     rlpxConnectionParent.expectMsg(RLPxConnectionHandler.ConnectionFailed)
     rlpxConnectionParent.expectTerminated(rlpxConnection)
   }
@@ -176,7 +180,8 @@ class RLPxConnectionHandlerSpec
     mockHandshaker.initiateHandler = Some(_ => initPacket -> mockHandshaker)
 
     tcpActorProbe.reply(Tcp.Connected(inetAddress, inetAddress))
-    tcpActorProbe.expectMsg(Tcp.Register(rlpxConnection))
+    tcpActorProbe.expectMsgClass(classOf[Tcp.Register]) // bridge registers (not typed actor directly)
+    val outboundBridge = tcpActorProbe.lastSender
     tcpActorProbe.expectMsg(Tcp.Write(initPacket, RLPxConnectionHandler.Ack))
 
     // AuthHandshaker handles the response message (that throws an invalid MAC)
@@ -184,7 +189,7 @@ class RLPxConnectionHandlerSpec
     mockHandshaker.handleResponseMessageV4Handler = Some(_ => throw new Exception("MAC invalid"))
 
     val data: ByteString = ByteString((0 until AuthHandshaker.ResponsePacketLength).map(_.toByte).toArray)
-    rlpxConnection ! Tcp.Received(data)
+    outboundBridge ! Tcp.Received(data)
     rlpxConnectionParent.expectMsg(RLPxConnectionHandler.ConnectionFailed)
     rlpxConnectionParent.expectTerminated(rlpxConnection)
   }
@@ -193,6 +198,7 @@ class RLPxConnectionHandlerSpec
     // Start setting up connection
     rlpxConnection ! RLPxConnectionHandler.HandleConnection(connection.ref)
     connection.expectMsgClass(classOf[Tcp.Register])
+    val bridge = connection.lastSender
 
     // AuthHandshaker handles initial message and fails (simulating auth failure scenario)
     val data: ByteString = ByteString((0 until AuthHandshaker.InitiatePacketLength).map(_.toByte).toArray)
@@ -202,7 +208,7 @@ class RLPxConnectionHandlerSpec
     mockHandshaker.handleInitialMessageV4Handler = Some(_ => throw new Exception("Auth failed"))
 
     // Send the auth data which will trigger shutdown
-    rlpxConnection ! Tcp.Received(data)
+    bridge ! Tcp.Received(data)
 
     // Immediately send a SendMessage during the shutdown window
     rlpxConnection ! RLPxConnectionHandler.SendMessage(Ping())
@@ -250,7 +256,7 @@ class RLPxConnectionHandlerSpec
     encodedMessages should be(empty)
 
     // Now send a regular message (non-Hello) and verify it goes through MessageCodec
-    rlpxConnection ! RLPxConnectionHandler.Ack
+    connection.reply(RLPxConnectionHandler.Ack)
     rlpxConnection ! RLPxConnectionHandler.SendMessage(Ping())
     connection.expectMsgClass(classOf[Tcp.Write])
 
@@ -477,24 +483,19 @@ class RLPxConnectionHandlerSpec
 
     lazy val tcpActorProbe: TestProbe = TestProbe()
     lazy val rlpxConnectionParent: TestProbe = TestProbe()
+    lazy val typedParent: org.apache.pekko.actor.typed.ActorRef[PeerActor.Command] =
+      rlpxConnectionParent.ref.toTyped[PeerActor.Command]
     lazy val rlpxConnection: TestActorRef[Nothing] = TestActorRef(
-      Props(
-        new RLPxConnectionHandler(
+      PropsAdapter(
+        RLPxConnectionHandler.apply(
           protocolVersion :: Nil,
           mockHandshaker,
-          (
-              _: FrameCodec,
-              _: Capability,
-              _: Long,
-              _: String,
-              _: MessageCodec.CompressionPolicy,
-              _: Boolean
-          ) => mockMessageCodec,
+          (_, _, _, _, _, _) => mockMessageCodec,
           rlpxConfiguration,
-          _ => mockHelloExtractor
-        ) {
-          override def tcpActor: ActorRef = tcpActorProbe.ref
-        }
+          _ => mockHelloExtractor,
+          typedParent,
+          Some(tcpActorProbe.ref)
+        )
       ),
       rlpxConnectionParent.ref
     )
@@ -505,6 +506,8 @@ class RLPxConnectionHandlerSpec
       // Start setting up connection
       rlpxConnection ! RLPxConnectionHandler.HandleConnection(connection.ref)
       connection.expectMsgClass(classOf[Tcp.Register])
+      // Bridge child registers with the connection; capture its ref to inject TCP events
+      val bridge: ActorRef = connection.lastSender
 
       // Configure stubFrameCodec to return empty Seq instead of null
       stubFrameCodec.readFrames.when(*).returns(Seq.empty)
@@ -537,10 +540,11 @@ class RLPxConnectionHandlerSpec
         .returning(Some((Hello(5, "", Capability.ETH63 :: Nil, 30303, ByteString("abc")), Seq.empty)))
       mockMessageCodec.readMessagesHandler = Some(_ => Nil) // For processing of messages after handshaking finishes
 
-      rlpxConnection ! Tcp.Received(data)
+      // Inject TCP data via the bridge (bridge forwards to typed actor as TcpReceived)
+      bridge ! Tcp.Received(data)
       connection.expectMsg(Tcp.Write(response, RLPxConnectionHandler.Ack))
 
-      rlpxConnection ! Tcp.Received(hello)
+      bridge ! Tcp.Received(hello)
 
       // Connection fully established
       rlpxConnectionParent.expectMsgClass(classOf[RLPxConnectionHandler.ConnectionEstablished])
