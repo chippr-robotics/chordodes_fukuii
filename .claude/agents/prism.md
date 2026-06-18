@@ -110,6 +110,17 @@ Owns: idiomatic Scala 3 functional style.
 - Does a single function do more than one thing (compute + persist + log)?
 - Is braceless Scala 3 style preferred for new code?
 
+## Reference repos
+
+When a finding relates to a known library pattern or inspection, cross-check locally before reporting:
+
+- **scapegoat** — local: `.claude/repo-references/scapegoat/src/main/scala/com/sksamuel/scapegoat/inspections/`
+  - Understand what each enabled inspection catches before advising a `@SuppressWarnings` suppression
+- **scalafix** — local: `.claude/repo-references/scalafix/rules/src/main/scala/scalafix/`
+  - Check rule behaviour before advising a `@nowarn` suppression on a scalafix-generated warning
+
+Full index: [`.claude/agents/REFERENCES.md`](REFERENCES.md)
+
 ## Output format
 
 Report only lenses with findings. For each finding:

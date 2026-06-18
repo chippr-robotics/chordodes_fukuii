@@ -56,6 +56,17 @@ sbt "IntegrationTest / test"
 - Flag any consensus-affecting change that reached you without `forge` (ETC) or
   `beacon` (ETH) review.
 
+## Reference test vectors
+
+When EVM opcode or gas cost behaviour is in question, cross-check against local test vectors before concluding:
+
+- **ethereum/tests** — local: `.claude/repo-references/ethereum/tests/`
+  - `GeneralStateTests/` — EVM state transition tests (opcode behaviour, gas, storage)
+  - `BlockchainTests/` — full block import tests (fork transitions, uncle rewards, difficulty)
+  - `VMTests/` — low-level opcode unit tests
+  - `TransactionTests/` — tx signing and RLP encoding
+  - These are the same vectors `sbt testComprehensive` runs internally. Read the JSON files directly when you need to inspect a specific test case without running the full suite.
+
 ## Reporting discipline
 
 - One test at a time conceptually: state exactly what ran and its result. Never

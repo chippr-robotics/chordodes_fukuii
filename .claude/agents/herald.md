@@ -69,7 +69,7 @@ yet public). The local copy is authoritative.
   - Fallback: https://ecips.ethereumclassic.org
 - **EIPs** — local: `.claude/repo-references/EIPs/EIPS/eip-NNNN.md`
   - Fallback: https://eips.ethereum.org
-- **devp2p / RLPx** — local: `.claude/repo-references/ethereum/devp2p/` (when cloned)
+- **devp2p / RLPx** — local: `.claude/repo-references/ethereum/devp2p/`
   - Key files: `rlpx.md`, `discv4.md`, `discv5/`, `eth/68.md`, `eth/69.md`, `snap.md`
   - Fallback: https://github.com/ethereum/devp2p
 

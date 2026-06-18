@@ -65,16 +65,22 @@ See `herald` for wire-protocol (ETH68/ETH69) detail.
 
 ## Spec references
 
-**Local-first rule**: if local clones of EIPs or ECIPs repos are available,
-check them before the public URLs — local working trees may be ahead (active
-drafts, unpublished revisions).
+**Local-first rule**: always use local repo-references clones — they are
+always preferred over public URLs.
 
-- **EIPs**: https://eips.ethereum.org
+- **EIPs** — local: `.claude/repo-references/EIPs/EIPS/eip-NNNN.md`
   - Osaka fork (Sepolia active): EIP-7939 (CLZ opcode), EIP-7702 (set code
     txs), EIP-7623 (calldata cost), EIP-7594 (PeerDAS), EIP-7685 (execution
     requests), EIP-7251 (max effective balance), EIP-6110 (deposit processing),
     EIP-2537 (BLS12-381 precompiles)
-- **ECIPs**: https://ecips.ethereumclassic.org — for comparison with ETC path
+  - Fallback: https://eips.ethereum.org
+- **Consensus specs** — local: `.claude/repo-references/ethereum/consensus-specs/`
+  - Key paths: `specs/phase0/` · `specs/bellatrix/` (merge) · `specs/capella/` (withdrawals) · `specs/deneb/` (blobs)
+  - Use for: PoS beacon block processing, execution payload format, withdrawal mechanics
+- **Ethereum test vectors** — local: `.claude/repo-references/ethereum/tests/`
+  - Use `GeneralStateTests/` and `BlockchainTests/` for EVM opcode/gas cross-check
+- **ECIPs** — local: `.claude/repo-references/ECIPs/_specs/` (for ETC path comparison only)
+  - Fallback: https://ecips.ethereumclassic.org
 
 ## ETH chain facts
 

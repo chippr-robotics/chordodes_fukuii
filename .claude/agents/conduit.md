@@ -75,11 +75,11 @@ jsonrpc/
 
 - **Ethereum JSON-RPC API (EIP-1474)** — local: `.claude/repo-references/EIPs/EIPS/eip-1474.md`
   - Fallback: https://eips.ethereum.org/EIPS/eip-1474
-- **execution-apis (web3_* / net_*)** — local: `.claude/repo-references/ethereum/execution-apis/` (when cloned)
+- **execution-apis (web3_* / net_*)** — local: `.claude/repo-references/ethereum/execution-apis/`
   - Fallback: https://github.com/ethereum/execution-apis/tree/main/api-documentation
 - **ETC JSON-RPC extensions** — local: `.claude/repo-references/ECIPs/_specs/` (ECIPs is ahead of upstream)
   - Fallback: https://ecips.ethereumclassic.org
-- **GraphQL** — local: `.claude/repo-references/sangria/` (when cloned) · Sangria DSL for schema + execution
+- **GraphQL** — local: `.claude/repo-references/sangria/` · Sangria DSL for schema + execution
 
 ## Iron rules
 

@@ -46,15 +46,17 @@ Pull fast-forward updates at session start:
 
 ```bash
 REFS=$(git rev-parse --show-toplevel)/.claude/repo-references
-for r in scala3 scala2; do
+for r in scala3 scala2 scalafix scapegoat; do
   git -C "$REFS/$r" pull --ff-only 2>/dev/null | grep -v "Already up to date" || true
 done
 ```
 
-| Repo | GitHub | What to check |
-|------|--------|---------------|
-| scala3 | https://github.com/scala/scala3 | `AGENTS.md` for test annotation conventions (`// error`); `changelogs/` for new Scala 2→3 migration patterns not yet listed in this file |
-| scala2 | https://github.com/scala/scala | `AGENTS.md` for Scala 2 stdlib guidance; `src/library/` to recognize source patterns during migration |
+| Repo | Local path | What to check |
+|------|-----------|---------------|
+| scala3 | `repo-references/scala3` | `AGENTS.md` for test annotation conventions (`// error`); `changelogs/` for new Scala 2→3 migration patterns not yet listed in this file |
+| scala2 | `repo-references/scala2` | `AGENTS.md` for Scala 2 stdlib guidance; `src/library/` to recognize source patterns during migration |
+| scalafix | `repo-references/scalafix` | `rules/src/main/scala/scalafix/` for built-in rule behavior — check before blaming a scalafix rule for a spurious rewrite |
+| scapegoat | `repo-references/scapegoat` | `src/main/scala/com/sksamuel/scapegoat/inspections/` — understand the inspection before suppressing it with `@SuppressWarnings` |
 
 Full index: [`.claude/agents/REFERENCES.md`](REFERENCES.md)
 

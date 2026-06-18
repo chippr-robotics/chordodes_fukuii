@@ -23,16 +23,21 @@ Pull fast-forward updates at session start:
 
 ```bash
 REFS=$(git rev-parse --show-toplevel)/.claude/repo-references
-for r in scala3 docs.scala-lang virtuslab/scala-skill; do
+for r in scala3 docs.scala-lang virtuslab/scala-skill scalafix scapegoat typelevel/cats typelevel/cats-effect typelevel/fs2; do
   git -C "$REFS/$r" pull --ff-only 2>/dev/null | grep -v "Already up to date" || true
 done
 ```
 
-| Repo | GitHub | What to check |
-|------|--------|---------------|
-| scala3 | https://github.com/scala/scala3 | `AGENTS.md` for compiler rules; `changelogs/` for new idioms, deprecated patterns, and breaking changes |
-| docs.scala-lang | https://github.com/scala/docs.scala-lang | `_overviews/scala3-migration/` for migration cookbook; `_overviews/scala3-book/` for idiomatic examples |
-| virtuslab/scala-skill | https://github.com/VirtusLab/scala-skill | `README.md` for IDE-integrated patterns to cross-reference when proposing editor-visible refactors |
+| Repo | Local path | What to check |
+|------|-----------|---------------|
+| scala3 | `repo-references/scala3` | `AGENTS.md` for compiler rules; `changelogs/` for new idioms, deprecated patterns, and breaking changes |
+| docs.scala-lang | `repo-references/docs.scala-lang` | `_overviews/scala3-migration/` for migration cookbook; `_overviews/scala3-book/` for idiomatic examples |
+| virtuslab/scala-skill | `repo-references/virtuslab/scala-skill` | `README.md` for IDE-integrated patterns to cross-reference when proposing editor-visible refactors |
+| scalafix | `repo-references/scalafix` | `docs/` for rule behaviour; `rules/src/main/scala/scalafix/` for built-in rule implementations (GivenUsing, ExplicitImplicitTypes); debug `.scalafix.conf` failures here |
+| scapegoat | `repo-references/scapegoat` | `src/main/scala/com/sksamuel/scapegoat/inspections/` to understand what each enabled inspection catches before suppressing with `@SuppressWarnings` |
+| typelevel/cats | `repo-references/typelevel/cats` | `core/src/main/scala/cats/` for Functor/Monad/Traverse idioms; `docs/` for usage examples |
+| typelevel/cats-effect | `repo-references/typelevel/cats-effect` | `core/src/main/scala/cats/effect/` for IO/Resource/Fiber patterns — reference if actors migrate to cats-effect |
+| typelevel/fs2 | `repo-references/typelevel/fs2` | `core/src/main/scala/fs2/` for streaming patterns — reference if network IO migrates from Pekko Streams |
 
 Full index: [`.claude/agents/REFERENCES.md`](REFERENCES.md)
 

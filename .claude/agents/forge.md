@@ -76,6 +76,9 @@ copy is authoritative.
   - Fallback (may lag local): https://ecips.ethereumclassic.org
 - **EIPs** — local: `.claude/repo-references/EIPs/EIPS/eip-NNNN.md`
   - Fallback: https://eips.ethereum.org
+- **Ethereum test vectors** — local: `.claude/repo-references/ethereum/tests/`
+  - Use `GeneralStateTests/` and `BlockchainTests/` when EVM opcode or gas behavior is in question
+  - Use `VMTests/` for low-level opcode cross-check
 
 ## Chain comparison: ETC vs ETH
 
