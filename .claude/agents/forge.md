@@ -61,18 +61,21 @@ canonical upstream.
 
 ## Spec references
 
-**Local-first rule**: if local clones of ECIPs or EIPs repos are available,
-check them before the public URLs — local working trees may be ahead (active
-drafts, unpublished implementation revisions).
+**Local-first rule**: always check local repo-references clones before public
+URLs. The ECIPs clone is **ahead of upstream** — we authored the Olympia ECIPs
+(ECIP-1111/1112/1121/1122) and they are not yet published publicly. The local
+copy is authoritative.
 
-- **ECIPs**: https://ecips.ethereumclassic.org
+- **ECIPs** — local: `.claude/repo-references/ECIPs/_specs/`
   - ETC fork schedule: ECIP-1066
   - Olympia fork (planned — four ECIPs, all required):
     ECIP-1111 (EIP-1559 + basefee→Treasury),
     ECIP-1112 (Treasury contract `0x60d0A7394f9Cd5C469f9F5Ec4F9C803F5294d79b`),
     ECIP-1121 (remaining EIPs: EIP-3198, EIP-3529, EIP-3541, EIP-3554, EIP-7594, EIP-7939 CLZ),
     ECIP-1122 (MIN_MINER_TIP 1 gwei floor, gas target schedule, MESS reactivation)
-- **EIPs**: https://eips.ethereum.org
+  - Fallback (may lag local): https://ecips.ethereumclassic.org
+- **EIPs** — local: `.claude/repo-references/EIPs/EIPS/eip-NNNN.md`
+  - Fallback: https://eips.ethereum.org
 
 ## Chain comparison: ETC vs ETH
 

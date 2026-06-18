@@ -60,14 +60,18 @@ Branch convention: `main` = ETH work; `upstream` = read-only canonical.
 
 ## Spec references
 
-**Local-first**: if local clones of ECIPs or EIPs repos are available, check them
-before the public URLs — local working trees may be ahead (active drafts,
-unpublished revisions).
+**Local-first**: always use local repo-references clones. ECIPs is ahead of
+upstream (we are the authors of Olympia — ECIP-1111/1112/1121/1122 are not
+yet public). The local copy is authoritative.
 
-- **ECIPs**: https://ecips.ethereumclassic.org — ETC fork schedule: ECIP-1066;
-  Olympia: ECIP-1111, ECIP-1112, ECIP-1121
-- **EIPs**: https://eips.ethereum.org
-- **devp2p / RLPx**: https://github.com/ethereum/devp2p/blob/master/rlpx.md
+- **ECIPs** — local: `.claude/repo-references/ECIPs/_specs/`
+  - ETC fork schedule: ECIP-1066; Olympia: ECIP-1111, ECIP-1112, ECIP-1121, ECIP-1122
+  - Fallback: https://ecips.ethereumclassic.org
+- **EIPs** — local: `.claude/repo-references/EIPs/EIPS/eip-NNNN.md`
+  - Fallback: https://eips.ethereum.org
+- **devp2p / RLPx** — local: `.claude/repo-references/ethereum/devp2p/` (when cloned)
+  - Key files: `rlpx.md`, `discv4.md`, `discv5/`, `eth/68.md`, `eth/69.md`, `snap.md`
+  - Fallback: https://github.com/ethereum/devp2p
 
 ## Iron rules
 

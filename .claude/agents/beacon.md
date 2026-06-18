@@ -32,7 +32,8 @@ analysis**, not a code edit:
 1. Confirm the target is ETH (not ETC) and identify the fork-schedule position
    (Cancun, Prague, Osaka, …).
 2. Cross-check the relevant EIP and go-ethereum reference client. Check local
-   EIP repos before fetching from public URLs — local working trees may be ahead.
+   EIP repos first: `.claude/repo-references/EIPs/EIPS/eip-NNNN.md` — local
+   clone is always preferred over the public URL (https://eips.ethereum.org).
 3. List the validation required (test vectors, state roots, gas, RLP bytes).
 4. Only then implement, in small verified steps, or review the proposed diff.
 
