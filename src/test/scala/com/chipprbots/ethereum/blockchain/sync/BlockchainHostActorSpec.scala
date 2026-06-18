@@ -1,9 +1,7 @@
 package com.chipprbots.ethereum.blockchain.sync
 
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.actor.Props
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -77,7 +75,9 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
       .commit()
 
     // when
-    blockchainHost ! MessageFromPeer(ETHPackets.GetReceipts(BigInt(0), receiptsHashes), peerId)
+    blockchainHost ! BlockchainHostActor.PeerEventReceived(
+      MessageFromPeer(ETHPackets.GetReceipts(BigInt(0), receiptsHashes), peerId)
+    )
 
     // then
     networkPeerManager.expectMsg(
@@ -107,7 +107,9 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
       .commit()
 
     // when
-    blockchainHost ! MessageFromPeer(ETHPackets.GetBlockBodies(BigInt(0), blockBodiesHashes), peerId)
+    blockchainHost ! BlockchainHostActor.PeerEventReceived(
+      MessageFromPeer(ETHPackets.GetBlockBodies(BigInt(0), blockBodiesHashes), peerId)
+    )
 
     // then
     networkPeerManager.expectMsg(
@@ -128,7 +130,9 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
       .commit()
 
     // when
-    blockchainHost ! MessageFromPeer(GetBlockHeaders(BigInt(0), Left(3), 2, 0, reverse = false), peerId)
+    blockchainHost ! BlockchainHostActor.PeerEventReceived(
+      MessageFromPeer(GetBlockHeaders(BigInt(0), Left(3), 2, 0, reverse = false), peerId)
+    )
 
     // then
     networkPeerManager.expectMsg(
@@ -150,7 +154,9 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
       .commit()
 
     // when
-    blockchainHost ! MessageFromPeer(GetBlockHeaders(BigInt(0), Left(3), 3, 0, reverse = false), peerId)
+    blockchainHost ! BlockchainHostActor.PeerEventReceived(
+      MessageFromPeer(GetBlockHeaders(BigInt(0), Left(3), 3, 0, reverse = false), peerId)
+    )
 
     // then
     networkPeerManager.expectMsg(
@@ -170,7 +176,9 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
       .commit()
 
     // when
-    blockchainHost ! MessageFromPeer(GetBlockHeaders(BigInt(0), Left(3), 2, 0, reverse = true), peerId)
+    blockchainHost ! BlockchainHostActor.PeerEventReceived(
+      MessageFromPeer(GetBlockHeaders(BigInt(0), Left(3), 2, 0, reverse = true), peerId)
+    )
 
     // then
     networkPeerManager.expectMsg(
@@ -191,7 +199,9 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
       .commit()
 
     // when
-    blockchainHost ! MessageFromPeer(GetBlockHeaders(BigInt(0), Right(firstHeader.hash), 2, 0, reverse = false), peerId)
+    blockchainHost ! BlockchainHostActor.PeerEventReceived(
+      MessageFromPeer(GetBlockHeaders(BigInt(0), Right(firstHeader.hash), 2, 0, reverse = false), peerId)
+    )
 
     // then
     networkPeerManager.expectMsg(
@@ -213,9 +223,11 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
       .commit()
 
     // when
-    blockchainHost ! MessageFromPeer(
-      ETHPackets.GetBlockHeaders(BigInt(0), Right(firstHeader.hash), maxHeaders = 2, skip = 1, reverse = false),
-      peerId
+    blockchainHost ! BlockchainHostActor.PeerEventReceived(
+      MessageFromPeer(
+        ETHPackets.GetBlockHeaders(BigInt(0), Right(firstHeader.hash), maxHeaders = 2, skip = 1, reverse = false),
+        peerId
+      )
     )
 
     // then
@@ -238,7 +250,9 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
       .commit()
 
     // when
-    blockchainHost ! MessageFromPeer(GetBlockHeaders(BigInt(0), Right(firstHeader.hash), 2, 1, reverse = true), peerId)
+    blockchainHost ! BlockchainHostActor.PeerEventReceived(
+      MessageFromPeer(GetBlockHeaders(BigInt(0), Right(firstHeader.hash), 2, 1, reverse = true), peerId)
+    )
 
     // then
     networkPeerManager.expectMsg(
@@ -260,7 +274,9 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
       .commit()
 
     // when
-    blockchainHost ! MessageFromPeer(GetBlockHeaders(BigInt(0), Right(firstHeader.hash), 3, 1, reverse = true), peerId)
+    blockchainHost ! BlockchainHostActor.PeerEventReceived(
+      MessageFromPeer(GetBlockHeaders(BigInt(0), Right(firstHeader.hash), 3, 1, reverse = true), peerId)
+    )
 
     // then
     networkPeerManager.expectMsg(
@@ -282,7 +298,9 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
       .commit()
 
     // when
-    blockchainHost ! MessageFromPeer(GetBlockHeaders(BigInt(0), Right(firstHeader.hash), 4, 1, reverse = true), peerId)
+    blockchainHost ! BlockchainHostActor.PeerEventReceived(
+      MessageFromPeer(GetBlockHeaders(BigInt(0), Right(firstHeader.hash), 4, 1, reverse = true), peerId)
+    )
 
     // then
     networkPeerManager.expectMsg(
@@ -301,7 +319,7 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
     storagesInstance.storages.evmCodeStorage.put(evmCodeHash, fakeEvmCode).commit()
 
     // when
-    blockchainHost ! MessageFromPeer(GetNodeData(Seq(evmCodeHash)), peerId)
+    blockchainHost ! BlockchainHostActor.PeerEventReceived(MessageFromPeer(GetNodeData(Seq(evmCodeHash)), peerId))
 
     // then
     networkPeerManager.expectMsg(NetworkPeerManagerActor.SendMessage(NodeData(Seq(fakeEvmCode)), peerId))
@@ -320,7 +338,9 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
     )
 
     // when
-    blockchainHost ! MessageFromPeer(GetNodeData(Seq(ByteString(extensionNode.hash))), peerId)
+    blockchainHost ! BlockchainHostActor.PeerEventReceived(
+      MessageFromPeer(GetNodeData(Seq(ByteString(extensionNode.hash))), peerId)
+    )
 
     // then
     networkPeerManager.expectMsg(NetworkPeerManagerActor.SendMessage(NodeData(Seq(extensionNode.toBytes)), peerId))
@@ -374,18 +394,18 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
     val networkPeerManager: TestProbe = TestProbe()
     val pendingTxManager: TestProbe = TestProbe()
 
-    val blockchainHost: TestActorRef[Nothing] = TestActorRef(
-      Props(
-        new BlockchainHostActor(
+    val blockchainHost: org.apache.pekko.actor.typed.ActorRef[BlockchainHostActor.Command] =
+      system.spawn(
+        BlockchainHostActor(
           blockchainReader,
           storagesInstance.storages.evmCodeStorage,
           peerConf,
           peerEventBus.ref,
           networkPeerManager.ref,
           pendingTxManager.ref.toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command]
-        )
+        ),
+        s"blockchain-host-${System.nanoTime()}"
       )
-    )
   }
 
 }

@@ -249,7 +249,10 @@ class PeerDiscoveryManagerSpec
     }
   }
 
-  it should "log errors from the service rather than propagating them to callers" taggedAs (UnitTest, NetworkTest) in test {
+  it should "log errors from the service rather than propagating them to callers" taggedAs (
+    UnitTest,
+    NetworkTest
+  ) in test {
     new Fixture {
       override lazy val discoveryConfig: DiscoveryConfig =
         defaultConfig.copy(discoveryEnabled = true, reuseKnownNodes = false)

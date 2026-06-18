@@ -272,17 +272,16 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
       s"pending-txs-stub-${System.nanoTime()}"
     )
 
-  val blockchainHost: ActorRef =
-    system.actorOf(
-      BlockchainHostActor
-        .props(
-          blockchainReader,
-          storagesInstance.storages.evmCodeStorage,
-          peerConf,
-          peerEventBus,
-          etcPeerManager,
-          pendingTransactionsManagerStub
-        ),
+  val blockchainHost: org.apache.pekko.actor.typed.ActorRef[BlockchainHostActor.Command] =
+    system.spawn(
+      BlockchainHostActor(
+        blockchainReader,
+        storagesInstance.storages.evmCodeStorage,
+        peerConf,
+        peerEventBus,
+        etcPeerManager,
+        pendingTransactionsManagerStub
+      ),
       "blockchain-host"
     )
 

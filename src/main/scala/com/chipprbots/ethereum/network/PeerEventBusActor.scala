@@ -23,12 +23,12 @@ import com.chipprbots.ethereum.network.p2p.Message
 object PeerEventBusActor {
 
   /** Classic-facing factory. Existing Classic callers (PeerActor, PeerManagerActor, PeerRequestHandler,
-    * PivotBlockSelector, PeersClient, PeerListSupportNg) and the Akka-Streams [[messageSource]] keep working
-    * unchanged through this shell: it captures `sender()` (the subscriber) and `Terminated`, enriches the wire
-    * messages with the explicit subscriber, and forwards them to the Typed dispatch core spawned as a child.
+    * PivotBlockSelector, PeersClient, PeerListSupportNg) and the Akka-Streams [[messageSource]] keep working unchanged
+    * through this shell: it captures `sender()` (the subscriber) and `Terminated`, enriches the wire messages with the
+    * explicit subscriber, and forwards them to the Typed dispatch core spawned as a child.
     *
-    * The dispatch logic lives in the Typed [[behavior]]; this Classic shell exists only as the `sender()` bridge and
-    * is removed once the last Classic subscriber migrates (Group NET).
+    * The dispatch logic lives in the Typed [[behavior]]; this Classic shell exists only as the `sender()` bridge and is
+    * removed once the last Classic subscriber migrates (Group NET).
     */
   def props: Props = Props(new PeerEventBusActor)
 
@@ -321,8 +321,8 @@ object PeerEventBusActor {
   *
   * Classic callers send the wire messages [[PeerEventBusActor.Subscribe]] / [[PeerEventBusActor.Unsubscribe]] /
   * [[PeerEventBusActor.Publish]] with no subscriber field — the subscriber is `sender()`. This actor captures
-  * `sender()` and forwards an enriched [[PeerEventBusActor.Command]] to the Typed core (spawned as a child). The
-  * Typed core owns subscriber lifecycle watching, so this shell holds no subscription state of its own.
+  * `sender()` and forwards an enriched [[PeerEventBusActor.Command]] to the Typed core (spawned as a child). The Typed
+  * core owns subscriber lifecycle watching, so this shell holds no subscription state of its own.
   */
 class PeerEventBusActor extends Actor {
   import PeerEventBusActor.*

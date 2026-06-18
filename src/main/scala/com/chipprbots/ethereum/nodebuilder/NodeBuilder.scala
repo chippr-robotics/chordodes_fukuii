@@ -455,8 +455,8 @@ trait BlockchainHostBuilder {
     with PeerEventBusBuilder
     with PendingTransactionsManagerBuilder =>
 
-  val blockchainHost: ActorRef = system.actorOf(
-    BlockchainHostActor.props(
+  val blockchainHost: org.apache.pekko.actor.typed.ActorRef[BlockchainHostActor.Command] = system.spawn(
+    BlockchainHostActor(
       blockchainReader,
       storagesInstance.storages.evmCodeStorage,
       peerConfiguration,

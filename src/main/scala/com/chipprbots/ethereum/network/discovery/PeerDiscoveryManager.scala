@@ -28,14 +28,14 @@ object PeerDiscoveryManager {
   sealed trait Command
   case object Start extends Command
   case object Stop extends Command
-  private final case class StartAttempt(result: Either[Throwable, (Discovery, IO[Unit])]) extends Command
-  private final case class StopAttempt(result: Either[Throwable, Unit]) extends Command
+  final private case class StartAttempt(result: Either[Throwable, (Discovery, IO[Unit])]) extends Command
+  final private case class StopAttempt(result: Either[Throwable, Unit]) extends Command
   final case class GetDiscoveredNodesInfoReq(replyTo: ActorRef[DiscoveredNodesInfo]) extends Command
   final case class GetRandomNodeInfoReq(replyTo: ActorRef[RandomNodeInfo]) extends Command
 
-  /** Legacy Classic-only messages — NOT part of Command. Used by the Classic bridge in NodeBuilder
-    * to translate fire-and-forget Classic requests into typed ask-with-replyTo requests.
-    * Remove once PeerManagerActor is migrated to Typed.
+  /** Legacy Classic-only messages — NOT part of Command. Used by the Classic bridge in NodeBuilder to translate
+    * fire-and-forget Classic requests into typed ask-with-replyTo requests. Remove once PeerManagerActor is migrated to
+    * Typed.
     */
   case object GetDiscoveredNodesInfo
   case object GetRandomNodeInfo
@@ -114,11 +114,13 @@ object PeerDiscoveryManager {
             .flatTap(nodes => IO(log.debug("Discovered nodes snapshot ({} total) sent", nodes.size.toString)))
             .map(DiscoveredNodesInfo(_))
         }
-        task.attempt.unsafeToFuture().onComplete {
-          case Success(Right(result)) => replyTo ! result
-          case Success(Left(ex))      => log.error("Failed to get discovered nodes: {}", ex.getMessage)
-          case Failure(ex)            => log.error("Unexpected failure getting discovered nodes: {}", ex.getMessage)
-        }(runtime.compute)
+        task.attempt
+          .unsafeToFuture()
+          .onComplete {
+            case Success(Right(result)) => replyTo ! result
+            case Success(Left(ex))      => log.error("Failed to get discovered nodes: {}", ex.getMessage)
+            case Failure(ex)            => log.error("Unexpected failure getting discovered nodes: {}", ex.getMessage)
+          }(runtime.compute)
       }
 
       def sendRandomNodeInfo(
@@ -131,11 +133,13 @@ object PeerDiscoveryManager {
             IO(log.debug("Random node candidate {} delivered", formatNodeForLogs(node)))
               .as(RandomNodeInfo(node))
           }
-        task.attempt.unsafeToFuture().onComplete {
-          case Success(Right(result)) => replyTo ! result
-          case Success(Left(ex))      => log.error("Failed to get random node: {}", ex.getMessage)
-          case Failure(ex)            => log.error("Unexpected failure getting random node: {}", ex.getMessage)
-        }(runtime.compute)
+        task.attempt
+          .unsafeToFuture()
+          .onComplete {
+            case Success(Right(result)) => replyTo ! result
+            case Success(Left(ex))      => log.error("Failed to get random node: {}", ex.getMessage)
+            case Failure(ex)            => log.error("Unexpected failure getting random node: {}", ex.getMessage)
+          }(runtime.compute)
       }
 
       // The service hasn't been started yet; serves static known nodes only.
