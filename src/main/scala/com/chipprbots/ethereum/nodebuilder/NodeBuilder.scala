@@ -204,28 +204,56 @@ trait PeerDiscoveryManagerBuilder {
 
   implicit lazy val ioRuntime: IORuntime = IORuntime.global
 
-  lazy val peerDiscoveryManager: ActorRef = system.actorOf(
-    PeerDiscoveryManager.props(
-      localNodeId = ByteString(nodeStatusHolder.get.nodeId),
-      discoveryConfig,
-      storagesInstance.storages.knownNodesStorage,
-      discoveryServiceResource(
+  // Typed ref — for in-scope callers and direct Typed wiring.
+  lazy val peerDiscoveryManagerTyped: org.apache.pekko.actor.typed.ActorRef[PeerDiscoveryManager.Command] =
+    system.spawn(
+      PeerDiscoveryManager(
+        localNodeId = ByteString(nodeStatusHolder.get.nodeId),
         discoveryConfig,
-        tcpPort = instanceConfig.Network.Server.port,
-        nodeStatusHolder,
         storagesInstance.storages.knownNodesStorage,
-        forkIdTag = Some(
-          new com.chipprbots.ethereum.network.discovery.ForkIdTag(
-            genesisHash = () => blockchainReader.genesisHeader.hash,
-            blockchainConfig = blockchainConfig,
-            currentBestBlock = () => blockchainReader.getBestBlockNumber
+        discoveryServiceResource(
+          discoveryConfig,
+          tcpPort = instanceConfig.Network.Server.port,
+          nodeStatusHolder,
+          storagesInstance.storages.knownNodesStorage,
+          forkIdTag = Some(
+            new com.chipprbots.ethereum.network.discovery.ForkIdTag(
+              genesisHash = () => blockchainReader.genesisHeader.hash,
+              blockchainConfig = blockchainConfig,
+              currentBestBlock = () => blockchainReader.getBestBlockNumber
+            )
           )
-        )
+        ),
+        randomNodeBufferSize = instanceConfig.Network.peer.maxOutgoingPeers
       ),
-      randomNodeBufferSize = instanceConfig.Network.peer.maxOutgoingPeers
-    ),
-    "peer-discovery-manager"
-  )
+      "peer-discovery-manager-typed"
+    )
+
+  // Classic bridge actor for out-of-scope Classic callers (PeerManagerActor, StdNode).
+  // Translates legacy GetDiscoveredNodesInfo / GetRandomNodeInfo case objects into typed
+  // GetDiscoveredNodesInfoReq / GetRandomNodeInfoReq with the Classic sender wrapped as
+  // a typed replyTo. Forwards PeerDiscoveryManager.Command messages (Start, Stop) directly.
+  // Remove once PeerManagerActor and StdNode are migrated to Typed.
+  lazy val peerDiscoveryManager: ActorRef =
+    system.actorOf(
+      org.apache.pekko.actor.Props(new org.apache.pekko.actor.Actor {
+        def receive: Receive = {
+          case PeerDiscoveryManager.GetDiscoveredNodesInfo =>
+            peerDiscoveryManagerTyped ! PeerDiscoveryManager.GetDiscoveredNodesInfoReq(
+              sender().toTyped[PeerDiscoveryManager.DiscoveredNodesInfo]
+            )
+
+          case PeerDiscoveryManager.GetRandomNodeInfo =>
+            peerDiscoveryManagerTyped ! PeerDiscoveryManager.GetRandomNodeInfoReq(
+              sender().toTyped[PeerDiscoveryManager.RandomNodeInfo]
+            )
+
+          case cmd: PeerDiscoveryManager.Command =>
+            peerDiscoveryManagerTyped ! cmd
+        }
+      }),
+      "peer-discovery-manager"
+    )
 }
 
 trait BlacklistBuilder {

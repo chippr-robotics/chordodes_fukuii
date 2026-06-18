@@ -3,19 +3,15 @@ package com.chipprbots.ethereum.network.discovery
 import java.net.URI
 import java.util.concurrent.atomic.AtomicInteger
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.pattern.AskTimeoutException
-import org.apache.pekko.pattern.ask
-import org.apache.pekko.testkit.TestActorRef
-import org.apache.pekko.testkit.TestKit
-import org.apache.pekko.util.ByteString
-import org.apache.pekko.util.Timeout
+import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe
+import org.apache.pekko.actor.typed.ActorRef
 
 import cats.effect.IO
 import cats.effect.Resource
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.Future
+import scala.concurrent.duration.*
 import scala.math.Ordering.Implicits.*
 import scala.util.control.NoStackTrace
 
@@ -24,13 +20,11 @@ import com.chipprbots.scalanet.discovery.ethereum.Node as ENode
 import com.chipprbots.scalanet.discovery.ethereum.v4.DiscoveryService
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
-import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 import scodec.bits.BitVector
 
 import com.chipprbots.ethereum.LongPatience
-import com.chipprbots.ethereum.Timeouts
 import com.chipprbots.ethereum.db.storage.KnownNodesStorage
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
@@ -40,11 +34,9 @@ class PeerDiscoveryManagerSpec
     with Matchers
     with Eventually
     with MockFactory
-    with ScalaFutures
     with LongPatience {
 
   given runtime: IORuntime = IORuntime.global
-  implicit val timeout: Timeout = Timeouts.normalTimeout
 
   val defaultConfig: DiscoveryConfig = DiscoveryConfig(Config.config, bootstrapNodes = Set.empty)
 
@@ -60,40 +52,50 @@ class PeerDiscoveryManagerSpec
   ).map(new java.net.URI(_)).map(Node.fromUri)
 
   trait Fixture {
-    implicit lazy val system: ActorSystem = ActorSystem("PeerDiscoveryManagerSpec_System")
-    lazy val discoveryConfig = defaultConfig
+    val testKit: ActorTestKit = ActorTestKit()
+    lazy val discoveryConfig: DiscoveryConfig = defaultConfig
     lazy val knownNodesStorage: KnownNodesStorage = mock[KnownNodesStorage]
     lazy val discoveryService: DiscoveryService = mock[DiscoveryService]
     lazy val discoveryServiceResource: Resource[IO, DiscoveryService] =
       Resource.pure[IO, DiscoveryService](discoveryService)
 
-    lazy val peerDiscoveryManager: TestActorRef[PeerDiscoveryManager] =
-      TestActorRef[PeerDiscoveryManager](
-        PeerDiscoveryManager.props(
-          localNodeId = ByteString.fromString("test-node"),
+    lazy val peerDiscoveryManager: ActorRef[PeerDiscoveryManager.Command] =
+      testKit.spawn(
+        PeerDiscoveryManager(
+          localNodeId = org.apache.pekko.util.ByteString.fromString("test-node"),
           discoveryConfig = discoveryConfig,
           knownNodesStorage = knownNodesStorage,
           discoveryServiceResource = discoveryServiceResource
         )
       )
 
-    def getPeers: Future[PeerDiscoveryManager.DiscoveredNodesInfo] =
-      (peerDiscoveryManager ? PeerDiscoveryManager.GetDiscoveredNodesInfo)
-        .mapTo[PeerDiscoveryManager.DiscoveredNodesInfo]
+    /** Send GetDiscoveredNodesInfoReq and wait for the response. */
+    def getPeers(timeout: FiniteDuration = 3.seconds): PeerDiscoveryManager.DiscoveredNodesInfo = {
+      val probe = testKit.createTestProbe[PeerDiscoveryManager.DiscoveredNodesInfo]()
+      peerDiscoveryManager ! PeerDiscoveryManager.GetDiscoveredNodesInfoReq(probe.ref)
+      probe.receiveMessage(timeout)
+    }
 
-    def getRandomPeer: Future[PeerDiscoveryManager.RandomNodeInfo] =
-      (peerDiscoveryManager ? PeerDiscoveryManager.GetRandomNodeInfo)
-        .mapTo[PeerDiscoveryManager.RandomNodeInfo]
+    /** Send GetRandomNodeInfoReq and wait for the response. Throws on timeout. */
+    def getRandomPeer(timeout: FiniteDuration = 8.seconds): PeerDiscoveryManager.RandomNodeInfo = {
+      val probe = testKit.createTestProbe[PeerDiscoveryManager.RandomNodeInfo]()
+      peerDiscoveryManager ! PeerDiscoveryManager.GetRandomNodeInfoReq(probe.ref)
+      probe.receiveMessage(timeout)
+    }
+
+    /** Send GetRandomNodeInfoReq and assert no response arrives within `timeout`. */
+    def expectNoRandomPeer(timeout: FiniteDuration = 500.millis): Unit = {
+      val probe = testKit.createTestProbe[PeerDiscoveryManager.RandomNodeInfo]()
+      peerDiscoveryManager ! PeerDiscoveryManager.GetRandomNodeInfoReq(probe.ref)
+      probe.expectNoMessage(timeout)
+    }
 
     def test(): Unit
   }
 
   def test(fixture: Fixture): Unit =
     try fixture.test()
-    finally {
-      fixture.system.stop(fixture.peerDiscoveryManager)
-      TestKit.shutdownActorSystem(fixture.system, verifySystemShutdown = true)
-    }
+    finally fixture.testKit.shutdownTestKit()
 
   def toENode(node: Node): ENode =
     ENode(
@@ -112,7 +114,7 @@ class PeerDiscoveryManagerSpec
         defaultConfig.copy(discoveryEnabled = false, reuseKnownNodes = false)
 
       override def test(): Unit =
-        getPeers.futureValue.nodes shouldBe empty
+        getPeers().nodes shouldBe empty
     }
   }
 
@@ -125,7 +127,7 @@ class PeerDiscoveryManagerSpec
         defaultConfig.copy(discoveryEnabled = false, reuseKnownNodes = true, bootstrapNodes = sampleNodes)
 
       override def test(): Unit =
-        getPeers.futureValue.nodes should contain theSameElementsAs sampleNodes
+        getPeers().nodes should contain theSameElementsAs sampleNodes
     }
   }
 
@@ -143,7 +145,7 @@ class PeerDiscoveryManagerSpec
         .once()
 
       override def test(): Unit =
-        getPeers.futureValue.nodes.map(_.toUri) should contain theSameElementsAs sampleKnownUris
+        getPeers().nodes.map(_.toUri) should contain theSameElementsAs sampleKnownUris
     }
   }
 
@@ -176,7 +178,7 @@ class PeerDiscoveryManagerSpec
       override def test(): Unit = {
         peerDiscoveryManager ! PeerDiscoveryManager.Start
         eventually {
-          getPeers.futureValue.nodes.map(_.toUri) should contain theSameElementsAs expected
+          getPeers().nodes.map(_.toUri) should contain theSameElementsAs expected
         }
       }
     }
@@ -205,7 +207,7 @@ class PeerDiscoveryManagerSpec
         eventually {
           started shouldBe true
         }
-        getPeers.futureValue.nodes should have size (sampleKnownUris.size)
+        getPeers().nodes should have size sampleKnownUris.size
       }
     }
   }
@@ -237,17 +239,17 @@ class PeerDiscoveryManagerSpec
       override def test(): Unit = {
         peerDiscoveryManager ! PeerDiscoveryManager.Start
         eventually {
-          getPeers.futureValue.nodes should have size (sampleKnownUris.size + sampleNodes.size)
+          getPeers().nodes should have size (sampleKnownUris.size + sampleNodes.size)
         }
         peerDiscoveryManager ! PeerDiscoveryManager.Stop
         eventually {
-          getPeers.futureValue.nodes should have size (sampleKnownUris.size)
+          getPeers().nodes should have size sampleKnownUris.size
         }
       }
     }
   }
 
-  it should "propagate any error from the service to the caller" taggedAs (UnitTest, NetworkTest) in test {
+  it should "log errors from the service rather than propagating them to callers" taggedAs (UnitTest, NetworkTest) in test {
     new Fixture {
       override lazy val discoveryConfig: DiscoveryConfig =
         defaultConfig.copy(discoveryEnabled = true, reuseKnownNodes = false)
@@ -268,8 +270,12 @@ class PeerDiscoveryManagerSpec
 
       override def test(): Unit = {
         peerDiscoveryManager ! PeerDiscoveryManager.Start
+        // In Typed, IO errors are logged rather than forwarded as Status.Failure.
+        // The actor stays alive and the caller simply receives no response for that request.
         eventually {
-          a[RuntimeException] shouldBe thrownBy(getPeers.futureValue)
+          val probe = testKit.createTestProbe[PeerDiscoveryManager.DiscoveredNodesInfo]()
+          peerDiscoveryManager ! PeerDiscoveryManager.GetDiscoveredNodesInfoReq(probe.ref)
+          probe.expectNoMessage(500.millis)
         }
       }
     }
@@ -297,9 +303,9 @@ class PeerDiscoveryManagerSpec
         peerDiscoveryManager ! PeerDiscoveryManager.Start
 
         eventually {
-          val n0 = getRandomPeer.futureValue.node
-          val n1 = getRandomPeer.futureValue.node
-          val n2 = getRandomPeer.futureValue.node
+          val n0 = getRandomPeer().node
+          val n1 = getRandomPeer().node
+          val n2 = getRandomPeer().node
 
           // Verify that we're getting nodes from the random set
           // Due to Set ordering in stream, we may get the same node multiple times
@@ -326,7 +332,7 @@ class PeerDiscoveryManagerSpec
         .once()
 
       override def test(): Unit =
-        getRandomPeer.failed.futureValue shouldBe an[AskTimeoutException]
+        expectNoRandomPeer()
     }
   }
 }
