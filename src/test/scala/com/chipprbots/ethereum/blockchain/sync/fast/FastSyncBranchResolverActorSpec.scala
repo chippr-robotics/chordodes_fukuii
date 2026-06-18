@@ -4,6 +4,8 @@ import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.pattern.gracefulStop
 import org.apache.pekko.testkit.TestActor.AutoPilot
 import org.apache.pekko.testkit.TestKit
@@ -90,7 +92,7 @@ class FastSyncBranchResolverActorSpec
 
         saveBlocks(blocksSaved)
         val networkPeerManager: ActorRef = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
-        val fastSyncBranchResolver: ActorRef =
+        val fastSyncBranchResolver: TypedActorRef[Any] =
           creatFastSyncBranchResolver(sender.ref, networkPeerManager, CacheBasedBlacklist.empty(BlacklistMaxElements))
 
         val expectation: PartialFunction[Any, BranchResolvedSuccessful] = {
@@ -98,7 +100,7 @@ class FastSyncBranchResolverActorSpec
         }
 
         val response: BranchResolvedSuccessful = (for {
-          _ <- IO(sender.send(fastSyncBranchResolver, StartBranchResolver))
+          _ <- IO(fastSyncBranchResolver ! StartBranchResolver)
           response <- IO(sender.expectMsgPF(branchResolutionTimeout)(expectation))
           _ <- IO(stopController(fastSyncBranchResolver))
         } yield response).unsafeRunSync()
@@ -129,7 +131,7 @@ class FastSyncBranchResolverActorSpec
 
           saveBlocks(blocksSaved)
           val networkPeerManager: ActorRef = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
-          val fastSyncBranchResolver: ActorRef =
+          val fastSyncBranchResolver: TypedActorRef[Any] =
             creatFastSyncBranchResolver(sender.ref, networkPeerManager, CacheBasedBlacklist.empty(BlacklistMaxElements))
 
           val expectation: PartialFunction[Any, BranchResolvedSuccessful] = {
@@ -137,7 +139,7 @@ class FastSyncBranchResolverActorSpec
           }
 
           val response: BranchResolvedSuccessful = (for {
-            _ <- IO(sender.send(fastSyncBranchResolver, StartBranchResolver))
+            _ <- IO(fastSyncBranchResolver ! StartBranchResolver)
             response <- IO(sender.expectMsgPF(branchResolutionTimeout)(expectation))
             _ <- IO(stopController(fastSyncBranchResolver))
           } yield response).unsafeRunSync()
@@ -167,7 +169,7 @@ class FastSyncBranchResolverActorSpec
 
           saveBlocks(blocksSaved)
           val networkPeerManager: ActorRef = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
-          val fastSyncBranchResolver: ActorRef =
+          val fastSyncBranchResolver: TypedActorRef[Any] =
             creatFastSyncBranchResolver(sender.ref, networkPeerManager, CacheBasedBlacklist.empty(BlacklistMaxElements))
 
           val expectation: PartialFunction[Any, BranchResolvedSuccessful] = {
@@ -175,7 +177,7 @@ class FastSyncBranchResolverActorSpec
           }
 
           val response: BranchResolvedSuccessful = (for {
-            _ <- IO(sender.send(fastSyncBranchResolver, StartBranchResolver))
+            _ <- IO(fastSyncBranchResolver ! StartBranchResolver)
             response <- IO(sender.expectMsgPF(branchResolutionTimeout)(expectation))
             _ <- IO(stopController(fastSyncBranchResolver))
           } yield response).unsafeRunSync()
@@ -205,7 +207,7 @@ class FastSyncBranchResolverActorSpec
 
           saveBlocks(blocksSaved)
           val networkPeerManager: ActorRef = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
-          val fastSyncBranchResolver: ActorRef =
+          val fastSyncBranchResolver: TypedActorRef[Any] =
             creatFastSyncBranchResolver(sender.ref, networkPeerManager, CacheBasedBlacklist.empty(BlacklistMaxElements))
 
           val expectation: PartialFunction[Any, BranchResolvedSuccessful] = {
@@ -213,7 +215,7 @@ class FastSyncBranchResolverActorSpec
           }
 
           val response: BranchResolvedSuccessful = (for {
-            _ <- IO(sender.send(fastSyncBranchResolver, StartBranchResolver))
+            _ <- IO(fastSyncBranchResolver ! StartBranchResolver)
             response <- IO(sender.expectMsgPF(branchResolutionTimeout)(expectation))
             _ <- IO(stopController(fastSyncBranchResolver))
           } yield response).unsafeRunSync()
@@ -243,12 +245,12 @@ class FastSyncBranchResolverActorSpec
 
         saveBlocks(blocksSaved)
         val networkPeerManager: ActorRef = createNetworkPeerManager(handshakedPeers, blocksSentFromPeer)
-        val fastSyncBranchResolver: ActorRef =
+        val fastSyncBranchResolver: TypedActorRef[Any] =
           creatFastSyncBranchResolver(sender.ref, networkPeerManager, CacheBasedBlacklist.empty(BlacklistMaxElements))
 
         log.debug(s"*** peers: ${handshakedPeers.map(p => (p._1.id, p._2.maxBlockNumber))}")
         (for {
-          _ <- IO(sender.send(fastSyncBranchResolver, StartBranchResolver))
+          _ <- IO(fastSyncBranchResolver ! StartBranchResolver)
           response <- IO(sender.expectMsg(branchResolutionTimeout, BranchResolutionFailed(NoCommonBlockFound)))
           _ <- IO(stopController(fastSyncBranchResolver))
         } yield response).unsafeRunSync()
@@ -303,9 +305,13 @@ class FastSyncBranchResolverActorSpec
       networkPeerManager.ref
     }
 
-    def creatFastSyncBranchResolver(fastSync: ActorRef, networkPeerManager: ActorRef, blacklist: Blacklist): ActorRef =
-      system.actorOf(
-        FastSyncBranchResolverActor.props(
+    def creatFastSyncBranchResolver(
+        fastSync: ActorRef,
+        networkPeerManager: ActorRef,
+        blacklist: Blacklist
+    ): TypedActorRef[Any] =
+      system.spawn(
+        FastSyncBranchResolverActor(
           fastSync = fastSync,
           peerEventBus = TestProbe("peer_event_bus").ref,
           networkPeerManager = networkPeerManager,
@@ -313,13 +319,13 @@ class FastSyncBranchResolverActorSpec
           blockchainReader = blockchainReader,
           blacklist = blacklist,
           syncConfig = syncConfig,
-          appStateStorage = storagesInstance.storages.appStateStorage,
-          scheduler = system.scheduler
-        )
+          appStateStorage = storagesInstance.storages.appStateStorage
+        ),
+        s"fast-sync-branch-resolver-${java.util.UUID.randomUUID()}"
       )
 
-    def stopController(actorRef: ActorRef): Unit =
-      awaitCond(gracefulStop(actorRef, actorAskTimeout.duration).futureValue)
+    def stopController(actorRef: TypedActorRef[Any]): Unit =
+      awaitCond(gracefulStop(actorRef.toClassic, actorAskTimeout.duration).futureValue)
 
     def getBestPeers: List[Peer] = {
       val maxBlock = handshakedPeers.toList.map { case (_, peerInfo) => peerInfo.maxBlockNumber }.max
