@@ -115,6 +115,13 @@ ECIP-1017 block-reward schedule (20% reduction every 5M blocks):
   `Block.scala`, `BlockHeader.scala`, `Transaction.scala`, MPT state.
 - Crypto: `crypto/src/main/scala/com/chipprbots/ethereum/crypto/` — ECDSA
   (secp256k1), Keccak-256, address derivation.
+- Ledger: `src/main/scala/com/chipprbots/ethereum/ledger/` — block execution pipeline:
+  `BlockExecution.scala` (559 LOC), `BlockPreparator.scala`, `StxLedger.scala`,
+  `BlockValidation.scala`, `BlockRewardCalculator.scala`. Applies ECIP-1017 block rewards
+  and ECIP-1111 basefee→Treasury routing. Treat with the same care as vm/.
+- extvm: `src/main/scala/com/chipprbots/ethereum/extvm/` — **HIBERNATED. Do not modify.**
+  IOHK/Mantis experimental gRPC bridge to external EVM. Upstream archived September 2021.
+  All tests `@Ignored`. Default `vm.mode = "internal"`. Deletion tracked in DEFERRED-BACKLOG Part 6a.
 
 ## Hard constraints
 
@@ -134,8 +141,11 @@ sbt compile-all                  # all modules compile
 sbt testVM                       # EVM opcode/gas tests
 sbt testCrypto                   # crypto vectors
 sbt testEthereum                 # ethereum/tests compliance (ETC-filtered)
-sbt "testOnly *ECIP1017*"        # ETC block-reward schedule
-sbt "testOnly *OlympiaOpCodes*"  # ETC Olympia fork dispatch
+sbt "testOnly *ECIP1017*"          # ETC block-reward schedule
+sbt "testOnly *OlympiaOpCodes*"    # ETC Olympia fork dispatch
+sbt "testOnly *BlockExecution*"    # ledger block execution pipeline
+sbt "testOnly *BlockValidation*"   # ledger block validation
+sbt "testOnly *StxLedger*"         # ledger transaction application
 ```
 
 Evidence required. "Probably works" is forbidden — show the test-vector result,

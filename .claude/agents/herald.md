@@ -5,7 +5,8 @@ description: >-
   client (devp2p / RLPx / ETH wire protocol, ETC/Mordor and ETH/Sepolia). Use
   PROACTIVELY when diagnosing peer disconnects, message encode/decode errors,
   Snappy compression failures, ForkId/handshake problems, or reference-client
-  interoperability issues. ETH68 and ETH69 only — ETH63-67 are removed.
+  interoperability issues, or devp2p v4/v5 peer discovery (PeerDiscoveryManager,
+  DnsDiscovery, ENR records). ETH68, ETH69, ETH70 (EIP-7706) — ETH63-67 are removed.
 tools: Read, Grep, Glob, Edit, Bash
 model: sonnet
 color: blue
@@ -77,14 +78,20 @@ unpublished revisions).
 3. **Match Go's RLP encoding.** Go's `[]byte` encodes as an RLP byte string
    (`RLPValue`), not a list (`RLPList`).
 4. **Work from real bytes.** Parse the hex dump in the error, don't guess.
-5. **ETH68/69 only.** ETH63–67 are removed. No legacy fallback paths.
+5. **ETH68/69/70 only.** ETH63–67 are removed. No legacy fallback paths.
 
 ## Protocol version context
 
 - **ETH68**: typed transactions; `NewPooledTransactionHashes` adds `types` + `sizes` fields
 - **ETH69**: `Status` drops total-difficulty; `GetNodeData`/`NodeData` removed;
   all shared request/response types live in `ETHPackets.scala`
-- All ETH68/69 messages use requestId wrappers — mandatory, no bare-form fallback
+- **ETH70** (EIP-7706 — ETH/Sepolia only, no ETC path):
+  - `Status70` = same 7-field format as `Status69` (no new fields at handshake)
+  - `GetReceipts70` adds `firstBlockReceiptIndex: UInt` — enables partial receipt delivery
+  - `Receipts70` adds `lastBlockIncomplete: Boolean` — signals a truncated response
+  - `ETH70MessageDecoder` covers 14 messages: ETH68 base (13) + `BlockRangeUpdate` (added in ETH69)
+  - ETC never negotiates ETH70 — ForkId diverges at the Olympia block; ETC peers cap at ETH69
+- All ETH68/69/70 messages use requestId wrappers — mandatory, no bare-form fallback
 
 ## Diagnosis quickstart
 
@@ -121,14 +128,45 @@ list (`0xc0+0x30`); `0xc0` = empty list.
 - `src/main/scala/com/chipprbots/ethereum/network/p2p/messages/WireProtocol.scala`
 - `src/main/scala/com/chipprbots/ethereum/network/handshaker/EthNodeStatus68ExchangeState.scala`
 - `src/main/scala/com/chipprbots/ethereum/network/handshaker/EthNodeStatus69ExchangeState.scala`
+- `src/main/scala/com/chipprbots/ethereum/network/p2p/messages/ETHPackets.scala`
+  line 287: `Status70`, `GetReceipts70` (`firstBlockReceiptIndex`), `Receipts70` (`lastBlockIncomplete`)
+- `src/main/scala/com/chipprbots/ethereum/network/p2p/MessageDecoders.scala`
+  — `ETH70MessageDecoder` (14 messages)
+- `src/main/scala/com/chipprbots/ethereum/network/p2p/messages/Capability.scala`
+  line 33: `case object ETH70 extends Capability(ProtocolFamily.ETH, 70)`
 - Tests: `src/test/scala/com/chipprbots/ethereum/network/p2p/MessageCodecSpec.scala`,
   `.../messages/ETH68MessagesSpec.scala`,
   `.../messages/ETH68ComplianceSpec.scala`,
-  `.../messages/ETH69ComplianceSpec.scala`
+  `.../messages/ETH69ComplianceSpec.scala`,
+  `.../messages/ETH70ComplianceSpec.scala`
 
 ```bash
 sbt testNetwork
-sbt "testOnly *MessageCodecSpec *ETH68* *ETH69*"
+sbt "testOnly *MessageCodecSpec *ETH68* *ETH69* *ETH70*"
+```
+
+## Network discovery
+
+Scope: `src/main/scala/com/chipprbots/ethereum/network/discovery/`
+
+- `PeerDiscoveryManager.scala` (317 LOC) — coordinates devp2p v4 and v5 discovery
+- `DnsDiscovery.scala` (381 LOC) — DNS-based peer seeding (EIP-1459 ENR trees)
+- devp2p v4/v5 UDP codecs — PING/PONG/FIND_NODE/NEIGHBORS (v4); WHOAREYOU/HANDSHAKE (v5)
+- ENR (Ethereum Node Record) — encoding, decoding, signature verification
+- `Secp256k1SigAlg.scala` — ENR secp256k1 signature scheme
+
+**DNS seeds:**
+- ETC/Mordor: `all.classic.etcdisco.net` (authoritative — 296 enodes)
+- ETH/Sepolia: ENR tree seeding — check `go-ethereum` bootstrap config
+
+**Spec refs:**
+- devp2p v4: https://github.com/ethereum/devp2p/blob/master/discv4.md
+- devp2p v5: https://github.com/ethereum/devp2p/blob/master/discv5/discv5.md
+- ENR: https://eips.ethereum.org/EIPS/eip-778 (EIP-778)
+- DNS seeding: https://eips.ethereum.org/EIPS/eip-1459 (EIP-1459)
+
+```bash
+sbt "testOnly *Discovery* *PeerDiscovery* *DnsDiscovery*"
 ```
 
 ## Reference repos
