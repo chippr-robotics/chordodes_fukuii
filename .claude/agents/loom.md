@@ -352,8 +352,8 @@ Current group status (read SPRINT-QUEUE.md Part 6 table for full state):
 | S2 | ✅ DONE | StateStorageActor, FastSyncBranchResolverActor |
 | PLN | ✅ DONE | PeerListHelper (shared infrastructure) |
 | S6 | ✅ DONE | ChainDownloader |
-| S5 | ✅ DONE `5d29511d4` | BlockBroadcasterActor (Behavior[BroadcasterMsg]), BlockImporter + RegularSync (Behavior[Any] — mixed Classic/Typed sources); PeerListHelper replaces PeerListSupportNg. 69 jsonrpc failures fixed `92584a07b`. Baseline: 3,519/0. |
-| NET | ⬜ NEXT — HERALD-1 pre-flight required | PeerEventBusActor + core network ×5 (PeerDiscoveryManager, RLPxConnectionHandler, PeerActor, PeerManagerActor) |
+| S5 | ✅ DONE `5d29511d4` | BlockBroadcasterActor (Behavior[BroadcasterMsg]), BlockImporter + RegularSync (Behavior[Any] — mixed Classic/Typed sources); PeerListHelper replaces PeerListSupportNg. 69 jsonrpc failures fixed `92584a07b`. |
+| NET | 🔄 IN PROGRESS | **RLPxConnectionHandler** ✅ DONE `f8a127870` — TCP bridge pattern (OutboundTcpBridge + InboundTcpBridge Classic children capture sender()); helloAckPending/helloWriteAcknowledged as `awaitInitialHello()` params; PropsAdapter co-existence so Classic PeerActor spawns it unchanged; PeerActor.Command trait non-sealed (subtypes in both files); 16 spec tests pass. Baseline: 3,601/0. **PeerActor** ⬜ NEXT. PeerEventBusActor, PeerDiscoveryManager, PeerManagerActor ⬜. **HERALD-2 CONDITIONAL** — 4 constraints: (1) PeerActor must migrate first; (2) PeerEventBusActor integration required (migrate PEA first or Classic bridge); (3) PeerId.fromRef identity chain must be reverified for Typed refs; (4) 8 sender() → replyTo paths. |
 | S3/S4/S7 | ⬜ post-NET | SNAP coordinators, fast sync actors, PeersClient |
 | NET2/SNAP1/SNAP2/ROOT | ⬜ | Final groups → capstone root flip |
 
