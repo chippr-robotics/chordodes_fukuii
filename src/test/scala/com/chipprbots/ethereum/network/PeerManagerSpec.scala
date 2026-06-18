@@ -741,7 +741,9 @@ class PeerManagerSpec
     peerManager ! PeerClosedConnection(discoveredNodes.head.addr.getHostAddress, Disconnect.Reasons.TooManyPeers)
 
     peerManager.underlyingActor.blacklist.keys.size shouldEqual 1
-    peerManager.underlyingActor.triedNodes.size shouldEqual 2
+    // `triedNodes` is now internal core state (shell+core split); its growth is observed indirectly via the
+    // ConnectTo dispatch + the "previously-tried nodes are not re-dialed" assertions below (probe/probe2 get no
+    // second ConnectTo, only the fresh node's probe3 does).
 
     ticker.advance(6, TimeUnit.MINUTES)
 
@@ -760,7 +762,6 @@ class PeerManagerSpec
     probe3.expectMsgClass(classOf[PeerActor.ConnectTo])
 
     peerManager.underlyingActor.blacklist.keys.size shouldEqual 0
-    peerManager.underlyingActor.triedNodes.size shouldEqual 3
   }
 
   behavior.of("numberOfIncomingConnectionsToPrune")
@@ -985,7 +986,11 @@ class PeerManagerSpec
 
     val knownNodes: Set[URI] = Set.empty
 
-    val peerFactory: (ActorContext, InetSocketAddress, Boolean) => ActorRef = { (_, address, isIncoming) =>
+    val peerFactory: (
+        org.apache.pekko.actor.typed.scaladsl.ActorContext[PeerManagerActor.Command],
+        InetSocketAddress,
+        Boolean
+    ) => ActorRef = { (_, address, isIncoming) =>
       val peerProbe = TestProbe()
       createdPeers :+= TestPeer(Peer(PeerId(""), address, peerProbe.ref, isIncoming), peerProbe)
       peerProbe.ref
