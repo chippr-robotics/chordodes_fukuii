@@ -71,7 +71,7 @@ import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.RLPxConfigurat
   */
 class PeerManagerActor(
     peerEventBus: ActorRef,
-    peerDiscoveryManager: ActorRef,
+    peerDiscoveryManager: typed.ActorRef[PeerDiscoveryManager.Command],
     peerConfiguration: PeerConfiguration,
     knownNodesManager: ActorRef,
     peerStatistics: typed.ActorRef[PeerStatisticsActor.Command],
@@ -143,8 +143,9 @@ class PeerManagerActor(
     case PeerClosedConnection(a, r)  => core ! PeerClosedConnectionCmd(a, r)
 
     // ── Discovery / known-nodes replies ────────────────────────────────────
-    // In production these arrive at the core's messageAdapter (sender-based). Tests inject them directly at the shell,
-    // so the shell also forwards them to the core. Both paths converge on the core's wrapped Commands.
+    // KnownNodes still arrives via the core's messageAdapter (KnownNodesManager is Classic). PeerDiscoveryManager is now
+    // Typed: the core asks it directly (context.ask) and the reply lands on the core, bypassing the shell. The
+    // DiscoveredNodesInfo / RandomNodeInfo cases below remain only so tests can inject discovery results at the shell.
     case KnownNodesManager.KnownNodes(nodes)             => core ! KnownNodesReceived(nodes)
     case PeerDiscoveryManager.DiscoveredNodesInfo(nodes) => core ! DiscoveredNodesReceived(nodes)
     case PeerDiscoveryManager.RandomNodeInfo(node)       => core ! RandomNodeReceived(node)
@@ -190,12 +191,24 @@ object PeerManagerActor {
   /** A [[PeerEventBusActor.PeerEvent]] delivered to the shell (the subscriber) and forwarded to the core. */
   final case class PeerEventReceived(ev: PeerEvent) extends Command
 
-  // Replies from the (still-Classic) KnownNodesManager / PeerDiscoveryManager, wrapped via messageAdapter so the
-  // Classic `sender()`-based reply lands as a typed Command. PMA keeps sending the legacy Classic request messages
-  // (GetKnownNodes / GetDiscoveredNodesInfo / GetRandomNodeInfo) with the adapter as the implicit sender.
+  // Reply from the (still-Classic) KnownNodesManager, wrapped via messageAdapter so the Classic `sender()`-based reply
+  // lands as a typed Command. PMA keeps sending the legacy Classic GetKnownNodes with the adapter as the sender.
   final private case class KnownNodesReceived(nodes: Set[URI]) extends Command
-  final private case class DiscoveredNodesReceived(nodes: Set[Node]) extends Command
-  final private case class RandomNodeReceived(node: Node) extends Command
+
+  // Replies from the (now-Typed) PeerDiscoveryManager, delivered by the `context.ask` mapping. Tests may also inject the
+  // public PeerDiscoveryManager.DiscoveredNodesInfo / RandomNodeInfo at the shell, which the shell forwards as these.
+  final private[network] case class DiscoveredNodesReceived(nodes: Set[Node]) extends Command
+  final private[network] case class RandomNodeReceived(node: Node) extends Command
+
+  /** A typed ask to PeerDiscoveryManager timed out or failed. Discovery is best-effort; the next scan / demand trigger
+    * re-requests, so this is logged and otherwise ignored.
+    */
+  private case object DiscoveryFailed extends Command
+
+  /** Self-scheduled trigger to re-request the discovered-nodes set. Posted by the periodic discovery timer (which runs
+    * off the actor thread) so that the `context.ask` itself always executes on the actor thread.
+    */
+  private case object RequestDiscoveredNodes extends Command
 
   // Self-scheduled / internal messages:
   private case object RefreshPeerStatuses extends Command
@@ -217,7 +230,7 @@ object PeerManagerActor {
   // scalastyle:off parameter.number method.length
   def behavior(
       peerEventBus: ActorRef,
-      peerDiscoveryManager: ActorRef,
+      peerDiscoveryManager: typed.ActorRef[PeerDiscoveryManager.Command],
       peerConfiguration: PeerConfiguration,
       knownNodesManager: ActorRef,
       peerStatistics: typed.ActorRef[PeerStatisticsActor.Command],
@@ -248,7 +261,7 @@ object PeerManagerActor {
   // scalastyle:off number.of.methods
   final private class Impl(
       peerEventBus: ActorRef,
-      peerDiscoveryManager: ActorRef,
+      peerDiscoveryManager: typed.ActorRef[PeerDiscoveryManager.Command],
       peerConfiguration: PeerConfiguration,
       knownNodesManager: ActorRef,
       peerStatistics: typed.ActorRef[PeerStatisticsActor.Command],
@@ -267,14 +280,38 @@ object PeerManagerActor {
 
     private def scheduler: Scheduler = externalSchedulerOpt.getOrElse(context.system.classicSystem.scheduler)
 
-    // Adapters that turn the Classic `sender()`-based replies from KnownNodesManager / PeerDiscoveryManager into typed
-    // Commands. Requests are sent with `.tell(msg, adapter.toClassic)` so the reply is routed back through the adapter.
+    // Adapter that turns the Classic `sender()`-based reply from the (still-Classic) KnownNodesManager into a typed
+    // Command. The request is sent with `.tell(msg, adapter.toClassic)` so the reply routes back through the adapter.
     private val knownNodesAdapter: ActorRef =
       context.messageAdapter[KnownNodesManager.KnownNodes](kn => KnownNodesReceived(kn.nodes)).toClassic
-    private val discoveredNodesAdapter: ActorRef =
-      context.messageAdapter[PeerDiscoveryManager.DiscoveredNodesInfo](d => DiscoveredNodesReceived(d.nodes)).toClassic
-    private val randomNodeAdapter: ActorRef =
-      context.messageAdapter[PeerDiscoveryManager.RandomNodeInfo](r => RandomNodeReceived(r.node)).toClassic
+
+    // Timeout for the typed asks to the (now-Typed) PeerDiscoveryManager. Discovery is best-effort, so a lapsed ask is
+    // simply logged (DiscoveryFailed) and retried by the next scan / connection-demand trigger.
+    implicit private val discoveryAskTimeout: Timeout = Timeout(peerConfiguration.updateNodesInterval)
+
+    /** Typed ask to the Typed PeerDiscoveryManager for the current discovered-nodes set. The mapped result lands back
+      * on the actor thread as [[DiscoveredNodesReceived]] (success) or [[DiscoveryFailed]] (timeout/failure).
+      */
+    private def requestDiscoveredNodes(): Unit =
+      context.ask[PeerDiscoveryManager.Command, PeerDiscoveryManager.DiscoveredNodesInfo](
+        peerDiscoveryManager,
+        PeerDiscoveryManager.GetDiscoveredNodesInfoReq(_)
+      ) {
+        case scala.util.Success(info) => DiscoveredNodesReceived(info.nodes)
+        case scala.util.Failure(_)    => DiscoveryFailed
+      }
+
+    /** Typed ask to the Typed PeerDiscoveryManager for a single random node. The mapped result lands back on the actor
+      * thread as [[RandomNodeReceived]] (success) or [[DiscoveryFailed]] (timeout/failure).
+      */
+    private def requestRandomNode(): Unit =
+      context.ask[PeerDiscoveryManager.Command, PeerDiscoveryManager.RandomNodeInfo](
+        peerDiscoveryManager,
+        PeerDiscoveryManager.GetRandomNodeInfoReq(_)
+      ) {
+        case scala.util.Success(info) => RandomNodeReceived(info.node)
+        case scala.util.Failure(_)    => DiscoveryFailed
+      }
 
     // HERALD-2 #2: the core's own subscriber ref for PeerEventBus events. Spawned PeerActors publish
     // PeerHandshakeSuccessful to the event bus, which delivers it here as PeerEventReceived. This adapter is ALSO used
@@ -384,7 +421,7 @@ object PeerManagerActor {
             // but bootstrap/static nodes are available as alreadyDiscoveredNodes in PeerDiscoveryManager.
             // Without this, the first connection attempt waits for updateNodesInitialDelay.
             // Core-geth dials bootstrap nodes at t+0; we should too.
-            peerDiscoveryManager.tell(PeerDiscoveryManager.GetDiscoveredNodesInfo, discoveredNodesAdapter)
+            requestDiscoveredNodes()
             stash.unstashAll(listening(ConnectedPeers.empty))
           case other =>
             stash.stash(other)
@@ -393,10 +430,12 @@ object PeerManagerActor {
       }
 
     private def scheduleNodesUpdate(): Unit =
+      // The timer runs off the actor thread, so it cannot call `context.ask` directly. Post a self-message instead; the
+      // actor thread handles RequestDiscoveredNodes by issuing the typed ask.
       scheduler.scheduleWithFixedDelay(
         peerConfiguration.updateNodesInitialDelay,
         peerConfiguration.updateNodesInterval
-      )(() => peerDiscoveryManager.tell(PeerDiscoveryManager.GetDiscoveredNodesInfo, discoveredNodesAdapter))(ec)
+      )(() => context.self ! RequestDiscoveredNodes)(ec)
 
     private def schedulePeerStatusRefresh(): Unit =
       scheduler.scheduleWithFixedDelay(10.seconds, 10.seconds)(() => context.self ! RefreshPeerStatuses)(ec)
@@ -436,6 +475,14 @@ object PeerManagerActor {
         case DiscoveredNodesReceived(nodes) =>
           Some(maybeConnectToDiscoveredNodes(connectedPeers, nodes))
 
+        case RequestDiscoveredNodes =>
+          requestDiscoveredNodes()
+          Some(Behaviors.same)
+
+        case DiscoveryFailed =>
+          log.debug("Discovery ask to PeerDiscoveryManager timed out or failed; will retry on next scan")
+          Some(Behaviors.same)
+
         case _ => None
       }
 
@@ -456,7 +503,7 @@ object PeerManagerActor {
             "Random node candidate {} rejected (already connected or blacklisted). Requesting replacement",
             formatNodeForLogs(node)
           )
-          peerDiscoveryManager.tell(PeerDiscoveryManager.GetRandomNodeInfo, randomNodeAdapter)
+          requestRandomNode()
         }
       } else {
         log.debug(
@@ -506,7 +553,7 @@ object PeerManagerActor {
       // request so we don't rack up too many pending futures, just trigger a
       // search if needed.
       if (connectedPeers.outgoingConnectionDemand > nodesToConnect.size) {
-        peerDiscoveryManager.tell(PeerDiscoveryManager.GetRandomNodeInfo, randomNodeAdapter)
+        requestRandomNode()
       }
       Behaviors.same
     }
@@ -839,7 +886,7 @@ object PeerManagerActor {
       }
       // Try to replace a lost connection with another one.
       if (newConnectedPeers.outgoingConnectionDemand > 0) {
-        peerDiscoveryManager.tell(PeerDiscoveryManager.GetRandomNodeInfo, randomNodeAdapter)
+        requestRandomNode()
       }
       // watchWith death-watch is one-shot per spawned ref; no explicit unwatch needed (the ref is terminated).
       listening(newConnectedPeers)
@@ -1062,7 +1109,7 @@ object PeerManagerActor {
 
   // scalastyle:off parameter.number
   def props[R <: HandshakeResult](
-      peerDiscoveryManager: ActorRef,
+      peerDiscoveryManager: typed.ActorRef[PeerDiscoveryManager.Command],
       peerConfiguration: PeerConfiguration,
       peerMessageBus: ActorRef,
       knownNodesManager: ActorRef,

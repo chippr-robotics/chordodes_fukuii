@@ -404,7 +404,7 @@ trait PeerManagerActorBuilder {
 
   lazy val peerManager: ActorRef = system.actorOf(
     PeerManagerActor.props(
-      peerDiscoveryManager,
+      peerDiscoveryManagerTyped,
       instanceConfig.Network.peer,
       peerEventBus,
       knownNodesManager,

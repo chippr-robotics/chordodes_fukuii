@@ -137,10 +137,10 @@ class PeerManagerSpec
 
     testScheduler.timePasses(21000.millis) // wait for next scan
 
-    eventually {
-      peerDiscoveryManager.expectMsg(PeerDiscoveryManager.GetDiscoveredNodesInfo)
+    val req = eventually {
+      peerDiscoveryManager.expectMsgClass(classOf[PeerDiscoveryManager.GetDiscoveredNodesInfoReq])
     }
-    peerDiscoveryManager.reply(PeerDiscoveryManager.DiscoveredNodesInfo(bootstrapNodes))
+    req.replyTo ! PeerDiscoveryManager.DiscoveredNodesInfo(bootstrapNodes)
   }
 
   it should "replace lost connections with random nodes" taggedAs (UnitTest, NetworkTest) in new TestSetup {
@@ -153,12 +153,14 @@ class PeerManagerSpec
 
     probe.ref ! PoisonPill
 
-    // Peer death triggers GetRandomNodeInfo, but timer-fired GetDiscoveredNodesInfo may arrive first
-    peerDiscoveryManager.fishForMessage(3.seconds, "waiting for GetRandomNodeInfo") {
-      case PeerDiscoveryManager.GetRandomNodeInfo => true
-      case _                                      => false
+    // Peer death triggers GetRandomNodeInfoReq, but a timer-fired GetDiscoveredNodesInfoReq may arrive first
+    val randomReq = peerDiscoveryManager.fishForMessage(3.seconds, "waiting for GetRandomNodeInfoReq") {
+      case _: PeerDiscoveryManager.GetRandomNodeInfoReq => true
+      case _                                            => false
     }
-    peerDiscoveryManager.reply(PeerDiscoveryManager.RandomNodeInfo(bootstrapNodes.head))
+    randomReq.asInstanceOf[PeerDiscoveryManager.GetRandomNodeInfoReq].replyTo ! PeerDiscoveryManager.RandomNodeInfo(
+      bootstrapNodes.head
+    )
   }
 
   it should "publish disconnect messages from peers" taggedAs (UnitTest, NetworkTest) in new TestSetup {
@@ -201,10 +203,10 @@ class PeerManagerSpec
 
     testScheduler.timePasses(21000.millis) // wait for next scan
 
-    eventually {
-      peerDiscoveryManager.expectMsg(PeerDiscoveryManager.GetDiscoveredNodesInfo)
+    val req2 = eventually {
+      peerDiscoveryManager.expectMsgClass(classOf[PeerDiscoveryManager.GetDiscoveredNodesInfoReq])
     }
-    peerDiscoveryManager.reply(PeerDiscoveryManager.DiscoveredNodesInfo(bootstrapNodes))
+    req2.replyTo ! PeerDiscoveryManager.DiscoveredNodesInfo(bootstrapNodes)
 
     peerManager ! PeerManagerActor.HandlePeerConnection(incomingConnection1.ref, incomingPeerAddress1)
 
@@ -726,10 +728,10 @@ class PeerManagerSpec
 
     peerManager ! PeerDiscoveryManager.DiscoveredNodesInfo(discoveredNodes)
 
-    // DiscoveredNodesInfo triggers GetRandomNodeInfo (line 228), but eager startup messages may precede it
-    peerDiscoveryManager.fishForMessage(3.seconds, "waiting for GetRandomNodeInfo") {
-      case PeerDiscoveryManager.GetRandomNodeInfo => true
-      case _                                      => false
+    // DiscoveredNodesInfo triggers GetRandomNodeInfoReq, but eager startup messages may precede it
+    peerDiscoveryManager.fishForMessage(3.seconds, "waiting for GetRandomNodeInfoReq") {
+      case _: PeerDiscoveryManager.GetRandomNodeInfoReq => true
+      case _                                            => false
     }
 
     val probe: TestProbe = createdPeers(0).probe
@@ -1039,7 +1041,7 @@ class PeerManagerSpec
       Props(
         new PeerManagerActor(
           peerEventBus.ref,
-          peerDiscoveryManager.ref,
+          peerDiscoveryManager.ref.toTyped[PeerDiscoveryManager.Command],
           peerConfiguration,
           knownNodesManager.ref,
           peerStatistics.ref.toTyped[PeerStatisticsActor.Command],
@@ -1060,8 +1062,8 @@ class PeerManagerSpec
     def handleInitialNodesDiscovery(): Unit = {
       testScheduler.timePasses(6000.millis) // wait for bootstrap nodes scan
 
-      peerDiscoveryManager.expectMsg(PeerDiscoveryManager.GetDiscoveredNodesInfo)
-      peerDiscoveryManager.reply(PeerDiscoveryManager.DiscoveredNodesInfo(bootstrapNodes))
+      val req = peerDiscoveryManager.expectMsgClass(classOf[PeerDiscoveryManager.GetDiscoveredNodesInfoReq])
+      req.replyTo ! PeerDiscoveryManager.DiscoveredNodesInfo(bootstrapNodes)
       knownNodesManager.expectMsg(KnownNodesManager.GetKnownNodes)
       knownNodesManager.reply(KnownNodesManager.KnownNodes(knownNodes))
     }
