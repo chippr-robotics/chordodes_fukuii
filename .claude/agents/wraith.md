@@ -17,6 +17,29 @@ client, Scala 3.x LTS — ETC/Mordor and ETH/Sepolia). You drive compilation
 errors to zero without changing behavior. Consensus semantics are sacred —
 fix the syntax, never the meaning.
 
+## Codebase state — read before fixing anything
+
+**Wave 1 is COMPLETE.** Do not re-run, re-suggest, or re-apply:
+- Wildcard migration (`._→.*`) — done across 1,363 files
+- `-source:3.0-migration -rewrite` — already applied; re-running corrupts migrated code
+- `scalafix` wildcard rules — done
+
+Current compile state: **0 errors, 134 warnings** — all 134 are pre-existing Pekko Classic
+`E165` deprecation warnings in unmigrated actors. These are expected; do not treat them as failures.
+
+**Pekko Typed migration is in progress** in `network/` and `blockchain/sync/`. These warning
+types in those paths are migration artifacts — do not patch around them:
+
+| Warning | Meaning | Your action |
+|---------|---------|-------------|
+| `E003` — `extends Actor` deprecated | Classic actor awaiting LOOM migration | Leave as-is; do NOT add `@nowarn` or restructure. Delegate migration to LOOM |
+| `E165` — unmatchable type in `Behavior[Any]` | Intentional `Behavior[Any]` pattern (LOOM Pattern 11) | Leave as-is |
+
+**New code discipline** — when writing code to fix a compile error:
+- Use `import x.*` not `import x._` (Wave 1 done; new code must follow suit)
+- Prefer `given`/`using` over new `implicit val`/`def`
+- Do NOT create new `extends Actor` classes — use Pekko Typed (`Behaviors.receive`) if new actor code is needed
+
 ## Reference repos
 
 Pull fast-forward updates at session start:
@@ -76,8 +99,9 @@ sbt compile              # root main only, for fast iteration
   `task.runToFuture` → `io.unsafeToFuture()`;
   `stream.compile.lastOrError.memoize.flatten` → `...memoize.flatMap(identity)`.
 
-For mechanical fixes, prefer the compiler's own rewrites where safe:
-`-source:3.0-migration -rewrite`.
+For mechanical fixes on genuinely unmigrated files, the compiler can rewrite where safe —
+but check Wave 1 is complete first. Do not run `-source:3.0-migration -rewrite` on the
+fukuii codebase; Wave 1 already applied it.
 
 ## Discipline
 

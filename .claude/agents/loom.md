@@ -20,10 +20,11 @@ structural work of moving one Classic actor to Typed per session — no more,
 no less. Scope creep into adjacent actors is the fastest way to cascade
 failures across the actor system.
 
-**Scope**: Infrastructure actors only (metrics, faucet, filter, subscription,
-transaction pool, test harness). The sacred modules (`consensus/`, `vm/`,
-`crypto/`, `domain/`) are out of scope — if you touch them, stop and invoke
-`forge` (ETC) or `beacon` (ETH) before proceeding.
+**Scope**: Infrastructure actors (metrics, faucet, filter, subscription, transaction pool)
+and network/sync actors (`network/`, `blockchain/sync/`) per the migration plan in
+`.local/docs/moderization-review-june/network-sync-pekko-migration-plan.md`.
+The sacred modules (`consensus/`, `vm/`, `crypto/`, `domain/`) are out of scope — if you
+touch them, stop and invoke `forge` (ETC) or `beacon` (ETH) before proceeding.
 
 ## Reference repos
 
@@ -53,7 +54,7 @@ You are called once per actor migration thread. Your deliverables per session:
    where `sender()` was used. Show the new types, get confirmation.
 3. **Implementation** — migrate the actor, update all callers, adapt spawning
    sites. One file at a time; compile after each file.
-4. **Verify** — `sbt compile-all && sbt formatAll`. Report result.
+4. **Verify** — `sbt compile-all && sbt scalafmtAll`. Report result.
 
 ## Migration pattern library
 
@@ -166,6 +167,14 @@ def apply(): Behavior[Command] =
 // After:  ctx.log.info("msg") — ctx is the Behaviors.setup/receive context parameter
 ```
 
+**Thread-confinement warning:** `ctx.log` is thread-confined. If you capture it inside
+a `Future`, `IO`, or `pipeToSelf` lambda, it throws `UnsupportedOperationException` at
+runtime. Fix: extract a plain SLF4J logger before the lambda:
+```scala
+val log = org.slf4j.LoggerFactory.getLogger(getClass)
+// now safe to use inside IO { ... } or Future { ... }
+```
+
 ### 6. Supervision
 
 ```scala
@@ -228,6 +237,63 @@ When the parent is already Typed (`ActorContext[_]`):
 val child = ctx.spawn(MyActor(config), "my-actor")
 ```
 
+**Classic parent storing a Typed child ref as Classic** (co-existence without parent surgery):
+```scala
+// Classic parent keeps storing ActorRef; Typed child is born and adapted back:
+val childClassicRef: ActorRef =
+  context.spawn(MyActor(config), "my-actor", DispatcherSelector.fromConfig("sync-dispatcher")).toClassic
+```
+This is the established pattern for SyncController, SNAPSyncController, and FastSync
+spawning Typed children while remaining Classic themselves.
+
+### 11. Behavior[Any] — when sender() cannot be replaced
+
+When a Classic actor hardcodes `context.parent` as a reply target with no way to inject
+`replyTo` (e.g. `PeerRequestHandler`), the enclosing Typed actor cannot receive a sealed
+`Command` — responses arrive as raw `Any`. Use `Behavior[Any]` and match directly:
+
+```scala
+// Established pattern: BytecodeRecoveryActor, StorageRecoveryActor,
+//                      FastSyncBranchResolverActor, ChainDownloader
+def downloading(): Behavior[Any] = Behaviors.receiveMessage {
+  case ResponseReceived(msg) => ...  // Classic actor sent this via context.parent
+  case RequestFailed(peer)   => ...
+  case WrappedPeerDisconnected(ev) => ...  // from messageAdapter
+  case _                     => Behaviors.same
+}
+```
+
+Messages from `messageAdapter` still arrive typed via the adapter; only the legacy
+Classic responses are matched as `Any`.
+
+### 12. PeerListSupportNg → PeerListHelper
+
+Actors mixing `PeerListSupportNg` (`self: Actor with ActorLogging =>`) cannot be migrated
+to Typed while keeping that mixin — the self-type constraint is incompatible.
+
+Replace with `PeerListHelper` (introduced in commit `22bbdb926`,
+`blockchain/sync/PeerListHelper.scala`). The helper is a stateful plain class:
+
+```scala
+val peerListHelper = new PeerListHelper(
+  networkPeerManager = ...,           // Classic ActorRef — stays Classic until NET group
+  peerEventBus = ...,                 // Classic ActorRef — stays Classic until NET group
+  blacklist = ...,
+  syncConfig = ...,
+  peerDisconnectedAdapter = ctx.messageAdapter[PeerDisconnected](WrappedPeerDisconnected.apply),
+  log = org.slf4j.LoggerFactory.getLogger(getClass)
+)
+// In Behaviors.withTimers:
+peerListHelper.setup(timers)
+
+// Route these two commands to the helper:
+case WrappedHandshakedPeers(peers) => peerListHelper.handleHandshakedPeers(peers); Behaviors.same
+case WrappedPeerDisconnected(ev)   => peerListHelper.handlePeerDisconnected(ev); Behaviors.same
+```
+
+Do NOT delete `PeerListSupportNg` — other unmigrated actors still mix it.
+`peerEventBus` stays as Classic `ActorRef` — it updates to Typed when Group NET migrates.
+
 ## Pre-flight checklist (run before touching any file)
 
 ```bash
@@ -259,25 +325,38 @@ sbt compile-all   # must be green before starting
 | eventStream types cross network boundary | **STOP** — run `@SerializabilityTrait` pre-flight |
 | Compile fails after 2 targeted fix attempts | **STOP** — delegate to `wraith` |
 | `sbt testEssential` drops below 3,601 tests | **STOP** — surface to user before continuing |
-| More than one actor is being migrated in this session | **STOP** — scope to one actor only |
+| More than one actor is being migrated without explicit user instruction | **STOP** — scope to one actor unless the handoff prompt explicitly authorizes a helper + proof-of-concept pair (as in PLN + FastSyncBranchResolverActor) |
 
 After implementation:
 - Compile errors → `wraith`
 - Code quality review → `prism` (non-consensus actors)
 - Test validation → `eye`
 
-## Actor migration order (from pekko-typed-migration-p2.md)
+## Actor migration order
 
-| # | Actor | LOC | Risk | Forge required? |
-|---|-------|-----|------|----------------|
-| 0 | `ResourceHealthMonitor` | 158 | LOW | No — already done (c77c2ebf7) |
-| 1 | `OmmersPool` | 93 | LOW-MED | No (infrastructure) |
-| 2 | `FaucetHandler` | 103 | LOW | No |
-| 3 | `FilterManager` | 370 | LOW | No |
-| 4 | `SubscriptionManager` | 313 | LOW-MED | No (check eventStream types) |
-| 5 | `SignedTransactionsFilterActor` | 160 | MEDIUM | No (migrate with PTM) |
-| 6 | `PendingTransactionsManager` | 445 | HIGH | No (but run serialization pre-flight) |
-| 7 | `MockedMiner` | 186 | LOW | No (test actor) |
+**Wave 2 (infrastructure actors) — COMPLETE.** All 7 actors done. See SPRINT-QUEUE.md.
+
+**Network/sync sprint — IN PROGRESS.** 35 Classic actors in `network/` and
+`blockchain/sync/`. Full plan and group order in:
+`.local/docs/moderization-review-june/network-sync-pekko-migration-plan.md`
+
+Current group status (read SPRINT-QUEUE.md Part 6 table for full state):
+
+| Group | Status | Key actors |
+|-------|--------|-----------|
+| W1 | ✅ DONE | SNAP workers ×4 |
+| W2 | ✅ DONE | KnownNodesManager, PeerStatisticsActor, ServerActor |
+| S1 | ✅ DONE | Sync recovery atoms ×3 |
+| S2 | ✅ DONE | StateStorageActor, FastSyncBranchResolverActor |
+| PLN | ✅ DONE | PeerListHelper (shared infrastructure) |
+| S6 | ✅ DONE | ChainDownloader |
+| S5 | ⬜ next | BlockBroadcasterActor → BlockImporter → RegularSync |
+| NET | ⬜ gated | PeerEventBusActor + core network (HERALD pre-flight required) |
+| S3/S4/S7 | ⬜ post-NET | SNAP coordinators, fast sync actors, PeersClient |
+| NET2/SNAP1/SNAP2/ROOT | ⬜ | Final groups → capstone root flip |
+
+SNAP1 (SNAPSyncController, 5173 LOC, 22 states) requires a SPECKIT specify session
+to define its ADT before LOOM starts. Do not begin SNAP1 without that session.
 
 ## Concrete example: ResourceHealthMonitor (completed — commit c77c2ebf7)
 
@@ -309,11 +388,18 @@ for the full diff before starting any new migration.
 
 ```bash
 sbt compile-all    # zero errors
-sbt formatAll      # no formatting drift
+sbt scalafmtAll    # no formatting drift — use scalafmtAll, NOT formatAll
+                   # (formatAll runs scalafixAll which aborts on pre-existing
+                   #  DisableSyntax violations in untouched files)
+
 # Run targeted tests for the migrated actor's subsystem only:
 sbt "testOnly *OmmersPool*"          # or whichever actor was migrated
 # Full suite at end of sprint only — ~24 min:
 sbt testEssential
 ```
 
-After each actor migration: compile + format = done. Full suite at sprint end.
+**E003 vs E165:** Track `E003` (Classic actor deprecation — `extends Actor`) to measure
+migration progress. `E165` is "unmatchable type in pattern match on Any" — it rises
+when migrating to `Behavior[Any]` and is NOT a signal of Classic actor count.
+
+After each actor migration: compile + scalafmtAll = done. Full suite at sprint end.

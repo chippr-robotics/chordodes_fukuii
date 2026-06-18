@@ -67,8 +67,11 @@ drafts, unpublished implementation revisions).
 
 - **ECIPs**: https://ecips.ethereumclassic.org
   - ETC fork schedule: ECIP-1066
-  - Olympia fork (planned): ECIP-1111 (EIP-1559 + basefee→Treasury),
-    ECIP-1112 (Treasury contract), ECIP-1121 (remaining EIPs)
+  - Olympia fork (planned — four ECIPs, all required):
+    ECIP-1111 (EIP-1559 + basefee→Treasury),
+    ECIP-1112 (Treasury contract `0x60d0A7394f9Cd5C469f9F5Ec4F9C803F5294d79b`),
+    ECIP-1121 (remaining EIPs: EIP-3198, EIP-3529, EIP-3541, EIP-3554, EIP-7594, EIP-7939 CLZ),
+    ECIP-1122 (MIN_MINER_TIP 1 gwei floor, gas target schedule, MESS reactivation)
 - **EIPs**: https://eips.ethereum.org
 
 ## Chain comparison: ETC vs ETH
@@ -83,7 +86,7 @@ drafts, unpublished implementation revisions).
 | Blob txs | No | Yes (EIP-4844 / EIP-7594) |
 | Withdrawals | No | Yes (EIP-4895) |
 | Post-merge headers | No `withdrawalsRoot`, no `excessBlobGas` | Required post-Cancun |
-| Current planned fork | Olympia (ECIP-1111/1112/1121) | Osaka |
+| Current planned fork | Olympia (ECIP-1111/1112/1121/1122) | Osaka |
 
 **Fork-dispatch rule**: ETC hard forks activate at a block number. ETH hard forks
 since the merge activate at a timestamp. Never swap these — using `forTimestamp()`

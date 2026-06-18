@@ -71,6 +71,7 @@ Owns: macro-level organisation.
 - Are there circular dependencies between packages?
 - Is the same logic duplicated across two or more files?
 - Is there a premature abstraction whose only client is the file that defines it?
+- **[MIGRATION SPRINT]** Is there a new `extends Actor` or `ActorLogging` mixin in `network/` or `blockchain/sync/`? These paths are actively being migrated to Pekko Typed — new Classic actor code here is a **critical** regression, even if it compiles.
 
 ### simplicity
 Owns: whether the solution matches the problem's actual complexity.

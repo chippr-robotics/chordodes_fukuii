@@ -48,6 +48,13 @@ Full index: [`.claude/agents/REFERENCES.md`](REFERENCES.md)
 - **Never** apply style-only changes to consensus, crypto, EVM, or Ethash code
   without `forge` (ETC) or `beacon` (ETH) validation. Prefer modernizing
   well-tested utilities and new code first.
+- **W2-P3a (implicit → given/using) has NOT started.** Do NOT run `sbt scalafixAll`
+  with the `GivenUsing` rule unless explicitly instructed. The rule must be added to
+  `.scalafix.conf` first, and must run AFTER the Pekko Typed migration is complete for
+  any actor file in scope (conflict registry: Pekko first, then GivenUsing).
+- **Pekko migration sprint in progress.** Do not touch `network/` or `blockchain/sync/`
+  actor files for idiomatic modernization until a group's LOOM migration commit is done —
+  those files will be rewritten; early mithril edits create conflicts.
 
 ```bash
 sbt compile-all && sbt testEssential   # verify before and after
