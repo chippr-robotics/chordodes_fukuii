@@ -31,29 +31,27 @@ object StaticNodesLoader extends Logger {
 
     if !file.exists() then {
       log.debug(s"Static nodes file not found: $filePath")
-      return Set.empty
-    }
-
-    if !file.canRead() then {
+      Set.empty
+    } else if !file.canRead() then {
       log.warn(s"Cannot read static nodes file: $filePath")
-      return Set.empty
-    }
-
-    Try {
-      val source = Source.fromFile(file)
-      try {
-        val content = source.mkString
-        parseStaticNodes(content)
-      } finally source.close()
-    } match {
-      case Success(nodes) =>
-        if nodes.nonEmpty then {
-          log.info(s"Loaded ${nodes.size} static node(s) from $filePath")
-        }
-        nodes
-      case Failure(exception) =>
-        log.warn(s"Failed to load static nodes from $filePath: ${exception.getMessage}")
-        Set.empty
+      Set.empty
+    } else {
+      Try {
+        val source = Source.fromFile(file)
+        try {
+          val content = source.mkString
+          parseStaticNodes(content)
+        } finally source.close()
+      } match {
+        case Success(nodes) =>
+          if nodes.nonEmpty then {
+            log.info(s"Loaded ${nodes.size} static node(s) from $filePath")
+          }
+          nodes
+        case Failure(exception) =>
+          log.warn(s"Failed to load static nodes from $filePath: ${exception.getMessage}")
+          Set.empty
+      }
     }
   }
 

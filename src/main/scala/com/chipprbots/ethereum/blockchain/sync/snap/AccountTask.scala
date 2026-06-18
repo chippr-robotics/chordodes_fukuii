@@ -102,7 +102,7 @@ object AccountTask {
     if concurrency == 1 then {
       // Single task covers entire range
       val min = bigIntTo32ByteString(BigInt(0))
-      return Seq(
+      Seq(
         AccountTask(
           next = min, // 0x00...
           // Core-Geth expects a 32-byte hash here (RLP-decoded into common.Hash).
@@ -111,21 +111,21 @@ object AccountTask {
           rootHash = rootHash
         )
       )
-    }
+    } else {
+      // Divide 256-bit space into equal chunks
+      val chunkSize = BigInt(2).pow(256) / concurrency
 
-    // Divide 256-bit space into equal chunks
-    val chunkSize = BigInt(2).pow(256) / concurrency
+      (0 until concurrency).map { i =>
+        val start = if i == 0 then BigInt(0) else chunkSize * i
+        // For the last chunk, use the maximum possible hash as the upper bound.
+        val endOpt = if i == concurrency - 1 then None else Some(chunkSize * (i + 1))
 
-    (0 until concurrency).map { i =>
-      val start = if i == 0 then BigInt(0) else chunkSize * i
-      // For the last chunk, use the maximum possible hash as the upper bound.
-      val endOpt = if i == concurrency - 1 then None else Some(chunkSize * (i + 1))
-
-      AccountTask(
-        next = bigIntTo32ByteString(start),
-        last = endOpt.map(bigIntTo32ByteString).getOrElse(MaxHash32),
-        rootHash = rootHash
-      )
+        AccountTask(
+          next = bigIntTo32ByteString(start),
+          last = endOpt.map(bigIntTo32ByteString).getOrElse(MaxHash32),
+          rootHash = rootHash
+        )
+      }
     }
   }
 

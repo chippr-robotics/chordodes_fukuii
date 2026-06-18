@@ -47,148 +47,151 @@ final class CheckpointExporter(
   import CheckpointExporter.*
   private val log = LoggerFactory.getLogger(getClass)
 
-  def exportArchive(blockNumber: BigInt, output: Path, gzip: Boolean = false): Either[ExportError, ExportResult] = {
-    val header = blockchainReader.getBlockHeaderByNumber(blockNumber) match {
-      case Some(h) => h
-      case None    => return Left(NoSuchBlock(blockNumber))
-    }
-    val weight = blockchainReader.getChainWeightByHash(header.hash) match {
-      case Some(w) => w
-      case None    => return Left(NoChainWeight(blockNumber))
-    }
+  def exportArchive(blockNumber: BigInt, output: Path, gzip: Boolean = false): Either[ExportError, ExportResult] =
+    blockchainReader.getBlockHeaderByNumber(blockNumber) match {
+      case None => Left(NoSuchBlock(blockNumber))
+      case Some(header) =>
+        blockchainReader.getChainWeightByHash(header.hash) match {
+          case None => Left(NoChainWeight(blockNumber))
+          case Some(weight) =>
+            val start = System.currentTimeMillis()
+            // Read through the StateStorage abstraction so per-chain wrapping (e.g.,
+            // ReferenceCountNodeStorage on BasicPruning chains) is unwrapped automatically.
+            // Using raw NodeStorage would surface ref-counted bytes here — see Bug 33.
+            val mpt = stateStorage.getReadOnlyStorage
+            val raw = new FileOutputStream(output.toFile)
+            val out =
+              if gzip then new GZIPOutputStream(new BufferedOutputStream(raw, 65536), 65536)
+              else new BufferedOutputStream(raw, 65536)
+            val writer = new CheckpointArchive.Writer(out)
+            val visited = new java.util.HashSet[ByteString]
+            val codeHashes = new java.util.HashSet[ByteString]
+            val storageRoots = new scala.collection.mutable.Queue[ByteString]
+            var nodesEmitted = 0L
+            var bytecodesEmitted = 0L
+            var exportError: Option[ExportError] = None
 
-    val start = System.currentTimeMillis()
-    // Read through the StateStorage abstraction so per-chain wrapping (e.g.,
-    // ReferenceCountNodeStorage on BasicPruning chains) is unwrapped automatically.
-    // Using raw NodeStorage would surface ref-counted bytes here — see Bug 33.
-    val mpt = stateStorage.getReadOnlyStorage
-    val raw = new FileOutputStream(output.toFile)
-    val out =
-      if gzip then new GZIPOutputStream(new BufferedOutputStream(raw, 65536), 65536)
-      else new BufferedOutputStream(raw, 65536)
-    val writer = new CheckpointArchive.Writer(out)
-    val visited = new java.util.HashSet[ByteString]
-    val codeHashes = new java.util.HashSet[ByteString]
-    val storageRoots = new scala.collection.mutable.Queue[ByteString]
-    var nodesEmitted = 0L
-    var bytecodesEmitted = 0L
+            try {
+              writer.writeHeader(
+                CheckpointArchive.Header(
+                  chainId = chainId.toLong,
+                  blockHeader = header,
+                  chainWeight = weight
+                )
+              )
 
-    try {
-      writer.writeHeader(
-        CheckpointArchive.Header(
-          chainId = chainId.toLong,
-          blockHeader = header,
-          chainWeight = weight
-        )
-      )
+              log.info(
+                "[CHECKPOINT EXPORT] block={} stateRoot={} writing to {}",
+                blockNumber,
+                hex8(header.stateRoot),
+                output
+              )
 
-      log.info(
-        "[CHECKPOINT EXPORT] block={} stateRoot={} writing to {}",
-        blockNumber,
-        hex8(header.stateRoot),
-        output
-      )
-
-      def abortLog(err: ExportError): Unit =
-        log.error(
-          "[CHECKPOINT EXPORT] ABORTED after nodes={} bytecodes={}: {}. " +
-            "Archive at {} is incomplete (missing end-of-stream marker + CRC) and unusable.",
-          nodesEmitted,
-          bytecodesEmitted,
-          err,
-          output
-        )
-
-      // Phase 1: account trie
-      walkTrie(
-        rootHash = header.stateRoot,
-        isMainTrie = true,
-        mpt = mpt,
-        writer = writer,
-        visited = visited,
-        codeHashes = codeHashes,
-        storageRoots = storageRoots,
-        onNodeEmitted = () => {
-          nodesEmitted += 1
-          if nodesEmitted % LogInterval == 0 then
-            log.info(
-              "[CHECKPOINT EXPORT] nodes={} bytecodes={} storageQueue={}",
-              nodesEmitted,
-              bytecodesEmitted,
-              storageRoots.size
-            )
-        }
-      ) match {
-        case Right(_) => ()
-        case Left(err) =>
-          abortLog(err)
-          return Left(err)
-      }
-
-      // Phase 2: per-account storage tries
-      while storageRoots.nonEmpty do {
-        val sroot = storageRoots.dequeue()
-        if sroot != Account.EmptyStorageRootHash then {
-          walkTrie(
-            rootHash = sroot,
-            isMainTrie = false,
-            mpt = mpt,
-            writer = writer,
-            visited = visited,
-            codeHashes = codeHashes,
-            storageRoots = storageRoots,
-            onNodeEmitted = () => {
-              nodesEmitted += 1
-              if nodesEmitted % LogInterval == 0 then
-                log.info(
-                  "[CHECKPOINT EXPORT] nodes={} bytecodes={} storageQueue={}",
+              def abortLog(err: ExportError): Unit =
+                log.error(
+                  "[CHECKPOINT EXPORT] ABORTED after nodes={} bytecodes={}: {}. " +
+                    "Archive at {} is incomplete (missing end-of-stream marker + CRC) and unusable.",
                   nodesEmitted,
                   bytecodesEmitted,
-                  storageRoots.size
+                  err,
+                  output
                 )
+
+              // Phase 1: account trie
+              walkTrie(
+                rootHash = header.stateRoot,
+                isMainTrie = true,
+                mpt = mpt,
+                writer = writer,
+                visited = visited,
+                codeHashes = codeHashes,
+                storageRoots = storageRoots,
+                onNodeEmitted = () => {
+                  nodesEmitted += 1
+                  if nodesEmitted % LogInterval == 0 then
+                    log.info(
+                      "[CHECKPOINT EXPORT] nodes={} bytecodes={} storageQueue={}",
+                      nodesEmitted,
+                      bytecodesEmitted,
+                      storageRoots.size
+                    )
+                }
+              ) match {
+                case Right(_) => ()
+                case Left(err) =>
+                  abortLog(err)
+                  exportError = Some(err)
+              }
+
+              // Phase 2: per-account storage tries
+              while storageRoots.nonEmpty && exportError.isEmpty do {
+                val sroot = storageRoots.dequeue()
+                if sroot != Account.EmptyStorageRootHash then {
+                  walkTrie(
+                    rootHash = sroot,
+                    isMainTrie = false,
+                    mpt = mpt,
+                    writer = writer,
+                    visited = visited,
+                    codeHashes = codeHashes,
+                    storageRoots = storageRoots,
+                    onNodeEmitted = () => {
+                      nodesEmitted += 1
+                      if nodesEmitted % LogInterval == 0 then
+                        log.info(
+                          "[CHECKPOINT EXPORT] nodes={} bytecodes={} storageQueue={}",
+                          nodesEmitted,
+                          bytecodesEmitted,
+                          storageRoots.size
+                        )
+                    }
+                  ) match {
+                    case Right(_) => ()
+                    case Left(err) =>
+                      abortLog(err)
+                      exportError = Some(err)
+                  }
+                }
+              }
+
+              // Phase 3: bytecodes
+              val it = codeHashes.iterator()
+              while it.hasNext && exportError.isEmpty do {
+                val ch = it.next()
+                if ch != Account.EmptyCodeHash then {
+                  evmCodeStorage.get(ch) match {
+                    case Some(code) =>
+                      writer.writeBytecode(ch, code.toArray)
+                      bytecodesEmitted += 1
+                    case None =>
+                      val err = MissingBytecode(ch)
+                      abortLog(err)
+                      exportError = Some(err)
+                  }
+                }
+              }
+
+              if exportError.isEmpty then writer.finish()
+            } finally
+              try out.close()
+              catch { case _: Throwable => () }
+
+            exportError match {
+              case Some(err) => Left(err)
+              case None =>
+                val elapsed = System.currentTimeMillis() - start
+                log.info(
+                  "[CHECKPOINT EXPORT] complete: block={} nodes={} bytecodes={} elapsed={}s output={}",
+                  blockNumber,
+                  nodesEmitted,
+                  bytecodesEmitted,
+                  elapsed / 1000,
+                  output
+                )
+                Right(ExportResult(blockNumber, nodesEmitted, bytecodesEmitted, elapsed))
             }
-          ) match {
-            case Right(_) => ()
-            case Left(err) =>
-              abortLog(err)
-              return Left(err)
-          }
         }
-      }
-
-      // Phase 3: bytecodes
-      val it = codeHashes.iterator()
-      while it.hasNext do {
-        val ch = it.next()
-        if ch != Account.EmptyCodeHash then {
-          evmCodeStorage.get(ch) match {
-            case Some(code) =>
-              writer.writeBytecode(ch, code.toArray)
-              bytecodesEmitted += 1
-            case None =>
-              val err = MissingBytecode(ch)
-              abortLog(err)
-              return Left(err)
-          }
-        }
-      }
-
-      writer.finish()
-    } finally
-      try out.close()
-      catch { case _: Throwable => () }
-
-    val elapsed = System.currentTimeMillis() - start
-    log.info(
-      "[CHECKPOINT EXPORT] complete: block={} nodes={} bytecodes={} elapsed={}s output={}",
-      blockNumber,
-      nodesEmitted,
-      bytecodesEmitted,
-      elapsed / 1000,
-      output
-    )
-    Right(ExportResult(blockNumber, nodesEmitted, bytecodesEmitted, elapsed))
-  }
+    }
 
   private def walkTrie(
       rootHash: ByteString,
@@ -202,22 +205,27 @@ final class CheckpointExporter(
   ): Either[ExportError, Unit] = {
     val stack = new scala.collection.mutable.Stack[ByteString]
     stack.push(rootHash)
-    while stack.nonEmpty do {
+    var walkError: Option[ExportError] = None
+    while stack.nonEmpty && walkError.isEmpty do {
       val h = stack.pop()
       if visited.add(h) then {
-        val decoded =
-          try mpt.get(h.toArray)
-          catch { case _: MerklePatriciaTrie.MissingNodeException => return Left(MissingTrieNode(h, isMainTrie)) }
-        // The MptStorage path decodes once and caches the raw RLP it parsed. Prefer that —
-        // it round-trips byte-identically and matches the content-addressed hash. Fall back
-        // to re-encoding for the rare case a node lacks a cached RLP (in-memory test fixtures).
-        val rlp = decoded.cachedRlpEncoded.getOrElse(MptTraversals.encodeNode(decoded))
-        writer.writeNode(h, rlp)
-        onNodeEmitted()
-        collectChildren(decoded, isMainTrie, stack, codeHashes, storageRoots)
+        val nodeOpt =
+          try Some(mpt.get(h.toArray))
+          catch {
+            case _: MerklePatriciaTrie.MissingNodeException => walkError = Some(MissingTrieNode(h, isMainTrie)); None
+          }
+        nodeOpt.foreach { decoded =>
+          // The MptStorage path decodes once and caches the raw RLP it parsed. Prefer that —
+          // it round-trips byte-identically and matches the content-addressed hash. Fall back
+          // to re-encoding for the rare case a node lacks a cached RLP (in-memory test fixtures).
+          val rlp = decoded.cachedRlpEncoded.getOrElse(MptTraversals.encodeNode(decoded))
+          writer.writeNode(h, rlp)
+          onNodeEmitted()
+          collectChildren(decoded, isMainTrie, stack, codeHashes, storageRoots)
+        }
       }
     }
-    Right(())
+    walkError.toLeft(())
   }
 
   /** Walk a decoded node's tree pulling out: hash references to push onto the work stack; account info from leaves of

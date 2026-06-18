@@ -79,19 +79,17 @@ object ByteCodeTask {
   ): Seq[ByteCodeTask] = {
     require(batchSize > 0, "Batch size must be positive")
 
-    if contractAccounts.isEmpty then {
-      return Seq.empty
-    }
-
-    // Group into batches
-    contractAccounts
-      .grouped(batchSize)
-      .map { batch =>
-        val accountHashes = batch.map(_._1)
-        val codeHashes = batch.map(_._2)
-        ByteCodeTask(codeHashes, accountHashes)
-      }
-      .toSeq
+    if contractAccounts.isEmpty then Seq.empty
+    else
+      // Group into batches
+      contractAccounts
+        .grouped(batchSize)
+        .map { batch =>
+          val accountHashes = batch.map(_._1)
+          val codeHashes = batch.map(_._2)
+          ByteCodeTask(codeHashes, accountHashes)
+        }
+        .toSeq
   }
 
   /** Create a single bytecode task from code hashes
@@ -121,13 +119,11 @@ object ByteCodeTask {
   ): Seq[ByteCodeTask] = {
     require(batchSize > 0, "Batch size must be positive")
 
-    if codeHashes.isEmpty then {
-      return Seq.empty
-    }
-
-    codeHashes
-      .grouped(batchSize)
-      .map(batch => ByteCodeTask(batch))
-      .toSeq
+    if codeHashes.isEmpty then Seq.empty
+    else
+      codeHashes
+        .grouped(batchSize)
+        .map(batch => ByteCodeTask(batch))
+        .toSeq
   }
 }

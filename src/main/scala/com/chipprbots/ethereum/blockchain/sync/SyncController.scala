@@ -804,23 +804,23 @@ class SyncController(
   private def handleBeaconHead(
       bh: ForkChoiceManager.BeaconHead,
       snapSyncOpt: Option[ActorRef]
-  ): Unit = {
-    if !clPivotEnabled then return
-    val isNew = !latestBeaconHead.exists(_.headHash == bh.headHash)
-    latestBeaconHead = Some(bh)
-    if isNew then
-      log.info(
-        "Received CL-driven beacon head {} (knownHeader={})",
-        com.chipprbots.ethereum.utils.ByteStringUtils.hash2string(bh.headHash),
-        bh.knownHeader.map(_.number).getOrElse("unknown")
-      )
-    snapSyncOpt.foreach { snapSync =>
-      snapSync ! com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.CLPivotHint(
-        bh.headHash,
-        bh.knownHeader
-      )
+  ): Unit =
+    if clPivotEnabled then {
+      val isNew = !latestBeaconHead.exists(_.headHash == bh.headHash)
+      latestBeaconHead = Some(bh)
+      if isNew then
+        log.info(
+          "Received CL-driven beacon head {} (knownHeader={})",
+          com.chipprbots.ethereum.utils.ByteStringUtils.hash2string(bh.headHash),
+          bh.knownHeader.map(_.number).getOrElse("unknown")
+        )
+      snapSyncOpt.foreach { snapSync =>
+        snapSync ! com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.CLPivotHint(
+          bh.headHash,
+          bh.knownHeader
+        )
+      }
     }
-  }
 
   /** Check if the SNAP<->Fast bounce cycle count has exceeded the configured threshold. If so, mark both sync modes as
     * done and escape to regular sync.
@@ -1011,127 +1011,127 @@ class SyncController(
       )
       startRegularSync()
       scheduler.scheduleOnce(delay, self, RestartFastSyncNow)
-      return
-    }
+    } else {
 
-    // Recovery flag: -Dfukuii.snap.clearDoneOnStart=true clears SnapSyncDone to re-enter healing.
-    // Use when healing completed prematurely (BUG-006: root mismatch) to resume without a full re-sync.
-    if doSnapSync && System.getProperty("fukuii.snap.clearDoneOnStart", "false").toBoolean then {
-      if appStateStorage.isSnapSyncDone() then {
-        log.warning("fukuii.snap.clearDoneOnStart=true: clearing SnapSyncDone to re-enter SNAP healing")
-        appStateStorage.clearSnapSyncDone().commit()
+      // Recovery flag: -Dfukuii.snap.clearDoneOnStart=true clears SnapSyncDone to re-enter healing.
+      // Use when healing completed prematurely (BUG-006: root mismatch) to resume without a full re-sync.
+      if doSnapSync && System.getProperty("fukuii.snap.clearDoneOnStart", "false").toBoolean then {
+        if appStateStorage.isSnapSyncDone() then {
+          log.warning("fukuii.snap.clearDoneOnStart=true: clearing SnapSyncDone to re-enter SNAP healing")
+          appStateStorage.clearSnapSyncDone().commit()
+        }
       }
-    }
 
-    (appStateStorage.isSnapSyncDone(), appStateStorage.isFastSyncDone(), doSnapSync, doFastSync) match {
-      case (false, _, true, _) =>
-        // SNAP sync requested - just start it
-        // It will fall back to fast sync if needed
-        startSnapSync()
-      case (true, _, true, _) =>
-        log.warning("do-snap-sync is true but SNAP sync already completed")
-        // Diagnostic: log stored SNAP sync state root vs pivot block state root
-        val snapStateRoot = appStateStorage.getSnapSyncStateRoot()
-        val bestBlockNum = appStateStorage.getBestBlockNumber()
-        val bestBlockHeader = blockchainReader.getBlockHeaderByNumber(bestBlockNum)
-        val pivotStateRoot = bestBlockHeader.map(_.stateRoot)
-        log.info(
-          "SNAP state root diagnostic: stored snapStateRoot={}, pivotBlockStateRoot={}, bestBlock={}, match={}",
-          snapStateRoot.map(r => r.take(8).toArray.map("%02x".format(_)).mkString).getOrElse("none"),
-          pivotStateRoot.map(r => r.take(8).toArray.map("%02x".format(_)).mkString).getOrElse("none"),
-          bestBlockNum,
-          snapStateRoot == pivotStateRoot
-        )
-        // After SNAP sync with deferred merkleization + pivot refreshes, the finalized trie root
-        // may differ from the pivot block header's stateRoot. The trie nodes are stored under
-        // the finalized root's hash, but the pivot header references the original (now orphaned) root.
-        // Fix: substitute the finalized root into the pivot block header.
-        bestBlockHeader.foreach { header =>
-          val mptStorage = stateStorage.getReadOnlyStorage
-          val pivotRootExists =
-            try { mptStorage.get(header.stateRoot.toArray); true }
-            catch { case _: Exception => false }
+      (appStateStorage.isSnapSyncDone(), appStateStorage.isFastSyncDone(), doSnapSync, doFastSync) match {
+        case (false, _, true, _) =>
+          // SNAP sync requested - just start it
+          // It will fall back to fast sync if needed
+          startSnapSync()
+        case (true, _, true, _) =>
+          log.warning("do-snap-sync is true but SNAP sync already completed")
+          // Diagnostic: log stored SNAP sync state root vs pivot block state root
+          val snapStateRoot = appStateStorage.getSnapSyncStateRoot()
+          val bestBlockNum = appStateStorage.getBestBlockNumber()
+          val bestBlockHeader = blockchainReader.getBlockHeaderByNumber(bestBlockNum)
+          val pivotStateRoot = bestBlockHeader.map(_.stateRoot)
           log.info(
-            "State root availability check: pivotRoot({})={}",
-            header.stateRoot.take(8).toArray.map("%02x".format(_)).mkString,
-            if pivotRootExists then "EXISTS" else "MISSING"
+            "SNAP state root diagnostic: stored snapStateRoot={}, pivotBlockStateRoot={}, bestBlock={}, match={}",
+            snapStateRoot.map(r => r.take(8).toArray.map("%02x".format(_)).mkString).getOrElse("none"),
+            pivotStateRoot.map(r => r.take(8).toArray.map("%02x".format(_)).mkString).getOrElse("none"),
+            bestBlockNum,
+            snapStateRoot == pivotStateRoot
           )
-          if !pivotRootExists then {
-            val finalizedRoot = appStateStorage.getSnapSyncFinalizedRoot()
-            finalizedRoot match {
-              case Some(fRoot) =>
-                val fRootExists =
-                  try { mptStorage.get(fRoot.toArray); true }
-                  catch { case _: Exception => false }
-                log.info(
-                  "Finalized trie root {} availability: {}",
-                  fRoot.take(8).toArray.map("%02x".format(_)).mkString,
-                  if fRootExists then "EXISTS" else "MISSING"
-                )
-                if fRootExists then {
-                  log.warning(
-                    "Substituting finalized trie root {} into pivot block header (replacing missing root {})",
+          // After SNAP sync with deferred merkleization + pivot refreshes, the finalized trie root
+          // may differ from the pivot block header's stateRoot. The trie nodes are stored under
+          // the finalized root's hash, but the pivot header references the original (now orphaned) root.
+          // Fix: substitute the finalized root into the pivot block header.
+          bestBlockHeader.foreach { header =>
+            val mptStorage = stateStorage.getReadOnlyStorage
+            val pivotRootExists =
+              try { mptStorage.get(header.stateRoot.toArray); true }
+              catch { case _: Exception => false }
+            log.info(
+              "State root availability check: pivotRoot({})={}",
+              header.stateRoot.take(8).toArray.map("%02x".format(_)).mkString,
+              if pivotRootExists then "EXISTS" else "MISSING"
+            )
+            if !pivotRootExists then {
+              val finalizedRoot = appStateStorage.getSnapSyncFinalizedRoot()
+              finalizedRoot match {
+                case Some(fRoot) =>
+                  val fRootExists =
+                    try { mptStorage.get(fRoot.toArray); true }
+                    catch { case _: Exception => false }
+                  log.info(
+                    "Finalized trie root {} availability: {}",
                     fRoot.take(8).toArray.map("%02x".format(_)).mkString,
+                    if fRootExists then "EXISTS" else "MISSING"
+                  )
+                  if fRootExists then {
+                    log.warning(
+                      "Substituting finalized trie root {} into pivot block header (replacing missing root {})",
+                      fRoot.take(8).toArray.map("%02x".format(_)).mkString,
+                      header.stateRoot.take(8).toArray.map("%02x".format(_)).mkString
+                    )
+                    val updatedHeader = header.copy(stateRoot = fRoot)
+                    blockchainWriter.storeBlockHeader(updatedHeader).commit()
+                  }
+                case None =>
+                  log.error(
+                    "Pivot state root {} MISSING and no finalized root stored! " +
+                      "Database is in an unrecoverable state — clear data and re-sync.",
                     header.stateRoot.take(8).toArray.map("%02x".format(_)).mkString
                   )
-                  val updatedHeader = header.copy(stateRoot = fRoot)
-                  blockchainWriter.storeBlockHeader(updatedHeader).commit()
-                }
-              case None =>
-                log.error(
-                  "Pivot state root {} MISSING and no finalized root stored! " +
-                    "Database is in an unrecoverable state — clear data and re-sync.",
-                  header.stateRoot.take(8).toArray.map("%02x".format(_)).mkString
-                )
-            }
-          } else {
-            // Symmetric case (Run-26): pivot root EXISTS in MPT but differs from snapStateRoot.
-            // The downloaded account trie is stored under snapStateRoot; update the pivot header
-            // to match so the startup diagnostic passes and regular sync reads the correct trie.
-            snapStateRoot.foreach { snapRoot =>
-              if snapRoot != header.stateRoot then {
-                val snapRootExists =
-                  try { mptStorage.get(snapRoot.toArray); true }
-                  catch { case _: Exception => false }
-                log.info(
-                  "snapStateRoot({}) availability: {}",
-                  snapRoot.take(8).toArray.map("%02x".format(_)).mkString,
-                  if snapRootExists then "EXISTS" else "MISSING"
-                )
-                if snapRootExists then {
-                  log.warning(
-                    "snapStateRoot({}) differs from pivotHeader.stateRoot({}) — " +
-                      "updating pivot block header to use downloaded state root.",
+              }
+            } else {
+              // Symmetric case (Run-26): pivot root EXISTS in MPT but differs from snapStateRoot.
+              // The downloaded account trie is stored under snapStateRoot; update the pivot header
+              // to match so the startup diagnostic passes and regular sync reads the correct trie.
+              snapStateRoot.foreach { snapRoot =>
+                if snapRoot != header.stateRoot then {
+                  val snapRootExists =
+                    try { mptStorage.get(snapRoot.toArray); true }
+                    catch { case _: Exception => false }
+                  log.info(
+                    "snapStateRoot({}) availability: {}",
                     snapRoot.take(8).toArray.map("%02x".format(_)).mkString,
-                    header.stateRoot.take(8).toArray.map("%02x".format(_)).mkString
+                    if snapRootExists then "EXISTS" else "MISSING"
                   )
-                  val updatedHeader = header.copy(stateRoot = snapRoot)
-                  blockchainWriter.storeBlockHeader(updatedHeader).commit()
+                  if snapRootExists then {
+                    log.warning(
+                      "snapStateRoot({}) differs from pivotHeader.stateRoot({}) — " +
+                        "updating pivot block header to use downloaded state root.",
+                      snapRoot.take(8).toArray.map("%02x".format(_)).mkString,
+                      header.stateRoot.take(8).toArray.map("%02x".format(_)).mkString
+                    )
+                    val updatedHeader = header.copy(stateRoot = snapRoot)
+                    blockchainWriter.storeBlockHeader(updatedHeader).commit()
+                  }
                 }
               }
             }
           }
-        }
-        val needBytecode = !appStateStorage.isBytecodeRecoveryDone()
-        val needStorage = !appStateStorage.isStorageRecoveryDone()
-        if needBytecode || needStorage then {
-          startRecovery(needBytecode, needStorage)
-        } else {
-          startRegularSync()
-        }
-      case (_, false, false, true) =>
-        startFastSync()
-      case (_, true, false, true) =>
-        log.warning("do-fast-sync is true but fast sync already completed")
-        startRegularSync()
-      case (_, true, false, false) =>
-        startRegularSync()
-      case (_, false, false, false) =>
-        if fastSyncStateStorage.getSyncState().isDefined then {
-          log.warning("do-fast-sync is false but fast sync hasn't completed")
+          val needBytecode = !appStateStorage.isBytecodeRecoveryDone()
+          val needStorage = !appStateStorage.isStorageRecoveryDone()
+          if needBytecode || needStorage then {
+            startRecovery(needBytecode, needStorage)
+          } else {
+            startRegularSync()
+          }
+        case (_, false, false, true) =>
           startFastSync()
-        } else startRegularSync()
-    }
+        case (_, true, false, true) =>
+          log.warning("do-fast-sync is true but fast sync already completed")
+          startRegularSync()
+        case (_, true, false, false) =>
+          startRegularSync()
+        case (_, false, false, false) =>
+          if fastSyncStateStorage.getSyncState().isDefined then {
+            log.warning("do-fast-sync is false but fast sync hasn't completed")
+            startFastSync()
+          } else startRegularSync()
+      }
+    } // else !isFastSyncCoolingOff
   }
 
   def startFastSync(): Unit = {

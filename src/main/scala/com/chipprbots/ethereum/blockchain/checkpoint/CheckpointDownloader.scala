@@ -40,65 +40,81 @@ final class CheckpointDownloader(
     *
     * On any failure the `.tmp` is left in place so the next attempt can resume.
     */
-  def download(url: String, target: Path): Either[DownloadError, Unit] = {
+  def download(url: String, target: Path): Either[DownloadError, Unit] =
     if Files.exists(target) then {
       log.info("[CHECKPOINT DOWNLOAD] target {} already exists; skipping fetch", target)
-      return Right(())
-    }
-    val tmpPath = target.resolveSibling(target.getFileName.toString + ".tmp")
-    Files.createDirectories(target.getParent)
-
-    val tmpChannel =
-      try
-        FileChannel.open(
-          tmpPath,
-          StandardOpenOption.CREATE,
-          StandardOpenOption.READ,
-          StandardOpenOption.WRITE
-        )
-      catch {
-        case e: IOException => return Left(IoError(s"open tmp: ${e.getMessage}"))
-      }
-
-    var lockOpt: Option[FileLock] = None
-    try {
-      try lockOpt = Option(tmpChannel.tryLock())
-      catch { case _: OverlappingFileLockException => () }
-      if lockOpt.isEmpty then {
-        log.warn("[CHECKPOINT DOWNLOAD] another process holds {}; refusing to start", tmpPath)
-        return Left(AlreadyDownloading)
-      }
-
-      val resumeFrom = tmpChannel.size()
-      val totalBytes = doDownload(url, tmpChannel, resumeFrom) match {
-        case Right(t) => t
-        case Left(e)  => return Left(e)
-      }
-
-      // Best-effort flush — file lock release on close is enough but make data hits disk first.
-      tmpChannel.force(true)
-
-      try Files.move(tmpPath, target, StandardCopyOption.ATOMIC_MOVE)
-      catch {
-        case _: java.nio.file.AtomicMoveNotSupportedException =>
-          Files.move(tmpPath, target, StandardCopyOption.REPLACE_EXISTING)
-        case e: IOException => return Left(IoError(s"rename tmp -> final: ${e.getMessage}"))
-      }
-      log.info(
-        "[CHECKPOINT DOWNLOAD] complete: {} bytes -> {}",
-        totalBytes,
-        target
-      )
       Right(())
-    } finally {
-      lockOpt.foreach(l =>
-        try l.release()
-        catch { case _: Throwable => () }
-      )
-      try tmpChannel.close()
-      catch { case _: Throwable => () }
+    } else {
+      val tmpPath = target.resolveSibling(target.getFileName.toString + ".tmp")
+      Files.createDirectories(target.getParent)
+
+      val tmpChannelResult =
+        try
+          Right(
+            FileChannel.open(
+              tmpPath,
+              StandardOpenOption.CREATE,
+              StandardOpenOption.READ,
+              StandardOpenOption.WRITE
+            )
+          )
+        catch {
+          case e: IOException => Left(IoError(s"open tmp: ${e.getMessage}"))
+        }
+
+      tmpChannelResult match {
+        case Left(err) => Left(err)
+        case Right(tmpChannel) =>
+          var lockOpt: Option[FileLock] = None
+          try {
+            try lockOpt = Option(tmpChannel.tryLock())
+            catch { case _: OverlappingFileLockException => () }
+
+            if lockOpt.isEmpty then {
+              log.warn("[CHECKPOINT DOWNLOAD] another process holds {}; refusing to start", tmpPath)
+              Left(AlreadyDownloading)
+            } else {
+              val resumeFrom = tmpChannel.size()
+              doDownload(url, tmpChannel, resumeFrom) match {
+                case Left(e)           => Left(e)
+                case Right(totalBytes) =>
+                  // Best-effort flush — file lock release on close is enough but make data hits disk first.
+                  tmpChannel.force(true)
+
+                  val moveResult =
+                    try {
+                      Files.move(tmpPath, target, StandardCopyOption.ATOMIC_MOVE)
+                      Right(())
+                    } catch {
+                      case _: java.nio.file.AtomicMoveNotSupportedException =>
+                        Files.move(tmpPath, target, StandardCopyOption.REPLACE_EXISTING)
+                        Right(())
+                      case e: IOException =>
+                        Left(IoError(s"rename tmp -> final: ${e.getMessage}"))
+                    }
+
+                  moveResult match {
+                    case Left(err) => Left(err)
+                    case Right(_) =>
+                      log.info(
+                        "[CHECKPOINT DOWNLOAD] complete: {} bytes -> {}",
+                        totalBytes,
+                        target
+                      )
+                      Right(())
+                  }
+              }
+            }
+          } finally {
+            lockOpt.foreach(l =>
+              try l.release()
+              catch { case _: Throwable => () }
+            )
+            try tmpChannel.close()
+            catch { case _: Throwable => () }
+          }
+      }
     }
-  }
 
   /** Perform the HTTP GET, appending to `tmpChannel`. Returns total bytes in the completed file. */
   private def doDownload(
@@ -119,42 +135,47 @@ final class CheckpointDownloader(
     }
     val request = builder.build()
 
-    val response =
-      try httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream())
+    val responseResult: Either[DownloadError, HttpResponse[java.io.InputStream]] =
+      try Right(httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream()))
       catch {
         case e: java.net.http.HttpConnectTimeoutException =>
-          return Left(HttpError(0, s"connect timeout: ${e.getMessage}"))
+          Left(HttpError(0, s"connect timeout: ${e.getMessage}"))
         case e: java.net.http.HttpTimeoutException =>
-          return Left(HttpError(0, s"timeout: ${e.getMessage}"))
+          Left(HttpError(0, s"timeout: ${e.getMessage}"))
         case e: IOException =>
-          return Left(HttpError(0, s"io: ${e.getMessage}"))
+          Left(HttpError(0, s"io: ${e.getMessage}"))
         case e: InterruptedException =>
           Thread.currentThread().interrupt()
-          return Left(HttpError(0, s"interrupted: ${e.getMessage}"))
+          Left(HttpError(0, s"interrupted: ${e.getMessage}"))
       }
 
-    val status = response.statusCode()
-    val rangeOk = resumeFrom > 0 && status == 206
-    val fullOk = resumeFrom == 0 && (status == 200 || status == 206)
-    if !rangeOk && !fullOk then {
-      // 200 to a Range request means server ignored the range — start over from byte 0.
-      if resumeFrom > 0 && status == 200 then {
-        log.warn(
-          "[CHECKPOINT DOWNLOAD] server ignored Range header (status 200); restarting download from scratch"
-        )
-        tmpChannel.truncate(0)
-        tmpChannel.position(0)
-        return readBodyInto(response.body(), tmpChannel, alreadyWritten = 0)
-      }
-      val errBody =
-        try
-          new String(response.body().readNBytes(1024), "UTF-8")
-        catch { case _: Throwable => "" }
-      return Left(HttpError(status, errBody))
+    responseResult match {
+      case Left(err) => Left(err)
+      case Right(response) =>
+        val status = response.statusCode()
+        val rangeOk = resumeFrom > 0 && status == 206
+        val fullOk = resumeFrom == 0 && (status == 200 || status == 206)
+        if !rangeOk && !fullOk then {
+          // 200 to a Range request means server ignored the range — start over from byte 0.
+          if resumeFrom > 0 && status == 200 then {
+            log.warn(
+              "[CHECKPOINT DOWNLOAD] server ignored Range header (status 200); restarting download from scratch"
+            )
+            tmpChannel.truncate(0)
+            tmpChannel.position(0)
+            readBodyInto(response.body(), tmpChannel, alreadyWritten = 0)
+          } else {
+            val errBody =
+              try
+                new String(response.body().readNBytes(1024), "UTF-8")
+              catch { case _: Throwable => "" }
+            Left(HttpError(status, errBody))
+          }
+        } else {
+          tmpChannel.position(resumeFrom)
+          readBodyInto(response.body(), tmpChannel, alreadyWritten = resumeFrom)
+        }
     }
-
-    tmpChannel.position(resumeFrom)
-    readBodyInto(response.body(), tmpChannel, alreadyWritten = resumeFrom)
   }
 
   private def readBodyInto(

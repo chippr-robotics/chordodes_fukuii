@@ -49,29 +49,35 @@ class StateValidator(mptStorage: MptStorage) {
       val missingStorageNodes = mutable.ArrayBuffer[ByteString]()
       val accounts = mutable.ArrayBuffer[Account]()
 
-      try {
-        val rootNode = mptStorage.get(stateRoot.toArray)
-        collectAccounts(rootNode, mptStorage, accounts)
-      } catch {
-        case _: Exception =>
-          return Left("Cannot validate storage tries: failed to traverse account trie")
-      }
-
-      accounts.foreach { account =>
-        if account.storageRoot != Account.EmptyStorageRootHash then {
-          try {
-            val storageRootNode = mptStorage.get(account.storageRoot.toArray)
-            traverseForMissingNodes(storageRootNode, mptStorage, missingStorageNodes)
-          } catch {
-            case e: MerklePatriciaTrie.MissingNodeException =>
-              missingStorageNodes += e.hash
-            case _: Exception => ()
-          }
+      val accountTrieResult =
+        try {
+          val rootNode = mptStorage.get(stateRoot.toArray)
+          collectAccounts(rootNode, mptStorage, accounts)
+          Right(())
+        } catch {
+          case _: Exception =>
+            Left("Cannot validate storage tries: failed to traverse account trie")
         }
-      }
 
-      if missingStorageNodes.isEmpty then Right(Seq.empty)
-      else Right(missingStorageNodes.toSeq)
+      accountTrieResult match {
+        case Left(err) => Left(err)
+        case Right(_) =>
+          accounts.foreach { account =>
+            if account.storageRoot != Account.EmptyStorageRootHash then {
+              try {
+                val storageRootNode = mptStorage.get(account.storageRoot.toArray)
+                traverseForMissingNodes(storageRootNode, mptStorage, missingStorageNodes)
+              } catch {
+                case e: MerklePatriciaTrie.MissingNodeException =>
+                  missingStorageNodes += e.hash
+                case _: Exception => ()
+              }
+            }
+          }
+
+          if missingStorageNodes.isEmpty then Right(Seq.empty)
+          else Right(missingStorageNodes.toSeq)
+      }
     } catch {
       case e: Exception =>
         Left(s"Storage validation error: ${e.getMessage}")

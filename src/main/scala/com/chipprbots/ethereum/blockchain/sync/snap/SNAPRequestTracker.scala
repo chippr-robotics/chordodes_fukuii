@@ -62,13 +62,14 @@ class SNAPRequestTracker(implicit scheduler: Scheduler) extends Logger {
   private def compareUnsignedLexicographically(a: ByteString, b: ByteString): Int = {
     val minLen = math.min(a.length, b.length)
     var i = 0
-    while i < minLen do {
+    var result = 0
+    while i < minLen && result == 0 do {
       val av = java.lang.Byte.toUnsignedInt(a(i))
       val bv = java.lang.Byte.toUnsignedInt(b(i))
-      if av != bv then return av - bv
+      result = av - bv
       i += 1
     }
-    a.length - b.length
+    if result != 0 then result else a.length - b.length
   }
 
   /** Request ID counter */
@@ -268,19 +269,15 @@ class SNAPRequestTracker(implicit scheduler: Scheduler) extends Logger {
     * @return
     *   validation result
     */
-  def validateByteCodes(response: ByteCodes): Either[String, ByteCodes] = {
-    if !isPending(response.requestId) then {
-      return Left(s"No pending request for ID ${response.requestId}")
+  def validateByteCodes(response: ByteCodes): Either[String, ByteCodes] =
+    if !isPending(response.requestId) then Left(s"No pending request for ID ${response.requestId}")
+    else {
+      val pending = getPendingRequest(response.requestId).get
+      if pending.requestType != RequestType.GetByteCodes then {
+        SNAPSyncMetrics.incrementMalformedResponse()
+        Left(s"Expected ${RequestType.GetByteCodes} but got response for ${pending.requestType}")
+      } else Right(response)
     }
-
-    val pending = getPendingRequest(response.requestId).get
-    if pending.requestType != RequestType.GetByteCodes then {
-      SNAPSyncMetrics.incrementMalformedResponse()
-      return Left(s"Expected ${RequestType.GetByteCodes} but got response for ${pending.requestType}")
-    }
-
-    Right(response)
-  }
 
   /** Validate TrieNodes response
     *
@@ -289,19 +286,15 @@ class SNAPRequestTracker(implicit scheduler: Scheduler) extends Logger {
     * @return
     *   validation result
     */
-  def validateTrieNodes(response: TrieNodes): Either[String, TrieNodes] = {
-    if !isPending(response.requestId) then {
-      return Left(s"No pending request for ID ${response.requestId}")
+  def validateTrieNodes(response: TrieNodes): Either[String, TrieNodes] =
+    if !isPending(response.requestId) then Left(s"No pending request for ID ${response.requestId}")
+    else {
+      val pending = getPendingRequest(response.requestId).get
+      if pending.requestType != RequestType.GetTrieNodes then {
+        SNAPSyncMetrics.incrementMalformedResponse()
+        Left(s"Expected ${RequestType.GetTrieNodes} but got response for ${pending.requestType}")
+      } else Right(response)
     }
-
-    val pending = getPendingRequest(response.requestId).get
-    if pending.requestType != RequestType.GetTrieNodes then {
-      SNAPSyncMetrics.incrementMalformedResponse()
-      return Left(s"Expected ${RequestType.GetTrieNodes} but got response for ${pending.requestType}")
-    }
-
-    Right(response)
-  }
 
   /** Get count of pending requests */
   def pendingCount: Int = synchronized {

@@ -295,270 +295,274 @@ class ChainDownloader private (
 
   private def dispatchRequests(): Behavior[Any] = {
     val inFlightCount = headerRequestPeers.size + bodyRequestPeers.size + receiptRequestPeers.size
-    if inFlightCount >= maxConcurrentRequests then return Behaviors.same
-
-    val available = peersToDownloadFrom.filterNot { case (peerId, p) =>
-      headerRequestPeers.contains(peerId) ||
-      bodyRequestPeers.contains(peerId) ||
-      receiptRequestPeers.contains(peerId) ||
-      p.peer.nodeId.exists(snapServerPeerNodeIds.contains) ||
-      emptyHeaderPeers.contains(peerId)
-    }
-
-    if available.isEmpty then return Behaviors.same
-
-    val peers = available.values.toList
-    var slotsLeft = maxConcurrentRequests - inFlightCount
-    var peerIdx = 0
-
-    // Priority 1: Headers (if we haven't reached target yet)
-    while slotsLeft > 0 && peerIdx < peers.size && bestHeaderNumber < targetBlock do {
-      val peerWithInfo = peers(peerIdx)
-      if !headerRequestPeers.contains(peerWithInfo.peer.id) then {
-        requestHeaders(peerWithInfo.peer)
-        slotsLeft -= 1
-        // Only one header request at a time to maintain sequential ordering
-        peerIdx = peers.size // break
+    if inFlightCount >= maxConcurrentRequests then Behaviors.same
+    else {
+      val available = peersToDownloadFrom.filterNot { case (peerId, p) =>
+        headerRequestPeers.contains(peerId) ||
+        bodyRequestPeers.contains(peerId) ||
+        receiptRequestPeers.contains(peerId) ||
+        p.peer.nodeId.exists(snapServerPeerNodeIds.contains) ||
+        emptyHeaderPeers.contains(peerId)
       }
-      peerIdx += 1
-    }
 
-    peerIdx = 0
+      if available.isEmpty then Behaviors.same
+      else {
+        val peers = available.values.toList
+        var slotsLeft = maxConcurrentRequests - inFlightCount
+        var peerIdx = 0
 
-    // Priority 2: Bodies
-    while slotsLeft > 0 && peerIdx < peers.size && bodiesQueue.nonEmpty do {
-      val peerWithInfo = peers(peerIdx)
-      val peerId = peerWithInfo.peer.id
-      if !headerRequestPeers.contains(peerId) &&
-        !bodyRequestPeers.contains(peerId)
-      then {
-        requestBodies(peerWithInfo.peer)
-        slotsLeft -= 1
+        // Priority 1: Headers (if we haven't reached target yet)
+        while slotsLeft > 0 && peerIdx < peers.size && bestHeaderNumber < targetBlock do {
+          val peerWithInfo = peers(peerIdx)
+          if !headerRequestPeers.contains(peerWithInfo.peer.id) then {
+            requestHeaders(peerWithInfo.peer)
+            slotsLeft -= 1
+            // Only one header request at a time to maintain sequential ordering
+            peerIdx = peers.size // break
+          }
+          peerIdx += 1
+        }
+
+        peerIdx = 0
+
+        // Priority 2: Bodies
+        while slotsLeft > 0 && peerIdx < peers.size && bodiesQueue.nonEmpty do {
+          val peerWithInfo = peers(peerIdx)
+          val peerId = peerWithInfo.peer.id
+          if !headerRequestPeers.contains(peerId) &&
+            !bodyRequestPeers.contains(peerId)
+          then {
+            requestBodies(peerWithInfo.peer)
+            slotsLeft -= 1
+          }
+          peerIdx += 1
+        }
+
+        peerIdx = 0
+
+        // Priority 3: Receipts
+        while slotsLeft > 0 && peerIdx < peers.size && receiptsQueue.nonEmpty do {
+          val peerWithInfo = peers(peerIdx)
+          val peerId = peerWithInfo.peer.id
+          if !headerRequestPeers.contains(peerId) &&
+            !bodyRequestPeers.contains(peerId) &&
+            !receiptRequestPeers.contains(peerId)
+          then {
+            requestReceipts(peerWithInfo)
+            slotsLeft -= 1
+          }
+          peerIdx += 1
+        }
+
+        // Log progress periodically
+        val now = System.currentTimeMillis()
+        if now - lastLogTime > 30000 then {
+          lastLogTime = now
+          val pct = if targetBlock > 0 then (bestHeaderNumber * 100 / targetBlock).toInt else 0
+          log.info(
+            s"Chain download: headers=$bestHeaderNumber/$targetBlock(${pct}%), bodies=$bodiesDownloaded, receipts=$receiptsDownloaded, peers=${available.size}, inflight=$inFlightCount"
+          )
+        }
+
+        // Check if we're done — returns `idle()` on completion, else `Behaviors.same`.
+        checkCompletion()
       }
-      peerIdx += 1
     }
-
-    peerIdx = 0
-
-    // Priority 3: Receipts
-    while slotsLeft > 0 && peerIdx < peers.size && receiptsQueue.nonEmpty do {
-      val peerWithInfo = peers(peerIdx)
-      val peerId = peerWithInfo.peer.id
-      if !headerRequestPeers.contains(peerId) &&
-        !bodyRequestPeers.contains(peerId) &&
-        !receiptRequestPeers.contains(peerId)
-      then {
-        requestReceipts(peerWithInfo)
-        slotsLeft -= 1
-      }
-      peerIdx += 1
-    }
-
-    // Log progress periodically
-    val now = System.currentTimeMillis()
-    if now - lastLogTime > 30000 then {
-      lastLogTime = now
-      val pct = if targetBlock > 0 then (bestHeaderNumber * 100 / targetBlock).toInt else 0
-      log.info(
-        s"Chain download: headers=$bestHeaderNumber/$targetBlock(${pct}%), bodies=$bodiesDownloaded, receipts=$receiptsDownloaded, peers=${available.size}, inflight=$inFlightCount"
-      )
-    }
-
-    // Check if we're done — returns `idle()` on completion, else `Behaviors.same`.
-    checkCompletion()
   }
 
   private def requestHeaders(peer: Peer): Unit = {
     val remaining = targetBlock - bestHeaderNumber
     val limit = remaining.min(syncConfig.blockHeadersPerRequest)
 
-    if limit <= 0 then return
+    if limit > 0 then {
+      headerRequestPeers += peer.id
 
-    headerRequestPeers += peer.id
+      val requestMsg = ETHPackets.GetBlockHeaders(
+        ETHPackets.nextRequestId,
+        Left(bestHeaderNumber + 1),
+        limit,
+        skip = 0,
+        reverse = false
+      )
 
-    val requestMsg = ETHPackets.GetBlockHeaders(
-      ETHPackets.nextRequestId,
-      Left(bestHeaderNumber + 1),
-      limit,
-      skip = 0,
-      reverse = false
-    )
-
-    // Spawned as a child of this Typed actor (via the Classic adapter) so PeerRequestHandler's
-    // `initiator = context.parent` resolves to us; it then sends ResponseReceived / RequestFailed
-    // straight to our mailbox (matched as raw Classic case classes).
-    context.toClassic.actorOf(
-      PeerRequestHandler
-        .props[ETHPackets.GetBlockHeaders, ETHPackets.BlockHeaders](
-          peer,
-          requestTimeout,
-          networkPeerManager,
-          peerEventBus,
-          requestMsg,
-          Codes.BlockHeadersCode
-        ),
-      s"chain-headers-${bestHeaderNumber + 1}-${System.nanoTime()}"
-    )
+      // Spawned as a child of this Typed actor (via the Classic adapter) so PeerRequestHandler's
+      // `initiator = context.parent` resolves to us; it then sends ResponseReceived / RequestFailed
+      // straight to our mailbox (matched as raw Classic case classes).
+      context.toClassic.actorOf(
+        PeerRequestHandler
+          .props[ETHPackets.GetBlockHeaders, ETHPackets.BlockHeaders](
+            peer,
+            requestTimeout,
+            networkPeerManager,
+            peerEventBus,
+            requestMsg,
+            Codes.BlockHeadersCode
+          ),
+        s"chain-headers-${bestHeaderNumber + 1}-${System.nanoTime()}"
+      )
+    }
   }
 
   private def requestBodies(peer: Peer): Unit = {
     val batch = bodiesQueue.take(syncConfig.blockBodiesPerRequest)
-    if batch.isEmpty then return
+    if batch.nonEmpty then {
+      bodiesQueue = bodiesQueue.drop(batch.size)
 
-    bodiesQueue = bodiesQueue.drop(batch.size)
+      val requestMsg = ETHPackets.GetBlockBodies(ETHPackets.nextRequestId, batch)
 
-    val requestMsg = ETHPackets.GetBlockBodies(ETHPackets.nextRequestId, batch)
+      context.toClassic.actorOf(
+        PeerRequestHandler
+          .props[ETHPackets.GetBlockBodies, ETHPackets.BlockBodies](
+            peer,
+            requestTimeout,
+            networkPeerManager,
+            peerEventBus,
+            requestMsg,
+            Codes.BlockBodiesCode
+          ),
+        s"chain-bodies-${System.nanoTime()}"
+      )
 
-    context.toClassic.actorOf(
-      PeerRequestHandler
-        .props[ETHPackets.GetBlockBodies, ETHPackets.BlockBodies](
-          peer,
-          requestTimeout,
-          networkPeerManager,
-          peerEventBus,
-          requestMsg,
-          Codes.BlockBodiesCode
-        ),
-      s"chain-bodies-${System.nanoTime()}"
-    )
-
-    bodyRequestPeers += (peer.id -> (peer, batch))
+      bodyRequestPeers += (peer.id -> (peer, batch))
+    }
   }
 
   private def requestReceipts(peerWithInfo: PeerWithInfo): Unit = {
     val batch = receiptsQueue.take(syncConfig.receiptsPerRequest)
-    if batch.isEmpty then return
+    if batch.nonEmpty then {
+      receiptsQueue = receiptsQueue.drop(batch.size)
 
-    receiptsQueue = receiptsQueue.drop(batch.size)
+      val peer = peerWithInfo.peer
+      val isEth70 = peerWithInfo.peerInfo.remoteStatus.capability == Capability.ETH70
 
-    val peer = peerWithInfo.peer
-    val isEth70 = peerWithInfo.peerInfo.remoteStatus.capability == Capability.ETH70
+      if isEth70 then {
+        // ETH70: resume partial delivery from the buffered index for the first block in batch
+        val firstBlockResumeIdx = partialReceiptState.getOrElse(batch.head, 0L)
+        val requestMsg = ETHPackets.GetReceipts70(ETHPackets.nextRequestId, firstBlockResumeIdx, batch)
+        context.toClassic.actorOf(
+          PeerRequestHandler
+            .props[ETHPackets.GetReceipts70, ETHPackets.Receipts70](
+              peer,
+              requestTimeout,
+              networkPeerManager,
+              peerEventBus,
+              requestMsg,
+              Codes.ReceiptsCode
+            ),
+          s"chain-receipts-eth70-${System.nanoTime()}"
+        )
+      } else {
+        val requestMsg = ETHPackets.GetReceipts(ETHPackets.nextRequestId, batch)
+        context.toClassic.actorOf(
+          PeerRequestHandler
+            .props[ETHPackets.GetReceipts, ETHPackets.Receipts68](
+              peer,
+              requestTimeout,
+              networkPeerManager,
+              peerEventBus,
+              requestMsg,
+              Codes.ReceiptsCode
+            ),
+          s"chain-receipts-${System.nanoTime()}"
+        )
+      }
 
-    if isEth70 then {
-      // ETH70: resume partial delivery from the buffered index for the first block in batch
-      val firstBlockResumeIdx = partialReceiptState.getOrElse(batch.head, 0L)
-      val requestMsg = ETHPackets.GetReceipts70(ETHPackets.nextRequestId, firstBlockResumeIdx, batch)
-      context.toClassic.actorOf(
-        PeerRequestHandler
-          .props[ETHPackets.GetReceipts70, ETHPackets.Receipts70](
-            peer,
-            requestTimeout,
-            networkPeerManager,
-            peerEventBus,
-            requestMsg,
-            Codes.ReceiptsCode
-          ),
-        s"chain-receipts-eth70-${System.nanoTime()}"
-      )
-    } else {
-      val requestMsg = ETHPackets.GetReceipts(ETHPackets.nextRequestId, batch)
-      context.toClassic.actorOf(
-        PeerRequestHandler
-          .props[ETHPackets.GetReceipts, ETHPackets.Receipts68](
-            peer,
-            requestTimeout,
-            networkPeerManager,
-            peerEventBus,
-            requestMsg,
-            Codes.ReceiptsCode
-          ),
-        s"chain-receipts-${System.nanoTime()}"
-      )
-    }
-
-    receiptRequestPeers += (peer.id -> (peer, batch))
+      receiptRequestPeers += (peer.id -> (peer, batch))
+    } // else batch.isEmpty — nothing to dispatch
   }
 
   private def handleHeaders(peer: Peer, headers: Seq[BlockHeader]): Unit = {
     val expectedStart = bestHeaderNumber + 1
 
     // Find usable headers: skip any before our expected start, use what extends our chain
-    val usable = if headers.head.number == expectedStart then {
-      headers
-    } else if headers.head.number < expectedStart && headers.last.number >= expectedStart then {
-      // Response overlaps — trim to the portion we need
-      val trimmed = headers.dropWhile(_.number < expectedStart)
-      log.debug(
-        "Chain download: trimmed overlapping headers {}-{} to start at {} ({} usable)",
-        headers.head.number,
-        headers.last.number,
-        expectedStart,
-        trimmed.size
-      )
-      trimmed
-    } else if headers.head.number > expectedStart then {
-      // Gap — can't use without the intervening headers
-      log.debug(
-        "Chain download: peer {} sent headers starting at {} but we need {} (gap)",
-        peer.id,
-        headers.head.number,
-        expectedStart
-      )
-      return
-    } else {
-      // All stale (before our cursor)
-      log.debug(
-        "Chain download: peer {} sent stale headers {}-{}, already past {}",
-        peer.id,
-        headers.head.number,
-        headers.last.number,
-        expectedStart
-      )
-      return
-    }
-
-    // Validate parent hash chaining
-    var prevHash = blockchainReader.getBlockHeaderByNumber(bestHeaderNumber).map(_.hash)
-    var validCount = 0
-    var aborted = false
-    val it = usable.iterator
-    while !aborted && it.hasNext do {
-      val header = it.next()
-      if prevHash.exists(_ == header.parentHash) then {
-        // Store header + chain weight, atomically advancing the backfill cursor in the same
-        // RocksDB write batch (#1169) so a crash mid-write never leaves the cursor ahead of
-        // the data on disk.
-        blockchainReader.getChainWeightByHash(header.parentHash) match {
-          case None =>
-            // Parent weight missing means the pivot TD was not seeded for this hash.
-            // Storing TD=0 here would corrupt every subsequent header's accumulated weight.
-            // Abort this batch; the backfill cursor stays at bestHeaderNumber so the next
-            // request will retry from the last committed position.
-            log.warn(
-              "Chain download: parent chain weight missing for block {} parentHash={} — aborting batch (cursor stays at {})",
-              header.number,
-              header.parentHash,
-              bestHeaderNumber
-            )
-            aborted = true
-          case Some(parentWeight) =>
-            blockchainWriter
-              .storeBlockHeader(header)
-              .and(blockchainWriter.storeChainWeight(header.hash, parentWeight.increase(header)))
-              .and(appStateStorage.putBackfillBestHeader(header.number))
-              .commit()
-
-            bodiesQueue :+= header.hash
-            receiptsQueue :+= header.hash
-            prevHash = Some(header.hash)
-            validCount += 1
-        }
-      } else {
-        log.warn(
-          "Chain download: header {} parent hash mismatch from peer {}",
-          header.number,
-          peer.id
+    val usableOpt: Option[Seq[BlockHeader]] =
+      if headers.head.number == expectedStart then Some(headers)
+      else if headers.head.number < expectedStart && headers.last.number >= expectedStart then {
+        // Response overlaps — trim to the portion we need
+        val trimmed = headers.dropWhile(_.number < expectedStart)
+        log.debug(
+          "Chain download: trimmed overlapping headers {}-{} to start at {} ({} usable)",
+          headers.head.number,
+          headers.last.number,
+          expectedStart,
+          trimmed.size
         )
-        blacklist.add(peer.id, syncConfig.blacklistDuration, ErrorInBlockHeaders)
-        aborted = true
+        Some(trimmed)
+      } else if headers.head.number > expectedStart then {
+        // Gap — can't use without the intervening headers
+        log.debug(
+          "Chain download: peer {} sent headers starting at {} but we need {} (gap)",
+          peer.id,
+          headers.head.number,
+          expectedStart
+        )
+        None
+      } else {
+        // All stale (before our cursor)
+        log.debug(
+          "Chain download: peer {} sent stale headers {}-{}, already past {}",
+          peer.id,
+          headers.head.number,
+          headers.last.number,
+          expectedStart
+        )
+        None
       }
-    }
 
-    bestHeaderNumber += validCount
-    headersDownloaded += validCount
+    usableOpt.foreach { usable =>
+      // Validate parent hash chaining
+      var prevHash = blockchainReader.getBlockHeaderByNumber(bestHeaderNumber).map(_.hash)
+      var validCount = 0
+      var aborted = false
+      val it = usable.iterator
+      while !aborted && it.hasNext do {
+        val header = it.next()
+        if prevHash.exists(_ == header.parentHash) then {
+          // Store header + chain weight, atomically advancing the backfill cursor in the same
+          // RocksDB write batch (#1169) so a crash mid-write never leaves the cursor ahead of
+          // the data on disk.
+          blockchainReader.getChainWeightByHash(header.parentHash) match {
+            case None =>
+              // Parent weight missing means the pivot TD was not seeded for this hash.
+              // Storing TD=0 here would corrupt every subsequent header's accumulated weight.
+              // Abort this batch; the backfill cursor stays at bestHeaderNumber so the next
+              // request will retry from the last committed position.
+              log.warn(
+                "Chain download: parent chain weight missing for block {} parentHash={} — aborting batch (cursor stays at {})",
+                header.number,
+                header.parentHash,
+                bestHeaderNumber
+              )
+              aborted = true
+            case Some(parentWeight) =>
+              blockchainWriter
+                .storeBlockHeader(header)
+                .and(blockchainWriter.storeChainWeight(header.hash, parentWeight.increase(header)))
+                .and(appStateStorage.putBackfillBestHeader(header.number))
+                .commit()
+
+              bodiesQueue :+= header.hash
+              receiptsQueue :+= header.hash
+              prevHash = Some(header.hash)
+              validCount += 1
+          }
+        } else {
+          log.warn(
+            "Chain download: header {} parent hash mismatch from peer {}",
+            header.number,
+            peer.id
+          )
+          blacklist.add(peer.id, syncConfig.blacklistDuration, ErrorInBlockHeaders)
+          aborted = true
+        }
+      }
+
+      bestHeaderNumber += validCount
+      headersDownloaded += validCount
+    }
   }
 
-  private def handleBodies(peer: Peer, requestedHashes: Seq[ByteString], bodies: Seq[BlockBody]): Unit = {
+  private def handleBodies(peer: Peer, requestedHashes: Seq[ByteString], bodies: Seq[BlockBody]): Unit =
     if bodies.isEmpty then {
       // Re-queue the hashes
       bodiesQueue = requestedHashes.toVector ++ bodiesQueue
@@ -567,34 +571,32 @@ class ChainDownloader private (
         syncConfig.blacklistDuration,
         EmptyBlockBodies(requestedHashes.map(h => s"0x${h.toArray.map("%02x".format(_)).mkString}"))
       )
-      return
-    }
+    } else {
+      // Store received bodies + atomically advance the body cursor (#1169).
+      val received = requestedHashes.zip(bodies)
+      val highestBodyNumber = received
+        .flatMap { case (hash, _) => blockchainReader.getBlockHeaderByHash(hash).map(_.number) }
+        .maxOption
+        .getOrElse(BigInt(0))
+      val cursorUpdate =
+        if highestBodyNumber > appStateStorage.getBackfillBestBody() then
+          appStateStorage.putBackfillBestBody(highestBodyNumber)
+        else appStateStorage.emptyBatchUpdate
 
-    // Store received bodies + atomically advance the body cursor (#1169).
-    val received = requestedHashes.zip(bodies)
-    val highestBodyNumber = received
-      .flatMap { case (hash, _) => blockchainReader.getBlockHeaderByHash(hash).map(_.number) }
-      .maxOption
-      .getOrElse(BigInt(0))
-    val cursorUpdate =
-      if highestBodyNumber > appStateStorage.getBackfillBestBody() then
-        appStateStorage.putBackfillBestBody(highestBodyNumber)
-      else appStateStorage.emptyBatchUpdate
+      received
+        .map { case (hash, body) => blockchainWriter.storeBlockBody(hash, body) }
+        .reduce(_.and(_))
+        .and(cursorUpdate)
+        .commit()
 
-    received
-      .map { case (hash, body) => blockchainWriter.storeBlockBody(hash, body) }
-      .reduce(_.and(_))
-      .and(cursorUpdate)
-      .commit()
+      bodiesDownloaded += received.size
 
-    bodiesDownloaded += received.size
-
-    // Re-queue any remaining hashes that weren't served
-    val remaining = requestedHashes.drop(bodies.size)
-    if remaining.nonEmpty then {
-      bodiesQueue = remaining.toVector ++ bodiesQueue
-    }
-  }
+      // Re-queue any remaining hashes that weren't served
+      val remaining = requestedHashes.drop(bodies.size)
+      if remaining.nonEmpty then {
+        bodiesQueue = remaining.toVector ++ bodiesQueue
+      }
+    } // else bodies.isEmpty
 
   private def handleReceipts(
       peer: Peer,
@@ -608,61 +610,59 @@ class ChainDownloader private (
     if receiptsRlp.items.isEmpty then {
       receiptsQueue = requestedHashes.toVector ++ receiptsQueue
       blacklist.add(peer.id, syncConfig.blacklistDuration, EmptyReceipts(hashStrings))
-      return
-    }
+    } else
+      try {
+        // Decode using the same approach as ETH63.Receipts.ReceiptsDec
+        val receiptsByBlock: Seq[Seq[Receipt]] = receiptsRlp.items.collect { case blockReceipts: RLPList =>
+          blockReceipts.items
+            .flatMap {
+              case v: RLPValue =>
+                val receiptBytes = v.bytes
+                if receiptBytes.nonEmpty && (receiptBytes(0) & 0xff) < 0x7f && receiptBytes.length > 1 then {
+                  try Seq(RLPValue(Array(receiptBytes(0))), rawDecode(receiptBytes.tail))
+                  catch { case _: Exception => Seq(v) }
+                } else Seq(v)
+              case other => Seq(other)
+            }
+            .toTypedRLPEncodables
+            .map(_.toReceipt)
+        }
 
-    try {
-      // Decode using the same approach as ETH63.Receipts.ReceiptsDec
-      val receiptsByBlock: Seq[Seq[Receipt]] = receiptsRlp.items.collect { case blockReceipts: RLPList =>
-        blockReceipts.items
-          .flatMap {
-            case v: RLPValue =>
-              val receiptBytes = v.bytes
-              if receiptBytes.nonEmpty && (receiptBytes(0) & 0xff) < 0x7f && receiptBytes.length > 1 then {
-                try Seq(RLPValue(Array(receiptBytes(0))), rawDecode(receiptBytes.tail))
-                catch { case _: Exception => Seq(v) }
-              } else Seq(v)
-            case other => Seq(other)
-          }
-          .toTypedRLPEncodables
-          .map(_.toReceipt)
+        // Store receipts. Atomically advance the receipt cursor (#1169) in the same batch as
+        // the highest-numbered receipt write, so a crash mid-write doesn't leave the cursor
+        // ahead of disk.
+        val receiptsByHash = requestedHashes.zip(receiptsByBlock)
+        val highestReceiptNumber = receiptsByHash
+          .flatMap { case (hash, _) => blockchainReader.getBlockHeaderByHash(hash).map(_.number) }
+          .maxOption
+          .getOrElse(BigInt(0))
+
+        receiptsByHash.zipWithIndex.foreach { case ((hash, receipts), idx) =>
+          val storeUpdate = blockchainWriter.storeReceipts(hash, receipts)
+          val withCursor =
+            if idx == receiptsByHash.size - 1 && highestReceiptNumber > appStateStorage.getBackfillBestReceipt() then
+              storeUpdate.and(appStateStorage.putBackfillBestReceipt(highestReceiptNumber))
+            else storeUpdate
+          withCursor.commit()
+        }
+
+        receiptsDownloaded += receiptsByBlock.size
+
+        // Re-queue remaining
+        val remaining = requestedHashes.drop(receiptsByBlock.size)
+        if remaining.nonEmpty then {
+          receiptsQueue = remaining.toVector ++ receiptsQueue
+        }
+      } catch {
+        case ex: Exception =>
+          log.warn("Chain download: failed to decode receipts from peer {}: {}", peer.id, ex.getMessage)
+          receiptsQueue = requestedHashes.toVector ++ receiptsQueue
+          blacklist.add(
+            peer.id,
+            syncConfig.blacklistDuration,
+            FastSyncRequestFailed(s"Invalid receipts: ${ex.getMessage}")
+          )
       }
-
-      // Store receipts. Atomically advance the receipt cursor (#1169) in the same batch as
-      // the highest-numbered receipt write, so a crash mid-write doesn't leave the cursor
-      // ahead of disk.
-      val receiptsByHash = requestedHashes.zip(receiptsByBlock)
-      val highestReceiptNumber = receiptsByHash
-        .flatMap { case (hash, _) => blockchainReader.getBlockHeaderByHash(hash).map(_.number) }
-        .maxOption
-        .getOrElse(BigInt(0))
-
-      receiptsByHash.zipWithIndex.foreach { case ((hash, receipts), idx) =>
-        val storeUpdate = blockchainWriter.storeReceipts(hash, receipts)
-        val withCursor =
-          if idx == receiptsByHash.size - 1 && highestReceiptNumber > appStateStorage.getBackfillBestReceipt() then
-            storeUpdate.and(appStateStorage.putBackfillBestReceipt(highestReceiptNumber))
-          else storeUpdate
-        withCursor.commit()
-      }
-
-      receiptsDownloaded += receiptsByBlock.size
-
-      // Re-queue remaining
-      val remaining = requestedHashes.drop(receiptsByBlock.size)
-      if remaining.nonEmpty then {
-        receiptsQueue = remaining.toVector ++ receiptsQueue
-      }
-    } catch {
-      case ex: Exception =>
-        log.warn("Chain download: failed to decode receipts from peer {}: {}", peer.id, ex.getMessage)
-        receiptsQueue = requestedHashes.toVector ++ receiptsQueue
-        blacklist.add(
-          peer.id,
-          syncConfig.blacklistDuration,
-          FastSyncRequestFailed(s"Invalid receipts: ${ex.getMessage}")
-        )
-    }
   }
 
   // Self-contained ETH70 receipt handler — does NOT delegate to handleReceipts.
@@ -685,93 +685,91 @@ class ChainDownloader private (
       requestedHashes.foreach { h =>
         partialReceiptState -= h; partialReceiptBuffer -= h
       }
-      return
-    }
+    } else
+      try {
+        val responseItems: Seq[RLPList] = receiptsRlp.items.collect { case rl: RLPList => rl }
+        val responseCount = responseItems.size
 
-    try {
-      val responseItems: Seq[RLPList] = receiptsRlp.items.collect { case rl: RLPList => rl }
-      val responseCount = responseItems.size
+        // Decode typed-tx prefixes from a bloom-absent block RLP (same logic as handleReceipts)
+        def decodeEncs(blockRlp: RLPList): Seq[RLPEncodeable] =
+          blockRlp.items.flatMap {
+            case v: RLPValue =>
+              val receiptBytes = v.bytes
+              if receiptBytes.nonEmpty && (receiptBytes(0) & 0xff) < 0x7f && receiptBytes.length > 1 then {
+                try Seq(RLPValue(Array(receiptBytes(0))), rawDecode(receiptBytes.tail))
+                catch { case _: Exception => Seq(v) }
+              } else Seq(v)
+            case other => Seq(other)
+          }
 
-      // Decode typed-tx prefixes from a bloom-absent block RLP (same logic as handleReceipts)
-      def decodeEncs(blockRlp: RLPList): Seq[RLPEncodeable] =
-        blockRlp.items.flatMap {
-          case v: RLPValue =>
-            val receiptBytes = v.bytes
-            if receiptBytes.nonEmpty && (receiptBytes(0) & 0xff) < 0x7f && receiptBytes.length > 1 then {
-              try Seq(RLPValue(Array(receiptBytes(0))), rawDecode(receiptBytes.tail))
-              catch { case _: Exception => Seq(v) }
-            } else Seq(v)
-          case other => Seq(other)
+        // Split: complete blocks vs. the possibly-truncated last block
+        val (completeItems, incompleteItemOpt) =
+          if lastBlockIncomplete && responseItems.nonEmpty then (responseItems.init, Some(responseItems.last))
+          else (responseItems, None)
+
+        // Build (hash, receipts) pairs for all complete blocks, merging any buffered partial data
+        val completeByHash: Seq[(ByteString, Seq[Receipt])] =
+          completeItems.zipWithIndex.map { case (blockRlp, idx) =>
+            val hash = requestedHashes(idx)
+            val existing = partialReceiptBuffer.getOrElse(hash, Seq.empty)
+            val decoded = (existing ++ decodeEncs(blockRlp)).toTypedRLPEncodables.map(_.toReceipt)
+            partialReceiptState -= hash
+            partialReceiptBuffer -= hash
+            (hash, decoded)
+          }
+
+        // Store complete receipts + advance backfill cursor (#1169 pattern)
+        if completeByHash.nonEmpty then {
+          val highestReceiptNumber = completeByHash
+            .flatMap { case (h, _) => blockchainReader.getBlockHeaderByHash(h).map(_.number) }
+            .maxOption
+            .getOrElse(BigInt(0))
+
+          completeByHash.zipWithIndex.foreach { case ((hash, receipts), idx) =>
+            val storeUpdate = blockchainWriter.storeReceipts(hash, receipts)
+            val withCursor =
+              if idx == completeByHash.size - 1 && highestReceiptNumber > appStateStorage.getBackfillBestReceipt() then
+                storeUpdate.and(appStateStorage.putBackfillBestReceipt(highestReceiptNumber))
+              else storeUpdate
+            withCursor.commit()
+          }
+          receiptsDownloaded += completeByHash.size
         }
 
-      // Split: complete blocks vs. the possibly-truncated last block
-      val (completeItems, incompleteItemOpt) =
-        if lastBlockIncomplete && responseItems.nonEmpty then (responseItems.init, Some(responseItems.last))
-        else (responseItems, None)
-
-      // Build (hash, receipts) pairs for all complete blocks, merging any buffered partial data
-      val completeByHash: Seq[(ByteString, Seq[Receipt])] =
-        completeItems.zipWithIndex.map { case (blockRlp, idx) =>
-          val hash = requestedHashes(idx)
+        // Accumulate partial receipts for the truncated last block and re-queue it
+        incompleteItemOpt.foreach { blockRlp =>
+          val incompleteHashIdx = completeItems.size
+          val hash = requestedHashes(incompleteHashIdx)
           val existing = partialReceiptBuffer.getOrElse(hash, Seq.empty)
-          val decoded = (existing ++ decodeEncs(blockRlp)).toTypedRLPEncodables.map(_.toReceipt)
-          partialReceiptState -= hash
-          partialReceiptBuffer -= hash
-          (hash, decoded)
+          val accumulated = existing ++ decodeEncs(blockRlp)
+          partialReceiptBuffer = partialReceiptBuffer.updated(hash, accumulated)
+          partialReceiptState = partialReceiptState.updated(hash, accumulated.size.toLong)
+          // Push back at front of queue so the next dispatch resumes this block first
+          receiptsQueue = hash +: receiptsQueue
+          log.debug(
+            "RECEIPTS_ETH70_PARTIAL: hash={} buffered={} receipts, resumeIdx={}",
+            s"0x${hash.toArray.take(4).map("%02x".format(_)).mkString}",
+            accumulated.size,
+            accumulated.size
+          )
         }
 
-      // Store complete receipts + advance backfill cursor (#1169 pattern)
-      if completeByHash.nonEmpty then {
-        val highestReceiptNumber = completeByHash
-          .flatMap { case (h, _) => blockchainReader.getBlockHeaderByHash(h).map(_.number) }
-          .maxOption
-          .getOrElse(BigInt(0))
-
-        completeByHash.zipWithIndex.foreach { case ((hash, receipts), idx) =>
-          val storeUpdate = blockchainWriter.storeReceipts(hash, receipts)
-          val withCursor =
-            if idx == completeByHash.size - 1 && highestReceiptNumber > appStateStorage.getBackfillBestReceipt() then
-              storeUpdate.and(appStateStorage.putBackfillBestReceipt(highestReceiptNumber))
-            else storeUpdate
-          withCursor.commit()
+        // Re-queue any hashes the server didn't return at all (beyond responseCount)
+        val remaining = requestedHashes.drop(responseCount)
+        if remaining.nonEmpty then {
+          receiptsQueue = remaining.toVector ++ receiptsQueue
         }
-        receiptsDownloaded += completeByHash.size
-      }
 
-      // Accumulate partial receipts for the truncated last block and re-queue it
-      incompleteItemOpt.foreach { blockRlp =>
-        val incompleteHashIdx = completeItems.size
-        val hash = requestedHashes(incompleteHashIdx)
-        val existing = partialReceiptBuffer.getOrElse(hash, Seq.empty)
-        val accumulated = existing ++ decodeEncs(blockRlp)
-        partialReceiptBuffer = partialReceiptBuffer.updated(hash, accumulated)
-        partialReceiptState = partialReceiptState.updated(hash, accumulated.size.toLong)
-        // Push back at front of queue so the next dispatch resumes this block first
-        receiptsQueue = hash +: receiptsQueue
-        log.debug(
-          "RECEIPTS_ETH70_PARTIAL: hash={} buffered={} receipts, resumeIdx={}",
-          s"0x${hash.toArray.take(4).map("%02x".format(_)).mkString}",
-          accumulated.size,
-          accumulated.size
-        )
+      } catch {
+        case ex: Exception =>
+          log.warn("Chain download ETH70: failed to decode receipts from peer {}: {}", peer.id, ex.getMessage)
+          receiptsQueue = requestedHashes.toVector ++ receiptsQueue
+          blacklist.add(
+            peer.id,
+            syncConfig.blacklistDuration,
+            FastSyncRequestFailed(s"Invalid receipts (ETH70): ${ex.getMessage}")
+          )
       }
-
-      // Re-queue any hashes the server didn't return at all (beyond responseCount)
-      val remaining = requestedHashes.drop(responseCount)
-      if remaining.nonEmpty then {
-        receiptsQueue = remaining.toVector ++ receiptsQueue
-      }
-
-    } catch {
-      case ex: Exception =>
-        log.warn("Chain download ETH70: failed to decode receipts from peer {}: {}", peer.id, ex.getMessage)
-        receiptsQueue = requestedHashes.toVector ++ receiptsQueue
-        blacklist.add(
-          peer.id,
-          syncConfig.blacklistDuration,
-          FastSyncRequestFailed(s"Invalid receipts (ETH70): ${ex.getMessage}")
-        )
-    }
   }
 
   private def checkCompletion(): Behavior[Any] =
@@ -811,50 +809,51 @@ class ChainDownloader private (
       else (BigInt(0), BigInt(0))
 
     // Quick check: if genesis+1 doesn't exist, start from 0 (only meaningful for fresh runs).
-    if best0 == 0 && blockchainReader.getBlockHeaderByNumber(1).isEmpty then return 0
+    if best0 == 0 && blockchainReader.getBlockHeaderByNumber(1).isEmpty then 0
+    else {
+      // Binary search above the cursor for the highest stored header. With cursor-fast-skip
+      // this almost always finds `best == cursorHeader` after one probe.
+      var low: BigInt = low0
+      var high: BigInt = targetBlock
+      var best: BigInt = best0
 
-    // Binary search above the cursor for the highest stored header. With cursor-fast-skip
-    // this almost always finds `best == cursorHeader` after one probe.
-    var low: BigInt = low0
-    var high: BigInt = targetBlock
-    var best: BigInt = best0
-
-    while low <= high do {
-      val mid = (low + high) / 2
-      if blockchainReader.getBlockHeaderByNumber(mid).isDefined then {
-        best = mid
-        low = mid + 1
-      } else {
-        high = mid - 1
-      }
-    }
-
-    // Rebuild the body/receipt queues for headers we have but bodies/receipts we don't.
-    // Use the body/receipt cursors as the floor so we don't re-walk every header — anything
-    // ≤ those cursors was committed atomically with its body/receipt write and is on disk.
-    val bodyFloor = appStateStorage.getBackfillBestBody()
-    val receiptFloor = appStateStorage.getBackfillBestReceipt()
-
-    var i = best
-    while i >= 1 do {
-      val needsBodyCheck = i > bodyFloor
-      val needsReceiptCheck = i > receiptFloor
-      if needsBodyCheck || needsReceiptCheck then {
-        blockchainReader.getBlockHeaderByNumber(i) match {
-          case Some(header) =>
-            if needsBodyCheck && blockchainReader.getBlockBodyByHash(header.hash).isEmpty then {
-              bodiesQueue :+= header.hash
-            }
-            if needsReceiptCheck && blockchainReader.getReceiptsByHash(header.hash).isEmpty then {
-              receiptsQueue :+= header.hash
-            }
-          case None => // shouldn't happen
+      while low <= high do {
+        val mid = (low + high) / 2
+        if blockchainReader.getBlockHeaderByNumber(mid).isDefined then {
+          best = mid
+          low = mid + 1
+        } else {
+          high = mid - 1
         }
       }
-      i -= 1
-    }
 
-    best
+      // Rebuild the body/receipt queues for headers we have but bodies/receipts we don't.
+      // Use the body/receipt cursors as the floor so we don't re-walk every header — anything
+      // ≤ those cursors was committed atomically with its body/receipt write and is on disk.
+      val bodyFloor = appStateStorage.getBackfillBestBody()
+      val receiptFloor = appStateStorage.getBackfillBestReceipt()
+
+      var i = best
+      while i >= 1 do {
+        val needsBodyCheck = i > bodyFloor
+        val needsReceiptCheck = i > receiptFloor
+        if needsBodyCheck || needsReceiptCheck then {
+          blockchainReader.getBlockHeaderByNumber(i) match {
+            case Some(header) =>
+              if needsBodyCheck && blockchainReader.getBlockBodyByHash(header.hash).isEmpty then {
+                bodiesQueue :+= header.hash
+              }
+              if needsReceiptCheck && blockchainReader.getReceiptsByHash(header.hash).isEmpty then {
+                receiptsQueue :+= header.hash
+              }
+            case None => // shouldn't happen
+          }
+        }
+        i -= 1
+      }
+
+      best
+    }
   }
 
   private def boostConcurrency(n: Int): Unit = {

@@ -920,27 +920,26 @@ class FastSync(
 
     private def insertBlocks(requestedHashes: Seq[ByteString], blockBodies: Seq[BlockBody]): Unit = {
       val blockHashesWithBodies = requestedHashes.zip(blockBodies)
-      if blockHashesWithBodies.isEmpty then {
+      if blockHashesWithBodies.isEmpty then
         log.warning(
           "Received block bodies but have no matching requested hashes (unsolicited or late response)"
         )
-        return
-      }
+      else {
+        blockHashesWithBodies
+          .map { case (hash, body) =>
+            blockchainWriter.storeBlockBody(hash, body)
+          }
+          .reduce(_.and(_))
+          .commit()
 
-      blockHashesWithBodies
-        .map { case (hash, body) =>
-          blockchainWriter.storeBlockBody(hash, body)
+        val receivedHashes = requestedHashes.take(blockBodies.size)
+        updateBestBlockIfNeeded(receivedHashes)
+        val remainingBlockBodies = requestedHashes.drop(blockBodies.size)
+        if remainingBlockBodies.nonEmpty then {
+          syncState = syncState.enqueueBlockBodies(remainingBlockBodies)
+          bodiesFetcherQueue.enqueue(remainingBlockBodies)
         }
-        .reduce(_.and(_))
-        .commit()
-
-      val receivedHashes = requestedHashes.take(blockBodies.size)
-      updateBestBlockIfNeeded(receivedHashes)
-      val remainingBlockBodies = requestedHashes.drop(blockBodies.size)
-      if remainingBlockBodies.nonEmpty then {
-        syncState = syncState.enqueueBlockBodies(remainingBlockBodies)
-        bodiesFetcherQueue.enqueue(remainingBlockBodies)
-      }
+      } // else blockHashesWithBodies.nonEmpty
     }
 
     def hasBestBlockFreshEnoughToUpdatePivotBlock(info: PeerInfo, state: SyncState, syncConfig: SyncConfig): Boolean =

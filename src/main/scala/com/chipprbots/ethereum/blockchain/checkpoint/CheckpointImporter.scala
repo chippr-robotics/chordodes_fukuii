@@ -120,11 +120,13 @@ final class CheckpointImporter(
       }
 
     var done = false
+    var loopError: Option[ImportError] = None
     while !done do
       reader.nextEntry() match {
         case Left(err) =>
           flushNodes(); flushCodes()
-          return Left(BadFormat(err))
+          loopError = Some(BadFormat(err))
+          done = true
         case Right(CheckpointArchive.NodeEntry(hash, rlpBytes)) =>
           nodeBuf += ((hash, rlpBytes))
           totalNodes += 1
@@ -149,36 +151,39 @@ final class CheckpointImporter(
           done = true
       }
 
-    reader.verifyCrc() match {
-      case Left(err) => return Left(BadFormat(err))
-      case Right(_)  => ()
+    loopError match {
+      case Some(err) => Left(err)
+      case None =>
+        reader.verifyCrc() match {
+          case Left(err) => Left(BadFormat(err))
+          case Right(_)  =>
+            // Header, chain weight, best-block pointer, and the done-markers all committed in a
+            // single atomic batch — partial state here would be worse than no state at all.
+            blockchainWriter
+              .storeBlockHeader(header.blockHeader)
+              .and(blockchainWriter.storeChainWeight(blockHash, header.chainWeight))
+              .and(appStateStorage.putBestBlockInfo(BlockInfo(blockHash, blockNum)))
+              .and(appStateStorage.snapSyncDone())
+              .and(appStateStorage.bytecodeRecoveryDone())
+              .and(appStateStorage.storageRecoveryDone())
+              .commit()
+
+            val elapsed = System.currentTimeMillis() - startMs
+            log.info(
+              "[CHECKPOINT IMPORT] complete: block={} nodes={} ({} MiB) bytecodes={} ({} MiB) elapsed={}s. " +
+                "RegularSync will resume from {}.",
+              blockNum,
+              totalNodes,
+              nodeBytes / (1024 * 1024),
+              totalBytecodes,
+              codeBytes / (1024 * 1024),
+              elapsed / 1000,
+              blockNum + 1
+            )
+
+            Right(ImportResult(blockNum, totalNodes, totalBytecodes, elapsed))
+        }
     }
-
-    // Header, chain weight, best-block pointer, and the done-markers all committed in a
-    // single atomic batch — partial state here would be worse than no state at all.
-    blockchainWriter
-      .storeBlockHeader(header.blockHeader)
-      .and(blockchainWriter.storeChainWeight(blockHash, header.chainWeight))
-      .and(appStateStorage.putBestBlockInfo(BlockInfo(blockHash, blockNum)))
-      .and(appStateStorage.snapSyncDone())
-      .and(appStateStorage.bytecodeRecoveryDone())
-      .and(appStateStorage.storageRecoveryDone())
-      .commit()
-
-    val elapsed = System.currentTimeMillis() - startMs
-    log.info(
-      "[CHECKPOINT IMPORT] complete: block={} nodes={} ({} MiB) bytecodes={} ({} MiB) elapsed={}s. " +
-        "RegularSync will resume from {}.",
-      blockNum,
-      totalNodes,
-      nodeBytes / (1024 * 1024),
-      totalBytecodes,
-      codeBytes / (1024 * 1024),
-      elapsed / 1000,
-      blockNum + 1
-    )
-
-    Right(ImportResult(blockNum, totalNodes, totalBytecodes, elapsed))
   }
 
   private def hex8(bs: ByteString): String =

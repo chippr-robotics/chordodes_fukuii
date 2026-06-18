@@ -94,33 +94,30 @@ object ApacheHttpClientStreamClient {
     def abort(): Unit =
       aborted = true
 
-    override def call(): StreamResponseMessage = {
-      if aborted then {
-        return null
-      }
+    override def call(): StreamResponseMessage =
+      if aborted then null
+      else
+        try {
+          val uri = requestMessage.getOperation().getURI()
 
-      try {
-        val uri = requestMessage.getOperation().getURI()
-
-        requestMessage.getOperation().getMethod match {
-          case UpnpRequest.Method.GET =>
-            executeGet(uri.toString())
-          case UpnpRequest.Method.POST =>
-            executePost(uri.toString())
-          case method =>
-            log.warn(s"Unsupported HTTP method: $method")
+          requestMessage.getOperation().getMethod match {
+            case UpnpRequest.Method.GET =>
+              executeGet(uri.toString())
+            case UpnpRequest.Method.POST =>
+              executePost(uri.toString())
+            case method =>
+              log.warn(s"Unsupported HTTP method: $method")
+              // Return new response with error status
+              new StreamResponseMessage(new UpnpResponse(UpnpResponse.Status.METHOD_NOT_SUPPORTED))
+          }
+        } catch {
+          case ex: Exception if !aborted =>
+            log.warn(s"HTTP request failed: ${ex.getMessage}")
             // Return new response with error status
-            new StreamResponseMessage(new UpnpResponse(UpnpResponse.Status.METHOD_NOT_SUPPORTED))
+            new StreamResponseMessage(new UpnpResponse(UpnpResponse.Status.INTERNAL_SERVER_ERROR))
+          case _: Exception =>
+            null
         }
-      } catch {
-        case ex: Exception if !aborted =>
-          log.warn(s"HTTP request failed: ${ex.getMessage}")
-          // Return new response with error status
-          new StreamResponseMessage(new UpnpResponse(UpnpResponse.Status.INTERNAL_SERVER_ERROR))
-        case _: Exception =>
-          null
-      }
-    }
 
     /** Helper method to populate StreamResponseMessage from Apache HttpClient response */
     private def populateResponse(

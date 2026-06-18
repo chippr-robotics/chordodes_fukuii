@@ -24,19 +24,17 @@ class TuiUpdater(
 
   /** Start the updater. */
   def start(): Unit =
-    if !tui.isEnabled then
-      log.info("TUI is disabled, not starting updater")
-      return
+    if !tui.isEnabled then log.info("TUI is disabled, not starting updater")
+    else
+      log.info("Starting TUI updater")
+      running = true
 
-    log.info("Starting TUI updater")
-    running = true
+      // Update network name immediately
+      tui.updateNetwork(networkName)
 
-    // Update network name immediately
-    tui.updateNetwork(networkName)
-
-    // Start update thread
-    updateThread = Some(new Thread(() => updateLoop(), "TuiUpdateThread"))
-    updateThread.foreach(_.start())
+      // Start update thread
+      updateThread = Some(new Thread(() => updateLoop(), "TuiUpdateThread"))
+      updateThread.foreach(_.start())
 
   /** Stop the updater. */
   def stop(): Unit =

@@ -126,29 +126,25 @@ abstract class BaseNode extends Node {
     // incrementally during regular sync's block-by-block import.
     if appState.isSnapSyncDone() then {
       log.info("Skipping DB consistency check: SNAP sync stores only pivot block header, not full header chain")
-      return
-    }
-    // Bug 28: Skip when SNAP is mid-sync. AppStateStorage.bestBlock holds the pivot number
-    // whose header we have, but the block body was never persisted and the 0..pivot chain is
-    // incomplete. The consistency checker would see "best block hash not in block storage",
-    // log "Database seems to be in inconsistent state", and call shutdown — turning a recoverable
-    // mid-SNAP restart into an unrecoverable wipe-and-resync.
-    if appState.isSnapSyncInProgress() then {
+      // Bug 28: Skip when SNAP is mid-sync. AppStateStorage.bestBlock holds the pivot number
+      // whose header we have, but the block body was never persisted and the 0..pivot chain is
+      // incomplete. The consistency checker would see "best block hash not in block storage",
+      // log "Database seems to be in inconsistent state", and call shutdown — turning a recoverable
+      // mid-SNAP restart into an unrecoverable wipe-and-resync.
+    } else if appState.isSnapSyncInProgress() then {
       log.info("Skipping DB consistency check: SNAP sync in progress (pivot header only, no full chain yet)")
-      return
-    }
-    // Skip consistency check in Engine API mode — optimistic imports store blocks
-    // at the chain tip without the full header chain from genesis.
-    if engineApiConfig.enabled then {
+      // Skip consistency check in Engine API mode — optimistic imports store blocks
+      // at the chain tip without the full header chain from genesis.
+    } else if engineApiConfig.enabled then {
       log.info("Skipping DB consistency check: Engine API mode uses optimistic block import")
-      return
+    } else {
+      StorageConsistencyChecker.checkStorageConsistency(
+        appState.getBestBlockNumber(),
+        storagesInstance.storages.blockNumberMappingStorage,
+        storagesInstance.storages.blockHeadersStorage,
+        shutdown
+      )(log)
     }
-    StorageConsistencyChecker.checkStorageConsistency(
-      appState.getBestBlockNumber(),
-      storagesInstance.storages.blockNumberMappingStorage,
-      storagesInstance.storages.blockHeadersStorage,
-      shutdown
-    )(log)
   }
 
   private[this] def startPeerManager(): Unit = peerManager ! PeerManagerActor.StartConnecting
