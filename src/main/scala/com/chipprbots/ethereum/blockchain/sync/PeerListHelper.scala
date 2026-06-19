@@ -53,6 +53,9 @@ class PeerListHelper(
 
   def globalMedianRttMs: Long = ethRateTracker.currentMedianRTT
 
+  def updateEthRate(peerId: String, msgType: Int, timeTaken: Long, itemCount: Int): Unit =
+    ethRateTracker.update(peerId, msgType, timeTaken, itemCount)
+
   /** Subscribers may override to exempt maintained peers from blacklisting (Besu alignment). Empty by default. */
   protected def maintainedNodeIdHexes: Set[String] = Set.empty
 

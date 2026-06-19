@@ -1,6 +1,9 @@
 package com.chipprbots.ethereum.blockchain.sync
 
 import org.apache.pekko.actor.*
+import org.apache.pekko.actor.typed.{ActorRef as TypedActorRef, Behavior}
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.FiniteDuration
@@ -109,6 +112,9 @@ class PeerRequestHandler[RequestMsg <: Message, ResponseMsg <: Message: ClassTag
 }
 
 object PeerRequestHandler {
+
+  // ---- Classic API (unchanged) ----
+
   def props[RequestMsg <: Message, ResponseMsg <: Message: ClassTag](
       peer: Peer,
       responseTimeout: FiniteDuration,
@@ -119,8 +125,120 @@ object PeerRequestHandler {
   )(implicit scheduler: Scheduler, toSerializable: RequestMsg => MessageSerializable): Props =
     Props(new PeerRequestHandler(peer, responseTimeout, networkPeerManager, peerEventBus, requestMsg, responseMsgCode))
 
-  final case class RequestFailed(peer: Peer, reason: String)
-  final case class ResponseReceived[T](peer: Peer, response: T, timeTaken: Long)
+  // ---- Shared result types (Classic and Typed callers) ----
+
+  sealed trait Result
+  final case class RequestFailed(peer: Peer, reason: String) extends Result
+  final case class ResponseReceived[T](peer: Peer, response: T, timeTaken: Long) extends Result
+
+  // ---- Typed API ----
+
+  sealed trait Command
+
+  final private case class MessageFromPeerCmd(msg: Message) extends Command
+  final private case class PeerLeftCmd(peerId: com.chipprbots.ethereum.network.PeerId) extends Command
+  private case object TimeoutCmd extends Command
+
+  /** Typed factory: spawns one `PeerRequestHandler` per request. Replies to `replyTo` with `ResponseReceived` or
+    * `RequestFailed` then stops. Callers pass an explicit `replyTo` because `context.parent` is unavailable in Pekko
+    * Typed.
+    */
+  def behavior[RequestMsg <: Message, ResponseMsg <: Message: ClassTag](
+      peer: Peer,
+      responseTimeout: FiniteDuration,
+      networkPeerManager: ActorRef,
+      peerEventBus: ActorRef,
+      requestMsg: RequestMsg,
+      responseMsgCode: Int,
+      replyTo: TypedActorRef[Result]
+  )(implicit toSerializable: RequestMsg => MessageSerializable): Behavior[Command] =
+    Behaviors.setup { ctx =>
+      Behaviors.withTimers { timers =>
+        val startTime = System.currentTimeMillis()
+
+        val expectedRequestId: Option[BigInt] = requestMsg match {
+          case hasId: ETHPackets.HasRequestId => Some(hasId.requestId)
+          case _                              => None
+        }
+
+        val msgAdapter = ctx.messageAdapter[MessageFromPeer] { case MessageFromPeer(m, _) => MessageFromPeerCmd(m) }
+        val disconnectAdapter = ctx.messageAdapter[PeerDisconnected] { case PeerDisconnected(pid) => PeerLeftCmd(pid) }
+
+        networkPeerManager.tell(
+          NetworkPeerManagerActor.SendMessage(toSerializable(requestMsg), peer.id),
+          ActorRef.noSender
+        )
+        peerEventBus.tell(
+          Subscribe(PeerDisconnectedClassifier(PeerSelector.WithId(peer.id))),
+          disconnectAdapter.toClassic
+        )
+        peerEventBus.tell(
+          Subscribe(MessageClassifier(Set(responseMsgCode), PeerSelector.WithId(peer.id))),
+          msgAdapter.toClassic
+        )
+        timers.startSingleTimer("timeout", TimeoutCmd, responseTimeout)
+
+        def timeTakenSoFar(): Long = System.currentTimeMillis() - startTime
+
+        def cleanup(): Unit = {
+          timers.cancel("timeout")
+          peerEventBus.tell(Unsubscribe(), msgAdapter.toClassic)
+          peerEventBus.tell(Unsubscribe(), disconnectAdapter.toClassic)
+        }
+
+        Behaviors.receiveMessage {
+          case MessageFromPeerCmd(msg) =>
+            msg match {
+              case responseMsg: ResponseMsg =>
+                (expectedRequestId, responseMsg) match {
+                  case (Some(expected), hasId: ETHPackets.HasRequestId) if hasId.requestId != expected =>
+                    ctx.log.debug(
+                      "PEER_REQUEST_STALE: peer={}, expected requestId={}, got={} — ignoring",
+                      peer.id,
+                      expected,
+                      hasId.requestId
+                    )
+                    Behaviors.same
+                  case _ =>
+                    val elapsed = timeTakenSoFar()
+                    cleanup()
+                    replyTo ! ResponseReceived(peer, responseMsg, elapsed)
+                    Behaviors.stopped
+                }
+              case _ =>
+                Behaviors.same
+            }
+
+          case TimeoutCmd =>
+            val elapsed = timeTakenSoFar()
+            ctx.log.warn(
+              "PEER_REQUEST_TIMEOUT: peer={}, reqType={}, elapsed={}ms (timeout={}ms)",
+              peer.id,
+              requestMsg.getClass.getSimpleName,
+              Long.box(elapsed),
+              Long.box(responseTimeout.toMillis)
+            )
+            cleanup()
+            replyTo ! RequestFailed(peer, "request timeout")
+            Behaviors.stopped
+
+          case PeerLeftCmd(peerId) if peerId == peer.id =>
+            val elapsed = timeTakenSoFar()
+            ctx.log.warn(
+              "PEER_REQUEST_DISCONNECTED: peer={}, reqType={}, elapsed={}ms - connection closed before response",
+              peer.id,
+              requestMsg.getClass.getSimpleName,
+              Long.box(elapsed)
+            )
+            cleanup()
+            replyTo ! RequestFailed(peer, "connection closed")
+            Behaviors.stopped
+
+          case PeerLeftCmd(_) =>
+            Behaviors.same
+        }
+      }
+    }
 
   private case object Timeout
 }

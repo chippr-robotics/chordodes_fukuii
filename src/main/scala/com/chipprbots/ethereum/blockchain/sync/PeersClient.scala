@@ -1,18 +1,24 @@
 package com.chipprbots.ethereum.blockchain.sync
 
 import org.apache.pekko.actor.Actor
-import org.apache.pekko.actor.ActorLogging
 import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.Cancellable
 import org.apache.pekko.actor.Props
 import org.apache.pekko.actor.Scheduler
+import org.apache.pekko.actor.typed.{ActorRef as TypedActorRef, Behavior}
+import org.apache.pekko.actor.typed.DispatcherSelector
+import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 
 import scala.collection.mutable
-import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.*
 import scala.reflect.ClassTag
+
+import org.slf4j.Logger
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MaintainedPeersChanged
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
@@ -31,336 +37,31 @@ import com.chipprbots.ethereum.network.p2p.messages.SNAP.TrieNodes
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 class PeersClient(
-    val networkPeerManager: ActorRef,
-    val peerEventBus: ActorRef,
-    val blacklist: Blacklist,
-    val syncConfig: SyncConfig,
-    implicit val scheduler: Scheduler
-) extends Actor
-    with ActorLogging
-    with PeerListSupportNg {
+    networkPeerManager: ActorRef,
+    peerEventBus: ActorRef,
+    blacklist: Blacklist,
+    syncConfig: SyncConfig,
+    scheduler: Scheduler // kept for props() backward compat; Typed core uses withTimers
+) extends Actor {
   import PeersClient.*
 
-  implicit val ec: ExecutionContext = context.dispatcher
+  private val core = context.spawn(
+    PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig),
+    "core",
+    DispatcherSelector.sameAsParent()
+  )
 
-  // Besu alignment: PeerDenylistManager.java:56 skips maintained peers at add() call site.
-  // Subscribe at startup so updates are received before any BlacklistPeer message can arrive.
-  peerEventBus ! Subscribe(MaintainedPeersClassifier)
-  private var _maintainedNodeIdHexes: Set[String] = Set.empty
-  override protected def maintainedNodeIdHexes: Set[String] = _maintainedNodeIdHexes
-
-  // Tracks GetNodeData capability per peer via observed behavior (not advertised capability).
-  // Shared across all StateNodeFetcher actors so the first failure protects all concurrent requests.
-  private val nodeDataCooldownUntilMs = mutable.Map.empty[PeerId, Long]
-  private val nodeDataConsecutiveFailures = mutable.Map.empty[PeerId, Int]
-
-  override def handlePeerListMessages: Receive = ({ case PeerDisconnected(peerId) =>
-    // Intentionally do NOT clear nodeData cooldown on disconnect. A peer that closes
-    // the connection when asked for GetNodeData (e.g. BONSAI Besu) will immediately
-    // reconnect and repeat the same failure if we reset its state here. The time-based
-    // cooldown must be allowed to expire naturally so the peer stays suppressed.
-    super.handlePeerListMessages(PeerDisconnected(peerId))
-  }: Receive).orElse(super.handlePeerListMessages)
-
-  val statusSchedule: Cancellable =
-    scheduler.scheduleWithFixedDelay(syncConfig.printStatusInterval, syncConfig.printStatusInterval, self, PrintStatus)
-
-  def receive: Receive = running(Map())
-
-  override def postStop(): Unit = {
-    super.postStop()
-    statusSchedule.cancel()
-  }
-
-  def running(requesters: Requesters): Receive =
-    handlePeerListMessages.orElse {
-      case MaintainedPeersChanged(nodeIds) =>
-        _maintainedNodeIdHexes = nodeIds
-        log.debug("Updated maintained peer node IDs: {} peers", nodeIds.size)
-      case PrintStatus                   => printStatus(requesters: Requesters)
-      case BlacklistPeer(peerId, reason) => blacklistIfHandshaked(peerId, syncConfig.blacklistDuration, reason)
-      case RecordNodeDataFailure(peerId) =>
-        val count = nodeDataConsecutiveFailures.getOrElse(peerId, 0) + 1
-        nodeDataConsecutiveFailures(peerId) = count
-        val cooldownMs = if count >= 3 then 3_600_000L else count * 30_000L
-        nodeDataCooldownUntilMs(peerId) = System.currentTimeMillis() + cooldownMs
-        log.debug("Peer {} GetNodeData failure #{} — cooldown {}ms", peerId, count, cooldownMs)
-      case Request(message, peerSelector, toSerializable) =>
-        val requester = sender()
-        log.debug(
-          "Received request for message type {} using selector {}",
-          message.getClass.getSimpleName,
-          peerSelector
-        )
-        log.debug(
-          "Total handshaked peers: {}, Available peers (not blacklisted): {}",
-          handshakedPeers.size,
-          peersToDownloadFrom.size
-        )
-
-        if peersToDownloadFrom.isEmpty && handshakedPeers.nonEmpty then {
-          log.debug("All {} handshaked peers are blacklisted", handshakedPeers.size)
-          handshakedPeers.foreach { case (peerId, peerInfo) =>
-            log.debug(
-              "Peer {} ({}): blacklisted={}",
-              peerId,
-              peerInfo.peer.remoteAddress,
-              blacklist.isBlacklisted(peerId)
-            )
-          }
-        }
-
-        selectPeer(peerSelector) match {
-          case Some(peer) =>
-            log.debug("Selected peer {} with address {} for request", peer.id, peer.remoteAddress.getHostString)
-            // Adapt message format based on peer's negotiated capability
-            val adaptedMessage = adaptMessageForPeer(message)
-            // Create a type-safe conversion function for the adapted message
-            val adaptedToSerializable: Message => MessageSerializable = (msg: Message) =>
-              msg match {
-                case s: MessageSerializable => s
-                case _                      => toSerializable(message) // fallback to original
-              }
-            val handler =
-              makeRequest(peer, adaptedMessage, responseMsgCode(adaptedMessage), adaptedToSerializable)(
-                scheduler,
-                responseClassTag(adaptedMessage)
-              )
-            val newRequesters = requesters + (handler -> requester)
-            context.become(running(newRequesters))
-          case None =>
-            log.debug(
-              "No suitable peer found to issue a request (handshaked: {}, available: {})",
-              handshakedPeers.size,
-              peersToDownloadFrom.size
-            )
-            requester ! NoSuitablePeer
-        }
-      case PeerRequestHandler.ResponseReceived(peer, message, timeTaken) =>
-        val (msgType, itemCount) = message match {
-          case ETHPackets.BlockHeaders(_, headers) => (PeerRateTracker.MsgGetBlockHeaders, headers.size)
-          case ETHPackets.BlockBodies(_, bodies)   => (PeerRateTracker.MsgGetBlockBodies, bodies.size)
-          case ETHPackets.Receipts68(_, receipts)  => (PeerRateTracker.MsgGetReceipts, receipts.items.size)
-          case _                                   => (-1, 0)
-        }
-        if msgType >= 0 then ethRateTracker.update(peer.id.value, msgType, timeTaken, itemCount)
-        handleResponse(requesters, Response(peer, message.asInstanceOf[Message]))
-      case PeerRequestHandler.RequestFailed(peer, reason) =>
-        log.warning(s"Request to peer ${peer.remoteAddress} failed - reason: $reason")
-        handleResponse(requesters, RequestFailed(peer, BlacklistReason.RegularSyncRequestFailed(reason)))
-    }
-
-  private def makeRequest[RequestMsg <: Message, ResponseMsg <: Message](
-      peer: Peer,
-      requestMsg: RequestMsg,
-      responseMsgCode: Int,
-      toSerializable: RequestMsg => MessageSerializable
-  )(implicit scheduler: Scheduler, classTag: ClassTag[ResponseMsg]): ActorRef = {
-    implicit val toSer: RequestMsg => MessageSerializable = toSerializable
-    context.actorOf(
-      PeerRequestHandler.props[RequestMsg, ResponseMsg](
-        peer = peer,
-        responseTimeout = syncConfig.peerResponseTimeout,
-        networkPeerManager = networkPeerManager,
-        peerEventBus = peerEventBus,
-        requestMsg = requestMsg,
-        responseMsgCode = responseMsgCode
+  override def receive: Receive = {
+    case req: Request[?] =>
+      core ! RequestCmd(
+        req.message.asInstanceOf[Message],
+        req.peerSelector,
+        req.toSerializable.asInstanceOf[Message => MessageSerializable],
+        sender()
       )
-    )
-  }
-
-  private def handleResponse[ResponseMsg <: ResponseMessage](requesters: Requesters, responseMsg: ResponseMsg): Unit = {
-    val requestHandler = sender()
-    requesters.get(requestHandler).foreach(_ ! responseMsg)
-    context.become(running(requesters - requestHandler))
-  }
-
-  private def selectPeer(peerSelector: PeerSelector): Option[Peer] =
-    peerSelector match {
-      case BestPeer =>
-        log.debug("Selecting best peer from {} available peers", peersToDownloadFrom.size)
-        bestPeer(peersToDownloadFrom, log)
-
-      case BestSnapPeer =>
-        val snapPeers = peersToDownloadFrom.filter { case (_, peerWithInfo) =>
-          peerWithInfo.peerInfo.remoteStatus.supportsSnap
-        }
-        log.debug(
-          "Selecting best SNAP-capable peer from {} available peers ({} SNAP-capable)",
-          peersToDownloadFrom.size,
-          snapPeers.size
-        )
-        bestPeer(snapPeers, log)
-
-      case BestNodeDataPeer =>
-        val now = System.currentTimeMillis()
-        val nodeDataPeers = peersToDownloadFrom.filter { case (peerId, _) =>
-          !nodeDataCooldownUntilMs.get(peerId).exists(_ > now)
-        }
-        log.debug(
-          "Selecting best GetNodeData-capable peer from {} available peers ({} capable, {} on cooldown)",
-          peersToDownloadFrom.size,
-          nodeDataPeers.size,
-          nodeDataCooldownUntilMs.count { case (_, exp) => exp > now }
-        )
-        bestPeer(nodeDataPeers, log)
-
-      case ExcludingPeers(exclude) =>
-        val filteredPeers = peersToDownloadFrom.filterNot { case (peerId, _) => exclude.contains(peerId) }
-        log.debug(
-          "Selecting best peer excluding {} peers from {} available ({} remaining)",
-          exclude.size,
-          peersToDownloadFrom.size,
-          filteredPeers.size
-        )
-        bestPeer(filteredPeers, log)
-
-      case BestPeerWithMinBlock(minBlock) =>
-        // Two-tier selection: peers with known maxBlockNumber >= minBlock are
-        // strictly better than peers with maxBlockNumber == 0 (unknown chain
-        // state). Try the known-good tier first; if empty, fall back to the
-        // unknown tier — which is correct behaviour for ETH/64-68 peers whose
-        // maxBlockNumber stays at 0 because their STATUS doesn't carry a
-        // block number and we don't receive block messages from them post-merge.
-        val knownAheadPeers = peersToDownloadFrom.filter { case (_, peerWithInfo) =>
-          peerWithInfo.peerInfo.maxBlockNumber >= minBlock
-        }
-        if knownAheadPeers.nonEmpty then {
-          log.debug(
-            "BestPeerWithMinBlock({}): {} peers have known maxBlockNumber >= target",
-            minBlock,
-            knownAheadPeers.size
-          )
-          bestPeer(knownAheadPeers, log)
-        } else {
-          val unknownChainHeadPeers = peersToDownloadFrom.filter { case (_, peerWithInfo) =>
-            peerWithInfo.peerInfo.maxBlockNumber == 0
-          }
-          log.debug(
-            s"BestPeerWithMinBlock($minBlock): no peer with known maxBlockNumber >= target; " +
-              s"falling back to ${unknownChainHeadPeers.size} peer(s) with maxBlockNumber=0 (chain state unknown)"
-          )
-          bestPeer(unknownChainHeadPeers, log)
-        }
-
-      case BestPeerWithMinBlockExcluding(minBlock, exclude) =>
-        val eligible = peersToDownloadFrom.filterNot { case (peerId, _) => exclude.contains(peerId) }
-        val knownAheadPeers = eligible.filter { case (_, peerWithInfo) =>
-          peerWithInfo.peerInfo.maxBlockNumber >= minBlock
-        }
-        if knownAheadPeers.nonEmpty then {
-          log.debug(
-            "BestPeerWithMinBlockExcluding({}): {} eligible after excluding {} tried peer(s)",
-            minBlock,
-            knownAheadPeers.size,
-            exclude.size
-          )
-          bestPeer(knownAheadPeers, log)
-        } else {
-          val unknownHeadPeers = eligible.filter { case (_, peerWithInfo) =>
-            peerWithInfo.peerInfo.maxBlockNumber == 0
-          }
-          log.debug(
-            "BestPeerWithMinBlockExcluding({}): no known-ahead peers after exclusion; {} unknown-chain-state remain",
-            minBlock,
-            unknownHeadPeers.size
-          )
-          bestPeer(unknownHeadPeers, log)
-        }
-
-      case BestSnapPeerExcluding(exclude) =>
-        val snapPeers = peersToDownloadFrom.filter { case (peerId, peerWithInfo) =>
-          !exclude.contains(peerId) && peerWithInfo.peerInfo.remoteStatus.supportsSnap
-        }
-        log.debug(
-          "Selecting best SNAP peer excluding {} tried peers ({} SNAP remaining)",
-          exclude.size,
-          snapPeers.size
-        )
-        bestPeer(snapPeers, log)
-
-      case BestSnapPeerWithMinBlockExcluding(minBlock, exclude) =>
-        val eligible = peersToDownloadFrom.filter { case (peerId, peerWithInfo) =>
-          !exclude.contains(peerId) && peerWithInfo.peerInfo.remoteStatus.supportsSnap
-        }
-        val knownAheadPeers = eligible.filter { case (_, peerWithInfo) =>
-          peerWithInfo.peerInfo.maxBlockNumber >= minBlock
-        }
-        if knownAheadPeers.nonEmpty then {
-          log.debug(
-            "BestSnapPeerWithMinBlockExcluding({}): {} SNAP peers at target after excluding {} tried",
-            minBlock,
-            knownAheadPeers.size,
-            exclude.size
-          )
-          bestPeer(knownAheadPeers, log)
-        } else {
-          val unknownHeadPeers = eligible.filter { case (_, peerWithInfo) =>
-            peerWithInfo.peerInfo.maxBlockNumber == 0
-          }
-          log.debug(
-            "BestSnapPeerWithMinBlockExcluding({}): no known-ahead SNAP peers; {} with unknown chain state remain",
-            minBlock,
-            unknownHeadPeers.size
-          )
-          bestPeer(unknownHeadPeers, log)
-        }
-
-      case BestNodeDataPeerExcluding(exclude) =>
-        val now = System.currentTimeMillis()
-        val nodeDataPeers = peersToDownloadFrom.filter { case (peerId, _) =>
-          !exclude.contains(peerId) &&
-          !nodeDataCooldownUntilMs.get(peerId).exists(_ > now)
-        }
-        log.debug(
-          "Selecting best GetNodeData peer excluding {} tried peers ({} capable remaining)",
-          exclude.size,
-          nodeDataPeers.size
-        )
-        bestPeer(nodeDataPeers, log)
-
-    }
-
-  /** Adapts message format based on peer's negotiated capability. ETH68+ always uses request-id — no adaptation needed.
-    */
-  private def adaptMessageForPeer[RequestMsg <: Message](message: RequestMsg): Message = message
-
-  private def responseClassTag[RequestMsg <: Message](requestMsg: RequestMsg): ClassTag[? <: Message] =
-    requestMsg match {
-      case _: ETHPackets.GetBlockHeaders       => implicitly[ClassTag[ETHPackets.BlockHeaders]]
-      case _: ETHPackets.GetBlockBodies        => implicitly[ClassTag[ETHPackets.BlockBodies]]
-      case _: ETHPackets.GetReceipts           => implicitly[ClassTag[ETHPackets.Receipts68]]
-      case _: ETHPackets.GetPooledTransactions => implicitly[ClassTag[ETHPackets.PooledTransactions]]
-      case _: GetTrieNodes                     => implicitly[ClassTag[TrieNodes]]
-      case _: GetByteCodes                     => implicitly[ClassTag[ByteCodes]]
-    }
-
-  private def responseMsgCode[RequestMsg <: Message](requestMsg: RequestMsg): Int =
-    requestMsg match {
-      case _: ETHPackets.GetBlockHeaders       => Codes.BlockHeadersCode
-      case _: ETHPackets.GetBlockBodies        => Codes.BlockBodiesCode
-      case _: ETHPackets.GetReceipts           => Codes.ReceiptsCode
-      case _: ETHPackets.GetPooledTransactions => Codes.PooledTransactionsCode
-      case _: GetTrieNodes                     => SNAP.Codes.TrieNodesCode
-      case _: GetByteCodes                     => SNAP.Codes.ByteCodesCode
-    }
-
-  private def printStatus(requesters: Requesters): Unit = {
-    log.debug(
-      "Request status: requests in progress: {}, available peers: {}",
-      requesters.size,
-      peersToDownloadFrom.size
-    )
-
-    lazy val handshakedPeersStatus = handshakedPeers.map { case (peerId, peerWithInfo) =>
-      val peerNetworkStatus = PeerNetworkStatus(
-        peerWithInfo.peer,
-        isBlacklisted = blacklist.isBlacklisted(peerId)
-      )
-      (peerNetworkStatus, peerWithInfo.peerInfo)
-    }
-
-    log.debug(s"Handshaked peers status (number of peers: ${handshakedPeersStatus.size}): $handshakedPeersStatus")
+    case BlacklistPeer(peerId, reason) => core ! BlacklistPeerCmd(peerId, reason)
+    case RecordNodeDataFailure(peerId) => core ! RecordNodeDataFailureCmd(peerId)
+    case PrintStatus                   => core ! PrintStatusCmd
   }
 }
 
@@ -374,6 +75,430 @@ object PeersClient {
       scheduler: Scheduler
   ): Props =
     Props(new PeersClient(networkPeerManager, peerEventBus, blacklist, syncConfig, scheduler))
+
+  // ---- Command ADT (Typed core only) ----
+
+  sealed trait Command
+
+  final private case class RequestCmd(
+      message: Message,
+      peerSelector: PeerSelector,
+      toSerializable: Message => MessageSerializable,
+      replyTo: ActorRef
+  ) extends Command
+  final private case class BlacklistPeerCmd(peerId: PeerId, reason: BlacklistReason) extends Command
+  final private case class RecordNodeDataFailureCmd(peerId: PeerId) extends Command
+  private case object PrintStatusCmd extends Command
+  private case object ScanPeersTick extends Command
+  private case object PrintStatusTick extends Command
+  final private case class HandshakedPeersCmd(peers: Map[Peer, PeerInfo]) extends Command
+  final private case class PeerDisconnectedCmd(peerId: PeerId) extends Command
+  final private case class MaintainedPeersChangedCmd(nodeIds: Set[String]) extends Command
+  final private case class PRHResultCmd(id: Int, result: PeerRequestHandler.Result) extends Command
+
+  // ---- Typed core behavior ----
+
+  private def behavior(
+      networkPeerManager: ActorRef,
+      peerEventBus: ActorRef,
+      blacklist: Blacklist,
+      syncConfig: SyncConfig
+  ): Behavior[Command] =
+    Behaviors.setup { ctx =>
+      val handshakedPeersAdapter =
+        ctx.messageAdapter[NetworkPeerManagerActor.HandshakedPeers] {
+          case NetworkPeerManagerActor.HandshakedPeers(peers) => HandshakedPeersCmd(peers)
+        }
+      val peerDisconnectedAdapter =
+        ctx.messageAdapter[PeerDisconnected] { case PeerDisconnected(peerId) => PeerDisconnectedCmd(peerId) }
+      val maintainedAdapter =
+        ctx.messageAdapter[MaintainedPeersChanged] { case MaintainedPeersChanged(nodeIds) =>
+          MaintainedPeersChangedCmd(nodeIds)
+        }
+
+      // Besu alignment: subscribe at startup so updates arrive before any BlacklistPeer message.
+      peerEventBus.tell(Subscribe(MaintainedPeersClassifier), maintainedAdapter.toClassic)
+
+      Behaviors.withTimers { timers =>
+        timers.startTimerWithFixedDelay("scan-peers", ScanPeersTick, 0.seconds, syncConfig.peersScanInterval)
+        timers.startTimerWithFixedDelay(
+          "print-status",
+          PrintStatusTick,
+          syncConfig.printStatusInterval,
+          syncConfig.printStatusInterval
+        )
+        new Impl(
+          ctx,
+          networkPeerManager,
+          peerEventBus,
+          blacklist,
+          syncConfig,
+          handshakedPeersAdapter,
+          peerDisconnectedAdapter
+        ).running(Map.empty)
+      }
+    }
+
+  // ---- Typed core Impl ----
+
+  private class Impl(
+      ctx: ActorContext[Command],
+      networkPeerManager: ActorRef,
+      peerEventBus: ActorRef,
+      blacklist: Blacklist,
+      syncConfig: SyncConfig,
+      handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers],
+      peerDisconnectedAdapter: TypedActorRef[PeerDisconnected]
+  ) {
+
+    private var _maintainedNodeIdHexes: Set[String] = Set.empty
+    private val nodeDataCooldownUntilMs = mutable.Map.empty[PeerId, Long]
+    private val nodeDataConsecutiveFailures = mutable.Map.empty[PeerId, Int]
+    private var nextPrhId: Int = 0
+
+    private val peerHelper = new PeerListHelper(peerEventBus, blacklist, peerDisconnectedAdapter, ctx.log) {
+      override protected def maintainedNodeIdHexes: Set[String] = _maintainedNodeIdHexes
+    }
+
+    def running(requesters: Map[Int, ActorRef]): Behavior[Command] =
+      Behaviors.receiveMessage {
+        case ScanPeersTick =>
+          networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, handshakedPeersAdapter.toClassic)
+          Behaviors.same
+
+        case HandshakedPeersCmd(peers) =>
+          peerHelper.handleHandshakedPeers(peers)
+          Behaviors.same
+
+        case PeerDisconnectedCmd(peerId) =>
+          // Intentionally do NOT clear nodeData cooldown on disconnect. A peer that closes
+          // the connection when asked for GetNodeData (e.g. BONSAI Besu) will immediately
+          // reconnect and repeat the same failure if we reset its state here. The time-based
+          // cooldown must be allowed to expire naturally so the peer stays suppressed.
+          peerHelper.handlePeerDisconnected(peerId)
+          Behaviors.same
+
+        case MaintainedPeersChangedCmd(nodeIds) =>
+          _maintainedNodeIdHexes = nodeIds
+          ctx.log.debug("Updated maintained peer node IDs: {} peers", nodeIds.size)
+          Behaviors.same
+
+        case BlacklistPeerCmd(peerId, reason) =>
+          peerHelper.blacklistIfHandshaked(peerId, syncConfig.blacklistDuration, reason)
+          Behaviors.same
+
+        case RecordNodeDataFailureCmd(peerId) =>
+          val count = nodeDataConsecutiveFailures.getOrElse(peerId, 0) + 1
+          nodeDataConsecutiveFailures(peerId) = count
+          val cooldownMs = if count >= 3 then 3_600_000L else count * 30_000L
+          nodeDataCooldownUntilMs(peerId) = System.currentTimeMillis() + cooldownMs
+          ctx.log.debug("Peer {} GetNodeData failure #{} — cooldown {}ms", peerId, count, Long.box(cooldownMs))
+          Behaviors.same
+
+        case PrintStatusCmd | PrintStatusTick =>
+          printStatus(requesters)
+          Behaviors.same
+
+        case RequestCmd(message, peerSelector, toSerializable, replyTo) =>
+          ctx.log.debug(
+            "Received request for message type {} using selector {}",
+            message.getClass.getSimpleName,
+            peerSelector
+          )
+          ctx.log.debug(
+            "Total handshaked peers: {}, Available peers (not blacklisted): {}",
+            peerHelper.handshakedPeers.size,
+            peerHelper.peersToDownloadFrom.size
+          )
+
+          if peerHelper.peersToDownloadFrom.isEmpty && peerHelper.handshakedPeers.nonEmpty then {
+            ctx.log.debug("All {} handshaked peers are blacklisted", peerHelper.handshakedPeers.size)
+            peerHelper.handshakedPeers.foreach { case (peerId, peerInfo) =>
+              ctx.log.debug(
+                "Peer {} ({}): blacklisted={}",
+                peerId,
+                peerInfo.peer.remoteAddress,
+                blacklist.isBlacklisted(peerId)
+              )
+            }
+          }
+
+          selectPeer(peerSelector) match {
+            case Some(peer) =>
+              ctx.log.debug(
+                "Selected peer {} with address {} for request",
+                peer.id,
+                peer.remoteAddress.getHostString
+              )
+              val adaptedMsg = adaptMessageForPeer(message)
+              val adaptedToSer: Message => MessageSerializable = msg =>
+                msg match {
+                  case s: MessageSerializable => s
+                  case _                      => toSerializable(message) // fallback to original
+                }
+              val id = nextPrhId; nextPrhId += 1
+              val prhAdapter = ctx.messageAdapter[PeerRequestHandler.Result](r => PRHResultCmd(id, r))
+              issueSpawn(
+                peer,
+                adaptedMsg,
+                responseMsgCode(adaptedMsg),
+                adaptedToSer,
+                prhAdapter,
+                id,
+                responseClassTag(adaptedMsg)
+              )
+              running(requesters + (id -> replyTo))
+
+            case None =>
+              ctx.log.debug(
+                "No suitable peer found to issue a request (handshaked: {}, available: {})",
+                peerHelper.handshakedPeers.size,
+                peerHelper.peersToDownloadFrom.size
+              )
+              replyTo.tell(NoSuitablePeer, ActorRef.noSender)
+              Behaviors.same
+          }
+
+        case PRHResultCmd(id, result) =>
+          requesters.get(id) match {
+            case Some(replyTo) =>
+              result match {
+                case PeerRequestHandler.ResponseReceived(peer, message, timeTaken) =>
+                  val (msgType, itemCount) = message match {
+                    case ETHPackets.BlockHeaders(_, headers) => (PeerRateTracker.MsgGetBlockHeaders, headers.size)
+                    case ETHPackets.BlockBodies(_, bodies)   => (PeerRateTracker.MsgGetBlockBodies, bodies.size)
+                    case ETHPackets.Receipts68(_, receipts)  => (PeerRateTracker.MsgGetReceipts, receipts.items.size)
+                    case _                                   => (-1, 0)
+                  }
+                  if msgType >= 0 then peerHelper.updateEthRate(peer.id.value, msgType, timeTaken, itemCount)
+                  replyTo.tell(Response(peer, message.asInstanceOf[Message]), ActorRef.noSender)
+
+                case PeerRequestHandler.RequestFailed(peer, reason) =>
+                  ctx.log.warn(s"Request to peer ${peer.remoteAddress} failed - reason: $reason")
+                  replyTo.tell(
+                    RequestFailed(peer, BlacklistReason.RegularSyncRequestFailed(reason)),
+                    ActorRef.noSender
+                  )
+              }
+            case None =>
+              ctx.log.debug("PRHResultCmd: unknown id={} — already handled or timed out", id)
+          }
+          running(requesters - id)
+      }
+
+    // Existential capture: extract the runtime ClassTag from ClassTag[? <: Message] into a fresh
+    // local type R so that PRH.behavior[Message, R] gets a concrete ClassTag for pattern matching.
+    private def issueSpawn(
+        peer: Peer,
+        msg: Message,
+        code: Int,
+        toSer: Message => MessageSerializable,
+        prhAdapter: TypedActorRef[PeerRequestHandler.Result],
+        id: Int,
+        ct: ClassTag[? <: Message]
+    ): Unit = {
+      type R <: Message
+      implicit val ctR: ClassTag[R] = ct.asInstanceOf[ClassTag[R]]
+      implicit val toSerializer: Message => MessageSerializable = toSer
+      ctx.spawn(
+        PeerRequestHandler.behavior[Message, R](
+          peer,
+          syncConfig.peerResponseTimeout,
+          networkPeerManager,
+          peerEventBus,
+          msg,
+          code,
+          prhAdapter
+        ),
+        s"prh-$id"
+      )
+    }
+
+    private def selectPeer(peerSelector: PeerSelector): Option[Peer] =
+      peerSelector match {
+        case BestPeer =>
+          ctx.log.debug("Selecting best peer from {} available peers", peerHelper.peersToDownloadFrom.size)
+          bestPeer(peerHelper.peersToDownloadFrom, ctx.log)
+
+        case BestSnapPeer =>
+          val snapPeers = peerHelper.peersToDownloadFrom.filter { case (_, peerWithInfo) =>
+            peerWithInfo.peerInfo.remoteStatus.supportsSnap
+          }
+          ctx.log.debug(
+            "Selecting best SNAP-capable peer from {} available peers ({} SNAP-capable)",
+            peerHelper.peersToDownloadFrom.size,
+            snapPeers.size
+          )
+          bestPeer(snapPeers, ctx.log)
+
+        case BestNodeDataPeer =>
+          val now = System.currentTimeMillis()
+          val nodeDataPeers = peerHelper.peersToDownloadFrom.filter { case (peerId, _) =>
+            !nodeDataCooldownUntilMs.get(peerId).exists(_ > now)
+          }
+          ctx.log.debug(
+            "Selecting best GetNodeData-capable peer from {} available peers ({} capable, {} on cooldown)",
+            peerHelper.peersToDownloadFrom.size,
+            nodeDataPeers.size,
+            nodeDataCooldownUntilMs.count { case (_, exp) => exp > now }
+          )
+          bestPeer(nodeDataPeers, ctx.log)
+
+        case ExcludingPeers(exclude) =>
+          val filteredPeers = peerHelper.peersToDownloadFrom.filterNot { case (peerId, _) => exclude.contains(peerId) }
+          ctx.log.debug(
+            "Selecting best peer excluding {} peers from {} available ({} remaining)",
+            exclude.size,
+            peerHelper.peersToDownloadFrom.size,
+            filteredPeers.size
+          )
+          bestPeer(filteredPeers, ctx.log)
+
+        case BestPeerWithMinBlock(minBlock) =>
+          // Two-tier selection: peers with known maxBlockNumber >= minBlock are
+          // strictly better than peers with maxBlockNumber == 0 (unknown chain
+          // state). Try the known-good tier first; if empty, fall back to the
+          // unknown tier — which is correct behaviour for ETH/64-68 peers whose
+          // maxBlockNumber stays at 0 because their STATUS doesn't carry a
+          // block number and we don't receive block messages from them post-merge.
+          val knownAheadPeers = peerHelper.peersToDownloadFrom.filter { case (_, peerWithInfo) =>
+            peerWithInfo.peerInfo.maxBlockNumber >= minBlock
+          }
+          if knownAheadPeers.nonEmpty then {
+            ctx.log.debug(
+              "BestPeerWithMinBlock({}): {} peers have known maxBlockNumber >= target",
+              minBlock,
+              knownAheadPeers.size
+            )
+            bestPeer(knownAheadPeers, ctx.log)
+          } else {
+            val unknownChainHeadPeers = peerHelper.peersToDownloadFrom.filter { case (_, peerWithInfo) =>
+              peerWithInfo.peerInfo.maxBlockNumber == 0
+            }
+            ctx.log.debug(
+              s"BestPeerWithMinBlock($minBlock): no peer with known maxBlockNumber >= target; " +
+                s"falling back to ${unknownChainHeadPeers.size} peer(s) with maxBlockNumber=0 (chain state unknown)"
+            )
+            bestPeer(unknownChainHeadPeers, ctx.log)
+          }
+
+        case BestPeerWithMinBlockExcluding(minBlock, exclude) =>
+          val eligible = peerHelper.peersToDownloadFrom.filterNot { case (peerId, _) => exclude.contains(peerId) }
+          val knownAheadPeers = eligible.filter { case (_, peerWithInfo) =>
+            peerWithInfo.peerInfo.maxBlockNumber >= minBlock
+          }
+          if knownAheadPeers.nonEmpty then {
+            ctx.log.debug(
+              "BestPeerWithMinBlockExcluding({}): {} eligible after excluding {} tried peer(s)",
+              minBlock,
+              knownAheadPeers.size,
+              exclude.size
+            )
+            bestPeer(knownAheadPeers, ctx.log)
+          } else {
+            val unknownHeadPeers = eligible.filter { case (_, peerWithInfo) =>
+              peerWithInfo.peerInfo.maxBlockNumber == 0
+            }
+            ctx.log.debug(
+              "BestPeerWithMinBlockExcluding({}): no known-ahead peers after exclusion; {} unknown-chain-state remain",
+              minBlock,
+              unknownHeadPeers.size
+            )
+            bestPeer(unknownHeadPeers, ctx.log)
+          }
+
+        case BestSnapPeerExcluding(exclude) =>
+          val snapPeers = peerHelper.peersToDownloadFrom.filter { case (peerId, peerWithInfo) =>
+            !exclude.contains(peerId) && peerWithInfo.peerInfo.remoteStatus.supportsSnap
+          }
+          ctx.log.debug(
+            "Selecting best SNAP peer excluding {} tried peers ({} SNAP remaining)",
+            exclude.size,
+            snapPeers.size
+          )
+          bestPeer(snapPeers, ctx.log)
+
+        case BestSnapPeerWithMinBlockExcluding(minBlock, exclude) =>
+          val eligible = peerHelper.peersToDownloadFrom.filter { case (peerId, peerWithInfo) =>
+            !exclude.contains(peerId) && peerWithInfo.peerInfo.remoteStatus.supportsSnap
+          }
+          val knownAheadPeers = eligible.filter { case (_, peerWithInfo) =>
+            peerWithInfo.peerInfo.maxBlockNumber >= minBlock
+          }
+          if knownAheadPeers.nonEmpty then {
+            ctx.log.debug(
+              "BestSnapPeerWithMinBlockExcluding({}): {} SNAP peers at target after excluding {} tried",
+              minBlock,
+              knownAheadPeers.size,
+              exclude.size
+            )
+            bestPeer(knownAheadPeers, ctx.log)
+          } else {
+            val unknownHeadPeers = eligible.filter { case (_, peerWithInfo) =>
+              peerWithInfo.peerInfo.maxBlockNumber == 0
+            }
+            ctx.log.debug(
+              "BestSnapPeerWithMinBlockExcluding({}): no known-ahead SNAP peers; {} with unknown chain state remain",
+              minBlock,
+              unknownHeadPeers.size
+            )
+            bestPeer(unknownHeadPeers, ctx.log)
+          }
+
+        case BestNodeDataPeerExcluding(exclude) =>
+          val now = System.currentTimeMillis()
+          val nodeDataPeers = peerHelper.peersToDownloadFrom.filter { case (peerId, _) =>
+            !exclude.contains(peerId) &&
+            !nodeDataCooldownUntilMs.get(peerId).exists(_ > now)
+          }
+          ctx.log.debug(
+            "Selecting best GetNodeData peer excluding {} tried peers ({} capable remaining)",
+            exclude.size,
+            nodeDataPeers.size
+          )
+          bestPeer(nodeDataPeers, ctx.log)
+      }
+
+    /** Adapts message format based on peer's negotiated capability. ETH68+ always uses request-id — no adaptation
+      * needed.
+      */
+    private def adaptMessageForPeer[RequestMsg <: Message](message: RequestMsg): Message = message
+
+    private def responseClassTag[RequestMsg <: Message](requestMsg: RequestMsg): ClassTag[? <: Message] =
+      requestMsg match {
+        case _: ETHPackets.GetBlockHeaders       => implicitly[ClassTag[ETHPackets.BlockHeaders]]
+        case _: ETHPackets.GetBlockBodies        => implicitly[ClassTag[ETHPackets.BlockBodies]]
+        case _: ETHPackets.GetReceipts           => implicitly[ClassTag[ETHPackets.Receipts68]]
+        case _: ETHPackets.GetPooledTransactions => implicitly[ClassTag[ETHPackets.PooledTransactions]]
+        case _: GetTrieNodes                     => implicitly[ClassTag[TrieNodes]]
+        case _: GetByteCodes                     => implicitly[ClassTag[ByteCodes]]
+      }
+
+    private def responseMsgCode[RequestMsg <: Message](requestMsg: RequestMsg): Int =
+      requestMsg match {
+        case _: ETHPackets.GetBlockHeaders       => Codes.BlockHeadersCode
+        case _: ETHPackets.GetBlockBodies        => Codes.BlockBodiesCode
+        case _: ETHPackets.GetReceipts           => Codes.ReceiptsCode
+        case _: ETHPackets.GetPooledTransactions => Codes.PooledTransactionsCode
+        case _: GetTrieNodes                     => SNAP.Codes.TrieNodesCode
+        case _: GetByteCodes                     => SNAP.Codes.ByteCodesCode
+      }
+
+    private def printStatus(requesters: Map[Int, ActorRef]): Unit = {
+      ctx.log.debug(
+        "Request status: requests in progress: {}, available peers: {}",
+        requesters.size,
+        peerHelper.peersToDownloadFrom.size
+      )
+      lazy val handshakedPeersStatus = peerHelper.handshakedPeers.map { case (peerId, peerWithInfo) =>
+        val peerNetworkStatus = PeerNetworkStatus(peerWithInfo.peer, isBlacklisted = blacklist.isBlacklisted(peerId))
+        (peerNetworkStatus, peerWithInfo.peerInfo)
+      }
+      ctx.log.debug(s"Handshaked peers status (number of peers: ${handshakedPeersStatus.size}): $handshakedPeersStatus")
+    }
+  }
+
+  // ---- Public API (unchanged from Classic) ----
 
   type Requesters = Map[ActorRef, ActorRef]
 
@@ -441,7 +566,7 @@ object PeersClient {
 
   def bestPeer(
       peersToDownloadFrom: Map[PeerId, PeerWithInfo],
-      log: org.apache.pekko.event.LoggingAdapter
+      log: Logger
   ): Option[Peer] = {
     log.debug("Evaluating {} peers to find best peer", peersToDownloadFrom.size)
 
