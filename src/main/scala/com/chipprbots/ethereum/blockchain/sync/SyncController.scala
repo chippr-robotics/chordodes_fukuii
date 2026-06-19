@@ -404,6 +404,9 @@ object SyncController {
           log.info("SNAP<->Fast cycle count: {}", snapFastCycleCount)
           checkSnapFastEscapeHatch().getOrElse(startSnapSync())
 
+        case other if isInternalMarker(other) =>
+          // Late self/death-watch marker for a child stopped before this transition — drop silently.
+          Behaviors.same
         case other =>
           fastSync.tell(other, ctx.toClassic.sender())
           Behaviors.same
@@ -590,6 +593,9 @@ object SyncController {
           healingServeRootRequester = None
           Behaviors.same
 
+        case msg if isInternalMarker(msg) =>
+          // Late self/death-watch marker for a child stopped before this transition — drop silently.
+          Behaviors.same
         case msg =>
           snapSync.tell(msg, ctx.toClassic.sender())
           Behaviors.same
@@ -766,6 +772,9 @@ object SyncController {
           }
           Behaviors.same
 
+        case msg if isInternalMarker(msg) =>
+          // Late self/death-watch marker for a child stopped before this transition — drop silently.
+          Behaviors.same
         case msg =>
           regularSync.tell(msg, ctx.toClassic.sender())
           Behaviors.same
@@ -821,6 +830,25 @@ object SyncController {
       case _                                => false
     }
 
+    /** Internal `Behavior[Any]` self / death-watch markers that must NEVER be forwarded to a Classic child. A watched
+      * child can terminate after the parent has already transitioned to a state that does not handle its marker (e.g.
+      * `RegularSyncStuck` poison-pills regularSync and enters `runningSnapSync`); the late `RegularSyncTerminated`
+      * then lands in `runningSnapSync`'s catch-all. Without this guard it would be `tell`-forwarded to the SNAP child
+      * and crash it with a ClassCastException. Every forwarding catch-all drops these silently.
+      */
+    private def isInternalMarker(msg: Any): Boolean = msg match {
+      case _: SnapSyncTerminated         => true
+      case _: RegularSyncTerminated      => true
+      case _: ResumerTerminated          => true
+      case _: BytecodeRecoveryTerminated => true
+      case _: StorageRecoveryTerminated  => true
+      case RestartFastSyncNow            => true
+      case PollRecoveryPeers             => true
+      case _: RecentRootTimeout          => true
+      case _: HealingServeRootTimeout    => true
+      case _                             => false
+    }
+
     def runningRegularSyncBootstrap(
         regularSync: ActorRef,
         targetBlock: BigInt,
@@ -864,6 +892,9 @@ object SyncController {
           regularSync.tell(SyncProtocol.GetStatus, ctx.toClassic.sender())
           Behaviors.same
 
+        case other if isInternalMarker(other) =>
+          // Late self/death-watch marker for a child stopped before this transition — drop silently.
+          Behaviors.same
         case other =>
           regularSync.tell(other, ctx.toClassic.sender())
           Behaviors.same
@@ -989,6 +1020,9 @@ object SyncController {
           ctx.toClassic.sender() ! SNAPSyncController.HealingServeRoot(0, None)
           Behaviors.same
 
+        case msg if isInternalMarker(msg) =>
+          // Late self/death-watch marker for a child stopped before this transition — drop silently.
+          Behaviors.same
         case msg =>
           // Forward coordinator and protocol messages to SNAP sync during the brief bootstrap.
           // This keeps coordinators functional while we fetch the pivot header (~1-5 seconds).
@@ -1905,6 +1939,9 @@ object SyncController {
             runningRecovery(bytecodeActor, storageActor = None, bytecodeComplete, storageComplete = true)
           }
 
+        case msg if isInternalMarker(msg) =>
+          // Late self/death-watch marker for a child stopped before this transition — drop silently.
+          Behaviors.same
         case msg =>
           // Forward SNAP protocol responses to both active recovery actors
           bytecodeActor.foreach(_.tell(msg, ctx.toClassic.sender()))
