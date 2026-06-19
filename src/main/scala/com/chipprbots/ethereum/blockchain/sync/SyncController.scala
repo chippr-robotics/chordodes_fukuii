@@ -1,13 +1,13 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import org.apache.pekko.actor.Actor
-import org.apache.pekko.actor.ActorLogging
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.PoisonPill
-import org.apache.pekko.actor.Props
 import org.apache.pekko.actor.Scheduler
-import org.apache.pekko.actor.Terminated
+import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.DispatcherSelector
+import org.apache.pekko.actor.typed.scaladsl.ActorContext
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
@@ -41,33 +41,25 @@ import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
-class SyncController(
-    blockchain: Blockchain,
-    blockchainReader: BlockchainReader,
-    blockchainWriter: BlockchainWriter,
-    appStateStorage: AppStateStorage,
-    blockNumberMappingStorage: BlockNumberMappingStorage,
-    evmCodeStorage: EvmCodeStorage,
-    stateStorage: StateStorage,
-    nodeStorage: NodeStorage,
-    flatSlotStorage: FlatSlotStorage,
-    fastSyncStateStorage: FastSyncStateStorage,
-    consensus: ConsensusAdapter,
-    validators: Validators,
-    peerEventBus: ActorRef,
-    pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
-      com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
-    ],
-    ommersPool: org.apache.pekko.actor.typed.ActorRef[com.chipprbots.ethereum.ommers.OmmersPool.Command],
-    networkPeerManager: ActorRef,
-    blacklist: Blacklist,
-    syncConfig: SyncConfig,
-    configBuilder: BlockchainConfigBuilder,
-    messConfig: Option[MESSConfig] = None,
-    forkChoiceManagerOpt: Option[ForkChoiceManager] = None,
-    externalSchedulerOpt: Option[Scheduler] = None
-) extends Actor
-    with ActorLogging {
+/** Top-level sync orchestrator.
+  *
+  * Pekko Typed migration (Group ROOT): converted to a Typed actor whose behavior type is `Behavior[Any]`. The `Any`
+  * domain is forced — `SyncController` is the central hub that receives heterogeneous raw Classic case classes from
+  * many still-Classic senders: `NetworkPeerManagerActor` (`HandshakedPeers`, `CalibrateChainWeightFromPeer`),
+  * `ForkChoiceManager` (`BeaconHead` via its Classic `setListener(ActorRef)` callback), the JSON-RPC layer (Classic
+  * `askFor[SyncProtocol.Status](SyncProtocol.GetStatus)`), and its children (`SNAPSyncController`, the recovery
+  * actors, `ChainDownloader`, the Classic `FastSync` / `RegularSync` / `PeersClient` / `PivotHeaderBootstrap`). It also
+  * `forward`s arbitrary messages to those children. Replies to a Classic ask go out via `ctx.toClassic.sender()` (same
+  * idiom as `RegularSync`); `forward` becomes `child.tell(msg, ctx.toClassic.sender())`.
+  *
+  * Each former `context.become(stateX)` becomes a named `Behavior[Any]` factory method on `Impl`. Stored-sender slots
+  * (`healingServeRootRequester`, `recentRootRequester`) capture the Classic `ctx.toClassic.sender()` and reply later.
+  * Timers (`RestartFastSyncNow`, `PollRecoveryPeers`, recent-root / healing-serve-root timeouts, TD calibration) move
+  * to a `TimerScheduler`. `PivotHeaderBootstrap` (now Typed) is spawned via `ctx.spawn`; the remaining Classic children
+  * are spawned via `ctx.toClassic.actorOf`. The Classic `OQ-5` ask path (`SyncProtocol.GetStatus`) is preserved as-is:
+  * `syncController` stays a Classic `ActorRef` to all callers via the `.toClassic` bridge until CAPSTONE flips the root.
+  */
+object SyncController {
 
   private case object RestartFastSyncNow
   private case object PollRecoveryPeers
@@ -77,7 +69,111 @@ class SyncController(
   // from RecentRootTimeout so the healing serve-root request never contends with storage recovery's requester.
   private case class HealingServeRootTimeout(generation: Int)
 
-  // Generation counters for actor names to prevent Pekko name collisions
+  // Death-watch markers (replace Classic `context.watch` + `Terminated(ref)`). Each watched child gets a distinct
+  // marker carrying its Classic ref so the handler can match the specific child that died.
+  private case class SnapSyncTerminated(ref: ActorRef)
+  private case class RegularSyncTerminated(ref: ActorRef)
+  private case class ResumerTerminated(ref: ActorRef)
+  private case class BytecodeRecoveryTerminated(ref: ActorRef)
+  private case class StorageRecoveryTerminated(ref: ActorRef)
+
+  // scalastyle:off parameter.number
+  def apply(
+      blockchain: Blockchain,
+      blockchainReader: BlockchainReader,
+      blockchainWriter: BlockchainWriter,
+      appStateStorage: AppStateStorage,
+      blockNumberMappingStorage: BlockNumberMappingStorage,
+      evmCodeStorage: EvmCodeStorage,
+      stateStorage: StateStorage,
+      nodeStorage: NodeStorage,
+      flatSlotStorage: FlatSlotStorage,
+      fastSyncStateStorage: FastSyncStateStorage,
+      consensus: ConsensusAdapter,
+      validators: Validators,
+      peerEventBus: ActorRef,
+      pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
+        com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
+      ],
+      ommersPool: org.apache.pekko.actor.typed.ActorRef[com.chipprbots.ethereum.ommers.OmmersPool.Command],
+      networkPeerManager: ActorRef,
+      blacklist: Blacklist,
+      syncConfig: SyncConfig,
+      configBuilder: BlockchainConfigBuilder,
+      messConfig: Option[MESSConfig] = None,
+      forkChoiceManagerOpt: Option[ForkChoiceManager] = None,
+      externalSchedulerOpt: Option[Scheduler] = None
+  ): Behavior[Any] =
+    Behaviors.setup { ctx =>
+      Behaviors.withTimers { timers =>
+        val impl = new Impl(
+          ctx,
+          timers,
+          blockchain,
+          blockchainReader,
+          blockchainWriter,
+          appStateStorage,
+          blockNumberMappingStorage,
+          evmCodeStorage,
+          stateStorage,
+          nodeStorage,
+          flatSlotStorage,
+          fastSyncStateStorage,
+          consensus,
+          validators,
+          peerEventBus,
+          pendingTransactionsManager,
+          ommersPool,
+          networkPeerManager,
+          blacklist,
+          syncConfig,
+          configBuilder,
+          messConfig,
+          forkChoiceManagerOpt,
+          externalSchedulerOpt
+        )
+        impl.setup()
+        impl.withPostStop(impl.idle())
+      }
+    }
+  // scalastyle:on parameter.number
+
+  // scalastyle:off number.of.methods
+  // scalastyle:off parameter.number
+  private class Impl(
+      ctx: ActorContext[Any],
+      timers: TimerScheduler[Any],
+      blockchain: Blockchain,
+      blockchainReader: BlockchainReader,
+      blockchainWriter: BlockchainWriter,
+      appStateStorage: AppStateStorage,
+      blockNumberMappingStorage: BlockNumberMappingStorage,
+      evmCodeStorage: EvmCodeStorage,
+      stateStorage: StateStorage,
+      nodeStorage: NodeStorage,
+      flatSlotStorage: FlatSlotStorage,
+      fastSyncStateStorage: FastSyncStateStorage,
+      consensus: ConsensusAdapter,
+      validators: Validators,
+      peerEventBus: ActorRef,
+      pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
+        com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
+      ],
+      ommersPool: org.apache.pekko.actor.typed.ActorRef[com.chipprbots.ethereum.ommers.OmmersPool.Command],
+      networkPeerManager: ActorRef,
+      blacklist: Blacklist,
+      syncConfig: SyncConfig,
+      configBuilder: BlockchainConfigBuilder,
+      messConfig: Option[MESSConfig],
+      forkChoiceManagerOpt: Option[ForkChoiceManager],
+      externalSchedulerOpt: Option[Scheduler]
+  ) {
+    // scalastyle:on parameter.number
+
+    // Plain SLF4J logger (safe from any thread — used inside scheduled callbacks below).
+    private val log = org.slf4j.LoggerFactory.getLogger(getClass)
+
+    // Generation counters for actor names to prevent Pekko name collisions
   // (context.stop is async — new actors can race with still-stopping ones).
   private var bootstrapGeneration: Long = 0
   private var syncGeneration: Long = 0
@@ -128,318 +224,375 @@ class SyncController(
   @annotation.unused
   private var networkBestTD: BigInt = BigInt(0) // last peerTD pushed by NPA
 
-  override def preStart(): Unit = {
-    super.preStart()
-    if clPivotEnabled then {
-      forkChoiceManagerOpt.foreach { fcm =>
-        fcm.setListener(self)
+    /** Construction-time side effects (former `preStart`). */
+    def setup(): Unit =
+      if clPivotEnabled then {
+        forkChoiceManagerOpt.foreach { fcm =>
+          // ForkChoiceManager.setListener takes a Classic ActorRef; bridge ctx.self.
+          fcm.setListener(ctx.self.toClassic)
+          log.info(
+            "Registered SyncController as ForkChoiceManager listener (post-merge chain TTD={}); " +
+              "SNAP pivot will be CL-driven once first forkchoiceUpdated arrives.",
+            configBuilder.blockchainConfig.terminalTotalDifficulty.get
+          )
+        }
+      }
+
+    /** Former `postStop`. Attached as a `PostStop` signal handler on every behavior via `withPostStop`. */
+    private def onPostStop(): Unit =
+      forkChoiceManagerOpt.foreach(_.clearListener())
+
+    /** Wrap a behavior with the shared `PostStop` cleanup so listener deregistration runs from every state. */
+    def withPostStop(b: Behavior[Any]): Behavior[Any] =
+      Behaviors.intercept(() =>
+        new org.apache.pekko.actor.typed.BehaviorInterceptor[Any, Any]() {
+          override def aroundReceive(
+              c: org.apache.pekko.actor.typed.TypedActorContext[Any],
+              msg: Any,
+              target: org.apache.pekko.actor.typed.BehaviorInterceptor.ReceiveTarget[Any]
+          ): Behavior[Any] = target(c, msg)
+          override def aroundSignal(
+              c: org.apache.pekko.actor.typed.TypedActorContext[Any],
+              signal: org.apache.pekko.actor.typed.Signal,
+              target: org.apache.pekko.actor.typed.BehaviorInterceptor.SignalTarget[Any]
+          ): Behavior[Any] = {
+            signal match {
+              case org.apache.pekko.actor.typed.PostStop => onPostStop()
+              case _                                     => ()
+            }
+            target(c, signal)
+          }
+        }
+      )(b)
+
+    private def stopSyncChildren(): Unit = {
+      // Stop all sync-related child actors. Names may have generation suffixes
+      // (e.g. "fast-sync-3") because PoisonPill is async and a new actor can
+      // race with a still-stopping one.
+      val prefixes = Seq(
+        "fast-sync",
+        "regular-sync",
+        "peers-client",
+        "snap-sync"
+      )
+      ctx.children
+        .filter { child =>
+          val n = child.path.name
+          prefixes.exists(p => n == p || n.startsWith(s"$p-"))
+        }
+        .foreach(c => ctx.stop(c))
+
+      // Stop any generation-numbered bootstrap children
+      ctx.children
+        .filter { child =>
+          val n = child.path.name
+          n.startsWith("peers-client-bootstrap") || n.startsWith("pivot-header-bootstrap")
+        }
+        .foreach(c => ctx.stop(c))
+
+      // Ensure snap-sync routing is not left pointing at a dead actor.
+      networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterSnapSyncController(
+        ctx.system.classicSystem.deadLetters
+      )
+    }
+
+    private def handleResetFastSync(replyTo: ActorRef): Unit = {
+      log.warn("ResetFastSync requested: clearing persisted fast-sync markers")
+      appStateStorage.clearFastSyncDone().commit()
+      fastSyncStateStorage.purge()
+      replyTo ! SyncProtocol.ResetFastSyncResponse(reset = true)
+    }
+
+    private def handleRestartFastSync(replyTo: ActorRef): Unit = {
+      val nowMillis = System.currentTimeMillis()
+      val cooldownUntil = appStateStorage.getFastSyncCooldownUntilMillis()
+
+      if cooldownUntil > nowMillis then {
+        val delay = (cooldownUntil - nowMillis).millis
+        log.warn(
+          "RestartFastSync requested but circuit-breaker is open (cool-off {} remaining); scheduling restart",
+          delay
+        )
+        timers.startSingleTimer(RestartFastSyncNow, delay)
+        replyTo ! SyncProtocol.RestartFastSyncResponse(started = false, cooldownUntilMillis = cooldownUntil)
+      } else {
+        ctx.self ! RestartFastSyncNow
+        replyTo ! SyncProtocol.RestartFastSyncResponse(started = true, cooldownUntilMillis = nowMillis)
+      }
+    }
+
+    private def doRestartFastSyncNow(): Behavior[Any] = {
+      val nowMillis = System.currentTimeMillis()
+      val cooldownUntil = nowMillis + syncConfig.fastSyncRestartCooloff.toMillis
+
+      log.warn(
+        "Restarting fast sync now (cool-off {}); stopping current sync actors and clearing fast-sync markers",
+        syncConfig.fastSyncRestartCooloff
+      )
+
+      // spec 004 MUST-FIX: this is reachable from runningSnapSync (RestartFastSyncNow). Clear the healing serve-root
+      // latch before we tear down sync children and become(runningFastSync), so no stale requester/bootstrap lingers.
+      abortHealingServeRootRequest("restart fast sync — leaving snap sync")
+      stopSyncChildren()
+      appStateStorage.clearFastSyncDone().and(appStateStorage.putFastSyncCooldownUntilMillis(cooldownUntil)).commit()
+      fastSyncStateStorage.purge()
+
+      startFastSync()
+    }
+
+    /** Classic scheduler retained for the few inline `scheduleOnce` callbacks that fire a Classic tell to a Classic
+      * collaborator (`networkPeerManager`) rather than a self-Command. Self-Command timers use `timers`.
+      */
+    def scheduler: Scheduler = externalSchedulerOpt.getOrElse(ctx.system.classicSystem.scheduler)
+
+    /** Load SNAP sync configuration with fallback to defaults */
+    private def loadSnapSyncConfig(): SNAPSyncConfig =
+      try
+        SNAPSyncConfig.fromConfig(Config.config.getConfig("sync"))
+      catch {
+        case e: Exception =>
+          log.warn(s"Failed to load SNAP sync config, using defaults: ${e.getMessage}")
+          SNAPSyncConfig()
+      }
+
+  def idle(): Behavior[Any] = Behaviors.receive { (_, msg) =>
+    msg match {
+      case SyncProtocol.Start =>
+        start()
+      case SyncProtocol.ResetFastSync =>
+        handleResetFastSync(ctx.toClassic.sender())
+        Behaviors.same
+      case SyncProtocol.RestartFastSync =>
+        handleRestartFastSync(ctx.toClassic.sender())
+        Behaviors.same
+      case RestartFastSyncNow =>
+        doRestartFastSyncNow()
+      case bh: ForkChoiceManager.BeaconHead =>
+        // Buffer for the eventual SNAP startup; idle predates startSnapSync().
+        handleBeaconHead(bh, snapSyncOpt = None)
+        Behaviors.same
+      case _ => Behaviors.unhandled
+    }
+  }
+
+  def runningFastSync(fastSync: ActorRef): Behavior[Any] = Behaviors.receive { (_, msg) =>
+    msg match {
+      case SyncProtocol.ResetFastSync =>
+        handleResetFastSync(ctx.toClassic.sender())
+        Behaviors.same
+      case SyncProtocol.RestartFastSync =>
+        handleRestartFastSync(ctx.toClassic.sender())
+        Behaviors.same
+      case RestartFastSyncNow =>
+        doRestartFastSyncNow()
+      case FastSync.Done =>
+        fastSync ! PoisonPill
+
+        // Open circuit-breaker for a cool-off period before allowing another fast-sync restart.
+        val cooldownUntil = System.currentTimeMillis() + syncConfig.fastSyncRestartCooloff.toMillis
+        appStateStorage.putFastSyncCooldownUntilMillis(cooldownUntil).commit()
+
+        resetSnapFastCycleCount()
+        startRegularSync()._2
+
+      case FastSync.FallbackToSnapSync =>
+        fastSync ! PoisonPill
+        log.warn("Fast sync detected ETH68-only network (no GetNodeData support), falling back to SNAP sync")
+        snapFastCycleCount += 1
+        appStateStorage.putSnapFastCycleCount(snapFastCycleCount).commit()
+        log.info("SNAP<->Fast cycle count: {}", snapFastCycleCount)
+        checkSnapFastEscapeHatch().getOrElse(startSnapSync())
+
+      case other =>
+        fastSync.tell(other, ctx.toClassic.sender())
+        Behaviors.same
+    }
+  }
+
+  def runningSnapSync(snapSync: ActorRef): Behavior[Any] = Behaviors.receive { (_, msg) =>
+    msg match {
+      case SyncProtocol.ResetFastSync =>
+        handleResetFastSync(ctx.toClassic.sender())
+        Behaviors.same
+      case SyncProtocol.RestartFastSync =>
+        handleRestartFastSync(ctx.toClassic.sender())
+        Behaviors.same
+      case RestartFastSyncNow =>
+        doRestartFastSyncNow()
+      case StartRegularSyncBootstrap(targetBlock) =>
+        log.info(s"SNAP sync requested bootstrap to pivot ${targetBlock}")
+
+        // Prefer a header-only bootstrap: SNAP only needs the pivot header (stateRoot).
+        bootstrapGeneration += 1
+        val gen = bootstrapGeneration
+        val peersClient =
+          ctx.toClassic.actorOf(
+            PeersClient.props(networkPeerManager, peerEventBus, blacklist, syncConfig, scheduler),
+            s"peers-client-bootstrap-$gen"
+          )
+        val headerBootstrap =
+          ctx
+            .spawn(
+              PivotHeaderBootstrap(
+                peersClient,
+                blockchainWriter,
+                targetBlock,
+                replyTo = ctx.self.toClassic,
+                syncConfig,
+                preferSnapPeers = true
+              ),
+              s"pivot-header-bootstrap-$gen"
+            )
+            .toClassic
+
+        // spec 004 MUST-FIX: clear any in-flight healing serve-root request as part of the transition so no healing
+        // bootstrap survives into runningPivotHeaderBootstrap (where its Completed/Failed/Timeout would dead-letter).
+        abortHealingServeRootRequest("entering pivot header bootstrap")
+        runningPivotHeaderBootstrap(peersClient, headerBootstrap, targetBlock, snapSync)
+
+      case StartRegularSyncBootstrapByHash(headHash) =>
+        // CL-driven bootstrap path (#1207): fetch the head header by hash from peers.
+        // The block number isn't known until the header arrives.
         log.info(
-          "Registered SyncController as ForkChoiceManager listener (post-merge chain TTD={}); " +
-            "SNAP pivot will be CL-driven once first forkchoiceUpdated arrives.",
-          configBuilder.blockchainConfig.terminalTotalDifficulty.get
+          "SNAP requested by-hash pivot header bootstrap for {}",
+          com.chipprbots.ethereum.utils.ByteStringUtils.hash2string(headHash)
         )
-      }
-    }
-  }
-
-  override def postStop(): Unit = {
-    forkChoiceManagerOpt.foreach(_.clearListener())
-    super.postStop()
-  }
-
-  private def stopSyncChildren(): Unit = {
-    // Stop all sync-related child actors. Names may have generation suffixes
-    // (e.g. "fast-sync-3") because PoisonPill is async and a new actor can
-    // race with a still-stopping one.
-    val prefixes = Seq(
-      "fast-sync",
-      "regular-sync",
-      "peers-client",
-      "snap-sync"
-    )
-    context.children
-      .filter { child =>
-        val n = child.path.name
-        prefixes.exists(p => n == p || n.startsWith(s"$p-"))
-      }
-      .foreach(_ ! PoisonPill)
-
-    // Stop any generation-numbered bootstrap children
-    context.children
-      .filter { child =>
-        val n = child.path.name
-        n.startsWith("peers-client-bootstrap") || n.startsWith("pivot-header-bootstrap")
-      }
-      .foreach(_ ! PoisonPill)
-
-    // Ensure snap-sync routing is not left pointing at a dead actor.
-    networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterSnapSyncController(
-      context.system.deadLetters
-    )
-  }
-
-  private def handleResetFastSync(): Unit = {
-    log.warning("ResetFastSync requested: clearing persisted fast-sync markers")
-    appStateStorage.clearFastSyncDone().commit()
-    fastSyncStateStorage.purge()
-    sender() ! SyncProtocol.ResetFastSyncResponse(reset = true)
-  }
-
-  private def handleRestartFastSync(): Unit = {
-    val nowMillis = System.currentTimeMillis()
-    val cooldownUntil = appStateStorage.getFastSyncCooldownUntilMillis()
-
-    if cooldownUntil > nowMillis then {
-      val delay = (cooldownUntil - nowMillis).millis
-      log.warning(
-        "RestartFastSync requested but circuit-breaker is open (cool-off {} remaining); scheduling restart",
-        delay
-      )
-      scheduler.scheduleOnce(delay, self, RestartFastSyncNow)
-      sender() ! SyncProtocol.RestartFastSyncResponse(started = false, cooldownUntilMillis = cooldownUntil)
-    } else {
-      self ! RestartFastSyncNow
-      sender() ! SyncProtocol.RestartFastSyncResponse(started = true, cooldownUntilMillis = nowMillis)
-    }
-  }
-
-  private def doRestartFastSyncNow(): Unit = {
-    val nowMillis = System.currentTimeMillis()
-    val cooldownUntil = nowMillis + syncConfig.fastSyncRestartCooloff.toMillis
-
-    log.warning(
-      "Restarting fast sync now (cool-off {}); stopping current sync actors and clearing fast-sync markers",
-      syncConfig.fastSyncRestartCooloff
-    )
-
-    // spec 004 MUST-FIX: this is reachable from runningSnapSync (RestartFastSyncNow). Clear the healing serve-root
-    // latch before we tear down sync children and become(runningFastSync), so no stale requester/bootstrap lingers.
-    abortHealingServeRootRequest("restart fast sync — leaving snap sync")
-    stopSyncChildren()
-    appStateStorage.clearFastSyncDone().and(appStateStorage.putFastSyncCooldownUntilMillis(cooldownUntil)).commit()
-    fastSyncStateStorage.purge()
-
-    startFastSync()
-  }
-
-  def scheduler: Scheduler = externalSchedulerOpt.getOrElse(context.system.scheduler)
-
-  /** Load SNAP sync configuration with fallback to defaults */
-  private def loadSnapSyncConfig(): SNAPSyncConfig =
-    try
-      SNAPSyncConfig.fromConfig(Config.config.getConfig("sync"))
-    catch {
-      case e: Exception =>
-        log.warning(s"Failed to load SNAP sync config, using defaults: ${e.getMessage}")
-        SNAPSyncConfig()
-    }
-
-  override def receive: Receive = idle
-
-  def idle: Receive = {
-    case SyncProtocol.Start =>
-      start()
-    case SyncProtocol.ResetFastSync =>
-      handleResetFastSync()
-    case SyncProtocol.RestartFastSync =>
-      handleRestartFastSync()
-    case RestartFastSyncNow =>
-      doRestartFastSyncNow()
-    case bh: ForkChoiceManager.BeaconHead =>
-      // Buffer for the eventual SNAP startup; idle predates startSnapSync().
-      handleBeaconHead(bh, snapSyncOpt = None)
-  }
-
-  def runningFastSync(fastSync: ActorRef): Receive = {
-    case SyncProtocol.ResetFastSync =>
-      handleResetFastSync()
-    case SyncProtocol.RestartFastSync =>
-      handleRestartFastSync()
-    case RestartFastSyncNow =>
-      doRestartFastSyncNow()
-    case FastSync.Done =>
-      fastSync ! PoisonPill
-
-      // Open circuit-breaker for a cool-off period before allowing another fast-sync restart.
-      val cooldownUntil = System.currentTimeMillis() + syncConfig.fastSyncRestartCooloff.toMillis
-      appStateStorage.putFastSyncCooldownUntilMillis(cooldownUntil).commit()
-
-      resetSnapFastCycleCount()
-      startRegularSync()
-
-    case FastSync.FallbackToSnapSync =>
-      fastSync ! PoisonPill
-      log.warning("Fast sync detected ETH68-only network (no GetNodeData support), falling back to SNAP sync")
-      snapFastCycleCount += 1
-      appStateStorage.putSnapFastCycleCount(snapFastCycleCount).commit()
-      log.info("SNAP<->Fast cycle count: {}", snapFastCycleCount)
-      if !checkSnapFastEscapeHatch() then {
-        startSnapSync()
-      }
-
-    case other => fastSync.forward(other)
-  }
-
-  def runningSnapSync(snapSync: ActorRef): Receive = {
-    case SyncProtocol.ResetFastSync =>
-      handleResetFastSync()
-    case SyncProtocol.RestartFastSync =>
-      handleRestartFastSync()
-    case RestartFastSyncNow =>
-      doRestartFastSyncNow()
-    case StartRegularSyncBootstrap(targetBlock) =>
-      log.info(s"SNAP sync requested bootstrap to pivot ${targetBlock}")
-
-      // Prefer a header-only bootstrap: SNAP only needs the pivot header (stateRoot).
-      bootstrapGeneration += 1
-      val gen = bootstrapGeneration
-      val peersClient =
-        context.actorOf(
-          PeersClient.props(networkPeerManager, peerEventBus, blacklist, syncConfig, scheduler),
-          s"peers-client-bootstrap-$gen"
-        )
-      val headerBootstrap =
-        context.actorOf(
-          PivotHeaderBootstrap
-            .props(peersClient, blockchainWriter, targetBlock, syncConfig, scheduler, preferSnapPeers = true),
-          s"pivot-header-bootstrap-$gen"
-        )
-
-      // spec 004 MUST-FIX: clear any in-flight healing serve-root request as part of the transition so no healing
-      // bootstrap survives into runningPivotHeaderBootstrap (where its Completed/Failed/Timeout would dead-letter).
-      abortHealingServeRootRequest("entering pivot header bootstrap")
-      context.become(runningPivotHeaderBootstrap(peersClient, headerBootstrap, targetBlock, snapSync))
-
-    case StartRegularSyncBootstrapByHash(headHash) =>
-      // CL-driven bootstrap path (#1207): fetch the head header by hash from peers.
-      // The block number isn't known until the header arrives.
-      log.info(
-        "SNAP requested by-hash pivot header bootstrap for {}",
-        com.chipprbots.ethereum.utils.ByteStringUtils.hash2string(headHash)
-      )
-      bootstrapGeneration += 1
-      val gen = bootstrapGeneration
-      val peersClient =
-        context.actorOf(
-          PeersClient.props(networkPeerManager, peerEventBus, blacklist, syncConfig, scheduler),
-          s"peers-client-bootstrap-$gen"
-        )
-      val headerBootstrap =
-        context.actorOf(
-          PivotHeaderBootstrap
-            .propsByHash(peersClient, blockchainWriter, headHash, syncConfig, scheduler, preferSnapPeers = false),
-          s"pivot-header-bootstrap-$gen"
-        )
-      // We pass `targetBlock = 0` as a placeholder — the bootstrap reply carries the
-      // resolved `header.number`. The runningPivotHeaderBootstrap state's matching on
-      // `block == targetBlock` is bypassed in by-hash mode by using a wildcard handler;
-      // the resolved Completed.targetBlock is preserved when handed to SNAP via
-      // BootstrapComplete.
-      // spec 004 MUST-FIX: abort any in-flight healing serve-root request BEFORE entering the by-hash bootstrap.
-      // With targetBlock == 0 the bootstrap's `Completed` guard accepts ANY block, so a stray healing `Completed`
-      // could otherwise be mis-consumed as the pivot header. Clearing here also prevents the dead-letter wedge.
-      abortHealingServeRootRequest("entering by-hash pivot header bootstrap")
-      context.become(
+        bootstrapGeneration += 1
+        val gen = bootstrapGeneration
+        val peersClient =
+          ctx.toClassic.actorOf(
+            PeersClient.props(networkPeerManager, peerEventBus, blacklist, syncConfig, scheduler),
+            s"peers-client-bootstrap-$gen"
+          )
+        val headerBootstrap =
+          ctx
+            .spawn(
+              PivotHeaderBootstrap.applyByHash(
+                peersClient,
+                blockchainWriter,
+                headHash,
+                replyTo = ctx.self.toClassic,
+                syncConfig,
+                preferSnapPeers = false
+              ),
+              s"pivot-header-bootstrap-$gen"
+            )
+            .toClassic
+        // We pass `targetBlock = 0` as a placeholder — the bootstrap reply carries the
+        // resolved `header.number`. The runningPivotHeaderBootstrap state's matching on
+        // `block == targetBlock` is bypassed in by-hash mode by using a wildcard handler;
+        // the resolved Completed.targetBlock is preserved when handed to SNAP via
+        // BootstrapComplete.
+        // spec 004 MUST-FIX: abort any in-flight healing serve-root request BEFORE entering the by-hash bootstrap.
+        // With targetBlock == 0 the bootstrap's `Completed` guard accepts ANY block, so a stray healing `Completed`
+        // could otherwise be mis-consumed as the pivot header. Clearing here also prevents the dead-letter wedge.
+        abortHealingServeRootRequest("entering by-hash pivot header bootstrap")
         runningPivotHeaderBootstrap(peersClient, headerBootstrap, targetBlock = BigInt(0), snapSync)
-      )
 
     case com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.SnapSyncFinalized(pivot) =>
       log.info(
         s"SNAP state finalised at pivot=$pivot. Starting regular sync; chain backfill continues in background."
       )
-      // spec 004 MUST-FIX: clear the healing serve-root latch on every exit from runningSnapSync.
-      abortHealingServeRootRequest("SNAP finalised — leaving snap sync")
-      resetSnapFastCycleCount()
-      // SNAPSyncController already owns the live ChainDownloader child via its
-      // `completedWithBackfill` state — don't spawn a duplicate standalone resumer (#1169).
-      val regularSync = startRegularSync(resumeBackfill = false)
-      context.watch(snapSync)
-      context.become(runningRegularSyncWithBackfill(regularSync, snapSync))
+        // spec 004 MUST-FIX: clear the healing serve-root latch on every exit from runningSnapSync.
+        abortHealingServeRootRequest("SNAP finalised — leaving snap sync")
+        resetSnapFastCycleCount()
+        // SNAPSyncController already owns the live ChainDownloader child via its
+        // `completedWithBackfill` state — don't spawn a duplicate standalone resumer (#1169).
+        val (regularSync, _) = startRegularSync(resumeBackfill = false)
+        ctx.watchWith(snapSync.toTyped[Nothing], SnapSyncTerminated(snapSync))
+        runningRegularSyncWithBackfill(regularSync, snapSync)
 
-    case com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.Done =>
-      // Defensive fallback: with the post-#1162 handshake, SnapSyncFinalized always precedes Done,
-      // so this branch should not normally be reached. If it is (e.g., unexpected message ordering),
-      // treat as a legacy "SNAP done" signal.
-      snapSync ! PoisonPill
-      log.info("SNAP sync completed (legacy Done path), transitioning to regular sync")
-      // spec 004 MUST-FIX: clear the healing serve-root latch on every exit from runningSnapSync.
-      abortHealingServeRootRequest("SNAP done (legacy) — leaving snap sync")
-      resetSnapFastCycleCount()
-      startRegularSync()
+      case com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.Done =>
+        // Defensive fallback: with the post-#1162 handshake, SnapSyncFinalized always precedes Done,
+        // so this branch should not normally be reached. If it is (e.g., unexpected message ordering),
+        // treat as a legacy "SNAP done" signal.
+        snapSync ! PoisonPill
+        log.info("SNAP sync completed (legacy Done path), transitioning to regular sync")
+        // spec 004 MUST-FIX: clear the healing serve-root latch on every exit from runningSnapSync.
+        abortHealingServeRootRequest("SNAP done (legacy) — leaving snap sync")
+        resetSnapFastCycleCount()
+        startRegularSync()._2
 
-    case com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.FallbackToFastSync =>
-      snapSync ! PoisonPill
-      log.warning("SNAP sync failed repeatedly, falling back to fast sync")
-      // spec 004 MUST-FIX: clear the healing serve-root latch on every exit from runningSnapSync.
-      abortHealingServeRootRequest("SNAP fallback to fast sync — leaving snap sync")
-      snapFastCycleCount += 1
-      appStateStorage.putSnapFastCycleCount(snapFastCycleCount).commit()
-      log.info("SNAP<->Fast cycle count: {}", snapFastCycleCount)
-      if !checkSnapFastEscapeHatch() then {
-        startFastSync()
-      }
+      case com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.FallbackToFastSync =>
+        snapSync ! PoisonPill
+        log.warn("SNAP sync failed repeatedly, falling back to fast sync")
+        // spec 004 MUST-FIX: clear the healing serve-root latch on every exit from runningSnapSync.
+        abortHealingServeRootRequest("SNAP fallback to fast sync — leaving snap sync")
+        snapFastCycleCount += 1
+        appStateStorage.putSnapFastCycleCount(snapFastCycleCount).commit()
+        log.info("SNAP<->Fast cycle count: {}", snapFastCycleCount)
+        checkSnapFastEscapeHatch().getOrElse(startFastSync())
 
-    case SyncProtocol.HealingImpossible =>
-      snapSync ! PoisonPill
-      log.warning(
-        "SNAP finalization aborted (state root mismatch). Clearing sync state and restarting SNAP with a fresh pivot."
-      )
-      // spec 004 MUST-FIX: clear the healing serve-root latch on every exit from runningSnapSync. The new SNAP
-      // actor started below gets a fresh latch, so the stale requester here must not linger.
-      abortHealingServeRootRequest("SNAP healing impossible — restarting snap sync")
-      appStateStorage.clearSnapSyncDone().commit()
-      appStateStorage.clearFastSyncDone().commit()
-      startSnapSync()
+      case SyncProtocol.HealingImpossible =>
+        snapSync ! PoisonPill
+        log.warn(
+          "SNAP finalization aborted (state root mismatch). Clearing sync state and restarting SNAP with a fresh pivot."
+        )
+        // spec 004 MUST-FIX: clear the healing serve-root latch on every exit from runningSnapSync. The new SNAP
+        // actor started below gets a fresh latch, so the stale requester here must not linger.
+        abortHealingServeRootRequest("SNAP healing impossible — restarting snap sync")
+        appStateStorage.clearSnapSyncDone().commit()
+        appStateStorage.clearFastSyncDone().commit()
+        startSnapSync()
 
-    case SyncProtocol.Status.Progress(_, _) =>
-      log.debug("SNAP sync in progress")
+      case SyncProtocol.Status.Progress(_, _) =>
+        log.debug("SNAP sync in progress")
+        Behaviors.same
 
-    case bh: ForkChoiceManager.BeaconHead =>
-      handleBeaconHead(bh, snapSyncOpt = Some(snapSync))
+      case bh: ForkChoiceManager.BeaconHead =>
+        handleBeaconHead(bh, snapSyncOpt = Some(snapSync))
+        Behaviors.same
 
-    // spec 004 (Decoupled Heal Serve-Root) T012: the healing coordinator (via SNAPSyncController) asks for a
-    // newest-servable root to fetch missing nodes against, while its completeness walk stays pinned to the walk
-    // root. Fetch a recent header via a DEDICATED bootstrap slot (never the storage-recovery `recentRootRequester`)
-    // and reply HealingServeRoot to the child. Run inline — no transition into the deadlock-prone bootstrap state.
-    case SNAPSyncController.RequestHealingServeRoot =>
-      if healingServeRootRequester.isEmpty && healingServeRootBootstrap.isEmpty then {
-        healingServeRootRequester = Some(sender())
-        log.info("[HEAL-SERVE-ROOT] Healing requested a newest-servable root. Polling peers for the network head.")
-        networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeers
-      } else {
-        log.debug("[HEAL-SERVE-ROOT] Healing serve-root request already in flight; ignoring duplicate.")
-      }
+      // spec 004 (Decoupled Heal Serve-Root) T012: the healing coordinator (via SNAPSyncController) asks for a
+      // newest-servable root to fetch missing nodes against, while its completeness walk stays pinned to the walk
+      // root. Fetch a recent header via a DEDICATED bootstrap slot (never the storage-recovery `recentRootRequester`)
+      // and reply HealingServeRoot to the child. Run inline — no transition into the deadlock-prone bootstrap state.
+      case SNAPSyncController.RequestHealingServeRoot =>
+        if healingServeRootRequester.isEmpty && healingServeRootBootstrap.isEmpty then {
+          healingServeRootRequester = Some(ctx.toClassic.sender())
+          log.info("[HEAL-SERVE-ROOT] Healing requested a newest-servable root. Polling peers for the network head.")
+          networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeers
+        } else {
+          log.debug("[HEAL-SERVE-ROOT] Healing serve-root request already in flight; ignoring duplicate.")
+        }
+        Behaviors.same
 
-    // Peer snapshot used both to feed snap peers and (if waiting) to start the healing serve-root bootstrap.
-    case com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers(peers)
-        if healingServeRootRequester.isDefined && healingServeRootBootstrap.isEmpty =>
-      maybeStartHealingServeRootBootstrap(peers)
+      // Peer snapshot used both to feed snap peers and (if waiting) to start the healing serve-root bootstrap.
+      case com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers(peers)
+          if healingServeRootRequester.isDefined && healingServeRootBootstrap.isEmpty =>
+        maybeStartHealingServeRootBootstrap(peers)
+        Behaviors.same
 
-    case PivotHeaderBootstrap.Completed(block, header) if healingServeRootRequester.isDefined =>
-      val rootHex = header.stateRoot.take(4).toArray.map("%02x".format(_)).mkString
-      log.info(s"[HEAL-SERVE-ROOT] Fetched header for block $block (root $rootHex). Replying to healing.")
-      stopHealingServeRootBootstrap()
-      healingServeRootRequester.foreach(
-        _ ! SNAPSyncController.HealingServeRoot(block, Some(header.stateRoot))
-      )
-      healingServeRootRequester = None
+      case PivotHeaderBootstrap.Completed(block, header) if healingServeRootRequester.isDefined =>
+        val rootHex = header.stateRoot.take(4).toArray.map("%02x".format(_)).mkString
+        log.info(s"[HEAL-SERVE-ROOT] Fetched header for block $block (root $rootHex). Replying to healing.")
+        stopHealingServeRootBootstrap()
+        healingServeRootRequester.foreach(
+          _ ! SNAPSyncController.HealingServeRoot(block, Some(header.stateRoot))
+        )
+        healingServeRootRequester = None
+        Behaviors.same
 
-    case PivotHeaderBootstrap.Failed(reason) if healingServeRootRequester.isDefined =>
-      log.warning(s"[HEAL-SERVE-ROOT] Serve-root bootstrap failed ($reason). Replying None (serve root kept).")
-      stopHealingServeRootBootstrap()
-      healingServeRootRequester.foreach(_ ! SNAPSyncController.HealingServeRoot(0, None))
-      healingServeRootRequester = None
+      case PivotHeaderBootstrap.Failed(reason) if healingServeRootRequester.isDefined =>
+        log.warn(s"[HEAL-SERVE-ROOT] Serve-root bootstrap failed ($reason). Replying None (serve root kept).")
+        stopHealingServeRootBootstrap()
+        healingServeRootRequester.foreach(_ ! SNAPSyncController.HealingServeRoot(0, None))
+        healingServeRootRequester = None
+        Behaviors.same
 
-    // spec 004 MUST-FIX: the guard (gen == healingServeRootGeneration && requester.isDefined) makes a late timeout a
-    // no-op after abortHealingServeRootRequest — abort clears the requester, and the next request bumps the generation.
-    case HealingServeRootTimeout(gen) if gen == healingServeRootGeneration && healingServeRootRequester.isDefined =>
-      log.warning("[HEAL-SERVE-ROOT] Serve-root bootstrap timed out. Replying None (serve root kept).")
-      stopHealingServeRootBootstrap()
-      healingServeRootRequester.foreach(_ ! SNAPSyncController.HealingServeRoot(0, None))
-      healingServeRootRequester = None
+      // spec 004 MUST-FIX: the guard (gen == healingServeRootGeneration && requester.isDefined) makes a late timeout a
+      // no-op after abortHealingServeRootRequest — abort clears the requester, and the next request bumps the generation.
+      case HealingServeRootTimeout(gen) if gen == healingServeRootGeneration && healingServeRootRequester.isDefined =>
+        log.warn("[HEAL-SERVE-ROOT] Serve-root bootstrap timed out. Replying None (serve root kept).")
+        stopHealingServeRootBootstrap()
+        healingServeRootRequester.foreach(_ ! SNAPSyncController.HealingServeRoot(0, None))
+        healingServeRootRequester = None
+        Behaviors.same
 
-    case msg =>
-      snapSync.forward(msg)
+      case msg =>
+        snapSync.tell(msg, ctx.toClassic.sender())
+        Behaviors.same
+    }
   }
 
   /** spec 004 T012: start a one-shot header bootstrap for a newest-servable block (margin back from the network head)
@@ -455,18 +608,26 @@ class SyncController(
       case Some(recentBlock) =>
         healingServeRootGeneration += 1
         val gen = healingServeRootGeneration
-        val peersClient = context.actorOf(
+        val peersClient = ctx.toClassic.actorOf(
           PeersClient.props(networkPeerManager, peerEventBus, blacklist, syncConfig, scheduler),
           s"healing-serve-root-peers-$gen"
         )
-        val bootstrap = context.actorOf(
-          PivotHeaderBootstrap
-            .props(peersClient, blockchainWriter, recentBlock, syncConfig, scheduler, preferSnapPeers = true),
-          s"healing-serve-root-bootstrap-$gen"
-        )
+        val bootstrap = ctx
+          .spawn(
+            PivotHeaderBootstrap(
+              peersClient,
+              blockchainWriter,
+              recentBlock,
+              replyTo = ctx.self.toClassic,
+              syncConfig,
+              preferSnapPeers = true
+            ),
+            s"healing-serve-root-bootstrap-$gen"
+          )
+          .toClassic
         healingServeRootBootstrap = Some((peersClient, bootstrap))
         log.info(s"[HEAL-SERVE-ROOT] Fetching header for newest-servable block $recentBlock.")
-        scheduler.scheduleOnce(20.seconds, self, HealingServeRootTimeout(gen))(context.dispatcher, self)
+        timers.startSingleTimer(HealingServeRootTimeout(gen), 20.seconds)
       case None =>
         log.info("[HEAL-SERVE-ROOT] No usable peer height yet; replying None (serve root kept).")
         healingServeRootRequester.foreach(_ ! SNAPSyncController.HealingServeRoot(0, None))
@@ -504,15 +665,25 @@ class SyncController(
       healingServeRootRequester = None
     }
 
-  def runningRegularSync(regularSync: ActorRef): Receive = { case other =>
+  def runningRegularSync(regularSync: ActorRef): Behavior[Any] = Behaviors.receive { (_, other) =>
+    handleRegularSyncMsg(regularSync, other)
+  }
+
+  /** Shared message handler for the regular-sync states. Returns the next `Behavior[Any]`. Extracted so the backfill
+    * variants can delegate to it after handling their own backfill-specific messages (former `runningRegularSync(...)
+    * .apply(msg)` Classic partial-function delegation).
+    */
+  private def handleRegularSyncMsg(regularSync: ActorRef, other: Any): Behavior[Any] =
     other match {
-      case Terminated(actor) if actor == regularSync =>
+      case RegularSyncTerminated(actor) if actor == regularSync =>
         log.error("RegularSync actor terminated unexpectedly — restarting regular sync.")
-        startRegularSync(resumeBackfill = false)
+        startRegularSync(resumeBackfill = false)._2
       case SyncProtocol.ResetFastSync =>
-        handleResetFastSync()
+        handleResetFastSync(ctx.toClassic.sender())
+        Behaviors.same
       case SyncProtocol.RestartFastSync =>
-        handleRestartFastSync()
+        handleRestartFastSync(ctx.toClassic.sender())
+        Behaviors.same
       case RestartFastSyncNow =>
         doRestartFastSyncNow()
       case SyncProtocol.RegularSyncStuck(blockNumber, missingHash) =>
@@ -587,11 +758,12 @@ class SyncController(
             scheduleTDCalibrationRetry()
           }
         }
+        Behaviors.same
 
       case msg =>
-        regularSync.forward(msg)
+        regularSync.tell(msg, ctx.toClassic.sender())
+        Behaviors.same
     }
-  }
 
   /** Receive used between `SnapSyncFinalized` and `Done` from the lingering SNAPSyncController.
     *
@@ -600,32 +772,35 @@ class SyncController(
     * so the lingering backfill actor is cleaned up before a new sync mode takes over. Everything else is delegated to
     * `runningRegularSync(regularSync)`.
     */
-  def runningRegularSyncWithBackfill(regularSync: ActorRef, snapSync: ActorRef): Receive = {
-    case com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.Done =>
-      log.info("SNAP background backfill complete; shutting down SNAPSyncController.")
-      context.unwatch(snapSync)
-      snapSync ! PoisonPill
-      context.become(runningRegularSync(regularSync))
+  def runningRegularSyncWithBackfill(regularSync: ActorRef, snapSync: ActorRef): Behavior[Any] =
+    Behaviors.receive { (_, msg) =>
+      msg match {
+        case com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.Done =>
+          log.info("SNAP background backfill complete; shutting down SNAPSyncController.")
+          ctx.unwatch(snapSync.toTyped[Nothing])
+          snapSync ! PoisonPill
+          runningRegularSync(regularSync)
 
-    case Terminated(actor) if actor == snapSync =>
-      log.warning("SNAPSyncController died while regular sync was running; chain backfill aborted.")
-      context.become(runningRegularSync(regularSync))
+        case SnapSyncTerminated(actor) if actor == snapSync =>
+          log.warn("SNAPSyncController died while regular sync was running; chain backfill aborted.")
+          runningRegularSync(regularSync)
 
-    case Terminated(actor) if actor == regularSync =>
-      log.error("RegularSync actor terminated unexpectedly during backfill — restarting regular sync.")
-      context.unwatch(snapSync)
-      snapSync ! PoisonPill
-      startRegularSync(resumeBackfill = false)
+        case RegularSyncTerminated(actor) if actor == regularSync =>
+          log.error("RegularSync actor terminated unexpectedly during backfill — restarting regular sync.")
+          ctx.unwatch(snapSync.toTyped[Nothing])
+          snapSync ! PoisonPill
+          startRegularSync(resumeBackfill = false)._2
 
-    case msg if isRestartTrigger(msg) =>
-      log.info("Restart triggered while SNAP backfill was running; poison-pilling SNAP backfill actor first.")
-      context.unwatch(snapSync)
-      snapSync ! PoisonPill
-      context.become(runningRegularSync(regularSync))
-      self ! msg // Re-deliver so the new state handles it.
+        case m if isRestartTrigger(m) =>
+          log.info("Restart triggered while SNAP backfill was running; poison-pilling SNAP backfill actor first.")
+          ctx.unwatch(snapSync.toTyped[Nothing])
+          snapSync ! PoisonPill
+          ctx.self ! m // Re-deliver so the new state handles it.
+          runningRegularSync(regularSync)
 
-    case msg =>
-      runningRegularSync(regularSync).apply(msg)
+        case m =>
+          handleRegularSyncMsg(regularSync, m)
+      }
   }
 
   /** Restart-style messages that mean the current sync strategy is being abandoned. Used by
@@ -643,43 +818,49 @@ class SyncController(
       regularSync: ActorRef,
       targetBlock: BigInt,
       originalSnapSyncRef: ActorRef
-  ): Receive = {
-    case SyncProtocol.ResetFastSync =>
-      handleResetFastSync()
-    case SyncProtocol.RestartFastSync =>
-      handleRestartFastSync()
-    case RestartFastSyncNow =>
-      doRestartFastSyncNow()
-    case RegularSync.ProgressProtocol.ImportedBlock(blockNumber, _) =>
-      log.debug(s"Bootstrap progress: block $blockNumber / $targetBlock")
+  ): Behavior[Any] = Behaviors.receive { (_, msg) =>
+    msg match {
+      case SyncProtocol.ResetFastSync =>
+        handleResetFastSync(ctx.toClassic.sender())
+        Behaviors.same
+      case SyncProtocol.RestartFastSync =>
+        handleRestartFastSync(ctx.toClassic.sender())
+        Behaviors.same
+      case RestartFastSyncNow =>
+        doRestartFastSyncNow()
+      case RegularSync.ProgressProtocol.ImportedBlock(blockNumber, _) =>
+        log.debug(s"Bootstrap progress: block $blockNumber / $targetBlock")
 
-      if blockNumber >= targetBlock then {
-        log.info(s"Bootstrap target ${targetBlock} reached - transitioning to SNAP sync")
+        if blockNumber >= targetBlock then {
+          log.info(s"Bootstrap target ${targetBlock} reached - transitioning to SNAP sync")
 
-        // Stop regular sync
-        regularSync ! PoisonPill
+          // Stop regular sync
+          regularSync ! PoisonPill
 
-        // Notify SNAP sync controller that bootstrap is complete, including the pivot header if available.
-        blockchainReader.getBlockHeaderByNumber(targetBlock) match {
-          case Some(header) =>
-            originalSnapSyncRef ! BootstrapComplete(Some(header))
-          case None =>
-            log.warning(
-              s"Bootstrap reached target $targetBlock but pivot header not found locally; notifying SNAP without header"
-            )
-            originalSnapSyncRef ! BootstrapComplete()
-        }
+          // Notify SNAP sync controller that bootstrap is complete, including the pivot header if available.
+          blockchainReader.getBlockHeaderByNumber(targetBlock) match {
+            case Some(header) =>
+              originalSnapSyncRef ! BootstrapComplete(Some(header))
+            case None =>
+              log.warn(
+                s"Bootstrap reached target $targetBlock but pivot header not found locally; notifying SNAP without header"
+              )
+              originalSnapSyncRef ! BootstrapComplete()
+          }
 
-        // Switch back to runningSnapSync state
-        context.become(runningSnapSync(originalSnapSyncRef))
-      }
+          // Switch back to runningSnapSync state
+          runningSnapSync(originalSnapSyncRef)
+        } else Behaviors.same
 
-    case SyncProtocol.GetStatus =>
-      // Forward status requests to regular sync
-      regularSync.forward(SyncProtocol.GetStatus)
+      case SyncProtocol.GetStatus =>
+        // Forward status requests to regular sync
+        regularSync.tell(SyncProtocol.GetStatus, ctx.toClassic.sender())
+        Behaviors.same
 
-    case other =>
-      regularSync.forward(other)
+      case other =>
+        regularSync.tell(other, ctx.toClassic.sender())
+        Behaviors.same
+    }
   }
 
   def runningPivotHeaderBootstrap(
@@ -687,114 +868,126 @@ class SyncController(
       headerBootstrap: ActorRef,
       targetBlock: BigInt,
       originalSnapSyncRef: ActorRef
-  ): Receive = {
-    case SyncProtocol.ResetFastSync =>
-      handleResetFastSync()
-    case SyncProtocol.RestartFastSync =>
-      handleRestartFastSync()
-    case RestartFastSyncNow =>
-      doRestartFastSyncNow()
+  ): Behavior[Any] = Behaviors.receive { (_, msg) =>
+    msg match {
+      case SyncProtocol.ResetFastSync =>
+        handleResetFastSync(ctx.toClassic.sender())
+        Behaviors.same
+      case SyncProtocol.RestartFastSync =>
+        handleRestartFastSync(ctx.toClassic.sender())
+        Behaviors.same
+      case RestartFastSyncNow =>
+        doRestartFastSyncNow()
 
-    case PivotHeaderBootstrap.Completed(block, header) if block == targetBlock || targetBlock == 0 =>
-      // `targetBlock == 0` is the sentinel for by-hash bootstrap (#1207): the actual
-      // block number is unknown at request time and resolved from the returned header.
-      log.info(
-        s"Pivot header bootstrap complete for block ${header.number} (requested $targetBlock) - notifying SNAP sync"
-      )
-      headerBootstrap ! PoisonPill
-      peersClient ! PoisonPill
-      originalSnapSyncRef ! BootstrapComplete(Some(header))
-      context.become(runningSnapSync(originalSnapSyncRef))
-
-    case PivotHeaderBootstrap.Failed(reason) =>
-      log.warning(s"Pivot header bootstrap failed (reason: $reason). Notifying SNAP sync controller.")
-      headerBootstrap ! PoisonPill
-      peersClient ! PoisonPill
-      originalSnapSyncRef ! PivotBootstrapFailed(reason)
-      context.become(runningSnapSync(originalSnapSyncRef))
-
-    case SyncProtocol.GetStatus =>
-      // Expose progress as a generic syncing state.
-      sender() ! SyncProtocol.Status.Syncing(
-        startingBlockNumber = appStateStorage.getSyncStartingBlock(),
-        blocksProgress = SyncProtocol.Status.Progress(appStateStorage.getBestBlockNumber(), targetBlock),
-        stateNodesProgress = None
-      )
-
-    case StartRegularSyncBootstrap(newTargetBlock) =>
-      // A new bootstrap request arrived while one is already in progress.
-      // Stop stale bootstrap actors and start fresh ones.
-      log.info(
-        s"New pivot header bootstrap requested for block $newTargetBlock (was $targetBlock). Restarting bootstrap."
-      )
-      headerBootstrap ! PoisonPill
-      peersClient ! PoisonPill
-      bootstrapGeneration += 1
-      val gen = bootstrapGeneration
-      val newPeersClient =
-        context.actorOf(
-          PeersClient.props(networkPeerManager, peerEventBus, blacklist, syncConfig, scheduler),
-          s"peers-client-bootstrap-$gen"
+      case PivotHeaderBootstrap.Completed(block, header) if block == targetBlock || targetBlock == 0 =>
+        // `targetBlock == 0` is the sentinel for by-hash bootstrap (#1207): the actual
+        // block number is unknown at request time and resolved from the returned header.
+        log.info(
+          s"Pivot header bootstrap complete for block ${header.number} (requested $targetBlock) - notifying SNAP sync"
         )
-      val newHeaderBootstrap =
-        context.actorOf(
-          PivotHeaderBootstrap
-            .props(newPeersClient, blockchainWriter, newTargetBlock, syncConfig, scheduler, preferSnapPeers = true),
-          s"pivot-header-bootstrap-$gen"
+        headerBootstrap ! PoisonPill
+        peersClient ! PoisonPill
+        originalSnapSyncRef ! BootstrapComplete(Some(header))
+        runningSnapSync(originalSnapSyncRef)
+
+      case PivotHeaderBootstrap.Failed(reason) =>
+        log.warn(s"Pivot header bootstrap failed (reason: $reason). Notifying SNAP sync controller.")
+        headerBootstrap ! PoisonPill
+        peersClient ! PoisonPill
+        originalSnapSyncRef ! PivotBootstrapFailed(reason)
+        runningSnapSync(originalSnapSyncRef)
+
+      case SyncProtocol.GetStatus =>
+        // Expose progress as a generic syncing state.
+        ctx.toClassic.sender() ! SyncProtocol.Status.Syncing(
+          startingBlockNumber = appStateStorage.getSyncStartingBlock(),
+          blocksProgress = SyncProtocol.Status.Progress(appStateStorage.getBestBlockNumber(), targetBlock),
+          stateNodesProgress = None
         )
-      context.become(
+        Behaviors.same
+
+      case StartRegularSyncBootstrap(newTargetBlock) =>
+        // A new bootstrap request arrived while one is already in progress.
+        // Stop stale bootstrap actors and start fresh ones.
+        log.info(
+          s"New pivot header bootstrap requested for block $newTargetBlock (was $targetBlock). Restarting bootstrap."
+        )
+        headerBootstrap ! PoisonPill
+        peersClient ! PoisonPill
+        bootstrapGeneration += 1
+        val gen = bootstrapGeneration
+        val newPeersClient =
+          ctx.toClassic.actorOf(
+            PeersClient.props(networkPeerManager, peerEventBus, blacklist, syncConfig, scheduler),
+            s"peers-client-bootstrap-$gen"
+          )
+        val newHeaderBootstrap =
+          ctx
+            .spawn(
+              PivotHeaderBootstrap(
+                newPeersClient,
+                blockchainWriter,
+                newTargetBlock,
+                replyTo = ctx.self.toClassic,
+                syncConfig,
+                preferSnapPeers = true
+              ),
+              s"pivot-header-bootstrap-$gen"
+            )
+            .toClassic
         runningPivotHeaderBootstrap(newPeersClient, newHeaderBootstrap, newTargetBlock, originalSnapSyncRef)
-      )
 
-    case com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.FallbackToFastSync =>
-      log.warning("Received FallbackToFastSync during pivot header bootstrap. Stopping bootstrap and falling back.")
-      headerBootstrap ! PoisonPill
-      peersClient ! PoisonPill
-      originalSnapSyncRef ! PoisonPill
-      snapFastCycleCount += 1
-      appStateStorage.putSnapFastCycleCount(snapFastCycleCount).commit()
-      log.info("SNAP<->Fast cycle count: {}", snapFastCycleCount)
-      if !checkSnapFastEscapeHatch() then {
-        startFastSync()
-      }
+      case com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.FallbackToFastSync =>
+        log.warn("Received FallbackToFastSync during pivot header bootstrap. Stopping bootstrap and falling back.")
+        headerBootstrap ! PoisonPill
+        peersClient ! PoisonPill
+        originalSnapSyncRef ! PoisonPill
+        snapFastCycleCount += 1
+        appStateStorage.putSnapFastCycleCount(snapFastCycleCount).commit()
+        log.info("SNAP<->Fast cycle count: {}", snapFastCycleCount)
+        checkSnapFastEscapeHatch().getOrElse(startFastSync())
 
-    case com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.SnapSyncFinalized(pivot) =>
-      log.info(
-        s"Received SnapSyncFinalized(pivot=$pivot) during pivot header bootstrap. Stopping bootstrap and transitioning to regular sync."
-      )
-      headerBootstrap ! PoisonPill
-      peersClient ! PoisonPill
-      // SNAP finalised mid-bootstrap is an exceptional path; tear down the SNAP actor cleanly
-      // (no chain-backfill watch, since the bootstrap state is already racy).
-      originalSnapSyncRef ! PoisonPill
-      resetSnapFastCycleCount()
-      startRegularSync()
+      case com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.SnapSyncFinalized(pivot) =>
+        log.info(
+          s"Received SnapSyncFinalized(pivot=$pivot) during pivot header bootstrap. Stopping bootstrap and transitioning to regular sync."
+        )
+        headerBootstrap ! PoisonPill
+        peersClient ! PoisonPill
+        // SNAP finalised mid-bootstrap is an exceptional path; tear down the SNAP actor cleanly
+        // (no chain-backfill watch, since the bootstrap state is already racy).
+        originalSnapSyncRef ! PoisonPill
+        resetSnapFastCycleCount()
+        startRegularSync()._2
 
-    case com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.Done =>
-      log.info(
-        "Received Done from SNAP sync during pivot header bootstrap. Stopping bootstrap and transitioning to regular sync."
-      )
-      headerBootstrap ! PoisonPill
-      peersClient ! PoisonPill
-      originalSnapSyncRef ! PoisonPill
-      resetSnapFastCycleCount()
-      startRegularSync()
+      case com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.Done =>
+        log.info(
+          "Received Done from SNAP sync during pivot header bootstrap. Stopping bootstrap and transitioning to regular sync."
+        )
+        headerBootstrap ! PoisonPill
+        peersClient ! PoisonPill
+        originalSnapSyncRef ! PoisonPill
+        resetSnapFastCycleCount()
+        startRegularSync()._2
 
-    case bh: ForkChoiceManager.BeaconHead =>
-      handleBeaconHead(bh, snapSyncOpt = Some(originalSnapSyncRef))
+      case bh: ForkChoiceManager.BeaconHead =>
+        handleBeaconHead(bh, snapSyncOpt = Some(originalSnapSyncRef))
+        Behaviors.same
 
-    // spec 004 T012: a healing serve-root request that lands during the brief pivot-header bootstrap window
-    // (a concurrent pivot refresh) is declined immediately so the child's in-flight latch clears and it can
-    // retry on a later healing tick. We never start a second bootstrap here (the pivot bootstrap is already
-    // using the slot). U2: declining keeps the child's current serve root.
-    case SNAPSyncController.RequestHealingServeRoot =>
-      log.debug("[HEAL-SERVE-ROOT] Request arrived during pivot header bootstrap — declining (serve root kept).")
-      sender() ! SNAPSyncController.HealingServeRoot(0, None)
+      // spec 004 T012: a healing serve-root request that lands during the brief pivot-header bootstrap window
+      // (a concurrent pivot refresh) is declined immediately so the child's in-flight latch clears and it can
+      // retry on a later healing tick. We never start a second bootstrap here (the pivot bootstrap is already
+      // using the slot). U2: declining keeps the child's current serve root.
+      case SNAPSyncController.RequestHealingServeRoot =>
+        log.debug("[HEAL-SERVE-ROOT] Request arrived during pivot header bootstrap — declining (serve root kept).")
+        ctx.toClassic.sender() ! SNAPSyncController.HealingServeRoot(0, None)
+        Behaviors.same
 
-    case msg =>
-      // Forward coordinator and protocol messages to SNAP sync during the brief bootstrap.
-      // This keeps coordinators functional while we fetch the pivot header (~1-5 seconds).
-      originalSnapSyncRef.forward(msg)
+      case msg =>
+        // Forward coordinator and protocol messages to SNAP sync during the brief bootstrap.
+        // This keeps coordinators functional while we fetch the pivot header (~1-5 seconds).
+        originalSnapSyncRef.tell(msg, ctx.toClassic.sender())
+        Behaviors.same
+    }
   }
 
   /** Buffer the latest CL-driven head and, when SNAP is currently running, forward it as a `CLPivotHint` so the pivot
@@ -825,12 +1018,13 @@ class SyncController(
   /** Check if the SNAP<->Fast bounce cycle count has exceeded the configured threshold. If so, mark both sync modes as
     * done and escape to regular sync.
     * @return
-    *   true if the escape hatch fired (caller should NOT start another sync), false otherwise
+    *   `Some(behavior)` to transition into when the escape hatch fired (caller should NOT start another sync);
+    *   `None` otherwise (caller proceeds with its own start).
     */
-  private def checkSnapFastEscapeHatch(): Boolean = {
+  private def checkSnapFastEscapeHatch(): Option[Behavior[Any]] = {
     val threshold = syncConfig.maxSnapFastCycleTransitions
     if threshold > 0 && snapFastCycleCount >= threshold then {
-      log.warning(
+      log.warn(
         "SNAP<->Fast sync bounce cycle count ({}) reached threshold ({}). " +
           "Escaping to regular sync — missing state will be fetched on-demand via GetTrieNodes.",
         snapFastCycleCount,
@@ -843,9 +1037,8 @@ class SyncController(
       fastSyncStateStorage.purge()
       // Reset cycle count
       resetSnapFastCycleCount()
-      startRegularSync()
-      true
-    } else false
+      Some(startRegularSync()._2)
+    } else None
   }
 
   private def resetSnapFastCycleCount(): Unit = {
@@ -853,7 +1046,7 @@ class SyncController(
     appStateStorage.clearSnapFastCycleCount().commit()
   }
 
-  def start(): Unit = {
+  def start(): Behavior[Any] = {
     import syncConfig.{doFastSync, doSnapSync}
 
     val nowMillis = System.currentTimeMillis()
@@ -865,7 +1058,7 @@ class SyncController(
     // flag is back to its real value (set by FastSync.finish()). Cheap, surgical recovery
     // that doesn't touch chain data.
     if System.getProperty("fukuii.reset-fast-sync-done", "false").equalsIgnoreCase("true") then {
-      log.warning(
+      log.warn(
         "System property fukuii.reset-fast-sync-done=true — clearing FastSyncDone flag on this startup"
       )
       appStateStorage.clearFastSyncDone().commit()
@@ -885,7 +1078,7 @@ class SyncController(
     // is automatically reused as SNAP fills in the gaps.
     val persistedBest = appStateStorage.getBestBlockNumber()
     if persistedBest > 0 && blockchainReader.getBlockHeaderByNumber(persistedBest).isEmpty then {
-      log.warning(
+      log.warn(
         "Persisted best block {} not found in storage — clearing sync-done flags so SNAP can resume from persisted progress",
         persistedBest
       )
@@ -909,7 +1102,7 @@ class SyncController(
         val peak = ss.maxTotalNodesCount
         if peak > 1000L && saved.toDouble / peak.toDouble < 0.90 then {
           val pct = (saved.toDouble / peak.toDouble * 100).toInt
-          log.warning(
+          log.warn(
             "FastSyncDone is set but persisted SyncState shows trie incomplete: " +
               "downloaded={} / peak total={} ({}%). Clearing FastSyncDone to resume fast sync " +
               "and finish state download.",
@@ -1004,20 +1197,21 @@ class SyncController(
     if doFastSync && appStateStorage.isFastSyncCoolingOff(nowMillis) then {
       val until = appStateStorage.getFastSyncCooldownUntilMillis()
       val delay = (until - nowMillis).millis
-      log.warning(
+      log.warn(
         "Fast sync requested but in cool-off until {} ({} remaining); starting regular sync and scheduling fast-sync restart",
         until,
         delay
       )
-      startRegularSync()
-      scheduler.scheduleOnce(delay, self, RestartFastSyncNow)
+      val (_, regularBehavior) = startRegularSync()
+      timers.startSingleTimer(RestartFastSyncNow, delay)
+      regularBehavior
     } else {
 
       // Recovery flag: -Dfukuii.snap.clearDoneOnStart=true clears SnapSyncDone to re-enter healing.
       // Use when healing completed prematurely (BUG-006: root mismatch) to resume without a full re-sync.
       if doSnapSync && System.getProperty("fukuii.snap.clearDoneOnStart", "false").toBoolean then {
         if appStateStorage.isSnapSyncDone() then {
-          log.warning("fukuii.snap.clearDoneOnStart=true: clearing SnapSyncDone to re-enter SNAP healing")
+          log.warn("fukuii.snap.clearDoneOnStart=true: clearing SnapSyncDone to re-enter SNAP healing")
           appStateStorage.clearSnapSyncDone().commit()
         }
       }
@@ -1028,7 +1222,7 @@ class SyncController(
           // It will fall back to fast sync if needed
           startSnapSync()
         case (true, _, true, _) =>
-          log.warning("do-snap-sync is true but SNAP sync already completed")
+          log.warn("do-snap-sync is true but SNAP sync already completed")
           // Diagnostic: log stored SNAP sync state root vs pivot block state root
           val snapStateRoot = appStateStorage.getSnapSyncStateRoot()
           val bestBlockNum = appStateStorage.getBestBlockNumber()
@@ -1068,7 +1262,7 @@ class SyncController(
                     if fRootExists then "EXISTS" else "MISSING"
                   )
                   if fRootExists then {
-                    log.warning(
+                    log.warn(
                       "Substituting finalized trie root {} into pivot block header (replacing missing root {})",
                       fRoot.take(8).toArray.map("%02x".format(_)).mkString,
                       header.stateRoot.take(8).toArray.map("%02x".format(_)).mkString
@@ -1098,7 +1292,7 @@ class SyncController(
                     if snapRootExists then "EXISTS" else "MISSING"
                   )
                   if snapRootExists then {
-                    log.warning(
+                    log.warn(
                       "snapStateRoot({}) differs from pivotHeader.stateRoot({}) — " +
                         "updating pivot block header to use downloaded state root.",
                       snapRoot.take(8).toArray.map("%02x".format(_)).mkString,
@@ -1116,27 +1310,27 @@ class SyncController(
           if needBytecode || needStorage then {
             startRecovery(needBytecode, needStorage)
           } else {
-            startRegularSync()
+            startRegularSync()._2
           }
         case (_, false, false, true) =>
           startFastSync()
         case (_, true, false, true) =>
-          log.warning("do-fast-sync is true but fast sync already completed")
-          startRegularSync()
+          log.warn("do-fast-sync is true but fast sync already completed")
+          startRegularSync()._2
         case (_, true, false, false) =>
-          startRegularSync()
+          startRegularSync()._2
         case (_, false, false, false) =>
           if fastSyncStateStorage.getSyncState().isDefined then {
-            log.warning("do-fast-sync is false but fast sync hasn't completed")
+            log.warn("do-fast-sync is false but fast sync hasn't completed")
             startFastSync()
-          } else startRegularSync()
+          } else startRegularSync()._2
       }
     } // else !isFastSyncCoolingOff
   }
 
-  def startFastSync(): Unit = {
+  def startFastSync(): Behavior[Any] = {
     syncGeneration += 1
-    val fastSync = context.actorOf(
+    val fastSync = ctx.toClassic.actorOf(
       FastSync
         .props(
           fastSyncStateStorage,
@@ -1160,16 +1354,16 @@ class SyncController(
       s"fast-sync-$syncGeneration"
     )
     fastSync ! SyncProtocol.Start
-    context.become(runningFastSync(fastSync))
+    runningFastSync(fastSync)
   }
 
-  def startSnapSync(minPivotBlock: Option[BigInt] = None): Unit = {
+  def startSnapSync(minPivotBlock: Option[BigInt] = None): Behavior[Any] = {
     log.info("Starting SNAP sync mode")
     syncGeneration += 1
 
     val snapSyncConfig = loadSnapSyncConfig()
 
-    val snapSync = context
+    val snapSync = ctx
       .spawn(
         SNAPSyncController(
           blockchainReader,
@@ -1184,7 +1378,7 @@ class SyncController(
           snapSyncConfig,
           scheduler,
           blacklist,
-          syncController = self
+          syncController = ctx.self.toClassic
         ),
         s"snap-sync-$syncGeneration",
         DispatcherSelector.fromConfig("sync-dispatcher")
@@ -1212,10 +1406,15 @@ class SyncController(
       snapSync ! SNAPSyncController.MinPivotBlock(minBlock)
     }
     snapSync ! SNAPSyncController.Start
-    context.become(runningSnapSync(snapSync))
+    runningSnapSync(snapSync)
   }
 
-  def startRegularSync(resumeBackfill: Boolean = true): ActorRef = {
+  /** Starts (or restarts) regular sync. Returns the spawned `regularSync` ref AND the next `Behavior[Any]` to enter:
+    * normally `runningRegularSync`, or — when `resumeBackfill` triggers a standalone backfill resumer —
+    * `runningRegularSyncWithStandaloneBackfill`. Callers that need the ref for a death-watch (e.g. the SNAP-finalised
+    * path) use `._1`; callers that just transition use `._2`.
+    */
+  def startRegularSync(resumeBackfill: Boolean = true): (ActorRef, Behavior[Any]) = {
     syncGeneration += 1
 
     // Operator escape hatch: seed exact chain-weight values before RegularSync starts.
@@ -1234,9 +1433,9 @@ class SyncController(
             blockchainWriter
               .storeChainWeight(hash, com.chipprbots.ethereum.domain.ChainWeight.totalDifficultyOnly(td))
               .commit()
-            log.warning("seed-chain-weights: wrote TD={} for hash={}...", td, hashHex.take(16))
+            log.warn("seed-chain-weights: wrote TD={} for hash={}...", td, hashHex.take(16))
           case _ =>
-            log.warning("seed-chain-weights: invalid entry '{}' (expected HASH:TD)", seed.trim)
+            log.warn("seed-chain-weights: invalid entry '{}' (expected HASH:TD)", seed.trim)
         }
       }
     }
@@ -1245,25 +1444,26 @@ class SyncController(
     // cumulative TD when it detects a TD-PROXY-GAP at peer handshake (stale genesis-proxy TD
     // stored by SNAP finalization when no ETH68 peers were available at that time).
     networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor
-      .RegisterChainWeightCalibrationTarget(self)
+      .RegisterChainWeightCalibrationTarget(ctx.self.toClassic)
 
     // Unconditional timed calibration: fire CalibrateChainWeightNow 30s after RegularSync starts.
     // NPA forwards bestNetworkTip (best ETH68 peer TD seen since startup) to this actor.
     // Handles multi-restart TD drift that falls below the TD-PROXY-GAP 10,000× threshold
     // (e.g. Restart #7 ratio=7,411×). For pure ETH69 networks, NPA sends a (0,0) sentinel
-    // and tier-3 local chain computation fires instead.
-    context.system.scheduler.scheduleOnce(30.seconds) {
+    // and tier-3 local chain computation fires instead. This is a one-shot delayed tell to a Classic
+    // collaborator (not a self-message), so it stays on the Classic scheduler.
+    scheduler.scheduleOnce(30.seconds)(
       networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.CalibrateChainWeightNow
-    }(context.dispatcher)
+    )(ctx.executionContext)
 
     val peersClient =
-      context.actorOf(
+      ctx.toClassic.actorOf(
         PeersClient
           .props(networkPeerManager, peerEventBus, blacklist, syncConfig, scheduler)
           .withDispatcher("sync-dispatcher"),
         s"peers-client-$syncGeneration"
       )
-    val regularSync = context.actorOf(
+    val regularSync = ctx.toClassic.actorOf(
       RegularSync
         .props(
           peersClient,
@@ -1286,22 +1486,24 @@ class SyncController(
       s"regular-sync-$syncGeneration"
     )
     regularSync ! SyncProtocol.Start
-    context.watch(regularSync)
-    context.become(runningRegularSync(regularSync))
+    ctx.watchWith(regularSync.toTyped[Nothing], RegularSyncTerminated(regularSync))
     // After SNAP completes, chain backfill (#1162) writes headers / bodies / receipts in the
     // background. If the node was killed mid-backfill, persisted cursors (#1169) tell us how
     // far it got — spawn a standalone ChainDownloader to finish the job alongside regular sync.
     // Suppressed when called from the SnapSyncFinalized path: SNAPSyncController already owns
     // the live backfill actor in that flow.
-    if resumeBackfill then maybeStartBackfillResume(regularSync)
-    regularSync
+    val nextBehavior =
+      if resumeBackfill then maybeStartBackfillResume(regularSync).getOrElse(runningRegularSync(regularSync))
+      else runningRegularSync(regularSync)
+    (regularSync, nextBehavior)
   }
 
-  /** Spawn a standalone `ChainDownloader` to resume background chain backfill from persisted cursors. No-op when SNAP
-    * has not completed, when no `BackfillTarget` was persisted, or when all cursors have already reached the target.
-    * Issues #1162 (background backfill) + #1169 (resume across restarts).
+  /** Spawn a standalone `ChainDownloader` to resume background chain backfill from persisted cursors. Returns
+    * `Some(runningRegularSyncWithStandaloneBackfill)` when a resumer is spawned; `None` when SNAP has not completed,
+    * no `BackfillTarget` was persisted, or all cursors have already reached the target (caller then enters plain
+    * `runningRegularSync`). Issues #1162 (background backfill) + #1169 (resume across restarts).
     */
-  private def maybeStartBackfillResume(regularSync: ActorRef): Unit =
+  private def maybeStartBackfillResume(regularSync: ActorRef): Option[Behavior[Any]] =
     if appStateStorage.needsBackfillResume() then {
       val target = appStateStorage.getBackfillTarget()
       val headerCursor = appStateStorage.getBackfillBestHeader()
@@ -1317,9 +1519,9 @@ class SyncController(
       val snapSyncConfig = loadSnapSyncConfig()
       syncGeneration += 1
       import com.chipprbots.ethereum.blockchain.sync.snap.ChainDownloader
-      // ChainDownloader is Pekko Typed (Group S6). Spawn it via the Classic→Typed adapter and convert the
-      // resulting Typed ref back to Classic so the existing `! ChainDownloader.X` sends below keep compiling.
-      val resumer = context
+      // ChainDownloader is Pekko Typed (Group S6). Spawn it via ctx.spawn and convert the resulting Typed ref back to
+      // Classic so the existing `! ChainDownloader.X` sends below keep compiling.
+      val resumer = ctx
         .spawn(
           ChainDownloader(
             blockchainReader = blockchainReader,
@@ -1328,7 +1530,7 @@ class SyncController(
             networkPeerManager = networkPeerManager,
             peerEventBus = peerEventBus,
             syncConfig = syncConfig,
-            replyTo = self,
+            replyTo = ctx.self.toClassic,
             maxConcurrentRequests = snapSyncConfig.chainBackfillConcurrentRequests,
             requestTimeout = snapSyncConfig.chainDownloadTimeout
           ),
@@ -1336,47 +1538,51 @@ class SyncController(
           DispatcherSelector.fromConfig("sync-dispatcher")
         )
         .toClassic
-      context.watch(resumer)
+      ctx.watchWith(resumer.toTyped[Nothing], ResumerTerminated(resumer))
       resumer ! ChainDownloader.Start(target)
-      context.become(runningRegularSyncWithStandaloneBackfill(regularSync, resumer))
-    }
+      Some(runningRegularSyncWithStandaloneBackfill(regularSync, resumer))
+    } else None
 
   /** Receive while regular sync runs alongside a standalone backfill resumer (#1169). Mirrors
     * `runningRegularSyncWithBackfill` but for the post-restart case where we own the backfill actor directly instead of
     * routing through a lingering `SNAPSyncController`.
     */
-  def runningRegularSyncWithStandaloneBackfill(regularSync: ActorRef, resumer: ActorRef): Receive = {
-    case com.chipprbots.ethereum.blockchain.sync.snap.ChainDownloader.Done =>
-      log.info("Standalone chain backfill resume complete.")
-      context.unwatch(resumer)
-      resumer ! PoisonPill
-      context.become(runningRegularSync(regularSync))
+  def runningRegularSyncWithStandaloneBackfill(regularSync: ActorRef, resumer: ActorRef): Behavior[Any] =
+    Behaviors.receive { (_, msg) =>
+      msg match {
+        case com.chipprbots.ethereum.blockchain.sync.snap.ChainDownloader.Done =>
+          log.info("Standalone chain backfill resume complete.")
+          ctx.unwatch(resumer.toTyped[Nothing])
+          resumer ! PoisonPill
+          runningRegularSync(regularSync)
 
-    case progress: com.chipprbots.ethereum.blockchain.sync.snap.ChainDownloader.Progress =>
-      log.debug(
-        "Standalone backfill progress: headers={} bodies={} receipts={} target={}",
-        progress.headersDownloaded,
-        progress.bodiesDownloaded,
-        progress.receiptsDownloaded,
-        progress.targetBlock
-      )
+        case progress: com.chipprbots.ethereum.blockchain.sync.snap.ChainDownloader.Progress =>
+          log.debug(
+            "Standalone backfill progress: headers={} bodies={} receipts={} target={}",
+            progress.headersDownloaded,
+            progress.bodiesDownloaded,
+            progress.receiptsDownloaded,
+            progress.targetBlock
+          )
+          Behaviors.same
 
-    case Terminated(actor) if actor == resumer =>
-      log.warning("Standalone backfill resumer died; chain backfill aborted (cursors persist for next restart).")
-      context.become(runningRegularSync(regularSync))
+        case ResumerTerminated(actor) if actor == resumer =>
+          log.warn("Standalone backfill resumer died; chain backfill aborted (cursors persist for next restart).")
+          runningRegularSync(regularSync)
 
-    case msg if isRestartTrigger(msg) =>
-      log.info("Restart triggered while standalone backfill was running; poison-pilling backfill resumer first.")
-      context.unwatch(resumer)
-      resumer ! PoisonPill
-      context.become(runningRegularSync(regularSync))
-      self ! msg // Re-deliver so the new state handles it.
+        case m if isRestartTrigger(m) =>
+          log.info("Restart triggered while standalone backfill was running; poison-pilling backfill resumer first.")
+          ctx.unwatch(resumer.toTyped[Nothing])
+          resumer ! PoisonPill
+          ctx.self ! m // Re-deliver so the new state handles it.
+          runningRegularSync(regularSync)
 
-    case msg =>
-      runningRegularSync(regularSync).apply(msg)
-  }
+        case m =>
+          handleRegularSyncMsg(regularSync, m)
+      }
+    }
 
-  def startRecovery(needBytecode: Boolean, needStorage: Boolean): Unit = {
+  def startRecovery(needBytecode: Boolean, needStorage: Boolean): Behavior[Any] = {
     syncGeneration += 1
     val stateRootOpt = appStateStorage.getSnapSyncStateRoot()
     val pivotBlockOpt = appStateStorage.getSnapSyncPivotBlock()
@@ -1402,26 +1608,26 @@ class SyncController(
           RecoveryMetrics.setStoragePhase(
             if needStorage then RecoveryMetrics.PhaseScanning else RecoveryMetrics.PhaseComplete
           )
-          context.spawn(
+          ctx.spawn(
             CombinedRecoveryScanActor(
               stateRoot,
               stateStorage,
               evmCodeStorage,
               appStateStorage,
-              self,
+              ctx.self.toClassic,
               pivotBlock,
               snapSyncConfig
             ),
             s"combined-recovery-scan-$syncGeneration",
             DispatcherSelector.fromConfig("sync-dispatcher")
           )
-          context.become(runningCombinedScan(needBytecode, needStorage, stateRoot, pivotBlock, snapSyncConfig))
+          runningCombinedScan(needBytecode, needStorage, stateRoot, pivotBlock, snapSyncConfig)
         } else {
           // Legacy path: each phase scans the full trie independently, then downloads.
           val bytecodeActor =
             if needBytecode then
               Some(
-                context
+                ctx
                   .spawn(
                     BytecodeRecoveryActor(
                       stateRoot,
@@ -1429,7 +1635,7 @@ class SyncController(
                       evmCodeStorage,
                       appStateStorage,
                       networkPeerManager,
-                      self,
+                      ctx.self.toClassic,
                       pivotBlock,
                       snapSyncConfig
                     ),
@@ -1442,7 +1648,7 @@ class SyncController(
           val storageActor =
             if needStorage then
               Some(
-                context
+                ctx
                   .spawn(
                     StorageRecoveryActor(
                       stateRoot,
@@ -1450,7 +1656,7 @@ class SyncController(
                       appStateStorage,
                       flatSlotStorage,
                       networkPeerManager,
-                      self,
+                      ctx.self.toClassic,
                       pivotBlock,
                       snapSyncConfig
                     ),
@@ -1469,10 +1675,10 @@ class SyncController(
         }
 
       case _ =>
-        log.warning("Cannot run recovery: missing stateRoot or pivotBlock. Marking done and proceeding.")
+        log.warn("Cannot run recovery: missing stateRoot or pivotBlock. Marking done and proceeding.")
         if needBytecode then appStateStorage.bytecodeRecoveryDone().commit()
         if needStorage then appStateStorage.storageRecoveryDone().commit()
-        startRegularSync()
+        startRegularSync()._2
     }
   }
 
@@ -1485,76 +1691,83 @@ class SyncController(
       stateRoot: ByteString,
       pivotBlock: BigInt,
       snapSyncConfig: com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncConfig
-  ): Receive = {
-    case CombinedRecoveryScanActor.CombinedScanComplete(byteGaps, storGaps) =>
-      val effByte = if needBytecode then byteGaps else Nil
-      val effStor = if needStorage then storGaps else Nil
-      log.info(s"Combined recovery scan reported ${effByte.size} bytecode gaps, ${effStor.size} storage gaps.")
-      // Phases the combined scan found complete (no gaps) are done right now.
-      if needBytecode && effByte.isEmpty then appStateStorage.bytecodeRecoveryDone().commit()
-      if needStorage && effStor.isEmpty then appStateStorage.storageRecoveryDone().commit()
+  ): Behavior[Any] = Behaviors.receive { (_, msg) =>
+    msg match {
+      case CombinedRecoveryScanActor.CombinedScanComplete(byteGaps, storGaps) =>
+        val effByte = if needBytecode then byteGaps else Nil
+        val effStor = if needStorage then storGaps else Nil
+        log.info(s"Combined recovery scan reported ${effByte.size} bytecode gaps, ${effStor.size} storage gaps.")
+        // Phases the combined scan found complete (no gaps) are done right now.
+        if needBytecode && effByte.isEmpty then appStateStorage.bytecodeRecoveryDone().commit()
+        if needStorage && effStor.isEmpty then appStateStorage.storageRecoveryDone().commit()
 
-      val bytecodeActor =
-        if needBytecode && effByte.nonEmpty then
-          Some(
-            context
-              .spawn(
-                BytecodeRecoveryActor.applyPreloaded(
-                  stateRoot,
-                  stateStorage,
-                  evmCodeStorage,
-                  appStateStorage,
-                  networkPeerManager,
-                  self,
-                  pivotBlock,
-                  snapSyncConfig,
-                  effByte
-                ),
-                s"bytecode-recovery-dl-$syncGeneration",
-                DispatcherSelector.fromConfig("sync-dispatcher")
-              )
-              .toClassic
-          )
-        else None
-      val storageActor =
-        if needStorage && effStor.nonEmpty then
-          Some(
-            context
-              .spawn(
-                StorageRecoveryActor.applyPreloaded(
-                  stateRoot,
-                  stateStorage,
-                  appStateStorage,
-                  flatSlotStorage,
-                  networkPeerManager,
-                  self,
-                  pivotBlock,
-                  snapSyncConfig,
-                  effStor
-                ),
-                s"storage-recovery-dl-$syncGeneration",
-                DispatcherSelector.fromConfig("sync-dispatcher")
-              )
-              .toClassic
-          )
-        else None
-      // A phase with no download actor is finished (no gaps / already done) — show Complete, not idle. Phases that
-      // will download have their phase set to Downloading by the recovery actor.
-      if bytecodeActor.isEmpty then RecoveryMetrics.setBytecodePhase(RecoveryMetrics.PhaseComplete)
-      if storageActor.isEmpty then RecoveryMetrics.setStoragePhase(RecoveryMetrics.PhaseComplete)
-      beginRecoveryDownloads(
-        bytecodeActor,
-        storageActor,
-        bytecodeComplete = bytecodeActor.isEmpty,
-        storageComplete = storageActor.isEmpty
-      )
+        val bytecodeActor =
+          if needBytecode && effByte.nonEmpty then
+            Some(
+              ctx
+                .spawn(
+                  BytecodeRecoveryActor.applyPreloaded(
+                    stateRoot,
+                    stateStorage,
+                    evmCodeStorage,
+                    appStateStorage,
+                    networkPeerManager,
+                    ctx.self.toClassic,
+                    pivotBlock,
+                    snapSyncConfig,
+                    effByte
+                  ),
+                  s"bytecode-recovery-dl-$syncGeneration",
+                  DispatcherSelector.fromConfig("sync-dispatcher")
+                )
+                .toClassic
+            )
+          else None
+        val storageActor =
+          if needStorage && effStor.nonEmpty then
+            Some(
+              ctx
+                .spawn(
+                  StorageRecoveryActor.applyPreloaded(
+                    stateRoot,
+                    stateStorage,
+                    appStateStorage,
+                    flatSlotStorage,
+                    networkPeerManager,
+                    ctx.self.toClassic,
+                    pivotBlock,
+                    snapSyncConfig,
+                    effStor
+                  ),
+                  s"storage-recovery-dl-$syncGeneration",
+                  DispatcherSelector.fromConfig("sync-dispatcher")
+                )
+                .toClassic
+            )
+          else None
+        // A phase with no download actor is finished (no gaps / already done) — show Complete, not idle. Phases that
+        // will download have their phase set to Downloading by the recovery actor.
+        if bytecodeActor.isEmpty then RecoveryMetrics.setBytecodePhase(RecoveryMetrics.PhaseComplete)
+        if storageActor.isEmpty then RecoveryMetrics.setStoragePhase(RecoveryMetrics.PhaseComplete)
+        beginRecoveryDownloads(
+          bytecodeActor,
+          storageActor,
+          bytecodeComplete = bytecodeActor.isEmpty,
+          storageComplete = storageActor.isEmpty
+        )
 
-    case bh: ForkChoiceManager.BeaconHead =>
-      handleBeaconHead(bh, snapSyncOpt = None)
+      case bh: ForkChoiceManager.BeaconHead =>
+        handleBeaconHead(bh, snapSyncOpt = None)
+        Behaviors.same
 
-    case other =>
-      log.debug("Ignoring message during combined recovery scan: {}", other.getClass.getSimpleName)
+      case other =>
+        log.debug("Ignoring message during combined recovery scan: {}", other.getClass.getSimpleName)
+        Behaviors.same
+    }
   }
+
+  // Timer key for the recovery peer poller (replaces the Classic `Cancellable` peerPoller field).
+  private val RecoveryPollerKey = "recovery-peer-poller"
 
   /** Wire up download-only recovery: register for SNAP routing, start the peer poller, and enter `runningRecovery`. If
     * there is nothing to download (no gaps), clear the resumable checkpoint and go straight to regular sync.
@@ -1564,130 +1777,133 @@ class SyncController(
       storageActor: Option[ActorRef],
       bytecodeComplete: Boolean,
       storageComplete: Boolean
-  ): Unit =
+  ): Behavior[Any] =
     if bytecodeActor.isEmpty && storageActor.isEmpty then {
       log.info("Recovery: no gaps to download. Transitioning to regular sync.")
       appStateStorage.clearRecoveryProgress().commit()
-      startRegularSync()
+      startRegularSync()._2
     } else {
-      bytecodeActor.foreach(context.watch)
-      storageActor.foreach(context.watch)
-      networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterSnapSyncController(self)
-      val peerPoller = context.system.scheduler.scheduleWithFixedDelay(2.seconds, 5.seconds, self, PollRecoveryPeers)
-      context.become(runningRecovery(bytecodeActor, storageActor, bytecodeComplete, storageComplete, peerPoller))
+      bytecodeActor.foreach(a => ctx.watchWith(a.toTyped[Nothing], BytecodeRecoveryTerminated(a)))
+      storageActor.foreach(a => ctx.watchWith(a.toTyped[Nothing], StorageRecoveryTerminated(a)))
+      networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterSnapSyncController(
+        ctx.self.toClassic
+      )
+      timers.startTimerWithFixedDelay(RecoveryPollerKey, PollRecoveryPeers, 2.seconds, 5.seconds)
+      runningRecovery(bytecodeActor, storageActor, bytecodeComplete, storageComplete)
     }
 
   /** Centralised recovery teardown: stop the peer poller, deregister SNAP routing, clear the resumable checkpoint, and
     * start regular sync. Called from every "all recovery complete" path.
     */
-  private def completeRecovery(peerPoller: org.apache.pekko.actor.Cancellable): Unit = {
-    peerPoller.cancel()
+  private def completeRecovery(): Behavior[Any] = {
+    timers.cancel(RecoveryPollerKey)
     networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterSnapSyncController(
-      context.system.deadLetters
+      ctx.system.classicSystem.deadLetters
     )
     appStateStorage.clearRecoveryProgress().commit()
     log.info("All recovery complete. Transitioning to regular sync.")
-    startRegularSync()
+    startRegularSync()._2
   }
 
   def runningRecovery(
       bytecodeActor: Option[ActorRef],
       storageActor: Option[ActorRef],
       bytecodeComplete: Boolean,
-      storageComplete: Boolean,
-      peerPoller: org.apache.pekko.actor.Cancellable = org.apache.pekko.actor.Cancellable.alreadyCancelled
-  ): Receive = {
-    case BytecodeRecoveryActor.RecoveryComplete =>
-      log.info(s"[SNAP-RECOVERY] bytecode recovery complete (storage done: $storageComplete)")
-      if storageComplete then {
-        completeRecovery(peerPoller)
-      } else {
-        context.become(
-          runningRecovery(bytecodeActor = None, storageActor, bytecodeComplete = true, storageComplete, peerPoller)
-        )
-      }
-
-    case StorageRecoveryActor.RecoveryComplete =>
-      log.info(s"[SNAP-RECOVERY] storage recovery complete (bytecode done: $bytecodeComplete)")
-      if bytecodeComplete then {
-        completeRecovery(peerPoller)
-      } else {
-        context.become(
-          runningRecovery(bytecodeActor, storageActor = None, bytecodeComplete, storageComplete = true, peerPoller)
-        )
-      }
-
-    case PollRecoveryPeers =>
-      networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeers
-
-    case com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers(peers) =>
-      val snapPeers = peers.filter { case (_, peerInfo) => peerInfo.remoteStatus.supportsSnap && peerInfo.forkAccepted }
-      if snapPeers.nonEmpty then {
-        snapPeers.foreach { case (peer, _) =>
-          bytecodeActor.foreach(_ ! snap.actors.Messages.ByteCodePeerAvailable(peer))
-          storageActor.foreach(_ ! snap.actors.Messages.StoragePeerAvailable(peer))
+      storageComplete: Boolean
+  ): Behavior[Any] = Behaviors.receive { (_, msg) =>
+    msg match {
+      case BytecodeRecoveryActor.RecoveryComplete =>
+        log.info(s"[SNAP-RECOVERY] bytecode recovery complete (storage done: $storageComplete)")
+        if storageComplete then {
+          completeRecovery()
+        } else {
+          runningRecovery(bytecodeActor = None, storageActor, bytecodeComplete = true, storageComplete)
         }
-      }
-      // If storage recovery is waiting for a recent root and no header fetch is in flight, start one
-      // now using the freshest peer height in this snapshot.
-      if recentRootRequester.isDefined && recentRootBootstrap.isEmpty then {
-        maybeStartRecentRootBootstrap(peers)
-      }
 
-    // Storage recovery: the saved pivot root has aged out of every peer's serve window. Fetch a recent
-    // canonical root so the download can roll onto something peers can still serve, instead of wedging.
-    case StorageRecoveryActor.RequestRecentRoot =>
-      if recentRootRequester.isEmpty && recentRootBootstrap.isEmpty then {
-        recentRootRequester = Some(sender())
-        log.info("Recovery requested a recent root to roll off the aged pivot. Polling peers for the network head.")
+      case StorageRecoveryActor.RecoveryComplete =>
+        log.info(s"[SNAP-RECOVERY] storage recovery complete (bytecode done: $bytecodeComplete)")
+        if bytecodeComplete then {
+          completeRecovery()
+        } else {
+          runningRecovery(bytecodeActor, storageActor = None, bytecodeComplete, storageComplete = true)
+        }
+
+      case PollRecoveryPeers =>
         networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeers
-      } else {
-        log.debug("Recovery recent-root request already in flight; ignoring duplicate.")
-      }
+        Behaviors.same
 
-    case PivotHeaderBootstrap.Completed(block, header) if recentRootRequester.isDefined =>
-      val rootHex = header.stateRoot.take(4).toArray.map("%02x".format(_)).mkString
-      log.info(s"Recovery recent-root: fetched header for block $block (root $rootHex). Replying.")
-      stopRecentRootBootstrap()
-      recentRootRequester.foreach(_ ! StorageRecoveryActor.RecentRoot(block, Some(header.stateRoot)))
-      recentRootRequester = None
+      case com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers(peers) =>
+        val snapPeers =
+          peers.filter { case (_, peerInfo) => peerInfo.remoteStatus.supportsSnap && peerInfo.forkAccepted }
+        if snapPeers.nonEmpty then {
+          snapPeers.foreach { case (peer, _) =>
+            bytecodeActor.foreach(_ ! snap.actors.Messages.ByteCodePeerAvailable(peer))
+            storageActor.foreach(_ ! snap.actors.Messages.StoragePeerAvailable(peer))
+          }
+        }
+        // If storage recovery is waiting for a recent root and no header fetch is in flight, start one
+        // now using the freshest peer height in this snapshot.
+        if recentRootRequester.isDefined && recentRootBootstrap.isEmpty then {
+          maybeStartRecentRootBootstrap(peers)
+        }
+        Behaviors.same
 
-    case PivotHeaderBootstrap.Failed(reason) if recentRootRequester.isDefined =>
-      log.warning(s"Recovery recent-root bootstrap failed ($reason). Declining the roll; abandon path will run.")
-      stopRecentRootBootstrap()
-      recentRootRequester.foreach(_ ! StorageRecoveryActor.RecentRoot(0, None))
-      recentRootRequester = None
+      // Storage recovery: the saved pivot root has aged out of every peer's serve window. Fetch a recent
+      // canonical root so the download can roll onto something peers can still serve, instead of wedging.
+      case StorageRecoveryActor.RequestRecentRoot =>
+        if recentRootRequester.isEmpty && recentRootBootstrap.isEmpty then {
+          recentRootRequester = Some(ctx.toClassic.sender())
+          log.info("Recovery requested a recent root to roll off the aged pivot. Polling peers for the network head.")
+          networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeers
+        } else {
+          log.debug("Recovery recent-root request already in flight; ignoring duplicate.")
+        }
+        Behaviors.same
 
-    case RecentRootTimeout(gen) if gen == recentRootGeneration && recentRootRequester.isDefined =>
-      log.warning("Recovery recent-root bootstrap timed out. Declining the roll; abandon path will run.")
-      stopRecentRootBootstrap()
-      recentRootRequester.foreach(_ ! StorageRecoveryActor.RecentRoot(0, None))
-      recentRootRequester = None
+      case PivotHeaderBootstrap.Completed(block, header) if recentRootRequester.isDefined =>
+        val rootHex = header.stateRoot.take(4).toArray.map("%02x".format(_)).mkString
+        log.info(s"Recovery recent-root: fetched header for block $block (root $rootHex). Replying.")
+        stopRecentRootBootstrap()
+        recentRootRequester.foreach(_ ! StorageRecoveryActor.RecentRoot(block, Some(header.stateRoot)))
+        recentRootRequester = None
+        Behaviors.same
 
-    case Terminated(actor) if bytecodeActor.contains(actor) =>
-      log.error("BytecodeRecoveryActor terminated unexpectedly. Treating as complete to unblock sync.")
-      if storageComplete then {
-        completeRecovery(peerPoller)
-      } else {
-        context.become(
-          runningRecovery(bytecodeActor = None, storageActor, bytecodeComplete = true, storageComplete, peerPoller)
-        )
-      }
+      case PivotHeaderBootstrap.Failed(reason) if recentRootRequester.isDefined =>
+        log.warn(s"Recovery recent-root bootstrap failed ($reason). Declining the roll; abandon path will run.")
+        stopRecentRootBootstrap()
+        recentRootRequester.foreach(_ ! StorageRecoveryActor.RecentRoot(0, None))
+        recentRootRequester = None
+        Behaviors.same
 
-    case Terminated(actor) if storageActor.contains(actor) =>
-      log.error("StorageRecoveryActor terminated unexpectedly. Treating as complete to unblock sync.")
-      if bytecodeComplete then {
-        completeRecovery(peerPoller)
-      } else {
-        context.become(
-          runningRecovery(bytecodeActor, storageActor = None, bytecodeComplete, storageComplete = true, peerPoller)
-        )
-      }
+      case RecentRootTimeout(gen) if gen == recentRootGeneration && recentRootRequester.isDefined =>
+        log.warn("Recovery recent-root bootstrap timed out. Declining the roll; abandon path will run.")
+        stopRecentRootBootstrap()
+        recentRootRequester.foreach(_ ! StorageRecoveryActor.RecentRoot(0, None))
+        recentRootRequester = None
+        Behaviors.same
 
-    case msg =>
-      // Forward SNAP protocol responses to both active recovery actors
-      bytecodeActor.foreach(_.forward(msg))
-      storageActor.foreach(_.forward(msg))
+      case BytecodeRecoveryTerminated(actor) if bytecodeActor.contains(actor) =>
+        log.error("BytecodeRecoveryActor terminated unexpectedly. Treating as complete to unblock sync.")
+        if storageComplete then {
+          completeRecovery()
+        } else {
+          runningRecovery(bytecodeActor = None, storageActor, bytecodeComplete = true, storageComplete)
+        }
+
+      case StorageRecoveryTerminated(actor) if storageActor.contains(actor) =>
+        log.error("StorageRecoveryActor terminated unexpectedly. Treating as complete to unblock sync.")
+        if bytecodeComplete then {
+          completeRecovery()
+        } else {
+          runningRecovery(bytecodeActor, storageActor = None, bytecodeComplete, storageComplete = true)
+        }
+
+      case msg =>
+        // Forward SNAP protocol responses to both active recovery actors
+        bytecodeActor.foreach(_.tell(msg, ctx.toClassic.sender()))
+        storageActor.foreach(_.tell(msg, ctx.toClassic.sender()))
+        Behaviors.same
+    }
   }
 
   /** Start a one-shot header bootstrap for a recent block (margin back from the network head) and arm a timeout. On
@@ -1702,18 +1918,26 @@ class SyncController(
       case Some(recentBlock) =>
         recentRootGeneration += 1
         val gen = recentRootGeneration
-        val peersClient = context.actorOf(
+        val peersClient = ctx.toClassic.actorOf(
           PeersClient.props(networkPeerManager, peerEventBus, blacklist, syncConfig, scheduler),
           s"recovery-recent-root-peers-$gen"
         )
-        val bootstrap = context.actorOf(
-          PivotHeaderBootstrap
-            .props(peersClient, blockchainWriter, recentBlock, syncConfig, scheduler, preferSnapPeers = true),
-          s"recovery-recent-root-bootstrap-$gen"
-        )
+        val bootstrap = ctx
+          .spawn(
+            PivotHeaderBootstrap(
+              peersClient,
+              blockchainWriter,
+              recentBlock,
+              replyTo = ctx.self.toClassic,
+              syncConfig,
+              preferSnapPeers = true
+            ),
+            s"recovery-recent-root-bootstrap-$gen"
+          )
+          .toClassic
         recentRootBootstrap = Some((peersClient, bootstrap))
         log.info(s"Recovery recent-root: fetching header for recent block $recentBlock.")
-        scheduler.scheduleOnce(20.seconds, self, RecentRootTimeout(gen))(context.dispatcher, self)
+        timers.startSingleTimer(RecentRootTimeout(gen), 20.seconds)
       case None =>
         log.info("Recovery recent-root: no usable peer height yet; declining the roll.")
         recentRootRequester.foreach(_ ! StorageRecoveryActor.RecentRoot(0, None))
@@ -1748,7 +1972,7 @@ class SyncController(
 
     blockchainReader.getBestBlockHeader match {
       case None =>
-        log.warning("TIMED_CALIBRATION_LOCAL: no best block header — skipping (attempt={})", tdCalibrationAttempt)
+        log.warn("TIMED_CALIBRATION_LOCAL: no best block header — skipping (attempt={})", tdCalibrationAttempt)
         false
 
       case Some(bestHeader) =>
@@ -1786,7 +2010,7 @@ class SyncController(
                 blockchainReader.getBlockHeaderByHash(cur.parentHash) match {
                   case Some(parent) => cur = parent
                   case None =>
-                    log.warning(
+                    log.warn(
                       "TIMED_CALIBRATION_LOCAL: parentHash chain broken at block={} hash={} — aborting (attempt={})",
                       cur.number,
                       cur.hash,
@@ -1798,7 +2022,7 @@ class SyncController(
           }
 
         if abort then {
-          log.warning(
+          log.warn(
             "TIMED_CALIBRATION_LOCAL: no plausible anchor within {} blocks of bestBlock={} — deferring (attempt={})",
             MaxWalkBlocks,
             bestHeader.number,
@@ -1837,7 +2061,7 @@ class SyncController(
             )
             true
           } else {
-            log.warning(
+            log.warn(
               "TIMED_CALIBRATION_LOCAL: computed td={} below plausibility threshold (genesisWeight={}) — aborting write (attempt={})",
               td,
               genesisWeight,
@@ -1853,9 +2077,10 @@ class SyncController(
     * gap > 10K blocks). The retry loop continues until calibration succeeds or ETH68 peers appear.
     */
   private def scheduleTDCalibrationRetry(): Unit = {
-    context.system.scheduler.scheduleOnce(30.minutes) {
+    // One-shot delayed tell to a Classic collaborator (not a self-message) — stays on the Classic scheduler.
+    scheduler.scheduleOnce(30.minutes)(
       networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.CalibrateChainWeightNow
-    }(context.dispatcher)
+    )(ctx.executionContext)
     val bestBlockNum = blockchainReader.getBestBlockHeader.map(_.number).getOrElse(BigInt(0))
     log.info(
       "TIMED_CALIBRATION_LOCAL: retry #{} scheduled in 30min (ChainDownloader advancing, current bestBlock={})",
@@ -1864,41 +2089,39 @@ class SyncController(
     )
   }
 
-  def startRegularSyncForBootstrap(): ActorRef = {
-    log.info("Starting regular sync for SNAP sync bootstrap")
+    def startRegularSyncForBootstrap(): ActorRef = {
+      log.info("Starting regular sync for SNAP sync bootstrap")
 
-    val peersClient =
-      context.actorOf(
-        PeersClient.props(networkPeerManager, peerEventBus, blacklist, syncConfig, scheduler),
-        "peers-client-bootstrap"
+      val peersClient =
+        ctx.toClassic.actorOf(
+          PeersClient.props(networkPeerManager, peerEventBus, blacklist, syncConfig, scheduler),
+          "peers-client-bootstrap"
+        )
+      val regularSync = ctx.toClassic.actorOf(
+        RegularSync.props(
+          peersClient,
+          networkPeerManager,
+          peerEventBus,
+          consensus,
+          blockchainReader,
+          blockchainWriter,
+          stateStorage,
+          evmCodeStorage,
+          { val br = new BranchResolution(blockchainReader); br.messConfig = messConfig; br },
+          validators.blockValidator,
+          blacklist,
+          syncConfig,
+          ommersPool,
+          pendingTransactionsManager,
+          configBuilder
+        ),
+        "regular-sync-bootstrap"
       )
-    val regularSync = context.actorOf(
-      RegularSync.props(
-        peersClient,
-        networkPeerManager,
-        peerEventBus,
-        consensus,
-        blockchainReader,
-        blockchainWriter,
-        stateStorage,
-        evmCodeStorage,
-        { val br = new BranchResolution(blockchainReader); br.messConfig = messConfig; br },
-        validators.blockValidator,
-        blacklist,
-        syncConfig,
-        ommersPool,
-        pendingTransactionsManager,
-        configBuilder
-      ),
-      "regular-sync-bootstrap"
-    )
-    regularSync ! SyncProtocol.Start
-    regularSync
+      regularSync ! SyncProtocol.Start
+      regularSync
+    }
   }
-
-}
-
-object SyncController {
+  // scalastyle:on number.of.methods
 
   /** Pick the block to roll the recovery storage download onto: `margin` blocks back from the highest known
     * SNAP-capable peer head (so the target is inside peers' snapshot serve window), clamped to >= 1. Returns None when
@@ -1906,56 +2129,4 @@ object SyncController {
     */
   private[sync] def recentRootTarget(snapPeerHeights: Iterable[BigInt], margin: BigInt): Option[BigInt] =
     snapPeerHeights.filter(_ > 0).maxOption.map(best => (best - margin).max(1))
-
-  // scalastyle:off parameter.number
-  def props(
-      blockchain: Blockchain,
-      blockchainReader: BlockchainReader,
-      blockchainWriter: BlockchainWriter,
-      appStateStorage: AppStateStorage,
-      blockNumberMappingStorage: BlockNumberMappingStorage,
-      evmCodeStorage: EvmCodeStorage,
-      stateStorage: StateStorage,
-      nodeStorage: NodeStorage,
-      flatSlotStorage: FlatSlotStorage,
-      syncStateStorage: FastSyncStateStorage,
-      consensus: ConsensusAdapter,
-      validators: Validators,
-      peerEventBus: ActorRef,
-      pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
-        com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
-      ],
-      ommersPool: org.apache.pekko.actor.typed.ActorRef[com.chipprbots.ethereum.ommers.OmmersPool.Command],
-      networkPeerManager: ActorRef,
-      blacklist: Blacklist,
-      syncConfig: SyncConfig,
-      configBuilder: BlockchainConfigBuilder,
-      messConfig: Option[MESSConfig] = None,
-      forkChoiceManagerOpt: Option[ForkChoiceManager] = None
-  ): Props =
-    Props(
-      new SyncController(
-        blockchain,
-        blockchainReader,
-        blockchainWriter,
-        appStateStorage,
-        blockNumberMappingStorage,
-        evmCodeStorage,
-        stateStorage,
-        nodeStorage,
-        flatSlotStorage,
-        syncStateStorage,
-        consensus,
-        validators,
-        peerEventBus,
-        pendingTransactionsManager,
-        ommersPool,
-        networkPeerManager,
-        blacklist,
-        syncConfig,
-        configBuilder,
-        messConfig,
-        forkChoiceManagerOpt
-      )
-    )
 }

@@ -1132,32 +1132,37 @@ trait SyncControllerBuilder extends SyncControllerRefBuilder {
     */
   def forkChoiceManagerForSync: Option[com.chipprbots.ethereum.consensus.engine.ForkChoiceManager] = None
 
-  lazy val syncController: ActorRef = system.actorOf(
-    SyncController.props(
-      blockchain,
-      blockchainReader,
-      blockchainWriter,
-      storagesInstance.storages.appStateStorage,
-      storagesInstance.storages.blockNumberMappingStorage,
-      storagesInstance.storages.evmCodeStorage,
-      storagesInstance.storages.stateStorage,
-      storagesInstance.storages.nodeStorage,
-      storagesInstance.storages.flatSlotStorage,
-      storagesInstance.storages.fastSyncStateStorage,
-      consensusAdapter,
-      mining.validators,
-      peerEventBus,
-      pendingTransactionsManagerTyped,
-      ommersPool,
-      networkPeerManager,
-      blacklist,
-      syncConfig,
-      this,
-      messConfigOpt,
-      forkChoiceManagerForSync
-    ),
-    "sync-controller"
-  )
+  // SyncController is Pekko Typed (Group ROOT) — a `Behavior[Any]`. Spawn it via the Classic→Typed adapter and convert
+  // the resulting Typed ref back to Classic so all callers (`syncController: ActorRef`, the JSON-RPC `askFor` path,
+  // `ForkChoiceManager.setListener`) keep compiling. The root flip to a fully-Typed ref is CAPSTONE.
+  lazy val syncController: ActorRef = system
+    .spawn(
+      SyncController(
+        blockchain,
+        blockchainReader,
+        blockchainWriter,
+        storagesInstance.storages.appStateStorage,
+        storagesInstance.storages.blockNumberMappingStorage,
+        storagesInstance.storages.evmCodeStorage,
+        storagesInstance.storages.stateStorage,
+        storagesInstance.storages.nodeStorage,
+        storagesInstance.storages.flatSlotStorage,
+        storagesInstance.storages.fastSyncStateStorage,
+        consensusAdapter,
+        mining.validators,
+        peerEventBus,
+        pendingTransactionsManagerTyped,
+        ommersPool,
+        networkPeerManager,
+        blacklist,
+        syncConfig,
+        this,
+        messConfigOpt,
+        forkChoiceManagerForSync
+      ),
+      "sync-controller"
+    )
+    .toClassic
 
 }
 
