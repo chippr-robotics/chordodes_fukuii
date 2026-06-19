@@ -193,6 +193,89 @@ ctx.watch(child)  // then: case Terminated(ref) => ...  (weaker typing)
 
 ---
 
+## P10 — Internal Commands for Future → actor-state writes
+
+When a Future needs to communicate a decision that mutates actor state, create
+dedicated internal Commands to marshal the result back to the actor thread. Do
+not share mutable state via `@volatile` or other synchronization — that is the
+Classic workaround, not the Typed pattern.
+
+**Pattern (from TNHC `verificationBFSRunning`):**
+
+```scala
+// ❌ Classic workaround — @volatile on shared actor state
+@volatile var verificationRunning: Boolean = false  // race with Future writes
+
+// ✅ Typed — Future sends a Command, actor writes state on-thread
+private case object RestartResumeVerification extends Command
+private case object RestartFullRebuild        extends Command
+
+// Before launching Future, capture selfRef:
+val selfRef = context.self
+crashRecoveryFuture.onComplete {
+  case Success(canResume) =>
+    if (canResume) selfRef ! RestartResumeVerification
+    else           selfRef ! RestartFullRebuild
+  case Failure(_) => selfRef ! RestartFullRebuild
+}(recoveryEc)
+
+// In behavior — state written only on actor thread:
+case RestartResumeVerification =>
+  verificationRunning = true   // safe: actor thread, plain var
+  resumeVerification()
+  Behaviors.same
+```
+
+**Pre-migration checklist addition:** Before migrating any Classic actor, grep for
+`@volatile` fields. Each site requires internal Command pairs in the Typed version —
+one per logical decision the Future can make.
+
+```bash
+grep -n "@volatile" src/main/scala/com/chipprbots/ethereum/...ActorFile.scala
+```
+
+**CAPSTONE sweep:**
+```bash
+grep -rn "@volatile" src/main/ --include="*.scala" | grep -v "extends Actor\b"
+# Target: 0 hits in Typed actors post-migration
+```
+
+---
+
+## P11 — `asyncLog` (plain SLF4J) for off-thread code
+
+`context.log` is only safe on the actor thread. Calling it from inside a Future,
+BFS walk, or worker closure contaminates MDC, can produce interleaved output, and
+has undefined thread-safety guarantees under Pekko's internal implementation.
+
+**Pattern (from TNHC BFS walk + restart Future):**
+
+```scala
+// Private plain SLF4J logger — safe from any thread
+private val asyncLog = LoggerFactory.getLogger(getClass)
+
+// ✅ In Future / BFS body / worker thread:
+asyncLog.info("Heal BFS step: node={} depth={}", nodeHash.short, depth)
+asyncLog.warn("Restart decision: reason={} canResume={}", reason, canResume)
+
+// ✅ In actor-thread message handlers:
+ctx.log.info("Verification started: pivot={} queueDepth={}", pivot, queue.size)
+```
+
+**Rule:** Any code that executes inside a `Future`, `onComplete`, `map`, or BFS/traversal
+callback passed to a non-actor `ExecutionContext` must use `asyncLog`, not `context.log`.
+Actor-thread message handlers always use `ctx.log`.
+
+**Actionable sweep — may catch existing correctness issues:**
+```bash
+# context.log used inside Future closures — potential MDC contamination
+grep -rn "ctx\.log\|context\.log" src/main/ --include="*.scala" -B5 \
+  | grep -B5 "Future\|onComplete\|\.map\|\.flatMap\|\.recover"
+# Review each hit — if it's inside a closure body, replace with asyncLog
+```
+
+---
+
 ## Anti-patterns — flag in PRISM review
 
 | Pattern | Problem | Correct |
@@ -214,4 +297,7 @@ grep -rn "\.toClassic\b" src/main/ --include="*.scala"        # remove adapters
 grep -rn "PropsAdapter\b" src/main/ --include="*.scala"       # remove adapters
 grep -rn "Behavior\[Any\]" src/main/ --include="*.scala"      # narrow to real type
 grep -rn "ActorSystem\b" src/main/ --include="*.scala"        # flip to ActorSystem[Nothing]
+grep -rn "@volatile" src/main/ --include="*.scala"            # should be 0 in Typed actors (P10)
+grep -rn "ctx\.log\|context\.log" src/main/ --include="*.scala" -B5 \
+  | grep -B5 "Future\|onComplete\|\.map\|flatMap\|\.recover"  # asyncLog violations (P11)
 ```

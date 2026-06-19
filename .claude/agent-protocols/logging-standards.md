@@ -448,6 +448,36 @@ logger.info("key={} key2={}", value1, value2)
 log.warn("...")   // NOT log.warning — fix inline as bucket-A cleanup
 ```
 
+### In Futures, BFS walks, and off-thread callbacks (Typed actors)
+
+`context.log` is only safe on the actor thread. Any code inside a `Future`,
+`onComplete`, BFS traversal, or closure passed to a non-actor `ExecutionContext`
+must use a plain SLF4J logger (`asyncLog`) instead.
+
+```scala
+// Declare alongside ctx at actor construction:
+private val asyncLog = LoggerFactory.getLogger(getClass)
+
+// ✅ Off-thread (Future body, BFS walk, onComplete):
+asyncLog.info("key={} key2={}", value1, value2)
+asyncLog.warn("reason={}", reason)
+
+// ✅ On actor thread (message handlers):
+ctx.log.info("key={} key2={}", value1, value2)
+```
+
+**Rule:** If the call site is inside a lambda passed to an `ExecutionContext`, use `asyncLog`.
+If it is directly in a message handler `case`, use `ctx.log`. When in doubt, check whether
+the enclosing `{}` block is an actor message handler or a callback — one `ExecutionContext`
+boundary is enough to require `asyncLog`.
+
+**Sweep for misuse:**
+```bash
+grep -rn "ctx\.log\|context\.log" src/main/ --include="*.scala" -B5 \
+  | grep -B5 "Future\|onComplete\|\.map\|\.flatMap\|\.recover"
+# Any hit inside a closure body is a correctness issue — replace with asyncLog
+```
+
 ---
 
 ## Log level guide
@@ -542,6 +572,10 @@ grep -rn "} catch {" src/main/ --include="*.scala" -A5 | grep -v "log\.\|logger\
 
 # Unhandled message handlers with no log — target: 0
 grep -rn "Behaviors\.unhandled" src/main/ --include="*.scala" -B3 | grep -v "log\."
+
+# context.log inside Future/callback closures — target: 0 (use asyncLog instead)
+grep -rn "ctx\.log\|context\.log" src/main/ --include="*.scala" -B5 \
+  | grep -B5 "Future\|onComplete\|\.map\|\.flatMap\|\.recover"
 
 # Positional log messages (no key= prefix) — target: 0
 grep -rn 'log\.\(info\|warn\|error\|debug\)("[A-Za-z][^=]*{}' src/main/ --include="*.scala" | wc -l
