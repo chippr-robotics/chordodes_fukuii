@@ -183,6 +183,6 @@ object Fukuii extends Logger {
                                                                                                                                  
                                                                                                                                  """
 
-    println(banner)
+    log.info(banner)
   }
 }

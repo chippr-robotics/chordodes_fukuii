@@ -452,7 +452,7 @@ class BlockPreparator(
       val evmConfig = EvmConfig.forBlock(blockHeader.number, blockchainConfig)
       val isCreate = stx.tx.isContractInit
       val intrinsicGas = evmConfig.calcTransactionIntrinsicGas(stx.tx.payload, isCreate, Seq.empty)
-      System.err.println(
+      log.debug(
         s"[TX-TRACE] block=${blockHeader.number} tx=${stx.hash.toHex} " +
           s"create=$isCreate gasLimit=$gasLimit intrinsic=$intrinsicGas " +
           s"vmGasRemaining=${result.gasRemaining} vmError=${result.error} " +

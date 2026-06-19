@@ -143,7 +143,7 @@ object App extends Logger {
   }
 
   private def showHelp(): Unit =
-    println(
+    log.info(
       """
         |Fukuii Ethereum Client
         |

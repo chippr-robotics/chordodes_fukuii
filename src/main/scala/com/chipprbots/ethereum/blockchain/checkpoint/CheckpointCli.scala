@@ -62,7 +62,7 @@ object CheckpointCli extends Logger {
     val parsed = rootCommand.parse(ArraySeq.unsafeWrapArray(args), sys.env)
     parsed match {
       case Left(help) =>
-        System.err.println(help)
+        log.warn(help.toString)
         sys.exit(2)
       case Right(Action.Export(args)) =>
         runExport(args) match {
