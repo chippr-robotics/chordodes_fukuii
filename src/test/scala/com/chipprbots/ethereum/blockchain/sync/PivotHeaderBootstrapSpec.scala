@@ -2,10 +2,9 @@ package com.chipprbots.ethereum.blockchain.sync
 
 import java.net.InetSocketAddress
 
-import org.apache.pekko.actor.Actor
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.actor.Props
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.ImplicitSender
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
@@ -55,7 +54,9 @@ class PivotHeaderBootstrapSpec
   val testPeer: Peer = Peer(PeerId("test-peer"), new InetSocketAddress("127.0.0.1", 9999), TestProbe().ref, false)
   val testPeer2: Peer = Peer(PeerId("test-peer-2"), new InetSocketAddress("127.0.0.1", 9998), TestProbe().ref, false)
 
-  /** Creates a PivotHeaderBootstrap under a wrapper actor that forwards all parent messages to parentProbe. */
+  /** Spawns a (Typed) PivotHeaderBootstrap whose `replyTo` is `parentProbe`, so Completed/Failed land on the probe.
+    * Returns the Classic-adapted ref so existing assertions still work.
+    */
   def mkBootstrap(
       peersClientProbe: TestProbe,
       parentProbe: TestProbe,
@@ -64,25 +65,23 @@ class PivotHeaderBootstrapSpec
       retryDelay: FiniteDuration = 50.millis,
       waitForPeerDelay: FiniteDuration = 50.millis,
       preferSnapPeers: Boolean = false
-  ): ActorRef = {
-    val bootstrapProps = PivotHeaderBootstrap.props(
-      peersClient = peersClientProbe.ref,
-      blockchainWriter = writer,
-      targetBlock = targetBlock,
-      syncConfig = null,
-      scheduler = system.scheduler,
-      maxAttempts = maxAttempts,
-      initialRetryDelay = retryDelay,
-      maxRetryDelay = retryDelay,
-      waitForPeerDelay = waitForPeerDelay,
-      preferSnapPeers = preferSnapPeers
-    )(system.dispatcher)
-
-    system.actorOf(Props(new Actor {
-      override def preStart(): Unit = context.actorOf(bootstrapProps, "phb")
-      override def receive: Receive = { case msg => parentProbe.ref.forward(msg) }
-    }))
-  }
+  ): ActorRef =
+    system
+      .spawnAnonymous(
+        PivotHeaderBootstrap(
+          peersClient = peersClientProbe.ref,
+          blockchainWriter = writer,
+          targetBlock = targetBlock,
+          replyTo = parentProbe.ref,
+          syncConfig = null,
+          maxAttempts = maxAttempts,
+          initialRetryDelay = retryDelay,
+          maxRetryDelay = retryDelay,
+          waitForPeerDelay = waitForPeerDelay,
+          preferSnapPeers = preferSnapPeers
+        )
+      )
+      .toClassic
 
   "PivotHeaderBootstrap" should "send Completed to parent when peer returns the correct header" taggedAs (
     UnitTest,

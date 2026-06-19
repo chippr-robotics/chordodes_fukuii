@@ -328,9 +328,11 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
       blacklistDuration = 1.second
     )
 
+    // SyncController is Pekko Typed (Group ROOT). Spawn through PropsAdapter so the Classic TestActorRef machinery
+    // and `someTimePasses()`/ExplicitlyTriggeredScheduler timing still work.
     lazy val syncController: TestActorRef[Nothing] = TestActorRef(
-      Props(
-        new SyncController(
+      org.apache.pekko.actor.typed.scaladsl.adapter.PropsAdapter(
+        SyncController(
           blockchain,
           blockchainReader,
           blockchainWriter,

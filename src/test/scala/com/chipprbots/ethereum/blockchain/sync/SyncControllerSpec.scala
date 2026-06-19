@@ -795,9 +795,13 @@ class SyncControllerSpec
       maxPivotBlockAge = 30
     )
 
+    // SyncController is Pekko Typed (Group ROOT) — a Behavior[Any]. Spawn through PropsAdapter so this Classic spec
+    // keeps `TestActorRef` child inspection (`syncController.children`). externalSchedulerOpt threads the
+    // ExplicitlyTriggeredScheduler so `someTimePasses()` continues to drive the actor's inline scheduler callbacks;
+    // its withTimers fire on the system scheduler (also the ExplicitlyTriggeredScheduler via explicit-scheduler.conf).
     lazy val syncController: TestActorRef[Nothing] = TestActorRef(
-      Props(
-        new SyncController(
+      org.apache.pekko.actor.typed.scaladsl.adapter.PropsAdapter(
+        SyncController(
           blockchain,
           blockchainReader,
           blockchainWriter,
