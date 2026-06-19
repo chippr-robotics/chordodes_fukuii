@@ -346,12 +346,6 @@ lazy val node = {
     .settings(inConfig(Evm)(Defaults.testSettings :+ (Test / parallelExecution := true)): _*)
     .settings(inConfig(Rpc)(Defaults.testSettings :+ (Test / parallelExecution := true)): _*)
     .settings(
-      // protobuf compilation
-      // Into a subdirectory of src_managed to avoid it deleting other generated files; see https://github.com/sbt/sbt-buildinfo/issues/149
-      (Compile / PB.targets) := Seq(
-        scalapb.gen() -> (Compile / sourceManaged).value / "protobuf"
-      ),
-      // protobuf API version file is now provided in src/main/resources/extvm/VERSION
       // Packaging
       maintainer := "chippr-robotics@github.com",
       (Compile / mainClass) := Some("com.chipprbots.ethereum.App"),
@@ -396,10 +390,7 @@ lazy val node = {
       }
     )
 
-  if (!nixBuild)
-    node
-  else
-    node.settings((Compile / PB.protocExecutable) := file("protoc"))
+  node
 
 }
 
@@ -409,9 +400,7 @@ coverageMinimumStmtTotal := 70
 coverageFailOnMinimum := true
 coverageHighlighting := true
 coverageExcludedPackages := Seq(
-  "com\\.chipprbots\\.ethereum\\.extvm\\.msg.*", // Protobuf generated code
-  "com\\.chipprbots\\.ethereum\\.utils\\.BuildInfo", // BuildInfo generated code
-  ".*\\.protobuf\\..*" // All protobuf packages
+  "com\\.chipprbots\\.ethereum\\.utils\\.BuildInfo" // BuildInfo generated code
 ).mkString(";")
 coverageExcludedFiles := Seq(
   ".*/src_managed/.*", // All managed sources
@@ -584,6 +573,5 @@ scapegoatConsoleOutput := false
 scapegoatDisabledInspections := Seq("UnsafeTraversableMethods")
 scapegoatIgnoredFiles := Seq(
   ".*/src_managed/.*",
-  ".*/target/.*protobuf/.*",
   ".*/BuildInfo\\.scala"
 )
