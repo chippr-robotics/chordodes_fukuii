@@ -39,6 +39,7 @@ import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.BlockHash
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect
+import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 
@@ -477,11 +478,11 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     peersInfoHolder ! MessageFromPeer(trieNodes, peer1.id)
     peersInfoHolder ! MessageFromPeer(byteCodes, peer1.id)
 
-    // Then they should be routed to SNAPSyncController
-    snapSyncController.expectMsg(accountRange)
-    snapSyncController.expectMsg(storageRanges)
-    snapSyncController.expectMsg(trieNodes)
-    snapSyncController.expectMsg(byteCodes)
+    // Then they should be routed to SNAPSyncController wrapped in Command ADT
+    snapSyncController.expectMsg(SNAPSyncController.AccountRangeResponse(accountRange))
+    snapSyncController.expectMsg(SNAPSyncController.StorageRangesResponse(storageRanges))
+    snapSyncController.expectMsg(SNAPSyncController.TrieNodesResponse(trieNodes))
+    snapSyncController.expectMsg(SNAPSyncController.ByteCodesResponse(byteCodes))
   }
 
   it should "handle SNAP messages gracefully when SNAPSyncController is not registered" taggedAs (

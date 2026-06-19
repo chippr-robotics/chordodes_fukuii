@@ -296,7 +296,7 @@ class AccountRangeCoordinatorSpec
     // Simulate what the AccountRangeWorker sends back when it verifies a proof-only empty AccountRange.
     coordinator ! Messages.TaskComplete(BigInt(1), Right((0, Seq.empty, Seq(ByteString("boundary-proof")))))
 
-    snapSyncController.expectMsgType[Messages.AccountRangeProgress](3.seconds)
+    snapSyncController.expectMsgType[SNAPSyncController.AccountRangeProgressCmd](3.seconds)
     snapSyncController.expectMsg(3.seconds, SNAPSyncController.AccountRangeSyncComplete)
   }
 
@@ -460,7 +460,7 @@ class AccountRangeCoordinatorSpec
     // Stop the coordinator — PostStop fires and sends AccountRangeProgress
     system.stop(coordinator)
 
-    val progressMsg = snapSyncController.expectMsgType[Messages.AccountRangeProgress](3.seconds)
+    val progressMsg = snapSyncController.expectMsgType[SNAPSyncController.AccountRangeProgressCmd](3.seconds)
     // concurrency=1 → 1 task → 1 entry in the progress map
     progressMsg.progress should not be empty
   }
