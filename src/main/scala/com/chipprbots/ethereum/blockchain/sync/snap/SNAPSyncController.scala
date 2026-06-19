@@ -3368,12 +3368,18 @@ class SNAPSyncController(
     }
   }
 
-  /** Layer 2: shared, lazily-built persisted-frontier handle for the healing coordinator. `None` (the default,
-    * `healing-frontier-persistence = false`) keeps Layer-1 behaviour — no CF writes, always full DFS on restart. Reuses
-    * the node's existing RocksDB DataSource (via `flatSlotStorage`); the CF auto-creates on open.
+  /** Layer 2: shared, lazily-built persisted-frontier handle for the healing coordinator. Reuses the node's existing
+    * RocksDB DataSource (via `flatSlotStorage`); the CF (`'g'`) auto-creates on open.
+    *
+    * Built when EITHER `healing-frontier-persistence` (frontier resume, Layer 2) OR `pruned-heal-verification` (spec
+    * 005 subtree-complete records, additive sentinels in the SAME CF `'g'`) is enabled. Both features only ever WRITE
+    * to CF `'g'`; the subtree-complete records are root-independent and never affect the frontier-resume path
+    * (`loadAll` filters them out), so co-enabling them is safe. `None` (both off) keeps Layer-1 behaviour — no CF
+    * writes, always full DFS on restart, no pruning.
     */
   private lazy val healingFrontierStorageOpt: Option[HealingFrontierStorage] =
-    if (snapSyncConfig.healingFrontierPersistence) Some(new HealingFrontierStorage(flatSlotStorage.dataSource))
+    if (snapSyncConfig.healingFrontierPersistence || snapSyncConfig.prunedHealVerification)
+      Some(new HealingFrontierStorage(flatSlotStorage.dataSource))
     else None
 
   private lazy val bfsQueueStorage: BfsQueueStorage =
@@ -3419,6 +3425,10 @@ class SNAPSyncController(
               frontierLowWater = snapSyncConfig.healingFrontierLowWater,
               scopedHealVerification = snapSyncConfig.scopedHealVerification,
               scopedHealMaxPaths = snapSyncConfig.scopedHealMaxPaths,
+              prunedHealVerification = snapSyncConfig.prunedHealVerification,
+              // spec 002/003 frontier-persistence + resume + completeness marker — gated SEPARATELY from the spec-005
+              // store presence so the store may exist (for subtree records) while these stay dark by default (FR-005).
+              frontierPersistenceEnabled = snapSyncConfig.healingFrontierPersistence,
               decoupledHealServeRoot = snapSyncConfig.decoupledHealServeRoot,
               decoupledHealMaxAttemptsNoRefresh = snapSyncConfig.decoupledHealMaxAttemptsNoRefresh
             )
@@ -3486,6 +3496,10 @@ class SNAPSyncController(
                   frontierLowWater = snapSyncConfig.healingFrontierLowWater,
                   scopedHealVerification = snapSyncConfig.scopedHealVerification,
                   scopedHealMaxPaths = snapSyncConfig.scopedHealMaxPaths,
+                  prunedHealVerification = snapSyncConfig.prunedHealVerification,
+                  // spec 002/003 frontier-persistence + resume + completeness marker — gated SEPARATELY from the
+                  // spec-005 store presence so the store may exist (for subtree records) while these stay dark (FR-005).
+                  frontierPersistenceEnabled = snapSyncConfig.healingFrontierPersistence,
                   decoupledHealServeRoot = snapSyncConfig.decoupledHealServeRoot,
                   decoupledHealMaxAttemptsNoRefresh = snapSyncConfig.decoupledHealMaxAttemptsNoRefresh
                 )
@@ -4898,6 +4912,14 @@ case class SNAPSyncConfig(
     // Upper bound on the in-memory healed-paths set (spec 003 FR-011). Over-bound rounds fall back to
     // full-root verification rather than growing the set, bounding its worst-case heap.
     scopedHealMaxPaths: Int = 200000,
+    // Pruned (descend-and-stop) post-heal verification (spec 005). When true (default), the completeness
+    // verification treats a present node that has a durable subtree-complete record (HealingFrontierStorage
+    // CF 'g', spec 005) as a verified frontier leaf and does NOT descend its subtree, so a fresh node's first
+    // verification costs O(missing-frontier) instead of re-reading the whole ~90M-node trie (~16-20h). Records
+    // are root-INDEPENDENT (content-addressed), seeded crash-safely during the SNAP/heal write path, and never
+    // cleared. Effective ONLY under storageScheme == Hash; off ⇒ Path scheme ⇒ no records ⇒ the unchanged
+    // full-trie walk (byte-identical completion decision/state root/marker). Set false to force the full walk.
+    prunedHealVerification: Boolean = true,
     // Decoupled heal serve-root (spec 004 FR-008). When true (default), the healing fetch targets an advancing
     // newest-servable serve root while the completeness walk stays pinned to the fixed walk root. Off ⇒ coupled
     // behaviour (fetch uses the walk root), byte-identical to today. Consensus-safety rests on the unchanged
@@ -5043,6 +5065,10 @@ object SNAPSyncConfig {
         if (snapConfig.hasPath("scoped-heal-max-paths"))
           snapConfig.getInt("scoped-heal-max-paths")
         else 200000,
+      prunedHealVerification =
+        if (snapConfig.hasPath("pruned-heal-verification"))
+          snapConfig.getBoolean("pruned-heal-verification")
+        else true,
       decoupledHealServeRoot =
         if (snapConfig.hasPath("decoupled-heal-serve-root"))
           snapConfig.getBoolean("decoupled-heal-serve-root")

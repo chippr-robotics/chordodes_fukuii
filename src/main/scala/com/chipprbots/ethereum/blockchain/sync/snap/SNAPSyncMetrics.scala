@@ -237,6 +237,27 @@ object SNAPSyncMetrics extends MetricsContainer {
   final private val HealingScopedDurationMsGauge =
     metrics.registry.gauge("snapsync.healing.scoped_duration_ms.gauge", new AtomicLong(0L))
 
+  // ===== Pruned (descend-and-stop) Verification (spec 005 C8/FR-009 — observation-only) =====
+  //
+  // Report whether the last verification engaged the descend-and-stop oracle (vs the full-trie walk), how many
+  // present subtrees it pruned (the savings), how many nodes it visited, and how long it took. These NEVER gate any
+  // consensus or completion decision — pure instrumentation pushed by `TrieNodeHealingCoordinator`. Nodes-visited
+  // reuses the existing `HealingRebuildVisitedGauge` (`snapsync.healing.rebuild_visited.gauge`).
+
+  /** 1 = the last verification engaged the PRUNED (descend-and-stop) path; 0 = full-trie walk (flag off / Path / no
+    * store).
+    */
+  final private val HealingPrunedVerificationGauge =
+    metrics.registry.gauge("snapsync.healing.pruned_verification.gauge", new AtomicLong(0L))
+
+  /** Number of present, recorded-complete subtrees the pruned verification skipped (descend-and-stop hits). */
+  final private val HealingPrunedSubtreesGauge =
+    metrics.registry.gauge("snapsync.healing.pruned_subtrees.gauge", new AtomicLong(0L))
+
+  /** Wall time (ms) of the last pruned verification, from launch to the clean-pass completion. */
+  final private val HealingPrunedDurationMsGauge =
+    metrics.registry.gauge("snapsync.healing.pruned_duration_ms.gauge", new AtomicLong(0L))
+
   // ===== Decoupled Heal Serve-Root (spec 004 C9/FR-010 — observation-only) =====
   //
   // Distinguish the fixed completeness WALK root from the advancing SERVE root used to fetch missing nodes,
@@ -445,6 +466,11 @@ object SNAPSyncMetrics extends MetricsContainer {
   def setHealingScopedVerification(scoped: Long): Unit = HealingScopedVerificationGauge.set(scoped)
   def setHealingScopedSubtrees(count: Long): Unit = HealingScopedSubtreesGauge.set(count)
   def setHealingScopedDurationMs(ms: Long): Unit = HealingScopedDurationMsGauge.set(ms)
+
+  // spec 005 C8/FR-009 — pruned (descend-and-stop) verification observability (never gates completion).
+  def setHealingPrunedVerification(pruned: Long): Unit = HealingPrunedVerificationGauge.set(pruned)
+  def setHealingPrunedSubtrees(count: Long): Unit = HealingPrunedSubtreesGauge.set(count)
+  def setHealingPrunedDurationMs(ms: Long): Unit = HealingPrunedDurationMsGauge.set(ms)
 
   // spec 004 C9/T019 — decoupled heal serve-root (observation-only)
   def setHealingDecoupledEngaged(engaged: Boolean): Unit = HealingDecoupledEngagedGauge.set(if (engaged) 1L else 0L)
