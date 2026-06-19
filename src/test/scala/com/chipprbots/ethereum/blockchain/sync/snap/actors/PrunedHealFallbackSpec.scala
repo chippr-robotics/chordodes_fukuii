@@ -14,7 +14,7 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.blockchain.sync.snap._
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.db.dataSource.{RocksDbConfig, RocksDbDataSource}
-import com.chipprbots.ethereum.db.storage.{HealingFrontierStorage, Namespaces}
+import com.chipprbots.ethereum.db.storage.{HealingFrontierStorage, Namespaces, PathNodeStorage}
 import com.chipprbots.ethereum.metrics.Metrics
 import com.chipprbots.ethereum.mpt.{BranchNode, HashNode, LeafNode, MptNode, MptTraversals, NullNode}
 import com.chipprbots.ethereum.network.p2p.messages.SNAP
@@ -109,12 +109,21 @@ class PrunedHealFallbackSpec
   /** Build a verification-driving fixture. `markComplete()` + empty frontier + `frontierPersistenceEnabled = true`
     * routes `StartTrieNodeHealing` to the verification pass (so we can drive the WALK directly). For the default-off
     * decoupling test we instead build with persistence OFF and drive the HEAL flow.
+    *
+    * `seedPathRoot` is required only by the Path-scheme case: under the Path scheme the coordinator's `isNodeInStorage`
+    * gate reads the root through a `PathNodeStorage` (path-keyed), NOT through the hash-keyed `mptStorage` the BFS walk
+    * later traverses. Without a populated `PathNodeStorage` the gate returns false, `StartTrieNodeHealing` takes the
+    * fresh-root-seed branch (which waits for a peer that never arrives) instead of the verification pass, and the test
+    * times out. Seeding the root node's RLP at the empty account-trie path makes the gate match so the verification
+    * walk actually runs — the walk itself reads hash-keyed from `mptStorage`, so a single root entry is enough to enter
+    * and complete the Path-scheme walk over the already-present subtree.
     */
   private def withVerificationFixture(
       stateRoot: ByteString,
       storage: TestMptStorage,
       prunedHealVerification: Boolean,
-      storageScheme: StorageScheme
+      storageScheme: StorageScheme,
+      seedPathRoot: Boolean = false
   )(body: (ActorRef, HealingFrontierStorage, TestProbe) => Unit): Unit = {
     val pool = Executors.newSingleThreadExecutor()
     val ec = ExecutionContext.fromExecutorService(pool)
@@ -122,6 +131,15 @@ class PrunedHealFallbackSpec
     val dataSource = RocksDbDataSource(rocksDbConfig(dbPath), Namespaces.nsSeq)
     val store = new HealingFrontierStorage(dataSource)
     store.markComplete()
+
+    // Path-scheme only: make the root readable through the path-keyed gate so the verification walk is entered.
+    val pathNodeStorageOpt: Option[PathNodeStorage] =
+      if (seedPathRoot) {
+        val pns = new PathNodeStorage(dataSource)
+        val rootRlp = storage.get(stateRoot.toArray).encode // == kec256(rootRlp) == stateRoot by construction
+        pns.writeAccountNode(Array.empty[Byte], stateRoot, rootRlp)
+        Some(pns)
+      } else None
 
     val controller = TestProbe()
     val coordinator = system.actorOf(
@@ -135,6 +153,7 @@ class PrunedHealFallbackSpec
         healingFrontierStorage = Some(store),
         healingWriterEcOverride = Some(ec),
         storageScheme = storageScheme,
+        pathNodeStorageOpt = pathNodeStorageOpt,
         prunedHealVerification = prunedHealVerification,
         frontierPersistenceEnabled = true
       )
@@ -188,16 +207,22 @@ class PrunedHealFallbackSpec
     val storage = new TestMptStorage()
     val (root, subtreeRoot) = presentSubtree(storage)
     // Path scheme ⇒ prunedEnabled is false even with the flag on (D5: Hash-scheme only). The hash-keyed record must
-    // never gate a Path-scheme verification.
-    withVerificationFixture(root, storage, prunedHealVerification = true, storageScheme = StorageScheme.Path) {
-      (coordinator, store, controller) =>
-        store.markSubtreeComplete(subtreeRoot)
-        SNAPSyncMetrics.setHealingPrunedVerification(-1L)
-        SNAPSyncMetrics.setHealingPrunedSubtrees(-1L)
-        coordinator ! Messages.StartTrieNodeHealing(root)
-        awaitStateHealingComplete(controller)
-        gaugeValue("snapsync.healing.pruned_verification.gauge") shouldBe 0.0 +- 1e-9
-        gaugeValue("snapsync.healing.pruned_subtrees.gauge") shouldBe 0.0 +- 1e-9
+    // never gate a Path-scheme verification. `seedPathRoot = true` makes the path-keyed `isNodeInStorage` gate match so
+    // the verification walk is actually entered (the walk reads the present subtree hash-keyed from `mptStorage`).
+    withVerificationFixture(
+      root,
+      storage,
+      prunedHealVerification = true,
+      storageScheme = StorageScheme.Path,
+      seedPathRoot = true
+    ) { (coordinator, store, controller) =>
+      store.markSubtreeComplete(subtreeRoot)
+      SNAPSyncMetrics.setHealingPrunedVerification(-1L)
+      SNAPSyncMetrics.setHealingPrunedSubtrees(-1L)
+      coordinator ! Messages.StartTrieNodeHealing(root)
+      awaitStateHealingComplete(controller)
+      gaugeValue("snapsync.healing.pruned_verification.gauge") shouldBe 0.0 +- 1e-9
+      gaugeValue("snapsync.healing.pruned_subtrees.gauge") shouldBe 0.0 +- 1e-9
     }
   }
 

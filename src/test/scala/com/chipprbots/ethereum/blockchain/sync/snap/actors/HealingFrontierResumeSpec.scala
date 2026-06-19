@@ -107,6 +107,7 @@ class HealingFrontierResumeSpec
         batchSize = 16,
         snapSyncController = controllerProbe.ref,
         healingFrontierStorage = if (persistence) Some(store) else None,
+        frontierPersistenceEnabled = persistence,
         healingWriterEcOverride = Some(ec)
       )
     )
