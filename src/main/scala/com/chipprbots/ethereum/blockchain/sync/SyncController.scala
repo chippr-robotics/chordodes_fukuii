@@ -1169,9 +1169,9 @@ class SyncController(
 
     val snapSyncConfig = loadSnapSyncConfig()
 
-    val snapSync = context.actorOf(
-      SNAPSyncController
-        .props(
+    val snapSync = context
+      .spawn(
+        SNAPSyncController(
           blockchainReader,
           blockchainWriter,
           appStateStorage,
@@ -1183,11 +1183,13 @@ class SyncController(
           syncConfig,
           snapSyncConfig,
           scheduler,
-          blacklist
-        )
-        .withDispatcher("sync-dispatcher"),
-      s"snap-sync-$syncGeneration"
-    )
+          blacklist,
+          syncController = self
+        ),
+        s"snap-sync-$syncGeneration",
+        DispatcherSelector.fromConfig("sync-dispatcher")
+      )
+      .toClassic
 
     // Register SNAPSyncController with NetworkPeerManagerActor for message routing
     networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterSnapSyncController(snapSync)

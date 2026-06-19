@@ -16,10 +16,13 @@ object Messages {
   /** Dynamically adjust per-peer concurrency budget for a coordinator. Sent by SNAPSyncController at phase transitions
     * to implement global per-peer request budgeting (Geth-aligned: total 5 requests per peer across all coordinators).
     *
-    * Extends `ByteCodeCoordinator.Command` so the now-Typed ByteCodeCoordinator can receive it in its sealed ADT. The
-    * other coordinators are still Classic and match the case class directly, so the marker trait is inert for them.
+    * Extends all four coordinator Command traits so each Typed coordinator can receive it directly.
     */
-  case class UpdateMaxInFlightPerPeer(newLimit: Int) extends ByteCodeCoordinator.Command
+  case class UpdateMaxInFlightPerPeer(newLimit: Int)
+      extends ByteCodeCoordinator.Command
+      with StorageRangeCoordinator.Command
+      with AccountRangeCoordinator.Command
+      with TrieNodeHealingCoordinator.Command
 
   // ========================================
   // AccountRange Messages
