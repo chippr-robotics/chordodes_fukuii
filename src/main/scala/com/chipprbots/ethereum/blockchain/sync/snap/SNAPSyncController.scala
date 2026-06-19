@@ -311,14 +311,17 @@ class SNAPSyncController(
   private var pivotBootstrapRetryTask: Option[Cancellable] = None
   private var rateTrackerTuneTask: Option[Cancellable] = None
 
-  private case object RetryPivotRefresh
-  private case class RetryBootstrapAtBlock(blockNumber: BigInt)
-  private case object CheckSnapCapability
-  private case object TuneRateTracker
-  private case object EvictNonSnapPeers
-  private case class PivotProbeTimeout(requestId: BigInt)
-  private case object DormantWakeUp
-  private case class DelayedRestart(reason: String)
+  // SNAP1 Phase 1: these private timer/async messages extend the companion's sealed
+  // Command (same source file, so sealing holds). They relocate into the companion in
+  // Phase 2 when the class body is rewritten as Typed behaviors.
+  private case object RetryPivotRefresh extends Command
+  private case class RetryBootstrapAtBlock(blockNumber: BigInt) extends Command
+  private case object CheckSnapCapability extends Command
+  private case object TuneRateTracker extends Command
+  private case object EvictNonSnapPeers extends Command
+  private case class PivotProbeTimeout(requestId: BigInt) extends Command
+  private case object DormantWakeUp extends Command
+  private case class DelayedRestart(reason: String) extends Command
   private var snapCapabilityCheckTask: Option[Cancellable] = None
   private var snapPeerEvictionTask: Option[Cancellable] = None
   // Eviction-churn guard: if eviction keeps firing without the snap-peer count ever rising, the network simply has no
@@ -1415,10 +1418,10 @@ class SNAPSyncController(
 
   // Internal message for periodic storage stagnation checks
   // Unified stagnation detection — single timer dispatches to the active coordinator
-  private case object CheckDownloadStagnation
-  private case class AccountCoordinatorProgress(progress: actors.AccountRangeStats)
-  private case class StorageCoordinatorProgress(stats: actors.StorageRangeCoordinator.SyncStatistics)
-  private case class ByteCodeCoordinatorProgress(progress: actors.Messages.ByteCodeProgress)
+  private case object CheckDownloadStagnation extends Command
+  private case class AccountCoordinatorProgress(progress: actors.AccountRangeStats) extends Command
+  private case class StorageCoordinatorProgress(stats: actors.StorageRangeCoordinator.SyncStatistics) extends Command
+  private case class ByteCodeCoordinatorProgress(progress: actors.Messages.ByteCodeProgress) extends Command
 
   private def scheduleStagnationChecks(): Unit = {
     accountStagnationCheckTask.foreach(_.cancel())
@@ -3124,7 +3127,7 @@ class SNAPSyncController(
   }
 
   // Internal message for periodic account range requests
-  private case object RequestAccountRanges
+  private case object RequestAccountRanges extends Command
 
   private def requestAccountRanges(): Unit =
     // Notify coordinator of available peers. Filter does NOT require maxBlockNumber >= pivot
@@ -3150,7 +3153,7 @@ class SNAPSyncController(
     }
 
   // Internal message for periodic bytecode requests
-  private case object RequestByteCodes
+  private case object RequestByteCodes extends Command
 
   private def requestByteCodes(): Unit =
     // Notify coordinator of available peers
@@ -3171,7 +3174,7 @@ class SNAPSyncController(
     }
 
   // Internal message for periodic storage range requests
-  private case object RequestStorageRanges
+  private case object RequestStorageRanges extends Command
 
   private def requestStorageRanges(): Unit =
     // Notify coordinator of available peers.
@@ -3380,10 +3383,10 @@ class SNAPSyncController(
   }
 
   // Internal messages for async trie walk
-  private case class TrieWalkResult(missingNodes: Seq[(Seq[ByteString], ByteString)])
-  private case class TrieWalkBatch(missingNodes: Seq[(Seq[ByteString], ByteString)])
-  private case class TrieWalkComplete(totalFound: Int)
-  private case class TrieWalkFailed(error: String)
+  private case class TrieWalkResult(missingNodes: Seq[(Seq[ByteString], ByteString)]) extends Command
+  private case class TrieWalkBatch(missingNodes: Seq[(Seq[ByteString], ByteString)]) extends Command
+  private case class TrieWalkComplete(totalFound: Int) extends Command
+  private case class TrieWalkFailed(error: String) extends Command
 
   // Async validation messages. `generation` is captured at Future-spawn time
   // (or schedule time, for ValidationRetry) and matched against
@@ -3392,14 +3395,14 @@ class SNAPSyncController(
       generation: Long,
       result: Either[String, Seq[ByteString]],
       elapsedMs: Long
-  )
+  ) extends Command
   private case class ValidateStorageTriesResult(
       generation: Long,
       result: Either[String, Seq[ByteString]],
       elapsedMs: Long
-  )
-  private case class ValidationRetry(generation: Long)
-  private case object ScheduledTrieWalk
+  ) extends Command
+  private case class ValidationRetry(generation: Long) extends Command
+  private case object ScheduledTrieWalk extends Command
 
   /** Start an async trie walk to discover missing nodes. Guards against concurrent walks. Uses streaming to emit
     * batches as they are found — critical for mainnet-scale tries where a full blocking walk can take hours before the
@@ -3606,8 +3609,8 @@ class SNAPSyncController(
     }
 
   // Internal message for periodic healing requests
-  private case object RequestTrieNodeHealing
-  private case object EnsureSnapServerPeersConnected
+  private case object RequestTrieNodeHealing extends Command
+  private case object EnsureSnapServerPeersConnected extends Command
 
   private def requestTrieNodeHealing(): Unit =
     // Notify coordinator of available peers
@@ -4713,6 +4716,48 @@ class SNAPSyncController(
 
 object SNAPSyncController {
 
+  // ───────────────────────────────────────────────────────────────────────────
+  // Command ADT (SNAP1 migration — Pekko Classic→Typed)
+  //
+  // Sealed in this companion: every inbound message the Typed SNAPSyncController
+  // accepts extends Command. All subtypes live in this source file, so the trait
+  // can be sealed (Scala 3 file-scope sealing). Some private subtypes are still
+  // declared in the class body (above) during Phase 1; they extend
+  // SNAPSyncController.Command in place and relocate to this companion in Phase 2.
+  //
+  // See .local/docs/moderization-review-june/SNAP1-SSC-ADT-design.md for the
+  // authoritative grouping (Groups 1–10) and the open-question resolutions.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  sealed trait Command
+
+  // ── Group 7: SNAP protocol responses (OQ-1) ───────────────────────────────
+  // NetworkPeerManagerActor (Typed core, Classic shell) routes raw SNAP wire
+  // responses to the SNAPSyncController ref. In Typed they must be Command-wrapped.
+  final case class AccountRangeResponse(msg: SNAP.AccountRange) extends Command
+  final case class ByteCodesResponse(msg: SNAP.ByteCodes) extends Command
+  final case class StorageRangesResponse(msg: SNAP.StorageRanges) extends Command
+  final case class TrieNodesResponse(msg: SNAP.TrieNodes) extends Command
+
+  // ── Group: ChainDownloader wrappers (OQ-2) ─────────────────────────────────
+  // ChainDownloader is Behavior[Any] (S6). Its outbound Progress/Done messages are
+  // wrapped so SSC's sealed mailbox accepts them.
+  private[snap] final case class ChainDownloaderProgress(
+      currentBlock: BigInt,
+      bodiesDownloaded: BigInt,
+      receiptsDownloaded: BigInt,
+      targetBlock: BigInt
+  ) extends Command
+  private[snap] case object ChainDownloaderDone extends Command
+
+  // ── Group: Peer-event wrappers (OQ-3 — PeerListHelper bridge) ──────────────
+  // SSC composes PeerListHelper (Group PLN). The handshaked-peers poll reply and
+  // the PeerDisconnected event are bridged into the Command ADT via messageAdapters.
+  final case class WrappedHandshakedPeers(
+      peers: Map[com.chipprbots.ethereum.network.Peer, com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo]
+  ) extends Command
+  final case class WrappedPeerDisconnected(peerId: com.chipprbots.ethereum.network.PeerId) extends Command
+
   sealed trait SyncPhase
   case object Idle extends SyncPhase
   case object AccountRangeSync extends SyncPhase
@@ -4741,7 +4786,7 @@ object SNAPSyncController {
     val name = "cl-driven"
   }
 
-  case object Start
+  case object Start extends Command
   case object Done
 
   /** Hint from `SyncController` that the consensus layer has pushed a fork-choice update. Carries the head's hash
@@ -4749,12 +4794,12 @@ object SNAPSyncController {
     * if FCU arrived before any `newPayload` for that head, in which case the controller falls back to a by-hash
     * `StartRegularSyncBootstrap` to fetch the header from peers). Closes #1207.
     */
-  final case class CLPivotHint(headHash: ByteString, knownHeader: Option[BlockHeader])
+  final case class CLPivotHint(headHash: ByteString, knownHeader: Option[BlockHeader]) extends Command
 
   /** Minimum block number the pivot must be at or above. Sent by SyncController when regular sync was stuck at a
     * specific block, so re-SNAP can't re-select the same pivot that caused the stall.
     */
-  final case class MinPivotBlock(minBlock: BigInt)
+  final case class MinPivotBlock(minBlock: BigInt) extends Command
 
   /** Bootstrap-by-hash variant of `StartRegularSyncBootstrap`. Used when the CL drives sync and we know the head hash
     * but not its block number — `PivotHeaderBootstrap` then fetches by `GetBlockHeaders(Right(hash))`. Closes #1207.
@@ -4770,16 +4815,17 @@ object SNAPSyncController {
   case class StartRegularSyncBootstrap(targetBlock: BigInt) // Request bootstrap from SyncController
   final case class BootstrapComplete(
       pivotHeader: Option[BlockHeader] = None
-  ) // Signal from SyncController that bootstrap is done
+  ) extends Command // Signal from SyncController that bootstrap is done
   final case class PivotBootstrapFailed(
       reason: String
-  ) // Signal from SyncController that pivot header bootstrap exhausted retries
-  private case object RetrySnapSyncStart // Internal message to retry SNAP sync start after bootstrap
-  private case object FlushPeerDisconnects // Debounce flush: forward batched PeerUnavailable to coordinators
-  case object AccountRangeSyncComplete
-  case object ByteCodeSyncComplete
-  case object StorageRangeSyncComplete
-  case object StorageRangeSyncForceCompleted
+  ) extends Command // Signal from SyncController that pivot header bootstrap exhausted retries
+  private case object RetrySnapSyncStart extends Command // Internal message to retry SNAP sync start after bootstrap
+  private case object FlushPeerDisconnects
+      extends Command // Debounce flush: forward batched PeerUnavailable to coordinators
+  case object AccountRangeSyncComplete extends Command
+  case object ByteCodeSyncComplete extends Command
+  case object StorageRangeSyncComplete extends Command
+  case object StorageRangeSyncForceCompleted extends Command
 
   /** Inline contract data dispatched from AccountRangeCoordinator after each account batch. Geth-aligned: bytecodes and
     * storage tasks are populated inline from processAccountResponse(), not queried after account download completes.
@@ -4787,11 +4833,17 @@ object SNAPSyncController {
   final case class IncrementalContractData(
       codeHashes: Seq[ByteString],
       storageTasks: Seq[StorageTask]
-  )
-  case object StateHealingComplete
-  case object HealingAllPeersStateless
-  case object StateValidationComplete
-  case object GetProgress
+  ) extends Command
+  case object StateHealingComplete extends Command
+  case object HealingAllPeersStateless extends Command
+  case object StateValidationComplete extends Command
+
+  // ── Group 3: Status / progress queries (C3 — explicit replyTo, OQ-5) ───────
+  // The 11 sender() call sites collapse into these two query Commands. The reply
+  // types (SyncProtocol.Status, SyncProgress) are unchanged; only the request gains
+  // a replyTo. Callers update in Phase 3 (Classic callers use the AskPattern adapter).
+  final case class GetStatus(replyTo: org.apache.pekko.actor.typed.ActorRef[SyncProtocol.Status]) extends Command
+  final case class GetProgress(replyTo: org.apache.pekko.actor.typed.ActorRef[SyncProgress]) extends Command
 
   /** spec 004 (Decoupled Heal Serve-Root) T011/T012: SNAPSyncController → SyncController (parent). During healing, ask
     * the parent to fetch a newest-servable canonical header (networkBest − RecentRootMarginBlocks) via its own
@@ -4805,41 +4857,49 @@ object SNAPSyncController {
     * `stateRoot = None` if none could be fetched (no peers / bootstrap failed / timeout). On `None`, the controller
     * keeps the current serve root (U2) and does NOT push a HealingServeRootRefresh.
     */
-  final case class HealingServeRoot(blockNumber: BigInt, stateRoot: Option[ByteString])
+  final case class HealingServeRoot(blockNumber: BigInt, stateRoot: Option[ByteString]) extends Command
 
   /** Signal from coordinators that the current pivot/stateRoot is likely not serveable by peers.
     *
     * This is analogous to Nethermind's ExpiredRootHash detection (empty payload + empty proofs).
     */
   final case class PivotStateUnservable(rootHash: ByteString, reason: String, consecutiveEmptyResponses: Int)
+      extends Command
 
   /** Progress updates emitted by worker coordinators.
     *
     * These are deltas (increments), not absolute totals.
     */
-  final case class ProgressAccountsSynced(count: Long)
-  case object ProgressAccountsFinalizingTrie
-  case object ProgressAccountsTrieFinalized
-  final case class AccountTrieFinalized(finalizedRoot: ByteString)
-  final case class AccountTrieFinalizationFailed(error: String)
-  final case class ProgressBytecodesDownloaded(count: Long)
-  final case class ProgressStorageSlotsSynced(count: Long)
-  final case class ProgressNodesHealed(count: Long)
-  final case class ProgressAccountEstimate(estimatedTotal: Long)
-  final case class ProgressStorageContracts(completedContracts: Int, totalContracts: Int)
+  final case class ProgressAccountsSynced(count: Long) extends Command
+  case object ProgressAccountsFinalizingTrie extends Command
+  case object ProgressAccountsTrieFinalized extends Command
+  final case class AccountTrieFinalized(finalizedRoot: ByteString) extends Command
+  final case class AccountTrieFinalizationFailed(error: String) extends Command
+  final case class ProgressBytecodesDownloaded(count: Long) extends Command
+  final case class ProgressStorageSlotsSynced(count: Long) extends Command
+  final case class ProgressNodesHealed(count: Long) extends Command
+  final case class ProgressAccountEstimate(estimatedTotal: Long) extends Command
+  final case class ProgressStorageContracts(completedContracts: Int, totalContracts: Int) extends Command
 
   /** Sent by `StorageRangeCoordinator` to the controller when its pending-task queue crosses a watermark. The
     * controller forwards it to `AccountRangeCoordinator` as a `StorageQueuePressure` message so account workers stop
     * producing new storage tasks during back-pressure. Workers already in flight always run to completion.
     */
-  final case class StorageBackpressureChanged(paused: Boolean)
+  final case class StorageBackpressureChanged(paused: Boolean) extends Command
 
   /** Sent by `ByteCodeCoordinator` to the controller when its pending-task queue crosses a watermark. Forwarded to
     * `AccountRangeCoordinator` as `ByteCodeQueuePressure`. Bytecode tasks are produced by account-range completions
     * (one task per batch of code hashes), so the pause/resume pattern is the same as storage. AccountRangeCoordinator
     * pauses dispatch if EITHER downstream coordinator is over its high-water mark.
     */
-  final case class ByteCodeBackpressureChanged(paused: Boolean)
+  final case class ByteCodeBackpressureChanged(paused: Boolean) extends Command
+
+  // ── Group 5 (cont.): HealingStagnated — coordinator → SSC progress push ────
+  // TNHC sends this OUTBOUND (it was pulled out of TrieNodeHealingCoordinatorMessage
+  // in S3, then lived in actors/Messages.scala). SSC receives it, so for the sealed
+  // Command ADT it is relocated here. Phase 3 removes actors.Messages.HealingStagnated
+  // and updates TNHC's two send sites to SNAPSyncController.HealingStagnated.
+  final case class HealingStagnated(healed: Long, pending: Long) extends Command
 
   private[snap] def shouldSkipHealingAfterDownloads(
       snapSyncConfig: SNAPSyncConfig,
