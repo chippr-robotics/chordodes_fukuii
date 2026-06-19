@@ -448,34 +448,57 @@ logger.info("key={} key2={}", value1, value2)
 log.warn("...")   // NOT log.warning — fix inline as bucket-A cleanup
 ```
 
-### In Futures, BFS walks, and off-thread callbacks (Typed actors)
+### In Futures, CE IO computations, BFS walks, and off-thread callbacks (Typed actors)
 
-`context.log` is only safe on the actor thread. Any code inside a `Future`,
-`onComplete`, BFS traversal, or closure passed to a non-actor `ExecutionContext`
-must use a plain SLF4J logger (`asyncLog`) instead.
+`context.log` is only safe on the actor thread. Any code inside a `Future`, a Cats Effect
+`IO { }` block, an `onComplete`, BFS traversal, or closure passed to a non-actor
+`ExecutionContext` or CE scheduler must use a plain SLF4J logger (`asyncLog`) instead.
+
+The violation is often silent: code compiles, most tests pass, but a specific code path that
+only runs off-thread will blow up at runtime. Classic symptom (found in S4 migration): tests
+for the happy path pass but a single error-branch test fails — the error path was the only one
+that called `ctx.log` from a CE `io-compute-N` thread.
+
+The **indirect** case is the most dangerous: a `private def` using `ctx.log` looks fine at
+its definition site but becomes a violation the moment it is called from a CE fiber or Future
+callback. Default `private def` helpers that do any logging to `asyncLog` to prevent this.
 
 ```scala
 // Declare alongside ctx at actor construction:
 private val asyncLog = LoggerFactory.getLogger(getClass)
 
-// ✅ Off-thread (Future body, BFS walk, onComplete):
+// ✅ Off-thread (Future body, IO block, BFS walk, onComplete):
 asyncLog.info("key={} key2={}", value1, value2)
 asyncLog.warn("reason={}", reason)
 
 // ✅ On actor thread (message handlers):
 ctx.log.info("key={} key2={}", value1, value2)
+
+// ❌ private def with ctx.log — unsafe if called from CE IO or Future:
+private def processNodes(nodes: List[Node]): Unit =
+  nodes.foreach { n => ctx.log.debug("node={}", n.hash) }  // blows up on io-compute thread
+
+// ✅ Use asyncLog in any private def that may be called off-thread:
+private def processNodes(nodes: List[Node]): Unit =
+  nodes.foreach { n => asyncLog.debug("node={}", n.hash) }
 ```
 
-**Rule:** If the call site is inside a lambda passed to an `ExecutionContext`, use `asyncLog`.
-If it is directly in a message handler `case`, use `ctx.log`. When in doubt, check whether
-the enclosing `{}` block is an actor message handler or a callback — one `ExecutionContext`
-boundary is enough to require `asyncLog`.
+**Rule:** If the call site is inside a lambda passed to an `ExecutionContext` or CE scheduler,
+use `asyncLog`. If it is directly in a `Behaviors.receive*` message handler `case`, use `ctx.log`.
+When in doubt: `asyncLog` is always safe; `ctx.log` is only safe on the actor mailbox thread.
 
-**Sweep for misuse:**
+**Sweeps for misuse:**
 ```bash
+# CE IO thread violation: ctx.log inside IO { } block
+grep -rn "IO\s*{" src/main/ --include="*.scala" -A30 | grep "ctx\.log\|context\.log"
+
+# Future thread violation: ctx.log inside Future/callback closures
 grep -rn "ctx\.log\|context\.log" src/main/ --include="*.scala" -B5 \
   | grep -B5 "Future\|onComplete\|\.map\|\.flatMap\|\.recover"
-# Any hit inside a closure body is a correctness issue — replace with asyncLog
+
+# Indirect risk: private defs in Typed actors using ctx.log (manual review)
+grep -rn "private def" src/main/ --include="*.scala" -A20 \
+  | grep "ctx\.log\|context\.log"
 ```
 
 ---
@@ -573,9 +596,15 @@ grep -rn "} catch {" src/main/ --include="*.scala" -A5 | grep -v "log\.\|logger\
 # Unhandled message handlers with no log — target: 0
 grep -rn "Behaviors\.unhandled" src/main/ --include="*.scala" -B3 | grep -v "log\."
 
+# context.log inside CE IO blocks — target: 0 (use asyncLog instead)
+grep -rn "IO\s*{" src/main/ --include="*.scala" -A30 | grep "ctx\.log\|context\.log"
+
 # context.log inside Future/callback closures — target: 0 (use asyncLog instead)
 grep -rn "ctx\.log\|context\.log" src/main/ --include="*.scala" -B5 \
   | grep -B5 "Future\|onComplete\|\.map\|\.flatMap\|\.recover"
+
+# private defs in Typed actors using ctx.log — manual review: may be called from CE/Future
+grep -rn "private def" src/main/ --include="*.scala" -A20 | grep "ctx\.log\|context\.log"
 
 # Positional log messages (no key= prefix) — target: 0
 grep -rn 'log\.\(info\|warn\|error\|debug\)("[A-Za-z][^=]*{}' src/main/ --include="*.scala" | wc -l

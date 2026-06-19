@@ -4,6 +4,7 @@ import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.ExplicitlyTriggeredScheduler
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
@@ -562,16 +563,18 @@ class PivotBlockSelectorSpec
 
     def testScheduler: ExplicitlyTriggeredScheduler = system.scheduler.asInstanceOf[ExplicitlyTriggeredScheduler]
 
-    lazy val pivotBlockSelector: ActorRef = system.actorOf(
-      PivotBlockSelector.props(
-        networkPeerManager.ref,
-        peerMessageBus.ref,
-        defaultSyncConfig,
-        testScheduler,
-        fastSync.ref,
-        blacklist
+    lazy val pivotBlockSelector: ActorRef = system
+      .spawn(
+        PivotBlockSelector(
+          networkPeerManager.ref,
+          peerMessageBus.ref,
+          defaultSyncConfig,
+          fastSync.ref,
+          blacklist
+        ),
+        s"pivot-block-selector-${java.util.UUID.randomUUID()}"
       )
-    )
+      .toClassic
 
     val baseBlockHeader = Fixtures.Blocks.Genesis.header
 

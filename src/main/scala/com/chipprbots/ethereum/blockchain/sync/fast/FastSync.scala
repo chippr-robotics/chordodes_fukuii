@@ -124,10 +124,12 @@ class FastSync(
 
   def startFromScratch(): Unit = {
     log.info("Starting fast sync from scratch")
-    val pivotBlockSelector = context.actorOf(
-      PivotBlockSelector.props(networkPeerManager, peerEventBus, syncConfig, scheduler, context.self, blacklist),
-      "pivot-block-selector"
-    )
+    val pivotBlockSelector = context
+      .spawn(
+        PivotBlockSelector(networkPeerManager, peerEventBus, syncConfig, context.self, blacklist),
+        "pivot-block-selector"
+      )
+      .toClassic
     pivotBlockSelector ! PivotBlockSelector.SelectPivotBlock
     context.become(waitingForPivotBlock)
   }
@@ -136,9 +138,12 @@ class FastSync(
     case SyncProtocol.GetStatus => sender() ! SyncProtocol.Status.NotSyncing
     case RetryPivotBlockSelection =>
       log.info("Retrying pivot block selection")
-      val pivotBlockSelector = context.actorOf(
-        PivotBlockSelector.props(networkPeerManager, peerEventBus, syncConfig, scheduler, context.self, blacklist)
-      )
+      val pivotBlockSelector = context
+        .spawn(
+          PivotBlockSelector(networkPeerManager, peerEventBus, syncConfig, context.self, blacklist),
+          s"pivot-block-selector-retry-${java.util.UUID.randomUUID()}"
+        )
+        .toClassic
       pivotBlockSelector ! PivotBlockSelector.SelectPivotBlock
     case PivotBlockSelector.SelectionFailed =>
       log.warning(
@@ -424,10 +429,12 @@ class FastSync(
       syncState = syncState.copy(updatingPivotBlock = true)
       log.debug("Asking for new pivot block")
       val pivotBlockSelector =
-        context.actorOf(
-          PivotBlockSelector.props(networkPeerManager, peerEventBus, syncConfig, scheduler, context.self, blacklist),
-          s"$countActor-pivot-block-selector-update"
-        )
+        context
+          .spawn(
+            PivotBlockSelector(networkPeerManager, peerEventBus, syncConfig, context.self, blacklist),
+            s"$countActor-pivot-block-selector-update"
+          )
+          .toClassic
       pivotBlockSelector ! PivotBlockSelector.SelectPivotBlock
       context.become(waitingForPivotBlockUpdate(updateReason))
     }

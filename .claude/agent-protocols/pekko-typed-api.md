@@ -245,33 +245,67 @@ grep -rn "@volatile" src/main/ --include="*.scala" | grep -v "extends Actor\b"
 ## P11 — `asyncLog` (plain SLF4J) for off-thread code
 
 `context.log` is only safe on the actor thread. Calling it from inside a Future,
-BFS walk, or worker closure contaminates MDC, can produce interleaved output, and
-has undefined thread-safety guarantees under Pekko's internal implementation.
+CE IO computation, BFS walk, or worker closure violates Pekko's thread-safety contract
+on `ActorContext`. The violation is often silent — code compiles, but tests fail
+selectively depending on which code paths trigger the log call and under what thread
+scheduling. The error manifests as a runtime exception from inside `ActorContext`,
+not a compile error.
 
-**Pattern (from TNHC BFS walk + restart Future):**
+**S4 migration bug (io-compute thread variant):** `processNodes` was a `private def`
+containing `ctx.log.debug(...)`. The method was invoked from within a CE IO computation
+running on `io-compute-2`. Tests for `FullResponse` and `PartialResponse` passed because
+those paths never hit the `ctx.log` call. Only the `RequestFailed` branch triggered it,
+and only then did the actor context access blow up — making the bug appear specific to one
+message type when the root cause was the CE thread boundary.
+
+**Rule:** Any code that executes on a non-actor thread must use `asyncLog`. This includes:
+- `Future { }` bodies and `.map`, `.flatMap`, `.recover`, `.onComplete` callbacks
+- `IO { }` bodies and any Cats Effect `.flatMap`, `.map`, `.evalMap` chain
+- BFS / traversal callbacks passed to a non-actor `ExecutionContext`
+- Any `private def` that is called from within any of the above (indirect violation)
+
+The indirect case is the most dangerous: a `private def` using `ctx.log` looks fine at its
+definition site but becomes a violation the moment any caller invokes it from a CE fiber or
+Future callback. Defaulting `private def` helpers that do logging to `asyncLog` avoids this
+entirely.
+
+**Pattern (from TNHC BFS + S4 CE IO fix):**
 
 ```scala
-// Private plain SLF4J logger — safe from any thread
+// Declare alongside ctx — safe from any thread:
 private val asyncLog = LoggerFactory.getLogger(getClass)
 
-// ✅ In Future / BFS body / worker thread:
-asyncLog.info("Heal BFS step: node={} depth={}", nodeHash.short, depth)
-asyncLog.warn("Restart decision: reason={} canResume={}", reason, canResume)
+// ❌ private def with ctx.log — unsafe if called from CE IO or Future:
+private def processNodes(nodes: List[Node]): Unit =
+  nodes.foreach { n =>
+    ctx.log.debug("Processing node: {}", n.hash)  // blows up on io-compute thread
+  }
 
-// ✅ In actor-thread message handlers:
-ctx.log.info("Verification started: pivot={} queueDepth={}", pivot, queue.size)
+// ✅ Use asyncLog in any private def that may run off the actor thread:
+private def processNodes(nodes: List[Node]): Unit =
+  nodes.foreach { n =>
+    asyncLog.debug("Processing node: {}", n.hash)  // safe from any thread
+  }
+
+// ✅ Actor-thread message handlers: ctx.log is fine here
+case StartPhase(pivot) =>
+  ctx.log.info("Phase started: pivot={}", pivot)
 ```
 
-**Rule:** Any code that executes inside a `Future`, `onComplete`, `map`, or BFS/traversal
-callback passed to a non-actor `ExecutionContext` must use `asyncLog`, not `context.log`.
-Actor-thread message handlers always use `ctx.log`.
+**Sweeps — run during pre-migration checklist and after each migration:**
 
-**Actionable sweep — may catch existing correctness issues:**
 ```bash
-# context.log used inside Future closures — potential MDC contamination
+# Direct violation: ctx.log inside a CE IO block
+grep -rn "IO\s*{" src/main/ --include="*.scala" -A30 | grep "ctx\.log\|context\.log"
+
+# Direct violation: ctx.log inside Future/callback closures
 grep -rn "ctx\.log\|context\.log" src/main/ --include="*.scala" -B5 \
   | grep -B5 "Future\|onComplete\|\.map\|\.flatMap\|\.recover"
-# Review each hit — if it's inside a closure body, replace with asyncLog
+
+# Indirect risk: private defs in Typed actor files that use ctx.log
+# Manual review required — check if any are called from IO / Future chains
+grep -rn "private def" src/main/ --include="*.scala" -A20 \
+  | grep "ctx\.log\|context\.log"
 ```
 
 ---
@@ -298,6 +332,8 @@ grep -rn "PropsAdapter\b" src/main/ --include="*.scala"       # remove adapters
 grep -rn "Behavior\[Any\]" src/main/ --include="*.scala"      # narrow to real type
 grep -rn "ActorSystem\b" src/main/ --include="*.scala"        # flip to ActorSystem[Nothing]
 grep -rn "@volatile" src/main/ --include="*.scala"            # should be 0 in Typed actors (P10)
+grep -rn "IO\s*{" src/main/ --include="*.scala" -A30 \
+  | grep "ctx\.log\|context\.log"                             # P11: CE IO thread violation
 grep -rn "ctx\.log\|context\.log" src/main/ --include="*.scala" -B5 \
-  | grep -B5 "Future\|onComplete\|\.map\|flatMap\|\.recover"  # asyncLog violations (P11)
+  | grep -B5 "Future\|onComplete\|\.map\|flatMap\|\.recover"  # P11: Future thread violation
 ```

@@ -490,10 +490,11 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
       sender ! PeersClient.Response(fakePeer, ETHPackets.BlockBodies(BigInt(0), firstBlocksBatch.map(_.body)))
     }
 
-    /** Synchronise on BlockFetcher having finished processing the bodies response. 1s is well above observed CI latency
-      * for a single message hop; short sleep keeps local runs fast.
+    /** Synchronise on BlockFetcher having finished processing the bodies response. expectNoMessage drains the
+      * peersClient mailbox for the given window, guaranteeing the actor has processed the bodies reply before the
+      * caller sends InvalidateBlocksFrom.
       */
-    def awaitBodiesProcessed(): Unit = Thread.sleep(1000L)
+    def awaitBodiesProcessed(): Unit = peersClient.expectNoMessage(1.second)
 
     def handleFirstBlockBatch(): Unit = {
       handleFirstBlockBatchHeaders()
