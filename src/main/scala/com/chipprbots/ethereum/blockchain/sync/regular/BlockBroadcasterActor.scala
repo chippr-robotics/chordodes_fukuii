@@ -2,7 +2,6 @@ package com.chipprbots.ethereum.blockchain.sync.regular
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed.Behavior
-import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
@@ -40,10 +39,8 @@ object BlockBroadcasterActor {
           ctx.messageAdapter[NetworkPeerManagerActor.HandshakedPeers](msg => WrappedHandshakedPeers(msg.peers))
 
         val peerListHelper = new PeerListHelper(
-          networkPeerManager = networkPeerManager,
           peerEventBus = peerEventBus,
           blacklist = blacklist,
-          syncConfig = syncConfig,
           peerDisconnectedAdapter = peerDisconnectedAdapter,
           log = org.slf4j.LoggerFactory.getLogger(classOf[BlockBroadcasterImpl])
         )

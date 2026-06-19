@@ -5,7 +5,6 @@ import java.net.URI
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.actor.Props
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.io.Tcp
 import org.apache.pekko.testkit.TestActorRef

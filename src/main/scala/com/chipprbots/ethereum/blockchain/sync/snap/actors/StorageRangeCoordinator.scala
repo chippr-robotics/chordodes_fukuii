@@ -5,7 +5,6 @@ import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
@@ -89,7 +88,6 @@ private[actors] class StorageRangeCoordinatorImpl(
   // `self` was a Classic field; under Typed it is `context.self`. Captured here so Future
   // continuations and scheduled timers reference the same value the old code expected.
   private val self: org.apache.pekko.actor.typed.ActorRef[Command] = context.self
-  implicit private val ec: ExecutionContext = context.executionContext
 
   // Mutable state root — updated in-place when the controller refreshes the pivot.
   private var stateRoot: ByteString = initialStateRoot

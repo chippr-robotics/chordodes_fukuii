@@ -269,7 +269,7 @@ object PeerManagerActor {
       discoveryConfig: DiscoveryConfig,
       val blacklist: Blacklist,
       externalSchedulerOpt: Option[Scheduler],
-      timers: TimerScheduler[Command],
+      @annotation.unused timers: TimerScheduler[Command],
       context: TypedActorContext[Command]
   ) {
 

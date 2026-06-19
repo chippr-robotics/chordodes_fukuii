@@ -47,7 +47,6 @@ private class ByteCodeCoordinatorImpl(
   import ByteCodeCoordinator.*
 
   private val log = context.log
-  implicit private val ec: scala.concurrent.ExecutionContext = context.executionContext
 
   // Typed leaf worker (Group W1).
   private type WorkerRef = org.apache.pekko.actor.typed.ActorRef[ByteCodeWorker.Command]

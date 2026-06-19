@@ -19,7 +19,6 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.PeerDisconnectedClassifier
 import com.chipprbots.ethereum.network.PeerEventBusActor.Unsubscribe
 import com.chipprbots.ethereum.network.PeerId
-import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 /** Typed-compatible replacement for the responsibilities of the Classic, self-typed `PeerListSupportNg` trait.
   *
@@ -37,10 +36,8 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
   * The whole PeerEventBus subsystem migrates with Group NET.
   */
 class PeerListHelper(
-    networkPeerManager: ActorRef,
     peerEventBus: ActorRef,
     blacklist: Blacklist,
-    syncConfig: SyncConfig,
     peerDisconnectedAdapter: TypedActorRef[PeerDisconnected],
     log: Logger
 ) {

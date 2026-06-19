@@ -937,10 +937,8 @@ object ChainDownloader {
           context.messageAdapter[PeerDisconnected](identity)
 
         val peerListHelper = new PeerListHelper(
-          networkPeerManager,
           peerEventBus,
           blacklist,
-          syncConfig,
           peerDisconnectedAdapter,
           context.log
         )

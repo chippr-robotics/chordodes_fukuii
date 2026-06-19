@@ -318,8 +318,7 @@ class FastSyncBranchResolverActorSpec
           blockchain = blockchain,
           blockchainReader = blockchainReader,
           blacklist = blacklist,
-          syncConfig = syncConfig,
-          appStateStorage = storagesInstance.storages.appStateStorage
+          syncConfig = syncConfig
         ),
         s"fast-sync-branch-resolver-${java.util.UUID.randomUUID()}"
       )

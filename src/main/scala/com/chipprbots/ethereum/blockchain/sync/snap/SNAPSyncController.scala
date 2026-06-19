@@ -3218,7 +3218,7 @@ class SNAPSyncController(
   // Unified stagnation check — dispatches to the active coordinator based on current phase.
   override def aroundReceive(receive: Receive, msg: Any): Unit = msg match {
     case CheckDownloadStagnation =>
-      import org.apache.pekko.pattern.{ask, pipe}
+      import org.apache.pekko.pattern.pipe
       import org.apache.pekko.util.Timeout
       implicit val timeout: Timeout = Timeout(2.seconds)
       log.debug(

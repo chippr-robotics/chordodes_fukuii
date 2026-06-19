@@ -17,7 +17,6 @@ import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
 import com.chipprbots.ethereum.blockchain.sync.PeerRequestHandler
 import com.chipprbots.ethereum.blockchain.sync.PeerRequestHandler.RequestFailed
 import com.chipprbots.ethereum.blockchain.sync.PeerRequestHandler.ResponseReceived
-import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.Blockchain
 import com.chipprbots.ethereum.domain.BlockchainReader
@@ -107,8 +106,7 @@ object FastSyncBranchResolverActor {
       blockchain: Blockchain,
       blockchainReader: BlockchainReader,
       blacklist: Blacklist,
-      syncConfig: SyncConfig,
-      appStateStorage: AppStateStorage
+      syncConfig: SyncConfig
   ): Behavior[Any] =
     Behaviors.setup { context =>
       Behaviors.withTimers { timers =>
@@ -116,10 +114,8 @@ object FastSyncBranchResolverActor {
           context.messageAdapter[PeerDisconnected](identity)
 
         val peerListHelper = new PeerListHelper(
-          networkPeerManager,
           peerEventBus,
           blacklist,
-          syncConfig,
           peerDisconnectedAdapter,
           context.log
         )

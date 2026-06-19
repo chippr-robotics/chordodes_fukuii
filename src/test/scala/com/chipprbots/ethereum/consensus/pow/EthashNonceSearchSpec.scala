@@ -27,7 +27,7 @@ class EthashNonceSearchSpec extends AnyFlatSpec with Matchers {
   private def searchNonce(
       headerHash: Array[Byte],
       difficulty: Long,
-      maxIterations: Int = 500_000
+      maxIterations: Int
   ): Option[(ByteString, ByteString)] =
     (0L until maxIterations.toLong).iterator
       .map { nonce =>

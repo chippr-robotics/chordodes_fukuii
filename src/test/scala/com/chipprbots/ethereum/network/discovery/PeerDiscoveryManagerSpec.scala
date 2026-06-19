@@ -4,7 +4,6 @@ import java.net.URI
 import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
-import org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe
 import org.apache.pekko.actor.typed.ActorRef
 
 import cats.effect.IO
