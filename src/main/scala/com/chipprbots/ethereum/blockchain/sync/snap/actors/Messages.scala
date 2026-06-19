@@ -282,10 +282,9 @@ object Messages {
   // TrieNodeHealing Messages
   // ========================================
 
-  // Extends TrieNodeHealingCoordinator.Command (Group S3): the coordinator is now a Typed actor with a (non-sealed,
-  // cross-file) Command ADT. All TrieNodeHealingCoordinatorMessage cases are therefore Commands; SSC (still Classic)
-  // sends them via the Classic `!`. (HealingStagnated is the one exception — it is OUTBOUND to SSC, not a Command;
-  // it is declared standalone below.)
+  // Extends TrieNodeHealingCoordinator.Command (Group S3): the coordinator is a Typed actor with a (non-sealed,
+  // cross-file) Command ADT. All TrieNodeHealingCoordinatorMessage cases are therefore Commands; SSC sends them via
+  // the Typed ActorRef[Command]. HealingStagnated (OUTBOUND from TNHC to SSC) lives in SNAPSyncController.Command.
   sealed trait TrieNodeHealingCoordinatorMessage extends TrieNodeHealingCoordinator.Command
 
   case class StartTrieNodeHealing(stateRoot: ByteString) extends TrieNodeHealingCoordinatorMessage
@@ -323,13 +322,6 @@ object Messages {
     * MUST NOT be reused for a serve-root advance.
     */
   final case class HealingServeRootRefresh(newServeRoot: ByteString) extends TrieNodeHealingCoordinatorMessage
-
-  /** Sent by coordinator after MaxConsecutiveStagnations consecutive 2-min HEAL-PULSE cycles with zero healed nodes.
-    * Controller should stop coordinator, clear walk checkpoint, refresh pivot.
-    */
-  // OUTBOUND to SNAPSyncController (Classic), never received by the coordinator. Therefore it is NOT a
-  // TrieNodeHealingCoordinator.Command — declared standalone so it does not enter the Typed Command ADT.
-  case class HealingStagnated(healed: Long, pending: Long)
 
   /** Sent by SNAPSyncController in reply to a `HealingStagnated` it chose NOT to act on by rolling the pivot
     * (`heal-hold-pivot-on-stagnation = true`). It tells the coordinator to clear the in-flight `pivotRefreshRequested`

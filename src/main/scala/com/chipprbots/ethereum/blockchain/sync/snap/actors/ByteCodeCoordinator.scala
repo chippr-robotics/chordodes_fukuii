@@ -38,7 +38,7 @@ private class ByteCodeCoordinatorImpl(
     requestTracker: SNAPRequestTracker,
     batchSize: Int,
     cooldownConfig: ByteCodeCoordinator.ByteCodePeerCooldownConfig,
-    snapSyncController: ActorRef,
+    snapSyncController: org.apache.pekko.actor.typed.ActorRef[SNAPSyncController.Command],
     backpressureHighWatermark: Int,
     backpressureLowWatermark: Int
 ) {
@@ -832,7 +832,7 @@ object ByteCodeCoordinator {
           requestTracker,
           batchSize,
           cooldownConfig,
-          snapSyncController,
+          snapSyncController.toTyped[SNAPSyncController.Command],
           backpressureHighWatermark = backpressureHighWatermark,
           backpressureLowWatermark = backpressureLowWatermark
         ).start()

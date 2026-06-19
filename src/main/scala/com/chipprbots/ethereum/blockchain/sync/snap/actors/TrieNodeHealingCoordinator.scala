@@ -5,6 +5,7 @@ import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
@@ -47,7 +48,7 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
     requestTracker: SNAPRequestTracker,
     mptStorage: MptStorage,
     batchSize: Int,
-    snapSyncController: ActorRef,
+    snapSyncController: org.apache.pekko.actor.typed.ActorRef[SNAPSyncController.Command],
     concurrency: Int,
     visitedCap: Int = TrieNodeHealingCoordinator.DefaultVisitedCap,
     healingFrontierStorage: Option[HealingFrontierStorage] = None,
@@ -1123,7 +1124,7 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
             s"[HEAL-STAGNATION] $MaxConsecutiveStagnations consecutive zero-progress cycles — " +
               s"notifying controller to restart healing with fresh pivot"
           )
-          snapSyncController ! HealingStagnated(totalNodesHealed.toLong, pendingTasks.size.toLong)
+          snapSyncController ! SNAPSyncController.HealingStagnated(totalNodesHealed.toLong, pendingTasks.size.toLong)
           consecutiveStagnations = 0
           // NB-11: Suppress further stagnation counting until the pivot refresh arrives (HealingPivotRefreshed
           // resets this flag). Prevents redundant HealingStagnated fires while bootstrap is in-flight.
@@ -1536,7 +1537,7 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
         s"[HEAL] Stagnation: no nodes healed in ${stagnantMs / 1000}s — requesting pivot refresh"
       )
       lastHealedAtMs = System.currentTimeMillis() // prevent re-firing while refresh in flight
-      snapSyncController ! actors.Messages.HealingStagnated(totalNodesHealed.toLong, pendingTasks.size.toLong)
+      snapSyncController ! SNAPSyncController.HealingStagnated(totalNodesHealed.toLong, pendingTasks.size.toLong)
       pivotRefreshRequested = true
       pivotRefreshRequestedAt = System.currentTimeMillis()
     }
@@ -2111,7 +2112,8 @@ object TrieNodeHealingCoordinator {
     * `UpdateMaxInFlightPerPeer` extends `ByteCodeCoordinator.Command` but is matched here via the non-sealed trait. The
     * trait is left non-sealed because Scala 3 forbids extending a sealed trait from another source file (same
     * cross-file constraint as the other SNAP coordinators); a defensive catch-all in `active()` covers the loss of
-    * exhaustiveness checking. NB: `HealingStagnated` is OUTBOUND to SSC and is deliberately NOT a Command.
+    * exhaustiveness checking. `HealingStagnated` is OUTBOUND to SSC as `SNAPSyncController.HealingStagnated extends
+    * Command`.
     */
   trait Command
 
@@ -2242,7 +2244,7 @@ object TrieNodeHealingCoordinator {
           requestTracker = requestTracker,
           mptStorage = mptStorage,
           batchSize = batchSize,
-          snapSyncController = snapSyncController,
+          snapSyncController = snapSyncController.toTyped[SNAPSyncController.Command],
           concurrency = concurrency,
           visitedCap = visitedCap,
           healingFrontierStorage = healingFrontierStorage,

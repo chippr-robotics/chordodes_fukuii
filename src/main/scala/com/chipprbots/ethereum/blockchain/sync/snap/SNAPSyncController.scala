@@ -766,8 +766,8 @@ private class SNAPSyncControllerImpl(
         ensureSnapServerPeersConnected()
         Behaviors.same
 
-      // Handle SNAP protocol responses
-      case msg: AccountRange =>
+      // Handle SNAP protocol responses (wrapped in Command ADT by NetworkPeerManagerActor)
+      case AccountRangeResponse(msg) =>
         // Intercept pivot readiness probe responses before forwarding to coordinator.
         pivotProbeRequestId match {
           case Some(probeId) if msg.requestId == probeId =>
@@ -813,21 +813,21 @@ private class SNAPSyncControllerImpl(
         }
         Behaviors.same
 
-      case msg: ByteCodes =>
+      case ByteCodesResponse(msg) =>
         ctx.log.debug(s"Received ByteCodes response: requestId=${msg.requestId}, codes=${msg.codes.size}")
 
         // Forward to the bytecode coordinator (it owns the workers).
         bytecodeCoordinator.foreach(_ ! actors.Messages.ByteCodesResponseMsg(msg))
         Behaviors.same
 
-      case msg: StorageRanges =>
+      case StorageRangesResponse(msg) =>
         ctx.log.debug(s"Received StorageRanges response: requestId=${msg.requestId}, slots=${msg.slots.size}")
 
         // Forward to the storage range coordinator (it owns the workers).
         storageRangeCoordinator.foreach(_ ! actors.Messages.StorageRangesResponseMsg(msg))
         Behaviors.same
 
-      case msg: TrieNodes =>
+      case TrieNodesResponse(msg) =>
         ctx.log.debug(s"Received TrieNodes response: requestId=${msg.requestId}, nodes=${msg.nodes.size}")
 
         // Forward to the trie node healing coordinator (it owns the workers).
@@ -858,7 +858,7 @@ private class SNAPSyncControllerImpl(
         }
         Behaviors.same
 
-      case actors.Messages.AccountRangeProgress(progress) =>
+      case AccountRangeProgressCmd(progress) =>
         preservedRangeProgress = progress
         if preservedAtPivotBlock.isEmpty then {
           preservedAtPivotBlock = pivotBlock
@@ -1306,7 +1306,7 @@ private class SNAPSyncControllerImpl(
       // becomes unservable by ALL peers, we still MUST roll or healing stalls.
       //
       // Set heal-hold-pivot-on-stagnation = false to restore the legacy roll-on-stagnation behaviour.
-      case actors.Messages.HealingStagnated(healed, pending) if currentPhase == StateHealing =>
+      case HealingStagnated(healed, pending) if currentPhase == StateHealing =>
         if snapSyncConfig.healHoldPivotOnStagnation then {
           ctx.log.warn(
             s"[HEAL-STAGNATED] Healing slow (healed=$healed pending=$pending) — HOLDING pivot (not rolling); " +
@@ -4673,15 +4673,16 @@ private class SNAPSyncControllerImpl(
         val downloader = ctx
           .spawn(
             ChainDownloader(
-              blockchainReader,
-              blockchainWriter,
-              appStateStorage,
-              networkPeerManager,
-              peerEventBus,
-              syncConfig,
-              snapSyncConfig.chainDownloadMaxConcurrentRequests,
-              snapSyncConfig.chainDownloadTimeout,
-              snapServerNodeIds
+              blockchainReader = blockchainReader,
+              blockchainWriter = blockchainWriter,
+              appStateStorage = appStateStorage,
+              networkPeerManager = networkPeerManager,
+              peerEventBus = peerEventBus,
+              syncConfig = syncConfig,
+              replyTo = chainDownloaderReplyAdapter,
+              maxConcurrentRequests = snapSyncConfig.chainDownloadMaxConcurrentRequests,
+              requestTimeout = snapSyncConfig.chainDownloadTimeout,
+              snapServerPeerNodeIds = snapServerNodeIds
             ),
             s"chain-downloader-$coordinatorGeneration",
             DispatcherSelector.fromConfig("sync-dispatcher")
@@ -4844,6 +4845,8 @@ object SNAPSyncController {
   final private[snap] case class PivotProbeTimeout(requestId: BigInt) extends Command
   private[snap] case object DormantWakeUp extends Command
   final private[snap] case class DelayedRestart(reason: String) extends Command
+  // Cursor progress snapshot sent by AccountRangeCoordinator on postStop (crash-recovery path)
+  final private[snap] case class AccountRangeProgressCmd(progress: Map[ByteString, ByteString]) extends Command
   // Unified stagnation detection — single timer dispatches to the active coordinator
   private[snap] case object CheckDownloadStagnation extends Command
   final private[snap] case class AccountCoordinatorProgress(progress: actors.AccountRangeStats) extends Command

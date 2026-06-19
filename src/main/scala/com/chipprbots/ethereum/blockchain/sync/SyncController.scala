@@ -1322,14 +1322,15 @@ class SyncController(
       val resumer = context
         .spawn(
           ChainDownloader(
-            blockchainReader,
-            blockchainWriter,
-            appStateStorage,
-            networkPeerManager,
-            peerEventBus,
-            syncConfig,
-            snapSyncConfig.chainBackfillConcurrentRequests,
-            snapSyncConfig.chainDownloadTimeout
+            blockchainReader = blockchainReader,
+            blockchainWriter = blockchainWriter,
+            appStateStorage = appStateStorage,
+            networkPeerManager = networkPeerManager,
+            peerEventBus = peerEventBus,
+            syncConfig = syncConfig,
+            replyTo = self,
+            maxConcurrentRequests = snapSyncConfig.chainBackfillConcurrentRequests,
+            requestTimeout = snapSyncConfig.chainDownloadTimeout
           ),
           s"backfill-resumer-$syncGeneration",
           DispatcherSelector.fromConfig("sync-dispatcher")

@@ -154,6 +154,7 @@ class ChainDownloaderSpec
           networkPeerManager = networkPeerManager.ref,
           peerEventBus = peerEventBus.ref,
           syncConfig = defaultSyncConfig,
+          replyTo = testActor,
           maxConcurrentRequests = 4
         ),
         s"chain-downloader-${System.nanoTime()}"

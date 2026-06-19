@@ -254,7 +254,11 @@ object NetworkPeerManagerActor {
     private[network] type PeersWithInfo = Map[PeerId, PeerWithInfo]
 
     // Mutable reference to SNAPSyncController that can be set after initialization
-    private var snapSyncControllerOpt: Option[ActorRef] = initialSnapSyncControllerOpt
+    private var snapSyncControllerOpt
+        : Option[typed.ActorRef[com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.Command]] =
+      initialSnapSyncControllerOpt.map(
+        _.toTyped[com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.Command]
+      )
 
     private var emptyHeaderResponses: Int = 0
 
@@ -319,7 +323,8 @@ object NetworkPeerManagerActor {
 
         case RegisterSnapSyncControllerCmd(ref) =>
           log.info("Registering SNAPSyncController for message routing")
-          snapSyncControllerOpt = Some(ref)
+          snapSyncControllerOpt =
+            Some(ref.toTyped[com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.Command])
           Behaviors.same
 
         case RegisterChainWeightCalibrationTargetCmd(target) =>
@@ -539,11 +544,28 @@ object NetworkPeerManagerActor {
 
         case PeerEventCmd(MessageFromPeer(message, peerId)) if peersWithInfo.contains(peerId) =>
           // Route SNAP protocol responses (from peers we're syncing from) to SNAPSyncController.
-          // C2: snapSyncControllerOpt stays Option[ActorRef] (Classic); use tell with noSender.
+          // Messages are wrapped in Command ADT so the Typed SSC mailbox accepts them.
           message match {
-            case msg @ (_: AccountRange | _: StorageRanges | _: TrieNodes | _: ByteCodes) =>
-              log.debug("Routing {} message to SNAPSyncController from peer {}", msg.getClass.getSimpleName, peerId)
-              snapSyncControllerOpt.foreach(_.tell(msg, ActorRef.noSender))
+            case msg: AccountRange =>
+              log.debug("Routing AccountRange to SNAPSyncController from peer {}", peerId)
+              snapSyncControllerOpt.foreach(
+                _ ! com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.AccountRangeResponse(msg)
+              )
+            case msg: ByteCodes =>
+              log.debug("Routing ByteCodes to SNAPSyncController from peer {}", peerId)
+              snapSyncControllerOpt.foreach(
+                _ ! com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.ByteCodesResponse(msg)
+              )
+            case msg: StorageRanges =>
+              log.debug("Routing StorageRanges to SNAPSyncController from peer {}", peerId)
+              snapSyncControllerOpt.foreach(
+                _ ! com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.StorageRangesResponse(msg)
+              )
+            case msg: TrieNodes =>
+              log.debug("Routing TrieNodes to SNAPSyncController from peer {}", peerId)
+              snapSyncControllerOpt.foreach(
+                _ ! com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.TrieNodesResponse(msg)
+              )
             case _ => // ETH protocol messages — no special routing needed
           }
 

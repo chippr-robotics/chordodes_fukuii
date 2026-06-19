@@ -5,6 +5,7 @@ import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
@@ -58,7 +59,7 @@ private[actors] class StorageRangeCoordinatorImpl(
     maxAccountsPerBatch: Int,
     maxInFlightRequests: Int,
     requestTimeout: FiniteDuration,
-    snapSyncController: ActorRef,
+    snapSyncController: org.apache.pekko.actor.typed.ActorRef[SNAPSyncController.Command],
     initialMaxInFlightPerPeer: Int = 5,
     configInitialResponseBytes: Int = 1048576,
     configMinResponseBytes: Int = 131072,
@@ -1675,7 +1676,7 @@ object StorageRangeCoordinator {
           maxAccountsPerBatch = maxAccountsPerBatch,
           maxInFlightRequests = maxInFlightRequests,
           requestTimeout = requestTimeout,
-          snapSyncController = snapSyncController,
+          snapSyncController = snapSyncController.toTyped[SNAPSyncController.Command],
           initialMaxInFlightPerPeer = initialMaxInFlightPerPeer,
           configInitialResponseBytes = initialResponseBytes,
           configMinResponseBytes = minResponseBytes,

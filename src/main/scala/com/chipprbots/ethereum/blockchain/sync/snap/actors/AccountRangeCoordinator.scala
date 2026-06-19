@@ -71,7 +71,7 @@ private class AccountRangeCoordinatorImpl(
     requestTracker: SNAPRequestTracker,
     mptStorage: MptStorage,
     concurrency: Int,
-    snapSyncController: ActorRef,
+    snapSyncController: org.apache.pekko.actor.typed.ActorRef[SNAPSyncController.Command],
     resumeProgress: Map[ByteString, ByteString] = Map.empty,
     initialMaxInFlightPerPeer: Int = 5,
     initialResponseBytesConfig: Int = 524288,
@@ -601,7 +601,7 @@ private class AccountRangeCoordinatorImpl(
   private def sendProgressSnapshot(): Unit = {
     val allTasks = pendingTasks.iterator ++ activeTasks.values.map(_._1) ++ completedTasks
     val progress: Map[ByteString, ByteString] = allTasks.map(t => t.last -> t.next).toMap
-    snapSyncController ! AccountRangeProgress(progress)
+    snapSyncController ! SNAPSyncController.AccountRangeProgressCmd(progress)
   }
 
   // Typed AccountRangeWorker children (Group W1) STOP on failure by default. The stop is caught by
@@ -1856,7 +1856,7 @@ object AccountRangeCoordinator {
           requestTracker = requestTracker,
           mptStorage = mptStorage,
           concurrency = concurrency,
-          snapSyncController = snapSyncController,
+          snapSyncController = snapSyncController.toTyped[SNAPSyncController.Command],
           resumeProgress = resumeProgress,
           initialMaxInFlightPerPeer = initialMaxInFlightPerPeer,
           initialResponseBytesConfig = initialResponseBytes,

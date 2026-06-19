@@ -76,7 +76,8 @@ class ChainDownloader private (
     peerListHelper: PeerListHelper,
     initialMaxConcurrentRequests: Int,
     requestTimeout: FiniteDuration,
-    snapServerPeerNodeIds: Set[ByteString]
+    snapServerPeerNodeIds: Set[ByteString],
+    replyTo: ClassicActorRef
 ) {
 
   import ChainDownloader.*
@@ -790,7 +791,7 @@ class ChainDownloader private (
       appStateStorage.clearBackfillCursors().commit()
       timers.cancel(DispatchKey)
       // The spawning parent (SyncController / SNAPSyncController) is still Classic; reach it via the adapter.
-      context.toClassic.parent ! Done
+      replyTo ! Done
       idle()
     } else {
       Behaviors.same
@@ -926,6 +927,7 @@ object ChainDownloader {
       networkPeerManager: ClassicActorRef,
       peerEventBus: ClassicActorRef,
       syncConfig: SyncConfig,
+      replyTo: ClassicActorRef,
       maxConcurrentRequests: Int = 4,
       requestTimeout: FiniteDuration = 10.seconds,
       snapServerPeerNodeIds: Set[ByteString] = Set.empty,
@@ -956,7 +958,8 @@ object ChainDownloader {
           peerListHelper,
           maxConcurrentRequests,
           requestTimeout,
-          snapServerPeerNodeIds
+          snapServerPeerNodeIds,
+          replyTo
         )
 
         // Immediate poll, then periodic poll for handshaked peers (replaces PeerListSupportNg's scheduleWithFixedDelay).
