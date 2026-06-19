@@ -24,6 +24,7 @@ import com.chipprbots.ethereum.blockchain.sync.Blacklist.*
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason.*
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
 import com.chipprbots.ethereum.blockchain.sync.PeerRateTracker
+import com.chipprbots.ethereum.blockchain.sync.PeerRequestHandler
 import com.chipprbots.ethereum.blockchain.sync.PeerRequestHandler.ResponseReceived
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
 import com.chipprbots.ethereum.blockchain.sync.fast.ReceiptsValidator.ReceiptsValidationResult
@@ -1327,6 +1328,26 @@ object FastSync {
   private case object ProcessSyncing
   private case object PersistSyncState
   private case object PrintStatus
+
+  // === Pekko Typed migration (Group SNAP2) ===
+  // FastSync becomes a thin Classic shell (captures `sender()` for the ask-based `GetStatus`) wrapping a
+  // `Behavior[Any]` core (same shell+core pattern as SyncStateSchedulerActor S4 and PeersClient S7). The core
+  // receives a heterogeneous message stream: external `SyncProtocol` messages, foreign coordinator messages
+  // (`SyncStateSchedulerActor.*`, `PivotBlockSelector.*`), internal ticks, and `PeerRequestHandler.Result`
+  // routed through an id-keyed message adapter. `Behavior[Any]` avoids wrapping every foreign source.
+
+  /** Shell → core: carries the Classic `sender()` of an ask-based `SyncProtocol.GetStatus` as an explicit reply-to. */
+  final private[fast] case class GetStatusCmd(replyTo: ActorRef)
+
+  /** Core-internal: a `PeerRequestHandler.Result` delivered through the per-request message adapter, tagged with the
+    * request id so the core can find the originating peer/hashes (replaces the Classic `sender()`-keyed handler maps).
+    */
+  final private[fast] case class PRHResultCmd(id: Int, result: PeerRequestHandler.Result)
+
+  /** Core-internal: periodic poll tick that re-requests the handshaked peer list from `networkPeerManager` (replaces the
+    * `scheduleWithFixedDelay` that `PeerListSupportNg` ran in the Classic actor).
+    */
+  private case object ScanPeersTick
 
   /** Sync state that should be persisted.
     */
