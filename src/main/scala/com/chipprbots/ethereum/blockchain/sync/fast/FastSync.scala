@@ -3,8 +3,17 @@ package com.chipprbots.ethereum.blockchain.sync.fast
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
-import org.apache.pekko.actor.*
+import org.apache.pekko.actor.Actor
+import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.Props
+import org.apache.pekko.actor.Scheduler
+import org.apache.pekko.actor.Terminated
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.DispatcherSelector
+import org.apache.pekko.actor.typed.scaladsl.ActorContext
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
@@ -43,8 +52,11 @@ import com.chipprbots.ethereum.db.storage.StateStorage
 import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.appstate.BlockInfo
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.PeerId
+import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.p2p.messages.Codes
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
@@ -52,214 +64,413 @@ import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
+/** Classic shell for FastSync (Pekko Typed migration, Group SNAP2).
+  *
+  * The shell exists only to capture `sender()` for the ask-based `SyncProtocol.GetStatus`. Every other message is
+  * forwarded verbatim to the `Behavior[Any]` core (same shell+core pattern as SyncStateSchedulerActor S4 and
+  * PeersClient S7). The core owns all state and behaviours. `props()` is unchanged so FastSyncSpec works without
+  * modification; `syncController` defaults to `context.parent` so SyncController's existing `context.actorOf` spawn
+  * needs no change.
+  */
 // scalastyle:off file.size.limit
 class FastSync(
-    val fastSyncStateStorage: FastSyncStateStorage,
-    val appStateStorage: AppStateStorage,
-    val blockNumberMappingStorage: BlockNumberMappingStorage,
-    val blockchain: Blockchain,
-    val blockchainReader: BlockchainReader,
+    fastSyncStateStorage: FastSyncStateStorage,
+    appStateStorage: AppStateStorage,
+    blockNumberMappingStorage: BlockNumberMappingStorage,
+    blockchain: Blockchain,
+    blockchainReader: BlockchainReader,
     blockchainWriter: BlockchainWriter,
     evmCodeStorage: EvmCodeStorage,
     stateStorage: StateStorage,
     nodeStorage: NodeStorage,
-    val validators: Validators,
-    val peerEventBus: ActorRef,
-    val networkPeerManager: ActorRef,
-    val blacklist: Blacklist,
-    val syncConfig: SyncConfig,
-    implicit val scheduler: Scheduler,
+    validators: Validators,
+    peerEventBus: ActorRef,
+    networkPeerManager: ActorRef,
+    blacklist: Blacklist,
+    syncConfig: SyncConfig,
+    scheduler: Scheduler,
     configBuilder: BlockchainConfigBuilder
-) extends Actor
-    with ActorLogging
-    with PeerListSupportNg
-    with ReceiptsValidator
-    with SyncBlocksValidator {
+) extends Actor {
 
-  import configBuilder.*
   import FastSync.*
-  import syncConfig.*
 
-  val syncController: ActorRef = context.parent
+  private val syncController: ActorRef = context.parent
 
-  override def receive: Receive = idle
+  private val core: TypedActorRef[Any] = context.spawn(
+    FastSync.behavior(
+      fastSyncStateStorage,
+      appStateStorage,
+      blockNumberMappingStorage,
+      blockchain,
+      blockchainReader,
+      blockchainWriter,
+      evmCodeStorage,
+      stateStorage,
+      nodeStorage,
+      validators,
+      peerEventBus,
+      networkPeerManager,
+      blacklist,
+      syncConfig,
+      configBuilder,
+      syncController
+    ),
+    "core"
+  )
 
-  private case object RetryPivotBlockSelection
+  context.watch(core.toClassic)
 
-  def idle: Receive = handlePeerListMessages.orElse {
-    case SyncProtocol.Start     => start()
-    case SyncProtocol.GetStatus => sender() ! SyncProtocol.Status.NotSyncing
+  override def receive: Receive = {
+    case SyncProtocol.GetStatus => core ! GetStatusCmd(sender())
+    case Terminated(_)          => context.stop(self)
+    case other                  => core ! other
   }
+}
 
-  def start(): Unit = {
-    log.info("Trying to start block synchronization (fast mode)")
-    fastSyncStateStorage.getSyncState() match {
-      case Some(syncState) => startWithState(syncState)
-      case None            => startFromScratch()
+// scalastyle:off file.size.limit
+object FastSync {
+
+  // scalastyle:off parameter.number method.length number.of.methods
+  /** Typed core factory for FastSync. Returns a `Behavior[Any]` because the core receives a heterogeneous message
+    * stream (external `SyncProtocol`, coordinator messages, internal ticks, and `PeerRequestHandler.Result` via an
+    * id-keyed adapter). `syncController` replaces the Classic `context.parent` reply target.
+    */
+  def behavior(
+      fastSyncStateStorage: FastSyncStateStorage,
+      appStateStorage: AppStateStorage,
+      blockNumberMappingStorage: BlockNumberMappingStorage,
+      blockchain: Blockchain,
+      blockchainReader: BlockchainReader,
+      blockchainWriter: BlockchainWriter,
+      evmCodeStorage: EvmCodeStorage,
+      stateStorage: StateStorage,
+      nodeStorage: NodeStorage,
+      validators: Validators,
+      peerEventBus: ActorRef,
+      networkPeerManager: ActorRef,
+      blacklist: Blacklist,
+      syncConfig: SyncConfig,
+      configBuilder: BlockchainConfigBuilder,
+      syncController: ActorRef
+  ): Behavior[Any] =
+    Behaviors.setup[Any] { ctx =>
+      Behaviors.withTimers[Any] { timers =>
+        val peerDisconnectedAdapter: TypedActorRef[PeerDisconnected] =
+          ctx.messageAdapter[PeerDisconnected](identity)
+        // Immediate first poll + periodic rescans (matches PeerListSupportNg's 0-delay scheduleWithFixedDelay).
+        networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, ctx.self.toClassic)
+        timers.startTimerWithFixedDelay(ScanPeersTick, syncConfig.peersScanInterval)
+        new Impl(
+          ctx,
+          timers,
+          fastSyncStateStorage,
+          appStateStorage,
+          blockNumberMappingStorage,
+          blockchain,
+          blockchainReader,
+          blockchainWriter,
+          evmCodeStorage,
+          stateStorage,
+          nodeStorage,
+          validators,
+          peerEventBus,
+          networkPeerManager,
+          blacklist,
+          syncConfig,
+          configBuilder,
+          syncController,
+          peerDisconnectedAdapter
+        ).idle()
+      }
     }
-  }
 
-  def startWithState(syncState: SyncState): Unit = {
-    // Check if headers in RocksDB go beyond the persisted bestBlockHeaderNumber.
-    // This happens when SyncState was persisted mid-download but the node restarted —
-    // headers continued being written to RocksDB past the last SyncState snapshot.
-    val existingBestHeader = blockchainReader.getBestBlockNumber
-    val updatedState =
-      if existingBestHeader > syncState.bestBlockHeaderNumber && existingBestHeader <= syncState.pivotBlock.number
-      then {
-        log.info(
-          "Headers in database ({}) ahead of persisted sync state ({}). Advancing to skip redundant download.",
-          existingBestHeader,
-          syncState.bestBlockHeaderNumber
-        )
-        syncState.copy(
-          bestBlockHeaderNumber = existingBestHeader,
-          lastFullBlockNumber = existingBestHeader.max(syncState.lastFullBlockNumber)
-        )
-      } else syncState
+  // scalastyle:off number.of.methods
+  private class Impl(
+      ctx: ActorContext[Any],
+      timers: TimerScheduler[Any],
+      fastSyncStateStorage: FastSyncStateStorage,
+      appStateStorage: AppStateStorage,
+      blockNumberMappingStorage: BlockNumberMappingStorage,
+      blockchain: Blockchain,
+      val blockchainReader: BlockchainReader,
+      blockchainWriter: BlockchainWriter,
+      evmCodeStorage: EvmCodeStorage,
+      stateStorage: StateStorage,
+      nodeStorage: NodeStorage,
+      val validators: Validators,
+      peerEventBus: ActorRef,
+      networkPeerManager: ActorRef,
+      blacklist: Blacklist,
+      val syncConfig: SyncConfig,
+      configBuilder: BlockchainConfigBuilder,
+      syncController: ActorRef,
+      peerDisconnectedAdapter: TypedActorRef[PeerDisconnected]
+  ) extends ReceiptsValidator
+      with SyncBlocksValidator {
 
-    log.info("Starting fast sync with existing state and asking for new pivot block")
-    val syncingHandler = new SyncingHandler(updatedState)
-    syncingHandler.askForPivotBlockUpdate(SyncRestart)
-  }
+    import configBuilder.*
+    import syncConfig.*
 
-  def startFromScratch(): Unit = {
-    log.info("Starting fast sync from scratch")
-    val pivotBlockSelector = context
-      .spawn(
-        PivotBlockSelector(networkPeerManager, peerEventBus, syncConfig, context.self, blacklist),
-        "pivot-block-selector"
-      )
-      .toClassic
-    pivotBlockSelector ! PivotBlockSelector.SelectPivotBlock
-    context.become(waitingForPivotBlock)
-  }
+    override protected val log: org.slf4j.Logger = ctx.log
 
-  def waitingForPivotBlock: Receive = handlePeerListMessages.orElse {
-    case SyncProtocol.GetStatus => sender() ! SyncProtocol.Status.NotSyncing
-    case RetryPivotBlockSelection =>
-      log.info("Retrying pivot block selection")
-      val pivotBlockSelector = context
+    // Classic scheduler for the Classic PeerRequestHandler children (PRH.props needs an implicit Scheduler).
+    implicit private val classicScheduler: Scheduler = ctx.system.classicSystem.scheduler
+
+    // Shared rate tracker: the PeerListHelper tunes it on each handshaked-peer refresh and the concurrent fetcher
+    // queues read its RTT/capacity estimates.
+    private val ethRateTracker: PeerRateTracker = new PeerRateTracker()
+
+    private val peerHelper =
+      new PeerListHelper(peerEventBus, blacklist, peerDisconnectedAdapter, log, Some(ethRateTracker))
+
+    private def handshakedPeers = peerHelper.handshakedPeers
+    private def peersToDownloadFrom = peerHelper.peersToDownloadFrom
+    private def globalMedianRttMs = peerHelper.globalMedianRttMs
+    private def blacklistIfHandshaked(peerId: PeerId, duration: FiniteDuration, reason: BlacklistReason): Unit =
+      peerHelper.blacklistIfHandshaked(peerId, duration, reason)
+
+    /** Handle the two PeerListHelper-routed messages plus the periodic poll tick. Returned by every behavior's
+      * `handlePeerListMessages` prefix.
+      */
+    private def handlePeerList(msg: Any): Boolean =
+      msg match {
+        case ScanPeersTick =>
+          networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, ctx.self.toClassic)
+          true
+        case NetworkPeerManagerActor.HandshakedPeers(peers) =>
+          peerHelper.handleHandshakedPeers(peers)
+          true
+        case PeerDisconnected(peerId) =>
+          peerHelper.handlePeerDisconnected(peerId)
+          true
+        case _ => false
+      }
+
+    // ── Pre-syncing behaviors ──────────────────────────────────────────────────────────────────
+
+    def idle(): Behavior[Any] = Behaviors.receiveMessage { msg =>
+      if handlePeerList(msg) then Behaviors.same
+      else
+        msg match {
+          case SyncProtocol.Start     => start()
+          case GetStatusCmd(replyTo)  => replyTo ! SyncProtocol.Status.NotSyncing; Behaviors.same
+          case SyncProtocol.GetStatus => Behaviors.same // bare GetStatus (no reply-to) — ignore
+          case _                      => Behaviors.same
+        }
+    }
+
+    def start(): Behavior[Any] = {
+      log.info("Trying to start block synchronization (fast mode)")
+      fastSyncStateStorage.getSyncState() match {
+        case Some(syncState) => startWithState(syncState)
+        case None            => startFromScratch()
+      }
+    }
+
+    def startWithState(syncState: SyncState): Behavior[Any] = {
+      // Check if headers in RocksDB go beyond the persisted bestBlockHeaderNumber.
+      // This happens when SyncState was persisted mid-download but the node restarted —
+      // headers continued being written to RocksDB past the last SyncState snapshot.
+      val existingBestHeader = blockchainReader.getBestBlockNumber
+      val updatedState =
+        if existingBestHeader > syncState.bestBlockHeaderNumber && existingBestHeader <= syncState.pivotBlock.number
+        then {
+          log.info(
+            "Headers in database ({}) ahead of persisted sync state ({}). Advancing to skip redundant download.",
+            existingBestHeader,
+            syncState.bestBlockHeaderNumber
+          )
+          syncState.copy(
+            bestBlockHeaderNumber = existingBestHeader,
+            lastFullBlockNumber = existingBestHeader.max(syncState.lastFullBlockNumber)
+          )
+        } else syncState
+
+      log.info("Starting fast sync with existing state and asking for new pivot block")
+      initSyncSession(updatedState)
+      askForPivotBlockUpdate(SyncRestart)
+    }
+
+    def startFromScratch(): Behavior[Any] = {
+      log.info("Starting fast sync from scratch")
+      val pivotBlockSelector = ctx
         .spawn(
-          PivotBlockSelector(networkPeerManager, peerEventBus, syncConfig, context.self, blacklist),
-          s"pivot-block-selector-retry-${java.util.UUID.randomUUID()}"
+          PivotBlockSelector(networkPeerManager, peerEventBus, syncConfig, ctx.self.toClassic, blacklist),
+          "pivot-block-selector"
         )
         .toClassic
       pivotBlockSelector ! PivotBlockSelector.SelectPivotBlock
-    case PivotBlockSelector.SelectionFailed =>
-      log.warning(
-        "Pivot block selection failed after maximum attempts. Retrying in {}",
-        startRetryInterval
-      )
-      scheduler.scheduleOnce(startRetryInterval, self, RetryPivotBlockSelection)
-    case PivotBlockSelector.Result(pivotBlockHeader) =>
-      if pivotBlockHeader.number < 1 then {
-        log.info("Unable to start block synchronization in fast mode: pivot block is less than 1")
-        // Don't give up — peers may not have been fork-validated yet at startup.
-        // Retry pivot selection after a delay instead of marking fast sync done.
-        log.info("Retrying pivot selection in {} (peers may still be connecting)", startRetryInterval)
-        scheduler.scheduleOnce(startRetryInterval, self, RetryPivotBlockSelection)
-      } else {
-        // Check if headers already exist in RocksDB from a previous sync run.
-        // This avoids re-downloading millions of headers that survived a restart.
-        val existingBestHeader = blockchainReader.getBestBlockNumber
-        val bootstrappedHeaderNumber =
-          if existingBestHeader > 0 && existingBestHeader <= pivotBlockHeader.number then {
-            log.info(
-              "Found existing headers in database up to block {}. Skipping redundant header download.",
-              existingBestHeader
+      waitingForPivotBlock()
+    }
+
+    def waitingForPivotBlock(): Behavior[Any] = Behaviors.receiveMessage { msg =>
+      if handlePeerList(msg) then Behaviors.same
+      else
+        msg match {
+          case GetStatusCmd(replyTo) => replyTo ! SyncProtocol.Status.NotSyncing; Behaviors.same
+          case RetryPivotBlockSelection =>
+            log.info("Retrying pivot block selection")
+            val pivotBlockSelector = ctx
+              .spawn(
+                PivotBlockSelector(networkPeerManager, peerEventBus, syncConfig, ctx.self.toClassic, blacklist),
+                s"pivot-block-selector-retry-${java.util.UUID.randomUUID()}"
+              )
+              .toClassic
+            pivotBlockSelector ! PivotBlockSelector.SelectPivotBlock
+            Behaviors.same
+          case PivotBlockSelector.SelectionFailed =>
+            log.warn(
+              "Pivot block selection failed after maximum attempts. Retrying in {}",
+              startRetryInterval
             )
-            existingBestHeader
-          } else BigInt(0)
+            timers.startSingleTimer(RetryPivotBlockSelection, startRetryInterval)
+            Behaviors.same
+          case PivotBlockSelector.Result(pivotBlockHeader) =>
+            if pivotBlockHeader.number < 1 then {
+              log.info("Unable to start block synchronization in fast mode: pivot block is less than 1")
+              // Don't give up — peers may not have been fork-validated yet at startup.
+              // Retry pivot selection after a delay instead of marking fast sync done.
+              log.info("Retrying pivot selection in {} (peers may still be connecting)", startRetryInterval)
+              timers.startSingleTimer(RetryPivotBlockSelection, startRetryInterval)
+              Behaviors.same
+            } else {
+              // Check if headers already exist in RocksDB from a previous sync run.
+              // This avoids re-downloading millions of headers that survived a restart.
+              val existingBestHeader = blockchainReader.getBestBlockNumber
+              val bootstrappedHeaderNumber =
+                if existingBestHeader > 0 && existingBestHeader <= pivotBlockHeader.number then {
+                  log.info(
+                    "Found existing headers in database up to block {}. Skipping redundant header download.",
+                    existingBestHeader
+                  )
+                  existingBestHeader
+                } else BigInt(0)
 
-        val initialSyncState =
-          SyncState(
-            pivotBlockHeader,
-            safeDownloadTarget = pivotBlockHeader.number + syncConfig.fastSyncBlockValidationX,
-            bestBlockHeaderNumber = bootstrappedHeaderNumber,
-            lastFullBlockNumber = bootstrappedHeaderNumber
-          )
-        val syncingHandler = new SyncingHandler(initialSyncState)
-        context.become(syncingHandler.receive)
-        syncingHandler.processSyncing()
-      }
-  }
+              val initialSyncState =
+                SyncState(
+                  pivotBlockHeader,
+                  safeDownloadTarget = pivotBlockHeader.number + syncConfig.fastSyncBlockValidationX,
+                  bestBlockHeaderNumber = bootstrappedHeaderNumber,
+                  lastFullBlockNumber = bootstrappedHeaderNumber
+                )
+              initSyncSession(initialSyncState)
+              val b = syncing()
+              processSyncing()
+              b
+            }
+          case _ => Behaviors.same
+        }
+    }
 
-  private val actorCounter = new AtomicInteger
-  private def countActor: Int = actorCounter.incrementAndGet
+    private val actorCounter = new AtomicInteger
+    private def countActor: Int = actorCounter.incrementAndGet
 
-  // scalastyle:off number.of.methods
-  private class SyncingHandler(initialSyncState: SyncState, var masterPeer: Option[Peer] = None) {
+    // ── Syncing session state (was the inner SyncingHandler class) ─────────────────────────────────
+    // There is at most one sync session per FastSync lifetime; the session state is initialised lazily by
+    // initSyncSession() when a pivot is first established, and lives directly on Impl.
 
     // not part of syncstate as we do not want to persist is.
     private var stateSyncRestartRequested = false
     private var stateSyncStarted = false
 
-    private var syncState = initialSyncState
+    // Set by initSyncSession() the first time a pivot is established. Before that, the pre-syncing behaviors
+    // (idle / waitingForPivotBlock) never read these fields.
+    private var syncState: SyncState = null
+    private var initialLastFullBlockNumber: BigInt = 0
 
-    private var assignedHandlers: Map[ActorRef, Peer] = Map.empty
-    private var requestedBlockBodies: Map[ActorRef, Seq[ByteString]] = Map.empty
-    private var requestedReceipts: Map[ActorRef, Seq[ByteString]] = Map.empty
+    // Outstanding PRH requests. The Classic PeerRequestHandler children (spawned via ctx.toClassic.actorOf) reply to
+    // context.parent (this core, adapted to Classic) with a raw ResponseReceived / RequestFailed, then stop. The core
+    // matches those on its Behavior[Any] and identifies the originating peer from the message's `peer` field — there
+    // is at most one in-flight bodies/receipts request per peer (the fetcher queue's inFlight(peerId) gate enforces
+    // this), so peer.id is an unambiguous key for the requested-hashes maps. `assignedHandlers` tracks the live child
+    // refs for the fullySynced/noBlockchainWorkRemaining gates and is pruned only on RequestTerminated (death-watch).
+    private var assignedHandlers: Set[ActorRef] = Set.empty
+    private var requestedBlockBodies: Map[PeerId, Seq[ByteString]] = Map.empty
+    private var requestedReceipts: Map[PeerId, Seq[ByteString]] = Map.empty
 
     private var bodiesFetcherQueue = new BodiesFetcherQueue(ethRateTracker)
     private var receiptsFetcherQueue = new ReceiptsFetcherQueue(ethRateTracker)
     private var headersFetcherQueue = new HeadersFetcherQueue(ethRateTracker)
     private val headerResponseBuffer = mutable.SortedMap.empty[BigInt, Seq[BlockHeader]]
-    private var headerQueueHighWatermark: BigInt = syncState.bestBlockHeaderNumber
+    private var headerQueueHighWatermark: BigInt = 0
 
-    // Pekko Typed migration (Group S2): StateStorageActor is now a Typed Behavior. FastSync is still Classic, so we spawn
-    // via the Classic->Typed adapter and hold the ref as Classic. Messages use the explicit Command ADT (Init/Persist).
-    private val syncStateStorageActor = context
-      .spawn(
-        StateStorageActor(),
-        s"$countActor-state-storage",
-        DispatcherSelector.fromConfig("sync-dispatcher")
-      )
-      .toClassic
-    syncStateStorageActor ! StateStorageActor.Init(fastSyncStateStorage)
+    // Children + timer keys established once per sync session by initSyncSession().
+    private var syncStateStorageActor: ActorRef = null
+    private var syncStateScheduler: TypedActorRef[Any] = null
 
-    private val syncStateScheduler = context.actorOf(
-      SyncStateSchedulerActor
-        .props(
-          SyncStateScheduler(
-            blockchainReader,
-            evmCodeStorage,
-            stateStorage,
-            nodeStorage,
-            syncConfig.stateSyncBloomFilterSize
-          ),
-          syncConfig,
-          networkPeerManager,
-          peerEventBus,
-          blacklist,
-          scheduler
-        ),
-      s"$countActor-state-scheduler"
-    )
-
-    // Delay before starting to persist snapshot. It should be 0, as the presence of it marks that fast sync was started
-    private val persistStateSnapshotDelay: FiniteDuration = 0.seconds
-    private val syncStatePersistCancellable =
-      scheduler.scheduleWithFixedDelay(persistStateSnapshotDelay, persistStateSnapshotInterval, self, PersistSyncState)
-    private val printStatusCancellable =
-      scheduler.scheduleWithFixedDelay(printStatusInterval, printStatusInterval, self, PrintStatus)
-    private val heartBeat =
-      scheduler.scheduleWithFixedDelay(syncRetryInterval, syncRetryInterval * 2, self, ProcessSyncing)
+    private val PersistTimerKey = "persist-sync-state"
+    private val PrintStatusTimerKey = "print-status"
+    private val HeartBeatTimerKey = "heart-beat"
 
     private val startTime: Long = System.currentTimeMillis()
     private def totalMinutesTaken(): Long = TimeUnit.MILLISECONDS.toMinutes(System.currentTimeMillis() - startTime)
 
     // Progress logging state (for rates)
     private var lastProgressLogMs: Long = startTime
-    private var lastLoggedFullBlock: BigInt = initialSyncState.lastFullBlockNumber
-    private var lastLoggedStateNodes: Long = initialSyncState.downloadedNodesCount
+    private var lastLoggedFullBlock: BigInt = 0
+    private var lastLoggedStateNodes: Long = 0
 
-    // Initialize fetcher queues from persisted sync state
-    bodiesFetcherQueue.enqueue(syncState.blockBodiesQueue)
-    receiptsFetcherQueue.enqueue(syncState.receiptsQueue)
+    /** Initialise the per-session state on first pivot establishment: state, fetcher queues, child actors, and the
+      * persist/print/heartbeat timers. Replaces the work the Classic `SyncingHandler` constructor did.
+      */
+    private def initSyncSession(initial: SyncState): Unit = {
+      syncState = initial
+      initialLastFullBlockNumber = initial.lastFullBlockNumber
+      headerQueueHighWatermark = initial.bestBlockHeaderNumber
+      lastLoggedFullBlock = initial.lastFullBlockNumber
+      lastLoggedStateNodes = initial.downloadedNodesCount
 
-    def handleStatus: Receive = {
-      case SyncProtocol.GetStatus => sender() ! currentSyncingStatus
+      // Pekko Typed migration (Group S2): StateStorageActor is a Typed Behavior; FastSync's core is Typed too, so
+      // spawn it directly and adapt the ref to Classic for the StateStorageActor.Init/Persist command sends.
+      syncStateStorageActor = ctx
+        .spawn(
+          StateStorageActor(),
+          s"$countActor-state-storage",
+          DispatcherSelector.fromConfig("sync-dispatcher")
+        )
+        .toClassic
+      syncStateStorageActor ! StateStorageActor.Init(fastSyncStateStorage)
+
+      // SyncStateSchedulerActor (Group S4) is a Typed Behavior (Classic shell + Behavior[Any] core); spawn the shell
+      // via the Typed factory. We send it StartSyncingTo / RestartRequested and it replies with foreign messages that
+      // arrive on our Behavior[Any] core.
+      syncStateScheduler = ctx
+        .spawn(
+          Behaviors
+            .supervise(
+              SyncStateSchedulerActor.behavior(
+                SyncStateScheduler(
+                  blockchainReader,
+                  evmCodeStorage,
+                  stateStorage,
+                  nodeStorage,
+                  syncConfig.stateSyncBloomFilterSize
+                ),
+                syncConfig,
+                networkPeerManager,
+                peerEventBus,
+                blacklist,
+                ctx.self.toClassic
+              )
+            )
+            .onFailure[Exception](org.apache.pekko.actor.typed.SupervisorStrategy.restart),
+          s"$countActor-state-scheduler"
+        )
+
+      // Persist delay should be 0, as the presence of it marks that fast sync was started.
+      timers.startTimerWithFixedDelay(PersistTimerKey, PersistSyncState, persistStateSnapshotInterval)
+      timers.startTimerWithFixedDelay(PrintStatusTimerKey, PrintStatus, printStatusInterval)
+      timers.startTimerWithFixedDelay(HeartBeatTimerKey, ProcessSyncing, syncRetryInterval * 2)
+
+      // Initialize fetcher queues from persisted sync state
+      bodiesFetcherQueue.enqueue(syncState.blockBodiesQueue)
+      receiptsFetcherQueue.enqueue(syncState.receiptsQueue)
+    }
+
+    def handleStatus(msg: Any): Boolean = msg match {
+      case GetStatusCmd(replyTo) =>
+        replyTo ! currentSyncingStatus
+        true
       case SyncStateSchedulerActor.StateSyncStats(saved, missing) =>
         val total = saved + missing
         // Track high-water mark so resume after a JVM restart doesn't lose the discovered
@@ -281,40 +492,45 @@ class FastSync(
           totalNodesCount = total,
           maxTotalNodesCount = newMax
         )
+        true
+      case _ => false
     }
 
-    def receive: Receive = handlePeerListMessages.orElse(handleStatus).orElse(handleRequestFailure).orElse {
-      case UpdatePivotBlock(reason) => updatePivotBlock(reason)
-      case WaitingForNewTargetBlock =>
-        log.debug("State sync stopped until receiving new pivot block")
-        updatePivotBlock(ImportedLastBlock)
-      case ProcessSyncing                => processSyncing()
-      case PrintStatus                   => printStatus()
-      case PersistSyncState              => persistSyncState()
-      case r @ ResponseReceived(_, _, _) => handleResponses(r)
-      case StateSyncFinished =>
-        syncState = syncState.copy(stateSyncFinished = true)
-        processSyncing()
-      case SyncStateSchedulerActor.NetworkIncompatible =>
-        log.warning(
-          "State scheduler reports no ETH63-67 peers available (ETH68-only network). " +
-            "Fast sync cannot use GetNodeData. Requesting fallback to SNAP sync."
-        )
-        cleanup()
-        context.become(idle)
-        syncController ! FallbackToSnapSync
-    }
-
-    def handleRequestFailure: Receive = {
-      case PeerRequestHandler.RequestFailed(peer, reason) =>
-        handleRequestFailure(peer, sender(), FastSyncRequestFailed(reason))
-      case Terminated(ref) =>
-        assignedHandlers.get(ref).foreach {
-          handleRequestFailure(_, ref, PeerActorTerminated)
+    def syncing(): Behavior[Any] = Behaviors.receiveMessage { msg =>
+      if handlePeerList(msg) || handleStatus(msg) then Behaviors.same
+      else
+        msg match {
+          case PeerRequestHandler.RequestFailed(peer, reason) =>
+            handleRequestFailure(peer, FastSyncRequestFailed(reason))
+            Behaviors.same
+          case RequestTerminated(handler) =>
+            assignedHandlers -= handler
+            Behaviors.same
+          case r: ResponseReceived[?] =>
+            handleResponses(r)
+          case UpdatePivotBlock(reason) => updatePivotBlock(reason)
+          case WaitingForNewTargetBlock =>
+            log.debug("State sync stopped until receiving new pivot block")
+            updatePivotBlock(ImportedLastBlock)
+          case ProcessSyncing   => processSyncing()
+          case PrintStatus      => printStatus(); Behaviors.same
+          case PersistSyncState => persistSyncState(); Behaviors.same
+          case StateSyncFinished =>
+            syncState = syncState.copy(stateSyncFinished = true)
+            processSyncing()
+          case SyncStateSchedulerActor.NetworkIncompatible =>
+            log.warn(
+              "State scheduler reports no ETH63-67 peers available (ETH68-only network). " +
+                "Fast sync cannot use GetNodeData. Requesting fallback to SNAP sync."
+            )
+            cleanup()
+            syncController ! FallbackToSnapSync
+            idle()
+          case _ => Behaviors.same
         }
     }
 
-    private def handleResponses: Receive = {
+    private def handleResponses(result: ResponseReceived[?]): Behavior[Any] = result match {
       case ResponseReceived(peer, blockHeadersMsg: ETHPackets.BlockHeaders, timeTaken) =>
         log.debug(
           "Received {} block headers from peer [{}] in {} ms",
@@ -327,22 +543,24 @@ class FastSync(
           case Some(peerWithInfo) =>
             headersFetcherQueue.deliver(peerWithInfo, blockHeadersMsg, timeTaken) match {
               case DeliveryResult.Delivered(_) =>
-                removeRequestHandler(sender())
                 if blockHeadersMsg.headers.nonEmpty then {
                   headerResponseBuffer.put(blockHeadersMsg.headers.head.number, blockHeadersMsg.headers)
                   drainOrderedHeaders(peer)
                 } else {
                   blacklist.add(peer.id, blacklistDuration, WrongBlockHeaders)
+                  Behaviors.same
                 }
               case DeliveryResult.Invalid(reason) =>
-                removeRequestHandler(sender())
-                log.warning("Header delivery rejected for peer [{}]: {}", peer.id, reason)
+                log.warn("Header delivery rejected for peer [{}]: {}", peer.id, reason)
                 blacklist.add(peer.id, blacklistDuration, WrongBlockHeaders)
+                Behaviors.same
               case DeliveryResult.Duplicate =>
                 log.debug("Duplicate/stale header response from peer [{}], ignoring", peer.id)
+                Behaviors.same
             }
           case None =>
             log.debug("Received block headers from unknown peer [{}], ignoring", peer.id)
+            Behaviors.same
         }
 
       case ResponseReceived(peer, blockBodiesMsg: ETHPackets.BlockBodies, timeTaken) =>
@@ -359,9 +577,8 @@ class FastSync(
         log.debug("Received {} block bodies from peer [{}] in {} ms", blockBodiesMsg.bodies.size, peer.id, timeTaken)
         FastSyncMetrics.setBlockBodiesDownloadTime(timeTaken)
 
-        val requestedBodies = requestedBlockBodies.getOrElse(sender(), Nil)
-        requestedBlockBodies -= sender()
-        removeRequestHandler(sender())
+        val requestedBodies = requestedBlockBodies.getOrElse(peer.id, Nil)
+        requestedBlockBodies -= peer.id
         handleBlockBodies(peer, requestedBodies, blockBodiesMsg.bodies)
       case ResponseReceived(peer, receipts68: ETHPackets.Receipts68, timeTaken) =>
         handshakedPeers.get(peer.id) match {
@@ -409,7 +626,7 @@ class FastSync(
             case r: RLPList =>
               Some(expandTypedReceipts(r.items).toTypedRLPEncodables.map(_.toReceipt))
             case other =>
-              log.warning(
+              log.warn(
                 "Unexpected RLP item type in Receipts68 from peer [{}]: {}",
                 peer.id,
                 other.getClass.getSimpleName
@@ -420,24 +637,31 @@ class FastSync(
         log.debug("Received {} receipts (ETH66) from peer [{}] in {} ms", receipts.size, peer.id, timeTaken)
         FastSyncMetrics.setBlockReceiptsDownloadTime(timeTaken)
 
-        val requestedHashes = requestedReceipts.getOrElse(sender(), Nil)
-        requestedReceipts -= sender()
-        removeRequestHandler(sender())
+        val requestedHashes = requestedReceipts.getOrElse(peer.id, Nil)
+        requestedReceipts -= peer.id
         handleReceipts(peer, requestedHashes, receipts)
+
+      case ResponseReceived(peer, other, _) =>
+        log.debug(
+          "Received unexpected response type {} from peer [{}], ignoring",
+          other.getClass.getSimpleName,
+          peer.id
+        )
+        Behaviors.same
     }
 
-    def askForPivotBlockUpdate(updateReason: PivotBlockUpdateReason): Unit = {
+    def askForPivotBlockUpdate(updateReason: PivotBlockUpdateReason): Behavior[Any] = {
       syncState = syncState.copy(updatingPivotBlock = true)
       log.debug("Asking for new pivot block")
       val pivotBlockSelector =
-        context
+        ctx
           .spawn(
-            PivotBlockSelector(networkPeerManager, peerEventBus, syncConfig, context.self, blacklist),
+            PivotBlockSelector(networkPeerManager, peerEventBus, syncConfig, ctx.self.toClassic, blacklist),
             s"$countActor-pivot-block-selector-update"
           )
           .toClassic
       pivotBlockSelector ! PivotBlockSelector.SelectPivotBlock
-      context.become(waitingForPivotBlockUpdate(updateReason))
+      waitingForPivotBlockUpdate(updateReason)
     }
 
     private def newPivotIsGoodEnough(
@@ -449,69 +673,79 @@ class FastSync(
         newPivot.number == currentState.pivotBlock.number && updateReason.isSyncRestart
       newPivot.number >= currentState.pivotBlock.number && !stalePivotAfterRestart
     }
-    def waitingForPivotBlockUpdate(updateReason: PivotBlockUpdateReason): Receive =
-      handlePeerListMessages.orElse(handleStatus).orElse(handleRequestFailure).orElse {
-        case PivotBlockSelector.SelectionFailed =>
-          log.warning(
-            "Pivot block selection failed after maximum attempts during update. Continuing with current pivot."
-          )
-          syncState = syncState.copy(updatingPivotBlock = false)
-          // On SyncRestart, the state scheduler is in idle state waiting for StartSyncingTo.
-          // Send it the existing pivot's state root so it doesn't deadlock.
-          if updateReason.isSyncRestart then {
-            log.info(
-              "SyncRestart: sending existing pivot state root to state scheduler (block {})",
-              syncState.pivotBlock.number
-            )
-            stateSyncStarted = true
-            syncStateScheduler ! StartSyncingTo(syncState.pivotBlock.stateRoot, syncState.pivotBlock.number)
+    def waitingForPivotBlockUpdate(updateReason: PivotBlockUpdateReason): Behavior[Any] =
+      Behaviors.receiveMessage { msg =>
+        if handlePeerList(msg) || handleStatus(msg) then Behaviors.same
+        else
+          msg match {
+            case PeerRequestHandler.RequestFailed(peer, reason) =>
+              handleRequestFailure(peer, FastSyncRequestFailed(reason))
+              Behaviors.same
+            case RequestTerminated(handler) =>
+              assignedHandlers -= handler
+              Behaviors.same
+            case PivotBlockSelector.SelectionFailed =>
+              log.warn(
+                "Pivot block selection failed after maximum attempts during update. Continuing with current pivot."
+              )
+              syncState = syncState.copy(updatingPivotBlock = false)
+              // On SyncRestart, the state scheduler is in idle state waiting for StartSyncingTo.
+              // Send it the existing pivot's state root so it doesn't deadlock.
+              if updateReason.isSyncRestart then {
+                log.info(
+                  "SyncRestart: sending existing pivot state root to state scheduler (block {})",
+                  syncState.pivotBlock.number
+                )
+                stateSyncStarted = true
+                syncStateScheduler ! StartSyncingTo(syncState.pivotBlock.stateRoot, syncState.pivotBlock.number)
+              }
+              processSyncing()
+
+            case PivotBlockSelector.Result(pivotBlockHeader)
+                if newPivotIsGoodEnough(pivotBlockHeader, syncState, updateReason) =>
+              log.debug("New pivot block with number {} received", pivotBlockHeader.number)
+              updatePivotSyncState(updateReason, pivotBlockHeader)
+              processSyncing()
+
+            case PivotBlockSelector.Result(pivotBlockHeader)
+                if !newPivotIsGoodEnough(pivotBlockHeader, syncState, updateReason) =>
+              log.debug("Received pivot block is older than old one, re-scheduling asking for new one")
+              reScheduleAskForNewPivot(updateReason)
+              Behaviors.same
+
+            case PersistSyncState => persistSyncState(); Behaviors.same
+
+            case UpdatePivotBlock(state) => updatePivotBlock(state)
+
+            case _ => Behaviors.same
           }
-          context.become(this.receive)
-          processSyncing()
-
-        case PivotBlockSelector.Result(pivotBlockHeader)
-            if newPivotIsGoodEnough(pivotBlockHeader, syncState, updateReason) =>
-          log.debug("New pivot block with number {} received", pivotBlockHeader.number)
-          updatePivotSyncState(updateReason, pivotBlockHeader)
-          context.become(this.receive)
-          processSyncing()
-
-        case PivotBlockSelector.Result(pivotBlockHeader)
-            if !newPivotIsGoodEnough(pivotBlockHeader, syncState, updateReason) =>
-          log.debug("Received pivot block is older than old one, re-scheduling asking for new one")
-          reScheduleAskForNewPivot(updateReason)
-
-        case PersistSyncState => persistSyncState()
-
-        case UpdatePivotBlock(state) => updatePivotBlock(state)
       }
 
     private def reScheduleAskForNewPivot(updateReason: PivotBlockUpdateReason): Unit = {
       syncState = syncState.copy(pivotBlockUpdateFailures = syncState.pivotBlockUpdateFailures + 1)
-      scheduler
-        .scheduleOnce(syncConfig.pivotBlockReScheduleInterval, self, UpdatePivotBlock(updateReason))
+      ctx.scheduleOnce(syncConfig.pivotBlockReScheduleInterval, ctx.self, UpdatePivotBlock(updateReason))
     }
 
     def currentSyncingStatus: SyncProtocol.Status =
       SyncProtocol.Status.Syncing(
-        initialSyncState.lastFullBlockNumber,
+        initialLastFullBlockNumber,
         Progress(syncState.lastFullBlockNumber, syncState.pivotBlock.number),
         Some(
           Progress(syncState.downloadedNodesCount, syncState.totalNodesCount.max(1))
         ) // There's always at least one state root to fetch
       )
 
-    private def updatePivotBlock(updateReason: PivotBlockUpdateReason): Unit =
+    private def updatePivotBlock(updateReason: PivotBlockUpdateReason): Behavior[Any] =
       if syncState.pivotBlockUpdateFailures <= syncConfig.maximumTargetUpdateFailures then {
         if assignedHandlers.nonEmpty || syncState.blockChainWorkQueued then {
           log.debug("Still waiting for some responses, rescheduling pivot block update")
-          scheduler.scheduleOnce(1.second, self, UpdatePivotBlock(updateReason))
+          ctx.scheduleOnce(1.second, ctx.self, UpdatePivotBlock(updateReason))
           processSyncing()
         } else {
           askForPivotBlockUpdate(updateReason)
         }
       } else {
-        log.warning("Sync failure! Number of pivot block update failures reached maximum.")
+        log.warn("Sync failure! Number of pivot block update failures reached maximum.")
         sys.exit(1)
       }
 
@@ -578,12 +812,6 @@ class FastSync(
           }
       }
 
-    private def removeRequestHandler(handler: ActorRef): Unit = {
-      log.debug(s"Removing request handler ${handler.path}")
-      context.unwatch(handler)
-      assignedHandlers -= handler
-    }
-
     private def discardLastBlocks(startBlock: BigInt, blocksToDiscard: Int): Unit =
       (startBlock to ((startBlock - blocksToDiscard).max(1)) by -1).foreach { n =>
         blockchainReader.getBlockHeaderByNumber(n).foreach { headerToRemove =>
@@ -601,7 +829,7 @@ class FastSync(
             Right(header)
 
           case Left(error) =>
-            log.warning("Block header validation failed during fast sync at block {}: {}", header.number, error)
+            log.warn("Block header validation failed during fast sync at block {}: {}", header.number, error)
             Left(ValidationFailed(header, peer))
         }
       } else {
@@ -637,7 +865,7 @@ class FastSync(
         N: Int,
         duration: FiniteDuration,
         continueSyncing: Boolean = true
-    ): Unit = {
+    ): Behavior[Any] = {
       blacklist.add(peer.id, duration, BlockHeaderValidationFailed)
       if header.number <= syncState.safeDownloadTarget then {
         discardLastBlocks(header.number, N)
@@ -646,14 +874,14 @@ class FastSync(
           updatePivotBlock(LastBlockValidationFailed)
         } else if continueSyncing then {
           processSyncing()
-        }
+        } else Behaviors.same
       } else if continueSyncing then {
         processSyncing()
-      }
+      } else Behaviors.same
     }
 
     // scalastyle:off method.length
-    private def handleBlockHeaders(peer: Peer, headers: Seq[BlockHeader]): Unit = {
+    private def handleBlockHeaders(peer: Peer, headers: Seq[BlockHeader]): Behavior[Any] = {
       def processHeader(header: BlockHeader): Either[HeaderProcessingResult, (BlockHeader, ChainWeight)] =
         for {
           validatedHeader <- validateHeader(header, peer)
@@ -681,37 +909,40 @@ class FastSync(
 
       if !checkHeadersChain(headers) then {
         blacklist.add(peer.id, blacklistDuration, ErrorInBlockHeaders)
-        return processSyncing() // scalafix:ok DisableSyntax.return
-      }
-
-      processHeaders(headers) match {
-        case ParentChainWeightNotFound(header) =>
-          // We could end in wrong fork and get blocked so we should rewind our state a little
-          // we blacklist peer just in case we got malicious peer which would send us bad blocks, forcing us to rollback
-          // to genesis
-          log.warning(
-            "Parent chain weight not found for block {} (parent: {}). Will retry sync with alternate peer.",
-            header.idTag,
-            header.parentHash
-          )
-          handleRewind(header, peer, syncConfig.fastSyncBlockValidationN, syncConfig.blacklistDuration)
-        case HeadersProcessingFinished =>
-          processSyncing()
-        case ImportedPivotBlock =>
-          updatePivotBlock(ImportedLastBlock)
-        case ValidationFailed(header, peerToBlackList) =>
-          log.warning("validation of header {} failed", header.idTag)
-          // pow validation failure indicate that either peer is malicious or it is on wrong fork
-          handleRewind(
-            header,
-            peerToBlackList,
-            syncConfig.fastSyncBlockValidationN,
-            syncConfig.criticalBlacklistDuration
-          )
-      }
+        processSyncing()
+      } else
+        processHeaders(headers) match {
+          case ParentChainWeightNotFound(header) =>
+            // We could end in wrong fork and get blocked so we should rewind our state a little
+            // we blacklist peer just in case we got malicious peer which would send us bad blocks, forcing us to roll
+            // back to genesis
+            log.warn(
+              "Parent chain weight not found for block {} (parent: {}). Will retry sync with alternate peer.",
+              header.idTag,
+              header.parentHash
+            )
+            handleRewind(header, peer, syncConfig.fastSyncBlockValidationN, syncConfig.blacklistDuration)
+          case HeadersProcessingFinished =>
+            processSyncing()
+          case ImportedPivotBlock =>
+            updatePivotBlock(ImportedLastBlock)
+          case ValidationFailed(header, peerToBlackList) =>
+            log.warn("validation of header {} failed", header.idTag)
+            // pow validation failure indicate that either peer is malicious or it is on wrong fork
+            handleRewind(
+              header,
+              peerToBlackList,
+              syncConfig.fastSyncBlockValidationN,
+              syncConfig.criticalBlacklistDuration
+            )
+        }
     }
 
-    private def handleBlockBodies(peer: Peer, requestedHashes: Seq[ByteString], blockBodies: Seq[BlockBody]): Unit = {
+    private def handleBlockBodies(
+        peer: Peer,
+        requestedHashes: Seq[ByteString],
+        blockBodies: Seq[BlockBody]
+    ): Behavior[Any] = {
       if blockBodies.isEmpty then {
         val knownHashes = requestedHashes.map(ByteStringUtils.hash2string)
         blacklist.add(peer.id, blacklistDuration, EmptyBlockBodies(knownHashes))
@@ -733,7 +964,11 @@ class FastSync(
       processSyncing()
     }
 
-    private def handleReceipts(peer: Peer, requestedHashes: Seq[ByteString], receipts: Seq[Seq[Receipt]]): Unit = {
+    private def handleReceipts(
+        peer: Peer,
+        requestedHashes: Seq[ByteString],
+        receipts: Seq[Seq[Receipt]]
+    ): Behavior[Any] = {
       if receipts.isEmpty then {
         val knownHashes = requestedHashes.map(ByteStringUtils.hash2string)
         blacklist.add(peer.id, blacklistDuration, EmptyReceipts(knownHashes))
@@ -743,7 +978,7 @@ class FastSync(
         validateReceipts(requestedHashes, receipts) match {
           case ReceiptsValidationResult.Valid(blockHashesWithReceipts) =>
             if blockHashesWithReceipts.isEmpty then {
-              log.warning(
+              log.warn(
                 "Received receipts from peer [{}] but have no matching requested hashes (unsolicited or late response)",
                 peer.id
               )
@@ -779,11 +1014,11 @@ class FastSync(
       processSyncing()
     }
 
-    private def handleRequestFailure(peer: Peer, handler: ActorRef, reason: BlacklistReason): Unit = {
-      removeRequestHandler(handler)
-
-      val failedBodies = requestedBlockBodies.getOrElse(handler, Nil)
-      val failedReceipts = requestedReceipts.getOrElse(handler, Nil)
+    private def handleRequestFailure(peer: Peer, reason: BlacklistReason): Unit = {
+      // The handler ref is pruned from assignedHandlers by the RequestTerminated death-watch when the Classic PRH
+      // child stops; here we only return the peer's in-flight work and apply the blacklist.
+      val failedBodies = requestedBlockBodies.getOrElse(peer.id, Nil)
+      val failedReceipts = requestedReceipts.getOrElse(peer.id, Nil)
 
       syncState = syncState
         .enqueueBlockBodies(failedBodies)
@@ -798,8 +1033,8 @@ class FastSync(
       else if failedReceipts.nonEmpty then receiptsFetcherQueue.enqueue(failedReceipts)
 
       headersFetcherQueue.unreserve(peer.id)
-      requestedBlockBodies = requestedBlockBodies - handler
-      requestedReceipts = requestedReceipts - handler
+      requestedBlockBodies = requestedBlockBodies - peer.id
+      requestedReceipts = requestedReceipts - peer.id
 
       // Peers that close the connection before answering (PEER_REQUEST_DISCONNECTED) get a longer
       // cooldown so they don't immediately rejoin and trigger another GetReceipts dispatch cycle.
@@ -916,11 +1151,11 @@ class FastSync(
       lastLoggedStateNodes = savedNodes
 
       log.debug(
-        s"""|Connection status: connected({})/
+        s"""|Connection status: inFlightHandlers({})/
             |handshaked({})
             | blacklisted({})
             |""".stripMargin.replace("\n", " "),
-        assignedHandlers.values.map(formatPeer).toSeq.sorted.mkString(", "),
+        assignedHandlers.map(_.path.name).toSeq.sorted.mkString(", "),
         handshakedPeers.values.toList.map(e => formatPeerEntry(e)).sorted.mkString(", "),
         blacklistedIds.map(_.value).mkString(", ")
       )
@@ -929,7 +1164,7 @@ class FastSync(
     private def insertBlocks(requestedHashes: Seq[ByteString], blockBodies: Seq[BlockBody]): Unit = {
       val blockHashesWithBodies = requestedHashes.zip(blockBodies)
       if blockHashesWithBodies.isEmpty then
-        log.warning(
+        log.warn(
           "Received block bodies but have no matching requested hashes (unsolicited or late response)"
         )
       else {
@@ -1004,7 +1239,11 @@ class FastSync(
       }
     }
 
-    def processSyncing(): Unit = {
+    def processSyncing(): Behavior[Any] = {
+      // Accumulator mirrors the Classic "last context.become wins" semantics: the stale-state branch may transition
+      // to waitingForPivotBlockUpdate, then the final block may override it (or keep it). The method returns the
+      // last-decided behavior.
+      var nextBehavior: Behavior[Any] = Behaviors.same
       FastSyncMetrics.measure(syncState)
       log.debug(
         "Start of processSyncing: {}",
@@ -1051,7 +1290,7 @@ class FastSync(
           )
           syncStateScheduler ! RestartRequested
           stateSyncRestartRequested = true
-          askForPivotBlockUpdate(ImportedLastBlock)
+          nextBehavior = askForPivotBlockUpdate(ImportedLastBlock)
         }
       }
 
@@ -1096,13 +1335,15 @@ class FastSync(
             syncStateScheduler ! RestartRequested
             stateSyncRestartRequested = true
           }
+          nextBehavior
         } else {
           log.debug("No more items to request, waiting for {} responses", assignedHandlers.size)
+          nextBehavior
         }
       }
     }
 
-    def finish(): Unit = {
+    def finish(): Behavior[Any] = {
       val totalTime = totalMinutesTaken()
       FastSyncMetrics.setFastSyncTotalTimeGauge(totalTime.toDouble)
       log.info("Total time taken for FastSync was {} minutes", totalTime)
@@ -1112,21 +1353,20 @@ class FastSync(
       discardLastBlocks(syncState.safeDownloadTarget, syncConfig.fastSyncBlockValidationX - 1)
       cleanup()
       appStateStorage.fastSyncDone().commit()
-      context.become(idle)
-      scheduler.scheduleOnce(syncSwitchDelay, syncController, Done)
+      ctx.scheduleOnce(syncSwitchDelay, syncController, Done)
+      idle()
     }
 
     def cleanup(): Unit = {
-      heartBeat.cancel()
-      syncStatePersistCancellable.cancel()
-      printStatusCancellable.cancel()
-      // StateStorageActor is now Typed; PoisonPill is a Classic-only protocol message it would silently drop. Stop the
-      // classic-adapted ref directly so the child terminates.
-      context.stop(syncStateStorageActor)
+      timers.cancel(HeartBeatTimerKey)
+      timers.cancel(PersistTimerKey)
+      timers.cancel(PrintStatusTimerKey)
+      // StateStorageActor is now Typed; stop the classic-adapted ref directly so the child terminates.
+      if syncStateStorageActor != null then ctx.stop(syncStateStorageActor.toTyped[Nothing])
       fastSyncStateStorage.purge()
     }
 
-    def processDownloads(): Unit = {
+    def processDownloads(): Behavior[Any] = {
       // Self-heal: if syncState has items but fetcher queues are empty (e.g., post-restart), re-sync them
       if syncState.blockBodiesQueue.nonEmpty && bodiesFetcherQueue.pending == 0 && bodiesFetcherQueue.inFlightCount == 0
       then bodiesFetcherQueue.enqueue(syncState.blockBodiesQueue)
@@ -1140,14 +1380,24 @@ class FastSync(
       if handshakedPeers.isEmpty then {
         if assignedHandlers.nonEmpty then
           log.debug("There are no available peers, waiting for [{}] responses.", assignedHandlers.size)
-        else scheduler.scheduleOnce(syncRetryInterval, self, ProcessSyncing)
+        else ctx.scheduleOnce(syncRetryInterval, ctx.self, ProcessSyncing)
       } else if hasWork then {
         dispatchWork()
       } else if assignedHandlers.nonEmpty then {
         log.debug("No pending work; waiting for [{}] in-flight responses.", assignedHandlers.size)
       } else {
-        scheduler.scheduleOnce(syncRetryInterval, self, ProcessSyncing)
+        ctx.scheduleOnce(syncRetryInterval, ctx.self, ProcessSyncing)
       }
+      Behaviors.same
+    }
+
+    /** Spawn a Classic PeerRequestHandler child (it replies to context.parent = this core, then stops), register a
+      * death-watch that delivers RequestTerminated, and track the ref in `assignedHandlers`.
+      */
+    private def spawnHandler(behaviorName: String, props: Props): Unit = {
+      val handler = ctx.toClassic.actorOf(props, behaviorName)
+      ctx.watchWith(handler.toTyped[Nothing], RequestTerminated(handler))
+      assignedHandlers += handler
     }
 
     private def dispatchWork(): Unit = {
@@ -1157,7 +1407,8 @@ class FastSync(
       // Bodies: dispatch to all idle-for-bodies peers simultaneously (mirrors go-ethereum fetchBodies goroutine)
       val bodyAssignments = ConcurrentFetch.dispatchTo(bodiesFetcherQueue, allPeers, targetRtt, "bodies", log)
       bodyAssignments.foreach { case (peerWithInfo, req) =>
-        val handler = context.actorOf(
+        spawnHandler(
+          s"$countActor-peer-request-handler-block-bodies",
           PeerRequestHandler.props[ETHPackets.GetBlockBodies, ETHPackets.BlockBodies](
             peerWithInfo.peer,
             peerResponseTimeout,
@@ -1165,19 +1416,17 @@ class FastSync(
             peerEventBus,
             requestMsg = req,
             responseMsgCode = Codes.BlockBodiesCode
-          ),
-          s"$countActor-peer-request-handler-block-bodies"
+          )
         )
-        context.watch(handler)
-        assignedHandlers += (handler -> peerWithInfo.peer)
-        requestedBlockBodies += handler -> req.hashes
+        requestedBlockBodies += peerWithInfo.peer.id -> req.hashes
         syncState = syncState.copy(blockBodiesQueue = syncState.blockBodiesQueue.diff(req.hashes))
       }
 
       // Receipts: dispatch to all idle-for-receipts peers simultaneously (mirrors go-ethereum fetchReceipts goroutine)
       val receiptAssignments = ConcurrentFetch.dispatchTo(receiptsFetcherQueue, allPeers, targetRtt, "receipts", log)
       receiptAssignments.foreach { case (peerWithInfo, req) =>
-        val handler = context.actorOf(
+        spawnHandler(
+          s"$countActor-peer-request-handler-receipts",
           PeerRequestHandler.props[ETHPackets.GetReceipts, ETHPackets.Receipts68](
             peerWithInfo.peer,
             peerResponseTimeout,
@@ -1185,12 +1434,9 @@ class FastSync(
             peerEventBus,
             requestMsg = req,
             responseMsgCode = Codes.ReceiptsCode
-          ),
-          s"$countActor-peer-request-handler-receipts"
+          )
         )
-        context.watch(handler)
-        assignedHandlers += (handler -> peerWithInfo.peer)
-        requestedReceipts += handler -> req.blockHashes
+        requestedReceipts += peerWithInfo.peer.id -> req.blockHashes
         syncState = syncState.copy(receiptsQueue = syncState.receiptsQueue.diff(req.blockHashes))
       }
 
@@ -1200,7 +1446,8 @@ class FastSync(
       val headerAssignments =
         ConcurrentFetch.dispatchTo(headersFetcherQueue, eligibleHeaderPeers, targetRtt, "headers", log)
       headerAssignments.foreach { case (peerWithInfo, req) =>
-        val handler = context.actorOf(
+        spawnHandler(
+          s"$countActor-fast-headers-${req.requestId}",
           PeerRequestHandler.props[ETHPackets.GetBlockHeaders, ETHPackets.BlockHeaders](
             peerWithInfo.peer,
             peerResponseTimeout,
@@ -1208,11 +1455,8 @@ class FastSync(
             peerEventBus,
             requestMsg = req,
             responseMsgCode = Codes.BlockHeadersCode
-          ),
-          s"$countActor-fast-headers-${req.requestId}"
+          )
         )
-        context.watch(handler)
-        assignedHandlers += (handler -> peerWithInfo.peer)
       }
     }
 
@@ -1226,22 +1470,25 @@ class FastSync(
       }
     }
 
-    private def drainOrderedHeaders(peer: Peer): Unit = {
+    private def drainOrderedHeaders(peer: Peer): Behavior[Any] = {
       // Prune anything superseded by a redownloadBlockchain reset
       while headerResponseBuffer.nonEmpty && headerResponseBuffer.firstKey <= syncState.bestBlockHeaderNumber do
         headerResponseBuffer.remove(headerResponseBuffer.firstKey)
 
-      // Drain the contiguous run from bestBlockHeaderNumber + 1
+      // Drain the contiguous run from bestBlockHeaderNumber + 1. Each handleBlockHeaders call may decide a behavior
+      // transition; the last decision wins (mirrors the Classic "last context.become wins" semantics).
+      var nextBehavior: Behavior[Any] = Behaviors.same
       var continue = true
       while continue do
         headerResponseBuffer.headOption match {
           case Some((blockNum, headers)) if blockNum == syncState.bestBlockHeaderNumber + 1 =>
             headerResponseBuffer.remove(blockNum)
-            handleBlockHeaders(peer, headers)
+            nextBehavior = handleBlockHeaders(peer, headers)
           case _ =>
             continue = false
         }
       enqueueHeadersIfNeeded()
+      nextBehavior
     }
 
     private def blockchainDataToDownload: Boolean =
@@ -1274,9 +1521,6 @@ class FastSync(
       }
     }
   }
-}
-
-object FastSync {
 
   /** Number of block numbers to keep ahead of bestBlockHeaderNumber in the header fetch queue. Ensures peers always
     * have work to do without enqueuing the entire chain at once. Mirrors go-ethereum skeleton scratchHeaders (131,072)
@@ -1339,15 +1583,19 @@ object FastSync {
   /** Shell → core: carries the Classic `sender()` of an ask-based `SyncProtocol.GetStatus` as an explicit reply-to. */
   final private[fast] case class GetStatusCmd(replyTo: ActorRef)
 
-  /** Core-internal: a `PeerRequestHandler.Result` delivered through the per-request message adapter, tagged with the
-    * request id so the core can find the originating peer/hashes (replaces the Classic `sender()`-keyed handler maps).
+  /** Core-internal: a watched Classic `PeerRequestHandler` child stopped (it replies to `context.parent` then stops
+    * itself). Delivered via `ctx.watchWith`, this is the single place that removes the handler from the active set —
+    * the response/failure handlers only do data processing (keyed by `peer.id`).
     */
-  final private[fast] case class PRHResultCmd(id: Int, result: PeerRequestHandler.Result)
+  final private[fast] case class RequestTerminated(handler: ActorRef)
 
-  /** Core-internal: periodic poll tick that re-requests the handshaked peer list from `networkPeerManager` (replaces the
-    * `scheduleWithFixedDelay` that `PeerListSupportNg` ran in the Classic actor).
+  /** Core-internal: periodic poll tick that re-requests the handshaked peer list from `networkPeerManager` (replaces
+    * the `scheduleWithFixedDelay` that `PeerListSupportNg` ran in the Classic actor).
     */
   private case object ScanPeersTick
+
+  /** Core-internal: retry pivot block selection after a delay (was a private case object inside the Classic actor). */
+  private case object RetryPivotBlockSelection
 
   /** Sync state that should be persisted.
     */

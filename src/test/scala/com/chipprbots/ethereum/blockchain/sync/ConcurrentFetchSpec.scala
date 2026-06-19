@@ -226,7 +226,8 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
 
   "ConcurrentFetch.dispatchTo" should "return empty when queue is empty" taggedAs UnitTest in {
     val q = new HeadersFetcherQueue(new PeerRateTracker())
-    val result = ConcurrentFetch.dispatchTo(q, Seq(peer1, peer2), 2000L, "headers", org.apache.pekko.event.NoLogging)
+    val result =
+      ConcurrentFetch.dispatchTo(q, Seq(peer1, peer2), 2000L, "headers", org.slf4j.helpers.NOPLogger.NOP_LOGGER)
     result shouldBe empty
   }
 
@@ -235,7 +236,7 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
     q.enqueue(Seq(100, 101, 102))
     q.reserve(peer1, 1)
 
-    val result = ConcurrentFetch.dispatchTo(q, Seq(peer1), 2000L, "headers", org.apache.pekko.event.NoLogging)
+    val result = ConcurrentFetch.dispatchTo(q, Seq(peer1), 2000L, "headers", org.slf4j.helpers.NOPLogger.NOP_LOGGER)
     result shouldBe empty
   }
 
@@ -243,7 +244,8 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
     val q = new HeadersFetcherQueue(new PeerRateTracker())
     q.enqueue(BigInt(100) to BigInt(110))
 
-    val result = ConcurrentFetch.dispatchTo(q, Seq(peer1, peer2), 2000L, "headers", org.apache.pekko.event.NoLogging)
+    val result =
+      ConcurrentFetch.dispatchTo(q, Seq(peer1, peer2), 2000L, "headers", org.slf4j.helpers.NOPLogger.NOP_LOGGER)
 
     result should have size 2
     val assignedPeers = result.map(_._1.peer.id).toSet
@@ -257,7 +259,8 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
     q.enqueue(BigInt(100) to BigInt(120))
     q.reserve(peer1, 3)
 
-    val result = ConcurrentFetch.dispatchTo(q, Seq(peer1, peer2), 2000L, "headers", org.apache.pekko.event.NoLogging)
+    val result =
+      ConcurrentFetch.dispatchTo(q, Seq(peer1, peer2), 2000L, "headers", org.slf4j.helpers.NOPLogger.NOP_LOGGER)
 
     result should have size 1
     result.head._1.peer.id shouldBe peer2.peer.id
@@ -268,7 +271,7 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
     q.enqueue(Seq(100))
 
     val result =
-      ConcurrentFetch.dispatchTo(q, Seq(peer1, peer2, peer3), 2000L, "headers", org.apache.pekko.event.NoLogging)
+      ConcurrentFetch.dispatchTo(q, Seq(peer1, peer2, peer3), 2000L, "headers", org.slf4j.helpers.NOPLogger.NOP_LOGGER)
 
     result should have size 1
     q.pending shouldBe 0
@@ -287,7 +290,8 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
 
     val q2 = new HeadersFetcherQueue(tracker)
     q2.enqueue(BigInt(100) to BigInt(200))
-    val result = ConcurrentFetch.dispatchTo(q2, Seq(peer1, peer2), 2000L, "headers", org.apache.pekko.event.NoLogging)
+    val result =
+      ConcurrentFetch.dispatchTo(q2, Seq(peer1, peer2), 2000L, "headers", org.slf4j.helpers.NOPLogger.NOP_LOGGER)
 
     result should have size 2
     val p1batch = result.find(_._1.peer.id == peer1.peer.id).get._2

@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import org.apache.pekko.event.LoggingAdapter
+import org.slf4j.Logger
 
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
 import com.chipprbots.ethereum.network.PeerId
@@ -114,14 +114,14 @@ object ConcurrentFetch {
     * @param label
     *   short label for log lines ("headers", "bodies", "receipts")
     * @param log
-    *   Pekko LoggingAdapter from the calling actor
+    *   SLF4J Logger from the calling actor (Typed `ctx.log`)
     */
   def dispatchTo[Req, Resp](
       queue: ConcurrentFetch[Req, Resp],
       availablePeers: Iterable[PeerWithInfo],
       targetRttMs: Long,
       label: String,
-      log: LoggingAdapter
+      log: Logger
   ): Seq[(PeerWithInfo, Req)] = {
     if queue.pending == 0 then return Seq.empty
 

@@ -80,11 +80,17 @@ class FastSyncConcurrentPipelineSpec extends AnyFlatSpec with Matchers {
     receiptsQ.enqueue((1 to 10).map(i => ByteString(i.toByte)))
 
     val hAssign =
-      ConcurrentFetch.dispatchTo(headersQ, Seq(peer1, peer2), 2000L, "headers", org.apache.pekko.event.NoLogging)
+      ConcurrentFetch.dispatchTo(headersQ, Seq(peer1, peer2), 2000L, "headers", org.slf4j.helpers.NOPLogger.NOP_LOGGER)
     val bAssign =
-      ConcurrentFetch.dispatchTo(bodiesQ, Seq(peer1, peer2), 2000L, "bodies", org.apache.pekko.event.NoLogging)
+      ConcurrentFetch.dispatchTo(bodiesQ, Seq(peer1, peer2), 2000L, "bodies", org.slf4j.helpers.NOPLogger.NOP_LOGGER)
     val rAssign =
-      ConcurrentFetch.dispatchTo(receiptsQ, Seq(peer1, peer2), 2000L, "receipts", org.apache.pekko.event.NoLogging)
+      ConcurrentFetch.dispatchTo(
+        receiptsQ,
+        Seq(peer1, peer2),
+        2000L,
+        "receipts",
+        org.slf4j.helpers.NOPLogger.NOP_LOGGER
+      )
 
     hAssign should not be empty
     bAssign should not be empty

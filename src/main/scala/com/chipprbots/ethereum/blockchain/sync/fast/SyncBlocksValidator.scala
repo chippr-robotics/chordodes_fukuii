@@ -1,7 +1,8 @@
 package com.chipprbots.ethereum.blockchain.sync.fast
 
-import org.apache.pekko.actor.ActorLogging
 import org.apache.pekko.util.ByteString
+
+import org.slf4j.Logger
 
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
@@ -11,13 +12,16 @@ import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
-trait SyncBlocksValidator { this: ActorLogging =>
+trait SyncBlocksValidator {
 
   import SyncBlocksValidator.*
   import BlockBodyValidationResult.*
 
   def blockchainReader: BlockchainReader
   def validators: Validators
+
+  /** SLF4J logger supplied by the mixing actor (Typed `ctx.log`). Replaces the Classic `ActorLogging` self-type. */
+  protected def log: Logger
 
   def validateBlocks(requestedHashes: Seq[ByteString], blockBodies: Seq[BlockBody]): BlockBodyValidationResult =
     requestedHashes
