@@ -141,14 +141,21 @@ Read it before planning or implementing. Highlights:
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/004-decoupled-heal-serve-root/plan.md` (decouple the post-SNAP heal's local
-completeness walk from the serve-window-bound node fetch: hold the WALK root fixed for
-the whole walk (a local read needing no peers) while fetching missing nodes from an
-advancing SERVE root that stays inside peers' ~128-block snap serve window. Trie nodes
-are content-addressed and the fetched node is verified keccak256==hash before store
-(the load-bearing guardrail), so a newer servable root safely supplies the deep nodes.
-Cures the serve-window-vs-walk-time deadlock that stalls heal at ~99%. Consensus-adjacent;
-forge-reviewed; byte-for-byte completion parity (FR-007); default-on; composes with the
-hold-pivot fix #1357 as its durable generalization. Needs build + one redeploy.) Prior
-plans: `specs/003-scoped-heal-verification/plan.md`, `specs/002-bfs-heal-performance/plan.md`.
+`specs/006-skip-redundant-verify-walk/plan.md` (eliminate the REDUNDANT second full-trie
+verification walk on a CLEAN post-SNAP heal. On a restart with a persisted frontier but no
+completeness marker, the heal runs TWO identical rebuildFrontierBFS walks before
+StateHealingComplete — the rebuild walk (FrontierRebuildComplete only writes the marker, never
+sets verificationPassComplete) then a watchdog-forced verification walk — doubling a ~16-20h
+walk to ~30-40h on ETC mainnet for no completeness gain. Fix: in the FrontierRebuildComplete
+handler, when the rebuild was GENUINELY CLEAN (missingEmitted==0 && totalNodesHealed==0 &&
+isComplete && !flushing && walkRoot==stateRoot), set verificationPassComplete=true and
+self ! HealingCheckCompletion — declaring completion after ONE walk through the single existing
+chokepoint (byte-parity). Makes FrontierRebuildComplete a case class carrying missingEmitted
+(frontierCount) + walkRoot (explicit stale-root guard). Unconditional; the dead-pulse watchdog
+stays as the built-in fallback; the verification walk still guards the shallow inline-discovery
+path (Chesterton's Fence preserved). Consensus-adjacent; forge adversarially verified — no false-
+completion path. Independent of spec 005. Needs build + one redeploy; cannot help an in-flight
+walk.) Prior plans: `specs/005-subtree-complete-verification/plan.md`,
+`specs/004-decoupled-heal-serve-root/plan.md`, `specs/003-scoped-heal-verification/plan.md`,
+`specs/002-bfs-heal-performance/plan.md`.
 <!-- SPECKIT END -->
