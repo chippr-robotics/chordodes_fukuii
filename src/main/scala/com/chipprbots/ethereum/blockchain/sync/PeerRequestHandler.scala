@@ -11,13 +11,14 @@ import scala.reflect.ClassTag
 
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.PeerEventBusActor.Command as PeerEventBusCommand
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
-import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.MessageClassifier
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.PeerDisconnectedClassifier
-import com.chipprbots.ethereum.network.PeerEventBusActor.Unsubscribe
+import com.chipprbots.ethereum.network.PeerEventBusActor.UnsubscribeAllCmd
 import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.MessageSerializable
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
@@ -26,7 +27,7 @@ class PeerRequestHandler[RequestMsg <: Message, ResponseMsg <: Message: ClassTag
     peer: Peer,
     responseTimeout: FiniteDuration,
     networkPeerManager: ActorRef,
-    peerEventBus: ActorRef,
+    peerEventBus: TypedActorRef[PeerEventBusCommand],
     requestMsg: RequestMsg,
     responseMsgCode: Int
 )(implicit scheduler: Scheduler, toSerializable: RequestMsg => MessageSerializable)
@@ -52,8 +53,8 @@ class PeerRequestHandler[RequestMsg <: Message, ResponseMsg <: Message: ClassTag
 
   override def preStart(): Unit = {
     networkPeerManager ! NetworkPeerManagerActor.SendMessage(toSerializable(requestMsg), peer.id)
-    peerEventBus ! Subscribe(PeerDisconnectedClassifier(PeerSelector.WithId(peer.id)))
-    peerEventBus ! Subscribe(subscribeMessageClassifier)
+    peerEventBus ! SubscribeCmd(PeerDisconnectedClassifier(PeerSelector.WithId(peer.id)), context.self)
+    peerEventBus ! SubscribeCmd(subscribeMessageClassifier, context.self)
   }
 
   override def receive: Receive = {
@@ -106,7 +107,7 @@ class PeerRequestHandler[RequestMsg <: Message, ResponseMsg <: Message: ClassTag
 
   def cleanupAndStop(): Unit = {
     timeout.cancel()
-    peerEventBus ! Unsubscribe()
+    peerEventBus ! UnsubscribeAllCmd(context.self)
     context.stop(self)
   }
 }
@@ -119,7 +120,7 @@ object PeerRequestHandler {
       peer: Peer,
       responseTimeout: FiniteDuration,
       networkPeerManager: ActorRef,
-      peerEventBus: ActorRef,
+      peerEventBus: TypedActorRef[PeerEventBusCommand],
       requestMsg: RequestMsg,
       responseMsgCode: Int
   )(implicit scheduler: Scheduler, toSerializable: RequestMsg => MessageSerializable): Props =
@@ -147,7 +148,7 @@ object PeerRequestHandler {
       peer: Peer,
       responseTimeout: FiniteDuration,
       networkPeerManager: ActorRef,
-      peerEventBus: ActorRef,
+      peerEventBus: TypedActorRef[PeerEventBusCommand],
       requestMsg: RequestMsg,
       responseMsgCode: Int,
       replyTo: TypedActorRef[Result]
@@ -168,12 +169,12 @@ object PeerRequestHandler {
           NetworkPeerManagerActor.SendMessage(toSerializable(requestMsg), peer.id),
           ActorRef.noSender
         )
-        peerEventBus.tell(
-          Subscribe(PeerDisconnectedClassifier(PeerSelector.WithId(peer.id))),
+        peerEventBus ! SubscribeCmd(
+          PeerDisconnectedClassifier(PeerSelector.WithId(peer.id)),
           disconnectAdapter.toClassic
         )
-        peerEventBus.tell(
-          Subscribe(MessageClassifier(Set(responseMsgCode), PeerSelector.WithId(peer.id))),
+        peerEventBus ! SubscribeCmd(
+          MessageClassifier(Set(responseMsgCode), PeerSelector.WithId(peer.id)),
           msgAdapter.toClassic
         )
         timers.startSingleTimer("timeout", TimeoutCmd, responseTimeout)
@@ -182,8 +183,8 @@ object PeerRequestHandler {
 
         def cleanup(): Unit = {
           timers.cancel("timeout")
-          peerEventBus.tell(Unsubscribe(), msgAdapter.toClassic)
-          peerEventBus.tell(Unsubscribe(), disconnectAdapter.toClassic)
+          peerEventBus ! UnsubscribeAllCmd(msgAdapter.toClassic)
+          peerEventBus ! UnsubscribeAllCmd(disconnectAdapter.toClassic)
         }
 
         Behaviors.receiveMessage {

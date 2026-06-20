@@ -21,8 +21,9 @@ import com.chipprbots.ethereum.domain.SignedTransactionWithSender
 import com.chipprbots.ethereum.jsonrpc.NewPendingTransaction
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.PeerEventBusActor.Command as PeerEventBusCommand
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
-import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.PeerManagerActor
@@ -90,7 +91,7 @@ object PendingTransactionsManager {
       txPoolConfig: TxPoolConfig,
       peerManager: ClassicActorRef,
       networkPeerManager: ClassicActorRef,
-      peerEventBus: ClassicActorRef,
+      peerEventBus: ActorRef[PeerEventBusCommand],
       blockchainReader: com.chipprbots.ethereum.domain.BlockchainReader = null,
       stateStorage: com.chipprbots.ethereum.db.storage.StateStorage = null
   ): Behavior[Command] = Behaviors.setup { context =>
@@ -110,23 +111,19 @@ object PendingTransactionsManager {
     val peerEventAdapter: ActorRef[PeerEvent] =
       context.messageAdapter[PeerEvent](WrappedPeerEvent.apply)
 
-    // Subscribe to peer events via the Classic peerEventBus (adapter ref as sender)
-    peerEventBus.tell(Subscribe(SubscriptionClassifier.PeerHandshaked), peerEventAdapter.toClassic)
-    peerEventBus.tell(
-      Subscribe(
-        SubscriptionClassifier.PeerDisconnectedClassifier(
-          com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector.AllPeers
-        )
+    // Subscribe to peer events via the peerEventBus
+    peerEventBus ! SubscribeCmd(SubscriptionClassifier.PeerHandshaked, peerEventAdapter.toClassic)
+    peerEventBus ! SubscribeCmd(
+      SubscriptionClassifier.PeerDisconnectedClassifier(
+        com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector.AllPeers
       ),
       peerEventAdapter.toClassic
     )
     // Subscribe to NewPooledTransactionHashes and PooledTransactions for tx pool protocol
-    peerEventBus.tell(
-      Subscribe(
-        SubscriptionClassifier.MessageClassifier(
-          Set(Codes.NewPooledTransactionHashesCode, Codes.PooledTransactionsCode),
-          com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector.AllPeers
-        )
+    peerEventBus ! SubscribeCmd(
+      SubscriptionClassifier.MessageClassifier(
+        Set(Codes.NewPooledTransactionHashesCode, Codes.PooledTransactionsCode),
+        com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector.AllPeers
       ),
       peerEventAdapter.toClassic
     )

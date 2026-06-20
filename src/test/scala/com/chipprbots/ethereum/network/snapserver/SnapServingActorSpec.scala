@@ -2,6 +2,7 @@ package com.chipprbots.ethereum.network.snapserver
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
@@ -21,6 +22,7 @@ import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.mpt.*
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
+import com.chipprbots.ethereum.network.PeerEventBusActor
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.PeerManagerActor
@@ -59,7 +61,7 @@ class SnapServingActorSpec extends AnyFlatSpec with Matchers with MockFactory wi
   ): ActorRef = TestActorRef(
     NetworkPeerManagerActor.props(
       peerManagerActor = peerManager.ref,
-      peerEventBusActor = peerEventBus.ref,
+      peerEventBusActor = peerEventBus.ref.toTyped[PeerEventBusActor.Command],
       appStateStorage = appStateStorage,
       forkResolverOpt = None,
       snapSyncControllerOpt = None,

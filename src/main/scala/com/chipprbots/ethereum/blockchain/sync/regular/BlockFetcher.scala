@@ -32,9 +32,10 @@ import com.chipprbots.ethereum.consensus.validators.BlockValidator
 import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerEventBusActor
+import com.chipprbots.ethereum.network.PeerEventBusActor.Command as PeerEventBusCommand
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
-import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.MessageClassifier
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.Message
@@ -48,7 +49,7 @@ import com.chipprbots.ethereum.utils.FunctorOps.*
 
 class BlockFetcher(
     val peersClient: ClassicActorRef,
-    val peerEventBus: ClassicActorRef,
+    val peerEventBus: ActorRef[PeerEventBusCommand],
     val supervisor: ClassicActorRef,
     val syncConfig: SyncConfig,
     val blockValidator: BlockValidator,
@@ -96,12 +97,10 @@ class BlockFetcher(
       case Start(importer, fromBlock) =>
         log.debug("BlockFetcher starting from block {} with importer {}", fromBlock, importer)
         val sa = context.spawn(subscribeAdapter(context.self), "fetcher-subscribe-adapter")
-        peerEventBus.tell(
-          Subscribe(
-            MessageClassifier(
-              Set(Codes.NewBlockCode, Codes.NewBlockHashesCode, Codes.BlockHeadersCode, Codes.BlockRangeUpdateCode),
-              PeerSelector.AllPeers
-            )
+        peerEventBus ! SubscribeCmd(
+          MessageClassifier(
+            Set(Codes.NewBlockCode, Codes.NewBlockHashesCode, Codes.BlockHeadersCode, Codes.BlockRangeUpdateCode),
+            PeerSelector.AllPeers
           ),
           sa.toClassic
         )
@@ -718,7 +717,7 @@ object BlockFetcher {
 
   def apply(
       peersClient: ClassicActorRef,
-      peerEventBus: ClassicActorRef,
+      peerEventBus: ActorRef[PeerEventBusCommand],
       supervisor: ClassicActorRef,
       syncConfig: SyncConfig,
       blockValidator: BlockValidator

@@ -22,7 +22,8 @@ import org.bouncycastle.util.encoders.Hex
 import com.chipprbots.ethereum.network.PeerActor.Status.*
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerHandshakeSuccessful
-import com.chipprbots.ethereum.network.PeerEventBusActor.Publish
+import com.chipprbots.ethereum.network.PeerEventBusActor.Command as PeerEventBusCommand
+import com.chipprbots.ethereum.network.PeerEventBusActor.PublishCmd
 import com.chipprbots.ethereum.network.PeerManagerActor.PeerConfiguration
 import com.chipprbots.ethereum.network.handshaker.Handshaker
 import com.chipprbots.ethereum.network.handshaker.Handshaker.HandshakeComplete.HandshakeFailure
@@ -124,7 +125,7 @@ object PeerActor {
       peerAddress: InetSocketAddress,
       rlpxConnectionFactory: ActorContext[Command] => ActorRef[RLPxConnectionHandler.Command],
       peerConfiguration: PeerConfiguration,
-      peerEventBus: ClassicActorRef,
+      peerEventBus: ActorRef[PeerEventBusCommand],
       knownNodesManager: ClassicActorRef,
       incomingConnection: Boolean,
       initHandshaker: Handshaker[R]
@@ -153,7 +154,7 @@ object PeerActor {
   def props[R <: HandshakeResult](
       peerAddress: InetSocketAddress,
       peerConfiguration: PeerConfiguration,
-      peerEventBus: ClassicActorRef,
+      peerEventBus: ActorRef[PeerEventBusCommand],
       knownNodesManager: ClassicActorRef,
       incomingConnection: Boolean,
       handshaker: Handshaker[R],
@@ -200,7 +201,7 @@ object PeerActor {
       peerAddress: InetSocketAddress,
       rlpxConnectionFactory: ActorContext[Command] => ActorRef[RLPxConnectionHandler.Command],
       peerConfiguration: PeerConfiguration,
-      peerEventBus: ClassicActorRef,
+      peerEventBus: ActorRef[PeerEventBusCommand],
       knownNodesManager: ClassicActorRef,
       incomingConnection: Boolean,
       initHandshaker: Handshaker[R],
@@ -532,7 +533,7 @@ object PeerActor {
         .map(_.message)
       val peer: Peer =
         Peer(peerId, peerAddress, context.self.toClassic, incomingConnection, source, Some(remoteNodeId))
-      peerEventBus ! Publish(PeerHandshakeSuccessful(peer, handshakeResult))
+      peerEventBus ! PublishCmd(PeerHandshakeSuccessful(peer, handshakeResult))
 
       Behaviors.receiveMessage {
         case RlpxTerminated(ref) if ref == rlpxConnection.ref =>
@@ -564,12 +565,12 @@ object PeerActor {
                 )
               } else {
                 MessageLogger.logMessage(peerId, message)
-                peerEventBus ! Publish(MessageFromPeer(message, peerId))
+                peerEventBus ! PublishCmd(MessageFromPeer(message, peerId))
                 Behaviors.same
               }
             case _ =>
               MessageLogger.logMessage(peerId, message)
-              peerEventBus ! Publish(MessageFromPeer(message, peerId))
+              peerEventBus ! PublishCmd(MessageFromPeer(message, peerId))
               Behaviors.same
           }
 

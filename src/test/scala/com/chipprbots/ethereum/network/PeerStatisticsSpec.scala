@@ -3,6 +3,7 @@ package com.chipprbots.ethereum.network
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe as TypedTestProbe
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 
 import scala.concurrent.duration.*
@@ -35,8 +36,10 @@ class PeerStatisticsSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
 
   it should "subscribe to peer events" taggedAs (UnitTest, NetworkTest) in new Fixture {
     // Subscriptions are sent to the Classic bus via the message adapter; the payloads are unchanged.
-    peerEventBus.expectMsg(Subscribe(PeerStatisticsActor.MessageSubscriptionClassifier))
-    peerEventBus.expectMsg(Subscribe(SubscriptionClassifier.PeerDisconnectedClassifier(PeerSelector.AllPeers)))
+    peerEventBus.expectMsgType[SubscribeCmd].to shouldBe PeerStatisticsActor.MessageSubscriptionClassifier
+    peerEventBus.expectMsgType[SubscribeCmd].to shouldBe SubscriptionClassifier.PeerDisconnectedClassifier(
+      PeerSelector.AllPeers
+    )
   }
 
   it should "initially return default stats for unknown peers" taggedAs (UnitTest, NetworkTest) in new Fixture {
@@ -80,6 +83,12 @@ class PeerStatisticsSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
 
     val peerEventBus: TestProbe = TestProbe()
     val peerStatistics: TypedActorRef[Command] =
-      testKit.spawn(PeerStatisticsActor(peerEventBus.ref, slotDuration = 1.minute, slotCount = 30)(mockClock))
+      testKit.spawn(
+        PeerStatisticsActor(
+          peerEventBus.ref.toTyped[PeerEventBusActor.Command],
+          slotDuration = 1.minute,
+          slotCount = 30
+        )(mockClock)
+      )
   }
 }

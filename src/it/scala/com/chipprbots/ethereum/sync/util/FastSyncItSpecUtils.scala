@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.sync.util
 
 import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import cats.effect.IO
@@ -41,7 +42,7 @@ object FastSyncItSpecUtils {
         storagesInstance.storages.stateStorage,
         storagesInstance.storages.nodeStorage,
         validators,
-        peerEventBus,
+        peerEventBus.toClassic,
         etcPeerManager,
         blacklist,
         testSyncConfig,

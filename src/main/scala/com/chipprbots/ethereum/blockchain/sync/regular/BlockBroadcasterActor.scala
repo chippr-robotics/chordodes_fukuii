@@ -6,6 +6,8 @@ import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 
+import com.chipprbots.ethereum.network.PeerEventBusActor.Command as PeerEventBusCommand
+
 import com.chipprbots.ethereum.blockchain.sync.Blacklist
 import com.chipprbots.ethereum.blockchain.sync.PeerListHelper
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockBroadcast.BlockToBroadcast
@@ -27,7 +29,7 @@ object BlockBroadcasterActor {
 
   def apply(
       broadcast: BlockBroadcast,
-      peerEventBus: ActorRef,
+      peerEventBus: TypedActorRef[PeerEventBusCommand],
       networkPeerManager: ActorRef,
       blacklist: Blacklist,
       syncConfig: SyncConfig

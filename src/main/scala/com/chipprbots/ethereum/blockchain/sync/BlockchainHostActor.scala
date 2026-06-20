@@ -17,10 +17,11 @@ import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
+import com.chipprbots.ethereum.network.PeerEventBusActor.Command as PeerEventBusCommand
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
-import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.MessageClassifier
 import com.chipprbots.ethereum.network.PeerManagerActor.PeerConfiguration
 import com.chipprbots.ethereum.network.p2p.Message
@@ -57,7 +58,7 @@ object BlockchainHostActor {
       blockchainReader: BlockchainReader,
       evmCodeStorage: EvmCodeStorage,
       peerConfiguration: PeerConfiguration,
-      peerEventBusActor: ActorRef,
+      peerEventBusActor: typed.ActorRef[PeerEventBusCommand],
       networkPeerManagerActor: ActorRef,
       pendingTransactionsManager: typed.ActorRef[
         com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
@@ -72,10 +73,7 @@ object BlockchainHostActor {
     val peerEventAdapter: ActorRef =
       context.messageAdapter[PeerEvent](PeerEventReceived(_)).toClassic
 
-    peerEventBusActor.tell(
-      Subscribe(MessageClassifier(requestMsgsCodes, PeerSelector.AllPeers)),
-      peerEventAdapter
-    )
+    peerEventBusActor ! SubscribeCmd(MessageClassifier(requestMsgsCodes, PeerSelector.AllPeers), peerEventAdapter)
 
     def handleGetPooledTransactions(
         txHashes: Seq[ByteString],

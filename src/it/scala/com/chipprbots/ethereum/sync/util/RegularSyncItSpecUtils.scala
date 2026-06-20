@@ -162,7 +162,7 @@ object RegularSyncItSpecUtils {
       RegularSync.props(
         peersClient,
         etcPeerManager,
-        peerEventBus,
+        peerEventBus.toClassic,
         consensusAdapter,
         blockchainReader,
         blockchainWriter,

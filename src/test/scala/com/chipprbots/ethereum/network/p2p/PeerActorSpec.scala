@@ -105,7 +105,8 @@ class PeerActorSpec
 
     def testScheduler: ExplicitlyTriggeredScheduler = classicSystem.scheduler.asInstanceOf[ExplicitlyTriggeredScheduler]
 
-    val peerMessageBus: ActorRef = classicSystem.actorOf(PeerEventBusActor.props)
+    val peerMessageBus =
+      classicSystem.spawn(PeerEventBusActor.behavior(), s"peer-event-bus-${java.util.UUID.randomUUID()}")
     var rlpxConnection: TestProbe = TestProbe() // var as we actually need new instances
     val knownNodesManager: TestProbe = TestProbe()
 
@@ -553,7 +554,8 @@ class PeerActorSpec
 
     def testScheduler: ExplicitlyTriggeredScheduler = classicSystem.scheduler.asInstanceOf[ExplicitlyTriggeredScheduler]
 
-    val peerMessageBus: ActorRef = classicSystem.actorOf(PeerEventBusActor.props)
+    val peerMessageBus =
+      classicSystem.spawn(PeerEventBusActor.behavior(), s"peer-event-bus-${java.util.UUID.randomUUID()}")
 
     val knownNodesManager: TestProbe = TestProbe()
 

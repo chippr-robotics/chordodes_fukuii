@@ -70,7 +70,7 @@ import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.RLPxConfigurat
   * pending peers.
   */
 class PeerManagerActor(
-    peerEventBus: ActorRef,
+    peerEventBus: typed.ActorRef[PeerEventBusActor.Command],
     peerDiscoveryManager: typed.ActorRef[PeerDiscoveryManager.Command],
     peerConfiguration: PeerConfiguration,
     knownNodesManager: ActorRef,
@@ -229,7 +229,7 @@ object PeerManagerActor {
 
   // scalastyle:off parameter.number method.length
   def behavior(
-      peerEventBus: ActorRef,
+      peerEventBus: typed.ActorRef[PeerEventBusActor.Command],
       peerDiscoveryManager: typed.ActorRef[PeerDiscoveryManager.Command],
       peerConfiguration: PeerConfiguration,
       knownNodesManager: ActorRef,
@@ -260,7 +260,7 @@ object PeerManagerActor {
 
   // scalastyle:off number.of.methods
   final private class Impl(
-      peerEventBus: ActorRef,
+      peerEventBus: typed.ActorRef[PeerEventBusActor.Command],
       peerDiscoveryManager: typed.ActorRef[PeerDiscoveryManager.Command],
       peerConfiguration: PeerConfiguration,
       knownNodesManager: ActorRef,
@@ -322,7 +322,7 @@ object PeerManagerActor {
       context.messageAdapter[PeerEvent](PeerEventReceived(_)).toClassic
 
     // Subscribe the core (via its peerEventAdapter as the Classic sender()) to the handshake event of any peer.
-    peerEventBus.tell(Subscribe(SubscriptionClassifier.PeerHandshaked), peerEventAdapter)
+    peerEventBus ! SubscribeCmd(SubscriptionClassifier.PeerHandshaked, peerEventAdapter)
 
     /** Maximum number of blacklisted nodes will never be larger than number of peers provided by discovery Discovery
       * provides remote nodes from all networks (ETC,ETH, Mordor etc.) only during handshake we learn that some of the
@@ -587,12 +587,12 @@ object PeerManagerActor {
           val wasAdded = !maintainedPeersByNodeId.contains(nodeId)
           maintainedPeersByNodeId = maintainedPeersByNodeId + (nodeId -> uri)
           replyTo ! AddMaintainedPeerResponse(wasAdded)
-          peerEventBus ! Publish(PeerEvent.MaintainedPeersChanged(maintainedPeersByNodeId.keySet))
+          peerEventBus ! PublishCmd(PeerEvent.MaintainedPeersChanged(maintainedPeersByNodeId.keySet))
           Some(connectWith(uri, connectedPeers))
 
         case RemoveMaintainedPeerCmd(nodeId) =>
           maintainedPeersByNodeId = maintainedPeersByNodeId - nodeId
-          peerEventBus ! Publish(PeerEvent.MaintainedPeersChanged(maintainedPeersByNodeId.keySet))
+          peerEventBus ! PublishCmd(PeerEvent.MaintainedPeersChanged(maintainedPeersByNodeId.keySet))
           Some(Behaviors.same)
 
         // ── Geth-compatible trusted peer / max-peers management ───────────────
@@ -873,7 +873,7 @@ object PeerManagerActor {
           )
         } else {
           log.debug("GENUINE_DISCONNECT: publishing PeerDisconnected for {} ref={}", peerId, ref)
-          peerEventBus ! Publish(PeerEvent.PeerDisconnected(peerId))
+          peerEventBus ! PublishCmd(PeerEvent.PeerDisconnected(peerId))
         }
         maintainedPeersByNodeId.get(peerId.value).foreach { uri =>
           if stillConnected then {
@@ -1110,7 +1110,7 @@ object PeerManagerActor {
   def props[R <: HandshakeResult](
       peerDiscoveryManager: typed.ActorRef[PeerDiscoveryManager.Command],
       peerConfiguration: PeerConfiguration,
-      peerMessageBus: ActorRef,
+      peerMessageBus: typed.ActorRef[PeerEventBusActor.Command],
       knownNodesManager: ActorRef,
       peerStatistics: typed.ActorRef[PeerStatisticsActor.Command],
       handshaker: Handshaker[R],
@@ -1157,7 +1157,7 @@ object PeerManagerActor {
 
   def peerFactory[R <: HandshakeResult](
       config: PeerConfiguration,
-      eventBus: ActorRef,
+      eventBus: typed.ActorRef[PeerEventBusActor.Command],
       knownNodesManager: ActorRef,
       handshaker: Handshaker[R],
       authHandshaker: AuthHandshaker,

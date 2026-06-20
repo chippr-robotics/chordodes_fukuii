@@ -11,9 +11,10 @@ import cats.effect.unsafe.IORuntime
 
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.domain.SignedTransactionWithSender
+import com.chipprbots.ethereum.network.PeerEventBusActor.Command as PeerEventBusCommand
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
-import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.MessageClassifier
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.Codes
@@ -52,7 +53,7 @@ object SignedTransactionsFilterActor {
 
   def apply(
       pendingTransactionsManager: ActorRef[PendingTransactionsManager.Command],
-      peerEventBus: ClassicActorRef
+      peerEventBus: ActorRef[PeerEventBusCommand]
   ): Behavior[Command] = Behaviors.setup { context =>
 
     implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
@@ -77,10 +78,8 @@ object SignedTransactionsFilterActor {
         }
       }
 
-    // Register with peerEventBus using the adapter's Classic ref as the sender.
-    // peerEventBus.receive does: peerEventBus.subscribe(sender(), to)
-    peerEventBus.tell(
-      Subscribe(MessageClassifier(Set(Codes.SignedTransactionsCode), PeerSelector.AllPeers)),
+    peerEventBus ! SubscribeCmd(
+      MessageClassifier(Set(Codes.SignedTransactionsCode), PeerSelector.AllPeers),
       peerMsgAdapter.toClassic
     )
 

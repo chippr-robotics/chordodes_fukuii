@@ -22,7 +22,8 @@ import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MaintainedPeersChanged
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
-import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
+import com.chipprbots.ethereum.network.PeerEventBusActor.Command as PeerEventBusCommand
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.MaintainedPeersClassifier
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.Message
@@ -38,7 +39,7 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 class PeersClient(
     networkPeerManager: ActorRef,
-    peerEventBus: ActorRef,
+    peerEventBus: TypedActorRef[PeerEventBusCommand],
     blacklist: Blacklist,
     syncConfig: SyncConfig,
     scheduler: Scheduler // kept for props() backward compat; Typed core uses withTimers
@@ -69,7 +70,7 @@ object PeersClient {
 
   def props(
       networkPeerManager: ActorRef,
-      peerEventBus: ActorRef,
+      peerEventBus: TypedActorRef[PeerEventBusCommand],
       blacklist: Blacklist,
       syncConfig: SyncConfig,
       scheduler: Scheduler
@@ -100,7 +101,7 @@ object PeersClient {
 
   private def behavior(
       networkPeerManager: ActorRef,
-      peerEventBus: ActorRef,
+      peerEventBus: TypedActorRef[PeerEventBusCommand],
       blacklist: Blacklist,
       syncConfig: SyncConfig
   ): Behavior[Command] =
@@ -117,7 +118,7 @@ object PeersClient {
         }
 
       // Besu alignment: subscribe at startup so updates arrive before any BlacklistPeer message.
-      peerEventBus.tell(Subscribe(MaintainedPeersClassifier), maintainedAdapter.toClassic)
+      peerEventBus ! SubscribeCmd(MaintainedPeersClassifier, maintainedAdapter.toClassic)
 
       Behaviors.withTimers { timers =>
         timers.startTimerWithFixedDelay("scan-peers", ScanPeersTick, 0.seconds, syncConfig.peersScanInterval)
@@ -144,7 +145,7 @@ object PeersClient {
   private class Impl(
       ctx: ActorContext[Command],
       networkPeerManager: ActorRef,
-      peerEventBus: ActorRef,
+      peerEventBus: TypedActorRef[PeerEventBusCommand],
       blacklist: Blacklist,
       syncConfig: SyncConfig,
       handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers],

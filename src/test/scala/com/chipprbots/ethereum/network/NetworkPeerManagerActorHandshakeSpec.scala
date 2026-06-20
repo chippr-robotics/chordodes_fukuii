@@ -3,6 +3,7 @@ package com.chipprbots.ethereum.network
 import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
@@ -23,8 +24,8 @@ import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerHandshakeSuccessful
-import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
-import com.chipprbots.ethereum.network.PeerEventBusActor.Unsubscribe
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
+import com.chipprbots.ethereum.network.PeerEventBusActor.UnsubscribeCmd
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.testing.Tags.*
 
@@ -67,7 +68,7 @@ class NetworkPeerManagerActorHandshakeSpec
     val ref = TestActorRef[NetworkPeerManagerActor](
       NetworkPeerManagerActor.props(
         pm.ref,
-        bus.ref,
+        bus.ref.toTyped[PeerEventBusActor.Command],
         new AppStateStorage(EphemDataSource()),
         forkResolverOpt = None,
         isPoWChain = false
@@ -81,8 +82,8 @@ class NetworkPeerManagerActorHandshakeSpec
   //   2. Subscribe(MessageClassifier(SNAP request codes, AllPeers))
   // Drain them before running per-test assertions.
   private def drainInitialSubscriptions(bus: TestProbe): Unit = {
-    bus.expectMsgType[Subscribe]
-    bus.expectMsgType[Subscribe]
+    bus.expectMsgType[SubscribeCmd]
+    bus.expectMsgType[SubscribeCmd]
   }
 
   private def outboundPeer(): Peer =
@@ -109,8 +110,8 @@ class NetworkPeerManagerActorHandshakeSpec
 
     npma ! PeerHandshakeSuccessful(outboundPeer(), peerInfo)
 
-    bus.expectMsgType[Subscribe] // PeerDisconnectedClassifier
-    bus.expectMsgType[Subscribe] // MessageClassifier
+    bus.expectMsgType[SubscribeCmd] // PeerDisconnectedClassifier
+    bus.expectMsgType[SubscribeCmd] // MessageClassifier
     bus.expectNoMessage(100.millis)
   }
 
@@ -122,8 +123,8 @@ class NetworkPeerManagerActorHandshakeSpec
     drainInitialSubscriptions(bus)
 
     npma ! PeerHandshakeSuccessful(outboundPeer(), peerInfo)
-    bus.expectMsgType[Subscribe]
-    bus.expectMsgType[Subscribe]
+    bus.expectMsgType[SubscribeCmd]
+    bus.expectMsgType[SubscribeCmd]
 
     npma ! PeerHandshakeSuccessful(inboundPeer(), peerInfo) // same PeerId, inbound wins
     bus.expectNoMessage(100.millis)
@@ -136,7 +137,7 @@ class NetworkPeerManagerActorHandshakeSpec
     val (npma, _, bus) = newNpma()
     drainInitialSubscriptions(bus)
     npma ! PeerHandshakeSuccessful(outboundPeer(), peerInfo)
-    bus.expectMsgType[Subscribe]; bus.expectMsgType[Subscribe]
+    bus.expectMsgType[SubscribeCmd]; bus.expectMsgType[SubscribeCmd]
     npma ! PeerHandshakeSuccessful(inboundPeer(), peerInfo)
     bus.expectNoMessage(100.millis)
 
@@ -150,15 +151,15 @@ class NetworkPeerManagerActorHandshakeSpec
     val (npma, _, bus) = newNpma()
     drainInitialSubscriptions(bus)
     npma ! PeerHandshakeSuccessful(outboundPeer(), peerInfo)
-    bus.expectMsgType[Subscribe]; bus.expectMsgType[Subscribe]
+    bus.expectMsgType[SubscribeCmd]; bus.expectMsgType[SubscribeCmd]
     npma ! PeerHandshakeSuccessful(inboundPeer(), peerInfo)
     npma ! PeerDisconnected(peerId) // outbound dying — suppressed
     bus.expectNoMessage(200.millis)
 
     // Genuine disconnect from the inbound must now evict the peer normally
     npma ! PeerDisconnected(peerId)
-    bus.expectMsgType[Unsubscribe]
-    bus.expectMsgType[Unsubscribe]
+    bus.expectMsgType[UnsubscribeCmd]
+    bus.expectMsgType[UnsubscribeCmd]
   }
 
   // C1 — drop: second outbound for the same PeerId must be silently dropped.
@@ -166,15 +167,15 @@ class NetworkPeerManagerActorHandshakeSpec
     val (npma, _, bus) = newNpma()
     drainInitialSubscriptions(bus)
     npma ! PeerHandshakeSuccessful(outboundPeer(), peerInfo)
-    bus.expectMsgType[Subscribe]; bus.expectMsgType[Subscribe]
+    bus.expectMsgType[SubscribeCmd]; bus.expectMsgType[SubscribeCmd]
 
     npma ! PeerHandshakeSuccessful(outboundPeer2(), peerInfo) // duplicate outbound — DROPPED
     bus.expectNoMessage(100.millis)
 
     // Original peer is still retained
     npma ! PeerDisconnected(peerId)
-    bus.expectMsgType[Unsubscribe]
-    bus.expectMsgType[Unsubscribe]
+    bus.expectMsgType[UnsubscribeCmd]
+    bus.expectMsgType[UnsubscribeCmd]
   }
 
   // C2 — drop: second inbound for the same PeerId must also be silently dropped.
@@ -182,7 +183,7 @@ class NetworkPeerManagerActorHandshakeSpec
     val (npma, _, bus) = newNpma()
     drainInitialSubscriptions(bus)
     npma ! PeerHandshakeSuccessful(inboundPeer(), peerInfo)
-    bus.expectMsgType[Subscribe]; bus.expectMsgType[Subscribe]
+    bus.expectMsgType[SubscribeCmd]; bus.expectMsgType[SubscribeCmd]
 
     npma ! PeerHandshakeSuccessful(
       Peer(
@@ -198,8 +199,8 @@ class NetworkPeerManagerActorHandshakeSpec
 
     // Original peer is still retained
     npma ! PeerDisconnected(peerId)
-    bus.expectMsgType[Unsubscribe]
-    bus.expectMsgType[Unsubscribe]
+    bus.expectMsgType[UnsubscribeCmd]
+    bus.expectMsgType[UnsubscribeCmd]
   }
 
   // D — eviction: genuine disconnect evicts the peer; a second PeerDisconnected is ignored.
@@ -207,11 +208,11 @@ class NetworkPeerManagerActorHandshakeSpec
     val (npma, _, bus) = newNpma()
     drainInitialSubscriptions(bus)
     npma ! PeerHandshakeSuccessful(outboundPeer(), peerInfo)
-    bus.expectMsgType[Subscribe]; bus.expectMsgType[Subscribe]
+    bus.expectMsgType[SubscribeCmd]; bus.expectMsgType[SubscribeCmd]
 
     npma ! PeerDisconnected(peerId)
-    bus.expectMsgType[Unsubscribe]
-    bus.expectMsgType[Unsubscribe]
+    bus.expectMsgType[UnsubscribeCmd]
+    bus.expectMsgType[UnsubscribeCmd]
 
     // Peer is now gone — second disconnect must be ignored (no Unsubscribes)
     npma ! PeerDisconnected(peerId)

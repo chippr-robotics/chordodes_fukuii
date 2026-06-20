@@ -4,6 +4,7 @@ import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.Props
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
@@ -28,7 +29,7 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPe
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerHandshakeSuccessful
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
-import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.*
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.Codes
@@ -326,29 +327,25 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     peersInfoHolder ! PeerHandshakeSuccessful(peer1, genesisInfo)
 
     // Expect subscriptions as usual
-    peerEventBus.expectMsg(Subscribe(PeerDisconnectedClassifier(PeerSelector.WithId(peer1.id))))
-    peerEventBus.expectMsg(
-      Subscribe(
-        MessageClassifier(
-          Set(
-            Codes.BlockHeadersCode,
-            Codes.NewBlockCode,
-            Codes.NewBlockHashesCode,
-            Codes.BlockRangeUpdateCode,
-            // SNAP protocol response codes
-            com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.AccountRangeCode,
-            com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.StorageRangesCode,
-            com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.TrieNodesCode,
-            com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.ByteCodesCode,
-            // SNAP protocol request codes — server-side serving
-            com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetAccountRangeCode,
-            com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetStorageRangesCode,
-            com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetTrieNodesCode,
-            com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetByteCodesCode
-          ),
-          PeerSelector.WithId(peer1.id)
-        )
-      )
+    peerEventBus.expectMsgType[SubscribeCmd].to shouldBe PeerDisconnectedClassifier(PeerSelector.WithId(peer1.id))
+    peerEventBus.expectMsgType[SubscribeCmd].to shouldBe MessageClassifier(
+      Set(
+        Codes.BlockHeadersCode,
+        Codes.NewBlockCode,
+        Codes.NewBlockHashesCode,
+        Codes.BlockRangeUpdateCode,
+        // SNAP protocol response codes
+        com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.AccountRangeCode,
+        com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.StorageRangesCode,
+        com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.TrieNodesCode,
+        com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.ByteCodesCode,
+        // SNAP protocol request codes — server-side serving
+        com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetAccountRangeCode,
+        com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetStorageRangesCode,
+        com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetTrieNodesCode,
+        com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetByteCodesCode
+      ),
+      PeerSelector.WithId(peer1.id)
     )
 
     // Verify NO GetBlockHeaders request is sent to avoid disconnect with reason 0x10 (Other)
@@ -375,8 +372,8 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     peersInfoHolder ! PeerHandshakeSuccessful(peer1, eth68Info)
 
     // Drain the two subscriptions that always follow handshake.
-    peerEventBus.expectMsg(Subscribe(PeerDisconnectedClassifier(PeerSelector.WithId(peer1.id))))
-    peerEventBus.expectMsgClass(classOf[Subscribe])
+    peerEventBus.expectMsgType[SubscribeCmd].to shouldBe PeerDisconnectedClassifier(PeerSelector.WithId(peer1.id))
+    peerEventBus.expectMsgType[SubscribeCmd]
 
     // The probe should land on the peerManager TestProbe as a SendMessage to peer1.
     val sent: PeerManagerActor.SendMessage = peerManager.expectMsgClass(classOf[PeerManagerActor.SendMessage])
@@ -404,8 +401,8 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     peersInfoHolder ! PeerHandshakeSuccessful(peer1, eth69Info)
 
     // Drain the two subscriptions.
-    peerEventBus.expectMsg(Subscribe(PeerDisconnectedClassifier(PeerSelector.WithId(peer1.id))))
-    peerEventBus.expectMsgClass(classOf[Subscribe])
+    peerEventBus.expectMsgType[SubscribeCmd].to shouldBe PeerDisconnectedClassifier(PeerSelector.WithId(peer1.id))
+    peerEventBus.expectMsgType[SubscribeCmd]
     // ETH/69: no GetBlockHeaders probe (latestBlock is in STATUS),
     // but a BlockRangeUpdate is sent immediately so the remote peer knows our chain range.
     peerManager.expectMsgClass(classOf[PeerManagerActor.SendMessage])
@@ -579,7 +576,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
       Props(
         new NetworkPeerManagerActor(
           peerManager.ref,
-          peerEventBus.ref,
+          peerEventBus.ref.toTyped[PeerEventBusActor.Command],
           storagesInstance.storages.appStateStorage,
           Some(forkResolver),
           isPoWChain = true
@@ -599,19 +596,15 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     // — still reach the handler. Tests that expect the initial subscriptions must
     // consume both.
     def expectInitialSubscriptions(): Unit = {
-      peerEventBus.expectMsg(Subscribe(PeerHandshaked))
-      peerEventBus.expectMsg(
-        Subscribe(
-          MessageClassifier(
-            Set(
-              com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetAccountRangeCode,
-              com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetStorageRangesCode,
-              com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetTrieNodesCode,
-              com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetByteCodesCode
-            ),
-            PeerSelector.AllPeers
-          )
-        )
+      peerEventBus.expectMsgType[SubscribeCmd].to shouldBe PeerHandshaked
+      peerEventBus.expectMsgType[SubscribeCmd].to shouldBe MessageClassifier(
+        Set(
+          com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetAccountRangeCode,
+          com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetStorageRangesCode,
+          com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetTrieNodesCode,
+          com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetByteCodesCode
+        ),
+        PeerSelector.AllPeers
       )
     }
 
@@ -619,30 +612,26 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
 
       peersInfoHolder ! PeerHandshakeSuccessful(peer, peerInfo)
 
-      peerEventBus.expectMsg(Subscribe(PeerDisconnectedClassifier(PeerSelector.WithId(peer.id))))
+      peerEventBus.expectMsgType[SubscribeCmd].to shouldBe PeerDisconnectedClassifier(PeerSelector.WithId(peer.id))
 
-      peerEventBus.expectMsg(
-        Subscribe(
-          MessageClassifier(
-            Set(
-              Codes.BlockHeadersCode,
-              Codes.NewBlockCode,
-              Codes.NewBlockHashesCode,
-              Codes.BlockRangeUpdateCode,
-              // SNAP protocol response codes
-              com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.AccountRangeCode,
-              com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.StorageRangesCode,
-              com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.TrieNodesCode,
-              com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.ByteCodesCode,
-              // SNAP protocol request codes — server-side serving
-              com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetAccountRangeCode,
-              com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetStorageRangesCode,
-              com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetTrieNodesCode,
-              com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetByteCodesCode
-            ),
-            PeerSelector.WithId(peer.id)
-          )
-        )
+      peerEventBus.expectMsgType[SubscribeCmd].to shouldBe MessageClassifier(
+        Set(
+          Codes.BlockHeadersCode,
+          Codes.NewBlockCode,
+          Codes.NewBlockHashesCode,
+          Codes.BlockRangeUpdateCode,
+          // SNAP protocol response codes
+          com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.AccountRangeCode,
+          com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.StorageRangesCode,
+          com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.TrieNodesCode,
+          com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.ByteCodesCode,
+          // SNAP protocol request codes — server-side serving
+          com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetAccountRangeCode,
+          com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetStorageRangesCode,
+          com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetTrieNodesCode,
+          com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetByteCodesCode
+        ),
+        PeerSelector.WithId(peer.id)
       )
 
       // After handshake completes, NetworkPeerManagerActor issues a Besu-style

@@ -22,9 +22,9 @@ import com.chipprbots.ethereum.network.PeerActor.DisconnectPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.*
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
-import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.*
-import com.chipprbots.ethereum.network.PeerEventBusActor.Unsubscribe
+import com.chipprbots.ethereum.network.PeerEventBusActor.UnsubscribeCmd
 import com.chipprbots.ethereum.network.handshaker.Handshaker.HandshakeResult
 import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.MessageSerializable
@@ -54,7 +54,7 @@ import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
   */
 class NetworkPeerManagerActor(
     peerManagerActor: ActorRef,
-    peerEventBusActor: ActorRef,
+    peerEventBusActor: typed.ActorRef[PeerEventBusActor.Command],
     appStateStorage: AppStateStorage,
     forkResolverOpt: Option[ForkResolver],
     initialSnapSyncControllerOpt: Option[ActorRef] = None,
@@ -161,7 +161,7 @@ object NetworkPeerManagerActor {
 
   def behavior(
       peerManagerActor: ActorRef,
-      peerEventBusActor: ActorRef,
+      peerEventBusActor: typed.ActorRef[PeerEventBusActor.Command],
       appStateStorage: AppStateStorage,
       forkResolverOpt: Option[ForkResolver],
       initialSnapSyncControllerOpt: Option[ActorRef] = None,
@@ -179,24 +179,22 @@ object NetworkPeerManagerActor {
         val eventAdapter: ActorRef = ctx.messageAdapter[PeerEvent](PeerEventCmd(_)).toClassic
 
         // Subscribe to the event of any peer getting handshaked
-        peerEventBusActor.tell(Subscribe(PeerHandshaked), eventAdapter)
+        peerEventBusActor ! SubscribeCmd(PeerHandshaked, eventAdapter)
 
         // Subscribe globally to SNAP request codes. The hive devp2p snap test client sends
         // GetAccountRange/etc immediately after the RLPx hello, BEFORE the ETH-status exchange
         // (and therefore before PeerHandshakeSuccessful fires and the per-peer subscription is
         // installed). Without a global subscription those early requests get dropped by the
         // event bus and the test peer times out waiting for a reply.
-        peerEventBusActor.tell(
-          Subscribe(
-            MessageClassifier(
-              Set(
-                SNAP.Codes.GetAccountRangeCode,
-                SNAP.Codes.GetStorageRangesCode,
-                SNAP.Codes.GetTrieNodesCode,
-                SNAP.Codes.GetByteCodesCode
-              ),
-              PeerSelector.AllPeers
-            )
+        peerEventBusActor ! SubscribeCmd(
+          MessageClassifier(
+            Set(
+              SNAP.Codes.GetAccountRangeCode,
+              SNAP.Codes.GetStorageRangesCode,
+              SNAP.Codes.GetTrieNodesCode,
+              SNAP.Codes.GetByteCodesCode
+            ),
+            PeerSelector.AllPeers
           ),
           eventAdapter
         )
@@ -237,7 +235,7 @@ object NetworkPeerManagerActor {
       @annotation.unused timers: TimerScheduler[Command],
       eventAdapter: ActorRef,
       peerManagerActor: ActorRef,
-      peerEventBusActor: ActorRef,
+      peerEventBusActor: typed.ActorRef[PeerEventBusActor.Command],
       appStateStorage: AppStateStorage,
       forkResolverOpt: Option[ForkResolver],
       initialSnapSyncControllerOpt: Option[ActorRef],
@@ -627,12 +625,9 @@ object NetworkPeerManagerActor {
                 s"addr=${pw.peer.remoteAddress} cap=${pw.peerInfo.remoteStatus.capability} " +
                 s"inbound=${pw.peer.incomingConnection}"
             )
-            peerEventBusActor.tell(
-              Unsubscribe(PeerDisconnectedClassifier(PeerSelector.WithId(peerId))),
-              eventAdapter
-            )
-            peerEventBusActor.tell(
-              Unsubscribe(MessageClassifier(msgCodesWithInfo, PeerSelector.WithId(peerId))),
+            peerEventBusActor ! UnsubscribeCmd(PeerDisconnectedClassifier(PeerSelector.WithId(peerId)), eventAdapter)
+            peerEventBusActor ! UnsubscribeCmd(
+              MessageClassifier(msgCodesWithInfo, PeerSelector.WithId(peerId)),
               eventAdapter
             )
             NetworkMetrics.registerRemoveHandshakedPeer(peersWithInfo(peerId).peer)
@@ -763,12 +758,9 @@ object NetworkPeerManagerActor {
           Behaviors.same
         }
       } else {
-        peerEventBusActor.tell(
-          Subscribe(PeerDisconnectedClassifier(PeerSelector.WithId(peer.id))),
-          eventAdapter
-        )
-        peerEventBusActor.tell(
-          Subscribe(MessageClassifier(msgCodesWithInfo, PeerSelector.WithId(peer.id))),
+        peerEventBusActor ! SubscribeCmd(PeerDisconnectedClassifier(PeerSelector.WithId(peer.id)), eventAdapter)
+        peerEventBusActor ! SubscribeCmd(
+          MessageClassifier(msgCodesWithInfo, PeerSelector.WithId(peer.id)),
           eventAdapter
         )
         // Besu-style eager best-block probe.
@@ -1372,7 +1364,7 @@ object NetworkPeerManagerActor {
 
   def props(
       peerManagerActor: ActorRef,
-      peerEventBusActor: ActorRef,
+      peerEventBusActor: typed.ActorRef[PeerEventBusActor.Command],
       appStateStorage: AppStateStorage,
       forkResolverOpt: Option[ForkResolver],
       snapSyncControllerOpt: Option[ActorRef] = None,

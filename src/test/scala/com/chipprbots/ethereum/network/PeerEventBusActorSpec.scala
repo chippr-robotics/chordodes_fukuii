@@ -5,12 +5,13 @@ import java.net.InetSocketAddress
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.PoisonPill
+import org.apache.pekko.actor.typed
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.stream.WatchedActorTerminatedException
 import org.apache.pekko.stream.scaladsl.Flow
 import org.apache.pekko.stream.scaladsl.Keep
 import org.apache.pekko.stream.scaladsl.Sink
 import org.apache.pekko.stream.scaladsl.Source
-import org.apache.pekko.testkit.TestActor
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
@@ -33,7 +34,11 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPe
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerHandshakeSuccessful
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
+import com.chipprbots.ethereum.network.PeerEventBusActor.PublishCmd
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.*
+import com.chipprbots.ethereum.network.PeerEventBusActor.UnsubscribeAllCmd
+import com.chipprbots.ethereum.network.PeerEventBusActor.UnsubscribeCmd
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Ping
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Pong
@@ -56,20 +61,20 @@ class PeerEventBusActorSpec
     val probe2: TestProbe = TestProbe()(system)
     val classifier1: MessageClassifier = MessageClassifier(Set(Ping.code), PeerSelector.WithId(PeerId("1")))
     val classifier2: MessageClassifier = MessageClassifier(Set(Ping.code), PeerSelector.AllPeers)
-    peerEventBusActor.tell(PeerEventBusActor.Subscribe(classifier1), probe1.ref)
+    peerEventBusActor ! SubscribeCmd(classifier1, probe1.ref)
 
-    peerEventBusActor.tell(PeerEventBusActor.Subscribe(classifier2), probe2.ref)
+    peerEventBusActor ! SubscribeCmd(classifier2, probe2.ref)
 
     val msgFromPeer: MessageFromPeer = MessageFromPeer(Ping(), PeerId("1"))
-    peerEventBusActor ! PeerEventBusActor.Publish(msgFromPeer)
+    peerEventBusActor ! PublishCmd(msgFromPeer)
 
     probe1.expectMsg(msgFromPeer)
     probe2.expectMsg(msgFromPeer)
 
-    peerEventBusActor.tell(PeerEventBusActor.Unsubscribe(classifier1), probe1.ref)
+    peerEventBusActor ! UnsubscribeCmd(classifier1, probe1.ref)
 
     val msgFromPeer2: MessageFromPeer = MessageFromPeer(Ping(), PeerId("99"))
-    peerEventBusActor ! PeerEventBusActor.Publish(msgFromPeer2)
+    peerEventBusActor ! PublishCmd(msgFromPeer2)
     probe1.expectNoMessage()
     probe2.expectMsg(msgFromPeer2)
 
@@ -79,41 +84,34 @@ class PeerEventBusActorSpec
     val classifier1: MessageClassifier = MessageClassifier(Set(Ping.code), PeerSelector.WithId(PeerId("1")))
     val classifier2: MessageClassifier = MessageClassifier(Set(Ping.code), PeerSelector.AllPeers)
 
-    val peerEventBusProbe: TestProbe = TestProbe()(system)
-    peerEventBusProbe.setAutoPilot { (sender: ActorRef, msg: Any) =>
-      peerEventBusActor.tell(msg, sender)
-      TestActor.KeepRunning
-    }
-
     val seqOnTermination: Sink[MessageFromPeer, Future[Seq[MessageFromPeer]]] = Flow[MessageFromPeer]
       .recoverWithRetries(1, { case _: WatchedActorTerminatedException => Source.empty })
       .toMat(Sink.seq)(Keep.right)
 
+    // Subscribe streams directly to the Typed PEA.
+    // fromMaterializer runs the callback synchronously during runWith(), so both SubscribeCmds
+    // are sent from the test thread before the next line executes.
     val stream1: Future[Seq[MessageFromPeer]] =
-      PeerEventBusActor.messageSource(peerEventBusProbe.ref, classifier1).runWith(seqOnTermination)
+      PeerEventBusActor.messageSource(peerEventBusActor, classifier1).runWith(seqOnTermination)
     val stream2: Future[Seq[MessageFromPeer]] =
-      PeerEventBusActor.messageSource(peerEventBusProbe.ref, classifier2).runWith(seqOnTermination)
+      PeerEventBusActor.messageSource(peerEventBusActor, classifier2).runWith(seqOnTermination)
 
-    // wait for subscriptions to be done
-    peerEventBusProbe.expectMsgType[PeerEventBusActor.Subscribe]
-    peerEventBusProbe.expectMsgType[PeerEventBusActor.Subscribe]
-
+    // Sync: subscribe syncProbe after streams (same test thread → same sender ordering).
+    // Once syncProbe receives its message, PEA has processed all three subscriptions in order.
     val syncProbe: TestProbe = TestProbe()(system)
-    peerEventBusActor.tell(PeerEventBusActor.Subscribe(classifier2), syncProbe.ref)
+    peerEventBusActor ! SubscribeCmd(classifier2, syncProbe.ref)
 
     val msgFromPeer: MessageFromPeer = MessageFromPeer(Ping(), PeerId("1"))
-    peerEventBusActor ! PeerEventBusActor.Publish(msgFromPeer)
-    // wait for first publish to propagate before sending second (prevents stream buffer overflow)
+    peerEventBusActor ! PublishCmd(msgFromPeer)
     syncProbe.expectMsg(msgFromPeer)
 
     val msgFromPeer2: MessageFromPeer = MessageFromPeer(Ping(), PeerId("99"))
-    peerEventBusActor ! PeerEventBusActor.Publish(msgFromPeer2)
+    peerEventBusActor ! PublishCmd(msgFromPeer2)
     syncProbe.expectMsg(msgFromPeer2)
 
-    peerEventBusProbe.ref ! PoisonPill
+    // Terminate streams by killing this test's PEA instance (watched via .watch(peerEventBus.toClassic)).
+    peerEventBusActor.toClassic ! PoisonPill
 
-    // make the stream checks a bit more robust to fork/timing differences by waiting
-    // deterministically for a short timeout instead of relying on the default whenReady
     val res1: Seq[MessageFromPeer] = Await.result(stream1, 5.seconds)
     res1 shouldEqual Seq(msgFromPeer)
 
@@ -125,15 +123,15 @@ class PeerEventBusActorSpec
 
     val probe1: TestProbe = TestProbe()
     val classifier1: MessageClassifier = MessageClassifier(Set(Ping.code), PeerSelector.WithId(PeerId("1")))
-    peerEventBusActor.tell(PeerEventBusActor.Subscribe(classifier1), probe1.ref)
+    peerEventBusActor ! SubscribeCmd(classifier1, probe1.ref)
 
     val msgFromPeer: MessageFromPeer = MessageFromPeer(Ping(), PeerId("1"))
-    peerEventBusActor ! PeerEventBusActor.Publish(msgFromPeer)
+    peerEventBusActor ! PublishCmd(msgFromPeer)
 
     probe1.expectMsg(msgFromPeer)
 
     val msgFromPeer2: MessageFromPeer = MessageFromPeer(Pong(), PeerId("1"))
-    peerEventBusActor ! PeerEventBusActor.Publish(msgFromPeer2)
+    peerEventBusActor ! PublishCmd(msgFromPeer2)
     probe1.expectNoMessage()
   }
 
@@ -141,31 +139,19 @@ class PeerEventBusActorSpec
 
     val probe1: TestProbe = TestProbe()
     val probe2: TestProbe = TestProbe()
-    peerEventBusActor.tell(
-      PeerEventBusActor.Subscribe(PeerDisconnectedClassifier(PeerSelector.WithId(PeerId("1")))),
-      probe1.ref
-    )
-    peerEventBusActor.tell(
-      PeerEventBusActor.Subscribe(PeerDisconnectedClassifier(PeerSelector.WithId(PeerId("2")))),
-      probe1.ref
-    )
-    peerEventBusActor.tell(
-      PeerEventBusActor.Subscribe(PeerDisconnectedClassifier(PeerSelector.WithId(PeerId("2")))),
-      probe2.ref
-    )
+    peerEventBusActor ! SubscribeCmd(PeerDisconnectedClassifier(PeerSelector.WithId(PeerId("1"))), probe1.ref)
+    peerEventBusActor ! SubscribeCmd(PeerDisconnectedClassifier(PeerSelector.WithId(PeerId("2"))), probe1.ref)
+    peerEventBusActor ! SubscribeCmd(PeerDisconnectedClassifier(PeerSelector.WithId(PeerId("2"))), probe2.ref)
 
     val msgPeerDisconnected: PeerDisconnected = PeerDisconnected(PeerId("2"))
-    peerEventBusActor ! PeerEventBusActor.Publish(msgPeerDisconnected)
+    peerEventBusActor ! PublishCmd(msgPeerDisconnected)
 
     probe1.expectMsg(msgPeerDisconnected)
     probe2.expectMsg(msgPeerDisconnected)
 
-    peerEventBusActor.tell(
-      PeerEventBusActor.Unsubscribe(PeerDisconnectedClassifier(PeerSelector.WithId(PeerId("2")))),
-      probe1.ref
-    )
+    peerEventBusActor ! UnsubscribeCmd(PeerDisconnectedClassifier(PeerSelector.WithId(PeerId("2"))), probe1.ref)
 
-    peerEventBusActor ! PeerEventBusActor.Publish(msgPeerDisconnected)
+    peerEventBusActor ! PublishCmd(msgPeerDisconnected)
     probe1.expectNoMessage()
     probe2.expectMsg(msgPeerDisconnected)
   }
@@ -174,8 +160,8 @@ class PeerEventBusActorSpec
 
     val probe1: TestProbe = TestProbe()
     val probe2: TestProbe = TestProbe()
-    peerEventBusActor.tell(PeerEventBusActor.Subscribe(PeerHandshaked), probe1.ref)
-    peerEventBusActor.tell(PeerEventBusActor.Subscribe(PeerHandshaked), probe2.ref)
+    peerEventBusActor ! SubscribeCmd(PeerHandshaked, probe1.ref)
+    peerEventBusActor ! SubscribeCmd(PeerHandshaked, probe2.ref)
 
     val peerHandshaked =
       new Peer(
@@ -186,14 +172,14 @@ class PeerEventBusActorSpec
         nodeId = Some(ByteString())
       )
     val msgPeerHandshaked: PeerHandshakeSuccessful[PeerInfo] = PeerHandshakeSuccessful(peerHandshaked, initialPeerInfo)
-    peerEventBusActor ! PeerEventBusActor.Publish(msgPeerHandshaked)
+    peerEventBusActor ! PublishCmd(msgPeerHandshaked)
 
     probe1.expectMsg(msgPeerHandshaked)
     probe2.expectMsg(msgPeerHandshaked)
 
-    peerEventBusActor.tell(PeerEventBusActor.Unsubscribe(PeerHandshaked), probe1.ref)
+    peerEventBusActor ! UnsubscribeCmd(PeerHandshaked, probe1.ref)
 
-    peerEventBusActor ! PeerEventBusActor.Publish(msgPeerHandshaked)
+    peerEventBusActor ! PublishCmd(msgPeerHandshaked)
     probe1.expectNoMessage()
     probe2.expectMsg(msgPeerHandshaked)
   }
@@ -204,17 +190,17 @@ class PeerEventBusActorSpec
   ) in new TestSetup {
 
     val probe1: TestProbe = TestProbe()
-    peerEventBusActor.tell(
-      PeerEventBusActor.Subscribe(MessageClassifier(Set(Ping.code, Ping.code), PeerSelector.WithId(PeerId("1")))),
+    peerEventBusActor ! SubscribeCmd(
+      MessageClassifier(Set(Ping.code, Ping.code), PeerSelector.WithId(PeerId("1"))),
       probe1.ref
     )
-    peerEventBusActor.tell(
-      PeerEventBusActor.Subscribe(MessageClassifier(Set(Ping.code, Pong.code), PeerSelector.WithId(PeerId("1")))),
+    peerEventBusActor ! SubscribeCmd(
+      MessageClassifier(Set(Ping.code, Pong.code), PeerSelector.WithId(PeerId("1"))),
       probe1.ref
     )
 
     val msgFromPeer: MessageFromPeer = MessageFromPeer(Ping(), PeerId("1"))
-    peerEventBusActor ! PeerEventBusActor.Publish(msgFromPeer)
+    peerEventBusActor ! PublishCmd(msgFromPeer)
 
     probe1.expectMsg(msgFromPeer)
     probe1.expectNoMessage()
@@ -226,33 +212,30 @@ class PeerEventBusActorSpec
   ) in new TestSetup {
 
     val probe1: TestProbe = TestProbe()
-    peerEventBusActor.tell(
-      PeerEventBusActor.Subscribe(MessageClassifier(Set(Ping.code), PeerSelector.WithId(PeerId("1")))),
+    peerEventBusActor ! SubscribeCmd(
+      MessageClassifier(Set(Ping.code), PeerSelector.WithId(PeerId("1"))),
       probe1.ref
     )
-    peerEventBusActor.tell(
-      PeerEventBusActor.Subscribe(MessageClassifier(Set(Ping.code), PeerSelector.AllPeers)),
+    peerEventBusActor ! SubscribeCmd(
+      MessageClassifier(Set(Ping.code), PeerSelector.AllPeers),
       probe1.ref
     )
 
     val msgFromPeer: MessageFromPeer = MessageFromPeer(Ping(), PeerId("1"))
-    peerEventBusActor ! PeerEventBusActor.Publish(msgFromPeer)
+    peerEventBusActor ! PublishCmd(msgFromPeer)
 
     // Receive a single notification
     probe1.expectMsg(msgFromPeer)
     probe1.expectNoMessage()
 
     val msgFromPeer2: MessageFromPeer = MessageFromPeer(Ping(), PeerId("2"))
-    peerEventBusActor ! PeerEventBusActor.Publish(msgFromPeer2)
+    peerEventBusActor ! PublishCmd(msgFromPeer2)
 
     // Receive based on AllPeers subscription
     probe1.expectMsg(msgFromPeer2)
 
-    peerEventBusActor.tell(
-      PeerEventBusActor.Unsubscribe(MessageClassifier(Set(Ping.code), PeerSelector.AllPeers)),
-      probe1.ref
-    )
-    peerEventBusActor ! PeerEventBusActor.Publish(msgFromPeer)
+    peerEventBusActor ! UnsubscribeCmd(MessageClassifier(Set(Ping.code), PeerSelector.AllPeers), probe1.ref)
+    peerEventBusActor ! PublishCmd(msgFromPeer)
 
     // Still received after unsubscribing from AllPeers
     probe1.expectMsg(msgFromPeer)
@@ -261,17 +244,17 @@ class PeerEventBusActorSpec
   it should "allow to subscribe to new messages" taggedAs (UnitTest, NetworkTest) in new TestSetup {
 
     val probe1: TestProbe = TestProbe()
-    peerEventBusActor.tell(
-      PeerEventBusActor.Subscribe(MessageClassifier(Set(Ping.code), PeerSelector.WithId(PeerId("1")))),
+    peerEventBusActor ! SubscribeCmd(
+      MessageClassifier(Set(Ping.code), PeerSelector.WithId(PeerId("1"))),
       probe1.ref
     )
-    peerEventBusActor.tell(
-      PeerEventBusActor.Subscribe(MessageClassifier(Set(Ping.code, Pong.code), PeerSelector.WithId(PeerId("1")))),
+    peerEventBusActor ! SubscribeCmd(
+      MessageClassifier(Set(Ping.code, Pong.code), PeerSelector.WithId(PeerId("1"))),
       probe1.ref
     )
 
     val msgFromPeer: MessageFromPeer = MessageFromPeer(Pong(), PeerId("1"))
-    peerEventBusActor ! PeerEventBusActor.Publish(msgFromPeer)
+    peerEventBusActor ! PublishCmd(msgFromPeer)
 
     probe1.expectMsg(msgFromPeer)
   }
@@ -279,17 +262,17 @@ class PeerEventBusActorSpec
   it should "not change subscriptions when subscribing to empty set" taggedAs (UnitTest, NetworkTest) in new TestSetup {
 
     val probe1: TestProbe = TestProbe()
-    peerEventBusActor.tell(
-      PeerEventBusActor.Subscribe(MessageClassifier(Set(Ping.code), PeerSelector.WithId(PeerId("1")))),
+    peerEventBusActor ! SubscribeCmd(
+      MessageClassifier(Set(Ping.code), PeerSelector.WithId(PeerId("1"))),
       probe1.ref
     )
-    peerEventBusActor.tell(
-      PeerEventBusActor.Subscribe(MessageClassifier(Set(), PeerSelector.WithId(PeerId("1")))),
+    peerEventBusActor ! SubscribeCmd(
+      MessageClassifier(Set(), PeerSelector.WithId(PeerId("1"))),
       probe1.ref
     )
 
     val msgFromPeer: MessageFromPeer = MessageFromPeer(Ping(), PeerId("1"))
-    peerEventBusActor ! PeerEventBusActor.Publish(msgFromPeer)
+    peerEventBusActor ! PublishCmd(msgFromPeer)
 
     probe1.expectMsg(msgFromPeer)
   }
@@ -297,40 +280,38 @@ class PeerEventBusActorSpec
   it should "allow to unsubscribe from messages" taggedAs (UnitTest, NetworkTest) in new TestSetup {
 
     val probe1: TestProbe = TestProbe()
-    peerEventBusActor.tell(
-      PeerEventBusActor.Subscribe(MessageClassifier(Set(Ping.code, Pong.code), PeerSelector.WithId(PeerId("1")))),
+    peerEventBusActor ! SubscribeCmd(
+      MessageClassifier(Set(Ping.code, Pong.code), PeerSelector.WithId(PeerId("1"))),
       probe1.ref
     )
 
     val msgFromPeer1: MessageFromPeer = MessageFromPeer(Ping(), PeerId("1"))
     val msgFromPeer2: MessageFromPeer = MessageFromPeer(Pong(), PeerId("1"))
-    peerEventBusActor ! PeerEventBusActor.Publish(msgFromPeer1)
-    peerEventBusActor ! PeerEventBusActor.Publish(msgFromPeer2)
+    peerEventBusActor ! PublishCmd(msgFromPeer1)
+    peerEventBusActor ! PublishCmd(msgFromPeer2)
 
     probe1.expectMsg(msgFromPeer1)
     probe1.expectMsg(msgFromPeer2)
 
-    peerEventBusActor.tell(
-      PeerEventBusActor.Unsubscribe(MessageClassifier(Set(Pong.code), PeerSelector.WithId(PeerId("1")))),
-      probe1.ref
-    )
+    peerEventBusActor ! UnsubscribeCmd(MessageClassifier(Set(Pong.code), PeerSelector.WithId(PeerId("1"))), probe1.ref)
 
-    peerEventBusActor ! PeerEventBusActor.Publish(msgFromPeer1)
-    peerEventBusActor ! PeerEventBusActor.Publish(msgFromPeer2)
+    peerEventBusActor ! PublishCmd(msgFromPeer1)
+    peerEventBusActor ! PublishCmd(msgFromPeer2)
 
     probe1.expectMsg(msgFromPeer1)
     probe1.expectNoMessage()
 
-    peerEventBusActor.tell(PeerEventBusActor.Unsubscribe(), probe1.ref)
+    peerEventBusActor ! UnsubscribeAllCmd(probe1.ref)
 
-    peerEventBusActor ! PeerEventBusActor.Publish(msgFromPeer1)
-    peerEventBusActor ! PeerEventBusActor.Publish(msgFromPeer2)
+    peerEventBusActor ! PublishCmd(msgFromPeer1)
+    peerEventBusActor ! PublishCmd(msgFromPeer2)
 
     probe1.expectNoMessage()
   }
 
   trait TestSetup {
-    val peerEventBusActor: ActorRef = system.actorOf(PeerEventBusActor.props)
+    val peerEventBusActor: typed.ActorRef[PeerEventBusActor.Command] =
+      system.spawn(PeerEventBusActor.behavior(), s"pea-${java.util.UUID.randomUUID()}")
 
     val peerStatus: RemoteStatus = RemoteStatus(
       capability = Capability.ETH63,

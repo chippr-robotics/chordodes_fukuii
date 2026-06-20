@@ -4,6 +4,7 @@ import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.Props
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
@@ -23,7 +24,7 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPe
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerHandshakeSuccessful
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
-import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.*
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
@@ -151,7 +152,7 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
       Props(
         new NetworkPeerManagerActor(
           peerManager.ref,
-          peerEventBus.ref,
+          peerEventBus.ref.toTyped[PeerEventBusActor.Command],
           storagesInstance.storages.appStateStorage,
           Some(forkResolver),
           isPoWChain = true
@@ -188,26 +189,22 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
       // Each peer generates two peerEventBus Subscribe messages:
       //   1. PeerDisconnectedClassifier — so NPA can observe this peer's disconnect
       //   2. MessageClassifier for per-peer ETH/SNAP message codes
-      peerEventBus.expectMsg(Subscribe(PeerDisconnectedClassifier(PeerSelector.WithId(peer.id))))
-      peerEventBus.expectMsgClass(classOf[Subscribe]) // per-peer MessageClassifier
+      peerEventBus.expectMsgType[SubscribeCmd].to shouldBe PeerDisconnectedClassifier(PeerSelector.WithId(peer.id))
+      peerEventBus.expectMsgType[SubscribeCmd] // per-peer MessageClassifier
       // ETH68 non-genesis peers also fire a GetBlockHeaders probe via peerManager.
       // We use bestHash == genesisHash in mkInfo so no probe fires; nothing to drain here.
     }
 
     def expectInitialSubscriptions(): Unit = {
-      peerEventBus.expectMsg(Subscribe(PeerHandshaked))
-      peerEventBus.expectMsg(
-        Subscribe(
-          MessageClassifier(
-            Set(
-              com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetAccountRangeCode,
-              com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetStorageRangesCode,
-              com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetTrieNodesCode,
-              com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetByteCodesCode
-            ),
-            PeerSelector.AllPeers
-          )
-        )
+      peerEventBus.expectMsgType[SubscribeCmd].to shouldBe PeerHandshaked
+      peerEventBus.expectMsgType[SubscribeCmd].to shouldBe MessageClassifier(
+        Set(
+          com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetAccountRangeCode,
+          com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetStorageRangesCode,
+          com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetTrieNodesCode,
+          com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetByteCodesCode
+        ),
+        PeerSelector.AllPeers
       )
     }
   }

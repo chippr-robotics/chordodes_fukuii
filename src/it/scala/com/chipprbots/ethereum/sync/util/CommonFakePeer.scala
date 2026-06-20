@@ -218,7 +218,7 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
     override val statSlotCount: Int = 30
   }
 
-  lazy val peerEventBus: ActorRef = system.actorOf(PeerEventBusActor.props, "peer-event-bus")
+  lazy val peerEventBus = system.spawn(PeerEventBusActor.behavior(), "peer-event-bus")
 
   private val handshakerConfiguration: NetworkHandshakerConfiguration =
     new NetworkHandshakerConfiguration {

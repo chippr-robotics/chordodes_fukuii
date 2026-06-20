@@ -1,9 +1,7 @@
 package com.chipprbots.ethereum.network
 
 import org.apache.pekko.NotUsed
-import org.apache.pekko.actor.Actor
 import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.Props
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -22,16 +20,6 @@ import com.chipprbots.ethereum.network.p2p.Message
 
 object PeerEventBusActor {
 
-  /** Classic-facing factory. Existing Classic callers (PeerActor, PeerManagerActor, PeerRequestHandler,
-    * PivotBlockSelector, PeersClient, PeerListSupportNg) and the Akka-Streams [[messageSource]] keep working unchanged
-    * through this shell: it captures `sender()` (the subscriber) and `Terminated`, enriches the wire messages with the
-    * explicit subscriber, and forwards them to the Typed dispatch core spawned as a child.
-    *
-    * The dispatch logic lives in the Typed [[behavior]]; this Classic shell exists only as the `sender()` bridge and is
-    * removed once the last Classic subscriber migrates (Group NET).
-    */
-  def props: Props = Props(new PeerEventBusActor)
-
   /** Handle subscription to the peer event bus via Akka Streams.
     *
     * @param peerEventBus
@@ -46,17 +34,19 @@ object PeerEventBusActor {
     *   - subscription is asynchronous so it may miss messages when starting.
     *   - it does not complete when a specified peerId disconnects.
     */
-  def messageSource(peerEventBus: ActorRef, messageClassifier: MessageClassifier): Source[MessageFromPeer, NotUsed] =
+  def messageSource(
+      peerEventBus: TypedActorRef[Command],
+      messageClassifier: MessageClassifier
+  ): Source[MessageFromPeer, NotUsed] =
     Source
       .fromMaterializer { (mat, _) =>
         val (actorRef, src) = Source
           // Buffer 64 + dropHead: an event-bus relay should absorb bursty peer messages, not die
           // on the first race. Buffer-1 + fail made PeerEventBusActorSpec flaky (BufferOverflowException).
           .actorRef[MessageFromPeer](PartialFunction.empty, PartialFunction.empty, 64, OverflowStrategy.dropHead)
-          .watch(peerEventBus)
+          .watch(peerEventBus.toClassic)
           .preMaterialize()(mat)
-        peerEventBus
-          .tell(Subscribe(messageClassifier), actorRef)
+        peerEventBus ! SubscribeCmd(messageClassifier, actorRef)
         src
       }
       .mapMaterializedValue(_ => NotUsed)
@@ -316,32 +306,4 @@ object PeerEventBusActor {
           Behaviors.same
       }
     }
-}
-
-/** Classic `sender()` bridge over the Typed [[PeerEventBusActor.behavior]] dispatch core.
-  *
-  * Classic callers send the wire messages [[PeerEventBusActor.Subscribe]] / [[PeerEventBusActor.Unsubscribe]] /
-  * [[PeerEventBusActor.Publish]] with no subscriber field — the subscriber is `sender()`. This actor captures
-  * `sender()` and forwards an enriched [[PeerEventBusActor.Command]] to the Typed core (spawned as a child). The Typed
-  * core owns subscriber lifecycle watching, so this shell holds no subscription state of its own.
-  */
-class PeerEventBusActor extends Actor {
-  import PeerEventBusActor.*
-
-  private val core: TypedActorRef[Command] =
-    context.spawn(PeerEventBusActor.behavior(), "core")
-
-  override def receive: Receive = {
-    case Subscribe(to) =>
-      core ! SubscribeCmd(to, sender())
-
-    case Unsubscribe(Some(from)) =>
-      core ! UnsubscribeCmd(from, sender())
-
-    case Unsubscribe(None) =>
-      core ! UnsubscribeAllCmd(sender())
-
-    case Publish(ev: PeerEvent) =>
-      core ! PublishCmd(ev)
-  }
 }

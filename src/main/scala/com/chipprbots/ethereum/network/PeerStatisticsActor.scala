@@ -2,7 +2,6 @@ package com.chipprbots.ethereum.network
 
 import java.time.Clock
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -23,8 +22,8 @@ object PeerStatisticsActor {
     * [[PeerEvent]] messages into the typed [[Command]] ADT ([[PeerMessageReceived]] / [[PeerGone]]); the adapter's
     * underlying Classic ref is what we hand to the bus via `Subscribe`.
     */
-  def apply(peerEventBus: ActorRef, slotDuration: FiniteDuration, slotCount: Int)(implicit
-      clock: Clock
+  def apply(peerEventBus: TypedActorRef[PeerEventBusActor.Command], slotDuration: FiniteDuration, slotCount: Int)(
+      implicit clock: Clock
   ): Behavior[Command] =
     Behaviors.setup { ctx =>
       // Lift Classic PeerEventBus notifications into the typed Command ADT.
@@ -35,10 +34,10 @@ object PeerStatisticsActor {
       }
 
       // Subscribe to messages received from handshaked peers to maintain stats.
-      peerEventBus.tell(Subscribe(MessageSubscriptionClassifier), eventAdapter.toClassic)
+      peerEventBus ! SubscribeCmd(MessageSubscriptionClassifier, eventAdapter.toClassic)
       // Removing peers is an optimisation to free space, but eventually the stats would be overwritten anyway.
-      peerEventBus.tell(
-        Subscribe(SubscriptionClassifier.PeerDisconnectedClassifier(PeerSelector.AllPeers)),
+      peerEventBus ! SubscribeCmd(
+        SubscriptionClassifier.PeerDisconnectedClassifier(PeerSelector.AllPeers),
         eventAdapter.toClassic
       )
 

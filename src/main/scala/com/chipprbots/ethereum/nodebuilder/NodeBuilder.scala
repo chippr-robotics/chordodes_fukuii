@@ -4,6 +4,7 @@ import java.time.Clock
 import java.util.concurrent.atomic.AtomicReference
 
 import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.ActorSystem
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
@@ -376,7 +377,8 @@ trait AuthHandshakerBuilder {
 trait PeerEventBusBuilder {
   self: ActorSystemBuilder =>
 
-  lazy val peerEventBus: ActorRef = classicSystem.actorOf(PeerEventBusActor.props, "peer-event-bus")
+  lazy val peerEventBus: TypedActorRef[PeerEventBusActor.Command] =
+    classicSystem.spawn(PeerEventBusActor.behavior(), "peer-event-bus")
 }
 
 trait PeerStatisticsBuilder {
@@ -1162,7 +1164,7 @@ trait SyncControllerBuilder extends SyncControllerRefBuilder {
         storagesInstance.storages.fastSyncStateStorage,
         consensusAdapter,
         mining.validators,
-        peerEventBus,
+        peerEventBus.toClassic,
         pendingTransactionsManagerTyped,
         ommersPool,
         networkPeerManager,

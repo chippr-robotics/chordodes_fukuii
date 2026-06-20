@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 
@@ -13,11 +12,12 @@ import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.PeerEventBusActor.Command as PeerEventBusCommand
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
-import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.PeerDisconnectedClassifier
-import com.chipprbots.ethereum.network.PeerEventBusActor.Unsubscribe
+import com.chipprbots.ethereum.network.PeerEventBusActor.UnsubscribeCmd
 import com.chipprbots.ethereum.network.PeerId
 
 /** Typed-compatible replacement for the responsibilities of the Classic, self-typed `PeerListSupportNg` trait.
@@ -30,13 +30,9 @@ import com.chipprbots.ethereum.network.PeerId
   *   - the periodic `GetHandshakedPeers` poll (it owns the timer and sends to `networkPeerManager` with a
   *     `HandshakedPeers` message adapter as the reply target), and
   *   - bridging `PeerDisconnected` PeerEventBus events into its Command ADT via a `context.messageAdapter`.
-  *
-  * `peerEventBus` stays Classic for now — `PeerEventBusActor.Subscribe` registers the `sender()` as the subscriber, so
-  * we pass `peerDisconnectedAdapter.toClassic` as the subscriber (the Classic ref that delivers into the Typed actor).
-  * The whole PeerEventBus subsystem migrates with Group NET.
   */
 class PeerListHelper(
-    peerEventBus: ActorRef,
+    peerEventBus: TypedActorRef[PeerEventBusCommand],
     blacklist: Blacklist,
     peerDisconnectedAdapter: TypedActorRef[PeerDisconnected],
     log: Logger,
@@ -139,8 +135,8 @@ class PeerListHelper(
           peerWithInfo.peerInfo.maxBlockNumber
         )
         log.debug("Peer {} chainWeight: {}", peerId, peerWithInfo.peerInfo.chainWeight)
-        peerEventBus.tell(
-          Subscribe(PeerDisconnectedClassifier(PeerSelector.WithId(peerId))),
+        peerEventBus ! SubscribeCmd(
+          PeerDisconnectedClassifier(PeerSelector.WithId(peerId)),
           peerDisconnectedAdapter.toClassic
         )
       }
@@ -166,8 +162,8 @@ class PeerListHelper(
     if peers.keySet.contains(peerId) then {
       val peerInfo = peers(peerId)
       log.debug("Removing disconnected peer {} ({})", peerId, peerInfo.peer.remoteAddress)
-      peerEventBus.tell(
-        Unsubscribe(Some(PeerDisconnectedClassifier(PeerSelector.WithId(peerId)))),
+      peerEventBus ! UnsubscribeCmd(
+        PeerDisconnectedClassifier(PeerSelector.WithId(peerId)),
         peerDisconnectedAdapter.toClassic
       )
       ethRateTracker.removePeer(peerId.value)

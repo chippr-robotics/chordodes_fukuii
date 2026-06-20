@@ -24,12 +24,14 @@ import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.PeerEventBusActor.Command as PeerEventBusCommand
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
-import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.MessageClassifier
-import com.chipprbots.ethereum.network.PeerEventBusActor.Unsubscribe
+import com.chipprbots.ethereum.network.PeerEventBusActor.UnsubscribeAllCmd
+import com.chipprbots.ethereum.network.PeerEventBusActor.UnsubscribeCmd
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.MessageSerializable
 import com.chipprbots.ethereum.network.p2p.messages.Capability
@@ -62,7 +64,7 @@ object PivotBlockSelector {
 
   def apply(
       networkPeerManager: ClassicActorRef,
-      peerEventBus: ClassicActorRef,
+      peerEventBus: TypedActorRef[PeerEventBusCommand],
       syncConfig: SyncConfig,
       fastSync: ClassicActorRef,
       blacklist: Blacklist
@@ -109,7 +111,7 @@ object PivotBlockSelector {
       ctx: ActorContext[Any],
       timers: TimerScheduler[Any],
       networkPeerManager: ClassicActorRef,
-      peerEventBus: ClassicActorRef,
+      peerEventBus: TypedActorRef[PeerEventBusCommand],
       syncConfig: SyncConfig,
       fastSync: ClassicActorRef,
       blacklist: Blacklist,
@@ -148,7 +150,7 @@ object PivotBlockSelector {
                 maxTotalSelectionAttempts
               )
               fastSync ! SelectionFailed
-              peerEventBus.tell(Unsubscribe(), ctx.self.toClassic)
+              peerEventBus ! UnsubscribeAllCmd(ctx.self.toClassic)
               Behaviors.stopped
             } else {
               totalSelectionAttempts += 1
@@ -213,8 +215,8 @@ object PivotBlockSelector {
       handleCommon(message).getOrElse {
         message match {
           case MessageFromPeer(blockHeaders: ETHPackets.BlockHeaders, peerId) =>
-            peerEventBus.tell(
-              Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peerId))),
+            peerEventBus ! UnsubscribeCmd(
+              MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peerId)),
               ctx.self.toClassic
             )
             val updatedPeersToAsk = peersToAsk - peerId
@@ -234,7 +236,7 @@ object PivotBlockSelector {
             }
           case ElectionPivotBlockTimeout =>
             peersToAsk.foreach(peerId => blacklist.add(peerId, blacklistDuration, PivotBlockElectionTimeout))
-            peerEventBus.tell(Unsubscribe(), ctx.self.toClassic)
+            peerEventBus ! UnsubscribeAllCmd(ctx.self.toClassic)
             ctx.log.warn(
               "Pivot block header receive timeout. Scheduling retry with backoff (attempt {})",
               pivotRetryState.attempt + 1
@@ -264,7 +266,7 @@ object PivotBlockSelector {
           timers.startSingleTimer(ElectionTimeoutKey, ElectionPivotBlockTimeout, peerResponseTimeout)
           runningPivotBlockElection(peersToAsk + additionalPeer, newWaitingPeers, pivotBlockNumber, headers)
         } else {
-          peerEventBus.tell(Unsubscribe(), ctx.self.toClassic)
+          peerEventBus ! UnsubscribeAllCmd(ctx.self.toClassic)
           ctx.log.warn(
             "Not enough votes for pivot block. Scheduling retry with backoff (attempt {})",
             pivotRetryState.attempt + 1
@@ -304,12 +306,12 @@ object PivotBlockSelector {
         attempts
       )
       fastSync ! Result(pivotBlockHeader)
-      peerEventBus.tell(Unsubscribe(), ctx.self.toClassic)
+      peerEventBus ! UnsubscribeAllCmd(ctx.self.toClassic)
     }
 
     private def obtainBlockHeaderFromPeer(peer: PeerId, blockNumber: BigInt): Unit = {
-      peerEventBus.tell(
-        Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer))),
+      peerEventBus ! SubscribeCmd(
+        MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer)),
         ctx.self.toClassic
       )
       val getBlockHeadersMsg: MessageSerializable = peerListHelper.handshakedPeers.get(peer) match {
