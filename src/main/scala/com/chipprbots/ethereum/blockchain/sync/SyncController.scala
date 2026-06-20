@@ -1371,9 +1371,9 @@ object SyncController {
 
     def startFastSync(): Behavior[Any] = {
       syncGeneration += 1
-      val fastSync = ctx.toClassic.actorOf(
-        FastSync
-          .props(
+      val fastSync = ctx
+        .spawn(
+          FastSync.behavior(
             fastSyncStateStorage,
             appStateStorage,
             blockNumberMappingStorage,
@@ -1388,12 +1388,13 @@ object SyncController {
             networkPeerManager,
             blacklist,
             syncConfig,
-            scheduler,
-            configBuilder
-          )
-          .withDispatcher("sync-dispatcher"),
-        s"fast-sync-$syncGeneration"
-      )
+            configBuilder,
+            ctx.self.toClassic
+          ),
+          s"fast-sync-$syncGeneration",
+          DispatcherSelector.fromConfig("sync-dispatcher")
+        )
+        .toClassic
       fastSync ! SyncProtocol.Start
       runningFastSync(fastSync)
     }

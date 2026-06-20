@@ -3,11 +3,7 @@ package com.chipprbots.ethereum.blockchain.sync.fast
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
-import org.apache.pekko.actor.Actor
 import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.Props
-import org.apache.pekko.actor.Scheduler
-import org.apache.pekko.actor.Terminated
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.DispatcherSelector
@@ -63,69 +59,6 @@ import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.Config.SyncConfig
-
-/** Classic shell for FastSync (Pekko Typed migration, Group SNAP2).
-  *
-  * The shell exists only to capture `sender()` for the ask-based `SyncProtocol.GetStatus`. Every other message is
-  * forwarded verbatim to the `Behavior[Any]` core (same shell+core pattern as SyncStateSchedulerActor S4 and
-  * PeersClient S7). The core owns all state and behaviours. `props()` is unchanged so FastSyncSpec works without
-  * modification; `syncController` defaults to `context.parent` so SyncController's existing `context.actorOf` spawn
-  * needs no change.
-  */
-// scalastyle:off file.size.limit
-class FastSync(
-    fastSyncStateStorage: FastSyncStateStorage,
-    appStateStorage: AppStateStorage,
-    blockNumberMappingStorage: BlockNumberMappingStorage,
-    blockchain: Blockchain,
-    blockchainReader: BlockchainReader,
-    blockchainWriter: BlockchainWriter,
-    evmCodeStorage: EvmCodeStorage,
-    stateStorage: StateStorage,
-    nodeStorage: NodeStorage,
-    validators: Validators,
-    peerEventBus: ActorRef,
-    networkPeerManager: ActorRef,
-    blacklist: Blacklist,
-    syncConfig: SyncConfig,
-    scheduler: Scheduler,
-    configBuilder: BlockchainConfigBuilder
-) extends Actor {
-
-  import FastSync.*
-
-  private val syncController: ActorRef = context.parent
-
-  private val core: TypedActorRef[Any] = context.spawn(
-    FastSync.behavior(
-      fastSyncStateStorage,
-      appStateStorage,
-      blockNumberMappingStorage,
-      blockchain,
-      blockchainReader,
-      blockchainWriter,
-      evmCodeStorage,
-      stateStorage,
-      nodeStorage,
-      validators,
-      peerEventBus,
-      networkPeerManager,
-      blacklist,
-      syncConfig,
-      configBuilder,
-      syncController
-    ),
-    "core"
-  )
-
-  context.watch(core.toClassic)
-
-  override def receive: Receive = {
-    case SyncProtocol.GetStatus => core ! GetStatusCmd(sender())
-    case Terminated(_)          => context.stop(self)
-    case other                  => core ! other
-  }
-}
 
 // scalastyle:off file.size.limit
 object FastSync {
@@ -254,7 +187,7 @@ object FastSync {
         msg match {
           case SyncProtocol.Start     => start()
           case GetStatusCmd(replyTo)  => replyTo ! SyncProtocol.Status.NotSyncing; Behaviors.same
-          case SyncProtocol.GetStatus => Behaviors.same // bare GetStatus (no reply-to) — ignore
+          case SyncProtocol.GetStatus => ctx.self ! GetStatusCmd(ctx.toClassic.sender()); Behaviors.same
           case _                      => Behaviors.same
         }
     }
@@ -325,6 +258,7 @@ object FastSync {
             )
             timers.startSingleTimer(RetryPivotBlockSelection, startRetryInterval)
             Behaviors.same
+          case SyncProtocol.GetStatus => ctx.self ! GetStatusCmd(ctx.toClassic.sender()); Behaviors.same
           case PivotBlockSelector.Result(pivotBlockHeader) =>
             if pivotBlockHeader.number < 1 then {
               log.info("Unable to start block synchronization in fast mode: pivot block is less than 1")
@@ -468,6 +402,9 @@ object FastSync {
     }
 
     def handleStatus(msg: Any): Boolean = msg match {
+      case SyncProtocol.GetStatus =>
+        ctx.self ! GetStatusCmd(ctx.toClassic.sender())
+        true
       case GetStatusCmd(replyTo) =>
         replyTo ! currentSyncingStatus
         true
@@ -525,7 +462,7 @@ object FastSync {
             )
             cleanup()
             syncController ! FallbackToSnapSync
-            idle()
+            Behaviors.stopped
           case _ => Behaviors.same
         }
     }
@@ -1542,59 +1479,12 @@ object FastSync {
     */
   val HeaderQueueLookahead: Int = 4096
 
-  // scalastyle:off parameter.number
-  def props(
-      fastSyncStateStorage: FastSyncStateStorage,
-      appStateStorage: AppStateStorage,
-      blockNumberMappingStorage: BlockNumberMappingStorage,
-      blockchain: Blockchain,
-      blockchainReader: BlockchainReader,
-      blockchainWriter: BlockchainWriter,
-      evmCodeStorage: EvmCodeStorage,
-      stateStorage: StateStorage,
-      nodeStorage: NodeStorage,
-      validators: Validators,
-      peerEventBus: ActorRef,
-      networkPeerManager: ActorRef,
-      blacklist: Blacklist,
-      syncConfig: SyncConfig,
-      scheduler: Scheduler,
-      configBuilder: BlockchainConfigBuilder
-  ): Props =
-    Props(
-      new FastSync(
-        fastSyncStateStorage,
-        appStateStorage,
-        blockNumberMappingStorage,
-        blockchain,
-        blockchainReader,
-        blockchainWriter,
-        evmCodeStorage,
-        stateStorage,
-        nodeStorage,
-        validators,
-        peerEventBus,
-        networkPeerManager,
-        blacklist,
-        syncConfig,
-        scheduler,
-        configBuilder
-      )
-    )
-
   private case class UpdatePivotBlock(reason: PivotBlockUpdateReason)
   private case object ProcessSyncing
   private case object PersistSyncState
   private case object PrintStatus
 
-  // === Pekko Typed migration (Group SNAP2) ===
-  // FastSync becomes a thin Classic shell (captures `sender()` for the ask-based `GetStatus`) wrapping a
-  // `Behavior[Any]` core (same shell+core pattern as SyncStateSchedulerActor S4 and PeersClient S7). The core
-  // receives a heterogeneous message stream: external `SyncProtocol` messages, foreign coordinator messages
-  // (`SyncStateSchedulerActor.*`, `PivotBlockSelector.*`), internal ticks, and `PeerRequestHandler.Result`
-  // routed through an id-keyed message adapter. `Behavior[Any]` avoids wrapping every foreign source.
-
-  /** Shell → core: carries the Classic `sender()` of an ask-based `SyncProtocol.GetStatus` as an explicit reply-to. */
+  /** Carries the Classic reply-to for an ask-based `SyncProtocol.GetStatus`. */
   final private[fast] case class GetStatusCmd(replyTo: ActorRef)
 
   /** Core-internal: a watched Classic `PeerRequestHandler` child stopped (it replies to `context.parent` then stops

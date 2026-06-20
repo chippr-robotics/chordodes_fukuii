@@ -2,6 +2,7 @@ package com.chipprbots.ethereum.blockchain.sync
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.pattern.ask
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
@@ -83,26 +84,29 @@ class FastSyncSpec
         testBlocks
       )
     lazy val peerEventBus: TestProbe = TestProbe("peer_event-bus")
-    lazy val fastSync: ActorRef = system.actorOf(
-      FastSync.props(
-        fastSyncStateStorage = storagesInstance.storages.fastSyncStateStorage,
-        appStateStorage = storagesInstance.storages.appStateStorage,
-        blockNumberMappingStorage = storagesInstance.storages.blockNumberMappingStorage,
-        blockchain = blockchain,
-        blockchainReader = blockchainReader,
-        blockchainWriter = blockchainWriter,
-        evmCodeStorage = storagesInstance.storages.evmCodeStorage,
-        nodeStorage = storagesInstance.storages.nodeStorage,
-        stateStorage = storagesInstance.storages.stateStorage,
-        validators = validators,
-        peerEventBus = peerEventBus.ref,
-        networkPeerManager = networkPeerManager.ref,
-        blacklist = blacklist,
-        syncConfig = syncConfig,
-        scheduler = system.scheduler,
-        configBuilder = this
+    lazy val syncControllerProbe: TestProbe = TestProbe("sync-controller")
+    lazy val fastSync: ActorRef = system
+      .spawnAnonymous(
+        FastSync.behavior(
+          fastSyncStateStorage = storagesInstance.storages.fastSyncStateStorage,
+          appStateStorage = storagesInstance.storages.appStateStorage,
+          blockNumberMappingStorage = storagesInstance.storages.blockNumberMappingStorage,
+          blockchain = blockchain,
+          blockchainReader = blockchainReader,
+          blockchainWriter = blockchainWriter,
+          evmCodeStorage = storagesInstance.storages.evmCodeStorage,
+          nodeStorage = storagesInstance.storages.nodeStorage,
+          stateStorage = storagesInstance.storages.stateStorage,
+          validators = validators,
+          peerEventBus = peerEventBus.ref,
+          networkPeerManager = networkPeerManager.ref,
+          blacklist = blacklist,
+          syncConfig = syncConfig,
+          configBuilder = this,
+          syncController = syncControllerProbe.ref
+        )
       )
-    )
+      .toClassic
 
     val saveGenesis: IO[Unit] = IO {
       blockchainWriter.save(

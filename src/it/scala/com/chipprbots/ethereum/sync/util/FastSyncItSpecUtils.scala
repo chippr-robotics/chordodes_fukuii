@@ -30,26 +30,28 @@ object FastSyncItSpecUtils {
 
     lazy val validators = new MockValidatorsAlwaysSucceed
 
-    lazy val fastSync: ActorRef = system.actorOf(
-      FastSync.props(
-        storagesInstance.storages.fastSyncStateStorage,
-        storagesInstance.storages.appStateStorage,
-        storagesInstance.storages.blockNumberMappingStorage,
-        bl,
-        blockchainReader,
-        blockchainWriter,
-        storagesInstance.storages.evmCodeStorage,
-        storagesInstance.storages.stateStorage,
-        storagesInstance.storages.nodeStorage,
-        validators,
-        peerEventBus.toClassic,
-        etcPeerManager,
-        blacklist,
-        testSyncConfig,
-        system.scheduler,
-        this
+    lazy val fastSync: ActorRef = system
+      .spawnAnonymous(
+        FastSync.behavior(
+          storagesInstance.storages.fastSyncStateStorage,
+          storagesInstance.storages.appStateStorage,
+          storagesInstance.storages.blockNumberMappingStorage,
+          bl,
+          blockchainReader,
+          blockchainWriter,
+          storagesInstance.storages.evmCodeStorage,
+          storagesInstance.storages.stateStorage,
+          storagesInstance.storages.nodeStorage,
+          validators,
+          peerEventBus.toClassic,
+          etcPeerManager,
+          blacklist,
+          testSyncConfig,
+          this,
+          system.deadLetters
+        )
       )
-    )
+      .toClassic
 
     def startFastSync(): IO[Unit] = IO {
       fastSync ! SyncProtocol.Start
