@@ -107,7 +107,7 @@ class BlockFetcher(
         log.debug("BlockFetcher subscribed to peer events")
         // 500ms stall-recovery heartbeat: fills open header slots if the primary reactive
         // triggers (BRU, response received) were missed or headersToIgnore just drained.
-        timers.startTimerWithFixedDelay("tick-fetch", TickFetch, 500.millis)
+        timers.startTimerWithFixedDelay("tick-fetch", TickFetch, syncConfig.blockFetcherTickInterval)
         BlockFetcherState.initial(importer, blockValidator, fromBlock) |> fetchBlocks
       case msg =>
         log.debug("Fetcher subscribe adapter received unhandled message {}", msg)
@@ -531,8 +531,8 @@ class BlockFetcher(
       state.isOnTop
     )
 
-    if state.isOnTop && newBlockNr == nextExpectedBlock then {
-      log.debug("Passing block {} directly to importer (on top and sequential)", newBlockNr)
+    if state.hasEmptyBuffer && newBlockNr == nextExpectedBlock then {
+      log.debug("Passing block {} directly to importer (buffer empty and sequential)", newBlockNr)
       val newState = state
         .withPeerForBlocks(peerId, Seq(newBlockNr))
         .withLastBlock(newBlockNr)

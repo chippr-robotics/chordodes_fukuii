@@ -42,7 +42,7 @@ import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
-import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.MessageClassifier
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.Message
@@ -71,7 +71,11 @@ trait RegularSyncFixtures { self: Matchers with AsyncMockFactory =>
     implicit override lazy val system: ActorSystem = _system
     implicit override lazy val ioRuntime: IORuntime = IORuntime.global
     override lazy val syncConfig: SyncConfig =
-      defaultSyncConfig.copy(blockHeadersPerRequest = 2, blockBodiesPerRequest = 2)
+      defaultSyncConfig.copy(
+        blockHeadersPerRequest = 2,
+        blockBodiesPerRequest = 2,
+        blockFetcherTickInterval = 60.seconds
+      )
     val handshakedPeers: Map[Peer, PeerInfo] =
       (0 to 5).toList.map(peerId.andThen(getPeer)).fproduct(getPeerInfo(_)).toMap
     val defaultPeer: Peer = peerByNumber(0)
@@ -426,7 +430,8 @@ trait RegularSyncFixtures { self: Matchers with AsyncMockFactory =>
     // knownTop to 21 after the last full batch, leaving isOnTop = false permanently.
     override lazy val syncConfig: SyncConfig = defaultSyncConfig.copy(
       blockHeadersPerRequest = 3,
-      blockBodiesPerRequest = 3
+      blockBodiesPerRequest = 3,
+      blockFetcherTickInterval = 60.seconds
     )
 
     val newBlock: Block = BlockHelpers.generateBlock(testBlocks.last)
@@ -490,11 +495,13 @@ trait RegularSyncFixtures { self: Matchers with AsyncMockFactory =>
     })
 
     def waitForSubscription(): Unit = {
-      peerEventBus.fishForMessage(max = 5.seconds) {
-        case Subscribe(MessageClassifier(_, _)) => true
-        case _                                  => false
-      }
-      blockFetcher = peerEventBus.sender()
+      blockFetcher = peerEventBus
+        .fishForMessage(max = 5.seconds) {
+          case SubscribeCmd(_: MessageClassifier, _) => true
+          case _                                      => false
+        }
+        .asInstanceOf[SubscribeCmd]
+        .subscriber
     }
 
     def sendLastTestBlockAsTop(): Unit = sendNewBlock(testBlocks.last)

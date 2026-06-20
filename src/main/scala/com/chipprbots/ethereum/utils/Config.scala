@@ -101,7 +101,8 @@ object Config extends InstanceConfig(ConfigFactory.load().getConfig("fukuii"), "
       // - `checkpointSyncUrl`: remote URL fetched into `${datadir}/checkpoint.bin` (resumable).
       // - `checkpointSyncDownloadDir`: where to place the downloaded archive. Defaults to datadir.
       checkpointSyncFile: Option[java.nio.file.Path],
-      checkpointSyncUrl: Option[String]
+      checkpointSyncUrl: Option[String],
+      blockFetcherTickInterval: FiniteDuration = 500.millis
   )
 
   object SyncConfig {

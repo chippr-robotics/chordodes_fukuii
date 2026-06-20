@@ -33,7 +33,7 @@ import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.HeadersSeq
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
-import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.MessageClassifier
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.Codes
@@ -287,7 +287,7 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
     // BF-1A: ETH/69 head-following via BlockRangeUpdate
     "should include BlockRangeUpdateCode in peer event subscription" taggedAs (UnitTest, SyncTest) in new TestSetup {
       blockFetcher ! BlockFetcher.Start(importer.ref, 0)
-      val sub: Subscribe = peerEventBus.expectMsgClass(classOf[Subscribe])
+      val sub = peerEventBus.expectMsgType[SubscribeCmd]
       sub.to match {
         case MessageClassifier(codes, _) =>
           codes should contain(Codes.BlockRangeUpdateCode)
@@ -431,13 +431,9 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
     def startFetcher(fromBlock: BigInt = 0): Unit = {
       blockFetcher ! BlockFetcher.Start(importer.ref, fromBlock)
 
-      peerEventBus.expectMsg(
-        Subscribe(
-          MessageClassifier(
-            Set(Codes.NewBlockCode, Codes.NewBlockHashesCode, Codes.BlockHeadersCode, Codes.BlockRangeUpdateCode),
-            PeerSelector.AllPeers
-          )
-        )
+      peerEventBus.expectMsgType[SubscribeCmd].to shouldBe MessageClassifier(
+        Set(Codes.NewBlockCode, Codes.NewBlockHashesCode, Codes.BlockHeadersCode, Codes.BlockRangeUpdateCode),
+        PeerSelector.AllPeers
       )
     }
 

@@ -85,7 +85,7 @@ case class BlockFetcherState(
   // true if we can dispatch a new header request right now
   def canDispatchHeaders: Boolean = headersToIgnore == 0 && inFlightHeaders < MaxConcurrentHeaderSlots
 
-  private def hasEmptyBuffer: Boolean = readyBlocks.isEmpty && waitingHeaders.isEmpty
+  def hasEmptyBuffer: Boolean = readyBlocks.isEmpty && waitingHeaders.isEmpty
 
   def hasFetchedTopHeader: Boolean = nextBlockToFetch == knownTop + 1
 

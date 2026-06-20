@@ -49,7 +49,7 @@ import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerEventBusActor
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
-import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.MessageClassifier
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.Codes
@@ -107,18 +107,14 @@ class RegularSyncSpec
         new Fixture(testSystem) {
           regularSync ! SyncProtocol.Start
 
-          peerEventBus.expectMsg(
-            PeerEventBusActor.Subscribe(
-              MessageClassifier(
-                Set(
-                  Codes.NewBlockCode,
-                  Codes.NewBlockHashesCode,
-                  Codes.BlockHeadersCode,
-                  Codes.BlockRangeUpdateCode
-                ),
-                PeerSelector.AllPeers
-              )
-            )
+          peerEventBus.expectMsgType[SubscribeCmd].to shouldBe MessageClassifier(
+            Set(
+              Codes.NewBlockCode,
+              Codes.NewBlockHashesCode,
+              Codes.BlockHeadersCode,
+              Codes.BlockRangeUpdateCode
+            ),
+            PeerSelector.AllPeers
           )
         }
       )
@@ -133,12 +129,10 @@ class RegularSyncSpec
       "fetch headers and bodies concurrently" taggedAs (UnitTest, SyncTest) in sync(new Fixture(testSystem) {
         regularSync ! SyncProtocol.Start
 
-        peerEventBus.expectMsgClass(classOf[Subscribe])
-        peerEventBus.reply(
-          MessageFromPeer(
-            NewBlock(testBlocks.last, ChainWeight(testBlocks.last.number).totalDifficulty),
-            defaultPeer.id
-          )
+        val sub136 = peerEventBus.expectMsgType[SubscribeCmd]
+        sub136.subscriber ! MessageFromPeer(
+          NewBlock(testBlocks.last, ChainWeight(testBlocks.last.number).totalDifficulty),
+          defaultPeer.id
         )
 
         peersClient.expectMsgEq(blockHeadersChunkRequest(0))
@@ -169,8 +163,8 @@ class RegularSyncSpec
           var blockFetcher: ActorRef = uninitialized
 
           regularSync ! SyncProtocol.Start
-          peerEventBus.expectMsgClass(classOf[Subscribe])
-          blockFetcher = peerEventBus.sender()
+          val sub168 = peerEventBus.expectMsgType[SubscribeCmd]
+          blockFetcher = sub168.subscriber
 
           peersClient.expectMsgEq(blockHeadersChunkRequest(0))
           peersClient.reply(PeersClient.Response(defaultPeer, BlockHeaders(BigInt(0), testBlocksChunked.head.headers)))
@@ -252,12 +246,10 @@ class RegularSyncSpec
 
         regularSync ! SyncProtocol.Start
 
-        peerEventBus.expectMsgClass(classOf[Subscribe])
-        peerEventBus.reply(
-          MessageFromPeer(
-            NewBlock(testBlocks.last, ChainWeight(testBlocks.last.header.difficulty).totalDifficulty),
-            defaultPeer.id
-          )
+        val sub249 = peerEventBus.expectMsgType[SubscribeCmd]
+        sub249.subscriber ! MessageFromPeer(
+          NewBlock(testBlocks.last, ChainWeight(testBlocks.last.header.difficulty).totalDifficulty),
+          defaultPeer.id
         )
 
         peersClient.expectMsgEq(blockHeadersChunkRequest(0))
@@ -388,12 +380,10 @@ class RegularSyncSpec
 
           regularSync ! SyncProtocol.Start
 
-          peerEventBus.expectMsgClass(classOf[Subscribe])
-          peerEventBus.reply(
-            MessageFromPeer(
-              NewBlock(alternativeBlocks.last, ChainWeight(alternativeBlocks.last.number).totalDifficulty),
-              defaultPeer.id
-            )
+          val sub383 = peerEventBus.expectMsgType[SubscribeCmd]
+          sub383.subscriber ! MessageFromPeer(
+            NewBlock(alternativeBlocks.last, ChainWeight(alternativeBlocks.last.number).totalDifficulty),
+            defaultPeer.id
           )
           // increase timeout slightly to reduce intermittent flakiness in forked test JVMs
           awaitCond(bestBlock == alternativeBlocks.last, 10.seconds)
@@ -452,13 +442,11 @@ class RegularSyncSpec
 
         regularSync ! SyncProtocol.Start
 
-        peerEventBus.expectMsgClass(classOf[Subscribe])
-        val blockFetcher: ActorRef = peerEventBus.sender()
-        peerEventBus.reply(
-          MessageFromPeer(
-            NewBlock(originalBranch.last, ChainWeight(originalBranch.last.number).totalDifficulty),
-            defaultPeer.id
-          )
+        val sub445 = peerEventBus.expectMsgType[SubscribeCmd]
+        val blockFetcher: ActorRef = sub445.subscriber
+        sub445.subscriber ! MessageFromPeer(
+          NewBlock(originalBranch.last, ChainWeight(originalBranch.last.number).totalDifficulty),
+          defaultPeer.id
         )
 
         awaitCond(bestBlock == originalBranch.last, 5.seconds)
@@ -585,11 +573,9 @@ class RegularSyncSpec
         val newBlock: Block = testBlocks.last
 
         regularSync ! SyncProtocol.Start
-        peerEventBus.expectMsgClass(classOf[Subscribe])
+        val sub576 = peerEventBus.expectMsgType[SubscribeCmd]
 
-        peerEventBus.reply(
-          MessageFromPeer(NewBlock(newBlock, ChainWeight(BigInt(1)).totalDifficulty), defaultPeer.id)
-        )
+        sub576.subscriber ! MessageFromPeer(NewBlock(newBlock, ChainWeight(BigInt(1)).totalDifficulty), defaultPeer.id)
 
         // Wait for actor to finish processing and verify it never calls evaluateBranchBlock
         // Use assertForDuration to continuously verify the mock is never called
@@ -609,12 +595,10 @@ class RegularSyncSpec
 
         regularSync ! SyncProtocol.Start
 
-        peerEventBus.expectMsgClass(classOf[Subscribe])
-        peerEventBus.reply(
-          MessageFromPeer(
-            NewBlock(testBlocks.last, ChainWeight(testBlocks.last.number).totalDifficulty),
-            defaultPeer.id
-          )
+        val sub598 = peerEventBus.expectMsgType[SubscribeCmd]
+        sub598.subscriber ! MessageFromPeer(
+          NewBlock(testBlocks.last, ChainWeight(testBlocks.last.number).totalDifficulty),
+          defaultPeer.id
         )
 
         awaitCond(didTryToImportBlock(failingBlock))
@@ -678,12 +662,10 @@ class RegularSyncSpec
 
         regularSync ! SyncProtocol.Start
 
-        peerEventBus.expectMsgClass(classOf[Subscribe])
-        peerEventBus.reply(
-          MessageFromPeer(
-            NewBlock(testBlocks.last, ChainWeight(testBlocks.last.number).totalDifficulty),
-            defaultPeer.id
-          )
+        val sub665 = peerEventBus.expectMsgType[SubscribeCmd]
+        sub665.subscriber ! MessageFromPeer(
+          NewBlock(testBlocks.last, ChainWeight(testBlocks.last.number).totalDifficulty),
+          defaultPeer.id
         )
 
         awaitCond(didTryToImportBlock(testBlocks.head))
@@ -781,15 +763,13 @@ class RegularSyncSpec
           _ <- IO(regularSync ! SyncProtocol.Start)
           before <- getSyncStatus
           _ <- IO {
-            peerEventBus.expectMsgClass(classOf[Subscribe])
-            peerEventBus.reply(
-              MessageFromPeer(
-                NewBlock(
-                  testBlocks.last,
-                  ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty
-                ),
-                defaultPeer.id
-              )
+            val sub766 = peerEventBus.expectMsgType[SubscribeCmd]
+            sub766.subscriber ! MessageFromPeer(
+              NewBlock(
+                testBlocks.last,
+                ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty
+              ),
+              defaultPeer.id
             )
           }
           after <- getSyncStatus
@@ -811,15 +791,13 @@ class RegularSyncSpec
           _ <- IO {
             regularSync ! SyncProtocol.Start
 
-            peerEventBus.expectMsgClass(classOf[Subscribe])
-            peerEventBus.reply(
-              MessageFromPeer(
-                NewBlock(
-                  testBlocks.last,
-                  ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty
-                ),
-                defaultPeer.id
-              )
+            val sub796 = peerEventBus.expectMsgType[SubscribeCmd]
+            sub796.subscriber ! MessageFromPeer(
+              NewBlock(
+                testBlocks.last,
+                ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty
+              ),
+              defaultPeer.id
             )
 
             peersClient.expectMsgEq(blockHeadersRequest(6))
@@ -841,15 +819,13 @@ class RegularSyncSpec
           _ <- IO {
             regularSync ! SyncProtocol.Start
 
-            peerEventBus.expectMsgClass(classOf[Subscribe])
-            peerEventBus.reply(
-              MessageFromPeer(
-                NewBlock(
-                  testBlocks.last,
-                  ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty
-                ),
-                defaultPeer.id
-              )
+            val sub824 = peerEventBus.expectMsgType[SubscribeCmd]
+            sub824.subscriber ! MessageFromPeer(
+              NewBlock(
+                testBlocks.last,
+                ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty
+              ),
+              defaultPeer.id
             )
 
             peersClient.expectMsgEq(blockHeadersChunkRequest(0))
@@ -873,15 +849,13 @@ class RegularSyncSpec
 
             regularSync ! SyncProtocol.Start
 
-            peerEventBus.expectMsgClass(classOf[Subscribe])
-            peerEventBus.reply(
-              MessageFromPeer(
-                NewBlock(
-                  testBlocks.last,
-                  ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty
-                ),
-                defaultPeer.id
-              )
+            val sub854 = peerEventBus.expectMsgType[SubscribeCmd]
+            sub854.subscriber ! MessageFromPeer(
+              NewBlock(
+                testBlocks.last,
+                ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty
+              ),
+              defaultPeer.id
             )
           }
           _ <- fishForStatus {
