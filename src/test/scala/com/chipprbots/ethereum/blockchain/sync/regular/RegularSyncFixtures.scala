@@ -94,7 +94,7 @@ trait RegularSyncFixtures { self: Matchers with AsyncMockFactory =>
     lazy val regularSync: ActorRef = system.actorOf(
       RegularSync
         .props(
-          peersClient.ref,
+          peersClient.ref.toTyped[PeersClient.Command],
           networkPeerManager.ref,
           peerEventBus.ref,
           consensusAdapter,
@@ -199,16 +199,27 @@ trait RegularSyncFixtures { self: Matchers with AsyncMockFactory =>
       blockHeadersRequest(block)
     }
 
-    def blockHeadersRequest(fromBlock: BigInt): PeersClient.Request[ETHGetBlockHeaders] = PeersClient.Request.create(
-      ETHGetBlockHeaders(
-        requestId = 0,
-        Left(fromBlock),
-        syncConfig.blockHeadersPerRequest,
-        skip = 0,
-        reverse = false
-      ),
-      PeersClient.BestPeer
-    )
+    // Builds an EXPECTED request for comparison via `expectMsgEq`. The `replyTo` is a placeholder —
+    // `eqInstanceForPeersClientRequest` compares only `message` + `peerSelector`, ignoring `replyTo`.
+    def blockHeadersRequest(fromBlock: BigInt): PeersClient.Request[ETHGetBlockHeaders] = PeersClient.Request
+      .create(
+        ETHGetBlockHeaders(
+          requestId = 0,
+          Left(fromBlock),
+          syncConfig.blockHeadersPerRequest,
+          skip = 0,
+          reverse = false
+        ),
+        PeersClient.BestPeer
+      )
+      .apply(peersClient.ref.toTyped[PeersClient.ResponseMessage])
+      .asInstanceOf[PeersClient.Request[ETHGetBlockHeaders]]
+
+    // Builds an EXPECTED bodies request for comparison via `expectMsgEq` (replyTo is a placeholder; ignored by Eq).
+    def blockBodiesRequest(hashes: Seq[ByteString]): PeersClient.Request[ETHGetBlockBodies] = PeersClient.Request
+      .create(ETHGetBlockBodies(BigInt(0), hashes), PeersClient.BestPeer)
+      .apply(peersClient.ref.toTyped[PeersClient.ResponseMessage])
+      .asInstanceOf[PeersClient.Request[ETHGetBlockBodies]]
 
     def fishForBlacklistPeer(peer: Peer): PeersClient.BlacklistPeer =
       peersClient.fishForSpecificMessage() {
@@ -263,9 +274,10 @@ trait RegularSyncFixtures { self: Matchers with AsyncMockFactory =>
       def overrides(@scala.annotation.unused sender: ActorRef): PartialFunction[Any, Option[AutoPilot]] =
         PartialFunction.empty
 
-      def defaultHandlers(sender: ActorRef): PartialFunction[Any, Option[AutoPilot]] = {
+      def defaultHandlers(@scala.annotation.unused sender: ActorRef): PartialFunction[Any, Option[AutoPilot]] = {
+        // Typed AskPattern carries its own reply address in `replyTo` (4th field) — reply there, not to `sender`.
         // Handle ETH68/69 GetBlockHeaders (with requestId)
-        case PeersClient.Request(ETHGetBlockHeaders(_, Left(minBlock), amount, _, _), _, _) =>
+        case PeersClient.Request(ETHGetBlockHeaders(_, Left(minBlock), amount, _, _), _, _, replyTo) =>
           val maxBlock = minBlock + amount
           val matchingHeaders = blocks
             .filter { b =>
@@ -274,16 +286,16 @@ trait RegularSyncFixtures { self: Matchers with AsyncMockFactory =>
             }
             .map(_.header)
             .sortBy(_.number)
-          sender ! PeersClient.Response(defaultPeer, BlockHeaders(BigInt(0), matchingHeaders))
+          replyTo ! PeersClient.Response(defaultPeer, BlockHeaders(BigInt(0), matchingHeaders))
           None
         // Handle ETH68/69 GetBlockBodies (with requestId)
-        case PeersClient.Request(ETHGetBlockBodies(_, hashes), _, _) =>
+        case PeersClient.Request(ETHGetBlockBodies(_, hashes), _, _, replyTo) =>
           val matchingBodies = hashes.flatMap(hash => blocks.find(_.hash == hash)).map(_.body)
 
-          sender ! PeersClient.Response(defaultPeer, BlockBodies(BigInt(0), matchingBodies))
+          replyTo ! PeersClient.Response(defaultPeer, BlockBodies(BigInt(0), matchingBodies))
           None
-        case PeersClient.Request(GetNodeData(hash :: Nil), _, _) =>
-          sender ! PeersClient.Response(
+        case PeersClient.Request(GetNodeData(hash :: Nil), _, _, replyTo) =>
+          replyTo ! PeersClient.Response(
             defaultPeer,
             NodeData(List(ByteString(blocks.byHashUnsafe(hash).header.toBytes: Array[Byte])))
           )

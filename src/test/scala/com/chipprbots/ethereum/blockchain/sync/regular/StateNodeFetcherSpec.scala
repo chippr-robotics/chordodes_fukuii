@@ -2,6 +2,7 @@ package com.chipprbots.ethereum.blockchain.sync.regular
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
 import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
@@ -69,7 +70,7 @@ class StateNodeFetcherSpec
 
     val fetcher: ActorRef[StateNodeFetcher.StateNodeFetcherCommand] =
       typedKit.spawn(
-        StateNodeFetcher(peersClientProbe.ref, syncConfig, supervisorProbe.ref),
+        StateNodeFetcher(peersClientProbe.ref.toTyped[PeersClient.Command], syncConfig, supervisorProbe.ref),
         "state-node-fetcher"
       )
 

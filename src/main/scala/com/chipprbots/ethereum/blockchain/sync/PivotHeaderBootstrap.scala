@@ -1,12 +1,14 @@
 package com.chipprbots.ethereum.blockchain.sync
 
 import org.apache.pekko.actor.ActorRef as ClassicActorRef
+import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
+import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.pattern.ask
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
@@ -41,10 +43,10 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
   * Pekko Typed migration (Group ROOT): converted to a `Behavior[Command]` with a sealed inbound ADT. The two outgoing
   * messages [[Completed]] / [[Failed]] are delivered to a Classic `replyTo` ref — the still-`Behavior[Any]`
   * `SyncController` parent (and its `ctx.self.toClassic`), which matches them as raw case classes in its bootstrap /
-  * recovery / healing states. `peersClient` stays Classic (PeersClient is a Classic shell at ROOT time), so the
-  * `peersClient ?` Classic ask is preserved; its async callbacks send self-Commands via the captured Typed `selfRef`.
-  * Retry / wait-for-peer scheduling moves from the injected `scheduler` to `Behaviors.withTimers`. All logging inside
-  * the ask callbacks uses a plain SLF4J `asyncLog` (off the actor thread).
+  * recovery / healing states. `peersClient` is Typed (CAPSTONE Phase 2d); requests use the Typed `AskPattern`
+  * (`peersClient.ask`), which supplies the `replyTo` directly. The ask callbacks run off the actor thread, so they send
+  * self-Commands via `ctx.self` and log via a plain SLF4J `asyncLog`. Retry / wait-for-peer scheduling moves from the
+  * injected `scheduler` to `Behaviors.withTimers`.
   */
 object PivotHeaderBootstrap {
 
@@ -63,7 +65,7 @@ object PivotHeaderBootstrap {
 
   /** Fetch by block number (the standard pre-merge / fast-sync / TD-driven SNAP path). */
   def apply(
-      peersClient: ClassicActorRef,
+      peersClient: ActorRef[PeersClient.Command],
       blockchainWriter: BlockchainWriter,
       targetBlock: BigInt,
       replyTo: ClassicActorRef,
@@ -92,7 +94,7 @@ object PivotHeaderBootstrap {
     * `Completed` carries the discovered `header.number`.
     */
   def applyByHash(
-      peersClient: ClassicActorRef,
+      peersClient: ActorRef[PeersClient.Command],
       blockchainWriter: BlockchainWriter,
       headHash: ByteString,
       replyTo: ClassicActorRef,
@@ -118,7 +120,7 @@ object PivotHeaderBootstrap {
     )
 
   private def behavior(
-      peersClient: ClassicActorRef,
+      peersClient: ActorRef[PeersClient.Command],
       blockchainWriter: BlockchainWriter,
       targetBlock: BigInt,
       targetHash: Option[ByteString],
@@ -153,7 +155,7 @@ object PivotHeaderBootstrap {
   private class Impl(
       ctx: ActorContext[Command],
       timers: TimerScheduler[Command],
-      peersClient: ClassicActorRef,
+      peersClient: ActorRef[PeersClient.Command],
       blockchainWriter: BlockchainWriter,
       targetBlock: BigInt,
       targetHash: Option[ByteString],
@@ -168,8 +170,10 @@ object PivotHeaderBootstrap {
     // Safe from any thread (the `peersClient ?` callbacks run off the actor thread).
     private val asyncLog = LoggerFactory.getLogger(getClass)
 
-    // Classic ask needs an ExecutionContext for the future combinators.
+    // The ask future combinators run off the actor thread.
     private given ec: ExecutionContext = ctx.executionContext
+    // Typed AskPattern needs an implicit Scheduler.
+    implicit private val scheduler: Scheduler = ctx.system.scheduler
 
     private val byHashMode: Boolean = targetHash.isDefined
     private def targetDesc: String = targetHash match {
@@ -275,9 +279,10 @@ object PivotHeaderBootstrap {
         else if preferSnapPeers then BestSnapPeer
         else if byHashMode then BestPeer
         else BestPeerWithMinBlockExcluding(targetBlock, triedPeers.toSet)
-      val req = Request[ETHPackets.GetBlockHeaders](msg, selector, (m: ETHPackets.GetBlockHeaders) => m)
-
-      (peersClient ? req)
+      peersClient
+        .ask[PeersClient.ResponseMessage](replyTo =>
+          Request[ETHPackets.GetBlockHeaders](msg, selector, (m: ETHPackets.GetBlockHeaders) => m, replyTo)
+        )
         .flatMap {
           case NoSuitablePeer if preferSnapPeers =>
             // No SNAP peer available — try any peer with the target as fallback
@@ -286,23 +291,27 @@ object PivotHeaderBootstrap {
               ETHPackets.GetBlockHeaders(ETHPackets.nextRequestId, target, maxHeaders = 1, skip = 0, reverse = false)
             val fallbackSelector =
               if byHashMode then BestPeer else BestPeerWithMinBlockExcluding(targetBlock, triedPeers.toSet)
-            val fallbackReq =
-              Request[ETHPackets.GetBlockHeaders](fallbackMsg, fallbackSelector, (m: ETHPackets.GetBlockHeaders) => m)
-            peersClient ? fallbackReq
+            peersClient.ask[PeersClient.ResponseMessage](replyTo =>
+              Request[ETHPackets.GetBlockHeaders](
+                fallbackMsg,
+                fallbackSelector,
+                (m: ETHPackets.GetBlockHeaders) => m,
+                replyTo
+              )
+            )
           case other =>
             scala.concurrent.Future.successful(other)
         }
         .map {
           case PeersClient.Response(peer, headers: ETHPackets.BlockHeaders) =>
             (Some(peer), headers.headers.headOption, false)
+          case PeersClient.Response(peer, _) =>
+            (Some(peer), None, false)
           case NoSuitablePeer =>
             (None, None, false)
           case RequestFailed(peer, reason) =>
             asyncLog.warn("Pivot header request failed: {}", reason)
             (Some(peer), None, true)
-          case other =>
-            asyncLog.debug("Unexpected pivot header response: {}", other)
-            (None, None, false)
         }
         .recover { case ex =>
           asyncLog.warn("Pivot header bootstrap ask failed (attempt {}/{}): {}", attempt, maxAttempts, ex.getMessage)

@@ -1,11 +1,7 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import org.apache.pekko.actor.Actor
 import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.Props
-import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.actor.typed.{ActorRef as TypedActorRef, Behavior}
-import org.apache.pekko.actor.typed.DispatcherSelector
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 
@@ -37,59 +33,43 @@ import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetTrieNodes
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.TrieNodes
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
-class PeersClient(
-    networkPeerManager: ActorRef,
-    peerEventBus: TypedActorRef[PeerEventBusCommand],
-    blacklist: Blacklist,
-    syncConfig: SyncConfig,
-    scheduler: Scheduler // kept for props() backward compat; Typed core uses withTimers
-) extends Actor {
-  import PeersClient.*
-
-  private val core = context.spawn(
-    PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig),
-    "core",
-    DispatcherSelector.sameAsParent()
-  )
-
-  override def receive: Receive = {
-    case req: Request[?] =>
-      core ! RequestCmd(
-        req.message.asInstanceOf[Message],
-        req.peerSelector,
-        req.toSerializable.asInstanceOf[Message => MessageSerializable],
-        sender()
-      )
-    case BlacklistPeer(peerId, reason) => core ! BlacklistPeerCmd(peerId, reason)
-    case RecordNodeDataFailure(peerId) => core ! RecordNodeDataFailureCmd(peerId)
-    case PrintStatus                   => core ! PrintStatusCmd
-  }
-}
-
 object PeersClient {
 
-  def props(
-      networkPeerManager: ActorRef,
-      peerEventBus: TypedActorRef[PeerEventBusCommand],
-      blacklist: Blacklist,
-      syncConfig: SyncConfig,
-      scheduler: Scheduler
-  ): Props =
-    Props(new PeersClient(networkPeerManager, peerEventBus, blacklist, syncConfig, scheduler))
-
-  // ---- Command ADT (Typed core only) ----
+  // ---- Command ADT ----
+  //
+  // The public request/control messages (Request, BlacklistPeer, RecordNodeDataFailure,
+  // PrintStatus) ARE the protocol — they extend Command directly. `Request` carries a Typed
+  // `replyTo: ActorRef[ResponseMessage]` so callers use the Typed AskPattern rather than the
+  // Classic `?` ask (which relied on the now-removed Classic shell capturing `sender()`).
 
   sealed trait Command
 
-  final private case class RequestCmd(
-      message: Message,
+  /** Issue a peer request. `replyTo` receives a [[ResponseMessage]] (Response / RequestFailed / NoSuitablePeer). */
+  final case class Request[RequestMsg <: Message](
+      message: RequestMsg,
       peerSelector: PeerSelector,
-      toSerializable: Message => MessageSerializable,
-      replyTo: ActorRef
+      toSerializable: RequestMsg => MessageSerializable,
+      replyTo: TypedActorRef[ResponseMessage]
   ) extends Command
-  final private case class BlacklistPeerCmd(peerId: PeerId, reason: BlacklistReason) extends Command
-  final private case class RecordNodeDataFailureCmd(peerId: PeerId) extends Command
-  private case object PrintStatusCmd extends Command
+
+  object Request {
+
+    /** A request awaiting its reply address. The Typed AskPattern supplies `replyTo`, so callers build a
+      * [[RequestBuilder]] and the ask site completes it. This replaces the Classic `?` ask, which captured the temp ask
+      * actor as `sender()`.
+      */
+    type RequestBuilder = TypedActorRef[ResponseMessage] => Request[? <: Message]
+
+    def create[RequestMsg <: Message](message: RequestMsg, peerSelector: PeerSelector)(implicit
+        toSerializable: RequestMsg => MessageSerializable
+    ): RequestBuilder =
+      (replyTo: TypedActorRef[ResponseMessage]) => Request(message, peerSelector, toSerializable, replyTo)
+  }
+
+  final case class BlacklistPeer(peerId: PeerId, reason: BlacklistReason) extends Command
+  final case class RecordNodeDataFailure(peerId: PeerId) extends Command
+  case object PrintStatus extends Command
+
   private case object ScanPeersTick extends Command
   private case object PrintStatusTick extends Command
   final private case class HandshakedPeersCmd(peers: Map[Peer, PeerInfo]) extends Command
@@ -97,9 +77,9 @@ object PeersClient {
   final private case class MaintainedPeersChangedCmd(nodeIds: Set[String]) extends Command
   final private case class PRHResultCmd(id: Int, result: PeerRequestHandler.Result) extends Command
 
-  // ---- Typed core behavior ----
+  // ---- Typed behavior ----
 
-  private def behavior(
+  def behavior(
       networkPeerManager: ActorRef,
       peerEventBus: TypedActorRef[PeerEventBusCommand],
       blacklist: Blacklist,
@@ -161,7 +141,7 @@ object PeersClient {
       override protected def maintainedNodeIdHexes: Set[String] = _maintainedNodeIdHexes
     }
 
-    def running(requesters: Map[Int, ActorRef]): Behavior[Command] =
+    def running(requesters: Map[Int, TypedActorRef[ResponseMessage]]): Behavior[Command] =
       Behaviors.receiveMessage {
         case ScanPeersTick =>
           networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, handshakedPeersAdapter.toClassic)
@@ -184,11 +164,11 @@ object PeersClient {
           ctx.log.debug("Updated maintained peer node IDs: {} peers", nodeIds.size)
           Behaviors.same
 
-        case BlacklistPeerCmd(peerId, reason) =>
+        case BlacklistPeer(peerId, reason) =>
           peerHelper.blacklistIfHandshaked(peerId, syncConfig.blacklistDuration, reason)
           Behaviors.same
 
-        case RecordNodeDataFailureCmd(peerId) =>
+        case RecordNodeDataFailure(peerId) =>
           val count = nodeDataConsecutiveFailures.getOrElse(peerId, 0) + 1
           nodeDataConsecutiveFailures(peerId) = count
           val cooldownMs = if count >= 3 then 3_600_000L else count * 30_000L
@@ -196,11 +176,11 @@ object PeersClient {
           ctx.log.debug("Peer {} GetNodeData failure #{} — cooldown {}ms", peerId, count, Long.box(cooldownMs))
           Behaviors.same
 
-        case PrintStatusCmd | PrintStatusTick =>
+        case PrintStatus | PrintStatusTick =>
           printStatus(requesters)
           Behaviors.same
 
-        case RequestCmd(message, peerSelector, toSerializable, replyTo) =>
+        case Request(message, peerSelector, toSerializable, replyTo) =>
           ctx.log.debug(
             "Received request for message type {} using selector {}",
             message.getClass.getSimpleName,
@@ -256,7 +236,7 @@ object PeersClient {
                 peerHelper.handshakedPeers.size,
                 peerHelper.peersToDownloadFrom.size
               )
-              replyTo.tell(NoSuitablePeer, ActorRef.noSender)
+              replyTo ! NoSuitablePeer
               Behaviors.same
           }
 
@@ -272,14 +252,11 @@ object PeersClient {
                     case _                                   => (-1, 0)
                   }
                   if msgType >= 0 then peerHelper.updateEthRate(peer.id.value, msgType, timeTaken, itemCount)
-                  replyTo.tell(Response(peer, message.asInstanceOf[Message]), ActorRef.noSender)
+                  replyTo ! Response(peer, message.asInstanceOf[Message])
 
                 case PeerRequestHandler.RequestFailed(peer, reason) =>
                   ctx.log.warn(s"Request to peer ${peer.remoteAddress} failed - reason: $reason")
-                  replyTo.tell(
-                    RequestFailed(peer, BlacklistReason.RegularSyncRequestFailed(reason)),
-                    ActorRef.noSender
-                  )
+                  replyTo ! RequestFailed(peer, BlacklistReason.RegularSyncRequestFailed(reason))
               }
             case None =>
               ctx.log.debug("PRHResultCmd: unknown id={} — already handled or timed out", id)
@@ -485,7 +462,7 @@ object PeersClient {
         case _: GetByteCodes                     => SNAP.Codes.ByteCodesCode
       }
 
-    private def printStatus(requesters: Map[Int, ActorRef]): Unit = {
+    private def printStatus(requesters: Map[Int, TypedActorRef[ResponseMessage]]): Unit = {
       ctx.log.debug(
         "Request status: requests in progress: {}, available peers: {}",
         requesters.size,
@@ -499,26 +476,7 @@ object PeersClient {
     }
   }
 
-  // ---- Public API (unchanged from Classic) ----
-
-  type Requesters = Map[ActorRef, ActorRef]
-
-  sealed trait PeersClientMessage
-  case class BlacklistPeer(peerId: PeerId, reason: BlacklistReason) extends PeersClientMessage
-  case class RecordNodeDataFailure(peerId: PeerId) extends PeersClientMessage
-  case class Request[RequestMsg <: Message](
-      message: RequestMsg,
-      peerSelector: PeerSelector,
-      toSerializable: RequestMsg => MessageSerializable
-  ) extends PeersClientMessage
-
-  object Request {
-
-    def create[RequestMsg <: Message](message: RequestMsg, peerSelector: PeerSelector)(implicit
-        toSerializable: RequestMsg => MessageSerializable
-    ): Request[RequestMsg] =
-      Request(message, peerSelector, toSerializable)
-  }
+  // ---- Public API ----
 
   case class PeerNetworkStatus(peer: Peer, isBlacklisted: Boolean) {
     override def toString: String =
@@ -528,7 +486,6 @@ object PeersClient {
         s" Is blacklisted?: $isBlacklisted" +
         s" }"
   }
-  case object PrintStatus extends PeersClientMessage
 
   sealed trait ResponseMessage
   case object NoSuitablePeer extends ResponseMessage

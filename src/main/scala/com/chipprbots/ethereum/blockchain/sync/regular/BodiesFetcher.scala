@@ -1,8 +1,8 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 
-import org.apache.pekko.actor.ActorRef as ClassicActorRef
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.actor.typed.scaladsl.AbstractBehavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -13,6 +13,7 @@ import cats.effect.unsafe.IORuntime
 import scala.util.Failure
 import scala.util.Success
 
+import com.chipprbots.ethereum.blockchain.sync.PeersClient
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.BestPeer
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.ExcludingPeers
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.Request
@@ -25,7 +26,7 @@ import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 class BodiesFetcher(
-    val peersClient: ClassicActorRef,
+    val peersClient: ActorRef[PeersClient.Command],
     val syncConfig: SyncConfig,
     val supervisor: ActorRef[FetchCommand],
     context: ActorContext[BodiesFetcher.BodiesFetcherCommand]
@@ -33,6 +34,7 @@ class BodiesFetcher(
     with FetchRequest[BodiesFetcher.BodiesFetcherCommand] {
 
   val log = context.log
+  implicit val scheduler: Scheduler = context.system.scheduler
   implicit val runtime: IORuntime = IORuntime.global
 
   import BodiesFetcher.*
@@ -222,7 +224,7 @@ class BodiesFetcher(
 object BodiesFetcher {
 
   def apply(
-      peersClient: ClassicActorRef,
+      peersClient: ActorRef[PeersClient.Command],
       syncConfig: SyncConfig,
       supervisor: ActorRef[FetchCommand]
   ): Behavior[BodiesFetcherCommand] =

@@ -1,5 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestActor.AutoPilot
@@ -135,20 +136,22 @@ class RegularSyncSpec
           defaultPeer.id
         )
 
-        peersClient.expectMsgEq(blockHeadersChunkRequest(0))
-        peersClient.reply(PeersClient.Response(defaultPeer, BlockHeaders(BigInt(0), testBlocksChunked.head.headers)))
+        peersClient.expectMsgEq(blockHeadersChunkRequest(0)).replyTo ! PeersClient.Response(
+          defaultPeer,
+          BlockHeaders(BigInt(0), testBlocksChunked.head.headers)
+        )
         peersClient.expectMsgAllOfEq(
           blockHeadersChunkRequest(1),
-          PeersClient.Request.create(ETHGetBlockBodies(BigInt(0), testBlocksChunked.head.hashes), PeersClient.BestPeer)
+          blockBodiesRequest(testBlocksChunked.head.hashes)
         )
       })
 
       "blacklist peer which caused failed request" taggedAs (UnitTest, SyncTest) in sync(new Fixture(testSystem) {
         regularSync ! SyncProtocol.Start
 
-        peersClient.expectMsgType[PeersClient.Request[ETHGetBlockHeaders]]
-        peersClient.reply(
-          PeersClient.RequestFailed(defaultPeer, BlacklistReason.RegularSyncRequestFailed("a random reason"))
+        peersClient.expectMsgType[PeersClient.Request[ETHGetBlockHeaders]].replyTo ! PeersClient.RequestFailed(
+          defaultPeer,
+          BlacklistReason.RegularSyncRequestFailed("a random reason")
         )
         peersClient.expectMsg(
           PeersClient.BlacklistPeer(defaultPeer.id, BlacklistReason.RegularSyncRequestFailed("a random reason"))
@@ -166,20 +169,22 @@ class RegularSyncSpec
           val sub168 = peerEventBus.expectMsgType[SubscribeCmd]
           blockFetcher = sub168.subscriber
 
-          peersClient.expectMsgEq(blockHeadersChunkRequest(0))
-          peersClient.reply(PeersClient.Response(defaultPeer, BlockHeaders(BigInt(0), testBlocksChunked.head.headers)))
+          peersClient.expectMsgEq(blockHeadersChunkRequest(0)).replyTo ! PeersClient.Response(
+            defaultPeer,
+            BlockHeaders(BigInt(0), testBlocksChunked.head.headers)
+          )
 
           // Full-sized first batch bumps knownTop, so the fetcher emits the
           // bodies request AND the next-chunk headers prefetch in parallel.
-          // Capture each sender so we can reply to the right one later.
-          var bodiesSender: org.apache.pekko.actor.ActorRef = null
-          var nextHeadersSender: org.apache.pekko.actor.ActorRef = null
+          // Capture each reply address (Typed AskPattern carries it in Request.replyTo).
+          var bodiesSender: TypedActorRef[PeersClient.ResponseMessage] = null
+          var nextHeadersSender: TypedActorRef[PeersClient.ResponseMessage] = null
           def classifyNext(): Unit = peersClient.expectMsgPF() {
-            case PeersClient.Request(msg: ETHGetBlockBodies, _, _)
+            case PeersClient.Request(msg: ETHGetBlockBodies, _, _, replyTo)
                 if msg.hashes == testBlocksChunked.head.headers.map(_.hash) =>
-              bodiesSender = peersClient.lastSender
-            case PeersClient.Request(_: ETHGetBlockHeaders, _, _) =>
-              nextHeadersSender = peersClient.lastSender
+              bodiesSender = replyTo
+            case PeersClient.Request(_: ETHGetBlockHeaders, _, _, replyTo) =>
+              nextHeadersSender = replyTo
           }
           classifyNext()
           classifyNext()
@@ -196,7 +201,7 @@ class RegularSyncSpec
           // AbstractPeerTask.java distinguishes HeadersNotMatchingExpected (no penalty) from
           // InvalidHeaders (blacklist). Expect a retry request instead of BlacklistPeer.
           nextHeadersSender ! PeersClient.Response(defaultPeer, BlockHeaders(BigInt(0), testBlocksChunked(5).headers))
-          peersClient.fishForSpecificMessage() { case PeersClient.Request(_: ETHGetBlockHeaders, _, _) =>
+          peersClient.fishForSpecificMessage() { case PeersClient.Request(_: ETHGetBlockHeaders, _, _, _) =>
             ()
           }
         }
@@ -208,11 +213,11 @@ class RegularSyncSpec
         // to our expected sequence. No blacklist — just drop and retry.
         regularSync ! SyncProtocol.Start
 
-        peersClient.expectMsgEq(blockHeadersChunkRequest(0))
-        peersClient.reply(
-          PeersClient.Response(defaultPeer, BlockHeaders(BigInt(0), testBlocks.headers.filter(_.number % 2 == 0)))
+        peersClient.expectMsgEq(blockHeadersChunkRequest(0)).replyTo ! PeersClient.Response(
+          defaultPeer,
+          BlockHeaders(BigInt(0), testBlocks.headers.filter(_.number % 2 == 0))
         )
-        peersClient.fishForSpecificMessage() { case PeersClient.Request(_: ETHGetBlockHeaders, _, _) =>
+        peersClient.fishForSpecificMessage() { case PeersClient.Request(_: ETHGetBlockHeaders, _, _, _) =>
           ()
         }
       })
@@ -227,8 +232,7 @@ class RegularSyncSpec
         ) {
           regularSync ! SyncProtocol.Start
 
-          peersClient.expectMsgEq(blockHeadersChunkRequest(0))
-          peersClient.reply(PeersClient.NoSuitablePeer)
+          peersClient.expectMsgEq(blockHeadersChunkRequest(0)).replyTo ! PeersClient.NoSuitablePeer
           peersClient.expectNoMessage(syncConfig.syncRetryInterval)
           peersClient.expectMsgEq(blockHeadersChunkRequest(0))
         }
@@ -252,16 +256,19 @@ class RegularSyncSpec
           defaultPeer.id
         )
 
-        peersClient.expectMsgEq(blockHeadersChunkRequest(0))
-        peersClient.reply(PeersClient.Response(defaultPeer, BlockHeaders(BigInt(0), testBlocksChunked.head.headers)))
+        peersClient.expectMsgEq(blockHeadersChunkRequest(0)).replyTo ! PeersClient.Response(
+          defaultPeer,
+          BlockHeaders(BigInt(0), testBlocksChunked.head.headers)
+        )
 
         // Now expects ETH66 GetBlockBodies with requestId
         // requestId is dynamic (generated per request) so we ignore it with _
         val expectedHashes = testBlocksChunked.head.hashes.toSet
-        peersClient.expectMsgPF() {
-          case PeersClient.Request(ETHGetBlockBodies(_, hashes), _, _) if hashes.toSet == expectedHashes => ()
+        val bodiesReplyTo: TypedActorRef[PeersClient.ResponseMessage] = peersClient.expectMsgPF() {
+          case PeersClient.Request(ETHGetBlockBodies(_, hashes), _, _, replyTo) if hashes.toSet == expectedHashes =>
+            replyTo
         }
-        peersClient.reply(PeersClient.Response(defaultPeer, BlockBodies(BigInt(0), testBlocksChunked.head.bodies)))
+        bodiesReplyTo ! PeersClient.Response(defaultPeer, BlockBodies(BigInt(0), testBlocksChunked.head.bodies))
 
         peersClient.expectNoMessage()
       })
@@ -359,17 +366,17 @@ class RegularSyncSpec
               extends PeersClientAutoPilot(blocks) {
             override def overrides(sender: ActorRef): PartialFunction[Any, Option[AutoPilot]] = {
               // Handle ETH68/69 GetBlockHeaders
-              case PeersClient.Request(ETHGetBlockHeaders(_, Left(nr), maxHeaders, _, _), _, _)
+              case PeersClient.Request(ETHGetBlockHeaders(_, Left(nr), maxHeaders, _, _), _, _, replyTo)
                   if nr >= alternativeBranch.numberAtUnsafe(syncConfig.blocksBatchSize) && !didResponseWithNewBranch =>
                 val responseHeaders = alternativeBranch.headers.filter(_.number >= nr).take(maxHeaders.toInt)
-                sender ! PeersClient.Response(defaultPeer, BlockHeaders(BigInt(0), responseHeaders))
+                replyTo ! PeersClient.Response(defaultPeer, BlockHeaders(BigInt(0), responseHeaders))
                 Some(new BranchResolutionAutoPilot(true, alternativeBlocks))
               // Handle ETH68/69 GetBlockBodies
-              case PeersClient.Request(ETHGetBlockBodies(_, hashes), _, _)
+              case PeersClient.Request(ETHGetBlockBodies(_, hashes), _, _, replyTo)
                   if !hashes.toSet.subsetOf(blocks.hashes.toSet) &&
                     hashes.toSet.subsetOf(testBlocks.hashes.toSet) =>
                 val matchingBodies = hashes.flatMap(hash => testBlocks.find(_.hash == hash)).map(_.body)
-                sender ! PeersClient.Response(defaultPeer, BlockBodies(BigInt(0), matchingBodies))
+                replyTo ! PeersClient.Response(defaultPeer, BlockBodies(BigInt(0), matchingBodies))
                 None
             }
           }
@@ -424,7 +431,7 @@ class RegularSyncSpec
         class ForkingAutoPilot(blocksToRespond: List[Block], forkedBlocks: Option[List[Block]])
             extends PeersClientAutoPilot(blocksToRespond) {
           override def overrides(sender: ActorRef): PartialFunction[Any, Option[AutoPilot]] = {
-            case req @ PeersClient.Request(ETHGetBlockBodies(_, hashes), _, _) =>
+            case req @ PeersClient.Request(ETHGetBlockBodies(_, hashes), _, _, _) =>
               handleForkLogic(hashes, req, sender)
           }
 
@@ -474,8 +481,8 @@ class RegularSyncSpec
 
         peersClient.setAutoPilot(new PeersClientAutoPilot {
           override def overrides(sender: ActorRef): PartialFunction[Any, Option[AutoPilot]] = {
-            case PeersClient.Request(GetNodeData(_), _, _) =>
-              sender ! PeersClient.Response(failingPeer, NodeData(Nil))
+            case PeersClient.Request(GetNodeData(_), _, _, replyTo) =>
+              replyTo ! PeersClient.Response(failingPeer, NodeData(Nil))
               None
           }
         })
@@ -489,8 +496,8 @@ class RegularSyncSpec
         val failingPeer: Peer = peerByNumber(1)
         peersClient.setAutoPilot(new PeersClientAutoPilot {
           override def overrides(sender: ActorRef): PartialFunction[Any, Option[AutoPilot]] = {
-            case PeersClient.Request(GetNodeData(_), _, _) =>
-              sender ! PeersClient.Response(failingPeer, NodeData(List(ByteString("foo"))))
+            case PeersClient.Request(GetNodeData(_), _, _, replyTo) =>
+              replyTo ! PeersClient.Response(failingPeer, NodeData(List(ByteString("foo"))))
               None
           }
         })
@@ -502,19 +509,19 @@ class RegularSyncSpec
 
       "retry fetching node if validation failed" taggedAs DisabledTest in sync(new MissingStateNodeFixture(testSystem) {
         def fishForFailingBlockNodeRequest(): Boolean = peersClient.fishForSpecificMessage(max = 10.seconds) {
-          case PeersClient.Request(GetNodeData(hash :: Nil), _, _) if hash == failingBlock.hash => true
+          case PeersClient.Request(GetNodeData(hash :: Nil), _, _, _) if hash == failingBlock.hash => true
         }
 
         class WrongNodeDataPeersClientAutoPilot(var handledRequests: Int = 0) extends PeersClientAutoPilot {
           override def overrides(sender: ActorRef): PartialFunction[Any, Option[AutoPilot]] = {
-            case PeersClient.Request(GetNodeData(_), _, _) =>
+            case PeersClient.Request(GetNodeData(_), _, _, replyTo) =>
               val response = handledRequests match {
                 case 0 => Some(PeersClient.Response(peerByNumber(1), NodeData(Nil)))
                 case 1 => Some(PeersClient.Response(peerByNumber(2), NodeData(List(ByteString("foo")))))
                 case _ => None
               }
 
-              response.foreach(sender ! _)
+              response.foreach(replyTo ! _)
               Some(new WrongNodeDataPeersClientAutoPilot(handledRequests + 1))
           }
         }
@@ -647,7 +654,7 @@ class RegularSyncSpec
         blockFetcher !
           MessageFromPeer(NewBlockHashes(List(BlockHash(newBlock.hash, newBlock.number))), defaultPeer.id)
 
-        peersClient.expectMsgPF() { case PeersClient.Request(ETHGetBlockHeaders(_, _, _, _, _), _, _) =>
+        peersClient.expectMsgPF() { case PeersClient.Request(ETHGetBlockHeaders(_, _, _, _, _), _, _, _) =>
           true
         }
       })
@@ -800,9 +807,9 @@ class RegularSyncSpec
               defaultPeer.id
             )
 
-            peersClient.expectMsgEq(blockHeadersRequest(6))
-            peersClient.reply(
-              PeersClient.Response(defaultPeer, BlockHeaders(BigInt(0), testBlocksChunked.head.headers))
+            peersClient.expectMsgEq(blockHeadersRequest(6)).replyTo ! PeersClient.Response(
+              defaultPeer,
+              BlockHeaders(BigInt(0), testBlocksChunked.head.headers)
             )
           }
           status <- pollForStatus(_.syncing)
@@ -828,9 +835,9 @@ class RegularSyncSpec
               defaultPeer.id
             )
 
-            peersClient.expectMsgEq(blockHeadersChunkRequest(0))
-            peersClient.reply(
-              PeersClient.Response(defaultPeer, BlockHeaders(BigInt(0), testBlocksChunked.head.headers))
+            peersClient.expectMsgEq(blockHeadersChunkRequest(0)).replyTo ! PeersClient.Response(
+              defaultPeer,
+              BlockHeaders(BigInt(0), testBlocksChunked.head.headers)
             )
           }
           status <- pollForStatus(_.syncing)

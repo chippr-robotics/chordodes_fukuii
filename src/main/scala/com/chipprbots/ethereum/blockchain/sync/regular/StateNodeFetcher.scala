@@ -3,6 +3,7 @@ package com.chipprbots.ethereum.blockchain.sync.regular
 import org.apache.pekko.actor.ActorRef as ClassicActorRef
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.actor.typed.scaladsl.AbstractBehavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -16,6 +17,7 @@ import scala.util.Failure
 import scala.util.Success
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
+import com.chipprbots.ethereum.blockchain.sync.PeersClient
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.*
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcher.FetchCommand
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcher.FetchedStateNode
@@ -36,7 +38,7 @@ import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 class StateNodeFetcher(
-    val peersClient: ClassicActorRef,
+    val peersClient: ActorRef[PeersClient.Command],
     val syncConfig: SyncConfig,
     val supervisor: ActorRef[FetchCommand],
     context: ActorContext[StateNodeFetcher.StateNodeFetcherCommand]
@@ -44,6 +46,7 @@ class StateNodeFetcher(
     with FetchRequest[StateNodeFetcher.StateNodeFetcherCommand] {
 
   val log = context.log
+  implicit val scheduler: Scheduler = context.system.scheduler
   implicit val runtime: IORuntime = IORuntime.global
 
   import StateNodeFetcher.*
@@ -348,7 +351,7 @@ class StateNodeFetcher(
       responseBytes = BigInt(512 * 1024)
     )
     val resp = makeRequest(
-      Request(request, BestSnapPeerExcluding(excludePeers), (msg: GetTrieNodes) => new GetTrieNodesEnc(msg)),
+      Request.create(request, BestSnapPeerExcluding(excludePeers))((msg: GetTrieNodes) => new GetTrieNodesEnc(msg)),
       StateNodeFetcher.RetryStateNodeRequest
     )
     context.pipeToSelf(resp.unsafeToFuture()) {
@@ -374,7 +377,7 @@ class StateNodeFetcher(
       responseBytes = BigInt(512 * 1024)
     )
     val resp = makeRequest(
-      Request(request, BestSnapPeerExcluding(excludePeers), (msg: GetByteCodes) => new GetByteCodesEnc(msg)),
+      Request.create(request, BestSnapPeerExcluding(excludePeers))((msg: GetByteCodes) => new GetByteCodesEnc(msg)),
       StateNodeFetcher.RetryStateNodeRequest
     )
     context.pipeToSelf(resp.unsafeToFuture()) {
@@ -387,7 +390,7 @@ class StateNodeFetcher(
 object StateNodeFetcher {
 
   def apply(
-      peersClient: ClassicActorRef,
+      peersClient: ActorRef[PeersClient.Command],
       syncConfig: SyncConfig,
       supervisor: ActorRef[FetchCommand]
   ): Behavior[StateNodeFetcherCommand] =

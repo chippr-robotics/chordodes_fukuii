@@ -11,6 +11,7 @@ import org.apache.pekko.event.LoggingAdapter
 import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist
+import com.chipprbots.ethereum.blockchain.sync.PeersClient
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
@@ -35,7 +36,7 @@ object RegularSync {
 
   // scalastyle:off parameter.number
   def apply(
-      peersClient: ActorRef,
+      peersClient: TypedActorRef[PeersClient.Command],
       networkPeerManager: ActorRef,
       peerEventBus: ActorRef,
       consensus: ConsensusAdapter,
@@ -111,7 +112,7 @@ object RegularSync {
 
   // scalastyle:off parameter.number
   def props(
-      peersClient: ActorRef,
+      peersClient: TypedActorRef[PeersClient.Command],
       networkPeerManager: ActorRef,
       peerEventBus: ActorRef,
       consensus: ConsensusAdapter,

@@ -1,20 +1,21 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 
-import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.pattern.ask
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Scheduler
+import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
 
 import scala.concurrent.duration.*
-import scala.util.Failure
 
 import org.slf4j.Logger
 
 import com.chipprbots.ethereum.blockchain.sync.PeersClient
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.BlacklistPeer
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.NoSuitablePeer
-import com.chipprbots.ethereum.blockchain.sync.PeersClient.Request
+import com.chipprbots.ethereum.blockchain.sync.PeersClient.Request.RequestBuilder
+import com.chipprbots.ethereum.blockchain.sync.PeersClient.ResponseMessage
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.RequestFailed
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerId
@@ -23,9 +24,10 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
 import com.chipprbots.ethereum.utils.FunctorOps.*
 
 trait FetchRequest[A] {
-  val peersClient: ActorRef
+  val peersClient: ActorRef[PeersClient.Command]
   val syncConfig: SyncConfig
   val log: Logger
+  implicit val scheduler: Scheduler
 
   def makeAdaptedMessage[T <: Message](peer: Peer, msg: T): A
 
@@ -35,21 +37,18 @@ trait FetchRequest[A] {
     *
     * When a peer fails, it is added to the triedPeers set and the next request will exclude it (Besu pattern). When all
     * peers are exhausted, exponential backoff is applied before retrying (go-ethereum grace period pattern).
+    *
+    * `request` is a [[RequestBuilder]] (message + selector + serializer); the Typed AskPattern supplies the `replyTo`.
     */
   def makeRequest(
-      request: Request[?],
+      request: RequestBuilder,
       responseFallback: A,
       triedPeers: Set[PeerId] = Set.empty,
       retryCount: Int = 0
   ): IO[A] = {
-    log.debug(
-      "Making request to peers client: {} (tried: {}, retry: {})",
-      request.message.getClass.getSimpleName,
-      triedPeers.size,
-      retryCount
-    )
+    log.debug("Making request to peers client (tried: {}, retry: {})", triedPeers.size, retryCount)
     IO
-      .fromFuture(IO(peersClient ? request))
+      .fromFuture(IO(peersClient.ask[ResponseMessage](replyTo => request(replyTo))))
       .tap { result =>
         blacklistPeerOnFailedRequest(result)
         result match {
@@ -59,10 +58,6 @@ trait FetchRequest[A] {
             log.debug("Request failed from peer {} ({}): {}", peer.id, peer.remoteAddress, reason)
           case NoSuitablePeer =>
             log.debug("No suitable peer available for request - will retry with backoff")
-          case Failure(cause) =>
-            log.debug("Request resulted in failure: {} - {}", cause.getClass.getSimpleName, cause.getMessage)
-          case _ =>
-            log.debug("Request resulted in unexpected response type: {}", result.getClass.getSimpleName)
         }
         IO.unit
       }
@@ -73,14 +68,14 @@ trait FetchRequest[A] {
       }
   }
 
-  def blacklistPeerOnFailedRequest(msg: Any): Unit = msg match {
+  def blacklistPeerOnFailedRequest(msg: ResponseMessage): Unit = msg match {
     case RequestFailed(peer, reason) =>
       log.debug("Blacklisting peer {} due to failed request: {}", peer.id, reason)
       peersClient ! BlacklistPeer(peer.id, reason)
     case _ => ()
   }
 
-  def handleRequestResult(fallback: A, retryCount: Int = 0)(msg: Any): IO[A] =
+  def handleRequestResult(fallback: A, retryCount: Int = 0)(msg: ResponseMessage): IO[A] =
     msg match {
       case failed: RequestFailed =>
         val delay = retryBackoffDelay(retryCount)
@@ -99,23 +94,9 @@ trait FetchRequest[A] {
           retryCount + 1
         )
         IO.pure(fallback).delayBy(delay)
-      case Failure(cause) =>
-        log.debug("Unexpected error on the request result: {}", cause.getMessage, cause)
-        IO.pure(fallback)
       case PeersClient.Response(peer, msg) =>
         log.debug("Successfully received response from peer {} - type: {}", peer.id, msg.getClass.getSimpleName)
         IO.pure(makeAdaptedMessage(peer, msg))
-      case other =>
-        // Guard against MatchError on unexpected response types (e.g. actor Status.Failure,
-        // timeout signals). Without this case, the MatchError propagates to handleError which
-        // returns fallback with no delay — causing rapid retry loops.
-        val delay = retryBackoffDelay(retryCount)
-        log.debug(
-          "Unexpected response type {}, applying {}ms backoff",
-          other.getClass.getSimpleName,
-          delay.toMillis
-        )
-        IO.pure(fallback).delayBy(delay)
     }
 
   /** Computes exponential backoff delay: min(syncRetryInterval * 2^retryCount, maxRetryDelay) */

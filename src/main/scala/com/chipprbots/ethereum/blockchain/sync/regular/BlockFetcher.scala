@@ -20,6 +20,7 @@ import scala.concurrent.duration.*
 import mouse.all.*
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
+import com.chipprbots.ethereum.blockchain.sync.PeersClient
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.*
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcherState.AwaitingBodiesToBeIgnored
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcherState.HeadersNotFormingSeq
@@ -48,7 +49,7 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
 import com.chipprbots.ethereum.utils.FunctorOps.*
 
 class BlockFetcher(
-    val peersClient: ClassicActorRef,
+    val peersClient: ActorRef[PeersClient.Command],
     val peerEventBus: ActorRef[PeerEventBusCommand],
     val supervisor: ClassicActorRef,
     val syncConfig: SyncConfig,
@@ -716,7 +717,7 @@ object BlockFetcher {
   val HeaderRejectionRewindBlocks: Int = 128
 
   def apply(
-      peersClient: ClassicActorRef,
+      peersClient: ActorRef[PeersClient.Command],
       peerEventBus: ActorRef[PeerEventBusCommand],
       supervisor: ClassicActorRef,
       syncConfig: SyncConfig,

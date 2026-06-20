@@ -3,6 +3,7 @@ package com.chipprbots.ethereum.blockchain.sync
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.PoisonPill
 import org.apache.pekko.actor.Scheduler
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.DispatcherSelector
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
@@ -184,7 +185,8 @@ object SyncController {
     // PivotHeaderBootstrap (inline in `runningRecovery` — no transition into the deadlock-prone bootstrap
     // state) and reply with StorageRecoveryActor.RecentRoot. Only one request is serviced at a time.
     private var recentRootRequester: Option[ActorRef] = None
-    private var recentRootBootstrap: Option[(ActorRef, ActorRef)] = None // (peersClient, headerBootstrap)
+    private var recentRootBootstrap: Option[(TypedActorRef[PeersClient.Command], ActorRef)] =
+      None // (peersClient, headerBootstrap)
     private var recentRootGeneration: Int = 0
 
     // spec 004 (Decoupled Heal Serve-Root) T012: a SEPARATE requester slot + bootstrap + generation for the HEALING
@@ -193,7 +195,8 @@ object SyncController {
     // a recent header with a dedicated PivotHeaderBootstrap (inline in `runningSnapSync` — no transition into the
     // deadlock-prone bootstrap state) and reply HealingServeRoot to the child. Only one is serviced at a time.
     private var healingServeRootRequester: Option[ActorRef] = None
-    private var healingServeRootBootstrap: Option[(ActorRef, ActorRef)] = None // (peersClient, headerBootstrap)
+    private var healingServeRootBootstrap: Option[(TypedActorRef[PeersClient.Command], ActorRef)] =
+      None // (peersClient, headerBootstrap)
     private var healingServeRootGeneration: Int = 0
     // Roll the download root this many blocks back from the network head — comfortably inside core-geth's
     // ~128-block snapshot serve window so peers can serve the recent root, yet recent enough that ~all
@@ -430,8 +433,8 @@ object SyncController {
           bootstrapGeneration += 1
           val gen = bootstrapGeneration
           val peersClient =
-            ctx.toClassic.actorOf(
-              PeersClient.props(networkPeerManager, peerEventBus, blacklist, syncConfig, scheduler),
+            ctx.spawn(
+              PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig),
               s"peers-client-bootstrap-$gen"
             )
           val headerBootstrap =
@@ -464,8 +467,8 @@ object SyncController {
           bootstrapGeneration += 1
           val gen = bootstrapGeneration
           val peersClient =
-            ctx.toClassic.actorOf(
-              PeersClient.props(networkPeerManager, peerEventBus, blacklist, syncConfig, scheduler),
+            ctx.spawn(
+              PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig),
               s"peers-client-bootstrap-$gen"
             )
           val headerBootstrap =
@@ -618,8 +621,8 @@ object SyncController {
         case Some(recentBlock) =>
           healingServeRootGeneration += 1
           val gen = healingServeRootGeneration
-          val peersClient = ctx.toClassic.actorOf(
-            PeersClient.props(networkPeerManager, peerEventBus, blacklist, syncConfig, scheduler),
+          val peersClient = ctx.spawn(
+            PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig),
             s"healing-serve-root-peers-$gen"
           )
           val bootstrap = ctx
@@ -648,7 +651,7 @@ object SyncController {
     private def stopHealingServeRootBootstrap(): Unit = {
       healingServeRootBootstrap.foreach { case (peersClient, bootstrap) =>
         bootstrap ! PoisonPill
-        peersClient ! PoisonPill
+        ctx.stop(peersClient)
       }
       healingServeRootBootstrap = None
     }
@@ -902,7 +905,7 @@ object SyncController {
     }
 
     def runningPivotHeaderBootstrap(
-        peersClient: ActorRef,
+        peersClient: TypedActorRef[PeersClient.Command],
         headerBootstrap: ActorRef,
         targetBlock: BigInt,
         originalSnapSyncRef: ActorRef
@@ -924,14 +927,14 @@ object SyncController {
             s"Pivot header bootstrap complete for block ${header.number} (requested $targetBlock) - notifying SNAP sync"
           )
           headerBootstrap ! PoisonPill
-          peersClient ! PoisonPill
+          ctx.stop(peersClient)
           originalSnapSyncRef ! BootstrapComplete(Some(header))
           runningSnapSync(originalSnapSyncRef)
 
         case PivotHeaderBootstrap.Failed(reason) =>
           log.warn(s"Pivot header bootstrap failed (reason: $reason). Notifying SNAP sync controller.")
           headerBootstrap ! PoisonPill
-          peersClient ! PoisonPill
+          ctx.stop(peersClient)
           originalSnapSyncRef ! PivotBootstrapFailed(reason)
           runningSnapSync(originalSnapSyncRef)
 
@@ -951,12 +954,12 @@ object SyncController {
             s"New pivot header bootstrap requested for block $newTargetBlock (was $targetBlock). Restarting bootstrap."
           )
           headerBootstrap ! PoisonPill
-          peersClient ! PoisonPill
+          ctx.stop(peersClient)
           bootstrapGeneration += 1
           val gen = bootstrapGeneration
           val newPeersClient =
-            ctx.toClassic.actorOf(
-              PeersClient.props(networkPeerManager, peerEventBus, blacklist, syncConfig, scheduler),
+            ctx.spawn(
+              PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig),
               s"peers-client-bootstrap-$gen"
             )
           val newHeaderBootstrap =
@@ -978,7 +981,7 @@ object SyncController {
         case com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.FallbackToFastSync =>
           log.warn("Received FallbackToFastSync during pivot header bootstrap. Stopping bootstrap and falling back.")
           headerBootstrap ! PoisonPill
-          peersClient ! PoisonPill
+          ctx.stop(peersClient)
           originalSnapSyncRef ! PoisonPill
           snapFastCycleCount += 1
           appStateStorage.putSnapFastCycleCount(snapFastCycleCount).commit()
@@ -990,7 +993,7 @@ object SyncController {
             s"Received SnapSyncFinalized(pivot=$pivot) during pivot header bootstrap. Stopping bootstrap and transitioning to regular sync."
           )
           headerBootstrap ! PoisonPill
-          peersClient ! PoisonPill
+          ctx.stop(peersClient)
           // SNAP finalised mid-bootstrap is an exceptional path; tear down the SNAP actor cleanly
           // (no chain-backfill watch, since the bootstrap state is already racy).
           originalSnapSyncRef ! PoisonPill
@@ -1002,7 +1005,7 @@ object SyncController {
             "Received Done from SNAP sync during pivot header bootstrap. Stopping bootstrap and transitioning to regular sync."
           )
           headerBootstrap ! PoisonPill
-          peersClient ! PoisonPill
+          ctx.stop(peersClient)
           originalSnapSyncRef ! PoisonPill
           resetSnapFastCycleCount()
           startRegularSync()._2
@@ -1499,11 +1502,10 @@ object SyncController {
       )(ctx.executionContext)
 
       val peersClient =
-        ctx.toClassic.actorOf(
-          PeersClient
-            .props(networkPeerManager, peerEventBus, blacklist, syncConfig, scheduler)
-            .withDispatcher("sync-dispatcher"),
-          s"peers-client-$syncGeneration"
+        ctx.spawn(
+          PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig),
+          s"peers-client-$syncGeneration",
+          DispatcherSelector.fromConfig("sync-dispatcher")
         )
       val regularSync = ctx.toClassic.actorOf(
         RegularSync
@@ -1966,8 +1968,8 @@ object SyncController {
         case Some(recentBlock) =>
           recentRootGeneration += 1
           val gen = recentRootGeneration
-          val peersClient = ctx.toClassic.actorOf(
-            PeersClient.props(networkPeerManager, peerEventBus, blacklist, syncConfig, scheduler),
+          val peersClient = ctx.spawn(
+            PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig),
             s"recovery-recent-root-peers-$gen"
           )
           val bootstrap = ctx
@@ -1996,7 +1998,7 @@ object SyncController {
     private def stopRecentRootBootstrap(): Unit = {
       recentRootBootstrap.foreach { case (peersClient, bootstrap) =>
         bootstrap ! PoisonPill
-        peersClient ! PoisonPill
+        ctx.stop(peersClient)
       }
       recentRootBootstrap = None
     }
@@ -2142,8 +2144,8 @@ object SyncController {
       log.info("Starting regular sync for SNAP sync bootstrap")
 
       val peersClient =
-        ctx.toClassic.actorOf(
-          PeersClient.props(networkPeerManager, peerEventBus, blacklist, syncConfig, scheduler),
+        ctx.spawn(
+          PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig),
           "peers-client-bootstrap"
         )
       val regularSync = ctx.toClassic.actorOf(

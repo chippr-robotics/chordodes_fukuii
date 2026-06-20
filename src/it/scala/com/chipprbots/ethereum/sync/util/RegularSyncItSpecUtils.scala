@@ -77,9 +77,9 @@ object RegularSyncItSpecUtils {
       mining
     }
 
-    lazy val peersClient: ActorRef =
-      system.actorOf(
-        PeersClient.props(etcPeerManager, peerEventBus, blacklist, testSyncConfig, system.scheduler),
+    lazy val peersClient: typed.ActorRef[PeersClient.Command] =
+      system.spawn(
+        PeersClient.behavior(etcPeerManager, peerEventBus, blacklist, testSyncConfig),
         "peers-client"
       )
 

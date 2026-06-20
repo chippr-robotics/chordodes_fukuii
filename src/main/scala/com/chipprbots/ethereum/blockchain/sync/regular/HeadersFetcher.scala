@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
-import org.apache.pekko.actor.ActorRef as ClassicActorRef
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.actor.typed.scaladsl.AbstractBehavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -15,6 +15,7 @@ import scala.util.Success
 
 import org.slf4j.Logger
 
+import com.chipprbots.ethereum.blockchain.sync.PeersClient
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.BestPeer
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.Request
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcher.FetchCommand
@@ -28,7 +29,7 @@ import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 class HeadersFetcher(
-    val peersClient: ClassicActorRef,
+    val peersClient: ActorRef[PeersClient.Command],
     val syncConfig: SyncConfig,
     val supervisor: ActorRef[FetchCommand],
     context: ActorContext[HeadersFetcher.HeadersFetcherCommand]
@@ -36,6 +37,7 @@ class HeadersFetcher(
     with FetchRequest[HeadersFetcherCommand] {
 
   val log: Logger = context.log
+  implicit val scheduler: Scheduler = context.system.scheduler
   implicit val runtime: IORuntime = IORuntime.global
 
   import HeadersFetcher.*
@@ -107,7 +109,7 @@ class HeadersFetcher(
 object HeadersFetcher {
 
   def apply(
-      peersClient: ClassicActorRef,
+      peersClient: ActorRef[PeersClient.Command],
       syncConfig: SyncConfig,
       supervisor: ActorRef[FetchCommand]
   ): Behavior[HeadersFetcherCommand] =

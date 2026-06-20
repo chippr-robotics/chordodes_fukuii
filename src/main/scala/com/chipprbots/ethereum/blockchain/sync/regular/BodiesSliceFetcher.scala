@@ -1,8 +1,8 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 
-import org.apache.pekko.actor.ActorRef as ClassicActorRef
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.actor.typed.scaladsl.AbstractBehavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -13,6 +13,7 @@ import cats.effect.unsafe.IORuntime
 import scala.util.Failure
 import scala.util.Success
 
+import com.chipprbots.ethereum.blockchain.sync.PeersClient
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.BestPeer
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.ExcludingPeers
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.Request
@@ -33,7 +34,7 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
   *   prior (aborted) batches.
   */
 class BodiesSliceFetcher(
-    val peersClient: ClassicActorRef,
+    val peersClient: ActorRef[PeersClient.Command],
     val syncConfig: SyncConfig,
     coordinator: ActorRef[BodiesFetcher.BodiesFetcherCommand],
     batchGen: Long,
@@ -44,6 +45,7 @@ class BodiesSliceFetcher(
   import BodiesSliceFetcher.*
 
   val log = context.log
+  implicit val scheduler: Scheduler = context.system.scheduler
   implicit val runtime: IORuntime = IORuntime.global
 
   override def makeAdaptedMessage[T <: Message](peer: Peer, msg: T): SliceCommand = AdaptedMessage(peer, msg)
@@ -90,7 +92,7 @@ class BodiesSliceFetcher(
 object BodiesSliceFetcher {
 
   def apply(
-      peersClient: ClassicActorRef,
+      peersClient: ActorRef[PeersClient.Command],
       syncConfig: SyncConfig,
       coordinator: ActorRef[BodiesFetcher.BodiesFetcherCommand],
       batchGen: Long
