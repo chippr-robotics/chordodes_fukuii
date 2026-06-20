@@ -26,7 +26,7 @@ trait ActorSystemBuilder {
 }
 
 trait FaucetControllerBuilder {
-  self: FaucetConfigBuilder with ActorSystemBuilder =>
+  self: FaucetConfigBuilder & ActorSystemBuilder =>
 
   implicit val ec: ExecutionContextExecutor = system.dispatcher
   implicit val runtime: IORuntime = IORuntime.global
@@ -72,7 +72,7 @@ trait ApisBuilder extends ApisBase {
 }
 
 trait JsonRpcConfigBuilder {
-  self: FaucetConfigBuilder with ApisBuilder =>
+  self: FaucetConfigBuilder & ApisBuilder =>
 
   lazy val availableApis: List[String] = available
   lazy val jsonRpcConfig: JsonRpcConfig = JsonRpcConfig(rawFukuiiConfig, availableApis)
@@ -80,7 +80,7 @@ trait JsonRpcConfigBuilder {
 }
 
 trait FaucetJsonRpcControllerBuilder {
-  self: JsonRpcConfigBuilder with FaucetRpcServiceBuilder =>
+  self: JsonRpcConfigBuilder & FaucetRpcServiceBuilder =>
 
   val faucetJsonRpcController = new FaucetJsonRpcController(faucetRpcService, jsonRpcConfig)
 }
@@ -102,7 +102,7 @@ trait FaucetJsonRpcHttpServerBuilder {
 }
 
 trait ShutdownHookBuilder {
-  self: ActorSystemBuilder with FaucetConfigBuilder with Logger =>
+  self: ActorSystemBuilder & FaucetConfigBuilder & Logger =>
 
   def shutdown: () => Unit = () =>
     Await.ready(

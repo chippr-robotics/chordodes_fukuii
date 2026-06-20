@@ -61,7 +61,7 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 // Fixture classes are wrapped in a trait due to problems with making mocks available inside of them
-trait RegularSyncFixtures { self: Matchers with AsyncMockFactory =>
+trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
   class RegularSyncFixture(_system: ActorSystem)
       extends TestKitBase
       with EphemBlockchainTestSetup

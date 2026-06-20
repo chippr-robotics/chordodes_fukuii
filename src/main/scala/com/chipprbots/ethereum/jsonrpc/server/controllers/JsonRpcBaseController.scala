@@ -33,7 +33,7 @@ trait ApisBase {
 }
 
 trait JsonRpcBaseController {
-  self: ApisBase with Logger =>
+  self: ApisBase & Logger =>
 
   import JsonRpcBaseController.*
 
