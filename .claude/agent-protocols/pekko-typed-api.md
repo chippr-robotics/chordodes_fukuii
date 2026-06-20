@@ -310,6 +310,106 @@ grep -rn "private def" src/main/ --include="*.scala" -A20 \
 
 ---
 
+## P12 — `mapMaterializedValue` over `preMaterialize` for subscription setup
+
+**Status:** Enforced after CAPSTONE. `preMaterialize()` in streaming subscription setup is forbidden.
+
+**Root cause (CAPSTONE bug, `bc2a7a2fc`):** `Source.fromMaterializer { (mat, _) => val (ref, src) = Source.actorRef(...).preMaterialize()(mat); ... src }` creates a Reactive Streams Publisher/Subscriber async boundary via `Sink.asPublisher(false)`. Under Pekko 1.6.0, elements pushed by the `actorRef` source don't reach downstream consumers through this boundary. `take(N).runWith(Sink.seq).futureValue` hangs indefinitely.
+
+**Anti-pattern — async boundary, never use for subscription setup:**
+```scala
+// ❌ preMaterialize() = hidden Publisher/Subscriber boundary = elements silently dropped
+def messageSource(pea: TypedActorRef[Command], mc: MessageClassifier): Source[Msg, NotUsed] =
+  Source
+    .fromMaterializer { (mat, _) =>
+      val (actorRef, src) = Source.actorRef[Msg](...).watch(pea.toClassic).preMaterialize()(mat)
+      pea ! SubscribeCmd(mc, actorRef)
+      src
+    }
+    .mapMaterializedValue(_ => NotUsed)
+```
+
+**Pattern — single graph materialization:**
+```scala
+// ✅ mapMaterializedValue fires at graph materialization — no async boundary
+def messageSource(pea: TypedActorRef[Command], mc: MessageClassifier): Source[Msg, NotUsed] =
+  Source
+    .actorRef[Msg](PartialFunction.empty, PartialFunction.empty, 64, OverflowStrategy.dropHead)
+    .watch(pea.toClassic)
+    .mapMaterializedValue { actorRef =>
+      pea ! SubscribeCmd(mc, actorRef)
+      NotUsed
+    }
+```
+
+**Sweep:**
+```bash
+grep -rn "preMaterialize\|fromMaterializer" src/ --include="*.scala"
+# Legitimate uses of fromMaterializer: acquiring the Materializer for downstream ops.
+# Illegitimate use: calling preMaterialize() inside fromMaterializer to "eagerly" subscribe.
+# When in doubt: ask whether a simpler mapMaterializedValue achieves the same result.
+```
+
+---
+
+## P13 — Stream test synchronization: syncProbe barrier + `take(N)`
+
+**Status:** Established pattern after CAPSTONE. Do not use `Await.result` + `PoisonPill` for stream termination in tests.
+
+**The problem with PoisonPill termination:**
+1. `pea.toClassic ! PoisonPill` sends a system message with priority over regular mailbox messages.
+2. Pekko delivers system messages (including `Terminated`) before pending regular messages.
+3. Stream actors may have buffered elements that haven't been forwarded downstream when termination arrives.
+4. `Await.result(stream, timeout)` succeeds but the seq is incomplete or never arrived.
+
+**The problem with `Await.result` + fixed timeout:**
+- Brittle under load (NUC at full testEssential load) — 5s timeout can expire.
+- Hides ordering bugs: if elements arrived but the future completed before assertion, test passes incorrectly.
+
+**Pattern — demand-driven self-termination with FIFO barrier:**
+```scala
+// Subscribe streams FIRST (mapMaterializedValue fires synchronously at runWith):
+val stream1 = PeerEventBusActor.messageSource(pea, classifier1).take(1).runWith(Sink.seq)
+val stream2 = PeerEventBusActor.messageSource(pea, classifier2).take(2).runWith(Sink.seq)
+
+// FIFO barrier: subscribe syncProbe AFTER stream subscriptions (same test thread).
+// When syncProbe.expectMsg confirms receipt, all earlier PEA mailbox messages (the
+// stream SubscribeCmds + PublishCmd) have been processed — FIFO guarantee.
+val syncProbe = TestProbe()
+pea ! SubscribeCmd(classifier2, syncProbe.ref)
+
+pea ! PublishCmd(msg1)
+syncProbe.expectMsg(msg1)      // ← barrier: confirms msg1 delivered to all classifier2 subs
+
+pea ! PublishCmd(msg2)
+syncProbe.expectMsg(msg2)      // ← barrier: confirms msg2 delivered
+
+// Elements are buffered; Futures complete as soon as take(N) demand is satisfied:
+stream1.futureValue shouldEqual Seq(msg1)
+stream2.futureValue shouldEqual Seq(msg1, msg2)
+```
+
+**Why this works:**
+- `take(N).runWith(Sink.seq)` is demand-driven — the Future completes the moment N elements are delivered, with no termination race.
+- `syncProbe` subscribed last from the test thread → PEA processes SubscribeCmds in FIFO order → by the time `syncProbe.expectMsg` returns, all stream actors have their elements buffered.
+- `ScalaFutures.futureValue` (from `with ScalaFutures with NormalPatience`) is non-timeout-race-sensitive because the elements are already in the buffer.
+
+**NEVER in stream tests:**
+```scala
+// ❌ PoisonPill races with buffered elements
+pea.toClassic ! PoisonPill
+Await.result(stream, 5.seconds)  // may be incomplete
+
+// ❌ Fixed sleep before assertion
+Thread.sleep(500)
+stream.futureValue  // timing-dependent
+
+// ❌ Await without a synchronization barrier
+Await.result(stream, 5.seconds)  // may time out under load
+```
+
+---
+
 ## Anti-patterns — flag in PRISM review
 
 | Pattern | Problem | Correct |
