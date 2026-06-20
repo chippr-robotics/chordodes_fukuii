@@ -410,7 +410,7 @@ class PeerManagerSpec
     // guarantees the 5s scheduleOnce has already been registered on testScheduler.
     peerEventBus.fishForMessage(3.seconds, "waiting for PeerDisconnected") {
       case PublishCmd(PeerDisconnected(_)) => true
-      case _                            => false
+      case _                               => false
     }
 
     testScheduler.timePasses(5.seconds)
@@ -449,7 +449,7 @@ class PeerManagerSpec
     createdPeers(0).probe.ref ! PoisonPill
     peerEventBus.fishForMessage(3.seconds, "waiting for PeerDisconnected") {
       case PublishCmd(PeerDisconnected(_)) => true
-      case _                            => false
+      case _                               => false
     }
 
     // Inbound from the same nodeId arrives before the 5s timer fires
@@ -533,7 +533,7 @@ class PeerManagerSpec
     createdPeers(0).probe.ref ! PoisonPill
     peerEventBus.fishForMessage(3.seconds, "waiting for PeerDisconnected after outbound kill") {
       case PublishCmd(PeerDisconnected(_)) => true
-      case _                            => false
+      case _                               => false
     }
 
     // Advance past the pre-handshake retry delay — no reconnect timer should have been scheduled
@@ -559,7 +559,7 @@ class PeerManagerSpec
     createdPeers(0).probe.ref ! PoisonPill
     peerEventBus.fishForMessage(3.seconds, "waiting for PeerDisconnected after outbound kill") {
       case PublishCmd(PeerDisconnected(_)) => true
-      case _                            => false
+      case _                               => false
     }
 
     // Inbound from the maintained peer host arrives (ephemeral port — different from 30303)
@@ -657,7 +657,7 @@ class PeerManagerSpec
     peerManager ! PeerManagerActor.AddMaintainedPeerCmd(maintainedUri, Actor.noSender)
     peerEventBus.fishForMessage(3.seconds, "waiting for MaintainedPeersChanged") {
       case PublishCmd(PeerEvent.MaintainedPeersChanged(_)) => true
-      case _                                            => false
+      case _                                               => false
     }
     createdPeers(0).probe.expectMsgType[ConnectTo](3.seconds)
 

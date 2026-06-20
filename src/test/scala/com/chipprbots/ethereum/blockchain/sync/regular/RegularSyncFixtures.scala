@@ -494,15 +494,14 @@ trait RegularSyncFixtures { self: Matchers with AsyncMockFactory =>
       }
     })
 
-    def waitForSubscription(): Unit = {
+    def waitForSubscription(): Unit =
       blockFetcher = peerEventBus
         .fishForMessage(max = 5.seconds) {
           case SubscribeCmd(_: MessageClassifier, _) => true
-          case _                                      => false
+          case _                                     => false
         }
         .asInstanceOf[SubscribeCmd]
         .subscriber
-    }
 
     def sendLastTestBlockAsTop(): Unit = sendNewBlock(testBlocks.last)
 

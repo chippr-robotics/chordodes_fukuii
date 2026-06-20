@@ -1,9 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync.fast
 
-import org.apache.pekko.actor.Actor
 import org.apache.pekko.actor.ActorRef as ClassicActorRef
-import org.apache.pekko.actor.Props
-import org.apache.pekko.actor.Terminated
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
@@ -49,46 +46,6 @@ import com.chipprbots.ethereum.network.p2p.messages.SNAP.TrieNodes
 import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
-/** Classic shell that captures `sender()` for the two commands that carry a reply-to reference ([[StartSyncingTo]],
-  * [[RestartRequested]]), then forwards everything to the Typed core.
-  *
-  * The core owns all state and behaviour. When the core terminates (self-stop on `Critical` error or
-  * `NetworkIncompatible`), the shell receives `Terminated` and stops itself so that the actor subtree visible to
-  * FastSync shrinks cleanly.
-  *
-  * Pekko Typed migration (Group S4): shell + core pattern (same as PeersClient S7). `props()` is unchanged so
-  * StateSyncSpec works without modification.
-  */
-class SyncStateSchedulerActor(
-    sync: SyncStateScheduler,
-    syncConfig: SyncConfig,
-    networkPeerManager: ClassicActorRef,
-    peerEventBus: ClassicActorRef,
-    blacklist: Blacklist,
-    @annotation.unused scheduler: org.apache.pekko.actor.Scheduler
-) extends Actor {
-
-  private val parentRef: ClassicActorRef = context.parent
-
-  private val core = context.spawn(
-    SyncStateSchedulerActor.behavior(sync, syncConfig, networkPeerManager, peerEventBus, blacklist, parentRef),
-    "core"
-  )
-
-  context.watch(core.toClassic)
-
-  override def receive: Receive = {
-    case cmd: StartSyncingTo =>
-      core.toClassic ! StartSyncingToCmd(cmd.stateRoot, cmd.blockNumber, sender())
-    case RestartRequested =>
-      core.toClassic ! RestartRequestedCmd(sender())
-    case Terminated(_) =>
-      context.stop(self)
-    case other =>
-      core.toClassic ! other
-  }
-}
-
 // scalastyle:off number.of.methods
 object SyncStateSchedulerActor {
 
@@ -96,7 +53,8 @@ object SyncStateSchedulerActor {
   private case object ScanPeers
   private val ScanKey = "ScanPeers"
 
-  // === Internal commands: shell → core, carrying the Classic sender() as replyTo ===
+  // Internal commands: StartSyncingTo/RestartRequested are received by the Behavior[Any] core and
+  // converted to these Cmd forms using the parentRef passed at construction (no sender() needed).
   final private[fast] case class StartSyncingToCmd(stateRoot: ByteString, blockNumber: BigInt, replyTo: ClassicActorRef)
   final private[fast] case class RestartRequestedCmd(replyTo: ClassicActorRef)
 
@@ -140,16 +98,6 @@ object SyncStateSchedulerActor {
   final case class StateSyncStats(saved: Long, missing: Long)
 
   final case class ProcessingResult(result: Either[ProcessingError, ProcessingSuccess])
-
-  def props(
-      sync: SyncStateScheduler,
-      syncConfig: SyncConfig,
-      networkPeerManager: ClassicActorRef,
-      peerEventBus: ClassicActorRef,
-      blacklist: Blacklist,
-      scheduler: org.apache.pekko.actor.Scheduler
-  ): Props =
-    Props(new SyncStateSchedulerActor(sync, syncConfig, networkPeerManager, peerEventBus, blacklist, scheduler))
 
   case object PrintInfo
   case object PrintInfoKey
@@ -233,7 +181,7 @@ object SyncStateSchedulerActor {
     private var activeHandlers: Map[PeerId, TypedActorRef[PeerRequestHandler.Command]] = Map.empty
 
     // Static SLF4J logger for IO-fiber callbacks — ctx.log is actor-thread-only.
-    private val fiberLog = org.slf4j.LoggerFactory.getLogger(classOf[SyncStateSchedulerActor])
+    private val fiberLog = org.slf4j.LoggerFactory.getLogger(getClass)
 
     // IO fiber for bloom filter loading — runs asynchronously; result delivered via self.toClassic.
     // If the actor stops before the fiber completes, the BloomFilterResult goes to dead letters (harmless).

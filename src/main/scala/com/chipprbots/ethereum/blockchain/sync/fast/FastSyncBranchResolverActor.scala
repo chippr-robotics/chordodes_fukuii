@@ -372,7 +372,10 @@ object FastSyncBranchResolverActor {
       restart()
     }
 
-    private def handlePeerTermination(peer: Peer, peerHandlerRef: TypedActorRef[PeerRequestHandler.Command]): Behavior[Any] = {
+    private def handlePeerTermination(
+        peer: Peer,
+        peerHandlerRef: TypedActorRef[PeerRequestHandler.Command]
+    ): Behavior[Any] = {
       log.warn(peerTerminatedLog, peerHandlerRef.path.name, peer.id)
       restart()
     }
