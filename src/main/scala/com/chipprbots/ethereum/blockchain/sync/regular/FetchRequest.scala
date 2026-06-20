@@ -27,11 +27,11 @@ trait FetchRequest[A] {
   val peersClient: ActorRef[PeersClient.Command]
   val syncConfig: SyncConfig
   val log: Logger
-  implicit val scheduler: Scheduler
+  given scheduler: Scheduler
 
   def makeAdaptedMessage[T <: Message](peer: Peer, msg: T): A
 
-  implicit val timeout: Timeout = syncConfig.peerResponseTimeout + 2.second // some margin for actor communication
+  given timeout: Timeout = syncConfig.peerResponseTimeout + 2.second // some margin for actor communication
 
   /** Makes a request with peer switching on failure.
     *

@@ -28,7 +28,7 @@ class SecureJsonRpcHttpServer(
     with Logger {
 
   def run(): Unit = {
-    implicit val ec: scala.concurrent.ExecutionContext = actorSystem.dispatcher
+    given ec: scala.concurrent.ExecutionContext = actorSystem.dispatcher
 
     val maybeHttpsContext = getSSLContext().map(sslContext => ConnectionContext.httpsServer(sslContext))
 

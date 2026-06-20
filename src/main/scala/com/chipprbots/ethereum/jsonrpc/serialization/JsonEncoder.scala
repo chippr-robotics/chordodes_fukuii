@@ -25,12 +25,12 @@ object JsonEncoder {
     }
   }
 
-  implicit val stringEncoder: JsonEncoder[String] = JString(_)
-  implicit val intEncoder: JsonEncoder[Int] = JInt(_)
-  implicit val longEncoder: JsonEncoder[Long] = JLong(_)
-  implicit val booleanEncoder: JsonEncoder[Boolean] = JBool(_)
-  implicit val jvalueEncoder: JsonEncoder[JValue] = identity
-  implicit val bigIntEncoder: JsonEncoder[BigInt] = JsonMethodsImplicits.encodeAsHex(_)
+  given stringEncoder: JsonEncoder[String] = JString(_)
+  given intEncoder: JsonEncoder[Int] = JInt(_)
+  given longEncoder: JsonEncoder[Long] = JLong(_)
+  given booleanEncoder: JsonEncoder[Boolean] = JBool(_)
+  given jvalueEncoder: JsonEncoder[JValue] = identity
+  given bigIntEncoder: JsonEncoder[BigInt] = JsonMethodsImplicits.encodeAsHex(_)
 
   implicit def listEncoder[T](implicit itemEncoder: JsonEncoder[T]): JsonEncoder[List[T]] = list =>
     JArray(list.map(itemEncoder.encodeJson))

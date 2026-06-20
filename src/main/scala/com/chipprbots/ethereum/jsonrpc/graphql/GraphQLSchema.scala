@@ -1161,7 +1161,7 @@ object GraphQLSchema {
               // arrival order, so the Get reply confirms the Add has been committed.
               import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
               import com.chipprbots.ethereum.transactions.PendingTransactionsManager
-              implicit val askTimeout: org.apache.pekko.util.Timeout =
+              given askTimeout: org.apache.pekko.util.Timeout =
                 org.apache.pekko.util.Timeout(scala.concurrent.duration.DurationInt(5).seconds)
 
               val req = com.chipprbots.ethereum.jsonrpc.EthTxService.SendRawTransactionRequest(raw)

@@ -22,14 +22,14 @@ import com.chipprbots.ethereum.utils.Logger
 
 trait ActorSystemBuilder {
   def systemName: String
-  implicit lazy val system: ActorSystem = ActorSystem(systemName, ConfigFactory.load())
+  given system: ActorSystem = ActorSystem(systemName, ConfigFactory.load())
 }
 
 trait FaucetControllerBuilder {
   self: FaucetConfigBuilder & ActorSystemBuilder =>
 
-  implicit val ec: ExecutionContextExecutor = system.dispatcher
-  implicit val runtime: IORuntime = IORuntime.global
+  given ec: ExecutionContextExecutor = system.dispatcher
+  given runtime: IORuntime = IORuntime.global
 }
 
 trait FaucetRpcServiceBuilder {

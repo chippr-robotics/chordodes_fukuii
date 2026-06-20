@@ -90,7 +90,7 @@ class GenesisDataLoader(
   private def loadGenesisData(genesisJson: String)(implicit blockchainConfig: BlockchainConfig): Try[Unit] = {
     import org.json4s.native.JsonMethods.parse
     import GenesisDataLoader.JsonSerializers.GenesisAccountSerializer
-    implicit val formats: Formats =
+    given formats: Formats =
       DefaultFormats + ByteStringJsonSerializer + UInt256JsonSerializer + GenesisAccountSerializer
     for {
       genesisData <- Try(Extraction.extract[GenesisData](parse(genesisJson)))

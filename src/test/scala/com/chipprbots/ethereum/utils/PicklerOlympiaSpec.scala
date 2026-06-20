@@ -10,7 +10,7 @@ import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
 import com.chipprbots.ethereum.testing.Tags.*
-import com.chipprbots.ethereum.utils.Picklers.*
+import com.chipprbots.ethereum.utils.Picklers.{given, *}
 
 /** Verify boopickle roundtrip for Olympia-specific types. */
 class PicklerOlympiaSpec extends AnyFlatSpec with Matchers {

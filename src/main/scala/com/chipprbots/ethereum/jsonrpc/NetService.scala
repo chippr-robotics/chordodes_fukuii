@@ -130,7 +130,7 @@ class NetService(
     }
 
   def peerCount(req: PeerCountRequest): ServiceResponse[PeerCountResponse] = {
-    implicit val timeout: Timeout = Timeout(config.peerManagerTimeout)
+    given timeout: Timeout = Timeout(config.peerManagerTimeout)
     peerManager
       .askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
       .map(peers => Right(PeerCountResponse(peers.handshaked.size)))
@@ -154,7 +154,7 @@ class NetService(
   }
 
   def listPeers(req: ListPeersRequest): ServiceResponse[ListPeersResponse] = {
-    implicit val timeout: Timeout = Timeout(config.peerManagerTimeout)
+    given timeout: Timeout = Timeout(config.peerManagerTimeout)
     peerManager
       .askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
       .map { peersData =>
@@ -172,7 +172,7 @@ class NetService(
   }
 
   def disconnectPeer(req: DisconnectPeerRequest): ServiceResponse[DisconnectPeerResponse] = {
-    implicit val timeout: Timeout = Timeout(config.peerManagerTimeout)
+    given timeout: Timeout = Timeout(config.peerManagerTimeout)
     peerManager
       .askFor[PeerManagerActor.DisconnectPeerResponse](ref =>
         PeerManagerActor.DisconnectPeerByIdCmd(PeerId(req.peerId), ref)
@@ -208,7 +208,7 @@ class NetService(
     }
 
   def addToBlacklist(req: AddToBlacklistRequest): ServiceResponse[AddToBlacklistResponse] = {
-    implicit val timeout: Timeout = Timeout(config.peerManagerTimeout)
+    given timeout: Timeout = Timeout(config.peerManagerTimeout)
     peerManager
       .askFor[PeerManagerActor.AddToBlacklistResponse](ref =>
         PeerManagerActor.AddToBlacklistCmd(
@@ -224,7 +224,7 @@ class NetService(
   }
 
   def removeFromBlacklist(req: RemoveFromBlacklistRequest): ServiceResponse[RemoveFromBlacklistResponse] = {
-    implicit val timeout: Timeout = Timeout(config.peerManagerTimeout)
+    given timeout: Timeout = Timeout(config.peerManagerTimeout)
     peerManager
       .askFor[PeerManagerActor.RemoveFromBlacklistResponse](ref =>
         PeerManagerActor.RemoveFromBlacklistCmd(PeerManagerActor.RemoveFromBlacklistRequest(req.address), ref)

@@ -11,7 +11,7 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
-import com.chipprbots.ethereum.jsonrpc.EthBlocksJsonMethodsImplicits.*
+import com.chipprbots.ethereum.jsonrpc.EthBlocksJsonMethodsImplicits.{given, *}
 
 /** Test to verify that genesis block is serialized correctly:
   *   1. mixHash field should be present

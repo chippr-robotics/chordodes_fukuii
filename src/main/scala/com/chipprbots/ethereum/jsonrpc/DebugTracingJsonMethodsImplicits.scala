@@ -22,7 +22,7 @@ import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodCodec
   */
 object DebugTracingJsonMethodsImplicits extends JsonMethodsImplicits {
 
-  implicit val debug_traceTransaction: JsonMethodCodec[TraceTransactionRequest, TraceTransactionResponse] =
+  given debug_traceTransaction: JsonMethodCodec[TraceTransactionRequest, TraceTransactionResponse] =
     new JsonMethodCodec[TraceTransactionRequest, TraceTransactionResponse] {
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, TraceTransactionRequest] =
         params match {
@@ -38,7 +38,7 @@ object DebugTracingJsonMethodsImplicits extends JsonMethodsImplicits {
       override def encodeJson(t: TraceTransactionResponse): JValue = t.result
     }
 
-  implicit val debug_traceCall: JsonMethodCodec[TraceCallRequest, TraceCallResponse] =
+  given debug_traceCall: JsonMethodCodec[TraceCallRequest, TraceCallResponse] =
     new JsonMethodCodec[TraceCallRequest, TraceCallResponse] {
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, TraceCallRequest] =
         params match {
@@ -59,7 +59,7 @@ object DebugTracingJsonMethodsImplicits extends JsonMethodsImplicits {
       override def encodeJson(t: TraceCallResponse): JValue = t.result
     }
 
-  implicit val debug_traceCallMany: JsonMethodCodec[TraceCallManyRequest, TraceCallManyResponse] =
+  given debug_traceCallMany: JsonMethodCodec[TraceCallManyRequest, TraceCallManyResponse] =
     new JsonMethodCodec[TraceCallManyRequest, TraceCallManyResponse] {
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, TraceCallManyRequest] =
         params match {
@@ -88,7 +88,7 @@ object DebugTracingJsonMethodsImplicits extends JsonMethodsImplicits {
       override def encodeJson(t: TraceCallManyResponse): JValue = JArray(t.results.toList)
     }
 
-  implicit val debug_traceBlockByHash: JsonMethodCodec[TraceBlockByHashRequest, TraceBlockByHashResponse] =
+  given debug_traceBlockByHash: JsonMethodCodec[TraceBlockByHashRequest, TraceBlockByHashResponse] =
     new JsonMethodCodec[TraceBlockByHashRequest, TraceBlockByHashResponse] {
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, TraceBlockByHashRequest] =
         params match {
@@ -105,7 +105,7 @@ object DebugTracingJsonMethodsImplicits extends JsonMethodsImplicits {
         JArray(t.results.toList)
     }
 
-  implicit val debug_traceBlockByNumber: JsonMethodCodec[TraceBlockByNumberRequest, TraceBlockByNumberResponse] =
+  given debug_traceBlockByNumber: JsonMethodCodec[TraceBlockByNumberRequest, TraceBlockByNumberResponse] =
     new JsonMethodCodec[TraceBlockByNumberRequest, TraceBlockByNumberResponse] {
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, TraceBlockByNumberRequest] =
         params match {
@@ -122,7 +122,7 @@ object DebugTracingJsonMethodsImplicits extends JsonMethodsImplicits {
         JArray(t.results.toList)
     }
 
-  implicit val debug_intermediateRoots: JsonMethodCodec[IntermediateRootsRequest, IntermediateRootsResponse] =
+  given debug_intermediateRoots: JsonMethodCodec[IntermediateRootsRequest, IntermediateRootsResponse] =
     new JsonMethodCodec[IntermediateRootsRequest, IntermediateRootsResponse] {
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, IntermediateRootsRequest] =
         params match {
@@ -136,7 +136,7 @@ object DebugTracingJsonMethodsImplicits extends JsonMethodsImplicits {
         JArray(t.roots.map(h => JString("0x" + org.bouncycastle.util.encoders.Hex.toHexString(h.toArray))).toList)
     }
 
-  implicit val debug_traceChain: JsonMethodCodec[TraceChainRequest, Seq[TraceChainBlockResult]] =
+  given debug_traceChain: JsonMethodCodec[TraceChainRequest, Seq[TraceChainBlockResult]] =
     new JsonMethodCodec[TraceChainRequest, Seq[TraceChainBlockResult]] {
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, TraceChainRequest] =
         params match {

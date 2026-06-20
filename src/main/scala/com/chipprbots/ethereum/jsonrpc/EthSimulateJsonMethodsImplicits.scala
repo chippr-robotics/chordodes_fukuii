@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder
 object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
   implicit override val formats: org.json4s.Formats = org.json4s.DefaultFormats
 
-  implicit val eth_simulateV1: JsonMethodDecoder[EthSimulateRequest] with JsonEncoder[EthSimulateResponse] =
+  given eth_simulateV1: (JsonMethodDecoder[EthSimulateRequest] & JsonEncoder[EthSimulateResponse]) =
     new JsonMethodDecoder[EthSimulateRequest] with JsonEncoder[EthSimulateResponse] {
 
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, EthSimulateRequest] =

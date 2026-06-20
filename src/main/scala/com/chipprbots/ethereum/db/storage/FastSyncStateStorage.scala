@@ -29,10 +29,10 @@ class FastSyncStateStorage(val dataSource: DataSource)
 
   override val namespace: IndexedSeq[Byte] = Namespaces.FastSyncStateNamespace
 
-  implicit val byteStringPickler: Pickler[ByteString] =
+  given byteStringPickler: Pickler[ByteString] =
     transformPickler[ByteString, Array[Byte]](ByteString(_))(_.toArray[Byte])
 
-  implicit val headerExtraFieldsPickler: CompositePickler[HeaderExtraFields] =
+  given headerExtraFieldsPickler: CompositePickler[HeaderExtraFields] =
     compositePickler[HeaderExtraFields]
       .addConcreteType[HefEmpty.type]
       .addConcreteType[HefPostOlympia]
@@ -40,7 +40,7 @@ class FastSyncStateStorage(val dataSource: DataSource)
       .addConcreteType[HefPostCancun]
       .addConcreteType[HefPostPrague]
 
-  implicit val hashTypePickler: CompositePickler[HashType] =
+  given hashTypePickler: CompositePickler[HashType] =
     compositePickler[HashType]
       .addConcreteType[StateMptNodeHash]
       .addConcreteType[ContractStorageMptNodeHash]

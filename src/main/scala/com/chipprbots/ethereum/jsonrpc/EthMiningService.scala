@@ -266,8 +266,8 @@ class EthMiningService(
       val miningConfig = ethash.config.specific
       import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
       import org.apache.pekko.actor.typed.scaladsl.adapter.*
-      implicit val timeout: Timeout = Timeout(miningConfig.ommerPoolQueryTimeout)
-      implicit val scheduler: org.apache.pekko.actor.typed.Scheduler = system.toTyped.scheduler
+      given timeout: Timeout = Timeout(miningConfig.ommerPoolQueryTimeout)
+      given scheduler: org.apache.pekko.actor.typed.Scheduler = system.toTyped.scheduler
 
       IO.fromFuture(IO(ommersPool.ask[OmmersPool.Ommers](OmmersPool.GetOmmers(parentBlockHash, _))))
         .handleError { ex =>

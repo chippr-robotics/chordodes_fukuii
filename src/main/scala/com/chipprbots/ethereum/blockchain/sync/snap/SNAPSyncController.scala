@@ -1168,8 +1168,8 @@ private class SNAPSyncControllerImpl(
           accountRangeCoordinator.foreach { coordinator =>
             import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
             import org.apache.pekko.util.Timeout
-            implicit val timeout: Timeout = Timeout(5.seconds)
-            implicit val typedScheduler: org.apache.pekko.actor.typed.Scheduler = ctx.system.scheduler
+            given timeout: Timeout = Timeout(5.seconds)
+            given typedScheduler: org.apache.pekko.actor.typed.Scheduler = ctx.system.scheduler
             coordinator
               .ask[actors.Messages.StorageFileInfoResponse](replyTo =>
                 actors.Messages.AccountGetStorageFileInfo(replyTo)
@@ -1532,7 +1532,7 @@ private class SNAPSyncControllerImpl(
       case CheckDownloadStagnation =>
         import org.apache.pekko.util.Timeout
         import scala.util.{Success, Failure}
-        implicit val timeout: Timeout = Timeout(2.seconds)
+        given timeout: Timeout = Timeout(2.seconds)
         ctx.log.debug(
           s"Stagnation check: phase=$currentPhase, stalledMs=${System.currentTimeMillis() - lastStorageProgressMs}"
         )
@@ -1579,7 +1579,7 @@ private class SNAPSyncControllerImpl(
           case AccountRangeSync =>
             accountRangeCoordinator.foreach { coordinator =>
               import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
-              implicit val typedScheduler: org.apache.pekko.actor.typed.Scheduler = ctx.system.scheduler
+              given typedScheduler: org.apache.pekko.actor.typed.Scheduler = ctx.system.scheduler
               ctx.pipeToSelf(
                 coordinator.ask[actors.AccountRangeStats](replyTo => actors.Messages.AccountGetProgress(replyTo))
               ) {
@@ -1590,7 +1590,7 @@ private class SNAPSyncControllerImpl(
           case ByteCodeAndStorageSync =>
             storageRangeCoordinator.foreach { coordinator =>
               import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
-              implicit val typedScheduler: org.apache.pekko.actor.typed.Scheduler = ctx.system.scheduler
+              given typedScheduler: org.apache.pekko.actor.typed.Scheduler = ctx.system.scheduler
               ctx.pipeToSelf(
                 coordinator.ask[actors.StorageRangeCoordinator.SyncStatistics](replyTo =>
                   actors.Messages.StorageGetProgress(replyTo)
@@ -1604,7 +1604,7 @@ private class SNAPSyncControllerImpl(
             if !bytecodePhaseComplete then {
               bytecodeCoordinator.foreach { coordinator =>
                 import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
-                implicit val typedScheduler: org.apache.pekko.actor.typed.Scheduler = ctx.system.scheduler
+                given typedScheduler: org.apache.pekko.actor.typed.Scheduler = ctx.system.scheduler
                 ctx.pipeToSelf(
                   coordinator.ask[actors.Messages.ByteCodeProgress](replyTo =>
                     actors.Messages.ByteCodeGetProgress(replyTo)

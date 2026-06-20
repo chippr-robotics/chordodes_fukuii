@@ -20,7 +20,7 @@ import com.chipprbots.ethereum.testmode.SealEngineType
 
 object TestJsonMethodsImplicits extends JsonMethodsImplicits {
 
-  implicit val test_setChainParams: JsonMethodDecoder[SetChainParamsRequest] with JsonEncoder[SetChainParamsResponse] =
+  given test_setChainParams: (JsonMethodDecoder[SetChainParamsRequest] & JsonEncoder[SetChainParamsResponse]) =
     new JsonMethodDecoder[SetChainParamsRequest] with JsonEncoder[SetChainParamsResponse] {
 
       private def extractAccounts(accountsJson: JValue): Either[JsonRpcError, Map[ByteString, GenesisAccount]] =
@@ -118,7 +118,7 @@ object TestJsonMethodsImplicits extends JsonMethodsImplicits {
       override def encodeJson(t: SetChainParamsResponse): JValue = true
     }
 
-  implicit val test_mineBlocks: JsonMethodDecoder[MineBlocksRequest] with JsonEncoder[MineBlocksResponse] =
+  given test_mineBlocks: (JsonMethodDecoder[MineBlocksRequest] & JsonEncoder[MineBlocksResponse]) =
     new JsonMethodDecoder[MineBlocksRequest] with JsonEncoder[MineBlocksResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, MineBlocksRequest] =
         params match {
@@ -130,8 +130,7 @@ object TestJsonMethodsImplicits extends JsonMethodsImplicits {
       override def encodeJson(t: MineBlocksResponse): JValue = true
     }
 
-  implicit val test_modifyTimestamp
-      : JsonMethodDecoder[ModifyTimestampRequest] with JsonEncoder[ModifyTimestampResponse] =
+  given test_modifyTimestamp: (JsonMethodDecoder[ModifyTimestampRequest] & JsonEncoder[ModifyTimestampResponse]) =
     new JsonMethodDecoder[ModifyTimestampRequest] with JsonEncoder[ModifyTimestampResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, ModifyTimestampRequest] =
         params match {
@@ -143,7 +142,7 @@ object TestJsonMethodsImplicits extends JsonMethodsImplicits {
       override def encodeJson(t: ModifyTimestampResponse): JValue = true
     }
 
-  implicit val test_rewindToBlock: JsonMethodDecoder[RewindToBlockRequest] with JsonEncoder[RewindToBlockResponse] =
+  given test_rewindToBlock: (JsonMethodDecoder[RewindToBlockRequest] & JsonEncoder[RewindToBlockResponse]) =
     new JsonMethodDecoder[RewindToBlockRequest] with JsonEncoder[RewindToBlockResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, RewindToBlockRequest] =
         params match {
@@ -155,7 +154,7 @@ object TestJsonMethodsImplicits extends JsonMethodsImplicits {
       override def encodeJson(t: RewindToBlockResponse): JValue = true
     }
 
-  implicit val test_importRawBlock: JsonMethodDecoder[ImportRawBlockRequest] with JsonEncoder[ImportRawBlockResponse] =
+  given test_importRawBlock: (JsonMethodDecoder[ImportRawBlockRequest] & JsonEncoder[ImportRawBlockResponse]) =
     new JsonMethodDecoder[ImportRawBlockRequest] with JsonEncoder[ImportRawBlockResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, ImportRawBlockRequest] =
         params match {
@@ -167,7 +166,7 @@ object TestJsonMethodsImplicits extends JsonMethodsImplicits {
       override def encodeJson(t: ImportRawBlockResponse): JValue = t.blockHash
     }
 
-  implicit val miner_setEtherbase: JsonMethodDecoder[SetEtherbaseRequest] with JsonEncoder[SetEtherbaseResponse] =
+  given miner_setEtherbase: (JsonMethodDecoder[SetEtherbaseRequest] & JsonEncoder[SetEtherbaseResponse]) =
     new JsonMethodDecoder[SetEtherbaseRequest] with JsonEncoder[SetEtherbaseResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, SetEtherbaseRequest] =
         params match {
@@ -179,7 +178,7 @@ object TestJsonMethodsImplicits extends JsonMethodsImplicits {
       def encodeJson(t: SetEtherbaseResponse): JValue = true
     }
 
-  implicit val debug_accountRange: JsonMethodDecoder[AccountsInRangeRequest] with JsonEncoder[AccountsInRangeResponse] =
+  given debug_accountRange: (JsonMethodDecoder[AccountsInRangeRequest] & JsonEncoder[AccountsInRangeResponse]) =
     new JsonMethodDecoder[AccountsInRangeRequest] with JsonEncoder[AccountsInRangeResponse] {
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, AccountsInRangeRequest] =
         params match {
@@ -206,7 +205,7 @@ object TestJsonMethodsImplicits extends JsonMethodsImplicits {
       )
     }
 
-  implicit val debug_storageRangeAt: JsonMethodDecoder[StorageRangeRequest] with JsonEncoder[StorageRangeResponse] =
+  given debug_storageRangeAt: (JsonMethodDecoder[StorageRangeRequest] & JsonEncoder[StorageRangeResponse]) =
     new JsonMethodDecoder[StorageRangeRequest] with JsonEncoder[StorageRangeResponse] {
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, StorageRangeRequest] =
         params match {
@@ -229,7 +228,7 @@ object TestJsonMethodsImplicits extends JsonMethodsImplicits {
       override def encodeJson(t: StorageRangeResponse): JValue = Extraction.decompose(t)
     }
 
-  implicit val test_getLogHash: JsonMethodDecoder[GetLogHashRequest] with JsonEncoder[GetLogHashResponse] =
+  given test_getLogHash: (JsonMethodDecoder[GetLogHashRequest] & JsonEncoder[GetLogHashResponse]) =
     new JsonMethodDecoder[GetLogHashRequest] with JsonEncoder[GetLogHashResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetLogHashRequest] =
         params match {

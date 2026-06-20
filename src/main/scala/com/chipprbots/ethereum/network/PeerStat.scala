@@ -17,7 +17,7 @@ object PeerStat {
     (mx, my).mapN(g).orElse(mx).orElse(my)
   }
 
-  implicit val monoid: Monoid[PeerStat] =
+  given monoid: Monoid[PeerStat] =
     Monoid.instance(
       empty,
       (a, b) =>

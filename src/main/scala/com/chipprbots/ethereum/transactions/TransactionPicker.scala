@@ -16,7 +16,7 @@ trait TransactionPicker extends Logger {
   protected def pendingTransactionsManager: ActorRef
   protected def getTransactionFromPoolTimeout: FiniteDuration
 
-  implicit val timeout: Timeout = Timeout(getTransactionFromPoolTimeout)
+  given timeout: Timeout = Timeout(getTransactionFromPoolTimeout)
 
   def getTransactionsFromPool: IO[PendingTransactionsResponse] =
     pendingTransactionsManager

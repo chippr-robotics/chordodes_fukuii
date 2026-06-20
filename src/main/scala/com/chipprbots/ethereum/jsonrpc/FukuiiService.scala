@@ -41,9 +41,9 @@ class FukuiiService(
 ) {
 
   import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
-  implicit val timeout: Timeout = Timeout(10.seconds)
+  given timeout: Timeout = Timeout(10.seconds)
 
-  implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
+  given blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
 
   def getAccountTransactions(
       request: GetAccountTransactionsRequest

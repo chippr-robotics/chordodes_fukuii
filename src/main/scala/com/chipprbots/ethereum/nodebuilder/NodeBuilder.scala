@@ -121,7 +121,7 @@ trait ActorSystemBuilder {
 // Mixed into production Node only. Wraps the Classic system as the Typed surface used by builders.
 trait TypedActorSystemProvider {
   self: ActorSystemBuilder =>
-  implicit lazy val system: ActorSystem[Nothing] = classicSystem.toTyped
+  given system: ActorSystem[Nothing] = classicSystem.toTyped
 }
 
 trait PruningConfigBuilder extends PruningModeComponent {
@@ -384,7 +384,7 @@ trait PeerEventBusBuilder {
 trait PeerStatisticsBuilder {
   self: ActorSystemBuilder & PeerEventBusBuilder & InstanceConfigProvider =>
 
-  implicit val clock: Clock = Clock.systemUTC()
+  given clock: Clock = Clock.systemUTC()
 
   lazy val peerStatistics: org.apache.pekko.actor.typed.ActorRef[PeerStatisticsActor.Command] = classicSystem.spawn(
     PeerStatisticsActor(
@@ -989,7 +989,7 @@ trait EngineApiBuilder {
   lazy val forkChoiceManager: ForkChoiceManager = new ForkChoiceManager(blockchainReader, blockchainWriter)
 
   lazy val engineApiService: EngineApiService = {
-    implicit val typedScheduler: org.apache.pekko.actor.typed.Scheduler = classicSystem.toTyped.scheduler
+    given typedScheduler: org.apache.pekko.actor.typed.Scheduler = classicSystem.toTyped.scheduler
     new EngineApiService(
       blockchainReader,
       blockchainWriter,
@@ -1029,8 +1029,8 @@ trait GraphQLServiceBuilder {
   lazy val maybeGraphQLService: Option[com.chipprbots.ethereum.jsonrpc.graphql.GraphQLService] =
     if !graphQLConfig.enabled then None
     else {
-      implicit val ec: scala.concurrent.ExecutionContext = classicSystem.dispatcher
-      implicit val runtime: cats.effect.unsafe.IORuntime = cats.effect.unsafe.IORuntime.global
+      given ec: scala.concurrent.ExecutionContext = classicSystem.dispatcher
+      given runtime: cats.effect.unsafe.IORuntime = cats.effect.unsafe.IORuntime.global
       val ctx = com.chipprbots.ethereum.jsonrpc.graphql.GraphQLContext(
         blockchain = blockchain,
         blockchainReader = blockchainReader,

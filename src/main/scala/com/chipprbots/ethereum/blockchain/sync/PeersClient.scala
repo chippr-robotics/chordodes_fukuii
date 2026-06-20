@@ -276,8 +276,8 @@ object PeersClient {
         ct: ClassTag[? <: Message]
     ): Unit = {
       type R <: Message
-      implicit val ctR: ClassTag[R] = ct.asInstanceOf[ClassTag[R]]
-      implicit val toSerializer: Message => MessageSerializable = toSer
+      given ctR: ClassTag[R] = ct.asInstanceOf[ClassTag[R]]
+      given toSerializer: (Message => MessageSerializable) = toSer
       ctx.spawn(
         PeerRequestHandler.behavior[Message, R](
           peer,

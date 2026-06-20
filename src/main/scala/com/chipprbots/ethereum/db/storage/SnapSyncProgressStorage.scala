@@ -30,7 +30,7 @@ case class SnapSyncProgress(
 )
 
 object SnapSyncProgress {
-  implicit val encoder: Encoder[SnapSyncProgress] = Encoder.instance { sp =>
+  given encoder: Encoder[SnapSyncProgress] = Encoder.instance { sp =>
     Json.obj(
       "pivotBlock" -> sp.pivotBlock.asJson,
       "accountCursors" -> sp.accountCursors.asJson,
@@ -38,7 +38,7 @@ object SnapSyncProgress {
     )
   }
 
-  implicit val decoder: Decoder[SnapSyncProgress] = Decoder.instance { c =>
+  given decoder: Decoder[SnapSyncProgress] = Decoder.instance { c =>
     for {
       pivotBlock <- c.downField("pivotBlock").as[Long]
       accountCursors <- c.downField("accountCursors").as[Map[String, String]]

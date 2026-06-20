@@ -20,7 +20,7 @@ class TransactionMappingStorage(val dataSource: DataSource)
   def valueDeserializer: IndexedSeq[Byte] => TransactionLocation =
     byteSequenceToBuffer.andThen(Unpickle[TransactionLocation].fromBytes)
 
-  implicit val byteStringPickler: Pickler[ByteString] =
+  given byteStringPickler: Pickler[ByteString] =
     transformPickler[ByteString, Array[Byte]](ByteString(_))(_.toArray[Byte])
 }
 

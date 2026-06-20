@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder
 
 object EthUserJsonMethodsImplicits extends JsonMethodsImplicits {
 
-  implicit val eth_getCode: JsonMethodDecoder[GetCodeRequest] with JsonEncoder[GetCodeResponse] =
+  given eth_getCode: (JsonMethodDecoder[GetCodeRequest] & JsonEncoder[GetCodeResponse]) =
     new JsonMethodDecoder[GetCodeRequest] with JsonEncoder[GetCodeResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetCodeRequest] =
         params match {
@@ -26,7 +26,7 @@ object EthUserJsonMethodsImplicits extends JsonMethodsImplicits {
       def encodeJson(t: GetCodeResponse): JValue = encodeAsHex(t.result)
     }
 
-  implicit val eth_getBalance: JsonMethodDecoder[GetBalanceRequest] with JsonEncoder[GetBalanceResponse] =
+  given eth_getBalance: (JsonMethodDecoder[GetBalanceRequest] & JsonEncoder[GetBalanceResponse]) =
     new JsonMethodDecoder[GetBalanceRequest] with JsonEncoder[GetBalanceResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetBalanceRequest] =
         params match {
@@ -42,7 +42,7 @@ object EthUserJsonMethodsImplicits extends JsonMethodsImplicits {
       def encodeJson(t: GetBalanceResponse): JValue = encodeAsHex(t.value)
     }
 
-  implicit val eth_getStorageAt: JsonMethodDecoder[GetStorageAtRequest] with JsonEncoder[GetStorageAtResponse] =
+  given eth_getStorageAt: (JsonMethodDecoder[GetStorageAtRequest] & JsonEncoder[GetStorageAtResponse]) =
     new JsonMethodDecoder[GetStorageAtRequest] with JsonEncoder[GetStorageAtResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetStorageAtRequest] =
         params match {
@@ -68,8 +68,8 @@ object EthUserJsonMethodsImplicits extends JsonMethodsImplicits {
       }
     }
 
-  implicit val eth_getTransactionCount
-      : JsonMethodDecoder[GetTransactionCountRequest] with JsonEncoder[GetTransactionCountResponse] =
+  given eth_getTransactionCount
+      : (JsonMethodDecoder[GetTransactionCountRequest] & JsonEncoder[GetTransactionCountResponse]) =
     new JsonMethodDecoder[GetTransactionCountRequest] with JsonEncoder[GetTransactionCountResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetTransactionCountRequest] =
         params match {
@@ -84,7 +84,7 @@ object EthUserJsonMethodsImplicits extends JsonMethodsImplicits {
       def encodeJson(t: GetTransactionCountResponse): JValue = encodeAsHex(t.value)
     }
 
-  implicit val eth_getStorageRoot: JsonMethodDecoder[GetStorageRootRequest] with JsonEncoder[GetStorageRootResponse] =
+  given eth_getStorageRoot: (JsonMethodDecoder[GetStorageRootRequest] & JsonEncoder[GetStorageRootResponse]) =
     new JsonMethodDecoder[GetStorageRootRequest] with JsonEncoder[GetStorageRootResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetStorageRootRequest] =
         params match {

@@ -56,8 +56,8 @@ object SignedTransactionsFilterActor {
       peerEventBus: ActorRef[PeerEventBusCommand]
   ): Behavior[Command] = Behaviors.setup { context =>
 
-    implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
-    implicit val ioRuntime: IORuntime = IORuntime.global
+    given blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
+    given ioRuntime: IORuntime = IORuntime.global
 
     val chunkedRecoveryThreshold = 256
     val recoveryChunkSize = SignedTransaction.batchSize

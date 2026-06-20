@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder.NoParamsM
   */
 object DebugJsonMethodsImplicits extends JsonMethodsImplicits {
 
-  implicit val debug_listPeersInfo: JsonMethodCodec[ListPeersInfoRequest, ListPeersInfoResponse] =
+  given debug_listPeersInfo: JsonMethodCodec[ListPeersInfoRequest, ListPeersInfoResponse] =
     new NoParamsMethodDecoder(ListPeersInfoRequest()) with JsonEncoder[ListPeersInfoResponse] {
       def encodeJson(t: ListPeersInfoResponse): JValue =
         JArray(t.peers.map(a => JString(a.toString)))

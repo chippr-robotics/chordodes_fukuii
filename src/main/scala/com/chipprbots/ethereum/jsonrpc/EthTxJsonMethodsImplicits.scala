@@ -32,7 +32,7 @@ object EthTxJsonMethodsImplicits extends JsonMethodsImplicits {
   }
 
   // Custom serializers for json4s Extraction.decompose to work in tests
-  implicit val transactionResponseCustomSerializer: CustomSerializer[TransactionResponse] =
+  given transactionResponseCustomSerializer: CustomSerializer[TransactionResponse] =
     new CustomSerializer[TransactionResponse](_ =>
       (
         PartialFunction.empty,
@@ -40,7 +40,7 @@ object EthTxJsonMethodsImplicits extends JsonMethodsImplicits {
       )
     )
 
-  implicit val transactionReceiptResponseCustomSerializer: CustomSerializer[TransactionReceiptResponse] =
+  given transactionReceiptResponseCustomSerializer: CustomSerializer[TransactionReceiptResponse] =
     new CustomSerializer[TransactionReceiptResponse](_ =>
       (
         PartialFunction.empty,
@@ -49,7 +49,7 @@ object EthTxJsonMethodsImplicits extends JsonMethodsImplicits {
     )
 
   // Manual encoder for TransactionReceiptResponse to avoid Scala 3 reflection issues
-  implicit val transactionReceiptResponseJsonEncoder: JsonEncoder[TransactionReceiptResponse] = { receipt =>
+  given transactionReceiptResponseJsonEncoder: JsonEncoder[TransactionReceiptResponse] = { receipt =>
     // Build base fields
     val baseFields = List(
       "transactionHash" -> encodeAsHex(receipt.transactionHash),
@@ -88,7 +88,7 @@ object EthTxJsonMethodsImplicits extends JsonMethodsImplicits {
     )
   }
 
-  implicit val transactionResponseJsonEncoder: JsonEncoder[TransactionResponse] = { tx =>
+  given transactionResponseJsonEncoder: JsonEncoder[TransactionResponse] = { tx =>
     val baseFields = List(
       "hash" -> encodeAsHex(tx.hash),
       "nonce" -> encodeAsHex(tx.nonce),
@@ -161,13 +161,13 @@ object EthTxJsonMethodsImplicits extends JsonMethodsImplicits {
     )
   }
 
-  implicit val eth_gasPrice: NoParamsMethodDecoder[GetGasPriceRequest] with JsonEncoder[GetGasPriceResponse] =
+  given eth_gasPrice: (NoParamsMethodDecoder[GetGasPriceRequest] & JsonEncoder[GetGasPriceResponse]) =
     new NoParamsMethodDecoder(GetGasPriceRequest()) with JsonEncoder[GetGasPriceResponse] {
       override def encodeJson(t: GetGasPriceResponse): JValue = encodeAsHex(t.price)
     }
 
-  implicit val eth_pendingTransactions
-      : NoParamsMethodDecoder[EthPendingTransactionsRequest] with JsonEncoder[EthPendingTransactionsResponse] =
+  given eth_pendingTransactions
+      : (NoParamsMethodDecoder[EthPendingTransactionsRequest] & JsonEncoder[EthPendingTransactionsResponse]) =
     new NoParamsMethodDecoder(EthPendingTransactionsRequest()) with JsonEncoder[EthPendingTransactionsResponse] {
 
       override def encodeJson(t: EthPendingTransactionsResponse): JValue =
@@ -176,8 +176,8 @@ object EthTxJsonMethodsImplicits extends JsonMethodsImplicits {
         })
     }
 
-  implicit val eth_getTransactionByHash
-      : JsonMethodDecoder[GetTransactionByHashRequest] with JsonEncoder[GetTransactionByHashResponse] =
+  given eth_getTransactionByHash
+      : (JsonMethodDecoder[GetTransactionByHashRequest] & JsonEncoder[GetTransactionByHashResponse]) =
     new JsonMethodDecoder[GetTransactionByHashRequest] with JsonEncoder[GetTransactionByHashResponse] {
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetTransactionByHashRequest] =
         params match {
@@ -192,8 +192,8 @@ object EthTxJsonMethodsImplicits extends JsonMethodsImplicits {
         JsonEncoder.encode(t.txResponse)
     }
 
-  implicit val eth_getTransactionReceipt
-      : JsonMethodDecoder[GetTransactionReceiptRequest] with JsonEncoder[GetTransactionReceiptResponse] =
+  given eth_getTransactionReceipt
+      : (JsonMethodDecoder[GetTransactionReceiptRequest] & JsonEncoder[GetTransactionReceiptResponse]) =
     new JsonMethodDecoder[GetTransactionReceiptRequest] with JsonEncoder[GetTransactionReceiptResponse] {
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetTransactionReceiptRequest] =
         params match {
@@ -208,15 +208,13 @@ object EthTxJsonMethodsImplicits extends JsonMethodsImplicits {
         JsonEncoder.encode(t.txResponse)
     }
 
-  implicit val GetTransactionByBlockHashAndIndexResponseEncoder
-      : JsonEncoder[GetTransactionByBlockHashAndIndexResponse] =
+  given GetTransactionByBlockHashAndIndexResponseEncoder: JsonEncoder[GetTransactionByBlockHashAndIndexResponse] =
     new JsonEncoder[GetTransactionByBlockHashAndIndexResponse] {
       override def encodeJson(t: GetTransactionByBlockHashAndIndexResponse): JValue =
         JsonEncoder.encode(t.transactionResponse)
     }
 
-  implicit val GetTransactionByBlockHashAndIndexRequestDecoder
-      : JsonMethodDecoder[GetTransactionByBlockHashAndIndexRequest] =
+  given GetTransactionByBlockHashAndIndexRequestDecoder: JsonMethodDecoder[GetTransactionByBlockHashAndIndexRequest] =
     new JsonMethodDecoder[GetTransactionByBlockHashAndIndexRequest] {
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetTransactionByBlockHashAndIndexRequest] =
         params match {
@@ -229,14 +227,13 @@ object EthTxJsonMethodsImplicits extends JsonMethodsImplicits {
         }
     }
 
-  implicit val GetTransactionByBlockNumberAndIndexResponseEncoder
-      : JsonEncoder[GetTransactionByBlockNumberAndIndexResponse] =
+  given GetTransactionByBlockNumberAndIndexResponseEncoder: JsonEncoder[GetTransactionByBlockNumberAndIndexResponse] =
     new JsonEncoder[GetTransactionByBlockNumberAndIndexResponse] {
       override def encodeJson(t: GetTransactionByBlockNumberAndIndexResponse): JValue =
         JsonEncoder.encode(t.transactionResponse)
     }
 
-  implicit val GetTransactionByBlockNumberAndIndexRequestDecoder
+  given GetTransactionByBlockNumberAndIndexRequestDecoder
       : JsonMethodDecoder[GetTransactionByBlockNumberAndIndexRequest] =
     new JsonMethodDecoder[GetTransactionByBlockNumberAndIndexRequest] {
       override def decodeJson(
@@ -252,8 +249,8 @@ object EthTxJsonMethodsImplicits extends JsonMethodsImplicits {
         }
     }
 
-  implicit val eth_sendRawTransaction
-      : JsonMethodDecoder[SendRawTransactionRequest] with JsonEncoder[SendRawTransactionResponse] =
+  given eth_sendRawTransaction
+      : (JsonMethodDecoder[SendRawTransactionRequest] & JsonEncoder[SendRawTransactionResponse]) =
     new JsonMethodDecoder[SendRawTransactionRequest] with JsonEncoder[SendRawTransactionResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, SendRawTransactionRequest] =
         params match {
@@ -267,7 +264,7 @@ object EthTxJsonMethodsImplicits extends JsonMethodsImplicits {
       def encodeJson(t: SendRawTransactionResponse): JValue = encodeAsHex(t.transactionHash)
     }
 
-  implicit val RawTransactionResponseJsonEncoder: JsonEncoder[RawTransactionResponse] =
+  given RawTransactionResponseJsonEncoder: JsonEncoder[RawTransactionResponse] =
     new JsonEncoder[RawTransactionResponse] {
       override def encodeJson(t: RawTransactionResponse): JValue =
         t.transactionResponse.map(RawTransactionCodec.asRawTransaction.andThen(encodeAsHex))

@@ -53,8 +53,8 @@ class EthFilterService(
     blockchainReader: com.chipprbots.ethereum.domain.BlockchainReader
 )(implicit system: ActorSystem) {
   import EthFilterService.*
-  implicit lazy val timeout: Timeout = Timeout(filterConfig.filterManagerQueryTimeout)
-  implicit lazy val scheduler: Scheduler = system.toTyped.scheduler
+  given timeout: Timeout = Timeout(filterConfig.filterManagerQueryTimeout)
+  given scheduler: Scheduler = system.toTyped.scheduler
 
   def newFilter(req: NewFilterRequest): ServiceResponse[NewFilterResponse] = {
     import req.filter.*

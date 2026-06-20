@@ -23,7 +23,7 @@ class InsecureJsonRpcHttpServer(
     with Logger {
 
   def run(): Unit = {
-    implicit val ec: scala.concurrent.ExecutionContext = actorSystem.dispatcher
+    given ec: scala.concurrent.ExecutionContext = actorSystem.dispatcher
 
     val bindingResultF = Http(actorSystem).newServerAt(config.interface, config.port).bind(route)
 

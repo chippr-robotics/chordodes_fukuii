@@ -97,7 +97,7 @@ object PendingTransactionsManager {
       stateStorage: com.chipprbots.ethereum.db.storage.StateStorage = null
   ): Behavior[Command] = Behaviors.setup { context =>
 
-    implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
+    given blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
 
     // Spawn STFA as a child with a bounded mailbox (backpressure from network layer)
     context.spawn(

@@ -193,7 +193,7 @@ class PersonalService(
     }
 
   private def sendTransaction(request: TransactionRequest, wallet: Wallet): IO[ByteString] = {
-    implicit val timeout: Timeout = Timeout(txPoolConfig.pendingTxManagerQueryTimeout)
+    given timeout: Timeout = Timeout(txPoolConfig.pendingTxManagerQueryTimeout)
 
     val pendingTxsFuture =
       txPool.askFor[PendingTransactionsResponse](PendingTransactionsManager.GetPendingTransactions)

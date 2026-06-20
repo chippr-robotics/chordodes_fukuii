@@ -60,8 +60,8 @@ class BlockFetcher(
 
   import BlockFetcher.*
 
-  implicit val runtime: IORuntime = IORuntime.global
-  implicit val timeout: Timeout = syncConfig.peerResponseTimeout + 2.second // some margin for actor communication
+  given runtime: IORuntime = IORuntime.global
+  given timeout: Timeout = syncConfig.peerResponseTimeout + 2.second // some margin for actor communication
   private val log = context.log
 
   val headersFetcher: ActorRef[HeadersFetcher.HeadersFetcherCommand] =

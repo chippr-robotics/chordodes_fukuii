@@ -210,7 +210,7 @@ final case class HeapEntry(nodeEncoded: NodeEncoded, numOfParents: Int, bn: BigI
 object HeapEntry {
   import boopickle.Default.*
 
-  implicit val HeapEntryPickler: Pickler[HeapEntry] = generatePickler[HeapEntry]
+  given HeapEntryPickler: Pickler[HeapEntry] = generatePickler[HeapEntry]
 
   def toBytes(entry: HeapEntry): Array[Byte] =
     compactPickledBytes(Pickle.intoBytes(entry)).toArray[Byte]
@@ -218,7 +218,7 @@ object HeapEntry {
   def fromBytes(asbytes: Array[Byte]): HeapEntry =
     Unpickle[HeapEntry].fromBytes(ByteBuffer.wrap(asbytes))
 
-  implicit val heapEntrySerializer: ByteArraySerializable[HeapEntry] = new ByteArraySerializable[HeapEntry] {
+  given heapEntrySerializer: ByteArraySerializable[HeapEntry] = new ByteArraySerializable[HeapEntry] {
     override def toBytes(input: HeapEntry): Array[Byte] = HeapEntry.toBytes(input)
     override def fromBytes(bytes: Array[Byte]): HeapEntry = HeapEntry.fromBytes(bytes)
   }
@@ -233,9 +233,9 @@ final case class Decrease(hash: ByteString) extends Update
 final case class New(hash: ByteString) extends Update
 
 object Update {
-  implicit val byteStringPickler: Pickler[ByteString] =
+  given byteStringPickler: Pickler[ByteString] =
     transformPickler[ByteString, Array[Byte]](ByteString(_))(_.toArray[Byte])
-  implicit val updatePickler: Pickler[Update] =
+  given updatePickler: Pickler[Update] =
     compositePickler[Update].addConcreteType[Increase].addConcreteType[Decrease].addConcreteType[New]
 }
 

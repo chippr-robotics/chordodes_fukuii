@@ -165,7 +165,7 @@ final case class EthTransactionResponse(
 
 object EthTransactionResponse {
 
-  implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
+  given blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
 
   def apply(tx: TransactionData): EthTransactionResponse =
     EthTransactionResponse(tx.stx, tx.blockHeader, tx.transactionIndex)

@@ -63,7 +63,7 @@ class TransactionHistoryService(
   }
 
   private val getTransactionsFromPool: IO[List[PendingTransaction]] = {
-    implicit val timeout: Timeout = getTransactionFromPoolTimeout
+    given timeout: Timeout = getTransactionFromPoolTimeout
     pendingTransactionsManager
       .askFor[PendingTransactionsManager.PendingTransactionsResponse](PendingTransactionsManager.GetPendingTransactions)
       .map(_.pendingTransactions.toList)

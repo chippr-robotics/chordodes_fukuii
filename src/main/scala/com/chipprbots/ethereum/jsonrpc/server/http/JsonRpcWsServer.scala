@@ -57,13 +57,13 @@ class JsonRpcWsServer(
 )(implicit system: ActorSystem)
     extends Logger {
 
-  implicit val mat: Materializer = Materializer(system)
-  implicit val ec: ExecutionContext = system.dispatcher
-  implicit val timeout: Timeout = Timeout(30.seconds)
-  implicit val scheduler: Scheduler = system.toTyped.scheduler
-  implicit val runtime: IORuntime = IORuntime.global
-  implicit val formats: Formats = DefaultFormats + JsonSerializers.RpcErrorJsonSerializer
-  implicit val serialization: Serialization.type = org.json4s.native.Serialization
+  given mat: Materializer = Materializer(system)
+  given ec: ExecutionContext = system.dispatcher
+  given timeout: Timeout = Timeout(30.seconds)
+  given scheduler: Scheduler = system.toTyped.scheduler
+  given runtime: IORuntime = IORuntime.global
+  given formats: Formats = DefaultFormats + JsonSerializers.RpcErrorJsonSerializer
+  given serialization: Serialization.type = org.json4s.native.Serialization
 
   private val route: Route =
     (pathEndOrSingleSlash | path("ws")) {

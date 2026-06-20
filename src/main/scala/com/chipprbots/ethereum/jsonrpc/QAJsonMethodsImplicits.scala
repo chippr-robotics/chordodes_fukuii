@@ -8,7 +8,7 @@ import com.chipprbots.ethereum.jsonrpc.QAService.*
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodCodec
 
 object QAJsonMethodsImplicits extends JsonMethodsImplicits {
-  implicit val qa_mineBlocks: JsonMethodCodec[MineBlocksRequest, MineBlocksResponse] =
+  given qa_mineBlocks: JsonMethodCodec[MineBlocksRequest, MineBlocksResponse] =
     new JsonMethodCodec[MineBlocksRequest, MineBlocksResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, MineBlocksRequest] =
         params match {

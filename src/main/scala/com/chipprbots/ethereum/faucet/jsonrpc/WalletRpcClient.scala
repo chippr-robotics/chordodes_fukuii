@@ -30,7 +30,7 @@ class WalletRpcClient(node: Uri, timeout: Duration, getSSLContext: () => Either[
 ) extends RpcClient(node, timeout, getSSLContext)
     with WalletRpcClientApi
     with Logger {
-  import com.chipprbots.ethereum.jsonrpc.client.CommonJsonCodecs.*
+  import com.chipprbots.ethereum.jsonrpc.client.CommonJsonCodecs.{given, *}
 
   def getNonce(address: Address): IO[Either[RpcError, BigInt]] =
     doRequest[BigInt]("eth_getTransactionCount", List(address.asJson, "latest".asJson))

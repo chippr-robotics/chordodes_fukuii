@@ -119,7 +119,7 @@ class McpService(
 
   import McpService.*
 
-  implicit val timeout: Timeout = Timeout(10.seconds)
+  given timeout: Timeout = Timeout(10.seconds)
 
   /** Dependencies bundle passed to tool/resource registries */
   val deps: McpDependencies = McpDependencies(

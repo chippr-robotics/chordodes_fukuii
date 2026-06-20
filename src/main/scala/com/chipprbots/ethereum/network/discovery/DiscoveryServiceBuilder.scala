@@ -43,14 +43,14 @@ trait DiscoveryServiceBuilder extends Logger {
       forkIdTag: Option[ForkIdTag] = None
   )(implicit scheduler: IORuntime): Resource[IO, v4.DiscoveryService] = {
 
-    implicit val sigalg = new Secp256k1SigAlg()
+    given sigalg: SigAlg = new Secp256k1SigAlg()
     val keyPair = nodeStatusHolder.get.key
     val (privateKeyBytes, _) = crypto.keyPairToByteArrays(keyPair)
     val privateKey = PrivateKey(BitVector(privateKeyBytes))
 
-    implicit val packetCodec: Codec[Packet] = v4.Packet.packetCodec(allowDecodeOverMaxPacketSize = true)
-    implicit val payloadCodec = RLPCodecs.payloadCodec
-    implicit val enrContentCodec: Codec[Content] = RLPCodecs.codecFromRLPCodec(using RLPCodecs.enrContentRLPCodec)
+    given packetCodec: Codec[Packet] = v4.Packet.packetCodec(allowDecodeOverMaxPacketSize = true)
+    given payloadCodec: Codec[v4.Payload] = RLPCodecs.payloadCodec
+    given enrContentCodec: Codec[Content] = RLPCodecs.codecFromRLPCodec(using RLPCodecs.enrContentRLPCodec)
 
     // Warm up the discv4 packet pack/unpack path eagerly. The first invocation
     // pays ~100 ms in JIT/class-loading + Bouncy Castle ECDSA provider init +
@@ -348,8 +348,8 @@ trait DiscoveryServiceBuilder extends Logger {
       runtime: IORuntime
   ): StaticUDPPeerGroup.SyncResponder = {
     import V5RLPCodecs.codecFromRLPCodec
-    implicit val v5PayloadCodec: Codec[v5.Payload] = V5RLPCodecs.payloadCodec
-    implicit val v5EnrCodec: Codec[EthereumNodeRecord] = codecFromRLPCodec(using V5RLPCodecs.enrRLPCodec)
+    given v5PayloadCodec: Codec[v5.Payload] = V5RLPCodecs.payloadCodec
+    given v5EnrCodec: Codec[EthereumNodeRecord] = codecFromRLPCodec(using V5RLPCodecs.enrRLPCodec)
 
     val localPubBytes = localNode.id.value.bytes
     val localNodeId = v5.Session.nodeIdFromPublicKey(localPubBytes)

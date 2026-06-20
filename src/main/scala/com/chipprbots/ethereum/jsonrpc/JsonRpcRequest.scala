@@ -18,7 +18,7 @@ case class JsonRpcRequest(jsonrpc: String, method: String, params: Option[JArray
     extends SensitiveInformationToString {
 
   def inspect: String = {
-    implicit val formats: Formats = DefaultFormats
+    given formats: Formats = DefaultFormats
     "JsonRpcRequest" + (jsonrpc, method, params.map(write(_)), id.map(write(_))).toString
   }
 }

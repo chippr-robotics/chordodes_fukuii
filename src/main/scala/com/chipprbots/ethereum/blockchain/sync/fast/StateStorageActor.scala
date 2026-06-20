@@ -83,7 +83,7 @@ object StateStorageActor {
       storage: FastSyncStateStorage,
       syncState: SyncState
   ): Behavior[Command] = {
-    implicit val runtime: IORuntime = IORuntime.global
+    given runtime: IORuntime = IORuntime.global
 
     // `context.log` is strictly confined to the actor thread in Pekko Typed; the IO below runs on the IO runtime, so we
     // capture the underlying (thread-safe) SLF4J logger here, on the actor thread, and use it inside the IO.

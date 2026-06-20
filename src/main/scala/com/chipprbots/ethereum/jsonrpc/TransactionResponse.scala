@@ -55,7 +55,7 @@ final case class TransactionData(
 
 object TransactionResponse {
 
-  implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
+  given blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
 
   def apply(tx: TransactionData): TransactionResponse =
     TransactionResponse(tx.stx, tx.blockHeader, tx.transactionIndex)

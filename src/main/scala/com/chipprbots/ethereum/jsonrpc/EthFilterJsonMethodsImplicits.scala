@@ -29,11 +29,11 @@ object EthFilterJsonMethodsImplicits extends JsonMethodsImplicits {
     JObject(base ::: tsField)
   }
 
-  implicit val newFilterResponseEnc: JsonEncoder[NewFilterResponse] = new JsonEncoder[NewFilterResponse] {
+  given newFilterResponseEnc: JsonEncoder[NewFilterResponse] = new JsonEncoder[NewFilterResponse] {
     def encodeJson(t: NewFilterResponse): JValue = encodeAsHex(t.filterId)
   }
 
-  implicit val eth_newFilter: JsonMethodDecoder[NewFilterRequest] = new JsonMethodDecoder[NewFilterRequest] {
+  given eth_newFilter: JsonMethodDecoder[NewFilterRequest] = new JsonMethodDecoder[NewFilterRequest] {
     def decodeJson(params: Option[JArray]): Either[JsonRpcError, NewFilterRequest] =
       params match {
         case Some(JArray((filterObj: JObject) :: Nil)) =>
@@ -44,15 +44,14 @@ object EthFilterJsonMethodsImplicits extends JsonMethodsImplicits {
       }
   }
 
-  implicit val eth_newBlockFilter: NoParamsMethodDecoder[NewBlockFilterRequest] = new NoParamsMethodDecoder(
+  given eth_newBlockFilter: NoParamsMethodDecoder[NewBlockFilterRequest] = new NoParamsMethodDecoder(
     NewBlockFilterRequest()
   ) {}
 
-  implicit val eth_newPendingTransactionFilter: NoParamsMethodDecoder[NewPendingTransactionFilterRequest] =
+  given eth_newPendingTransactionFilter: NoParamsMethodDecoder[NewPendingTransactionFilterRequest] =
     new NoParamsMethodDecoder(NewPendingTransactionFilterRequest()) {}
 
-  implicit val eth_uninstallFilter
-      : JsonMethodDecoder[UninstallFilterRequest] with JsonEncoder[UninstallFilterResponse] =
+  given eth_uninstallFilter: (JsonMethodDecoder[UninstallFilterRequest] & JsonEncoder[UninstallFilterResponse]) =
     new JsonMethodDecoder[UninstallFilterRequest] with JsonEncoder[UninstallFilterResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, UninstallFilterRequest] =
         params match {
@@ -65,8 +64,7 @@ object EthFilterJsonMethodsImplicits extends JsonMethodsImplicits {
       override def encodeJson(t: UninstallFilterResponse): JValue = JBool(t.success)
     }
 
-  implicit val eth_getFilterChanges
-      : JsonMethodDecoder[GetFilterChangesRequest] with JsonEncoder[GetFilterChangesResponse] =
+  given eth_getFilterChanges: (JsonMethodDecoder[GetFilterChangesRequest] & JsonEncoder[GetFilterChangesResponse]) =
     new JsonMethodDecoder[GetFilterChangesRequest] with JsonEncoder[GetFilterChangesResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetFilterChangesRequest] =
         params match {
@@ -84,7 +82,7 @@ object EthFilterJsonMethodsImplicits extends JsonMethodsImplicits {
         }
     }
 
-  implicit val eth_getFilterLogs: JsonMethodDecoder[GetFilterLogsRequest] with JsonEncoder[GetFilterLogsResponse] =
+  given eth_getFilterLogs: (JsonMethodDecoder[GetFilterLogsRequest] & JsonEncoder[GetFilterLogsResponse]) =
     new JsonMethodDecoder[GetFilterLogsRequest] with JsonEncoder[GetFilterLogsResponse] {
       import FilterManager.*
 
@@ -105,7 +103,7 @@ object EthFilterJsonMethodsImplicits extends JsonMethodsImplicits {
         }
     }
 
-  implicit val eth_getLogs: JsonMethodDecoder[GetLogsRequest] with JsonEncoder[GetLogsResponse] =
+  given eth_getLogs: (JsonMethodDecoder[GetLogsRequest] & JsonEncoder[GetLogsResponse]) =
     new JsonMethodDecoder[GetLogsRequest] with JsonEncoder[GetLogsResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetLogsRequest] =
         params match {

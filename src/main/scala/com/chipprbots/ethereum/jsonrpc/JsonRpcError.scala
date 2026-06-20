@@ -18,12 +18,12 @@ object JsonRpcError extends JsonMethodsImplicits {
   def apply[T: JsonEncoder](code: Int, message: String, data: T): JsonRpcError =
     JsonRpcError(code, message, Some(JsonEncoder[T].encodeJson(data)))
 
-  implicit val rateLimitInformation: JsonEncoder[RateLimitInformation] = (rateLimit: RateLimitInformation) =>
+  given rateLimitInformation: JsonEncoder[RateLimitInformation] = (rateLimit: RateLimitInformation) =>
     JObject(
       "backoff_seconds" -> JLong(rateLimit.backoffSeconds)
     )
 
-  implicit val jsonRpcErrorEncoder: JsonEncoder[JsonRpcError] = err =>
+  given jsonRpcErrorEncoder: JsonEncoder[JsonRpcError] = err =>
     JObject(
       List("code" -> JsonEncoder.encode(err.code), "message" -> JsonEncoder.encode(err.message)) ++
         err.data.map("data" -> _)
@@ -69,7 +69,7 @@ object JsonRpcError extends JsonMethodsImplicits {
   // Custom errors based on proposal https://eth.wiki/json-rpc/json-rpc-error-codes-improvement-proposal
   sealed abstract class EthCustomError private (val code: Int, val message: String)
   object EthCustomError {
-    implicit val ethCustomErrorEncoder: JsonEncoder[EthCustomError] = err =>
+    given ethCustomErrorEncoder: JsonEncoder[EthCustomError] = err =>
       JObject("code" -> JInt(err.code), "message" -> JString(err.message))
 
     case class DoesntExist(what: String) extends EthCustomError(100, s"${what} doesn't exist")

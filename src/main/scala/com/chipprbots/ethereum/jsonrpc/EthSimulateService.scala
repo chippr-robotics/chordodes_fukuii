@@ -134,7 +134,7 @@ class EthSimulateService(
 
   import EthSimulateService.*
 
-  implicit val bcConfig: BlockchainConfig = blockchainConfig
+  given bcConfig: BlockchainConfig = blockchainConfig
 
   def ethSimulate(req: EthSimulateRequest): ServiceResponse[EthSimulateResponse] =
     IO {

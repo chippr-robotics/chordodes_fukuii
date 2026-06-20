@@ -42,7 +42,7 @@ class DebugService(
     } yield Right(ListPeersInfoResponse(peers.flatten))
 
   private def getPeerIds: IO[List[PeerId]] = {
-    implicit val timeout: Timeout = Timeout(20.seconds)
+    given timeout: Timeout = Timeout(20.seconds)
 
     peerManager
       .askFor[Peers](PeerManagerActor.GetPeersCmd(_))
@@ -51,7 +51,7 @@ class DebugService(
   }
 
   private def getPeerInfo(peer: PeerId): IO[Option[PeerInfo]] = {
-    implicit val timeout: Timeout = Timeout(20.seconds)
+    given timeout: Timeout = Timeout(20.seconds)
 
     networkPeerManager
       .askFor[PeerInfoResponse](NetworkPeerManagerActor.PeerInfoRequest(peer))

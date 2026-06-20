@@ -44,9 +44,9 @@ trait JsonRpcBaseController {
 
   def enabledApis: Seq[String]
 
-  implicit val formats: DefaultFormats.type = DefaultFormats
+  given formats: DefaultFormats.type = DefaultFormats
 
-  implicit val serialization: Serialization.type = native.Serialization
+  given serialization: Serialization.type = native.Serialization
 
   def handleRequest(request: JsonRpcRequest): IO[JsonRpcResponse] = {
     val startTimeNanos = System.nanoTime()

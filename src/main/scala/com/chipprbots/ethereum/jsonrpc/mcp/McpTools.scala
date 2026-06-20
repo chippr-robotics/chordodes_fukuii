@@ -65,7 +65,7 @@ object NodeStatusTool {
   )
 
   def execute(deps: McpDependencies)(implicit timeout: Timeout, @unused ec: ExecutionContext): IO[String] = {
-    implicit val scheduler: typed.Scheduler = deps.scheduler
+    given scheduler: typed.Scheduler = deps.scheduler
     val syncStatusIO = deps.syncController.askFor[SyncProtocol.Status](SyncProtocol.GetStatus)
     val peersIO = deps.peerManager.askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
 
@@ -180,7 +180,7 @@ object PeerListTool {
   )
 
   def execute(deps: McpDependencies)(implicit timeout: Timeout, @unused ec: ExecutionContext): IO[String] = {
-    implicit val scheduler: typed.Scheduler = deps.scheduler
+    given scheduler: typed.Scheduler = deps.scheduler
     deps.peerManager
       .askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
       .recover { case _ =>

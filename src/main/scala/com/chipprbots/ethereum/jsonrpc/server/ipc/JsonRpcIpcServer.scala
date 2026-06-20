@@ -29,7 +29,7 @@ import com.chipprbots.ethereum.utils.Logger
 
 class JsonRpcIpcServer(jsonRpcController: JsonRpcController, config: JsonRpcIpcServerConfig) extends Logger {
 
-  implicit val runtime: IORuntime = IORuntime.global
+  given runtime: IORuntime = IORuntime.global
 
   var serverSocket: ServerSocket = _
 

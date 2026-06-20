@@ -387,6 +387,7 @@ class PeerManagerSpec
     start()
 
     peerManager ! PeerManagerActor.AddMaintainedPeerCmd(maintainedUri, Actor.noSender)
+    assert(createdPeerQueue.poll(3, TimeUnit.SECONDS) ne null, "peerFactory not called within 3s")
     createdPeers(0).probe.expectMsgType[ConnectTo](3.seconds)
 
     // Complete ETH handshake so the peer is promoted from pending → handshaked
@@ -431,6 +432,7 @@ class PeerManagerSpec
 
     // Register and handshake the maintained peer (outgoing)
     peerManager ! PeerManagerActor.AddMaintainedPeerCmd(maintainedUri, Actor.noSender)
+    assert(createdPeerQueue.poll(3, TimeUnit.SECONDS) ne null, "peerFactory not called within 3s")
     createdPeers(0).probe.expectMsgType[ConnectTo](3.seconds)
     createdPeers(0).probe.reply(
       PeerEvent.PeerHandshakeSuccessful(
@@ -489,6 +491,7 @@ class PeerManagerSpec
     start()
 
     peerManager ! PeerManagerActor.AddMaintainedPeerCmd(maintainedUri, Actor.noSender)
+    assert(createdPeerQueue.poll(3, TimeUnit.SECONDS) ne null, "peerFactory not called within 3s")
     createdPeers(0).probe.expectMsgType[ConnectTo](3.seconds)
     // Outbound actor is pending (nodeId = None in connectedPeers).
     // Bug: connectedPeers lookup finds the pre-handshake peer with nodeId=None → isMaintainedPeer=false → blacklist.
@@ -511,6 +514,7 @@ class PeerManagerSpec
     start()
 
     peerManager ! PeerManagerActor.AddMaintainedPeerCmd(maintainedUri, Actor.noSender)
+    assert(createdPeerQueue.poll(3, TimeUnit.SECONDS) ne null, "peerFactory not called within 3s")
     createdPeers(0).probe.expectMsgType[ConnectTo](3.seconds)
 
     // Inbound from the same maintained peer arrives and fully handshakes
@@ -553,6 +557,7 @@ class PeerManagerSpec
 
     // Outbound actor created, pending in pendingMaintainedConnections
     peerManager ! PeerManagerActor.AddMaintainedPeerCmd(maintainedUri, Actor.noSender)
+    assert(createdPeerQueue.poll(3, TimeUnit.SECONDS) ne null, "peerFactory not called within 3s")
     createdPeers(0).probe.expectMsgType[ConnectTo](3.seconds)
 
     // Terminate outbound pre-handshake (no inbound yet) → RC2 schedules a retry timer
@@ -590,6 +595,7 @@ class PeerManagerSpec
 
     // Step 1: outbound initiated for the maintained peer
     peerManager ! PeerManagerActor.AddMaintainedPeerCmd(maintainedUri, Actor.noSender)
+    assert(createdPeerQueue.poll(3, TimeUnit.SECONDS) ne null, "peerFactory not called within 3s")
     createdPeers(0).probe.expectMsgType[ConnectTo](3.seconds)
 
     // Step 2: outbound handshakes — enters handshakedPeers
@@ -659,6 +665,7 @@ class PeerManagerSpec
       case PublishCmd(PeerEvent.MaintainedPeersChanged(_)) => true
       case _                                               => false
     }
+    assert(createdPeerQueue.poll(3, TimeUnit.SECONDS) ne null, "peerFactory not called within 3s")
     createdPeers(0).probe.expectMsgType[ConnectTo](3.seconds)
 
     // Step 2: outbound handshakes
@@ -982,6 +989,7 @@ class PeerManagerSpec
 
     case class TestPeer(peer: Peer, probe: TestProbe)
     var createdPeers: Seq[TestPeer] = Seq.empty
+    val createdPeerQueue = new java.util.concurrent.LinkedBlockingQueue[TestPeer]()
 
     val peerConfiguration: PeerConfiguration = Config.Network.peer
     val discoveryConfig: DiscoveryConfig =
@@ -1003,7 +1011,9 @@ class PeerManagerSpec
         Boolean
     ) => ActorRef = { (_, address, isIncoming) =>
       val peerProbe = TestProbe()
-      createdPeers :+= TestPeer(Peer(PeerId(""), address, peerProbe.ref, isIncoming), peerProbe)
+      val tp = TestPeer(Peer(PeerId(""), address, peerProbe.ref, isIncoming), peerProbe)
+      createdPeers :+= tp
+      createdPeerQueue.offer(tp)
       peerProbe.ref
     }
 

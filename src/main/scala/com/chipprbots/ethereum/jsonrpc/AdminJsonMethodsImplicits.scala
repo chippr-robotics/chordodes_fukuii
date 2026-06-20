@@ -19,7 +19,7 @@ import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder.NoParamsM
 
 object AdminJsonMethodsImplicits extends JsonMethodsImplicits {
 
-  implicit val admin_nodeInfo: NoParamsMethodDecoder[AdminNodeInfoRequest] with JsonEncoder[AdminNodeInfoResponse] =
+  given admin_nodeInfo: (NoParamsMethodDecoder[AdminNodeInfoRequest] & JsonEncoder[AdminNodeInfoResponse]) =
     new NoParamsMethodDecoder(AdminNodeInfoRequest()) with JsonEncoder[AdminNodeInfoResponse] {
       override def encodeJson(t: AdminNodeInfoResponse): JValue =
         ("enode" -> t.enode.map(JString(_)).getOrElse(JNull)) ~
@@ -39,7 +39,7 @@ object AdminJsonMethodsImplicits extends JsonMethodsImplicits {
           ("activeFork" -> t.activeFork)
     }
 
-  implicit val admin_peers: NoParamsMethodDecoder[AdminPeersRequest] with JsonEncoder[AdminPeersResponse] =
+  given admin_peers: (NoParamsMethodDecoder[AdminPeersRequest] & JsonEncoder[AdminPeersResponse]) =
     new NoParamsMethodDecoder(AdminPeersRequest()) with JsonEncoder[AdminPeersResponse] {
       override def encodeJson(t: AdminPeersResponse): JValue =
         JArray(t.peers.toList.map { peer =>
@@ -49,7 +49,7 @@ object AdminJsonMethodsImplicits extends JsonMethodsImplicits {
         })
     }
 
-  implicit val admin_addPeer: JsonMethodDecoder[AdminAddPeerRequest] with JsonEncoder[AdminAddPeerResponse] =
+  given admin_addPeer: (JsonMethodDecoder[AdminAddPeerRequest] & JsonEncoder[AdminAddPeerResponse]) =
     new JsonMethodDecoder[AdminAddPeerRequest] with JsonEncoder[AdminAddPeerResponse] {
       override def decodeJson(params: Option[JsonAST.JArray]): Either[JsonRpcError, AdminAddPeerRequest] =
         params match {
@@ -60,7 +60,7 @@ object AdminJsonMethodsImplicits extends JsonMethodsImplicits {
       override def encodeJson(t: AdminAddPeerResponse): JValue = JBool(t.success)
     }
 
-  implicit val admin_removePeer: JsonMethodDecoder[AdminRemovePeerRequest] with JsonEncoder[AdminRemovePeerResponse] =
+  given admin_removePeer: (JsonMethodDecoder[AdminRemovePeerRequest] & JsonEncoder[AdminRemovePeerResponse]) =
     new JsonMethodDecoder[AdminRemovePeerRequest] with JsonEncoder[AdminRemovePeerResponse] {
       override def decodeJson(params: Option[JsonAST.JArray]): Either[JsonRpcError, AdminRemovePeerRequest] =
         params match {
@@ -74,8 +74,8 @@ object AdminJsonMethodsImplicits extends JsonMethodsImplicits {
   /** Besu AdminChangeLogLevel: params[0] = level string, params[1] = optional String[] log filters. Encodes as null on
     * success (Besu returns JsonRpcSuccessResponse with no result value).
     */
-  implicit val admin_changeLogLevel
-      : JsonMethodDecoder[AdminChangeLogLevelRequest] with JsonEncoder[AdminChangeLogLevelResponse] =
+  given admin_changeLogLevel
+      : (JsonMethodDecoder[AdminChangeLogLevelRequest] & JsonEncoder[AdminChangeLogLevelResponse]) =
     new JsonMethodDecoder[AdminChangeLogLevelRequest] with JsonEncoder[AdminChangeLogLevelResponse] {
       override def decodeJson(
           params: Option[JsonAST.JArray]
@@ -92,13 +92,12 @@ object AdminJsonMethodsImplicits extends JsonMethodsImplicits {
       override def encodeJson(t: AdminChangeLogLevelResponse): JValue = JNull
     }
 
-  implicit val admin_datadir: NoParamsMethodDecoder[AdminDatadirRequest] with JsonEncoder[AdminDatadirResponse] =
+  given admin_datadir: (NoParamsMethodDecoder[AdminDatadirRequest] & JsonEncoder[AdminDatadirResponse]) =
     new NoParamsMethodDecoder(AdminDatadirRequest()) with JsonEncoder[AdminDatadirResponse] {
       override def encodeJson(t: AdminDatadirResponse): JValue = JString(t.datadir)
     }
 
-  implicit val admin_exportChain
-      : JsonMethodDecoder[AdminExportChainRequest] with JsonEncoder[AdminExportChainResponse] =
+  given admin_exportChain: (JsonMethodDecoder[AdminExportChainRequest] & JsonEncoder[AdminExportChainResponse]) =
     new JsonMethodDecoder[AdminExportChainRequest] with JsonEncoder[AdminExportChainResponse] {
       override def decodeJson(params: Option[JsonAST.JArray]): Either[JsonRpcError, AdminExportChainRequest] =
         params match {
@@ -117,8 +116,7 @@ object AdminJsonMethodsImplicits extends JsonMethodsImplicits {
       override def encodeJson(t: AdminExportChainResponse): JValue = JBool(t.success)
     }
 
-  implicit val admin_importChain
-      : JsonMethodDecoder[AdminImportChainRequest] with JsonEncoder[AdminImportChainResponse] =
+  given admin_importChain: (JsonMethodDecoder[AdminImportChainRequest] & JsonEncoder[AdminImportChainResponse]) =
     new JsonMethodDecoder[AdminImportChainRequest] with JsonEncoder[AdminImportChainResponse] {
       override def decodeJson(params: Option[JsonAST.JArray]): Either[JsonRpcError, AdminImportChainRequest] =
         params match {
@@ -129,7 +127,7 @@ object AdminJsonMethodsImplicits extends JsonMethodsImplicits {
       override def encodeJson(t: AdminImportChainResponse): JValue = JBool(t.success)
     }
 
-  implicit val admin_blockIP: JsonMethodDecoder[AdminBlockIPRequest] with JsonEncoder[AdminBlockIPResponse] =
+  given admin_blockIP: (JsonMethodDecoder[AdminBlockIPRequest] & JsonEncoder[AdminBlockIPResponse]) =
     new JsonMethodDecoder[AdminBlockIPRequest] with JsonEncoder[AdminBlockIPResponse] {
       override def decodeJson(params: Option[JsonAST.JArray]): Either[JsonRpcError, AdminBlockIPRequest] =
         params match {
@@ -140,7 +138,7 @@ object AdminJsonMethodsImplicits extends JsonMethodsImplicits {
       override def encodeJson(t: AdminBlockIPResponse): JValue = JBool(t.success)
     }
 
-  implicit val admin_unblockIP: JsonMethodDecoder[AdminUnblockIPRequest] with JsonEncoder[AdminUnblockIPResponse] =
+  given admin_unblockIP: (JsonMethodDecoder[AdminUnblockIPRequest] & JsonEncoder[AdminUnblockIPResponse]) =
     new JsonMethodDecoder[AdminUnblockIPRequest] with JsonEncoder[AdminUnblockIPResponse] {
       override def decodeJson(params: Option[JsonAST.JArray]): Either[JsonRpcError, AdminUnblockIPRequest] =
         params match {
@@ -151,8 +149,8 @@ object AdminJsonMethodsImplicits extends JsonMethodsImplicits {
       override def encodeJson(t: AdminUnblockIPResponse): JValue = JBool(t.success)
     }
 
-  implicit val admin_listBlockedIPs
-      : NoParamsMethodDecoder[AdminListBlockedIPsRequest] with JsonEncoder[AdminListBlockedIPsResponse] =
+  given admin_listBlockedIPs
+      : (NoParamsMethodDecoder[AdminListBlockedIPsRequest] & JsonEncoder[AdminListBlockedIPsResponse]) =
     new NoParamsMethodDecoder(AdminListBlockedIPsRequest()) with JsonEncoder[AdminListBlockedIPsResponse] {
       override def encodeJson(t: AdminListBlockedIPsResponse): JValue =
         JArray(t.ips.map(JString(_)))
@@ -161,8 +159,8 @@ object AdminJsonMethodsImplicits extends JsonMethodsImplicits {
   // ── Geth-compatible methods ────────────────────────────────────────────────
   // core-geth references: node/api.go AddTrustedPeer/RemoveTrustedPeer, eth/api_admin.go MaxPeers
 
-  implicit val admin_addTrustedPeer
-      : JsonMethodDecoder[AdminAddTrustedPeerRequest] with JsonEncoder[AdminAddTrustedPeerResponse] =
+  given admin_addTrustedPeer
+      : (JsonMethodDecoder[AdminAddTrustedPeerRequest] & JsonEncoder[AdminAddTrustedPeerResponse]) =
     new JsonMethodDecoder[AdminAddTrustedPeerRequest] with JsonEncoder[AdminAddTrustedPeerResponse] {
       override def decodeJson(
           params: Option[JsonAST.JArray]
@@ -174,8 +172,8 @@ object AdminJsonMethodsImplicits extends JsonMethodsImplicits {
       override def encodeJson(t: AdminAddTrustedPeerResponse): JValue = JBool(t.success)
     }
 
-  implicit val admin_removeTrustedPeer
-      : JsonMethodDecoder[AdminRemoveTrustedPeerRequest] with JsonEncoder[AdminRemoveTrustedPeerResponse] =
+  given admin_removeTrustedPeer
+      : (JsonMethodDecoder[AdminRemoveTrustedPeerRequest] & JsonEncoder[AdminRemoveTrustedPeerResponse]) =
     new JsonMethodDecoder[AdminRemoveTrustedPeerRequest] with JsonEncoder[AdminRemoveTrustedPeerResponse] {
       override def decodeJson(
           params: Option[JsonAST.JArray]
@@ -187,7 +185,7 @@ object AdminJsonMethodsImplicits extends JsonMethodsImplicits {
       override def encodeJson(t: AdminRemoveTrustedPeerResponse): JValue = JBool(t.success)
     }
 
-  implicit val admin_maxPeers: JsonMethodDecoder[AdminMaxPeersRequest] with JsonEncoder[AdminMaxPeersResponse] =
+  given admin_maxPeers: (JsonMethodDecoder[AdminMaxPeersRequest] & JsonEncoder[AdminMaxPeersResponse]) =
     new JsonMethodDecoder[AdminMaxPeersRequest] with JsonEncoder[AdminMaxPeersResponse] {
       override def decodeJson(
           params: Option[JsonAST.JArray]

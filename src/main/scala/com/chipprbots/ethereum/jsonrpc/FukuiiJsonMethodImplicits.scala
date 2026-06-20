@@ -21,7 +21,7 @@ import com.chipprbots.ethereum.transactions.TransactionHistoryService.ExtendedTr
 import JsonEncoder.OptionToNull.*
 
 object FukuiiJsonMethodImplicits extends JsonMethodsImplicits {
-  implicit val extendedTransactionDataJsonEncoder: JsonEncoder[ExtendedTransactionData] = extendedTxData => {
+  given extendedTransactionDataJsonEncoder: JsonEncoder[ExtendedTransactionData] = extendedTxData => {
     val asTxResponse = TransactionResponse(
       extendedTxData.stx,
       extendedTxData.minedTransactionData.map(_.header),
@@ -39,8 +39,7 @@ object FukuiiJsonMethodImplicits extends JsonMethodsImplicits {
     Merge.merge(encodedTxResponse, encodedExtension)
   }
 
-  implicit val fukuii_getAccountTransactions
-      : JsonMethodCodec[GetAccountTransactionsRequest, GetAccountTransactionsResponse] =
+  given fukuii_getAccountTransactions: JsonMethodCodec[GetAccountTransactionsRequest, GetAccountTransactionsResponse] =
     new JsonMethodDecoder[GetAccountTransactionsRequest] with JsonEncoder[GetAccountTransactionsResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetAccountTransactionsRequest] =
         params match {
@@ -57,16 +56,15 @@ object FukuiiJsonMethodImplicits extends JsonMethodsImplicits {
         JObject("transactions" -> t.transactions.jsonEncoded)
     }
 
-  implicit val fukuii_resetFastSync_decoder: JsonMethodDecoder[ResetFastSyncRequest] =
+  given fukuii_resetFastSync_decoder: JsonMethodDecoder[ResetFastSyncRequest] =
     new NoParamsMethodDecoder(ResetFastSyncRequest())
 
-  implicit val fukuii_resetFastSync_encoder: JsonEncoder[ResetFastSyncResponse] = t =>
-    JObject("reset" -> t.reset.jsonEncoded)
+  given fukuii_resetFastSync_encoder: JsonEncoder[ResetFastSyncResponse] = t => JObject("reset" -> t.reset.jsonEncoded)
 
-  implicit val fukuii_restartFastSync_decoder: JsonMethodDecoder[RestartFastSyncRequest] =
+  given fukuii_restartFastSync_decoder: JsonMethodDecoder[RestartFastSyncRequest] =
     new NoParamsMethodDecoder(RestartFastSyncRequest())
 
-  implicit val fukuii_restartFastSync_encoder: JsonEncoder[RestartFastSyncResponse] = t =>
+  given fukuii_restartFastSync_encoder: JsonEncoder[RestartFastSyncResponse] = t =>
     JObject(
       "started" -> t.started.jsonEncoded,
       "cooldownUntilMillis" -> t.cooldownUntilMillis.jsonEncoded

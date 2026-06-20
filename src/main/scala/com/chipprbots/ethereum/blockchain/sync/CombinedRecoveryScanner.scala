@@ -133,7 +133,7 @@ final class CombinedRecoveryScanner(
       remaining.foreach(scanOne)
     } else {
       val pool = Executors.newFixedThreadPool(math.min(concurrency, remaining.size))
-      implicit val ec: ExecutionContext = ExecutionContext.fromExecutorService(pool)
+      given ec: ExecutionContext = ExecutionContext.fromExecutorService(pool)
       try Await.result(Future.sequence(remaining.map(idx => Future(scanOne(idx)))), Duration.Inf)
       finally pool.shutdown()
     }

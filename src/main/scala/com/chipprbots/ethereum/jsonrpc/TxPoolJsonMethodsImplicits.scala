@@ -12,15 +12,15 @@ import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder.NoParamsM
 
 object TxPoolJsonMethodsImplicits extends JsonMethodsImplicits {
 
-  implicit val txpool_besuTransactions
-      : NoParamsMethodDecoder[TxPoolBesuTransactionsRequest] with JsonEncoder[TxPoolBesuTransactionsResponse] =
+  given txpool_besuTransactions
+      : (NoParamsMethodDecoder[TxPoolBesuTransactionsRequest] & JsonEncoder[TxPoolBesuTransactionsResponse]) =
     new NoParamsMethodDecoder(TxPoolBesuTransactionsRequest()) with JsonEncoder[TxPoolBesuTransactionsResponse] {
       override def encodeJson(t: TxPoolBesuTransactionsResponse): JValue =
         JArray(t.pendingTransactions.toList.map(tx => transactionResponseJsonEncoder.encodeJson(tx)))
     }
 
-  implicit val txpool_besuStatistics
-      : NoParamsMethodDecoder[TxPoolBesuStatisticsRequest] with JsonEncoder[TxPoolBesuStatisticsResponse] =
+  given txpool_besuStatistics
+      : (NoParamsMethodDecoder[TxPoolBesuStatisticsRequest] & JsonEncoder[TxPoolBesuStatisticsResponse]) =
     new NoParamsMethodDecoder(TxPoolBesuStatisticsRequest()) with JsonEncoder[TxPoolBesuStatisticsResponse] {
       override def encodeJson(t: TxPoolBesuStatisticsResponse): JValue =
         JObject(
@@ -30,8 +30,8 @@ object TxPoolJsonMethodsImplicits extends JsonMethodsImplicits {
         )
     }
 
-  implicit val txpool_besuPendingTransactions: JsonMethodDecoder[TxPoolBesuPendingTransactionsRequest]
-    with JsonEncoder[TxPoolBesuPendingTransactionsResponse] =
+  given txpool_besuPendingTransactions
+      : (JsonMethodDecoder[TxPoolBesuPendingTransactionsRequest] & JsonEncoder[TxPoolBesuPendingTransactionsResponse]) =
     new JsonMethodDecoder[TxPoolBesuPendingTransactionsRequest]
       with JsonEncoder[TxPoolBesuPendingTransactionsResponse] {
 
@@ -101,7 +101,7 @@ object TxPoolJsonMethodsImplicits extends JsonMethodsImplicits {
 
   // ── Geth-compatible methods ────────────────────────────────────────────────
 
-  implicit val txpool_content: NoParamsMethodDecoder[TxPoolContentRequest] with JsonEncoder[TxPoolContentResponse] =
+  given txpool_content: (NoParamsMethodDecoder[TxPoolContentRequest] & JsonEncoder[TxPoolContentResponse]) =
     new NoParamsMethodDecoder(TxPoolContentRequest()) with JsonEncoder[TxPoolContentResponse] {
       override def encodeJson(t: TxPoolContentResponse): JValue = {
         def encodeNested(m: Map[String, Map[String, TransactionResponse]]): JObject =
@@ -114,8 +114,7 @@ object TxPoolJsonMethodsImplicits extends JsonMethodsImplicits {
       }
     }
 
-  implicit val txpool_contentFrom
-      : JsonMethodDecoder[TxPoolContentFromRequest] with JsonEncoder[TxPoolContentFromResponse] =
+  given txpool_contentFrom: (JsonMethodDecoder[TxPoolContentFromRequest] & JsonEncoder[TxPoolContentFromResponse]) =
     new JsonMethodDecoder[TxPoolContentFromRequest] with JsonEncoder[TxPoolContentFromResponse] {
       override def decodeJson(
           params: Option[JArray]
@@ -136,7 +135,7 @@ object TxPoolJsonMethodsImplicits extends JsonMethodsImplicits {
       }
     }
 
-  implicit val txpool_status: NoParamsMethodDecoder[TxPoolStatusRequest] with JsonEncoder[TxPoolStatusResponse] =
+  given txpool_status: (NoParamsMethodDecoder[TxPoolStatusRequest] & JsonEncoder[TxPoolStatusResponse]) =
     new NoParamsMethodDecoder(TxPoolStatusRequest()) with JsonEncoder[TxPoolStatusResponse] {
       // core-geth uses hexutil.Uint — serialises as a hex string (e.g. "0x5")
       override def encodeJson(t: TxPoolStatusResponse): JValue =
@@ -146,7 +145,7 @@ object TxPoolJsonMethodsImplicits extends JsonMethodsImplicits {
         )
     }
 
-  implicit val txpool_inspect: NoParamsMethodDecoder[TxPoolInspectRequest] with JsonEncoder[TxPoolInspectResponse] =
+  given txpool_inspect: (NoParamsMethodDecoder[TxPoolInspectRequest] & JsonEncoder[TxPoolInspectResponse]) =
     new NoParamsMethodDecoder(TxPoolInspectRequest()) with JsonEncoder[TxPoolInspectResponse] {
       override def encodeJson(t: TxPoolInspectResponse): JValue = {
         def encodeNested(m: Map[String, Map[String, String]]): JObject =

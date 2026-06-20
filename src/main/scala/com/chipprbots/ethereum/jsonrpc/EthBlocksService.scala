@@ -85,7 +85,7 @@ class EthBlocksService(
   final override def forkChoiceManagerOpt: Option[ForkChoiceManager] = _forkChoiceManagerOpt
   import EthBlocksService.*
 
-  implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
+  given blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
 
   /** eth_blockNumber that returns the number of most recent block.
     *

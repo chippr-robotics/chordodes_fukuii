@@ -16,7 +16,7 @@ import com.chipprbots.ethereum.testmode.EthTransactionResponse
 
 object JsonSerializers {
 
-  implicit lazy val formats: Formats =
+  given formats: Formats =
     DefaultFormats + UnformattedDataJsonSerializer + QuantitiesSerializer +
       OptionNoneToJNullSerializer + AddressJsonSerializer + EthTransactionResponseSerializer +
       makeTransactionResponseSerializer + makeTransactionReceiptResponseSerializer + makeBlockResponseSerializer
@@ -72,7 +72,7 @@ object JsonSerializers {
         (
           PartialFunction.empty,
           { case tx: EthTransactionResponse =>
-            implicit val formats: Formats =
+            given formats: Formats =
               DefaultFormats.preservingEmptyValues + UnformattedDataJsonSerializer + QuantitiesSerializer + AddressJsonSerializer
             Extraction.decompose(tx)
           }

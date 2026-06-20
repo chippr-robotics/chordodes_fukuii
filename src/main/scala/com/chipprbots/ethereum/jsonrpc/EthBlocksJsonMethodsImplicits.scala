@@ -16,7 +16,7 @@ object EthBlocksJsonMethodsImplicits extends JsonMethodsImplicits {
   import org.json4s.CustomSerializer
 
   // Custom serializer for json4s Extraction.decompose to work with BlockResponse in tests
-  implicit val blockResponseCustomSerializer: CustomSerializer[BlockResponse] =
+  given blockResponseCustomSerializer: CustomSerializer[BlockResponse] =
     new CustomSerializer[BlockResponse](_ =>
       (
         PartialFunction.empty,
@@ -25,7 +25,7 @@ object EthBlocksJsonMethodsImplicits extends JsonMethodsImplicits {
     )
 
   // Manual encoder for BlockResponse to avoid Scala 3 reflection issues
-  implicit val blockResponseEncoder: JsonEncoder[BlockResponse] = { block =>
+  given blockResponseEncoder: JsonEncoder[BlockResponse] = { block =>
     val transactionsField = block.transactions match {
       case Left(hashes) =>
         JArray(hashes.toList.map(encodeAsHex))
@@ -84,19 +84,18 @@ object EthBlocksJsonMethodsImplicits extends JsonMethodsImplicits {
   }
 
   // Encoder for BaseBlockResponse (which is typically BlockResponse)
-  implicit val baseBlockResponseEncoder: JsonEncoder[BaseBlockResponse] = {
+  given baseBlockResponseEncoder: JsonEncoder[BaseBlockResponse] = {
     case block: BlockResponse => blockResponseEncoder.encodeJson(block)
     case other => throw new IllegalArgumentException(s"Unknown BaseBlockResponse type: ${other.getClass.getName}")
   }
 
-  implicit val eth_blockNumber
-      : NoParamsMethodDecoder[BestBlockNumberRequest] with JsonEncoder[BestBlockNumberResponse] =
+  given eth_blockNumber: (NoParamsMethodDecoder[BestBlockNumberRequest] & JsonEncoder[BestBlockNumberResponse]) =
     new NoParamsMethodDecoder(BestBlockNumberRequest()) with JsonEncoder[BestBlockNumberResponse] {
       override def encodeJson(t: BestBlockNumberResponse): JValue = encodeAsHex(t.bestBlockNumber)
     }
 
-  implicit val eth_getBlockTransactionCountByHash
-      : JsonMethodDecoder[TxCountByBlockHashRequest] with JsonEncoder[TxCountByBlockHashResponse] =
+  given eth_getBlockTransactionCountByHash
+      : (JsonMethodDecoder[TxCountByBlockHashRequest] & JsonEncoder[TxCountByBlockHashResponse]) =
     new JsonMethodDecoder[TxCountByBlockHashRequest] with JsonEncoder[TxCountByBlockHashResponse] {
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, TxCountByBlockHashRequest] =
         params match {
@@ -109,8 +108,7 @@ object EthBlocksJsonMethodsImplicits extends JsonMethodsImplicits {
         t.txsQuantity.map(count => encodeAsHex(BigInt(count))).getOrElse(JNull)
     }
 
-  implicit val eth_getBlockByHash
-      : JsonMethodDecoder[BlockByBlockHashRequest] with JsonEncoder[BlockByBlockHashResponse] =
+  given eth_getBlockByHash: (JsonMethodDecoder[BlockByBlockHashRequest] & JsonEncoder[BlockByBlockHashResponse]) =
     new JsonMethodDecoder[BlockByBlockHashRequest] with JsonEncoder[BlockByBlockHashResponse] {
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, BlockByBlockHashRequest] =
         params match {
@@ -123,7 +121,7 @@ object EthBlocksJsonMethodsImplicits extends JsonMethodsImplicits {
         JsonEncoder.encode(t.blockResponse)
     }
 
-  implicit val eth_getBlockByNumber: JsonMethodDecoder[BlockByNumberRequest] with JsonEncoder[BlockByNumberResponse] =
+  given eth_getBlockByNumber: (JsonMethodDecoder[BlockByNumberRequest] & JsonEncoder[BlockByNumberResponse]) =
     new JsonMethodDecoder[BlockByNumberRequest] with JsonEncoder[BlockByNumberResponse] {
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, BlockByNumberRequest] =
         params match {
@@ -136,8 +134,8 @@ object EthBlocksJsonMethodsImplicits extends JsonMethodsImplicits {
         JsonEncoder.encode(t.blockResponse)
     }
 
-  implicit val eth_getUncleByBlockHashAndIndex
-      : JsonMethodDecoder[UncleByBlockHashAndIndexRequest] with JsonEncoder[UncleByBlockHashAndIndexResponse] =
+  given eth_getUncleByBlockHashAndIndex
+      : (JsonMethodDecoder[UncleByBlockHashAndIndexRequest] & JsonEncoder[UncleByBlockHashAndIndexResponse]) =
     new JsonMethodDecoder[UncleByBlockHashAndIndexRequest] with JsonEncoder[UncleByBlockHashAndIndexResponse] {
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, UncleByBlockHashAndIndexRequest] =
         params match {
@@ -158,8 +156,8 @@ object EthBlocksJsonMethodsImplicits extends JsonMethodsImplicits {
       }
     }
 
-  implicit val eth_getUncleByBlockNumberAndIndex
-      : JsonMethodDecoder[UncleByBlockNumberAndIndexRequest] with JsonEncoder[UncleByBlockNumberAndIndexResponse] =
+  given eth_getUncleByBlockNumberAndIndex
+      : (JsonMethodDecoder[UncleByBlockNumberAndIndexRequest] & JsonEncoder[UncleByBlockNumberAndIndexResponse]) =
     new JsonMethodDecoder[UncleByBlockNumberAndIndexRequest] with JsonEncoder[UncleByBlockNumberAndIndexResponse] {
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, UncleByBlockNumberAndIndexRequest] =
         params match {
@@ -180,8 +178,8 @@ object EthBlocksJsonMethodsImplicits extends JsonMethodsImplicits {
       }
     }
 
-  implicit val eth_getUncleCountByBlockNumber
-      : JsonMethodDecoder[GetUncleCountByBlockNumberRequest] with JsonEncoder[GetUncleCountByBlockNumberResponse] =
+  given eth_getUncleCountByBlockNumber
+      : (JsonMethodDecoder[GetUncleCountByBlockNumberRequest] & JsonEncoder[GetUncleCountByBlockNumberResponse]) =
     new JsonMethodDecoder[GetUncleCountByBlockNumberRequest] with JsonEncoder[GetUncleCountByBlockNumberResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetUncleCountByBlockNumberRequest] =
         params match {
@@ -195,8 +193,8 @@ object EthBlocksJsonMethodsImplicits extends JsonMethodsImplicits {
       def encodeJson(t: GetUncleCountByBlockNumberResponse): JValue = encodeAsHex(t.result)
     }
 
-  implicit val eth_getUncleCountByBlockHash
-      : JsonMethodDecoder[GetUncleCountByBlockHashRequest] with JsonEncoder[GetUncleCountByBlockHashResponse] =
+  given eth_getUncleCountByBlockHash
+      : (JsonMethodDecoder[GetUncleCountByBlockHashRequest] & JsonEncoder[GetUncleCountByBlockHashResponse]) =
     new JsonMethodDecoder[GetUncleCountByBlockHashRequest] with JsonEncoder[GetUncleCountByBlockHashResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetUncleCountByBlockHashRequest] =
         params match {
@@ -210,8 +208,8 @@ object EthBlocksJsonMethodsImplicits extends JsonMethodsImplicits {
       def encodeJson(t: GetUncleCountByBlockHashResponse): JValue = encodeAsHex(t.result)
     }
 
-  implicit val eth_getBlockTransactionCountByNumber: JsonMethodDecoder[GetBlockTransactionCountByNumberRequest]
-    with JsonEncoder[GetBlockTransactionCountByNumberResponse] =
+  given eth_getBlockTransactionCountByNumber: (JsonMethodDecoder[GetBlockTransactionCountByNumberRequest] &
+    JsonEncoder[GetBlockTransactionCountByNumberResponse]) =
     new JsonMethodDecoder[GetBlockTransactionCountByNumberRequest]
       with JsonEncoder[GetBlockTransactionCountByNumberResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetBlockTransactionCountByNumberRequest] =
@@ -227,8 +225,7 @@ object EthBlocksJsonMethodsImplicits extends JsonMethodsImplicits {
     }
 
   // eth_getBlockReceipts
-  implicit val eth_getBlockReceipts
-      : JsonMethodDecoder[GetBlockReceiptsRequest] with JsonEncoder[GetBlockReceiptsResponse] =
+  given eth_getBlockReceipts: (JsonMethodDecoder[GetBlockReceiptsRequest] & JsonEncoder[GetBlockReceiptsResponse]) =
     new JsonMethodDecoder[GetBlockReceiptsRequest] with JsonEncoder[GetBlockReceiptsResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetBlockReceiptsRequest] =
         params match {
@@ -246,7 +243,7 @@ object EthBlocksJsonMethodsImplicits extends JsonMethodsImplicits {
     }
 
   // eth_feeHistory
-  implicit val eth_feeHistory: JsonMethodDecoder[FeeHistoryRequest] with JsonEncoder[FeeHistoryResponse] =
+  given eth_feeHistory: (JsonMethodDecoder[FeeHistoryRequest] & JsonEncoder[FeeHistoryResponse]) =
     new JsonMethodDecoder[FeeHistoryRequest] with JsonEncoder[FeeHistoryResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, FeeHistoryRequest] =
         params match {
@@ -282,20 +279,20 @@ object EthBlocksJsonMethodsImplicits extends JsonMethodsImplicits {
     }
 
   // eth_maxPriorityFeePerGas
-  implicit val eth_maxPriorityFeePerGas
-      : NoParamsMethodDecoder[MaxPriorityFeePerGasRequest] with JsonEncoder[MaxPriorityFeePerGasResponse] =
+  given eth_maxPriorityFeePerGas
+      : (NoParamsMethodDecoder[MaxPriorityFeePerGasRequest] & JsonEncoder[MaxPriorityFeePerGasResponse]) =
     new NoParamsMethodDecoder(MaxPriorityFeePerGasRequest()) with JsonEncoder[MaxPriorityFeePerGasResponse] {
       def encodeJson(t: MaxPriorityFeePerGasResponse): JValue = encodeAsHex(t.maxPriorityFeePerGas)
     }
 
   // eth_blobBaseFee
-  implicit val eth_blobBaseFee: NoParamsMethodDecoder[BlobBaseFeeRequest] with JsonEncoder[BlobBaseFeeResponse] =
+  given eth_blobBaseFee: (NoParamsMethodDecoder[BlobBaseFeeRequest] & JsonEncoder[BlobBaseFeeResponse]) =
     new NoParamsMethodDecoder(BlobBaseFeeRequest()) with JsonEncoder[BlobBaseFeeResponse] {
       def encodeJson(t: BlobBaseFeeResponse): JValue = encodeAsHex(t.blobBaseFee)
     }
 
   // debug_getRawBlock
-  implicit val debug_getRawBlock: JsonMethodDecoder[GetRawBlockRequest] with JsonEncoder[GetRawBlockResponse] =
+  given debug_getRawBlock: (JsonMethodDecoder[GetRawBlockRequest] & JsonEncoder[GetRawBlockResponse]) =
     new JsonMethodDecoder[GetRawBlockRequest] with JsonEncoder[GetRawBlockResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetRawBlockRequest] =
         params match {
@@ -309,7 +306,7 @@ object EthBlocksJsonMethodsImplicits extends JsonMethodsImplicits {
     }
 
   // debug_getRawHeader
-  implicit val debug_getRawHeader: JsonMethodDecoder[GetRawHeaderRequest] with JsonEncoder[GetRawHeaderResponse] =
+  given debug_getRawHeader: (JsonMethodDecoder[GetRawHeaderRequest] & JsonEncoder[GetRawHeaderResponse]) =
     new JsonMethodDecoder[GetRawHeaderRequest] with JsonEncoder[GetRawHeaderResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetRawHeaderRequest] =
         params match {
@@ -323,7 +320,7 @@ object EthBlocksJsonMethodsImplicits extends JsonMethodsImplicits {
     }
 
   // debug_getRawReceipts
-  implicit val debug_getRawReceipts: JsonMethodDecoder[GetRawReceiptsRequest] with JsonEncoder[GetRawReceiptsResponse] =
+  given debug_getRawReceipts: (JsonMethodDecoder[GetRawReceiptsRequest] & JsonEncoder[GetRawReceiptsResponse]) =
     new JsonMethodDecoder[GetRawReceiptsRequest] with JsonEncoder[GetRawReceiptsResponse] {
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetRawReceiptsRequest] =
         params match {

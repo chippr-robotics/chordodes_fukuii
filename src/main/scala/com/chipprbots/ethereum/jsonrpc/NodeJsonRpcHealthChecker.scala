@@ -28,7 +28,7 @@ class NodeJsonRpcHealthChecker(
     asyncConfig: AsyncConfig
 ) extends JsonRpcHealthChecker {
 
-  implicit val askTimeout: Timeout = asyncConfig.askTimeout
+  given askTimeout: Timeout = asyncConfig.askTimeout
 
   protected def mainService: String = "node health"
 

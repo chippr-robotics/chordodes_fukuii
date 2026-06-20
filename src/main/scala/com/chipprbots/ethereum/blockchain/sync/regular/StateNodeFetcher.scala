@@ -46,8 +46,8 @@ class StateNodeFetcher(
     with FetchRequest[StateNodeFetcher.StateNodeFetcherCommand] {
 
   val log = context.log
-  implicit val scheduler: Scheduler = context.system.scheduler
-  implicit val runtime: IORuntime = IORuntime.global
+  given scheduler: Scheduler = context.system.scheduler
+  given runtime: IORuntime = IORuntime.global
 
   import StateNodeFetcher.*
 

@@ -34,8 +34,8 @@ class BodiesFetcher(
     with FetchRequest[BodiesFetcher.BodiesFetcherCommand] {
 
   val log = context.log
-  implicit val scheduler: Scheduler = context.system.scheduler
-  implicit val runtime: IORuntime = IORuntime.global
+  given scheduler: Scheduler = context.system.scheduler
+  given runtime: IORuntime = IORuntime.global
 
   import BodiesFetcher.*
   private type Command = BodiesFetcher.BodiesFetcherCommand

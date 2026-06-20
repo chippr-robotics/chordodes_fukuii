@@ -64,9 +64,9 @@ object BlockchainHostActor {
         com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
       ]
   ): Behavior[Command] = Behaviors.setup { context =>
-    implicit val ec: ExecutionContext = context.executionContext
-    implicit val timeout: Timeout = Timeout(3.seconds)
-    implicit val scheduler: Scheduler = context.system.scheduler
+    given ec: ExecutionContext = context.executionContext
+    given timeout: Timeout = Timeout(3.seconds)
+    given scheduler: Scheduler = context.system.scheduler
 
     // Typed subscriber ref: PEA's Classic shell captures sender() as the subscriber. The adapter lifts
     // delivered PeerEvents into this behavior's Command, then routes them back through the Classic event bus.

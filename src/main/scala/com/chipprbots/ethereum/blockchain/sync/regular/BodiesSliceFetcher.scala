@@ -45,8 +45,8 @@ class BodiesSliceFetcher(
   import BodiesSliceFetcher.*
 
   val log = context.log
-  implicit val scheduler: Scheduler = context.system.scheduler
-  implicit val runtime: IORuntime = IORuntime.global
+  given scheduler: Scheduler = context.system.scheduler
+  given runtime: IORuntime = IORuntime.global
 
   override def makeAdaptedMessage[T <: Message](peer: Peer, msg: T): SliceCommand = AdaptedMessage(peer, msg)
 

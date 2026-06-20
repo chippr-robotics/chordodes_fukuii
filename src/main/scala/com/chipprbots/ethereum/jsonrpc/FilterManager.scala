@@ -103,9 +103,9 @@ object FilterManager {
       filterConfig: FilterConfig,
       txPoolConfig: TxPoolConfig
   ): Behavior[Command] = Behaviors.setup { ctx =>
-    implicit val ec: ExecutionContext = ctx.executionContext
-    implicit val ioRuntime: IORuntime = IORuntime.global
-    implicit val timeout: Timeout = Timeout(txPoolConfig.pendingTxManagerQueryTimeout)
+    given ec: ExecutionContext = ctx.executionContext
+    given ioRuntime: IORuntime = IORuntime.global
+    given timeout: Timeout = Timeout(txPoolConfig.pendingTxManagerQueryTimeout)
 
     val maxBlockHashesChanges = 256
 

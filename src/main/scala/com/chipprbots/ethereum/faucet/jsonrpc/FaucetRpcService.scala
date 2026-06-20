@@ -27,8 +27,8 @@ class FaucetRpcService(config: FaucetConfig, handler: ActorRef[FaucetHandler.Com
     system: ActorSystem
 ) extends Logger {
 
-  implicit lazy val actorTimeout: Timeout = Timeout(config.actorCommunicationMargin + config.rpcClient.timeout)
-  implicit lazy val scheduler: Scheduler = system.toTyped.scheduler
+  given actorTimeout: Timeout = Timeout(config.actorCommunicationMargin + config.rpcClient.timeout)
+  given scheduler: Scheduler = system.toTyped.scheduler
 
   def sendFunds(sendFundsRequest: SendFundsRequest): ServiceResponse[SendFundsResponse] =
     IO.fromFuture(

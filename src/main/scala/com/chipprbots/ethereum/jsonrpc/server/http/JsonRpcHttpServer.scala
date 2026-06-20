@@ -45,10 +45,10 @@ trait JsonRpcHttpServer extends Json4sSupport with Logger {
   /** Optional GraphQL endpoint, mounted at `POST /graphql` when defined. */
   val graphQLService: Option[GraphQLService] = None
 
-  implicit val runtime: IORuntime = IORuntime.global
-  implicit val serialization: Serialization.type = native.Serialization
+  given runtime: IORuntime = IORuntime.global
+  given serialization: Serialization.type = native.Serialization
 
-  implicit val formats: Formats = DefaultFormats + JsonSerializers.RpcErrorJsonSerializer
+  given formats: Formats = DefaultFormats + JsonSerializers.RpcErrorJsonSerializer
 
   def corsAllowedOrigins: HttpOriginMatcher
 

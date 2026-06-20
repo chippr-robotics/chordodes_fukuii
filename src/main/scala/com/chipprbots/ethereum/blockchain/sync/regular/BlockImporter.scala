@@ -179,7 +179,7 @@ final private class BlockImporterLogic(
   import BlockImporter.*
   import configBuilder.*
 
-  implicit val runtime: IORuntime = IORuntime.global
+  given runtime: IORuntime = IORuntime.global
 
   private val log: LoggingAdapter = Logging(ctx.system.classicSystem, classOf[BlockImporterImpl])
   private val selfRef = ctx.self

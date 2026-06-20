@@ -862,8 +862,8 @@ object PeerManagerActor {
       msg match {
         case SchedulePruneIncomingPeers =>
           import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
-          implicit val timeout: Timeout = Timeout(peerConfiguration.updateNodesInterval)
-          implicit val typedScheduler: org.apache.pekko.actor.typed.Scheduler = context.system.scheduler
+          given timeout: Timeout = Timeout(peerConfiguration.updateNodesInterval)
+          given typedScheduler: org.apache.pekko.actor.typed.Scheduler = context.system.scheduler
 
           // Ask for the whole statistics duration, we'll use averages to make it fair.
           val window = peerConfiguration.statSlotCount * peerConfiguration.statSlotDuration
@@ -948,8 +948,8 @@ object PeerManagerActor {
 
     private def getPeerStatus(peer: Peer): IO[Option[(Peer, PeerActor.Status)]] = {
       import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
-      implicit val timeout: Timeout = Timeout(2.seconds)
-      implicit val typedScheduler: org.apache.pekko.actor.typed.Scheduler = context.system.scheduler
+      given timeout: Timeout = Timeout(2.seconds)
+      given typedScheduler: org.apache.pekko.actor.typed.Scheduler = context.system.scheduler
       // Extract a plain SLF4J logger before the IO lambda — ctx.log is thread-confined.
       val slf4jLog = org.slf4j.LoggerFactory.getLogger("com.chipprbots.ethereum.network.PeerManagerActor")
       val typedRef = peer.ref.toTyped[PeerActor.Command]
