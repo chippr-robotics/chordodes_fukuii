@@ -7,6 +7,7 @@ import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+import org.apache.pekko.actor.typed.eventstream.EventStream
 import org.apache.pekko.event.Logging
 import org.apache.pekko.event.LoggingAdapter
 import org.apache.pekko.util.ByteString
@@ -183,7 +184,6 @@ final private class BlockImporterLogic(
   private val log: LoggingAdapter = Logging(ctx.system.classicSystem, classOf[BlockImporterImpl])
   private val selfRef = ctx.self
   private val selfClassic = ctx.self.toClassic
-  private val eventStream = ctx.system.classicSystem.eventStream
 
   private var pendingStateNodeHash: Option[ByteString] = None
   private var unknownParentStrikes: Map[ByteString, Int] = Map.empty
@@ -639,12 +639,12 @@ final private class BlockImporterLogic(
             val (blocks, weights) = importedBlocksData.map(data => (data.block, data.weight)).unzip
             broadcastBlocks(blocks, weights)
             updateTxPool(importedBlocksData.map(_.block), Seq.empty)
-            blocks.foreach(b => eventStream.publish(NewBlockImported(b)))
+            blocks.foreach(b => ctx.system.eventStream.tell(EventStream.Publish(NewBlockImported(b))))
             supervisor ! ProgressProtocol.ImportedBlock(block.number, internally)
           case ChainReorganised(oldBranch, newBranch, weights) =>
             updateTxPool(newBranch, oldBranch)
             broadcastBlocks(newBranch, weights)
-            newBranch.foreach(b => eventStream.publish(NewBlockImported(b)))
+            newBranch.foreach(b => ctx.system.eventStream.tell(EventStream.Publish(NewBlockImported(b))))
             newBranch.lastOption.foreach(block => supervisor ! ProgressProtocol.ImportedBlock(block.number, internally))
           case BlockImportFailedDueToMissingNode(missingNodeException) if syncConfig.redownloadMissingStateNodes =>
             // state node re-download will be handled when downloading headers

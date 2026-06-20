@@ -1,10 +1,10 @@
 package com.chipprbots.ethereum.transactions
 
-import org.apache.pekko.actor.Actor
 import org.apache.pekko.actor.ActorRef as ClassicActorRef
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.MailboxSelector
+import org.apache.pekko.actor.typed.eventstream.EventStream
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
@@ -332,7 +332,7 @@ object PendingTransactionsManager {
           val timestamp = System.currentTimeMillis()
           transactionsToAdd.foreach(t => pendingTransactions.put(t.tx.hash, PendingTransaction(t, timestamp)))
           updatePendingNonces(transactionsToAdd)
-          transactionsToAdd.foreach(t => context.system.toClassic.eventStream.publish(NewPendingTransaction(t)))
+          transactionsToAdd.foreach(t => context.system.eventStream.tell(EventStream.Publish(NewPendingTransaction(t))))
           val peers = connectedPeers.values.toSeq
           if peers.nonEmpty then {
             context.self ! NotifyPeers(transactionsToAdd.toSeq, peers)
@@ -363,7 +363,7 @@ object PendingTransactionsManager {
           PendingTransaction(newPendingTx, timestamp, receivedFromLocalSource = true)
         )
         updatePendingNonces(Seq(newPendingTx))
-        context.system.toClassic.eventStream.publish(NewPendingTransaction(newPendingTx))
+        context.system.eventStream.tell(EventStream.Publish(NewPendingTransaction(newPendingTx)))
         val peers = connectedPeers.values.toSeq
         if peers.nonEmpty then {
           context.self ! NotifyPeers(Seq(newPendingTx), peers)
@@ -435,7 +435,7 @@ object PendingTransactionsManager {
             "PooledTransactions from peer {} has type/size mismatch with announcement — disconnecting",
             peerId
           )
-          peerManager ! PeerManagerActor.DisconnectPeerByIdCmd(peerId, Actor.noSender)
+          peerManager ! PeerManagerActor.DisconnectPeerByIdCmd(peerId, ClassicActorRef.noSender)
         } else {
           // Store blob tx sidecar bytes for PooledTransactions responses
           msg.blobTxRawBytes.foreach { case (hash, rawBytes) =>
