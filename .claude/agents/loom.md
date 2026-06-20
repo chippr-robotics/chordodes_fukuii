@@ -305,6 +305,48 @@ case WrappedPeerDisconnected(ev)   => peerListHelper.handlePeerDisconnected(ev);
 Do NOT delete `PeerListSupportNg` — other unmigrated actors still mix it.
 `peerEventBus` stays as Classic `ActorRef` — it updates to Typed when Group NET migrates.
 
+### 13. Scala 3 union types for mixed-message actors
+
+When an actor receives both a public `Command` and a fixed set of internal adapter-wrapped
+messages, prefer a Scala 3 union type over `Behavior[Any]`:
+
+```scala
+// ❌ Behavior[Any] — underspecifies; any message passes type check
+def behavior(): Behavior[Any] = Behaviors.receiveMessage {
+  case cmd: Command => ...
+  case internal: InternalAdapter => ...
+  case _ => Behaviors.same  // required to absorb Classic noise
+}
+
+// ✅ Behavior[Command | InternalAdapter] — documents exact expected message set
+//   Use only when ALL callers are Typed and there is no Classic noise to absorb
+sealed trait InternalAdapter
+private case class WrappedResponse(r: SomeTypedResponse) extends InternalAdapter
+
+def behavior(): Behavior[Command | InternalAdapter] = Behaviors.receiveMessage {
+  case cmd: Command => ...
+  case WrappedResponse(r) => ...
+  // No catch-all needed — compiler rejects unknown message types
+}
+```
+
+**When to use `Behavior[Command | InternalAdapter]`:**
+- All callers are Typed (no `.toClassic` adapter in use)
+- The internal set is closed and finite (messageAdapter wrappers only)
+- No Classic noise expected (no migrating callers still sending arbitrary messages)
+
+**When `Behavior[Any]` is still correct:**
+- Actor exposes `.toClassic` for unmigrated Classic callers
+- Actor uses the `GetStatus`-style self-forward pattern (`ctx.self ! InternalCmd(ctx.toClassic.sender())`)
+- Any `case _ => Behaviors.same` catch-all is load-bearing
+
+**Post-CAPSTONE migration path:** Once all callers of a `Behavior[Any]` actor are Typed,
+narrow in two steps:
+1. Replace `Behavior[Any]` with `Behavior[Command | InternalMsg]` (remove `case _ => Behaviors.same`)
+2. Then merge `InternalMsg` into `Command` (sealed) if all cases belong to the same ADT
+
+---
+
 ## Pre-flight checklist (run before touching any file)
 
 > Full pre-flight protocol: `~/.claude/agent-protocols/pre-migration-checklist.md`

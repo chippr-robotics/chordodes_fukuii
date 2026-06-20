@@ -40,11 +40,23 @@ git -C "$REFS/spec-kit" pull --ff-only 2>/dev/null | grep -v "Already up to date
 
 ---
 
+---
+
+### `fukuii-sync-troubleshooting` / `fukuii-peer-management`
+
+| Repo | Clone as | What to check |
+|------|----------|--------------|
+| Apache Pekko | `repo-references/pekko` | `stream/` — `Source.scala`, `Sink.scala`, materializer internals; `stream-testkit/` — `TestSink`, `TestSource`; `discovery/` — DNS-SD Lookup API |
+| Apache Pekko Management | `repo-references/pekko-management` | `discovery/` — DNS-SD implementation; reference when debugging DnsDiscovery peer lookup failures |
+| devp2p | `repo-references/ethereum/devp2p` | `discv4.md`, `discv5/` — discovery protocol specs; reference when diagnosing ENR or peer discovery failures |
+
+---
+
 ## Sync Relevant Refs (skills)
 
 ```bash
 REFS=$(git rev-parse --show-toplevel)/.claude/repo-references
-for r in spec-kit scala3 scala2 pekko; do
+for r in spec-kit scala3 scala2 pekko pekko-management; do
   git -C "$REFS/$r" pull --ff-only 2>/dev/null | grep -v "Already up to date" || true
 done
 ```

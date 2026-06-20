@@ -7,51 +7,55 @@ Reference repos are cloned locally at `<fukuii-root>/.claude/repo-references/` (
 ```bash
 cd "$(git rev-parse --show-toplevel)/.claude/repo-references"
 
-# Core Language
-git clone https://github.com/scala/scala3.git
-git clone https://github.com/scala/scala.git scala2
-git clone https://github.com/scala/docs.scala-lang.git
+# Core Language (mithril, wraith, prism)
+git clone https://github.com/scala/scala3.git                                    # Scala 3 idioms, changelogs, migration patterns
+git clone https://github.com/scala/scala.git scala2                              # Scala 2 stdlib patterns (migration source reference)
+git clone https://github.com/scala/docs.scala-lang.git                           # Migration cookbook, official style guidance
 
-# Actor Framework
-git clone https://github.com/apache/pekko.git
-git clone https://github.com/apache/pekko-connectors.git        # Batch 1
-git clone https://github.com/apache/pekko-http.git              # Batch 1
+# Actor Framework (loom, herald, flow, conduit)
+git clone https://github.com/apache/pekko.git                                    # Typed actor API, stream internals (stream/, discovery/), testkit
+git clone https://github.com/apache/pekko-connectors.git                         # TCP/UDP/network connector patterns (loom: TCP actor bridges)
+git clone https://github.com/apache/pekko-http.git                               # HTTP/WebSocket routing DSL (conduit: JsonRpcHttpServer routes)
+git clone https://github.com/apache/pekko-management.git                         # DNS-SD, Kubernetes, Consul discovery implementations (herald: DnsDiscovery)
 mkdir -p virtuslab && cd virtuslab
-git clone https://github.com/VirtusLab/pekko-serialization-helper.git
-git clone https://github.com/VirtusLab/scala-skill.git
+git clone https://github.com/VirtusLab/pekko-serialization-helper.git            # @SerializabilityTrait — read before migrating eventStream actors (loom)
+git clone https://github.com/VirtusLab/scala-skill.git                           # IDE-integrated Scala dev patterns (mithril)
 cd ..
 
-# Testing
-git clone https://github.com/scalamock/scalamock.git
-mkdir -p typelevel && cd typelevel                               # Batch 3
-git clone https://github.com/typelevel/cats.git
-git clone https://github.com/typelevel/cats-effect.git
-git clone https://github.com/typelevel/fs2.git
-cd ..
-git clone https://github.com/scalacenter/scalafix.git           # Batch 3
-git clone https://github.com/sksamuel/scapegoat.git             # Batch 3
+# Testing (scalamock: prism, eye; scalafix/scapegoat: mithril, wraith)
+git clone https://github.com/scalamock/scalamock.git                             # Idiomatic Scala 3 mock patterns (prism, eye)
+git clone https://github.com/scalacenter/scalafix.git                            # Custom rule dev, GivenUsing/ExplicitImplicitTypes rules (mithril, wraith)
+git clone https://github.com/sksamuel/scapegoat.git                              # Static analysis inspection catalogue (prism, wraith)
 
-# Spec-Driven Development
-git clone https://github.com/github/spec-kit.git
+# Spec-Driven Development (speckit-* skills)
+git clone https://github.com/github/spec-kit.git                                 # Upstream SDD workflow, templates, CHANGELOG (all speckit skills)
 
-# Ethereum Protocol (ECIPs and EIPs may be copied from local canonical paths)
-git clone https://github.com/ethereumclassic/ECIPs.git          # NOTE: local copy may be ahead of upstream (see note below)
-git clone https://github.com/ethereum/EIPs.git
-mkdir -p ethereum && cd ethereum                                 # Batch 4
-git clone https://github.com/ethereum/devp2p.git                # Batch 1 (devp2p spec)
-git clone https://github.com/ethereum/execution-apis.git        # Batch 2
-git clone https://github.com/ethereum/yellowpaper.git           # Batch 4
-git clone https://github.com/ethereum/consensus-specs.git       # Batch 4
-git clone https://github.com/ethereum/tests.git                 # Batch 4
+# Typelevel functional stack (mithril, and IO-safe logging in all actors)
+mkdir -p typelevel && cd typelevel
+git clone https://github.com/typelevel/cats.git                                  # Functor/Monad/Traverse used in sync pipeline (mithril)
+git clone https://github.com/typelevel/cats-effect.git                           # IO, Resource, Fiber patterns — CE3 (mithril; P11 asyncLog context)
+git clone https://github.com/typelevel/fs2.git                                   # Streaming alt to Pekko Streams — reactive-streams interop (mithril, herald)
+git clone https://github.com/typelevel/log4cats.git                              # IO-safe logging abstraction over SLF4J (wraith, eye — CE logging bugs)
 cd ..
 
-# JSON / Serialization (Batch 2 — CONDUIT work)
-git clone https://github.com/json4s/json4s.git
-git clone https://github.com/circe/circe.git
-git clone https://github.com/sangria-graphql/sangria.git
+# Ethereum Protocol — specs and wire protocol (forge, beacon, herald, conduit)
+git clone https://github.com/ethereumclassic/ECIPs.git                           # ETC fork schedule — LOCAL COPY MAY BE AHEAD (see note below)
+git clone https://github.com/ethereum/EIPs.git                                   # ETH EIP specs (Osaka: EIP-7706, 7939, etc.)
+mkdir -p ethereum && cd ethereum
+git clone https://github.com/ethereum/devp2p.git                                 # RLPx, discv4/v5, ETH68/69/70, SNAP wire specs (herald)
+git clone https://github.com/ethereum/execution-apis.git                         # ETH JSON-RPC spec — eth_*, net_*, web3_* (conduit)
+git clone https://github.com/ethereum/yellowpaper.git                            # Formal EVM/tx spec — last resort when EIP text is ambiguous (forge, beacon)
+git clone https://github.com/ethereum/consensus-specs.git                        # PoS beacon block, withdrawals, execution payload (beacon)
+git clone https://github.com/ethereum/tests.git                                  # Canonical state/blockchain/VM test vectors (forge, beacon, eye)
+cd ..
 
-# Storage (VAULT work)
-git clone https://github.com/facebook/rocksdb.git
+# JSON / Serialization (conduit)
+git clone https://github.com/json4s/json4s.git                                   # JSON-RPC serialization in fukuii — codec bug reference (conduit)
+git clone https://github.com/circe/circe.git                                     # Migration target if json4s replaced; idiomatic Scala 3 codecs (conduit)
+git clone https://github.com/sangria-graphql/sangria.git                         # GraphQL schema/execution in jsonrpc/graphql/ (conduit)
+
+# Storage (vault)
+git clone https://github.com/facebook/rocksdb.git                                # Java API, WriteBatch, WAL, column families, cache tuning (vault)
 ```
 
 > **ECIPs local-ahead note:** The local `repo-references/ECIPs` copy contains Olympia spec
@@ -113,6 +117,40 @@ find "$REFS" -maxdepth 3 -name .git -exec dirname {} \; \
 | **Used by** | `loom`, `herald` |
 | **Key paths** | `AGENTS.md` · `actor-typed/src/main/scala/` · `CHANGELOG.md` · `serialization/` |
 | **Why** | Canonical Typed actor API patterns; MiMa binary-compat rules; formatting and licensing rules from `AGENTS.md`; serialization marker interfaces |
+
+### Actor Framework — Apache Pekko Streams
+
+> Note: Pekko Streams is inside the pekko monorepo. Key paths listed here for direct navigation.
+
+| | |
+|---|---|
+| **GitHub** | https://github.com/apache/pekko (subpath: `stream/`) |
+| **Clone as** | `repo-references/pekko` (already cloned — navigate to `stream/`) |
+| **Used by** | `flow`, `loom`, `herald` |
+| **Key paths** | `stream/src/main/scala/org/apache/pekko/stream/scaladsl/` — `Source.scala`, `Sink.scala`, `Flow.scala`, `Keep.scala` · `stream/src/main/scala/org/apache/pekko/stream/impl/fusing/` — materializer internals · `stream-testkit/src/main/scala/` — `TestSink`, `TestSource`, `TestPublisher` |
+| **Why** | Canonical streaming API patterns; materialization internals (how `preMaterialize()` creates an async Reactive Streams Publisher/Subscriber boundary — root cause of CAPSTONE bug `bc2a7a2fc`); test utilities |
+
+### Actor Framework — Apache Pekko Discovery
+
+> Note: Pekko Discovery is inside the pekko monorepo. Key paths listed here for direct navigation.
+
+| | |
+|---|---|
+| **GitHub** | https://github.com/apache/pekko (subpath: `discovery/`) |
+| **Clone as** | `repo-references/pekko` (already cloned — navigate to `discovery/`) |
+| **Used by** | `herald`, `flow` |
+| **Key paths** | `discovery/src/main/scala/org/apache/pekko/discovery/` — `Lookup`, `ServiceDiscovery`, `SimpleServiceDiscovery` · `discovery/src/main/resources/reference.conf` |
+| **Why** | DNS-SD Lookup API used by `DnsDiscovery.scala` in fukuii. Reference when modifying peer discovery or adding new discovery backends. |
+
+### Actor Framework — Apache Pekko Management
+
+| | |
+|---|---|
+| **GitHub** | https://github.com/apache/pekko-management |
+| **Clone as** | `repo-references/pekko-management` |
+| **Used by** | `herald` |
+| **Key paths** | `discovery/` — DNS-SD, Kubernetes, Consul discovery implementations · `management/` — HTTP management API · `README.md` |
+| **Why** | Concrete discovery implementations for DNS-based peer lookup. Reference when `DnsDiscovery` needs to be updated or a new discovery mechanism (K8s, Consul) is considered. |
 
 ### Actor Framework — Pekko Serialization Helper (VirtusLab)
 
@@ -277,6 +315,16 @@ find "$REFS" -maxdepth 3 -name .git -exec dirname {} \; \
 | **Used by** | `prism`, `wraith` |
 | **Key paths** | `src/main/scala/com/sksamuel/scapegoat/inspections/` · `README.md` |
 | **Why** | Understanding which inspections are enabled/disabled in `build.sbt`; reference for false-positive patterns before suppressing a warning |
+
+### Typelevel — log4cats
+
+| | |
+|---|---|
+| **GitHub** | https://github.com/typelevel/log4cats |
+| **Clone as** | `repo-references/typelevel/log4cats` |
+| **Used by** | `mithril`, `wraith`, `eye` |
+| **Key paths** | `core/src/main/scala/org/typelevel/log4cats/` — `Logger`, `SelfAwareLogger`, `LoggerFactory` · `slf4j/src/` — SLF4J backend integration |
+| **Why** | fukuii uses `log4cats-core` + `log4cats-slf4j` as the IO-safe logging abstraction. Reference when fixing CE3 logging bugs (IO-context vs actor-thread logging), when migrating from `ctx.log` to `asyncLog`, or when reviewing logger acquisition patterns in non-actor modules. |
 
 ### Typelevel — Cats (Batch 3)
 
