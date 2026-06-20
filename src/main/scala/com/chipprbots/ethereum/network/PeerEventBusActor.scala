@@ -39,17 +39,13 @@ object PeerEventBusActor {
       messageClassifier: MessageClassifier
   ): Source[MessageFromPeer, NotUsed] =
     Source
-      .fromMaterializer { (mat, _) =>
-        val (actorRef, src) = Source
-          // Buffer 64 + dropHead: an event-bus relay should absorb bursty peer messages, not die
-          // on the first race. Buffer-1 + fail made PeerEventBusActorSpec flaky (BufferOverflowException).
-          .actorRef[MessageFromPeer](PartialFunction.empty, PartialFunction.empty, 64, OverflowStrategy.dropHead)
-          .watch(peerEventBus.toClassic)
-          .preMaterialize()(mat)
+      // Buffer 64 + dropHead: absorbs bursty peer messages without dying on a race.
+      .actorRef[MessageFromPeer](PartialFunction.empty, PartialFunction.empty, 64, OverflowStrategy.dropHead)
+      .watch(peerEventBus.toClassic)
+      .mapMaterializedValue { actorRef =>
         peerEventBus ! SubscribeCmd(messageClassifier, actorRef)
-        src
+        NotUsed
       }
-      .mapMaterializedValue(_ => NotUsed)
 
   sealed trait PeerSelector {
     def contains(peerId: PeerId): Boolean
