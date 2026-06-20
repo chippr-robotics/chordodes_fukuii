@@ -513,7 +513,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
   }
 
   trait TestSetup extends EphemBlockchainTestSetup {
-    implicit override lazy val system: ActorSystem = ActorSystem("PeersInfoHolderSpec_System")
+    implicit override lazy val classicSystem: ActorSystem = ActorSystem("PeersInfoHolderSpec_System")
 
     blockchainWriter.storeBlockHeader(Fixtures.Blocks.Genesis.header).commit()
 

@@ -136,7 +136,7 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
   // ─── Test setup ───────────────────────────────────────────────────────────
 
   trait TestSetup extends EphemBlockchainTestSetup {
-    implicit override lazy val system: ActorSystem = ActorSystem("BestNetworkTipTrackingSpec_System")
+    implicit override lazy val classicSystem: ActorSystem = ActorSystem("BestNetworkTipTrackingSpec_System")
 
     blockchainWriter.storeBlockHeader(Fixtures.Blocks.Genesis.header).commit()
 

@@ -99,13 +99,13 @@ class PeerActorSpec
 
   it should "try to reconnect on broken rlpx connection" taggedAs (UnitTest, NetworkTest) in new NodeStatusSetup
     with HandshakerSetup {
-    implicit override lazy val system: ActorSystem =
+    implicit override lazy val classicSystem: ActorSystem =
       ActorSystem("PeerActorSpec_System", ConfigFactory.load("explicit-scheduler"))
     override def protocol: Capability = Capability.ETH63
 
-    def testScheduler: ExplicitlyTriggeredScheduler = system.scheduler.asInstanceOf[ExplicitlyTriggeredScheduler]
+    def testScheduler: ExplicitlyTriggeredScheduler = classicSystem.scheduler.asInstanceOf[ExplicitlyTriggeredScheduler]
 
-    val peerMessageBus: ActorRef = system.actorOf(PeerEventBusActor.props)
+    val peerMessageBus: ActorRef = classicSystem.actorOf(PeerEventBusActor.props)
     var rlpxConnection: TestProbe = TestProbe() // var as we actually need new instances
     val knownNodesManager: TestProbe = TestProbe()
 
@@ -542,8 +542,8 @@ class PeerActorSpec
   trait TestSetup extends NodeStatusSetup with BlockUtils with HandshakerSetup {
     override def protocol: Capability = Capability.ETH63
 
-    // Override system to use the explicit scheduler from TestKit
-    implicit override lazy val system: ActorSystem = PeerActorSpec.this.system
+    // Override classicSystem to use the explicit scheduler from TestKit
+    implicit override lazy val classicSystem: ActorSystem = PeerActorSpec.this.system
 
     val genesisHash = genesisBlock.hash
 
@@ -551,9 +551,9 @@ class PeerActorSpec
 
     val rlpxConnection: TestProbe = TestProbe()
 
-    def testScheduler: ExplicitlyTriggeredScheduler = system.scheduler.asInstanceOf[ExplicitlyTriggeredScheduler]
+    def testScheduler: ExplicitlyTriggeredScheduler = classicSystem.scheduler.asInstanceOf[ExplicitlyTriggeredScheduler]
 
-    val peerMessageBus: ActorRef = system.actorOf(PeerEventBusActor.props)
+    val peerMessageBus: ActorRef = classicSystem.actorOf(PeerEventBusActor.props)
 
     val knownNodesManager: TestProbe = TestProbe()
 

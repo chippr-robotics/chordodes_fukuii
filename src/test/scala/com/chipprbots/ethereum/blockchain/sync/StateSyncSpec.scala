@@ -136,7 +136,7 @@ class StateSyncSpec
   }
 
   class TestSetup extends EphemBlockchainTestSetup with TestSyncConfig {
-    implicit override lazy val system: ActorSystem = StateSyncSpec.this.system
+    implicit override lazy val classicSystem: ActorSystem = StateSyncSpec.this.system
     type PeerConfig = Map[PeerId, PeerAction]
     val syncInit: TestProbe = TestProbe()
 
@@ -256,7 +256,7 @@ class StateSyncSpec
 
     lazy val syncStateSchedulerActor: ActorRef = {
       val (blockchainReader, _) = buildBlockChain()
-      system.actorOf(
+      classicSystem.actorOf(
         SyncStateSchedulerActor.props(
           SyncStateScheduler(
             blockchainReader,
@@ -269,7 +269,7 @@ class StateSyncSpec
           networkPeerManager.ref,
           peerEventBus.ref,
           blacklist,
-          system.scheduler
+          classicSystem.scheduler
         )
       )
     }

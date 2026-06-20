@@ -4,7 +4,8 @@ import java.time.Clock
 import java.util.concurrent.atomic.AtomicReference
 
 import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
@@ -110,7 +111,16 @@ trait AsyncConfigBuilder {
 
 trait ActorSystemBuilder {
   self: InstanceConfigProvider =>
-  implicit lazy val system: ActorSystem = ActorSystem(s"fukuii_${instanceConfig.instanceId}", ConfigFactory.load())
+  // Physical Classic ActorSystem. Not implicit — callers use classicSystem directly.
+  // Test builders inherit this without getting a Typed system: ActorSystem[Nothing] collision.
+  lazy val classicSystem: org.apache.pekko.actor.ActorSystem =
+    org.apache.pekko.actor.ActorSystem(s"fukuii_${instanceConfig.instanceId}", ConfigFactory.load())
+}
+
+// Mixed into production Node only. Wraps the Classic system as the Typed surface used by builders.
+trait TypedActorSystemProvider {
+  self: ActorSystemBuilder =>
+  implicit lazy val system: ActorSystem[Nothing] = classicSystem.toTyped
 }
 
 trait PruningConfigBuilder extends PruningModeComponent {
@@ -162,7 +172,7 @@ trait KnownNodesManagerBuilder {
 
   // Typed ref — for in-scope callers and direct Typed wiring.
   lazy val knownNodesManagerTyped: org.apache.pekko.actor.typed.ActorRef[KnownNodesManager.Command] =
-    system.spawn(
+    classicSystem.spawn(
       KnownNodesManager(knownNodesManagerConfig, storagesInstance.storages.knownNodesStorage),
       "known-nodes-manager-typed"
     )
@@ -171,7 +181,7 @@ trait KnownNodesManagerBuilder {
   // Translates the legacy GetKnownNodes case object to the Typed ask pattern (replying to the
   // original sender), and forwards all other KnownNodesManager Commands directly.
   lazy val knownNodesManager: ActorRef =
-    system.actorOf(
+    classicSystem.actorOf(
       org.apache.pekko.actor.Props(new org.apache.pekko.actor.Actor {
         implicit private val scheduler: org.apache.pekko.actor.typed.Scheduler =
           context.system.toTyped.scheduler
@@ -206,7 +216,7 @@ trait PeerDiscoveryManagerBuilder {
 
   // Typed ref — for in-scope callers and direct Typed wiring.
   lazy val peerDiscoveryManagerTyped: org.apache.pekko.actor.typed.ActorRef[PeerDiscoveryManager.Command] =
-    system.spawn(
+    classicSystem.spawn(
       PeerDiscoveryManager(
         localNodeId = ByteString(nodeStatusHolder.get.nodeId),
         discoveryConfig,
@@ -235,7 +245,7 @@ trait PeerDiscoveryManagerBuilder {
   // a typed replyTo. Forwards PeerDiscoveryManager.Command messages (Start, Stop) directly.
   // Remove once PeerManagerActor and StdNode are migrated to Typed.
   lazy val peerDiscoveryManager: ActorRef =
-    system.actorOf(
+    classicSystem.actorOf(
       org.apache.pekko.actor.Props(new org.apache.pekko.actor.Actor {
         def receive: Receive = {
           case PeerDiscoveryManager.GetDiscoveredNodesInfo =>
@@ -366,7 +376,7 @@ trait AuthHandshakerBuilder {
 trait PeerEventBusBuilder {
   self: ActorSystemBuilder =>
 
-  lazy val peerEventBus: ActorRef = system.actorOf(PeerEventBusActor.props, "peer-event-bus")
+  lazy val peerEventBus: ActorRef = classicSystem.actorOf(PeerEventBusActor.props, "peer-event-bus")
 }
 
 trait PeerStatisticsBuilder {
@@ -374,7 +384,7 @@ trait PeerStatisticsBuilder {
 
   implicit val clock: Clock = Clock.systemUTC()
 
-  lazy val peerStatistics: org.apache.pekko.actor.typed.ActorRef[PeerStatisticsActor.Command] = system.spawn(
+  lazy val peerStatistics: org.apache.pekko.actor.typed.ActorRef[PeerStatisticsActor.Command] = classicSystem.spawn(
     PeerStatisticsActor(
       peerEventBus,
       // `slotCount * slotDuration` should be set so that it's at least as long
@@ -402,7 +412,7 @@ trait PeerManagerActorBuilder {
 
   lazy val peerConfiguration: PeerConfiguration = instanceConfig.Network.peer
 
-  lazy val peerManager: ActorRef = system.actorOf(
+  lazy val peerManager: ActorRef = classicSystem.actorOf(
     PeerManagerActor.props(
       peerDiscoveryManagerTyped,
       instanceConfig.Network.peer,
@@ -429,7 +439,7 @@ trait NetworkPeerManagerActorBuilder {
     with BlockchainBuilder
     with BlockchainConfigBuilder =>
 
-  lazy val networkPeerManager: ActorRef = system.actorOf(
+  lazy val networkPeerManager: ActorRef = classicSystem.actorOf(
     NetworkPeerManagerActor
       .props(
         peerManager,
@@ -455,7 +465,7 @@ trait BlockchainHostBuilder {
     with PeerEventBusBuilder
     with PendingTransactionsManagerBuilder =>
 
-  val blockchainHost: org.apache.pekko.actor.typed.ActorRef[BlockchainHostActor.Command] = system.spawn(
+  val blockchainHost: org.apache.pekko.actor.typed.ActorRef[BlockchainHostActor.Command] = classicSystem.spawn(
     BlockchainHostActor(
       blockchainReader,
       storagesInstance.storages.evmCodeStorage,
@@ -481,7 +491,7 @@ trait ServerActorBuilder {
   lazy val networkConfig = instanceConfig.Network
 
   lazy val server: org.apache.pekko.actor.typed.ActorRef[ServerActor.Command] =
-    system.spawn(ServerActor(nodeStatusHolder, peerManager, blacklist), "server")
+    classicSystem.spawn(ServerActor(nodeStatusHolder, peerManager, blacklist), "server")
 
 }
 
@@ -518,7 +528,7 @@ object PendingTransactionsManagerBuilder {
 
     lazy val pendingTransactionsManagerTyped
         : org.apache.pekko.actor.typed.ActorRef[PendingTransactionsManager.Command] =
-      system.spawn(
+      classicSystem.spawn(
         PendingTransactionsManager(
           txPoolConfig,
           peerManager,
@@ -534,7 +544,7 @@ object PendingTransactionsManagerBuilder {
     // Translates the legacy GetPendingTransactions case object to the Typed ask pattern,
     // and forwards all other PTM Commands directly.
     lazy val pendingTransactionsManager: ActorRef =
-      system.actorOf(
+      classicSystem.actorOf(
         org.apache.pekko.actor.Props(new org.apache.pekko.actor.Actor {
           implicit private val scheduler: org.apache.pekko.actor.typed.Scheduler =
             context.system.toTyped.scheduler
@@ -583,7 +593,7 @@ trait FilterManagerBuilder {
     with MiningBuilder =>
 
   lazy val filterManager: org.apache.pekko.actor.typed.ActorRef[FilterManager.Command] =
-    system.spawn(
+    classicSystem.spawn(
       FilterManager(
         blockchainReader,
         mining.blockGenerator,
@@ -671,7 +681,7 @@ trait EthMiningServiceBuilder {
     txPoolConfig.getTransactionFromPoolTimeout,
     this,
     coinbaseProvider,
-    system
+    classicSystem
   )
 }
 trait EthTxServiceBuilder {
@@ -721,7 +731,7 @@ trait EthFilterServiceBuilder {
     filterManager,
     filterConfig,
     blockchainReader
-  )(system)
+  )(classicSystem)
 }
 
 trait PersonalServiceBuilder {
@@ -778,7 +788,7 @@ trait McpServiceBuilder {
     blockchainConfig,
     nodeStatusHolder,
     storagesInstance.storages.transactionMappingStorage
-  )(system.dispatcher)
+  )(classicSystem.dispatcher)
 }
 
 trait KeyStoreBuilder {
@@ -964,7 +974,7 @@ trait EngineApiBuilder {
   lazy val forkChoiceManager: ForkChoiceManager = new ForkChoiceManager(blockchainReader, blockchainWriter)
 
   lazy val engineApiService: EngineApiService = {
-    implicit val typedScheduler: org.apache.pekko.actor.typed.Scheduler = system.toTyped.scheduler
+    implicit val typedScheduler: org.apache.pekko.actor.typed.Scheduler = classicSystem.toTyped.scheduler
     new EngineApiService(
       blockchainReader,
       blockchainWriter,
@@ -1004,7 +1014,7 @@ trait GraphQLServiceBuilder {
   lazy val maybeGraphQLService: Option[com.chipprbots.ethereum.jsonrpc.graphql.GraphQLService] =
     if !graphQLConfig.enabled then None
     else {
-      implicit val ec: scala.concurrent.ExecutionContext = system.dispatcher
+      implicit val ec: scala.concurrent.ExecutionContext = classicSystem.dispatcher
       implicit val runtime: cats.effect.unsafe.IORuntime = cats.effect.unsafe.IORuntime.global
       val ctx = com.chipprbots.ethereum.jsonrpc.graphql.GraphQLContext(
         blockchain = blockchain,
@@ -1038,7 +1048,8 @@ trait JSONRpcHttpServerBuilder {
     with SSLContextBuilder
     with GraphQLServiceBuilder =>
 
-  lazy val maybeJsonRpcHttpServer: Either[String, JsonRpcHttpServer] =
+  lazy val maybeJsonRpcHttpServer: Either[String, JsonRpcHttpServer] = {
+    given org.apache.pekko.actor.ActorSystem = classicSystem
     JsonRpcHttpServer(
       jsonRpcController,
       jsonRpcHealthChecker,
@@ -1046,6 +1057,7 @@ trait JSONRpcHttpServerBuilder {
       () => sslContext("fukuii.network.rpc.http"),
       maybeGraphQLService
     )
+  }
 }
 
 trait JSONRpcIpcServerBuilder {
@@ -1058,7 +1070,7 @@ trait SubscriptionManagerBuilder {
   self: ActorSystemBuilder with BlockchainBuilder =>
 
   lazy val subscriptionManager: org.apache.pekko.actor.typed.ActorRef[SubscriptionManager.Command] =
-    system.spawn(
+    classicSystem.spawn(
       SubscriptionManager(blockchainReader),
       "subscription-manager"
     )
@@ -1072,7 +1084,7 @@ trait JSONRpcWsServerBuilder {
       jsonRpcController,
       subscriptionManager,
       jsonRpcConfig.wsServerConfig
-    )(system)
+    )(classicSystem)
 }
 
 trait OmmersPoolBuilder {
@@ -1080,7 +1092,7 @@ trait OmmersPoolBuilder {
 
   lazy val ommersPoolSize: Int = 30
   lazy val ommersPool: org.apache.pekko.actor.typed.ActorRef[OmmersPool.Command] =
-    system.spawn(OmmersPool(blockchainReader, ommersPoolSize), "ommers-pool")
+    classicSystem.spawn(OmmersPool(blockchainReader, ommersPoolSize), "ommers-pool")
 }
 
 trait VmBuilder {
@@ -1135,7 +1147,7 @@ trait SyncControllerBuilder extends SyncControllerRefBuilder {
   // SyncController is Pekko Typed (Group ROOT) — a `Behavior[Any]`. Spawn it via the Classic→Typed adapter and convert
   // the resulting Typed ref back to Classic so all callers (`syncController: ActorRef`, the JSON-RPC `askFor` path,
   // `ForkChoiceManager.setListener`) keep compiling. The root flip to a fully-Typed ref is CAPSTONE.
-  lazy val syncController: ActorRef = system
+  lazy val syncController: ActorRef = classicSystem
     .spawn(
       SyncController(
         blockchain,
@@ -1261,6 +1273,7 @@ trait Node
     with SecureRandomBuilder
     with NodeKeyBuilder
     with ActorSystemBuilder
+    with TypedActorSystemProvider
     with StorageBuilder
     with BlockchainBuilder
     with MESSBuilder

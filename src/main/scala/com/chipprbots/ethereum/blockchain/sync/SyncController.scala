@@ -832,9 +832,9 @@ object SyncController {
 
     /** Internal `Behavior[Any]` self / death-watch markers that must NEVER be forwarded to a Classic child. A watched
       * child can terminate after the parent has already transitioned to a state that does not handle its marker (e.g.
-      * `RegularSyncStuck` poison-pills regularSync and enters `runningSnapSync`); the late `RegularSyncTerminated`
-      * then lands in `runningSnapSync`'s catch-all. Without this guard it would be `tell`-forwarded to the SNAP child
-      * and crash it with a ClassCastException. Every forwarding catch-all drops these silently.
+      * `RegularSyncStuck` poison-pills regularSync and enters `runningSnapSync`); the late `RegularSyncTerminated` then
+      * lands in `runningSnapSync`'s catch-all. Without this guard it would be `tell`-forwarded to the SNAP child and
+      * crash it with a ClassCastException. Every forwarding catch-all drops these silently.
       */
     private def isInternalMarker(msg: Any): Boolean = msg match {
       case _: SnapSyncTerminated         => true

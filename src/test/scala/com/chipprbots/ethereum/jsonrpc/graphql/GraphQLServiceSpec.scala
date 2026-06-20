@@ -141,7 +141,7 @@ class GraphQLServiceSpec
     val syncProbe: TestProbe = TestProbe()
     val pendingTxProbe: TestProbe = TestProbe()
     val filterManager: org.apache.pekko.actor.typed.ActorRef[FilterManager.Command] =
-      system.spawnAnonymous(Behaviors.ignore[FilterManager.Command])
+      system.classicSystem.spawnAnonymous(Behaviors.ignore[FilterManager.Command])
 
     lazy val ethBlocksService = new EthBlocksService(
       blockchain,

@@ -164,10 +164,10 @@ class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers {
   }
 
   trait TestSetup extends EphemBlockchainTestSetup {
-    implicit override lazy val system: ActorSystem =
+    implicit override lazy val classicSystem: ActorSystem =
       ActorSystem("PeerActorSpec_System", ConfigFactory.load("explicit-scheduler"))
 
-    def testScheduler: ExplicitlyTriggeredScheduler = system.scheduler.asInstanceOf[ExplicitlyTriggeredScheduler]
+    def testScheduler: ExplicitlyTriggeredScheduler = classicSystem.scheduler.asInstanceOf[ExplicitlyTriggeredScheduler]
 
     val uri = new URI(
       "enode://18a551bee469c2e02de660ab01dede06503c986f6b8520cb5a65ad122df88b17b285e3fef09a40a0d44f99e014f8616cf1ebc2e094f96c6e09e2f390f5d34857@47.90.36.129:30303"
@@ -191,7 +191,7 @@ class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers {
     )
 
     def expectStatus(peer: TestActorRef[Nothing], expected: StatusResponse): Unit = {
-      val statusProbe: TestProbe = TestProbe()(system)
+      val statusProbe: TestProbe = TestProbe()(classicSystem)
       peer ! GetStatus(statusProbe.ref.toTyped[StatusResponse])
       statusProbe.expectMsg(expected)
     }

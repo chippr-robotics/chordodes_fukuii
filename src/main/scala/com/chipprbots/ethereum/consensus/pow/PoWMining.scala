@@ -109,7 +109,7 @@ class PoWMining private (
           case PoW | RestrictedPoW =>
             log.info("Instantiating PoWMiningCoordinator")
             minerCoordinatorRef = Some(
-              node.system.spawn(
+              node.system.classicSystem.spawn(
                 PoWMiningCoordinator(
                   node.syncController,
                   node.ethMiningService,
@@ -123,7 +123,7 @@ class PoWMining private (
             )
           case MockedPow =>
             log.info("Instantiating MockedMiner")
-            minerSystem = Some(node.system.toTyped)
+            minerSystem = Some(node.system)
             mockedMinerRef = Some(MockedMiner.spawn(node))
           case EngineApi =>
             log.info("Engine API mode — mining disabled (blocks from CL)")
@@ -152,7 +152,7 @@ class PoWMining private (
             mining = mining,
             ommersPool = node.ommersPool,
             coinbaseProvider = node.coinbaseProvider,
-            system = node.system
+            system = node.system.classicSystem
           )
         case mining => wrongMiningArgument[PoWMining](mining)
       }

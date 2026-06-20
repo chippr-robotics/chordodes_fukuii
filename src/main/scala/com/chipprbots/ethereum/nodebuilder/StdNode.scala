@@ -228,7 +228,7 @@ abstract class BaseNode extends Node {
         Some(syncController),
         Config.blockchains.network,
         shutdown
-      )(using system)
+      )(using system.classicSystem)
       tuiUpdater = Some(updater)
       updater.start()
     }
@@ -246,7 +246,7 @@ abstract class BaseNode extends Node {
     tryAndLogFailure(() => mining.stopProtocol())
     tryAndLogFailure(() =>
       Await.ready(
-        system
+        system.classicSystem
           .terminate()
           .map(
             _ ->

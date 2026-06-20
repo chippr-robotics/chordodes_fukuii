@@ -81,9 +81,9 @@ object MockedMiner {
           mining = mining,
           ommersPool = node.ommersPool,
           coinbaseProvider = node.coinbaseProvider,
-          system = node.system
+          system = node.system.classicSystem
         )
-        node.system.spawn(
+        node.system.classicSystem.spawn(
           MockedMiner(
             blockchainReader = node.blockchainReader,
             blockCreator = blockCreator,

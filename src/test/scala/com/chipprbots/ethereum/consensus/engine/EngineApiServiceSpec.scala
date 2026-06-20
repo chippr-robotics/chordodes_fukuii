@@ -154,13 +154,13 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       lazy val forkChoiceManager = new ForkChoiceManager(blockchainReader, blockchainWriter)
       lazy val pendingTxManager: org.apache.pekko.actor.typed.ActorRef[
         com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
-      ] = system.spawn(
+      ] = classicSystem.spawn(
         org.apache.pekko.actor.typed.scaladsl.Behaviors.ignore[
           com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
         ],
         "ptm-ignore-engine-spec"
       )
-      implicit lazy val typedScheduler: org.apache.pekko.actor.typed.Scheduler = system.toTyped.scheduler
+      implicit lazy val typedScheduler: org.apache.pekko.actor.typed.Scheduler = classicSystem.toTyped.scheduler
 
       lazy val engineApi = new EngineApiService(
         blockchainReader,
@@ -572,8 +572,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       .taggedAs(UnitTest) in new EngineApiTestSetup {
       import org.apache.pekko.testkit.TestProbe
 
-      // EphemBlockchainTestSetup provides `system: ActorSystem` for us.
-      val probe: TestProbe = TestProbe()(system)
+      val probe: TestProbe = TestProbe()(classicSystem)
       forkChoiceManager.setListener(probe.ref)
 
       val unknownHead: ByteString = ByteString(Array.fill(32)(0xab.toByte))

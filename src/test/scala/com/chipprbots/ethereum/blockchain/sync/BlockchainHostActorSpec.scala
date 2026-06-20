@@ -347,7 +347,7 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
   }
 
   trait TestSetup extends EphemBlockchainTestSetup {
-    implicit override lazy val system: ActorSystem = ActorSystem("BlockchainHostActor_System")
+    implicit override lazy val classicSystem: ActorSystem = ActorSystem("BlockchainHostActor_System")
 
     blockchainWriter.storeBlockHeader(Fixtures.Blocks.Genesis.header).commit()
 
@@ -395,7 +395,7 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
     val pendingTxManager: TestProbe = TestProbe()
 
     val blockchainHost: org.apache.pekko.actor.typed.ActorRef[BlockchainHostActor.Command] =
-      system.spawn(
+      classicSystem.spawn(
         BlockchainHostActor(
           blockchainReader,
           storagesInstance.storages.evmCodeStorage,

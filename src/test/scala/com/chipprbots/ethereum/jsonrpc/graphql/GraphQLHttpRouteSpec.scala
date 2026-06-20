@@ -122,7 +122,7 @@ class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRoute
   // -------------------------------------------------------------------------
   abstract class TestSetup(val graphQLEnabled: Boolean = true) extends EphemBlockchainTestSetup {
 
-    implicit override lazy val system: ActorSystem = GraphQLHttpRouteSpec.this.system
+    implicit override lazy val classicSystem: ActorSystem = GraphQLHttpRouteSpec.this.system
 
     val blockGenerator: PoWBlockGenerator = mock[PoWBlockGenerator]
     override lazy val mining: TestMining = buildTestMining().withBlockGenerator(blockGenerator)
@@ -135,7 +135,7 @@ class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRoute
     val syncProbe: TestProbe = TestProbe()
     val pendingTxProbe: TestProbe = TestProbe()
     val filterManager: org.apache.pekko.actor.typed.ActorRef[FilterManager.Command] =
-      system.spawnAnonymous(Behaviors.ignore[FilterManager.Command])
+      classicSystem.spawnAnonymous(Behaviors.ignore[FilterManager.Command])
 
     lazy val ethBlocksService = new EthBlocksService(blockchain, blockchainReader, mining, blockQueue)
     lazy val ethTxService = new EthTxService(
@@ -173,7 +173,7 @@ class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRoute
       blockchainReader
     )
 
-    implicit val ec: ExecutionContext = system.dispatcher
+    implicit val ec: ExecutionContext = classicSystem.dispatcher
 
     val graphQLSvc: Option[GraphQLService] =
       if !graphQLEnabled then None
