@@ -68,7 +68,8 @@ Tracked protocols that all agents reference live in `.claude/agent-protocols/`:
 | `inline-cleanup.md` | "Hunt and seek" — what to fix opportunistically, what to log in CHASE-QUEUE |
 | `logging-standards.md` | Preferred logging API, levels, message format, SLF4J patterns |
 | `scala3-style.md` | S1-S10 Scala 3 standards with grep-verifiable ratchets |
-| `pekko-typed-api.md` | P1-P9 Pekko Typed API preferences for migration and new code |
+| `scala3-given-migration.md` | G1-G3 operational pitfalls for `given/using` migration (P3a findings, applies to P3b) |
+| `pekko-typed-api.md` | P1-P13 Pekko Typed API preferences for migration and new code |
 | `pre-migration-checklist.md` | LOOM pre-flight: grep each actor for sender(), returns, timers, workers before migrating |
 | `migration-handoff.md` | Continuation file protocol when a thread ends mid-migration |
 | `storage-rocksdb.md` | DataSource contract, column families, iterator lifecycle, WriteBatch, EphemDataSource, RocksDB config |

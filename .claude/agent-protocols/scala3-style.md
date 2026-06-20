@@ -48,22 +48,27 @@ Exception: JNI/interop boundary code — narrow `@nowarn` + comment.
 ---
 
 ### S3 — `given/using` over `implicit`
-**Status:** Not yet started (Part 3a, after Pekko migration).
+**Status:** COMPLETE — W2-P3a (`7210311bb`, 334 sites). Override-chain sites
+intentionally kept as `implicit val/lazy val` (see `scala3-given-migration.md` G3).
 
 ```bash
 grep -rn "implicit val\|implicit def\|implicit lazy val" src/main/ --include="*.scala" \
-  | grep -v "consensus/\|vm/\|crypto/\|//\|@nowarn"
-# Target: 0 hits (consensus excluded — FORGE review required)
+  | grep -v "consensus/\|vm/\|crypto/\|//\|@nowarn\|not given.*override"
+# Target: only the intentional override-chain sites (annotated with "not given" comment)
 ```
 
-Fix: `implicit val x: T = ...` → `given x: T = ...`; function params `(implicit x: T)` → `(using x: T)`.
-Ratchet: GivenUsing scalafix rule (add to `.scalafix.conf` after Part 3a complete).
-**Do not start until Pekko migration (Part 2) is complete.**
+Ratchet: GivenUsing scalafix rule — add to `.scalafix.conf` after confirming
+override-chain `implicit val` sites are excluded from the rule.
+
+**Operational gotchas (discovered P3a):** See `scala3-given-migration.md` for:
+- G1: `import X.{given, *}` required at call sites after companion conversion
+- G2: anonymous `given` instances need explicit type annotations
+- G3: `given` is final — override chains must stay `implicit val/lazy val`
 
 ---
 
 ### S4 — Extension methods over `implicit class`
-**Status:** Not yet started (Part 3b, after Part 3a).
+**Status:** Not yet started (Part 3b, after Part 3a — P3a now complete).
 
 ```bash
 grep -rn "implicit class\b" src/main/ --include="*.scala" | grep -v "//\|consensus/\|vm/"
