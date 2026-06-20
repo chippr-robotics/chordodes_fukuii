@@ -3,7 +3,6 @@ package com.chipprbots.ethereum.network.snapserver
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -58,19 +57,21 @@ class SnapServingActorSpec extends AnyFlatSpec with Matchers with MockFactory wi
       evmCodeStorageOpt: Option[com.chipprbots.ethereum.db.storage.EvmCodeStorage] = None,
       mptStorageOpt: Option[com.chipprbots.ethereum.db.storage.MptStorage] = None,
       blockchainReader: Option[BlockchainReader] = None
-  ): ActorRef = TestActorRef(
-    NetworkPeerManagerActor.props(
-      peerManagerActor = peerManager.ref,
-      peerEventBusActor = peerEventBus.ref.toTyped[PeerEventBusActor.Command],
-      appStateStorage = appStateStorage,
-      forkResolverOpt = None,
-      snapSyncControllerOpt = None,
-      evmCodeStorageOpt = evmCodeStorageOpt,
-      mptStorageOpt = mptStorageOpt,
-      blockchainReader = blockchainReader,
-      isPoWChain = false
+  ): ActorRef = system
+    .spawnAnonymous(
+      NetworkPeerManagerActor.behavior(
+        peerManagerActor = peerManager.ref.toTyped[PeerManagerActor.Command],
+        peerEventBusActor = peerEventBus.ref.toTyped[PeerEventBusActor.Command],
+        appStateStorage = appStateStorage,
+        forkResolverOpt = None,
+        initialSnapSyncControllerOpt = None,
+        evmCodeStorageOpt = evmCodeStorageOpt,
+        mptStorageOpt = mptStorageOpt,
+        blockchainReader = blockchainReader,
+        isPoWChain = false
+      )
     )
-  )
+    .toClassic
 
   /** Build a state trie with n EOA accounts and return (rootHash, storage). */
   private def buildAccountTrie(n: Int): (ByteString, TestMptStorage) = {
@@ -82,8 +83,8 @@ class SnapServingActorSpec extends AnyFlatSpec with Matchers with MockFactory wi
   }
 
   /** Drain one outbound SendMessage from the peerManager probe. */
-  private def nextSend(pm: TestProbe): PeerManagerActor.SendMessage =
-    pm.expectMsgType[PeerManagerActor.SendMessage](2.seconds)
+  private def nextSend(pm: TestProbe): PeerManagerActor.SendMessageCmd =
+    pm.expectMsgType[PeerManagerActor.SendMessageCmd](2.seconds)
 
   // ── Test 1: unknown peer → response still served ────────────────────────────
   //

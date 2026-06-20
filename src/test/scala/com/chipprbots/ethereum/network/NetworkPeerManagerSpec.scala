@@ -3,9 +3,7 @@ package com.chipprbots.ethereum.network
 import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.actor.Props
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -572,17 +570,17 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     val peerManager: TestProbe = TestProbe()
     val peerEventBus: TestProbe = TestProbe()
 
-    val peersInfoHolder: TestActorRef[Nothing] = TestActorRef(
-      Props(
-        new NetworkPeerManagerActor(
-          peerManager.ref,
+    val peersInfoHolder = classicSystem
+      .spawnAnonymous(
+        NetworkPeerManagerActor.behavior(
+          peerManager.ref.toTyped[PeerManagerActor.Command],
           peerEventBus.ref.toTyped[PeerEventBusActor.Command],
           storagesInstance.storages.appStateStorage,
           Some(forkResolver),
           isPoWChain = true
         )
       )
-    )
+      .toClassic
 
     val requestSender: TestProbe = TestProbe()
 

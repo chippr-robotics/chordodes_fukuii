@@ -1,9 +1,6 @@
 package com.chipprbots.ethereum.network
 
-import org.apache.pekko.actor.Actor
-import org.apache.pekko.actor.ActorLogging
 import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.Props
 import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.actor.typed
 import org.apache.pekko.actor.typed.Behavior
@@ -38,88 +35,6 @@ import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect
 import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
-
-/** Classic `sender()` bridge over the Typed [[NetworkPeerManagerActor.behavior]] dispatch core.
-  *
-  * NetworkPeerManager keeps peer state up to date and exposes that information to other components. It subscribes to
-  * peer lifecycle events (handshake, disconnection, messages) and routes protocol traffic to the appropriate handlers.
-  *
-  * Migrated from Pekko Classic to Typed using the same shell+core split as [[PeerManagerActor]]. The Typed core owns
-  * the full peer-management state machine (the `peersWithInfo` map and all mutable peer bookkeeping). This thin Classic
-  * shell exists only because [[SNAPSyncController]] and other callers use Classic `?` (askFor) for the two ask-paths
-  * ([[GetHandshakedPeers]] and [[PeerInfoRequest]]). The shell captures `sender()`, enriches each wire message with the
-  * replier, and forwards a [[NetworkPeerManagerActor.Command]] to the core.
-  *
-  * The shell is removed once the last Classic caller migrates (Group SNAP1+).
-  */
-class NetworkPeerManagerActor(
-    peerManagerActor: typed.ActorRef[PeerManagerActor.Command],
-    peerEventBusActor: typed.ActorRef[PeerEventBusActor.Command],
-    appStateStorage: AppStateStorage,
-    forkResolverOpt: Option[ForkResolver],
-    initialSnapSyncControllerOpt: Option[ActorRef] = None,
-    evmCodeStorageOpt: Option[com.chipprbots.ethereum.db.storage.EvmCodeStorage] = None,
-    mptStorageOpt: Option[com.chipprbots.ethereum.db.storage.MptStorage] = None,
-    blockchainReader: Option[com.chipprbots.ethereum.domain.BlockchainReader] = None,
-    isPoWChain: Boolean = false
-) extends Actor
-    with ActorLogging {
-
-  import NetworkPeerManagerActor.*
-
-  private val core: typed.ActorRef[Command] =
-    context.spawn(
-      NetworkPeerManagerActor.behavior(
-        peerManagerActor,
-        peerEventBusActor,
-        appStateStorage,
-        forkResolverOpt,
-        initialSnapSyncControllerOpt,
-        evmCodeStorageOpt,
-        mptStorageOpt,
-        blockchainReader,
-        isPoWChain
-      ),
-      "core",
-      // Inherit the shell's dispatcher so that under a synchronous TestActorRef (CallingThreadDispatcher) the core runs
-      // synchronously too — preserving the white-box / ordering assumptions of NetworkPeerManagerSpec.
-      org.apache.pekko.actor.typed.DispatcherSelector.sameAsParent()
-    )
-
-  override def receive: Receive = {
-    // ── 2 ask-paths: capture sender() and forward with replyTo ───────────────
-    case GetHandshakedPeers =>
-      core ! GetHandshakedPeersCmd(sender())
-
-    case PeerInfoRequest(peerId) =>
-      core ! PeerInfoRequestCmd(peerId, sender())
-
-    // ── fire-and-forget registrations ────────────────────────────────────────
-    case RegisterSnapSyncController(ref) =>
-      core ! RegisterSnapSyncControllerCmd(ref)
-
-    case RegisterChainWeightCalibrationTarget(target) =>
-      core ! RegisterChainWeightCalibrationTargetCmd(target)
-
-    case CalibrateChainWeightNow =>
-      core ! CalibrateChainWeightNowCmd
-
-    // ── wire protocol messages ────────────────────────────────────────────────
-    case SendMessage(message, peerId) =>
-      core ! SendMessageCmd(message, peerId)
-
-    case UpdateClHead(blockNumber) =>
-      core ! UpdateClHeadCmd(blockNumber)
-
-    // SNAPSyncController may send ConnectToPeer to NPMA — forward to PMA
-    case PeerManagerActor.ConnectToPeer(uri) =>
-      core ! ConnectToPeerForwardCmd(uri)
-
-    // ── PeerEvent subtypes from the event bus (and test injection) ────────────
-    case ev: PeerEvent =>
-      core ! PeerEventCmd(ev)
-  }
-}
 
 object NetworkPeerManagerActor {
 
@@ -169,7 +84,7 @@ object NetworkPeerManagerActor {
       mptStorageOpt: Option[com.chipprbots.ethereum.db.storage.MptStorage] = None,
       blockchainReader: Option[com.chipprbots.ethereum.domain.BlockchainReader] = None,
       isPoWChain: Boolean = false
-  ): Behavior[Command] =
+  ): Behavior[Any] =
     Behaviors.setup { ctx =>
       Behaviors.withTimers { timers =>
         // messageAdapter bridges PeerEvent → PeerEventCmd so the event bus (Classic) can
@@ -231,8 +146,8 @@ object NetworkPeerManagerActor {
 
   // scalastyle:off number.of.methods
   final private class Impl(
-      ctx: TypedActorContext[Command],
-      @annotation.unused timers: TimerScheduler[Command],
+      ctx: TypedActorContext[Any],
+      @annotation.unused timers: TimerScheduler[Any],
       eventAdapter: ActorRef,
       peerManagerActor: typed.ActorRef[PeerManagerActor.Command],
       peerEventBusActor: typed.ActorRef[PeerEventBusActor.Command],
@@ -301,8 +216,37 @@ object NetworkPeerManagerActor {
       * @param peersWithInfo
       *   which has the peer and peer information for each handshaked peer (identified by its id)
       */
-    def handleMessages(peersWithInfo: PeersWithInfo): Behavior[Command] =
+    def handleMessages(peersWithInfo: PeersWithInfo): Behavior[Any] =
       Behaviors.receiveMessage {
+
+        // ── External Classic API (absorbed from the removed Classic shell) ──────────────
+        case GetHandshakedPeers =>
+          ctx.self ! GetHandshakedPeersCmd(ctx.toClassic.sender())
+          Behaviors.same
+        case PeerInfoRequest(pid) =>
+          ctx.self ! PeerInfoRequestCmd(pid, ctx.toClassic.sender())
+          Behaviors.same
+        case RegisterSnapSyncController(ref) =>
+          ctx.self ! RegisterSnapSyncControllerCmd(ref)
+          Behaviors.same
+        case RegisterChainWeightCalibrationTarget(target) =>
+          ctx.self ! RegisterChainWeightCalibrationTargetCmd(target)
+          Behaviors.same
+        case CalibrateChainWeightNow =>
+          ctx.self ! CalibrateChainWeightNowCmd
+          Behaviors.same
+        case SendMessage(message, pid) =>
+          ctx.self ! SendMessageCmd(message, pid)
+          Behaviors.same
+        case UpdateClHead(blockNumber) =>
+          ctx.self ! UpdateClHeadCmd(blockNumber)
+          Behaviors.same
+        case PeerManagerActor.ConnectToPeer(uri) =>
+          ctx.self ! ConnectToPeerForwardCmd(uri)
+          Behaviors.same
+        case ev: PeerEvent =>
+          ctx.self ! PeerEventCmd(ev)
+          Behaviors.same
 
         // ── Ask-paths ────────────────────────────────────────────────────────
 
@@ -511,7 +455,7 @@ object NetworkPeerManagerActor {
                         duration = Some(LaggingPeerBlacklistDuration),
                         reason = Disconnect.reasonToString(Disconnect.Reasons.UselessPeer)
                       ),
-                      Actor.noSender
+                      ActorRef.noSender
                     )
                   }
                   laggingPeerSince.remove(peerId)
@@ -642,13 +586,15 @@ object NetworkPeerManagerActor {
 
         case PeerEventCmd(_) =>
           Behaviors.same
+
+        case _ => Behaviors.same
       }
 
     private def handlePeerHandshakeSuccessful(
         peer: Peer,
         peerInfo: PeerInfo,
         peersWithInfo: PeersWithInfo
-    ): Behavior[Command] = {
+    ): Behavior[Any] = {
       val chainInfoDisplay =
         if peerInfo.remoteStatus.capability == com.chipprbots.ethereum.network.p2p.messages.Capability.ETH69 then
           s"latestBlock=${peerInfo.remoteStatus.latestBlock.getOrElse("?")} TD=${peerInfo.remoteStatus.chainWeight.totalDifficulty} (ETH/69, TD from local DB or block-number proxy)"
@@ -721,7 +667,7 @@ object NetworkPeerManagerActor {
                         duration = Some(5.minutes),
                         reason = "TD-PROXY-GAP: stale chain weight, reconnect after calibration"
                       ),
-                      Actor.noSender
+                      ActorRef.noSender
                     )
                   }
                 } else
@@ -1368,28 +1314,4 @@ object NetworkPeerManagerActor {
   /** Unconditional timed calibration: sent by SyncController 30s after startRegularSync. */
   case object CalibrateChainWeightNow
 
-  def props(
-      peerManagerActor: typed.ActorRef[PeerManagerActor.Command],
-      peerEventBusActor: typed.ActorRef[PeerEventBusActor.Command],
-      appStateStorage: AppStateStorage,
-      forkResolverOpt: Option[ForkResolver],
-      snapSyncControllerOpt: Option[ActorRef] = None,
-      evmCodeStorageOpt: Option[com.chipprbots.ethereum.db.storage.EvmCodeStorage] = None,
-      mptStorageOpt: Option[com.chipprbots.ethereum.db.storage.MptStorage] = None,
-      blockchainReader: Option[com.chipprbots.ethereum.domain.BlockchainReader] = None,
-      isPoWChain: Boolean = false
-  ): Props =
-    Props(
-      new NetworkPeerManagerActor(
-        peerManagerActor,
-        peerEventBusActor,
-        appStateStorage,
-        forkResolverOpt,
-        snapSyncControllerOpt,
-        evmCodeStorageOpt,
-        mptStorageOpt,
-        blockchainReader,
-        isPoWChain
-      )
-    )
 }

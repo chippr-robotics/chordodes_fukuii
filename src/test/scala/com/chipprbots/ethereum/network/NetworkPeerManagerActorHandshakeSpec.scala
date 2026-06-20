@@ -2,9 +2,9 @@ package com.chipprbots.ethereum.network
 
 import java.net.InetSocketAddress
 
+import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.testkit.TestActorRef
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
@@ -62,18 +62,20 @@ class NetworkPeerManagerActorHandshakeSpec
 
   // ── helpers ──────────────────────────────────────────────────────────────────
 
-  private def newNpma(): (TestActorRef[NetworkPeerManagerActor], TestProbe, TestProbe) = {
+  private def newNpma(): (ActorRef, TestProbe, TestProbe) = {
     val pm = TestProbe()
     val bus = TestProbe()
-    val ref = TestActorRef[NetworkPeerManagerActor](
-      NetworkPeerManagerActor.props(
-        pm.ref,
-        bus.ref.toTyped[PeerEventBusActor.Command],
-        new AppStateStorage(EphemDataSource()),
-        forkResolverOpt = None,
-        isPoWChain = false
+    val ref = system
+      .spawnAnonymous(
+        NetworkPeerManagerActor.behavior(
+          pm.ref.toTyped[PeerManagerActor.Command],
+          bus.ref.toTyped[PeerEventBusActor.Command],
+          new AppStateStorage(EphemDataSource()),
+          forkResolverOpt = None,
+          isPoWChain = false
+        )
       )
-    )
+      .toClassic
     (ref, pm, bus)
   }
 

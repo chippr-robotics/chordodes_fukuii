@@ -262,10 +262,11 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
     "peer-manager"
   )
 
-  lazy val etcPeerManager: ActorRef = system.actorOf(
-    NetworkPeerManagerActor.props(peerManager, peerEventBus, storagesInstance.storages.appStateStorage, None),
-    "etc-peer-manager"
-  )
+  lazy val etcPeerManager: ActorRef = system
+    .spawnAnonymous(
+      NetworkPeerManagerActor.behavior(peerManager, peerEventBus, storagesInstance.storages.appStateStorage, None)
+    )
+    .toClassic
 
   // Integration-test fake peer — PendingTransactionsManager isn't exercised by the sync harness,
   // so an actor that discards everything suffices to satisfy the ctor requirement added with the
