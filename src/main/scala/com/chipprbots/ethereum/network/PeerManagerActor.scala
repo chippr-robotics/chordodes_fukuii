@@ -4,11 +4,8 @@ import java.net.InetSocketAddress
 import java.net.URI
 import java.util.Collections.newSetFromMap
 
-import org.apache.pekko.actor.Actor
-import org.apache.pekko.actor.ActorLogging
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.PoisonPill
-import org.apache.pekko.actor.Props
 import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.actor.typed
 import org.apache.pekko.actor.typed.Behavior
@@ -45,116 +42,6 @@ import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect
 import com.chipprbots.ethereum.network.rlpx.AuthHandshaker
 import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.RLPxConfiguration
-
-/** Classic `sender()` bridge over the Typed [[PeerManagerActor.behavior]] dispatch core.
-  *
-  * Migrated from Pekko Classic to Typed using the same shell+core split as [[PeerEventBusActor]]. The Typed core owns
-  * the full peer-management state machine (the `connectedPeers` `ConnectedPeers` value plus the mutable maintained /
-  * trusted / blacklist-flap state, the discovery timers, peer spawning via `ctx.spawn(...).toClassic` + `watchWith`,
-  * and replies via explicit `replyTo`). This thin Classic shell exists only because the 8 ask-paths (GetPeers,
-  * DisconnectPeerById, AddToBlacklistRequest, RemoveFromBlacklistRequest, AddMaintainedPeer, AddTrustedPeer,
-  * RemoveTrustedPeer, SetMaxPeers) are driven by Classic callers using `?` (`askFor`) — a pure Typed behavior cannot
-  * observe `sender()`. The shell captures `sender()`, enriches each wire message with the replier, and forwards a
-  * [[PeerManagerActor.Command]] to the core.
-  *
-  * The [[PeerEventBusActor]] subscription lives in the core: it sends `Subscribe(PeerHandshaked)` via its own
-  * `messageAdapter[PeerEvent]` (HERALD-2 #2), so handshake events land back on the core as
-  * [[PeerManagerActor.PeerEventReceived]]. The same adapter is the Classic `sender()` when the core tells a PeerActor
-  * `HandleConnection` / `ConnectTo`, so a direct parent-reply (or a test probe standing in for one) also reaches the
-  * core. The shell+core split is removed once the last Classic caller migrates (Group NET2+).
-  *
-  * `peerFactory` keeps returning a Classic [[ActorRef]] so [[Peer]] / [[ConnectedPeers]] / [[PeerId.fromRef]] are
-  * unchanged. In production the factory builds the (already-Typed) [[PeerActor]] behavior and `ctx.spawn(…, id)`s it,
-  * then `.toClassic`s the result; the child path name is the sanitized address, identical to the previous
-  * `ctx.actorOf(PeerActor.props, id)` — so `PeerId.fromRef(ref).value == ref.path.name` is byte-for-byte preserved for
-  * pending peers.
-  */
-class PeerManagerActor(
-    peerEventBus: typed.ActorRef[PeerEventBusActor.Command],
-    peerDiscoveryManager: typed.ActorRef[PeerDiscoveryManager.Command],
-    peerConfiguration: PeerConfiguration,
-    knownNodesManager: ActorRef,
-    peerStatistics: typed.ActorRef[PeerStatisticsActor.Command],
-    peerFactory: (TypedActorContext[PeerManagerActor.Command], InetSocketAddress, Boolean) => ActorRef,
-    discoveryConfig: DiscoveryConfig,
-    val blacklist: Blacklist,
-    externalSchedulerOpt: Option[Scheduler] = None
-) extends Actor
-    with ActorLogging {
-
-  import PeerManagerActor.*
-
-  private val core: typed.ActorRef[Command] =
-    context.spawn(
-      PeerManagerActor.behavior(
-        peerEventBus,
-        peerDiscoveryManager,
-        peerConfiguration,
-        knownNodesManager,
-        peerStatistics,
-        peerFactory,
-        discoveryConfig,
-        blacklist,
-        externalSchedulerOpt
-      ),
-      "core",
-      // Inherit the shell's dispatcher so that under a synchronous TestActorRef (CallingThreadDispatcher) the core runs
-      // synchronously too — preserving the white-box / ordering assumptions of PeerManagerSpec. In production this is
-      // the normal default dispatcher.
-      org.apache.pekko.actor.typed.DispatcherSelector.sameAsParent()
-    )
-
-  // The core subscribes to PeerHandshaked itself (via its messageAdapter, in Impl construction); the shell does not
-  // hold any PeerEventBus subscription. The shell only bridges the 8 ask-paths and forwards fire-and-forget wire
-  // messages and discovery replies.
-
-  override def receive: Receive = {
-    // ── 8 ask-paths: capture sender() and forward with replyTo ──────────────
-    case GetPeers =>
-      core ! GetPeersCmd(sender())
-
-    case DisconnectPeerById(peerId) =>
-      core ! DisconnectPeerByIdCmd(peerId, sender())
-
-    case req: AddToBlacklistRequest =>
-      core ! AddToBlacklistCmd(req, sender())
-
-    case req: RemoveFromBlacklistRequest =>
-      core ! RemoveFromBlacklistCmd(req, sender())
-
-    case AddMaintainedPeer(uri) =>
-      core ! AddMaintainedPeerCmd(uri, sender())
-
-    case AddTrustedPeer(uri) =>
-      core ! AddTrustedPeerCmd(uri, sender())
-
-    case RemoveTrustedPeer(nodeId) =>
-      core ! RemoveTrustedPeerCmd(nodeId, sender())
-
-    case SetMaxPeers(n) =>
-      core ! SetMaxPeersCmd(n, sender())
-
-    // ── fire-and-forget wire messages: forward as-is ───────────────────────
-    case StartConnecting             => core ! StartConnectingCmd
-    case HandlePeerConnection(c, ra) => core ! HandlePeerConnectionCmd(c, ra)
-    case ConnectToPeer(uri)          => core ! ConnectToPeerCmd(uri)
-    case RemoveMaintainedPeer(nid)   => core ! RemoveMaintainedPeerCmd(nid)
-    case SendMessage(message, pid)   => core ! SendMessageCmd(message, pid)
-    case PeerClosedConnection(a, r)  => core ! PeerClosedConnectionCmd(a, r)
-
-    // ── Discovery / known-nodes replies ────────────────────────────────────
-    // KnownNodes still arrives via the core's messageAdapter (KnownNodesManager is Classic). PeerDiscoveryManager is now
-    // Typed: the core asks it directly (context.ask) and the reply lands on the core, bypassing the shell. The
-    // DiscoveredNodesInfo / RandomNodeInfo cases below remain only so tests can inject discovery results at the shell.
-    case KnownNodesManager.KnownNodes(nodes)             => core ! KnownNodesReceived(nodes)
-    case PeerDiscoveryManager.DiscoveredNodesInfo(nodes) => core ! DiscoveredNodesReceived(nodes)
-    case PeerDiscoveryManager.RandomNodeInfo(node)       => core ! RandomNodeReceived(node)
-
-    // ── PeerEventBus delivery forwarded for any caller that still tells the shell directly ──────────────────────────
-    // The core subscribes to PeerHandshaked itself; this only covers a PeerEvent tell aimed at the shell's path.
-    case ev: PeerEvent => core ! PeerEventReceived(ev)
-  }
-}
 
 object PeerManagerActor {
 
@@ -195,10 +82,10 @@ object PeerManagerActor {
   // lands as a typed Command. PMA keeps sending the legacy Classic GetKnownNodes with the adapter as the sender.
   final private case class KnownNodesReceived(nodes: Set[URI]) extends Command
 
-  // Replies from the (now-Typed) PeerDiscoveryManager, delivered by the `context.ask` mapping. Tests may also inject the
-  // public PeerDiscoveryManager.DiscoveredNodesInfo / RandomNodeInfo at the shell, which the shell forwards as these.
-  final private[network] case class DiscoveredNodesReceived(nodes: Set[Node]) extends Command
-  final private[network] case class RandomNodeReceived(node: Node) extends Command
+  // Replies from the (now-Typed) PeerDiscoveryManager, delivered by the `context.ask` mapping.
+  // private[ethereum] so integration tests outside the `network` package can inject discovery results directly.
+  final private[ethereum] case class DiscoveredNodesReceived(nodes: Set[Node]) extends Command
+  final private[ethereum] case class RandomNodeReceived(node: Node) extends Command
 
   /** A typed ask to PeerDiscoveryManager timed out or failed. Discovery is best-effort; the next scan / demand trigger
     * re-requests, so this is logged and otherwise ignored.
@@ -586,7 +473,7 @@ object PeerManagerActor {
           val nodeId = uri.getUserInfo
           val wasAdded = !maintainedPeersByNodeId.contains(nodeId)
           maintainedPeersByNodeId = maintainedPeersByNodeId + (nodeId -> uri)
-          replyTo ! AddMaintainedPeerResponse(wasAdded)
+          if replyTo != null then replyTo ! AddMaintainedPeerResponse(wasAdded)
           peerEventBus ! PublishCmd(PeerEvent.MaintainedPeersChanged(maintainedPeersByNodeId.keySet))
           Some(connectWith(uri, connectedPeers))
 
@@ -1064,7 +951,7 @@ object PeerManagerActor {
       implicit val timeout: Timeout = Timeout(2.seconds)
       implicit val typedScheduler: org.apache.pekko.actor.typed.Scheduler = context.system.scheduler
       // Extract a plain SLF4J logger before the IO lambda — ctx.log is thread-confined.
-      val slf4jLog = org.slf4j.LoggerFactory.getLogger(classOf[PeerManagerActor])
+      val slf4jLog = org.slf4j.LoggerFactory.getLogger("com.chipprbots.ethereum.network.PeerManagerActor")
       val typedRef = peer.ref.toTyped[PeerActor.Command]
       IO.fromFuture(
         IO(typedRef.ask[PeerActor.StatusResponse](replyTo => PeerActor.GetStatus(replyTo)))
@@ -1105,44 +992,6 @@ object PeerManagerActor {
     }
   }
   // scalastyle:on number.of.methods
-
-  // scalastyle:off parameter.number
-  def props[R <: HandshakeResult](
-      peerDiscoveryManager: typed.ActorRef[PeerDiscoveryManager.Command],
-      peerConfiguration: PeerConfiguration,
-      peerMessageBus: typed.ActorRef[PeerEventBusActor.Command],
-      knownNodesManager: ActorRef,
-      peerStatistics: typed.ActorRef[PeerStatisticsActor.Command],
-      handshaker: Handshaker[R],
-      authHandshaker: AuthHandshaker,
-      discoveryConfig: DiscoveryConfig,
-      blacklist: Blacklist,
-      capabilities: List[Capability]
-  ): Props = {
-    val factory: (TypedActorContext[Command], InetSocketAddress, Boolean) => ActorRef =
-      peerFactory(
-        peerConfiguration,
-        peerMessageBus,
-        knownNodesManager,
-        handshaker,
-        authHandshaker,
-        capabilities
-      )
-
-    Props(
-      new PeerManagerActor(
-        peerMessageBus,
-        peerDiscoveryManager,
-        peerConfiguration,
-        knownNodesManager,
-        peerStatistics,
-        peerFactory = factory,
-        discoveryConfig,
-        blacklist
-      )
-    )
-  }
-  // scalastyle:on parameter.number
 
   /** Sanitize an InetSocketAddress string for use as a Pekko actor path element. Pekko only allows ASCII letters/digits
     * and -_.*$+:@&=,!~'; in path elements. IPv6 brackets ([2a01:4f8::2]) and DNS-failure placeholders (<unresolved>)

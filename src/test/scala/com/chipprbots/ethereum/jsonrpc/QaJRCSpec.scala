@@ -3,6 +3,8 @@ package com.chipprbots.ethereum.jsonrpc
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 
+import org.apache.pekko.actor.typed
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.json4s.JsonAST.*
 import org.scalamock.handlers.CallHandler1
 import org.scalatest.concurrent.PatienceConfiguration
@@ -18,6 +20,7 @@ import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.jsonrpc.QAService.*
 import com.chipprbots.ethereum.jsonrpc.QAService.MineBlocksResponse.MinerResponseType.*
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
+import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.nodebuilder.ApisBuilder
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.utils.Config
@@ -103,6 +106,7 @@ class QaJRCSpec
     val web3Service: Web3Service = mock[Web3Service]
     // MIGRATION: Scala 3 mock cannot infer AtomicReference type parameter - create real instance
     implicit val testSystem: org.apache.pekko.actor.ActorSystem = org.apache.pekko.actor.ActorSystem("QaJRCSpec-test")
+    implicit val scheduler: typed.Scheduler = testSystem.toTyped.scheduler
     val netService: NetService = new NetService(
       new java.util.concurrent.atomic.AtomicReference(
         com.chipprbots.ethereum.utils.NodeStatus(
@@ -111,7 +115,7 @@ class QaJRCSpec
           com.chipprbots.ethereum.utils.ServerStatus.NotListening
         )
       ),
-      org.apache.pekko.testkit.TestProbe().ref,
+      org.apache.pekko.testkit.TestProbe().ref.toTyped[PeerManagerActor.Command],
       com.chipprbots.ethereum.blockchain.sync.CacheBasedBlacklist.empty(100),
       com.chipprbots.ethereum.jsonrpc.NetService.NetServiceConfig(scala.concurrent.duration.DurationInt(5).seconds)
     )
@@ -125,18 +129,15 @@ class QaJRCSpec
     val ethUserService: EthUserService = mock[EthUserService]
     val ethFilterService: EthFilterService = mock[EthFilterService]
     val fukuiiService: FukuiiService = mock[FukuiiService]
-    val mcpService: McpService = {
-      implicit val testSystem: org.apache.pekko.actor.ActorSystem =
-        org.apache.pekko.actor.ActorSystem("QaJRCSpec-mcp")
+    val mcpService: McpService =
       new McpService(
-        org.apache.pekko.testkit.TestProbe().ref,
+        org.apache.pekko.testkit.TestProbe().ref.toTyped[PeerManagerActor.Command],
         org.apache.pekko.testkit.TestProbe().ref,
         null,
         null,
         new java.util.concurrent.atomic.AtomicReference[com.chipprbots.ethereum.utils.NodeStatus](),
         null
       )(scala.concurrent.ExecutionContext.global)
-    }
     val qaService: QAService = mock[QAService]
 
     val jsonRpcController =

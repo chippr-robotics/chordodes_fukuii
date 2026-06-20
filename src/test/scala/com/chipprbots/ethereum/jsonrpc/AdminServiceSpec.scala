@@ -3,6 +3,9 @@ package com.chipprbots.ethereum.jsonrpc
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicReference
 
+import org.apache.pekko.actor.ActorSystem as ClassicActorSystem
+import org.apache.pekko.actor.typed
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
@@ -10,6 +13,7 @@ import cats.effect.unsafe.IORuntime
 import scala.concurrent.duration.*
 
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair
+import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -34,9 +38,17 @@ import com.chipprbots.ethereum.utils.ServerStatus
   * Besu reference: AdminNodeInfo.java, AdminPeers.java, AdminAddPeer.java, AdminRemovePeer.java,
   * AdminChangeLogLevel.java DefaultP2PNetwork.java (peer management)
   */
-class AdminServiceSpec extends AnyFlatSpec with Matchers {
+class AdminServiceSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
 
   implicit val runtime: IORuntime = IORuntime.global
+
+  private val testActorSystem: ClassicActorSystem = ClassicActorSystem("AdminServiceSpec")
+  implicit val scheduler: typed.Scheduler = testActorSystem.toTyped.scheduler
+
+  override def afterAll(): Unit = {
+    testActorSystem.terminate()
+    super.afterAll()
+  }
 
   "AdminService.nodeInfo" should "return P2P info when server is listening" taggedAs UnitTest in new TestSetup {
     val result: Either[JsonRpcError, AdminNodeInfoResponse] =

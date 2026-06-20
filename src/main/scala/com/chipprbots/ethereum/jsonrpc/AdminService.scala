@@ -7,7 +7,9 @@ import java.net.URI
 import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicReference
 
+import org.apache.pekko.actor.Actor
 import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
@@ -117,13 +119,14 @@ object AdminService {
 
 class AdminService(
     nodeStatusHolder: AtomicReference[NodeStatus],
-    peerManager: ActorRef,
+    peerManager: typed.ActorRef[PeerManagerActor.Command],
     blockchainReader: BlockchainReader,
     blockchainConfig: BlockchainConfig,
     peerManagerTimeout: FiniteDuration,
     datadir: String,
     blockedIPRegistry: BlockedIPRegistry
-) extends Logger {
+)(implicit scheduler: typed.Scheduler)
+    extends Logger {
   import AdminService.*
 
   implicit private val timeout: Timeout = Timeout(peerManagerTimeout)
@@ -222,7 +225,7 @@ class AdminService(
     */
   def peers(@unused req: AdminPeersRequest): ServiceResponse[AdminPeersResponse] =
     peerManager
-      .askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeers)
+      .askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
       .map { peersResult =>
         val peerInfos = peersResult.peers.map { case (peer, _) =>
           AdminPeerInfo(
@@ -247,7 +250,7 @@ class AdminService(
     try {
       val uri = new URI(req.enodeUrl)
       peerManager
-        .askFor[PeerManagerActor.AddMaintainedPeerResponse](PeerManagerActor.AddMaintainedPeer(uri))
+        .askFor[PeerManagerActor.AddMaintainedPeerResponse](ref => PeerManagerActor.AddMaintainedPeerCmd(uri, ref))
         .map(r => Right(AdminAddPeerResponse(r.wasAdded)))
         .handleError { ex =>
           log.error(s"Failed to add peer: ${req.enodeUrl}", ex)
@@ -265,7 +268,7 @@ class AdminService(
     */
   def removePeer(req: AdminRemovePeerRequest): ServiceResponse[AdminRemovePeerResponse] =
     peerManager
-      .askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeers)
+      .askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
       .map { peersResult =>
         try {
           val uri = new URI(req.enodeUrl)
@@ -274,13 +277,13 @@ class AdminService(
             case None           => Right(AdminRemovePeerResponse(false))
             case Some(targetId) =>
               // Always remove from maintained set to prevent auto-reconnect
-              peerManager ! PeerManagerActor.RemoveMaintainedPeer(targetId)
+              peerManager ! PeerManagerActor.RemoveMaintainedPeerCmd(targetId)
               val matchingPeer = peersResult.peers.keys.find { peer =>
                 peer.nodeId.exists(nid => Hex.toHexString(nid.toArray).toLowerCase == targetId)
               }
               matchingPeer match {
                 case Some(peer) =>
-                  peerManager ! PeerManagerActor.DisconnectPeerById(peer.id)
+                  peerManager ! PeerManagerActor.DisconnectPeerByIdCmd(peer.id, Actor.noSender)
                   Right(AdminRemovePeerResponse(true))
                 case None =>
                   Right(AdminRemovePeerResponse(false))
@@ -409,7 +412,7 @@ class AdminService(
     try {
       val uri = new URI(req.enodeUrl)
       peerManager
-        .askFor[PeerManagerActor.AddTrustedPeerResponse](PeerManagerActor.AddTrustedPeer(uri))
+        .askFor[PeerManagerActor.AddTrustedPeerResponse](ref => PeerManagerActor.AddTrustedPeerCmd(uri, ref))
         .map(r => Right(AdminAddTrustedPeerResponse(r.success)))
         .handleError { ex =>
           log.error(s"Failed to add trusted peer: ${req.enodeUrl}", ex)
@@ -429,8 +432,8 @@ class AdminService(
       val uri = new URI(req.enodeUrl)
       val targetNodeId = Option(uri.getUserInfo).map(_.toLowerCase).getOrElse("")
       peerManager
-        .askFor[PeerManagerActor.RemoveTrustedPeerResponse](
-          PeerManagerActor.RemoveTrustedPeer(targetNodeId)
+        .askFor[PeerManagerActor.RemoveTrustedPeerResponse](ref =>
+          PeerManagerActor.RemoveTrustedPeerCmd(targetNodeId, ref)
         )
         .map(r => Right(AdminRemoveTrustedPeerResponse(r.success)))
         .handleError { ex =>
@@ -448,7 +451,7 @@ class AdminService(
     */
   def maxPeers(req: AdminMaxPeersRequest): ServiceResponse[AdminMaxPeersResponse] =
     peerManager
-      .askFor[PeerManagerActor.SetMaxPeersResponse](PeerManagerActor.SetMaxPeers(req.maxPeers))
+      .askFor[PeerManagerActor.SetMaxPeersResponse](ref => PeerManagerActor.SetMaxPeersCmd(req.maxPeers, ref))
       .map(r => Right(AdminMaxPeersResponse(r.success)))
       .handleError { ex =>
         log.error(s"Failed to set max peers to ${req.maxPeers}", ex)

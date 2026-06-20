@@ -376,7 +376,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     peerEventBus.expectMsgType[SubscribeCmd]
 
     // The probe should land on the peerManager TestProbe as a SendMessage to peer1.
-    val sent: PeerManagerActor.SendMessage = peerManager.expectMsgClass(classOf[PeerManagerActor.SendMessage])
+    val sent: PeerManagerActor.SendMessageCmd = peerManager.expectMsgClass(classOf[PeerManagerActor.SendMessageCmd])
     sent.peerId shouldBe peer1.id
     sent.message.code shouldBe Codes.GetBlockHeadersCode
     // ETH/66+ uses request-id-prefixed envelope.
@@ -405,7 +405,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     peerEventBus.expectMsgType[SubscribeCmd]
     // ETH/69: no GetBlockHeaders probe (latestBlock is in STATUS),
     // but a BlockRangeUpdate is sent immediately so the remote peer knows our chain range.
-    peerManager.expectMsgClass(classOf[PeerManagerActor.SendMessage])
+    peerManager.expectMsgClass(classOf[PeerManagerActor.SendMessageCmd])
     peerManager.expectNoMessage(100.millis)
   }
 
@@ -644,7 +644,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
       val nonGenesis = peerInfo.remoteStatus.bestHash != peerInfo.remoteStatus.genesisHash
       val notEth69 = peerInfo.remoteStatus.capability != Capability.ETH69
       if nonGenesis && notEth69 then {
-        val probe = peerManager.expectMsgClass(classOf[PeerManagerActor.SendMessage])
+        val probe = peerManager.expectMsgClass(classOf[PeerManagerActor.SendMessageCmd])
         probe.peerId shouldBe peer.id
         probe.message.code shouldBe Codes.GetBlockHeadersCode
       }

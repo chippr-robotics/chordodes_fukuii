@@ -3,6 +3,8 @@ package com.chipprbots.ethereum.jsonrpc
 import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 
@@ -45,8 +47,8 @@ class DebugServiceSpec
     val result: Future[Either[JsonRpcError, ListPeersInfoResponse]] =
       debugService.listPeersInfo(ListPeersInfoRequest()).unsafeToFuture()
 
-    peerManager.expectMsg(PeerManagerActor.GetPeers)
-    peerManager.reply(Peers(Map(peer1 -> PeerActor.Status.Connecting)))
+    val cmd1 = peerManager.expectMsgType[PeerManagerActor.GetPeersCmd]
+    cmd1.replyTo ! Peers(Map(peer1 -> PeerActor.Status.Connecting))
 
     etcPeerManager.expectMsg(NetworkPeerManagerActor.PeerInfoRequest(peer1.id))
     etcPeerManager.reply(NetworkPeerManagerActor.PeerInfoResponse(Some(peer1Info)))
@@ -58,8 +60,8 @@ class DebugServiceSpec
     val result: Future[Either[JsonRpcError, ListPeersInfoResponse]] =
       debugService.listPeersInfo(ListPeersInfoRequest()).unsafeToFuture()
 
-    peerManager.expectMsg(PeerManagerActor.GetPeers)
-    peerManager.reply(Peers(Map.empty))
+    val cmd2 = peerManager.expectMsgType[PeerManagerActor.GetPeersCmd]
+    cmd2.replyTo ! Peers(Map.empty)
 
     result.futureValue shouldBe Right(ListPeersInfoResponse(List.empty))
   }
@@ -68,8 +70,8 @@ class DebugServiceSpec
     val result: Future[Either[JsonRpcError, ListPeersInfoResponse]] =
       debugService.listPeersInfo(ListPeersInfoRequest()).unsafeToFuture()
 
-    peerManager.expectMsg(PeerManagerActor.GetPeers)
-    peerManager.reply(Peers(Map(peer1 -> PeerActor.Status.Connecting)))
+    val cmd3 = peerManager.expectMsgType[PeerManagerActor.GetPeersCmd]
+    cmd3.replyTo ! Peers(Map(peer1 -> PeerActor.Status.Connecting))
 
     etcPeerManager.expectMsg(NetworkPeerManagerActor.PeerInfoRequest(peer1.id))
     etcPeerManager.reply(NetworkPeerManagerActor.PeerInfoResponse(None))
@@ -78,9 +80,10 @@ class DebugServiceSpec
   }
 
   class TestSetup(implicit system: ActorSystem) {
+    implicit val scheduler: typed.Scheduler = system.toTyped.scheduler
     val peerManager: TestProbe = TestProbe()
     val etcPeerManager: TestProbe = TestProbe()
-    val debugService = new DebugService(peerManager.ref, etcPeerManager.ref)
+    val debugService = new DebugService(peerManager.ref.toTyped[PeerManagerActor.Command], etcPeerManager.ref)
 
     val peerStatus: RemoteStatus = RemoteStatus(
       capability = Capability.ETH63,

@@ -4,6 +4,7 @@ import java.net.URI
 import java.util.concurrent.atomic.AtomicReference
 
 import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
@@ -107,10 +108,11 @@ trait NetServiceAPI {
 
 class NetService(
     nodeStatusHolder: AtomicReference[NodeStatus],
-    peerManager: ActorRef,
+    peerManager: typed.ActorRef[PeerManagerActor.Command],
     blacklist: Blacklist,
     config: NetService.NetServiceConfig
-) extends NetServiceAPI {
+)(implicit scheduler: typed.Scheduler)
+    extends NetServiceAPI {
   import NetService.*
   import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
 
@@ -130,7 +132,7 @@ class NetService(
   def peerCount(req: PeerCountRequest): ServiceResponse[PeerCountResponse] = {
     implicit val timeout: Timeout = Timeout(config.peerManagerTimeout)
     peerManager
-      .askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeers)
+      .askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
       .map(peers => Right(PeerCountResponse(peers.handshaked.size)))
   }
 
@@ -154,7 +156,7 @@ class NetService(
   def listPeers(req: ListPeersRequest): ServiceResponse[ListPeersResponse] = {
     implicit val timeout: Timeout = Timeout(config.peerManagerTimeout)
     peerManager
-      .askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeers)
+      .askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
       .map { peersData =>
         val peerInfoList = peersData.peers.map { case (peer, status) =>
           PeerInfo(
@@ -172,8 +174,8 @@ class NetService(
   def disconnectPeer(req: DisconnectPeerRequest): ServiceResponse[DisconnectPeerResponse] = {
     implicit val timeout: Timeout = Timeout(config.peerManagerTimeout)
     peerManager
-      .askFor[PeerManagerActor.DisconnectPeerResponse](
-        PeerManagerActor.DisconnectPeerById(PeerId(req.peerId))
+      .askFor[PeerManagerActor.DisconnectPeerResponse](ref =>
+        PeerManagerActor.DisconnectPeerByIdCmd(PeerId(req.peerId), ref)
       )
       .map(response => Right(DisconnectPeerResponse(response.disconnected)))
   }
@@ -184,7 +186,7 @@ class NetService(
       // Note: This sends the connect message and returns immediately.
       // Success=true means the URI is valid and connection attempt was initiated,
       // not that the connection succeeded. Check net_listPeers to verify connection.
-      peerManager ! PeerManagerActor.ConnectToPeer(uri)
+      peerManager ! PeerManagerActor.ConnectToPeerCmd(uri)
       IO.pure(Right(ConnectToPeerResponse(success = true)))
     } catch {
       case e: Exception =>
@@ -208,11 +210,14 @@ class NetService(
   def addToBlacklist(req: AddToBlacklistRequest): ServiceResponse[AddToBlacklistResponse] = {
     implicit val timeout: Timeout = Timeout(config.peerManagerTimeout)
     peerManager
-      .askFor[PeerManagerActor.AddToBlacklistResponse](
-        PeerManagerActor.AddToBlacklistRequest(
-          address = req.address,
-          duration = req.duration.map(_.seconds),
-          reason = req.reason
+      .askFor[PeerManagerActor.AddToBlacklistResponse](ref =>
+        PeerManagerActor.AddToBlacklistCmd(
+          PeerManagerActor.AddToBlacklistRequest(
+            address = req.address,
+            duration = req.duration.map(_.seconds),
+            reason = req.reason
+          ),
+          ref
         )
       )
       .map(response => Right(AddToBlacklistResponse(response.added)))
@@ -221,8 +226,8 @@ class NetService(
   def removeFromBlacklist(req: RemoveFromBlacklistRequest): ServiceResponse[RemoveFromBlacklistResponse] = {
     implicit val timeout: Timeout = Timeout(config.peerManagerTimeout)
     peerManager
-      .askFor[PeerManagerActor.RemoveFromBlacklistResponse](
-        PeerManagerActor.RemoveFromBlacklistRequest(req.address)
+      .askFor[PeerManagerActor.RemoveFromBlacklistResponse](ref =>
+        PeerManagerActor.RemoveFromBlacklistCmd(PeerManagerActor.RemoveFromBlacklistRequest(req.address), ref)
       )
       .map(response => Right(RemoveFromBlacklistResponse(response.removed)))
   }

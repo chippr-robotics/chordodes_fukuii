@@ -1,5 +1,6 @@
 package com.chipprbots.ethereum.jsonrpc.mcp
 
+import org.apache.pekko.actor.typed
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
@@ -28,8 +29,9 @@ object NodeStatusResource {
   val mimeType: Some[String] = Some("application/json")
 
   def read(deps: McpDependencies)(implicit timeout: Timeout, @unused ec: ExecutionContext): IO[String] = {
+    implicit val scheduler: typed.Scheduler = deps.scheduler
     val syncStatusIO = deps.syncController.askFor[SyncProtocol.Status](SyncProtocol.GetStatus)
-    val peersIO = deps.peerManager.askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeers)
+    val peersIO = deps.peerManager.askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
 
     for {
       syncStatus <- syncStatusIO.recover { case _ => SyncProtocol.Status.NotSyncing }
@@ -145,9 +147,10 @@ object ConnectedPeersResource {
   val description: Some[String] = Some("List of currently connected peers with addresses and status")
   val mimeType: Some[String] = Some("application/json")
 
-  def read(deps: McpDependencies)(implicit timeout: Timeout, @unused ec: ExecutionContext): IO[String] =
+  def read(deps: McpDependencies)(implicit timeout: Timeout, @unused ec: ExecutionContext): IO[String] = {
+    implicit val scheduler: typed.Scheduler = deps.scheduler
     deps.peerManager
-      .askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeers)
+      .askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
       .recover { case _ =>
         PeerManagerActor.Peers(Map.empty)
       }
@@ -172,6 +175,7 @@ object ConnectedPeersResource {
         |  ]
         |}""".stripMargin
       }
+  }
 }
 
 object MiningRpcResource {

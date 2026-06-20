@@ -11,11 +11,15 @@ import org.json4s.JObject
 import org.json4s.JString
 import org.scalamock.scalatest.AsyncMockFactory
 
+import org.apache.pekko.actor.typed
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
+
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.FreeSpecBase
 import com.chipprbots.ethereum.SpecFixtures
 import com.chipprbots.ethereum.jsonrpc.FukuiiService.GetAccountTransactionsResponse
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
+import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.nodebuilder.ApisBuilder
 import com.chipprbots.ethereum.transactions.TransactionHistoryService.ExtendedTransactionData
 import com.chipprbots.ethereum.transactions.TransactionHistoryService.MinedTransactionData
@@ -31,6 +35,7 @@ class FukuiiJRCSpec extends FreeSpecBase with SpecFixtures with AsyncMockFactory
     // MIGRATION: Scala 3 mock cannot infer AtomicReference type parameter - create real instance
     implicit val testSystem: org.apache.pekko.actor.ActorSystem =
       org.apache.pekko.actor.ActorSystem("FukuiiJRCSpec-test")
+    implicit val scheduler: typed.Scheduler = testSystem.toTyped.scheduler
     val netService: NetService = new NetService(
       new java.util.concurrent.atomic.AtomicReference(
         com.chipprbots.ethereum.utils.NodeStatus(
@@ -39,7 +44,7 @@ class FukuiiJRCSpec extends FreeSpecBase with SpecFixtures with AsyncMockFactory
           com.chipprbots.ethereum.utils.ServerStatus.NotListening
         )
       ),
-      org.apache.pekko.testkit.TestProbe().ref,
+      org.apache.pekko.testkit.TestProbe().ref.toTyped[PeerManagerActor.Command],
       com.chipprbots.ethereum.blockchain.sync.CacheBasedBlacklist.empty(100),
       com.chipprbots.ethereum.jsonrpc.NetService.NetServiceConfig(scala.concurrent.duration.DurationInt(5).seconds)
     )
@@ -55,7 +60,7 @@ class FukuiiJRCSpec extends FreeSpecBase with SpecFixtures with AsyncMockFactory
     val qaService: QAService = mock[QAService]
     val fukuiiService: FukuiiService = mock[FukuiiService]
     val mcpService: McpService = new McpService(
-      org.apache.pekko.testkit.TestProbe().ref,
+      org.apache.pekko.testkit.TestProbe().ref.toTyped[PeerManagerActor.Command],
       org.apache.pekko.testkit.TestProbe().ref,
       null,
       null,

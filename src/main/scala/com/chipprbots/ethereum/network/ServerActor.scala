@@ -46,7 +46,7 @@ object ServerActor {
     */
   def apply(
       nodeStatusHolder: AtomicReference[NodeStatus],
-      peerManager: ActorRef,
+      peerManager: TypedActorRef[PeerManagerActor.Command],
       blacklist: Blacklist
   ): Behavior[Command] =
     behavior(nodeStatusHolder, peerManager, blacklist, tcpManagerRef = None)
@@ -54,7 +54,7 @@ object ServerActor {
   /** Test entry point: injects a TCP manager ref (a TestProbe) to avoid real port binding. */
   def testApply(
       nodeStatusHolder: AtomicReference[NodeStatus],
-      peerManager: ActorRef,
+      peerManager: TypedActorRef[PeerManagerActor.Command],
       blacklist: Blacklist,
       tcpManager: ActorRef
   ): Behavior[Command] =
@@ -62,7 +62,7 @@ object ServerActor {
 
   private def behavior(
       nodeStatusHolder: AtomicReference[NodeStatus],
-      peerManager: ActorRef,
+      peerManager: TypedActorRef[PeerManagerActor.Command],
       blacklist: Blacklist,
       tcpManagerRef: Option[ActorRef]
   ): Behavior[Command] =
@@ -82,7 +82,7 @@ object ServerActor {
   private def initial(
       ctx: ActorContext[Command],
       nodeStatusHolder: AtomicReference[NodeStatus],
-      peerManager: ActorRef,
+      peerManager: TypedActorRef[PeerManagerActor.Command],
       blacklist: Blacklist,
       tcpManager: ActorRef,
       tcpBridge: ActorRef
@@ -95,7 +95,7 @@ object ServerActor {
   private def waitingForBindingResult(
       ctx: ActorContext[Command],
       nodeStatusHolder: AtomicReference[NodeStatus],
-      peerManager: ActorRef,
+      peerManager: TypedActorRef[PeerManagerActor.Command],
       blacklist: Blacklist,
       advertisedAddressOverride: Option[InetAddress]
   ): Behavior[Command] =
@@ -123,7 +123,7 @@ object ServerActor {
   private def waitingForIpDetection(
       ctx: ActorContext[Command],
       nodeStatusHolder: AtomicReference[NodeStatus],
-      peerManager: ActorRef,
+      peerManager: TypedActorRef[PeerManagerActor.Command],
       blacklist: Blacklist,
       localAddress: InetSocketAddress
   ): Behavior[Command] =
@@ -154,7 +154,7 @@ object ServerActor {
   private def finishBinding(
       ctx: ActorContext[Command],
       nodeStatusHolder: AtomicReference[NodeStatus],
-      peerManager: ActorRef,
+      peerManager: TypedActorRef[PeerManagerActor.Command],
       blacklist: Blacklist,
       localAddress: InetSocketAddress,
       advertisedHost: InetAddress
@@ -173,7 +173,7 @@ object ServerActor {
 
   private def listening(
       ctx: ActorContext[Command],
-      peerManager: ActorRef,
+      peerManager: TypedActorRef[PeerManagerActor.Command],
       blacklist: Blacklist
   ): Behavior[Command] =
     Behaviors.receiveMessagePartial { case TcpConnected(connection, remoteAddress) =>
@@ -183,7 +183,7 @@ object ServerActor {
         ctx.log.debug("Dropping inbound TCP from blacklisted {}", remoteAddress.getHostString)
         connection ! Close
       } else {
-        peerManager ! PeerManagerActor.HandlePeerConnection(connection, remoteAddress)
+        peerManager ! PeerManagerActor.HandlePeerConnectionCmd(connection, remoteAddress)
       }
       Behaviors.same
     }

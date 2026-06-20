@@ -57,6 +57,7 @@ import com.chipprbots.ethereum.network.PeerStatisticsActor
 import com.chipprbots.ethereum.network.ServerActor
 import com.chipprbots.ethereum.network.discovery.DiscoveryConfig
 import com.chipprbots.ethereum.network.discovery.Node
+import com.chipprbots.ethereum.network.discovery.PeerDiscoveryManager
 import com.chipprbots.ethereum.network.discovery.PeerDiscoveryManager.DiscoveredNodesInfo
 import com.chipprbots.ethereum.network.handshaker.Handshaker
 import com.chipprbots.ethereum.network.handshaker.NetworkHandshaker
@@ -240,18 +241,23 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
 
   lazy val blacklist: CacheBasedBlacklist = CacheBasedBlacklist.empty(1000)
 
-  lazy val peerManager: ActorRef = system.actorOf(
-    PeerManagerActor.props(
-      peerDiscoveryManager,
-      Config.Network.peer,
+  lazy val peerManager: org.apache.pekko.actor.typed.ActorRef[PeerManagerActor.Command] = system.spawn(
+    PeerManagerActor.behavior(
       peerEventBus,
+      peerDiscoveryManager.toTyped[PeerDiscoveryManager.Command],
+      Config.Network.peer,
       knownNodesManager,
       peerStatistics,
-      handshaker,
-      authHandshaker,
+      PeerManagerActor.peerFactory(
+        Config.Network.peer,
+        peerEventBus,
+        knownNodesManager,
+        handshaker,
+        authHandshaker,
+        Config.supportedCapabilities
+      ),
       discoveryConfig,
-      blacklist,
-      Config.supportedCapabilities
+      blacklist
     ),
     "peer-manager"
   )
@@ -343,7 +349,7 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
   def startPeer(): IO[Unit] =
     for {
       _ <- IO {
-        peerManager ! PeerManagerActor.StartConnecting
+        peerManager ! PeerManagerActor.StartConnectingCmd
         server ! ServerActor.StartServer(listenAddress)
       }
       _ <- retryUntilWithDelay(IO(nodeStatusHolder.get()), 1.second, 5) { status =>
@@ -369,7 +375,7 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
   def connectToPeers(nodes: Set[Node], maxRetries: Int = 15): IO[Unit] =
     for {
       _ <- IO {
-        peerManager ! DiscoveredNodesInfo(nodes)
+        peerManager ! PeerManagerActor.DiscoveredNodesReceived(nodes)
       }
       _ <- retryUntilWithDelay(IO(storagesInstance.storages.knownNodesStorage.getKnownNodes), 1.second, maxRetries) {
         knownNodes =>

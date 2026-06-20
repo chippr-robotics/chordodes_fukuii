@@ -3,6 +3,7 @@ package com.chipprbots.ethereum.jsonrpc
 import java.util.concurrent.atomic.AtomicReference
 
 import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
@@ -15,6 +16,7 @@ import org.json4s.JsonAST.JValue
 
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage
 import com.chipprbots.ethereum.domain.BlockchainReader
+import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.jsonrpc.mcp.McpPromptRegistry
 import com.chipprbots.ethereum.jsonrpc.mcp.McpResourceRegistry
 import com.chipprbots.ethereum.jsonrpc.mcp.McpToolRegistry
@@ -107,13 +109,13 @@ object McpService {
 }
 
 class McpService(
-    peerManager: ActorRef,
+    peerManager: typed.ActorRef[PeerManagerActor.Command],
     syncController: ActorRef,
     blockchainReader: BlockchainReader,
     blockchainConfig: BlockchainConfig,
     nodeStatusHolder: AtomicReference[NodeStatus],
     transactionMappingStorage: TransactionMappingStorage
-)(implicit val executionContext: ExecutionContext) {
+)(implicit val executionContext: ExecutionContext, scheduler: typed.Scheduler) {
 
   import McpService.*
 
@@ -126,7 +128,8 @@ class McpService(
     blockchainReader,
     blockchainConfig,
     nodeStatusHolder,
-    transactionMappingStorage
+    transactionMappingStorage,
+    scheduler
   )
 
   def initialize(@unused request: McpInitializeRequest): ServiceResponse[McpInitializeResponse] =
@@ -240,10 +243,11 @@ class McpService(
 
 /** Bundle of dependencies available to MCP tools and resources */
 case class McpDependencies(
-    peerManager: ActorRef,
+    peerManager: typed.ActorRef[PeerManagerActor.Command],
     syncController: ActorRef,
     blockchainReader: BlockchainReader,
     blockchainConfig: BlockchainConfig,
     nodeStatusHolder: AtomicReference[NodeStatus],
-    transactionMappingStorage: TransactionMappingStorage
+    transactionMappingStorage: TransactionMappingStorage,
+    scheduler: typed.Scheduler
 )

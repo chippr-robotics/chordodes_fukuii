@@ -53,7 +53,7 @@ import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
   * The shell is removed once the last Classic caller migrates (Group SNAP1+).
   */
 class NetworkPeerManagerActor(
-    peerManagerActor: ActorRef,
+    peerManagerActor: typed.ActorRef[PeerManagerActor.Command],
     peerEventBusActor: typed.ActorRef[PeerEventBusActor.Command],
     appStateStorage: AppStateStorage,
     forkResolverOpt: Option[ForkResolver],
@@ -160,7 +160,7 @@ object NetworkPeerManagerActor {
   // =========================================================================
 
   def behavior(
-      peerManagerActor: ActorRef,
+      peerManagerActor: typed.ActorRef[PeerManagerActor.Command],
       peerEventBusActor: typed.ActorRef[PeerEventBusActor.Command],
       appStateStorage: AppStateStorage,
       forkResolverOpt: Option[ForkResolver],
@@ -234,7 +234,7 @@ object NetworkPeerManagerActor {
       ctx: TypedActorContext[Command],
       @annotation.unused timers: TimerScheduler[Command],
       eventAdapter: ActorRef,
-      peerManagerActor: ActorRef,
+      peerManagerActor: typed.ActorRef[PeerManagerActor.Command],
       peerEventBusActor: typed.ActorRef[PeerEventBusActor.Command],
       appStateStorage: AppStateStorage,
       forkResolverOpt: Option[ForkResolver],
@@ -363,7 +363,7 @@ object NetworkPeerManagerActor {
             message.code.toHexString
           )
           val newPeersWithInfo = updatePeersWithInfo(peersWithInfo, peerId, message.underlyingMsg, handleSentMessage)
-          peerManagerActor ! PeerManagerActor.SendMessage(message, peerId)
+          peerManagerActor ! PeerManagerActor.SendMessageCmd(message, peerId)
           handleMessages(newPeersWithInfo)
 
         case UpdateClHeadCmd(blockNumber) =>
@@ -372,7 +372,7 @@ object NetworkPeerManagerActor {
 
         case ConnectToPeerForwardCmd(uri) =>
           log.info("Forwarding ConnectToPeer({}) to PeerManagerActor", uri)
-          peerManagerActor ! PeerManagerActor.ConnectToPeer(uri)
+          peerManagerActor ! PeerManagerActor.ConnectToPeerCmd(uri)
           Behaviors.same
 
         // ── Timer ticks ───────────────────────────────────────────────────────
@@ -419,7 +419,7 @@ object NetworkPeerManagerActor {
                   peerInfo.remoteStatus.capability,
                   peerInfo.maxBlockNumber
                 )
-                peerManagerActor ! PeerManagerActor.SendMessage(probe, peer.id)
+                peerManagerActor ! PeerManagerActor.SendMessageCmd(probe, peer.id)
                 probed += 1
               }
             }
@@ -505,10 +505,13 @@ object NetworkPeerManagerActor {
                   // PeerClosedConnection will apply a short-tier (2-min) blacklist for UselessPeer.
                   // Schedule a longer override that lands AFTER PeerClosedConnection's short-tier add.
                   scheduler.scheduleOnce(LaggingPeerBlacklistOverrideDelay) {
-                    peerManagerActor ! PeerManagerActor.AddToBlacklistRequest(
-                      address = peer.remoteAddress.getHostString,
-                      duration = Some(LaggingPeerBlacklistDuration),
-                      reason = Disconnect.reasonToString(Disconnect.Reasons.UselessPeer)
+                    peerManagerActor ! PeerManagerActor.AddToBlacklistCmd(
+                      PeerManagerActor.AddToBlacklistRequest(
+                        address = peer.remoteAddress.getHostString,
+                        duration = Some(LaggingPeerBlacklistDuration),
+                        reason = Disconnect.reasonToString(Disconnect.Reasons.UselessPeer)
+                      ),
+                      Actor.noSender
                     )
                   }
                   laggingPeerSince.remove(peerId)
@@ -712,10 +715,13 @@ object NetworkPeerManagerActor {
                   )
                   peer.ref ! DisconnectPeer(Disconnect.Reasons.UselessPeer)
                   scheduler.scheduleOnce(LaggingPeerBlacklistOverrideDelay) {
-                    peerManagerActor ! PeerManagerActor.AddToBlacklistRequest(
-                      address = peer.remoteAddress.getHostString,
-                      duration = Some(5.minutes),
-                      reason = "TD-PROXY-GAP: stale chain weight, reconnect after calibration"
+                    peerManagerActor ! PeerManagerActor.AddToBlacklistCmd(
+                      PeerManagerActor.AddToBlacklistRequest(
+                        address = peer.remoteAddress.getHostString,
+                        duration = Some(5.minutes),
+                        reason = "TD-PROXY-GAP: stale chain weight, reconnect after calibration"
+                      ),
+                      Actor.noSender
                     )
                   }
                 } else
@@ -776,7 +782,7 @@ object NetworkPeerManagerActor {
             peerInfo.remoteStatus.capability,
             ByteStringUtils.hash2string(bestHash)
           )
-          peerManagerActor ! PeerManagerActor.SendMessage(probe, peer.id)
+          peerManagerActor ! PeerManagerActor.SendMessageCmd(probe, peer.id)
         } else if peerInfo.remoteStatus.capability == Capability.ETH69 then {
           // ETH/69 (EIP-7642): announce our block range immediately after STATUS.
           val bestInfo = appStateStorage.getBestBlockInfo()
@@ -787,7 +793,7 @@ object NetworkPeerManagerActor {
             bestInfo.number,
             bestInfo.hash
           )
-          peerManagerActor ! PeerManagerActor.SendMessage(bru, peer.id)
+          peerManagerActor ! PeerManagerActor.SendMessageCmd(bru, peer.id)
         }
         NetworkMetrics.registerAddHandshakedPeer(peer)
         PeerTelemetry.registerPeer(peer, peerInfo)
@@ -963,7 +969,7 @@ object NetworkPeerManagerActor {
             )
             AccountRange(msg.requestId, Seq.empty, Seq.empty)
         }
-      peerManagerActor ! PeerManagerActor.SendMessage(response, peerId)
+      peerManagerActor ! PeerManagerActor.SendMessageCmd(response, peerId)
       log.debug(
         "SNAP-SERVE: GetAccountRange peer={} accounts={} proofs={}",
         peerId,
@@ -1072,7 +1078,7 @@ object NetworkPeerManagerActor {
         case None =>
           StorageRanges(msg.requestId, Seq.empty, Seq.empty)
       }
-      peerManagerActor ! PeerManagerActor.SendMessage(response, peerId)
+      peerManagerActor ! PeerManagerActor.SendMessageCmd(response, peerId)
       log.debug(
         "SNAP-SERVE: GetStorageRanges peer={} slots={} proofs={}",
         peerId,
@@ -1113,7 +1119,7 @@ object NetworkPeerManagerActor {
             )
             TrieNodes(msg.requestId, Seq.empty)
         }
-      peerManagerActor ! PeerManagerActor.SendMessage(response, peerId)
+      peerManagerActor ! PeerManagerActor.SendMessageCmd(response, peerId)
       log.debug(
         "SNAP-SERVE: GetTrieNodes peer={} nodes={}",
         peerId,
@@ -1152,7 +1158,7 @@ object NetworkPeerManagerActor {
             )
             ByteCodes(msg.requestId, Seq.empty)
         }
-      peerManagerActor ! PeerManagerActor.SendMessage(response, peerId)
+      peerManagerActor ! PeerManagerActor.SendMessageCmd(response, peerId)
       log.debug(
         "SNAP-SERVE: GetByteCodes peer={} codes={}",
         peerId,
@@ -1363,7 +1369,7 @@ object NetworkPeerManagerActor {
   case object CalibrateChainWeightNow
 
   def props(
-      peerManagerActor: ActorRef,
+      peerManagerActor: typed.ActorRef[PeerManagerActor.Command],
       peerEventBusActor: typed.ActorRef[PeerEventBusActor.Command],
       appStateStorage: AppStateStorage,
       forkResolverOpt: Option[ForkResolver],

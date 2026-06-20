@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.jsonrpc
 
 import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
@@ -30,9 +31,9 @@ object DebugService {
   * against the [[com.chipprbots.ethereum.vm.ExecutionTracer]] interface.
   */
 class DebugService(
-    peerManager: ActorRef,
+    peerManager: typed.ActorRef[PeerManagerActor.Command],
     networkPeerManager: ActorRef
-) {
+)(implicit scheduler: typed.Scheduler) {
 
   def listPeersInfo(@unused getPeersInfoRequest: ListPeersInfoRequest): ServiceResponse[ListPeersInfoResponse] =
     for {
@@ -44,7 +45,7 @@ class DebugService(
     implicit val timeout: Timeout = Timeout(20.seconds)
 
     peerManager
-      .askFor[Peers](PeerManagerActor.GetPeers)
+      .askFor[Peers](PeerManagerActor.GetPeersCmd(_))
       .handleError(_ => Peers(Map.empty[Peer, PeerActor.Status]))
       .map(_.peers.keySet.map(_.id).toList)
   }

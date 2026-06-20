@@ -3,6 +3,8 @@ package com.chipprbots.ethereum.jsonrpc
 import java.util.concurrent.atomic.AtomicReference
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.Timeout
@@ -18,6 +20,7 @@ import org.scalatest.wordspec.AnyWordSpecLike
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.jsonrpc.McpService.*
+import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.utils.*
 
 class McpServiceSpec
@@ -31,6 +34,7 @@ class McpServiceSpec
 
   implicit val timeout: Timeout = Timeout(3.seconds)
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
+  implicit val scheduler: typed.Scheduler = system.toTyped.scheduler
 
   val peerManagerProbe: TestProbe = TestProbe()
   val syncControllerProbe: TestProbe = TestProbe()
@@ -53,7 +57,7 @@ class McpServiceSpec
 
   // Use null for dependencies not exercised in basic tests
   val service = new McpService(
-    peerManagerProbe.ref,
+    peerManagerProbe.ref.toTyped[PeerManagerActor.Command],
     syncControllerProbe.ref,
     null.asInstanceOf[BlockchainReader],
     testBlockchainConfig,

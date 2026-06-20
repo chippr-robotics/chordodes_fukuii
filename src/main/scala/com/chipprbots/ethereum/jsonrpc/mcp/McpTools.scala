@@ -1,5 +1,6 @@
 package com.chipprbots.ethereum.jsonrpc.mcp
 
+import org.apache.pekko.actor.typed
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
@@ -64,8 +65,9 @@ object NodeStatusTool {
   )
 
   def execute(deps: McpDependencies)(implicit timeout: Timeout, @unused ec: ExecutionContext): IO[String] = {
+    implicit val scheduler: typed.Scheduler = deps.scheduler
     val syncStatusIO = deps.syncController.askFor[SyncProtocol.Status](SyncProtocol.GetStatus)
-    val peersIO = deps.peerManager.askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeers)
+    val peersIO = deps.peerManager.askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
 
     for {
       syncStatus <- syncStatusIO.recover { case _ => SyncProtocol.Status.NotSyncing }
@@ -177,9 +179,10 @@ object PeerListTool {
     "List all connected peers with their addresses, status, and connection direction"
   )
 
-  def execute(deps: McpDependencies)(implicit timeout: Timeout, @unused ec: ExecutionContext): IO[String] =
+  def execute(deps: McpDependencies)(implicit timeout: Timeout, @unused ec: ExecutionContext): IO[String] = {
+    implicit val scheduler: typed.Scheduler = deps.scheduler
     deps.peerManager
-      .askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeers)
+      .askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
       .recover { case _ =>
         PeerManagerActor.Peers(Map.empty)
       }
@@ -203,6 +206,7 @@ object PeerListTool {
           s"Connected Peers: ${peers.peers.size}\n${peerLines.mkString("\n")}"
         }
       }
+  }
 }
 
 object SetEtherbaseTool {

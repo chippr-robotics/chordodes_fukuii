@@ -1,5 +1,6 @@
 package com.chipprbots.ethereum.transactions
 
+import org.apache.pekko.actor.Actor
 import org.apache.pekko.actor.ActorRef as ClassicActorRef
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
@@ -89,7 +90,7 @@ object PendingTransactionsManager {
 
   def apply(
       txPoolConfig: TxPoolConfig,
-      peerManager: ClassicActorRef,
+      peerManager: ActorRef[PeerManagerActor.Command],
       networkPeerManager: ClassicActorRef,
       peerEventBus: ActorRef[PeerEventBusCommand],
       blockchainReader: com.chipprbots.ethereum.domain.BlockchainReader = null,
@@ -434,7 +435,7 @@ object PendingTransactionsManager {
             "PooledTransactions from peer {} has type/size mismatch with announcement — disconnecting",
             peerId
           )
-          peerManager ! PeerManagerActor.DisconnectPeerById(peerId)
+          peerManager ! PeerManagerActor.DisconnectPeerByIdCmd(peerId, Actor.noSender)
         } else {
           // Store blob tx sidecar bytes for PooledTransactions responses
           msg.blobTxRawBytes.foreach { case (hash, rawBytes) =>

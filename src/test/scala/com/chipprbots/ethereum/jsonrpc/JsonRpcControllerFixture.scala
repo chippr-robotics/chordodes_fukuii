@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.jsonrpc
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
@@ -40,6 +41,7 @@ import com.chipprbots.ethereum.keystore.KeyStore
 import com.chipprbots.ethereum.ledger.BloomFilter
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ledger.StxLedger
+import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.nodebuilder.ApisBuilder
 import com.chipprbots.ethereum.ommers.OmmersPool
@@ -227,8 +229,9 @@ class JsonRpcControllerFixture(implicit system: ActorSystem, mockFactory: org.sc
   val debugService: DebugService = mock[DebugService]
   val qaService: QAService = mock[QAService]
   val fukuiiService: FukuiiService = mock[FukuiiService]
+  implicit val scheduler: typed.Scheduler = system.toTyped.scheduler
   val mcpService: McpService = new McpService(
-    TestProbe().ref,
+    TestProbe().ref.toTyped[PeerManagerActor.Command],
     TestProbe().ref,
     null,
     null,

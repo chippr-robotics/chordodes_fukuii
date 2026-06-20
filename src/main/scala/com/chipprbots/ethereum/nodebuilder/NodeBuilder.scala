@@ -414,18 +414,23 @@ trait PeerManagerActorBuilder {
 
   lazy val peerConfiguration: PeerConfiguration = instanceConfig.Network.peer
 
-  lazy val peerManager: ActorRef = classicSystem.actorOf(
-    PeerManagerActor.props(
+  lazy val peerManager: TypedActorRef[PeerManagerActor.Command] = classicSystem.spawn(
+    PeerManagerActor.behavior(
+      peerEventBus,
       peerDiscoveryManagerTyped,
       instanceConfig.Network.peer,
-      peerEventBus,
       knownNodesManager,
       peerStatistics,
-      handshaker,
-      authHandshaker,
+      PeerManagerActor.peerFactory(
+        instanceConfig.Network.peer,
+        peerEventBus,
+        knownNodesManager,
+        handshaker,
+        authHandshaker,
+        instanceConfig.supportedCapabilities
+      ),
       discoveryConfig,
-      blacklist,
-      instanceConfig.supportedCapabilities
+      blacklist
     ),
     "peer-manager"
   )
@@ -502,11 +507,17 @@ trait Web3ServiceBuilder {
 }
 
 trait NetServiceBuilder {
-  this: PeerManagerActorBuilder with NodeStatusBuilder with BlacklistBuilder with InstanceConfigProvider =>
+  this: PeerManagerActorBuilder
+    with NodeStatusBuilder
+    with BlacklistBuilder
+    with InstanceConfigProvider
+    with ActorSystemBuilder =>
 
   lazy val netServiceConfig: NetServiceConfig = NetServiceConfig(instanceConfig.config)
 
-  lazy val netService = new NetService(nodeStatusHolder, peerManager, blacklist, netServiceConfig)
+  lazy val netService = new NetService(nodeStatusHolder, peerManager, blacklist, netServiceConfig)(
+    classicSystem.toTyped.scheduler
+  )
 }
 
 trait PendingTransactionsManagerBuilder {
@@ -609,9 +620,9 @@ trait FilterManagerBuilder {
 }
 
 trait DebugServiceBuilder {
-  self: NetworkPeerManagerActorBuilder with PeerManagerActorBuilder =>
+  self: NetworkPeerManagerActorBuilder with PeerManagerActorBuilder with ActorSystemBuilder =>
 
-  lazy val debugService = new DebugService(peerManager, networkPeerManager)
+  lazy val debugService = new DebugService(peerManager, networkPeerManager)(classicSystem.toTyped.scheduler)
 }
 
 trait EthProofServiceBuilder {
@@ -790,7 +801,7 @@ trait McpServiceBuilder {
     blockchainConfig,
     nodeStatusHolder,
     storagesInstance.storages.transactionMappingStorage
-  )(classicSystem.dispatcher)
+  )(classicSystem.dispatcher, classicSystem.toTyped.scheduler)
 }
 
 trait KeyStoreBuilder {
@@ -826,7 +837,8 @@ trait AdminServiceBuilder {
     with NodeStatusBuilder
     with BlockchainBuilder
     with BlockchainConfigBuilder
-    with InstanceConfigProvider =>
+    with InstanceConfigProvider
+    with ActorSystemBuilder =>
 
   lazy val blockedIPRegistry: BlockedIPRegistry = new BlockedIPRegistry(Set.empty)
 
@@ -838,7 +850,7 @@ trait AdminServiceBuilder {
     instanceConfig.config.getConfig("network.rpc.net").getDuration("peer-manager-timeout").toMillis.millis,
     instanceConfig.config.getString("datadir"),
     blockedIPRegistry
-  )
+  )(classicSystem.toTyped.scheduler)
 }
 
 trait TxPoolServiceBuilder {
