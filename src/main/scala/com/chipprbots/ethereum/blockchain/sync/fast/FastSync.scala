@@ -699,13 +699,24 @@ object FastSync {
                 stateSyncStarted = true
                 syncStateScheduler ! StartSyncingTo(syncState.pivotBlock.stateRoot, syncState.pivotBlock.number)
               }
+              // Mirror the Classic `context.become(this.receive); processSyncing()`: transition out of the
+              // pivot-update wait into `syncing()` (which handles ResponseReceived) and run processSyncing() for
+              // its dispatch side effects. processSyncing() returns Behaviors.same here, so the explicit `syncing()`
+              // is what takes effect — without it the actor would stay in waitingForPivotBlockUpdate and drop the
+              // header/body/receipt responses.
+              val b = syncing()
               processSyncing()
+              b
 
             case PivotBlockSelector.Result(pivotBlockHeader)
                 if newPivotIsGoodEnough(pivotBlockHeader, syncState, updateReason) =>
               log.debug("New pivot block with number {} received", pivotBlockHeader.number)
               updatePivotSyncState(updateReason, pivotBlockHeader)
+              // See SelectionFailed above: become syncing() before running processSyncing()'s side effects so the
+              // subsequently-arriving PeerRequestHandler responses are handled instead of dropped.
+              val b = syncing()
               processSyncing()
+              b
 
             case PivotBlockSelector.Result(pivotBlockHeader)
                 if !newPivotIsGoodEnough(pivotBlockHeader, syncState, updateReason) =>

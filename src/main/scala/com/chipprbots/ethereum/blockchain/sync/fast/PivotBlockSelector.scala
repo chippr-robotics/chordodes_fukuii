@@ -318,7 +318,11 @@ object PivotBlockSelector {
         case _ =>
           ETHPackets.GetBlockHeaders(ETHPackets.nextRequestId, Left(blockNumber), 1, 0, reverse = false)
       }
-      networkPeerManager ! NetworkPeerManagerActor.SendMessage(getBlockHeadersMsg, peer)
+      // Typed context has no implicit `sender()`; pass `ctx.self.toClassic` explicitly so a directly-replying
+      // peer manager (notably the test AutoPilot) routes its `MessageFromPeer` response back here rather than to
+      // dead letters. In production the response arrives via the peerEventBus subscription above; this keeps the
+      // pre-S4-Classic behaviour where `self` was the implicit sender of `SendMessage`.
+      networkPeerManager.tell(NetworkPeerManagerActor.SendMessage(getBlockHeadersMsg, peer), ctx.self.toClassic)
     }
 
     private def collectVoters(previousBestBlockNumber: Option[BigInt] = None): ElectionDetails = {

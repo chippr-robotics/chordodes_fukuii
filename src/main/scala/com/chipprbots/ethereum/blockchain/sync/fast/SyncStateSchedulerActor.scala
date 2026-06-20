@@ -265,6 +265,17 @@ object SyncStateSchedulerActor {
       case pd: PeerDisconnected =>
         peerListHelper.handlePeerDisconnected(pd.peerId)
         Some(Behaviors.same)
+      // FastSync spawns this core behavior directly (bypassing the Classic `SyncStateSchedulerActor` shell that
+      // captures `sender()`), so the bare public messages arrive here instead of the shell-translated `*Cmd` forms.
+      // Re-dispatch them as `*Cmd` with `parentRef` as the replyTo — the Classic actor used `sender()` (= the
+      // FastSync parent) for exactly this. Without this the core drops `StartSyncingTo` and state download never
+      // begins. The shell path is unaffected: it forwards `*Cmd` directly and never sends the bare messages here.
+      case StartSyncingTo(stateRoot, blockNumber) =>
+        ctx.self ! StartSyncingToCmd(stateRoot, blockNumber, parentRef)
+        Some(Behaviors.same)
+      case RestartRequested =>
+        ctx.self ! RestartRequestedCmd(parentRef)
+        Some(Behaviors.same)
       case _ => None
     }
 
