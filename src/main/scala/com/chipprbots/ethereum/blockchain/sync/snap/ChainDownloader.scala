@@ -1,7 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync.snap
 
 import org.apache.pekko.actor.ActorRef as ClassicActorRef
-import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
@@ -82,8 +81,8 @@ class ChainDownloader private (
 
   import ChainDownloader.*
 
-  // PeerRequestHandler.props requires an implicit (Classic) Scheduler.
-  implicit private val implicitScheduler: Scheduler = context.system.classicSystem.scheduler
+  private val prhResultAdapter: TypedActorRef[PeerRequestHandler.Result] =
+    context.messageAdapter[PeerRequestHandler.Result](identity)
 
   private def log = context.log
 
@@ -386,18 +385,16 @@ class ChainDownloader private (
         reverse = false
       )
 
-      // Spawned as a child of this Typed actor (via the Classic adapter) so PeerRequestHandler's
-      // `initiator = context.parent` resolves to us; it then sends ResponseReceived / RequestFailed
-      // straight to our mailbox (matched as raw Classic case classes).
-      context.toClassic.actorOf(
+      context.spawn(
         PeerRequestHandler
-          .props[ETHPackets.GetBlockHeaders, ETHPackets.BlockHeaders](
+          .behavior[ETHPackets.GetBlockHeaders, ETHPackets.BlockHeaders](
             peer,
             requestTimeout,
             networkPeerManager,
             peerEventBus,
             requestMsg,
-            Codes.BlockHeadersCode
+            Codes.BlockHeadersCode,
+            replyTo = prhResultAdapter
           ),
         s"chain-headers-${bestHeaderNumber + 1}-${System.nanoTime()}"
       )
@@ -411,15 +408,16 @@ class ChainDownloader private (
 
       val requestMsg = ETHPackets.GetBlockBodies(ETHPackets.nextRequestId, batch)
 
-      context.toClassic.actorOf(
+      context.spawn(
         PeerRequestHandler
-          .props[ETHPackets.GetBlockBodies, ETHPackets.BlockBodies](
+          .behavior[ETHPackets.GetBlockBodies, ETHPackets.BlockBodies](
             peer,
             requestTimeout,
             networkPeerManager,
             peerEventBus,
             requestMsg,
-            Codes.BlockBodiesCode
+            Codes.BlockBodiesCode,
+            replyTo = prhResultAdapter
           ),
         s"chain-bodies-${System.nanoTime()}"
       )
@@ -440,29 +438,31 @@ class ChainDownloader private (
         // ETH70: resume partial delivery from the buffered index for the first block in batch
         val firstBlockResumeIdx = partialReceiptState.getOrElse(batch.head, 0L)
         val requestMsg = ETHPackets.GetReceipts70(ETHPackets.nextRequestId, firstBlockResumeIdx, batch)
-        context.toClassic.actorOf(
+        context.spawn(
           PeerRequestHandler
-            .props[ETHPackets.GetReceipts70, ETHPackets.Receipts70](
+            .behavior[ETHPackets.GetReceipts70, ETHPackets.Receipts70](
               peer,
               requestTimeout,
               networkPeerManager,
               peerEventBus,
               requestMsg,
-              Codes.ReceiptsCode
+              Codes.ReceiptsCode,
+              replyTo = prhResultAdapter
             ),
           s"chain-receipts-eth70-${System.nanoTime()}"
         )
       } else {
         val requestMsg = ETHPackets.GetReceipts(ETHPackets.nextRequestId, batch)
-        context.toClassic.actorOf(
+        context.spawn(
           PeerRequestHandler
-            .props[ETHPackets.GetReceipts, ETHPackets.Receipts68](
+            .behavior[ETHPackets.GetReceipts, ETHPackets.Receipts68](
               peer,
               requestTimeout,
               networkPeerManager,
               peerEventBus,
               requestMsg,
-              Codes.ReceiptsCode
+              Codes.ReceiptsCode,
+              replyTo = prhResultAdapter
             ),
           s"chain-receipts-${System.nanoTime()}"
         )

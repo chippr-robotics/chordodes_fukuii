@@ -218,7 +218,6 @@ object SyncStateSchedulerActor {
     import syncConfig.*
 
     implicit private val ioRuntime: IORuntime = IORuntime.global
-    implicit private val actorScheduler: org.apache.pekko.actor.Scheduler = ctx.system.classicSystem.scheduler
 
     /** State root for the current sync target — needed for GetTrieNodes requests. */
     private var currentStateRoot: ByteString = ByteString.empty
@@ -227,8 +226,11 @@ object SyncStateSchedulerActor {
     private var consecutiveUselessResponses: Int = 0
     private val UselessResponseThreshold: Int = 20
 
-    /** Live Classic refs to PeerRequestHandler children, keyed by PeerId for explicit unwatch. */
-    private var activeHandlers: Map[PeerId, ClassicActorRef] = Map.empty
+    private val prhResultAdapter: TypedActorRef[PeerRequestHandler.Result] =
+      ctx.messageAdapter[PeerRequestHandler.Result](identity)
+
+    /** Live Typed refs to PeerRequestHandler children, keyed by PeerId for explicit unwatch. */
+    private var activeHandlers: Map[PeerId, TypedActorRef[PeerRequestHandler.Command]] = Map.empty
 
     // Static SLF4J logger for IO-fiber callbacks — ctx.log is actor-thread-only.
     private val fiberLog = org.slf4j.LoggerFactory.getLogger(classOf[SyncStateSchedulerActor])
@@ -411,7 +413,7 @@ object SyncStateSchedulerActor {
       freePeers
     }
 
-    /** Spawns a PeerRequestHandler child (via Classic adapter), registers a death-watch, and tracks the ref. */
+    /** Spawns a PeerRequestHandler child, registers a death-watch, and tracks the ref. */
     private def requestNodes(request: PeerRequest): Unit = {
       val useSnap = peerUsesSnap(request.peer)
       ctx.log.debug(
@@ -433,8 +435,8 @@ object SyncStateSchedulerActor {
               Seq(ByteString(HexPrefix.encode(Array.empty[Byte], isLeaf = false)))
           }
         }
-        ctx.toClassic.actorOf(
-          PeerRequestHandler.props[GetTrieNodes, TrieNodes](
+        ctx.spawnAnonymous(
+          PeerRequestHandler.behavior[GetTrieNodes, TrieNodes](
             request.peer,
             syncConfig.peerResponseTimeout,
             networkPeerManager,
@@ -445,22 +447,24 @@ object SyncStateSchedulerActor {
               paths = paths,
               responseBytes = BigInt(512 * 1024)
             ),
-            responseMsgCode = SNAP.Codes.TrieNodesCode
+            responseMsgCode = SNAP.Codes.TrieNodesCode,
+            replyTo = prhResultAdapter
           )
         )
       } else {
-        ctx.toClassic.actorOf(
-          PeerRequestHandler.props[GetNodeData, NodeData](
+        ctx.spawnAnonymous(
+          PeerRequestHandler.behavior[GetNodeData, NodeData](
             request.peer,
             syncConfig.peerResponseTimeout,
             networkPeerManager,
             peerEventBus,
             requestMsg = GetNodeData(request.nodes.toList),
-            responseMsgCode = Codes.NodeDataCode
+            responseMsgCode = Codes.NodeDataCode,
+            replyTo = prhResultAdapter
           )
         )
       }
-      ctx.watchWith(handler.toTyped[Nothing], RequestTerminated(request.peer))
+      ctx.watchWith(handler, RequestTerminated(request.peer))
       activeHandlers = activeHandlers.updated(request.peer.id, handler)
     }
 
@@ -515,7 +519,7 @@ object SyncStateSchedulerActor {
             case ResponseReceived(peer: Peer, nodeData: NodeData, timeTaken: Long) =>
               ctx.log.debug("Received {} state nodes via GetNodeData in {} ms", nodeData.values.size, timeTaken)
               FastSyncMetrics.setMptStateDownloadTime(timeTaken)
-              activeHandlers.get(peer.id).foreach(h => ctx.unwatch(h.toTyped[Nothing]))
+              activeHandlers.get(peer.id).foreach(h => ctx.unwatch(h))
               activeHandlers -= peer.id
               ctx.self.toClassic ! RequestData(nodeData, peer)
               Behaviors.same
@@ -523,13 +527,13 @@ object SyncStateSchedulerActor {
             case ResponseReceived(peer: Peer, trieNodes: TrieNodes, timeTaken: Long) =>
               ctx.log.debug("Received {} state nodes via GetTrieNodes in {} ms", trieNodes.nodes.size, timeTaken)
               FastSyncMetrics.setMptStateDownloadTime(timeTaken)
-              activeHandlers.get(peer.id).foreach(h => ctx.unwatch(h.toTyped[Nothing]))
+              activeHandlers.get(peer.id).foreach(h => ctx.unwatch(h))
               activeHandlers -= peer.id
               ctx.self.toClassic ! RequestData(NodeData(trieNodes.nodes.toList), peer)
               Behaviors.same
 
             case PeerRequestHandler.RequestFailed(peer: Peer, reason: String) =>
-              activeHandlers.get(peer.id).foreach(h => ctx.unwatch(h.toTyped[Nothing]))
+              activeHandlers.get(peer.id).foreach(h => ctx.unwatch(h))
               activeHandlers -= peer.id
               ctx.log.debug("Request to peer {} failed due to {}", peer.id, reason)
               ctx.self.toClassic ! RequestFailed(peer, reason)

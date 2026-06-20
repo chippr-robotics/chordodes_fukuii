@@ -213,12 +213,12 @@ object FastSync {
 
     override protected val log: org.slf4j.Logger = ctx.log
 
-    // Classic scheduler for the Classic PeerRequestHandler children (PRH.props needs an implicit Scheduler).
-    implicit private val classicScheduler: Scheduler = ctx.system.classicSystem.scheduler
-
     // Shared rate tracker: the PeerListHelper tunes it on each handshaked-peer refresh and the concurrent fetcher
     // queues read its RTT/capacity estimates.
     private val ethRateTracker: PeerRateTracker = new PeerRateTracker()
+
+    private val prhResultAdapter: TypedActorRef[PeerRequestHandler.Result] =
+      ctx.messageAdapter[PeerRequestHandler.Result](identity)
 
     private val peerHelper =
       new PeerListHelper(peerEventBus, blacklist, peerDisconnectedAdapter, log, Some(ethRateTracker))
@@ -384,7 +384,7 @@ object FastSync {
     // is at most one in-flight bodies/receipts request per peer (the fetcher queue's inFlight(peerId) gate enforces
     // this), so peer.id is an unambiguous key for the requested-hashes maps. `assignedHandlers` tracks the live child
     // refs for the fullySynced/noBlockchainWorkRemaining gates and is pruned only on RequestTerminated (death-watch).
-    private var assignedHandlers: Set[ActorRef] = Set.empty
+    private var assignedHandlers: Set[TypedActorRef[PeerRequestHandler.Command]] = Set.empty
     private var requestedBlockBodies: Map[PeerId, Seq[ByteString]] = Map.empty
     private var requestedReceipts: Map[PeerId, Seq[ByteString]] = Map.empty
 
@@ -1402,12 +1402,12 @@ object FastSync {
       Behaviors.same
     }
 
-    /** Spawn a Classic PeerRequestHandler child (it replies to context.parent = this core, then stops), register a
-      * death-watch that delivers RequestTerminated, and track the ref in `assignedHandlers`.
+    /** Spawn a Typed PeerRequestHandler child, register a death-watch that delivers RequestTerminated, and track the
+      * ref in `assignedHandlers`.
       */
-    private def spawnHandler(behaviorName: String, props: Props): Unit = {
-      val handler = ctx.toClassic.actorOf(props, behaviorName)
-      ctx.watchWith(handler.toTyped[Nothing], RequestTerminated(handler))
+    private def spawnHandler(behaviorName: String, beh: Behavior[PeerRequestHandler.Command]): Unit = {
+      val handler = ctx.spawn(beh, behaviorName)
+      ctx.watchWith(handler, RequestTerminated(handler))
       assignedHandlers += handler
     }
 
@@ -1420,13 +1420,14 @@ object FastSync {
       bodyAssignments.foreach { case (peerWithInfo, req) =>
         spawnHandler(
           s"$countActor-peer-request-handler-block-bodies",
-          PeerRequestHandler.props[ETHPackets.GetBlockBodies, ETHPackets.BlockBodies](
+          PeerRequestHandler.behavior[ETHPackets.GetBlockBodies, ETHPackets.BlockBodies](
             peerWithInfo.peer,
             peerResponseTimeout,
             networkPeerManager,
             peerEventBus,
             requestMsg = req,
-            responseMsgCode = Codes.BlockBodiesCode
+            responseMsgCode = Codes.BlockBodiesCode,
+            replyTo = prhResultAdapter
           )
         )
         requestedBlockBodies += peerWithInfo.peer.id -> req.hashes
@@ -1438,13 +1439,14 @@ object FastSync {
       receiptAssignments.foreach { case (peerWithInfo, req) =>
         spawnHandler(
           s"$countActor-peer-request-handler-receipts",
-          PeerRequestHandler.props[ETHPackets.GetReceipts, ETHPackets.Receipts68](
+          PeerRequestHandler.behavior[ETHPackets.GetReceipts, ETHPackets.Receipts68](
             peerWithInfo.peer,
             peerResponseTimeout,
             networkPeerManager,
             peerEventBus,
             requestMsg = req,
-            responseMsgCode = Codes.ReceiptsCode
+            responseMsgCode = Codes.ReceiptsCode,
+            replyTo = prhResultAdapter
           )
         )
         requestedReceipts += peerWithInfo.peer.id -> req.blockHashes
@@ -1459,13 +1461,14 @@ object FastSync {
       headerAssignments.foreach { case (peerWithInfo, req) =>
         spawnHandler(
           s"$countActor-fast-headers-${req.requestId}",
-          PeerRequestHandler.props[ETHPackets.GetBlockHeaders, ETHPackets.BlockHeaders](
+          PeerRequestHandler.behavior[ETHPackets.GetBlockHeaders, ETHPackets.BlockHeaders](
             peerWithInfo.peer,
             peerResponseTimeout,
             networkPeerManager,
             peerEventBus,
             requestMsg = req,
-            responseMsgCode = Codes.BlockHeadersCode
+            responseMsgCode = Codes.BlockHeadersCode,
+            replyTo = prhResultAdapter
           )
         )
       }
@@ -1598,7 +1601,7 @@ object FastSync {
     * itself). Delivered via `ctx.watchWith`, this is the single place that removes the handler from the active set —
     * the response/failure handlers only do data processing (keyed by `peer.id`).
     */
-  final private[fast] case class RequestTerminated(handler: ActorRef)
+  final private[fast] case class RequestTerminated(handler: TypedActorRef[PeerRequestHandler.Command])
 
   /** Core-internal: periodic poll tick that re-requests the handshaked peer list from `networkPeerManager` (replaces
     * the `scheduleWithFixedDelay` that `PeerListSupportNg` ran in the Classic actor).

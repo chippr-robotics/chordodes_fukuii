@@ -56,7 +56,7 @@ object FastSyncBranchResolverActor {
   private case object ScanPeers
 
   /** A watched PeerRequestHandler child terminated. */
-  final private case class HandlerTerminated(ref: ClassicActorRef)
+  final private case class HandlerTerminated(ref: TypedActorRef[PeerRequestHandler.Command])
 
   // ----- Outgoing messages to the Classic `fastSync` parent -----
 
@@ -160,6 +160,9 @@ object FastSyncBranchResolverActor {
   ) {
     import BinarySearchSupport.*
 
+    private val prhResultAdapter: TypedActorRef[PeerRequestHandler.Result] =
+      context.messageAdapter[PeerRequestHandler.Result](identity)
+
     private def log = context.log
 
     /** Shared peer-list / scan handling for every state. Returns `Some(next)` if the message was handled. */
@@ -202,7 +205,7 @@ object FastSyncBranchResolverActor {
     private def waitingForRecentBlockHeaders(
         masterPeer: Peer,
         bestBlockNumber: BigInt,
-        requestHandler: ClassicActorRef
+        requestHandler: TypedActorRef[PeerRequestHandler.Command]
     ): Behavior[Any] =
       Behaviors.receiveMessage { message =>
         handleCommon(message).getOrElse {
@@ -226,13 +229,13 @@ object FastSyncBranchResolverActor {
     private def waitingForBinarySearchBlock(
         searchState: SearchState,
         blockHeaderNumberToSearch: BigInt,
-        requestHandler: ClassicActorRef
+        requestHandler: TypedActorRef[PeerRequestHandler.Command]
     ): Behavior[Any] =
       Behaviors.receiveMessage { message =>
         handleCommon(message).getOrElse {
           message match {
             case ResponseReceived(peer, ETH68BlockHeaders(_, headers), durationMs) if peer == searchState.masterPeer =>
-              context.unwatch(requestHandler.toTyped[Nothing])
+              context.unwatch(requestHandler)
               headers.toList match {
                 case childHeader :: Nil if childHeader.number == blockHeaderNumberToSearch =>
                   log.debug(ReceivedBlockHeaderLog, blockHeaderNumberToSearch, peer.id, durationMs)
@@ -317,36 +320,35 @@ object FastSyncBranchResolverActor {
       Behaviors.stopped
     }
 
-    private def sendGetBlockHeadersRequest(peer: Peer, fromBlock: BigInt, amount: BigInt): ClassicActorRef = {
+    private def sendGetBlockHeadersRequest(
+        peer: Peer,
+        fromBlock: BigInt,
+        amount: BigInt
+    ): TypedActorRef[PeerRequestHandler.Command] = {
       // ETH68+ always uses request-id; capability check kept for parity with the Classic implementation.
       val _ = peerListHelper.handshakedPeers
         .get(peer.id)
         .exists(peerWithInfo => Capability.usesRequestId(peerWithInfo.peerInfo.remoteStatus.capability))
 
-      // `props` needs an implicit Scheduler (the Classic system scheduler) plus the implicit
-      // GetBlockHeaders -> MessageSerializable conversion (from ETHPackets.GetBlockHeaders.GetBlockHeadersEnc).
-      implicit val scheduler: org.apache.pekko.actor.Scheduler = context.system.classicSystem.scheduler
-
-      // Spawned as a child of this Typed actor so PeerRequestHandler's `initiator = context.parent` resolves to us;
-      // it then sends ResponseReceived / RequestFailed straight to our mailbox (matched as raw Classic case classes).
-      val handler = context.toClassic.actorOf(
-        PeerRequestHandler.props[ETH68GetBlockHeaders, ETH68BlockHeaders](
+      val handler = context.spawnAnonymous(
+        PeerRequestHandler.behavior[ETH68GetBlockHeaders, ETH68BlockHeaders](
           peer,
           syncConfig.peerResponseTimeout,
           networkPeerManager,
           peerEventBus,
           requestMsg =
             ETH68GetBlockHeaders(ETHPackets.nextRequestId, Left(fromBlock), amount, skip = 0, reverse = false),
-          responseMsgCode = Codes.BlockHeadersCode
+          responseMsgCode = Codes.BlockHeadersCode,
+          replyTo = prhResultAdapter
         )
       )
-      context.watchWith(handler.toTyped[Nothing], HandlerTerminated(handler))
+      context.watchWith(handler, HandlerTerminated(handler))
       handler
     }
 
-    private def handleInvalidResponse(peer: Peer, peerRef: ClassicActorRef): Behavior[Any] = {
+    private def handleInvalidResponse(peer: Peer, peerRef: TypedActorRef[PeerRequestHandler.Command]): Behavior[Any] = {
       log.warn(s"Received invalid response from peer [${peer.id}]. Restarting branch resolver.")
-      context.unwatch(peerRef.toTyped[Nothing])
+      context.unwatch(peerRef)
       peerListHelper.blacklistIfHandshaked(
         peer.id,
         syncConfig.blacklistDuration,
@@ -355,9 +357,13 @@ object FastSyncBranchResolverActor {
       restart()
     }
 
-    private def handleRequestFailure(peer: Peer, peerRef: ClassicActorRef, reason: String): Behavior[Any] = {
+    private def handleRequestFailure(
+        peer: Peer,
+        peerRef: TypedActorRef[PeerRequestHandler.Command],
+        reason: String
+    ): Behavior[Any] = {
       log.warn(s"Request to peer [${peer.id}] failed: [$reason]. Restarting branch resolver.")
-      context.unwatch(peerRef.toTyped[Nothing])
+      context.unwatch(peerRef)
       peerListHelper.blacklistIfHandshaked(
         peer.id,
         syncConfig.blacklistDuration,
@@ -366,7 +372,7 @@ object FastSyncBranchResolverActor {
       restart()
     }
 
-    private def handlePeerTermination(peer: Peer, peerHandlerRef: ClassicActorRef): Behavior[Any] = {
+    private def handlePeerTermination(peer: Peer, peerHandlerRef: TypedActorRef[PeerRequestHandler.Command]): Behavior[Any] = {
       log.warn(peerTerminatedLog, peerHandlerRef.path.name, peer.id)
       restart()
     }
