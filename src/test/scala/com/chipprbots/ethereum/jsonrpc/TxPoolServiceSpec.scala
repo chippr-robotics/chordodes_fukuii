@@ -29,11 +29,7 @@ import com.chipprbots.ethereum.utils.TxPoolConfig
   * Besu reference: TxPoolBesuTransactions, TxPoolBesuStatistics, TxPoolBesuPendingTransactions,
   * PendingTransactionFilter, PendingTransactionsParams
   */
-class TxPoolServiceSpec
-    extends ScalaTestWithActorTestKit
-    with AnyFlatSpecLike
-    with Matchers
-    with ScalaFutures {
+class TxPoolServiceSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers with ScalaFutures {
 
   import TxPoolService.*
 

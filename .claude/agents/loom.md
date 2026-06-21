@@ -470,3 +470,20 @@ Do not run `testEssential` (or `./local/scripts/fukuii-test` without arguments) 
 **E003 vs E165:** Track `E003` (Classic actor deprecation — `extends Actor`) to measure
 migration progress. `E165` is "unmatchable type in pattern match on Any" — it rises
 when migrating to `Behavior[Any]` and is NOT a signal of Classic actor count.
+
+**Test file migration — `TestKit` → `ScalaTestWithActorTestKit`:**
+
+When migrating a test file alongside its production actor, swap `extends TestKit(...) with ...`
+to `extends ScalaTestWithActorTestKit`. The test kit owns actor system lifecycle; drop
+`WithActorSystemShutDown` and explicit `afterAll` teardown — handled automatically.
+
+Known pitfalls (observed across 8a-retro batches 1 + 2):
+
+| Symptom | Root cause | Fix |
+|---------|-----------|-----|
+| `PatienceConfig` ambiguity error | `NormalPatience`/`LongPatience` abstract override conflicts with `ScalaTestWithActorTestKit.patience` | Drop patience trait from mixin; test kit default (10s) is sufficient |
+| `cannot create top-level actor from the outside` at `system.spawnAnonymous(...)` | Typed test kit's custom user guardian blocks Classic adapter spawning | Thread `ActorTestKit` as parameter into fixture; use `actorTestKit.spawn(...)` instead |
+| `override` error on `def timeout` | `ActorTestKitBase` already declares `def timeout: Timeout` | Add `override` modifier |
+| `system.toTyped.scheduler` invalid | `system` is already `ActorSystem[Nothing]` after migration | Change to `system.scheduler` |
+| Classic `TestProbe` / Pekko HTTP `Http()` fails | These require a Classic `ActorSystem` | Obtain via `system.toClassic` |
+| No `afterAll` → actor system leak | `WithActorSystemShutDown` was providing cleanup | Migration fixes automatically — no explicit teardown needed |

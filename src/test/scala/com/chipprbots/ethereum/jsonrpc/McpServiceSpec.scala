@@ -22,13 +22,10 @@ import com.chipprbots.ethereum.jsonrpc.McpService.*
 import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.utils.*
 
-class McpServiceSpec
-    extends ScalaTestWithActorTestKit
-    with AnyWordSpecLike
-    with Matchers {
+class McpServiceSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike with Matchers {
 
   implicit private val classicActorSystem: ActorSystem = system.toClassic
-  override implicit val timeout: Timeout = Timeout(3.seconds)
+  implicit override val timeout: Timeout = Timeout(3.seconds)
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
   implicit val scheduler: typed.Scheduler = system.scheduler
 

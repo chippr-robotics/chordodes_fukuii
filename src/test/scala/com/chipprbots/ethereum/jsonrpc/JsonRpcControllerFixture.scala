@@ -66,8 +66,7 @@ class JsonRpcControllerFixture(implicit
     system: ActorSystem,
     mockFactory: org.scalamock.scalatest.MockFactory,
     actorTestKit: ActorTestKit
-)
-    extends EphemBlockchainTestSetup
+) extends EphemBlockchainTestSetup
     with JsonMethodsImplicits
     with ApisBuilder {
 

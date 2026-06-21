@@ -35,10 +35,7 @@ import com.chipprbots.ethereum.transactions.TransactionHistoryService.ExtendedTr
 import com.chipprbots.ethereum.transactions.TransactionHistoryService.MinedTransactionData
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
-class FukuiiServiceSpec
-    extends ScalaTestWithActorTestKit
-    with FreeSpecBase
-    with SpecFixtures {
+class FukuiiServiceSpec extends ScalaTestWithActorTestKit with FreeSpecBase with SpecFixtures {
 
   implicit private val classicActorSystem: ActorSystem = system.toClassic
 
