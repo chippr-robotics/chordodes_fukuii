@@ -11,7 +11,6 @@ import org.apache.pekko.actor.typed
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext as TypedActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
@@ -125,21 +124,18 @@ object PeerManagerActor {
       externalSchedulerOpt: Option[Scheduler] = None
   ): Behavior[Command] =
     Behaviors.setup { context =>
-      Behaviors.withTimers { timers =>
-        new Impl(
-          peerEventBus,
-          peerDiscoveryManager,
-          peerConfiguration,
-          knownNodesManager,
-          peerStatistics,
-          peerFactory,
-          discoveryConfig,
-          blacklist,
-          externalSchedulerOpt,
-          timers,
-          context
-        ).waitingForStart()
-      }
+      new Impl(
+        peerEventBus,
+        peerDiscoveryManager,
+        peerConfiguration,
+        knownNodesManager,
+        peerStatistics,
+        peerFactory,
+        discoveryConfig,
+        blacklist,
+        externalSchedulerOpt,
+        context
+      ).waitingForStart()
     }
   // scalastyle:on parameter.number method.length
 
@@ -154,7 +150,6 @@ object PeerManagerActor {
       discoveryConfig: DiscoveryConfig,
       val blacklist: Blacklist,
       externalSchedulerOpt: Option[Scheduler],
-      @annotation.unused timers: TimerScheduler[Command],
       context: TypedActorContext[Command]
   ) {
 
