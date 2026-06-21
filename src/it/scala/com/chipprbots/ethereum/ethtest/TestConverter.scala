@@ -48,7 +48,32 @@ object TestConverter {
     * @return
     *   Internal BlockHeader object
     */
-  def toBlockHeader(testHeader: TestBlockHeader): BlockHeader =
+  def toBlockHeader(testHeader: TestBlockHeader): BlockHeader = {
+    import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
+
+    // Post-merge header fields. Defaults are applied when a fixture omits a field so
+    // the reconstructed header hashes byte-identically to block[0].parentHash.
+    val baseFee = testHeader.baseFeePerGas.map(parseBigInt).getOrElse(BigInt(0))
+    val withdrawalsRoot =
+      testHeader.withdrawalsRoot.map(h => ByteString(parseHex(h))).getOrElse(BlockHeader.EmptyMpt)
+    val blobGasUsed = testHeader.blobGasUsed.map(parseBigInt).getOrElse(BigInt(0))
+    val excessBlobGas = testHeader.excessBlobGas.map(parseBigInt).getOrElse(BigInt(0))
+    val parentBeaconBlockRoot =
+      testHeader.parentBeaconBlockRoot.map(h => ByteString(parseHex(h))).getOrElse(ByteString(Array.fill(32)(0.toByte)))
+    val requestsHash = testHeader.requestsHash.map(h => ByteString(parseHex(h)))
+
+    // Select the post-merge extraFields variant from the fields actually present in
+    // the fixture. Each variant changes the RLP item count and therefore the hash, so
+    // matching go-ethereum's per-fork header shape is consensus-critical here.
+    val extraFields =
+      if requestsHash.isDefined then
+        HefPostPrague(baseFee, withdrawalsRoot, blobGasUsed, excessBlobGas, parentBeaconBlockRoot, requestsHash.get)
+      else if testHeader.blobGasUsed.isDefined || testHeader.parentBeaconBlockRoot.isDefined then
+        HefPostCancun(baseFee, withdrawalsRoot, blobGasUsed, excessBlobGas, parentBeaconBlockRoot)
+      else if testHeader.withdrawalsRoot.isDefined then HefPostShanghai(baseFee, withdrawalsRoot)
+      else if testHeader.baseFeePerGas.isDefined then HefPostOlympia(baseFee)
+      else HefEmpty
+
     BlockHeader(
       parentHash = ByteString(parseHex(testHeader.parentHash)),
       ommersHash = ByteString(parseHex(testHeader.uncleHash)),
@@ -64,7 +89,24 @@ object TestConverter {
       unixTimestamp = parseBigInt(testHeader.timestamp).toLong,
       extraData = ByteString(parseHex(testHeader.extraData)),
       mixHash = ByteString(parseHex(testHeader.mixHash)),
-      nonce = ByteString(parseHex(testHeader.nonce))
+      nonce = ByteString(parseHex(testHeader.nonce)),
+      extraFields = extraFields
+    )
+  }
+
+  /** Convert ethereum/tests TestWithdrawal to internal Withdrawal (EIP-4895).
+    *
+    * @param testWithdrawal
+    *   Withdrawal from test file
+    * @return
+    *   Internal Withdrawal object (amount is in Gwei, as in the test format)
+    */
+  def toWithdrawal(testWithdrawal: TestWithdrawal): Withdrawal =
+    Withdrawal(
+      index = parseBigInt(testWithdrawal.index),
+      validatorIndex = parseBigInt(testWithdrawal.validatorIndex),
+      address = Address(ByteString(parseHex(testWithdrawal.address))),
+      amount = parseBigInt(testWithdrawal.amount)
     )
 
   /** Convert ethereum/tests TestTransaction to internal Transaction
@@ -80,9 +122,12 @@ object TestConverter {
     val r = ByteString(parseHex(testTx.r))
     val s = ByteString(parseHex(testTx.s))
 
-    // Parse common transaction data
+    // Parse common transaction data.
+    // gasPrice is present for legacy (0x00) and EIP-2930 (0x01) txs; EIP-1559 (0x02)
+    // and EIP-4844 (0x03) omit it (they carry maxFeePerGas/maxPriorityFeePerGas).
+    // Default to 0 when absent — the dynamic-fee/blob branches never read this value.
     val nonce = parseBigInt(testTx.nonce)
-    val gasPrice = parseBigInt(testTx.gasPrice)
+    val gasPrice = testTx.gasPrice.map(parseBigInt).getOrElse(BigInt(0))
     val gasLimit = parseBigInt(testTx.gasLimit)
     val receivingAddress =
       if testTx.to.isEmpty || testTx.to == "0x" then None
@@ -342,8 +387,16 @@ object TestConverter {
         ForkBlockNumbers.Empty.copy(frontierBlockNumber = 0)
     }
 
-    // For Shanghai+ forks, also set timestamp-based activations
-    val configWithForks = baseConfig.copy(forkBlockNumbers = forks)
+    // These vectors target the ETH execution path (chainId=1, timestamp fork dispatch).
+    // The base config defaults to networkType=ETC; force ETH so the ETC-Olympia
+    // block-number guards (e.g. EIP-2935 history contract, EIP-7623 calldata floor)
+    // do NOT fire pre-Prague just because olympiaBlockNumber is mapped to 0 here.
+    // Without this, the EIP-2935 ETC path writes HistoryStorage slots at Cancun and
+    // throws "Account not found" when persisting that contract's storage.
+    val configWithForks = baseConfig.copy(
+      forkBlockNumbers = forks,
+      networkType = com.chipprbots.ethereum.utils.NetworkType.ETH
+    )
     network.toLowerCase match {
       case "shanghai" =>
         configWithForks.copy(

@@ -144,7 +144,8 @@ object AccountState {
 case class TestBlock(
     blockHeader: TestBlockHeader,
     transactions: Seq[TestTransaction],
-    uncleHeaders: Seq[TestBlockHeader]
+    uncleHeaders: Seq[TestBlockHeader],
+    withdrawals: Option[Seq[TestWithdrawal]] = None // EIP-4895 (Shanghai+)
 )
 
 object TestBlock {
@@ -153,7 +154,27 @@ object TestBlock {
       header <- cursor.downField("blockHeader").as[TestBlockHeader]
       txs <- cursor.downField("transactions").as[Seq[TestTransaction]]
       uncles <- cursor.downField("uncleHeaders").as[Seq[TestBlockHeader]]
-    } yield TestBlock(header, txs, uncles)
+      withdrawals <- cursor.downField("withdrawals").as[Option[Seq[TestWithdrawal]]]
+    } yield TestBlock(header, txs, uncles, withdrawals)
+  }
+}
+
+/** EIP-4895 withdrawal from ethereum/tests (hex-encoded fields) */
+case class TestWithdrawal(
+    index: String,
+    validatorIndex: String,
+    address: String,
+    amount: String
+)
+
+object TestWithdrawal {
+  implicit val decoder: Decoder[TestWithdrawal] = Decoder.instance { cursor =>
+    for {
+      index <- cursor.downField("index").as[String]
+      validatorIndex <- cursor.downField("validatorIndex").as[String]
+      address <- cursor.downField("address").as[String]
+      amount <- cursor.downField("amount").as[String]
+    } yield TestWithdrawal(index, validatorIndex, address, amount)
   }
 }
 
@@ -173,7 +194,15 @@ case class TestBlockHeader(
     timestamp: String,
     extraData: String,
     mixHash: String,
-    nonce: String
+    nonce: String,
+    // Post-merge header fields (optional). Required to reconstruct a byte-exact
+    // genesis hash for Shanghai+ vectors so block[0].parentHash links correctly.
+    baseFeePerGas: Option[String] = None, // EIP-1559 (London/Shanghai+)
+    withdrawalsRoot: Option[String] = None, // EIP-4895 (Shanghai+)
+    blobGasUsed: Option[String] = None, // EIP-4844 (Cancun+)
+    excessBlobGas: Option[String] = None, // EIP-4844 (Cancun+)
+    parentBeaconBlockRoot: Option[String] = None, // EIP-4788 (Cancun+)
+    requestsHash: Option[String] = None // EIP-7685 (Prague+)
 )
 
 object TestBlockHeader {
@@ -194,6 +223,12 @@ object TestBlockHeader {
       extraData <- cursor.downField("extraData").as[String]
       mixHash <- cursor.downField("mixHash").as[String]
       nonce <- cursor.downField("nonce").as[String]
+      baseFeePerGas <- cursor.downField("baseFeePerGas").as[Option[String]]
+      withdrawalsRoot <- cursor.downField("withdrawalsRoot").as[Option[String]]
+      blobGasUsed <- cursor.downField("blobGasUsed").as[Option[String]]
+      excessBlobGas <- cursor.downField("excessBlobGas").as[Option[String]]
+      parentBeaconBlockRoot <- cursor.downField("parentBeaconBlockRoot").as[Option[String]]
+      requestsHash <- cursor.downField("requestsHash").as[Option[String]]
     } yield TestBlockHeader(
       parentHash,
       uncleHash,
@@ -209,7 +244,13 @@ object TestBlockHeader {
       timestamp,
       extraData,
       mixHash,
-      nonce
+      nonce,
+      baseFeePerGas,
+      withdrawalsRoot,
+      blobGasUsed,
+      excessBlobGas,
+      parentBeaconBlockRoot,
+      requestsHash
     )
   }
 }
@@ -218,7 +259,7 @@ object TestBlockHeader {
 case class TestTransaction(
     data: String,
     gasLimit: String,
-    gasPrice: String,
+    gasPrice: Option[String], // legacy/2930 only; absent for EIP-1559 (0x02) and EIP-4844 (0x03)
     nonce: String,
     to: String,
     value: String,
@@ -254,7 +295,9 @@ object TestTransaction {
     for {
       data <- cursor.downField("data").as[String]
       gasLimit <- cursor.downField("gasLimit").as[String]
-      gasPrice <- cursor.downField("gasPrice").as[String]
+      // gasPrice is optional: type-0x02 (EIP-1559) and type-0x03 (EIP-4844) carry
+      // maxFeePerGas/maxPriorityFeePerGas instead and omit gasPrice entirely.
+      gasPrice <- cursor.downField("gasPrice").as[Option[String]]
       nonce <- cursor.downField("nonce").as[String]
       to <- cursor.downField("to").as[String]
       value <- cursor.downField("value").as[String]

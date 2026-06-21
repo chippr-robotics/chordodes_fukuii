@@ -262,8 +262,12 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup {
     val header = TestConverter.toBlockHeader(testBlock.blockHeader)
     val transactions = testBlock.transactions.map(TestConverter.toTransaction)
     val uncles = testBlock.uncleHeaders.map(TestConverter.toBlockHeader)
+    // EIP-4895: thread the withdrawals array through so BlockExecution credits each
+    // withdrawal (amount Gwei) before computing the post-state root. Present (possibly
+    // empty) for Shanghai+ headers; absent for pre-Shanghai blocks.
+    val withdrawals = testBlock.withdrawals.map(_.map(TestConverter.toWithdrawal))
 
-    Block(header, BlockBody(transactions, uncles))
+    Block(header, BlockBody(transactions, uncles, withdrawals))
   }
 
   private def parseHex(hex: String): Array[Byte] = {
