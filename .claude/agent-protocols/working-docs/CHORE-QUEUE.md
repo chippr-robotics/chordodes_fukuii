@@ -138,9 +138,9 @@ Audit doc: `.local/docs/moderization-review-june/thread-sleep-audit.md` (gitigno
 
 ---
 
-### C8a — FastSyncBranchResolverActor — DEFERRED (investigation complete)
+### ~~C8a~~ ✅ FastSyncBranchResolverActor — WIRED (not deleted)
 
-Grep found 3 non-zero results in `src/main/` but all are doc/code comments and the definition file itself — no actual spawn call exists. However, `FastSyncBranchResolverSpec` and `FastSyncBranchResolverActorSpec` provide live test coverage; deleting would break compilation. Literal condition "zero results" not met. **"May wire post-capstone" still stands.** Do not delete until CAPSTONE wiring decision is made.
+Investigation confirmed zero production spawn sites. Actor was not dead — it was **unwired**. Fix: `FastSync.scala` `handleBlockHeaders` `ParentChainWeightNotFound` case now spawns `FastSyncBranchResolverActor` (binary search for true common ancestor) and transitions to new `waitingForBranchResolution()` behavior. `BranchResolvedSuccessful` resets all in-memory cursors/queues to confirmed ancestor; `BranchResolutionFailed` falls back to N-block rewind. 15/15 `FastSyncBranchResolver*` tests pass, 0 compile errors. **Commit pending.**
 
 **Ref:** DEFERRED-BACKLOG.md §8f
 
@@ -196,13 +196,13 @@ Recurring patterns now documented in DEFERRED-BACKLOG §8a for remaining batches
 
 ---
 
-### C12 — 8a-retro batch 3: remaining test specs (in progress)
+### ~~C12~~ ✅ scalafmt residuals from 8a-retro batch 2 — DONE (`92db5815e`)
 
-4 jsonrpc test specs staged but not yet committed (present in working tree as of `ef75a5608`). Pending identification and commit. Apply same `ScalaTestWithActorTestKit` patterns from DEFERRED-BACKLOG §8a / LOOM agent pitfalls table.
+The 4 jsonrpc test files reported as "pre-existing uncommitted" had no actual diffs — already clean. `92db5815e` is the scalafmt residuals commit from batch 2, already at branch tip. No batch 3 pending.
 
-**testEssential note:** Both engine-api commits now landed (`4f5a678fa` CLASS A + `8911135d9` CLASS B). Full accumulated stack ready: `4907406fe`, `ef75a5608`, `92db5815e`, `4f5a678fa`, `8911135d9`. **Run testEssential now** before additional commits land.
+**testEssential (`5dd96ad01` stack — 2026-06-21):** 3,600 / 3,600 passed, 0 failures. Exit 0. Log: `/media/dev/2tb/data/blockchain/fukuii/test-logs/testEssential-20260621-122654.log`. Branch `scala3-cleanup-june` is green.
 
-**Ref:** DEFERRED-BACKLOG.md §8a, §8c-H1-A, §8c-H1-B
+**Ref:** DEFERRED-BACKLOG.md §8c-H1-A, §8c-H1-B
 
 ---
 
@@ -211,6 +211,32 @@ Recurring patterns now documented in DEFERRED-BACKLOG §8a for remaining batches
 Injected `clock: () => ZonedDateTime = () => ZonedDateTime.now(ZoneOffset.UTC)` into `KeyStoreImpl`. Test uses a monotonic fake clock (tick counter advancing the seconds field) in a local `orderedStore` instance — removes two `Thread.sleep(10)` calls while preserving go-ethereum keystore filename interoperability.
 
 **Ref:** thread-sleep-audit.md §B5
+
+---
+
+### ~~C13~~ ✅ Actor.noSender → ActorRef.noSender (3 files) — DONE (`417165930`)
+
+PRISM post-capstone finding. `fix(pekko): replace Actor.noSender with ActorRef.noSender (7d artifact cleanup)`
+
+- `AdminService.scala`: `import o.a.p.actor.Actor` → `import o.a.p.actor.ActorRef`
+- `AkkaTaskOps.scala`: `Actor` import removed (already had `ActorRef`)
+- `StdNode.scala`: `import o.a.p.actor.Actor` → `import o.a.p.actor.ActorRef`
+- All three call sites: `Actor.noSender` → `ActorRef.noSender`
+
+**Ref:** DEFERRED-BACKLOG.md PRISM Post-Capstone Audit
+
+---
+
+### ~~C14~~ ✅ SyncController Classic scheduler → Typed ctx.system.scheduler (2 sites) — DONE (`8d460a145`)
+
+PRISM post-capstone finding. `fix(pekko): replace Classic scheduler with Typed ctx.system.scheduler in SyncController (7d)`
+
+- Lines 1507 + 2140: `scheduler.scheduleOnce(delay)(effect)(ec)` → `ctx.system.scheduler.scheduleOnce(java.time.Duration.of…, () => effect, ctx.executionContext)`
+- `FiniteDuration` → `java.time.Duration`: `30.seconds` → `Duration.ofSeconds(30)`, `30.minutes` → `Duration.ofMinutes(30)` (no new import needed)
+- Scheduler helper method at line 357 retained — still passed to `SNAPSyncController` at line 1431; Scaladoc updated to reflect sole remaining use
+- 91/91 `SyncController` tests pass
+
+**Ref:** DEFERRED-BACKLOG.md PRISM Post-Capstone Audit
 
 ---
 
@@ -226,10 +252,12 @@ Injected `clock: () => ZonedDateTime = () => ZonedDateTime.now(ZoneOffset.UTC)` 
 | ~~1h~~ | ~~C5 console→logging~~ | ~~✅ DONE `6a3e2cd88`~~ | — |
 | ~~2h+~~ | ~~C6 dead code research~~ | ~~✅ DONE — `dead-code-audit.md` (325 lines)~~ | — |
 | ~~2h+~~ | ~~C7 Thread.sleep fixes~~ | ~~✅ DONE — audit only; 7 real calls, all Bucket B (clock injection required)~~ | — |
-| deferred | C8a FastSyncBranchResolverActor | No spawn call found — test specs live; delete deferred to CAPSTONE wiring decision | `chore(cleanup):` |
+| ~~deferred~~ | ~~C8a FastSyncBranchResolverActor~~ | ~~✅ WIRED — commit pending; testEssential required before PR~~ | — |
 | ~~UNBLOCKED~~ | ~~C8b MerkleProofVerifier dead private methods~~ | ~~✅ DONE `cc7b58b3b`~~ | — |
 | ~~~1h~~ | ~~C9a SNAPSyncControllerSpec Thread.sleep ×2~~ | ~~✅ DONE `e9638ac52` — CountDownLatch gates~~ | — |
 | ~~30 min~~ | ~~C9b Discv4SyncResponderSpec Thread.sleep ×1~~ | ~~✅ DONE `ba9b9d463` — `fakeNanos` var in RateLimiter~~ | — |
 | ~~1h~~ | ~~C9c KeyStoreImplSpec Thread.sleep ×2~~ | ~~✅ DONE `479adc62f` — monotonic fake clock, go-ethereum compat preserved~~ | — |
 | ~~2h~~ | ~~C10 8a-retro batch 1: consensus/mining TestKit migration~~ | ~~✅ DONE `0d65a85c4` — 5 files, 27/27; ForkChoiceManagerSpec leak fixed~~ | — |
 | ~~3h~~ | ~~C11 8a-retro batch 2: jsonrpc/ + graphql/ TestKit migration~~ | ~~✅ DONE `b5e11c0a4` + `722f316f2` — 20 specs, 275/275; PatienceConfig + spawnAnonymous patterns documented~~ | — |
+| ~~15 min~~ | ~~C13 `Actor.noSender` → `ActorRef.noSender` (3 files)~~ | ~~✅ DONE `417165930`~~ | — |
+| ~~30 min~~ | ~~C14 SyncController Classic scheduler → Typed `ctx.system.scheduler` (2 sites)~~ | ~~✅ DONE `8d460a145`~~ | — |

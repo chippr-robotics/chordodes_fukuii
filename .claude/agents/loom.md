@@ -487,3 +487,4 @@ Known pitfalls (observed across 8a-retro batches 1 + 2):
 | `system.toTyped.scheduler` invalid | `system` is already `ActorSystem[Nothing]` after migration | Change to `system.scheduler` |
 | Classic `TestProbe` / Pekko HTTP `Http()` fails | These require a Classic `ActorSystem` | Obtain via `system.toClassic` |
 | No `afterAll` → actor system leak | `WithActorSystemShutDown` was providing cleanup | Migration fixes automatically — no explicit teardown needed |
+| `scheduleOnce` type error after replacing Classic scheduler | Typed `Scheduler.scheduleOnce` takes `java.time.Duration`, not `FiniteDuration` | Convert: `30.seconds` → `java.time.Duration.ofSeconds(30)`, `30.minutes` → `java.time.Duration.ofMinutes(30)`. No new import needed — `java.time` is on the default classpath |

@@ -947,18 +947,20 @@ VERIFY: `compile-all` — 0 errors. `testOnly *EngineApi*` — 16/16 ✅.
 
 ---
 
-### 8d-A1 — EngineApiService Blocking Await on CE3 Compute Thread (fix-now)
+### ~~8d-A1~~ ✅ EngineApiService Blocking Await on CE3 Compute Thread — DONE (`0a8ed3038`)
 
 **File**: `consensus/engine/EngineApiService.scala:561`
 
-**Problem**: `Await.result(future, 3.seconds)` is nested inside `forkchoiceUpdated`'s `IO { }` body. `IO { }` is `IO.delay` — it executes on the CE3 compute pool. Blocking a compute thread for up to 3 seconds per CL invocation directly threatens staking availability under load (CE3 compute pool has a fixed thread count).
+**Problem**: `Await.result(future, 3.seconds)` nested inside `forkchoiceUpdated`'s `IO { }` body (`IO.delay`) — blocked CE3 compute thread up to 3s per CL invocation.
 
-**Fix**: `IO.fromFuture(IO(ask(target, msg, 3.seconds)))` — lifts the `Future` into CE3's async model without blocking any thread.
+**Fix applied**:
+- `IO { }` → `IO.defer { }` (defers evaluation; body must return `IO[A]`)
+- `Await.result(ask(...), 3.seconds)` → `IO.fromFuture(IO(pendingTransactionsManager.ask[...]))` — no thread blocked
+- All early-exit branches wrapped in `IO.pure(...)` to satisfy `IO.defer` contract
+- `handleErrorWith` on the ask handles timeouts/failures (same empty-tx fallback as before)
+- `import scala.concurrent.Await` removed (now unused)
 
-**Gate**: BEACON — file is in `consensus/engine/`, engine-API spec compliance must be verified.
-**Priority**: fix-now / HIGH.
-**Effort**: XS (1-line swap + import).
-**Agent**: BEACON review → LOOM (CE3 migration) → EYE (verify `EngineApiSpec`).
+**Verify**: 16/16 `EngineApiSpec` tests pass, `sbt compile-all` clean.
 
 ---
 
@@ -1035,7 +1037,7 @@ grep -rn "TODO\|FIXME\|HACK\|XXX\b" src/ --include="*.scala" | wc -l
 ```
 
 **Known candidates beyond extvm**:
-- `FastSyncBranchResolverActor` — fast sync pivot logic; verify if still reachable from `NodeBuilder` or replaced by SNAP sync pivot
+- ~~`FastSyncBranchResolverActor`~~ ✅ WIRED — `FastSync.scala` `handleBlockHeaders` `ParentChainWeightNotFound` case now spawns the actor (binary search for true common ancestor) and transitions to `waitingForBranchResolution()`; `BranchResolvedSuccessful` resets cursors/queues; `BranchResolutionFailed` falls back to N-block rewind. 15/15 tests pass. Commit pending.
 - Test helpers with `@Ignore` annotations (56 occurrences in tests) — audit which are permanently dead
 
 **Output**: `dead-code-audit.md` — file list, confidence level (definitely dead / possibly dead / uncertain).
@@ -1350,3 +1352,31 @@ fork block/timestamp. Verify against `OsakaOpCodes` activation in ETH genesis co
 
 ~~G3 → G1 → G4 → G2 → G2-R → G5~~ ✅ **G-SERIES COMPLETE.** 15/15 EthSmoke vectors passing.
 All four are BEACON-only; no FORGE involvement unless ETC fork config is touched.
+
+---
+
+## PRISM Post-Capstone Artifact Audit
+
+**Report:** `.local/docs/moderization-review-june/post-capstone-artifact-audit.md`
+**Date:** 2026-06-21
+**Summary:** 4 resolved, 38 intentional, 5 fix-now
+
+### Resolved (4)
+
+Pre-existing findings that are already addressed on `scala3-cleanup-june`. No action needed.
+
+### Intentional (38)
+
+Pervasive `toClassic` / `toTyped` bridges and `Behavior[Any]` occurrences throughout the codebase. PRISM confirmed all 38 are load-bearing interop at the `PeerEventBus` Classic subscriber boundary — not misuse. No regressions. Do not touch without a full PeerEventBus Typed migration (LOOM).
+
+### Fix-Now (5) — routed to C13 / C14
+
+| File | Line | Issue | Fix |
+|------|------|-------|-----|
+| `jsonrpc/AdminService.scala` | 10 | `o.a.p.actor.Actor` imported for `Actor.noSender` | → `ActorRef.noSender` |
+| `jsonrpc/AkkaTaskOps.scala` | 3 | Same `Actor.noSender` misuse | → `ActorRef.noSender` |
+| `nodebuilder/StdNode.scala` | 3 | Same `Actor.noSender` misuse | → `ActorRef.noSender` |
+| `blockchain/sync/SyncController.scala` | 1507 | Classic `scheduler.scheduleOnce` inside Typed actor | → `ctx.scheduleOnce` or `Behaviors.withTimers` |
+| `blockchain/sync/SyncController.scala` | 2140 | Same Classic scheduler (30-min delay) | → same fix |
+
+All PRISM-gate — no migration work required. See CHORE-QUEUE C13/C14.
