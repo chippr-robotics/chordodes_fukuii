@@ -16,8 +16,8 @@ class Eip3529SpecPostMystique extends Eip3529Spec {
 
 trait Eip3529Spec extends AnyFunSuite with Matchers {
 
-  protected[this] def forkBlockHeight: Int
-  protected[this] def config: EvmConfig
+  protected def forkBlockHeight: Int
+  protected def config: EvmConfig
 
   test("EIP-3529: R_sclear should be 4800", UnitTest, VMTest) {
     config.feeSchedule.R_sclear shouldBe 4800

@@ -41,7 +41,7 @@ object JsonSerializers {
       )
 
   object OptionNoneToJNullSerializer
-      extends CustomSerializer[Option[_]](_ =>
+      extends CustomSerializer[Option[?]](_ =>
         (
           PartialFunction.empty,
           { case None => JNull }

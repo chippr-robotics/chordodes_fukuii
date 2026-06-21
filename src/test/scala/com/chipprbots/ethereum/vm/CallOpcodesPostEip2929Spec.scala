@@ -34,7 +34,7 @@ abstract class CallOpcodesPostEip2929Spec(config: EvmConfig)
 
   import config.feeSchedule.*
 
-  protected[this] val fxt: CallOpFixture
+  protected val fxt: CallOpFixture
 
   "CALL" when {
 

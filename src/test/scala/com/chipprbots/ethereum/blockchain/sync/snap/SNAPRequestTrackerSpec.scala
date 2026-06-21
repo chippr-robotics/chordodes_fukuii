@@ -161,7 +161,7 @@ class SNAPRequestTrackerSpec
 
     val result = tracker.validateAccountRange(response)
     result shouldBe a[Left[?, ?]]
-    result.left.get should include("not monotonically increasing")
+    result.swap.getOrElse(fail("Expected Left")) should include("not monotonically increasing")
   }
 
   it should "reject AccountRange response for unknown request ID" taggedAs UnitTest in {
@@ -176,7 +176,7 @@ class SNAPRequestTrackerSpec
 
     val result = tracker.validateAccountRange(response)
     result shouldBe a[Left[?, ?]]
-    result.left.get should include("No pending request")
+    result.swap.getOrElse(fail("Expected Left")) should include("No pending request")
   }
 
   it should "validate StorageRanges response with monotonic ordering" taggedAs UnitTest in {
@@ -221,7 +221,7 @@ class SNAPRequestTrackerSpec
 
     val result = tracker.validateStorageRanges(response)
     result shouldBe a[Left[?, ?]]
-    result.left.get should include("not monotonically increasing")
+    result.swap.getOrElse(fail("Expected Left")) should include("not monotonically increasing")
   }
 
   it should "validate ByteCodes response" taggedAs UnitTest in {

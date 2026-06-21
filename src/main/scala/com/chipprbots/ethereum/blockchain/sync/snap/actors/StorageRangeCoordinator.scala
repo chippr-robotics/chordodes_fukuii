@@ -11,7 +11,6 @@ import org.apache.pekko.util.ByteString
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
-import scala.math.Ordered.orderingToOrdered
 
 import com.chipprbots.ethereum.blockchain.sync.snap.*
 import com.chipprbots.ethereum.db.dataSource.DataSourceBatchUpdate
@@ -1343,7 +1342,7 @@ private[actors] class StorageRangeCoordinatorImpl(
             // Per SNAP spec: empty proof = full storage served, no continuation needed.
             val needsContinuation = if proofForThisTask.nonEmpty then {
               val lastSlot = accountSlots.last._1
-              lastSlot.toSeq.compare(task.last.toSeq) < 0
+              java.util.Arrays.compareUnsigned(lastSlot.toArray, task.last.toArray) < 0
             } else false
 
             if needsContinuation then {

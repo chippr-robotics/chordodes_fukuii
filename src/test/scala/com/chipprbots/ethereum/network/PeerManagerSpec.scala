@@ -1175,10 +1175,10 @@ class PeerManagerSpec
       numOutgoing <- Gen.choose(0, maxOutgoingPeers)
       incoming <- Gen.listOfN(numIncoming, genIncomingPeer)
       outgoing <- Gen.listOfN(numOutgoing, genOugoingPeer)
-      connections0 = (incoming ++ outgoing).foldLeft(ConnectedPeers.empty)(_ addNewPendingPeer _)
+      connections0 = (incoming ++ outgoing).foldLeft(ConnectedPeers.empty)(_.addNewPendingPeer(_))
       numHandshaked <- Gen.choose(0.75, 1.0).map(_ * (numIncoming + numOutgoing)).map(_.toInt)
       handshaked <- Gen.pick(numHandshaked, incoming ++ outgoing)
-      connections1 = handshaked.foldLeft(connections0)(_ promotePeerToHandshaked _)
+      connections1 = handshaked.foldLeft(connections0)(_.promotePeerToHandshaked(_))
     } yield connections1
 
 }

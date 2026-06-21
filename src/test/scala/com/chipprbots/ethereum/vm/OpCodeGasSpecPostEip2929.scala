@@ -33,7 +33,7 @@ class OpCodeGasSpecPostBerlin extends OpCodeGasSpecPostEip2929 {
 
 trait OpCodeGasSpecPostEip2929 extends AnyFunSuite with OpCodeTesting with Matchers with ScalaCheckPropertyChecks {
 
-  protected[this] def forkBlockHeight: Int
+  protected def forkBlockHeight: Int
 
   import config.feeSchedule.*
 

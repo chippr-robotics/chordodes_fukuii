@@ -37,7 +37,7 @@ final case class RetryStrategy(
 
     val baseDelay = math.min(
       initialDelay.toMillis * math.pow(multiplier, attempt),
-      maxDelay.toMillis
+      maxDelay.toMillis.toDouble
     )
 
     val jitterRange = (baseDelay * jitterFactor).toInt

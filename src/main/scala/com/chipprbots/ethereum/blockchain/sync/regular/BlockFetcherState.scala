@@ -186,7 +186,7 @@ case class BlockFetcherState(
         .ensure(HeadersNotFormingSeq)(HeadersSeq.areChain)
         .ensure(HeadersNotMatchingReadyBlocks)(checkConsistencyWithReadyBlocks)
         .ensure(HeadersNotMatchingWaitingHeaders)(headers =>
-          (waitingHeaders.lastOption, headers.headOption).mapN(_ isParentOf _).getOrElse(true)
+          (waitingHeaders.lastOption, headers.headOption).mapN(_.isParentOf(_)).getOrElse(true)
         )
     }
 

@@ -75,6 +75,7 @@ object StateStorageActor {
         case GetStorage(reply) =>
           reply ! storage.getSyncState()
           Behaviors.same
+        case Init(_) => Behaviors.unhandled // Init only valid in initial behavior; unexpected here
       }
     }
 

@@ -84,7 +84,7 @@ class MessageCodecMalformedInputSpec
     val results = noCompressionCodec.readFrames(frames)
     results should have size 1
     results.head shouldBe a[Left[?, ?]]
-    results.head.left.get shouldBe a[MessageDecoder.UnknownMessageTypeError]
+    results.head.swap.getOrElse(fail("Expected Left")) shouldBe a[MessageDecoder.UnknownMessageTypeError]
   }
 
   it should "return Left for type code 0x1000 (above all registered protocols)" taggedAs (UnitTest, NetworkTest) in {

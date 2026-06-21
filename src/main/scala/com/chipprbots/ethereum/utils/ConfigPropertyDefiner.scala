@@ -1,5 +1,7 @@
 package com.chipprbots.ethereum.utils
 
+import scala.compiletime.uninitialized
+
 import ch.qos.logback.core.PropertyDefinerBase
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigException
@@ -26,8 +28,8 @@ import com.typesafe.config.ConfigFactory
   */
 class ConfigPropertyDefiner extends PropertyDefinerBase {
 
-  private var key: String = _
-  private var defaultValue: String = _
+  private var key: String = uninitialized
+  private var defaultValue: String = uninitialized
 
   /** Set the configuration key to load (called by logback via reflection) */
   def setKey(key: String): Unit =

@@ -96,7 +96,7 @@ class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory {
     blockQueue.enqueueBlock(block2a)
     blockQueue.enqueueBlock(block2b)
 
-    val expectedWeight: ChainWeight = List(block1, block2a, block3).map(_.header).foldLeft(parentWeight)(_ increase _)
+    val expectedWeight: ChainWeight = List(block1, block2a, block3).map(_.header).foldLeft(parentWeight)(_.increase(_))
     blockQueue.enqueueBlock(block3) shouldEqual Some(Leaf(block3.header.hash, expectedWeight))
   }
 

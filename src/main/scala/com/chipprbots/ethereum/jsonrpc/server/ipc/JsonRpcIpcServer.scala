@@ -9,6 +9,7 @@ import java.net.Socket
 import cats.effect.unsafe.IORuntime
 
 import scala.annotation.tailrec
+import scala.compiletime.uninitialized
 import scala.concurrent.duration.*
 import scala.util.Try
 
@@ -31,7 +32,7 @@ class JsonRpcIpcServer(jsonRpcController: JsonRpcController, config: JsonRpcIpcS
 
   given runtime: IORuntime = IORuntime.global
 
-  var serverSocket: ServerSocket = _
+  var serverSocket: ServerSocket = uninitialized
 
   def run(): Unit = {
     log.info(s"Starting IPC server: ${config.socketFile}")
