@@ -147,9 +147,9 @@ class ScopedVerificationObservabilitySpec
   private def driveHeal(coordinator: ActorRef, peerName: String): Int = {
     val nodes = (0 until 3).map(cleanLeaf)
     val peer = PeerTestHelpers.createTestPeer(peerName, TestProbe().ref)
-    coordinator ! Messages.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
-    coordinator.tell(Messages.HealingPeerAvailable(peer), TestProbe().ref)
-    coordinator ! Messages.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3)))
+    coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
+    coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), TestProbe().ref)
+    coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3)))
     nodes.size
   }
 

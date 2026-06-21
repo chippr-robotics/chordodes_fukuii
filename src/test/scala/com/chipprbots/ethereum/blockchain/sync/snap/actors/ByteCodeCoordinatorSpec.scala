@@ -566,7 +566,7 @@ class ByteCodeCoordinatorSpec
     // With the BUG-S1 fix the retained peer is found there and dispatch proceeds.
     // Without the fix (peer cleared) tryRedispatchPendingTasks() finds nobody → timeout.
     coordinator ! ByteCodeCoordinator.AddByteCodeTasks(Seq(h1))
-    coordinator ! Messages.UpdateMaxInFlightPerPeer(testCooldownConfig.maxInFlightPerPeer)
+    coordinator ! ByteCodeCoordinator.UpdateMaxInFlightPerPeer(testCooldownConfig.maxInFlightPerPeer)
 
     val send = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
     val req = send.message.asInstanceOf[GetByteCodesEnc].underlyingMsg

@@ -479,7 +479,7 @@ private class SNAPSyncControllerImpl(
       accountRangeCoordinator.foreach(_ ! actors.AccountRangeCoordinator.PeerUnavailable(id))
       storageRangeCoordinator.foreach(_ ! actors.StorageRangeCoordinator.StoragePeerUnavailable(id))
       bytecodeCoordinator.foreach(_ ! actors.ByteCodeCoordinator.ByteCodePeerUnavailable(id))
-      trieNodeHealingCoordinator.foreach(_ ! actors.Messages.HealingPeerUnavailable(id))
+      trieNodeHealingCoordinator.foreach(_ ! actors.TrieNodeHealingCoordinator.HealingPeerUnavailable(id))
     }
   }
 
@@ -753,7 +753,7 @@ private class SNAPSyncControllerImpl(
               s"[HEAL-SERVE-ROOT] Pushing newest-servable serve root ${root.take(4).toHex} (block $blockNumber) " +
                 s"to healing coordinator (walk root unchanged)."
             )
-            trieNodeHealingCoordinator.foreach(_ ! actors.Messages.HealingServeRootRefresh(root))
+            trieNodeHealingCoordinator.foreach(_ ! actors.TrieNodeHealingCoordinator.HealingServeRootRefresh(root))
           case _ =>
             ctx.log.info(
               "[HEAL-SERVE-ROOT] Parent could not fetch a newest-servable root (no peers / bootstrap failed). " +
@@ -835,7 +835,7 @@ private class SNAPSyncControllerImpl(
         // signalled complete and any responses still arriving from peers are
         // late chatter that must not race with the validation walk.
         if currentPhase != StateValidation then
-          trieNodeHealingCoordinator.foreach(_ ! actors.Messages.TrieNodesResponseMsg(msg))
+          trieNodeHealingCoordinator.foreach(_ ! actors.TrieNodeHealingCoordinator.TrieNodesResponseMsg(msg))
         Behaviors.same
 
       case ProgressAccountsSynced(count) =>
@@ -1312,7 +1312,7 @@ private class SNAPSyncControllerImpl(
             s"[HEAL-STAGNATED] Healing slow (healed=$healed pending=$pending) — HOLDING pivot (not rolling); " +
               s"resuming dispatch on held root so the verification pass can converge"
           )
-          trieNodeHealingCoordinator.foreach(_ ! actors.Messages.HealingResumeDispatch)
+          trieNodeHealingCoordinator.foreach(_ ! actors.TrieNodeHealingCoordinator.HealingResumeDispatch)
         } else {
           // Legacy behaviour: refresh pivot — coordinator receives HealingPivotRefreshed, clears stale tasks +
           // stateless peers, re-seeds new root top-down (Besu-aligned). Do NOT stop coordinator —
@@ -1343,7 +1343,7 @@ private class SNAPSyncControllerImpl(
         if missingNodes.nonEmpty then {
           ctx.log.info(s"Trie walk batch: ${missingNodes.size} missing nodes — queuing for healing")
           trieNodeHealingCoordinator.foreach { coordinator =>
-            coordinator ! actors.Messages.QueueMissingNodes(missingNodes)
+            coordinator ! actors.TrieNodeHealingCoordinator.QueueMissingNodes(missingNodes)
           }
         }
         Behaviors.same
@@ -1351,7 +1351,7 @@ private class SNAPSyncControllerImpl(
       // Streaming walk completed — all batches already sent via TrieWalkBatch
       case TrieWalkComplete(totalFound) if currentPhase == StateHealing =>
         trieWalkInProgress = false
-        trieNodeHealingCoordinator.foreach(_ ! actors.Messages.WalkStateChanged(false))
+        trieNodeHealingCoordinator.foreach(_ ! actors.TrieNodeHealingCoordinator.WalkStateChanged(false))
         if totalFound == 0 then {
           ctx.log.info("Trie walk found no missing nodes — healing complete after {} rounds!", healingRoundCount)
           healingRoundCount = 0
@@ -1379,7 +1379,7 @@ private class SNAPSyncControllerImpl(
 
       case TrieWalkResult(missingNodes) if currentPhase == StateHealing =>
         trieWalkInProgress = false
-        trieNodeHealingCoordinator.foreach(_ ! actors.Messages.WalkStateChanged(false))
+        trieNodeHealingCoordinator.foreach(_ ! actors.TrieNodeHealingCoordinator.WalkStateChanged(false))
         if missingNodes.isEmpty then {
           ctx.log.info("Trie walk found no missing nodes — healing complete after {} rounds!", healingRoundCount)
           healingRoundCount = 0
@@ -1401,7 +1401,7 @@ private class SNAPSyncControllerImpl(
             s"Trie walk found ${missingNodes.size} missing nodes — queuing for healing (round $healingRoundCount)"
           )
           trieNodeHealingCoordinator.foreach { coordinator =>
-            coordinator ! actors.Messages.QueueMissingNodes(missingNodes)
+            coordinator ! actors.TrieNodeHealingCoordinator.QueueMissingNodes(missingNodes)
           }
           timers.startSingleTimer(ScheduledTrieWalkKey, ScheduledTrieWalk, 2.minutes)
         }
@@ -1413,7 +1413,7 @@ private class SNAPSyncControllerImpl(
 
       case TrieWalkFailed(error) if currentPhase == StateHealing =>
         trieWalkInProgress = false
-        trieNodeHealingCoordinator.foreach(_ ! actors.Messages.WalkStateChanged(false))
+        trieNodeHealingCoordinator.foreach(_ ! actors.TrieNodeHealingCoordinator.WalkStateChanged(false))
         ctx.log.error(s"Trie walk failed: $error. Retrying after delay...")
         timers.startSingleTimer(ScheduledTrieWalkKey, ScheduledTrieWalk, 5.seconds)
         Behaviors.same
@@ -3438,7 +3438,7 @@ private class SNAPSyncControllerImpl(
     if trieWalkInProgress then return
     if currentPhase != StateHealing then return
     trieWalkInProgress = true
-    trieNodeHealingCoordinator.foreach(_ ! actors.Messages.WalkStateChanged(true))
+    trieNodeHealingCoordinator.foreach(_ ! actors.TrieNodeHealingCoordinator.WalkStateChanged(true))
     stateRoot.foreach { root =>
       ctx.log.info("Starting trie walk to discover missing nodes for healing...")
       val storage = getOrCreateMptStorage(pivotBlock.getOrElse(BigInt(0)))
@@ -3519,13 +3519,13 @@ private class SNAPSyncControllerImpl(
 
       // Start the coordinator — give healing full per-peer budget (accounts/storage/bytecode done)
       trieNodeHealingCoordinator.foreach { coordinator =>
-        coordinator ! actors.Messages.StartTrieNodeHealing(root)
-        coordinator ! actors.Messages.UpdateMaxInFlightPerPeer(snapSyncConfig.healingMaxInFlightPerPeer)
+        coordinator ! actors.TrieNodeHealingCoordinator.StartTrieNodeHealing(root)
+        coordinator ! actors.TrieNodeHealingCoordinator.UpdateMaxInFlightPerPeer(snapSyncConfig.healingMaxInFlightPerPeer)
         // Flush current snap peers immediately — the 0-second scheduler delay is async; an explicit
         // flush here ensures peers are available before any StartTrieNodeHealing dispatch attempt.
         peersToDownloadFrom.values
           .filter(p => p.peerInfo.remoteStatus.supportsSnap && p.peerInfo.forkAccepted)
-          .foreach(p => coordinator ! actors.Messages.HealingPeerAvailable(p.peer))
+          .foreach(p => coordinator ! actors.TrieNodeHealingCoordinator.HealingPeerAvailable(p.peer))
       }
 
       // Periodically send peer availability notifications (cancel any existing scheduler first)
@@ -3583,11 +3583,11 @@ private class SNAPSyncControllerImpl(
             )
           )
           trieNodeHealingCoordinator.foreach { coordinator =>
-            coordinator ! actors.Messages.StartTrieNodeHealing(root)
-            coordinator ! actors.Messages.UpdateMaxInFlightPerPeer(snapSyncConfig.healingMaxInFlightPerPeer)
+            coordinator ! actors.TrieNodeHealingCoordinator.StartTrieNodeHealing(root)
+            coordinator ! actors.TrieNodeHealingCoordinator.UpdateMaxInFlightPerPeer(snapSyncConfig.healingMaxInFlightPerPeer)
             peersToDownloadFrom.values
               .filter(p => p.peerInfo.remoteStatus.supportsSnap && p.peerInfo.forkAccepted)
-              .foreach(p => coordinator ! actors.Messages.HealingPeerAvailable(p.peer))
+              .foreach(p => coordinator ! actors.TrieNodeHealingCoordinator.HealingPeerAvailable(p.peer))
           }
           startHealingRequestScheduler()
           ctx.log.info(
@@ -3631,7 +3631,7 @@ private class SNAPSyncControllerImpl(
         ctx.log.debug("No SNAP-capable peers available for healing requests")
       } else {
         snapPeers.foreach { peer =>
-          coordinator ! actors.Messages.HealingPeerAvailable(peer)
+          coordinator ! actors.TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
         }
       }
     }
@@ -4192,7 +4192,7 @@ private class SNAPSyncControllerImpl(
     // Healing coordinator: update root, clear pending tasks and stateless peers.
     // Then re-walk the trie with the new root to discover missing nodes.
     trieNodeHealingCoordinator.foreach { coordinator =>
-      coordinator ! actors.Messages.HealingPivotRefreshed(newStateRoot)
+      coordinator ! actors.TrieNodeHealingCoordinator.HealingPivotRefreshed(newStateRoot)
     }
     // Chain download target extends to the new pivot (chain data is canonical, never invalidated)
     if chainDownloader.isDefined then {

@@ -18,9 +18,9 @@ import com.chipprbots.ethereum.blockchain.sync.snap.*
   */
 object TrieNodeHealingWorker {
 
-  import Messages.*
+  import TrieNodeHealingCoordinator.*
 
-  type Command = TrieNodeHealingWorkerMessage
+  type Command = WorkerMessage
 
   /** @param coordinator
     *   Parent coordinator that manages all healing logic (Classic)

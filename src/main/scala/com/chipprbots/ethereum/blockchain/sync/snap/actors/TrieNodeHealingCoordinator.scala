@@ -74,7 +74,6 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
     decoupledHealMaxAttemptsNoRefresh: Int = TrieNodeHealingCoordinator.DefaultDecoupledHealMaxAttemptsNoRefresh
 ) {
 
-  import Messages.*
   import TrieNodeHealingCoordinator.*
 
   private val log = context.log
@@ -2103,18 +2102,26 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
 
 object TrieNodeHealingCoordinator {
 
-  /** Command protocol for the now-Typed coordinator (Group S3). The command set spans `Messages.scala` —
-    * `TrieNodeHealingCoordinatorMessage` (and the worker-reply `TrieNodesResponseMsg` + the self-sent
-    * `HealingRequestTimeout`) extend this trait — plus the coordinator-private internal messages (`FlushComplete`,
-    * `FrontierRebuilt`, `VerificationBFSComplete`, `FrontierRebuildComplete`, `FrontierWalkFailed`,
-    * `HealingStagnationCheck`, `RestartResumeVerification`, `RestartFullRebuild`). The shared
-    * `UpdateMaxInFlightPerPeer` extends `ByteCodeCoordinator.Command` but is matched here via the non-sealed trait. The
-    * trait is left non-sealed because Scala 3 forbids extending a sealed trait from another source file (same
-    * cross-file constraint as the other SNAP coordinators); a defensive catch-all in `active()` covers the loss of
-    * exhaustiveness checking. `HealingStagnated` is OUTBOUND to SSC as `SNAPSyncController.HealingStagnated extends
-    * Command`.
-    */
-  trait Command
+  sealed trait Command
+  case class StartTrieNodeHealing(stateRoot: ByteString) extends Command
+  case class QueueMissingNodes(nodes: Seq[(Seq[ByteString], ByteString)]) extends Command
+  case class HealingPeerAvailable(peer: Peer) extends Command
+  case class HealingPeerUnavailable(peerId: String) extends Command
+  case class HealingTaskComplete(requestId: BigInt, result: Either[String, Int]) extends Command
+  case class HealingTaskFailed(requestId: BigInt, reason: String) extends Command
+  case class HealingGetProgress(replyTo: org.apache.pekko.actor.typed.ActorRef[HealingStatistics]) extends Command
+  case object HealingCheckCompletion extends Command
+  case class HealingPivotRefreshed(newStateRoot: ByteString) extends Command
+  final case class HealingServeRootRefresh(newServeRoot: ByteString) extends Command
+  case object HealingResumeDispatch extends Command
+  case object HealingForceComplete extends Command
+  case class WalkStateChanged(inProgress: Boolean) extends Command
+  case class UpdateMaxInFlightPerPeer(newLimit: Int) extends Command
+  sealed trait WorkerMessage
+  case class FetchTrieNodes(task: HealingTask, peer: Peer) extends WorkerMessage
+  case class TrieNodesResponseMsg(response: TrieNodes) extends WorkerMessage with Command
+  case class HealingRequestTimeout(requestId: BigInt) extends WorkerMessage with Command
+  case object HealingCheckIdle extends WorkerMessage
 
   /** Default cap on the frontier-rebuild walk's FIFO `visited` set: 4M entries ≈ 480-640 MB (a 32-byte ByteString key +
     * wrapper + LinkedHashMap entry is ~120-150 B, not the 80 B an "≈320 MB" estimate assumed). Insertion-order

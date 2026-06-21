@@ -107,7 +107,7 @@ class DecoupledHealObservabilitySpec
       // A serve-root advance updates the serve-root gauge (to the new root's short label) while the walk-root
       // gauge stays pinned to the walk root — the two roots are observably distinct after the advance.
       val newServeRoot = kec256(ByteString("observ-t7-on-serve-root"))
-      coordinator ! Messages.HealingServeRootRefresh(newServeRoot)
+      coordinator ! TrieNodeHealingCoordinator.HealingServeRootRefresh(newServeRoot)
       awaitAssert(
         {
           gaugeValue("snapsync.healing.decoupled.serve_root.gauge") shouldBe shortRootLabel(
@@ -140,9 +140,9 @@ class DecoupledHealObservabilitySpec
 
       // The fetch uses the walk root (decoupling disabled) — observed on the actual GetTrieNodes.
       val nodeHash = kec256(ByteString("observ-t7-off-missing-node"))
-      coordinator ! Messages.QueueMissingNodes(Seq((Seq(ByteString(Array[Byte](0x00))), nodeHash)))
+      coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(Seq((Seq(ByteString(Array[Byte](0x00))), nodeHash)))
       val peer = PeerTestHelpers.createTestPeer("observ-t7-off-peer", TestProbe().ref)
-      coordinator.tell(Messages.HealingPeerAvailable(peer), TestProbe().ref)
+      coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), TestProbe().ref)
       val send = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
       getTrieNodesOf(send).rootHash shouldBe stateRoot
     }

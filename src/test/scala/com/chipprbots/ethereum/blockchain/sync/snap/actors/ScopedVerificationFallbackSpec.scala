@@ -153,9 +153,9 @@ class ScopedVerificationFallbackSpec
     SNAPSyncMetrics.setHealingScopedVerification(-1L)
     val node = cleanLeaf(0)
     val peer = PeerTestHelpers.createTestPeer("fallback-peer", TestProbe().ref)
-    coordinator ! Messages.QueueMissingNodes(Seq((node._1, node._2)))
-    coordinator.tell(Messages.HealingPeerAvailable(peer), TestProbe().ref)
-    coordinator ! Messages.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = Seq(node._3)))
+    coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(Seq((node._1, node._2)))
+    coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), TestProbe().ref)
+    coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = Seq(node._3)))
     awaitStateHealingComplete(controller)
     // Full-root verification sets the mode gauge to 0; scoped would have set 1.
     gaugeValue("snapsync.healing.scoped_verification.gauge") shouldBe 0.0 +- 1e-9
@@ -189,7 +189,7 @@ class ScopedVerificationFallbackSpec
     // and an empty set, the next gate can only take the full-root path.
     withFixture(scoped = true, maxPaths = 200000, markComplete = true) { (coordinator, store, _, _) =>
       store.isComplete shouldBe true
-      coordinator ! Messages.HealingPivotRefreshed(kec256(ByteString("fallback-different-root")))
+      coordinator ! TrieNodeHealingCoordinator.HealingPivotRefreshed(kec256(ByteString("fallback-different-root")))
       awaitAssert(store.isComplete shouldBe false, 3.seconds, 100.millis)
     }
   }

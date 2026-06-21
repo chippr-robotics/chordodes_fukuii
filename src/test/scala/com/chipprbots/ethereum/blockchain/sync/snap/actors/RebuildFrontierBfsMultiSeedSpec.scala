@@ -75,7 +75,7 @@ class RebuildFrontierBfsMultiSeedSpec
 
   private def pendingTasks(coordinator: ActorRef): Int = {
     val probe = TestProbe()
-    coordinator ! Messages.HealingGetProgress(probe.ref.toTyped[HealingStatistics])
+    coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref.toTyped[HealingStatistics])
     probe.expectMsgType[HealingStatistics](2.seconds).pendingTasks
   }
 
@@ -92,7 +92,7 @@ class RebuildFrontierBfsMultiSeedSpec
       )
     )
     try {
-      coordinator ! Messages.StartTrieNodeHealing(root)
+      coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(root)
       var observed = -1
       awaitAssert(
         {

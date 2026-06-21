@@ -80,10 +80,10 @@ class TrieNodeHealingCoordinatorSpec
       (Seq(ByteString(Array[Byte](0x00))), node2Hash)
     )
 
-    coordinator ! Messages.QueueMissingNodes(missingNodes)
+    coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(missingNodes)
 
     // Coordinator should queue the nodes
-    coordinator ! Messages.HealingGetProgress(testActor.toTyped[HealingStatistics])
+    coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(testActor.toTyped[HealingStatistics])
     expectMsgType[Any](3.seconds)
   }
 
@@ -111,9 +111,9 @@ class TrieNodeHealingCoordinatorSpec
     val nodeHash = kec256(ByteString("node1"))
     val missingNodes = Seq((Seq(ByteString(Array[Byte](0x00))), nodeHash))
 
-    coordinator ! Messages.StartTrieNodeHealing(stateRoot)
-    coordinator ! Messages.QueueMissingNodes(missingNodes)
-    coordinator ! Messages.HealingPeerAvailable(peer)
+    coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(stateRoot)
+    coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(missingNodes)
+    coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
 
     // Should send request to network peer manager
     networkPeerManager.expectMsgType[Any](3.seconds)
@@ -137,10 +137,10 @@ class TrieNodeHealingCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.HealingTaskComplete(BigInt(123), Right(5))
+    coordinator ! TrieNodeHealingCoordinator.HealingTaskComplete(BigInt(123), Right(5))
 
     // Coordinator should handle completion
-    coordinator ! Messages.HealingGetProgress(testActor.toTyped[HealingStatistics])
+    coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(testActor.toTyped[HealingStatistics])
     expectMsgType[Any](3.seconds)
   }
 
@@ -162,7 +162,7 @@ class TrieNodeHealingCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.HealingCheckCompletion
+    coordinator ! TrieNodeHealingCoordinator.HealingCheckCompletion
 
     // An idle coordinator (no pending tasks, no active requests) should complete immediately
     snapSyncController.expectMsg(3.seconds, SNAPSyncController.StateHealingComplete)
@@ -186,10 +186,10 @@ class TrieNodeHealingCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.HealingTaskFailed(BigInt(123), "Test failure")
+    coordinator ! TrieNodeHealingCoordinator.HealingTaskFailed(BigInt(123), "Test failure")
 
     // Coordinator should still be operational
-    coordinator ! Messages.HealingGetProgress(testActor.toTyped[HealingStatistics])
+    coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(testActor.toTyped[HealingStatistics])
     expectMsgType[Any](3.seconds)
   }
 
@@ -211,7 +211,7 @@ class TrieNodeHealingCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.HealingForceComplete
+    coordinator ! TrieNodeHealingCoordinator.HealingForceComplete
 
     snapSyncController.expectMsg(3.seconds, SNAPSyncController.StateHealingComplete)
   }
@@ -238,15 +238,15 @@ class TrieNodeHealingCoordinatorSpec
     )
 
     val newStateRoot = kec256(ByteString("new-heal-root"))
-    coordinator ! Messages.HealingPivotRefreshed(newStateRoot)
+    coordinator ! TrieNodeHealingCoordinator.HealingPivotRefreshed(newStateRoot)
 
     // The new root is not in storage, so it is added to pendingTasks.
     // isComplete = false → StateHealingComplete must NOT be sent.
-    coordinator ! Messages.HealingCheckCompletion
+    coordinator ! TrieNodeHealingCoordinator.HealingCheckCompletion
     snapSyncController.expectNoMessage(300.millis)
 
     // Coordinator remains operational.
-    coordinator ! Messages.HealingGetProgress(testActor.toTyped[HealingStatistics])
+    coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(testActor.toTyped[HealingStatistics])
     expectMsgType[Any](3.seconds)
   }
 
@@ -269,10 +269,10 @@ class TrieNodeHealingCoordinatorSpec
     )
 
     val nodeHash = kec256(ByteString("missing-node"))
-    coordinator ! Messages.QueueMissingNodes(Seq((Seq(ByteString(Array[Byte](0x00))), nodeHash)))
+    coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(Seq((Seq(ByteString(Array[Byte](0x00))), nodeHash)))
 
     // pendingTasks is non-empty → isComplete = false → no StateHealingComplete
-    coordinator ! Messages.HealingCheckCompletion
+    coordinator ! TrieNodeHealingCoordinator.HealingCheckCompletion
     snapSyncController.expectNoMessage(300.millis)
   }
 
@@ -312,10 +312,10 @@ class TrieNodeHealingCoordinatorSpec
     val nodeCount = 50000
     val nodes = (1 to nodeCount).map(fakeHashedNode)
 
-    coordinator ! Messages.StartTrieNodeHealing(stateRoot)
+    coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(stateRoot)
     val queueStart = System.nanoTime()
-    coordinator ! Messages.QueueMissingNodes(nodes)
-    coordinator ! Messages.HealingGetProgress(testActor.toTyped[HealingStatistics])
+    coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(nodes)
+    coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(testActor.toTyped[HealingStatistics])
 
     val stats = expectMsgType[HealingStatistics](5.seconds)
     val elapsedMs = (System.nanoTime() - queueStart) / 1000000L
@@ -348,13 +348,13 @@ class TrieNodeHealingCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartTrieNodeHealing(stateRoot)
+    coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(stateRoot)
 
     // Three batches; total 750 nodes queued in O(n) time.
     val batches = Seq.tabulate(3)(g => (g * 250 until (g + 1) * 250).map(fakeHashedNode))
-    batches.foreach(b => coordinator ! Messages.QueueMissingNodes(b))
+    batches.foreach(b => coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(b))
 
-    coordinator ! Messages.HealingGetProgress(testActor.toTyped[HealingStatistics])
+    coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(testActor.toTyped[HealingStatistics])
     val stats = expectMsgType[HealingStatistics](3.seconds)
     // Exactly 750: the walk root is absent, so the seed-site guard signals HealingRootUnservable and
     // does NOT seed the root (the futile +1 is gone). The three batches are the only frontier.
@@ -381,7 +381,7 @@ class TrieNodeHealingCoordinatorSpec
     )
 
     coordinator should not be null
-    coordinator ! Messages.HealingGetProgress(testActor.toTyped[HealingStatistics])
+    coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(testActor.toTyped[HealingStatistics])
     expectMsgType[HealingStatistics](2.seconds)
   }
 
@@ -412,14 +412,14 @@ class TrieNodeHealingCoordinatorSpec
     // Queue tasks and make a peer available so some become active
     val nodeHash1 = kec256(ByteString("node-force-1"))
     val nodeHash2 = kec256(ByteString("node-force-2"))
-    coordinator ! Messages.StartTrieNodeHealing(stateRoot)
-    coordinator ! Messages.QueueMissingNodes(
+    coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(stateRoot)
+    coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(
       Seq(
         (Seq(ByteString(Array[Byte](0x00))), nodeHash1),
         (Seq(ByteString(Array[Byte](0x01))), nodeHash2)
       )
     )
-    coordinator ! Messages.HealingPeerAvailable(peer)
+    coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
 
     // The walk root is absent (empty storage), so StartTrieNodeHealing first fires the seed-site guard:
     // HealingRootUnservable (do NOT seed the root). The QueueMissingNodes tasks are still real and get
@@ -428,7 +428,7 @@ class TrieNodeHealingCoordinatorSpec
     networkPeerManager.expectMsgType[Any](3.seconds) // queued task dispatched
 
     // ForceComplete while tasks are in-flight: abandon all, signal complete immediately
-    coordinator ! Messages.HealingForceComplete
+    coordinator ! TrieNodeHealingCoordinator.HealingForceComplete
     snapSyncController.expectMsg(3.seconds, SNAPSyncController.StateHealingComplete)
   }
 
@@ -584,16 +584,16 @@ class TrieNodeHealingCoordinatorSpec
 
     // Provide a real task and dispatch it to the peer. (The walk root is absent, so StartTrieNodeHealing
     // no longer seeds it — it signals HealingRootUnservable; we supply the frontier via QueueMissingNodes.)
-    coordinator ! Messages.StartTrieNodeHealing(stateRoot)
-    coordinator ! Messages.QueueMissingNodes(Seq((Seq(ByteString(Array[Byte](0x00))), kec256(ByteString("nb7-task")))))
-    coordinator ! Messages.HealingPeerAvailable(peer)
+    coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(stateRoot)
+    coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(Seq((Seq(ByteString(Array[Byte](0x00))), kec256(ByteString("nb7-task")))))
+    coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
 
     // Empty TrieNodes response (requestId=1 is the first generated) → marks peer stateless
-    coordinator ! Messages.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = Seq.empty))
+    coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = Seq.empty))
 
     // Second HealingPeerAvailable for the same peer must be silently ignored
-    coordinator ! Messages.HealingPeerAvailable(peer)
+    coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
     networkPeerManager.expectNoMessage(300.millis)
   }
 
@@ -622,15 +622,15 @@ class TrieNodeHealingCoordinatorSpec
 
     // The walk root is absent, so StartTrieNodeHealing no longer seeds it (it signals HealingRootUnservable).
     // Provide all 3 tasks explicitly so 3 requests dispatch concurrently (default maxInFlightPerPeer=5).
-    coordinator ! Messages.StartTrieNodeHealing(stateRoot)
-    coordinator ! Messages.QueueMissingNodes(
+    coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(stateRoot)
+    coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(
       Seq(
         (Seq(ByteString(Array[Byte](0x00))), kec256(ByteString("missing-node-1"))),
         (Seq(ByteString(Array[Byte](0x01))), kec256(ByteString("missing-node-2"))),
         (Seq(ByteString(Array[Byte](0x02))), kec256(ByteString("missing-node-3")))
       )
     )
-    coordinator ! Messages.HealingPeerAvailable(peer)
+    coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds) // reqId=1
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds) // reqId=2
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds) // reqId=3
@@ -640,9 +640,9 @@ class TrieNodeHealingCoordinatorSpec
     snapSyncController.expectMsg(3.seconds, SNAPSyncController.HealingRootUnservable(stateRoot))
 
     // Simulate 3 consecutive timeouts for the same peer (one per active request)
-    coordinator ! Messages.HealingRequestTimeout(BigInt(1))
-    coordinator ! Messages.HealingRequestTimeout(BigInt(2))
-    coordinator ! Messages.HealingRequestTimeout(BigInt(3))
+    coordinator ! TrieNodeHealingCoordinator.HealingRequestTimeout(BigInt(1))
+    coordinator ! TrieNodeHealingCoordinator.HealingRequestTimeout(BigInt(2))
+    coordinator ! TrieNodeHealingCoordinator.HealingRequestTimeout(BigInt(3))
 
     // Key assertion: HealingAllPeersStateless must NOT be sent.
     // With the old code the 3rd timeout triggered stateless marking → all-peers-stateless →
@@ -672,22 +672,22 @@ class TrieNodeHealingCoordinatorSpec
 
     // Make peer stateless. The walk root is absent, so StartTrieNodeHealing no longer seeds it (it
     // signals HealingRootUnservable); provide a real task to dispatch via QueueMissingNodes.
-    coordinator ! Messages.StartTrieNodeHealing(stateRoot)
-    coordinator ! Messages.QueueMissingNodes(
+    coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(stateRoot)
+    coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(
       Seq((Seq(ByteString(Array[Byte](0x00))), kec256(ByteString("nb7-readmit-task"))))
     )
-    coordinator ! Messages.HealingPeerAvailable(peer)
+    coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
-    coordinator ! Messages.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = Seq.empty))
+    coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = Seq.empty))
 
     // Pivot refresh: clears statelessPeers and re-seeds new root as pending task. (HealingPivotRefreshed
     // targets a freshly servable root and KEEPS its own reseed — only the StartTrieNodeHealing seed of an
     // absent walk root is deferred by the complementary guard.)
     val newRoot = kec256(ByteString("nb7-readmit-new-root"))
-    coordinator ! Messages.HealingPivotRefreshed(newRoot)
+    coordinator ! TrieNodeHealingCoordinator.HealingPivotRefreshed(newRoot)
 
     // Peer is no longer stateless — HealingPeerAvailable should trigger dispatch for the new root
-    coordinator ! Messages.HealingPeerAvailable(peer)
+    coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
   }
 
@@ -722,12 +722,12 @@ class TrieNodeHealingCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartTrieNodeHealing(root)
+    coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(root)
 
     // All 3 missing children should be queued once BFS completes.
     awaitAssert(
       {
-        coordinator ! Messages.HealingGetProgress(testActor.toTyped[HealingStatistics])
+        coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(testActor.toTyped[HealingStatistics])
         expectMsgType[HealingStatistics](2.seconds).pendingTasks shouldBe 3
       },
       max = 5.seconds,
@@ -776,25 +776,25 @@ class TrieNodeHealingCoordinatorSpec
     try {
       // Pre-load the backlog ABOVE the high-water mark with no peers, so it can never drain below
       // low-water — the walk's emit gate will block until the safety timeout fires.
-      coordinator ! Messages.QueueMissingNodes(
+      coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(
         Seq((Seq(ByteString(Array[Byte](0x09))), kec256(ByteString("bp-preload"))))
       )
       awaitAssert(
         {
-          coordinator ! Messages.HealingGetProgress(testActor.toTyped[HealingStatistics])
+          coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(testActor.toTyped[HealingStatistics])
           expectMsgType[HealingStatistics](2.seconds).pendingTasks shouldBe 1
         },
         max = 3.seconds,
         interval = 100.millis
       )
 
-      coordinator ! Messages.StartTrieNodeHealing(root)
+      coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(root)
 
       // The walk must still complete and deliver its 3 discovered children (preload + 3 = 4),
       // proving the safety timeout fired and resumed it rather than deadlocking on the gate.
       awaitAssert(
         {
-          coordinator ! Messages.HealingGetProgress(testActor.toTyped[HealingStatistics])
+          coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(testActor.toTyped[HealingStatistics])
           expectMsgType[HealingStatistics](2.seconds).pendingTasks shouldBe 4
         },
         max = 8.seconds,
@@ -847,12 +847,12 @@ class TrieNodeHealingCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartTrieNodeHealing(root)
+    coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(root)
 
     // Both deep frontier nodes (missingL2a, missingL2b) should be found across 3 BFS levels.
     awaitAssert(
       {
-        coordinator ! Messages.HealingGetProgress(testActor.toTyped[HealingStatistics])
+        coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(testActor.toTyped[HealingStatistics])
         expectMsgType[HealingStatistics](2.seconds).pendingTasks shouldBe 2
       },
       max = 5.seconds,
@@ -898,12 +898,12 @@ class TrieNodeHealingCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartTrieNodeHealing(root)
+    coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(root)
 
     // Shared missing child should appear in the frontier exactly once, not twice.
     awaitAssert(
       {
-        coordinator ! Messages.HealingGetProgress(testActor.toTyped[HealingStatistics])
+        coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(testActor.toTyped[HealingStatistics])
         expectMsgType[HealingStatistics](2.seconds).pendingTasks shouldBe 1
       },
       max = 5.seconds,
@@ -948,12 +948,12 @@ class TrieNodeHealingCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartTrieNodeHealing(root)
+    coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(root)
 
     // All 16 missing L2 hashes must land in the pending frontier.
     awaitAssert(
       {
-        coordinator ! Messages.HealingGetProgress(testActor.toTyped[HealingStatistics])
+        coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(testActor.toTyped[HealingStatistics])
         expectMsgType[HealingStatistics](2.seconds).pendingTasks shouldBe 16
       },
       max = 10.seconds,
@@ -986,14 +986,14 @@ class TrieNodeHealingCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartTrieNodeHealing(fx.rootHash)
+    coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(fx.rootHash)
 
     // The shared ancestor is reached via two parents but visited once; the missing grandchild below it
     // is still discovered. It is the ONLY absent node, so the frontier is exactly 1 — not 0 (skipped)
     // and not 2 (double-counted).
     awaitAssert(
       {
-        coordinator ! Messages.HealingGetProgress(testActor.toTyped[HealingStatistics])
+        coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(testActor.toTyped[HealingStatistics])
         expectMsgType[HealingStatistics](2.seconds).pendingTasks shouldBe 1
       },
       max = 5.seconds,
@@ -1017,11 +1017,11 @@ class TrieNodeHealingCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartTrieNodeHealing(fx.rootHash)
+    coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(fx.rootHash)
 
     awaitAssert(
       {
-        coordinator ! Messages.HealingGetProgress(testActor.toTyped[HealingStatistics])
+        coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(testActor.toTyped[HealingStatistics])
         expectMsgType[HealingStatistics](2.seconds).pendingTasks shouldBe 1
       },
       max = 5.seconds,
@@ -1056,11 +1056,11 @@ class TrieNodeHealingCoordinatorSpec
           traversalParallelism = 1 // serial branch
         )
       )
-      coordinator ! Messages.StartTrieNodeHealing(fx.rootHash)
+      coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(fx.rootHash)
       var observed = -1
       awaitAssert(
         {
-          coordinator ! Messages.HealingGetProgress(testActor.toTyped[HealingStatistics])
+          coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(testActor.toTyped[HealingStatistics])
           observed = expectMsgType[HealingStatistics](2.seconds).pendingTasks
           observed shouldBe fx.missingNodeHashes.size // 2 distinct missing nodes
         },
@@ -1132,13 +1132,13 @@ class TrieNodeHealingCoordinatorSpec
     )
 
     try {
-      coordinator ! Messages.StartTrieNodeHealing(fx.rootHash)
+      coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(fx.rootHash)
 
       // No deadlock: the full frontier lands within a generous-but-bounded timeout. If the parallel
       // Await deadlocked, pendingTasks would never reach the expected count and this would time out.
       awaitAssert(
         {
-          coordinator ! Messages.HealingGetProgress(testActor.toTyped[HealingStatistics])
+          coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(testActor.toTyped[HealingStatistics])
           expectMsgType[HealingStatistics](3.seconds).pendingTasks shouldBe fx.expectedFrontier
         },
         max = 60.seconds,
@@ -1183,10 +1183,10 @@ class TrieNodeHealingCoordinatorSpec
     )
 
     try {
-      coordinator ! Messages.StartTrieNodeHealing(fx.rootHash)
+      coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(fx.rootHash)
       awaitAssert(
         {
-          coordinator ! Messages.HealingGetProgress(testActor.toTyped[HealingStatistics])
+          coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(testActor.toTyped[HealingStatistics])
           expectMsgType[HealingStatistics](2.seconds).pendingTasks shouldBe 1
         },
         max = 5.seconds,

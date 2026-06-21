@@ -100,7 +100,7 @@ class TrieNodeHealingScopedVerificationSpec
     */
   private def openFrontier(coordinator: ActorRef): Int = {
     val probe = TestProbe()
-    coordinator ! Messages.HealingGetProgress(probe.ref.toTyped[HealingStatistics])
+    coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref.toTyped[HealingStatistics])
     val stats = probe.expectMsgType[HealingStatistics](2.seconds)
     stats.pendingTasks + stats.activeTasks
   }
@@ -185,9 +185,9 @@ class TrieNodeHealingScopedVerificationSpec
       withMarkerCompleteFixture(stateRoot, storage) { (coordinator, store, controller) =>
         store.isComplete shouldBe true
         val peer = PeerTestHelpers.createTestPeer("scoped-clean-peer", TestProbe().ref)
-        coordinator ! Messages.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
-        coordinator.tell(Messages.HealingPeerAvailable(peer), TestProbe().ref)
-        coordinator ! Messages.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3)))
+        coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
+        coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), TestProbe().ref)
+        coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3)))
 
         awaitStateHealingComplete(controller)
         // The scoped path engaged (gauge=1), not the full-root fallback (which sets gauge=0).
@@ -208,10 +208,10 @@ class TrieNodeHealingScopedVerificationSpec
 
       withMarkerCompleteFixture(stateRoot, storage) { (coordinator, _, controller) =>
         val peer = PeerTestHelpers.createTestPeer("scoped-gap-peer", TestProbe().ref)
-        coordinator ! Messages.QueueMissingNodes(Seq((pathset, hash)))
-        coordinator.tell(Messages.HealingPeerAvailable(peer), TestProbe().ref)
+        coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(Seq((pathset, hash)))
+        coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), TestProbe().ref)
         // Heal the branch — its only child is missing, so a gap remains below the healed node.
-        coordinator ! Messages.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = Seq(encoded)))
+        coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = Seq(encoded)))
 
         // The missing descendant must surface in the OPEN frontier (pending OR in-flight); the round MUST stay open.
         // Inline discovery enqueues it, then the non-empty heal response pipelines it straight into an active

@@ -138,7 +138,7 @@ class HealingFrontierResumeSpec
     // the suite runs with test parallelism — one test's awaitAssert can consume another test's
     // HealingStatistics (observed as a deterministic-looking "0 was not equal to 7").
     val probe = TestProbe()
-    coordinator ! Messages.HealingGetProgress(probe.ref.toTyped[HealingStatistics])
+    coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref.toTyped[HealingStatistics])
     probe.expectMsgType[HealingStatistics](2.seconds).pendingTasks
   }
 
@@ -146,7 +146,7 @@ class HealingFrontierResumeSpec
     "resume from a COMPLETE persisted frontier and skip the full-state DFS" taggedAs UnitTest in {
       val entries = (0 until 7).map(i => hash(i) -> pathset(i))
       withResumeFixture(persistence = true, prePopulate = entries, markComplete = true) { (coordinator, root, _, _) =>
-        coordinator ! Messages.StartTrieNodeHealing(root)
+        coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(root)
         // Resume loads the 7 persisted entries (a childless-leaf-root DFS would have found 0).
         awaitAssert(pendingTasks(coordinator) shouldBe entries.size, 3.seconds, 100.millis)
       }
@@ -157,7 +157,7 @@ class HealingFrontierResumeSpec
     // un-walked region and leave gaps; the coordinator must fall back to the full DFS instead.
     val partial = (0 until 5).map(i => hash(i) -> pathset(i))
     withResumeFixture(persistence = true, prePopulate = partial, markComplete = false) { (coordinator, root, _, _) =>
-      coordinator ! Messages.StartTrieNodeHealing(root)
+      coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(root)
       // No resume of the 5 partial entries; the childless-leaf-root DFS finds nothing → pendingTasks stays 0.
       awaitAssert(pendingTasks(coordinator) shouldBe 0, 2.seconds, 100.millis)
     }
@@ -167,7 +167,7 @@ class HealingFrontierResumeSpec
     // Store HAS entries, but the coordinator is wired with None — they must be ignored.
     withResumeFixture(persistence = false, prePopulate = (0 until 5).map(i => hash(i) -> pathset(i))) {
       (coordinator, root, _, _) =>
-        coordinator ! Messages.StartTrieNodeHealing(root)
+        coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(root)
         // No resume; the childless-leaf-root DFS finds nothing. Contrast with the resume test (reaches 7).
         awaitAssert(pendingTasks(coordinator) shouldBe 0, 2.seconds, 100.millis)
     }
@@ -175,7 +175,7 @@ class HealingFrontierResumeSpec
 
   it should "fall back to the full-state DFS when the persisted frontier is empty" taggedAs UnitTest in
     withResumeFixture(persistence = true) { (coordinator, root, _, _) =>
-      coordinator ! Messages.StartTrieNodeHealing(root)
+      coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(root)
       awaitAssert(pendingTasks(coordinator) shouldBe 0, 2.seconds, 100.millis)
     }
 
@@ -186,7 +186,7 @@ class HealingFrontierResumeSpec
     // pass directly; on the childless-leaf root it finds nothing and completion flows to the
     // controller — under the old behavior nothing reaches the controller until the watchdog era.
     withResumeFixture(persistence = true, markComplete = true) { (coordinator, root, _, controller) =>
-      coordinator ! Messages.StartTrieNodeHealing(root)
+      coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(root)
       controller.expectMsg(10.seconds, SNAPSyncController.StateHealingComplete)
     }
   }
@@ -194,7 +194,7 @@ class HealingFrontierResumeSpec
   it should "mirror newly-queued nodes into the persisted frontier (write-on-queue)" taggedAs UnitTest in
     withResumeFixture(persistence = true, rootInStorage = false) { (coordinator, _, store, _) =>
       val queued = (10 until 16).map(i => pathset(i) -> hash(i))
-      coordinator ! Messages.QueueMissingNodes(queued)
+      coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(queued)
       // queueNodes persists synchronously on the actor thread; the store should gain the queued hashes.
       awaitAssert(
         {
@@ -217,7 +217,7 @@ class HealingFrontierResumeSpec
     // by "skip the walk and complete via verification ..." above and proven invariant-safe by review.
     withResumeFixture(persistence = true, markComplete = false) { (coordinator, root, store, _) =>
       store.isComplete shouldBe false
-      coordinator ! Messages.StartTrieNodeHealing(root)
+      coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(root)
       awaitAssert(store.isComplete shouldBe true, 5.seconds, 100.millis)
     }
 
@@ -227,7 +227,7 @@ class HealingFrontierResumeSpec
     // refresh (frequent on peer-scarce mainnet), silently defeating the skip-on-restart.
     withResumeFixture(persistence = true, markComplete = true) { (coordinator, root, store, _) =>
       store.isComplete shouldBe true
-      coordinator ! Messages.HealingPivotRefreshed(root) // same root as props stateRoot
+      coordinator ! TrieNodeHealingCoordinator.HealingPivotRefreshed(root) // same root as props stateRoot
       // The guard is synchronous on the actor thread; give the mailbox a moment and confirm it stayed set.
       awaitAssert(store.isComplete shouldBe true, 2.seconds, 100.millis)
     }
@@ -237,7 +237,7 @@ class HealingFrontierResumeSpec
     // dropped (conservative) and the new root reseeded for re-traversal.
     withResumeFixture(persistence = true, markComplete = true) { (coordinator, _, store, _) =>
       store.isComplete shouldBe true
-      coordinator ! Messages.HealingPivotRefreshed(kec256(ByteString("a-genuinely-different-root")))
+      coordinator ! TrieNodeHealingCoordinator.HealingPivotRefreshed(kec256(ByteString("a-genuinely-different-root")))
       awaitAssert(store.isComplete shouldBe false, 2.seconds, 100.millis)
     }
 }

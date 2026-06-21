@@ -11,8 +11,8 @@ import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.blockchain.sync.snap.actors.AccountRangeCoordinator
 import com.chipprbots.ethereum.blockchain.sync.snap.actors.ByteCodeCoordinator
-import com.chipprbots.ethereum.blockchain.sync.snap.actors.Messages
 import com.chipprbots.ethereum.blockchain.sync.snap.actors.StorageRangeCoordinator
+import com.chipprbots.ethereum.blockchain.sync.snap.actors.TrieNodeHealingCoordinator
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
@@ -68,7 +68,7 @@ class SNAPFakePeer(
                 }
               case req: GetTrieNodes =>
                 trieNodesHandler(req).foreach { resp =>
-                  sender ! Messages.TrieNodesResponseMsg(resp)
+                  sender ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(resp)
                   served.incrementAndGet()
                 }
               case _ => // ignore unknown messages

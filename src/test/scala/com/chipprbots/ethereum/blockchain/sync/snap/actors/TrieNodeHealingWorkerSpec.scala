@@ -51,9 +51,9 @@ class TrieNodeHealingWorkerSpec
     val peer = PeerTestHelpers.createTestPeer("heal-peer-1", peerProbe.ref)
     val worker = makeWorker(coordinator)
 
-    worker ! Messages.FetchTrieNodes(makeHealingTask(), peer)
+    worker ! TrieNodeHealingCoordinator.FetchTrieNodes(makeHealingTask(), peer)
 
-    coordinator.expectMsg(1.second, Messages.HealingPeerAvailable(peer))
+    coordinator.expectMsg(1.second, TrieNodeHealingCoordinator.HealingPeerAvailable(peer))
   }
 
   it should "forward TrieNodesResponseMsg to coordinator while working" taggedAs UnitTest in {
@@ -62,13 +62,13 @@ class TrieNodeHealingWorkerSpec
     val peer = PeerTestHelpers.createTestPeer("heal-peer-2", peerProbe.ref)
     val worker = makeWorker(coordinator)
 
-    worker ! Messages.FetchTrieNodes(makeHealingTask(), peer)
-    coordinator.expectMsgType[Messages.HealingPeerAvailable](1.second)
+    worker ! TrieNodeHealingCoordinator.FetchTrieNodes(makeHealingTask(), peer)
+    coordinator.expectMsgType[TrieNodeHealingCoordinator.HealingPeerAvailable](1.second)
 
     val response = TrieNodes(requestId = BigInt(7), nodes = Seq(dummyHash))
-    worker ! Messages.TrieNodesResponseMsg(response)
+    worker ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(response)
 
-    coordinator.expectMsg(1.second, Messages.TrieNodesResponseMsg(response))
+    coordinator.expectMsg(1.second, TrieNodeHealingCoordinator.TrieNodesResponseMsg(response))
   }
 
   it should "return to idle after forwarding response (accept a second FetchTrieNodes)" taggedAs UnitTest in {
@@ -78,15 +78,15 @@ class TrieNodeHealingWorkerSpec
     val worker = makeWorker(coordinator)
 
     // First cycle
-    worker ! Messages.FetchTrieNodes(makeHealingTask(), peer)
-    coordinator.expectMsgType[Messages.HealingPeerAvailable](1.second)
+    worker ! TrieNodeHealingCoordinator.FetchTrieNodes(makeHealingTask(), peer)
+    coordinator.expectMsgType[TrieNodeHealingCoordinator.HealingPeerAvailable](1.second)
     val resp1 = TrieNodes(requestId = BigInt(1), nodes = Seq.empty)
-    worker ! Messages.TrieNodesResponseMsg(resp1)
-    coordinator.expectMsg(1.second, Messages.TrieNodesResponseMsg(resp1))
+    worker ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(resp1)
+    coordinator.expectMsg(1.second, TrieNodeHealingCoordinator.TrieNodesResponseMsg(resp1))
 
     // Second cycle — must be back in idle
-    worker ! Messages.FetchTrieNodes(makeHealingTask(), peer)
-    coordinator.expectMsg(1.second, Messages.HealingPeerAvailable(peer))
+    worker ! TrieNodeHealingCoordinator.FetchTrieNodes(makeHealingTask(), peer)
+    coordinator.expectMsg(1.second, TrieNodeHealingCoordinator.HealingPeerAvailable(peer))
   }
 
   it should "ignore HealingRequestTimeout for unknown request ID (no currentRequestId set)" taggedAs UnitTest in {
@@ -95,12 +95,12 @@ class TrieNodeHealingWorkerSpec
     val peer = PeerTestHelpers.createTestPeer("heal-peer-4", peerProbe.ref)
     val worker = makeWorker(coordinator)
 
-    worker ! Messages.FetchTrieNodes(makeHealingTask(), peer)
-    coordinator.expectMsgType[Messages.HealingPeerAvailable](1.second)
+    worker ! TrieNodeHealingCoordinator.FetchTrieNodes(makeHealingTask(), peer)
+    coordinator.expectMsgType[TrieNodeHealingCoordinator.HealingPeerAvailable](1.second)
 
     // currentRequestId is never explicitly set in TrieNodeHealingWorker (proxy pattern),
     // so a timeout for any ID is silently ignored.
-    worker ! Messages.HealingRequestTimeout(BigInt(999))
+    worker ! TrieNodeHealingCoordinator.HealingRequestTimeout(BigInt(999))
     coordinator.expectNoMessage(200.millis)
   }
 
@@ -110,14 +110,14 @@ class TrieNodeHealingWorkerSpec
     val peer = PeerTestHelpers.createTestPeer("heal-peer-5", peerProbe.ref)
     val worker = makeWorker(coordinator)
 
-    worker ! Messages.FetchTrieNodes(makeHealingTask(), peer)
-    coordinator.expectMsgType[Messages.HealingPeerAvailable](1.second)
+    worker ! TrieNodeHealingCoordinator.FetchTrieNodes(makeHealingTask(), peer)
+    coordinator.expectMsgType[TrieNodeHealingCoordinator.HealingPeerAvailable](1.second)
 
     // HealingCheckIdle while currentRequestId is None → return to idle
-    worker ! Messages.HealingCheckIdle
+    worker ! TrieNodeHealingCoordinator.HealingCheckIdle
 
     // Worker should now accept a new FetchTrieNodes
-    worker ! Messages.FetchTrieNodes(makeHealingTask(), peer)
-    coordinator.expectMsg(1.second, Messages.HealingPeerAvailable(peer))
+    worker ! TrieNodeHealingCoordinator.FetchTrieNodes(makeHealingTask(), peer)
+    coordinator.expectMsg(1.second, TrieNodeHealingCoordinator.HealingPeerAvailable(peer))
   }
 }

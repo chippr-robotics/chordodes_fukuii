@@ -131,9 +131,9 @@ class ScopedVerificationParitySpec
     death.watch(coordinator)
     try {
       val peer = PeerTestHelpers.createTestPeer(s"parity-peer-$scoped", TestProbe().ref)
-      coordinator ! Messages.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
-      coordinator.tell(Messages.HealingPeerAvailable(peer), TestProbe().ref)
-      coordinator ! Messages.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3)))
+      coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
+      coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), TestProbe().ref)
+      coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3)))
       awaitStateHealingComplete(controller)
       // The mode gauge distinguishes the two paths: 1 = scoped engaged, 0 = full-root fallback.
       if scoped then gaugeValue("snapsync.healing.scoped_verification.gauge") shouldBe 1.0 +- 1e-9

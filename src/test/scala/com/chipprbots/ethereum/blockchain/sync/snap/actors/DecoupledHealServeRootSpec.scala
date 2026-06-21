@@ -53,7 +53,7 @@ class DecoupledHealServeRootSpec
 
   private def pendingTasks(coordinator: ActorRef): Int = {
     val probe = TestProbe()
-    coordinator ! Messages.HealingGetProgress(probe.ref.toTyped[HealingStatistics])
+    coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref.toTyped[HealingStatistics])
     probe.expectMsgType[HealingStatistics](2.seconds).pendingTasks
   }
 
@@ -93,10 +93,10 @@ class DecoupledHealServeRootSpec
       val peer = PeerTestHelpers.createTestPeer("decoupled-t1-peer", TestProbe().ref)
 
       // Advance the serve root, then queue a missing node and make a peer available so a fetch dispatches.
-      coordinator ! Messages.HealingServeRootRefresh(serveRoot)
+      coordinator ! TrieNodeHealingCoordinator.HealingServeRootRefresh(serveRoot)
       val nodeHash = kec256(ByteString("decoupled-t1-missing-node"))
-      coordinator ! Messages.QueueMissingNodes(Seq((Seq(ByteString(Array[Byte](0x00))), nodeHash)))
-      coordinator.tell(Messages.HealingPeerAvailable(peer), TestProbe().ref)
+      coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(Seq((Seq(ByteString(Array[Byte](0x00))), nodeHash)))
+      coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), TestProbe().ref)
 
       val send = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
       val request = getTrieNodesOf(send)
@@ -116,7 +116,7 @@ class DecoupledHealServeRootSpec
     // Queue two missing nodes BEFORE the refresh — the persisted/in-memory frontier under test.
     val h1 = kec256(ByteString("decoupled-t2-node-1"))
     val h2 = kec256(ByteString("decoupled-t2-node-2"))
-    coordinator ! Messages.QueueMissingNodes(
+    coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(
       Seq(
         (Seq(ByteString(Array[Byte](0x00))), h1),
         (Seq(ByteString(Array[Byte](0x01))), h2)
@@ -126,7 +126,7 @@ class DecoupledHealServeRootSpec
     pendingBefore shouldBe 2
 
     // The refresh advances the serve root. It MUST NOT clear the frontier or re-seed the walk.
-    coordinator ! Messages.HealingServeRootRefresh(serveRoot)
+    coordinator ! TrieNodeHealingCoordinator.HealingServeRootRefresh(serveRoot)
 
     // The pending frontier is unchanged (NOT cleared the way HealingPivotRefreshed would).
     pendingTasks(coordinator) shouldBe pendingBefore
@@ -134,12 +134,12 @@ class DecoupledHealServeRootSpec
     // Completion still keys off the WALK root: an idle (no pending) coordinator completes, but here the
     // frontier is non-empty so HealingCheckCompletion must NOT declare completion — the refresh did not
     // perturb the completion gate (which reads stateRoot, never serveRoot).
-    coordinator ! Messages.HealingCheckCompletion
+    coordinator ! TrieNodeHealingCoordinator.HealingCheckCompletion
     snapSyncController.expectNoMessage(300.millis)
 
     // And the fetch now uses the advanced serve root, proving the refresh took effect on serveRoot alone.
     val peer = PeerTestHelpers.createTestPeer("decoupled-t2-peer", TestProbe().ref)
-    coordinator.tell(Messages.HealingPeerAvailable(peer), TestProbe().ref)
+    coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), TestProbe().ref)
     val send = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
     getTrieNodesOf(send).rootHash shouldBe serveRoot
   }
@@ -155,10 +155,10 @@ class DecoupledHealServeRootSpec
       val peer = PeerTestHelpers.createTestPeer("coupled-t6-peer", TestProbe().ref)
 
       // A serve-root refresh must be a no-op when the feature is disabled.
-      coordinator ! Messages.HealingServeRootRefresh(serveRoot)
+      coordinator ! TrieNodeHealingCoordinator.HealingServeRootRefresh(serveRoot)
       val nodeHash = kec256(ByteString("coupled-t6-missing-node"))
-      coordinator ! Messages.QueueMissingNodes(Seq((Seq(ByteString(Array[Byte](0x00))), nodeHash)))
-      coordinator.tell(Messages.HealingPeerAvailable(peer), TestProbe().ref)
+      coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(Seq((Seq(ByteString(Array[Byte](0x00))), nodeHash)))
+      coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), TestProbe().ref)
 
       val send = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
       val request = getTrieNodesOf(send)
