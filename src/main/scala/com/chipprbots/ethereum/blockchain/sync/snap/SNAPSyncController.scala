@@ -652,9 +652,123 @@ private class SNAPSyncControllerImpl(
           handleCLPivotHint(hint, isStarting = false)
           Behaviors.same
 
-        case other =>
-          ctx.log.debug(s"Unhandled message in idle state: $other")
+        // ── Design gap: GetProgress in idle has no reply path; ask-callers will time out.
+        // GetStatus (above) replies NotSyncing. GetProgress is analogous and should reply
+        // with a zero/empty SyncProgress. Flagged in P4 report; fix in a separate task.
+        case GetProgress(_) =>
+          ctx.log.warn(
+            "GetProgress in idle: no reply sent; ask-pattern caller will time out — design gap, see P4 findings"
+          )
           Behaviors.same
+
+        // ── Unexpected bootstrap signals (should not arrive before sync starts) ────────
+        case _: BootstrapComplete =>
+          ctx.log.warn("Unexpected BootstrapComplete in idle — dropped")
+          Behaviors.same
+        case msg: PivotBootstrapFailed =>
+          ctx.log.warn("Unexpected PivotBootstrapFailed({}) in idle — dropped", msg.reason)
+          Behaviors.same
+
+        // ── Stale SNAP network responses (only valid while syncing) ───────────────────
+        case _: AccountRangeResponse  => ctx.log.debug("Dropping stale AccountRangeResponse in idle"); Behaviors.same
+        case _: ByteCodesResponse     => ctx.log.debug("Dropping stale ByteCodesResponse in idle"); Behaviors.same
+        case _: StorageRangesResponse => ctx.log.debug("Dropping stale StorageRangesResponse in idle"); Behaviors.same
+        case _: TrieNodesResponse     => ctx.log.debug("Dropping stale TrieNodesResponse in idle"); Behaviors.same
+
+        // ── Stale chain-downloader messages ───────────────────────────────────────────
+        case _: ChainDownloaderProgress =>
+          ctx.log.debug("Dropping stale ChainDownloaderProgress in idle"); Behaviors.same
+        case ChainDownloaderDone => ctx.log.debug("Dropping stale ChainDownloaderDone in idle"); Behaviors.same
+
+        // ── Syncing-state retry timers (stale after sync stops) ───────────────────────
+        case RetrySnapSyncStart       => ctx.log.debug("Dropping stale RetrySnapSyncStart in idle"); Behaviors.same
+        case RetryPivotRefresh        => ctx.log.debug("Dropping stale RetryPivotRefresh in idle"); Behaviors.same
+        case _: RetryBootstrapAtBlock => ctx.log.debug("Dropping stale RetryBootstrapAtBlock in idle"); Behaviors.same
+        case CheckSnapCapability      => ctx.log.debug("Dropping stale CheckSnapCapability in idle"); Behaviors.same
+        case TuneRateTracker          => ctx.log.debug("Dropping stale TuneRateTracker in idle"); Behaviors.same
+        case EvictNonSnapPeers        => ctx.log.debug("Dropping stale EvictNonSnapPeers in idle"); Behaviors.same
+        case _: PivotProbeTimeout     => ctx.log.debug("Dropping stale PivotProbeTimeout in idle"); Behaviors.same
+        case DormantWakeUp            => ctx.log.debug("Dropping stale DormantWakeUp in idle"); Behaviors.same
+        case _: DelayedRestart        => ctx.log.debug("Dropping stale DelayedRestart in idle"); Behaviors.same
+
+        // ── Coordinator progress (stale after sync stops) ────────────────────────────
+        case _: AccountRangeProgressCmd =>
+          ctx.log.debug("Dropping stale AccountRangeProgressCmd in idle"); Behaviors.same
+        case CheckDownloadStagnation => ctx.log.debug("Dropping stale CheckDownloadStagnation in idle"); Behaviors.same
+        case _: AccountCoordinatorProgress =>
+          ctx.log.debug("Dropping stale AccountCoordinatorProgress in idle"); Behaviors.same
+        case _: StorageCoordinatorProgress =>
+          ctx.log.debug("Dropping stale StorageCoordinatorProgress in idle"); Behaviors.same
+        case _: ByteCodeCoordinatorProgress =>
+          ctx.log.debug("Dropping stale ByteCodeCoordinatorProgress in idle"); Behaviors.same
+
+        // ── Periodic request ticks (silent — frequent, expected stale after sync stops)
+        case RequestAccountRanges           => Behaviors.same
+        case RequestByteCodes               => Behaviors.same
+        case RequestStorageRanges           => Behaviors.same
+        case RequestTrieNodeHealing         => Behaviors.same
+        case EnsureSnapServerPeersConnected => Behaviors.same
+
+        // ── Stale trie-walk results ───────────────────────────────────────────────────
+        case _: TrieWalkResult   => ctx.log.debug("Dropping stale TrieWalkResult in idle"); Behaviors.same
+        case _: TrieWalkBatch    => ctx.log.debug("Dropping stale TrieWalkBatch in idle"); Behaviors.same
+        case _: TrieWalkComplete => ctx.log.debug("Dropping stale TrieWalkComplete in idle"); Behaviors.same
+        case _: TrieWalkFailed   => ctx.log.debug("Dropping stale TrieWalkFailed in idle"); Behaviors.same
+        case _: ValidateAccountTrieResult =>
+          ctx.log.debug("Dropping stale ValidateAccountTrieResult in idle"); Behaviors.same
+        case _: ValidateStorageTriesResult =>
+          ctx.log.debug("Dropping stale ValidateStorageTriesResult in idle"); Behaviors.same
+        case _: ValidationRetry => ctx.log.debug("Dropping stale ValidationRetry in idle"); Behaviors.same
+        case ScheduledTrieWalk  => ctx.log.debug("Dropping stale ScheduledTrieWalk in idle"); Behaviors.same
+
+        // ── Unexpected sync-completion signals ────────────────────────────────────────
+        case AccountRangeSyncComplete =>
+          ctx.log.warn("Unexpected AccountRangeSyncComplete in idle — dropped")
+          Behaviors.same
+        case ByteCodeSyncComplete =>
+          ctx.log.warn("Unexpected ByteCodeSyncComplete in idle — dropped")
+          Behaviors.same
+        case StorageRangeSyncComplete =>
+          ctx.log.warn("Unexpected StorageRangeSyncComplete in idle — dropped")
+          Behaviors.same
+        case StorageRangeSyncForceCompleted =>
+          ctx.log.warn("Unexpected StorageRangeSyncForceCompleted in idle — dropped")
+          Behaviors.same
+        case _: IncrementalContractData =>
+          ctx.log.debug("Dropping stale IncrementalContractData in idle"); Behaviors.same
+        case StateHealingComplete =>
+          ctx.log.warn("Unexpected StateHealingComplete in idle — dropped")
+          Behaviors.same
+        case HealingAllPeersStateless =>
+          ctx.log.debug("Dropping stale HealingAllPeersStateless in idle"); Behaviors.same
+        case StateValidationComplete =>
+          ctx.log.warn("Unexpected StateValidationComplete in idle — dropped")
+          Behaviors.same
+
+        // ── Stale healing/serve-root messages ─────────────────────────────────────────
+        case _: HealingServeRoot     => ctx.log.debug("Dropping stale HealingServeRoot in idle"); Behaviors.same
+        case _: PivotStateUnservable => ctx.log.debug("Dropping stale PivotStateUnservable in idle"); Behaviors.same
+
+        // ── Progress deltas (silent — frequent, stale after sync stops) ───────────────
+        case _: ProgressAccountsSynced      => Behaviors.same
+        case ProgressAccountsFinalizingTrie => Behaviors.same
+        case ProgressAccountsTrieFinalized  => Behaviors.same
+        case _: AccountTrieFinalized => ctx.log.debug("Dropping stale AccountTrieFinalized in idle"); Behaviors.same
+        case _: AccountTrieFinalizationFailed =>
+          ctx.log.warn("Unexpected AccountTrieFinalizationFailed in idle — dropped")
+          Behaviors.same
+        case _: ProgressBytecodesDownloaded => Behaviors.same
+        case _: ProgressStorageSlotsSynced  => Behaviors.same
+        case _: ProgressNodesHealed         => Behaviors.same
+        case _: ProgressAccountEstimate     => Behaviors.same
+        case _: ProgressStorageContracts    => Behaviors.same
+
+        // ── Stale backpressure / stagnation signals ───────────────────────────────────
+        case _: StorageBackpressureChanged =>
+          ctx.log.debug("Dropping stale StorageBackpressureChanged in idle"); Behaviors.same
+        case _: ByteCodeBackpressureChanged =>
+          ctx.log.debug("Dropping stale ByteCodeBackpressureChanged in idle"); Behaviors.same
+        case _: HealingStagnated => ctx.log.debug("Dropping stale HealingStagnated in idle"); Behaviors.same
       }
       .receiveSignal { case (_, PostStop) =>
         onStop(); Behaviors.same
