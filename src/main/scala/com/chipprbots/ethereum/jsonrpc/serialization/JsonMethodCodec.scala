@@ -9,7 +9,7 @@ object JsonMethodCodec {
   import scala.language.implicitConversions
 
   implicit def decoderWithEncoderIntoCodec[Req, Res](
-      decEnc: JsonMethodDecoder[Req] with JsonEncoder[Res]
+      decEnc: JsonMethodDecoder[Req] & JsonEncoder[Res]
   ): JsonMethodCodec[Req, Res] = new JsonMethodCodec[Req, Res] {
     def decodeJson(params: Option[JArray]): Either[JsonRpcError, Req] = decEnc.decodeJson(params)
     def encodeJson(t: Res): JValue = decEnc.encodeJson(t)

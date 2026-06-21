@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.rlp.RLPValue
 
 object AuthResponseMessageV4 {
 
-  implicit val rlpEncDec: RLPEncoder[AuthResponseMessageV4] with RLPDecoder[AuthResponseMessageV4] =
+  implicit val rlpEncDec: RLPEncoder[AuthResponseMessageV4] & RLPDecoder[AuthResponseMessageV4] =
     new RLPEncoder[AuthResponseMessageV4] with RLPDecoder[AuthResponseMessageV4] {
       override def encode(obj: AuthResponseMessageV4): RLPEncodeable = {
         import obj.*

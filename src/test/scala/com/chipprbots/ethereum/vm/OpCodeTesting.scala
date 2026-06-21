@@ -18,7 +18,7 @@ trait OpCodeTesting extends AnyFunSuiteLike {
   lazy val dupOps: List[DupOp] = config.opCodes.collect { case op: DupOp => op }
   lazy val swapOps: List[SwapOp] = config.opCodes.collect { case op: SwapOp => op }
   lazy val logOps: List[LogOp] = config.opCodes.collect { case op: LogOp => op }
-  lazy val constGasOps: List[OpCode with ConstGas] = config.opCodes.collect { case op: ConstGas if op != INVALID => op }
+  lazy val constGasOps: List[OpCode & ConstGas] = config.opCodes.collect { case op: ConstGas if op != INVALID => op }
 
   def test[T <: OpCode](ops: T*)(f: T => Any): Unit =
     ops.foreach(op => test(op.toString)(f(op)))

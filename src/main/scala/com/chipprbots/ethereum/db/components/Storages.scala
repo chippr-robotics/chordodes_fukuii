@@ -15,7 +15,7 @@ object Storages {
 
   trait DefaultStorages extends StoragesComponent {
 
-    dataSourcesComp: DataSourceComponent with PruningModeComponent =>
+    dataSourcesComp: DataSourceComponent & PruningModeComponent =>
 
     override val storages: Storages = new DefaultStorages(pruningMode)
 

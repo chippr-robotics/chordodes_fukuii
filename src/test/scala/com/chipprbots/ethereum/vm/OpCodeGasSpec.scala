@@ -20,7 +20,7 @@ class OpCodeGasSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
 
   import config.feeSchedule.*
 
-  val stackOpsFees: List[(OpCode with ConstGas, BigInt)] = (pushOps ++ dupOps ++ swapOps).map(_ -> G_verylow)
+  val stackOpsFees: List[(OpCode & ConstGas, BigInt)] = (pushOps ++ dupOps ++ swapOps).map(_ -> G_verylow)
   val constOpsFees: List[(ConstOp, BigInt)] = constOps.map(_ -> G_base)
 
   val constGasFees: Map[OpCode, BigInt] = Map[OpCode, BigInt](
