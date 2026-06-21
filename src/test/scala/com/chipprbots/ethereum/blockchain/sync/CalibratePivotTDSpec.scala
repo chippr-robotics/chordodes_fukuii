@@ -236,7 +236,7 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
 
       // No retry: calibration succeeded
       testScheduler.timePasses(30.minutes)
-      networkPeerManager.expectNoMsg(200.millis)
+      networkPeerManager.expectNoMessage(200.millis)
     }
 
   // ─── T8.2 Pure ETH69 network: retry until anchor found ────────────────────
@@ -259,7 +259,7 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
       // Attempt 2: anchor found, TD written
       syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
       testScheduler.timePasses(30.minutes)
-      networkPeerManager.expectNoMsg(200.millis) // no retry after success
+      networkPeerManager.expectNoMessage(200.millis) // no retry after success
     }
 
   // ─── T8.3 Re-calibration of an already-correct node is idempotent ─────────

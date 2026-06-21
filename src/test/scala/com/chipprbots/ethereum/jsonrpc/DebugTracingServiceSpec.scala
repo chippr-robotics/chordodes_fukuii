@@ -200,7 +200,7 @@ class DebugTracingServiceSpec
         .intermediateRoots(IntermediateRootsRequest(block.header.hash))
         .unsafeRunSync()
       result.isLeft shouldBe true
-      result.left.get.message should include("Block not found")
+      result.swap.getOrElse(fail("Expected Left")).message should include("Block not found")
     }
 
   it should "return empty list for a block with no transactions" taggedAs (UnitTest, RPCTest) in new TestSetup {

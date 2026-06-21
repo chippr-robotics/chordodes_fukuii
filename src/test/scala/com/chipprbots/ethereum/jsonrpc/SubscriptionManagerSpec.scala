@@ -198,10 +198,13 @@ class SubscriptionManagerSpec
     received should have size 1
 
     val json = parse(received.head)
-    (json \ "method").extract[String] shouldBe "eth_subscription"
+    val method = (json \ "method").values.toString
+    method shouldBe "eth_subscription"
     val params = json \ "params"
-    (params \ "result" \ "number").extract[String] should startWith("0x")
-    (params \ "result" \ "hash").extract[String] should startWith("0x")
+    val number = (params \ "result" \ "number").values.toString
+    val hash = (params \ "result" \ "hash").values.toString
+    number should startWith("0x")
+    hash should startWith("0x")
   }
 
   it should "not push newHeads to other connections" taggedAs UnitTest in {

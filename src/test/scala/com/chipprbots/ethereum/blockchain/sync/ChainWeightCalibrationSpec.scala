@@ -91,7 +91,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       testScheduler.timePasses(30.minutes)
       networkPeerManager.expectMsg(CalibrateChainWeightNow)
       // No second message without advancing clock again
-      networkPeerManager.expectNoMsg(100.millis)
+      networkPeerManager.expectNoMessage(100.millis)
     }
 
   // ─── T2.5 Tier 3 success: no retry when anchor found and TD written ────────
@@ -103,7 +103,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
 
       testScheduler.timePasses(30.minutes)
-      networkPeerManager.expectNoMsg(200.millis)
+      networkPeerManager.expectNoMessage(200.millis)
     }
 
   // ─── T2.6 Plausibility gate — below threshold: no write ───────────────────
@@ -200,7 +200,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
 
       // No retry needed — success
       testScheduler.timePasses(30.minutes)
-      networkPeerManager.expectNoMsg(200.millis)
+      networkPeerManager.expectNoMessage(200.millis)
     }
 
   // ─── T3.4 Broken parentHash chain aborts cleanly ─────────────────────────
@@ -380,7 +380,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       // Attempt 2 succeeds → no retry scheduled
       syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
       testScheduler.timePasses(30.minutes)
-      networkPeerManager.expectNoMsg(200.millis)
+      networkPeerManager.expectNoMessage(200.millis)
     }
 
   // ─── T4.3 ETH68 peer appears at retry: tier 2 fires, no local chain ───────
@@ -404,7 +404,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       stored.get.totalDifficulty shouldBe peerTD
 
       testScheduler.timePasses(30.minutes)
-      networkPeerManager.expectNoMsg(200.millis)
+      networkPeerManager.expectNoMessage(200.millis)
     }
 
   // ─── Base test setup ──────────────────────────────────────────────────────
