@@ -4,7 +4,7 @@ import org.apache.pekko.actor.ActorRef as ClassicActorRef
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.MailboxSelector
-import org.apache.pekko.actor.typed.eventstream.EventStream
+import org.apache.pekko.actor.typed.pubsub.Topic
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
@@ -93,6 +93,7 @@ object PendingTransactionsManager {
       peerManager: ActorRef[PeerManagerActor.Command],
       networkPeerManager: ClassicActorRef,
       peerEventBus: ActorRef[PeerEventBusCommand],
+      pendingTxTopic: ActorRef[Topic.Command[NewPendingTransaction]],
       blockchainReader: com.chipprbots.ethereum.domain.BlockchainReader = null,
       stateStorage: com.chipprbots.ethereum.db.storage.StateStorage = null
   ): Behavior[Command] = Behaviors.setup { context =>
@@ -332,7 +333,7 @@ object PendingTransactionsManager {
           val timestamp = System.currentTimeMillis()
           transactionsToAdd.foreach(t => pendingTransactions.put(t.tx.hash, PendingTransaction(t, timestamp)))
           updatePendingNonces(transactionsToAdd)
-          transactionsToAdd.foreach(t => context.system.eventStream.tell(EventStream.Publish(NewPendingTransaction(t))))
+          transactionsToAdd.foreach(t => pendingTxTopic ! Topic.Publish(NewPendingTransaction(t)))
           val peers = connectedPeers.values.toSeq
           if peers.nonEmpty then {
             context.self ! NotifyPeers(transactionsToAdd.toSeq, peers)
@@ -363,7 +364,7 @@ object PendingTransactionsManager {
           PendingTransaction(newPendingTx, timestamp, receivedFromLocalSource = true)
         )
         updatePendingNonces(Seq(newPendingTx))
-        context.system.eventStream.tell(EventStream.Publish(NewPendingTransaction(newPendingTx)))
+        pendingTxTopic ! Topic.Publish(NewPendingTransaction(newPendingTx))
         val peers = connectedPeers.values.toSeq
         if peers.nonEmpty then {
           context.self ! NotifyPeers(Seq(newPendingTx), peers)

@@ -375,7 +375,7 @@ class PendingTransactionsManagerSpec
     }
 
     override val pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[Command] = system.spawn(
-      PendingTransactionsManager(txPoolConfig, peerManager.ref, etcPeerManager.ref, peerMessageBus.ref),
+      PendingTransactionsManager(txPoolConfig, peerManager.ref, etcPeerManager.ref, peerMessageBus.ref, pendingTxTopic),
       s"ptm-test-timeout-${java.util.UUID.randomUUID()}"
     )
 
@@ -569,6 +569,7 @@ class PendingTransactionsManagerSpec
         peerManager.ref,
         etcPeerManager.ref,
         peerMessageBus.ref,
+        pendingTxTopic,
         blockchainReader = fakeBlockchainReader,
         stateStorage = null
       ),
@@ -624,8 +625,16 @@ class PendingTransactionsManagerSpec
     val peerManager: TestProbe = TestProbe()
     val etcPeerManager: TestProbe = TestProbe()
     val peerMessageBus: TestProbe = TestProbe()
+    val pendingTxTopic: org.apache.pekko.actor.typed.ActorRef[
+      org.apache.pekko.actor.typed.pubsub.Topic.Command[com.chipprbots.ethereum.jsonrpc.NewPendingTransaction]
+    ] = system.spawn(
+      org.apache.pekko.actor.typed.pubsub.Topic[com.chipprbots.ethereum.jsonrpc.NewPendingTransaction](
+        "pending-tx-topic"
+      ),
+      s"pending-tx-topic-${java.util.UUID.randomUUID()}"
+    )
     val pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[Command] = system.spawn(
-      PendingTransactionsManager(txPoolConfig, peerManager.ref, etcPeerManager.ref, peerMessageBus.ref),
+      PendingTransactionsManager(txPoolConfig, peerManager.ref, etcPeerManager.ref, peerMessageBus.ref, pendingTxTopic),
       s"ptm-test-${java.util.UUID.randomUUID()}"
     )
   }

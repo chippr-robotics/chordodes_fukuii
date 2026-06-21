@@ -5,6 +5,7 @@ import java.util.concurrent.atomic.AtomicLong
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.eventstream.EventStream
+import org.apache.pekko.actor.typed.pubsub.Topic
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.stream.scaladsl.SourceQueueWithComplete
 import org.apache.pekko.util.ByteString
@@ -87,7 +88,10 @@ object SubscriptionManager {
 
   // ── Behavior ─────────────────────────────────────────────────────────────
 
-  def apply(blockchainReader: BlockchainReader): Behavior[Command] = Behaviors.setup { ctx =>
+  def apply(
+      blockchainReader: BlockchainReader,
+      pendingTxTopic: ActorRef[Topic.Command[NewPendingTransaction]]
+  ): Behavior[Command] = Behaviors.setup { ctx =>
     DefaultFormats + JsonSerializers.RpcErrorJsonSerializer
     ctx.executionContext
 
@@ -99,7 +103,7 @@ object SubscriptionManager {
     val blockAdapter = ctx.messageAdapter[NewBlockImported](e => BlockImported(e.block))
     val pendingTxAdapter = ctx.messageAdapter[NewPendingTransaction](e => PendingTxArrived(e.stx))
     ctx.system.eventStream.tell(EventStream.Subscribe[NewBlockImported](blockAdapter))
-    ctx.system.eventStream.tell(EventStream.Subscribe[NewPendingTransaction](pendingTxAdapter))
+    pendingTxTopic ! Topic.Subscribe(pendingTxAdapter)
 
     // ---- subscription builders ----
 
@@ -319,7 +323,7 @@ object SubscriptionManager {
       }
       .receiveSignal { case (_, org.apache.pekko.actor.typed.PostStop) =>
         ctx.system.eventStream.tell(EventStream.Unsubscribe(blockAdapter))
-        ctx.system.eventStream.tell(EventStream.Unsubscribe(pendingTxAdapter))
+        pendingTxTopic ! Topic.Unsubscribe(pendingTxAdapter)
         Behaviors.same
       }
   }

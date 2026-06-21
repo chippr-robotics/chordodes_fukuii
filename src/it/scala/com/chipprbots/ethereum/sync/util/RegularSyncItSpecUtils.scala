@@ -113,8 +113,17 @@ object RegularSyncItSpecUtils {
     lazy val ommersPool: typed.ActorRef[OmmersPool.Command] =
       system.spawn(OmmersPool(blockchainReader, 1), "ommers-pool")
 
+    lazy val pendingTxTopic: typed.ActorRef[
+      org.apache.pekko.actor.typed.pubsub.Topic.Command[com.chipprbots.ethereum.jsonrpc.NewPendingTransaction]
+    ] = system.spawn(
+      org.apache.pekko.actor.typed.pubsub.Topic[com.chipprbots.ethereum.jsonrpc.NewPendingTransaction](
+        "pending-tx-topic"
+      ),
+      "pending-tx-topic"
+    )
+
     lazy val pendingTransactionsManager: typed.ActorRef[PendingTransactionsManager.Command] = system.spawn(
-      PendingTransactionsManager(TxPoolConfig(config), peerManager, etcPeerManager, peerEventBus),
+      PendingTransactionsManager(TxPoolConfig(config), peerManager, etcPeerManager, peerEventBus, pendingTxTopic),
       "pending-transactions-manager"
     )
 

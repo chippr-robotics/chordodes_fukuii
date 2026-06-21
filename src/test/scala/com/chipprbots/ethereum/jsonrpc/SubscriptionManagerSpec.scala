@@ -49,8 +49,11 @@ class SubscriptionManagerSpec
 
   // ── helpers ────────────────────────────────────────────────────────────────
 
+  def makePendingTxTopic(): ActorRef[org.apache.pekko.actor.typed.pubsub.Topic.Command[NewPendingTransaction]] =
+    testKit.spawn(org.apache.pekko.actor.typed.pubsub.Topic[NewPendingTransaction]("pending-tx-topic"))
+
   def makeManager(): ActorRef[SubscriptionManager.Command] =
-    testKit.spawn(SubscriptionManager(new EphemBlockchainTestSetup {}.blockchainReader))
+    testKit.spawn(SubscriptionManager(new EphemBlockchainTestSetup {}.blockchainReader, makePendingTxTopic()))
 
   /** Returns a preMaterialized queue + source pair. */
   def makeQueue(): (SourceQueueWithComplete[String], Source[String, NotUsed]) = Source

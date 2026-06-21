@@ -124,6 +124,31 @@ trait TypedActorSystemProvider {
   given system: ActorSystem[Nothing] = classicSystem.toTyped
 }
 
+// Dedicated Topic[T] pub/sub channels for blockchain events (replaces ActorSystem.eventStream, 7b).
+// Producers (BlockImporter, PendingTransactionsManager) publish; SubscriptionManager subscribes.
+// Single-JVM, local pub/sub — no serialization needed.
+trait EventTopicsBuilder {
+  self: ActorSystemBuilder =>
+
+  lazy val pendingTxTopic: org.apache.pekko.actor.typed.ActorRef[org.apache.pekko.actor.typed.pubsub.Topic.Command[
+    com.chipprbots.ethereum.jsonrpc.NewPendingTransaction
+  ]] =
+    classicSystem.spawn(
+      org.apache.pekko.actor.typed.pubsub
+        .Topic[com.chipprbots.ethereum.jsonrpc.NewPendingTransaction]("pending-tx-topic"),
+      "pending-tx-topic"
+    )
+
+  lazy val blockTopic: org.apache.pekko.actor.typed.ActorRef[org.apache.pekko.actor.typed.pubsub.Topic.Command[
+    com.chipprbots.ethereum.jsonrpc.NewBlockImported
+  ]] =
+    classicSystem.spawn(
+      org.apache.pekko.actor.typed.pubsub
+        .Topic[com.chipprbots.ethereum.jsonrpc.NewBlockImported]("block-imported-topic"),
+      "block-imported-topic"
+    )
+}
+
 trait PruningConfigBuilder extends PruningModeComponent {
   self: InstanceConfigProvider =>
   override val pruningMode: PruningMode = PruningConfig(instanceConfig.config).mode
@@ -498,7 +523,7 @@ trait PendingTransactionsManagerBuilder {
 object PendingTransactionsManagerBuilder {
   trait Default extends PendingTransactionsManagerBuilder {
     self: ActorSystemBuilder & PeerManagerActorBuilder & NetworkPeerManagerActorBuilder & PeerEventBusBuilder &
-      TxPoolConfigBuilder & BlockchainBuilder & StorageBuilder =>
+      TxPoolConfigBuilder & BlockchainBuilder & StorageBuilder & EventTopicsBuilder =>
 
     lazy val pendingTransactionsManagerTyped
         : org.apache.pekko.actor.typed.ActorRef[PendingTransactionsManager.Command] =
@@ -508,6 +533,7 @@ object PendingTransactionsManagerBuilder {
           peerManager,
           networkPeerManager,
           peerEventBus,
+          pendingTxTopic,
           blockchainReader,
           storagesInstance.storages.stateStorage
         ),
@@ -966,11 +992,11 @@ trait JSONRpcIpcServerBuilder {
 }
 
 trait SubscriptionManagerBuilder {
-  self: ActorSystemBuilder & BlockchainBuilder =>
+  self: ActorSystemBuilder & BlockchainBuilder & EventTopicsBuilder =>
 
   lazy val subscriptionManager: org.apache.pekko.actor.typed.ActorRef[SubscriptionManager.Command] =
     classicSystem.spawn(
-      SubscriptionManager(blockchainReader),
+      SubscriptionManager(blockchainReader, pendingTxTopic),
       "subscription-manager"
     )
 }
@@ -1196,6 +1222,7 @@ trait Node
     with GraphQLServiceBuilder
     with JSONRpcHttpServerBuilder
     with JSONRpcIpcServerBuilder
+    with EventTopicsBuilder
     with SubscriptionManagerBuilder
     with JSONRpcWsServerBuilder
     with EngineApiBuilder
