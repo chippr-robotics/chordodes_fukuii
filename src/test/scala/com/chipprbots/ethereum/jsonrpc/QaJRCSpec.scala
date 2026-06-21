@@ -162,7 +162,8 @@ class QaJRCSpec
         null: TxPoolService,
         null: DebugTracingService,
         null: TraceService,
-        config
+        config,
+        testSystem
       )
 
     val mineBlocksReq: MineBlocksRequest = MineBlocksRequest(1, withTransactions = true, None)

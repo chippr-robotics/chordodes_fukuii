@@ -90,7 +90,8 @@ class FukuiiJRCSpec extends FreeSpecBase with SpecFixtures with AsyncMockFactory
         null: TxPoolService,
         null: DebugTracingService,
         null: TraceService,
-        config
+        config,
+        testSystem
       )
 
   }

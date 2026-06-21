@@ -38,7 +38,7 @@ trait JsonRpcBaseController {
   import JsonRpcBaseController.*
 
   val config: JsonRpcConfig
-  implicit def executionContext: ExecutionContext = scala.concurrent.ExecutionContext.global
+  implicit def executionContext: ExecutionContext
 
   def apisHandleFns: Map[String, PartialFunction[JsonRpcRequest, IO[JsonRpcResponse]]]
 

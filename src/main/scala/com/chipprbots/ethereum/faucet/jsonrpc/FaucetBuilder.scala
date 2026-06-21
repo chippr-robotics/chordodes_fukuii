@@ -76,9 +76,9 @@ trait JsonRpcConfigBuilder {
 }
 
 trait FaucetJsonRpcControllerBuilder {
-  self: JsonRpcConfigBuilder & FaucetRpcServiceBuilder =>
+  self: JsonRpcConfigBuilder & FaucetRpcServiceBuilder & ActorSystemBuilder =>
 
-  val faucetJsonRpcController = new FaucetJsonRpcController(faucetRpcService, jsonRpcConfig)
+  val faucetJsonRpcController = new FaucetJsonRpcController(faucetRpcService, jsonRpcConfig, system)
 }
 
 trait FaucetJsonRpcHttpServerBuilder {

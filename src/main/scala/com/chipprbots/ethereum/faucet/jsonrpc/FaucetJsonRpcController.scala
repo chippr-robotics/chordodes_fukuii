@@ -2,6 +2,10 @@ package com.chipprbots.ethereum.faucet.jsonrpc
 
 import cats.effect.IO
 
+import org.apache.pekko.actor.ActorSystem
+
+import scala.concurrent.ExecutionContext
+
 import com.chipprbots.ethereum.faucet.jsonrpc.FaucetDomain.*
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError
 import com.chipprbots.ethereum.jsonrpc.JsonRpcRequest
@@ -12,10 +16,13 @@ import com.chipprbots.ethereum.utils.Logger
 
 class FaucetJsonRpcController(
     faucetRpcService: FaucetRpcService,
-    override val config: JsonRpcConfig
+    override val config: JsonRpcConfig,
+    actorSystem: ActorSystem
 ) extends ApisBuilder
     with Logger
     with JsonRpcBaseController {
+
+  override implicit def executionContext: ExecutionContext = actorSystem.dispatcher
 
   import FaucetMethodsImplicits.given
 

@@ -2,6 +2,10 @@ package com.chipprbots.ethereum.jsonrpc
 
 import cats.effect.IO
 
+import org.apache.pekko.actor.ActorSystem
+
+import scala.concurrent.ExecutionContext
+
 import org.json4s.JsonDSL.*
 
 import com.chipprbots.ethereum.jsonrpc.AdminService.*
@@ -54,10 +58,13 @@ case class JsonRpcController(
     txPoolService: TxPoolService,
     debugTracingService: DebugTracingService,
     traceService: TraceService,
-    override val config: JsonRpcConfig
+    override val config: JsonRpcConfig,
+    actorSystem: ActorSystem
 ) extends ApisBuilder
     with Logger
     with JsonRpcBaseController {
+
+  override implicit def executionContext: ExecutionContext = actorSystem.dispatcher
 
   import AdminJsonMethodsImplicits.given
   import TxPoolJsonMethodsImplicits.given

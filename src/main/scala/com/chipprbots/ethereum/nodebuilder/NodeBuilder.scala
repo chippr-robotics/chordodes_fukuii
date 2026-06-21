@@ -850,7 +850,7 @@ trait JSONRpcControllerBuilder {
     EthMiningServiceBuilder & EthBlocksServiceBuilder & EthTxServiceBuilder & EthUserServiceBuilder &
     EthFilterServiceBuilder & NetServiceBuilder & PersonalServiceBuilder & DebugServiceBuilder & JSONRpcConfigBuilder &
     QaServiceBuilder & FukuiiServiceBuilder & McpServiceBuilder & AdminServiceBuilder & TxPoolServiceBuilder &
-    DebugTracingServiceBuilder & TraceServiceBuilder =>
+    DebugTracingServiceBuilder & TraceServiceBuilder & ActorSystemBuilder =>
 
   protected def testService: Option[TestService] = None
 
@@ -876,7 +876,8 @@ trait JSONRpcControllerBuilder {
       txPoolService,
       debugTracingService,
       traceService,
-      jsonRpcConfig
+      jsonRpcConfig,
+      classicSystem
     )
 }
 

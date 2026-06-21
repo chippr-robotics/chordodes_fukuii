@@ -266,7 +266,8 @@ class JsonRpcControllerFixture(implicit
       null: TxPoolService,
       null: DebugTracingService,
       null: TraceService,
-      config
+      config,
+      system
     )
 
   val blockHeader: BlockHeader = Fixtures.Blocks.ValidBlock.header.copy(
