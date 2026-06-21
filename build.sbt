@@ -62,8 +62,10 @@ val baseScalacOptions = Seq(
 // Scala 3 warning and feature options
 val scala3Options = Seq(
   "-source:future",  // Enforce Scala 3 future syntax (import x.* required, not import x._)
+  "-language:adhocExtensions", // Allow extending non-open classes (TestKit, Pekko test patterns)
   "-Wunused:all", // Enable unused warnings for Scala 3 (required for scalafix)
   "-Wconf:id=E198:error", // Ratchet step 4/4: unused symbols are build errors (Scala 3: id=E198, cat=unused is not valid)
+  "-Wconf:cat=feature:s", // Suppress adhocExtensions feature warnings (extending non-open Pekko/library classes)
   "-Wconf:cat=unchecked:error", // Ratchet step 4/4: unchecked patterns are build errors
   "-Ykind-projector", // Scala 3 replacement for kind-projector plugin
   "-Xmax-inlines:64" // Increase inline depth limit for complex boopickle/circe derivations
