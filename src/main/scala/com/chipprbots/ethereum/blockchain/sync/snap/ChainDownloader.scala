@@ -27,6 +27,7 @@ import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
 import com.chipprbots.ethereum.domain.Receipt
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.PeerId
@@ -55,16 +56,16 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
   * `Behaviors.withTimers`. The dispatch tick that was a `scheduler.scheduleWithFixedDelay(self, Dispatch)` is now a
   * Typed timer keyed `DispatchKey`.
   *
-  * The behavior type is `Behavior[Any]` (same idiom as `FastSyncBranchResolverActor` / `BytecodeRecoveryActor`):
-  * `PeerRequestHandler` stays Classic and sends its `ResponseReceived` / `RequestFailed` replies to `context.parent`,
-  * which — when each handler is spawned via `context.toClassic.actorOf` — is this Typed actor's mailbox. Those raw
-  * Classic case classes are matched directly. Because the handler reply no longer arrives from the handler's own
-  * `sender()`, the body/receipt in-flight maps are keyed by `PeerId` (carried on every response) instead of the handler
-  * `ActorRef`. `PeerDisconnected` and `HandshakedPeers` events arrive via `context.messageAdapter`s.
+  * The behavior type is `Behavior[Command]` with a sealed ADT. `PeerRequestHandler` (already Typed[Cmd]) sends
+  * `ResponseReceived` / `RequestFailed` replies to `prhResultAdapter`; the adapter wraps them into `PeerResult` before
+  * delivery. `PeerDisconnected` events arrive via `peerDisconnectedAdapter` wrapped as `PeerGone`. `HandshakedPeers`
+  * from `NetworkPeerManagerActor` arrive via `handshakedPeersAdapter` wrapped as `HandshakedPeersMsg`. Because replies
+  * no longer arrive via `sender()`, the body/receipt in-flight maps are keyed by `PeerId` (carried on every response)
+  * instead of the handler `ActorRef`.
   */
 class ChainDownloader private (
-    context: ActorContext[Any],
-    timers: TimerScheduler[Any],
+    context: ActorContext[ChainDownloader.Command],
+    timers: TimerScheduler[ChainDownloader.Command],
     blockchainReader: BlockchainReader,
     blockchainWriter: BlockchainWriter,
     appStateStorage: AppStateStorage,
@@ -82,7 +83,10 @@ class ChainDownloader private (
   import ChainDownloader.*
 
   private val prhResultAdapter: TypedActorRef[PeerRequestHandler.Result] =
-    context.messageAdapter[PeerRequestHandler.Result](identity)
+    context.messageAdapter[PeerRequestHandler.Result](PeerResult(_))
+
+  private val handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers] =
+    context.messageAdapter[NetworkPeerManagerActor.HandshakedPeers](hp => HandshakedPeersMsg(hp.peers))
 
   private def log = context.log
 
@@ -123,20 +127,20 @@ class ChainDownloader private (
   private def peersToDownloadFrom: Map[PeerId, PeerWithInfo] = peerListHelper.peersToDownloadFrom
 
   /** Shared peer-list / scan handling for every state. Returns `Some(next)` if the message was handled. */
-  private def handleCommon(message: Any): Option[Behavior[Any]] = message match {
+  private def handleCommon(message: Command): Option[Behavior[Command]] = message match {
     case ScanPeers =>
-      networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, context.self.toClassic)
+      networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, handshakedPeersAdapter.toClassic)
       Some(Behaviors.same)
-    case NetworkPeerManagerActor.HandshakedPeers(peers) =>
+    case HandshakedPeersMsg(peers) =>
       peerListHelper.handleHandshakedPeers(peers)
       Some(Behaviors.same)
-    case PeerDisconnected(peerId) =>
+    case PeerGone(peerId) =>
       peerListHelper.handlePeerDisconnected(peerId)
       Some(Behaviors.same)
     case _ => None
   }
 
-  def idle(): Behavior[Any] =
+  def idle(): Behavior[Command] =
     Behaviors.receiveMessage { message =>
       handleCommon(message).getOrElse {
         message match {
@@ -190,7 +194,7 @@ class ChainDownloader private (
       }
     }
 
-  def downloading(): Behavior[Any] =
+  def downloading(): Behavior[Command] =
     Behaviors.receiveMessage { message =>
       handleCommon(message).getOrElse {
         message match {
@@ -245,7 +249,7 @@ class ChainDownloader private (
             Behaviors.same
 
           // --- Header responses ---
-          case ResponseReceived(peer, ETHPackets.BlockHeaders(_, headers), _) =>
+          case PeerResult(ResponseReceived(peer, ETHPackets.BlockHeaders(_, headers), _)) =>
             headerRequestPeers -= peer.id
             if headers.nonEmpty then {
               emptyHeaderPeers -= peer.id
@@ -256,7 +260,7 @@ class ChainDownloader private (
             }
             dispatchRequests()
 
-          case RequestFailed(peer, reason) =>
+          case PeerResult(RequestFailed(peer, reason)) =>
             headerRequestPeers -= peer.id
             bodyRequestPeers -= peer.id
             receiptRequestPeers -= peer.id
@@ -265,7 +269,7 @@ class ChainDownloader private (
             dispatchRequests()
 
           // --- Body responses ---
-          case ResponseReceived(peer, ETHPackets.BlockBodies(_, bodies), _) =>
+          case PeerResult(ResponseReceived(peer, ETHPackets.BlockBodies(_, bodies), _)) =>
             bodyRequestPeers.get(peer.id).foreach { case (_, requestedHashes) =>
               bodyRequestPeers -= peer.id
               handleBodies(peer, requestedHashes, bodies)
@@ -273,7 +277,7 @@ class ChainDownloader private (
             dispatchRequests()
 
           // --- Receipt responses ---
-          case ResponseReceived(peer, eth66Receipts: ETHPackets.Receipts68, _) =>
+          case PeerResult(ResponseReceived(peer, eth66Receipts: ETHPackets.Receipts68, _)) =>
             receiptRequestPeers.get(peer.id).foreach { case (_, requestedHashes) =>
               receiptRequestPeers -= peer.id
               handleReceipts(peer, requestedHashes, eth66Receipts)
@@ -281,7 +285,7 @@ class ChainDownloader private (
             dispatchRequests()
 
           // ETH70 partial receipt delivery
-          case ResponseReceived(peer, receipts70: ETHPackets.Receipts70, _) =>
+          case PeerResult(ResponseReceived(peer, receipts70: ETHPackets.Receipts70, _)) =>
             receiptRequestPeers.get(peer.id).foreach { case (_, requestedHashes) =>
               receiptRequestPeers -= peer.id
               handleReceipts70(peer, requestedHashes, receipts70)
@@ -293,7 +297,7 @@ class ChainDownloader private (
       }
     }
 
-  private def dispatchRequests(): Behavior[Any] = {
+  private def dispatchRequests(): Behavior[Command] = {
     val inFlightCount = headerRequestPeers.size + bodyRequestPeers.size + receiptRequestPeers.size
     if inFlightCount >= maxConcurrentRequests then Behaviors.same
     else {
@@ -773,7 +777,7 @@ class ChainDownloader private (
       }
   }
 
-  private def checkCompletion(): Behavior[Any] =
+  private def checkCompletion(): Behavior[Command] =
     if bestHeaderNumber >= targetBlock &&
       bodiesQueue.isEmpty &&
       receiptsQueue.isEmpty &&
@@ -891,31 +895,41 @@ class ChainDownloader private (
 }
 
 object ChainDownloader {
-  // Public protocol — unchanged so the still-Classic parents (SyncController / SNAPSyncController) can keep
-  // sending these via their `.toClassic` ref. The behavior type is `Behavior[Any]`, so the Classic ref accepts them.
-  case class Start(targetBlock: BigInt)
-  case class UpdateTarget(newTarget: BigInt)
-  case object Pause
-  case object Resume
-  case object Stop
-  case object Done
-  case class BoostConcurrency(maxConcurrent: Int)
+
+  /** Sealed inbound protocol. Classic parents (SyncController / SNAPSyncController) send the public cases via
+    * `.toClassic` ref and co-existence mode delivers them to the typed mailbox; all arrive as `Command`.
+    */
+  sealed trait Command
+
+  // Public protocol
+  case class Start(targetBlock: BigInt) extends Command
+  case class UpdateTarget(newTarget: BigInt) extends Command
+  case object Pause extends Command
+  case object Resume extends Command
+  case object Stop extends Command
+  case object Done // outbound to parent — NOT a Command
+  case class BoostConcurrency(maxConcurrent: Int) extends Command
   // Sent when SNAP state is finalised and regular sync is taking over. Backfill drops to a smaller
   // concurrency budget so it competes politely for peer slots. Mirrors `BoostConcurrency` but downward.
-  case class YieldToRegularSync(maxConcurrent: Int)
-  case class GetProgress(replyTo: TypedActorRef[Progress])
-  case class Progress(
+  case class YieldToRegularSync(maxConcurrent: Int) extends Command
+  case class GetProgress(replyTo: TypedActorRef[Progress]) extends Command
+  case class Progress( // outbound reply type — NOT a Command
       headersDownloaded: BigInt,
       bodiesDownloaded: BigInt,
       receiptsDownloaded: BigInt,
       targetBlock: BigInt
   )
 
-  // Internal — the dispatch tick.
-  private case object Dispatch
+  // Internal — timer ticks
+  private case object Dispatch extends Command
+  private case object ScanPeers extends Command
 
-  // Timer keys / poll cadence for the periodic GetHandshakedPeers scan (replaces PeerListSupportNg's scheduler).
-  private case object ScanPeers
+  // Adapter wrappers — bridge external message types into the sealed Command domain
+  private case class PeerResult(result: PeerRequestHandler.Result) extends Command
+  private case class HandshakedPeersMsg(peers: Map[Peer, PeerInfo]) extends Command
+  private case class PeerGone(peerId: PeerId) extends Command
+
+  // Timer keys
   private val ScanKey: String = "ScanPeers"
   private val DispatchKey: String = "Dispatch"
 
@@ -932,11 +946,11 @@ object ChainDownloader {
       requestTimeout: FiniteDuration = 10.seconds,
       snapServerPeerNodeIds: Set[ByteString] = Set.empty,
       blacklist: Blacklist = CacheBasedBlacklist.empty(1000)
-  ): Behavior[Any] =
+  ): Behavior[Command] =
     Behaviors.setup { context =>
       Behaviors.withTimers { timers =>
         val peerDisconnectedAdapter: TypedActorRef[PeerDisconnected] =
-          context.messageAdapter[PeerDisconnected](identity)
+          context.messageAdapter[PeerDisconnected](d => PeerGone(d.peerId))
 
         val peerListHelper = new PeerListHelper(
           peerEventBus,
@@ -963,7 +977,7 @@ object ChainDownloader {
         )
 
         // Immediate poll, then periodic poll for handshaked peers (replaces PeerListSupportNg's scheduleWithFixedDelay).
-        networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, context.self.toClassic)
+        networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, downloader.handshakedPeersAdapter.toClassic)
         timers.startTimerWithFixedDelay(ScanKey, ScanPeers, syncConfig.peersScanInterval)
 
         downloader.idle()

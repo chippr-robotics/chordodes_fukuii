@@ -173,8 +173,8 @@ private class SNAPSyncControllerImpl(
   private var trieNodeHealingCoordinator
       : Option[org.apache.pekko.actor.typed.ActorRef[actors.TrieNodeHealingCoordinator.Command]] =
     None
-  // ChainDownloader is Behavior[Any] (S6); keep a Typed handle so ctx.stop works directly.
-  private var chainDownloader: Option[org.apache.pekko.actor.typed.ActorRef[Any]] = None
+  // ChainDownloader is Behavior[Command] (S6 narrowed); typed ref enables type-safe sends.
+  private var chainDownloader: Option[org.apache.pekko.actor.typed.ActorRef[ChainDownloader.Command]] = None
   private var chainDownloadComplete: Boolean = false
 
   // Monotonic counter appended to coordinator actor names so restarts don't collide
@@ -4781,9 +4781,8 @@ private class SNAPSyncControllerImpl(
         val snapServerNodeIds = snapSyncConfig.snapServerPeers.flatMap { uri =>
           scala.util.Try(ByteString(org.bouncycastle.util.encoders.Hex.decode(uri.getUserInfo))).toOption
         }.toSet
-        // ChainDownloader is Pekko Typed (Group S6). Spawn it via the Classic→Typed adapter and convert the
-        // resulting Typed ref back to Classic so the existing `chainDownloader ! ChainDownloader.X` sends
-        // (Pause/Resume/UpdateTarget/YieldToRegularSync/…) keep compiling against the `Option[ActorRef]` field.
+        // ChainDownloader is Pekko Typed Behavior[Command] (Group S6 narrowed).
+        // Sends (Pause/Resume/UpdateTarget/YieldToRegularSync/…) are now type-safe against ActorRef[Command].
         import org.apache.pekko.actor.typed.DispatcherSelector
         val downloader = ctx
           .spawn(
