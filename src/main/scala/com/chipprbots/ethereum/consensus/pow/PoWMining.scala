@@ -68,10 +68,10 @@ class PoWMining private (
     blockchainReader = blockchainReader
   )
 
-  @volatile private[pow] var minerCoordinatorRef: Option[ActorRef[CoordinatorProtocol]] = None
-  @volatile private[pow] var mockedMinerRef: Option[ActorRef[MockedMiner.Command]] = None
+  private[pow] var minerCoordinatorRef: Option[ActorRef[CoordinatorProtocol]] = None
+  private[pow] var mockedMinerRef: Option[ActorRef[MockedMiner.Command]] = None
   // Captured at spawn time to provide the Typed Scheduler (ask) and ignoreRef (fire-and-forget).
-  @volatile private var minerSystem: Option[org.apache.pekko.actor.typed.ActorSystem[Nothing]] = None
+  private var minerSystem: Option[org.apache.pekko.actor.typed.ActorSystem[Nothing]] = None
 
   final val BlockForgerDispatcherId = "fukuii.async.dispatchers.block-forger"
   implicit private val timeout: Timeout = 20.seconds
