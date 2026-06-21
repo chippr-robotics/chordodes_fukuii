@@ -81,7 +81,6 @@ private[actors] class StorageRangeCoordinatorImpl(
     pathNodeStorage: Option[PathNodeStorage] = None
 ) {
 
-  import Messages.*
   import StorageRangeCoordinator.*
 
   private val log = context.log
@@ -1627,13 +1626,67 @@ private[actors] class StorageRangeCoordinatorImpl(
 
 object StorageRangeCoordinator {
 
-  /** Command protocol for the now-Typed coordinator (Group S3). The command set spans `Messages.scala` —
-    * `StorageRangeCoordinatorMessage` (and the worker-reply `StorageRangesResponseMsg`, plus the shared
-    * `UpdateMaxInFlightPerPeer`) extend this trait. The trait is left non-sealed because Scala 3 forbids extending a
-    * sealed trait from another source file; the same cross-file constraint applies to the other SNAP coordinators. A
-    * defensive catch-all in `active()` covers the loss of exhaustiveness checking.
+  /** Command protocol for the Typed coordinator (Group S3). All subtypes live in this companion so the trait is
+    * sealed — Scala 3 file-scope sealing enables exhaustive match checking at every call site.
     */
-  trait Command
+  sealed trait Command
+
+  // ── Coordinator Commands (SSC-sent and external) ───────────────────────────
+
+  case class StartStorageRangeSync(stateRoot: ByteString) extends Command
+  case class AddStorageTasks(tasks: Seq[StorageTask]) extends Command
+  case class AddStorageTask(task: StorageTask) extends Command
+  case class StoragePeerAvailable(peer: Peer) extends Command
+  case class StoragePeerUnavailable(peerId: String) extends Command
+  case class StorageTaskComplete(requestId: BigInt, result: Either[String, Int]) extends Command
+  case class StorageTaskFailed(requestId: BigInt, reason: String) extends Command
+  case class StorageGetProgress(replyTo: org.apache.pekko.actor.typed.ActorRef[SyncStatistics]) extends Command
+  case object StorageCheckCompletion extends Command
+
+  /** Sent by SNAPSyncController when a fresher pivot has been selected during storage sync. Coordinator updates state
+    * root and clears per-peer adaptive state.
+    */
+  case class StoragePivotRefreshed(newStateRoot: ByteString) extends Command
+
+  /** Signal that no more storage tasks will arrive (all accounts downloaded). Coordinator may now report completion
+    * when pending + active tasks drain.
+    */
+  case object NoMoreStorageTasks extends Command
+
+  /** Sent by SNAPSyncController when storage sync has stagnated and should promote to healing. Coordinator flushes
+    * deferred writes and reports StorageRangeSyncForceCompleted.
+    */
+  case object ForceCompleteStorage extends Command
+
+  /** Dynamically adjust per-peer concurrency budget. Sent by SNAPSyncController at phase transitions (Geth-aligned:
+    * total 5 requests per peer across all coordinators).
+    */
+  case class UpdateMaxInFlightPerPeer(newLimit: Int) extends Command
+
+  /** An aggregated flat-slot batch (small-contract writes) finished committing on the storage-writer dispatcher.
+    * `forStateRoot` lets the coordinator drop completion messages from a superseded generation.
+    */
+  private[actors] case class FlatBatchFlushComplete(
+      forStateRoot: ByteString,
+      entryCount: Int,
+      elapsedMs: Long
+  ) extends Command
+
+  /** Aggregated flat-slot batch failed to commit. Healing phase is expected to re-fetch the missing slots. */
+  private[actors] case class FlatBatchFlushFailed(
+      forStateRoot: ByteString,
+      entryCount: Int,
+      error: String
+  ) extends Command
+
+  // ── Worker message protocol ────────────────────────────────────────────────
+
+  sealed trait WorkerMessage
+  case class FetchStorageRanges(task: StorageTask, peer: Peer) extends WorkerMessage
+  // Sent to the coordinator (SSC forwards it via the Classic `!`), so it is also a Command.
+  case class StorageRangesResponseMsg(response: StorageRanges) extends WorkerMessage with Command
+  case class StorageRequestTimeout(requestId: BigInt) extends WorkerMessage
+  case object StorageCheckIdle extends WorkerMessage
 
   /** Behavior factory (Group S3). SSC and StorageRecoveryActor are still Classic / Classic-spawned at S3 time, so they
     * spawn this via `PropsAdapter` and hold a Classic `ActorRef`; their `!` routes Command-typed messages. SRC spawns

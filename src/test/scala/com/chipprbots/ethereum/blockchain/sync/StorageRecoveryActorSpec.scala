@@ -102,7 +102,7 @@ class StorageRecoveryActorSpec
       )
       .toClassic
     // The actor enters `downloading` and immediately hands the missing list to the coordinator.
-    coordinator.expectMsgType[actors.Messages.AddStorageTasks](2.seconds)
+    coordinator.expectMsgType[actors.StorageRangeCoordinator.AddStorageTasks](2.seconds)
     (actor, appStateStorage)
   }
 
@@ -142,7 +142,7 @@ class StorageRecoveryActorSpec
     actor ! StorageRecoveryActor.RecentRoot(BigInt(200), Some(recentRoot))
 
     // The coordinator is re-armed against the recent root instead of the actor abandoning.
-    coordinator.expectMsg(2.seconds, actors.Messages.StoragePivotRefreshed(recentRoot))
+    coordinator.expectMsg(2.seconds, actors.StorageRangeCoordinator.StoragePivotRefreshed(recentRoot))
     // The roll cancelled the abandon timer → no RecoveryComplete follows.
     syncController.expectNoMessage(1.second)
     appStateStorage.isStorageRecoveryDone() shouldBe false
@@ -182,7 +182,7 @@ class StorageRecoveryActorSpec
     syncController.expectMsg(2.seconds, StorageRecoveryActor.RequestRecentRoot) // roll 1 requested
     val root1 = ByteString(Array.fill[Byte](32)(0x55))
     actor ! StorageRecoveryActor.RecentRoot(BigInt(10), Some(root1))
-    coordinator.expectMsg(2.seconds, actors.Messages.StoragePivotRefreshed(root1)) // roll 1 applied
+    coordinator.expectMsg(2.seconds, actors.StorageRangeCoordinator.StoragePivotRefreshed(root1)) // roll 1 applied
 
     actor ! pivotUnservable() // still unservable, but the single roll is spent → no new request
     syncController.expectMsg(3.seconds, StorageRecoveryActor.RecoveryComplete) // abandons the residue

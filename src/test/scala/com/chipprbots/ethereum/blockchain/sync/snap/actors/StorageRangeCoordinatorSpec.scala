@@ -76,8 +76,8 @@ class StorageRangeCoordinatorSpec
 
   // Typed `StorageGetProgress` carries a `replyTo: ActorRef[SyncStatistics]`. In these Classic tests the reply target
   // is the test actor (ImplicitSender); adapt it to a typed ref so the coordinator can reply.
-  private def getProgress: Messages.StorageGetProgress =
-    Messages.StorageGetProgress(testActor.toTyped[StorageRangeCoordinator.SyncStatistics])
+  private def getProgress: StorageRangeCoordinator.StorageGetProgress =
+    StorageRangeCoordinator.StorageGetProgress(testActor.toTyped[StorageRangeCoordinator.SyncStatistics])
 
   // White-box helper: build the `StorageRangeCoordinatorImpl` directly through a synchronous `BehaviorTestKit`,
   // capturing the Impl instance so tests can drive `private[actors]` accumulator/counter logic in isolation (the
@@ -174,8 +174,8 @@ class StorageRangeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartStorageRangeSync(stateRoot)
-    coordinator ! Messages.StoragePeerAvailable(peer)
+    coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)
+    coordinator ! StorageRangeCoordinator.StoragePeerAvailable(peer)
 
     // Should handle peer availability (may or may not send request depending on tasks)
     coordinator ! getProgress
@@ -203,7 +203,7 @@ class StorageRangeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StorageTaskComplete(BigInt(123), Right(10))
+    coordinator ! StorageRangeCoordinator.StorageTaskComplete(BigInt(123), Right(10))
 
     // Coordinator should handle completion
     coordinator ! getProgress
@@ -231,12 +231,12 @@ class StorageRangeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartStorageRangeSync(stateRoot)
+    coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)
 
     // Signal that no more tasks will arrive (sentinel pattern)
-    coordinator ! Messages.NoMoreStorageTasks
+    coordinator ! StorageRangeCoordinator.NoMoreStorageTasks
 
-    coordinator ! Messages.StorageCheckCompletion
+    coordinator ! StorageRangeCoordinator.StorageCheckCompletion
 
     // Should complete immediately since no tasks and sentinel received
     snapSyncController.expectMsg(3.seconds, SNAPSyncController.StorageRangeSyncComplete)
@@ -263,7 +263,7 @@ class StorageRangeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StorageTaskFailed(BigInt(123), "Test failure")
+    coordinator ! StorageRangeCoordinator.StorageTaskFailed(BigInt(123), "Test failure")
 
     // Coordinator should still be operational
     coordinator ! getProgress
@@ -295,7 +295,7 @@ class StorageRangeCoordinatorSpec
     val storageRoot1 = kec256(ByteString("storage-root-1"))
     val task = StorageTask.createStorageTask(accountHash1, storageRoot1)
 
-    coordinator ! Messages.AddStorageTasks(Seq(task))
+    coordinator ! StorageRangeCoordinator.AddStorageTasks(Seq(task))
 
     // Should remain operational after adding tasks
     coordinator ! getProgress
@@ -324,7 +324,7 @@ class StorageRangeCoordinatorSpec
     )
 
     val newStateRoot = kec256(ByteString("new-state-root"))
-    coordinator ! Messages.StoragePivotRefreshed(newStateRoot)
+    coordinator ! StorageRangeCoordinator.StoragePivotRefreshed(newStateRoot)
 
     // Coordinator should still respond to progress queries after pivot refresh
     coordinator ! getProgress
@@ -354,9 +354,9 @@ class StorageRangeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartStorageRangeSync(stateRoot)
-    coordinator ! Messages.NoMoreStorageTasks
-    coordinator ! Messages.StorageCheckCompletion
+    coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)
+    coordinator ! StorageRangeCoordinator.NoMoreStorageTasks
+    coordinator ! StorageRangeCoordinator.StorageCheckCompletion
 
     snapSyncController.expectMsg(3.seconds, SNAPSyncController.StorageRangeSyncComplete)
   }
@@ -403,9 +403,9 @@ class StorageRangeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartStorageRangeSync(stateRoot)
-    coordinator ! Messages.AddStorageTasks(Seq(task1, task2))
-    coordinator ! Messages.StoragePeerAvailable(peer)
+    coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)
+    coordinator ! StorageRangeCoordinator.AddStorageTasks(Seq(task1, task2))
+    coordinator ! StorageRangeCoordinator.StoragePeerAvailable(peer)
 
     // Coordinator dispatches task1 to peer
     val send1 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
@@ -415,7 +415,7 @@ class StorageRangeCoordinatorSpec
 
     // Inject proof-of-absence: 0 slots, 1 proof node — valid snap/1 empty-storage proof
     val dummyProofNode = ByteString(Array.fill(32)(0xab.toByte))
-    coordinator ! Messages.StorageRangesResponseMsg(
+    coordinator ! StorageRangeCoordinator.StorageRangesResponseMsg(
       StorageRanges(req1.requestId, slots = Seq.empty, proof = Seq(dummyProofNode))
     )
 
@@ -460,11 +460,11 @@ class StorageRangeCoordinatorSpec
     val accountHash = kec256(ByteString("account-force"))
     val storageRoot = kec256(ByteString("storage-root-force"))
     val task = StorageTask.createStorageTask(accountHash, storageRoot)
-    coordinator ! Messages.StartStorageRangeSync(stateRoot)
-    coordinator ! Messages.AddStorageTasks(Seq(task))
+    coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)
+    coordinator ! StorageRangeCoordinator.AddStorageTasks(Seq(task))
 
     // Force completion without a peer — should immediately promote to healing
-    coordinator ! Messages.ForceCompleteStorage
+    coordinator ! StorageRangeCoordinator.ForceCompleteStorage
 
     snapSyncController.expectMsg(3.seconds, SNAPSyncController.StorageRangeSyncForceCompleted)
   }
@@ -498,11 +498,11 @@ class StorageRangeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartStorageRangeSync(stateRoot)
+    coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)
     // Peer known but no tasks queued — simulates the window during the account-range phase
-    coordinator ! Messages.StoragePeerAvailable(peer)
+    coordinator ! StorageRangeCoordinator.StoragePeerAvailable(peer)
     // StorageCheckCompletion tick that arrives before any storage tasks
-    coordinator ! Messages.StorageCheckCompletion
+    coordinator ! StorageRangeCoordinator.StorageCheckCompletion
 
     // Neither PivotStateUnservable nor StorageRangeSyncComplete should be sent:
     // tasks.isEmpty → maybeRequestPivotRefresh() not called, isComplete=false (no sentinel)
@@ -530,7 +530,7 @@ class StorageRangeCoordinatorSpec
     impl.consecutiveTaskFailures = 50
 
     val newStateRoot = kec256(ByteString("pivot-reset-root"))
-    kit.run(Messages.StoragePivotRefreshed(newStateRoot))
+    kit.run(StorageRangeCoordinator.StoragePivotRefreshed(newStateRoot))
 
     // BehaviorTestKit processes synchronously — counter must be 0 immediately after
     impl.consecutiveTaskFailures shouldBe 0
@@ -556,7 +556,7 @@ class StorageRangeCoordinatorSpec
 
     // Pivot refresh (mirrors what happens when SNAPSyncController updates the pivot block)
     val newRoot = kec256(ByteString("mid-session-pivot"))
-    kit.run(Messages.StoragePivotRefreshed(newRoot))
+    kit.run(StorageRangeCoordinator.StoragePivotRefreshed(newRoot))
 
     // Counter is now 0. Set it to 99 again (simulating another near-threshold accumulation
     // after the pivot — still one below the threshold from this epoch).
@@ -675,7 +675,7 @@ class StorageRangeCoordinatorSpec
     impl.stageFlatSlotChunk(accountHash, slots.toSeq)
     impl.pendingFlatBatchEntries shouldBe 4
 
-    kit.run(Messages.ForceCompleteStorage)
+    kit.run(StorageRangeCoordinator.ForceCompleteStorage)
 
     drainSelf(kit)
     impl.inFlightFlatBatches shouldBe 0
@@ -692,7 +692,7 @@ class StorageRangeCoordinatorSpec
     impl.inFlightFlatBatches = 1
     val staleRoot = kec256(ByteString("a-stale-root"))
 
-    kit.run(Messages.FlatBatchFlushComplete(staleRoot, entryCount = 7, elapsedMs = 5L))
+    kit.run(StorageRangeCoordinator.FlatBatchFlushComplete(staleRoot, entryCount = 7, elapsedMs = 5L))
 
     impl.inFlightFlatBatches shouldBe 0
   }
@@ -709,7 +709,7 @@ class StorageRangeCoordinatorSpec
     impl.pendingFlatBatchEntries shouldBe 4
 
     // Pivot refresh: must commit the accumulator THEN advance the root.
-    kit.run(Messages.StoragePivotRefreshed(newRoot))
+    kit.run(StorageRangeCoordinator.StoragePivotRefreshed(newRoot))
 
     drainSelf(kit)
     impl.inFlightFlatBatches shouldBe 0
@@ -728,7 +728,7 @@ class StorageRangeCoordinatorSpec
     impl.inFlightFlatBatches = 2
 
     kit.run(
-      Messages.FlatBatchFlushFailed(
+      StorageRangeCoordinator.FlatBatchFlushFailed(
         forStateRoot = kec256(ByteString("flat-batch-test-root")),
         entryCount = 11,
         error = "synthetic write failure"
@@ -739,7 +739,7 @@ class StorageRangeCoordinatorSpec
 
     // Still operational: a progress query yields a reply via the typed replyTo probe.
     val probe = org.apache.pekko.actor.testkit.typed.scaladsl.TestInbox[StorageRangeCoordinator.SyncStatistics]()
-    kit.run(Messages.StorageGetProgress(probe.ref))
+    kit.run(StorageRangeCoordinator.StorageGetProgress(probe.ref))
     probe.receiveMessage()
   }
 
@@ -775,7 +775,7 @@ class StorageRangeCoordinatorSpec
     coordinator should not be null
 
     // Smoke: accept the basic lifecycle messages without error.
-    coordinator ! Messages.StartStorageRangeSync(stateRoot)
+    coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)
     coordinator ! getProgress
     expectMsgType[Any](3.seconds)
 
@@ -814,7 +814,7 @@ class StorageRangeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartStorageRangeSync(stateRoot)
+    coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)
 
     // Build a small batch of tasks, enough to push the queue to 5 entries.
     val tasks =
@@ -824,13 +824,13 @@ class StorageRangeCoordinatorSpec
           storageRoot = kec256(ByteString(s"root-$i"))
         )
       )
-    coordinator ! Messages.AddStorageTasks(tasks)
+    coordinator ! StorageRangeCoordinator.AddStorageTasks(tasks)
 
     // Crossing the high-water mark triggers a pause signal upward.
     snapSyncController.expectMsg(3.seconds, SNAPSyncController.StorageBackpressureChanged(paused = true))
 
     // Re-checking with the same depth must NOT emit another transition (no duplicate signals).
-    coordinator ! Messages.StorageCheckCompletion
+    coordinator ! StorageRangeCoordinator.StorageCheckCompletion
     snapSyncController.expectNoMessage(500.millis)
   }
 
@@ -846,7 +846,7 @@ class StorageRangeCoordinatorSpec
       backpressureLowWatermark = 2
     )
 
-    kit.run(Messages.StartStorageRangeSync(stateRoot))
+    kit.run(StorageRangeCoordinator.StartStorageRangeSync(stateRoot))
 
     // Drive across the high-water mark first.
     val tasks =
@@ -856,14 +856,14 @@ class StorageRangeCoordinatorSpec
           storageRoot = kec256(ByteString(s"root-$i"))
         )
       )
-    kit.run(Messages.AddStorageTasks(tasks))
+    kit.run(StorageRangeCoordinator.AddStorageTasks(tasks))
     snapSyncController.expectMsg(3.seconds, SNAPSyncController.StorageBackpressureChanged(paused = true))
 
     // Drain the underlying queue to 2 entries (≤ low-water mark) and trigger a check.
     val q = impl.tasks
     while q.size > 2 do q.dequeue()
 
-    kit.run(Messages.StorageCheckCompletion)
+    kit.run(StorageRangeCoordinator.StorageCheckCompletion)
     snapSyncController.expectMsg(3.seconds, SNAPSyncController.StorageBackpressureChanged(paused = false))
   }
 

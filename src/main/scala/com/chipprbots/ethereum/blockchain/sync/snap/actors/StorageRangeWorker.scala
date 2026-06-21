@@ -18,9 +18,9 @@ import com.chipprbots.ethereum.blockchain.sync.snap.*
   */
 object StorageRangeWorker {
 
-  import Messages.*
+  import StorageRangeCoordinator.*
 
-  type Command = StorageRangeWorkerMessage
+  type Command = WorkerMessage
 
   /** @param coordinator
     *   Parent coordinator that manages all storage sync logic (Classic)

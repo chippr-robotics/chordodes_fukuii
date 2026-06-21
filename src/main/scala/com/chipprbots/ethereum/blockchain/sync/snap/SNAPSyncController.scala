@@ -477,7 +477,7 @@ private class SNAPSyncControllerImpl(
     pendingDisconnectedPeers = Set.empty
     ids.foreach { id =>
       accountRangeCoordinator.foreach(_ ! actors.Messages.PeerUnavailable(id))
-      storageRangeCoordinator.foreach(_ ! actors.Messages.StoragePeerUnavailable(id))
+      storageRangeCoordinator.foreach(_ ! actors.StorageRangeCoordinator.StoragePeerUnavailable(id))
       bytecodeCoordinator.foreach(_ ! actors.ByteCodeCoordinator.ByteCodePeerUnavailable(id))
       trieNodeHealingCoordinator.foreach(_ ! actors.Messages.HealingPeerUnavailable(id))
     }
@@ -824,7 +824,7 @@ private class SNAPSyncControllerImpl(
         ctx.log.debug(s"Received StorageRanges response: requestId=${msg.requestId}, slots=${msg.slots.size}")
 
         // Forward to the storage range coordinator (it owns the workers).
-        storageRangeCoordinator.foreach(_ ! actors.Messages.StorageRangesResponseMsg(msg))
+        storageRangeCoordinator.foreach(_ ! actors.StorageRangeCoordinator.StorageRangesResponseMsg(msg))
         Behaviors.same
 
       case TrieNodesResponse(msg) =>
@@ -979,7 +979,7 @@ private class SNAPSyncControllerImpl(
           )
           stateRoot.foreach { root =>
             accountRangeCoordinator.foreach(_ ! actors.Messages.PivotRefreshed(root))
-            storageRangeCoordinator.foreach(_ ! actors.Messages.StoragePivotRefreshed(root))
+            storageRangeCoordinator.foreach(_ ! actors.StorageRangeCoordinator.StoragePivotRefreshed(root))
           }
         } else if currentPhase == AccountRangeSync || currentPhase == ByteCodeAndStorageSync then {
           lastPivotRestartMs = now
@@ -1148,7 +1148,7 @@ private class SNAPSyncControllerImpl(
           progressMonitor.updateEstimates(bytecodes = bytecodesEstimatedTotal)
         }
         if storageTasks.nonEmpty then {
-          storageRangeCoordinator.foreach(_ ! actors.Messages.AddStorageTasks(storageTasks))
+          storageRangeCoordinator.foreach(_ ! actors.StorageRangeCoordinator.AddStorageTasks(storageTasks))
         }
         Behaviors.same
 
@@ -1202,7 +1202,7 @@ private class SNAPSyncControllerImpl(
 
           // Signal that no more work will arrive (sentinel pattern — prevents premature completion)
           bytecodeCoordinator.foreach(_ ! actors.ByteCodeCoordinator.NoMoreByteCodeTasks)
-          storageRangeCoordinator.foreach(_ ! actors.Messages.NoMoreStorageTasks)
+          storageRangeCoordinator.foreach(_ ! actors.StorageRangeCoordinator.NoMoreStorageTasks)
 
           // Transition to ByteCodeAndStorageSync for status reporting and stagnation checks
           currentPhase = ByteCodeAndStorageSync
@@ -1210,7 +1210,7 @@ private class SNAPSyncControllerImpl(
 
           // Redistribute per-peer budget: accounts done, give storage+bytecode more bandwidth.
           // Global budget remains 5 per peer: storage=3, bytecode=2.
-          storageRangeCoordinator.foreach(_ ! actors.Messages.UpdateMaxInFlightPerPeer(3))
+          storageRangeCoordinator.foreach(_ ! actors.StorageRangeCoordinator.UpdateMaxInFlightPerPeer(3))
           // ByteCode budget 8 per peer: with 2 local ETC-capable peers (Besu + core-geth) that gives
           // 16 concurrent requests vs 4 at budget=2. External ETH-mainnet peers return empty quickly
           // and cool down; local peers handle the full load at <1ms RTT.
@@ -1246,7 +1246,7 @@ private class SNAPSyncControllerImpl(
         // On peer-limited networks (Mordor: ~10 peers), this nearly doubles storage throughput.
         if !storagePhaseComplete then {
           storageRangeCoordinator.foreach { coord =>
-            coord ! actors.Messages.UpdateMaxInFlightPerPeer(snapSyncConfig.maxInFlightPerPeer)
+            coord ! actors.StorageRangeCoordinator.UpdateMaxInFlightPerPeer(snapSyncConfig.maxInFlightPerPeer)
             ctx.log.info(
               s"Storage per-peer budget boosted to ${snapSyncConfig.maxInFlightPerPeer} (bytecode complete, full budget)"
             )
@@ -1593,7 +1593,7 @@ private class SNAPSyncControllerImpl(
               given typedScheduler: org.apache.pekko.actor.typed.Scheduler = ctx.system.scheduler
               ctx.pipeToSelf(
                 coordinator.ask[actors.StorageRangeCoordinator.SyncStatistics](replyTo =>
-                  actors.Messages.StorageGetProgress(replyTo)
+                  actors.StorageRangeCoordinator.StorageGetProgress(replyTo)
                 )
               ) {
                 case Success(stats) => StorageCoordinatorProgress(stats)
@@ -1712,7 +1712,7 @@ private class SNAPSyncControllerImpl(
         timers.cancel(RequestStorageRanges)
         if !forceCompleteStorageSent then {
           forceCompleteStorageSent = true
-          storageRangeCoordinator.foreach(_ ! actors.Messages.ForceCompleteStorage)
+          storageRangeCoordinator.foreach(_ ! actors.StorageRangeCoordinator.ForceCompleteStorage)
         }
       }
       return
@@ -1746,7 +1746,7 @@ private class SNAPSyncControllerImpl(
       timers.cancel(RequestStorageRanges)
       if !forceCompleteStorageSent then {
         forceCompleteStorageSent = true
-        storageRangeCoordinator.foreach(_ ! actors.Messages.ForceCompleteStorage)
+        storageRangeCoordinator.foreach(_ ! actors.StorageRangeCoordinator.ForceCompleteStorage)
       }
     }
   }
@@ -2253,7 +2253,7 @@ private class SNAPSyncControllerImpl(
                   org.apache.pekko.actor.typed.DispatcherSelector.fromConfig("sync-dispatcher")
                 )
               )
-              storageRangeCoordinator.foreach(_ ! actors.Messages.StartStorageRangeSync(rootBs))
+              storageRangeCoordinator.foreach(_ ! actors.StorageRangeCoordinator.StartStorageRangeSync(rootBs))
               timers.startTimerWithFixedDelay(RequestStorageRanges, RequestStorageRanges, 1.second)
             }
 
@@ -2284,13 +2284,13 @@ private class SNAPSyncControllerImpl(
                             batch += StorageTask.createStorageTask(accountHash, storageRoot)
                           }
                           if batch.size >= 10000 then {
-                            coordinator ! actors.Messages.AddStorageTasks(batch.toSeq)
+                            coordinator ! actors.StorageRangeCoordinator.AddStorageTasks(batch.toSeq)
                             totalTasks += batch.size
                             batch.clear()
                           }
                         }
                         if batch.nonEmpty then {
-                          coordinator ! actors.Messages.AddStorageTasks(batch.toSeq)
+                          coordinator ! actors.StorageRangeCoordinator.AddStorageTasks(batch.toSeq)
                           totalTasks += batch.size
                         }
                       } finally raf.close()
@@ -2299,16 +2299,16 @@ private class SNAPSyncControllerImpl(
                     .foreach { count =>
                       asyncLog.info(s"Recovery: streamed $count storage tasks from ${filePath}")
                       // Signal no more tasks — sentinel allows completion
-                      coordinator ! actors.Messages.NoMoreStorageTasks
+                      coordinator ! actors.StorageRangeCoordinator.NoMoreStorageTasks
                     }
                 } else {
                   ctx.log.warn(s"Recovery: storage file $filePath not found. Sending NoMore immediately.")
-                  storageRangeCoordinator.foreach(_ ! actors.Messages.NoMoreStorageTasks)
+                  storageRangeCoordinator.foreach(_ ! actors.StorageRangeCoordinator.NoMoreStorageTasks)
                 }
               }
             if savedStoragePath.isEmpty then {
               ctx.log.warn("Recovery: no storage file path persisted. Sending NoMore immediately.")
-              storageRangeCoordinator.foreach(_ ! actors.Messages.NoMoreStorageTasks)
+              storageRangeCoordinator.foreach(_ ! actors.StorageRangeCoordinator.NoMoreStorageTasks)
             }
 
             // Bytecodes: stream codeHashes from persisted file if available. Each entry is 32 bytes
@@ -3330,7 +3330,7 @@ private class SNAPSyncControllerImpl(
         )
       )
       // Start with empty tasks — tasks arrive incrementally via AddStorageTasks
-      storageRangeCoordinator.foreach(_ ! actors.Messages.StartStorageRangeSync(rootHash))
+      storageRangeCoordinator.foreach(_ ! actors.StorageRangeCoordinator.StartStorageRangeSync(rootHash))
 
       timers.startTimerWithFixedDelay(RequestStorageRanges, RequestStorageRanges, 1.second)
     }
@@ -3342,7 +3342,7 @@ private class SNAPSyncControllerImpl(
     // stale-root timeouts recoverable rather than failure cascades. See PR #1252.
     // During AccountRangeSync: accounts=5, storage=2, bytecode=2 per peer.
     bytecodeCoordinator.foreach(_ ! actors.ByteCodeCoordinator.UpdateMaxInFlightPerPeer(2))
-    storageRangeCoordinator.foreach(_ ! actors.Messages.UpdateMaxInFlightPerPeer(2))
+    storageRangeCoordinator.foreach(_ ! actors.StorageRangeCoordinator.UpdateMaxInFlightPerPeer(2))
 
     progressMonitor.startPhase(AccountRangeSync)
   }
@@ -3425,7 +3425,7 @@ private class SNAPSyncControllerImpl(
         ctx.log.info("No SNAP-capable peers available for storage range requests")
       } else {
         snapPeers.foreach { peer =>
-          coordinator ! actors.Messages.StoragePeerAvailable(peer)
+          coordinator ! actors.StorageRangeCoordinator.StoragePeerAvailable(peer)
         }
       }
     }
@@ -4091,7 +4091,7 @@ private class SNAPSyncControllerImpl(
         consecutivePivotRefreshes = MaxConsecutivePivotRefreshes
       }
       accountRangeCoordinator.foreach(_ ! actors.Messages.PivotRefreshed(newStateRoot))
-      storageRangeCoordinator.foreach(_ ! actors.Messages.StoragePivotRefreshed(newStateRoot))
+      storageRangeCoordinator.foreach(_ ! actors.StorageRangeCoordinator.StoragePivotRefreshed(newStateRoot))
       return
     }
 
@@ -4185,7 +4185,7 @@ private class SNAPSyncControllerImpl(
 
     // Geth-aligned: send refresh signal to ALL active coordinators (all 3 run concurrently)
     accountRangeCoordinator.foreach(_ ! actors.Messages.PivotRefreshed(newStateRoot))
-    storageRangeCoordinator.foreach(_ ! actors.Messages.StoragePivotRefreshed(newStateRoot))
+    storageRangeCoordinator.foreach(_ ! actors.StorageRangeCoordinator.StoragePivotRefreshed(newStateRoot))
     // Bytecodes are content-addressed (hash-keyed) so pivot changes don't invalidate them,
     // but the coordinator should clear stale peer tracking.
     bytecodeCoordinator.foreach(_ ! actors.ByteCodeCoordinator.ByteCodePivotRefreshed)

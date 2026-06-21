@@ -16,11 +16,10 @@ object Messages {
   /** Dynamically adjust per-peer concurrency budget for a coordinator. Sent by SNAPSyncController at phase transitions
     * to implement global per-peer request budgeting (Geth-aligned: total 5 requests per peer across all coordinators).
     *
-    * BCC defines its own sealed UpdateMaxInFlightPerPeer. Remaining: SRC, ARC, TNHC (still non-sealed).
+    * BCC and SRC define their own sealed UpdateMaxInFlightPerPeer. Remaining: ARC, TNHC (still non-sealed).
     */
   case class UpdateMaxInFlightPerPeer(newLimit: Int)
-      extends StorageRangeCoordinator.Command
-      with AccountRangeCoordinator.Command
+      extends AccountRangeCoordinator.Command
       with TrieNodeHealingCoordinator.Command
 
   // ========================================
@@ -160,67 +159,6 @@ object Messages {
     * is sent back because the coordinator has already re-queued the task. Idempotent: a second cancel is a no-op.
     */
   case class WorkerRequestCancelled(requestId: BigInt) extends AccountRangeWorkerMessage
-
-  // ========================================
-  // StorageRange Messages
-  // ========================================
-
-  // Extends StorageRangeCoordinator.Command (Group S3): the coordinator is now a Typed actor with a (non-sealed,
-  // cross-file) Command ADT. All StorageRangeCoordinatorMessage cases are therefore Commands; SSC and
-  // StorageRecoveryActor (still Classic / Classic-spawned) send them via the Classic `!`.
-  sealed trait StorageRangeCoordinatorMessage extends StorageRangeCoordinator.Command
-
-  case class StartStorageRangeSync(stateRoot: ByteString) extends StorageRangeCoordinatorMessage
-  case class AddStorageTasks(tasks: Seq[StorageTask]) extends StorageRangeCoordinatorMessage
-  case class AddStorageTask(task: StorageTask) extends StorageRangeCoordinatorMessage
-  case class StoragePeerAvailable(peer: Peer) extends StorageRangeCoordinatorMessage
-  case class StoragePeerUnavailable(peerId: String) extends StorageRangeCoordinatorMessage
-  case class StorageTaskComplete(requestId: BigInt, result: Either[String, Int]) extends StorageRangeCoordinatorMessage
-  case class StorageTaskFailed(requestId: BigInt, reason: String) extends StorageRangeCoordinatorMessage
-  case class StorageGetProgress(replyTo: org.apache.pekko.actor.typed.ActorRef[StorageRangeCoordinator.SyncStatistics])
-      extends StorageRangeCoordinatorMessage
-  case object StorageCheckCompletion extends StorageRangeCoordinatorMessage
-
-  sealed trait StorageRangeWorkerMessage
-  case class FetchStorageRanges(task: StorageTask, peer: Peer) extends StorageRangeWorkerMessage
-  // Sent to the now-Typed coordinator (SSC forwards it via the Classic `!`), so it is also a Command.
-  case class StorageRangesResponseMsg(response: StorageRanges)
-      extends StorageRangeWorkerMessage
-      with StorageRangeCoordinator.Command
-  case class StorageRequestTimeout(requestId: BigInt) extends StorageRangeWorkerMessage
-  case object StorageCheckIdle extends StorageRangeWorkerMessage
-
-  /** Sent by SNAPSyncController when a fresher pivot has been selected during storage sync. Coordinator updates state
-    * root and clears per-peer adaptive state.
-    */
-  case class StoragePivotRefreshed(newStateRoot: ByteString) extends StorageRangeCoordinatorMessage
-
-  /** Signal that no more storage tasks will arrive (all accounts downloaded). Coordinator may now report completion
-    * when pending + active tasks drain.
-    */
-  case object NoMoreStorageTasks extends StorageRangeCoordinatorMessage
-
-  /** Sent by SNAPSyncController when storage sync has stagnated and should promote to healing. Coordinator flushes
-    * deferred writes and reports StorageRangeSyncForceCompleted so the controller cannot treat the handoff as clean.
-    */
-  case object ForceCompleteStorage extends StorageRangeCoordinatorMessage
-
-  /** An aggregated flat-slot batch (small-contract writes) finished committing on the storage-writer dispatcher.
-    * `forStateRoot` lets the coordinator drop completion messages from a generation that has since been superseded by a
-    * pivot refresh. The data has already been persisted; the message is just bookkeeping.
-    */
-  private[actors] case class FlatBatchFlushComplete(
-      forStateRoot: ByteString,
-      entryCount: Int,
-      elapsedMs: Long
-  ) extends StorageRangeCoordinatorMessage
-
-  /** Aggregated flat-slot batch failed to commit. Healing phase is expected to re-fetch the missing slots. */
-  private[actors] case class FlatBatchFlushFailed(
-      forStateRoot: ByteString,
-      entryCount: Int,
-      error: String
-  ) extends StorageRangeCoordinatorMessage
 
   // ========================================
   // TrieNodeHealing Messages

@@ -11,6 +11,7 @@ import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.blockchain.sync.snap.actors.ByteCodeCoordinator
 import com.chipprbots.ethereum.blockchain.sync.snap.actors.Messages
+import com.chipprbots.ethereum.blockchain.sync.snap.actors.StorageRangeCoordinator
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
@@ -56,7 +57,7 @@ class SNAPFakePeer(
                 }
               case req: GetStorageRanges =>
                 storageRangesHandler(req).foreach { resp =>
-                  sender ! Messages.StorageRangesResponseMsg(resp)
+                  sender ! StorageRangeCoordinator.StorageRangesResponseMsg(resp)
                   served.incrementAndGet()
                 }
               case req: GetByteCodes =>

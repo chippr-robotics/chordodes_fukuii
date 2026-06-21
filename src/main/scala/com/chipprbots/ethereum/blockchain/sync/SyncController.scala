@@ -1882,7 +1882,7 @@ object SyncController {
           if snapPeers.nonEmpty then {
             snapPeers.foreach { case (peer, _) =>
               bytecodeActor.foreach(_ ! snap.actors.ByteCodeCoordinator.ByteCodePeerAvailable(peer))
-              storageActor.foreach(_ ! snap.actors.Messages.StoragePeerAvailable(peer))
+              storageActor.foreach(_ ! snap.actors.StorageRangeCoordinator.StoragePeerAvailable(peer))
             }
           }
           // If storage recovery is waiting for a recent root and no header fetch is in flight, start one
