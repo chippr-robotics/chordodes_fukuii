@@ -610,6 +610,7 @@ object FastSync {
         newPivot.number == currentState.pivotBlock.number && updateReason.isSyncRestart
       newPivot.number >= currentState.pivotBlock.number && !stalePivotAfterRestart
     }
+
     /** Suspends header dispatch while `FastSyncBranchResolverActor` binary-searches for the highest common ancestor.
       * The resolver discards diverged blocks itself; on `BranchResolvedSuccessful` we reset in-memory tracking to
       * match, then resume. On `BranchResolutionFailed` we fall back to the N-block blind rewind.
@@ -934,7 +935,7 @@ object FastSync {
             blacklist.add(peer.id, syncConfig.blacklistDuration, BlockHeaderValidationFailed)
             val resolver = ctx.spawn(
               FastSyncBranchResolverActor(
-                fastSync = ctx.self.toClassic,
+                replyTo = ctx.messageAdapter[FastSyncBranchResolverActor.BranchResolverResponse](identity),
                 peerEventBus = peerEventBus,
                 networkPeerManager = networkPeerManager,
                 blockchain = blockchain,

@@ -351,8 +351,8 @@ object SyncController {
       startFastSync()
     }
 
-    /** Classic scheduler passed to SNAPSyncController, which manages its own scheduled callbacks.
-      * Inline `scheduleOnce` calls use `ctx.system.scheduler` directly. Self-Command timers use `timers`.
+    /** Classic scheduler passed to SNAPSyncController, which manages its own scheduled callbacks. Inline `scheduleOnce`
+      * calls use `ctx.system.scheduler` directly. Self-Command timers use `timers`.
       */
     def scheduler: Scheduler = externalSchedulerOpt.getOrElse(ctx.system.classicSystem.scheduler)
 
@@ -1522,6 +1522,7 @@ object SyncController {
             networkPeerManager,
             peerEventBus,
             consensus,
+            blockchain,
             blockchainReader,
             blockchainWriter,
             stateStorage,
@@ -2164,6 +2165,7 @@ object SyncController {
           networkPeerManager,
           peerEventBus,
           consensus,
+          blockchain,
           blockchainReader,
           blockchainWriter,
           stateStorage,

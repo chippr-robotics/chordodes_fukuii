@@ -172,6 +172,10 @@ object RegularSyncItSpecUtils {
           pendingTransactionsManager,
           blockTopic,
           regularSync,
+          peerEventBus.toClassic,
+          etcPeerManager,
+          bl,
+          blacklist,
           this
         ),
         "block-importer"
@@ -183,6 +187,7 @@ object RegularSyncItSpecUtils {
         etcPeerManager,
         peerEventBus.toClassic,
         consensusAdapter,
+        bl,
         blockchainReader,
         blockchainWriter,
         storagesInstance.storages.stateStorage,

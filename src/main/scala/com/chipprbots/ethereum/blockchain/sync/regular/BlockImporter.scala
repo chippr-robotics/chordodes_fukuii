@@ -19,8 +19,10 @@ import cats.implicits.*
 
 import scala.concurrent.duration.*
 
+import com.chipprbots.ethereum.blockchain.sync.Blacklist
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
+import com.chipprbots.ethereum.blockchain.sync.fast.FastSyncBranchResolverActor
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockBroadcast.BlockToBroadcast
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockBroadcasterActor.BroadcastBlocks
 import com.chipprbots.ethereum.blockchain.sync.regular.RegularSync.ProgressProtocol
@@ -80,6 +82,10 @@ object BlockImporter {
       pendingTransactionsManager: TypedActorRef[PendingTransactionsManager.Command],
       blockTopic: TypedActorRef[Topic.Command[NewBlockImported]],
       supervisor: ActorRef,
+      peerEventBus: ActorRef,
+      networkPeerManager: ActorRef,
+      blockchain: Blockchain,
+      blacklist: Blacklist,
       configBuilder: BlockchainConfigBuilder
   ): Behavior[Any] =
     Behaviors.setup { ctx =>
@@ -101,6 +107,10 @@ object BlockImporter {
           pendingTransactionsManager,
           blockTopic,
           supervisor,
+          peerEventBus,
+          networkPeerManager,
+          blockchain,
+          blacklist,
           configBuilder
         )
         timers.startTimerWithFixedDelay(RetryKey, SyncRetryTick, syncConfig.syncRetryInterval)
@@ -177,6 +187,10 @@ final private class BlockImporterLogic(
     pendingTransactionsManager: TypedActorRef[PendingTransactionsManager.Command],
     blockTopic: TypedActorRef[Topic.Command[NewBlockImported]],
     supervisor: ActorRef,
+    peerEventBus: ActorRef,
+    networkPeerManager: ActorRef,
+    blockchain: Blockchain,
+    blacklist: Blacklist,
     configBuilder: BlockchainConfigBuilder
 ) {
   import BlockImporter.*
@@ -187,6 +201,9 @@ final private class BlockImporterLogic(
   private val log: LoggingAdapter = Logging(ctx.system.classicSystem, classOf[BlockImporterImpl])
   private val selfRef = ctx.self
   private val selfClassic = ctx.self.toClassic
+
+  private val branchResolverAdapter: TypedActorRef[FastSyncBranchResolverActor.BranchResolverResponse] =
+    ctx.messageAdapter[FastSyncBranchResolverActor.BranchResolverResponse](identity)
 
   private var pendingStateNodeHash: Option[ByteString] = None
   private var unknownParentStrikes: Map[ByteString, Int] = Map.empty
@@ -267,8 +284,7 @@ final private class BlockImporterLogic(
         Behaviors.same
 
       case StartForkRecovery(failedBlockNumber: BigInt) =>
-        handleForkRecovery(failedBlockNumber)
-        Behaviors.same
+        handleForkRecovery(failedBlockNumber, state)
 
       case _ => Behaviors.same
     }
@@ -794,34 +810,76 @@ final private class BlockImporterLogic(
       .nextOption()
   }
 
-  private def handleForkRecovery(failedBlockNumber: BigInt): Unit = {
-    val currentBest = bestKnownBlockNumber
+  private def handleForkRecovery(failedBlockNumber: BigInt, state: ImporterState): Behavior[Any] = {
+    val capturedBest = bestKnownBlockNumber
     val snapPivot = blockchainReader.getSnapSyncPivotBlock.getOrElse(BigInt(0))
-    val floor = (currentBest - MaxForkAncestryDepth).max(snapPivot)
+    log.warning(
+      "SYNC-FORK: repeated UnknownParent on block {} — spawning branch resolver (best={}, snapPivot={})",
+      failedBlockNumber,
+      capturedBest,
+      snapPivot
+    )
+    val resolverRef = ctx.spawnAnonymous(
+      FastSyncBranchResolverActor(
+        replyTo = branchResolverAdapter,
+        peerEventBus = peerEventBus,
+        networkPeerManager = networkPeerManager,
+        blockchain = blockchain,
+        blockchainReader = blockchainReader,
+        blacklist = blacklist,
+        syncConfig = syncConfig
+      )
+    )
+    resolverRef ! FastSyncBranchResolverActor.StartBranchResolver
+    resolvingFork(capturedBest, snapPivot, state)
+  }
+
+  private def resolvingFork(capturedBest: BigInt, snapPivot: BigInt, state: ImporterState): Behavior[Any] =
+    Behaviors.receiveMessage {
+      case FastSyncBranchResolverActor.BranchResolvedSuccessful(lca, _) =>
+        blockchainReader.getBlockHeaderByNumber(lca) match {
+          case Some(lcaHeader) =>
+            log.info(
+              "SYNC-FORK: branch resolver found LCA at {} — rewinding canonical chain from {}",
+              lca,
+              capturedBest
+            )
+            blockchainWriter.setCanonicalChainHead(lca, lcaHeader.hash, capturedBest)
+            unknownParentStrikes = Map.empty
+            fetcher ! BlockFetcher.InvalidateBlocksFrom(lca + 1, "SYNC-FORK branch-resolver rollback", shouldBlacklist = false)
+          case None =>
+            log.warning("SYNC-FORK: no header at resolver LCA {} — falling back to blind rewind", lca)
+            blindRewind(capturedBest, snapPivot)
+        }
+        running(state)
+
+      case FastSyncBranchResolverActor.BranchResolutionFailed(_) =>
+        log.warning("SYNC-FORK: branch resolver failed — falling back to 128-block blind rewind")
+        blindRewind(capturedBest, snapPivot)
+        running(state)
+
+      case _ => Behaviors.same
+    }
+
+  private def blindRewind(capturedBest: BigInt, snapPivot: BigInt): Unit = {
+    val floor = (capturedBest - MaxForkAncestryDepth).max(snapPivot)
     blockchainReader.getBlockHeaderByNumber(floor) match {
       case Some(floorHeader) =>
         log.warning(
-          "SYNC-FORK: repeated UnknownParent on block {} — rolling back canonical chain from {} to {} (snapPivot={})",
-          failedBlockNumber,
-          currentBest,
+          "SYNC-FORK: blind rewind from {} to {} (snapPivot={})",
+          capturedBest,
           floor,
           snapPivot
         )
-        blockchainWriter.setCanonicalChainHead(floor, floorHeader.hash, currentBest)
+        blockchainWriter.setCanonicalChainHead(floor, floorHeader.hash, capturedBest)
         unknownParentStrikes = Map.empty
-        log.info(
-          "SYNC-FORK: chain rewound to bno={} hash={} — restarting header sync from {}",
-          floor,
-          ByteStringUtils.hash2string(floorHeader.hash).take(8),
-          floor + 1
-        )
         fetcher ! BlockFetcher.InvalidateBlocksFrom(floor + 1, "SYNC-FORK rollback", shouldBlacklist = false)
       case None =>
         log.warning(
           "SYNC-FORK: no header at fork recovery floor bno={} — escalating to SNAP re-sync",
           floor
         )
-        supervisor ! SyncProtocol.RegularSyncStuck(failedBlockNumber, s"no header at fork recovery floor $floor")
+        supervisor ! SyncProtocol.RegularSyncStuck(floor, s"no header at fork recovery floor $floor")
     }
   }
 

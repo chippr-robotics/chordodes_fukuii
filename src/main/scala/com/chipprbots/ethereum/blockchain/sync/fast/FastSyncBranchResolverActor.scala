@@ -65,7 +65,7 @@ object FastSyncBranchResolverActor {
       extends BranchResolverResponse
 
   import BranchResolutionFailed.*
-  final case class BranchResolutionFailed(failure: BranchResolutionFailure)
+  final case class BranchResolutionFailed(failure: BranchResolutionFailure) extends BranchResolverResponse
   object BranchResolutionFailed {
     def noCommonBlock: BranchResolutionFailed = BranchResolutionFailed(NoCommonBlockFound)
     def blockHeaderNotFound(blockHeaderNum: BigInt): BranchResolutionFailed = BranchResolutionFailed(
@@ -100,7 +100,7 @@ object FastSyncBranchResolverActor {
 
   // scalastyle:off parameter.number
   def apply(
-      fastSync: ClassicActorRef,
+      replyTo: TypedActorRef[BranchResolverResponse],
       peerEventBus: ClassicActorRef,
       networkPeerManager: ClassicActorRef,
       blockchain: Blockchain,
@@ -125,7 +125,7 @@ object FastSyncBranchResolverActor {
         val resolver = new Resolver(
           context,
           timers,
-          fastSync,
+          replyTo,
           peerEventBus,
           networkPeerManager,
           blockchainReader,
@@ -148,7 +148,7 @@ object FastSyncBranchResolverActor {
   private class Resolver(
       context: ActorContext[Any],
       timers: TimerScheduler[Any],
-      fastSync: ClassicActorRef,
+      replyTo: TypedActorRef[BranchResolverResponse],
       peerEventBus: ClassicActorRef,
       networkPeerManager: ClassicActorRef,
       blockchainReader: BlockchainReader,
@@ -307,16 +307,13 @@ object FastSyncBranchResolverActor {
     private def finalizeBranchResolver(firstCommonBlockNumber: BigInt, masterPeer: Peer): Behavior[Any] = {
       branchLogic.discardBlocksAfter(firstCommonBlockNumber)
       log.info(s"Branch resolution completed with first common block number [$firstCommonBlockNumber]")
-      fastSync.tell(
-        BranchResolvedSuccessful(highestCommonBlockNumber = firstCommonBlockNumber, masterPeer = masterPeer),
-        org.apache.pekko.actor.ActorRef.noSender
-      )
+      replyTo ! BranchResolvedSuccessful(highestCommonBlockNumber = firstCommonBlockNumber, masterPeer = masterPeer)
       Behaviors.stopped
     }
 
-    /** On fatal errors (and to prevent trying forever) signal fast-sync and let it decide whether to retry. */
+    /** On fatal errors (and to prevent trying forever) signal the caller and let it decide whether to retry. */
     private def stopWithFailure(response: BranchResolutionFailed): Behavior[Any] = {
-      fastSync.tell(response, org.apache.pekko.actor.ActorRef.noSender)
+      replyTo ! response
       Behaviors.stopped
     }
 

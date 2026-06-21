@@ -20,6 +20,7 @@ import com.chipprbots.ethereum.consensus.ConsensusAdapter
 import com.chipprbots.ethereum.consensus.validators.BlockValidator
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.StateStorage
+import com.chipprbots.ethereum.domain.Blockchain
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
 import com.chipprbots.ethereum.ledger.BranchResolution
@@ -40,6 +41,7 @@ object RegularSync {
       networkPeerManager: ActorRef,
       peerEventBus: ActorRef,
       consensus: ConsensusAdapter,
+      blockchain: Blockchain,
       blockchainReader: BlockchainReader,
       blockchainWriter: BlockchainWriter,
       stateStorage: StateStorage,
@@ -96,6 +98,10 @@ object RegularSync {
               pendingTransactionsManager,
               blockTopic,
               ctx.self.toClassic,
+              peerEventBus,
+              networkPeerManager,
+              blockchain,
+              blacklist,
               configBuilder
             ),
             "block-importer"
@@ -120,6 +126,7 @@ object RegularSync {
       networkPeerManager: ActorRef,
       peerEventBus: ActorRef,
       consensus: ConsensusAdapter,
+      blockchain: Blockchain,
       blockchainReader: BlockchainReader,
       blockchainWriter: BlockchainWriter,
       stateStorage: StateStorage,
@@ -141,6 +148,7 @@ object RegularSync {
         networkPeerManager,
         peerEventBus,
         consensus,
+        blockchain,
         blockchainReader,
         blockchainWriter,
         stateStorage,

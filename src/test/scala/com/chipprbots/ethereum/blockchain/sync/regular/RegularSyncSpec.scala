@@ -317,6 +317,10 @@ class RegularSyncSpec
                     .toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
                   blockTopic,
                   importerSupervisor.ref,
+                  peerEventBus.ref,
+                  networkPeerManager.ref,
+                  blockchain,
+                  blacklist,
                   this
                 )
               ),

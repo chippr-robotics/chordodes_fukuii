@@ -312,7 +312,7 @@ class FastSyncBranchResolverActorSpec
     ): TypedActorRef[Any] =
       system.spawn(
         FastSyncBranchResolverActor(
-          fastSync = fastSync,
+          replyTo = fastSync.toTyped[FastSyncBranchResolverActor.BranchResolverResponse],
           peerEventBus = TestProbe("peer_event_bus").ref,
           networkPeerManager = networkPeerManager,
           blockchain = blockchain,
