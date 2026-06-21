@@ -652,13 +652,8 @@ private class SNAPSyncControllerImpl(
           handleCLPivotHint(hint, isStarting = false)
           Behaviors.same
 
-        // ── Design gap: GetProgress in idle has no reply path; ask-callers will time out.
-        // GetStatus (above) replies NotSyncing. GetProgress is analogous and should reply
-        // with a zero/empty SyncProgress. Flagged in P4 report; fix in a separate task.
-        case GetProgress(_) =>
-          ctx.log.warn(
-            "GetProgress in idle: no reply sent; ask-pattern caller will time out — design gap, see P4 findings"
-          )
+        case GetProgress(replyTo) =>
+          replyTo ! progressMonitor.currentProgress
           Behaviors.same
 
         // ── Unexpected bootstrap signals (should not arrive before sync starts) ────────
