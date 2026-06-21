@@ -31,10 +31,12 @@ import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
-import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.MessageClassifier
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.PeerDisconnectedClassifier
-import com.chipprbots.ethereum.network.PeerEventBusActor.Unsubscribe
+import com.chipprbots.ethereum.network.PeerEventBusActor.UnsubscribeAllCmd
+import com.chipprbots.ethereum.network.PeerEventBusActor.UnsubscribeCmd
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.messages.Capability
@@ -59,27 +61,33 @@ class PivotBlockSelectorSpec
 
     pivotBlockSelector ! SelectPivotBlock
 
-    peerMessageBus.expectMsgAllOf(
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id)))
+    expectSubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
     )
 
     expectGetBlockHeadersRequests(Seq(peer1, peer2, peer3), expectedPivotBlock)
 
     // Collecting pivot block (for voting)
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer1.id)
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer2.id)
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer3.id)
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer1.id)
+    )
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer2.id)
+    )
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer3.id)
+    )
 
-    peerMessageBus.expectMsgAllOf(
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))),
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id))),
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id)))
+    expectUnsubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
     )
 
     fastSync.expectMsg(Result(pivotBlockHeader))
-    peerMessageBus.expectMsg(Unsubscribe())
+    peerMessageBus.expectMsgType[UnsubscribeAllCmd]
   }
 
   it should "ask for the block number 0 if [bestPeerBestBlockNumber < syncConfig.pivotBlockOffset]" taggedAs (
@@ -99,10 +107,10 @@ class PivotBlockSelectorSpec
 
     pivotBlockSelector ! SelectPivotBlock
 
-    peerMessageBus.expectMsgAllOf(
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id)))
+    expectSubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
     )
 
     expectGetBlockHeadersRequests(Seq(peer1, peer2, peer3), blockNumber = 0)
@@ -145,10 +153,10 @@ class PivotBlockSelectorSpec
 
     testScheduler.timePasses(syncConfig.startRetryInterval)
 
-    peerMessageBus.expectMsgAllOf(
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id)))
+    expectSubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
     )
   }
 
@@ -157,36 +165,41 @@ class PivotBlockSelectorSpec
 
     pivotBlockSelector ! SelectPivotBlock
 
-    peerMessageBus.expectMsgAllOf(
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id)))
+    expectSubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
     )
 
     expectGetBlockHeadersRequests(Seq(peer1, peer2, peer3), expectedPivotBlock)
 
     // Collecting pivot block (for voting)
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer1.id)
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer2.id)
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer1.id)
+    )
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer2.id)
+    )
 
     // one peer return different header
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(differentBlockHeader)), peer3.id)
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(differentBlockHeader)), peer3.id)
+    )
 
-    peerMessageBus.expectMsgAllOf(
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))),
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id))),
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))),
-      Unsubscribe()
+    expectUnsubscribeCmdsWithAll(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
     )
 
     fastSync.expectNoMessage() // consensus not reached - process have to be repeated
 
     testScheduler.timePasses(syncConfig.startRetryInterval)
 
-    peerMessageBus.expectMsgAllOf(
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id)))
+    expectSubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
     )
   }
 
@@ -198,34 +211,37 @@ class PivotBlockSelectorSpec
 
     pivotBlockSelector ! SelectPivotBlock
 
-    peerMessageBus.expectMsgAllOf(
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id)))
+    expectSubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
     )
 
     expectGetBlockHeadersRequests(Seq(peer1, peer2, peer3), expectedPivotBlock)
 
     // Collecting pivot block (for voting)
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer1.id)
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer1.id)
+    )
 
     // One peer return different header. Because pivotBlockSelector waits only for one peer more - consensus won't be reached
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(differentBlockHeader)), peer2.id)
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(differentBlockHeader)), peer2.id)
+    )
 
-    peerMessageBus.expectMsgAllOf(
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))),
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id))),
-      Unsubscribe()
+    expectUnsubscribeCmdsWithAll(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id))
     )
 
     fastSync.expectNoMessage() // consensus not reached - process have to be repeated
 
     testScheduler.timePasses(syncConfig.startRetryInterval)
 
-    peerMessageBus.expectMsgAllOf(
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id)))
+    expectSubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
     )
   }
 
@@ -239,21 +255,22 @@ class PivotBlockSelectorSpec
 
     pivotBlockSelector ! SelectPivotBlock
 
-    peerMessageBus.expectMsgAllOf(
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)))
+    expectSubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))
     )
 
     expectGetBlockHeadersRequests(Seq(peer1), expectedPivotBlock)
 
     // peer responds with block header number
-    pivotBlockSelector ! MessageFromPeer(
-      BlockHeaders(BigInt(0), Seq(pivotBlockHeader.copy(number = expectedPivotBlock + 1))),
-      peer1.id
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(
+        BlockHeaders(BigInt(0), Seq(pivotBlockHeader.copy(number = expectedPivotBlock + 1))),
+        peer1.id
+      )
     )
 
-    peerMessageBus.expectMsgAllOf(
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))),
-      Unsubscribe()
+    expectUnsubscribeCmdsWithAll(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))
     )
     testScheduler.timePasses(syncConfig.syncRetryInterval)
 
@@ -269,10 +286,10 @@ class PivotBlockSelectorSpec
 
     pivotBlockSelector ! SelectPivotBlock
 
-    peerMessageBus.expectMsgAllOf(
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id)))
+    expectSubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
     )
     peerMessageBus.expectNoMessage()
 
@@ -280,15 +297,20 @@ class PivotBlockSelectorSpec
     networkPeerManager.expectNoMessage()
 
     // Collecting pivot block (for voting)
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer1.id)
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer2.id)
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer3.id)
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer1.id)
+    )
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer2.id)
+    )
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer3.id)
+    )
 
-    peerMessageBus.expectMsgAllOf(
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))),
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id))),
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))),
-      Unsubscribe()
+    expectUnsubscribeCmdsWithAll(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
     )
     peerMessageBus.expectNoMessage()
 
@@ -303,10 +325,10 @@ class PivotBlockSelectorSpec
 
     pivotBlockSelector ! SelectPivotBlock
 
-    peerMessageBus.expectMsgAllOf(
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id)))
+    expectSubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
     )
     peerMessageBus.expectNoMessage()
 
@@ -314,25 +336,32 @@ class PivotBlockSelectorSpec
     networkPeerManager.expectNoMessage()
 
     // Collecting pivot block (for voting)
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer1.id)
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(differentBlockHeader)), peer2.id)
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(anotherDifferentBlockHeader)), peer3.id)
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer1.id)
+    )
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(differentBlockHeader)), peer2.id)
+    )
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(anotherDifferentBlockHeader)), peer3.id)
+    )
 
-    peerMessageBus.expectMsgAllOf(
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))),
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id))),
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))),
-      Subscribe(
-        MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer4.id))
-      ) // Next peer will be asked
+    expectUnsubscribeCmdsWithNextSubscribe(
+      unsubClassifiers = Seq(
+        MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+        MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
+        MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
+      ),
+      nextSub = MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer4.id))
     )
 
     expectGetBlockHeadersRequests(Seq(peer4), expectedPivotBlock)
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer4.id)
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer4.id)
+    )
 
-    peerMessageBus.expectMsgAllOf(
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer4.id))),
-      Unsubscribe()
+    expectUnsubscribeCmdsWithAll(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer4.id))
     )
     peerMessageBus.expectNoMessage()
 
@@ -347,10 +376,10 @@ class PivotBlockSelectorSpec
 
     pivotBlockSelector ! SelectPivotBlock
 
-    peerMessageBus.expectMsgAllOf(
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id)))
+    expectSubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
     )
     peerMessageBus.expectNoMessage()
 
@@ -358,35 +387,42 @@ class PivotBlockSelectorSpec
     networkPeerManager.expectNoMessage()
 
     // Collecting pivot block (for voting)
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer1.id)
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(differentBlockHeader)), peer2.id)
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(anotherDifferentBlockHeader)), peer3.id)
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer1.id)
+    )
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(differentBlockHeader)), peer2.id)
+    )
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(anotherDifferentBlockHeader)), peer3.id)
+    )
 
-    peerMessageBus.expectMsgAllOf(
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))),
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id))),
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))),
-      Subscribe(
-        MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer4.id))
-      ) // Next peer will be asked
+    expectUnsubscribeCmdsWithNextSubscribe(
+      unsubClassifiers = Seq(
+        MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+        MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
+        MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
+      ),
+      nextSub = MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer4.id))
     )
 
     expectGetBlockHeadersRequests(Seq(peer4), expectedPivotBlock)
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(nextAnotherDifferentBlockHeader)), peer4.id)
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(nextAnotherDifferentBlockHeader)), peer4.id)
+    )
 
-    peerMessageBus.expectMsgAllOf(
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer4.id))),
-      Unsubscribe()
+    expectUnsubscribeCmdsWithAll(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer4.id))
     )
 
     fastSync.expectNoMessage() // consensus not reached - process have to be repeated
 
     testScheduler.timePasses(syncConfig.startRetryInterval)
 
-    peerMessageBus.expectMsgAllOf(
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id)))
+    expectSubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
     )
     peerMessageBus.expectNoMessage()
   }
@@ -401,10 +437,10 @@ class PivotBlockSelectorSpec
 
     pivotBlockSelector ! SelectPivotBlock
 
-    peerMessageBus.expectMsgAllOf(
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer4.id)))
+    expectSubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer4.id))
     )
     peerMessageBus.expectNoMessage() // Peer 1 will be skipped
   }
@@ -417,29 +453,35 @@ class PivotBlockSelectorSpec
 
     pivotBlockSelector ! SelectPivotBlock
 
-    peerMessageBus.expectMsgAllOf(
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))),
+    expectSubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
       // Peer 2 is skipped
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer4.id)))
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer4.id))
     )
     peerMessageBus.expectNoMessage()
 
     expectGetBlockHeadersRequests(Seq(peer1, peer3, peer4), expectedPivotBlock)
 
     // Collecting pivot block (for voting)
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer1.id)
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer3.id)
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer4.id)
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer1.id)
+    )
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer3.id)
+    )
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer4.id)
+    )
 
-    peerMessageBus.expectMsgAllOf(
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))),
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))),
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer4.id)))
+    expectUnsubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer4.id))
     )
 
     fastSync.expectMsg(Result(pivotBlockHeader))
-    peerMessageBus.expectMsg(Unsubscribe())
+    peerMessageBus.expectMsgType[UnsubscribeAllCmd]
   }
 
   it should "retry pivot block election with fallback to lower peer numbers" taggedAs (
@@ -462,25 +504,30 @@ class PivotBlockSelectorSpec
 
     pivotBlockSelector ! SelectPivotBlock
 
-    peerMessageBus.expectMsgAllOf(
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))),
-      Subscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer4.id)))
+    expectSubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer4.id))
     )
 
     expectGetBlockHeadersRequests(Seq(peer1, peer3, peer4), blockNumber = 900)
     networkPeerManager.expectNoMessage()
 
     // Collecting pivot block (for voting)
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(baseBlockHeader.copy(number = 900))), peer1.id)
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(baseBlockHeader.copy(number = 900))), peer3.id)
-    pivotBlockSelector ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(baseBlockHeader.copy(number = 900))), peer4.id)
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(baseBlockHeader.copy(number = 900))), peer1.id)
+    )
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(baseBlockHeader.copy(number = 900))), peer3.id)
+    )
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(baseBlockHeader.copy(number = 900))), peer4.id)
+    )
 
-    peerMessageBus.expectMsgAllOf(
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))),
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))),
-      Unsubscribe(MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer4.id))),
-      Unsubscribe()
+    expectUnsubscribeCmdsWithAll(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer4.id))
     )
     peerMessageBus.expectNoMessage()
 
@@ -526,6 +573,47 @@ class PivotBlockSelectorSpec
         fail(s"Expected GetBlockHeaders for block $expectedBlockNumber but received $other")
     }
 
+    // Assertion helpers: subscriber ref is an internal adapter ref — matched with wildcard.
+
+    def expectSubscribeCmds(classifiers: SubscriptionClassifier*): Unit = {
+      val msgs = peerMessageBus.receiveN(classifiers.size)
+      val got = msgs.map {
+        case SubscribeCmd(c, _) => c
+        case other              => fail(s"Expected SubscribeCmd but got: $other")
+      }
+      got.toSet shouldEqual classifiers.toSet
+    }
+
+    def expectUnsubscribeCmds(classifiers: SubscriptionClassifier*): Unit = {
+      val msgs = peerMessageBus.receiveN(classifiers.size)
+      val got = msgs.map {
+        case UnsubscribeCmd(c, _) => c
+        case other                => fail(s"Expected UnsubscribeCmd but got: $other")
+      }
+      got.toSet shouldEqual classifiers.toSet
+    }
+
+    // Receives n UnsubscribeCmd + 1 UnsubscribeAllCmd in any order.
+    def expectUnsubscribeCmdsWithAll(classifiers: SubscriptionClassifier*): Unit = {
+      val msgs = peerMessageBus.receiveN(classifiers.size + 1)
+      val unsubCmds = msgs.collect { case UnsubscribeCmd(c, _) => c }
+      val unsubAllCmds = msgs.collect { case _: UnsubscribeAllCmd => () }
+      unsubCmds.toSet shouldEqual classifiers.toSet
+      unsubAllCmds.size shouldEqual 1
+    }
+
+    // Receives n UnsubscribeCmd + 1 SubscribeCmd in any order (ask-additional-peers pattern).
+    def expectUnsubscribeCmdsWithNextSubscribe(
+        unsubClassifiers: Seq[SubscriptionClassifier],
+        nextSub: SubscriptionClassifier
+    ): Unit = {
+      val msgs = peerMessageBus.receiveN(unsubClassifiers.size + 1)
+      val unsubCmds = msgs.collect { case UnsubscribeCmd(c, _) => c }
+      val subCmds = msgs.collect { case SubscribeCmd(c, _) => c }
+      unsubCmds.toSet shouldEqual unsubClassifiers.toSet
+      subCmds.toSet shouldEqual Set(nextSub)
+    }
+
     val networkPeerManager: TestProbe = TestProbe()
     networkPeerManager.ignoreMsg {
       case NetworkPeerManagerActor.SendMessage(msg, _) if isNewBlock(msg.underlyingMsg) => true
@@ -534,11 +622,11 @@ class PivotBlockSelectorSpec
 
     val peerMessageBus: TestProbe = TestProbe()
     peerMessageBus.ignoreMsg {
-      case Subscribe(MessageClassifier(codes, PeerSelector.AllPeers))
+      case SubscribeCmd(MessageClassifier(codes, PeerSelector.AllPeers), _)
           if codes == Set(Codes.NewBlockCode, Codes.NewBlockHashesCode) =>
         true
-      case Subscribe(PeerDisconnectedClassifier(_))         => true
-      case Unsubscribe(Some(PeerDisconnectedClassifier(_))) => true
+      case SubscribeCmd(PeerDisconnectedClassifier(_), _)   => true
+      case UnsubscribeCmd(PeerDisconnectedClassifier(_), _) => true
     }
 
     def minPeersToChoosePivotBlock = 3
@@ -708,6 +796,7 @@ class PivotBlockSelectorSpec
       )
     )
 
-    def updateHandshakedPeers(handshakedPeers: HandshakedPeers): Unit = pivotBlockSelector ! handshakedPeers
+    def updateHandshakedPeers(handshakedPeers: HandshakedPeers): Unit =
+      pivotBlockSelector ! PivotBlockSelector.WrappedHandshakedPeers(handshakedPeers)
   }
 }
