@@ -94,6 +94,21 @@ class BlockHashHistorySpec extends AnyFlatSpec with Matchers {
     world.getStorage(HistoryStorageAddress).load(slot) shouldBe UInt256(parentHash).toBigInt
   }
 
+  it should "deploy the history contract and write the slot when processing a post-activation block on a fresh world" taggedAs (
+    OlympiaTest,
+    ConsensusTest
+  ) in new TestSetup {
+    // emptyWorld has no account at HistoryStorageAddress — simulates executing block N+1
+    // without having first processed the activation block in this world instance.
+    // Before the fix this threw IllegalStateException at getGuaranteedAccount inside getStorage.
+    val parentHash: ByteString = ByteString(Array.fill(32)(0xcc.toByte))
+    val world: InMemoryWorldStateProxy = runBlock(makeBlock(olympiaBlock + 1, parentHash))
+
+    world.getCode(HistoryStorageAddress) shouldBe HistoryStorageCode
+    val slot: BigInt = olympiaBlock % Window // (olympiaBlock + 1 - 1) % Window
+    world.getStorage(HistoryStorageAddress).load(slot) shouldBe UInt256(parentHash).toBigInt
+  }
+
   it should "deploy the history storage contract code at the Olympia activation block" taggedAs (
     OlympiaTest,
     ConsensusTest

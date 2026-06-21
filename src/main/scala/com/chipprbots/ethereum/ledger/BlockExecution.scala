@@ -249,18 +249,12 @@ class BlockExecution(
     val etcOlympiaActive = blockchainConfig.networkType == com.chipprbots.ethereum.utils.NetworkType.ETC &&
       blockNumber >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber
     if !pragueActive && !etcOlympiaActive then return world
-    // Only deploy at the FIRST block where it activates
-    val isActivationBlock = if pragueActive then {
-      blockchainReader
-        .getBlockHeaderByHash(block.header.parentHash)
-        .exists(parent => !blockchainConfig.isPragueTimestamp(parent.unixTimestamp))
-    } else {
-      blockNumber == blockchainConfig.forkBlockNumbers.olympiaBlockNumber
-    }
 
-    // At the fork block, deploy the history storage contract
-    // Deploy history storage contract only if not already deployed (genesis may pre-deploy it)
-    val w1 = if isActivationBlock && world.getCode(HistoryStorageAddress).isEmpty then {
+    // Deploy history storage contract only if not already deployed (genesis may pre-deploy it).
+    // Use code presence as the sole guard — identical to applyEip4788's account-existence guard.
+    // Tying deployment to isActivationBlock caused IllegalStateException when processing a
+    // post-activation block on a fresh world: the account was absent so getStorage threw.
+    val w1 = if world.getCode(HistoryStorageAddress).isEmpty then {
       val account = world
         .getAccount(HistoryStorageAddress)
         .getOrElse(Account.empty(blockchainConfig.accountStartNonce))
