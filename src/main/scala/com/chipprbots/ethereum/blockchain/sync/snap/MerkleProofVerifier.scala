@@ -2,7 +2,6 @@ package com.chipprbots.ethereum.blockchain.sync.snap
 
 import org.apache.pekko.util.ByteString
 
-import scala.annotation.unused
 
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.mpt.BranchNode
@@ -494,79 +493,6 @@ class MerkleProofVerifier(rootHash: ByteString) extends Logger {
       key -> nodeBytes.toArray
     }.toMap
 
-  @unused private def verifyProofRoot(proofNodes: Seq[MptNode]): Either[String, Unit] =
-    if proofNodes.isEmpty then Left("Empty proof")
-    else {
-      val firstNodeHash = ByteString(proofNodes.head.hash)
-      if firstNodeHash != rootHash then
-        Left(
-          s"Proof root mismatch: got ${firstNodeHash.take(4).toArray.map("%02x".format(_)).mkString}... expected ${rootHash.take(4).toArray.map("%02x".format(_)).mkString}..."
-        )
-      else Right(())
-    }
-
-  @unused private def verifyStorageSlotInProof(
-      slotHash: ByteString,
-      slotValue: ByteString,
-      proofMap: Map[ByteString, MptNode]
-  ): Either[String, Unit] =
-    traverseStoragePath(rootHash, hashToNibbles(slotHash), proofMap, slotValue)
-
-  @unused private def traverseStoragePath(
-      currentHash: ByteString,
-      path: Seq[Int],
-      proofMap: Map[ByteString, MptNode],
-      expectedValue: ByteString
-  ): Either[String, Unit] =
-    proofMap.get(currentHash) match {
-      case None =>
-        Right(())
-      case Some(leafNode: LeafNode) =>
-        if leafNode.value == expectedValue then Right(())
-        else Left(s"Storage value mismatch")
-      case Some(branchNode: BranchNode) =>
-        if path.isEmpty then {
-          branchNode.terminator match {
-            case Some(value) =>
-              if value == expectedValue then Right(()) else Left("Storage value mismatch at branch terminator")
-            case None => Left("Path ended at branch without terminator")
-          }
-        } else {
-          val nextIndex = path.head
-          branchNode.children.lift(nextIndex) match {
-            case Some(nextNode: HashNode) =>
-              traverseStoragePath(ByteString(nextNode.hash), path.tail, proofMap, expectedValue)
-            case Some(nextNode) =>
-              traverseStoragePath(ByteString(nextNode.hash), path.tail, proofMap, expectedValue)
-            case None => Left(s"No child at index $nextIndex")
-          }
-        }
-      case Some(extensionNode: ExtensionNode) =>
-        val sharedNibbles = extensionNode.sharedKey.map(_.toInt)
-        if path.startsWith(sharedNibbles) then {
-          extensionNode.next match {
-            case hashNode: HashNode =>
-              traverseStoragePath(ByteString(hashNode.hash), path.drop(sharedNibbles.length), proofMap, expectedValue)
-            case nextNode =>
-              traverseStoragePath(ByteString(nextNode.hash), path.drop(sharedNibbles.length), proofMap, expectedValue)
-          }
-        } else Left("Path doesn't match extension node")
-      case Some(_) => Left("Unexpected node type")
-    }
-
-  @unused private def validateStorageSlotsBasic(
-      slots: Seq[(ByteString, ByteString)],
-      @unused startHash: ByteString,
-      @unused endHash: ByteString
-  ): Either[String, Unit] = {
-    var i = 1
-    var loopError: Option[String] = None
-    while i < slots.size && loopError.isEmpty do {
-      if cmpBytes(slots(i - 1)._1, slots(i)._1) >= 0 then loopError = Some("Storage slots not monotonically increasing")
-      i += 1
-    }
-    loopError.toLeft(())
-  }
 }
 
 object MerkleProofVerifier {
