@@ -22,7 +22,7 @@ class FaucetJsonRpcController(
     with Logger
     with JsonRpcBaseController {
 
-  override implicit def executionContext: ExecutionContext = actorSystem.dispatcher
+  implicit override def executionContext: ExecutionContext = actorSystem.dispatcher
 
   import FaucetMethodsImplicits.given
 

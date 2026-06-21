@@ -228,7 +228,7 @@ class MockableJsonRpcControllerForGraphQL extends JsonRpcBaseController with Api
   override def available: List[String] = List.empty
   @SuppressWarnings(Array("scalafix:DisableSyntax.null"))
   override val config: JsonRpcConfig = null
-  override implicit def executionContext: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
+  implicit override def executionContext: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
 }
 
 class GraphQLFakeServer(

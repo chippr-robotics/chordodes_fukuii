@@ -64,7 +64,7 @@ case class JsonRpcController(
     with Logger
     with JsonRpcBaseController {
 
-  override implicit def executionContext: ExecutionContext = actorSystem.dispatcher
+  implicit override def executionContext: ExecutionContext = actorSystem.dispatcher
 
   import AdminJsonMethodsImplicits.given
   import TxPoolJsonMethodsImplicits.given
