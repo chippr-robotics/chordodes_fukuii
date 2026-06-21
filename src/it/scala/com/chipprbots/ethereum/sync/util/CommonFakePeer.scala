@@ -156,6 +156,8 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
         implicit private val bridgeTimeout: org.apache.pekko.util.Timeout =
           org.apache.pekko.util.Timeout(10.seconds)
 
+        // Classic bridge: only GetKnownNodes and Command subtypes are ever sent here — sealed-trait match on Any is safe.
+        @annotation.nowarn("msg=Matchable")
         def receive: Receive = {
           case KnownNodesManager.GetKnownNodes =>
             val s = sender()
