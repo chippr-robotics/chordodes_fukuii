@@ -40,6 +40,10 @@ abstract class BaseNode extends Node {
 
   private var tuiUpdater: Option[TuiUpdater] = None
 
+  // Secondary ActorSystem hosting the periodic DB consistency check (see startPeriodicDBConsistencyCheck).
+  // Retained so shutdown() can terminate it — otherwise its dispatcher threads outlive node death.
+  private var periodicConsistencyCheckSystem: Option[ActorSystem[?]] = None
+
   def start(): Unit = {
     // Phase 1: Essential initialization (must complete before anything else)
     startMetricsClient()
@@ -207,15 +211,17 @@ abstract class BaseNode extends Node {
 
   def startPeriodicDBConsistencyCheck(): Unit =
     if Config.Db.periodicConsistencyCheck then
-      ActorSystem(
-        PeriodicConsistencyCheck.start(
-          storagesInstance.storages.appStateStorage,
-          storagesInstance.storages.blockNumberMappingStorage,
-          storagesInstance.storages.blockHeadersStorage,
-          shutdown,
-          engineApiConfig.enabled
-        ),
-        s"PeriodicDBConsistencyCheck_${instanceConfig.instanceId}"
+      periodicConsistencyCheckSystem = Some(
+        ActorSystem(
+          PeriodicConsistencyCheck.start(
+            storagesInstance.storages.appStateStorage,
+            storagesInstance.storages.blockNumberMappingStorage,
+            storagesInstance.storages.blockHeadersStorage,
+            shutdown,
+            engineApiConfig.enabled
+          ),
+          s"PeriodicDBConsistencyCheck_${instanceConfig.instanceId}"
+        )
       )
 
   private def startTuiUpdater(): Unit = {
@@ -245,6 +251,24 @@ abstract class BaseNode extends Node {
     tryAndLogFailure(() => Tui.getInstance().shutdown())
     tryAndLogFailure(() => peerDiscoveryManager ! PeerDiscoveryManager.Stop)
     tryAndLogFailure(() => mining.stopProtocol())
+    // Stop the Engine API server first: it owns its own Http() binding (port 8551) on a dedicated
+    // ActorSystem + IORuntime. Terminate them before the main ActorSystem so the port is released
+    // and its dispatcher/compute pools don't outlive node death.
+    tryAndLogFailure(() =>
+      maybeEngineApiServer.foreach { engineServer =>
+        shutdownTimeoutDuration match {
+          case fd: scala.concurrent.duration.FiniteDuration => engineServer.stopSync(fd)
+          case _                                            => engineServer.stopSync()
+        }
+      }
+    )
+    // Terminate the secondary ActorSystem hosting the periodic DB consistency check.
+    tryAndLogFailure(() =>
+      periodicConsistencyCheckSystem.foreach { s =>
+        s.terminate()
+        Await.ready(s.whenTerminated, shutdownTimeoutDuration)
+      }
+    )
     tryAndLogFailure(() =>
       Await.ready(
         system.classicSystem

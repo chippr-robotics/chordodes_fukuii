@@ -25,6 +25,12 @@ trait FileUtils extends Logger {
         Left(error)
     }
 
+  /** Opens a buffered reader over `file`.
+    *
+    * RESOURCE CONTRACT: the returned [[scala.io.BufferedSource]] holds an open file handle. The caller is responsible
+    * for closing it (e.g. in a `try`/`finally`). The sole production caller — `SSLContextFactory.getSSLContext` —
+    * closes it in a `finally` block.
+    */
   def getReader(file: String): BufferedSource = Source.fromFile(file)
 
 }
