@@ -38,6 +38,21 @@ class EngineApiService(
   import scala.concurrent.Await
   implicit private val askTimeout: Timeout = Timeout(3.seconds)
 
+  /*
+   * EVICTION POLICY (CLASS A — BEACON approved 2026-06-21):
+   * Cap = 64 entries per map.  TTL = 12.8 minutes (2 epochs, 12_800_000_000_000 ns).
+   * The CL never sends a "discard payload" call, so eviction is EL self-managed.
+   * Two triggers:
+   *   PUT: evict the oldest entry (smallest insertedAt across all four maps) when size >= cap.
+   *   GET (getPayload only): if age > TTL, remove from all four maps and return 404.
+   *        This also cleans up orphaned pendingPayloadRequests entries that V1/V2/V3
+   *        getPayload calls never .remove(), since only the V4 path calls
+   *        getPayloadExecutionRequests which does the remove.
+   */
+  private val PayloadCap    = 64
+  private val PayloadTtlNs  = 12_800_000_000_000L // 12.8 min in nanoseconds
+  private val evictionLock  = new Object()
+
   /** Pending payloads built by forkchoiceUpdated, keyed by payloadId. */
   private val pendingPayloads = new java.util.concurrent.ConcurrentHashMap[ByteString, Block]()
   // EIP-7685 executionRequests associated with each payloadId, returned by getPayloadV4.
@@ -61,6 +76,34 @@ class EngineApiService(
   )
   private val pendingPayloadBlobsBundle =
     new java.util.concurrent.ConcurrentHashMap[ByteString, BlobsBundleData]()
+  // Insertion timestamps (System.nanoTime) shared by all four maps above, used for eviction.
+  private val pendingPayloadTimestamps = new java.util.concurrent.ConcurrentHashMap[ByteString, Long]()
+
+  /** Remove a payloadId from all four pending maps and the timestamp index. */
+  private def removePayloadEntry(payloadId: ByteString): Unit = {
+    pendingPayloads.remove(payloadId)
+    pendingPayloadRequests.remove(payloadId)
+    pendingPayloadReceipts.remove(payloadId)
+    pendingPayloadBlobsBundle.remove(payloadId)
+    pendingPayloadTimestamps.remove(payloadId)
+  }
+
+  /** If the timestamp map is at cap, find the oldest entry and remove it from all four maps. */
+  private def evictOldestIfAtCapacity(): Unit = evictionLock.synchronized {
+    if pendingPayloadTimestamps.size() >= PayloadCap then {
+      var oldestKey: ByteString = null
+      var oldestTs: Long        = Long.MaxValue
+      val iter                  = pendingPayloadTimestamps.entrySet().iterator()
+      while iter.hasNext do {
+        val e = iter.next()
+        if e.getValue < oldestTs then {
+          oldestTs  = e.getValue
+          oldestKey = e.getKey
+        }
+      }
+      if oldestKey ne null then removePayloadEntry(oldestKey)
+    }
+  }
 
   /** Blocks that returned INVALID via newPayload. Maps blockHash → latestValidHash. forkchoiceUpdated should not accept
     * these as head. Children of invalid blocks inherit the latestValidHash of their invalid parent.
@@ -783,6 +826,8 @@ class EngineApiService(
                       extraFields = finalExtraFields
                     )
                     val payload = skeletonBlock.copy(header = updatedHeader)
+                    evictOldestIfAtCapacity()
+                    pendingPayloadTimestamps.put(id, System.nanoTime())
                     pendingPayloads.put(id, payload)
                     // Also stash executionRequests so getPayloadV4 can emit them.
                     if executionRequests.nonEmpty then pendingPayloadRequests.put(id, executionRequests)
@@ -832,9 +877,19 @@ class EngineApiService(
     // the same id (e.g. first getPayloadV1 then getPayloadV2 for the same payload, as the
     // hive engine-withdrawals "Withdrawals Fork on Block N" tests do). Removing on the first
     // read makes any follow-up call fail with "Payload not available".
+    //
+    // TTL eviction: if the entry is older than PayloadTtlNs we treat it as gone. The
+    // removePayloadEntry call also cleans up pendingPayloadRequests entries that V1/V2/V3
+    // paths would otherwise orphan (they never call getPayloadExecutionRequests which does
+    // the only explicit .remove of that map).
     Option(pendingPayloads.get(payloadId)) match {
-      case Some(block) => Right(block)
-      case None        => Left("Payload not available")
+      case Some(block) =>
+        val age = Option(pendingPayloadTimestamps.get(payloadId)).map(System.nanoTime() - _).getOrElse(0L)
+        if age > PayloadTtlNs then {
+          removePayloadEntry(payloadId)
+          Left("Payload not available")
+        } else Right(block)
+      case None => Left("Payload not available")
     }
   }
 
