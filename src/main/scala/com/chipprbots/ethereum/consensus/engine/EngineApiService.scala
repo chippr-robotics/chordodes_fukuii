@@ -529,6 +529,23 @@ class EngineApiService(
               }
             }
 
+            // CLASS B — finalized-watermark prune (BEACON approved 2026-06-21):
+            // Remove stale invalidBlocks / acceptedChildrenByParent entries for blocks at
+            // or below the finalized height. Blocks ABOVE the watermark are left intact —
+            // a block invalid but not yet finalized may still be an FCU head candidate,
+            // and premature eviction is a consensus fault.
+            if finalizedHash != zeroHash then {
+              blockchainReader.getBlockHeaderByHash(finalizedHash).foreach { finalizedHeader =>
+                val finalizedNumber = finalizedHeader.number
+                invalidBlocks.entrySet().removeIf { e =>
+                  blockchainReader.getBlockHeaderByHash(e.getKey).exists(_.number <= finalizedNumber)
+                }
+                acceptedChildrenByParent.entrySet().removeIf { e =>
+                  blockchainReader.getBlockHeaderByHash(e.getKey).exists(_.number <= finalizedNumber)
+                }
+              }
+            }
+
             // Validate payload attributes AFTER applying forkchoice — per engine-API spec
             // step ordering (apply forkchoiceState, THEN check attrs) and hive's
             // 'Invalid PayloadAttributes' test, which asserts the forkchoice IS applied
