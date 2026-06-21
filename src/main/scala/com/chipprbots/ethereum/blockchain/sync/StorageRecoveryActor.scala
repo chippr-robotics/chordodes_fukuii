@@ -17,7 +17,6 @@ import org.slf4j.Logger
 
 import com.chipprbots.ethereum.blockchain.sync.ProgressMilestones
 import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncConfig
-import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController
 import com.chipprbots.ethereum.blockchain.sync.snap.StorageTask
 import com.chipprbots.ethereum.blockchain.sync.snap.actors
 import com.chipprbots.ethereum.db.storage.AppStateStorage
@@ -26,6 +25,7 @@ import com.chipprbots.ethereum.db.storage.StateStorage
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.mpt.*
 import com.chipprbots.ethereum.mpt.MptVisitors.*
+import com.chipprbots.ethereum.network.Peer
 
 /** Storage recovery actor for Bug 20 hardening.
   *
@@ -46,27 +46,35 @@ import com.chipprbots.ethereum.mpt.MptVisitors.*
   */
 object StorageRecoveryActor {
 
-  // Internal self-messages
-  private case class ScanResult(missingStorage: Seq[(ByteString, ByteString)])
+  sealed trait Command
+  private case class ScanResult(missingStorage: Seq[(ByteString, ByteString)]) extends Command
   // Delayed self-ping for Bug 30b abandon path. Carries the progress counter current at arm time;
   // if progressSeq still matches on fire, nothing moved and we give up.
-  private[sync] case class CheckAbandon(progressAtSchedule: Long)
-  // Delivered via watchWith when StorageRangeCoordinator terminates unexpectedly
-  private case object CoordinatorTerminated
+  private[sync] case class CheckAbandon(progressAtSchedule: Long) extends Command
+  private case object CoordinatorTerminated extends Command
+  // SyncController forwards peer-available events here; SRA re-forwards to SRC
+  case class StoragePeerAvailable(peer: Peer) extends Command
+  // Adapter-mapped SSC replies — private[sync] so tests can inject them directly
+  private[sync] case object StorageRangeDone extends Command
+  private[sync] case class StorageSlotProgress(n: Long) extends Command
+  private[sync] case class PivotUnservable(rootHash: ByteString, reason: String, emptyResponses: Int) extends Command
+  // Catch-all for unexpected SSC messages arriving via the adapter
+  private case object DroppedSrcMsg extends Command
+
+  /** SyncController → recovery: a recent canonical `(blockNumber, stateRoot)`, or `stateRoot = None` if none could be
+    * fetched (no peers / bootstrap failed).
+    */
+  final case class RecentRoot(blockNumber: BigInt, stateRoot: Option[ByteString]) extends Command
 
   /** Sent to SyncController when recovery is complete (or skipped) */
   case object RecoveryComplete
 
   /** Recovery → SyncController: the saved pivot root has aged out of every peer's snapshot serve window, so storage
     * downloads are returning empty. Please fetch a RECENT canonical header from a peer and reply with [[RecentRoot]] so
-    * the download can roll onto a root peers can still serve.
+    * the download can roll onto a root peers can still serve. Carries `replyTo` so SyncController does not need
+    * `sender()` to reply.
     */
-  case object RequestRecentRoot
-
-  /** SyncController → recovery: a recent canonical `(blockNumber, stateRoot)`, or `stateRoot = None` if none could be
-    * fetched (no peers / bootstrap failed).
-    */
-  final case class RecentRoot(blockNumber: BigInt, stateRoot: Option[ByteString])
+  case class RequestRecentRoot(replyTo: ActorRef)
 
   def apply(
       stateRoot: ByteString,
@@ -77,7 +85,7 @@ object StorageRecoveryActor {
       syncController: ActorRef,
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig
-  ): Behavior[Any] = scanning(
+  ): Behavior[Command] = scanning(
     stateRoot,
     stateStorage,
     appStateStorage,
@@ -103,7 +111,7 @@ object StorageRecoveryActor {
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig,
       missing: Seq[(ByteString, ByteString)]
-  ): Behavior[Any] = scanning(
+  ): Behavior[Command] = scanning(
     stateRoot,
     stateStorage,
     appStateStorage,
@@ -128,7 +136,7 @@ object StorageRecoveryActor {
       snapSyncConfig: SNAPSyncConfig,
       preloaded: Option[Seq[(ByteString, ByteString)]] = None,
       coordinatorForTesting: Option[ActorRef] = None
-  ): Behavior[Any] = scanning(
+  ): Behavior[Command] = scanning(
     stateRoot,
     stateStorage,
     appStateStorage,
@@ -152,7 +160,7 @@ object StorageRecoveryActor {
       snapSyncConfig: SNAPSyncConfig,
       preloaded: Option[Seq[(ByteString, ByteString)]],
       coordinatorForTesting: Option[ActorRef]
-  ): Behavior[Any] =
+  ): Behavior[Command] =
     Behaviors.setup { ctx =>
       preloaded match {
         case Some(missing) =>
@@ -185,33 +193,39 @@ object StorageRecoveryActor {
             )
             RecoveryMetrics.setStoragePhase(RecoveryMetrics.PhaseDownloading)
 
-            val coordinator: ActorRef = coordinatorForTesting.getOrElse {
-              val requestTracker = new snap.SNAPRequestTracker()(ctx.system.classicSystem.scheduler)
-              val mptStorage = stateStorage.getBackingStorage(pivotBlockNumber)
-              // S3: StorageRangeCoordinator is now Typed. Spawn it from this Typed context and adapt
-              // the ref back to Classic so the rest of this actor (which stores ActorRef) is unchanged.
-              ctx
-                .spawn(
-                  actors.StorageRangeCoordinator(
-                    stateRoot = stateRoot,
-                    networkPeerManager = networkPeerManager,
-                    requestTracker = requestTracker,
-                    mptStorage = mptStorage,
-                    flatSlotStorage = flatSlotStorage,
-                    maxAccountsPerBatch = snapSyncConfig.storageBatchSize,
-                    maxInFlightRequests = snapSyncConfig.storageConcurrency,
-                    requestTimeout = snapSyncConfig.timeout,
-                    snapSyncController = ctx.self.toClassic,
-                    initialResponseBytes = snapSyncConfig.storageInitialResponseBytes,
-                    minResponseBytes = snapSyncConfig.storageMinResponseBytes
-                  ),
-                  "storage-recovery-coordinator",
-                  org.apache.pekko.actor.typed.DispatcherSelector.fromConfig("sync-dispatcher")
-                )
-                .toClassic
-            }
+            val srcAdapter: org.apache.pekko.actor.typed.ActorRef[snap.SNAPSyncController.Command] =
+              ctx.messageAdapter {
+                case snap.SNAPSyncController.StorageRangeSyncComplete             => StorageRangeDone
+                case snap.SNAPSyncController.ProgressStorageSlotsSynced(n)        => StorageSlotProgress(n)
+                case snap.SNAPSyncController.PivotStateUnservable(r, reason, cnt) => PivotUnservable(r, reason, cnt)
+                case _                                                            => DroppedSrcMsg
+              }
+            val coordinator: org.apache.pekko.actor.typed.ActorRef[actors.StorageRangeCoordinator.Command] =
+              coordinatorForTesting match {
+                case Some(testRef) => testRef.toTyped[actors.StorageRangeCoordinator.Command]
+                case None =>
+                  val requestTracker = new snap.SNAPRequestTracker()(ctx.system.classicSystem.scheduler)
+                  val mptStorage = stateStorage.getBackingStorage(pivotBlockNumber)
+                  ctx.spawn(
+                    actors.StorageRangeCoordinator(
+                      stateRoot = stateRoot,
+                      networkPeerManager = networkPeerManager,
+                      requestTracker = requestTracker,
+                      mptStorage = mptStorage,
+                      flatSlotStorage = flatSlotStorage,
+                      maxAccountsPerBatch = snapSyncConfig.storageBatchSize,
+                      maxInFlightRequests = snapSyncConfig.storageConcurrency,
+                      requestTimeout = snapSyncConfig.timeout,
+                      snapSyncController = srcAdapter.toClassic,
+                      initialResponseBytes = snapSyncConfig.storageInitialResponseBytes,
+                      minResponseBytes = snapSyncConfig.storageMinResponseBytes
+                    ),
+                    "storage-recovery-coordinator",
+                    org.apache.pekko.actor.typed.DispatcherSelector.fromConfig("sync-dispatcher")
+                  )
+              }
 
-            ctx.watchWith(coordinator.toTyped[Nothing], CoordinatorTerminated)
+            ctx.watchWith(coordinator, CoordinatorTerminated)
 
             val batchSize = 10000
             var totalSent = 0
@@ -219,8 +233,7 @@ object StorageRecoveryActor {
               val tasks = batch.map { case (accountHash, storageRoot) =>
                 StorageTask.createStorageTask(accountHash, storageRoot)
               }
-              coordinator
-                .tell(actors.StorageRangeCoordinator.AddStorageTasks(tasks), org.apache.pekko.actor.ActorRef.noSender)
+              coordinator ! actors.StorageRangeCoordinator.AddStorageTasks(tasks)
               totalSent += tasks.size
             }
             ctx.log.info(
@@ -245,8 +258,8 @@ object StorageRecoveryActor {
     }
 
   private def downloading(
-      ctx: ActorContext[Any],
-      coordinator: ActorRef,
+      ctx: ActorContext[Command],
+      coordinator: org.apache.pekko.actor.typed.ActorRef[actors.StorageRangeCoordinator.Command],
       missing: Seq[(ByteString, ByteString)],
       stateRoot: ByteString,
       stateStorage: StateStorage,
@@ -254,7 +267,7 @@ object StorageRecoveryActor {
       syncController: ActorRef,
       appStateStorage: AppStateStorage,
       snapSyncConfig: SNAPSyncConfig
-  ): Behavior[Any] = {
+  ): Behavior[Command] = {
     val expectedCount = missing.size
     var progressSeq = 0L
     var downloadedCount = 0L
@@ -287,7 +300,7 @@ object StorageRecoveryActor {
         timers.startSingleTimer("abandon", CheckAbandon(progressSeq), abandonAfter)
       }
 
-      def finishRecovery(reason: String): Behavior[Any] = {
+      def finishRecovery(reason: String): Behavior[Command] = {
         timers.cancel("abandon")
         logResidualGaps(missing, stateStorage, pivotBlockNumber, ctx.log)
         RecoveryMetrics.setStoragePhase(RecoveryMetrics.PhaseComplete)
@@ -298,21 +311,18 @@ object StorageRecoveryActor {
       }
 
       Behaviors.receiveMessage {
-        case actors.StorageRangeCoordinator.StoragePeerAvailable(peer) =>
-          coordinator.tell(
-            actors.StorageRangeCoordinator.StoragePeerAvailable(peer),
-            org.apache.pekko.actor.ActorRef.noSender
-          )
+        case StoragePeerAvailable(peer) =>
+          coordinator ! actors.StorageRangeCoordinator.StoragePeerAvailable(peer)
           Behaviors.same
 
-        case SNAPSyncController.StorageRangeSyncComplete =>
+        case StorageRangeDone =>
           ctx.log.info(
             s"[SNAP-PROGRESS] STORAGE-RECOVERY 100% — $expectedCount / $expectedCount storage roots recovered — COMPLETE"
           )
           RecoveryMetrics.setStorageDownloaded(expectedCount.toLong)
           finishRecovery(s"downloaded storage for $expectedCount contracts")
 
-        case SNAPSyncController.ProgressStorageSlotsSynced(_) =>
+        case StorageSlotProgress(_) =>
           downloadedCount += 1
           RecoveryMetrics.setStorageDownloaded(downloadedCount)
           recordProgress()
@@ -333,7 +343,7 @@ object StorageRecoveryActor {
           }
           Behaviors.same
 
-        case _: SNAPSyncController.PivotStateUnservable =>
+        case PivotUnservable(_, _, _) =>
           unservableCount += 1
           if unservableCount <= 3 || unservableCount % 100 == 0 then {
             ctx.log.info(
@@ -351,8 +361,7 @@ object StorageRecoveryActor {
               rollsAttempted + 1,
               maxRolls
             )
-            // Two-arg tell: sets ctx.self.toClassic as sender so SyncController's sender() captures this actor's ref
-            syncController.tell(RequestRecentRoot, ctx.self.toClassic)
+            syncController.tell(RequestRecentRoot(ctx.self.toClassic), org.apache.pekko.actor.ActorRef.noSender)
           } else if rollsAttempted >= maxRolls then {
             ctx.log.info(
               "Storage recovery: exhausted {} recent-root rolls; letting the abandon timer run for the residue.",
@@ -380,10 +389,7 @@ object StorageRecoveryActor {
                 s"Storage recovery: rolling download root $oldHex -> $newHex (block $blockNumber, " +
                   s"roll $rollsAttempted/$maxRolls). Re-queuing $expectedCount tasks."
               )
-              coordinator.tell(
-                actors.StorageRangeCoordinator.StoragePivotRefreshed(root),
-                org.apache.pekko.actor.ActorRef.noSender
-              )
+              coordinator ! actors.StorageRangeCoordinator.StoragePivotRefreshed(root)
             case Some(_) =>
               ctx.log.info(
                 "Storage recovery: recent root equals current download root — no newer servable pivot. " +
@@ -414,9 +420,9 @@ object StorageRecoveryActor {
           )
           finishRecovery("coordinator crashed")
 
-        case _ =>
-          // Drop unrecognised messages (e.g. StorageBackpressureChanged directed at this actor)
-          Behaviors.same
+        case DroppedSrcMsg => Behaviors.same
+
+        case ScanResult(_) => Behaviors.unhandled
       }
     }
   }

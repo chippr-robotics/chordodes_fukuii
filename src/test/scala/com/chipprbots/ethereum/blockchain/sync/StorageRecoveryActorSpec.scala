@@ -15,7 +15,6 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncConfig
-import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController
 import com.chipprbots.ethereum.blockchain.sync.snap.actors
 import com.chipprbots.ethereum.db.cache.LruCache
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
@@ -53,8 +52,8 @@ class StorageRecoveryActorSpec
   private def newConfig(abandonAfter: FiniteDuration, maxRolls: Int): SNAPSyncConfig =
     SNAPSyncConfig(storageRecoveryAbandonTimeout = abandonAfter, storageRecoveryMaxRootRolls = maxRolls)
 
-  private def pivotUnservable(): SNAPSyncController.PivotStateUnservable =
-    SNAPSyncController.PivotStateUnservable(fakeStateRoot, "test", 0)
+  private def pivotUnservable(): StorageRecoveryActor.PivotUnservable =
+    StorageRecoveryActor.PivotUnservable(fakeStateRoot, "test", 0)
 
   private def newStorages(): (StateStorage, AppStateStorage, FlatSlotStorage) = {
     val ds = EphemDataSource()
@@ -118,7 +117,7 @@ class StorageRecoveryActorSpec
 
       (1 to 5).foreach(_ => actor ! pivotUnservable())
       // The actor tries to roll off the aged pivot first; decline (no recent root) → abandon path.
-      syncController.expectMsg(2.seconds, StorageRecoveryActor.RequestRecentRoot)
+      syncController.expectMsgType[StorageRecoveryActor.RequestRecentRoot](2.seconds)
       actor ! StorageRecoveryActor.RecentRoot(BigInt(0), None)
 
       syncController.expectMsg(3.seconds, StorageRecoveryActor.RecoveryComplete)
@@ -136,7 +135,7 @@ class StorageRecoveryActorSpec
     val (actor, appStateStorage) = downloadingActor("roll", syncController, coordinator, abandonAfter = 5.seconds)
 
     actor ! pivotUnservable()
-    syncController.expectMsg(2.seconds, StorageRecoveryActor.RequestRecentRoot)
+    syncController.expectMsgType[StorageRecoveryActor.RequestRecentRoot](2.seconds)
 
     val recentRoot = ByteString(Array.fill[Byte](32)(0x44))
     actor ! StorageRecoveryActor.RecentRoot(BigInt(200), Some(recentRoot))
@@ -159,7 +158,7 @@ class StorageRecoveryActorSpec
       downloadingActor("sameroot", syncController, coordinator, abandonAfter = 600.millis)
 
     actor ! pivotUnservable()
-    syncController.expectMsg(2.seconds, StorageRecoveryActor.RequestRecentRoot)
+    syncController.expectMsgType[StorageRecoveryActor.RequestRecentRoot](2.seconds)
     actor ! StorageRecoveryActor.RecentRoot(BigInt(0), Some(fakeStateRoot)) // == current root → no-op roll
 
     // No StoragePivotRefreshed sent (the initial AddStorageTasks was already consumed).
@@ -179,7 +178,7 @@ class StorageRecoveryActorSpec
     val (actor, _) = downloadingActor("bound", syncController, coordinator, abandonAfter = 700.millis, maxRolls = 1)
 
     actor ! pivotUnservable()
-    syncController.expectMsg(2.seconds, StorageRecoveryActor.RequestRecentRoot) // roll 1 requested
+    syncController.expectMsgType[StorageRecoveryActor.RequestRecentRoot](2.seconds) // roll 1 requested
     val root1 = ByteString(Array.fill[Byte](32)(0x55))
     actor ! StorageRecoveryActor.RecentRoot(BigInt(10), Some(root1))
     coordinator.expectMsg(2.seconds, actors.StorageRangeCoordinator.StoragePivotRefreshed(root1)) // roll 1 applied
@@ -200,11 +199,13 @@ class StorageRecoveryActorSpec
       downloadingActor("noAbandon", syncController, coordinator, abandonAfter)
 
     actor ! pivotUnservable()
-    syncController.expectMsg(2.seconds, StorageRecoveryActor.RequestRecentRoot) // consume the roll request
+    syncController.expectMsgType[StorageRecoveryActor.RequestRecentRoot](2.seconds) // consume the roll request
     // Progress resets the counter + cancels the pending abandon.
-    actor ! SNAPSyncController.ProgressStorageSlotsSynced(10)
+    actor ! StorageRecoveryActor.StorageSlotProgress(10)
     actor ! pivotUnservable()
-    syncController.expectMsg(2.seconds, StorageRecoveryActor.RequestRecentRoot) // progress reset the budget → re-asks
+    syncController.expectMsgType[StorageRecoveryActor.RequestRecentRoot](
+      2.seconds
+    ) // progress reset the budget → re-asks
 
     // No RecoveryComplete within the fresh window: the second unservable's abandon timer was armed
     // after progress, so abandon is still pending — we only assert it did not PREMATURELY fire.

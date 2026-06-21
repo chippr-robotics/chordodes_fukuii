@@ -14,7 +14,6 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncConfig
-import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController
 import com.chipprbots.ethereum.db.cache.LruCache
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.db.storage.AppStateStorage
@@ -127,7 +126,7 @@ class BytecodeRecoveryActorSpec
 
       coordinatorProbe.expectMsgType[snap.actors.ByteCodeCoordinator.StartByteCodeSync](2.seconds)
 
-      actor ! SNAPSyncController.ByteCodeSyncComplete
+      actor ! BytecodeRecoveryActor.ByteCodeDownloadComplete
 
       syncController.expectMsg(3.seconds, BytecodeRecoveryActor.RecoveryComplete)
       appStateStorage.isBytecodeRecoveryDone() shouldBe true

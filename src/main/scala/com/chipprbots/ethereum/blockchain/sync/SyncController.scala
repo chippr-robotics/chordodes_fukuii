@@ -1891,8 +1891,8 @@ object SyncController {
             peers.filter { case (_, peerInfo) => peerInfo.remoteStatus.supportsSnap && peerInfo.forkAccepted }
           if snapPeers.nonEmpty then {
             snapPeers.foreach { case (peer, _) =>
-              bytecodeActor.foreach(_ ! snap.actors.ByteCodeCoordinator.ByteCodePeerAvailable(peer))
-              storageActor.foreach(_ ! snap.actors.StorageRangeCoordinator.StoragePeerAvailable(peer))
+              bytecodeActor.foreach(_ ! BytecodeRecoveryActor.ByteCodePeerAvailable(peer))
+              storageActor.foreach(_ ! StorageRecoveryActor.StoragePeerAvailable(peer))
             }
           }
           // If storage recovery is waiting for a recent root and no header fetch is in flight, start one
@@ -1904,9 +1904,9 @@ object SyncController {
 
         // Storage recovery: the saved pivot root has aged out of every peer's serve window. Fetch a recent
         // canonical root so the download can roll onto something peers can still serve, instead of wedging.
-        case StorageRecoveryActor.RequestRecentRoot =>
+        case StorageRecoveryActor.RequestRecentRoot(replyTo) =>
           if recentRootRequester.isEmpty && recentRootBootstrap.isEmpty then {
-            recentRootRequester = Some(ctx.toClassic.sender())
+            recentRootRequester = Some(replyTo)
             log.info("Recovery requested a recent root to roll off the aged pivot. Polling peers for the network head.")
             networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeers
           } else {

@@ -22,6 +22,7 @@ import com.chipprbots.ethereum.db.storage.StateStorage
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.mpt.*
 import com.chipprbots.ethereum.mpt.MptVisitors.*
+import com.chipprbots.ethereum.network.Peer
 
 /** Bytecode recovery actor for Bug 20 hardening.
   *
@@ -40,11 +41,17 @@ import com.chipprbots.ethereum.mpt.MptVisitors.*
   */
 object BytecodeRecoveryActor {
 
-  // Internal self-messages (opaque to Classic senders)
-  private case class ScanResult(missingCodeHashes: Seq[ByteString])
-  private case class CheckAbandon(progressSeq: Long)
-  // Delivered via watchWith when ByteCodeCoordinator terminates unexpectedly
-  private case object CoordinatorTerminated
+  sealed trait Command
+  private case class ScanResult(missingCodeHashes: Seq[ByteString]) extends Command
+  private case class CheckAbandon(progressSeq: Long) extends Command
+  private case object CoordinatorTerminated extends Command
+  // SyncController forwards peer-available events here; BCA re-forwards to BCC
+  case class ByteCodePeerAvailable(peer: Peer) extends Command
+  // Adapter-mapped SSC replies — private[sync] so tests can inject them directly
+  private[sync] case object ByteCodeDownloadComplete extends Command
+  private[sync] case class ByteCodeDownloadProgress(n: Long) extends Command
+  // Catch-all for unexpected SSC messages arriving via the adapter
+  private case object DroppedBccMsg extends Command
 
   /** Sent to SyncController when recovery is complete (or skipped) */
   case object RecoveryComplete
@@ -58,7 +65,7 @@ object BytecodeRecoveryActor {
       syncController: ActorRef,
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig
-  ): Behavior[Any] = scanning(
+  ): Behavior[Command] = scanning(
     stateRoot,
     stateStorage,
     evmCodeStorage,
@@ -84,7 +91,7 @@ object BytecodeRecoveryActor {
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig,
       missing: Seq[ByteString]
-  ): Behavior[Any] = scanning(
+  ): Behavior[Command] = scanning(
     stateRoot,
     stateStorage,
     evmCodeStorage,
@@ -109,7 +116,7 @@ object BytecodeRecoveryActor {
       snapSyncConfig: SNAPSyncConfig,
       preloaded: Option[Seq[ByteString]] = None,
       coordinatorForTesting: Option[ActorRef] = None
-  ): Behavior[Any] = scanning(
+  ): Behavior[Command] = scanning(
     stateRoot,
     stateStorage,
     evmCodeStorage,
@@ -133,7 +140,7 @@ object BytecodeRecoveryActor {
       snapSyncConfig: SNAPSyncConfig,
       preloaded: Option[Seq[ByteString]],
       coordinatorForTesting: Option[ActorRef]
-  ): Behavior[Any] =
+  ): Behavior[Command] =
     Behaviors.setup { ctx =>
       preloaded match {
         case Some(missing) =>
@@ -167,31 +174,31 @@ object BytecodeRecoveryActor {
               s"Bytecode recovery: found ${missing.size} missing bytecodes. Starting download..."
             )
             RecoveryMetrics.setBytecodePhase(RecoveryMetrics.PhaseDownloading)
-            val coordinator: ActorRef = coordinatorForTesting.getOrElse {
-              val requestTracker = new snap.SNAPRequestTracker()(ctx.system.classicSystem.scheduler)
-              // S3: ByteCodeCoordinator is now Typed. This actor stays Behavior[Any] and keeps a Classic ref
-              // (it sends StartByteCodeSync / ByteCodePeerAvailable via Classic .tell and watches via .toTyped),
-              // so spawn through PropsAdapter rather than ctx.spawn.
-              ctx.toClassic.actorOf(
-                org.apache.pekko.actor.typed.scaladsl.adapter
-                  .PropsAdapter(
+            val bccAdapter: org.apache.pekko.actor.typed.ActorRef[snap.SNAPSyncController.Command] =
+              ctx.messageAdapter {
+                case snap.SNAPSyncController.ByteCodeSyncComplete           => ByteCodeDownloadComplete
+                case snap.SNAPSyncController.ProgressBytecodesDownloaded(n) => ByteCodeDownloadProgress(n)
+                case _                                                      => DroppedBccMsg
+              }
+            val coordinator: org.apache.pekko.actor.typed.ActorRef[snap.actors.ByteCodeCoordinator.Command] =
+              coordinatorForTesting match {
+                case Some(testRef) => testRef.toTyped[snap.actors.ByteCodeCoordinator.Command]
+                case None =>
+                  val requestTracker = new snap.SNAPRequestTracker()(ctx.system.classicSystem.scheduler)
+                  ctx.spawn(
                     snap.actors.ByteCodeCoordinator(
                       evmCodeStorage = evmCodeStorage,
                       networkPeerManager = networkPeerManager,
                       requestTracker = requestTracker,
                       batchSize = snap.ByteCodeTask.DEFAULT_BATCH_SIZE,
-                      snapSyncController = ctx.self.toClassic
-                    )
+                      snapSyncController = bccAdapter.toClassic
+                    ),
+                    "bytecode-recovery-coordinator",
+                    org.apache.pekko.actor.typed.DispatcherSelector.fromConfig("sync-dispatcher")
                   )
-                  .withDispatcher("sync-dispatcher"),
-                "bytecode-recovery-coordinator"
-              )
-            }
-            ctx.watchWith(coordinator.toTyped[Nothing], CoordinatorTerminated)
-            coordinator.tell(
-              snap.actors.ByteCodeCoordinator.StartByteCodeSync(missing),
-              org.apache.pekko.actor.ActorRef.noSender
-            )
+              }
+            ctx.watchWith(coordinator, CoordinatorTerminated)
+            coordinator ! snap.actors.ByteCodeCoordinator.StartByteCodeSync(missing)
             downloading(ctx, coordinator, missing.size, syncController, appStateStorage, snapSyncConfig)
           }
 
@@ -200,13 +207,13 @@ object BytecodeRecoveryActor {
     }
 
   private def downloading(
-      ctx: ActorContext[Any],
-      coordinator: ActorRef,
+      ctx: ActorContext[Command],
+      coordinator: org.apache.pekko.actor.typed.ActorRef[snap.actors.ByteCodeCoordinator.Command],
       expectedCount: Int,
       syncController: ActorRef,
       appStateStorage: AppStateStorage,
       snapSyncConfig: SNAPSyncConfig
-  ): Behavior[Any] = {
+  ): Behavior[Command] = {
     var progressSeq = 0L
     var downloadedCount = 0L
     var lastBytecodeRecoveryMilestone: Int = -1
@@ -222,7 +229,7 @@ object BytecodeRecoveryActor {
         timers.cancel("abandon")
       }
 
-      def finishRecovery(): Behavior[Any] = {
+      def finishRecovery(): Behavior[Command] = {
         timers.cancel("abandon")
         RecoveryMetrics.setBytecodePhase(RecoveryMetrics.PhaseComplete)
         appStateStorage.bytecodeRecoveryDone().commit()
@@ -231,14 +238,11 @@ object BytecodeRecoveryActor {
       }
 
       Behaviors.receiveMessage {
-        case snap.actors.ByteCodeCoordinator.ByteCodePeerAvailable(peer) =>
-          coordinator.tell(
-            snap.actors.ByteCodeCoordinator.ByteCodePeerAvailable(peer),
-            org.apache.pekko.actor.ActorRef.noSender
-          )
+        case ByteCodePeerAvailable(peer) =>
+          coordinator ! snap.actors.ByteCodeCoordinator.ByteCodePeerAvailable(peer)
           Behaviors.same
 
-        case snap.SNAPSyncController.ByteCodeSyncComplete =>
+        case ByteCodeDownloadComplete =>
           ctx.log.info(
             s"[SNAP-PROGRESS] BYTECODE-RECOVERY 100% — $expectedCount / $expectedCount bytecodes recovered — COMPLETE"
           )
@@ -246,7 +250,7 @@ object BytecodeRecoveryActor {
           RecoveryMetrics.setBytecodePhase(RecoveryMetrics.PhaseComplete)
           finishRecovery()
 
-        case snap.SNAPSyncController.ProgressBytecodesDownloaded(_) =>
+        case ByteCodeDownloadProgress(_) =>
           downloadedCount += 1
           RecoveryMetrics.setBytecodeDownloaded(downloadedCount)
           recordProgress()
@@ -285,10 +289,9 @@ object BytecodeRecoveryActor {
           )
           finishRecovery()
 
-        case _ =>
-          // Drop unrecognised messages (e.g. ByteCodeBackpressureChanged directed at this actor
-          // by the coordinator — not meaningful in recovery mode)
-          Behaviors.same
+        case DroppedBccMsg => Behaviors.same
+
+        case ScanResult(_) => Behaviors.unhandled
       }
     }
   }
