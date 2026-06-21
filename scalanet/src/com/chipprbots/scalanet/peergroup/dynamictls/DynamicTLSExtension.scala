@@ -243,7 +243,7 @@ private[scalanet] object DynamicTLSExtension {
 
   object SignedKeyExtensionNodeData {
     def apply(
-        hostKeyType: KeyType,
+        @annotation.unused hostKeyType: KeyType,
         hostKeyPair: KeyPair,
         connectionKeyType: SupportedCurves,
         secureRandom: SecureRandom,

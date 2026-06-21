@@ -20,7 +20,7 @@ abstract class FieldSpec[T: FiniteField] extends AnyFunSuite with ScalaCheckProp
 
   def fp2Generator: Gen[Fp2] = for {
     fp1 <- fpGenerator
-    fp2 <- fpGenerator
+    _   <- fpGenerator // MIGRATION: fp2 was bound but unused; Fp2(fp1, fp1) appears intentional — discard to satisfy E198 ratchet
   } yield Fp2(fp1, fp1)
 
   def fp6Generator: Gen[Fp6] = for {

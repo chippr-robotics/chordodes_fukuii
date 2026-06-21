@@ -3,7 +3,6 @@ package com.chipprbots.ethereum.jsonrpc
 import java.net.URI
 import java.util.concurrent.atomic.AtomicReference
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed
 import org.apache.pekko.util.Timeout
 

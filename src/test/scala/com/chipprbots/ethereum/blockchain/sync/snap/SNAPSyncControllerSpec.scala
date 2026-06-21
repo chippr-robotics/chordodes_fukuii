@@ -73,8 +73,6 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
   }
 
   "SyncProgress" should "format progress string correctly" taggedAs UnitTest in {
-    import SNAPSyncController.*
-
     val progress = SyncProgress(
       phase = AccountRangeSync,
       accountsSynced = 1000,
@@ -350,8 +348,6 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
   }
 
   "SyncProgress formatCount" should "format large numbers with K/M suffixes" taggedAs UnitTest in {
-    import SNAPSyncController.*
-
     val progress = SyncProgress(
       phase = AccountRangeSync,
       accountsSynced = 13200000,
@@ -606,8 +602,6 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "show ByteCode phase with total and percentage" taggedAs UnitTest in {
-    import SNAPSyncController.*
-
     val progress = SyncProgress(
       phase = ByteCodeAndStorageSync,
       accountsSynced = 2700000,

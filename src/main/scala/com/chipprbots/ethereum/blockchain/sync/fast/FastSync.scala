@@ -18,7 +18,7 @@ import cats.implicits.*
 
 import scala.annotation.tailrec
 import scala.collection.mutable
-import scala.concurrent.ExecutionContext.Implicits.global
+
 import scala.concurrent.duration.*
 import scala.util.Random
 

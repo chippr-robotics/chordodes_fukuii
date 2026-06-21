@@ -10,7 +10,7 @@ import com.chipprbots.ethereum.db.storage.BlockBodiesStorage.BlockBodyHash
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.utils.ByteUtils.byteSequenceToBuffer
 import com.chipprbots.ethereum.utils.ByteUtils.compactPickledBytes
-import com.chipprbots.ethereum.utils.Picklers.{given, *}
+import com.chipprbots.ethereum.utils.Picklers.given
 
 /** This class is used to store the BlockBody, by using: Key: hash of the block to which the BlockBody belong Value: the
   * block body

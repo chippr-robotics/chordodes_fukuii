@@ -34,7 +34,7 @@ object Packet {
   private def consumeNBits(context: String, size: Int) =
     Decoder[BitVector] { (bits: BitVector) =>
       bits.consumeThen(size)(
-        err => Attempt.failure(Err.InsufficientBits(size, bits.size, List(context))),
+        _ => Attempt.failure(Err.InsufficientBits(size, bits.size, List(context))),
         (range, remainder) => Attempt.successful(DecodeResult(range, remainder))
       )
     }

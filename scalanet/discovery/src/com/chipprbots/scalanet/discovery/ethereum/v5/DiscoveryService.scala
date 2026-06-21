@@ -2,10 +2,6 @@ package com.chipprbots.scalanet.discovery.ethereum.v5
 
 import java.net.InetSocketAddress
 import java.security.SecureRandom
-import java.util.concurrent.atomic.AtomicReference
-
-import scala.concurrent.duration.*
-
 import cats.effect.{Deferred, IO, Ref, Resource, Temporal}
 import cats.implicits.*
 import com.chipprbots.scalanet.discovery.crypto.{PrivateKey, PublicKey, SigAlg}
@@ -97,7 +93,7 @@ object DiscoveryService {
       stateRef: Ref[IO, State],
       localNodeId: ByteVector,
       network: DiscoveryNetwork[InetSocketAddress],
-      sessions: Session.SessionCache,
+      @annotation.unused sessions: Session.SessionCache,
       bystanders: Discv5SyncResponder.BystanderEnrTable,
       bootstrapNodes: Set[Node],
       config: DiscoveryConfig,

@@ -29,7 +29,7 @@ import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.CriticalE
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.ProcessingStatistics
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.SchedulerState
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.SyncResponse
-import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateSchedulerActor.*
+
 import com.chipprbots.ethereum.mpt.HexPrefix
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.Peer
@@ -159,11 +159,10 @@ object SyncStateSchedulerActor {
       syncConfig: SyncConfig,
       networkPeerManager: ClassicActorRef,
       peerEventBus: ClassicActorRef,
-      blacklist: Blacklist,
+      @annotation.unused blacklist: Blacklist,
       parentRef: ClassicActorRef,
       peerListHelper: PeerListHelper
   ) {
-    import syncConfig.*
 
     implicit private val ioRuntime: IORuntime = IORuntime.global
 
@@ -185,7 +184,8 @@ object SyncStateSchedulerActor {
 
     // IO fiber for bloom filter loading — runs asynchronously; result delivered via self.toClassic.
     // If the actor stops before the fiber completes, the BloomFilterResult goes to dead letters (harmless).
-    private val loadingFiber = sync.loadFilterFromBlockchain.attempt
+    // Fiber handle intentionally discarded — fire-and-forget: the fiber notifies self via message on completion.
+    private val _ = sync.loadFilterFromBlockchain.attempt
       .flatMap { result =>
         IO {
           result match {

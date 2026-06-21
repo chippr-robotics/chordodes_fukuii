@@ -334,8 +334,8 @@ object Discv5SyncResponder extends LazyLogging {
   private def handleMessage(
       sender: InetSocketAddress,
       msg: Packet.MessagePacket,
-      rawIncoming: ByteVector,
-      privateKey: PrivateKey,
+      @annotation.unused rawIncoming: ByteVector,
+      @annotation.unused privateKey: PrivateKey,
       localNodeId: ByteVector,
       handler: Handler,
       sessions: Session.SessionCache,
@@ -343,7 +343,7 @@ object Discv5SyncResponder extends LazyLogging {
       outboundSenderRef: AtomicReference[Option[OutboundSender]]
   )(implicit
       payloadCodec: Codec[Payload],
-      sigalg: SigAlg
+      @annotation.unused sigalg: SigAlg
   ): Option[BitVector] = {
     val sid = Session.SessionId(msg.header.srcId, sender)
     sessions.get(sid) match {
@@ -374,7 +374,7 @@ object Discv5SyncResponder extends LazyLogging {
       sender: InetSocketAddress,
       destNodeId: ByteVector,
       triggerNonce: ByteVector,
-      localNodeId: ByteVector,
+      @annotation.unused localNodeId: ByteVector,
       challenges: ChallengeCache
   ): Option[BitVector] = {
     val sid = Session.SessionId(destNodeId, sender)
@@ -428,7 +428,7 @@ object Discv5SyncResponder extends LazyLogging {
   private def handleHandshake(
       sender: InetSocketAddress,
       hs: Packet.HandshakePacket,
-      rawIncoming: ByteVector,
+      @annotation.unused rawIncoming: ByteVector,
       privateKey: PrivateKey,
       localNodeId: ByteVector,
       handler: Handler,
@@ -481,7 +481,7 @@ object Discv5SyncResponder extends LazyLogging {
       logger.debug(s"discv5 sync-fastpath: handshake from $sender failed pubkey recovery / srcId mismatch")
       return None
     }
-    val peerPubkey: PublicKey = peerPubkeyOpt.get
+    val _ = peerPubkeyOpt.get // MIGRATION: peerPubkey unused — recovered key not yet threaded into deriveKeys; TODO when completing handshake path
 
     // Derive session keys: we are the recipient, so flip the result.
     val keys = Session.deriveKeys(
@@ -607,7 +607,7 @@ object Discv5SyncResponder extends LazyLogging {
   private def dispatchRequest(
       payload: Payload,
       sender: InetSocketAddress,
-      peerNodeId: ByteVector,
+      @annotation.unused peerNodeId: ByteVector,
       handler: Handler
   ): List[Payload] = payload match {
 

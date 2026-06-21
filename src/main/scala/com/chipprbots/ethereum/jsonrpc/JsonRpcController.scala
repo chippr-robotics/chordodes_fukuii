@@ -59,21 +59,21 @@ case class JsonRpcController(
     with Logger
     with JsonRpcBaseController {
 
-  import AdminJsonMethodsImplicits.{given, *}
-  import TxPoolJsonMethodsImplicits.{given, *}
-  import DebugJsonMethodsImplicits.{given, *}
-  import EthJsonMethodsImplicits.{given, *}
-  import EthBlocksJsonMethodsImplicits.{given, *}
-  import EthMiningJsonMethodsImplicits.{given, *}
-  import EthTxJsonMethodsImplicits.{given, *}
-  import EthUserJsonMethodsImplicits.{given, *}
-  import EthFilterJsonMethodsImplicits.{given, *}
-  import EthProofJsonMethodsImplicits.{given, *}
-  import JsonMethodsImplicits.{given, *}
-  import QAJsonMethodsImplicits.{given, *}
-  import TestJsonMethodsImplicits.{given, *}
-  import FukuiiJsonMethodImplicits.{given, *}
-  import McpJsonMethodsImplicits.{given, *}
+  import AdminJsonMethodsImplicits.given
+  import TxPoolJsonMethodsImplicits.given
+  import DebugJsonMethodsImplicits.given
+  import EthJsonMethodsImplicits.given
+  import EthBlocksJsonMethodsImplicits.given
+  import EthMiningJsonMethodsImplicits.given
+  import EthTxJsonMethodsImplicits.given
+  import EthUserJsonMethodsImplicits.given
+  import EthFilterJsonMethodsImplicits.given
+  import EthProofJsonMethodsImplicits.given
+  import JsonMethodsImplicits.given
+  import QAJsonMethodsImplicits.given
+  import TestJsonMethodsImplicits.given
+  import FukuiiJsonMethodImplicits.given
+  import McpJsonMethodsImplicits.given
 
   override def apisHandleFns: Map[String, PartialFunction[JsonRpcRequest, IO[JsonRpcResponse]]] = Map(
     Apis.Eth -> handleEthRequest,

@@ -3,7 +3,6 @@ package com.chipprbots.ethereum.blockchain.sync.snap
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.actor.typed.Behavior
-import org.apache.pekko.actor.typed.DispatcherSelector
 import org.apache.pekko.actor.typed.PostStop
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -4670,7 +4669,6 @@ private class SNAPSyncControllerImpl(
         // resulting Typed ref back to Classic so the existing `chainDownloader ! ChainDownloader.X` sends
         // (Pause/Resume/UpdateTarget/YieldToRegularSync/…) keep compiling against the `Option[ActorRef]` field.
         import org.apache.pekko.actor.typed.DispatcherSelector
-        import org.apache.pekko.actor.typed.scaladsl.adapter.*
         val downloader = ctx
           .spawn(
             ChainDownloader(
