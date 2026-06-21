@@ -3,7 +3,7 @@ package com.chipprbots.ethereum
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.net.URL
+import java.net.URI
 import java.nio.file.*
 import java.security.DigestInputStream
 import java.security.MessageDigest
@@ -43,7 +43,7 @@ object BootstrapDownload extends Logger {
   def downloadFile(urlToDownloadFrom: String, outFile: File): String = {
 
     val sha512 = MessageDigest.getInstance("SHA-512")
-    val dis = new DigestInputStream(new URL(urlToDownloadFrom).openStream(), sha512)
+    val dis = new DigestInputStream(URI.create(urlToDownloadFrom).toURL().openStream(), sha512)
 
     try {
       val out = new FileOutputStream(outFile)
@@ -99,7 +99,7 @@ object BootstrapDownload extends Logger {
         " and the path to extract the file to"
     )
 
-    val urlToDownloadFrom = new URL(args(0))
+    val urlToDownloadFrom = URI.create(args(0)).toURL()
     val expectedHash = args(1)
     val minimumExpectedDiskSpace = args(2)
     val pathToDownloadTo = Paths.get(args(3))
