@@ -136,6 +136,7 @@ object EthTxJsonMethodsImplicits extends JsonMethodsImplicits {
           case other                                     => JString(other.toString)
         }
         JObject(
+          // cast: Map[String, Any] from SetCodeAuthorization serialization — values are typed at construction
           "chainId" -> encodeAsHex(item("chainId").asInstanceOf[BigInt]),
           "address" -> addr,
           "nonce" -> encodeAsHex(item("nonce").asInstanceOf[BigInt]),

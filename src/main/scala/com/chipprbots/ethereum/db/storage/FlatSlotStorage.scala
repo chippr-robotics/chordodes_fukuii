@@ -75,7 +75,7 @@ class FlatSlotStorage(val dataSource: DataSource) extends TransactionalKeyValueS
           .map {
             case Right((key, value)) =>
               Right((ByteString.fromArrayUnsafe(key.drop(32)), ByteString.fromArrayUnsafe(value)))
-            case left => left.asInstanceOf[Either[IterationError, (ByteString, ByteString)]]
+            case Left(err) => Left(err)
           }
       case _ =>
         Stream.empty

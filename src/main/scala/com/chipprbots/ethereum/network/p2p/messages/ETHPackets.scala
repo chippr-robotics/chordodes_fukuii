@@ -621,7 +621,10 @@ object ETHPackets {
               ByteString(payloadBytes),
               fromRlpList[AccessListItem](accessList).toList,
               ByteUtils.bytesToBigInt(maxFeePerBlobGasBytes),
-              blobVersionedHashes.items.map(item => ByteString(item.asInstanceOf[RLPValue].bytes)).toList
+              blobVersionedHashes.items.map {
+                case v: RLPValue => ByteString(v.bytes)
+                case other => throw new RuntimeException(s"Expected RLPValue for blob versioned hash, got: $other")
+              }.toList
             ),
             ECDSASignature(
               ByteUtils.bytesToBigInt(signatureRandomBytes),
@@ -735,8 +738,11 @@ object ETHPackets {
           case Transaction.Type04 => PrefixedRLPEncodable(Transaction.Type04, rawDecode(bytes.tail))
           case Transaction.Type03 =>
             rawDecode(bytes.tail) match {
-              case outer: RLPList if outer.items.size == 4 && outer.items.head.isInstanceOf[RLPList] =>
-                PrefixedRLPEncodable(Transaction.Type03, outer.items.head)
+              case outer: RLPList if outer.items.size == 4 =>
+                outer.items.head match {
+                  case inner: RLPList => PrefixedRLPEncodable(Transaction.Type03, inner)
+                  case _              => PrefixedRLPEncodable(Transaction.Type03, outer)
+                }
               case other => PrefixedRLPEncodable(Transaction.Type03, other)
             }
           case Transaction.Type02 => PrefixedRLPEncodable(Transaction.Type02, rawDecode(bytes.tail))
@@ -754,9 +760,14 @@ object ETHPackets {
           case Transaction.Type03 =>
             val decoded = rawDecode(bytes.tail)
             decoded match {
-              case outer: RLPList if outer.items.size == 4 && outer.items.head.isInstanceOf[RLPList] =>
-                val stx = PrefixedRLPEncodable(Transaction.Type03, outer.items.head).toSignedTransaction
-                (stx, Some(bytes))
+              case outer: RLPList if outer.items.size == 4 =>
+                outer.items.head match {
+                  case inner: RLPList =>
+                    val stx = PrefixedRLPEncodable(Transaction.Type03, inner).toSignedTransaction
+                    (stx, Some(bytes))
+                  case _ =>
+                    (PrefixedRLPEncodable(Transaction.Type03, decoded).toSignedTransaction, None)
+                }
               case _ =>
                 (PrefixedRLPEncodable(Transaction.Type03, decoded).toSignedTransaction, None)
             }
@@ -1111,7 +1122,10 @@ object ETHPackets {
           val typedItems = rlpList.items.toTypedRLPEncodables
           typedItems.foreach {
             case PrefixedRLPEncodable(Transaction.Type03, inner: RLPList) =>
-              val isNetworkWrapped = inner.items.size == 4 && inner.items.head.isInstanceOf[RLPList]
+              val isNetworkWrapped = inner.items.size == 4 && (inner.items.head match {
+                case _: RLPList => true
+                case _          => false
+              })
               if !isNetworkWrapped then
                 throw new RuntimeException("Blob tx in PooledTransactions missing sidecar (network wrapping required)")
             case _ =>
@@ -1119,7 +1133,10 @@ object ETHPackets {
           val blobTxRawBytesBuilder = Map.newBuilder[ByteString, ByteString]
           val unwrappedItems = typedItems.map {
             case prefixed @ PrefixedRLPEncodable(Transaction.Type03, inner: RLPList)
-                if inner.items.size == 4 && inner.items.head.isInstanceOf[RLPList] =>
+                if inner.items.size == 4 && (inner.items.head match {
+                  case _: RLPList => true
+                  case _          => false
+                }) =>
               val rawBytes = com.chipprbots.ethereum.rlp.encode(prefixed)
               val unwrapped = PrefixedRLPEncodable(Transaction.Type03, inner.items.head)
               val stx = unwrapped.toSignedTransaction

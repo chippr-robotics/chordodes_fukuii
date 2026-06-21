@@ -91,7 +91,10 @@ case class AuthHandshaker(
   }
 
   def handleResponseMessage(data: ByteString): AuthHandshakeResult = {
-    val plaintext = ECIESCoder.decrypt(nodeKey.getPrivate.asInstanceOf[ECPrivateKeyParameters].getD, data.toArray)
+    val plaintext = ECIESCoder.decrypt(
+      nodeKey.getPrivate.asInstanceOf[ECPrivateKeyParameters].getD,
+      data.toArray
+    ) // interop: BC API returns CipherParameters
     val message = AuthResponseMessage.decode(plaintext)
 
     copy(responsePacketOpt = Some(data)).finalizeHandshake(message.ephemeralPublicKey, message.nonce)
@@ -102,7 +105,8 @@ case class AuthHandshaker(
     val encryptedPayload = data.drop(2)
 
     val plaintext = ECIESCoder.decrypt(
-      privKey = nodeKey.getPrivate.asInstanceOf[ECPrivateKeyParameters].getD,
+      privKey =
+        nodeKey.getPrivate.asInstanceOf[ECPrivateKeyParameters].getD, // interop: BC API returns CipherParameters
       cipher = encryptedPayload.toArray,
       macData = Some(sizeBytes.toArray)
     )
@@ -127,7 +131,10 @@ case class AuthHandshaker(
   }
 
   def handleInitialMessage(data: ByteString): (ByteString, AuthHandshakeResult) = {
-    val plaintext = ECIESCoder.decrypt(nodeKey.getPrivate.asInstanceOf[ECPrivateKeyParameters].getD, data.toArray)
+    val plaintext = ECIESCoder.decrypt(
+      nodeKey.getPrivate.asInstanceOf[ECPrivateKeyParameters].getD,
+      data.toArray
+    ) // interop: BC API returns CipherParameters
 
     val message =
       try AuthInitiateMessage.decode(plaintext)
@@ -147,7 +154,8 @@ case class AuthHandshaker(
       }
 
     val response = AuthResponseMessage(
-      ephemeralPublicKey = ephemeralKey.getPublic.asInstanceOf[ECPublicKeyParameters].getQ,
+      ephemeralPublicKey =
+        ephemeralKey.getPublic.asInstanceOf[ECPublicKeyParameters].getQ, // interop: BC API returns CipherParameters
       nonce = nonce,
       knownPeer = false
     )
@@ -171,7 +179,8 @@ case class AuthHandshaker(
     val encryptedPayload = data.drop(2)
 
     val plaintext = ECIESCoder.decrypt(
-      privKey = nodeKey.getPrivate.asInstanceOf[ECPrivateKeyParameters].getD,
+      privKey =
+        nodeKey.getPrivate.asInstanceOf[ECPrivateKeyParameters].getD, // interop: BC API returns CipherParameters
       cipher = encryptedPayload.toArray,
       macData = Some(sizeBytes.toArray)
     )
@@ -194,7 +203,8 @@ case class AuthHandshaker(
       }
 
     val response = AuthResponseMessageV4(
-      ephemeralPublicKey = ephemeralKey.getPublic.asInstanceOf[ECPublicKeyParameters].getQ,
+      ephemeralPublicKey =
+        ephemeralKey.getPublic.asInstanceOf[ECPublicKeyParameters].getQ, // interop: BC API returns CipherParameters
       nonce = nonce,
       version = ProtocolVersion
     )
@@ -238,7 +248,8 @@ case class AuthHandshaker(
       bigIntegerToBytes(agreement.calculateAgreement(new ECPublicKeyParameters(remotePubKey, curve)), NonceSize)
     }
 
-    val publicKey = nodeKey.getPublic.asInstanceOf[ECPublicKeyParameters].getQ
+    val publicKey =
+      nodeKey.getPublic.asInstanceOf[ECPublicKeyParameters].getQ // interop: BC API returns CipherParameters
 
     val messageToSign = xor(sharedSecret, nonce.toArray)
     val signature = ECDSASignature.sign(messageToSign, ephemeralKey)

@@ -1999,10 +1999,9 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
         decoded match {
           case branch: BranchNode =>
             // Collect all non-pending HashNode children, then check storage in one multiGetNodes call.
-            val toCheck = (0 until 16)
-              .collect {
-                case i if branch.children(i).isInstanceOf[HashNode] =>
-                  (i, ByteString(branch.children(i).asInstanceOf[HashNode].hashNode))
+            val toCheck = branch.children.zipWithIndex
+              .collect { case (hn: HashNode, i) =>
+                (i, ByteString(hn.hashNode))
               }
               .filterNot { case (_, h) => pendingHashSet.contains(h) }
             if toCheck.nonEmpty then {

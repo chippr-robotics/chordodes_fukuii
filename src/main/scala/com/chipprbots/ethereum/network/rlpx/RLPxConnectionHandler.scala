@@ -179,8 +179,9 @@ object RLPxConnectionHandler {
     private def extractHello(frame: Frame): Option[Hello] =
       if frame.`type` == Hello.code then
         NetworkMessageDecoder.fromBytes(frame.`type`, frame.payload.toArray) match {
-          case Left(err)  => throw err
-          case Right(msg) => Some(msg.asInstanceOf[Hello])
+          case Left(err)       => throw err
+          case Right(h: Hello) => Some(h)
+          case Right(_)        => None
         }
       else None
   }
@@ -439,34 +440,30 @@ object RLPxConnectionHandler {
       case Right(message) =>
         parent ! MessageReceived(message)
 
-      case Left(ex) =>
-        val isDecompressionFailure = MessageDecoder.isDecompressionFailure(ex)
-        val isUnknownMessageType = ex.isInstanceOf[UnknownMessageTypeError]
+      case Left(ex: UnknownMessageTypeError) =>
+        log.warn(
+          "DECODE_ERROR: Peer {} sent unknown message type: 0x{} ({}). " +
+            "Skipping this message but keeping connection alive. Error: {}",
+          peerId,
+          ex.messageType.toHexString,
+          ex.messageType,
+          ex.getMessage
+        )
 
-        if isDecompressionFailure then {
-          log.warn(
-            "DECODE_ERROR: Peer {} sent message that failed to decompress. " +
-              "Skipping this message but keeping connection alive. Error: {}",
-            peerId,
-            ex.getMessage
-          )
-        } else if isUnknownMessageType then {
-          val msgCode = ex.asInstanceOf[UnknownMessageTypeError].messageType
-          log.warn(
-            "DECODE_ERROR: Peer {} sent unknown message type: 0x{} ({}). " +
-              "Skipping this message but keeping connection alive. Error: {}",
-            peerId,
-            msgCode.toHexString,
-            msgCode,
-            ex.getMessage
-          )
-        } else {
-          val errMsg = Option(ex.getMessage).map(m => if m.length > 80 then m.take(80) + "…" else m).getOrElse("null")
-          log.warn("DECODE_ERROR: Cannot decode message from {} - disconnecting. Error: {}", peerId, errMsg)
-          parent ! com.chipprbots.ethereum.network.PeerActor.DisconnectPeer(
-            com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect.Reasons.BreachOfProtocol
-          )
-        }
+      case Left(ex) if MessageDecoder.isDecompressionFailure(ex) =>
+        log.warn(
+          "DECODE_ERROR: Peer {} sent message that failed to decompress. " +
+            "Skipping this message but keeping connection alive. Error: {}",
+          peerId,
+          ex.getMessage
+        )
+
+      case Left(ex) =>
+        val errMsg = Option(ex.getMessage).map(m => if m.length > 80 then m.take(80) + "…" else m).getOrElse("null")
+        log.warn("DECODE_ERROR: Cannot decode message from {} - disconnecting. Error: {}", peerId, errMsg)
+        parent ! com.chipprbots.ethereum.network.PeerActor.DisconnectPeer(
+          com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect.Reasons.BreachOfProtocol
+        )
     }
 
     private def processFrames(

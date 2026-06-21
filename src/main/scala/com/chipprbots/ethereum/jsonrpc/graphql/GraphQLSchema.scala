@@ -312,6 +312,7 @@ object GraphQLSchema {
     )
   }
 
+  // cast: dynamic GraphQL argument map returns Any; callers supply the expected type A
   private def asOption[A](v: Any): Option[A] = v match {
     case null    => None
     case None    => None

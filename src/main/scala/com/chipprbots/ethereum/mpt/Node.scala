@@ -28,14 +28,9 @@ sealed abstract class MptNode {
 
   val parsedRlp: Option[RLPEncodeable]
 
-  // Overriding equals is necessery to avoid array comparisons.
+  // Overriding equals is necessary to avoid array comparisons.
   override def equals(obj: Any): Boolean =
-    if !obj.isInstanceOf[MptNode] then {
-      false
-    } else {
-      val compared = obj.asInstanceOf[MptNode]
-      hash.sameElements(compared.hash)
-    }
+    obj.isInstanceOf[MptNode] && hash.sameElements(obj.asInstanceOf[MptNode].hash)
 
   override def hashCode(): Int =
     17 + util.Arrays.hashCode(hash)

@@ -15,5 +15,6 @@ object ServerStatus {
 
 case class NodeStatus(key: AsymmetricCipherKeyPair, serverStatus: ServerStatus, discoveryStatus: ServerStatus) {
 
-  val nodeId: Array[Byte] = key.getPublic.asInstanceOf[ECPublicKeyParameters].toNodeId
+  val nodeId: Array[Byte] =
+    key.getPublic.asInstanceOf[ECPublicKeyParameters].toNodeId // interop: BC API returns AsymmetricKeyParameter
 }

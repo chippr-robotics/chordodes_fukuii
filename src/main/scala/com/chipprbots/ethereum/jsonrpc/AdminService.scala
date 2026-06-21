@@ -310,7 +310,9 @@ class AdminService(
       Left(JsonRpcError.InvalidParams(s"Invalid log level: ${req.level}"))
     } else {
       try {
-        val ctx = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
+        val ctx =
+          LoggerFactory.getILoggerFactory
+            .asInstanceOf[LoggerContext] // interop: SLF4J returns ILoggerFactory; Logback impl is always LoggerContext
         val level = Level.toLevel(req.level)
         val logFilters = req.logFilters.getOrElse(List(""))
         logFilters.foreach { filter =>

@@ -199,6 +199,6 @@ object ExternalIPDetector {
       .find { addr =>
         !addr.isLoopbackAddress &&
         !addr.isLinkLocalAddress &&
-        addr.isInstanceOf[Inet4Address]
+        (addr match { case _: Inet4Address => true; case _ => false })
       }
 }

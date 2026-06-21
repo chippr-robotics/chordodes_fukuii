@@ -99,7 +99,10 @@ class PeerListHelper(
         val isMaintained = peerWithInfo.peer.nodeId.exists { nodeId =>
           maintainedNodeIdHexes.contains(Hex.toHexString(nodeId.toArray))
         }
-        val skipBlacklist = isMaintained && !reason.isInstanceOf[BlacklistReason.RegularSyncRequestFailed]
+        val skipBlacklist = isMaintained && (reason match {
+          case _: BlacklistReason.RegularSyncRequestFailed => false
+          case _                                           => true
+        })
         if skipBlacklist then {
           log.debug("Skipping blacklist for maintained peer {} (reason: {})", peerId, reason)
         } else {

@@ -31,7 +31,9 @@ class TuiLogSuppressor extends FukuiiLogger:
       true
     else
       try
-        val loggerContext = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
+        val loggerContext =
+          LoggerFactory.getILoggerFactory
+            .asInstanceOf[LoggerContext] // interop: SLF4J returns ILoggerFactory; Logback impl is always LoggerContext
         val rootLogger = loggerContext.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME)
 
         // Find and detach console appenders
@@ -69,7 +71,9 @@ class TuiLogSuppressor extends FukuiiLogger:
       true
     else
       try
-        val loggerContext = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
+        val loggerContext =
+          LoggerFactory.getILoggerFactory
+            .asInstanceOf[LoggerContext] // interop: SLF4J returns ILoggerFactory; Logback impl is always LoggerContext
         val rootLogger = loggerContext.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME)
 
         // Reattach previously suppressed console appenders

@@ -252,7 +252,10 @@ object PeersClient {
                     case _                                   => (-1, 0)
                   }
                   if msgType >= 0 then peerHelper.updateEthRate(peer.id.value, msgType, timeTaken, itemCount)
-                  replyTo ! Response(peer, message.asInstanceOf[Message])
+                  replyTo ! Response(
+                    peer,
+                    message.asInstanceOf[Message]
+                  ) // cast: PRH ResponseReceived[T] is erased; T <: Message at construction
 
                 case PeerRequestHandler.RequestFailed(peer, reason) =>
                   ctx.log.warn(s"Request to peer ${peer.remoteAddress} failed - reason: $reason")
@@ -276,7 +279,9 @@ object PeersClient {
         ct: ClassTag[? <: Message]
     ): Unit = {
       type R <: Message
-      given ctR: ClassTag[R] = ct.asInstanceOf[ClassTag[R]]
+      given ctR: ClassTag[R] = ct.asInstanceOf[ClassTag[
+        R
+      ]] // cast: existential ClassTag[? <: Message] narrowed to fresh local R for PRH.behavior type param
       given toSerializer: (Message => MessageSerializable) = toSer
       ctx.spawn(
         PeerRequestHandler.behavior[Message, R](

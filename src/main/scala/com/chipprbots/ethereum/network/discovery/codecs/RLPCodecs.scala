@@ -82,7 +82,13 @@ trait ContentCodecs {
   given nodeRLPCodec: RLPCodec[Node] =
     RLPCodec.instance[Node](
       { case Node(id, address) =>
-        RLPEncoder.encode(address).asInstanceOf[RLPList] :+ id
+        RLPEncoder.encode(address) match {
+          case rl: RLPList => rl :+ id
+          case other =>
+            throw new RuntimeException(
+              s"Expected RLPList encoding for Node.Address, got: ${other.getClass.getSimpleName}"
+            )
+        }
       },
       {
         case RLPList(items*) if items.length == 4 =>
@@ -143,7 +149,13 @@ trait ContentCodecs {
   implicit val enrRLPCodec: RLPCodec[EthereumNodeRecord] =
     RLPCodec.instance(
       { case EthereumNodeRecord(signature, content) =>
-        val contentList = RLPEncoder.encode(content).asInstanceOf[RLPList]
+        val contentList = RLPEncoder.encode(content) match {
+          case rl: RLPList => rl
+          case other =>
+            throw new RuntimeException(
+              s"Expected RLPList encoding for ENR content, got: ${other.getClass.getSimpleName}"
+            )
+        }
         signature +: contentList
       },
       { case RLPList(signature, content*) =>
@@ -177,9 +189,13 @@ trait PayloadCodecs { self: ContentCodecs =>
         val to = items(2).decodeAs[Node.Address]("to")
         val expiration = items(3).decodeAs[Long]("expiration")
         // Only try to decode enrSeq if it's an RLPValue (not a list), for EIP-8 forward compatibility
-        val enrSeq = if items.length >= 5 && items(4).isInstanceOf[RLPValue] then {
-          Some(items(4).decodeAs[Long]("enrSeq"))
-        } else None
+        val enrSeq =
+          if items.length >= 5 then
+            items(4) match {
+              case v: RLPValue => Some(v.decodeAs[Long]("enrSeq"))
+              case _           => None
+            }
+          else None
         Payload.Ping(version, from, to, expiration, enrSeq)
     }
   )
@@ -199,9 +215,13 @@ trait PayloadCodecs { self: ContentCodecs =>
         val pingHash = items(1).decodeAs[Hash]("pingHash")
         val expiration = items(2).decodeAs[Long]("expiration")
         // Only try to decode enrSeq if it's an RLPValue (not a list), for EIP-8 forward compatibility
-        val enrSeq = if items.length >= 4 && items(3).isInstanceOf[RLPValue] then {
-          Some(items(3).decodeAs[Long]("enrSeq"))
-        } else None
+        val enrSeq =
+          if items.length >= 4 then
+            items(3) match {
+              case v: RLPValue => Some(v.decodeAs[Long]("enrSeq"))
+              case _           => None
+            }
+          else None
         Payload.Pong(to, pingHash, expiration, enrSeq)
     }
   )

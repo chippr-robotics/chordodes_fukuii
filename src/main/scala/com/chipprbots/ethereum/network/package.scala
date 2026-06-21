@@ -21,9 +21,7 @@ package object network {
 
   extension (pubKey: ECPublicKeyParameters) {
     def toNodeId: Array[Byte] =
-      pubKey
-        .asInstanceOf[ECPublicKeyParameters]
-        .getQ
+      pubKey.getQ
         .getEncoded(false)
         .drop(1) // drop type info
   }
