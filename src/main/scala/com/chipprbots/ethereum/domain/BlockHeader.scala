@@ -137,8 +137,10 @@ object BlockHeader {
     *   rlp.encode( [blockHeader.parentHash, ..., blockHeader.extraData] )
     */
   def getEncodedWithoutNonce(blockHeader: BlockHeader): Array[Byte] = {
-    // toRLPEncodeable is guaranteed to return a RLPList
-    val rlpList: RLPList = blockHeader.toRLPEncodable.asInstanceOf[RLPList]
+    val rlpList: RLPList = blockHeader.toRLPEncodable match {
+      case rl: RLPList => rl
+      case _           => throw new RuntimeException("BlockHeader.toRLPEncodable did not return RLPList")
+    }
 
     val numberOfPowFields = 2
     val numberOfExtraFields = blockHeader.extraFields match {

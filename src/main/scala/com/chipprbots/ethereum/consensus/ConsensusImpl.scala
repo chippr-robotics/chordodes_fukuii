@@ -116,8 +116,8 @@ class ConsensusImpl(
         saveLastBlock(importedBlocks)
         ExtendedCurrentBestBranch(importedBlocks)
 
-      case (_, Some(MPTError(reason))) if reason.isInstanceOf[MissingNodeException] =>
-        ConsensusErrorDueToMissingNode(Nil, reason.asInstanceOf[MissingNodeException])
+      case (_, Some(MPTError(reason: MissingNodeException))) =>
+        ConsensusErrorDueToMissingNode(Nil, reason)
 
       case (Nil, Some(error)) =>
         BranchExecutionFailure(Nil, branch.head.header.hash, error.toString)
@@ -172,14 +172,14 @@ class ConsensusImpl(
       case None =>
         SelectedNewBestBranch(oldBlocksData.map(_.block), executedBlocks.map(_.block), executedBlocks.map(_.weight))
 
-      case Some(MPTError(reason)) if reason.isInstanceOf[MissingNodeException] =>
+      case Some(MPTError(reason: MissingNodeException)) =>
         log.error(
           "REORG-EXEC-FAIL blocks [{}-{}]: MissingNode({})",
           newBranch.head.number,
           newBranch.last.number,
           reason.getMessage
         )
-        ConsensusErrorDueToMissingNode(executedBlocks.map(_.block), reason.asInstanceOf[MissingNodeException])
+        ConsensusErrorDueToMissingNode(executedBlocks.map(_.block), reason)
 
       case Some(error) =>
         log.error(

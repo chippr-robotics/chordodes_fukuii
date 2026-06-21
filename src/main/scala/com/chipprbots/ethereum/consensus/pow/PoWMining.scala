@@ -226,16 +226,23 @@ class PoWMining private (
 
   /** Internal API, used for testing */
   def withBlockGenerator(blockGenerator: TestBlockGenerator): PoWMining =
-    new PoWMining(
-      evmCodeStorage = evmCodeStorage,
-      vm = vm,
-      blockchain = blockchain,
-      blockchainReader = blockchainReader,
-      config = config,
-      validators = validators,
-      blockGenerator = blockGenerator.asInstanceOf[PoWBlockGenerator],
-      difficultyCalculator = difficultyCalculator
-    )
+    blockGenerator match {
+      case pg: PoWBlockGenerator =>
+        new PoWMining(
+          evmCodeStorage = evmCodeStorage,
+          vm = vm,
+          blockchain = blockchain,
+          blockchainReader = blockchainReader,
+          config = config,
+          validators = validators,
+          blockGenerator = pg,
+          difficultyCalculator = difficultyCalculator
+        )
+      case _ =>
+        throw new IllegalArgumentException(
+          s"withBlockGenerator requires a PoWBlockGenerator, got ${blockGenerator.getClass.getName}"
+        )
+    }
 
 }
 

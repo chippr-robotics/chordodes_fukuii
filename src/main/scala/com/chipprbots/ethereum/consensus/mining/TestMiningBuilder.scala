@@ -8,7 +8,11 @@ import com.chipprbots.ethereum.utils.Logger
   */
 trait TestMiningBuilder { self: StdMiningBuilder =>
   protected def buildTestMining(): TestMining =
-    buildMining().asInstanceOf[TestMining] // we are in tests, so if we get an exception, so be it
+    buildMining() match {
+      case tm: TestMining => tm
+      case other =>
+        throw new RuntimeException(s"buildMining() returned ${other.getClass.getName}, expected TestMining")
+    }
 }
 
 /** A standard [[TestMiningBuilder]] cake. */

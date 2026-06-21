@@ -88,10 +88,22 @@ object Block {
         )
       // Shanghai+ blocks include withdrawals as 4th item
       case rlpList: RLPList if rlpList.items.size >= 4 =>
-        val header = rlpList.items(0).asInstanceOf[RLPList]
-        val stx = rlpList.items(1).asInstanceOf[RLPList]
-        val uncles = rlpList.items(2).asInstanceOf[RLPList]
-        val withdrawalsRlp = rlpList.items(3).asInstanceOf[RLPList]
+        val header = rlpList.items(0) match {
+          case rl: RLPList => rl
+          case _           => throw new RuntimeException("Cannot decode block: expected RLPList at index 0 (header)")
+        }
+        val stx = rlpList.items(1) match {
+          case rl: RLPList => rl
+          case _ => throw new RuntimeException("Cannot decode block: expected RLPList at index 1 (transactions)")
+        }
+        val uncles = rlpList.items(2) match {
+          case rl: RLPList => rl
+          case _           => throw new RuntimeException("Cannot decode block: expected RLPList at index 2 (uncles)")
+        }
+        val withdrawalsRlp = rlpList.items(3) match {
+          case rl: RLPList => rl
+          case _ => throw new RuntimeException("Cannot decode block: expected RLPList at index 3 (withdrawals)")
+        }
         import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
         val ws = withdrawalsRlp.items.collect { case w: RLPList =>
           val idx: BigInt = bigIntFromEncodeable(w.items(0))

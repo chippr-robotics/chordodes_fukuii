@@ -82,10 +82,19 @@ object BlockBody {
   ): BlockBody =
     rlpEncodeable match {
       case rlpList: RLPList if rlpList.items.length >= 2 =>
-        val transactions = rlpList.items(0).asInstanceOf[RLPList]
-        val uncles = rlpList.items(1).asInstanceOf[RLPList]
+        val transactions = rlpList.items(0) match {
+          case rl: RLPList => rl
+          case _ => throw new RuntimeException("Cannot decode BlockBody: expected RLPList at index 0 (transactions)")
+        }
+        val uncles = rlpList.items(1) match {
+          case rl: RLPList => rl
+          case _ => throw new RuntimeException("Cannot decode BlockBody: expected RLPList at index 1 (uncles)")
+        }
         val withdrawals = if rlpList.items.length >= 3 then {
-          Some(rlpList.items(2).asInstanceOf[RLPList].items.map(_.toWithdrawal))
+          rlpList.items(2) match {
+            case rl: RLPList => Some(rl.items.map(_.toWithdrawal))
+            case _ => throw new RuntimeException("Cannot decode BlockBody: expected RLPList at index 2 (withdrawals)")
+          }
         } else {
           None
         }
