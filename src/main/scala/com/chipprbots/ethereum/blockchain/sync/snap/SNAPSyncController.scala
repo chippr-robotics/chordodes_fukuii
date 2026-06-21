@@ -1581,7 +1581,9 @@ private class SNAPSyncControllerImpl(
               import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
               given typedScheduler: org.apache.pekko.actor.typed.Scheduler = ctx.system.scheduler
               ctx.pipeToSelf(
-                coordinator.ask[actors.AccountRangeStats](replyTo => actors.AccountRangeCoordinator.AccountGetProgress(replyTo))
+                coordinator.ask[actors.AccountRangeStats](replyTo =>
+                  actors.AccountRangeCoordinator.AccountGetProgress(replyTo)
+                )
               ) {
                 case Success(stats) => AccountCoordinatorProgress(stats)
                 case Failure(_)     => AccountCoordinatorProgress(actors.AccountRangeStats(0L, 0L, 0, 0, 0, 0.0, 0L, 0))
@@ -1611,7 +1613,8 @@ private class SNAPSyncControllerImpl(
                   )
                 ) {
                   case Success(progress) => ByteCodeCoordinatorProgress(progress)
-                  case Failure(_)        => ByteCodeCoordinatorProgress(actors.ByteCodeCoordinator.ByteCodeProgress(0.0, 0L, 0L))
+                  case Failure(_) =>
+                    ByteCodeCoordinatorProgress(actors.ByteCodeCoordinator.ByteCodeProgress(0.0, 0L, 0L))
                 }
               }
             }
@@ -3520,7 +3523,9 @@ private class SNAPSyncControllerImpl(
       // Start the coordinator — give healing full per-peer budget (accounts/storage/bytecode done)
       trieNodeHealingCoordinator.foreach { coordinator =>
         coordinator ! actors.TrieNodeHealingCoordinator.StartTrieNodeHealing(root)
-        coordinator ! actors.TrieNodeHealingCoordinator.UpdateMaxInFlightPerPeer(snapSyncConfig.healingMaxInFlightPerPeer)
+        coordinator ! actors.TrieNodeHealingCoordinator.UpdateMaxInFlightPerPeer(
+          snapSyncConfig.healingMaxInFlightPerPeer
+        )
         // Flush current snap peers immediately — the 0-second scheduler delay is async; an explicit
         // flush here ensures peers are available before any StartTrieNodeHealing dispatch attempt.
         peersToDownloadFrom.values
@@ -3584,7 +3589,9 @@ private class SNAPSyncControllerImpl(
           )
           trieNodeHealingCoordinator.foreach { coordinator =>
             coordinator ! actors.TrieNodeHealingCoordinator.StartTrieNodeHealing(root)
-            coordinator ! actors.TrieNodeHealingCoordinator.UpdateMaxInFlightPerPeer(snapSyncConfig.healingMaxInFlightPerPeer)
+            coordinator ! actors.TrieNodeHealingCoordinator.UpdateMaxInFlightPerPeer(
+              snapSyncConfig.healingMaxInFlightPerPeer
+            )
             peersToDownloadFrom.values
               .filter(p => p.peerInfo.remoteStatus.supportsSnap && p.peerInfo.forkAccepted)
               .foreach(p => coordinator ! actors.TrieNodeHealingCoordinator.HealingPeerAvailable(p.peer))
@@ -4845,7 +4852,8 @@ object SNAPSyncController {
   final private[snap] case class AccountCoordinatorProgress(progress: actors.AccountRangeStats) extends Command
   final private[snap] case class StorageCoordinatorProgress(stats: actors.StorageRangeCoordinator.SyncStatistics)
       extends Command
-  final private[snap] case class ByteCodeCoordinatorProgress(progress: actors.ByteCodeCoordinator.ByteCodeProgress) extends Command
+  final private[snap] case class ByteCodeCoordinatorProgress(progress: actors.ByteCodeCoordinator.ByteCodeProgress)
+      extends Command
   // Periodic peer-request ticks
   private[snap] case object RequestAccountRanges extends Command
   private[snap] case object RequestByteCodes extends Command

@@ -25,14 +25,8 @@ trait MiningBuilder {
   *   [[Mining]], [[com.chipprbots.ethereum.consensus.pow.PoWMining PoWConsensus]],
   */
 trait StdMiningBuilder extends MiningBuilder {
-  self: VmBuilder
-    & StorageBuilder
-    & BlockchainBuilder
-    & BlockchainConfigBuilder
-    & MiningConfigBuilder
-    & NodeKeyBuilder
-    & com.chipprbots.ethereum.utils.InstanceConfigProvider
-    & Logger =>
+  self: VmBuilder & StorageBuilder & BlockchainBuilder & BlockchainConfigBuilder & MiningConfigBuilder &
+    NodeKeyBuilder & com.chipprbots.ethereum.utils.InstanceConfigProvider & Logger =>
 
   private lazy val fukuiiConfig = instanceConfig.config
 

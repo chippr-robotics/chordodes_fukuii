@@ -40,10 +40,14 @@ class KeyStoreImplSpec extends AnyFlatSpec with Matchers with BeforeAndAfter wit
     // Monotonic fake clock: each call advances the second field, guaranteeing
     // distinct filenames without any wall-clock dependency.
     var tick = 0
-    val orderedStore = new KeyStoreImpl(keyStoreConfig, secureRandom, clock = () => {
-      tick += 1
-      ZonedDateTime.of(2024, 1, 1, 0, 0, tick, 0, ZoneOffset.UTC)
-    })
+    val orderedStore = new KeyStoreImpl(
+      keyStoreConfig,
+      secureRandom,
+      clock = () => {
+        tick += 1
+        ZonedDateTime.of(2024, 1, 1, 0, 0, tick, 0, ZoneOffset.UTC)
+      }
+    )
 
     val res1: Address = orderedStore.importPrivateKey(key1, "aaaaaaaa").toOption.get
     val res2: Address = orderedStore.importPrivateKey(key2, "bbbbbbbb").toOption.get

@@ -230,7 +230,9 @@ class AccountRangeCoordinatorSpec
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
 
-    coordinator ! AccountRangeCoordinator.AccountGetContractAccounts(self.toTyped[AccountRangeCoordinator.ContractAccountsResponse])
+    coordinator ! AccountRangeCoordinator.AccountGetContractAccounts(
+      self.toTyped[AccountRangeCoordinator.ContractAccountsResponse]
+    )
     val response = expectMsgType[AccountRangeCoordinator.ContractAccountsResponse](3.seconds)
 
     response.accounts shouldBe empty
@@ -294,7 +296,10 @@ class AccountRangeCoordinatorSpec
     networkPeerManager.expectMsgType[Any](3.seconds)
 
     // Simulate what the AccountRangeWorker sends back when it verifies a proof-only empty AccountRange.
-    coordinator ! AccountRangeCoordinator.TaskComplete(BigInt(1), Right((0, Seq.empty, Seq(ByteString("boundary-proof")))))
+    coordinator ! AccountRangeCoordinator.TaskComplete(
+      BigInt(1),
+      Right((0, Seq.empty, Seq(ByteString("boundary-proof"))))
+    )
 
     snapSyncController.expectMsgType[SNAPSyncController.AccountRangeProgressCmd](3.seconds)
     snapSyncController.expectMsg(3.seconds, SNAPSyncController.AccountRangeSyncComplete)

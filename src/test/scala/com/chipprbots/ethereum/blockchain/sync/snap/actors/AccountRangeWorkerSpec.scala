@@ -110,7 +110,9 @@ class AccountRangeWorkerSpec
     worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
 
-    worker ! AccountRangeCoordinator.AccountRangeResponseMsg(AccountRange(requestId = reqId, accounts = Seq.empty, proof = Seq.empty))
+    worker ! AccountRangeCoordinator.AccountRangeResponseMsg(
+      AccountRange(requestId = reqId, accounts = Seq.empty, proof = Seq.empty)
+    )
 
     val msg = coordinator.expectMsgType[AccountRangeCoordinator.TaskComplete](1.second)
     msg.requestId shouldBe reqId
@@ -230,7 +232,9 @@ class AccountRangeWorkerSpec
 
     // Late response arrives with the correct reqId — worker is now idle (handles only FetchAccountRange)
     // → message is unhandled/dropped; coordinator receives NO second message
-    worker ! AccountRangeCoordinator.AccountRangeResponseMsg(AccountRange(requestId = reqId, accounts = Seq.empty, proof = Seq.empty))
+    worker ! AccountRangeCoordinator.AccountRangeResponseMsg(
+      AccountRange(requestId = reqId, accounts = Seq.empty, proof = Seq.empty)
+    )
     coordinator.expectNoMessage(200.millis)
   }
 }

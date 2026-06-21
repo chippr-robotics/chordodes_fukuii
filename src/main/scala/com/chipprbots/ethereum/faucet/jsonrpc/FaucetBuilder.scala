@@ -33,12 +33,8 @@ trait FaucetControllerBuilder {
 }
 
 trait FaucetRpcServiceBuilder {
-  self: FaucetConfigBuilder
-    & FaucetControllerBuilder
-    & ActorSystemBuilder
-    & SecureRandomBuilder
-    & ShutdownHookBuilder
-    & SSLContextBuilder =>
+  self: FaucetConfigBuilder & FaucetControllerBuilder & ActorSystemBuilder & SecureRandomBuilder & ShutdownHookBuilder &
+    SSLContextBuilder =>
 
   val keyStore =
     new KeyStoreImpl(
@@ -86,12 +82,8 @@ trait FaucetJsonRpcControllerBuilder {
 }
 
 trait FaucetJsonRpcHttpServerBuilder {
-  self: ActorSystemBuilder
-    & JsonRpcConfigBuilder
-    & SecureRandomBuilder
-    & FaucetJsonRpcHealthCheckBuilder
-    & FaucetJsonRpcControllerBuilder
-    & SSLContextBuilder =>
+  self: ActorSystemBuilder & JsonRpcConfigBuilder & SecureRandomBuilder & FaucetJsonRpcHealthCheckBuilder &
+    FaucetJsonRpcControllerBuilder & SSLContextBuilder =>
 
   val faucetJsonRpcHttpServer: Either[String, JsonRpcHttpServer] = JsonRpcHttpServer(
     faucetJsonRpcController,

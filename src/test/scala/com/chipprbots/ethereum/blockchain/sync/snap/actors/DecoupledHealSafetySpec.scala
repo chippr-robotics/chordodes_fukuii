@@ -129,7 +129,9 @@ class DecoupledHealSafetySpec
       // Queue a task whose hash is a fixed value we control; the response will carry DIFFERENT bytes whose
       // keccak does not equal that hash — simulating a serve root resolving the path to a different node.
       val requestedHash = kec256(ByteString("safety-t3-expected-hash"))
-      coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(Seq((Seq(ByteString(Array[Byte](0x00))), requestedHash)))
+      coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(
+        Seq((Seq(ByteString(Array[Byte](0x00))), requestedHash))
+      )
       val peer = PeerTestHelpers.createTestPeer("safety-t3-peer", TestProbe().ref)
       coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), TestProbe().ref)
       val send = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
@@ -137,7 +139,9 @@ class DecoupledHealSafetySpec
 
       val wrongContent = ByteString("safety-t3-wrong-content-bytes")
       kec256(wrongContent) should not be requestedHash // sanity: the response really mismatches
-      coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = reqId, nodes = Seq(wrongContent)))
+      coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(
+        SNAP.TrieNodes(requestId = reqId, nodes = Seq(wrongContent))
+      )
 
       // The wrong-content node is dropped: not stored, not counted as healed, and the task is re-queued.
       awaitAssert(
@@ -186,7 +190,9 @@ class DecoupledHealSafetySpec
       // aligned). A 30s per-peer cooldown is recorded on timeout, so we dispatch each fresh attempt to a NEW
       // (non-cooling) peer — three rounds cross the threshold=2 surfacing point.
       val unservableHash = kec256(ByteString("safety-t4-unservable-node"))
-      coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(Seq((Seq(ByteString(Array[Byte](0x07))), unservableHash)))
+      coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(
+        Seq((Seq(ByteString(Array[Byte](0x07))), unservableHash))
+      )
 
       def dispatchAndTimeout(round: Int): Unit = {
         val peer = PeerTestHelpers.createTestPeer(s"safety-t4-peer-$round", TestProbe().ref)
@@ -289,11 +295,15 @@ class DecoupledHealSafetySpec
       // bytes only; completion is decided against the unchanged walk root). The served node bytes are the
       // walk root's expectation either way (content-hash-verified), so the final stored state is identical.
       if decoupled then
-        coordinator ! TrieNodeHealingCoordinator.HealingServeRootRefresh(kec256(ByteString("decoupled-parity-serve-root")))
+        coordinator ! TrieNodeHealingCoordinator.HealingServeRootRefresh(
+          kec256(ByteString("decoupled-parity-serve-root"))
+        )
       val peer = PeerTestHelpers.createTestPeer(s"parity-peer-$decoupled", TestProbe().ref)
       coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
       coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), TestProbe().ref)
-      coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3)))
+      coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(
+        SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3))
+      )
       // Completion is reached via the SAME StateHealingComplete signal on both paths (the load-bearing parity
       // observable, alongside the marker + state root below). fishForMessage tolerates interleaved progress.
       controller.fishForMessage(10.seconds) {

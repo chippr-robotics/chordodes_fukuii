@@ -1811,8 +1811,7 @@ object AccountRangeCoordinator {
   case class TaskFailed(requestId: BigInt, reason: String) extends Command
   case class PeerUnavailable(peerId: String) extends Command
   case object GetProgress extends Command
-  case class AccountGetProgress(replyTo: org.apache.pekko.actor.typed.ActorRef[AccountRangeStats])
-      extends Command
+  case class AccountGetProgress(replyTo: org.apache.pekko.actor.typed.ActorRef[AccountRangeStats]) extends Command
   case object GetContractAccounts extends Command
   case class AccountGetContractAccounts(replyTo: org.apache.pekko.actor.typed.ActorRef[ContractAccountsResponse])
       extends Command

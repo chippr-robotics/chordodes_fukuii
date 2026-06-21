@@ -219,7 +219,8 @@ object StorageRecoveryActor {
               val tasks = batch.map { case (accountHash, storageRoot) =>
                 StorageTask.createStorageTask(accountHash, storageRoot)
               }
-              coordinator.tell(actors.StorageRangeCoordinator.AddStorageTasks(tasks), org.apache.pekko.actor.ActorRef.noSender)
+              coordinator
+                .tell(actors.StorageRangeCoordinator.AddStorageTasks(tasks), org.apache.pekko.actor.ActorRef.noSender)
               totalSent += tasks.size
             }
             ctx.log.info(
@@ -298,7 +299,10 @@ object StorageRecoveryActor {
 
       Behaviors.receiveMessage {
         case actors.StorageRangeCoordinator.StoragePeerAvailable(peer) =>
-          coordinator.tell(actors.StorageRangeCoordinator.StoragePeerAvailable(peer), org.apache.pekko.actor.ActorRef.noSender)
+          coordinator.tell(
+            actors.StorageRangeCoordinator.StoragePeerAvailable(peer),
+            org.apache.pekko.actor.ActorRef.noSender
+          )
           Behaviors.same
 
         case SNAPSyncController.StorageRangeSyncComplete =>
@@ -376,7 +380,10 @@ object StorageRecoveryActor {
                 s"Storage recovery: rolling download root $oldHex -> $newHex (block $blockNumber, " +
                   s"roll $rollsAttempted/$maxRolls). Re-queuing $expectedCount tasks."
               )
-              coordinator.tell(actors.StorageRangeCoordinator.StoragePivotRefreshed(root), org.apache.pekko.actor.ActorRef.noSender)
+              coordinator.tell(
+                actors.StorageRangeCoordinator.StoragePivotRefreshed(root),
+                org.apache.pekko.actor.ActorRef.noSender
+              )
             case Some(_) =>
               ctx.log.info(
                 "Storage recovery: recent root equals current download root — no newer servable pivot. " +

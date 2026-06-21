@@ -773,8 +773,8 @@ private class ByteCodeCoordinatorImpl(
 
 object ByteCodeCoordinator {
 
-  /** Command protocol for the Typed coordinator (Group S3). All subtypes live in this companion so the trait is
-    * sealed — Scala 3 file-scope sealing enables exhaustive match checking at every call site.
+  /** Command protocol for the Typed coordinator (Group S3). All subtypes live in this companion so the trait is sealed
+    * — Scala 3 file-scope sealing enables exhaustive match checking at every call site.
     */
   sealed trait Command
 
@@ -804,8 +804,8 @@ object ByteCodeCoordinator {
   case class ByteCodeGetProgress(replyTo: org.apache.pekko.actor.typed.ActorRef[ByteCodeProgress]) extends Command
   case object ByteCodeCheckCompletion extends Command
 
-  /** Sent by SNAPSyncController when bytecode sync has stagnated and must be force-completed (#1164). Missing
-    * bytecodes are recovered post-SNAP via BytecodeRecoveryActor.
+  /** Sent by SNAPSyncController when bytecode sync has stagnated and must be force-completed (#1164). Missing bytecodes
+    * are recovered post-SNAP via BytecodeRecoveryActor.
     */
   case object ForceCompleteByteCodes extends Command
 

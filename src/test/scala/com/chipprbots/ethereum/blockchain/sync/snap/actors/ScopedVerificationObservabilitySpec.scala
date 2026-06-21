@@ -149,7 +149,9 @@ class ScopedVerificationObservabilitySpec
     val peer = PeerTestHelpers.createTestPeer(peerName, TestProbe().ref)
     coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
     coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), TestProbe().ref)
-    coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3)))
+    coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(
+      SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3))
+    )
     nodes.size
   }
 

@@ -1626,8 +1626,8 @@ private[actors] class StorageRangeCoordinatorImpl(
 
 object StorageRangeCoordinator {
 
-  /** Command protocol for the Typed coordinator (Group S3). All subtypes live in this companion so the trait is
-    * sealed — Scala 3 file-scope sealing enables exhaustive match checking at every call site.
+  /** Command protocol for the Typed coordinator (Group S3). All subtypes live in this companion so the trait is sealed
+    * — Scala 3 file-scope sealing enables exhaustive match checking at every call site.
     */
   sealed trait Command
 

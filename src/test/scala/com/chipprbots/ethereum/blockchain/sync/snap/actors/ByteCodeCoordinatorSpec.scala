@@ -315,7 +315,9 @@ class ByteCodeCoordinatorSpec
     req1.hashes shouldEqual Seq(h1, h2, h3)
 
     // Respond with a single middle element (gap allowed by snap/1 semantics)
-    system.actorSelection(coordinator.path / "*") ! ByteCodeCoordinator.ByteCodesResponseMsg(ByteCodes(req1.requestId, Seq(code2)))
+    system.actorSelection(coordinator.path / "*") ! ByteCodeCoordinator.ByteCodesResponseMsg(
+      ByteCodes(req1.requestId, Seq(code2))
+    )
 
     // Ensure the returned code got persisted
     within(3.seconds) {
@@ -471,7 +473,9 @@ class ByteCodeCoordinatorSpec
     req1.hashes shouldEqual Seq(h1)
 
     // Respond with empty ByteCodes (peer had none of the requested hashes)
-    system.actorSelection(coordinator.path / "*") ! ByteCodeCoordinator.ByteCodesResponseMsg(ByteCodes(req1.requestId, Seq.empty))
+    system.actorSelection(coordinator.path / "*") ! ByteCodeCoordinator.ByteCodesResponseMsg(
+      ByteCodes(req1.requestId, Seq.empty)
+    )
 
     // Immediately advertising the same peer should not trigger a re-request due to cooldown
     coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
@@ -513,7 +517,9 @@ class ByteCodeCoordinatorSpec
     val req1 = send1.message.asInstanceOf[GetByteCodesEnc].underlyingMsg
 
     // Empty response → peer enters cooldown
-    system.actorSelection(coordinator.path / "*") ! ByteCodeCoordinator.ByteCodesResponseMsg(ByteCodes(req1.requestId, Seq.empty))
+    system.actorSelection(coordinator.path / "*") ! ByteCodeCoordinator.ByteCodesResponseMsg(
+      ByteCodes(req1.requestId, Seq.empty)
+    )
 
     // Verify cooldown is active — same peer should not dispatch immediately
     coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)

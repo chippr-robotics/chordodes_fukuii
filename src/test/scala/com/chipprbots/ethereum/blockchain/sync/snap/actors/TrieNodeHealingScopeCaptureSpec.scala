@@ -161,7 +161,9 @@ class TrieNodeHealingScopeCaptureSpec
         coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), networkProbe.ref)
 
         // Heal all N in a single TrieNodes response (the first generated requestId is 1).
-        coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3)))
+        coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(
+          SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3))
+        )
 
         // The healed nodes are storage-trie leaves with no children, so the round drains clean and the
         // completion gate engages the scoped path, seeding exactly the N captured subtrees.
@@ -186,7 +188,9 @@ class TrieNodeHealingScopeCaptureSpec
       // Respond with the N node bodies PLUS a duplicate of the first — the duplicate matches the same
       // task hash (already captured), so the dedup-by-hash guard must NOT grow the captured set.
       val withDuplicate = nodes.map(_._3) :+ nodes.head._3
-      coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = withDuplicate))
+      coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(
+        SNAP.TrieNodes(requestId = 1, nodes = withDuplicate)
+      )
 
       awaitStateHealingComplete(controller)
       gaugeValue("snapsync.healing.scoped_verification.gauge") shouldBe 1.0 +- 1e-9
@@ -205,7 +209,9 @@ class TrieNodeHealingScopeCaptureSpec
       val networkProbe = TestProbe()
       coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
       coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), networkProbe.ref)
-      coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3)))
+      coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(
+        SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3))
+      )
       awaitAssert(pendingTasks(coordinator) shouldBe 0, 5.seconds, 100.millis)
     }
   }
