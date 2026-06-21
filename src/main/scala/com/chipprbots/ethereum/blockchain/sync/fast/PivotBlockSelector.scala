@@ -45,22 +45,27 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
   * (`idle` / `runningPivotBlockElection`). Peer-list responsibilities move to [[PeerListHelper]] (replacing the
   * self-typed `PeerListSupportNg` trait). The three `scheduler.scheduleOnce` calls become `Behaviors.withTimers`.
   *
-  * Direct `PeerEventBusActor` subscriptions for `BlockHeaders` use `ctx.self.toClassic` as the subscriber identity;
-  * PeerListHelper's `PeerDisconnected` subscription uses a separate `messageAdapter` ref and is not affected by the
-  * actor-level `Unsubscribe()` call.
-  *
-  * The behavior type is `Behavior[Any]`: `fastSync` stays Classic and sends `SelectPivotBlock` as a plain message.
+  * Direct `PeerEventBusActor` subscriptions for `BlockHeaders` use `blockHeadersAdapter.toClassic` as the subscriber
+  * identity; PeerListHelper's `PeerDisconnected` subscription uses a separate `messageAdapter` ref. Selection state
+  * (`pivotBlockRetryCount`, `totalSelectionAttempts`, `pivotRetryState`) is threaded as immutable [[PivotState]]
+  * through behavior factory closures — no mutable `Impl` fields.
   */
 object PivotBlockSelector {
 
   // Besu: PivotBlockRetriever.SUSPICIOUS_NUMBER_OF_RETRIES = 5
   val SuspiciousRetryThreshold: Int = 5
 
-  private case object ScanPeers
+  sealed trait Command
+  case object SelectPivotBlock extends Command
+  case object ElectionPivotBlockTimeout extends Command
+  private case object ScanPeers extends Command
+  final case class WrappedMessageFromPeer(msg: MessageFromPeer) extends Command
+  final case class WrappedHandshakedPeers(hp: NetworkPeerManagerActor.HandshakedPeers) extends Command
+  final case class WrappedPeerDisconnected(pd: PeerDisconnected) extends Command
 
-  private val ElectionTimeoutKey: String = "ElectionTimeout"
-  private val RetryKey: String = "Retry"
-  private val ScanKey: String = "ScanPeers"
+  private case object ElectionTimeoutKey
+  private case object RetryKey
+  private case object ScanKey
 
   def apply(
       networkPeerManager: ClassicActorRef,
@@ -68,27 +73,48 @@ object PivotBlockSelector {
       syncConfig: SyncConfig,
       fastSync: ClassicActorRef,
       blacklist: Blacklist
-  ): Behavior[Any] =
-    Behaviors.setup[Any] { ctx =>
-      Behaviors.withTimers[Any] { timers =>
+  ): Behavior[Command] =
+    Behaviors.setup[Command] { ctx =>
+      Behaviors.withTimers[Command] { timers =>
         val peerDisconnectedAdapter: TypedActorRef[PeerDisconnected] =
-          ctx.messageAdapter[PeerDisconnected](identity)
+          ctx.messageAdapter[PeerDisconnected](WrappedPeerDisconnected(_))
+        val blockHeadersAdapter: TypedActorRef[MessageFromPeer] =
+          ctx.messageAdapter[MessageFromPeer](WrappedMessageFromPeer(_))
+        val handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers] =
+          ctx.messageAdapter[NetworkPeerManagerActor.HandshakedPeers](WrappedHandshakedPeers(_))
         val peerListHelper = new PeerListHelper(
           peerEventBus,
           blacklist,
           peerDisconnectedAdapter,
           ctx.log
         )
-        networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, ctx.self.toClassic)
+        networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, handshakedPeersAdapter.toClassic)
         timers.startTimerWithFixedDelay(ScanKey, ScanPeers, syncConfig.peersScanInterval)
-        new Impl(ctx, timers, networkPeerManager, peerEventBus, syncConfig, fastSync, blacklist, peerListHelper).idle()
+        val initialState = PivotState(
+          pivotBlockRetryCount = 0,
+          totalSelectionAttempts = 0,
+          pivotRetryState = RetryState(
+            strategy =
+              RetryStrategy(initialDelay = syncConfig.startRetryInterval, maxDelay = 60.seconds, jitterFactor = 0.0)
+          )
+        )
+        new Impl(
+          ctx,
+          timers,
+          networkPeerManager,
+          peerEventBus,
+          syncConfig,
+          fastSync,
+          blacklist,
+          peerListHelper,
+          blockHeadersAdapter,
+          handshakedPeersAdapter
+        ).idle(initialState)
       }
     }
 
-  case object SelectPivotBlock
-  final case class Result(targetBlockHeader: BlockHeader)
   case object SelectionFailed
-  case object ElectionPivotBlockTimeout
+  final case class Result(targetBlockHeader: BlockHeader)
 
   case class BlockHeaderWithVotes(header: BlockHeader, votes: Int = 1) {
     def vote: BlockHeaderWithVotes = copy(votes = votes + 1)
@@ -107,61 +133,65 @@ object PivotBlockSelector {
     def hasEnoughVoters(minNumberOfVoters: Int): Boolean = participants.size >= minNumberOfVoters
   }
 
+  private case class PivotState(
+      pivotBlockRetryCount: Int,
+      totalSelectionAttempts: Int,
+      pivotRetryState: RetryState
+  )
+
   private class Impl(
-      ctx: ActorContext[Any],
-      timers: TimerScheduler[Any],
+      ctx: ActorContext[Command],
+      timers: TimerScheduler[Command],
       networkPeerManager: ClassicActorRef,
       peerEventBus: TypedActorRef[PeerEventBusCommand],
       syncConfig: SyncConfig,
       fastSync: ClassicActorRef,
       blacklist: Blacklist,
-      peerListHelper: PeerListHelper
+      peerListHelper: PeerListHelper,
+      blockHeadersAdapter: TypedActorRef[MessageFromPeer],
+      handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers]
   ) {
     import syncConfig.*
 
-    private var pivotBlockRetryCount = 0
-    private var totalSelectionAttempts = 0
     private val maxTotalSelectionAttempts = syncConfig.pivotBlockMaxTotalSelectionAttempts
 
-    private var pivotRetryState: RetryState = RetryState(
-      strategy = RetryStrategy(initialDelay = syncConfig.startRetryInterval, maxDelay = 60.seconds, jitterFactor = 0.0)
-    )
-
-    private def handleCommon(message: Any): Option[Behavior[Any]] = message match {
+    private def handleCommon(message: Command): Option[Behavior[Command]] = message match {
       case ScanPeers =>
-        networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, ctx.self.toClassic)
+        networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, handshakedPeersAdapter.toClassic)
         Some(Behaviors.same)
-      case NetworkPeerManagerActor.HandshakedPeers(peers) =>
+      case WrappedHandshakedPeers(NetworkPeerManagerActor.HandshakedPeers(peers)) =>
         peerListHelper.handleHandshakedPeers(peers)
         Some(Behaviors.same)
-      case pd: PeerDisconnected =>
+      case WrappedPeerDisconnected(pd) =>
         peerListHelper.handlePeerDisconnected(pd.peerId)
         Some(Behaviors.same)
       case _ => None
     }
 
-    def idle(): Behavior[Any] = Behaviors.receiveMessage { message =>
+    def idle(state: PivotState): Behavior[Command] = Behaviors.receiveMessage { message =>
       handleCommon(message).getOrElse {
         message match {
           case SelectPivotBlock =>
-            if totalSelectionAttempts >= maxTotalSelectionAttempts then {
+            if state.totalSelectionAttempts >= maxTotalSelectionAttempts then {
               ctx.log.error(
                 "Pivot block selection failed after {} total attempts. Stopping pivot block selector.",
                 maxTotalSelectionAttempts
               )
               fastSync ! SelectionFailed
-              peerEventBus ! UnsubscribeAllCmd(ctx.self.toClassic)
+              peerEventBus ! UnsubscribeAllCmd(blockHeadersAdapter.toClassic)
               Behaviors.stopped
             } else {
-              totalSelectionAttempts += 1
-              startPivotBlockSelection(collectVoters())
+              startPivotBlockSelection(
+                collectVoters(),
+                state.copy(totalSelectionAttempts = state.totalSelectionAttempts + 1)
+              )
             }
           case _ => Behaviors.same
         }
       }
     }
 
-    private def startPivotBlockSelection(election: ElectionDetails): Behavior[Any] = {
+    private def startPivotBlockSelection(election: ElectionDetails, state: PivotState): Behavior[Command] = {
       val ElectionDetails(correctPeers, currentBestBlockNumber, expectedPivotBlock) = election
 
       if election.hasEnoughVoters(minPeersToChoosePivotBlock) then {
@@ -178,7 +208,13 @@ object PivotBlockSelector {
 
         peersToAsk.foreach(peer => obtainBlockHeaderFromPeer(peer.id, expectedPivotBlock))
         timers.startSingleTimer(ElectionTimeoutKey, ElectionPivotBlockTimeout, peerResponseTimeout)
-        runningPivotBlockElection(peersToAsk.map(_.id).toSet, waitingPeers.map(_.id), expectedPivotBlock, Map.empty)
+        runningPivotBlockElection(
+          peersToAsk.map(_.id).toSet,
+          waitingPeers.map(_.id),
+          expectedPivotBlock,
+          Map.empty,
+          state
+        )
       } else {
         ctx.log.debug(
           "Cannot pick pivot block. Need at least {} peers, but there are only {} which meet the criteria " +
@@ -188,21 +224,24 @@ object PivotBlockSelector {
           peerListHelper.peersToDownloadFrom.size,
           currentBestBlockNumber
         )
-        retryPivotBlockSelection(currentBestBlockNumber)
+        retryPivotBlockSelection(currentBestBlockNumber, state)
       }
     }
 
-    private def retryPivotBlockSelection(pivotBlockNumber: BigInt): Behavior[Any] = {
-      pivotBlockRetryCount += 1
-      if pivotBlockRetryCount <= maxPivotBlockFailuresCount && pivotBlockNumber > 0 then {
-        startPivotBlockSelection(collectVoters(Some(pivotBlockNumber)))
+    private def retryPivotBlockSelection(pivotBlockNumber: BigInt, state: PivotState): Behavior[Command] = {
+      val newRetryCount = state.pivotBlockRetryCount + 1
+      if newRetryCount <= maxPivotBlockFailuresCount && pivotBlockNumber > 0 then {
+        startPivotBlockSelection(
+          collectVoters(Some(pivotBlockNumber)),
+          state.copy(pivotBlockRetryCount = newRetryCount)
+        )
       } else {
         ctx.log.debug(
           "Cannot pick pivot block. Current best block number [{}]. Scheduling retry with backoff (attempt {})",
           pivotBlockNumber,
-          pivotRetryState.attempt + 1
+          state.pivotRetryState.attempt + 1
         )
-        scheduleRetry()
+        scheduleRetry(state.copy(pivotBlockRetryCount = newRetryCount))
       }
     }
 
@@ -210,14 +249,15 @@ object PivotBlockSelector {
         peersToAsk: Set[PeerId],
         waitingPeers: List[PeerId],
         pivotBlockNumber: BigInt,
-        headers: Map[ByteString, BlockHeaderWithVotes]
-    ): Behavior[Any] = Behaviors.receiveMessage { message =>
+        headers: Map[ByteString, BlockHeaderWithVotes],
+        state: PivotState
+    ): Behavior[Command] = Behaviors.receiveMessage { message =>
       handleCommon(message).getOrElse {
         message match {
-          case MessageFromPeer(blockHeaders: ETHPackets.BlockHeaders, peerId) =>
+          case WrappedMessageFromPeer(MessageFromPeer(blockHeaders: ETHPackets.BlockHeaders, peerId)) =>
             peerEventBus ! UnsubscribeCmd(
               MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peerId)),
-              ctx.self.toClassic
+              blockHeadersAdapter.toClassic
             )
             val updatedPeersToAsk = peersToAsk - peerId
             blockHeaders.headers.find(_.number == pivotBlockNumber) match {
@@ -228,20 +268,21 @@ object PivotBlockSelector {
                   updatedPeersToAsk,
                   waitingPeers,
                   pivotBlockNumber,
-                  headers.updated(targetBlockHeader.hash, newValue)
+                  headers.updated(targetBlockHeader.hash, newValue),
+                  state
                 )
               case None =>
                 blacklist.add(peerId, blacklistDuration, InvalidPivotBlockElectionResponse)
-                votingProcess(updatedPeersToAsk, waitingPeers, pivotBlockNumber, headers)
+                votingProcess(updatedPeersToAsk, waitingPeers, pivotBlockNumber, headers, state)
             }
           case ElectionPivotBlockTimeout =>
             peersToAsk.foreach(peerId => blacklist.add(peerId, blacklistDuration, PivotBlockElectionTimeout))
-            peerEventBus ! UnsubscribeAllCmd(ctx.self.toClassic)
+            peerEventBus ! UnsubscribeAllCmd(blockHeadersAdapter.toClassic)
             ctx.log.warn(
               "Pivot block header receive timeout. Scheduling retry with backoff (attempt {})",
-              pivotRetryState.attempt + 1
+              state.pivotRetryState.attempt + 1
             )
-            scheduleRetry()
+            scheduleRetry(state)
           case _ => Behaviors.same
         }
       }
@@ -251,12 +292,13 @@ object PivotBlockSelector {
         peersToAsk: Set[PeerId],
         waitingPeers: List[PeerId],
         pivotBlockNumber: BigInt,
-        headers: Map[ByteString, BlockHeaderWithVotes]
-    ): Behavior[Any] = {
+        headers: Map[ByteString, BlockHeaderWithVotes],
+        state: PivotState
+    ): Behavior[Command] = {
       val maybeBlockHeaderWithVotes = headers.mostVotedHeader
       if peersToAsk.isEmpty && maybeBlockHeaderWithVotes.exists(_.votes >= minPeersToChoosePivotBlock) then {
         timers.cancel(ElectionTimeoutKey)
-        maybeBlockHeaderWithVotes.foreach(hWv => sendResponseAndCleanup(hWv.header))
+        maybeBlockHeaderWithVotes.foreach(hWv => sendResponseAndCleanup(hWv.header, state.pivotRetryState))
         Behaviors.stopped
       } else if !isPossibleToReachConsensus(peersToAsk.size, maybeBlockHeaderWithVotes.map(_.votes).getOrElse(0)) then {
         timers.cancel(ElectionTimeoutKey)
@@ -264,41 +306,40 @@ object PivotBlockSelector {
           val additionalPeer :: newWaitingPeers = waitingPeers: @unchecked
           obtainBlockHeaderFromPeer(additionalPeer, pivotBlockNumber)
           timers.startSingleTimer(ElectionTimeoutKey, ElectionPivotBlockTimeout, peerResponseTimeout)
-          runningPivotBlockElection(peersToAsk + additionalPeer, newWaitingPeers, pivotBlockNumber, headers)
+          runningPivotBlockElection(peersToAsk + additionalPeer, newWaitingPeers, pivotBlockNumber, headers, state)
         } else {
-          peerEventBus ! UnsubscribeAllCmd(ctx.self.toClassic)
+          peerEventBus ! UnsubscribeAllCmd(blockHeadersAdapter.toClassic)
           ctx.log.warn(
             "Not enough votes for pivot block. Scheduling retry with backoff (attempt {})",
-            pivotRetryState.attempt + 1
+            state.pivotRetryState.attempt + 1
           )
-          scheduleRetry()
+          scheduleRetry(state)
         }
       } else {
-        runningPivotBlockElection(peersToAsk, waitingPeers, pivotBlockNumber, headers)
+        runningPivotBlockElection(peersToAsk, waitingPeers, pivotBlockNumber, headers, state)
       }
     }
 
     private def isPossibleToReachConsensus(peersLeft: Int, bestHeaderVotes: Int): Boolean =
       peersLeft + bestHeaderVotes >= minPeersToChoosePivotBlock
 
-    private def scheduleRetry(): Behavior[Any] = {
-      pivotBlockRetryCount = 0
-      val delay = pivotRetryState.nextDelay
-      pivotRetryState = pivotRetryState.recordAttempt
-      if pivotRetryState.attempt % SuspiciousRetryThreshold == 0 then {
+    private def scheduleRetry(state: PivotState): Behavior[Command] = {
+      val delay = state.pivotRetryState.nextDelay
+      val newPivotRetryState = state.pivotRetryState.recordAttempt
+      if newPivotRetryState.attempt % SuspiciousRetryThreshold == 0 then {
         ctx.log.warn(
           "{} pivot block selection retries have failed to obtain a valid pivot block",
-          pivotRetryState.attempt
+          newPivotRetryState.attempt
         )
       }
       ctx.log.debug("Scheduling pivot block selection retry in {}", delay)
       timers.startSingleTimer(RetryKey, SelectPivotBlock, delay)
-      idle()
+      idle(state.copy(pivotBlockRetryCount = 0, pivotRetryState = newPivotRetryState))
     }
 
-    private def sendResponseAndCleanup(pivotBlockHeader: BlockHeader): Unit = {
-      pivotRetryState = pivotRetryState.reset
-      val attempts = pivotRetryState.attempt
+    private def sendResponseAndCleanup(pivotBlockHeader: BlockHeader, pivotRetryState: RetryState): Unit = {
+      val resetState = pivotRetryState.reset
+      val attempts = resetState.attempt
       ctx.log.info(
         "[PIVOT] Selected block={} hash={} after {} attempt(s)",
         pivotBlockHeader.number,
@@ -306,13 +347,13 @@ object PivotBlockSelector {
         attempts
       )
       fastSync ! Result(pivotBlockHeader)
-      peerEventBus ! UnsubscribeAllCmd(ctx.self.toClassic)
+      peerEventBus ! UnsubscribeAllCmd(blockHeadersAdapter.toClassic)
     }
 
     private def obtainBlockHeaderFromPeer(peer: PeerId, blockNumber: BigInt): Unit = {
       peerEventBus ! SubscribeCmd(
         MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer)),
-        ctx.self.toClassic
+        blockHeadersAdapter.toClassic
       )
       val getBlockHeadersMsg: MessageSerializable = peerListHelper.handshakedPeers.get(peer) match {
         case Some(peerWithInfo) if Capability.usesRequestId(peerWithInfo.peerInfo.remoteStatus.capability) =>
@@ -320,11 +361,13 @@ object PivotBlockSelector {
         case _ =>
           ETHPackets.GetBlockHeaders(ETHPackets.nextRequestId, Left(blockNumber), 1, 0, reverse = false)
       }
-      // Typed context has no implicit `sender()`; pass `ctx.self.toClassic` explicitly so a directly-replying
-      // peer manager (notably the test AutoPilot) routes its `MessageFromPeer` response back here rather than to
-      // dead letters. In production the response arrives via the peerEventBus subscription above; this keeps the
-      // pre-S4-Classic behaviour where `self` was the implicit sender of `SendMessage`.
-      networkPeerManager.tell(NetworkPeerManagerActor.SendMessage(getBlockHeadersMsg, peer), ctx.self.toClassic)
+      // In production the response arrives via the peerEventBus subscription above. Pass blockHeadersAdapter
+      // explicitly so a directly-replying peer manager (notably the test AutoPilot) routes its MessageFromPeer
+      // response back here rather than to dead letters.
+      networkPeerManager.tell(
+        NetworkPeerManagerActor.SendMessage(getBlockHeadersMsg, peer),
+        blockHeadersAdapter.toClassic
+      )
     }
 
     private def collectVoters(previousBestBlockNumber: Option[BigInt] = None): ElectionDetails = {
