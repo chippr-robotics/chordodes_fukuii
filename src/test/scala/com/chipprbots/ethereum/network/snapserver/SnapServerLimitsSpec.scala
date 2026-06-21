@@ -84,9 +84,10 @@ class SnapServerLimitsSpec extends AnyFlatSpec with Matchers {
   it should "set a deadline approximately 4 seconds in the future" taggedAs UnitTest in {
     val before = System.currentTimeMillis()
     val deadline = System.currentTimeMillis() + 4000
-    val after = System.currentTimeMillis()
+    // Lower bound is trivially true; upper bound is non-trivial: requires the two consecutive
+    // millis() calls to differ by ≤1 ms (true on any modern JVM with ≤1 ms timer resolution).
     deadline should be >= before + 4000L
-    deadline should be <= after + 4001L // tiny slack for two clock reads
+    deadline should be <= before + 4001L
   }
 
   // ── serveAccountRange: first-item guarantee ───────────────────────────────
