@@ -34,11 +34,11 @@ trait FaucetControllerBuilder {
 
 trait FaucetRpcServiceBuilder {
   self: FaucetConfigBuilder
-    with FaucetControllerBuilder
-    with ActorSystemBuilder
-    with SecureRandomBuilder
-    with ShutdownHookBuilder
-    with SSLContextBuilder =>
+    & FaucetControllerBuilder
+    & ActorSystemBuilder
+    & SecureRandomBuilder
+    & ShutdownHookBuilder
+    & SSLContextBuilder =>
 
   val keyStore =
     new KeyStoreImpl(
@@ -87,11 +87,11 @@ trait FaucetJsonRpcControllerBuilder {
 
 trait FaucetJsonRpcHttpServerBuilder {
   self: ActorSystemBuilder
-    with JsonRpcConfigBuilder
-    with SecureRandomBuilder
-    with FaucetJsonRpcHealthCheckBuilder
-    with FaucetJsonRpcControllerBuilder
-    with SSLContextBuilder =>
+    & JsonRpcConfigBuilder
+    & SecureRandomBuilder
+    & FaucetJsonRpcHealthCheckBuilder
+    & FaucetJsonRpcControllerBuilder
+    & SSLContextBuilder =>
 
   val faucetJsonRpcHttpServer: Either[String, JsonRpcHttpServer] = JsonRpcHttpServer(
     faucetJsonRpcController,
@@ -138,7 +138,7 @@ class FaucetServer
     startJsonRpcHttpServer()
   }
 
-  private[this] def startJsonRpcHttpServer() =
+  private def startJsonRpcHttpServer() =
     faucetJsonRpcHttpServer match {
       case Right(jsonRpcServer) => jsonRpcServer.run()
       case Left(error)          => throw new RuntimeException(s"$error")

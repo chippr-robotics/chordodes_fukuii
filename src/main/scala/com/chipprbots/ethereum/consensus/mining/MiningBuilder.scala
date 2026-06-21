@@ -26,13 +26,13 @@ trait MiningBuilder {
   */
 trait StdMiningBuilder extends MiningBuilder {
   self: VmBuilder
-    with StorageBuilder
-    with BlockchainBuilder
-    with BlockchainConfigBuilder
-    with MiningConfigBuilder
-    with NodeKeyBuilder
-    with com.chipprbots.ethereum.utils.InstanceConfigProvider
-    with Logger =>
+    & StorageBuilder
+    & BlockchainBuilder
+    & BlockchainConfigBuilder
+    & MiningConfigBuilder
+    & NodeKeyBuilder
+    & com.chipprbots.ethereum.utils.InstanceConfigProvider
+    & Logger =>
 
   private lazy val fukuiiConfig = instanceConfig.config
 
