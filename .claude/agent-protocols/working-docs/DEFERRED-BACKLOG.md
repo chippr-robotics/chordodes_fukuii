@@ -119,8 +119,8 @@ sprint below.
 
 | Item | Location | Issue | Fix | Gate |
 |------|----------|-------|-----|------|
-| `@annotation.unused timers` | `PeerManagerActor.Impl:272` | Impl receives `TimerScheduler[Command]` from `Behaviors.withTimers` but uses `classicSystem.scheduler` exclusively instead. `withTimers` wrapper is dead weight. Suppressed with `@annotation.unused` during C3b. | Either drop `withTimers` and use `classicSystem.scheduler` directly, or replace `classicSystem.scheduler` calls with the typed `TimerScheduler` API (preferred — eliminates the Classic scheduler dependency). | PMA Classic shell removal — CAPSTONE or dedicated NET cleanup pass |
-| NET-01 | `NetworkPeerManagerActor.scala:165,451,663` | `private def scheduler = ctx.system.classicSystem.scheduler` (line 165) used for two fire-and-forget blacklist-delay `scheduleOnce` calls (lines 451, 663). Root cause: `AddToBlacklistCmd.replyTo` is a Classic `ActorRef`, requiring the Classic `!`-send bridge. `classicSystem.scheduler` is backed by the same `HashedWheelTimer` — behaviour is **correct; this is an interop bridge, not a bug**. HERALD verified by-design (2026-06-21). | (a) Change `AddToBlacklistCmd.replyTo: ActorRef` → `Option[typed.ActorRef[_]]` or remove `replyTo` (always `noSender`). (b) Replace `scheduleOnce` with `timers.startSingleTimer` or `context.system.scheduler.scheduleOnce(delay, runnable, ec)`. (c) Delete the `scheduler` private def. | Prerequisite: `PeerManagerActor` full Typed migration (LOOM). Risk: Low — no behaviour change until `replyTo` field changes. |
+| ~~`@annotation.unused timers`~~ | ~~`PeerManagerActor.Impl:272`~~ | ~~Impl receives `TimerScheduler[Command]` from `Behaviors.withTimers` but uses `classicSystem.scheduler` exclusively. Suppressed with `@annotation.unused` during C3b.~~ | ✅ DONE `4b101b612` — `Behaviors.withTimers` wrapper dropped entirely; `@annotation.unused timers: TimerScheduler[Command]` removed from Impl constructor; import dropped. `classicSystem.scheduler` private def stays — still used for `scheduleWithFixedDelay` (node-update, status-refresh) and `scheduleOnce` (connect retries). 61/61 PeerManager tests green. Full typed-timer migration deferred to network/P2P sprint. | — |
+| ~~NET-01~~ | ~~`NetworkPeerManagerActor.scala:165,451,663`~~ | ~~`classicSystem.scheduler` for two fire-and-forget blacklist-delay `scheduleOnce` calls. HERALD verified by-design (2026-06-21).~~ | ✅ DONE `6b506a63f` (partial) — `@annotation.unused timers: TimerScheduler[Any]` removed from NPMA Impl constructor; `timers,` removed from `new Impl(ctx, timers, ...)` call; TimerScheduler import dropped. `private def scheduler = ctx.system.classicSystem.scheduler` stays — correct for the two fire-and-forget `AddToBlacklistCmd` delays. Full treatment (path b: typed timers) deferred to network/P2P sprint. | — |
 
 ### Network/P2P Sprint — Pekko Migration Completion Gate
 
@@ -857,7 +857,7 @@ housekeeping task during test waits for specific domain files.
 | ID | File | Issue | Severity | Gate | Status |
 |----|------|-------|----------|------|--------|
 | **A1** | `consensus/engine/EngineApiService.scala:561` | `Await.result(future, 3.seconds)` inside `forkchoiceUpdated`'s `IO { }` body (= `IO.delay`) — executes on CE3 compute pool; blocks compute thread up to 3s per CL invocation; threatens staking availability under load. Fix: `IO.fromFuture(IO(ask))` | **fix-now** | BEACON | tracked below as §8d-A1 |
-| **B1** | `jsonrpc/JsonRpcBaseController.scala:41` | `EC.global` as implicit `ExecutionContext` — all `Future` combinators and Pekko asks in RPC services (incl. KeyStore file I/O) run on unbounded global pool. Fix: replace with `actorSystem.dispatcher` | defer | — | tracked below as §8d-B1 |
+| **B1** ✅ | `jsonrpc/JsonRpcBaseController.scala:41` | `EC.global` as implicit `ExecutionContext` — all `Future` combinators and Pekko asks in RPC services (incl. KeyStore file I/O) run on unbounded global pool. Fix: replace with `actorSystem.dispatcher` | defer | `276c77735` | tracked below as §8d-B1 |
 | **B2** | `consensus/pow/PoWMiningCoordinator.scala` | FORGE-gated finding — see CHASE-QUEUE | defer | FORGE | CHASE-QUEUE |
 
 ---
@@ -964,18 +964,23 @@ VERIFY: `compile-all` — 0 errors. `testOnly *EngineApi*` — 16/16 ✅.
 
 ---
 
-### 8d-B1 — JsonRpcBaseController EC.global (defer)
+### ~~8d-B1~~ ✅ JsonRpcBaseController EC.global → actorSystem.dispatcher — DONE (`276c77735`)
 
 **File**: `jsonrpc/JsonRpcBaseController.scala:41`
 
-**Problem**: Every JSON-RPC controller inherits `ExecutionContext.global` as its implicit `ExecutionContext`. All `Future` combinators and Pekko asks in RPC services — including KeyStore file I/O — run on the unbounded JVM global fork-join pool instead of a bounded actor dispatcher.
+**Implementation** (10 files):
 
-**Fix**: Replace `ExecutionContext.global` with `actorSystem.dispatcher` (or a dedicated RPC bounded dispatcher in `application.conf`).
+| File | Change |
+|------|--------|
+| `JsonRpcBaseController.scala` | `implicit def executionContext` → `abstract` |
+| `JsonRpcController.scala` | Add `actorSystem: ActorSystem` field; `override implicit def executionContext = actorSystem.dispatcher` |
+| `NodeBuilder.scala` | `JSONRpcControllerBuilder` self-type adds `ActorSystemBuilder`; passes `classicSystem` |
+| `FaucetJsonRpcController.scala` | Add `actorSystem: ActorSystem` param; same override |
+| `FaucetBuilder.scala` | `FaucetJsonRpcControllerBuilder` self-type adds `ActorSystemBuilder`; passes `system` |
+| `JsonRpcControllerFixture.scala`, `FukuiiJRCSpec.scala`, `QaJRCSpec.scala` | Pass `system`/`testSystem` as last arg |
+| `JsonRpcHttpServerSpec.scala`, `GraphQLHttpRouteSpec.scala` | Test-only mock stubs override with `EC.global` (mock framework intercepts all calls — no production path) |
 
-**Gate**: None. Low risk — `actorSystem.dispatcher` is already available at construction.
-**Priority**: defer / MEDIUM — no correctness issue, but unbounded global pool is inconsistent with rest of dispatcher architecture.
-**Effort**: S (one change in base class, propagates to all 20 RPC service specs).
-**Agent**: CONDUIT (JSON-RPC layer owner).
+**Verify**: `sbt compile-all` → 0 errors in jsonrpc files. `testOnly *JsonRpc*` blocked by pre-existing compile error in `NetworkPeerManagerActor.scala` (in-progress LOOM migration, unrelated).
 
 ---
 
@@ -1037,7 +1042,7 @@ grep -rn "TODO\|FIXME\|HACK\|XXX\b" src/ --include="*.scala" | wc -l
 ```
 
 **Known candidates beyond extvm**:
-- ~~`FastSyncBranchResolverActor`~~ ✅ WIRED — `FastSync.scala` `handleBlockHeaders` `ParentChainWeightNotFound` case now spawns the actor (binary search for true common ancestor) and transitions to `waitingForBranchResolution()`; `BranchResolvedSuccessful` resets cursors/queues; `BranchResolutionFailed` falls back to N-block rewind. 15/15 tests pass. Commit pending.
+- ~~`FastSyncBranchResolverActor`~~ ✅ WIRED `ea60c4f29` — `FastSync.scala` `handleBlockHeaders` `ParentChainWeightNotFound` case now spawns the actor (binary search for true common ancestor) and transitions to `waitingForBranchResolution()`; `BranchResolvedSuccessful` resets cursors/queues; `BranchResolutionFailed` falls back to N-block rewind. 15/15 tests pass. testEssential 3,600/0 ✅.
 - Test helpers with `@Ignore` annotations (56 occurrences in tests) — audit which are permanently dead
 
 **Output**: `dead-code-audit.md` — file list, confidence level (definitely dead / possibly dead / uncertain).
@@ -1343,8 +1348,11 @@ fork block/timestamp. Verify against `OsakaOpCodes` activation in ETH genesis co
 3. **ETC Olympia EIP-2935 path fired on ETH vectors** — `networkToConfig` was defaulting to `NetworkType.ETC`, triggering the block-number EIP-2935 guard on ETH timestamp-fork vectors. Fix: set `NetworkType.ETH` for ETH test chains.
 4. **EIP-4895 withdrawals dropped** — `TestBlock` ignored the `withdrawals` array; state-root mismatch on shanghai vector with non-empty withdrawals. Fix: added `TestWithdrawal` decoder, threaded withdrawals into `BlockBody`.
 
-**Latent issue flagged (not fixed — route to FORGE or CHASE-QUEUE):**
-`BlockExecution.applyEip2935` writes `HistoryStorageAddress` storage without guaranteeing the account exists first (unlike `applyEip4788`). Currently masked on real ETC by deployment order. See CHASE-QUEUE if tracking.
+~~**Latent issue — FORGE assessed, fix required before Olympia activation:**~~
+
+~~`BlockExecution.applyEip2935`~~ ✅ `bbc5f1df8` — account-existence gap **FIXED** (2026-06-21). 2 files, `scala3-cleanup-june`.
+
+**What was done**: Removed `isActivationBlock` variable entirely (was only used in the `w1` branch condition; `blockchainReader.getBlockHeaderByHash` call removed with it). Changed `w1` condition from `if isActivationBlock && world.getCode(HistoryStorageAddress).isEmpty` to `if world.getCode(HistoryStorageAddress).isEmpty` — code-absence is now the sole deployment guard, matching `applyEip4788`. Self-heals any absent-account scenario on post-activation blocks. New regression test in `BlockHashHistorySpec`: runs `olympiaBlock + 1` on `emptyWorld` (no pre-seeded account), asserts code deployed + slot written — threw `IllegalStateException` at `getGuaranteedAccount` before fix, passes now. `sbt compile-all` → 0 errors; `scalafmtAll` clean; `testOnly *BlockHash* *BlockExecution* *Eip2935*` → 21/21; `BlockHashHistorySpec` → 6/6 (5 pre-existing + 1 new).
 
 ---
 
@@ -1380,3 +1388,40 @@ Pervasive `toClassic` / `toTyped` bridges and `Behavior[Any]` occurrences throug
 | `blockchain/sync/SyncController.scala` | 2140 | Same Classic scheduler (30-min delay) | → same fix |
 
 All PRISM-gate — no migration work required. See CHORE-QUEUE C13/C14.
+
+---
+
+## ~~Regular Sync LCA Recovery — handleForkRecovery Precise Rollback~~ ✅ DONE (`0d290019e`)
+
+**Audit:** HERALD (2026-06-21). **Source:** `post-capstone-artifact-audit.md` chain / CHASE-QUEUE cleared log.
+
+### Background
+
+Regular sync has three divergence-recovery paths (escalating):
+
+| Path | Trigger | Action |
+|------|---------|--------|
+| A — stale-tip rewind | `HeaderRejectionRewindThreshold` = 3 consecutive rejections from distinct peers | `invalidateBlocksFrom(lastBlock - 128)` — blind 128-block rewind |
+| B — UnknownBranch rewind | `BranchResolution.resolveBranch` returns `UnknownBranch` (parent not in canonical chain) | `InvalidateBlocksFrom(currentBlock - branchResolutionRequestSize)` — blind rewind |
+| C — handleForkRecovery | `ForkDetectThreshold` = 5 consecutive `UnknownParent \| BlockImportFailed` on same block hash | `setCanonicalChainHead(currentBest - 128, ...)` — destructive 128-block canonical-chain rollback, iterates |
+
+### Gap
+
+Paths A and B use a blind fixed-size rewind. Path C (the most aggressive, `BlockImporter.scala:797`) iterates: it rolls back the canonical chain 128 blocks per `ForkDetectThreshold` cycle, permanently mutating chain index entries (and serving wrong data to peers) during recovery. On a fork deeper than 128 blocks it cycles repeatedly — each iteration takes minutes (5 strikes × peer response timeouts). It converges but has no concept of the LCA.
+
+**ETC mainnet impact:** Low — MESS makes forks deeper than 128 blocks near-impossible. More relevant on Mordor.
+
+### Fix
+
+`FastSyncBranchResolverActor` already implements the full LCA search (recent-header scan + binary search fallback). One parameter generalization makes it reusable here:
+
+1. **Generalize constructor**: `fastSync: ClassicActorRef` → `replyTo: ActorRef[BranchResolverResponse]` (one-line change)
+2. **Add `ResolvingFork` behavior** to `BlockImporterLogic`: suspends import dispatch; waits for `BranchResolvedSuccessful(lca, _)` or `BranchResolutionFailed`
+3. **Replace blind rollback** in `handleForkRecovery` (`BlockImporter.scala:797`): spawn branch resolver → on `BranchResolvedSuccessful` call `setCanonicalChainHead(lca, ...)` once, precisely, then `InvalidateBlocksFrom(lca + 1)`; on `BranchResolutionFailed` fall back to current 128-block blind rewind
+
+No consensus code touched. No new network protocol. Binary search reuses existing `GetBlockHeaders` path.
+
+**Dependency:** FastSyncBranchResolverActor wiring in `FastSync.scala` — ✅ `ea60c4f29`.
+**Size:** S. **Gate:** None. **Agent:** LOOM (new behavior state) + HERALD pre-flight.
+
+**Implementation:** `handleForkRecovery` (`BlockImporter.scala:797`) spawns `FastSyncBranchResolverActor` with a typed `replyTo` adapter; enters new `resolvingFork` suspended state. `BranchResolvedSuccessful(lca, _)` → `setCanonicalChainHead(lca)` + `InvalidateBlocksFrom(lca + 1)` (precise rollback). `BranchResolutionFailed` → original 128-block blind rewind (safe degradation). 46/46 targeted tests pass.

@@ -138,9 +138,11 @@ Audit doc: `.local/docs/moderization-review-june/thread-sleep-audit.md` (gitigno
 
 ---
 
-### ~~C8a~~ ✅ FastSyncBranchResolverActor — WIRED (not deleted)
+### ~~C8a~~ ✅ FastSyncBranchResolverActor — WIRED (`ea60c4f29`)
 
-Investigation confirmed zero production spawn sites. Actor was not dead — it was **unwired**. Fix: `FastSync.scala` `handleBlockHeaders` `ParentChainWeightNotFound` case now spawns `FastSyncBranchResolverActor` (binary search for true common ancestor) and transitions to new `waitingForBranchResolution()` behavior. `BranchResolvedSuccessful` resets all in-memory cursors/queues to confirmed ancestor; `BranchResolutionFailed` falls back to N-block rewind. 15/15 `FastSyncBranchResolver*` tests pass, 0 compile errors. **Commit pending.**
+Investigation confirmed zero production spawn sites. Actor was not dead — it was **unwired**. Fix: `FastSync.scala` `handleBlockHeaders` `ParentChainWeightNotFound` case now spawns `FastSyncBranchResolverActor` (binary search for true common ancestor) and transitions to new `waitingForBranchResolution()` behavior. `BranchResolvedSuccessful` resets all in-memory cursors/queues to confirmed ancestor; `BranchResolutionFailed` falls back to N-block rewind. 15/15 `FastSyncBranchResolver*` tests pass, 0 compile errors.
+
+**testEssential (`ea60c4f29` stack — 2026-06-21):** 3,600 / 3,600 passed, 0 failures (main 3498 + rlp 26 + bytes 11 + crypto 65). Gate cleared.
 
 **Ref:** DEFERRED-BACKLOG.md §8f
 
@@ -252,7 +254,7 @@ PRISM post-capstone finding. `fix(pekko): replace Classic scheduler with Typed c
 | ~~1h~~ | ~~C5 console→logging~~ | ~~✅ DONE `6a3e2cd88`~~ | — |
 | ~~2h+~~ | ~~C6 dead code research~~ | ~~✅ DONE — `dead-code-audit.md` (325 lines)~~ | — |
 | ~~2h+~~ | ~~C7 Thread.sleep fixes~~ | ~~✅ DONE — audit only; 7 real calls, all Bucket B (clock injection required)~~ | — |
-| ~~deferred~~ | ~~C8a FastSyncBranchResolverActor~~ | ~~✅ WIRED — commit pending; testEssential required before PR~~ | — |
+| ~~deferred~~ | ~~C8a FastSyncBranchResolverActor~~ | ~~✅ WIRED `ea60c4f29` — testEssential 3600/0 ✅~~ | — |
 | ~~UNBLOCKED~~ | ~~C8b MerkleProofVerifier dead private methods~~ | ~~✅ DONE `cc7b58b3b`~~ | — |
 | ~~~1h~~ | ~~C9a SNAPSyncControllerSpec Thread.sleep ×2~~ | ~~✅ DONE `e9638ac52` — CountDownLatch gates~~ | — |
 | ~~30 min~~ | ~~C9b Discv4SyncResponderSpec Thread.sleep ×1~~ | ~~✅ DONE `ba9b9d463` — `fakeNanos` var in RateLimiter~~ | — |
