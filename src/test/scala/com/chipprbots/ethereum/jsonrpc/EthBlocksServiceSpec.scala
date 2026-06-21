@@ -1,7 +1,6 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
@@ -15,7 +14,6 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.NormalPatience
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.consensus.blocks.PendingBlock
 import com.chipprbots.ethereum.consensus.blocks.PendingBlockAndState
@@ -32,9 +30,8 @@ import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.testing.Tags.*
 
 class EthBlocksServiceSpec
-    extends TestKit(ActorSystem("EthBlocksServiceSpec_ActorSystem"))
+    extends ScalaTestWithActorTestKit
     with AnyFlatSpecLike
-    with WithActorSystemShutDown
     with Matchers
     with ScalaFutures
     with OptionValues

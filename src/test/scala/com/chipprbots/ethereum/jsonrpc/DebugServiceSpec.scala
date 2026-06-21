@@ -3,9 +3,9 @@ package com.chipprbots.ethereum.jsonrpc
 import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 
 import cats.effect.unsafe.IORuntime
@@ -18,7 +18,6 @@ import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.jsonrpc.DebugService.ListPeersInfoRequest
 import com.chipprbots.ethereum.jsonrpc.DebugService.ListPeersInfoResponse
@@ -34,14 +33,14 @@ import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.testing.Tags.*
 
 class DebugServiceSpec
-    extends TestKit(ActorSystem("ActorSystem_DebugServiceSpec"))
+    extends ScalaTestWithActorTestKit
     with AnyFlatSpecLike
-    with WithActorSystemShutDown
     with Matchers
     with MockFactory
     with ScalaFutures {
 
   implicit val runtime: IORuntime = IORuntime.global
+  implicit private val classicActorSystem: ActorSystem = system.toClassic
 
   "DebugService" should "return list of peers info" taggedAs (UnitTest, RPCTest) in new TestSetup {
     val result: Future[Either[JsonRpcError, ListPeersInfoResponse]] =

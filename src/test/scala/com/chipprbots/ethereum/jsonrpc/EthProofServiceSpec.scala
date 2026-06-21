@@ -1,7 +1,6 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
@@ -34,9 +33,8 @@ import com.chipprbots.ethereum.nodebuilder.ApisBuilder
 import com.chipprbots.ethereum.testing.Tags.*
 
 class EthProofServiceSpec
-    extends TestKit(ActorSystem("EthGetProofSpec_ActorSystem"))
+    extends ScalaTestWithActorTestKit
     with AnyFlatSpecLike
-    with WithActorSystemShutDown
     with Matchers
     with ScalaFutures
     with OptionValues

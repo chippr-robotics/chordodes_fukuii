@@ -1,8 +1,8 @@
 package com.chipprbots.ethereum.jsonrpc
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -20,8 +20,6 @@ import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Mocks.MockValidatorsAlwaysSucceed
-import com.chipprbots.ethereum.NormalPatience
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.consensus.blocks.PendingBlock
@@ -60,16 +58,15 @@ import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.Config
 
 class EthMiningServiceSpec
-    extends TestKit(ActorSystem("EthMiningServiceSpec_ActorSystem"))
+    extends ScalaTestWithActorTestKit
     with AnyFlatSpecLike
-    with WithActorSystemShutDown
     with Matchers
     with ScalaFutures
     with Eventually
-    with NormalPatience
     with org.scalamock.scalatest.MockFactory {
 
   implicit val runtime: IORuntime = IORuntime.global
+  implicit private val classicActorSystem: ActorSystem = system.toClassic
 
   "MiningServiceSpec" should "return if node is mining base on getWork" taggedAs (UnitTest, RPCTest) in new TestSetup {
 

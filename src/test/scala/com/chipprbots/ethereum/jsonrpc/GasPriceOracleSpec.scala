@@ -1,7 +1,8 @@
 package com.chipprbots.ethereum.jsonrpc
 
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -44,17 +45,16 @@ import com.chipprbots.ethereum.utils.Config
   *   - F. Network-specific integration regression
   */
 class GasPriceOracleSpec
-    extends TestKit(ActorSystem("GasPriceOracleSpec_ActorSystem"))
+    extends ScalaTestWithActorTestKit
     with AnyFlatSpecLike
-    with WithActorSystemShutDown
     with Matchers
     with ScalaFutures
     with OptionValues
     with MockFactory
-    with NormalPatience
     with TypeCheckedTripleEquals {
 
   implicit val runtime: IORuntime = IORuntime.global
+  implicit private val classicActorSystem: ActorSystem = system.toClassic
 
   // ─── Shared constants ──────────────────────────────────────────────────────
 

@@ -2,8 +2,8 @@ package com.chipprbots.ethereum.jsonrpc
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -14,7 +14,6 @@ import scala.collection.immutable.NumericRange
 import com.chipprbots.ethereum.BlockHelpers
 import com.chipprbots.ethereum.FreeSpecBase
 import com.chipprbots.ethereum.SpecFixtures
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.Address
@@ -37,10 +36,12 @@ import com.chipprbots.ethereum.transactions.TransactionHistoryService.MinedTrans
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 class FukuiiServiceSpec
-    extends TestKit(ActorSystem("FukuiiServiceSpec"))
+    extends ScalaTestWithActorTestKit
     with FreeSpecBase
-    with SpecFixtures
-    with WithActorSystemShutDown {
+    with SpecFixtures {
+
+  implicit private val classicActorSystem: ActorSystem = system.toClassic
+
   class Fixture
       extends TransactionHistoryServiceBuilder.Default
       with EphemBlockchainTestSetup

@@ -1,7 +1,8 @@
 package com.chipprbots.ethereum.jsonrpc
 
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -34,9 +35,8 @@ import com.chipprbots.ethereum.testing.ActorsTesting.simpleAutoPilot
 import com.chipprbots.ethereum.testing.Tags.*
 
 class EthServiceSpec
-    extends TestKit(ActorSystem("EthInfoServiceSpec_ActorSystem"))
+    extends ScalaTestWithActorTestKit
     with AnyFlatSpecLike
-    with WithActorSystemShutDown
     with Matchers
     with ScalaFutures
     with OptionValues
@@ -45,6 +45,7 @@ class EthServiceSpec
     with TypeCheckedTripleEquals {
 
   implicit val runtime: IORuntime = IORuntime.global
+  implicit private val classicActorSystem: ActorSystem = system.toClassic
 
   "EthInfoService" should "return ethereum protocol version" taggedAs (UnitTest, RPCTest) in new TestSetup {
     val response: Either[JsonRpcError, ProtocolVersionResponse] =
