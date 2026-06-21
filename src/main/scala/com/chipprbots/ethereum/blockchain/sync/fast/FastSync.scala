@@ -610,6 +610,70 @@ object FastSync {
         newPivot.number == currentState.pivotBlock.number && updateReason.isSyncRestart
       newPivot.number >= currentState.pivotBlock.number && !stalePivotAfterRestart
     }
+    /** Suspends header dispatch while `FastSyncBranchResolverActor` binary-searches for the highest common ancestor.
+      * The resolver discards diverged blocks itself; on `BranchResolvedSuccessful` we reset in-memory tracking to
+      * match, then resume. On `BranchResolutionFailed` we fall back to the N-block blind rewind.
+      */
+    def waitingForBranchResolution(): Behavior[Any] =
+      Behaviors.receiveMessage { msg =>
+        if handlePeerList(msg) || handleStatus(msg) then Behaviors.same
+        else
+          msg match {
+            case FastSyncBranchResolverActor.BranchResolvedSuccessful(highestCommonBlock, _) =>
+              log.info(
+                "Branch resolution completed: highest common block is {}. Resetting cursor and resuming fast sync.",
+                highestCommonBlock
+              )
+              // The resolver already removed diverged blocks from the DB; realign in-memory state.
+              syncState = syncState.copy(
+                bestBlockHeaderNumber = highestCommonBlock,
+                blockBodiesQueue = Seq.empty,
+                receiptsQueue = Seq.empty,
+                nextBlockToFullyValidate = (highestCommonBlock + 1).max(1)
+              )
+              bodiesFetcherQueue = new BodiesFetcherQueue(ethRateTracker)
+              receiptsFetcherQueue = new ReceiptsFetcherQueue(ethRateTracker)
+              headersFetcherQueue = new HeadersFetcherQueue(ethRateTracker)
+              headerResponseBuffer.clear()
+              headerQueueHighWatermark = highestCommonBlock
+              val b = syncing()
+              processSyncing()
+              b
+
+            case FastSyncBranchResolverActor.BranchResolutionFailed(failure) =>
+              log.warn(
+                "Branch resolution failed ({}). Falling back to {}-block rewind from {}.",
+                failure,
+                syncConfig.fastSyncBlockValidationN,
+                syncState.bestBlockHeaderNumber
+              )
+              val rewindTarget =
+                (syncState.bestBlockHeaderNumber - syncConfig.fastSyncBlockValidationN - 1).max(0)
+              syncState = syncState.copy(
+                blockBodiesQueue = Seq.empty,
+                receiptsQueue = Seq.empty,
+                bestBlockHeaderNumber = rewindTarget,
+                nextBlockToFullyValidate = (rewindTarget + 1).max(1)
+              )
+              bodiesFetcherQueue = new BodiesFetcherQueue(ethRateTracker)
+              receiptsFetcherQueue = new ReceiptsFetcherQueue(ethRateTracker)
+              headersFetcherQueue = new HeadersFetcherQueue(ethRateTracker)
+              headerResponseBuffer.clear()
+              headerQueueHighWatermark = rewindTarget
+              val b = syncing()
+              processSyncing()
+              b
+
+            case PeerRequestHandler.RequestFailed(peer, reason) =>
+              handleRequestFailure(peer, FastSyncRequestFailed(reason))
+              Behaviors.same
+            case RequestTerminated(handler) =>
+              assignedHandlers -= handler
+              Behaviors.same
+            case _ => Behaviors.same
+          }
+      }
+
     def waitingForPivotBlockUpdate(updateReason: PivotBlockUpdateReason): Behavior[Any] =
       Behaviors.receiveMessage { msg =>
         if handlePeerList(msg) || handleStatus(msg) then Behaviors.same
@@ -861,15 +925,27 @@ object FastSync {
       } else
         processHeaders(headers) match {
           case ParentChainWeightNotFound(header) =>
-            // We could end in wrong fork and get blocked so we should rewind our state a little
-            // we blacklist peer just in case we got malicious peer which would send us bad blocks, forcing us to roll
-            // back to genesis
             log.warn(
-              "Parent chain weight not found for block {} (parent: {}). Will retry sync with alternate peer.",
+              "Parent chain weight not found for block {} (parent: {}). " +
+                "Spawning branch resolver to locate common ancestor.",
               header.idTag,
               header.parentHash
             )
-            handleRewind(header, peer, syncConfig.fastSyncBlockValidationN, syncConfig.blacklistDuration)
+            blacklist.add(peer.id, syncConfig.blacklistDuration, BlockHeaderValidationFailed)
+            val resolver = ctx.spawn(
+              FastSyncBranchResolverActor(
+                fastSync = ctx.self.toClassic,
+                peerEventBus = peerEventBus,
+                networkPeerManager = networkPeerManager,
+                blockchain = blockchain,
+                blockchainReader = blockchainReader,
+                blacklist = blacklist,
+                syncConfig = syncConfig
+              ),
+              s"fast-sync-branch-resolver-${java.util.UUID.randomUUID()}"
+            )
+            resolver ! FastSyncBranchResolverActor.StartBranchResolver
+            waitingForBranchResolution()
           case HeadersProcessingFinished =>
             processSyncing()
           case ImportedPivotBlock =>
