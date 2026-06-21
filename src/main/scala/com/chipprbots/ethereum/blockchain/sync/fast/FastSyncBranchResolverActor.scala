@@ -33,30 +33,42 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
 /** Finds the first common block between our chain and the chain of the master peer (the peer with the highest block),
   * so fast sync can discard our diverged tip and re-download from the common ancestor.
   *
-  * Pekko Typed migration (Group S2): the Classic `context.become` state machine becomes named `Behavior` factories
-  * (`waitingForPeerWithHighestBlock` / `waitingForRecentBlockHeaders` / `waitingForBinarySearchBlock`). Peer-list
-  * responsibilities move to the composed [[PeerListHelper]] (replacing the self-typed `PeerListSupportNg` trait); the
-  * periodic `GetHandshakedPeers` poll is owned here via `Behaviors.withTimers`.
+  * Pekko Typed migration (Group S2 — narrowed): `Behavior[Command]` with a sealed Command ADT. Three named behavior
+  * states: `waitingForPeerWithHighestBlock` / `waitingForRecentBlockHeaders` / `waitingForBinarySearchBlock`. Peer-list
+  * responsibilities live in [[PeerListHelper]]; the periodic `GetHandshakedPeers` poll runs via `Behaviors.withTimers`.
   *
-  * The behavior type is `Behavior[Any]` (same idiom as `BytecodeRecoveryActor`): `PeerRequestHandler` stays Classic and
-  * sends its `ResponseReceived` / `RequestFailed` replies to `context.parent`, which — when the handler is spawned via
-  * `context.toClassic.actorOf` — is this Typed actor's mailbox. Those raw Classic case classes are matched directly.
-  * `PeerDisconnected` and `HandshakedPeers` events arrive via `context.messageAdapter`s. `fastSync` stays Classic —
-  * replies go out via Classic `tell` with `noSender`. The pure binary-search/discard logic stays in the
-  * [[FastSyncBranchResolver]] trait, mixed into the helper [[BranchLogic]] instance.
+  * All inbound message types are Command ADT members. `HandshakedPeers` replies from `NetworkPeerManagerActor` (Classic
+  * tell) are wrapped via a `messageAdapter` into `HandshakedPeersMsg`. `PeerRequestHandler` results arrive wrapped as
+  * `PeerRequestResult` via another adapter; the PRH child is spawned typed and death-watched with `watchWith(handler,
+  * HandlerTerminated(handler))`. `replyTo: TypedActorRef[BranchResolverResponse]` stays a typed ref — `FastSync` passes
+  * `ctx.messageAdapter[BranchResolverResponse](identity)` until it is itself narrowed (SNAP2). The pure
+  * binary-search/discard logic stays in [[FastSyncBranchResolver]] via [[BranchLogic]].
   */
 object FastSyncBranchResolverActor {
 
   import FastSyncBranchResolver.*
 
+  // ----- Sealed Command ADT -----
+
+  sealed trait Command
+
   /** Begin (or restart) branch resolution. Public command sent by the parent / test. */
-  case object StartBranchResolver
+  case object StartBranchResolver extends Command
 
   /** Periodic timer fire: poll `networkPeerManager` for handshaked peers. */
-  private case object ScanPeers
+  private case object ScanPeers extends Command
 
   /** A watched PeerRequestHandler child terminated. */
-  final private case class HandlerTerminated(ref: TypedActorRef[PeerRequestHandler.Command])
+  final private case class HandlerTerminated(ref: TypedActorRef[PeerRequestHandler.Command]) extends Command
+
+  /** Wraps the `HandshakedPeers` reply from `NetworkPeerManagerActor` (Classic tell → adapter). */
+  final private case class HandshakedPeersMsg(msg: NetworkPeerManagerActor.HandshakedPeers) extends Command
+
+  /** Wraps a `PeerDisconnected` event from the peer event bus adapter. */
+  final private case class PeerDisconnectedMsg(event: PeerDisconnected) extends Command
+
+  /** Wraps a `PeerRequestHandler.Result` reply from the PRH result adapter. */
+  final private case class PeerRequestResult(result: PeerRequestHandler.Result) extends Command
 
   // ----- Outgoing messages to the Classic `fastSync` parent -----
 
@@ -107,11 +119,14 @@ object FastSyncBranchResolverActor {
       blockchainReader: BlockchainReader,
       blacklist: Blacklist,
       syncConfig: SyncConfig
-  ): Behavior[Any] =
+  ): Behavior[Command] =
     Behaviors.setup { context =>
       Behaviors.withTimers { timers =>
         val peerDisconnectedAdapter: TypedActorRef[PeerDisconnected] =
-          context.messageAdapter[PeerDisconnected](identity)
+          context.messageAdapter[PeerDisconnected](PeerDisconnectedMsg(_))
+
+        val handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers] =
+          context.messageAdapter[NetworkPeerManagerActor.HandshakedPeers](HandshakedPeersMsg(_))
 
         val peerListHelper = new PeerListHelper(
           peerEventBus,
@@ -133,11 +148,12 @@ object FastSyncBranchResolverActor {
           peerListHelper,
           branchLogic,
           new RecentBlocksSearch(blockchainReader),
-          syncConfig.blockHeadersPerRequest
+          syncConfig.blockHeadersPerRequest,
+          handshakedPeersAdapter
         )
 
         // Immediate poll, then periodic poll for handshaked peers (replaces PeerListSupportNg's scheduleWithFixedDelay).
-        networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, context.self.toClassic)
+        networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, handshakedPeersAdapter.toClassic)
         timers.startTimerWithFixedDelay(ScanKey, ScanPeers, syncConfig.peersScanInterval)
 
         resolver.waitingForPeerWithHighestBlock()
@@ -146,8 +162,8 @@ object FastSyncBranchResolverActor {
 
   /** Holds the wiring shared across the behavior states. Each `waiting...` method returns the next `Behavior`. */
   private class Resolver(
-      context: ActorContext[Any],
-      timers: TimerScheduler[Any],
+      context: ActorContext[Command],
+      timers: TimerScheduler[Command],
       replyTo: TypedActorRef[BranchResolverResponse],
       peerEventBus: ClassicActorRef,
       networkPeerManager: ClassicActorRef,
@@ -156,30 +172,31 @@ object FastSyncBranchResolverActor {
       peerListHelper: PeerListHelper,
       branchLogic: BranchLogic,
       recentBlocksSearch: RecentBlocksSearch,
-      recentHeadersSize: Int
+      recentHeadersSize: Int,
+      handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers]
   ) {
     import BinarySearchSupport.*
 
     private val prhResultAdapter: TypedActorRef[PeerRequestHandler.Result] =
-      context.messageAdapter[PeerRequestHandler.Result](identity)
+      context.messageAdapter[PeerRequestHandler.Result](PeerRequestResult(_))
 
     private def log = context.log
 
     /** Shared peer-list / scan handling for every state. Returns `Some(next)` if the message was handled. */
-    private def handleCommon(message: Any): Option[Behavior[Any]] = message match {
+    private def handleCommon(message: Command): Option[Behavior[Command]] = message match {
       case ScanPeers =>
-        networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, context.self.toClassic)
+        networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, handshakedPeersAdapter.toClassic)
         Some(Behaviors.same)
-      case NetworkPeerManagerActor.HandshakedPeers(peers) =>
+      case HandshakedPeersMsg(NetworkPeerManagerActor.HandshakedPeers(peers)) =>
         peerListHelper.handleHandshakedPeers(peers)
         Some(Behaviors.same)
-      case PeerDisconnected(peerId) =>
+      case PeerDisconnectedMsg(PeerDisconnected(peerId)) =>
         peerListHelper.handlePeerDisconnected(peerId)
         Some(Behaviors.same)
       case _ => None
     }
 
-    def waitingForPeerWithHighestBlock(): Behavior[Any] =
+    def waitingForPeerWithHighestBlock(): Behavior[Command] =
       Behaviors.receiveMessage { message =>
         handleCommon(message).getOrElse {
           message match {
@@ -206,18 +223,19 @@ object FastSyncBranchResolverActor {
         masterPeer: Peer,
         bestBlockNumber: BigInt,
         requestHandler: TypedActorRef[PeerRequestHandler.Command]
-    ): Behavior[Any] =
+    ): Behavior[Command] =
       Behaviors.receiveMessage { message =>
         handleCommon(message).getOrElse {
           message match {
-            case ResponseReceived(peer, ETH68BlockHeaders(_, headers), timeTaken) if peer == masterPeer =>
+            case PeerRequestResult(ResponseReceived(peer, ETH68BlockHeaders(_, headers), timeTaken))
+                if peer == masterPeer =>
               if headers.size == recentHeadersSize then {
                 log.debug("Received {} block headers from peer {} in {} ms", headers.size, masterPeer.id, timeTaken)
                 handleRecentBlockHeadersResponse(headers, masterPeer, bestBlockNumber)
               } else {
                 handleInvalidResponse(peer, requestHandler)
               }
-            case RequestFailed(peer, reason) =>
+            case PeerRequestResult(RequestFailed(peer, reason)) =>
               handleRequestFailure(peer, requestHandler, reason)
             case HandlerTerminated(ref) if ref == requestHandler =>
               handlePeerTermination(masterPeer, ref)
@@ -230,11 +248,12 @@ object FastSyncBranchResolverActor {
         searchState: SearchState,
         blockHeaderNumberToSearch: BigInt,
         requestHandler: TypedActorRef[PeerRequestHandler.Command]
-    ): Behavior[Any] =
+    ): Behavior[Command] =
       Behaviors.receiveMessage { message =>
         handleCommon(message).getOrElse {
           message match {
-            case ResponseReceived(peer, ETH68BlockHeaders(_, headers), durationMs) if peer == searchState.masterPeer =>
+            case PeerRequestResult(ResponseReceived(peer, ETH68BlockHeaders(_, headers), durationMs))
+                if peer == searchState.masterPeer =>
               context.unwatch(requestHandler)
               headers.toList match {
                 case childHeader :: Nil if childHeader.number == blockHeaderNumberToSearch =>
@@ -244,17 +263,17 @@ object FastSyncBranchResolverActor {
                   log.warn(ReceivedWrongHeaders, blockHeaderNumberToSearch, headers.map(_.number))
                   handleInvalidResponse(peer, requestHandler)
               }
-            case RequestFailed(peer, reason) =>
+            case PeerRequestResult(RequestFailed(peer, reason)) =>
               handleRequestFailure(peer, requestHandler, reason)
             case HandlerTerminated(ref) if ref == requestHandler =>
               handlePeerTermination(searchState.masterPeer, ref)
-            case HandlerTerminated(_) => Behaviors.same // ignore
+            case HandlerTerminated(_) => Behaviors.same // ignore stale death-watch
             case _                    => Behaviors.same
           }
         }
       }
 
-    private def requestRecentBlockHeaders(masterPeer: Peer, bestBlockNumber: BigInt): Behavior[Any] = {
+    private def requestRecentBlockHeaders(masterPeer: Peer, bestBlockNumber: BigInt): Behavior[Command] = {
       val requestHandler = sendGetBlockHeadersRequest(
         masterPeer,
         fromBlock = childOf((bestBlockNumber - recentHeadersSize).max(0)),
@@ -268,7 +287,7 @@ object FastSyncBranchResolverActor {
         blockHeaders: Seq[BlockHeader],
         masterPeer: Peer,
         bestBlockNumber: BigInt
-    ): Behavior[Any] =
+    ): Behavior[Command] =
       recentBlocksSearch.getHighestCommonBlock(blockHeaders, bestBlockNumber) match {
         case Some(highestCommonBlockNumber) =>
           finalizeBranchResolver(highestCommonBlockNumber, masterPeer)
@@ -279,7 +298,7 @@ object FastSyncBranchResolverActor {
           )
       }
 
-    private def requestBlockHeaderForBinarySearch(searchState: SearchState): Behavior[Any] = {
+    private def requestBlockHeaderForBinarySearch(searchState: SearchState): Behavior[Command] = {
       val headerNumberToRequest = blockHeaderNumberToRequest(searchState.minBlockNumber, searchState.maxBlockNumber)
       val handler = sendGetBlockHeadersRequest(searchState.masterPeer, headerNumberToRequest, 1)
       waitingForBinarySearchBlock(searchState, headerNumberToRequest, handler)
@@ -288,7 +307,7 @@ object FastSyncBranchResolverActor {
     private def handleBinarySearchBlockHeaderResponse(
         searchState: SearchState,
         childHeader: BlockHeader
-    ): Behavior[Any] = {
+    ): Behavior[Command] = {
       import BinarySearchSupport.*
       blockchainReader.getBlockHeaderByNumber(parentOf(childHeader.number)) match {
         case Some(parentHeader) =>
@@ -304,7 +323,7 @@ object FastSyncBranchResolverActor {
       }
     }
 
-    private def finalizeBranchResolver(firstCommonBlockNumber: BigInt, masterPeer: Peer): Behavior[Any] = {
+    private def finalizeBranchResolver(firstCommonBlockNumber: BigInt, masterPeer: Peer): Behavior[Command] = {
       branchLogic.discardBlocksAfter(firstCommonBlockNumber)
       log.info(s"Branch resolution completed with first common block number [$firstCommonBlockNumber]")
       replyTo ! BranchResolvedSuccessful(highestCommonBlockNumber = firstCommonBlockNumber, masterPeer = masterPeer)
@@ -312,7 +331,7 @@ object FastSyncBranchResolverActor {
     }
 
     /** On fatal errors (and to prevent trying forever) signal the caller and let it decide whether to retry. */
-    private def stopWithFailure(response: BranchResolutionFailed): Behavior[Any] = {
+    private def stopWithFailure(response: BranchResolutionFailed): Behavior[Command] = {
       replyTo ! response
       Behaviors.stopped
     }
@@ -343,7 +362,10 @@ object FastSyncBranchResolverActor {
       handler
     }
 
-    private def handleInvalidResponse(peer: Peer, peerRef: TypedActorRef[PeerRequestHandler.Command]): Behavior[Any] = {
+    private def handleInvalidResponse(
+        peer: Peer,
+        peerRef: TypedActorRef[PeerRequestHandler.Command]
+    ): Behavior[Command] = {
       log.warn(s"Received invalid response from peer [${peer.id}]. Restarting branch resolver.")
       context.unwatch(peerRef)
       peerListHelper.blacklistIfHandshaked(
@@ -358,7 +380,7 @@ object FastSyncBranchResolverActor {
         peer: Peer,
         peerRef: TypedActorRef[PeerRequestHandler.Command],
         reason: String
-    ): Behavior[Any] = {
+    ): Behavior[Command] = {
       log.warn(s"Request to peer [${peer.id}] failed: [$reason]. Restarting branch resolver.")
       context.unwatch(peerRef)
       peerListHelper.blacklistIfHandshaked(
@@ -372,12 +394,12 @@ object FastSyncBranchResolverActor {
     private def handlePeerTermination(
         peer: Peer,
         peerHandlerRef: TypedActorRef[PeerRequestHandler.Command]
-    ): Behavior[Any] = {
+    ): Behavior[Command] = {
       log.warn(peerTerminatedLog, peerHandlerRef.path.name, peer.id)
       restart()
     }
 
-    private def restart(): Behavior[Any] = {
+    private def restart(): Behavior[Command] = {
       context.self ! StartBranchResolver
       waitingForPeerWithHighestBlock()
     }
