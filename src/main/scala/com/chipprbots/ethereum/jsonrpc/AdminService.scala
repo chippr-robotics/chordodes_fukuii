@@ -7,7 +7,7 @@ import java.net.URI
 import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicReference
 
-import org.apache.pekko.actor.Actor
+import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed
 import org.apache.pekko.util.Timeout
 
@@ -282,7 +282,7 @@ class AdminService(
               }
               matchingPeer match {
                 case Some(peer) =>
-                  peerManager ! PeerManagerActor.DisconnectPeerByIdCmd(peer.id, Actor.noSender)
+                  peerManager ! PeerManagerActor.DisconnectPeerByIdCmd(peer.id, ActorRef.noSender)
                   Right(AdminRemovePeerResponse(true))
                 case None =>
                   Right(AdminRemovePeerResponse(false))
