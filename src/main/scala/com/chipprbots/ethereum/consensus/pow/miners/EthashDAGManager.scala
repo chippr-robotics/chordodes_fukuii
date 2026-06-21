@@ -9,6 +9,7 @@ import org.apache.pekko.util.ByteString
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
+import scala.util.Using
 
 import org.bouncycastle.util.encoders.Hex
 
@@ -61,46 +62,50 @@ class EthashDAGManager(blockCreator: PoWBlockCreator) extends Logger {
     file.getParentFile.mkdirs()
     file.createNewFile()
 
-    val outputStream = new FileOutputStream(dagFile(seed).getAbsolutePath)
-    outputStream.write(DagFilePrefix.toArray[Byte])
-
-    val cache = EthashUtils.makeCache(epoch, seed)
     val res = new Array[Array[Int]](dagNumHashes)
 
-    (0 until dagNumHashes).foreach { i =>
-      val item = EthashUtils.calcDatasetItem(cache, i)
-      outputStream.write(ByteUtils.intsToBytes(item, bigEndian = false))
-      res(i) = item
+    val written = Using(new FileOutputStream(dagFile(seed).getAbsolutePath)) { outputStream =>
+      outputStream.write(DagFilePrefix.toArray[Byte])
 
-      if i % 100000 == 0 then log.info(s"Generating DAG ${((i / dagNumHashes.toDouble) * 100).toInt}%")
-    }
+      val cache = EthashUtils.makeCache(epoch, seed)
 
-    Try(outputStream.close())
+      (0 until dagNumHashes).foreach { i =>
+        val item = EthashUtils.calcDatasetItem(cache, i)
+        outputStream.write(ByteUtils.intsToBytes(item, bigEndian = false))
+        res(i) = item
 
-    res
-  }
-
-  private def loadDagFromFile(seed: ByteString, dagNumHashes: Int): Try[Array[Array[Int]]] = {
-    val inputStream = new FileInputStream(dagFile(seed).getAbsolutePath)
-
-    val prefix = new Array[Byte](8)
-    if inputStream.read(prefix) != 8 || ByteString(prefix) != DagFilePrefix then {
-      Failure(new RuntimeException("Invalid DAG file prefix"))
-    } else {
-      val buffer = new Array[Byte](64) // scalastyle:ignore magic.number
-      val res = new Array[Array[Int]](dagNumHashes)
-      var index = 0
-
-      while inputStream.read(buffer) > 0 do {
-        if index % 100000 == 0 then log.info(s"Loading DAG from file ${((index / res.length.toDouble) * 100).toInt}%")
-        res(index) = ByteUtils.bytesToInts(buffer, bigEndian = false)
-        index += 1
+        if i % 100000 == 0 then log.info(s"Generating DAG ${((i / dagNumHashes.toDouble) * 100).toInt}%")
       }
+    }
 
-      Try(inputStream.close())
-
-      if index == dagNumHashes then Success(res)
-      else Failure(new RuntimeException("DAG file ended unexpectedly"))
+    written match {
+      case Success(_)  => res
+      case Failure(ex) =>
+        // Delete the partial/corrupt DAG file so the next run regenerates from scratch.
+        log.error("Failed to generate DAG file, removing partial output", ex)
+        if file.exists() then file.delete()
+        throw ex
     }
   }
+
+  private def loadDagFromFile(seed: ByteString, dagNumHashes: Int): Try[Array[Array[Int]]] =
+    Using(new FileInputStream(dagFile(seed).getAbsolutePath)) { inputStream =>
+      val prefix = new Array[Byte](8)
+      if inputStream.read(prefix) != 8 || ByteString(prefix) != DagFilePrefix then {
+        Failure(new RuntimeException("Invalid DAG file prefix"))
+      } else {
+        val buffer = new Array[Byte](64) // scalastyle:ignore magic.number
+        val res = new Array[Array[Int]](dagNumHashes)
+        var index = 0
+
+        while inputStream.read(buffer) > 0 do {
+          if index % 100000 == 0 then log.info(s"Loading DAG from file ${((index / res.length.toDouble) * 100).toInt}%")
+          res(index) = ByteUtils.bytesToInts(buffer, bigEndian = false)
+          index += 1
+        }
+
+        if index == dagNumHashes then Success(res)
+        else Failure(new RuntimeException("DAG file ended unexpectedly"))
+      }
+    }.flatten
 }
