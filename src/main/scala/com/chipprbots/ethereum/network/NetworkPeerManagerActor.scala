@@ -6,7 +6,6 @@ import org.apache.pekko.actor.typed
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext as TypedActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
@@ -129,7 +128,6 @@ object NetworkPeerManagerActor {
 
         new Impl(
           ctx,
-          timers,
           eventAdapter,
           peerManagerActor,
           peerEventBusActor,
@@ -147,7 +145,6 @@ object NetworkPeerManagerActor {
   // scalastyle:off number.of.methods
   final private class Impl(
       ctx: TypedActorContext[Any],
-      @annotation.unused timers: TimerScheduler[Any],
       eventAdapter: ActorRef,
       peerManagerActor: typed.ActorRef[PeerManagerActor.Command],
       peerEventBusActor: typed.ActorRef[PeerEventBusActor.Command],
