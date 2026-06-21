@@ -35,7 +35,6 @@ class EngineApiService(
 
   import org.apache.pekko.util.Timeout
   import scala.concurrent.duration.*
-  import scala.concurrent.Await
   implicit private val askTimeout: Timeout = Timeout(3.seconds)
 
   /*
@@ -435,7 +434,7 @@ class EngineApiService(
   def forkchoiceUpdated(
       forkChoiceState: ForkChoiceState,
       payloadAttributes: Option[PayloadAttributes]
-  ): IO[Either[String, ForkchoiceUpdatedResponse]] = IO {
+  ): IO[Either[String, ForkchoiceUpdatedResponse]] = IO.defer {
     // Check invalid/unvalidated blocks BEFORE applying fork choice state
     // (applyForkChoiceState calls saveBestKnownBlocks which would make the block canonical)
     val zeroHash = ByteString(new Array[Byte](32))
@@ -443,7 +442,7 @@ class EngineApiService(
     if invalidBlocks.containsKey(forkChoiceState.headBlockHash) then {
       val latestValid = Option(invalidBlocks.get(forkChoiceState.headBlockHash))
       EngineApiMetrics.recordForkchoiceUpdated("INVALID")
-      Right(
+      IO.pure(Right(
         ForkchoiceUpdatedResponse(
           payloadStatus = PayloadStatusV1(
             Invalid,
@@ -451,7 +450,7 @@ class EngineApiService(
             validationError = Some("head block was previously invalidated")
           )
         )
-      )
+      ))
     } else {
       // Check if the head block is fully stored (number→hash mapping exists).
       // Blocks stored via storeBlockByHashOnly (ACCEPTED) don't have this mapping.
@@ -491,31 +490,31 @@ class EngineApiService(
         // wait state because the FCU short-circuits before publishBeaconHead fires.
         forkChoiceManager.applyForkChoiceState(forkChoiceState)
         EngineApiMetrics.recordForkchoiceUpdated("SYNCING")
-        Right(ForkchoiceUpdatedResponse(payloadStatus = PayloadStatusV1(Syncing)))
+        IO.pure(Right(ForkchoiceUpdatedResponse(payloadStatus = PayloadStatusV1(Syncing))))
       } else if headOptimistic then {
         // Same rationale as the unknown-head case: drive ForkChoiceManager so SNAP sync
         // can re-pivot on the freshest CL head while we're still optimistically caught up.
         forkChoiceManager.applyForkChoiceState(forkChoiceState)
         EngineApiMetrics.recordForkchoiceUpdated("SYNCING")
-        Right(ForkchoiceUpdatedResponse(payloadStatus = PayloadStatusV1(Syncing)))
+        IO.pure(Right(ForkchoiceUpdatedResponse(payloadStatus = PayloadStatusV1(Syncing))))
       } else if safeUnknown || finalizedUnknown then {
         val msg = if safeUnknown then "unknown safe block hash" else "unknown finalized block hash"
         EngineApiMetrics.recordForkchoiceUpdated("INVALID")
-        Left(msg)
+        IO.pure(Left(msg))
       } else if headHeader.isDefined && !isAncestorOrEqual(safeHash, forkChoiceState.headBlockHash, zeroHash) then {
         EngineApiMetrics.recordForkchoiceUpdated("INVALID")
-        Left("invalid forkchoice state: safe block is not an ancestor of head")
+        IO.pure(Left("invalid forkchoice state: safe block is not an ancestor of head"))
       } else if headHeader.isDefined && !isAncestorOrEqual(finalizedHash, forkChoiceState.headBlockHash, zeroHash)
       then {
         EngineApiMetrics.recordForkchoiceUpdated("INVALID")
-        Left("invalid forkchoice state: finalized block is not an ancestor of head")
+        IO.pure(Left("invalid forkchoice state: finalized block is not an ancestor of head"))
       } else {
 
         forkChoiceManager.applyForkChoiceState(forkChoiceState) match {
           case Left(_) =>
             // Head not known — return SYNCING so CL knows we need newPayload
             EngineApiMetrics.recordForkchoiceUpdated("SYNCING")
-            Right(ForkchoiceUpdatedResponse(payloadStatus = PayloadStatusV1(Syncing)))
+            IO.pure(Right(ForkchoiceUpdatedResponse(payloadStatus = PayloadStatusV1(Syncing))))
 
           case Right(()) =>
             // FCU has advanced best-block; purge the head block's txs from the mempool
@@ -561,91 +560,103 @@ class EngineApiService(
             }
             if invalidAttrsMsg.isDefined then {
               EngineApiMetrics.recordForkchoiceUpdated("INVALID")
-              Left("ATTR:" + invalidAttrsMsg.get)
+              IO.pure(Left("ATTR:" + invalidAttrsMsg.get))
             } else {
+              payloadAttributes match {
+                case None =>
+                  EngineApiMetrics.recordForkchoiceUpdated("VALID")
+                  IO.pure(Right(
+                    ForkchoiceUpdatedResponse(
+                      payloadStatus = PayloadStatusV1(Valid, latestValidHash = Some(forkChoiceState.headBlockHash)),
+                      payloadId = None
+                    )
+                  ))
+                case Some(attrs) =>
+                  // Deterministic payload ID MUST be unique for every distinct attribute
+                  // combination — hive 'Unique Payload ID' test sends FCUs differing only in
+                  // a single withdrawal field or beaconRoot and expects the IDs to differ.
+                  // Include withdrawals + beaconRoot in the hash.
+                  val withdrawalBytes: Array[Byte] =
+                    attrs.withdrawals.toSeq.flatMap { ws =>
+                      ws.flatMap { w =>
+                        w.index.toByteArray.toSeq ++
+                          w.validatorIndex.toByteArray.toSeq ++
+                          w.address.bytes.toArray.toSeq ++
+                          w.amount.toByteArray.toSeq
+                      }
+                    }.toArray
+                  val beaconRootBytes = attrs.parentBeaconBlockRoot.map(_.toArray).getOrElse(Array.emptyByteArray)
+                  val idBytes = kec256(
+                    forkChoiceState.headBlockHash.toArray ++
+                      BigInt(attrs.timestamp).toByteArray ++
+                      attrs.prevRandao.toArray ++
+                      attrs.suggestedFeeRecipient.bytes.toArray ++
+                      withdrawalBytes ++
+                      beaconRootBytes
+                  )
+                  val id = ByteString(idBytes.take(8))
 
-              val payloadId = payloadAttributes.map { attrs =>
-                // Deterministic payload ID MUST be unique for every distinct attribute
-                // combination — hive 'Unique Payload ID' test sends FCUs differing only in
-                // a single withdrawal field or beaconRoot and expects the IDs to differ.
-                // Include withdrawals + beaconRoot in the hash.
-                val withdrawalBytes: Array[Byte] =
-                  attrs.withdrawals.toSeq.flatMap { ws =>
-                    ws.flatMap { w =>
-                      w.index.toByteArray.toSeq ++
-                        w.validatorIndex.toByteArray.toSeq ++
-                        w.address.bytes.toArray.toSeq ++
-                        w.amount.toByteArray.toSeq
-                    }
-                  }.toArray
-                val beaconRootBytes = attrs.parentBeaconBlockRoot.map(_.toArray).getOrElse(Array.emptyByteArray)
-                val idBytes = kec256(
-                  forkChoiceState.headBlockHash.toArray ++
-                    BigInt(attrs.timestamp).toByteArray ++
-                    attrs.prevRandao.toArray ++
-                    attrs.suggestedFeeRecipient.bytes.toArray ++
-                    withdrawalBytes ++
-                    beaconRootBytes
-                )
-                val id = ByteString(idBytes.take(8))
-
-                // Build the payload using BlockPreparator directly with post-merge header
-                try {
                   val parentOpt = blockchainReader.getBlockByHash(forkChoiceState.headBlockHash)
-                  parentOpt.foreach { parent =>
-                    // Compute EIP-1559 base fee from parent
-                    val parentBaseFee = parent.header.baseFee.getOrElse(BigInt("1000000000"))
-                    val parentGasTarget = parent.header.gasLimit / 2
-                    val baseFee: BigInt =
-                      if parent.header.number == 0 then parentBaseFee
-                      else if parent.header.gasUsed == parentGasTarget then parentBaseFee
-                      else if parent.header.gasUsed > parentGasTarget then {
-                        val delta = parentBaseFee * (parent.header.gasUsed - parentGasTarget) / parentGasTarget / 8
-                        parentBaseFee + (if delta == BigInt(0) then BigInt(1) else delta)
-                      } else {
-                        val delta = parentBaseFee * (parentGasTarget - parent.header.gasUsed) / parentGasTarget / 8
-                        if parentBaseFee - delta < 0 then BigInt(0) else parentBaseFee - delta
-                      }
+                  parentOpt match {
+                    case None =>
+                      EngineApiMetrics.recordForkchoiceUpdated("VALID")
+                      IO.pure(Right(
+                        ForkchoiceUpdatedResponse(
+                          payloadStatus = PayloadStatusV1(Valid, latestValidHash = Some(forkChoiceState.headBlockHash)),
+                          payloadId = Some(id)
+                        )
+                      ))
+                    case Some(parent) =>
+                      // Compute EIP-1559 base fee from parent
+                      val parentBaseFee = parent.header.baseFee.getOrElse(BigInt("1000000000"))
+                      val parentGasTarget = parent.header.gasLimit / 2
+                      val baseFee: BigInt =
+                        if parent.header.number == 0 then parentBaseFee
+                        else if parent.header.gasUsed == parentGasTarget then parentBaseFee
+                        else if parent.header.gasUsed > parentGasTarget then {
+                          val delta = parentBaseFee * (parent.header.gasUsed - parentGasTarget) / parentGasTarget / 8
+                          parentBaseFee + (if delta == BigInt(0) then BigInt(1) else delta)
+                        } else {
+                          val delta = parentBaseFee * (parentGasTarget - parent.header.gasUsed) / parentGasTarget / 8
+                          if parentBaseFee - delta < 0 then BigInt(0) else parentBaseFee - delta
+                        }
 
-                    // Fetch pending transactions from the tx pool, filtering by chain ID.
-                    // Also capture the network-wrapped raw bytes for EIP-4844 blob txs so
-                    // engine_getPayloadV3 can emit them in the blobsBundle envelope.
-                    val (pendingTxs, blobTxRawBytesFromPool): (Seq[SignedTransaction], Map[ByteString, ByteString]) =
-                      try {
-                        import com.chipprbots.ethereum.transactions.PendingTransactionsManager.*
-                        import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
-                        val future =
-                          pendingTransactionsManager.ask[PendingTransactionsResponse](ref =>
-                            GetPendingTransactionsReq(ref)
-                          )
-                        val response = Await.result(future, 3.seconds)
-                        val expectedChainId = blockchainConfig.chainId
-                        val filtered = response.pendingTransactions.map(_.stx.tx).filter { stx =>
-                          val txChainId: Option[BigInt] = stx.tx match {
-                            case t: com.chipprbots.ethereum.domain.TransactionWithAccessList => Some(t.chainId)
-                            case t: com.chipprbots.ethereum.domain.TransactionWithDynamicFee => Some(t.chainId)
-                            case t: com.chipprbots.ethereum.domain.BlobTransaction           => Some(t.chainId)
-                            case t: com.chipprbots.ethereum.domain.SetCodeTransaction        => Some(t.chainId)
-                            case _ => None // legacy txs don't have explicit chainID
+                      // Fetch pending transactions from the tx pool using IO.fromFuture so the
+                      // CE3 compute thread is not blocked waiting for the actor response.
+                      import com.chipprbots.ethereum.transactions.PendingTransactionsManager.*
+                      import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
+                      IO.fromFuture(IO(pendingTransactionsManager.ask[PendingTransactionsResponse](ref =>
+                        GetPendingTransactionsReq(ref)
+                      ))).handleErrorWith { e =>
+                        log.error("Failed to fetch pending txs: {}", e.getMessage)
+                        IO.pure(PendingTransactionsResponse(Seq.empty))
+                      }.flatMap { response =>
+                        // Also capture the network-wrapped raw bytes for EIP-4844 blob txs so
+                        // engine_getPayloadV3 can emit them in the blobsBundle envelope.
+                        IO {
+                          val expectedChainId = blockchainConfig.chainId
+                          val filtered = response.pendingTransactions.map(_.stx.tx).filter { stx =>
+                            val txChainId: Option[BigInt] = stx.tx match {
+                              case t: com.chipprbots.ethereum.domain.TransactionWithAccessList => Some(t.chainId)
+                              case t: com.chipprbots.ethereum.domain.TransactionWithDynamicFee => Some(t.chainId)
+                              case t: com.chipprbots.ethereum.domain.BlobTransaction           => Some(t.chainId)
+                              case t: com.chipprbots.ethereum.domain.SetCodeTransaction        => Some(t.chainId)
+                              case _ => None // legacy txs don't have explicit chainID
+                            }
+                            txChainId.forall(_ == expectedChainId)
                           }
-                          txChainId.forall(_ == expectedChainId)
-                        }
-                        // Sort by (sender, nonce) so execution processes each sender's txs
-                        // in nonce order. The pool returns them in arrival order — a blob-tx
-                        // producer like hive's NewPayloadV3 tests sends nonces N, N+1, ...,
-                        // and without this sort execution hits NONCE_MISMATCH_TOO_HIGH when
-                        // tx with nonce N+2 runs before nonce N.
-                        val txs = filtered.sortBy { stx =>
-                          val sender = SignedTransaction.getSender(stx).map(_.bytes.toArray.toSeq).getOrElse(Seq.empty)
-                          (sender, stx.tx.nonce)
-                        }
-                        if txs.nonEmpty then log.info("Payload includes {} pending transactions", txs.size)
-                        (txs, response.blobTxNetworkBytes)
-                      } catch {
-                        case e: Exception =>
-                          log.error("Failed to fetch pending txs: {}", e.getMessage)
-                          (Seq.empty[SignedTransaction], Map.empty[ByteString, ByteString])
-                      }
+                          // Sort by (sender, nonce) so execution processes each sender's txs
+                          // in nonce order. The pool returns them in arrival order — a blob-tx
+                          // producer like hive's NewPayloadV3 tests sends nonces N, N+1, ...,
+                          // and without this sort execution hits NONCE_MISMATCH_TOO_HIGH when
+                          // tx with nonce N+2 runs before nonce N.
+                          val txs = filtered.sortBy { stx =>
+                            val sender = SignedTransaction.getSender(stx).map(_.bytes.toArray.toSeq).getOrElse(Seq.empty)
+                            (sender, stx.tx.nonce)
+                          }
+                          if txs.nonEmpty then log.info("Payload includes {} pending transactions", txs.size)
+                          val pendingTxs                                                        = txs
+                          val blobTxRawBytesFromPool: Map[ByteString, ByteString]              = response.blobTxNetworkBytes
 
                     // EIP-4844 / EIP-7691: cap blob-gas included in the payload at the fork's
                     // MAX_BLOB_GAS_PER_BLOCK (6 blobs Cancun, 9 blobs Prague). Without this cap
@@ -865,21 +876,21 @@ class EngineApiService(
                       if isPrague then "Prague" else if isCancun then "Cancun" else "Shanghai",
                       executionRequests.size
                     )
-                  }
-                } catch {
-                  case e: Exception =>
+                  }.handleError { e =>
                     log.error("Failed to build payload: {}", e.getMessage)
-                }
-                id
-              }
-
-              EngineApiMetrics.recordForkchoiceUpdated("VALID")
-              Right(
-                ForkchoiceUpdatedResponse(
-                  payloadStatus = PayloadStatusV1(Valid, latestValidHash = Some(forkChoiceState.headBlockHash)),
-                  payloadId = payloadId
-                )
-              )
+                  }
+                      }.map { _ =>
+                        EngineApiMetrics.recordForkchoiceUpdated("VALID")
+                        Right(
+                          ForkchoiceUpdatedResponse(
+                            payloadStatus =
+                              PayloadStatusV1(Valid, latestValidHash = Some(forkChoiceState.headBlockHash)),
+                            payloadId = Some(id)
+                          )
+                        )
+                      }
+                  } // closes: parentOpt match
+              } // closes: payloadAttributes match
             } // end else (invalidAttrs check)
           // end else (safe/finalized check)
           // end case Right
