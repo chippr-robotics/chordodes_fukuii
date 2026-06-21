@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.consensus.engine
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -18,7 +18,9 @@ import com.chipprbots.ethereum.testing.Tags.*
   * with a `BeaconHead` message — including the unknown-head (Left("SYNCING")) branch, which is the trigger SNAP needs
   * on post-merge chains.
   */
-class ForkChoiceManagerSpec extends TestKit(ActorSystem("ForkChoiceManagerSpec")) with AnyFlatSpecLike with Matchers {
+class ForkChoiceManagerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
+
+  implicit private val classicActorSystem: org.apache.pekko.actor.ActorSystem = system.toClassic
 
   trait Fixture extends EphemBlockchainTestSetup {
     val fcm = new ForkChoiceManager(blockchainReader, blockchainWriter)

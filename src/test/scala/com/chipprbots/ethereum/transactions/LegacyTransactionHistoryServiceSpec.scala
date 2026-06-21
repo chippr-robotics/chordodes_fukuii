@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.transactions
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -19,12 +19,13 @@ import com.chipprbots.ethereum.transactions.TransactionHistoryService.MinedTrans
 import com.chipprbots.ethereum.transactions.testing.PendingTransactionsManagerAutoPilot
 
 class LegacyTransactionHistoryServiceSpec
-    extends TestKit(ActorSystem("TransactionHistoryServiceSpec-system"))
+    extends ScalaTestWithActorTestKit
     with FreeSpecBase
     with SpecFixtures
-    with WithActorSystemShutDown
     with Matchers
     with DiffMatcher {
+
+  implicit private val classicActorSystem: org.apache.pekko.actor.ActorSystem = system.toClassic
   class Fixture extends EphemBlockchainTestSetup {
     val pendingTransactionManager: TestProbe = TestProbe()
     pendingTransactionManager.setAutoPilot(PendingTransactionsManagerAutoPilot())

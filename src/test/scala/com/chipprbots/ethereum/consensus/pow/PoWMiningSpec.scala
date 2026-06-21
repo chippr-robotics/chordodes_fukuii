@@ -1,13 +1,11 @@
 package com.chipprbots.ethereum.consensus.pow
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.consensus.mining.FullMiningConfig
 import com.chipprbots.ethereum.consensus.mining.MiningConfig
@@ -26,9 +24,8 @@ import com.chipprbots.ethereum.nodebuilder.StdNode
 import com.chipprbots.ethereum.testing.Tags.*
 
 class PoWMiningSpec
-    extends TestKit(ActorSystem("PoWMiningSpec_System"))
+    extends ScalaTestWithActorTestKit
     with AnyFlatSpecLike
-    with WithActorSystemShutDown
     with Matchers
     with org.scalamock.scalatest.MockFactory {
 

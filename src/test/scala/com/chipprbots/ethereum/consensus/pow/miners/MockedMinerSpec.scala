@@ -1,9 +1,9 @@
 package com.chipprbots.ethereum.consensus.pow.miners
 
 import org.apache.pekko.actor.ActorSystem as ClassicSystem
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.testkit.TestKit
 
 import cats.effect.IO
 
@@ -15,7 +15,6 @@ import org.scalatest.*
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.consensus.blocks.PendingBlock
 import com.chipprbots.ethereum.consensus.blocks.PendingBlockAndState
 import com.chipprbots.ethereum.consensus.pow.MinerSpecSetup
@@ -37,10 +36,9 @@ import com.chipprbots.ethereum.utils.ByteStringUtils
 // ACTOR SYSTEM FIX: TestSetup now overrides classicSystem to use TestKit's actor system,
 // preventing actor system conflicts between TestKit and MinerSpecSetup.
 class MockedMinerSpec
-    extends TestKit(ClassicSystem("MockedPowMinerSpec_System"))
+    extends ScalaTestWithActorTestKit
     with AnyWordSpecLike
     with Matchers
-    with WithActorSystemShutDown
     with org.scalamock.scalatest.MockFactory {
 
   implicit private val timeout: Duration = 1.minute
@@ -237,8 +235,8 @@ class MockedMinerSpec
   }
 
   class TestSetup extends MinerSpecSetup {
-    // Override classicSystem to use the TestKit's actor system instead of creating a new one
-    implicit override def classicSystem: ClassicSystem = MockedMinerSpec.this.system
+    // Override classicSystem to use the ScalaTestWithActorTestKit's actor system (converted to classic)
+    implicit override def classicSystem: ClassicSystem = MockedMinerSpec.this.system.toClassic
     val noMessageTimeOut: FiniteDuration = 3.seconds
 
     // Implement abstract mock members - created in test class with MockFactory context
@@ -251,7 +249,7 @@ class MockedMinerSpec
     override lazy val mockMptStorage: MptStorage = mock[MptStorage]
 
     val miner: typed.ActorRef[MockedMiner.Command] =
-      classicSystem.spawnAnonymous(
+      testKit.spawn(
         MockedMiner(
           blockchainReader,
           blockCreator,
