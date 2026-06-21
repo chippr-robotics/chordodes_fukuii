@@ -32,8 +32,8 @@ and add a dated log entry at the bottom.
 | File | Line(s) | Pattern | Type | Agent | Date |
 |------|---------|---------|------|-------|------|
 | `consensus/pow/PoWMining.scala` | 103–132 | `mutex.synchronized` init guard: Bucket A — `startMiningProcess` checks `minerCoordinatorRef.isEmpty && mockedMinerRef.isEmpty` then sets one of them; semantically an AtomicBoolean init flag but is a compound check-then-act on two `@volatile` fields. FORGE gate required before converting to `AtomicBoolean`. | MUTABLE | MITHRIL | 2026-06-20 |
-| `network/NetworkPeerManagerActor.scala` | 451, 663 | Typed actor may use `classicSystem.scheduler` for fire-and-forget blacklist delay (not `context.system.scheduler` from Typed). Low risk (message goes to dead letters if NPMA stops), but verify scheduler source. If confirmed Classic, log alongside PMA deferred item in DEFERRED-BACKLOG Part 2 NET group. HERALD gate. | CLASSIC | PRISM | 2026-06-21 |
 | `blockchain/ledger/BlockExecution.scala` | `applyEip2935` | `applyEip2935` writes to `HistoryStorageAddress` storage without first guaranteeing the account exists (unlike `applyEip4788` which creates the account). Currently masked on ETC by deployment order. Latent correctness gap — if `HistoryStorageAddress` account is absent the storage write may silently no-op or behave incorrectly. FORGE gate required before touching. | EXCEPT | BEACON | 2026-06-21 |
+| `consensus/pow/PoWMiningCoordinator.scala` | — | Threading model finding (R9/8d B2): FORGE-gated. See `threading-model-audit.md §B2` for detail. FORGE review required before any fix. | MUTABLE | PRISM | 2026-06-21 |
 
 ---
 
@@ -53,7 +53,9 @@ When 5+ entries share a Type or package, open a dedicated sprint:
 
 ## Cleared entries log
 
+| EngineApiService H1 MUTABLE | `consensus/engine/EngineApiService.scala:42–75` | Cleared 2026-06-21: BEACON review complete. 6 maps (PRISM missed `acceptedChildrenByParent` line 74). CLASS A (4 payloadId-keyed) → bounded LRU+TTL, CONDUIT owner (§8c-H1-A). CLASS B (2 hash-keyed) → finalized-watermark prune, BEACON impl (§8c-H1-B). No source files touched. | — | — | 2026-06-21 |
 | IMPLICIT ×3 / P4a EXCEPT | various | Cleared 2026-06-21: (1) IMPLICIT ×3 — `*Enc extends MessageSerializableImplicit`/`RLPSerializable` subtype polymorphism + `ReceiptBloom*` wildcard collision — permanent deferrals (P3b); no fix planned. (2) P4a SSC `GetProgress` idle-state gap — fixed `74db726d1`. | — | — | 2026-06-21 |
+| NPMA CLASSIC (NET-01) | `NetworkPeerManagerActor.scala:165,451,663` | Cleared 2026-06-21: HERALD verified by-design — `classicSystem.scheduler` is correct interop bridge for Classic `AddToBlacklistCmd.replyTo`; same `HashedWheelTimer` backing. Logged as NET-01 in DEFERRED-BACKLOG Part 2 NET group for LOOM cleanup when PMA migrates. | — | — | 2026-06-21 |
 
 ---
 
