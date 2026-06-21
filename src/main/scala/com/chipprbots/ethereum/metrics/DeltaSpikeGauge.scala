@@ -8,10 +8,10 @@ import java.util.concurrent.atomic.AtomicInteger
   * Specifically, the sampling rate must be greater than the rate the signal is triggered.
   */
 class DeltaSpikeGauge(name: String, metrics: Metrics) {
-  final private[this] val isTriggeredRef = new AtomicBoolean(false)
-  final private[this] val valueRef = new AtomicInteger(0)
+  final private val isTriggeredRef = new AtomicBoolean(false)
+  final private val valueRef = new AtomicInteger(0)
 
-  private[this] def getValue(): Double =
+  private def getValue(): Double =
     if isTriggeredRef.compareAndSet(true, false) then {
       valueRef.getAndSet(0)
     } else {

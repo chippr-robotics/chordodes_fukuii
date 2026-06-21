@@ -13,9 +13,9 @@ import com.chipprbots.ethereum.utils.LoggingUtils.getClassName
 
 object MeterRegistryBuilder extends Logger {
 
-  final private[this] val StdMetricsClock = Clock.SYSTEM
+  final private val StdMetricsClock = Clock.SYSTEM
 
-  private[this] def onMeterAdded(m: Meter): Unit =
+  private def onMeterAdded(m: Meter): Unit =
     log.debug(s"New ${getClassName(m)} metric: " + m.getId.getName)
 
   /** Build our meter registry consist in:

@@ -25,9 +25,9 @@ class RateLimit(config: RateLimitConfig) extends Directive0 with Json4sSupport {
   implicit override val serialization: Serialization = native.Serialization
   implicit override val formats: Formats = DefaultFormats + JsonSerializers.RpcErrorJsonSerializer
 
-  private[this] lazy val minInterval = config.minRequestInterval.toSeconds
+  private lazy val minInterval = config.minRequestInterval.toSeconds
 
-  private[this] lazy val lru = {
+  private lazy val lru = {
     val nanoDuration = config.minRequestInterval.toNanos
     val javaDuration = Duration.ofNanos(nanoDuration)
     val ticker: Ticker = new Ticker {
@@ -41,7 +41,7 @@ class RateLimit(config: RateLimitConfig) extends Directive0 with Json4sSupport {
       .build[RemoteAddress, NotUsed]()
   }
 
-  private[this] def isBelowRateLimit(ip: RemoteAddress): Boolean = {
+  private def isBelowRateLimit(ip: RemoteAddress): Boolean = {
     var exists = true
     lru.get(
       ip,

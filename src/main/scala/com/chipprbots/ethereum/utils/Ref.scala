@@ -6,7 +6,7 @@ import java.util.concurrent.atomic.AtomicReference
   * that can be set once.
   */
 class Ref[T <: AnyRef] {
-  final private[this] val ref = new AtomicReference[Option[T]](None)
+  final private val ref = new AtomicReference[Option[T]](None)
 
   // set once (but not necessarily compute once)
   final def setOnce(t: => T): Boolean = ref.get().isEmpty && ref.compareAndSet(None, Some(t))

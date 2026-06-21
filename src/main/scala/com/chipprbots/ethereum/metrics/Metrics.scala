@@ -16,7 +16,7 @@ import org.slf4j.LoggerFactory
 
 case class Metrics(metricsPrefix: String, registry: MeterRegistry, serverPort: Int = 0) {
 
-  private[this] def mkName: String => String = MetricsUtils.mkNameWithPrefix(metricsPrefix)
+  private def mkName: String => String = MetricsUtils.mkNameWithPrefix(metricsPrefix)
 
   private lazy val server: PrometheusHTTPServer =
     PrometheusHTTPServer.builder().port(serverPort).buildAndStart()
@@ -86,7 +86,7 @@ object Metrics {
   private val instances = new ConcurrentHashMap[String, Metrics]()
 
   // Default/fallback instance for backward compatibility
-  final private[this] val defaultMetrics = Metrics(MetricsPrefix, new SimpleMeterRegistry())
+  final private val defaultMetrics = Metrics(MetricsPrefix, new SimpleMeterRegistry())
   private val defaultRef = new AtomicReference[Metrics](defaultMetrics)
 
   /** Get the default metrics instance (backward compatible with single-instance mode). */

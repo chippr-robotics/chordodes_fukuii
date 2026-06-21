@@ -82,7 +82,7 @@ abstract class BaseNode extends Node {
     startTuiUpdater()
   }
 
-  private[this] def startMetricsClient(): Unit = {
+  private def startMetricsClient(): Unit = {
     val metricsConfig = MetricsConfig(instanceConfig.config)
     Metrics.configure(metricsConfig, instanceConfig.instanceId) match {
       case Success(_) =>
@@ -106,12 +106,12 @@ abstract class BaseNode extends Node {
     }
   }
 
-  private[this] def loadGenesisData(): Unit =
+  private def loadGenesisData(): Unit =
     if !Config.testmode then {
       genesisDataLoader.loadGenesisData()
     }
 
-  private[this] def importChainData(): Unit = {
+  private def importChainData(): Unit = {
     val chainFile = scala.util.Try(instanceConfig.config.getString("import-chain-file")).toOption
     chainFile.foreach { path =>
       log.info(s"Importing chain data from: $path")
@@ -120,7 +120,7 @@ abstract class BaseNode extends Node {
     }
   }
 
-  private[this] def runDBConsistencyCheck(): Unit = {
+  private def runDBConsistencyCheck(): Unit = {
     val appState = storagesInstance.storages.appStateStorage
     // Skip consistency check after SNAP sync — block headers 0..pivot don't exist yet.
     // SNAP sync only stores the pivot block header; earlier headers are downloaded
@@ -148,14 +148,14 @@ abstract class BaseNode extends Node {
     }
   }
 
-  private[this] def startPeerManager(): Unit = peerManager ! PeerManagerActor.StartConnectingCmd
+  private def startPeerManager(): Unit = peerManager ! PeerManagerActor.StartConnectingCmd
 
   /** Load static peer nodes from ${datadir}/static-nodes.json and add each to the maintained-peers set.
     *
     * Besu reference: StaticNodesParser.fromPath() → DefaultP2PNetwork adds each to MaintainedPeers. Static peers are
     * maintained connections: the node will always attempt to reconnect on disconnect.
     */
-  private[this] def loadStaticNodes(): Unit = {
+  private def loadStaticNodes(): Unit = {
     val datadir = instanceConfig.config.getString("datadir")
     val nodes = StaticNodesLoader.load(datadir)
     if nodes.nonEmpty then {
@@ -167,31 +167,31 @@ abstract class BaseNode extends Node {
     }
   }
 
-  private[this] def startServer(): Unit = server ! ServerActor.StartServer(
+  private def startServer(): Unit = server ! ServerActor.StartServer(
     networkConfig.Server.listenAddress,
     networkConfig.Server.advertisedAddress.map(java.net.InetAddress.getByName)
   )
 
-  private[this] def startSyncController(): Unit = syncController ! SyncProtocol.Start
+  private def startSyncController(): Unit = syncController ! SyncProtocol.Start
 
-  private[this] def startMining(): Unit = mining.startProtocol(this)
+  private def startMining(): Unit = mining.startProtocol(this)
 
-  private[this] def startDiscoveryManager(): Unit = peerDiscoveryManager ! PeerDiscoveryManager.Start
+  private def startDiscoveryManager(): Unit = peerDiscoveryManager ! PeerDiscoveryManager.Start
 
-  private[this] def startJsonRpcHttpServer(): Unit =
+  private def startJsonRpcHttpServer(): Unit =
     maybeJsonRpcHttpServer match {
       case Right(jsonRpcServer) if jsonRpcConfig.httpServerConfig.enabled => jsonRpcServer.run()
       case Left(error) if jsonRpcConfig.httpServerConfig.enabled          => log.error(error)
       case _                                                              => // Nothing
     }
 
-  private[this] def startJsonRpcWsServer(): Unit =
+  private def startJsonRpcWsServer(): Unit =
     if jsonRpcConfig.wsServerConfig.enabled then jsonRpcWsServer.run()
 
-  private[this] def startJsonRpcIpcServer(): Unit =
+  private def startJsonRpcIpcServer(): Unit =
     if jsonRpcConfig.ipcServerConfig.enabled then jsonRpcIpcServer.run()
 
-  private[this] def startEngineApiServer(): Unit =
+  private def startEngineApiServer(): Unit =
     maybeEngineApiServer.foreach { server =>
       try {
         val binding = scala.concurrent.Await.result(
@@ -218,7 +218,7 @@ abstract class BaseNode extends Node {
         s"PeriodicDBConsistencyCheck_${instanceConfig.instanceId}"
       )
 
-  private[this] def startTuiUpdater(): Unit = {
+  private def startTuiUpdater(): Unit = {
     val tui = Tui.getInstance()
     if tui.isEnabled then {
       log.info("Starting TUI updater")

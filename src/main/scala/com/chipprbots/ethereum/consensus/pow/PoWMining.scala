@@ -61,7 +61,7 @@ class PoWMining private (
 
   type Config = EthashConfig
 
-  final private[this] val _blockPreparator = new BlockPreparator(
+  final private val _blockPreparator = new BlockPreparator(
     vm = vm,
     signedTxValidator = validators.signedTransactionValidator,
     blockchain = blockchain,
@@ -71,7 +71,7 @@ class PoWMining private (
   @volatile private[pow] var minerCoordinatorRef: Option[ActorRef[CoordinatorProtocol]] = None
   @volatile private[pow] var mockedMinerRef: Option[ActorRef[MockedMiner.Command]] = None
   // Captured at spawn time to provide the Typed Scheduler (ask) and ignoreRef (fire-and-forget).
-  @volatile private[this] var minerSystem: Option[org.apache.pekko.actor.typed.ActorSystem[Nothing]] = None
+  @volatile private var minerSystem: Option[org.apache.pekko.actor.typed.ActorSystem[Nothing]] = None
 
   final val BlockForgerDispatcherId = "fukuii.async.dispatchers.block-forger"
   implicit private val timeout: Timeout = 20.seconds
@@ -100,9 +100,9 @@ class PoWMining private (
       case _ => IO.pure(MinerNotExist)
     }
 
-  private[this] val mutex = new Object
+  private val mutex = new Object
 
-  private[this] def startMiningProcess(node: Node, blockCreator: PoWBlockCreator): Unit =
+  private def startMiningProcess(node: Node, blockCreator: PoWBlockCreator): Unit =
     mutex.synchronized {
       if minerCoordinatorRef.isEmpty && mockedMinerRef.isEmpty then {
         config.generic.protocol match {
@@ -132,7 +132,7 @@ class PoWMining private (
       }
     }
 
-  private[this] def stopMiningProcess(): Unit =
+  private def stopMiningProcess(): Unit =
     sendMiner(MinerProtocol.StopMining)
 
   /** This is used by the [[Mining#blockGenerator blockGenerator]].
