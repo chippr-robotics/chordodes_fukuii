@@ -123,10 +123,10 @@ class ByteCodeCoordinatorSpec
       kec256(ByteString("code2"))
     )
 
-    coordinator ! Messages.StartByteCodeSync(codeHashes)
+    coordinator ! ByteCodeCoordinator.StartByteCodeSync(codeHashes)
 
     // Coordinator should queue the contracts
-    coordinator ! Messages.ByteCodeGetProgress(self.toTyped[Messages.ByteCodeProgress])
+    coordinator ! ByteCodeCoordinator.ByteCodeGetProgress(self.toTyped[ByteCodeCoordinator.ByteCodeProgress])
     expectMsgType[Any](3.seconds)
   }
 
@@ -151,8 +151,8 @@ class ByteCodeCoordinatorSpec
 
     val codeHashes = Seq(kec256(ByteString("code1")))
 
-    coordinator ! Messages.StartByteCodeSync(codeHashes)
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.StartByteCodeSync(codeHashes)
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
 
     // Should send request to network peer manager
     networkPeerManager.expectMsgType[Any](3.seconds)
@@ -174,10 +174,10 @@ class ByteCodeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.ByteCodeTaskComplete(BigInt(123), Right(5))
+    coordinator ! ByteCodeCoordinator.ByteCodeTaskComplete(BigInt(123), Right(5))
 
     // Coordinator should handle completion
-    coordinator ! Messages.ByteCodeGetProgress(self.toTyped[Messages.ByteCodeProgress])
+    coordinator ! ByteCodeCoordinator.ByteCodeGetProgress(self.toTyped[ByteCodeCoordinator.ByteCodeProgress])
     expectMsgType[Any](3.seconds)
   }
 
@@ -206,9 +206,9 @@ class ByteCodeCoordinatorSpec
     )
 
     val hashes = Seq(kec256(ByteString("redispatch-a")), kec256(ByteString("redispatch-b")))
-    coordinator ! Messages.StartByteCodeSync(hashes)
-    coordinator ! Messages.NoMoreByteCodeTasks
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.StartByteCodeSync(hashes)
+    coordinator ! ByteCodeCoordinator.NoMoreByteCodeTasks
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
 
     // Only the first task is dispatched (maxInFlightPerPeer=1). The SendMessage proves the active task
     // exists and carries its requestId — read it here instead of inspecting coordinator internal state
@@ -220,10 +220,10 @@ class ByteCodeCoordinatorSpec
     // Release it first so the worker transitions to idle; the coordinator's subsequent
     // tryRedispatchPendingTasks() dispatch will then be accepted rather than stashed. The single
     // worker child is reachable via the coordinator's child selection.
-    system.actorSelection(coordinator.path / "*") ! Messages.ByteCodeWorkerRelease(reqId)
+    system.actorSelection(coordinator.path / "*") ! ByteCodeCoordinator.ByteCodeWorkerRelease(reqId)
 
     // Complete the in-flight task at coordinator level — calls markWorkerIdle + tryRedispatchPendingTasks()
-    coordinator ! Messages.ByteCodeTaskComplete(reqId, Right(1))
+    coordinator ! ByteCodeCoordinator.ByteCodeTaskComplete(reqId, Right(1))
 
     // The pending task must be dispatched immediately via tryRedispatchPendingTasks()
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
@@ -246,13 +246,13 @@ class ByteCodeCoordinatorSpec
     )
 
     // Start with empty contract list
-    coordinator ! Messages.StartByteCodeSync(Seq.empty)
+    coordinator ! ByteCodeCoordinator.StartByteCodeSync(Seq.empty)
 
     // Signal that no more tasks will arrive (sentinel pattern)
-    coordinator ! Messages.NoMoreByteCodeTasks
+    coordinator ! ByteCodeCoordinator.NoMoreByteCodeTasks
 
     // Should complete immediately since no tasks and sentinel received
-    coordinator ! Messages.ByteCodeCheckCompletion
+    coordinator ! ByteCodeCoordinator.ByteCodeCheckCompletion
     snapSyncController.expectMsg(3.seconds, SNAPSyncController.ByteCodeSyncComplete)
   }
 
@@ -272,10 +272,10 @@ class ByteCodeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.ByteCodeTaskFailed(BigInt(123), "Test failure")
+    coordinator ! ByteCodeCoordinator.ByteCodeTaskFailed(BigInt(123), "Test failure")
 
     // Coordinator should still be operational
-    coordinator ! Messages.ByteCodeGetProgress(self.toTyped[Messages.ByteCodeProgress])
+    coordinator ! ByteCodeCoordinator.ByteCodeGetProgress(self.toTyped[ByteCodeCoordinator.ByteCodeProgress])
     expectMsgType[Any](3.seconds)
   }
 
@@ -307,15 +307,15 @@ class ByteCodeCoordinatorSpec
 
     val codeHashes = Seq(h1, h2, h3)
 
-    coordinator ! Messages.StartByteCodeSync(codeHashes)
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.StartByteCodeSync(codeHashes)
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
 
     val send1 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
     val req1 = send1.message.asInstanceOf[GetByteCodesEnc].underlyingMsg
     req1.hashes shouldEqual Seq(h1, h2, h3)
 
     // Respond with a single middle element (gap allowed by snap/1 semantics)
-    system.actorSelection(coordinator.path / "*") ! Messages.ByteCodesResponseMsg(ByteCodes(req1.requestId, Seq(code2)))
+    system.actorSelection(coordinator.path / "*") ! ByteCodeCoordinator.ByteCodesResponseMsg(ByteCodes(req1.requestId, Seq(code2)))
 
     // Ensure the returned code got persisted
     within(3.seconds) {
@@ -323,7 +323,7 @@ class ByteCodeCoordinatorSpec
     }
 
     // Drive next dispatch and assert the missing hashes were re-queued
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
     val send2 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
     val req2 = send2.message.asInstanceOf[GetByteCodesEnc].underlyingMsg
     req2.hashes shouldEqual Seq(h1, h3)
@@ -356,15 +356,15 @@ class ByteCodeCoordinatorSpec
 
     val codeHashes = Seq(h1, h2)
 
-    coordinator ! Messages.StartByteCodeSync(codeHashes)
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.StartByteCodeSync(codeHashes)
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
 
     val send1 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
     val req1 = send1.message.asInstanceOf[GetByteCodesEnc].underlyingMsg
     req1.hashes shouldEqual Seq(h1, h2)
 
     // Respond out-of-order (violates snap/1 ordering requirement)
-    system.actorSelection(coordinator.path / "*") ! Messages.ByteCodesResponseMsg(
+    system.actorSelection(coordinator.path / "*") ! ByteCodeCoordinator.ByteCodesResponseMsg(
       ByteCodes(req1.requestId, Seq(code2, code1))
     )
 
@@ -377,11 +377,11 @@ class ByteCodeCoordinatorSpec
     }
 
     // Verify peer is in cooldown by attempting immediate retry
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
     networkPeerManager.expectNoMessage(80.millis)
 
     // Drive retry after cooldown expires
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
     val send2 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
     val req2 = send2.message.asInstanceOf[GetByteCodesEnc].underlyingMsg
     req2.hashes shouldEqual Seq(h1, h2)
@@ -412,15 +412,15 @@ class ByteCodeCoordinatorSpec
 
     val codeHashes = Seq(h1)
 
-    coordinator ! Messages.StartByteCodeSync(codeHashes)
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.StartByteCodeSync(codeHashes)
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
 
     val send1 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
     val req1 = send1.message.asInstanceOf[GetByteCodesEnc].underlyingMsg
     req1.hashes shouldEqual Seq(h1)
 
     // Duplicate code for the same hash should be rejected
-    system.actorSelection(coordinator.path / "*") ! Messages.ByteCodesResponseMsg(
+    system.actorSelection(coordinator.path / "*") ! ByteCodeCoordinator.ByteCodesResponseMsg(
       ByteCodes(req1.requestId, Seq(code1, code1))
     )
 
@@ -429,11 +429,11 @@ class ByteCodeCoordinatorSpec
     }
 
     // Verify peer is in cooldown by attempting immediate retry
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
     networkPeerManager.expectNoMessage(80.millis)
 
     // Drive retry after cooldown expires (task should be re-queued)
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
     val send2 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
     val req2 = send2.message.asInstanceOf[GetByteCodesEnc].underlyingMsg
     req2.hashes shouldEqual Seq(h1)
@@ -463,22 +463,22 @@ class ByteCodeCoordinatorSpec
     val h1 = kec256(code1)
     val codeHashes = Seq(h1)
 
-    coordinator ! Messages.StartByteCodeSync(codeHashes)
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.StartByteCodeSync(codeHashes)
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
 
     val send1 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
     val req1 = send1.message.asInstanceOf[GetByteCodesEnc].underlyingMsg
     req1.hashes shouldEqual Seq(h1)
 
     // Respond with empty ByteCodes (peer had none of the requested hashes)
-    system.actorSelection(coordinator.path / "*") ! Messages.ByteCodesResponseMsg(ByteCodes(req1.requestId, Seq.empty))
+    system.actorSelection(coordinator.path / "*") ! ByteCodeCoordinator.ByteCodesResponseMsg(ByteCodes(req1.requestId, Seq.empty))
 
     // Immediately advertising the same peer should not trigger a re-request due to cooldown
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
     networkPeerManager.expectNoMessage(80.millis)
 
     // After cooldown elapses (already waited 80ms above, cooldown is 50ms), coordinator should send again
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
   }
 
@@ -506,24 +506,24 @@ class ByteCodeCoordinatorSpec
 
     val h1 = kec256(ByteString("pivot-code"))
 
-    coordinator ! Messages.StartByteCodeSync(Seq(h1))
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.StartByteCodeSync(Seq(h1))
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
 
     val send1 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
     val req1 = send1.message.asInstanceOf[GetByteCodesEnc].underlyingMsg
 
     // Empty response → peer enters cooldown
-    system.actorSelection(coordinator.path / "*") ! Messages.ByteCodesResponseMsg(ByteCodes(req1.requestId, Seq.empty))
+    system.actorSelection(coordinator.path / "*") ! ByteCodeCoordinator.ByteCodesResponseMsg(ByteCodes(req1.requestId, Seq.empty))
 
     // Verify cooldown is active — same peer should not dispatch immediately
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
     networkPeerManager.expectNoMessage(80.millis)
 
     // Pivot refresh clears both peerFailureCounts and peerCooldownUntilMillis (BUG-S1 fix)
-    coordinator ! Messages.ByteCodePivotRefreshed
+    coordinator ! ByteCodeCoordinator.ByteCodePivotRefreshed
 
     // Peer should dispatch again immediately (no cooldown wait)
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
   }
 
@@ -552,20 +552,20 @@ class ByteCodeCoordinatorSpec
     val h1 = kec256(ByteString("retained-code"))
 
     // Register peer with no initial tasks → peer enters knownAvailablePeers pool.
-    coordinator ! Messages.StartByteCodeSync(Seq.empty)
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.StartByteCodeSync(Seq.empty)
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
 
     // Pivot refresh. In the old code knownAvailablePeers was cleared here (BUG-S1).
     // In the fixed code the peer is retained: bytecodes are content-addressed,
     // not state-root-dependent, so the peer can serve the same hashes after a pivot.
-    coordinator ! Messages.ByteCodePivotRefreshed
+    coordinator ! ByteCodeCoordinator.ByteCodePivotRefreshed
 
     // Add tasks AFTER the pivot. AddByteCodeTasks queues work but does not call
     // tryRedispatchPendingTasks(). UpdateMaxInFlightPerPeer is the coordinator-internal
     // trigger that calls tryRedispatchPendingTasks(), which iterates knownAvailablePeers.
     // With the BUG-S1 fix the retained peer is found there and dispatch proceeds.
     // Without the fix (peer cleared) tryRedispatchPendingTasks() finds nobody → timeout.
-    coordinator ! Messages.AddByteCodeTasks(Seq(h1))
+    coordinator ! ByteCodeCoordinator.AddByteCodeTasks(Seq(h1))
     coordinator ! Messages.UpdateMaxInFlightPerPeer(testCooldownConfig.maxInFlightPerPeer)
 
     val send = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
@@ -601,15 +601,15 @@ class ByteCodeCoordinatorSpec
     // Sanity: corruptCode's hash must not equal realHash
     kec256(corruptCode) should not be realHash
 
-    coordinator ! Messages.StartByteCodeSync(Seq(realHash))
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.StartByteCodeSync(Seq(realHash))
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
 
     val send1 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
     val req1 = send1.message.asInstanceOf[GetByteCodesEnc].underlyingMsg
     req1.hashes shouldEqual Seq(realHash)
 
     // Respond with a code whose hash != realHash (corrupted / wrong code)
-    system.actorSelection(coordinator.path / "*") ! Messages.ByteCodesResponseMsg(
+    system.actorSelection(coordinator.path / "*") ! ByteCodeCoordinator.ByteCodesResponseMsg(
       ByteCodes(req1.requestId, Seq(corruptCode))
     )
 
@@ -619,11 +619,11 @@ class ByteCodeCoordinatorSpec
     }
 
     // Peer must be in cooldown (invalid response)
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
     networkPeerManager.expectNoMessage(80.millis)
 
     // After cooldown, task is re-queued and peer dispatches again
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
     val send2 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
     val req2 = send2.message.asInstanceOf[GetByteCodesEnc].underlyingMsg
     req2.hashes shouldEqual Seq(realHash)
@@ -652,15 +652,15 @@ class ByteCodeCoordinatorSpec
     // Queue a non-trivial set of bytecode hashes. No peer is registered, so they'll sit in pendingTasks
     // forever — modelling the wedged state where peers can't serve a small unservable subset.
     val codeHashes = (1 to 10).map(i => kec256(ByteString(s"code$i")))
-    coordinator ! Messages.StartByteCodeSync(codeHashes)
-    coordinator ! Messages.NoMoreByteCodeTasks
+    coordinator ! ByteCodeCoordinator.StartByteCodeSync(codeHashes)
+    coordinator ! ByteCodeCoordinator.NoMoreByteCodeTasks
 
     // Without the force-complete, ByteCodeCheckCompletion stays blocked because pendingTasks is non-empty.
-    coordinator ! Messages.ByteCodeCheckCompletion
+    coordinator ! ByteCodeCoordinator.ByteCodeCheckCompletion
     snapSyncController.expectNoMessage(200.millis)
 
     // Force-complete drains the queue and signals the parent.
-    coordinator ! Messages.ForceCompleteByteCodes
+    coordinator ! ByteCodeCoordinator.ForceCompleteByteCodes
     snapSyncController.expectMsg(3.seconds, SNAPSyncController.ByteCodeSyncComplete)
   }
 
@@ -690,9 +690,9 @@ class ByteCodeCoordinatorSpec
     )
 
     val hashes = (1 to 3).map(i => kec256(ByteString(s"fc-active-$i")))
-    coordinator ! Messages.StartByteCodeSync(hashes)
-    coordinator ! Messages.NoMoreByteCodeTasks
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.StartByteCodeSync(hashes)
+    coordinator ! ByteCodeCoordinator.NoMoreByteCodeTasks
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
 
     // Two tasks dispatched concurrently (the two SendMessages prove 2 active in-flight requests).
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
@@ -702,12 +702,12 @@ class ByteCodeCoordinatorSpec
     // exposes no `.underlyingActor`, so the pool invariant (active drained, workers returned to idle)
     // is verified indirectly: the parent receives ByteCodeSyncComplete, and the coordinator remains
     // operational and idle afterwards (a follow-up GetProgress returns 100% with no pending/active work).
-    coordinator ! Messages.ForceCompleteByteCodes
+    coordinator ! ByteCodeCoordinator.ForceCompleteByteCodes
     snapSyncController.expectMsg(3.seconds, SNAPSyncController.ByteCodeSyncComplete)
 
     // ByteCodeGetProgress now carries a typed replyTo; route the reply to the Classic test actor via .toTyped.
-    coordinator ! Messages.ByteCodeGetProgress(self.toTyped[Messages.ByteCodeProgress])
-    val progress = expectMsgType[Messages.ByteCodeProgress](3.seconds)
+    coordinator ! ByteCodeCoordinator.ByteCodeGetProgress(self.toTyped[ByteCodeCoordinator.ByteCodeProgress])
+    val progress = expectMsgType[ByteCodeCoordinator.ByteCodeProgress](3.seconds)
     // All queues drained by force-complete → progress reports complete (no pending/active tasks remain).
     progress.progress shouldBe 1.0
   }
@@ -730,7 +730,7 @@ class ByteCodeCoordinatorSpec
     )
 
     // Empty queue + ForceCompleteByteCodes: should still emit ByteCodeSyncComplete (idempotent terminal state).
-    coordinator ! Messages.ForceCompleteByteCodes
+    coordinator ! ByteCodeCoordinator.ForceCompleteByteCodes
     snapSyncController.expectMsg(3.seconds, SNAPSyncController.ByteCodeSyncComplete)
   }
 
@@ -766,8 +766,8 @@ class ByteCodeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartByteCodeSync(Seq(kec256(ByteString("term-code"))))
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.StartByteCodeSync(Seq(kec256(ByteString("term-code"))))
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
 
     // Worker created and request dispatched
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
@@ -779,7 +779,7 @@ class ByteCodeCoordinatorSpec
 
     // Task was re-queued after WorkerTerminated handling — providing peer again triggers re-dispatch,
     // which is observable proof the dead worker was removed and the task re-queued.
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
   }
 
@@ -804,20 +804,20 @@ class ByteCodeCoordinatorSpec
     )
 
     // Queue a task and dispatch — worker created
-    coordinator ! Messages.StartByteCodeSync(Seq(kec256(ByteString("idle-code"))))
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.StartByteCodeSync(Seq(kec256(ByteString("idle-code"))))
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
 
     // Resolve the worker child, then mark the sync done and stop the worker. The coordinator must
     // process WorkerTerminated without exception and stay operational (no `.underlyingActor` access).
     val workerRef = resolveWorkerChild(coordinator)
-    coordinator ! Messages.NoMoreByteCodeTasks
+    coordinator ! ByteCodeCoordinator.NoMoreByteCodeTasks
 
     system.stop(workerRef)
 
     // Coordinator stays operational after the worker stops — a GetProgress query still returns.
-    coordinator ! Messages.ByteCodeGetProgress(self.toTyped[Messages.ByteCodeProgress])
-    expectMsgType[Messages.ByteCodeProgress](3.seconds)
+    coordinator ! ByteCodeCoordinator.ByteCodeGetProgress(self.toTyped[ByteCodeCoordinator.ByteCodeProgress])
+    expectMsgType[ByteCodeCoordinator.ByteCodeProgress](3.seconds)
   }
 
   // ── P-0 regression: ByteCodePeerUnavailable must restore workers to idle pool ─
@@ -851,8 +851,8 @@ class ByteCodeCoordinatorSpec
 
     // Queue 3 hashes (one per task) and dispatch
     val hashes = (1 to 3).map(i => kec256(ByteString(s"unavail-code-$i")))
-    coordinator ! Messages.StartByteCodeSync(hashes)
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.StartByteCodeSync(hashes)
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
 
     // Three tasks dispatched — one worker per task. The three SendMessages prove 3 active in-flight
     // requests (formerly `workers.size == 3, idleWorkers empty` on internal state).
@@ -861,12 +861,12 @@ class ByteCodeCoordinatorSpec
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
 
     // Peer disconnects — ByteCodePeerUnavailable must release all in-flight workers back to idle.
-    coordinator ! Messages.ByteCodePeerUnavailable(peerId)
+    coordinator ! ByteCodeCoordinator.ByteCodePeerUnavailable(peerId)
 
     // Observable proof of the P-0 fix (markWorkerIdle after release): dispatch succeeds again because
     // the released workers are back in the idle pool and the tasks were re-queued. Without the fix the
     // idle pool would be empty and no SendMessage would follow.
-    coordinator ! Messages.ByteCodePeerAvailable(peer)
+    coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
   }
 
@@ -893,11 +893,11 @@ class ByteCodeCoordinatorSpec
 
     // Queue 4 hashes → 4 tasks → crosses the high-water mark.
     val hashes = (1 to 4).map(i => kec256(ByteString(s"hash-$i")))
-    coordinator ! Messages.AddByteCodeTasks(hashes)
+    coordinator ! ByteCodeCoordinator.AddByteCodeTasks(hashes)
     snapSyncController.expectMsg(3.seconds, SNAPSyncController.ByteCodeBackpressureChanged(paused = true))
 
     // Re-checking at the same depth must NOT emit a duplicate transition.
-    coordinator ! Messages.ByteCodeCheckCompletion
+    coordinator ! ByteCodeCoordinator.ByteCodeCheckCompletion
     snapSyncController.expectNoMessage(500.millis)
   }
 }

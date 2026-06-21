@@ -189,7 +189,7 @@ object BytecodeRecoveryActor {
             }
             ctx.watchWith(coordinator.toTyped[Nothing], CoordinatorTerminated)
             coordinator.tell(
-              snap.actors.Messages.StartByteCodeSync(missing),
+              snap.actors.ByteCodeCoordinator.StartByteCodeSync(missing),
               org.apache.pekko.actor.ActorRef.noSender
             )
             downloading(ctx, coordinator, missing.size, syncController, appStateStorage, snapSyncConfig)
@@ -231,9 +231,9 @@ object BytecodeRecoveryActor {
       }
 
       Behaviors.receiveMessage {
-        case snap.actors.Messages.ByteCodePeerAvailable(peer) =>
+        case snap.actors.ByteCodeCoordinator.ByteCodePeerAvailable(peer) =>
           coordinator.tell(
-            snap.actors.Messages.ByteCodePeerAvailable(peer),
+            snap.actors.ByteCodeCoordinator.ByteCodePeerAvailable(peer),
             org.apache.pekko.actor.ActorRef.noSender
           )
           Behaviors.same

@@ -9,6 +9,7 @@ import org.apache.pekko.testkit.TestActor.AutoPilot
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
+import com.chipprbots.ethereum.blockchain.sync.snap.actors.ByteCodeCoordinator
 import com.chipprbots.ethereum.blockchain.sync.snap.actors.Messages
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.Peer
@@ -60,7 +61,7 @@ class SNAPFakePeer(
                 }
               case req: GetByteCodes =>
                 byteCodesHandler(req).foreach { resp =>
-                  sender ! Messages.ByteCodesResponseMsg(resp)
+                  sender ! ByteCodeCoordinator.ByteCodesResponseMsg(resp)
                   served.incrementAndGet()
                 }
               case req: GetTrieNodes =>

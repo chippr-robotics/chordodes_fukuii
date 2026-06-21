@@ -125,7 +125,7 @@ class BytecodeRecoveryActorSpec
         )
         .toClassic
 
-      coordinatorProbe.expectMsgType[snap.actors.Messages.StartByteCodeSync](2.seconds)
+      coordinatorProbe.expectMsgType[snap.actors.ByteCodeCoordinator.StartByteCodeSync](2.seconds)
 
       actor ! SNAPSyncController.ByteCodeSyncComplete
 
@@ -197,7 +197,7 @@ class BytecodeRecoveryActorSpec
         )
         .toClassic
 
-      coordinatorProbe.expectMsgType[snap.actors.Messages.StartByteCodeSync](2.seconds)
+      coordinatorProbe.expectMsgType[snap.actors.ByteCodeCoordinator.StartByteCodeSync](2.seconds)
 
       // Kill the coordinator — recovery actor watches it and should handle CoordinatorTerminated
       system.stop(coordinatorProbe.ref)
@@ -238,7 +238,7 @@ class BytecodeRecoveryActorSpec
         )
         .toClassic
 
-      coordinatorProbe.expectMsgType[snap.actors.Messages.StartByteCodeSync](2.seconds)
+      coordinatorProbe.expectMsgType[snap.actors.ByteCodeCoordinator.StartByteCodeSync](2.seconds)
 
       // No ProgressBytecodesDownloaded → progressSeq stays 0 → CheckAbandon(0) fires and abandons
       syncController.expectMsg(abandonAfter * 4, BytecodeRecoveryActor.RecoveryComplete)

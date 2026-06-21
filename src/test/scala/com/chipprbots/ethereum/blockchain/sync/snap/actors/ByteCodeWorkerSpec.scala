@@ -55,7 +55,7 @@ class ByteCodeWorkerSpec
 
     val task = makeTask()
     val reqId = BigInt(1)
-    worker ! Messages.ByteCodeWorkerFetchTask(task, peer, reqId, BigInt(1024 * 1024))
+    worker ! ByteCodeCoordinator.ByteCodeWorkerFetchTask(task, peer, reqId, BigInt(1024 * 1024))
 
     // Worker must have sent GetByteCodes to the network peer manager
     val sendMsg = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
@@ -74,14 +74,14 @@ class ByteCodeWorkerSpec
     val worker = makeWorker(coordinator, networkPeerManager)
 
     val reqId = BigInt(2)
-    worker ! Messages.ByteCodeWorkerFetchTask(makeTask(), peer, reqId, BigInt(1024 * 1024))
+    worker ! ByteCodeCoordinator.ByteCodeWorkerFetchTask(makeTask(), peer, reqId, BigInt(1024 * 1024))
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
 
     val code = ByteString("contract bytecode here")
     val response = ByteCodes(requestId = reqId, codes = Seq(code))
-    worker ! Messages.ByteCodesResponseMsg(response)
+    worker ! ByteCodeCoordinator.ByteCodesResponseMsg(response)
 
-    coordinator.expectMsg(1.second, Messages.ByteCodesResponseMsg(response))
+    coordinator.expectMsg(1.second, ByteCodeCoordinator.ByteCodesResponseMsg(response))
   }
 
   it should "return to idle after response and process a stashed ByteCodeWorkerFetchTask" taggedAs UnitTest in {
@@ -93,18 +93,18 @@ class ByteCodeWorkerSpec
 
     // First task
     val reqId1 = BigInt(3)
-    worker ! Messages.ByteCodeWorkerFetchTask(makeTask(Seq(codeHash1)), peer, reqId1, BigInt(1024 * 1024))
+    worker ! ByteCodeCoordinator.ByteCodeWorkerFetchTask(makeTask(Seq(codeHash1)), peer, reqId1, BigInt(1024 * 1024))
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
 
     // Second task — stashed while working
     val reqId2 = BigInt(4)
-    worker ! Messages.ByteCodeWorkerFetchTask(makeTask(Seq(codeHash2)), peer, reqId2, BigInt(1024 * 1024))
+    worker ! ByteCodeCoordinator.ByteCodeWorkerFetchTask(makeTask(Seq(codeHash2)), peer, reqId2, BigInt(1024 * 1024))
 
     // Respond to first task — worker unstashes and processes the second
     val resp1 = ByteCodes(requestId = reqId1, codes = Seq(ByteString("code1")))
-    worker ! Messages.ByteCodesResponseMsg(resp1)
+    worker ! ByteCodeCoordinator.ByteCodesResponseMsg(resp1)
 
-    coordinator.expectMsg(1.second, Messages.ByteCodesResponseMsg(resp1))
+    coordinator.expectMsg(1.second, ByteCodeCoordinator.ByteCodesResponseMsg(resp1))
     // Unstash triggers second task → GetByteCodes sent for reqId2
     val sendMsg2 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
     sendMsg2.message.asInstanceOf[GetByteCodesEnc].underlyingMsg.requestId shouldBe reqId2
@@ -118,12 +118,12 @@ class ByteCodeWorkerSpec
     val worker = makeWorker(coordinator, networkPeerManager)
 
     val reqId = BigInt(5)
-    worker ! Messages.ByteCodeWorkerFetchTask(makeTask(), peer, reqId, BigInt(1024 * 1024))
+    worker ! ByteCodeCoordinator.ByteCodeWorkerFetchTask(makeTask(), peer, reqId, BigInt(1024 * 1024))
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
 
-    worker ! Messages.ByteCodeRequestTimeout(reqId)
+    worker ! ByteCodeCoordinator.ByteCodeRequestTimeout(reqId)
 
-    coordinator.expectMsg(1.second, Messages.ByteCodeTaskFailed(reqId, "Timeout"))
+    coordinator.expectMsg(1.second, ByteCodeCoordinator.ByteCodeTaskFailed(reqId, "Timeout"))
   }
 
   it should "return to idle after timeout and accept a new ByteCodeWorkerFetchTask" taggedAs UnitTest in {
@@ -134,15 +134,15 @@ class ByteCodeWorkerSpec
     val worker = makeWorker(coordinator, networkPeerManager)
 
     val reqId1 = BigInt(6)
-    worker ! Messages.ByteCodeWorkerFetchTask(makeTask(), peer, reqId1, BigInt(1024 * 1024))
+    worker ! ByteCodeCoordinator.ByteCodeWorkerFetchTask(makeTask(), peer, reqId1, BigInt(1024 * 1024))
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
 
-    worker ! Messages.ByteCodeRequestTimeout(reqId1)
-    coordinator.expectMsgType[Messages.ByteCodeTaskFailed](1.second)
+    worker ! ByteCodeCoordinator.ByteCodeRequestTimeout(reqId1)
+    coordinator.expectMsgType[ByteCodeCoordinator.ByteCodeTaskFailed](1.second)
 
     // Worker should now be idle — second task accepted
     val reqId2 = BigInt(7)
-    worker ! Messages.ByteCodeWorkerFetchTask(makeTask(), peer, reqId2, BigInt(1024 * 1024))
+    worker ! ByteCodeCoordinator.ByteCodeWorkerFetchTask(makeTask(), peer, reqId2, BigInt(1024 * 1024))
     val sendMsg = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
     sendMsg.message.asInstanceOf[GetByteCodesEnc].underlyingMsg.requestId shouldBe reqId2
   }
@@ -155,15 +155,15 @@ class ByteCodeWorkerSpec
     val worker = makeWorker(coordinator, networkPeerManager)
 
     val reqId1 = BigInt(8)
-    worker ! Messages.ByteCodeWorkerFetchTask(makeTask(Seq(codeHash1)), peer, reqId1, BigInt(1024 * 1024))
+    worker ! ByteCodeCoordinator.ByteCodeWorkerFetchTask(makeTask(Seq(codeHash1)), peer, reqId1, BigInt(1024 * 1024))
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
 
     // Stash a second task
     val reqId2 = BigInt(9)
-    worker ! Messages.ByteCodeWorkerFetchTask(makeTask(Seq(codeHash2)), peer, reqId2, BigInt(1024 * 1024))
+    worker ! ByteCodeCoordinator.ByteCodeWorkerFetchTask(makeTask(Seq(codeHash2)), peer, reqId2, BigInt(1024 * 1024))
 
     // Coordinator sends explicit Release
-    worker ! Messages.ByteCodeWorkerRelease(reqId1)
+    worker ! ByteCodeCoordinator.ByteCodeWorkerRelease(reqId1)
 
     // Unstash triggers second task → GetByteCodes for reqId2
     val sendMsg2 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
@@ -178,12 +178,12 @@ class ByteCodeWorkerSpec
     val worker = makeWorker(coordinator, networkPeerManager)
 
     val reqId = BigInt(10)
-    worker ! Messages.ByteCodeWorkerFetchTask(makeTask(), peer, reqId, BigInt(1024 * 1024))
+    worker ! ByteCodeCoordinator.ByteCodeWorkerFetchTask(makeTask(), peer, reqId, BigInt(1024 * 1024))
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
 
     val wrongReqId = BigInt(999)
     val response = ByteCodes(requestId = wrongReqId, codes = Seq.empty)
-    worker ! Messages.ByteCodesResponseMsg(response)
+    worker ! ByteCodeCoordinator.ByteCodesResponseMsg(response)
 
     // Coordinator should NOT receive anything for the mismatched response
     coordinator.expectNoMessage(200.millis)

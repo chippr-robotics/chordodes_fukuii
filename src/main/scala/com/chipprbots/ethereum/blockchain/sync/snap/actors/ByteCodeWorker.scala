@@ -21,9 +21,9 @@ import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
   */
 object ByteCodeWorker {
 
-  import Messages.*
+  import ByteCodeCoordinator.*
 
-  type Command = ByteCodeWorkerMessage
+  type Command = WorkerMessage
 
   private val StashCapacity = 100
 

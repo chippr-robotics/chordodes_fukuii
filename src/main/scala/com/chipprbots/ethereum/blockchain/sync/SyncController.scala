@@ -1881,7 +1881,7 @@ object SyncController {
             peers.filter { case (_, peerInfo) => peerInfo.remoteStatus.supportsSnap && peerInfo.forkAccepted }
           if snapPeers.nonEmpty then {
             snapPeers.foreach { case (peer, _) =>
-              bytecodeActor.foreach(_ ! snap.actors.Messages.ByteCodePeerAvailable(peer))
+              bytecodeActor.foreach(_ ! snap.actors.ByteCodeCoordinator.ByteCodePeerAvailable(peer))
               storageActor.foreach(_ ! snap.actors.Messages.StoragePeerAvailable(peer))
             }
           }

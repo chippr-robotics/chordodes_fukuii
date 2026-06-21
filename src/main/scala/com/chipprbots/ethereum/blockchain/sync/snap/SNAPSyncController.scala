@@ -478,7 +478,7 @@ private class SNAPSyncControllerImpl(
     ids.foreach { id =>
       accountRangeCoordinator.foreach(_ ! actors.Messages.PeerUnavailable(id))
       storageRangeCoordinator.foreach(_ ! actors.Messages.StoragePeerUnavailable(id))
-      bytecodeCoordinator.foreach(_ ! actors.Messages.ByteCodePeerUnavailable(id))
+      bytecodeCoordinator.foreach(_ ! actors.ByteCodeCoordinator.ByteCodePeerUnavailable(id))
       trieNodeHealingCoordinator.foreach(_ ! actors.Messages.HealingPeerUnavailable(id))
     }
   }
@@ -817,7 +817,7 @@ private class SNAPSyncControllerImpl(
         ctx.log.debug(s"Received ByteCodes response: requestId=${msg.requestId}, codes=${msg.codes.size}")
 
         // Forward to the bytecode coordinator (it owns the workers).
-        bytecodeCoordinator.foreach(_ ! actors.Messages.ByteCodesResponseMsg(msg))
+        bytecodeCoordinator.foreach(_ ! actors.ByteCodeCoordinator.ByteCodesResponseMsg(msg))
         Behaviors.same
 
       case StorageRangesResponse(msg) =>
@@ -1140,7 +1140,7 @@ private class SNAPSyncControllerImpl(
       // IncrementalContractData arrives from AccountRangeCoordinator after every identifyContractAccounts() call.
       case IncrementalContractData(codeHashes, storageTasks) =>
         if codeHashes.nonEmpty then {
-          bytecodeCoordinator.foreach(_ ! actors.Messages.AddByteCodeTasks(codeHashes))
+          bytecodeCoordinator.foreach(_ ! actors.ByteCodeCoordinator.AddByteCodeTasks(codeHashes))
           // Accumulate the running total of unique codeHashes for the dashboard. `codeHashes` is
           // already deduplicated upstream (Bloom filter in AccountRangeCoordinator), so summing
           // batch sizes gives the unique total.
@@ -1201,7 +1201,7 @@ private class SNAPSyncControllerImpl(
           consecutivePivotRefreshes = 0
 
           // Signal that no more work will arrive (sentinel pattern — prevents premature completion)
-          bytecodeCoordinator.foreach(_ ! actors.Messages.NoMoreByteCodeTasks)
+          bytecodeCoordinator.foreach(_ ! actors.ByteCodeCoordinator.NoMoreByteCodeTasks)
           storageRangeCoordinator.foreach(_ ! actors.Messages.NoMoreStorageTasks)
 
           // Transition to ByteCodeAndStorageSync for status reporting and stagnation checks
@@ -1214,10 +1214,10 @@ private class SNAPSyncControllerImpl(
           // ByteCode budget 8 per peer: with 2 local ETC-capable peers (Besu + core-geth) that gives
           // 16 concurrent requests vs 4 at budget=2. External ETH-mainnet peers return empty quickly
           // and cool down; local peers handle the full load at <1ms RTT.
-          bytecodeCoordinator.foreach(_ ! actors.Messages.UpdateMaxInFlightPerPeer(8))
+          bytecodeCoordinator.foreach(_ ! actors.ByteCodeCoordinator.UpdateMaxInFlightPerPeer(8))
           // Clear accumulated peer cooldowns and seed initial dispatch — without this, peers on
           // 2-min backoff from AccountRange skip ByteCode dispatch indefinitely (Layer 2 stall).
-          bytecodeCoordinator.foreach(_ ! actors.Messages.ByteCodePivotRefreshed)
+          bytecodeCoordinator.foreach(_ ! actors.ByteCodeCoordinator.ByteCodePivotRefreshed)
           requestByteCodes()
 
           // Cancel account-phase schedulers (no longer relevant)
@@ -1606,12 +1606,12 @@ private class SNAPSyncControllerImpl(
                 import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
                 given typedScheduler: org.apache.pekko.actor.typed.Scheduler = ctx.system.scheduler
                 ctx.pipeToSelf(
-                  coordinator.ask[actors.Messages.ByteCodeProgress](replyTo =>
-                    actors.Messages.ByteCodeGetProgress(replyTo)
+                  coordinator.ask[actors.ByteCodeCoordinator.ByteCodeProgress](replyTo =>
+                    actors.ByteCodeCoordinator.ByteCodeGetProgress(replyTo)
                   )
                 ) {
                   case Success(progress) => ByteCodeCoordinatorProgress(progress)
-                  case Failure(_)        => ByteCodeCoordinatorProgress(actors.Messages.ByteCodeProgress(0.0, 0L, 0L))
+                  case Failure(_)        => ByteCodeCoordinatorProgress(actors.ByteCodeCoordinator.ByteCodeProgress(0.0, 0L, 0L))
                 }
               }
             }
@@ -1758,7 +1758,7 @@ private class SNAPSyncControllerImpl(
     * Only fires during ByteCodeAndStorageSync when noMoreTasksExpected is set (post-AccountRange). Missing bytecodes
     * are recovered per-block during import via BytecodeRecoveryActor.
     */
-  private def maybeForceCompleteIfBytecodeStagnant(progress: actors.Messages.ByteCodeProgress): Unit = {
+  private def maybeForceCompleteIfBytecodeStagnant(progress: actors.ByteCodeCoordinator.ByteCodeProgress): Unit = {
     if currentPhase != ByteCodeAndStorageSync || bytecodePhaseComplete then return
     if progress.bytecodesDownloaded > lastBytecodeProgressCount then {
       lastBytecodeProgressCount = progress.bytecodesDownloaded
@@ -1772,7 +1772,7 @@ private class SNAPSyncControllerImpl(
         s"(threshold=${BytecodeStagnationThreshold.toSeconds}s, downloaded=${progress.bytecodesDownloaded}). " +
         s"Force-completing — missing bytecodes deferred to import-time recovery."
     )
-    bytecodeCoordinator.foreach(_ ! actors.Messages.ForceCompleteByteCodes)
+    bytecodeCoordinator.foreach(_ ! actors.ByteCodeCoordinator.ForceCompleteByteCodes)
   }
 
   /** Geth-aligned: check if all 3 concurrent download phases are complete. Only transitions to healing when accounts +
@@ -2222,7 +2222,7 @@ private class SNAPSyncControllerImpl(
                   org.apache.pekko.actor.typed.DispatcherSelector.fromConfig("sync-dispatcher")
                 )
               )
-              bytecodeCoordinator.foreach(_ ! actors.Messages.StartByteCodeSync(Seq.empty))
+              bytecodeCoordinator.foreach(_ ! actors.ByteCodeCoordinator.StartByteCodeSync(Seq.empty))
               timers.startTimerWithFixedDelay(RequestByteCodes, RequestByteCodes, 1.second)
             }
 
@@ -2258,7 +2258,7 @@ private class SNAPSyncControllerImpl(
             }
 
             // Recovery budget: accounts done, bytecode=2, storage=3 (total 5 per peer)
-            bytecodeCoordinator.foreach(_ ! actors.Messages.UpdateMaxInFlightPerPeer(2))
+            bytecodeCoordinator.foreach(_ ! actors.ByteCodeCoordinator.UpdateMaxInFlightPerPeer(2))
 
             // Stream storage tasks from persisted file if available
             if !storageAlreadyDone then
@@ -2331,13 +2331,13 @@ private class SNAPSyncControllerImpl(
                           raf.readFully(buf)
                           batch += ByteString(java.util.Arrays.copyOf(buf, 32))
                           if batch.size >= 10000 then {
-                            coordinator ! actors.Messages.AddByteCodeTasks(batch.toSeq)
+                            coordinator ! actors.ByteCodeCoordinator.AddByteCodeTasks(batch.toSeq)
                             totalHashes += batch.size
                             batch.clear()
                           }
                         }
                         if batch.nonEmpty then {
-                          coordinator ! actors.Messages.AddByteCodeTasks(batch.toSeq)
+                          coordinator ! actors.ByteCodeCoordinator.AddByteCodeTasks(batch.toSeq)
                           totalHashes += batch.size
                         }
                       } finally raf.close()
@@ -2345,16 +2345,16 @@ private class SNAPSyncControllerImpl(
                     }
                     .foreach { count =>
                       asyncLog.info(s"Recovery: streamed $count codeHashes from ${filePath} for bytecode sync")
-                      coordinator ! actors.Messages.NoMoreByteCodeTasks
+                      coordinator ! actors.ByteCodeCoordinator.NoMoreByteCodeTasks
                     }
                 } else {
                   ctx.log.warn(s"Recovery: codeHashes file $filePath not found. Sending NoMore immediately.")
-                  bytecodeCoordinator.foreach(_ ! actors.Messages.NoMoreByteCodeTasks)
+                  bytecodeCoordinator.foreach(_ ! actors.ByteCodeCoordinator.NoMoreByteCodeTasks)
                 }
               }
             if savedCodeHashesPath.isEmpty then {
               ctx.log.warn("Recovery: no codeHashes file path persisted. Sending NoMore immediately.")
-              bytecodeCoordinator.foreach(_ ! actors.Messages.NoMoreByteCodeTasks)
+              bytecodeCoordinator.foreach(_ ! actors.ByteCodeCoordinator.NoMoreByteCodeTasks)
             }
 
             currentPhase = ByteCodeAndStorageSync
@@ -2364,8 +2364,8 @@ private class SNAPSyncControllerImpl(
 
             // Same as fresh ByteCode phase start: raise budget + clear cooldowns so peers on 2-min
             // backoff from AccountRange don't block ByteCode dispatch on resume.
-            bytecodeCoordinator.foreach(_ ! actors.Messages.UpdateMaxInFlightPerPeer(8))
-            bytecodeCoordinator.foreach(_ ! actors.Messages.ByteCodePivotRefreshed)
+            bytecodeCoordinator.foreach(_ ! actors.ByteCodeCoordinator.UpdateMaxInFlightPerPeer(8))
+            bytecodeCoordinator.foreach(_ ! actors.ByteCodeCoordinator.ByteCodePivotRefreshed)
             requestByteCodes()
 
             // Start parallel chain download during recovery too
@@ -3287,7 +3287,7 @@ private class SNAPSyncControllerImpl(
         )
       )
       // Start with empty codeHashes — tasks arrive incrementally via AddByteCodeTasks
-      bytecodeCoordinator.foreach(_ ! actors.Messages.StartByteCodeSync(Seq.empty))
+      bytecodeCoordinator.foreach(_ ! actors.ByteCodeCoordinator.StartByteCodeSync(Seq.empty))
 
       timers.startTimerWithFixedDelay(RequestByteCodes, RequestByteCodes, 1.second)
     }
@@ -3341,7 +3341,7 @@ private class SNAPSyncControllerImpl(
     // OOM. PR #1237's strike-counted demotion + PR #1241's backpressure-release-on-pivot make
     // stale-root timeouts recoverable rather than failure cascades. See PR #1252.
     // During AccountRangeSync: accounts=5, storage=2, bytecode=2 per peer.
-    bytecodeCoordinator.foreach(_ ! actors.Messages.UpdateMaxInFlightPerPeer(2))
+    bytecodeCoordinator.foreach(_ ! actors.ByteCodeCoordinator.UpdateMaxInFlightPerPeer(2))
     storageRangeCoordinator.foreach(_ ! actors.Messages.UpdateMaxInFlightPerPeer(2))
 
     progressMonitor.startPhase(AccountRangeSync)
@@ -3383,7 +3383,7 @@ private class SNAPSyncControllerImpl(
         ctx.log.debug("No SNAP-capable peers available for bytecode requests")
       } else {
         snapPeers.foreach { peer =>
-          coordinator ! actors.Messages.ByteCodePeerAvailable(peer)
+          coordinator ! actors.ByteCodeCoordinator.ByteCodePeerAvailable(peer)
         }
       }
     }
@@ -4188,7 +4188,7 @@ private class SNAPSyncControllerImpl(
     storageRangeCoordinator.foreach(_ ! actors.Messages.StoragePivotRefreshed(newStateRoot))
     // Bytecodes are content-addressed (hash-keyed) so pivot changes don't invalidate them,
     // but the coordinator should clear stale peer tracking.
-    bytecodeCoordinator.foreach(_ ! actors.Messages.ByteCodePivotRefreshed)
+    bytecodeCoordinator.foreach(_ ! actors.ByteCodeCoordinator.ByteCodePivotRefreshed)
     // Healing coordinator: update root, clear pending tasks and stateless peers.
     // Then re-walk the trie with the new root to discover missing nodes.
     trieNodeHealingCoordinator.foreach { coordinator =>
@@ -4845,7 +4845,7 @@ object SNAPSyncController {
   final private[snap] case class AccountCoordinatorProgress(progress: actors.AccountRangeStats) extends Command
   final private[snap] case class StorageCoordinatorProgress(stats: actors.StorageRangeCoordinator.SyncStatistics)
       extends Command
-  final private[snap] case class ByteCodeCoordinatorProgress(progress: actors.Messages.ByteCodeProgress) extends Command
+  final private[snap] case class ByteCodeCoordinatorProgress(progress: actors.ByteCodeCoordinator.ByteCodeProgress) extends Command
   // Periodic peer-request ticks
   private[snap] case object RequestAccountRanges extends Command
   private[snap] case object RequestByteCodes extends Command

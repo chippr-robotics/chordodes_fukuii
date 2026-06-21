@@ -16,11 +16,10 @@ object Messages {
   /** Dynamically adjust per-peer concurrency budget for a coordinator. Sent by SNAPSyncController at phase transitions
     * to implement global per-peer request budgeting (Geth-aligned: total 5 requests per peer across all coordinators).
     *
-    * Extends all four coordinator Command traits so each Typed coordinator can receive it directly.
+    * BCC defines its own sealed UpdateMaxInFlightPerPeer. Remaining: SRC, ARC, TNHC (still non-sealed).
     */
   case class UpdateMaxInFlightPerPeer(newLimit: Int)
-      extends ByteCodeCoordinator.Command
-      with StorageRangeCoordinator.Command
+      extends StorageRangeCoordinator.Command
       with AccountRangeCoordinator.Command
       with TrieNodeHealingCoordinator.Command
 
@@ -161,61 +160,6 @@ object Messages {
     * is sent back because the coordinator has already re-queued the task. Idempotent: a second cancel is a no-op.
     */
   case class WorkerRequestCancelled(requestId: BigInt) extends AccountRangeWorkerMessage
-
-  // ========================================
-  // ByteCode Messages
-  // ========================================
-
-  // Extends ByteCodeCoordinator.Command (Group S3): the coordinator is now a Typed actor with a sealed Command ADT.
-  // All ByteCodeCoordinatorMessage cases are therefore Commands; SSC (still Classic) sends them via the Classic `!`.
-  sealed trait ByteCodeCoordinatorMessage extends ByteCodeCoordinator.Command
-
-  case class StartByteCodeSync(codeHashes: Seq[ByteString]) extends ByteCodeCoordinatorMessage
-
-  /** Incrementally add bytecode download tasks (geth-aligned: inline dispatch from account responses). Coordinator
-    * deduplicates and batches these into ByteCodeTasks.
-    */
-  case class AddByteCodeTasks(codeHashes: Seq[ByteString]) extends ByteCodeCoordinatorMessage
-
-  /** Signal that no more bytecode tasks will arrive (all accounts downloaded). Coordinator may now report completion
-    * when pending + active tasks drain.
-    */
-  case object NoMoreByteCodeTasks extends ByteCodeCoordinatorMessage
-
-  /** Sent by SNAPSyncController when a fresher pivot has been selected. Bytecodes are content-addressed (hash-keyed) so
-    * pivot changes don't invalidate them, but the coordinator should clear stale peer tracking.
-    */
-  case object ByteCodePivotRefreshed extends ByteCodeCoordinatorMessage
-
-  case class ByteCodePeerAvailable(peer: Peer) extends ByteCodeCoordinatorMessage
-  case class ByteCodePeerUnavailable(peerId: String) extends ByteCodeCoordinatorMessage
-  case class ByteCodeTaskComplete(requestId: BigInt, result: Either[String, Int]) extends ByteCodeCoordinatorMessage
-  case class ByteCodeTaskFailed(requestId: BigInt, reason: String) extends ByteCodeCoordinatorMessage
-  case class ByteCodeGetProgress(replyTo: org.apache.pekko.actor.typed.ActorRef[ByteCodeProgress])
-      extends ByteCodeCoordinatorMessage
-  case object ByteCodeCheckCompletion extends ByteCodeCoordinatorMessage
-
-  /** Sent by SNAPSyncController when bytecode sync has stagnated and must be force-completed (#1164). Coordinator
-    * abandons remaining pending/active tasks (with an accounting counter), drains the queue, and reports
-    * `ByteCodeSyncComplete`. Mirrors `ForceCompleteStorage`. Missing bytecodes can be recovered post-SNAP via
-    * `BytecodeRecoveryActor`.
-    */
-  case object ForceCompleteByteCodes extends ByteCodeCoordinatorMessage
-
-  sealed trait ByteCodeWorkerMessage
-  case class FetchByteCodes(task: ByteCodeTask, peer: Peer) extends ByteCodeWorkerMessage
-  case class ByteCodeWorkerFetchTask(task: ByteCodeTask, peer: Peer, requestId: BigInt, maxResponseSize: BigInt)
-      extends ByteCodeWorkerMessage
-  // Sent to BOTH the worker (its own response handling) and the now-Typed coordinator (line ~328), so it is a
-  // member of both command sets.
-  case class ByteCodesResponseMsg(response: ByteCodes) extends ByteCodeWorkerMessage with ByteCodeCoordinator.Command
-  case class ByteCodeRequestTimeout(requestId: BigInt) extends ByteCodeWorkerMessage
-
-  /** Sent by ByteCodeCoordinator to ByteCodeWorker after processing the response. Worker cancels its timeout and
-    * transitions from working to idle state without waiting for the 30s timeout.
-    */
-  case class ByteCodeWorkerRelease(requestId: BigInt) extends ByteCodeWorkerMessage
-  case class ByteCodeProgress(progress: Double, bytecodesDownloaded: Long, bytesDownloaded: Long)
 
   // ========================================
   // StorageRange Messages
