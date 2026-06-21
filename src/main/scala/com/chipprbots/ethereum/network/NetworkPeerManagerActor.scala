@@ -512,22 +512,38 @@ class NetworkPeerManagerActor(
         //                   STATUS data to SyncController; peer is evicted for 5 minutes.
         //   TD-DIVERGE    — ratio ≤ 10K: peer genuinely has higher cumulative work; we may be on
         //                   a lighter fork or still catching up.
+        //
+        // FRESH-NODE EXEMPTION (2026-06-21): TD-PROXY-GAP must NOT fire when our best block is at
+        // genesis (ourBest.header.number == 0). On a freshly-wiped node the genesis TD is the real
+        // chain difficulty (~2^34 for ETC) — not a stale proxy — so the ratio vs a real peer's
+        // cumulative TD (~2.48e22) always exceeds 10K. Firing the eviction disconnects and
+        // 5-min-blacklists every legitimate SNAP peer before the eager best-block probe can run,
+        // leaving maxBlockNumber=0 on all peers → SNAP pivot selection sees no peers → pivot=0
+        // forever. TD-PROXY-GAP is only meaningful when our best block is already past genesis
+        // (i.e., SNAP finalization wrote a genesis-proxy TD for a high best block). The guard
+        // `ourBest.header.number > 0` is the unambiguous, minimal condition: block 0 IS genesis
+        // by definition; no post-SNAP node can have a best block of exactly 0.
         if (peerInfo.remoteStatus.capability != com.chipprbots.ethereum.network.p2p.messages.Capability.ETH69) {
           val peerTD = peerInfo.remoteStatus.chainWeight.totalDifficulty
           reader.getBestBlock().foreach { ourBest =>
             reader.getChainWeightByHash(ourBest.header.hash).foreach { ourWeight =>
               if (peerTD > ourWeight.totalDifficulty) {
                 val ratio = peerTD / ourWeight.totalDifficulty
-                if (ratio > BigInt(10_000)) {
+                if (ratio > BigInt(10_000) && ourBest.header.number > 0) {
                   // TD-PROXY-GAP: stored TD is a genesis proxy from SNAP finalization when no ETH68
                   // peers were available. Push calibration data to SyncController *before* evicting
                   // the peer so it can write the correct cumulative TD from this handshake's STATUS.
                   // Note: ETH68 maxBlockNumber is 0 here (eager probe fires after this handler);
                   // SyncController uses peerTD directly in that case — tiny overestimate, safe.
+                  // Guard: ourBest.header.number > 0 ensures we never fire this on a fresh node at
+                  // genesis — see FRESH-NODE EXEMPTION comment above.
                   chainWeightCalibrationTarget.foreach { target =>
                     target ! com.chipprbots.ethereum.blockchain.sync.SyncProtocol
                       .CalibrateChainWeightFromPeer(peerTD, peerInfo.maxBlockNumber)
                   }
+                  // NOTE: Pekko LoggingAdapter caps template substitution at 4 args — do NOT add a
+                  // 5th (e.g. ourBest.header.number) or compilation fails (E007). The block number is
+                  // implied: this branch only runs when ourBest.header.number > 0 (see guard above).
                   log.warning(
                     "TD-PROXY-GAP: peer {} TD={} vs ours={} (ratio={}x). " +
                       "Calibrating from peer STATUS data and evicting peer for 5 minutes.",
