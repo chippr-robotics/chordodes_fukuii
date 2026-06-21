@@ -50,6 +50,9 @@ object RegularSync {
       syncConfig: SyncConfig,
       ommersPool: TypedActorRef[OmmersPool.Command],
       pendingTransactionsManager: TypedActorRef[PendingTransactionsManager.Command],
+      blockTopic: TypedActorRef[
+        org.apache.pekko.actor.typed.pubsub.Topic.Command[com.chipprbots.ethereum.jsonrpc.NewBlockImported]
+      ],
       configBuilder: BlockchainConfigBuilder
   ): Behavior[Any] =
     Behaviors.setup { ctx =>
@@ -91,6 +94,7 @@ object RegularSync {
               ommersPool,
               broadcaster.toClassic,
               pendingTransactionsManager,
+              blockTopic,
               ctx.self.toClassic,
               configBuilder
             ),
@@ -126,6 +130,9 @@ object RegularSync {
       syncConfig: SyncConfig,
       ommersPool: TypedActorRef[OmmersPool.Command],
       pendingTransactionsManager: TypedActorRef[PendingTransactionsManager.Command],
+      blockTopic: TypedActorRef[
+        org.apache.pekko.actor.typed.pubsub.Topic.Command[com.chipprbots.ethereum.jsonrpc.NewBlockImported]
+      ],
       configBuilder: BlockchainConfigBuilder
   ): org.apache.pekko.actor.Props =
     org.apache.pekko.actor.typed.scaladsl.adapter.PropsAdapter(
@@ -144,6 +151,7 @@ object RegularSync {
         syncConfig,
         ommersPool,
         pendingTransactionsManager,
+        blockTopic,
         configBuilder
       )
     )

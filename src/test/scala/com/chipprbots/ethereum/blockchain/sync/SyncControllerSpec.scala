@@ -799,6 +799,15 @@ class SyncControllerSpec
     // keeps `TestActorRef` child inspection (`syncController.children`). externalSchedulerOpt threads the
     // ExplicitlyTriggeredScheduler so `someTimePasses()` continues to drive the actor's inline scheduler callbacks;
     // its withTimers fire on the system scheduler (also the ExplicitlyTriggeredScheduler via explicit-scheduler.conf).
+    lazy val blockTopic: org.apache.pekko.actor.typed.ActorRef[
+      org.apache.pekko.actor.typed.pubsub.Topic.Command[com.chipprbots.ethereum.jsonrpc.NewBlockImported]
+    ] = system.spawn(
+      org.apache.pekko.actor.typed.pubsub.Topic[com.chipprbots.ethereum.jsonrpc.NewBlockImported](
+        "block-imported-topic"
+      ),
+      "block-imported-topic"
+    )
+
     lazy val syncController: TestActorRef[Nothing] = TestActorRef(
       org.apache.pekko.actor.typed.scaladsl.adapter.PropsAdapter(
         SyncController(
@@ -817,6 +826,7 @@ class SyncControllerSpec
           peerMessageBus.ref,
           pendingTransactionsManager.ref
             .toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
+          blockTopic,
           ommersPool.ref,
           networkPeerManager.ref,
           blacklist,

@@ -97,6 +97,9 @@ object SyncController {
       pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
         com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
       ],
+      blockTopic: org.apache.pekko.actor.typed.ActorRef[
+        org.apache.pekko.actor.typed.pubsub.Topic.Command[com.chipprbots.ethereum.jsonrpc.NewBlockImported]
+      ],
       ommersPool: org.apache.pekko.actor.typed.ActorRef[com.chipprbots.ethereum.ommers.OmmersPool.Command],
       networkPeerManager: ActorRef,
       blacklist: Blacklist,
@@ -125,6 +128,7 @@ object SyncController {
           validators,
           peerEventBus,
           pendingTransactionsManager,
+          blockTopic,
           ommersPool,
           networkPeerManager,
           blacklist,
@@ -160,6 +164,9 @@ object SyncController {
       peerEventBus: ActorRef,
       pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
         com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
+      ],
+      blockTopic: org.apache.pekko.actor.typed.ActorRef[
+        org.apache.pekko.actor.typed.pubsub.Topic.Command[com.chipprbots.ethereum.jsonrpc.NewBlockImported]
       ],
       ommersPool: org.apache.pekko.actor.typed.ActorRef[com.chipprbots.ethereum.ommers.OmmersPool.Command],
       networkPeerManager: ActorRef,
@@ -1524,6 +1531,7 @@ object SyncController {
             syncConfig,
             ommersPool,
             pendingTransactionsManager,
+            blockTopic,
             configBuilder
           )
           .withDispatcher("sync-dispatcher"),
@@ -2164,6 +2172,7 @@ object SyncController {
           syncConfig,
           ommersPool,
           pendingTransactionsManager,
+          blockTopic,
           configBuilder
         ),
         "regular-sync-bootstrap"

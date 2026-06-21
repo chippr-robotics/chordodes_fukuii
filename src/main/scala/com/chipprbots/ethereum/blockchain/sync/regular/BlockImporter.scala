@@ -7,7 +7,7 @@ import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
-import org.apache.pekko.actor.typed.eventstream.EventStream
+import org.apache.pekko.actor.typed.pubsub.Topic
 import org.apache.pekko.event.Logging
 import org.apache.pekko.event.LoggingAdapter
 import org.apache.pekko.util.ByteString
@@ -78,6 +78,7 @@ object BlockImporter {
       ommersPool: TypedActorRef[OmmersPool.Command],
       broadcaster: ActorRef,
       pendingTransactionsManager: TypedActorRef[PendingTransactionsManager.Command],
+      blockTopic: TypedActorRef[Topic.Command[NewBlockImported]],
       supervisor: ActorRef,
       configBuilder: BlockchainConfigBuilder
   ): Behavior[Any] =
@@ -98,6 +99,7 @@ object BlockImporter {
           ommersPool,
           broadcaster,
           pendingTransactionsManager,
+          blockTopic,
           supervisor,
           configBuilder
         )
@@ -173,6 +175,7 @@ final private class BlockImporterLogic(
     ommersPool: TypedActorRef[OmmersPool.Command],
     broadcaster: ActorRef,
     pendingTransactionsManager: TypedActorRef[PendingTransactionsManager.Command],
+    blockTopic: TypedActorRef[Topic.Command[NewBlockImported]],
     supervisor: ActorRef,
     configBuilder: BlockchainConfigBuilder
 ) {
@@ -639,12 +642,12 @@ final private class BlockImporterLogic(
             val (blocks, weights) = importedBlocksData.map(data => (data.block, data.weight)).unzip
             broadcastBlocks(blocks, weights)
             updateTxPool(importedBlocksData.map(_.block), Seq.empty)
-            blocks.foreach(b => ctx.system.eventStream.tell(EventStream.Publish(NewBlockImported(b))))
+            blocks.foreach(b => blockTopic ! Topic.Publish(NewBlockImported(b)))
             supervisor ! ProgressProtocol.ImportedBlock(block.number, internally)
           case ChainReorganised(oldBranch, newBranch, weights) =>
             updateTxPool(newBranch, oldBranch)
             broadcastBlocks(newBranch, weights)
-            newBranch.foreach(b => ctx.system.eventStream.tell(EventStream.Publish(NewBlockImported(b))))
+            newBranch.foreach(b => blockTopic ! Topic.Publish(NewBlockImported(b)))
             newBranch.lastOption.foreach(block => supervisor ! ProgressProtocol.ImportedBlock(block.number, internally))
           case BlockImportFailedDueToMissingNode(missingNodeException) if syncConfig.redownloadMissingStateNodes =>
             // state node re-download will be handled when downloading headers

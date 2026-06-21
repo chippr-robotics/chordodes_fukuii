@@ -292,6 +292,14 @@ class RegularSyncSpec
 
           for depth <- List(1, 5, 64, 128) do {
             val lca = BigInt(depth)
+            val blockTopic: org.apache.pekko.actor.typed.ActorRef[
+              org.apache.pekko.actor.typed.pubsub.Topic.Command[com.chipprbots.ethereum.jsonrpc.NewBlockImported]
+            ] = system.spawn(
+              org.apache.pekko.actor.typed.pubsub.Topic[com.chipprbots.ethereum.jsonrpc.NewBlockImported](
+                "block-imported-topic"
+              ),
+              s"block-imported-topic-depth-$depth"
+            )
             val importer = system.actorOf(
               org.apache.pekko.actor.typed.scaladsl.adapter.PropsAdapter(
                 BlockImporter.apply(
@@ -307,6 +315,7 @@ class RegularSyncSpec
                   importerBroadcaster.ref,
                   pendingTransactionsManager.ref
                     .toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
+                  blockTopic,
                   importerSupervisor.ref,
                   this
                 )

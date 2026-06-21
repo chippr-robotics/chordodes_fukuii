@@ -127,6 +127,15 @@ object RegularSyncItSpecUtils {
       "pending-transactions-manager"
     )
 
+    lazy val blockTopic: typed.ActorRef[
+      org.apache.pekko.actor.typed.pubsub.Topic.Command[com.chipprbots.ethereum.jsonrpc.NewBlockImported]
+    ] = system.spawn(
+      org.apache.pekko.actor.typed.pubsub.Topic[com.chipprbots.ethereum.jsonrpc.NewBlockImported](
+        "block-imported-topic"
+      ),
+      "block-imported-topic"
+    )
+
     lazy val validators: ValidatorsExecutor = buildEthashMining().validators
 
     val broadcasterRef: typed.ActorRef[BlockBroadcasterActor.BroadcasterMsg] =
@@ -161,6 +170,7 @@ object RegularSyncItSpecUtils {
           ommersPool,
           broadcasterRef.toClassic,
           pendingTransactionsManager,
+          blockTopic,
           regularSync,
           this
         ),
@@ -183,6 +193,7 @@ object RegularSyncItSpecUtils {
         testSyncConfig,
         ommersPool,
         pendingTransactionsManager,
+        blockTopic,
         this
       )
     )

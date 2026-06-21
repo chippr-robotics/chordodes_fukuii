@@ -91,6 +91,15 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
     val stateStorage: StateStorage = stub[StateStorage]
     val evmCodeStorage: EvmCodeStorage = stub[EvmCodeStorage]
 
+    lazy val blockTopic: org.apache.pekko.actor.typed.ActorRef[
+      org.apache.pekko.actor.typed.pubsub.Topic.Command[com.chipprbots.ethereum.jsonrpc.NewBlockImported]
+    ] = system.spawn(
+      org.apache.pekko.actor.typed.pubsub.Topic[com.chipprbots.ethereum.jsonrpc.NewBlockImported](
+        "block-imported-topic"
+      ),
+      "block-imported-topic"
+    )
+
     lazy val regularSync: ActorRef = system.actorOf(
       RegularSync
         .props(
@@ -109,6 +118,7 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
           ommersPool.ref.toTyped[com.chipprbots.ethereum.ommers.OmmersPool.Command],
           pendingTransactionsManager.ref
             .toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
+          blockTopic,
           this
         )
         .withDispatcher("pekko.actor.default-dispatcher")

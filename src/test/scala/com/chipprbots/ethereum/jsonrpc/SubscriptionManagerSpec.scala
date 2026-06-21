@@ -52,8 +52,27 @@ class SubscriptionManagerSpec
   def makePendingTxTopic(): ActorRef[org.apache.pekko.actor.typed.pubsub.Topic.Command[NewPendingTransaction]] =
     testKit.spawn(org.apache.pekko.actor.typed.pubsub.Topic[NewPendingTransaction]("pending-tx-topic"))
 
+  def makeBlockTopic(): ActorRef[org.apache.pekko.actor.typed.pubsub.Topic.Command[NewBlockImported]] =
+    testKit.spawn(org.apache.pekko.actor.typed.pubsub.Topic[NewBlockImported]("block-imported-topic"))
+
   def makeManager(): ActorRef[SubscriptionManager.Command] =
-    testKit.spawn(SubscriptionManager(new EphemBlockchainTestSetup {}.blockchainReader, makePendingTxTopic()))
+    testKit.spawn(
+      SubscriptionManager(new EphemBlockchainTestSetup {}.blockchainReader, makePendingTxTopic(), makeBlockTopic())
+    )
+
+  /** Returns a manager wired to a fresh block topic the caller can publish to. */
+  def makeManagerWithBlockTopic(): (
+      ActorRef[SubscriptionManager.Command],
+      ActorRef[org.apache.pekko.actor.typed.pubsub.Topic.Command[
+        NewBlockImported
+      ]]
+  ) = {
+    val blockTopic = makeBlockTopic()
+    val mgr = testKit.spawn(
+      SubscriptionManager(new EphemBlockchainTestSetup {}.blockchainReader, makePendingTxTopic(), blockTopic)
+    )
+    (mgr, blockTopic)
+  }
 
   /** Returns a preMaterialized queue + source pair. */
   def makeQueue(): (SourceQueueWithComplete[String], Source[String, NotUsed]) = Source
@@ -186,7 +205,7 @@ class SubscriptionManagerSpec
   // ── push notifications ─────────────────────────────────────────────────────
 
   it should "push newHeads notification to subscribed connection on NewBlockImported" taggedAs UnitTest in {
-    val mgr = makeManager()
+    val (mgr, blockTopic) = makeManagerWithBlockTopic()
     val (queue, source) = makeQueue()
     val connId = "conn-push-newheads"
     val messages = collectN(source, 1)
@@ -194,8 +213,8 @@ class SubscriptionManagerSpec
     mgr ! RegisterConnection(connId, queue)
     subscribe(mgr, connId, "newHeads")
 
-    // Classic eventStream publish reaches the Typed messageAdapter
-    testKit.system.classicSystem.eventStream.publish(NewBlockImported(fixtureBlock))
+    // Publish via the dedicated block Topic[T]; reaches the Typed messageAdapter
+    blockTopic ! org.apache.pekko.actor.typed.pubsub.Topic.Publish(NewBlockImported(fixtureBlock))
 
     val received = Await.result(messages, 5.seconds)
     received should have size 1
@@ -211,7 +230,7 @@ class SubscriptionManagerSpec
   }
 
   it should "not push newHeads to other connections" taggedAs UnitTest in {
-    val mgr = makeManager()
+    val (mgr, blockTopic) = makeManagerWithBlockTopic()
     val (queue1, _) = makeQueue()
     val (queue2, source2) = makeQueue()
     val connId1 = "conn-iso-1"
@@ -223,7 +242,7 @@ class SubscriptionManagerSpec
     // Only conn1 subscribes
     subscribe(mgr, connId1, "newHeads")
 
-    testKit.system.classicSystem.eventStream.publish(NewBlockImported(fixtureBlock))
+    blockTopic ! org.apache.pekko.actor.typed.pubsub.Topic.Publish(NewBlockImported(fixtureBlock))
 
     // conn2 should receive nothing — take(1) with a short completion timeout: if nothing was
     // routed the stream never completes and completionTimeout fires, proving isolation.

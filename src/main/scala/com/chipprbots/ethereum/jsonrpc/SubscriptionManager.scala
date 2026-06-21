@@ -4,7 +4,6 @@ import java.util.concurrent.atomic.AtomicLong
 
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
-import org.apache.pekko.actor.typed.eventstream.EventStream
 import org.apache.pekko.actor.typed.pubsub.Topic
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.stream.scaladsl.SourceQueueWithComplete
@@ -29,8 +28,8 @@ import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
   * ethereum/api/.../websocket/subscription/pending/PendingTransactionSubscriptionService.java
   * ethereum/api/.../websocket/subscription/syncing/SyncingSubscriptionService.java
   *
-  * Besu uses Vert.x EventBus + Verticle for subscription routing. We use ActorSystem.eventStream (same pub/sub
-  * semantics) with a Pekko actor instead of a Vert.x Verticle.
+  * Besu uses Vert.x EventBus + Verticle for subscription routing. We use dedicated Pekko Typed Topic[T] actors
+  * (blockTopic, pendingTxTopic — same pub/sub semantics) with a Pekko actor instead of a Vert.x Verticle.
   *
   * Connection lifecycle: RegisterConnection → Subscribe/Unsubscribe (0..N) → ConnectionClosed. All subscriptions for a
   * closed connection are automatically cleaned up.
@@ -77,7 +76,7 @@ object SubscriptionManager {
       extends Command
   case class Unsubscribe(connId: String, subId: Long, replyTo: ActorRef[UnsubscribeResponse]) extends Command
 
-  // private adapters for eventStream events
+  // private adapters for Topic[T] events
   private case class BlockImported(block: Block) extends Command
   private case class PendingTxArrived(stx: SignedTransactionWithSender) extends Command
 
@@ -90,7 +89,8 @@ object SubscriptionManager {
 
   def apply(
       blockchainReader: BlockchainReader,
-      pendingTxTopic: ActorRef[Topic.Command[NewPendingTransaction]]
+      pendingTxTopic: ActorRef[Topic.Command[NewPendingTransaction]],
+      blockTopic: ActorRef[Topic.Command[NewBlockImported]]
   ): Behavior[Command] = Behaviors.setup { ctx =>
     DefaultFormats + JsonSerializers.RpcErrorJsonSerializer
     ctx.executionContext
@@ -99,10 +99,10 @@ object SubscriptionManager {
     var connections: Map[String, SourceQueueWithComplete[String]] = Map.empty
     val counter = new AtomicLong(0L)
 
-    // Subscribe to the Classic+Typed shared eventStream via message adapters
+    // Subscribe to the dedicated Topic[T] channels via message adapters
     val blockAdapter = ctx.messageAdapter[NewBlockImported](e => BlockImported(e.block))
     val pendingTxAdapter = ctx.messageAdapter[NewPendingTransaction](e => PendingTxArrived(e.stx))
-    ctx.system.eventStream.tell(EventStream.Subscribe[NewBlockImported](blockAdapter))
+    blockTopic ! Topic.Subscribe(blockAdapter)
     pendingTxTopic ! Topic.Subscribe(pendingTxAdapter)
 
     // ---- subscription builders ----
@@ -322,7 +322,7 @@ object SubscriptionManager {
           Behaviors.same
       }
       .receiveSignal { case (_, org.apache.pekko.actor.typed.PostStop) =>
-        ctx.system.eventStream.tell(EventStream.Unsubscribe(blockAdapter))
+        blockTopic ! Topic.Unsubscribe(blockAdapter)
         pendingTxTopic ! Topic.Unsubscribe(pendingTxAdapter)
         Behaviors.same
       }

@@ -443,6 +443,15 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
 
     // SyncController is Pekko Typed (Group ROOT). Spawn through PropsAdapter so the Classic TestActorRef machinery
     // and `someTimePasses()`/ExplicitlyTriggeredScheduler timing still work.
+    lazy val blockTopic: org.apache.pekko.actor.typed.ActorRef[
+      org.apache.pekko.actor.typed.pubsub.Topic.Command[com.chipprbots.ethereum.jsonrpc.NewBlockImported]
+    ] = system.spawn(
+      org.apache.pekko.actor.typed.pubsub.Topic[com.chipprbots.ethereum.jsonrpc.NewBlockImported](
+        "block-imported-topic"
+      ),
+      "block-imported-topic"
+    )
+
     lazy val syncController: TestActorRef[Nothing] = TestActorRef(
       org.apache.pekko.actor.typed.scaladsl.adapter.PropsAdapter(
         SyncController(
@@ -461,6 +470,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
           peerMessageBus.ref,
           pendingTransactionsManager.ref
             .toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
+          blockTopic,
           ommersPool.ref,
           networkPeerManager.ref,
           blacklist,
