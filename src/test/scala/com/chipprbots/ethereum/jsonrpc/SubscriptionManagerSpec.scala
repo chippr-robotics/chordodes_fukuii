@@ -219,10 +219,10 @@ class SubscriptionManagerSpec
 
     testKit.system.classicSystem.eventStream.publish(NewBlockImported(fixtureBlock))
 
-    // conn2 should receive nothing — add a brief wait and drain
+    // conn2 should receive nothing — take(1) with a short completion timeout: if nothing was
+    // routed the stream never completes and completionTimeout fires, proving isolation.
     Thread.sleep(200)
-    val messages2 = source2.take(0).runWith(Sink.seq)(mat)
-    val received2 = Await.result(messages2, 1.second)
-    received2 shouldBe empty
+    val messages2 = source2.take(1).completionTimeout(50.millis).runWith(Sink.seq)(mat)
+    intercept[Exception](Await.result(messages2, 200.millis))
   }
 }
