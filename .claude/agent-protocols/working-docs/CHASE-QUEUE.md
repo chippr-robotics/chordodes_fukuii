@@ -31,7 +31,10 @@ and add a dated log entry at the bottom.
 
 | File | Line(s) | Pattern | Type | Agent | Date |
 |------|---------|---------|------|-------|------|
-| _No entries yet_ | | | | | |
+| `consensus/pow/PoWMining.scala` | 103–132 | `mutex.synchronized` init guard: Bucket A — `startMiningProcess` checks `minerCoordinatorRef.isEmpty && mockedMinerRef.isEmpty` then sets one of them; semantically an AtomicBoolean init flag but is a compound check-then-act on two `@volatile` fields. FORGE gate required before converting to `AtomicBoolean`. | MUTABLE | MITHRIL | 2026-06-20 |
+| `network/p2p/messages/ETHPackets.scala`, `SNAP.scala`, `ETH69.scala`, `WireProtocol.scala` | various | `*Enc extends MessageSerializableImplicit` — subtype polymorphism: upcast to `MessageSerializable` at call sites; cannot be replaced by extension methods | IMPLICIT | MITHRIL | 2026-06-20 |
+| `network/p2p/messages/ETHPackets.scala:426`, `blockchain/sync/codec/MptNodeCodecs.scala:20` | 426, 20 | `SignedTransactionEnc`/`MptNodeEnc extends RLPSerializable` — `toBytes` inherited via trait and called from cross-file callers (`domain/BlockBody`, SNAP codec); cannot be replaced by extension methods | IMPLICIT | MITHRIL | 2026-06-20 |
+| `network/p2p/messages/ETHPackets.scala` | 1224, 1249, 1265 | `TxLogEntryRLPEnc`/`ReceiptBloomEnc`/`ReceiptBloomFreeEnc` — name collision with `ReceiptCodecs` extension under wildcard import; ambiguous implicit search | IMPLICIT | MITHRIL | 2026-06-20 |
 
 ---
 
