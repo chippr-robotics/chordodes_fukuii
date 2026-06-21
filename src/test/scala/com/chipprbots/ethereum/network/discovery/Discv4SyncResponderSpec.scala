@@ -191,11 +191,12 @@ class Discv4SyncResponderSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "refill rate-limit tokens lazily based on elapsed time" taggedAs (UnitTest, NetworkTest) in {
-    // 100 tokens/sec → 1 token per 10 ms. Burst of 1.
-    val limiter = new Discv4SyncResponder.RateLimiter(tokensPerSecond = 100, maxBurst = 1)
+    // 100 tokens/sec → 1 token per 10 ms. Burst of 1. Fake clock advances explicitly.
+    var fakeNanos = 0L
+    val limiter = new Discv4SyncResponder.RateLimiter(tokensPerSecond = 100, maxBurst = 1, clock = () => fakeNanos)
     limiter.tryAcquire() shouldBe true
     limiter.tryAcquire() shouldBe false
-    Thread.sleep(20) // wait for at least 1 token to refill
+    fakeNanos += 20_000_000L // advance 20 ms — 2× the 10 ms needed to refill 1 token
     limiter.tryAcquire() shouldBe true
   }
 

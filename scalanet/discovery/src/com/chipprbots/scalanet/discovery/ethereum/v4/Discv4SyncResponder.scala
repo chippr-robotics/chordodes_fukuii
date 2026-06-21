@@ -147,17 +147,17 @@ object Discv4SyncResponder extends LazyLogging {
     * codebase it's only ever called from the single netty event-loop thread, so
     * contention is effectively zero.
     */
-  class RateLimiter(tokensPerSecond: Int, maxBurst: Int) {
+  class RateLimiter(tokensPerSecond: Int, maxBurst: Int, clock: () => Long = () => System.nanoTime()) {
     require(tokensPerSecond > 0, "tokensPerSecond must be positive")
     require(maxBurst > 0, "maxBurst must be positive")
 
     private val tokens = new AtomicInteger(maxBurst)
-    private val lastRefillNanos = new AtomicLong(System.nanoTime())
+    private val lastRefillNanos = new AtomicLong(clock())
     private val nanosPerToken: Long = 1_000_000_000L / tokensPerSecond.toLong
 
     def tryAcquire(): Boolean = {
       // Lazy refill — top up the bucket based on elapsed wall-clock time.
-      val now = System.nanoTime()
+      val now = clock()
       val last = lastRefillNanos.get()
       val elapsed = now - last
       if (elapsed >= nanosPerToken) {
