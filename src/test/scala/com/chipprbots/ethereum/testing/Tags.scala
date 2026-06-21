@@ -297,4 +297,14 @@ object Tags {
 
   /** Tests that require manual verification or are non-deterministic. */
   object ManualTest extends Tag("ManualTest")
+
+  /** Fast ETH-path smoke tests (Target: < 60 seconds).
+    *
+    * A lightweight subset that exercises the ETH execution path (chainId=1, `forTimestamp` dispatch) using a handful of
+    * named ethereum/tests vectors. Reachable below `testComprehensive` so the ETH path gets quick CI/local coverage.
+    *
+    * @see
+    *   `EthSmokeSpec` and the `testEthSmoke` sbt target
+    */
+  object EthSmoke extends Tag("EthSmoke")
 }

@@ -557,6 +557,18 @@ addCommandAlias(
     |""".stripMargin
 )
 
+// testEthSmoke - Fast ETH-path smoke target (< 60s)
+// Runs only EthSmoke-tagged vectors in the IntegrationTest config to exercise the ETH
+// execution path (chainId=1, forTimestamp dispatch) below testComprehensive.
+// Mirrors the testEssential pattern (compile-all + filtered testOnly), but scoped to
+// IntegrationTest and using an inclusion filter (-n EthSmoke) instead of exclusions.
+addCommandAlias(
+  "testEthSmoke",
+  """; compile-all
+    |; IntegrationTest / testOnly -- -n EthSmoke
+    |""".stripMargin
+)
+
 // Module-specific test commands
 addCommandAlias("testCrypto", "testOnly -- -n CryptoTest")
 addCommandAlias("testVM", "testOnly -- -n VMTest")
