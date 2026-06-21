@@ -47,6 +47,7 @@ git clone https://github.com/ethereum/execution-apis.git                        
 git clone https://github.com/ethereum/yellowpaper.git                            # Formal EVM/tx spec — last resort when EIP text is ambiguous (forge, beacon)
 git clone https://github.com/ethereum/consensus-specs.git                        # PoS beacon block, withdrawals, execution payload (beacon)
 git clone https://github.com/ethereum/tests.git                                  # Canonical state/blockchain/VM test vectors (forge, beacon, eye)
+git clone https://github.com/ethereum/hive.git                               # multi-client black-box test orchestrator: devp2p, ETH execution, PoS, smoke simulators (eye, herald, forge, beacon)
 cd ..
 
 # JSON / Serialization (conduit)
@@ -387,6 +388,19 @@ find "$REFS" -maxdepth 3 -name .git -exec dirname {} \; \
 | **Used by** | `forge`, `beacon`, `eye` |
 | **Key paths** | `GeneralStateTests/` · `BlockchainTests/` · `VMTests/` |
 | **Why** | Canonical state test vectors; cross-reference when EVM opcode or gas cost behavior is in question |
+
+---
+
+### Ethereum Testing — Hive (Multi-client Test Orchestrator)
+
+| | |
+|---|---|
+| **GitHub** | https://github.com/ethereum/hive |
+| **Clone as** | `repo-references/hive` |
+| **Used by** | `eye`, `herald`, `forge`, `beacon` |
+| **Key paths** | `simulators/devp2p/` — RLPx, discovery, ETH wire protocol compliance tests (herald) · `simulators/ethereum/` — block execution, state, JSON-RPC tests (forge, beacon, eye) · `simulators/eth2/` — PoS consensus tests (beacon) · `simulators/smoke/` — basic sanity checks (eye) · `hivesim/` — Go simulation framework API · `clients/` — client descriptors · `docs/` — simulator authoring guide |
+| **Branch convention** | `upstream` = read-only canonical ethereum/hive master (currently checked out — use for simulator structure and hivesim API) · `main` = ETC integration WIP (incomplete, do not treat as canonical) · `fukuii` = fukuii client descriptor WIP |
+| **Why** | Black-box multi-client compliance testing. Both `repo-references/hive` and `/media/dev/2tb/dev/reference-clients-evm/hive/` are clones of white-b0x/hive. Stay on `upstream` branch when reading simulator structure. Switch to `main` only to inspect in-progress ETC patches. Active test runs happen in `reference-clients-evm/hive/`. |
 
 ---
 

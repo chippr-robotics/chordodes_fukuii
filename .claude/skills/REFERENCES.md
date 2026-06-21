@@ -49,6 +49,7 @@ git -C "$REFS/spec-kit" pull --ff-only 2>/dev/null | grep -v "Already up to date
 | Apache Pekko | `repo-references/pekko` | `stream/` — `Source.scala`, `Sink.scala`, materializer internals; `stream-testkit/` — `TestSink`, `TestSource`; `discovery/` — DNS-SD Lookup API |
 | Apache Pekko Management | `repo-references/pekko-management` | `discovery/` — DNS-SD implementation; reference when debugging DnsDiscovery peer lookup failures |
 | devp2p | `repo-references/ethereum/devp2p` | `discv4.md`, `discv5/` — discovery protocol specs; reference when diagnosing ENR or peer discovery failures |
+| Hive | `repo-references/hive` (read `upstream` branch) | `simulators/devp2p/` — wire protocol compliance; `simulators/ethereum/` — block execution compliance; working ETC integration at `/media/dev/2tb/dev/reference-clients-evm/hive/` |
 
 ---
 

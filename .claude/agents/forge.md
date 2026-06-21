@@ -88,6 +88,10 @@ copy is authoritative.
 - **Ethereum test vectors** — local: `.claude/repo-references/ethereum/tests/`
   - Use `GeneralStateTests/` and `BlockchainTests/` when EVM opcode or gas behavior is in question
   - Use `VMTests/` for low-level opcode cross-check
+- **Hive ethereum simulators** — local: `.claude/repo-references/hive/simulators/ethereum/` (read `upstream` branch)
+  Working ETC integration: `/media/dev/2tb/dev/reference-clients-evm/hive/`
+  - Black-box block execution and state compliance — same vector coverage as BlockchainTests but run against a live client over JSON-RPC
+  - Reference `simulators/ethereum/` source when a hive block-execution test fails on ETC — fork filter and chain config are set here
 
 ## Chain comparison: ETC vs ETH
 

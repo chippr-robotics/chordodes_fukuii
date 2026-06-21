@@ -90,6 +90,11 @@ always preferred over public URLs.
   - Use `GeneralStateTests/` and `BlockchainTests/` for EVM opcode/gas cross-check
 - **ECIPs** — local: `.claude/repo-references/ECIPs/_specs/` (for ETC path comparison only)
   - Fallback: https://ecips.ethereumclassic.org
+- **Hive ethereum + eth2 simulators** — local: `.claude/repo-references/hive/simulators/` (read `upstream` branch)
+  Working ETC integration: `/media/dev/2tb/dev/reference-clients-evm/hive/`
+  - `simulators/ethereum/` — execution layer compliance (Berlin through Prague, JSON-RPC)
+  - `simulators/eth2/` — PoS consensus compliance (execution payload, withdrawals, Engine API)
+  - Reference when debugging hive test failures on ETH/Sepolia paths
 
 ## ETH chain facts
 

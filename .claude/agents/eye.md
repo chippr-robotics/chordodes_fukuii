@@ -72,6 +72,12 @@ When EVM opcode or gas cost behaviour is in question, cross-check against local 
   - `VMTests/` — low-level opcode unit tests
   - `TransactionTests/` — tx signing and RLP encoding
   - These are the same vectors `sbt testComprehensive` runs internally. Read the JSON files directly when you need to inspect a specific test case without running the full suite.
+- **Hive** — local: `.claude/repo-references/hive/` (read `upstream` branch — `main` is ETC WIP)
+  Working ETC integration: `/media/dev/2tb/dev/reference-clients-evm/hive/`
+  - `simulators/devp2p/` — wire protocol compliance (RLPx, discovery, ETH68/69)
+  - `simulators/ethereum/` — block execution and JSON-RPC compliance
+  - `simulators/smoke/` — basic client sanity (first-pass gate when adding a new client)
+  - Hive tests are black-box — they run against a live fukuii node, not unit test infrastructure. Separate tier beyond testComprehensive.
 
 ## Reporting discipline
 

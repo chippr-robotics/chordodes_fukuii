@@ -80,6 +80,11 @@ yet public). The local copy is authoritative.
 - **devp2p / RLPx** — local: `.claude/repo-references/ethereum/devp2p/`
   - Key files: `rlpx.md`, `discv4.md`, `discv5/`, `eth/68.md`, `eth/69.md`, `snap.md`
   - Fallback: https://github.com/ethereum/devp2p
+- **Hive devp2p simulators** — local: `.claude/repo-references/hive/simulators/devp2p/` (read `upstream` branch)
+  Working ETC integration: `/media/dev/2tb/dev/reference-clients-evm/hive/`
+  - Black-box wire protocol compliance: RLPx handshake, discv4/v5, ETH68/69 message exchange, SNAP
+  - Read simulator source when debugging a hive test failure — the test logic is here, not in fukuii
+  - Use `hivesim/` API docs when authoring a new devp2p simulator
 
 ## Iron rules
 
