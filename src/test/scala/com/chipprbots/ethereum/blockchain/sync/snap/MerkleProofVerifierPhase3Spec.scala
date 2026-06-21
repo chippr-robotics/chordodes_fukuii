@@ -570,7 +570,7 @@ class MerkleProofVerifierPhase3Spec extends AnyFlatSpec with Matchers {
     r2 shouldBe Right(())
   }
 
-  it should "exhibit at most linear Phase 3 growth (10x accounts < 25x longer)" taggedAs UnitTest in {
+  it should "exhibit at most linear Phase 3 growth (10x accounts < 25x longer)" taggedAs SlowTest in {
     // Discriminates B1 (O(N×depth), uniform per-leaf cost) from B3 (O(N²), growing per-leaf cost).
     // With current code this test passes but 4096-account tests timeout — confirms B1 not B3.
     // After fix: ms1000 ≈ 10 × ms100, not 100×.
