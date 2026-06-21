@@ -16,7 +16,7 @@ import com.google.common.hash.PrimitiveSink
 import fs2.Stream
 import io.vavr.collection.PriorityQueue
 
-import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs.MptNodeDec
+import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs.*
 import com.chipprbots.ethereum.blockchain.sync.fast.LoadableBloomFilter.BloomFilterLoadingResult
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.*
 import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource.IterationError
@@ -343,7 +343,7 @@ object SyncStateScheduler {
       o2.nodeDepth.compare(o1.nodeDepth)
   }
 
-  implicit class Tuple2Ops[A, B](o: io.vavr.Tuple2[A, B]) {
+  extension [A, B](o: io.vavr.Tuple2[A, B]) {
     def asScala(): (A, B) = (o._1, o._2)
   }
 

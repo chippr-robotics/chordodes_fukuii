@@ -24,8 +24,8 @@ object ReceiptCodecs {
 
   // ── TxLogEntry ───────────────────────────────────────────────────────────────
 
-  implicit class TxLogEntryEnc(logEntry: TxLogEntry) extends RLPSerializable {
-    override def toRLPEncodable: RLPEncodeable = {
+  extension (logEntry: TxLogEntry) {
+    def toRLPEncodable: RLPEncodeable = {
       import logEntry.*
       val topicsRLP = logTopics.map(t => RLPValue(t.toArray[Byte]))
       RLPList(
@@ -36,7 +36,7 @@ object ReceiptCodecs {
     }
   }
 
-  implicit class TxLogEntryDec(rlp: RLPEncodeable) {
+  extension (rlp: RLPEncodeable) {
     def toTxLogEntry: TxLogEntry = rlp match {
       case RLPList(RLPValue(loggerAddressBytes), logTopics: RLPList, RLPValue(dataBytes)) =>
         TxLogEntry(Address(ByteString(loggerAddressBytes)), fromRlpList[ByteString](logTopics), ByteString(dataBytes))
@@ -46,8 +46,8 @@ object ReceiptCodecs {
 
   // ── Receipt ──────────────────────────────────────────────────────────────────
 
-  implicit class ReceiptEnc(receipt: Receipt) extends RLPSerializable {
-    override def toRLPEncodable: RLPEncodeable = {
+  extension (receipt: Receipt) {
+    def toRLPEncodable: RLPEncodeable = {
       import receipt.*
       val stateHash: RLPEncodeable = postTransactionStateHash match {
         case HashOutcome(hash) => RLPValue(hash.toArray[Byte])
@@ -69,13 +69,15 @@ object ReceiptCodecs {
         case _: TypedLegacyReceipt => legacyRLPReceipt
       }
     }
+    def toBytes: Array[Byte] = encode(receipt.toRLPEncodable)
   }
 
-  implicit class ReceiptSeqEnc(receipts: Seq[Receipt]) extends RLPSerializable {
-    override def toRLPEncodable: RLPEncodeable = RLPList(receipts.map(_.toRLPEncodable)*)
+  extension (receipts: Seq[Receipt]) {
+    def toRLPEncodable: RLPEncodeable = RLPList(receipts.map(_.toRLPEncodable)*)
+    def toBytes: Array[Byte] = encode(receipts.toRLPEncodable)
   }
 
-  implicit class ReceiptDec(val bytes: Array[Byte]) extends AnyVal {
+  extension (bytes: Array[Byte]) {
     def toReceipt: Receipt = {
       if bytes.isEmpty then throw new RuntimeException("Cannot decode Receipt: empty byte array")
       val first = bytes(0)
@@ -93,17 +95,7 @@ object ReceiptCodecs {
     }
   }
 
-  implicit class ReceiptRLPEncodableDec(val rlpEncodeable: RLPEncodeable) extends AnyVal {
-
-    private def decodeTypedReceiptFromBytes(bytes: Array[Byte]): Receipt = {
-      val txType = bytes.head
-      val payload = rawDecode(bytes.tail)
-      txType match {
-        case Transaction.Type01 => Type01Receipt(payload.toLegacyReceipt)
-        case other              => throw new RuntimeException(s"Unsupported typed receipt type: $other")
-      }
-    }
-
+  extension (rlpEncodeable: RLPEncodeable) {
     def toLegacyReceipt: LegacyReceipt = rlpEncodeable match {
       // 4-field: ETH68 bloom-inclusive  [stateHash, gasUsed, logsBloom, logs]
       case RLPList(
@@ -150,14 +142,24 @@ object ReceiptCodecs {
         throw new RuntimeException(s"Cannot decode Receipt: expected RLPList, got ${other.getClass.getSimpleName}")
     }
 
-    def toReceipt: Receipt = rlpEncodeable match {
-      case PrefixedRLPEncodable(Transaction.Type04, legacyReceipt) => Type04Receipt(legacyReceipt.toLegacyReceipt)
-      case PrefixedRLPEncodable(Transaction.Type03, legacyReceipt) => Type03Receipt(legacyReceipt.toLegacyReceipt)
-      case PrefixedRLPEncodable(Transaction.Type02, legacyReceipt) => Type02Receipt(legacyReceipt.toLegacyReceipt)
-      case PrefixedRLPEncodable(Transaction.Type01, legacyReceipt) => Type01Receipt(legacyReceipt.toLegacyReceipt)
-      case RLPValue(bytes) if bytes.nonEmpty && bytes.head.isValidTransactionType && bytes.length > 1 =>
-        decodeTypedReceiptFromBytes(bytes)
-      case other => other.toLegacyReceipt
+    def toReceipt: Receipt = {
+      def decodeTypedReceiptFromBytes(bytes: Array[Byte]): Receipt = {
+        val txType = bytes.head
+        val payload = rawDecode(bytes.tail)
+        txType match {
+          case Transaction.Type01 => Type01Receipt(payload.toLegacyReceipt)
+          case other              => throw new RuntimeException(s"Unsupported typed receipt type: $other")
+        }
+      }
+      rlpEncodeable match {
+        case PrefixedRLPEncodable(Transaction.Type04, legacyReceipt) => Type04Receipt(legacyReceipt.toLegacyReceipt)
+        case PrefixedRLPEncodable(Transaction.Type03, legacyReceipt) => Type03Receipt(legacyReceipt.toLegacyReceipt)
+        case PrefixedRLPEncodable(Transaction.Type02, legacyReceipt) => Type02Receipt(legacyReceipt.toLegacyReceipt)
+        case PrefixedRLPEncodable(Transaction.Type01, legacyReceipt) => Type01Receipt(legacyReceipt.toLegacyReceipt)
+        case RLPValue(bytes) if bytes.nonEmpty && bytes.head.isValidTransactionType && bytes.length > 1 =>
+          decodeTypedReceiptFromBytes(bytes)
+        case other => other.toLegacyReceipt
+      }
     }
   }
 }

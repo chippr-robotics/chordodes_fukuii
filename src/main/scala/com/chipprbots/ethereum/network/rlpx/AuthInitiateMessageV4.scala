@@ -9,8 +9,8 @@ import com.chipprbots.ethereum.rlp.*
 
 object AuthInitiateMessageV4 extends AuthInitiateEcdsaCodec {
 
-  implicit class AuthInitiateMessageV4Enc(obj: AuthInitiateMessageV4) extends RLPSerializable {
-    override def toRLPEncodable: RLPEncodeable = {
+  extension (obj: AuthInitiateMessageV4) {
+    def toRLPEncodable: RLPEncodeable = {
       import obj.*
       // byte 0 of encoded ECC point indicates that it is uncompressed point, it is part of bouncycastle encoding
       RLPList(
@@ -20,9 +20,10 @@ object AuthInitiateMessageV4 extends AuthInitiateEcdsaCodec {
         RLPValue(Array(version.toByte))
       )
     }
+    def toBytes: Array[Byte] = encode(obj.toRLPEncodable)
   }
 
-  implicit class AuthInitiateMessageV4Dec(val bytes: Array[Byte]) extends AnyVal {
+  extension (bytes: Array[Byte]) {
     def toAuthInitiateMessageV4: AuthInitiateMessageV4 = {
       // EIP-8 auth messages are transported inside an ECIES envelope and may contain random trailing
       // padding bytes after the RLP payload. Our RLP decoder expects to consume the entire byte array,

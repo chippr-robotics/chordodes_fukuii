@@ -19,7 +19,7 @@ package object network {
 
   val ProtocolVersion = 4
 
-  implicit class ECPublicKeyParametersNodeId(val pubKey: ECPublicKeyParameters) extends AnyVal {
+  extension (pubKey: ECPublicKeyParameters) {
     def toNodeId: Array[Byte] =
       pubKey
         .asInstanceOf[ECPublicKeyParameters]

@@ -33,7 +33,7 @@ class TransactionSpec
       val encodedSignedTransaction: Array[Byte] = originalSignedTransaction.toBytes
 
       // decode it
-      import SignedTransactions.SignedTransactionDec
+      import SignedTransactions.*
       val decodedSignedTransaction = encodedSignedTransaction.toSignedTransaction
 
       decodedSignedTransaction shouldEqual originalSignedTransaction
@@ -66,7 +66,7 @@ class TransactionSpec
       val encodedSignedTransaction: Array[Byte] = originalSignedTransaction.toBytes
 
       // decode it
-      import SignedTransactions.SignedTransactionDec
+      import SignedTransactions.*
       val decodedSignedTransaction = encodedSignedTransaction.toSignedTransaction
 
       // resolve original sender
@@ -83,7 +83,7 @@ class TransactionSpec
       val encodedSignedTransactionSeq: Array[Byte] = SignedTransactions(originalSignedTransactionSeq).toBytes
 
       // decode it
-      import SignedTransactions.SignedTransactionsDec
+      import SignedTransactions.*
       val SignedTransactions(decodedSignedTransactionSeq) = encodedSignedTransactionSeq.toSignedTransactions
 
       decodedSignedTransactionSeq shouldEqual originalSignedTransactionSeq

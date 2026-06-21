@@ -243,7 +243,7 @@ class EthTxService(
     IO(Right(GetGasPriceResponse(suggestGasPrice())))
 
   def sendRawTransaction(req: SendRawTransactionRequest): ServiceResponse[SendRawTransactionResponse] = {
-    import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.SignedTransactionDec
+    import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
 
     Try(req.data.toArray.toSignedTransactionWithSidecar) match {
       case Success((signedTransaction, rawBytesOpt)) =>

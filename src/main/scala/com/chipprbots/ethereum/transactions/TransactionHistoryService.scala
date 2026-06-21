@@ -12,7 +12,7 @@ import scala.concurrent.duration.FiniteDuration
 import fs2.Stream
 
 import com.chipprbots.ethereum.domain.*
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.TaskActorOps
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransaction
 import com.chipprbots.ethereum.transactions.TransactionHistoryService.ExtendedTransactionData
 import com.chipprbots.ethereum.transactions.TransactionHistoryService.MinedTxChecker

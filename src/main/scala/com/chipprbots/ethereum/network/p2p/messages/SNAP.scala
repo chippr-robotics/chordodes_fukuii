@@ -99,7 +99,7 @@ object SNAP {
       }
     }
 
-    implicit class GetAccountRangeDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toGetAccountRange: GetAccountRange = rawDecode(bytes) match {
         case RLPList(
               RLPValue(requestIdBytes),
@@ -179,7 +179,7 @@ object SNAP {
       }
     }
 
-    implicit class AccountRangeDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toAccountRange: AccountRange = rawDecode(bytes) match {
         case RLPList(
               RLPValue(requestIdBytes),
@@ -270,7 +270,7 @@ object SNAP {
       }
     }
 
-    implicit class GetStorageRangesDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toGetStorageRanges: GetStorageRanges = rawDecode(bytes) match {
         case RLPList(
               RLPValue(requestIdBytes),
@@ -358,7 +358,7 @@ object SNAP {
       }
     }
 
-    implicit class StorageRangesDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toStorageRanges: StorageRanges = rawDecode(bytes) match {
         case RLPList(
               RLPValue(requestIdBytes),
@@ -442,7 +442,7 @@ object SNAP {
       }
     }
 
-    implicit class GetByteCodesDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toGetByteCodes: GetByteCodes = rawDecode(bytes) match {
         case RLPList(
               RLPValue(requestIdBytes),
@@ -507,7 +507,7 @@ object SNAP {
       }
     }
 
-    implicit class ByteCodesDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toByteCodes: ByteCodes = rawDecode(bytes) match {
         case RLPList(
               RLPValue(requestIdBytes),
@@ -582,7 +582,7 @@ object SNAP {
       }
     }
 
-    implicit class GetTrieNodesDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toGetTrieNodes: GetTrieNodes = rawDecode(bytes) match {
         case RLPList(
               RLPValue(requestIdBytes),
@@ -656,7 +656,7 @@ object SNAP {
       }
     }
 
-    implicit class TrieNodesDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toTrieNodes: TrieNodes = rawDecode(bytes) match {
         case RLPList(
               RLPValue(requestIdBytes),

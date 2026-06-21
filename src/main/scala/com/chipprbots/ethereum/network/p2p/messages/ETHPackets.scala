@@ -96,7 +96,7 @@ object ETHPackets {
   // Copied from ETHPackets.TypedTransaction — needed by SignedTransactions and PooledTransactions.
 
   object TypedTransaction {
-    implicit class TypedTransactionsRLPAggregator(val encodables: Seq[RLPEncodeable]) extends AnyVal {
+    extension (encodables: Seq[RLPEncodeable]) {
       def toTypedRLPEncodables: Seq[RLPEncodeable] = {
         import Transaction.ByteArrayTransactionTypeValidator
         import Transaction.TransactionTypeValidator
@@ -175,7 +175,7 @@ object ETHPackets {
         }
       }
 
-      implicit class Status68Dec(val bytes: Array[Byte]) extends AnyVal {
+      extension (bytes: Array[Byte]) {
         def toStatus68: Status68 = rawDecode(bytes) match {
           case RLPList(
                 RLPValue(protocolVersionBytes),
@@ -236,7 +236,7 @@ object ETHPackets {
         }
       }
 
-      implicit class Status69Dec(val bytes: Array[Byte]) extends AnyVal {
+      extension (bytes: Array[Byte]) {
         // Two-arm decode: canonical match + catch-all stub.
         // The catch-all covers all off-spec STATUS shapes (ETH/68-shaped, legacy 6-field,
         // ≥8-field extensions, no-forkId variants) without requiring a new arm per variant.
@@ -330,7 +330,7 @@ object ETHPackets {
         }
       }
 
-      implicit class Status70Dec(val bytes: Array[Byte]) extends AnyVal {
+      extension (bytes: Array[Byte]) {
         // Two-arm decode: canonical match + catch-all stub. Mirrors Status69Dec.
         def toStatus70: Status70 = rawDecode(bytes) match {
           // (1) Canonical 7-field EIP-7706 shape.
@@ -380,11 +380,11 @@ object ETHPackets {
     }
 
     object BlockHash {
-      implicit class BlockHashEnc(blockHash: BlockHash) extends RLPSerializable {
-        override def toRLPEncodable: RLPEncodeable =
+      extension (blockHash: BlockHash) {
+        def toRLPEncodable: RLPEncodeable =
           RLPList(RLPValue(blockHash.hash.toArray[Byte]), blockHash.number)
       }
-      implicit class BlockHashRLPEncodableDec(val rlpEncodeable: RLPEncodeable) extends AnyVal {
+      extension (rlpEncodeable: RLPEncodeable) {
         def toBlockHash: BlockHash = rlpEncodeable match {
           case RLPList(RLPValue(hashBytes), RLPValue(numberBytes)) =>
             BlockHash(ByteString(hashBytes), ByteUtils.bytesToBigInt(numberBytes))
@@ -409,7 +409,7 @@ object ETHPackets {
           RLPList(msg.hashes.map(_.toRLPEncodable)*)
       }
 
-      implicit class NewBlockHashesDec(val bytes: Array[Byte]) extends AnyVal {
+      extension (bytes: Array[Byte]) {
         def toNewBlockHashes: NewBlockHashes = rawDecode(bytes) match {
           case rlpList: RLPList => NewBlockHashes(rlpList.items.map(_.toBlockHash))
           case _                => throw new RuntimeException("Cannot decode NewBlockHashes")
@@ -551,7 +551,7 @@ object ETHPackets {
     }
 
     // scalastyle:off method.length
-    implicit class SignedTransactionRlpEncodableDec(val rlpEncodeable: RLPEncodeable) extends AnyVal {
+    extension (rlpEncodeable: RLPEncodeable) {
       def toSignedTransaction: SignedTransaction = rlpEncodeable match {
         case PrefixedRLPEncodable(
               Transaction.Type04,
@@ -728,7 +728,7 @@ object ETHPackets {
     }
     // scalastyle:on method.length
 
-    implicit class SignedTransactionDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toSignedTransaction: SignedTransaction = {
         val first = bytes(0)
         (first match {
@@ -773,7 +773,7 @@ object ETHPackets {
         RLPList(msg.txs.map(_.toRLPEncodable)*)
     }
 
-    implicit class SignedTransactionsDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toSignedTransactions: SignedTransactions = rawDecode(bytes) match {
         case rlpList: RLPList =>
           import TypedTransaction.*
@@ -810,7 +810,7 @@ object ETHPackets {
       }
     }
 
-    implicit class NewBlockDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toNewBlock: NewBlock = rawDecode(bytes) match {
         case RLPList(
               RLPList(blockHeader, transactionList: RLPList, uncleNodesList: RLPList),
@@ -860,7 +860,7 @@ object ETHPackets {
       }
     }
 
-    implicit class GetBlockHeadersDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toGetBlockHeaders: GetBlockHeaders = rawDecode(bytes) match {
         case RLPList(
               RLPValue(requestIdBytes),
@@ -934,7 +934,7 @@ object ETHPackets {
         )
     }
 
-    implicit class BlockHeadersDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toBlockHeaders: BlockHeaders = rawDecode(bytes) match {
         case rlpList: RLPList if rlpList.items.size == 2 =>
           rlpList.items match {
@@ -966,7 +966,7 @@ object ETHPackets {
         RLPList(RLPValue(ByteUtils.bigIntToUnsignedByteArray(msg.requestId)), toRlpList(msg.hashes))
     }
 
-    implicit class GetBlockBodiesDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toGetBlockBodies: GetBlockBodies = rawDecode(bytes) match {
         case rlpList: RLPList if rlpList.items.size == 2 =>
           rlpList.items match {
@@ -1000,7 +1000,7 @@ object ETHPackets {
         )
     }
 
-    implicit class BlockBodiesDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toBlockBodies: BlockBodies = rawDecode(bytes) match {
         case rlpList: RLPList if rlpList.items.size == 2 =>
           rlpList.items match {
@@ -1034,7 +1034,7 @@ object ETHPackets {
       }
     }
 
-    implicit class NewPooledTransactionHashesDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toNewPooledTransactionHashes: NewPooledTransactionHashes =
         rawDecode(bytes) match {
           case RLPList(RLPValue(typesBytes), sizesList: RLPList, hashesList: RLPList) =>
@@ -1069,7 +1069,7 @@ object ETHPackets {
         RLPList(RLPValue(ByteUtils.bigIntToUnsignedByteArray(msg.requestId)), toRlpList(msg.txHashes))
     }
 
-    implicit class GetPooledTransactionsDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toGetPooledTransactions: GetPooledTransactions = rawDecode(bytes) match {
         case RLPList(RLPValue(requestIdBytes), rlpList: RLPList) =>
           GetPooledTransactions(ByteUtils.bytesToBigInt(requestIdBytes), fromRlpList[ByteString](rlpList))
@@ -1103,7 +1103,7 @@ object ETHPackets {
       }
     }
 
-    implicit class PooledTransactionsDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toPooledTransactions: PooledTransactions = rawDecode(bytes) match {
         case RLPList(RLPValue(requestIdBytes), rlpList: RLPList) =>
           import SignedTransactions.*
@@ -1166,7 +1166,7 @@ object ETHPackets {
         RLPList(RLPValue(ByteUtils.bigIntToUnsignedByteArray(msg.requestId)), toRlpList(msg.blockHashes))
     }
 
-    implicit class GetReceiptsDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toGetReceipts: GetReceipts = rawDecode(bytes) match {
         case rlpList: RLPList if rlpList.items.size == 2 =>
           rlpList.items match {
@@ -1197,7 +1197,7 @@ object ETHPackets {
         RLPList(RLPValue(ByteUtils.bigIntToUnsignedByteArray(msg.requestId)), toRlpList(msg.blockHashes))
     }
 
-    implicit class GetReceipts69Dec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toGetReceipts69: GetReceipts69 = rawDecode(bytes) match {
         case rlpList: RLPList if rlpList.items.size == 2 =>
           rlpList.items match {
@@ -1294,7 +1294,7 @@ object ETHPackets {
         RLPList(RLPValue(ByteUtils.bigIntToUnsignedByteArray(msg.requestId)), msg.receiptsForBlocks)
     }
 
-    implicit class Receipts68Dec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toReceipts68: Receipts68 = rawDecode(bytes) match {
         case rlpList: RLPList if rlpList.items.size == 2 =>
           rlpList.items match {
@@ -1328,7 +1328,7 @@ object ETHPackets {
         RLPList(RLPValue(ByteUtils.bigIntToUnsignedByteArray(msg.requestId)), msg.receiptsForBlocks)
     }
 
-    implicit class Receipts69Dec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toReceipts69: Receipts69 = rawDecode(bytes) match {
         case rlpList: RLPList if rlpList.items.size == 2 =>
           rlpList.items match {
@@ -1374,7 +1374,7 @@ object ETHPackets {
         )
     }
 
-    implicit class GetReceipts70Dec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toGetReceipts70: GetReceipts70 = rawDecode(bytes) match {
         case RLPList(RLPValue(requestIdBytes), RLPValue(firstBlockBytes), hashesList: RLPList) =>
           GetReceipts70(
@@ -1409,7 +1409,7 @@ object ETHPackets {
         )
     }
 
-    implicit class Receipts70Dec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toReceipts70: Receipts70 = rawDecode(bytes) match {
         case RLPList(RLPValue(requestIdBytes), RLPValue(lastBlockBytes), receiptsList: RLPList) =>
           Receipts70(
@@ -1445,7 +1445,7 @@ object ETHPackets {
       )
     }
 
-    implicit class BlockRangeUpdateDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toBlockRangeUpdate: BlockRangeUpdate = rawDecode(bytes) match {
         case RLPList(
               RLPValue(earliestBlockBytes),
@@ -1494,7 +1494,7 @@ object ETHPackets {
       override def toRLPEncodable: RLPEncodeable = RLPList(msg.values.map(v => RLPValue(v.toArray[Byte]))*)
     }
 
-    implicit class NodeDataDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toNodeData: NodeData = rawDecode(bytes) match {
         case rlpList: RLPList =>
           NodeData(rlpList.items.map {

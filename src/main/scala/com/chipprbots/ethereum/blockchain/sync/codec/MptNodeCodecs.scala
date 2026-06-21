@@ -21,11 +21,11 @@ object MptNodeCodecs {
     def toRLPEncodable: RLPEncodeable = MptTraversals.encode(obj)
   }
 
-  implicit class MptNodeDec(val bytes: Array[Byte]) extends AnyVal {
+  extension (bytes: Array[Byte]) {
     def toMptNode: MptNode = MptTraversals.decodeNode(bytes)
   }
 
-  implicit class MptNodeRLPEncodableDec(val rlp: RLPEncodeable) extends AnyVal {
+  extension (rlp: RLPEncodeable) {
     def toMptNode: MptNode = rlp match {
       case RLPValue(bytes) => MptTraversals.decodeNode(bytes)
       case _               => throw new RuntimeException("Cannot decode MptNode from non-RLPValue")

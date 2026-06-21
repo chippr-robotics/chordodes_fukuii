@@ -96,15 +96,13 @@ object ForkId {
       config.forkTimestamps.bpo2Timestamp.map(BigInt(_))
     ).flatten.filterNot(_ == 0).distinct.sorted
 
-  implicit class ForkIdEnc(forkId: ForkId) extends RLPSerializable {
-
-    import com.chipprbots.ethereum.utils.ByteUtils.*
-    override def toRLPEncodable: RLPEncodeable = {
+  extension (forkId: ForkId) {
+    def toRLPEncodable: RLPEncodeable = {
+      import com.chipprbots.ethereum.utils.ByteUtils.*
       val hash: Array[Byte] = bigIntToBytes(forkId.hash, 4).takeRight(4)
       val next: Array[Byte] = bigIntToUnsignedByteArray(forkId.next.getOrElse(BigInt(0))).takeRight(8)
       RLPList(hash, next)
     }
-
   }
 
   implicit val forkIdEnc: RLPDecoder[ForkId] = new RLPDecoder[ForkId] {

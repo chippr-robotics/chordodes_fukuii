@@ -36,24 +36,25 @@ object WireProtocol {
       }
     }
 
-    implicit class HelloDec(val bytes: Array[Byte]) extends AnyVal {
-      import Capability.*
-
-      def toHello: Hello = rawDecode(bytes) match {
-        case RLPList(
-              RLPValue(p2pVersionBytes),
-              RLPValue(clientIdBytes),
-              (capabilities: RLPList),
-              RLPValue(listenPortBytes),
-              RLPValue(nodeIdBytes),
-              _*
-            ) =>
-          val p2pVersion = ByteUtils.bytesToBigInt(p2pVersionBytes).toLong
-          val clientId = new String(clientIdBytes, java.nio.charset.StandardCharsets.UTF_8)
-          val listenPort = ByteUtils.bytesToBigInt(listenPortBytes).toLong
-          val nodeId = ByteString(nodeIdBytes)
-          Hello(p2pVersion, clientId, capabilities.items.map(_.toCapability).flatten, listenPort, nodeId)
-        case _ => throw new RuntimeException("Cannot decode Hello")
+    extension (bytes: Array[Byte]) {
+      def toHello: Hello = {
+        import Capability.*
+        rawDecode(bytes) match {
+          case RLPList(
+                RLPValue(p2pVersionBytes),
+                RLPValue(clientIdBytes),
+                (capabilities: RLPList),
+                RLPValue(listenPortBytes),
+                RLPValue(nodeIdBytes),
+                _*
+              ) =>
+            val p2pVersion = ByteUtils.bytesToBigInt(p2pVersionBytes).toLong
+            val clientId = new String(clientIdBytes, java.nio.charset.StandardCharsets.UTF_8)
+            val listenPort = ByteUtils.bytesToBigInt(listenPortBytes).toLong
+            val nodeId = ByteString(nodeIdBytes)
+            Hello(p2pVersion, clientId, capabilities.items.map(_.toCapability).flatten, listenPort, nodeId)
+          case _ => throw new RuntimeException("Cannot decode Hello")
+        }
       }
     }
   }
@@ -124,7 +125,7 @@ object WireProtocol {
       override def toRLPEncodable: RLPEncodeable = RLPList(msg.reason)
     }
 
-    implicit class DisconnectDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toDisconnect: Disconnect = rawDecode(bytes) match {
         case RLPList(RLPValue(reasonBytes), _*) =>
           val reason = ByteUtils.bytesToBigInt(reasonBytes).toLong
@@ -159,7 +160,7 @@ object WireProtocol {
       override def toRLPEncodable: RLPEncodeable = RLPList()
     }
 
-    implicit class PingDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toPing: Ping = Ping()
     }
   }
@@ -181,7 +182,7 @@ object WireProtocol {
       override def toRLPEncodable: RLPEncodeable = RLPList()
     }
 
-    implicit class PongDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toPong: Pong = Pong()
     }
   }

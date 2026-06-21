@@ -72,7 +72,7 @@ class SignedLegacyTransactionSpec extends AnyFlatSpec with SignedTransactionBeha
     )
 
     forAll(testValues) { (binaryRLP: String, expectedSender: String) =>
-      import SignedTransactions.SignedTransactionDec
+      import SignedTransactions.*
       val decodedSignedTransaction = Hex.decode(binaryRLP).toSignedTransaction
 
       val expectedSenderAddress = Address(expectedSender)

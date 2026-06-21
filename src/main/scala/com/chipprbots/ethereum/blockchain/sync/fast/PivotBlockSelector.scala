@@ -94,7 +94,7 @@ object PivotBlockSelector {
     def vote: BlockHeaderWithVotes = copy(votes = votes + 1)
   }
 
-  implicit class SortableHeadersMap(headers: Map[ByteString, BlockHeaderWithVotes]) {
+  extension (headers: Map[ByteString, BlockHeaderWithVotes]) {
     def mostVotedHeader: Option[BlockHeaderWithVotes] =
       headers.toList.maximumByOption { case (_, headerWithVotes) => headerWithVotes.votes }.map(_._2)
   }

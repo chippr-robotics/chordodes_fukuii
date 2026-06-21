@@ -97,7 +97,7 @@ object GraphQLSchema {
   private def createContractAddress(sender: Address, nonce: BigInt): Address = {
     import com.chipprbots.ethereum.rlp.RLPImplicitConversions.toEncodeable
     import com.chipprbots.ethereum.rlp.RLPImplicits.byteStringEncDec
-    import com.chipprbots.ethereum.rlp.UInt256RLPImplicits.UInt256Enc
+    import com.chipprbots.ethereum.rlp.UInt256RLPImplicits.*
     val hash = kec256(
       rlp.encode(RLPList(toEncodeable(sender.bytes), UInt256(nonce).toRLPEncodable))
     )
@@ -1115,7 +1115,7 @@ object GraphQLSchema {
         Bytes32Type,
         arguments = List(RawDataArg),
         resolve = { c =>
-          import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.SignedTransactionDec
+          import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
 
           val raw = c.arg(RawDataArg)
           // Parse and classify errors locally so hive sees the right errorCode / message. The

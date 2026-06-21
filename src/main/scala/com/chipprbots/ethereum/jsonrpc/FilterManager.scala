@@ -17,7 +17,7 @@ import scala.util.Random
 
 import com.chipprbots.ethereum.consensus.blocks.BlockGenerator
 import com.chipprbots.ethereum.domain.*
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.TaskActorOps
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
 import com.chipprbots.ethereum.keystore.KeyStore
 import com.chipprbots.ethereum.ledger.BloomFilter
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager

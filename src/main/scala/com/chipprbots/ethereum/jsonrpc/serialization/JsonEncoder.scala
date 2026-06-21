@@ -20,7 +20,7 @@ object JsonEncoder {
   def encode[T](value: T)(implicit encoder: JsonEncoder[T]): JValue = encoder.encodeJson(value)
 
   object Ops {
-    implicit class JsonEncoderOps[T](val item: T) extends AnyVal {
+    extension [T](item: T) {
       def jsonEncoded(implicit encoder: JsonEncoder[T]): JValue = encoder.encodeJson(item)
     }
   }

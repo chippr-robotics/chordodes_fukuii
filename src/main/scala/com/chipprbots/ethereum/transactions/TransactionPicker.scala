@@ -7,7 +7,7 @@ import cats.effect.IO
 
 import scala.concurrent.duration.FiniteDuration
 
-import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.TaskActorOps
+import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransactionsResponse
 import com.chipprbots.ethereum.utils.Logger
 

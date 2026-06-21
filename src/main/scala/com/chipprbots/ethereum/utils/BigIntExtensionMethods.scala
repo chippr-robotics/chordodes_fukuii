@@ -3,7 +3,7 @@ package com.chipprbots.ethereum.utils
 import com.chipprbots.ethereum.domain.UInt256
 
 object BigIntExtensionMethods {
-  implicit class BigIntAsUnsigned(val srcBigInteger: BigInt) extends AnyVal {
+  extension (srcBigInteger: BigInt) {
     def toUnsignedByteArray: Array[Byte] =
       ByteUtils.bigIntToUnsignedByteArray(srcBigInteger)
 

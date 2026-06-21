@@ -4,7 +4,6 @@ import com.chipprbots.ethereum.rlp.RLPEncodeable
 import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
 import com.chipprbots.ethereum.rlp.RLPList
-import com.chipprbots.ethereum.rlp.RLPSerializable
 import com.chipprbots.ethereum.rlp.RLPValue
 import com.chipprbots.ethereum.rlp.rawDecode
 
@@ -12,8 +11,8 @@ sealed trait ProtocolFamily
 object ProtocolFamily {
   case object ETH extends ProtocolFamily
   case object SNAP extends ProtocolFamily
-  implicit class ProtocolFamilyEnc(val msg: ProtocolFamily) extends RLPSerializable {
-    override def toRLPEncodable: RLPEncodeable = msg match {
+  extension (msg: ProtocolFamily) {
+    def toRLPEncodable: RLPEncodeable = msg match {
       case ETH  => RLPValue("eth".getBytes())
       case SNAP => RLPValue("snap".getBytes())
     }
@@ -119,15 +118,15 @@ object Capability {
     case _                                             => false
   }
 
-  implicit class CapabilityEnc(val msg: Capability) extends RLPSerializable {
-    override def toRLPEncodable: RLPEncodeable = RLPList(msg.name.toRLPEncodable, msg.version)
+  extension (msg: Capability) {
+    def toRLPEncodable: RLPEncodeable = RLPList(msg.name.toRLPEncodable, msg.version)
   }
 
-  implicit class CapabilityDec(val bytes: Array[Byte]) extends AnyVal {
-    def toCapability: Option[Capability] = CapabilityRLPEncodableDec(rawDecode(bytes)).toCapability
+  extension (bytes: Array[Byte]) {
+    def toCapability: Option[Capability] = rawDecode(bytes).toCapability
   }
 
-  implicit class CapabilityRLPEncodableDec(val rLPEncodeable: RLPEncodeable) extends AnyVal {
+  extension (rLPEncodeable: RLPEncodeable) {
     def toCapability: Option[Capability] = rLPEncodeable match {
       case RLPList(RLPValue(nameBytes), RLPValue(versionBytes), _*) if versionBytes.nonEmpty =>
         parse(s"${new String(nameBytes, java.nio.charset.StandardCharsets.UTF_8)}/${versionBytes(0)}")

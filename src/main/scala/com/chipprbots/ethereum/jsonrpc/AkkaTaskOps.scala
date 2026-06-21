@@ -13,8 +13,7 @@ import cats.effect.IO
 import scala.reflect.ClassTag
 
 object AkkaTaskOps {
-  implicit class TaskActorOps(val to: ActorRef) extends AnyVal {
-
+  extension (to: ActorRef) {
     def askFor[A](
         message: Any
     )(implicit timeout: Timeout, classTag: ClassTag[A], sender: ActorRef = Actor.noSender): IO[A] =
@@ -24,7 +23,7 @@ object AkkaTaskOps {
 
   // Typed ask: converts the temp typed replyTo to a Classic ActorRef so existing Cmd variants
   // (replyTo: ActorRef) stay unchanged. The lambda receives the Classic ref directly.
-  implicit class TaskTypedActorOps[C](val to: typed.ActorRef[C]) extends AnyVal {
+  extension [C](to: typed.ActorRef[C]) {
     def askFor[A](
         makeCmd: ActorRef => C
     )(implicit timeout: Timeout, scheduler: typed.Scheduler): IO[A] =

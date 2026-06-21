@@ -25,7 +25,7 @@ import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodCodec
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder.NoParamsMethodDecoder
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers
-import com.chipprbots.ethereum.utils.BigIntExtensionMethods.BigIntAsUnsigned
+import com.chipprbots.ethereum.utils.BigIntExtensionMethods.*
 import com.chipprbots.ethereum.utils.ByteUtils
 
 trait JsonMethodsImplicits {

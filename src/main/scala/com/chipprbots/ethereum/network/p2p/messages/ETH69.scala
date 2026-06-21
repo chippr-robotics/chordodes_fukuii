@@ -68,8 +68,7 @@ object ETH69 {
       )
     }
 
-    implicit class StatusDec(val bytes: Array[Byte]) extends AnyVal {
-      import com.chipprbots.ethereum.forkid.ForkId.*
+    extension (bytes: Array[Byte]) {
 
       /** Decode an ETH/69 STATUS frame.
         *
@@ -89,66 +88,69 @@ object ETH69 {
         * RLPList at index 3, ETH/68 has it at index 5. Scala pattern matching distinguishes them via the type at each
         * position (`RLPList` vs `RLPValue`).
         */
-      def toETH69Status: Status = rawDecode(bytes) match {
-        // (1) Canonical 7-field EIP-7642 shape — geth/besu/reth.
-        case RLPList(
-              RLPValue(protocolVersionBytes),
-              RLPValue(networkIdBytes),
-              RLPValue(genesisHashBytes),
-              forkIdRlp: RLPList,
-              RLPValue(earliestBlockBytes),
-              RLPValue(latestBlockBytes),
-              RLPValue(latestBlockHashBytes)
-            ) =>
-          Status(
-            protocolVersion = ByteUtils.bytesToBigInt(protocolVersionBytes).toInt,
-            networkId = ByteUtils.bytesToBigInt(networkIdBytes).toLong,
-            genesisHash = ByteString(genesisHashBytes),
-            forkId = decode[ForkId](forkIdRlp),
-            earliestBlock = ByteUtils.bytesToBigInt(earliestBlockBytes),
-            latestBlock = ByteUtils.bytesToBigInt(latestBlockBytes),
-            latestBlockHash = ByteString(latestBlockHashBytes)
-          )
-        // (3) 6-field ETH/68-shape on ETH/69 channel (forkId at idx 5) — common from wrong-chain peers
-        // (e.g. Holesky-derived testnets) that announce ETH/69 but emit ETH/68 STATUS. We accept the
-        // payload so the genesis check downstream can disconnect them as `Useless peer`.
-        case RLPList(
-              RLPValue(protocolVersionBytes),
-              RLPValue(networkIdBytes),
-              RLPValue(_),
-              RLPValue(bestHashBytes),
-              RLPValue(genesisHashBytes),
-              forkIdRlp: RLPList
-            ) =>
-          Status(
-            protocolVersion = ByteUtils.bytesToBigInt(protocolVersionBytes).toInt,
-            networkId = ByteUtils.bytesToBigInt(networkIdBytes).toLong,
-            genesisHash = ByteString(genesisHashBytes),
-            forkId = decode[ForkId](forkIdRlp),
-            earliestBlock = BigInt(0),
-            latestBlock = BigInt(0),
-            latestBlockHash = ByteString(bestHashBytes)
-          )
-        // (2) 6-field legacy fukuii shape (forkId at idx 3) — pre-fix fukuii nodes that omitted earliestBlock.
-        // Accept with earliestBlock=0 so old fukuii peers still handshake during the rollout window.
-        case RLPList(
-              RLPValue(protocolVersionBytes),
-              RLPValue(networkIdBytes),
-              RLPValue(genesisHashBytes),
-              forkIdRlp: RLPList,
-              RLPValue(latestBlockBytes),
-              RLPValue(latestBlockHashBytes)
-            ) =>
-          Status(
-            protocolVersion = ByteUtils.bytesToBigInt(protocolVersionBytes).toInt,
-            networkId = ByteUtils.bytesToBigInt(networkIdBytes).toLong,
-            genesisHash = ByteString(genesisHashBytes),
-            forkId = decode[ForkId](forkIdRlp),
-            earliestBlock = BigInt(0),
-            latestBlock = ByteUtils.bytesToBigInt(latestBlockBytes),
-            latestBlockHash = ByteString(latestBlockHashBytes)
-          )
-        case other => throw new RuntimeException(s"Cannot decode ETH69.Status from: $other")
+      def toETH69Status: Status = {
+        import com.chipprbots.ethereum.forkid.ForkId.*
+        rawDecode(bytes) match {
+          // (1) Canonical 7-field EIP-7642 shape — geth/besu/reth.
+          case RLPList(
+                RLPValue(protocolVersionBytes),
+                RLPValue(networkIdBytes),
+                RLPValue(genesisHashBytes),
+                forkIdRlp: RLPList,
+                RLPValue(earliestBlockBytes),
+                RLPValue(latestBlockBytes),
+                RLPValue(latestBlockHashBytes)
+              ) =>
+            Status(
+              protocolVersion = ByteUtils.bytesToBigInt(protocolVersionBytes).toInt,
+              networkId = ByteUtils.bytesToBigInt(networkIdBytes).toLong,
+              genesisHash = ByteString(genesisHashBytes),
+              forkId = decode[ForkId](forkIdRlp),
+              earliestBlock = ByteUtils.bytesToBigInt(earliestBlockBytes),
+              latestBlock = ByteUtils.bytesToBigInt(latestBlockBytes),
+              latestBlockHash = ByteString(latestBlockHashBytes)
+            )
+          // (3) 6-field ETH/68-shape on ETH/69 channel (forkId at idx 5) — common from wrong-chain peers
+          // (e.g. Holesky-derived testnets) that announce ETH/69 but emit ETH/68 STATUS. We accept the
+          // payload so the genesis check downstream can disconnect them as `Useless peer`.
+          case RLPList(
+                RLPValue(protocolVersionBytes),
+                RLPValue(networkIdBytes),
+                RLPValue(_),
+                RLPValue(bestHashBytes),
+                RLPValue(genesisHashBytes),
+                forkIdRlp: RLPList
+              ) =>
+            Status(
+              protocolVersion = ByteUtils.bytesToBigInt(protocolVersionBytes).toInt,
+              networkId = ByteUtils.bytesToBigInt(networkIdBytes).toLong,
+              genesisHash = ByteString(genesisHashBytes),
+              forkId = decode[ForkId](forkIdRlp),
+              earliestBlock = BigInt(0),
+              latestBlock = BigInt(0),
+              latestBlockHash = ByteString(bestHashBytes)
+            )
+          // (2) 6-field legacy fukuii shape (forkId at idx 3) — pre-fix fukuii nodes that omitted earliestBlock.
+          // Accept with earliestBlock=0 so old fukuii peers still handshake during the rollout window.
+          case RLPList(
+                RLPValue(protocolVersionBytes),
+                RLPValue(networkIdBytes),
+                RLPValue(genesisHashBytes),
+                forkIdRlp: RLPList,
+                RLPValue(latestBlockBytes),
+                RLPValue(latestBlockHashBytes)
+              ) =>
+            Status(
+              protocolVersion = ByteUtils.bytesToBigInt(protocolVersionBytes).toInt,
+              networkId = ByteUtils.bytesToBigInt(networkIdBytes).toLong,
+              genesisHash = ByteString(genesisHashBytes),
+              forkId = decode[ForkId](forkIdRlp),
+              earliestBlock = BigInt(0),
+              latestBlock = ByteUtils.bytesToBigInt(latestBlockBytes),
+              latestBlockHash = ByteString(latestBlockHashBytes)
+            )
+          case other => throw new RuntimeException(s"Cannot decode ETH69.Status from: $other")
+        }
       }
     }
   }
@@ -177,7 +179,7 @@ object ETH69 {
       )
     }
 
-    implicit class BlockRangeUpdateDec(val bytes: Array[Byte]) extends AnyVal {
+    extension (bytes: Array[Byte]) {
       def toBlockRangeUpdate: BlockRangeUpdate = rawDecode(bytes) match {
         case RLPList(
               RLPValue(earliestBlockBytes),

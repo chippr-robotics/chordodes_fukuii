@@ -17,7 +17,7 @@ trait LoggingContext {
 }
 
 object LoggingContext {
-  implicit class ContextLoggerOps[T <: scalalogging.Logger](log: T) {
+  extension [T <: scalalogging.Logger](log: T) {
     def withContext(context: LoggingContext)(doLog: T => Unit): Unit = {
       context.asParameterMap.foreach { case (key, value) => MDC.put(key, value) }
       doLog(log)

@@ -363,14 +363,14 @@ object EthereumMessageDecoder {
 object SNAPMessageDecoder extends MessageDecoder {
   import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
   import com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.*
-  import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetAccountRange.GetAccountRangeDec
-  import com.chipprbots.ethereum.network.p2p.messages.SNAP.AccountRange.AccountRangeDec
-  import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetStorageRanges.GetStorageRangesDec
-  import com.chipprbots.ethereum.network.p2p.messages.SNAP.StorageRanges.StorageRangesDec
-  import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetByteCodes.GetByteCodesDec
-  import com.chipprbots.ethereum.network.p2p.messages.SNAP.ByteCodes.ByteCodesDec
-  import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetTrieNodes.GetTrieNodesDec
-  import com.chipprbots.ethereum.network.p2p.messages.SNAP.TrieNodes.TrieNodesDec
+  import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetAccountRange.*
+  import com.chipprbots.ethereum.network.p2p.messages.SNAP.AccountRange.*
+  import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetStorageRanges.*
+  import com.chipprbots.ethereum.network.p2p.messages.SNAP.StorageRanges.*
+  import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetByteCodes.*
+  import com.chipprbots.ethereum.network.p2p.messages.SNAP.ByteCodes.*
+  import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetTrieNodes.*
+  import com.chipprbots.ethereum.network.p2p.messages.SNAP.TrieNodes.*
 
   def fromBytes(msgCode: Int, payload: Array[Byte]): Either[DecodingError, Message] =
     msgCode match {
