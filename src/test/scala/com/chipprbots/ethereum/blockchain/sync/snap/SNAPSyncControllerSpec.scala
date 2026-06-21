@@ -2,6 +2,8 @@ package com.chipprbots.ethereum.blockchain.sync.snap
 
 import org.apache.pekko.util.ByteString
 
+import java.util.concurrent.CountDownLatch
+
 import scala.concurrent.duration.*
 
 import org.scalatest.flatspec.AnyFlatSpec
@@ -1219,8 +1221,8 @@ class FakeStateValidator(
     storageResult: Either[String, Seq[ByteString]],
     throwOnAccount: Option[Throwable] = None,
     throwOnStorage: Option[Throwable] = None,
-    accountSleepMs: Long = 0L,
-    storageSleepMs: Long = 0L
+    accountGate: Option[CountDownLatch] = None,
+    storageGate: Option[CountDownLatch] = None
 ) extends StateValidator(storage) {
 
   @volatile var accountCallCount: Int = 0
@@ -1228,14 +1230,14 @@ class FakeStateValidator(
 
   override def validateAccountTrie(stateRoot: ByteString): Either[String, Seq[ByteString]] = {
     accountCallCount += 1
-    if accountSleepMs > 0 then Thread.sleep(accountSleepMs)
+    accountGate.foreach(_.countDown())
     throwOnAccount.foreach(t => throw t)
     accountResult
   }
 
   override def validateAllStorageTries(stateRoot: ByteString): Either[String, Seq[ByteString]] = {
     storageCallCount += 1
-    if storageSleepMs > 0 then Thread.sleep(storageSleepMs)
+    storageGate.foreach(_.countDown())
     throwOnStorage.foreach(t => throw t)
     storageResult
   }
