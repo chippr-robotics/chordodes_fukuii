@@ -55,7 +55,8 @@ class StateValidator(mptStorage: MptStorage) {
           collectAccounts(rootNode, mptStorage, accounts)
           Right(())
         } catch {
-          case _: Exception =>
+          case e: Exception =>
+            log.warn(s"Failed to traverse account trie for storage validation: ${e.getMessage}", e)
             Left("Cannot validate storage tries: failed to traverse account trie")
         }
 
@@ -70,7 +71,16 @@ class StateValidator(mptStorage: MptStorage) {
               } catch {
                 case e: MerklePatriciaTrie.MissingNodeException =>
                   missingStorageNodes += e.hash
-                case _: Exception => ()
+                case e: Exception =>
+                  // A non-missing fault here means this storage trie was NOT fully
+                  // validated. Conservatively flag the storage root for healing so the
+                  // caller does not treat an un-walked trie as intact; log so corrupt
+                  // storage data (not just a missing node) is visible.
+                  log.warn(
+                    s"Unexpected error walking storage trie ${account.storageRoot.take(8).toHex}; flagging for healing: ${e.getMessage}",
+                    e
+                  )
+                  missingStorageNodes += account.storageRoot
               }
             }
           }
@@ -124,7 +134,15 @@ class StateValidator(mptStorage: MptStorage) {
           } catch {
             case _: MerklePatriciaTrie.MissingNodeException =>
               missingNodes += ByteString(hash.hash)
-            case _: Exception =>
+            case e: Exception =>
+              // Intentional: an unreadable node (corrupt RLP, I/O error) is conservatively
+              // treated as missing so healing re-fetches and overwrites it. Logged so a
+              // persistent non-missing fault (e.g. StorageException) is visible rather than
+              // silently indistinguishable from an ordinary missing node.
+              log.warn(
+                s"Unexpected error resolving node ${ByteString(hash.hash).take(8).toHex}; treating as missing: ${e.getMessage}",
+                e
+              )
               missingNodes += ByteString(hash.hash)
           }
         }
@@ -145,7 +163,11 @@ class StateValidator(mptStorage: MptStorage) {
           val account = accountSerializer.fromBytes(leaf.value.toArray)
           accounts += account
         } catch {
-          case _: Exception => ()
+          case e: Exception =>
+            // A leaf that fails to decode as an Account means its storage trie will not
+            // be validated. Log so corrupt account RLP is visible rather than silently
+            // dropped (which would make storage validation report a false "intact").
+            log.warn(s"Failed to decode account leaf during validation: ${e.getMessage}", e)
         }
 
       case ext: ExtensionNode =>
@@ -167,7 +189,10 @@ class StateValidator(mptStorage: MptStorage) {
               val account = accountSerializer.fromBytes(value.toArray)
               accounts += account
             } catch {
-              case _: Exception => ()
+              case e: Exception =>
+                // Same rationale as the LeafNode case: a non-decodable terminator account
+                // would be silently skipped and its storage trie never validated.
+                log.warn(s"Failed to decode account terminator during validation: ${e.getMessage}", e)
             }
           }
         }
@@ -179,8 +204,17 @@ class StateValidator(mptStorage: MptStorage) {
             val resolvedNode = storage.get(hash.hash)
             collectAccounts(resolvedNode, storage, accounts, visited)
           } catch {
-            case _: MerklePatriciaTrie.MissingNodeException => ()
-            case _: Exception                               => ()
+            // Either case means the account subtree below this hash is skipped, so its
+            // accounts' storage tries are not validated. The account-trie completeness is
+            // checked separately by validateAccountTrie/findMissingNodes; here we only need
+            // observability so a non-missing fault (corrupt DB) is not silently masked.
+            case _: MerklePatriciaTrie.MissingNodeException =>
+              log.debug(s"Missing account-trie node ${ByteString(hash.hash).take(8).toHex} during account collection")
+            case e: Exception =>
+              log.warn(
+                s"Unexpected error resolving account-trie node ${ByteString(hash.hash).take(8).toHex} during collection: ${e.getMessage}",
+                e
+              )
           }
         }
 
@@ -302,7 +336,13 @@ class StateValidator(mptStorage: MptStorage) {
                   flushIfFull()
               }
             }
-          } catch { case _: Exception => () }
+          } catch {
+            case e: Exception =>
+              // A leaf that fails to decode as an Account means its storage trie is omitted
+              // from the healing walk. Log so corrupt account data is visible rather than
+              // silently producing a false "no missing nodes" completion signal.
+              log.warn(s"Failed to decode account leaf during heal walk: ${e.getMessage}", e)
+          }
 
         case ext: ExtensionNode =>
           val nodeHash = ByteString(ext.hash)
