@@ -15,14 +15,14 @@ import org.typelevel.log4cats.slf4j.Slf4jLogger
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteUtils.*
 
-sealed trait ForkIdValidationResult
-case object Connect extends ForkIdValidationResult
-case object ErrRemoteStale extends ForkIdValidationResult
-case object ErrLocalIncompatibleOrStale extends ForkIdValidationResult
+enum ForkIdValidationResult:
+  case Connect, ErrRemoteStale, ErrLocalIncompatibleOrStale
 
 import cats.effect.*
 
 object ForkIdValidator {
+
+  import ForkIdValidationResult.*
 
   implicit val ioLogger: SelfAwareStructuredLogger[IO] = Slf4jLogger.getLogger[IO]
   implicit val syncIoLogger: SelfAwareStructuredLogger[SyncIO] = Slf4jLogger.getLogger[SyncIO]
@@ -41,9 +41,10 @@ object ForkIdValidator {
     *   \- ForkId announced by the connecting peer
     * @return
     *   One of:
-    *   - [[com.chipprbots.ethereum.forkid.Connect]] - It is safe to connect to the peer
-    *   - [[com.chipprbots.ethereum.forkid.ErrRemoteStale]] - Remote is stale, don't connect
-    *   - [[com.chipprbots.ethereum.forkid.ErrLocalIncompatibleOrStale]] - Local is incompatible or stale, don't connect
+    *   - [[com.chipprbots.ethereum.forkid.ForkIdValidationResult.Connect]] - It is safe to connect to the peer
+    *   - [[com.chipprbots.ethereum.forkid.ForkIdValidationResult.ErrRemoteStale]] - Remote is stale, don't connect
+    *   - [[com.chipprbots.ethereum.forkid.ForkIdValidationResult.ErrLocalIncompatibleOrStale]] - Local is incompatible
+    *     or stale, don't connect
     */
   def validatePeer[F[_]: Monad: Logger](
       genesisHash: ByteString,

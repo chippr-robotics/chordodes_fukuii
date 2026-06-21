@@ -10,6 +10,7 @@ import com.chipprbots.ethereum.utils.Logger
 class SyncProgressMonitor(@annotation.unused _scheduler: Scheduler) extends Logger {
 
   import SNAPSyncController.*
+  import SNAPSyncController.SyncPhase.*
 
   private var currentPhaseState: SyncPhase = Idle
   private var bytecodesDone: Boolean = false
@@ -304,6 +305,7 @@ case class SyncProgress(
 
   private def wormChasesBrainBar: String = {
     import SNAPSyncController.*
+    import SNAPSyncController.SyncPhase.*
 
     val stages = Vector[SyncPhase](
       AccountRangeSync,
@@ -364,20 +366,21 @@ case class SyncProgress(
   }
 
   def formattedString: String = {
+    import SNAPSyncController.SyncPhase.*
     val bar = wormChasesBrainBar
     val chain = chainStr
     val elapsed = elapsedStr
 
     phase match {
-      case SNAPSyncController.AccountRangeSync if isFinalizingTrie =>
+      case AccountRangeSync if isFinalizingTrie =>
         s"$bar FINALIZING TRIE: flushing ${formatCount(accountsSynced)} accounts to disk (${finalizeElapsedSeconds}s)$chain | $elapsed"
 
-      case SNAPSyncController.AccountRangeSync =>
+      case AccountRangeSync =>
         val progressStr = if estimatedTotalAccounts > 0 then s" ${phaseProgress}%" else ""
         val totalStr = if estimatedTotalAccounts > 0 then s"/~${formatCount(estimatedTotalAccounts)}" else ""
         s"$bar Accounts$progressStr: ${formatCount(accountsSynced)}$totalStr @ ${accountsPerSec.toInt}/s$chain | $elapsed"
 
-      case SNAPSyncController.ByteCodeAndStorageSync =>
+      case ByteCodeAndStorageSync =>
         val contractsStr =
           if storageContractsTotal > 0 then s" (${storageContractsCompleted}/${storageContractsTotal} contracts)"
           else ""
@@ -386,13 +389,13 @@ case class SyncProgress(
           else s"codes=${formatCount(bytecodesDownloaded)} @ ${bytecodesPerSec.toInt}/s"
         s"$bar Code+Storage: $codeStr, slots=${formatCount(storageSlotsSynced)} @ ${slotsPerSec.toInt}/s$contractsStr$chain | $elapsed"
 
-      case SNAPSyncController.StateHealing =>
+      case StateHealing =>
         s"$bar Healing: ${formatCount(nodesHealed)} nodes @ ${nodesPerSec.toInt}/s$chain | $elapsed"
 
-      case SNAPSyncController.StateValidation =>
+      case StateValidation =>
         s"$bar Validating state trie...$chain | $elapsed"
 
-      case SNAPSyncController.ChainDownloadCompletion =>
+      case ChainDownloadCompletion =>
         val bodiesPct = if chainTarget > 0 then (chainBodies * 100 / chainTarget).toInt else 0
         val receiptsPct = if chainTarget > 0 then (chainReceipts * 100 / chainTarget).toInt else 0
         s"$bar State done, chain download (boosted): bodies=${formatBigInt(chainBodies)}/$bodiesPct% receipts=${formatBigInt(chainReceipts)}/$receiptsPct% | $elapsed"

@@ -387,15 +387,16 @@ object SNAPSyncMetrics extends MetricsContainer {
   /** Record full sync progress from SyncProgress object */
   def measure(progress: SyncProgress): Unit = {
     // Phase
+    import SNAPSyncController.SyncPhase.*
     val phaseValue = progress.phase match {
-      case SNAPSyncController.Idle                    => 0
-      case SNAPSyncController.AccountRangeSync        => 1
-      case SNAPSyncController.ByteCodeAndStorageSync  => 3
-      case SNAPSyncController.StateHealing            => 5
-      case SNAPSyncController.StateValidation         => 6
-      case SNAPSyncController.ChainDownloadCompletion => 7
-      case SNAPSyncController.Completed               => 8
-      case SNAPSyncController.Dormant                 => 9
+      case Idle                    => 0
+      case AccountRangeSync        => 1
+      case ByteCodeAndStorageSync  => 3
+      case StateHealing            => 5
+      case StateValidation         => 6
+      case ChainDownloadCompletion => 7
+      case Completed               => 8
+      case Dormant                 => 9
     }
     setCurrentPhase(phaseValue)
 

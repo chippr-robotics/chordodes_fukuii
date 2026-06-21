@@ -16,7 +16,7 @@ import org.bouncycastle.crypto.params.ECPublicKeyParameters
 import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.crypto
-import com.chipprbots.ethereum.forkid.Connect
+import com.chipprbots.ethereum.forkid.ForkIdValidationResult.Connect
 import com.chipprbots.ethereum.forkid.ForkId
 import com.chipprbots.ethereum.forkid.ForkIdValidator
 import com.chipprbots.ethereum.rlp

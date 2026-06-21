@@ -12,6 +12,7 @@ import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestMptStorage
 
 class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
+  import SNAPSyncController.SyncPhase.*
 
   "SNAPSyncConfig" should "load from config correctly" taggedAs UnitTest in {
     // Test that the config case class works properly

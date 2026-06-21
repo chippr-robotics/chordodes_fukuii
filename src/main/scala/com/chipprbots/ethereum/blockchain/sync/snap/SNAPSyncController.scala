@@ -68,6 +68,7 @@ private class SNAPSyncControllerImpl(
 )(implicit ec: ExecutionContext) {
 
   import SNAPSyncController.*
+  import SyncPhase.*
 
   // P11: plain SLF4J logger, safe to call from Future callbacks (off the actor thread).
   // Used ONLY at the two Recovery-streaming Future `.foreach` sites; all on-thread logging uses ctx.log.
@@ -4771,15 +4772,9 @@ object SNAPSyncController {
   ) extends Command
   final case class WrappedPeerDisconnected(peerId: com.chipprbots.ethereum.network.PeerId) extends Command
 
-  sealed trait SyncPhase
-  case object Idle extends SyncPhase
-  case object AccountRangeSync extends SyncPhase
-  case object ByteCodeAndStorageSync extends SyncPhase
-  case object StateHealing extends SyncPhase
-  case object StateValidation extends SyncPhase
-  case object ChainDownloadCompletion extends SyncPhase
-  case object Completed extends SyncPhase
-  case object Dormant extends SyncPhase
+  enum SyncPhase:
+    case Idle, AccountRangeSync, ByteCodeAndStorageSync, StateHealing, StateValidation, ChainDownloadCompletion,
+      Completed, Dormant
 
   /** Source of pivot block selection */
   sealed trait PivotSelectionSource {

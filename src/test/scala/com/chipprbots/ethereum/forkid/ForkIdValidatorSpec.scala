@@ -11,6 +11,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import com.chipprbots.ethereum.utils.Config.*
 
+import ForkIdValidationResult.*
 import ForkIdValidator.*
 
 class ForkIdValidatorSpec extends AnyWordSpec with Matchers {
