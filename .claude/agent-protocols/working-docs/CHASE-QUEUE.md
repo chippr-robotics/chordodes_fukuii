@@ -55,3 +55,11 @@ When 5+ entries share a Type or package, open a dedicated sprint:
 ## Cleared entries log
 
 _None yet._
+
+---
+
+## wall-clock-assertion (protocol candidate)
+
+Pattern: unit tests asserting real elapsed time (`elapsed should be < N.millis`).
+Recurs in 3 files (`MerkleProofVerifierPhase3Spec`, `SnapServerLimitsSpec`, `WorkNotifierSpec`).
+Fix: replace with op-count guard or `@SlowTest` tag. See `test-quality-audit.md §R1-b`.
