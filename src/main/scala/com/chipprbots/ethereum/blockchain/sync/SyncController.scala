@@ -351,8 +351,8 @@ object SyncController {
       startFastSync()
     }
 
-    /** Classic scheduler retained for the few inline `scheduleOnce` callbacks that fire a Classic tell to a Classic
-      * collaborator (`networkPeerManager`) rather than a self-Command. Self-Command timers use `timers`.
+    /** Classic scheduler passed to SNAPSyncController, which manages its own scheduled callbacks.
+      * Inline `scheduleOnce` calls use `ctx.system.scheduler` directly. Self-Command timers use `timers`.
       */
     def scheduler: Scheduler = externalSchedulerOpt.getOrElse(ctx.system.classicSystem.scheduler)
 
@@ -1502,11 +1502,12 @@ object SyncController {
       // NPA forwards bestNetworkTip (best ETH68 peer TD seen since startup) to this actor.
       // Handles multi-restart TD drift that falls below the TD-PROXY-GAP 10,000× threshold
       // (e.g. Restart #7 ratio=7,411×). For pure ETH69 networks, NPA sends a (0,0) sentinel
-      // and tier-3 local chain computation fires instead. This is a one-shot delayed tell to a Classic
-      // collaborator (not a self-message), so it stays on the Classic scheduler.
-      scheduler.scheduleOnce(30.seconds)(
-        networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.CalibrateChainWeightNow
-      )(ctx.executionContext)
+      // and tier-3 local chain computation fires instead.
+      ctx.system.scheduler.scheduleOnce(
+        java.time.Duration.ofSeconds(30),
+        () => networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.CalibrateChainWeightNow,
+        ctx.executionContext
+      )
 
       val peersClient =
         ctx.spawn(
@@ -2136,10 +2137,11 @@ object SyncController {
       * (ChainDownloader gap > 10K blocks). The retry loop continues until calibration succeeds or ETH68 peers appear.
       */
     private def scheduleTDCalibrationRetry(): Unit = {
-      // One-shot delayed tell to a Classic collaborator (not a self-message) — stays on the Classic scheduler.
-      scheduler.scheduleOnce(30.minutes)(
-        networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.CalibrateChainWeightNow
-      )(ctx.executionContext)
+      ctx.system.scheduler.scheduleOnce(
+        java.time.Duration.ofMinutes(30),
+        () => networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.CalibrateChainWeightNow,
+        ctx.executionContext
+      )
       val bestBlockNum = blockchainReader.getBestBlockHeader.map(_.number).getOrElse(BigInt(0))
       log.info(
         "TIMED_CALIBRATION_LOCAL: retry #{} scheduled in 30min (ChainDownloader advancing, current bestBlock={})",
