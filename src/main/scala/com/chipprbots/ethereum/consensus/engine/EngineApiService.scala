@@ -132,8 +132,8 @@ class EngineApiService(
       payload.expectedBlobVersionedHashes.exists { expected =>
         val payloadHashes: Seq[ByteString] =
           block.body.transactionList.flatMap {
-            case stx if stx.tx.isInstanceOf[com.chipprbots.ethereum.domain.BlobTransaction] =>
-              stx.tx.asInstanceOf[com.chipprbots.ethereum.domain.BlobTransaction].blobVersionedHashes
+            case SignedTransaction(blobTx: com.chipprbots.ethereum.domain.BlobTransaction, _) =>
+              blobTx.blobVersionedHashes
             case _ => Nil
           }
         expected != payloadHashes
@@ -207,8 +207,8 @@ class EngineApiService(
             else {
               // Validate blobGasUsed: count blob txs * GAS_PER_BLOB
               val blobTxCount = block.body.transactionList.collect {
-                case stx if stx.tx.isInstanceOf[com.chipprbots.ethereum.domain.BlobTransaction] =>
-                  stx.tx.asInstanceOf[com.chipprbots.ethereum.domain.BlobTransaction].blobVersionedHashes.size
+                case SignedTransaction(blobTx: com.chipprbots.ethereum.domain.BlobTransaction, _) =>
+                  blobTx.blobVersionedHashes.size
               }.sum
               val expectedBlobGas = BigInt(blobTxCount) * BlobGasUtils.GAS_PER_BLOB
               val actualBlobGas = block.header.blobGasUsed.getOrElse(BigInt(0))
@@ -225,8 +225,8 @@ class EngineApiService(
       val versionedHashesInvalid: Option[String] = payload.expectedBlobVersionedHashes.flatMap { expected =>
         val payloadHashes: Seq[ByteString] =
           block.body.transactionList.flatMap {
-            case stx if stx.tx.isInstanceOf[com.chipprbots.ethereum.domain.BlobTransaction] =>
-              stx.tx.asInstanceOf[com.chipprbots.ethereum.domain.BlobTransaction].blobVersionedHashes
+            case SignedTransaction(blobTx: com.chipprbots.ethereum.domain.BlobTransaction, _) =>
+              blobTx.blobVersionedHashes
             case _ => Nil
           }
         if expected == payloadHashes then None
@@ -746,10 +746,8 @@ class EngineApiService(
 
                     // Blob-gas accounting: sum GAS_PER_BLOB * blob_count across blob txs.
                     val blobGasUsed: BigInt = skeletonBlock.body.transactionList.map {
-                      case stx if stx.tx.isInstanceOf[com.chipprbots.ethereum.domain.BlobTransaction] =>
-                        BigInt(
-                          stx.tx.asInstanceOf[com.chipprbots.ethereum.domain.BlobTransaction].blobVersionedHashes.size
-                        ) * BlobGasUtils.GAS_PER_BLOB
+                      case SignedTransaction(blobTx: com.chipprbots.ethereum.domain.BlobTransaction, _) =>
+                        BigInt(blobTx.blobVersionedHashes.size) * BlobGasUtils.GAS_PER_BLOB
                       case _ => BigInt(0)
                     }.sum
 
@@ -870,7 +868,7 @@ class EngineApiService(
   ): BlobsBundleData = {
     import com.chipprbots.ethereum.rlp.{rawDecode, RLPList, RLPValue}
     val blobTxHashes = txs.collect {
-      case stx if stx.tx.isInstanceOf[com.chipprbots.ethereum.domain.BlobTransaction] => stx.hash
+      case stx @ SignedTransaction(_: com.chipprbots.ethereum.domain.BlobTransaction, _) => stx.hash
     }
     val allBlobs = Seq.newBuilder[ByteString]
     val allCommitments = Seq.newBuilder[ByteString]
