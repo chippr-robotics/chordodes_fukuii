@@ -1,7 +1,8 @@
 package com.chipprbots.ethereum.jsonrpc
 
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
@@ -20,8 +21,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.Fixtures
-import com.chipprbots.ethereum.LongPatience
-import com.chipprbots.ethereum.WithActorSystemShutDown
+
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.jsonrpc.DebugService.ListPeersInfoRequest
 import com.chipprbots.ethereum.jsonrpc.DebugService.ListPeersInfoResponse
@@ -40,19 +40,19 @@ import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.testing.Tags.*
 
 class JsonRpcControllerSpec
-    extends TestKit(ActorSystem("JsonRpcControllerSpec_System"))
+    extends ScalaTestWithActorTestKit
     with AnyFlatSpecLike
-    with WithActorSystemShutDown
     with Matchers
     with JRCMatchers
     with org.scalamock.scalatest.MockFactory
     with JsonRpcControllerTestSupport
     with ScalaCheckPropertyChecks
     with ScalaFutures
-    with LongPatience
     with Eventually {
 
   implicit val runtime: IORuntime = IORuntime.global
+  implicit private val classicActorSystem: ActorSystem = system.toClassic
+  implicit private val actorTestKitImpl: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
 
   implicit val formats: Formats = DefaultFormats.preservingEmptyValues + OptionNoneToJNullSerializer +
     QuantitiesSerializer + UnformattedDataJsonSerializer

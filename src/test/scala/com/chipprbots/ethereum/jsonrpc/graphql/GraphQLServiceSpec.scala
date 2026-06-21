@@ -1,9 +1,9 @@
 package com.chipprbots.ethereum.jsonrpc.graphql
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -23,7 +23,6 @@ import org.scalatest.time.Seconds
 import org.scalatest.time.Span
 
 import com.chipprbots.ethereum.Fixtures
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.consensus.blocks.PendingBlockAndState
 import com.chipprbots.ethereum.consensus.mining.MiningConfigs
@@ -44,9 +43,8 @@ import com.chipprbots.ethereum.ledger.StxLedger
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 
 class GraphQLServiceSpec
-    extends TestKit(ActorSystem("GraphQLServiceSpec_ActorSystem"))
+    extends ScalaTestWithActorTestKit
     with AnyFlatSpecLike
-    with WithActorSystemShutDown
     with Matchers
     with ScalaFutures
     with MockFactory {
@@ -54,7 +52,8 @@ class GraphQLServiceSpec
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(10, Seconds), interval = Span(200, Millis))
   implicit val runtime: IORuntime = IORuntime.global
-  implicit val ec: ExecutionContext = system.dispatcher
+  implicit private val classicActorSystem: ActorSystem = system.toClassic
+  implicit val ec: ExecutionContext = classicActorSystem.dispatcher
 
   "GraphQLService" should "answer { chainID } with the configured chain id as 0x-hex" in new GraphQLTestSetup {
     val (status, body) = service.execute("{ chainID }", None, None).unsafeRunSync()
@@ -141,7 +140,7 @@ class GraphQLServiceSpec
     val syncProbe: TestProbe = TestProbe()
     val pendingTxProbe: TestProbe = TestProbe()
     val filterManager: org.apache.pekko.actor.typed.ActorRef[FilterManager.Command] =
-      system.classicSystem.spawnAnonymous(Behaviors.ignore[FilterManager.Command])
+      testKit.spawn(Behaviors.ignore[FilterManager.Command])
 
     lazy val ethBlocksService = new EthBlocksService(
       blockchain,

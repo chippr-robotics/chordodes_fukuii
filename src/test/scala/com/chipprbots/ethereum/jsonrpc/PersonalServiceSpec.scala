@@ -3,7 +3,8 @@ package com.chipprbots.ethereum.jsonrpc
 import java.time.Duration
 
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -23,9 +24,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.Fixtures
-import com.chipprbots.ethereum.NormalPatience
 import com.chipprbots.ethereum.Timeouts
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.consensus.mining.Mining
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage
@@ -48,17 +47,16 @@ import com.chipprbots.ethereum.utils.MonetaryPolicyConfig
 import com.chipprbots.ethereum.utils.TxPoolConfig
 
 class PersonalServiceSpec
-    extends TestKit(ActorSystem("JsonRpcControllerEthSpec_System"))
+    extends ScalaTestWithActorTestKit
     with AnyFlatSpecLike
-    with WithActorSystemShutDown
     with Matchers
     with MockFactory
     with ScalaFutures
-    with NormalPatience
     with Eventually
     with ScalaCheckPropertyChecks {
 
   implicit val runtime: IORuntime = IORuntime.global
+  implicit private val classicActorSystem: ActorSystem = system.toClassic
 
   "PersonalService" should "import private keys" taggedAs (UnitTest, RPCTest) in new TestSetup {
     keyStore.importPrivateKey.expects(prvKey, passphrase).returning(Right(address))

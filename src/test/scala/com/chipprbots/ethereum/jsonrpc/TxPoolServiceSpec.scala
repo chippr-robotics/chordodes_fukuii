@@ -1,7 +1,8 @@
 package com.chipprbots.ethereum.jsonrpc
 
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 
 import cats.effect.unsafe.IORuntime
@@ -14,7 +15,6 @@ import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures
-import com.chipprbots.ethereum.NormalPatience
 import com.chipprbots.ethereum.domain.SignedTransactionWithSender
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
@@ -30,15 +30,15 @@ import com.chipprbots.ethereum.utils.TxPoolConfig
   * PendingTransactionFilter, PendingTransactionsParams
   */
 class TxPoolServiceSpec
-    extends TestKit(ActorSystem("TxPoolServiceSpec"))
+    extends ScalaTestWithActorTestKit
     with AnyFlatSpecLike
     with Matchers
-    with ScalaFutures
-    with NormalPatience {
+    with ScalaFutures {
 
   import TxPoolService.*
 
   implicit val runtime: IORuntime = IORuntime.global
+  implicit private val classicActorSystem: ActorSystem = system.toClassic
 
   val txPoolConfig: TxPoolConfig = new TxPoolConfig {
     val txPoolSize: Int = 4096

@@ -1,7 +1,6 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
@@ -13,7 +12,6 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.NormalPatience
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage.TransactionLocation
@@ -37,9 +35,8 @@ import com.chipprbots.ethereum.vm.ExecutionTracer
   * core-geth reference: eth/tracers/api.go
   */
 class TraceServiceSpec
-    extends TestKit(ActorSystem("TraceServiceSpec"))
+    extends ScalaTestWithActorTestKit
     with AnyFlatSpecLike
-    with WithActorSystemShutDown
     with Matchers
     with MockFactory
     with ScalaFutures
@@ -256,7 +253,7 @@ class TraceServiceSpec
 
   // ── TestSetup ────────────────────────────────────────────────────────────────
 
-  class TestSetup(implicit @scala.annotation.unused system: ActorSystem) extends EphemBlockchainTestSetup {
+  class TestSetup() extends EphemBlockchainTestSetup {
 
     val block: Block = Block(Fixtures.Blocks.Block3125369.header, Fixtures.Blocks.Block3125369.body)
 

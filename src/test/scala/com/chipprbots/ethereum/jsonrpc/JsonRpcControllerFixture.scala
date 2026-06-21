@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.jsonrpc
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
 import org.apache.pekko.actor.typed
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
@@ -55,12 +56,17 @@ import com.chipprbots.ethereum.utils.FilterConfig
 object JsonRpcControllerFixture {
   def apply()(implicit
       system: ActorSystem,
-      mockFactory: org.scalamock.scalatest.MockFactory
+      mockFactory: org.scalamock.scalatest.MockFactory,
+      actorTestKit: ActorTestKit
   ): JsonRpcControllerFixture =
-    new JsonRpcControllerFixture()(system, mockFactory)
+    new JsonRpcControllerFixture()(system, mockFactory, actorTestKit)
 }
 
-class JsonRpcControllerFixture(implicit system: ActorSystem, mockFactory: org.scalamock.scalatest.MockFactory)
+class JsonRpcControllerFixture(implicit
+    system: ActorSystem,
+    mockFactory: org.scalamock.scalatest.MockFactory,
+    actorTestKit: ActorTestKit
+)
     extends EphemBlockchainTestSetup
     with JsonMethodsImplicits
     with ApisBuilder {
@@ -157,7 +163,7 @@ class JsonRpcControllerFixture(implicit system: ActorSystem, mockFactory: org.sc
   val pendingTransactionsManager: TestProbe = TestProbe()
   val ommersPool: TestProbe = TestProbe()
   val filterManager: org.apache.pekko.actor.typed.ActorRef[FilterManager.Command] =
-    system.spawnAnonymous(Behaviors.ignore[FilterManager.Command])
+    actorTestKit.spawn(Behaviors.ignore[FilterManager.Command])
 
   val ethashConfig = MiningConfigs.ethashConfig
   override lazy val miningConfig = MiningConfigs.miningConfig

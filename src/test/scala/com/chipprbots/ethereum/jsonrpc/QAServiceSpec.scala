@@ -1,13 +1,14 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 
 import cats.effect.IO
 
 import org.scalamock.scalatest.AsyncMockFactory
 
-import com.chipprbots.ethereum.*
+import com.chipprbots.ethereum.ByteGenerators
+import com.chipprbots.ethereum.FlatSpecBase
+import com.chipprbots.ethereum.SpecFixtures
 import com.chipprbots.ethereum.consensus.mining.Mining
 import com.chipprbots.ethereum.consensus.pow.EthashConfig
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.MineBlocks
@@ -17,9 +18,8 @@ import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.testing.Tags.*
 
 class QAServiceSpec
-    extends TestKit(ActorSystem("QAServiceSpec_ActorSystem"))
+    extends ScalaTestWithActorTestKit
     with FlatSpecBase
-    with WithActorSystemShutDown
     with SpecFixtures
     with ByteGenerators
     with AsyncMockFactory {
