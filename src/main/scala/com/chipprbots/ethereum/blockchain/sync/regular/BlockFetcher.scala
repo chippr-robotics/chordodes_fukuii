@@ -51,7 +51,7 @@ import com.chipprbots.ethereum.utils.FunctorOps.*
 class BlockFetcher(
     val peersClient: ActorRef[PeersClient.Command],
     val peerEventBus: ActorRef[PeerEventBusCommand],
-    val supervisor: ClassicActorRef,
+    val supervisor: ActorRef[RegularSync.ProgressProtocol],
     val syncConfig: SyncConfig,
     val blockValidator: BlockValidator,
     context: ActorContext[BlockFetcher.FetchCommand],
@@ -719,7 +719,7 @@ object BlockFetcher {
   def apply(
       peersClient: ActorRef[PeersClient.Command],
       peerEventBus: ActorRef[PeerEventBusCommand],
-      supervisor: ClassicActorRef,
+      supervisor: ActorRef[RegularSync.ProgressProtocol],
       syncConfig: SyncConfig,
       blockValidator: BlockValidator
   ): Behavior[FetchCommand] =

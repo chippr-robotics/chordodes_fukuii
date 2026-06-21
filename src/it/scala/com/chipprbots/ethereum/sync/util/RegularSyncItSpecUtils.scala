@@ -152,11 +152,17 @@ object RegularSyncItSpecUtils {
 
     val fetcher: typed.ActorRef[BlockFetcher.FetchCommand] =
       system.spawn(
-        BlockFetcher(peersClient, peerEventBus, regularSync, syncConfig, validators.blockValidator),
+        BlockFetcher(
+          peersClient,
+          peerEventBus,
+          regularSync.toTyped[RegularSync.ProgressProtocol],
+          syncConfig,
+          validators.blockValidator
+        ),
         "block-fetcher"
       )
 
-    lazy val blockImporter: typed.ActorRef[Any] =
+    lazy val blockImporter: typed.ActorRef[BlockImporter.Command] =
       system.spawn(
         BlockImporter.apply(
           fetcher,

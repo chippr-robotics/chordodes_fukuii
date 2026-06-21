@@ -2,10 +2,13 @@ package com.chipprbots.ethereum.blockchain.sync
 import com.chipprbots.ethereum.domain.Block
 
 object SyncProtocol {
+  // non-sealed: sync.regular.RegularSync cases (ProgressProtocol, timer ticks) also extend (P7)
+  trait RegularSyncCommand
+
   sealed trait SyncProtocolMsg
-  case object Start extends SyncProtocolMsg
-  case object GetStatus extends SyncProtocolMsg
-  case class MinedBlock(block: Block) extends SyncProtocolMsg
+  case object Start extends SyncProtocolMsg with RegularSyncCommand
+  case object GetStatus extends SyncProtocolMsg with RegularSyncCommand
+  case class MinedBlock(block: Block) extends SyncProtocolMsg with RegularSyncCommand
 
   /** Clears persisted fast-sync markers so the next start can enter fast sync again. This is intentionally a "soft"
     * reset: it does not wipe the chain DB.
@@ -24,7 +27,9 @@ object SyncProtocol {
     * snap-serve window of every connected peer has moved far past us). The controller responds by clearing the
     * SnapSyncDone flag and re-running SNAP sync from a recent pivot, which is the only viable recovery path.
     */
-  final case class RegularSyncStuck(blockNumber: BigInt, missingHash: String) extends SyncProtocolMsg
+  final case class RegularSyncStuck(blockNumber: BigInt, missingHash: String)
+      extends SyncProtocolMsg
+      with RegularSyncCommand
 
   /** Signals that SNAP finalization detected a state root mismatch (snapStateRoot != pivotHeader.stateRoot).
     * SyncController responds by clearing SnapSyncDone and restarting SNAP with a fresh pivot. Mirrors Besu BUG-008

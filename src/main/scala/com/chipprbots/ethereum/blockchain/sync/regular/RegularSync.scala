@@ -30,8 +30,12 @@ import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 object RegularSync {
-  private[regular] case object FetcherStatusTick
-  private[regular] case object PrintStatusTick
+  // non-sealed: SyncProtocol cases (Start, GetStatus, MinedBlock, RegularSyncStuck) sent
+  // by Classic SyncController also extend this via SyncProtocol.RegularSyncCommand (P7)
+  type Command = SyncProtocol.RegularSyncCommand
+
+  private[regular] case object FetcherStatusTick extends SyncProtocol.RegularSyncCommand
+  private[regular] case object PrintStatusTick extends SyncProtocol.RegularSyncCommand
   private val FetcherStatusKey = "RegularSyncFetcherStatus"
   private val PrintStatusKey = "RegularSyncPrintStatus"
 
@@ -56,14 +60,14 @@ object RegularSync {
         org.apache.pekko.actor.typed.pubsub.Topic.Command[com.chipprbots.ethereum.jsonrpc.NewBlockImported]
       ],
       configBuilder: BlockchainConfigBuilder
-  ): Behavior[Any] =
+  ): Behavior[Command] =
     Behaviors.setup { ctx =>
       Behaviors.withTimers { timers =>
         val log: LoggingAdapter = Logging(ctx.system.classicSystem, classOf[RegularSyncImpl])
 
         val fetcher: TypedActorRef[BlockFetcher.FetchCommand] =
           ctx.spawn(
-            BlockFetcher(peersClient, peerEventBus, ctx.self.toClassic, syncConfig, blockValidator),
+            BlockFetcher(peersClient, peerEventBus, ctx.self.narrow[ProgressProtocol], syncConfig, blockValidator),
             "block-fetcher"
           )
 
@@ -82,7 +86,7 @@ object RegularSync {
             "block-broadcaster"
           )
 
-        val importer: TypedActorRef[Any] =
+        val importer: TypedActorRef[BlockImporter.Command] =
           ctx.spawn(
             BlockImporter.apply(
               fetcher,
@@ -167,10 +171,10 @@ object RegularSync {
   private def running(
       progressState: ProgressState,
       fetcher: TypedActorRef[BlockFetcher.FetchCommand],
-      importer: TypedActorRef[Any],
+      importer: TypedActorRef[BlockImporter.Command],
       log: LoggingAdapter,
-      ctx: org.apache.pekko.actor.typed.scaladsl.ActorContext[Any]
-  ): Behavior[Any] =
+      ctx: org.apache.pekko.actor.typed.scaladsl.ActorContext[Command]
+  ): Behavior[Command] =
     Behaviors.receiveMessage {
       case SyncProtocol.Start =>
         log.info("Starting regular sync")
@@ -271,7 +275,7 @@ object RegularSync {
       }
   }
 
-  sealed trait ProgressProtocol
+  sealed trait ProgressProtocol extends SyncProtocol.RegularSyncCommand
   object ProgressProtocol {
     case object StartedFetching extends ProgressProtocol
     case class StartingFrom(blockNumber: BigInt) extends ProgressProtocol
