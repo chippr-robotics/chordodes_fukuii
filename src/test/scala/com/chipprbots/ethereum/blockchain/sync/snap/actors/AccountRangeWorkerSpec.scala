@@ -62,7 +62,7 @@ class AccountRangeWorkerSpec
     val worker = makeWorker(coordinator, networkPeerManager)
 
     val reqId = BigInt(1)
-    worker ! Messages.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
+    worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
 
     val sendMsg = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
     sendMsg.peerId shouldBe peer.id
@@ -82,13 +82,13 @@ class AccountRangeWorkerSpec
     val (root, rangeProof) = proofOnlyRange()
 
     val reqId = BigInt(2)
-    worker ! Messages.FetchAccountRange(makeTask(root), peer, reqId, defaultBytes)
+    worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(root), peer, reqId, defaultBytes)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
 
     val emptyResponse = AccountRange(requestId = reqId, accounts = Seq.empty, proof = rangeProof)
-    worker ! Messages.AccountRangeResponseMsg(emptyResponse)
+    worker ! AccountRangeCoordinator.AccountRangeResponseMsg(emptyResponse)
 
-    val msg = coordinator.expectMsgType[Messages.TaskComplete](1.second)
+    val msg = coordinator.expectMsgType[AccountRangeCoordinator.TaskComplete](1.second)
     msg.requestId shouldBe reqId
     msg.result.isRight shouldBe true
     val (count, accounts, returnedProof) = msg.result.toOption.get
@@ -107,12 +107,12 @@ class AccountRangeWorkerSpec
     val worker = makeWorker(coordinator, networkPeerManager)
 
     val reqId = BigInt(20)
-    worker ! Messages.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
+    worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
 
-    worker ! Messages.AccountRangeResponseMsg(AccountRange(requestId = reqId, accounts = Seq.empty, proof = Seq.empty))
+    worker ! AccountRangeCoordinator.AccountRangeResponseMsg(AccountRange(requestId = reqId, accounts = Seq.empty, proof = Seq.empty))
 
-    val msg = coordinator.expectMsgType[Messages.TaskComplete](1.second)
+    val msg = coordinator.expectMsgType[AccountRangeCoordinator.TaskComplete](1.second)
     msg.requestId shouldBe reqId
   }
 
@@ -124,12 +124,12 @@ class AccountRangeWorkerSpec
     val worker = makeWorker(coordinator, networkPeerManager)
 
     val reqId = BigInt(3)
-    worker ! Messages.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
+    worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
 
-    worker ! Messages.RequestTimeout(reqId)
+    worker ! AccountRangeCoordinator.RequestTimeout(reqId)
 
-    val failed = coordinator.expectMsgType[Messages.TaskFailed](1.second)
+    val failed = coordinator.expectMsgType[AccountRangeCoordinator.TaskFailed](1.second)
     failed.requestId shouldBe reqId
     failed.reason shouldBe "Request timeout"
   }
@@ -142,12 +142,12 @@ class AccountRangeWorkerSpec
     val worker = makeWorker(coordinator, networkPeerManager)
 
     val reqId = BigInt(4)
-    worker ! Messages.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
+    worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
 
-    worker ! Messages.WorkerPeerDisconnected(peer.id.value)
+    worker ! AccountRangeCoordinator.WorkerPeerDisconnected(peer.id.value)
 
-    val failed = coordinator.expectMsgType[Messages.TaskFailed](1.second)
+    val failed = coordinator.expectMsgType[AccountRangeCoordinator.TaskFailed](1.second)
     failed.requestId shouldBe reqId
     failed.reason shouldBe "Peer disconnected"
   }
@@ -160,14 +160,14 @@ class AccountRangeWorkerSpec
     val worker = makeWorker(coordinator, networkPeerManager)
 
     val reqId1 = BigInt(5)
-    worker ! Messages.FetchAccountRange(makeTask(), peer, reqId1, defaultBytes)
+    worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId1, defaultBytes)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
 
     // Send a second task while still working
     val reqId2 = BigInt(6)
-    worker ! Messages.FetchAccountRange(makeTask(), peer, reqId2, defaultBytes)
+    worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId2, defaultBytes)
 
-    val failed = coordinator.expectMsgType[Messages.TaskFailed](1.second)
+    val failed = coordinator.expectMsgType[AccountRangeCoordinator.TaskFailed](1.second)
     failed.requestId shouldBe 0
     failed.reason shouldBe "Worker busy"
   }
@@ -180,14 +180,14 @@ class AccountRangeWorkerSpec
     val worker = makeWorker(coordinator, networkPeerManager)
 
     val reqId1 = BigInt(7)
-    worker ! Messages.FetchAccountRange(makeTask(), peer, reqId1, defaultBytes)
+    worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId1, defaultBytes)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
-    worker ! Messages.RequestTimeout(reqId1)
-    coordinator.expectMsgType[Messages.TaskFailed](1.second)
+    worker ! AccountRangeCoordinator.RequestTimeout(reqId1)
+    coordinator.expectMsgType[AccountRangeCoordinator.TaskFailed](1.second)
 
     // Worker should now be in idle — second task accepted
     val reqId2 = BigInt(8)
-    worker ! Messages.FetchAccountRange(makeTask(), peer, reqId2, defaultBytes)
+    worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId2, defaultBytes)
     val sendMsg2 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
     sendMsg2.message.asInstanceOf[GetAccountRangeEnc].underlyingMsg.requestId shouldBe reqId2
   }
@@ -200,12 +200,12 @@ class AccountRangeWorkerSpec
     val worker = makeWorker(coordinator, networkPeerManager)
 
     val reqId = BigInt(9)
-    worker ! Messages.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
+    worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
 
     // Respond with the wrong request ID
     val wrongResponse = AccountRange(requestId = BigInt(999), accounts = Seq.empty, proof = Seq.empty)
-    worker ! Messages.AccountRangeResponseMsg(wrongResponse)
+    worker ! AccountRangeCoordinator.AccountRangeResponseMsg(wrongResponse)
 
     coordinator.expectNoMessage(200.millis)
   }
@@ -221,16 +221,16 @@ class AccountRangeWorkerSpec
     val worker = makeWorker(coordinator, networkPeerManager)
 
     val reqId = BigInt(10)
-    worker ! Messages.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
+    worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
 
     // Timeout fires — worker sends TaskFailed and transitions to idle
-    worker ! Messages.RequestTimeout(reqId)
-    coordinator.expectMsg(1.second, Messages.TaskFailed(reqId, "Request timeout"))
+    worker ! AccountRangeCoordinator.RequestTimeout(reqId)
+    coordinator.expectMsg(1.second, AccountRangeCoordinator.TaskFailed(reqId, "Request timeout"))
 
     // Late response arrives with the correct reqId — worker is now idle (handles only FetchAccountRange)
     // → message is unhandled/dropped; coordinator receives NO second message
-    worker ! Messages.AccountRangeResponseMsg(AccountRange(requestId = reqId, accounts = Seq.empty, proof = Seq.empty))
+    worker ! AccountRangeCoordinator.AccountRangeResponseMsg(AccountRange(requestId = reqId, accounts = Seq.empty, proof = Seq.empty))
     coordinator.expectNoMessage(200.millis)
   }
 }

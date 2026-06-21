@@ -9,6 +9,7 @@ import org.apache.pekko.testkit.TestActor.AutoPilot
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
+import com.chipprbots.ethereum.blockchain.sync.snap.actors.AccountRangeCoordinator
 import com.chipprbots.ethereum.blockchain.sync.snap.actors.ByteCodeCoordinator
 import com.chipprbots.ethereum.blockchain.sync.snap.actors.Messages
 import com.chipprbots.ethereum.blockchain.sync.snap.actors.StorageRangeCoordinator
@@ -52,7 +53,7 @@ class SNAPFakePeer(
             rawMsg.underlyingMsg match {
               case req: GetAccountRange =>
                 accountRangeHandler(req).foreach { resp =>
-                  sender ! Messages.AccountRangeResponseMsg(resp)
+                  sender ! AccountRangeCoordinator.AccountRangeResponseMsg(resp)
                   served.incrementAndGet()
                 }
               case req: GetStorageRanges =>

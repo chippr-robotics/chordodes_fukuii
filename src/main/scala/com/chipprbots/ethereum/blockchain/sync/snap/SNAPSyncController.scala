@@ -476,7 +476,7 @@ private class SNAPSyncControllerImpl(
     val ids = pendingDisconnectedPeers
     pendingDisconnectedPeers = Set.empty
     ids.foreach { id =>
-      accountRangeCoordinator.foreach(_ ! actors.Messages.PeerUnavailable(id))
+      accountRangeCoordinator.foreach(_ ! actors.AccountRangeCoordinator.PeerUnavailable(id))
       storageRangeCoordinator.foreach(_ ! actors.StorageRangeCoordinator.StoragePeerUnavailable(id))
       bytecodeCoordinator.foreach(_ ! actors.ByteCodeCoordinator.ByteCodePeerUnavailable(id))
       trieNodeHealingCoordinator.foreach(_ ! actors.Messages.HealingPeerUnavailable(id))
@@ -809,7 +809,7 @@ private class SNAPSyncControllerImpl(
           case _ =>
             ctx.log.debug(s"Received AccountRange response: requestId=${msg.requestId}, accounts=${msg.accounts.size}")
             // Forward to the account range coordinator (it owns the workers).
-            accountRangeCoordinator.foreach(_ ! actors.Messages.AccountRangeResponseMsg(msg))
+            accountRangeCoordinator.foreach(_ ! actors.AccountRangeCoordinator.AccountRangeResponseMsg(msg))
         }
         Behaviors.same
 
@@ -950,14 +950,14 @@ private class SNAPSyncControllerImpl(
       case StorageBackpressureChanged(paused) =>
         // Forward the storage coordinator's pause/resume signal to the account coordinator so it
         // stops dispatching new account-range requests when storage is over its high-water mark.
-        accountRangeCoordinator.foreach(_ ! actors.Messages.StorageQueuePressure(paused))
+        accountRangeCoordinator.foreach(_ ! actors.AccountRangeCoordinator.StorageQueuePressure(paused))
         Behaviors.same
 
       case ByteCodeBackpressureChanged(paused) =>
         // Same pattern for bytecodes — account-range completions enqueue bytecode tasks (in addition
         // to storage tasks), so the account coordinator must also pause when the bytecode queue is
         // over its high-water mark.
-        accountRangeCoordinator.foreach(_ ! actors.Messages.ByteCodeQueuePressure(paused))
+        accountRangeCoordinator.foreach(_ ! actors.AccountRangeCoordinator.ByteCodeQueuePressure(paused))
         Behaviors.same
 
       case PivotStateUnservable(rootHash, reason, emptyResponses) =>
@@ -978,7 +978,7 @@ private class SNAPSyncControllerImpl(
               s"emptyResponses=$emptyResponses, reason=$reason) — re-arming coordinators"
           )
           stateRoot.foreach { root =>
-            accountRangeCoordinator.foreach(_ ! actors.Messages.PivotRefreshed(root))
+            accountRangeCoordinator.foreach(_ ! actors.AccountRangeCoordinator.PivotRefreshed(root))
             storageRangeCoordinator.foreach(_ ! actors.StorageRangeCoordinator.StoragePivotRefreshed(root))
           }
         } else if currentPhase == AccountRangeSync || currentPhase == ByteCodeAndStorageSync then {
@@ -1171,8 +1171,8 @@ private class SNAPSyncControllerImpl(
             given timeout: Timeout = Timeout(5.seconds)
             given typedScheduler: org.apache.pekko.actor.typed.Scheduler = ctx.system.scheduler
             coordinator
-              .ask[actors.Messages.StorageFileInfoResponse](replyTo =>
-                actors.Messages.AccountGetStorageFileInfo(replyTo)
+              .ask[actors.AccountRangeCoordinator.StorageFileInfoResponse](replyTo =>
+                actors.AccountRangeCoordinator.AccountGetStorageFileInfo(replyTo)
               )
               .foreach { info =>
                 if info.filePath != null then {
@@ -1181,8 +1181,8 @@ private class SNAPSyncControllerImpl(
                 }
               }
             coordinator
-              .ask[actors.Messages.CodeHashesFileInfoResponse](replyTo =>
-                actors.Messages.AccountGetCodeHashesFileInfo(replyTo)
+              .ask[actors.AccountRangeCoordinator.CodeHashesFileInfoResponse](replyTo =>
+                actors.AccountRangeCoordinator.AccountGetCodeHashesFileInfo(replyTo)
               )
               .foreach { info =>
                 if info.filePath != null then {
@@ -1581,7 +1581,7 @@ private class SNAPSyncControllerImpl(
               import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
               given typedScheduler: org.apache.pekko.actor.typed.Scheduler = ctx.system.scheduler
               ctx.pipeToSelf(
-                coordinator.ask[actors.AccountRangeStats](replyTo => actors.Messages.AccountGetProgress(replyTo))
+                coordinator.ask[actors.AccountRangeStats](replyTo => actors.AccountRangeCoordinator.AccountGetProgress(replyTo))
               ) {
                 case Success(stats) => AccountCoordinatorProgress(stats)
                 case Failure(_)     => AccountCoordinatorProgress(actors.AccountRangeStats(0L, 0L, 0, 0, 0, 0.0, 0L, 0))
@@ -3258,7 +3258,7 @@ private class SNAPSyncControllerImpl(
     )
 
     // Start the coordinator
-    accountRangeCoordinator.foreach(_ ! actors.Messages.StartAccountRangeSync(rootHash))
+    accountRangeCoordinator.foreach(_ ! actors.AccountRangeCoordinator.StartAccountRangeSync(rootHash))
 
     // Periodically send peer availability notifications
     timers.startTimerWithFixedDelay(RequestAccountRanges, RequestAccountRanges, 1.second)
@@ -3365,7 +3365,7 @@ private class SNAPSyncControllerImpl(
         ctx.log.debug("No SNAP-capable peers available for account range requests")
       } else {
         snapPeers.foreach { peer =>
-          coordinator ! actors.Messages.PeerAvailable(peer)
+          coordinator ! actors.AccountRangeCoordinator.PeerAvailable(peer)
         }
       }
     }
@@ -4090,7 +4090,7 @@ private class SNAPSyncControllerImpl(
         )
         consecutivePivotRefreshes = MaxConsecutivePivotRefreshes
       }
-      accountRangeCoordinator.foreach(_ ! actors.Messages.PivotRefreshed(newStateRoot))
+      accountRangeCoordinator.foreach(_ ! actors.AccountRangeCoordinator.PivotRefreshed(newStateRoot))
       storageRangeCoordinator.foreach(_ ! actors.StorageRangeCoordinator.StoragePivotRefreshed(newStateRoot))
       return
     }
@@ -4184,7 +4184,7 @@ private class SNAPSyncControllerImpl(
     SNAPSyncMetrics.incrementPivotRefreshed()
 
     // Geth-aligned: send refresh signal to ALL active coordinators (all 3 run concurrently)
-    accountRangeCoordinator.foreach(_ ! actors.Messages.PivotRefreshed(newStateRoot))
+    accountRangeCoordinator.foreach(_ ! actors.AccountRangeCoordinator.PivotRefreshed(newStateRoot))
     storageRangeCoordinator.foreach(_ ! actors.StorageRangeCoordinator.StoragePivotRefreshed(newStateRoot))
     // Bytecodes are content-addressed (hash-keyed) so pivot changes don't invalidate them,
     // but the coordinator should clear stale peer tracking.
@@ -4469,7 +4469,7 @@ private class SNAPSyncControllerImpl(
     // leaked slots are re-queued and visible by the time the resulting `PivotRefreshed`
     // message arrives. Coordinator-side defensive drains (PeerUnavailable / PivotRefreshed
     // / CheckDispatchStalled) cover this independently; this is the explicit controller hook.
-    accountRangeCoordinator.foreach(_ ! actors.Messages.RecoverStalledAccountTasks)
+    accountRangeCoordinator.foreach(_ ! actors.AccountRangeCoordinator.RecoverStalledAccountTasks)
     refreshPivotInPlace(s"account stall: $context")
   }
 

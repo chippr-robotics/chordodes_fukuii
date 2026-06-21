@@ -11,7 +11,7 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.blockchain.sync.snap.actors.Messages
+import com.chipprbots.ethereum.blockchain.sync.snap.actors.AccountRangeCoordinator
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
 import com.chipprbots.ethereum.testing.Tags.*
@@ -52,7 +52,7 @@ class SNAPFakePeerSpec
     )
 
     // SNAPFakePeer sends AccountRangeResponseMsg back to the sender (testActor here)
-    val msg = expectMsgType[Messages.AccountRangeResponseMsg](1.second)
+    val msg = expectMsgType[AccountRangeCoordinator.AccountRangeResponseMsg](1.second)
     msg.response.requestId shouldBe BigInt(1)
     msg.response.accounts shouldBe empty
     msg.response.proof should not be empty // boundary proof present
@@ -95,7 +95,7 @@ class SNAPFakePeerSpec
       fakePeer.peer.id
     )
 
-    val msg = expectMsgType[Messages.AccountRangeResponseMsg](1.second)
+    val msg = expectMsgType[AccountRangeCoordinator.AccountRangeResponseMsg](1.second)
     msg.response.accounts shouldBe empty
     msg.response.proof shouldBe empty // no proof — triggers stateless marking in coordinator
     fakePeer.served.get() shouldBe 1
@@ -144,7 +144,7 @@ class SNAPFakePeerSpec
       fakePeer.peer.id
     )
 
-    val msg = expectMsgType[Messages.AccountRangeResponseMsg](1.second)
+    val msg = expectMsgType[AccountRangeCoordinator.AccountRangeResponseMsg](1.second)
     msg.response.requestId shouldBe BigInt(5)
     fakePeer.served.get() shouldBe 1
   }
@@ -177,7 +177,7 @@ class SNAPFakePeerSpec
       fakePeer.peer.id
     )
 
-    val msg = expectMsgType[Messages.AccountRangeResponseMsg](1.second)
+    val msg = expectMsgType[AccountRangeCoordinator.AccountRangeResponseMsg](1.second)
     msg.response.requestId shouldBe BigInt(106) // handler applied +100 offset
     msg.response.proof shouldBe Seq(ByteString("custom-proof"))
     fakePeer.served.get() shouldBe 1

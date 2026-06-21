@@ -100,7 +100,7 @@ class AccountRangeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartAccountRangeSync(stateRoot)
+    coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
 
     coordinator should not be null
   }
@@ -126,8 +126,8 @@ class AccountRangeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartAccountRangeSync(stateRoot)
-    coordinator ! Messages.PeerAvailable(peer)
+    coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
+    coordinator ! AccountRangeCoordinator.PeerAvailable(peer)
 
     networkPeerManager.expectMsgType[Any](3.seconds)
   }
@@ -150,9 +150,9 @@ class AccountRangeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartAccountRangeSync(stateRoot)
+    coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
 
-    coordinator ! Messages.AccountGetProgress(self.toTyped[AccountRangeStats])
+    coordinator ! AccountRangeCoordinator.AccountGetProgress(self.toTyped[AccountRangeStats])
     val progress = expectMsgType[AccountRangeStats](3.seconds)
 
     progress.accountsDownloaded shouldBe 0
@@ -177,8 +177,8 @@ class AccountRangeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartAccountRangeSync(stateRoot)
-    coordinator ! Messages.CheckCompletion
+    coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
+    coordinator ! AccountRangeCoordinator.CheckCompletion
 
     // Should not complete immediately (tasks pending)
     snapSyncController.expectNoMessage(500.milliseconds)
@@ -202,11 +202,11 @@ class AccountRangeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartAccountRangeSync(stateRoot)
-    coordinator ! Messages.TaskFailed(BigInt(123), "Test failure")
+    coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
+    coordinator ! AccountRangeCoordinator.TaskFailed(BigInt(123), "Test failure")
 
     // Coordinator should still be operational
-    coordinator ! Messages.AccountGetProgress(self.toTyped[AccountRangeStats])
+    coordinator ! AccountRangeCoordinator.AccountGetProgress(self.toTyped[AccountRangeStats])
     expectMsgType[AccountRangeStats](3.seconds)
   }
 
@@ -228,10 +228,10 @@ class AccountRangeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartAccountRangeSync(stateRoot)
+    coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
 
-    coordinator ! Messages.AccountGetContractAccounts(self.toTyped[Messages.ContractAccountsResponse])
-    val response = expectMsgType[Messages.ContractAccountsResponse](3.seconds)
+    coordinator ! AccountRangeCoordinator.AccountGetContractAccounts(self.toTyped[AccountRangeCoordinator.ContractAccountsResponse])
+    val response = expectMsgType[AccountRangeCoordinator.ContractAccountsResponse](3.seconds)
 
     response.accounts shouldBe empty
   }
@@ -254,8 +254,8 @@ class AccountRangeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartAccountRangeSync(stateRoot)
-    coordinator ! Messages.AccountGetProgress(self.toTyped[AccountRangeStats])
+    coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
+    coordinator ! AccountRangeCoordinator.AccountGetProgress(self.toTyped[AccountRangeStats])
 
     val progress = expectMsgType[AccountRangeStats](3.seconds)
     progress.progress should be >= 0.0
@@ -286,15 +286,15 @@ class AccountRangeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartAccountRangeSync(stateRoot)
-    coordinator ! Messages.PeerAvailable(peer)
+    coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
+    coordinator ! AccountRangeCoordinator.PeerAvailable(peer)
 
     // Worker dispatches a GetAccountRange — consume to keep the probe clean.
     // SNAPRequestTracker starts at nextRequestId=1, so the first task is requestId=BigInt(1).
     networkPeerManager.expectMsgType[Any](3.seconds)
 
     // Simulate what the AccountRangeWorker sends back when it verifies a proof-only empty AccountRange.
-    coordinator ! Messages.TaskComplete(BigInt(1), Right((0, Seq.empty, Seq(ByteString("boundary-proof")))))
+    coordinator ! AccountRangeCoordinator.TaskComplete(BigInt(1), Right((0, Seq.empty, Seq(ByteString("boundary-proof")))))
 
     snapSyncController.expectMsgType[SNAPSyncController.AccountRangeProgressCmd](3.seconds)
     snapSyncController.expectMsg(3.seconds, SNAPSyncController.AccountRangeSyncComplete)
@@ -326,19 +326,19 @@ class AccountRangeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartAccountRangeSync(stateRoot)
-    coordinator ! Messages.PeerAvailable(peerA)
+    coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
+    coordinator ! AccountRangeCoordinator.PeerAvailable(peerA)
 
     // First dispatch: real worker → networkPeerManager receives a SendMessage.
     networkPeerManager.expectMsgType[Any](3.seconds)
 
     // Drain via PeerUnavailable. WorkerRequestCancelled goes to the worker (clears currentTask,
     // become(idle)); coordinator re-queues the task.
-    coordinator ! Messages.PeerUnavailable(peerA.id.value)
+    coordinator ! AccountRangeCoordinator.PeerUnavailable(peerA.id.value)
 
     // Second dispatch via a fresh peer. Without the worker-reuse fix, the still-busy worker would
     // emit TaskFailed(0, "Worker busy") instead of dispatching. We assert that we DO see a second send.
-    coordinator ! Messages.PeerAvailable(peerB)
+    coordinator ! AccountRangeCoordinator.PeerAvailable(peerB)
     networkPeerManager.expectMsgType[Any](3.seconds)
 
     system.stop(coordinator)
@@ -375,8 +375,8 @@ class AccountRangeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartAccountRangeSync(stateRoot)
-    coordinator ! Messages.PeerAvailable(peer)
+    coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
+    coordinator ! AccountRangeCoordinator.PeerAvailable(peer)
 
     // Route failures through the worker so it properly transitions to idle before each re-dispatch.
     // The worker (Typed) is resolved via selection; WorkerPeerDisconnected skips cooldown and stateless
@@ -384,7 +384,7 @@ class AccountRangeCoordinatorSpec
     for _ <- 1 to (AccountRangeCoordinator.MaxRequeuesPerTask + 1) do {
       networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](2.seconds)
       val workerRef = resolveWorkerChild(coordinator)
-      workerRef ! Messages.WorkerPeerDisconnected(peer.id.value)
+      workerRef ! AccountRangeCoordinator.WorkerPeerDisconnected(peer.id.value)
     }
 
     snapSyncController.expectMsgType[SNAPSyncController.PivotStateUnservable](2.seconds)
@@ -414,22 +414,22 @@ class AccountRangeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartAccountRangeSync(rootR1)
-    coordinator ! Messages.PeerAvailable(peer)
+    coordinator ! AccountRangeCoordinator.StartAccountRangeSync(rootR1)
+    coordinator ! AccountRangeCoordinator.PeerAvailable(peer)
 
     val sendMsg1 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](2.seconds)
     val reqId1 = sendMsg1.message.asInstanceOf[GetAccountRangeEnc].underlyingMsg.requestId
 
     // Pivot refreshes while the task is still in-flight at rootR1
-    coordinator ! Messages.PivotRefreshed(rootR2)
+    coordinator ! AccountRangeCoordinator.PivotRefreshed(rootR2)
 
     // Task fails with "Missing proof" — but its rootHash is rootR1 (stale). The rootHash guard must
     // prevent marking peer as stateless for rootR2.
-    coordinator ! Messages.TaskFailed(reqId1, "Missing proof for empty account range")
+    coordinator ! AccountRangeCoordinator.TaskFailed(reqId1, "Missing proof for empty account range")
 
     // GetProgress as a synchronization barrier — by the time we get a response, the coordinator has
     // fully processed the TaskFailed (including any re-dispatch attempts).
-    coordinator ! Messages.AccountGetProgress(self.toTyped[AccountRangeStats])
+    coordinator ! AccountRangeCoordinator.AccountGetProgress(self.toTyped[AccountRangeStats])
     expectMsgType[AccountRangeStats](2.seconds)
 
     // PivotStateUnservable must NOT have been sent — peer was not marked stateless for rootR2
@@ -456,7 +456,7 @@ class AccountRangeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartAccountRangeSync(stateRoot)
+    coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
     // Stop the coordinator — PostStop fires and sends AccountRangeProgress
     system.stop(coordinator)
 
@@ -492,15 +492,15 @@ class AccountRangeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartAccountRangeSync(rootR1)
-    coordinator ! Messages.PeerAvailable(peer)
+    coordinator ! AccountRangeCoordinator.StartAccountRangeSync(rootR1)
+    coordinator ! AccountRangeCoordinator.PeerAvailable(peer)
 
     // First dispatch at rootR1.
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
 
     // Pivot refresh: the in-flight task is drained back to pending, re-tagged to rootR2, and
     // immediately redispatched to the still-known peer.
-    coordinator ! Messages.PivotRefreshed(rootR2)
+    coordinator ! AccountRangeCoordinator.PivotRefreshed(rootR2)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
   }
 
@@ -531,16 +531,16 @@ class AccountRangeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartAccountRangeSync(root)
-    coordinator ! Messages.PeerAvailable(peer1)
+    coordinator ! AccountRangeCoordinator.StartAccountRangeSync(root)
+    coordinator ! AccountRangeCoordinator.PeerAvailable(peer1)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](2.seconds)
 
     // Peer1 disconnects mid-flight: coordinator drains the slot (WorkerRequestCancelled to the worker)
     // and removes peer1 from knownAvailablePeers.
-    coordinator ! Messages.PeerUnavailable(peer1.id.value)
+    coordinator ! AccountRangeCoordinator.PeerUnavailable(peer1.id.value)
 
     // Peer2 becomes available → coordinator re-dispatches the now-pending task to peer2.
-    coordinator ! Messages.PeerAvailable(peer2)
+    coordinator ! AccountRangeCoordinator.PeerAvailable(peer2)
     val redispatch = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
     redispatch.peerId shouldBe peer2.id
   }
@@ -566,21 +566,21 @@ class AccountRangeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartAccountRangeSync(root)
-    coordinator ! Messages.PeerAvailable(peer)
+    coordinator ! AccountRangeCoordinator.StartAccountRangeSync(root)
+    coordinator ! AccountRangeCoordinator.PeerAvailable(peer)
     val sendMsg = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](2.seconds)
     val reqId = sendMsg.message.asInstanceOf[GetAccountRangeEnc].underlyingMsg.requestId
     val worker = resolveWorkerChild(coordinator)
 
     // Worker times out — fires TaskFailed("Request timeout") to coordinator.
-    worker ! Messages.RequestTimeout(reqId)
+    worker ! AccountRangeCoordinator.RequestTimeout(reqId)
 
     // Coordinator requeues; controller receives no escalation (not enough retries).
     snapSyncController.expectNoMessage(300.millis)
 
     // Late AccountRangeResponse arrives at worker (now in idle state) — must be silently dropped;
     // coordinator must NOT receive a second TaskFailed or TaskComplete for this request.
-    worker ! Messages.AccountRangeResponseMsg(
+    worker ! AccountRangeCoordinator.AccountRangeResponseMsg(
       AccountRange(requestId = reqId, accounts = Seq.empty, proof = Seq.empty)
     )
 
@@ -614,18 +614,18 @@ class AccountRangeCoordinatorSpec
       )
     )
 
-    coordinator ! Messages.StartAccountRangeSync(root)
-    coordinator ! Messages.PeerAvailable(peer1)
+    coordinator ! AccountRangeCoordinator.StartAccountRangeSync(root)
+    coordinator ! AccountRangeCoordinator.PeerAvailable(peer1)
 
     val sendMsg1 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](2.seconds)
     val reqId1 = sendMsg1.message.asInstanceOf[GetAccountRangeEnc].underlyingMsg.requestId
     val worker1 = resolveWorkerChild(coordinator)
 
     // peer1 times out — enters cooldown via recordPeerCooldown.
-    worker1 ! Messages.RequestTimeout(reqId1)
+    worker1 ! AccountRangeCoordinator.RequestTimeout(reqId1)
 
     // peer2 connects after peer1 enters cooldown.
-    coordinator ! Messages.PeerAvailable(peer2)
+    coordinator ! AccountRangeCoordinator.PeerAvailable(peer2)
 
     // The requeued task should be dispatched to peer2, NOT to the cooling peer1.
     val sendMsg2 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](2.seconds)
@@ -656,8 +656,8 @@ class AccountRangeCoordinatorSpec
       )
     )
 
-    coord ! Messages.StartAccountRangeSync(root)
-    coord ! Messages.PeerAvailable(peer)
+    coord ! AccountRangeCoordinator.StartAccountRangeSync(root)
+    coord ! AccountRangeCoordinator.PeerAvailable(peer)
 
     // Nothing to download — no GetAccountRange dispatched.
     networkPeerManager.expectNoMessage(500.millis)
@@ -684,17 +684,17 @@ class AccountRangeCoordinatorSpec
     val peerProbe = TestProbe()
     val peer = PeerTestHelpers.createTestPeer("backpressure-peer", peerProbe.ref)
 
-    coord ! Messages.StartAccountRangeSync(root)
+    coord ! AccountRangeCoordinator.StartAccountRangeSync(root)
 
     // Engage back-pressure BEFORE peer becomes available — coordinator accepts the peer but dispatches
     // no GetAccountRange requests until back-pressure releases.
-    coord ! Messages.StorageQueuePressure(paused = true)
-    coord ! Messages.PeerAvailable(peer)
+    coord ! AccountRangeCoordinator.StorageQueuePressure(paused = true)
+    coord ! AccountRangeCoordinator.PeerAvailable(peer)
 
     networkPeerManager.expectNoMessage(500.millis)
 
     // Release: the coordinator wakes up and dispatches against the known peer.
-    coord ! Messages.StorageQueuePressure(paused = false)
+    coord ! AccountRangeCoordinator.StorageQueuePressure(paused = false)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](2.seconds)
   }
 
@@ -715,21 +715,21 @@ class AccountRangeCoordinatorSpec
     val peerProbe = TestProbe()
     val peer = PeerTestHelpers.createTestPeer("two-source-peer", peerProbe.ref)
 
-    coord ! Messages.StartAccountRangeSync(root)
+    coord ! AccountRangeCoordinator.StartAccountRangeSync(root)
 
     // Engage BOTH sources.
-    coord ! Messages.StorageQueuePressure(paused = true)
-    coord ! Messages.ByteCodeQueuePressure(paused = true)
-    coord ! Messages.PeerAvailable(peer)
+    coord ! AccountRangeCoordinator.StorageQueuePressure(paused = true)
+    coord ! AccountRangeCoordinator.ByteCodeQueuePressure(paused = true)
+    coord ! AccountRangeCoordinator.PeerAvailable(peer)
 
     networkPeerManager.expectNoMessage(500.millis)
 
     // Release storage only — bytecode is still engaged, so dispatch must remain paused.
-    coord ! Messages.StorageQueuePressure(paused = false)
+    coord ! AccountRangeCoordinator.StorageQueuePressure(paused = false)
     networkPeerManager.expectNoMessage(500.millis)
 
     // Release bytecode — set is now empty, dispatch resumes.
-    coord ! Messages.ByteCodeQueuePressure(paused = false)
+    coord ! AccountRangeCoordinator.ByteCodeQueuePressure(paused = false)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](2.seconds)
   }
 }

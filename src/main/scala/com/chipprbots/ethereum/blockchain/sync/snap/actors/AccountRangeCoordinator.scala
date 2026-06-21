@@ -33,6 +33,7 @@ import com.chipprbots.ethereum.db.storage.PathNodeStorage
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.AccountRange
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 
 /** AccountRangeCoordinator manages account range download workers.
@@ -81,7 +82,6 @@ private class AccountRangeCoordinatorImpl(
     pathNodeStorage: Option[PathNodeStorage] = None
 ) {
 
-  import Messages.*
   import SNAPSyncController.PivotStateUnservable
   import AccountRangeCoordinator.*
 
@@ -1801,12 +1801,65 @@ private class AccountRangeCoordinatorImpl(
 
 object AccountRangeCoordinator {
 
-  /** Coordinator command protocol (Group S3). Non-sealed: `AccountRangeCoordinatorMessage` and
-    * `AccountRangeResponseMsg` extend this from `Messages.scala`, which spans the SNAP actors package boundary — Scala
-    * 3 forbids sealing a trait across source files. The defensive catch-all in `receive`/`finalizing` covers the lost
-    * compile-time exhaustiveness. Same constraint as `ByteCodeCoordinator.Command` / `StorageRangeCoordinator.Command`.
-    */
-  trait Command
+  sealed trait Command
+  case class StartAccountRangeSync(stateRoot: ByteString) extends Command
+  case class PeerAvailable(peer: Peer) extends Command
+  case class TaskComplete(
+      requestId: BigInt,
+      result: Either[String, (Int, Seq[(ByteString, com.chipprbots.ethereum.domain.Account)], Seq[ByteString])]
+  ) extends Command
+  case class TaskFailed(requestId: BigInt, reason: String) extends Command
+  case class PeerUnavailable(peerId: String) extends Command
+  case object GetProgress extends Command
+  case class AccountGetProgress(replyTo: org.apache.pekko.actor.typed.ActorRef[AccountRangeStats])
+      extends Command
+  case object GetContractAccounts extends Command
+  case class AccountGetContractAccounts(replyTo: org.apache.pekko.actor.typed.ActorRef[ContractAccountsResponse])
+      extends Command
+  case class ContractAccountsResponse(accounts: Seq[(ByteString, ByteString)]) extends Command
+  case object GetContractStorageAccounts extends Command
+  case class AccountGetContractStorageAccounts(
+      replyTo: org.apache.pekko.actor.typed.ActorRef[ContractStorageAccountsResponse]
+  ) extends Command
+  case class ContractStorageAccountsResponse(accounts: Seq[(ByteString, ByteString)]) extends Command
+  case object GetUniqueCodeHashes extends Command
+  case class AccountGetUniqueCodeHashes(replyTo: org.apache.pekko.actor.typed.ActorRef[UniqueCodeHashesResponse])
+      extends Command
+  case class UniqueCodeHashesResponse(codeHashes: Seq[ByteString])
+  case object GetStorageFileInfo extends Command
+  case class AccountGetStorageFileInfo(replyTo: org.apache.pekko.actor.typed.ActorRef[StorageFileInfoResponse])
+      extends Command
+  case class StorageFileInfoResponse(filePath: java.nio.file.Path, count: Long)
+  case object GetCodeHashesFileInfo extends Command
+  case class AccountGetCodeHashesFileInfo(replyTo: org.apache.pekko.actor.typed.ActorRef[CodeHashesFileInfoResponse])
+      extends Command
+  case class CodeHashesFileInfoResponse(filePath: java.nio.file.Path, count: Long)
+  case object CheckCompletion extends Command
+  case class AccountRangeProgress(progress: Map[ByteString, ByteString]) extends Command
+  case class PivotRefreshed(newStateRoot: ByteString) extends Command
+  case object RecoverStalledAccountTasks extends Command
+  case class StorageQueuePressure(paused: Boolean) extends Command
+  case class ByteCodeQueuePressure(paused: Boolean) extends Command
+  private[actors] case object CheckDispatchStalled extends Command
+  private[actors] case class StoreAccountChunk(
+      task: AccountTask,
+      remaining: Seq[(ByteString, com.chipprbots.ethereum.domain.Account)],
+      totalCount: Int,
+      storedSoFar: Int,
+      isTaskRangeComplete: Boolean
+  ) extends Command
+  case class UpdateMaxInFlightPerPeer(newLimit: Int) extends Command
+  sealed trait WorkerMessage
+  case class FetchAccountRange(
+      task: AccountTask,
+      peer: Peer,
+      requestId: BigInt,
+      responseBytes: BigInt = BigInt(512 * 1024)
+  ) extends WorkerMessage
+  case class AccountRangeResponseMsg(response: AccountRange) extends WorkerMessage with Command
+  case class RequestTimeout(requestId: BigInt) extends WorkerMessage
+  case class WorkerPeerDisconnected(peerId: String) extends WorkerMessage
+  case class WorkerRequestCancelled(requestId: BigInt) extends WorkerMessage
 
   /** Hard cap on consecutive re-queues for a single account task before the coordinator escalates to the controller via
     * `PivotStateUnservable`. On ETC mainnet with 1-5 SNAP peers, serve-window gaps can last 5-10 minutes. At 5s

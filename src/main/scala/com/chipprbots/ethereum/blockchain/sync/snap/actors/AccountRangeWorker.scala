@@ -29,9 +29,9 @@ import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
   */
 object AccountRangeWorker {
 
-  import Messages.*
+  import AccountRangeCoordinator.*
 
-  type Command = AccountRangeWorkerMessage
+  type Command = WorkerMessage
 
   /** @param coordinator
     *   Parent coordinator actor (Classic)
