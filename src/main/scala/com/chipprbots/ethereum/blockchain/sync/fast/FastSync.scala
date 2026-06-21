@@ -330,7 +330,7 @@ object FastSync {
 
     // Children + timer keys established once per sync session by initSyncSession().
     private var syncStateStorageActor: ActorRef = null
-    private var syncStateScheduler: TypedActorRef[Any] = null
+    private var syncStateScheduler: TypedActorRef[SyncStateSchedulerActor.Command] = null
 
     private val PersistTimerKey = "persist-sync-state"
     private val PrintStatusTimerKey = "print-status"

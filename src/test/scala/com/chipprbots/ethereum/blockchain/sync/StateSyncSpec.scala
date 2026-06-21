@@ -251,7 +251,7 @@ class StateSyncSpec
     def genRandomByteString(): ByteString =
       ByteString.fromArrayUnsafe(genRandomArray())
 
-    lazy val syncStateSchedulerActor: TypedActorRef[Any] = {
+    lazy val syncStateSchedulerActor: TypedActorRef[SyncStateSchedulerActor.Command] = {
       val (blockchainReader, _) = buildBlockChain()
       classicSystem.spawnAnonymous(
         SyncStateSchedulerActor.behavior(

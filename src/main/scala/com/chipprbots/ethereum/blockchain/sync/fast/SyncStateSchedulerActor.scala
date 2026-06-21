@@ -49,14 +49,24 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
 // scalastyle:off number.of.methods
 object SyncStateSchedulerActor {
 
-  // === Internal timer key and polling message (core-only) ===
-  private case object ScanPeers
-  private val ScanKey = "ScanPeers"
+  sealed trait Command
 
-  // Internal commands: StartSyncingTo/RestartRequested are received by the Behavior[Any] core and
+  // === Internal timer key and polling message (core-only) ===
+  private case object ScanPeers extends Command
+  private case object ScanKey
+
+  // Internal commands: StartSyncingTo/RestartRequested are received by the Behavior[Command] core and
   // converted to these Cmd forms using the parentRef passed at construction (no sender() needed).
   final private[fast] case class StartSyncingToCmd(stateRoot: ByteString, blockNumber: BigInt, replyTo: ClassicActorRef)
-  final private[fast] case class RestartRequestedCmd(replyTo: ClassicActorRef)
+      extends Command
+  final private[fast] case class RestartRequestedCmd(replyTo: ClassicActorRef) extends Command
+
+  // === Private wrapper commands — replace identity adapters and .toClassic self-sends ===
+  private case class WrappedPRHResult(result: PeerRequestHandler.Result) extends Command
+  private case class WrappedHandshakedPeers(peers: Map[Peer, NetworkPeerManagerActor.PeerInfo]) extends Command
+  private case class WrappedPeerDisconnected(pd: PeerDisconnected) extends Command
+  private case class WrappedRequestData(nodeData: NodeData, from: Peer) extends Command
+  private case class WrappedRequestFailed(from: Peer, reason: String) extends Command
 
   // === Typed core factory ===
   def behavior(
@@ -66,14 +76,16 @@ object SyncStateSchedulerActor {
       peerEventBus: ClassicActorRef,
       blacklist: Blacklist,
       parentRef: ClassicActorRef
-  ): Behavior[Any] =
-    Behaviors.setup[Any] { ctx =>
-      Behaviors.withTimers[Any] { timers =>
+  ): Behavior[Command] =
+    Behaviors.setup[Command] { ctx =>
+      Behaviors.withTimers[Command] { timers =>
         val peerDisconnectedAdapter: TypedActorRef[PeerDisconnected] =
-          ctx.messageAdapter[PeerDisconnected](identity)
+          ctx.messageAdapter[PeerDisconnected](WrappedPeerDisconnected(_))
         val peerListHelper = new PeerListHelper(peerEventBus, blacklist, peerDisconnectedAdapter, ctx.log)
+        val handshakedPeersAdapter =
+          ctx.messageAdapter[NetworkPeerManagerActor.HandshakedPeers](hp => WrappedHandshakedPeers(hp.peers))
         // Immediate first poll + periodic rescans (matches PeerListSupportNg's 0-delay scheduleWithFixedDelay).
-        networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, ctx.self.toClassic)
+        networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, handshakedPeersAdapter.toClassic)
         timers.startTimerWithFixedDelay(ScanKey, ScanPeers, syncConfig.peersScanInterval)
         new Impl(ctx, timers, sync, syncConfig, networkPeerManager, peerEventBus, blacklist, parentRef, peerListHelper)
           .waitingForBloomFilterToLoad(None)
@@ -83,7 +95,7 @@ object SyncStateSchedulerActor {
   // === Public API (unchanged) ===
 
   case object SyncKey
-  case object Sync
+  private case object Sync extends Command
 
   private def reportStats(
       to: ClassicActorRef,
@@ -97,14 +109,16 @@ object SyncStateSchedulerActor {
 
   final case class StateSyncStats(saved: Long, missing: Long)
 
-  final case class ProcessingResult(result: Either[ProcessingError, ProcessingSuccess])
+  final case class ProcessingResult(result: Either[ProcessingError, ProcessingSuccess]) extends Command
 
-  case object PrintInfo
+  case object PrintInfo extends Command
   case object PrintInfoKey
 
   sealed trait SyncStateSchedulerActorCommand
-  final case class StartSyncingTo(stateRoot: ByteString, blockNumber: BigInt) extends SyncStateSchedulerActorCommand
-  case object RestartRequested extends SyncStateSchedulerActorCommand
+  final case class StartSyncingTo(stateRoot: ByteString, blockNumber: BigInt)
+      extends SyncStateSchedulerActorCommand
+      with Command
+  case object RestartRequested extends SyncStateSchedulerActorCommand with Command
 
   sealed trait SyncStateSchedulerActorResponse
   case object StateSyncFinished extends SyncStateSchedulerActorResponse
@@ -114,7 +128,7 @@ object SyncStateSchedulerActor {
   final case class GetMissingNodes(nodesToGet: List[ByteString])
   final case class MissingNodes(missingNodes: List[SyncResponse], downloaderCapacity: Int)
 
-  final case class BloomFilterResult(res: BloomFilterLoadingResult)
+  final case class BloomFilterResult(res: BloomFilterLoadingResult) extends Command
 
   sealed trait RequestResult
   final case class RequestData(nodeData: NodeData, from: Peer) extends RequestResult
@@ -134,7 +148,7 @@ object SyncStateSchedulerActor {
       processingStats: ProcessingStatistics
   )
 
-  final case class RequestTerminated(to: Peer)
+  final case class RequestTerminated(to: Peer) extends Command
 
   final case class PeerRequest(
       peer: Peer,
@@ -153,8 +167,8 @@ object SyncStateSchedulerActor {
 
   // scalastyle:off cyclomatic.complexity method.length
   private class Impl(
-      ctx: ActorContext[Any],
-      timers: TimerScheduler[Any],
+      ctx: ActorContext[Command],
+      timers: TimerScheduler[Command],
       sync: SyncStateScheduler,
       syncConfig: SyncConfig,
       networkPeerManager: ClassicActorRef,
@@ -174,7 +188,10 @@ object SyncStateSchedulerActor {
     private val UselessResponseThreshold: Int = 20
 
     private val prhResultAdapter: TypedActorRef[PeerRequestHandler.Result] =
-      ctx.messageAdapter[PeerRequestHandler.Result](identity)
+      ctx.messageAdapter[PeerRequestHandler.Result](WrappedPRHResult(_))
+
+    private val handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers] =
+      ctx.messageAdapter[NetworkPeerManagerActor.HandshakedPeers](hp => WrappedHandshakedPeers(hp.peers))
 
     /** Live Typed refs to PeerRequestHandler children, keyed by PeerId for explicit unwatch. */
     private var activeHandlers: Map[PeerId, TypedActorRef[PeerRequestHandler.Command]] = Map.empty
@@ -182,7 +199,7 @@ object SyncStateSchedulerActor {
     // Static SLF4J logger for IO-fiber callbacks — ctx.log is actor-thread-only.
     private val fiberLog = org.slf4j.LoggerFactory.getLogger(getClass)
 
-    // IO fiber for bloom filter loading — runs asynchronously; result delivered via self.toClassic.
+    // IO fiber for bloom filter loading — runs asynchronously; result delivered via self.
     // If the actor stops before the fiber completes, the BloomFilterResult goes to dead letters (harmless).
     // Fiber handle intentionally discarded — fire-and-forget: the fiber notifies self via message on completion.
     private val _ = sync.loadFilterFromBlockchain.attempt
@@ -195,24 +212,24 @@ object SyncStateSchedulerActor {
                   "which may result with degraded performance",
                 ex
               )
-              ctx.self.toClassic ! BloomFilterResult(BloomFilterLoadingResult())
+              ctx.self ! BloomFilterResult(BloomFilterLoadingResult())
             case Right(value) =>
               fiberLog.info("Bloom filter loading finished")
-              ctx.self.toClassic ! BloomFilterResult(value)
+              ctx.self ! BloomFilterResult(value)
           }
         }
       }
       .start
       .unsafeRunSync()(ioRuntime)
 
-    private def handleCommon(message: Any): Option[Behavior[Any]] = message match {
+    private def handleCommon(message: Command): Option[Behavior[Command]] = message match {
       case ScanPeers =>
-        networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, ctx.self.toClassic)
+        networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, handshakedPeersAdapter.toClassic)
         Some(Behaviors.same)
-      case NetworkPeerManagerActor.HandshakedPeers(peers) =>
+      case WrappedHandshakedPeers(peers) =>
         peerListHelper.handleHandshakedPeers(peers)
         Some(Behaviors.same)
-      case pd: PeerDisconnected =>
+      case WrappedPeerDisconnected(pd) =>
         peerListHelper.handlePeerDisconnected(pd.peerId)
         Some(Behaviors.same)
       // FastSync spawns this core behavior directly (bypassing the Classic `SyncStateSchedulerActor` shell that
@@ -230,7 +247,7 @@ object SyncStateSchedulerActor {
     }
 
     /** Initial behavior: wait for the bloom filter IO fiber to complete, buffering any early command. */
-    def waitingForBloomFilterToLoad(lastCmd: Option[Any]): Behavior[Any] =
+    def waitingForBloomFilterToLoad(lastCmd: Option[Command]): Behavior[Command] =
       Behaviors.receiveMessage { message =>
         handleCommon(message).getOrElse {
           message match {
@@ -259,7 +276,7 @@ object SyncStateSchedulerActor {
         }
       }
 
-    def idle(processingStatistics: ProcessingStatistics): Behavior[Any] =
+    def idle(processingStatistics: ProcessingStatistics): Behavior[Command] =
       Behaviors.receiveMessage { message =>
         handleCommon(message).getOrElse {
           message match {
@@ -282,7 +299,7 @@ object SyncStateSchedulerActor {
         bn: BigInt,
         initialStats: ProcessingStatistics,
         initiator: ClassicActorRef
-    ): Behavior[Any] = {
+    ): Behavior[Command] = {
       timers.startTimerAtFixedRate(PrintInfoKey, PrintInfo, 30.seconds)
       currentStateRoot = root
       consecutiveUselessResponses = 0
@@ -297,12 +314,12 @@ object SyncStateSchedulerActor {
           idle(initialStats)
         case Some(initState) =>
           val nextBehavior = syncing(SyncSchedulerActorState.initial(initState, initialStats, bn, initiator))
-          ctx.self.toClassic ! Sync
+          ctx.self ! Sync
           nextBehavior
       }
     }
 
-    private def finalizeSync(state: SyncSchedulerActorState): Behavior[Any] = {
+    private def finalizeSync(state: SyncSchedulerActorState): Behavior[Command] = {
       val memBatch = state.currentSchedulerState.memBatch
       if memBatch.nonEmpty then {
         ctx.log.debug("Persisting {} elements to blockchain and finalizing the state sync", memBatch.size)
@@ -320,7 +337,7 @@ object SyncStateSchedulerActor {
         currentStats: ProcessingStatistics,
         targetBlock: BigInt,
         restartRequester: ClassicActorRef
-    ): Behavior[Any] = {
+    ): Behavior[Command] = {
       ctx.log.debug("Starting request sequence")
       sync.persistBatch(currentState, targetBlock)
       restartRequester ! WaitingForNewTargetBlock
@@ -457,40 +474,40 @@ object SyncStateSchedulerActor {
         case Failure(ex) => throw ex
       }
 
-    def syncing(currentState: SyncSchedulerActorState): Behavior[Any] =
+    def syncing(currentState: SyncSchedulerActorState): Behavior[Command] =
       Behaviors.receiveMessage { message =>
         handleCommon(message).getOrElse {
           message match {
 
-            // === PRH result forwarding: unwatch + self-dispatch as RequestResult ===
+            // === PRH result forwarding: unwatch + self-dispatch as wrapped RequestResult ===
 
-            case ResponseReceived(peer: Peer, nodeData: NodeData, timeTaken: Long) =>
+            case WrappedPRHResult(ResponseReceived(peer: Peer, nodeData: NodeData, timeTaken: Long)) =>
               ctx.log.debug("Received {} state nodes via GetNodeData in {} ms", nodeData.values.size, timeTaken)
               FastSyncMetrics.setMptStateDownloadTime(timeTaken)
               activeHandlers.get(peer.id).foreach(h => ctx.unwatch(h))
               activeHandlers -= peer.id
-              ctx.self.toClassic ! RequestData(nodeData, peer)
+              ctx.self ! WrappedRequestData(nodeData, peer)
               Behaviors.same
 
-            case ResponseReceived(peer: Peer, trieNodes: TrieNodes, timeTaken: Long) =>
+            case WrappedPRHResult(ResponseReceived(peer: Peer, trieNodes: TrieNodes, timeTaken: Long)) =>
               ctx.log.debug("Received {} state nodes via GetTrieNodes in {} ms", trieNodes.nodes.size, timeTaken)
               FastSyncMetrics.setMptStateDownloadTime(timeTaken)
               activeHandlers.get(peer.id).foreach(h => ctx.unwatch(h))
               activeHandlers -= peer.id
-              ctx.self.toClassic ! RequestData(NodeData(trieNodes.nodes.toList), peer)
+              ctx.self ! WrappedRequestData(NodeData(trieNodes.nodes.toList), peer)
               Behaviors.same
 
-            case PeerRequestHandler.RequestFailed(peer: Peer, reason: String) =>
+            case WrappedPRHResult(PeerRequestHandler.RequestFailed(peer: Peer, reason: String)) =>
               activeHandlers.get(peer.id).foreach(h => ctx.unwatch(h))
               activeHandlers -= peer.id
               ctx.log.debug("Request to peer {} failed due to {}", peer.id, reason)
-              ctx.self.toClassic ! RequestFailed(peer, reason)
+              ctx.self ! WrappedRequestFailed(peer, reason)
               Behaviors.same
 
             case RequestTerminated(peer: Peer) =>
               ctx.log.debug("Request to {} terminated", peer.id)
               activeHandlers -= peer.id
-              ctx.self.toClassic ! RequestFailed(peer, "Peer disconnected in the middle of request")
+              ctx.self ! WrappedRequestFailed(peer, "Peer disconnected in the middle of request")
               Behaviors.same
 
             // === State machine ===
@@ -539,7 +556,7 @@ object SyncStateSchedulerActor {
               }
 
             case Sync if currentState.hasRemainingPendingRequests && currentState.restartHasBeenRequested =>
-              currentState.restartRequested.fold[Behavior[Any]](Behaviors.same) { restartRequester =>
+              currentState.restartRequested.fold[Behavior[Command]](Behaviors.same) { restartRequester =>
                 handleRestart(
                   currentState.currentSchedulerState,
                   currentState.currentStats,
@@ -551,7 +568,23 @@ object SyncStateSchedulerActor {
             case Sync =>
               finalizeSync(currentState)
 
-            case result: RequestResult =>
+            case WrappedRequestData(nodeData, from) =>
+              val result = RequestData(nodeData, from)
+              if currentState.isProcessing then {
+                ctx.log.debug(
+                  "Response received while processing. Enqueuing for import later. Current response queue size: {}",
+                  currentState.nodesToProcess.size + 1
+                )
+                syncing(currentState.withNewRequestResult(result))
+              } else {
+                ctx.log.debug("Response received while idle. Initiating response processing")
+                val newState = currentState.initProcessing
+                pipeProcess(newState, result)
+                syncing(newState)
+              }
+
+            case WrappedRequestFailed(from, reason) =>
+              val result = RequestFailed(from, reason)
               if currentState.isProcessing then {
                 ctx.log.debug(
                   "Response received while processing. Enqueuing for import later. Current response queue size: {}",
@@ -599,7 +632,7 @@ object SyncStateSchedulerActor {
               reportStats(currentState.syncInitiator, newStats1, newState1)
               val nextBehavior =
                 syncing(currentState.withNewProcessingResults(newState1, newDownloaderState, newStats1))
-              ctx.self.toClassic ! Sync
+              ctx.self ! Sync
               nextBehavior
 
             case ProcessingResult(Left(err)) =>
@@ -631,12 +664,12 @@ object SyncStateSchedulerActor {
                           parentRef
                         )
                       } else {
-                        ctx.self.toClassic ! Sync
+                        ctx.self ! Sync
                         syncing(currentState.withNewDownloaderState(newDownloaderState))
                       }
 
                     case _ =>
-                      ctx.self.toClassic ! Sync
+                      ctx.self ! Sync
                       syncing(currentState.withNewDownloaderState(newDownloaderState))
                   }
               }
