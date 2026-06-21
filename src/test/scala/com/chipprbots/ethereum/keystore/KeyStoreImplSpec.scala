@@ -5,6 +5,8 @@ import java.nio.file.FileSystemException
 import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.ZonedDateTime
+import java.time.ZoneOffset
 
 import org.apache.pekko.util.ByteString
 
@@ -35,18 +37,23 @@ class KeyStoreImplSpec extends AnyFlatSpec with Matchers with BeforeAndAfter wit
     val listBeforeImport: List[Address] = keyStore.listAccounts.toOption.get
     listBeforeImport shouldEqual Nil
 
-    // Small delay between imports to ensure different file timestamps (ISO_DATE_TIME format includes milliseconds)
-    val res1: Address = keyStore.importPrivateKey(key1, "aaaaaaaa").toOption.get
-    Thread.sleep(10)
-    val res2: Address = keyStore.importPrivateKey(key2, "bbbbbbbb").toOption.get
-    Thread.sleep(10)
-    val res3: Address = keyStore.importPrivateKey(key3, "cccccccc").toOption.get
+    // Monotonic fake clock: each call advances the second field, guaranteeing
+    // distinct filenames without any wall-clock dependency.
+    var tick = 0
+    val orderedStore = new KeyStoreImpl(keyStoreConfig, secureRandom, clock = () => {
+      tick += 1
+      ZonedDateTime.of(2024, 1, 1, 0, 0, tick, 0, ZoneOffset.UTC)
+    })
+
+    val res1: Address = orderedStore.importPrivateKey(key1, "aaaaaaaa").toOption.get
+    val res2: Address = orderedStore.importPrivateKey(key2, "bbbbbbbb").toOption.get
+    val res3: Address = orderedStore.importPrivateKey(key3, "cccccccc").toOption.get
 
     res1 shouldEqual addr1
     res2 shouldEqual addr2
     res3 shouldEqual addr3
 
-    val listAfterImport: List[Address] = keyStore.listAccounts.toOption.get
+    val listAfterImport: List[Address] = orderedStore.listAccounts.toOption.get
     // result should be ordered by creation date
     listAfterImport shouldEqual List(addr1, addr2, addr3)
   }

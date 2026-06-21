@@ -40,7 +40,12 @@ trait KeyStore {
   def unlockAccount(address: Address, passphrase: String): Either[KeyStoreError, Wallet]
 }
 
-class KeyStoreImpl(keyStoreConfig: KeyStoreConfig, secureRandom: SecureRandom) extends KeyStore with Logger {
+class KeyStoreImpl(
+    keyStoreConfig: KeyStoreConfig,
+    secureRandom: SecureRandom,
+    clock: () => ZonedDateTime = () => ZonedDateTime.now(ZoneOffset.UTC)
+) extends KeyStore
+    with Logger {
 
   init()
 
@@ -162,7 +167,7 @@ class KeyStoreImpl(keyStoreConfig: KeyStoreConfig, secureRandom: SecureRandom) e
     IOError(ex.toString)
 
   private def fileName(encKey: EncryptedKey) = {
-    val dateStr = ZonedDateTime.now(ZoneOffset.UTC).format(DateTimeFormatter.ISO_DATE_TIME).replace(':', '-')
+    val dateStr = clock().format(DateTimeFormatter.ISO_DATE_TIME).replace(':', '-')
     val addrStr = encKey.address.toUnprefixedString
     s"UTC--$dateStr--$addrStr"
   }
