@@ -320,6 +320,23 @@ object TestConverter {
           berlinBlockNumber = 0,
           olympiaBlockNumber = 0
         )
+      case "osaka" =>
+        // Osaka (Sepolia active) — post-Prague, timestamp-gated. Same fork-block
+        // layout as Prague; the Osaka activation is applied via forkTimestamps below.
+        ForkBlockNumbers.Empty.copy(
+          frontierBlockNumber = 0,
+          homesteadBlockNumber = 0,
+          eip150BlockNumber = 0,
+          eip160BlockNumber = 0,
+          eip155BlockNumber = 0,
+          eip161BlockNumber = 0,
+          byzantiumBlockNumber = 0,
+          constantinopleBlockNumber = 0,
+          petersburgBlockNumber = 0,
+          istanbulBlockNumber = 0,
+          berlinBlockNumber = 0,
+          olympiaBlockNumber = 0
+        )
       case _ =>
         // Default to Frontier for unknown networks
         ForkBlockNumbers.Empty.copy(frontierBlockNumber = 0)
@@ -345,6 +362,15 @@ object TestConverter {
             shanghaiTimestamp = Some(0L),
             cancunTimestamp = Some(0L),
             pragueTimestamp = Some(0L)
+          )
+        )
+      case "osaka" =>
+        configWithForks.copy(
+          forkTimestamps = com.chipprbots.ethereum.utils.ForkTimestamps(
+            shanghaiTimestamp = Some(0L),
+            cancunTimestamp = Some(0L),
+            pragueTimestamp = Some(0L),
+            osakaTimestamp = Some(0L)
           )
         )
       case _ => configWithForks
