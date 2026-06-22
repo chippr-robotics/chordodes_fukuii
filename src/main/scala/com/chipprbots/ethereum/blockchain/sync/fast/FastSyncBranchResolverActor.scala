@@ -153,7 +153,7 @@ object FastSyncBranchResolverActor {
         )
 
         // Immediate poll, then periodic poll for handshaked peers (replaces PeerListSupportNg's scheduleWithFixedDelay).
-        networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, handshakedPeersAdapter.toClassic)
+        networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter.toClassic)
         timers.startTimerWithFixedDelay(ScanKey, ScanPeers, syncConfig.peersScanInterval)
 
         resolver.waitingForPeerWithHighestBlock()
@@ -185,7 +185,7 @@ object FastSyncBranchResolverActor {
     /** Shared peer-list / scan handling for every state. Returns `Some(next)` if the message was handled. */
     private def handleCommon(message: Command): Option[Behavior[Command]] = message match {
       case ScanPeers =>
-        networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, handshakedPeersAdapter.toClassic)
+        networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter.toClassic)
         Some(Behaviors.same)
       case HandshakedPeersMsg(NetworkPeerManagerActor.HandshakedPeers(peers)) =>
         peerListHelper.handleHandshakedPeers(peers)

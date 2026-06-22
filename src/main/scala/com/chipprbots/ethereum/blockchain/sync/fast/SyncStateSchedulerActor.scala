@@ -85,7 +85,7 @@ object SyncStateSchedulerActor {
         val handshakedPeersAdapter =
           ctx.messageAdapter[NetworkPeerManagerActor.HandshakedPeers](hp => WrappedHandshakedPeers(hp.peers))
         // Immediate first poll + periodic rescans (matches PeerListSupportNg's 0-delay scheduleWithFixedDelay).
-        networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, handshakedPeersAdapter.toClassic)
+        networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter.toClassic)
         timers.startTimerWithFixedDelay(ScanKey, ScanPeers, syncConfig.peersScanInterval)
         new Impl(ctx, timers, sync, syncConfig, networkPeerManager, peerEventBus, blacklist, parentRef, peerListHelper)
           .waitingForBloomFilterToLoad(None)
@@ -224,7 +224,7 @@ object SyncStateSchedulerActor {
 
     private def handleCommon(message: Command): Option[Behavior[Command]] = message match {
       case ScanPeers =>
-        networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, handshakedPeersAdapter.toClassic)
+        networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter.toClassic)
         Some(Behaviors.same)
       case WrappedHandshakedPeers(peers) =>
         peerListHelper.handleHandshakedPeers(peers)

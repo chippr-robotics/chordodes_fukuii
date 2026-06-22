@@ -47,7 +47,7 @@ object BlockBroadcasterActor {
           log = org.slf4j.LoggerFactory.getLogger(classOf[BlockBroadcasterImpl])
         )
 
-        networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, handshakedPeersAdapter.toClassic)
+        networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter.toClassic)
         timers.startTimerWithFixedDelay(ScanKey, ScanPeers, syncConfig.peersScanInterval)
 
         running(peerListHelper, broadcast, networkPeerManager, handshakedPeersAdapter)
@@ -62,7 +62,7 @@ object BlockBroadcasterActor {
   ): Behavior[BroadcasterMsg] =
     Behaviors.receiveMessage {
       case ScanPeers =>
-        networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, handshakedPeersAdapter.toClassic)
+        networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter.toClassic)
         Behaviors.same
 
       case WrappedHandshakedPeers(peers) =>

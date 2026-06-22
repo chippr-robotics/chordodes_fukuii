@@ -54,7 +54,7 @@ class DebugService(
     given timeout: Timeout = Timeout(20.seconds)
 
     networkPeerManager
-      .askFor[PeerInfoResponse](NetworkPeerManagerActor.PeerInfoRequest(peer))
+      .askForVia[PeerInfoResponse](replyTo => NetworkPeerManagerActor.PeerInfoRequestCmd(peer, replyTo))
       .map(resp => resp.peerInfo)
   }
 }

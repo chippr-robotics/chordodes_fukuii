@@ -531,8 +531,7 @@ private class SNAPSyncControllerImpl(
       .toClassic
 
   private def pollHandshakedPeers(): Unit =
-    networkPeerManager.tell(
-      com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeers,
+    networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeersCmd(
       handshakedPeersAdapter
     )
 

@@ -144,7 +144,7 @@ object PeersClient {
     def running(requesters: Map[Int, TypedActorRef[ResponseMessage]]): Behavior[Command] =
       Behaviors.receiveMessage {
         case ScanPeersTick =>
-          networkPeerManager.tell(NetworkPeerManagerActor.GetHandshakedPeers, handshakedPeersAdapter.toClassic)
+          networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter.toClassic)
           Behaviors.same
 
         case HandshakedPeersCmd(peers) =>

@@ -18,6 +18,14 @@ object AkkaTaskOps {
     )(implicit timeout: Timeout, classTag: ClassTag[A], sender: ActorRef = ActorRef.noSender): IO[A] =
       // let the akka ask future manage its timeout instead of adding a second timeout layer
       IO.fromFuture(IO((to ? message).mapTo[A]))
+
+    // Classic ask where the reply target is an explicit field of the message (replyTo: ActorRef).
+    // Uses the "extended" ask so the ask temp actor is passed as the Cmd's replyTo instead of the
+    // implicit sender(). Mirrors the typed `askFor(makeCmd)` for Cmd variants that carry replyTo.
+    def askForVia[A](
+        makeCmd: ActorRef => Any
+    )(implicit timeout: Timeout, classTag: ClassTag[A]): IO[A] =
+      IO.fromFuture(IO(org.apache.pekko.pattern.extended.ask(to, makeCmd).mapTo[A]))
   }
 
   // Typed ask: converts the temp typed replyTo to a Classic ActorRef so existing Cmd variants

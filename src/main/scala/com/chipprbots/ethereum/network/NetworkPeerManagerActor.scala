@@ -1361,6 +1361,16 @@ final class NetworkPeerManagerShell(
     )
 
   override def receive: Receive = {
+    // ── Typed Cmd passthrough: callers now carry their own replyTo ────────────
+    // Migrated callers send the Typed Command directly (replyTo is their own
+    // messageAdapter / self), so the shell only forwards to the core. The
+    // legacy GetHandshakedPeers / PeerInfoRequest cases below remain for any
+    // still-Classic ask callers until the shell is deleted (CAPSTONE).
+    case cmd: GetHandshakedPeersCmd =>
+      core ! cmd
+    case cmd: PeerInfoRequestCmd =>
+      core ! cmd
+
     // ── Ask-paths: capture the Classic sender() as replyTo ────────────────────
     case GetHandshakedPeers =>
       core ! GetHandshakedPeersCmd(sender())
