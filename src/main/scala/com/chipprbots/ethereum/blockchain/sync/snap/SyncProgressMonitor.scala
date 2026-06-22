@@ -208,6 +208,7 @@ class SyncProgressMonitor(@annotation.unused _scheduler: Scheduler) extends Logg
     val etaStr = calculateETA.map(eta => s", ETA: ${formatETA(eta)}").getOrElse("")
     SNAPSyncMetrics.measure(progress)
     log.info(s"SNAP Sync Progress: ${progress.formattedString}$etaStr")
+    log.info(progress.wormBlock)
   }
 
   def currentProgress: SyncProgress = synchronized {
@@ -303,7 +304,7 @@ case class SyncProgress(
     bytecodeComplete: Boolean = false
 ) {
 
-  private def wormChasesBrainBar: String = {
+  private def globalProgress: Double = {
     import SNAPSyncController.*
     import SNAPSyncController.SyncPhase.*
 
@@ -325,15 +326,7 @@ case class SyncProgress(
     val withinStage =
       if phaseProgress > 0 && phaseProgress <= 100 then (phaseProgress / 100.0) * stageSize else 0.0
 
-    val globalProgress = math.max(0.0, math.min(1.0, stageIndex * stageSize + withinStage))
-
-    val trackLen = 20
-    val wormPos = math.max(0, math.min(trackLen, math.round(globalProgress * trackLen).toInt))
-    val filled = "=" * math.max(0, wormPos)
-    val remaining = "." * (trackLen - wormPos)
-    val worm = "\ud83e\udeb1"
-    val brain = "\ud83e\udde0"
-    s"$worm[$filled$remaining]$brain"
+    math.max(0.0, math.min(1.0, stageIndex * stageSize + withinStage))
   }
 
   private def formatCount(n: Long): String =
@@ -367,18 +360,17 @@ case class SyncProgress(
 
   def formattedString: String = {
     import SNAPSyncController.SyncPhase.*
-    val bar = wormChasesBrainBar
     val chain = chainStr
     val elapsed = elapsedStr
 
     phase match {
       case AccountRangeSync if isFinalizingTrie =>
-        s"$bar FINALIZING TRIE: flushing ${formatCount(accountsSynced)} accounts to disk (${finalizeElapsedSeconds}s)$chain | $elapsed"
+        s"FINALIZING TRIE: flushing ${formatCount(accountsSynced)} accounts to disk (${finalizeElapsedSeconds}s)$chain | $elapsed"
 
       case AccountRangeSync =>
         val progressStr = if estimatedTotalAccounts > 0 then s" ${phaseProgress}%" else ""
         val totalStr = if estimatedTotalAccounts > 0 then s"/~${formatCount(estimatedTotalAccounts)}" else ""
-        s"$bar Accounts$progressStr: ${formatCount(accountsSynced)}$totalStr @ ${accountsPerSec.toInt}/s$chain | $elapsed"
+        s"Accounts$progressStr: ${formatCount(accountsSynced)}$totalStr @ ${accountsPerSec.toInt}/s$chain | $elapsed"
 
       case ByteCodeAndStorageSync =>
         val contractsStr =
@@ -387,21 +379,87 @@ case class SyncProgress(
         val codeStr =
           if bytecodeComplete then s"codes=${formatCount(bytecodesDownloaded)} \u2714"
           else s"codes=${formatCount(bytecodesDownloaded)} @ ${bytecodesPerSec.toInt}/s"
-        s"$bar Code+Storage: $codeStr, slots=${formatCount(storageSlotsSynced)} @ ${slotsPerSec.toInt}/s$contractsStr$chain | $elapsed"
+        s"Code+Storage: $codeStr, slots=${formatCount(storageSlotsSynced)} @ ${slotsPerSec.toInt}/s$contractsStr$chain | $elapsed"
 
       case StateHealing =>
-        s"$bar Healing: ${formatCount(nodesHealed)} nodes @ ${nodesPerSec.toInt}/s$chain | $elapsed"
+        s"Healing: ${formatCount(nodesHealed)} nodes @ ${nodesPerSec.toInt}/s$chain | $elapsed"
 
       case StateValidation =>
-        s"$bar Validating state trie...$chain | $elapsed"
+        s"Validating state trie...$chain | $elapsed"
 
       case ChainDownloadCompletion =>
         val bodiesPct = if chainTarget > 0 then (chainBodies * 100 / chainTarget).toInt else 0
         val receiptsPct = if chainTarget > 0 then (chainReceipts * 100 / chainTarget).toInt else 0
-        s"$bar State done, chain download (boosted): bodies=${formatBigInt(chainBodies)}/$bodiesPct% receipts=${formatBigInt(chainReceipts)}/$receiptsPct% | $elapsed"
+        s"State done, chain download (boosted): bodies=${formatBigInt(chainBodies)}/$bodiesPct% receipts=${formatBigInt(chainReceipts)}/$receiptsPct% | $elapsed"
 
       case _ =>
-        s"$bar $phase$chain | $elapsed"
+        s"$phase$chain | $elapsed"
     }
+  }
+
+  def wormBlock: String = {
+    import com.chipprbots.ethereum.blockchain.sync.WormToBrainBar
+    import com.chipprbots.ethereum.blockchain.sync.WormToBrainBar.WormState.*
+    import SNAPSyncController.SyncPhase.*
+
+    val overallBar = s"${WormToBrainBar.renderKnown(globalProgress)} \u2014 SNAP Overall"
+
+    val contractsStr =
+      if storageContractsTotal > 0 then s" (${storageContractsCompleted}/${storageContractsTotal} contracts)"
+      else ""
+
+    val accountsBar = {
+      val (bar, detail) =
+        if estimatedTotalAccounts > 0 then
+          (
+            WormToBrainBar.renderKnown(accountsSynced.toDouble / estimatedTotalAccounts),
+            s" \u2014 ${formatCount(accountsSynced)} / ~${formatCount(estimatedTotalAccounts)} @ ${accountsPerSec.toInt}/s"
+          )
+        else if accountsSynced > 0 then
+          (
+            WormToBrainBar.renderUnknown(Active),
+            s" \u2014 ${formatCount(accountsSynced)} accounts @ ${accountsPerSec.toInt}/s"
+          )
+        else (WormToBrainBar.renderUnknown(Queued), "")
+      s"  Accounts   $bar$detail"
+    }
+
+    val storageBar = {
+      val (bar, detail) =
+        if estimatedTotalSlots > 0 then
+          (
+            WormToBrainBar.renderKnown(storageSlotsSynced.toDouble / estimatedTotalSlots),
+            s" \u2014 ${formatCount(storageSlotsSynced)} slots$contractsStr"
+          )
+        else if storageSlotsSynced > 0 then
+          (WormToBrainBar.renderUnknown(Active), s" \u2014 ${formatCount(storageSlotsSynced)} slots$contractsStr")
+        else (WormToBrainBar.renderUnknown(Queued), "")
+      s"  Storage    $bar$detail"
+    }
+
+    val bytecodesBar = {
+      val (bar, detail) =
+        if bytecodeComplete then (WormToBrainBar.renderUnknown(Complete), "")
+        else if bytecodesDownloaded > 0 && estimatedTotalBytecodes > 0 then
+          (
+            WormToBrainBar.renderKnown(bytecodesDownloaded.toDouble / estimatedTotalBytecodes),
+            s" \u2014 ${formatCount(bytecodesDownloaded)} bytecodes"
+          )
+        else if bytecodesDownloaded > 0 then
+          (WormToBrainBar.renderUnknown(Active), s" \u2014 ${formatCount(bytecodesDownloaded)} bytecodes")
+        else (WormToBrainBar.renderUnknown(Queued), "")
+      s"  Bytecodes  $bar$detail"
+    }
+
+    val healingBar = {
+      val (bar, detail) =
+        if phase == Completed then (WormToBrainBar.renderUnknown(Complete), "")
+        else if nodesHealed > 0 then
+          (WormToBrainBar.renderUnknown(Active), s" \u2014 ${formatCount(nodesHealed)} nodes @ ${nodesPerSec.toInt}/s")
+        else (WormToBrainBar.renderUnknown(Queued), "")
+      s"  Healing    $bar$detail"
+    }
+
+    s"$overallBar\n$accountsBar\n$storageBar\n$bytecodesBar\n$healingBar"
   }
 }
