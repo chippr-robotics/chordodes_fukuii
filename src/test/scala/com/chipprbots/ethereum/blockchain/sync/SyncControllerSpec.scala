@@ -65,7 +65,7 @@ class SyncControllerSpec
     SyncTest
   ) in withTestSetup() { testSetup =>
     import testSetup.*
-    syncController ! SyncProtocol.Start
+    syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
 
     val handshakedPeers = HandshakedPeers(twoAcceptedPeers)
 
@@ -86,7 +86,7 @@ class SyncControllerSpec
     import testSetup.*
     startWithState(defaultStateBeforeNodeRestart)
 
-    syncController ! SyncProtocol.Start
+    syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
 
     val handshakedPeers = HandshakedPeers(singlePeer)
 
@@ -115,7 +115,7 @@ class SyncControllerSpec
     import testSetup.*
     startWithState(defaultStateBeforeNodeRestart)
 
-    syncController ! SyncProtocol.Start
+    syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
 
     val handshakedPeers = HandshakedPeers(singlePeer)
     val watcher = TestProbe()
@@ -165,7 +165,7 @@ class SyncControllerSpec
       )
     )
 
-    syncController ! SyncProtocol.Start
+    syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
 
     val handshakedPeers = HandshakedPeers(singlePeer)
 
@@ -214,7 +214,7 @@ class SyncControllerSpec
     import testSetup.*
     startWithState(defaultStateBeforeNodeRestart)
 
-    syncController ! SyncProtocol.Start
+    syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
 
     val handshakedPeers = HandshakedPeers(singlePeer)
 
@@ -246,7 +246,7 @@ class SyncControllerSpec
 
       startWithState(defaultStateBeforeNodeRestart)
 
-      syncController ! SyncProtocol.Start
+      syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
 
       val handshakedPeers = HandshakedPeers(twoAcceptedPeers)
       val watcher = TestProbe()
@@ -300,7 +300,7 @@ class SyncControllerSpec
     import testSetup.*
     startWithState(defaultStateBeforeNodeRestart)
 
-    syncController ! SyncProtocol.Start
+    syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
 
     val handshakedPeers = HandshakedPeers(twoAcceptedPeers.filter(_._1 == peer2))
 
@@ -341,7 +341,7 @@ class SyncControllerSpec
   it should "not process, out of date new pivot block" taggedAs (UnitTest, SyncTest) in withTestSetup() { testSetup =>
     import testSetup.*
     startWithState(defaultStateBeforeNodeRestart)
-    syncController ! SyncProtocol.Start
+    syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
 
     val staleNewPeer1Info = defaultPeer1Info.copy(maxBlockNumber = bestBlock - 2)
     val staleHeader = defaultPivotBlockHeader.copy(number = defaultPivotBlockHeader.number - 2)
@@ -386,7 +386,7 @@ class SyncControllerSpec
   ) in withTestSetup() { testSetup =>
     import testSetup.*
     startWithState(defaultStateBeforeNodeRestart)
-    syncController ! SyncProtocol.Start
+    syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
 
     val freshHeader = defaultPivotBlockHeader.copy(number = defaultPivotBlockHeader.number + 9)
     val freshPeerInfo1 = defaultPeer1Info.copy(maxBlockNumber = bestBlock + 9)
@@ -437,7 +437,7 @@ class SyncControllerSpec
 
       startWithState(defaultStateBeforeNodeRestart)
 
-      syncController ! SyncProtocol.Start
+      syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
 
       val handshakedPeers = HandshakedPeers(singlePeer)
       val watcher = TestProbe()
@@ -472,7 +472,7 @@ class SyncControllerSpec
     import testSetup.*
     startWithState(defaultStateBeforeNodeRestart)
 
-    syncController ! SyncProtocol.Start
+    syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
 
     val handshakedPeers = HandshakedPeers(singlePeer)
 
@@ -557,7 +557,7 @@ class SyncControllerSpec
     import testSetup.*
     seedSnapDoneWithRecovery(storagesInstance.storages.appStateStorage)
 
-    syncController ! SyncProtocol.Start
+    syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
 
     eventually {
       someTimePasses()
@@ -574,7 +574,7 @@ class SyncControllerSpec
     import testSetup.*
     seedSnapDoneWithRecovery(storagesInstance.storages.appStateStorage, needStorage = false)
 
-    syncController ! SyncProtocol.Start
+    syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
 
     eventually {
       someTimePasses()
@@ -590,7 +590,7 @@ class SyncControllerSpec
     import testSetup.*
     seedSnapDoneWithRecovery(storagesInstance.storages.appStateStorage, needBytecode = false)
 
-    syncController ! SyncProtocol.Start
+    syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
 
     eventually {
       someTimePasses()
@@ -610,7 +610,7 @@ class SyncControllerSpec
       withStateRoot = false
     )
 
-    syncController ! SyncProtocol.Start
+    syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
 
     eventually {
       someTimePasses()
@@ -653,7 +653,7 @@ class SyncControllerSpec
     storagesInstance.storages.appStateStorage.storageRecoveryDone().commit()
     storagesInstance.storages.appStateStorage.putSnapSyncStateRoot(rootB).commit()
 
-    syncController ! SyncProtocol.Start
+    syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
 
     eventually {
       someTimePasses()
@@ -683,7 +683,7 @@ class SyncControllerSpec
     storagesInstance.storages.appStateStorage.storageRecoveryDone().commit()
     storagesInstance.storages.appStateStorage.putSnapSyncFinalizedRoot(rootB).commit()
 
-    syncController ! SyncProtocol.Start
+    syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
 
     eventually {
       someTimePasses()
@@ -698,7 +698,7 @@ class SyncControllerSpec
   ) in withRecoveryTestSetup() { testSetup =>
     import testSetup.*
     // No snapSyncDone → start() → case (false, _, true, _) → startSnapSync()
-    syncController ! SyncProtocol.Start
+    syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
 
     eventually {
       someTimePasses()
@@ -709,7 +709,7 @@ class SyncControllerSpec
     storagesInstance.storages.appStateStorage.snapSyncDone().commit()
     storagesInstance.storages.appStateStorage.fastSyncDone().commit()
 
-    syncController ! SyncProtocol.HealingImpossible
+    syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.HealingImpossible)
 
     // HealingImpossible clears both flags synchronously
     storagesInstance.storages.appStateStorage.isSnapSyncDone() shouldBe false
@@ -730,14 +730,16 @@ class SyncControllerSpec
     // doFastSync=true, doSnapSync=false; pre-set fastSyncDone → case (_, true, false, true) → startRegularSync()
     storagesInstance.storages.appStateStorage.fastSyncDone().commit()
 
-    syncController ! SyncProtocol.Start
+    syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
 
     eventually {
       someTimePasses()
       assert(syncController.children.exists(_.path.name.startsWith("regular-sync")))
     }
 
-    syncController ! SyncProtocol.RegularSyncStuck(BigInt(24601125), "deadbeefdeadbeef")
+    syncController ! SyncController.WrappedSyncProtocol(
+      SyncProtocol.RegularSyncStuck(BigInt(24601125), "deadbeefdeadbeef")
+    )
 
     storagesInstance.storages.appStateStorage.isSnapSyncDone() shouldBe false
     storagesInstance.storages.appStateStorage.isFastSyncDone() shouldBe false

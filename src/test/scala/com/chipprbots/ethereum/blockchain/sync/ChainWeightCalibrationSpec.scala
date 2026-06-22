@@ -40,7 +40,9 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
 
       val peerTD: BigInt = BigInt("24000000000000000000000")
       val peerMaxBlock: BigInt = BigInt(25000000)
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(peerTD, peerMaxBlock)
+      syncController ! SyncController.WrappedSyncProtocol(
+        SyncProtocol.CalibrateChainWeightFromPeer(peerTD, peerMaxBlock)
+      )
 
       val expected: BigInt = peerTD * BigInt(24720000) / peerMaxBlock
       val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(
@@ -57,7 +59,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       drainRegistration()
 
       val peerTD: BigInt = BigInt("24000000000000000000000")
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(peerTD, BigInt(0))
+      syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.CalibrateChainWeightFromPeer(peerTD, BigInt(0)))
 
       val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(
         blockchainReader.getBestBlockHeader.get.hash
@@ -73,7 +75,9 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       drainRegistration()
 
       // No anchor reachable → calibrateTDFromLocalChain returns false → retry scheduled
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      syncController ! SyncController.WrappedSyncProtocol(
+        SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      )
 
       // Proof: retry was scheduled — advance 30 min and expect CalibrateChainWeightNow
       testScheduler.timePasses(30.minutes)
@@ -86,7 +90,9 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       setupBestBlock(blockNum = BigInt(24720000))
       drainRegistration()
 
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      syncController ! SyncController.WrappedSyncProtocol(
+        SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      )
 
       testScheduler.timePasses(30.minutes)
       networkPeerManager.expectMsg(CalibrateChainWeightNow)
@@ -100,7 +106,9 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       setupAnchorChain(bestBlockNum = 10, anchorNum = 7, anchorTD = BigInt("7000000000000000"))
       drainRegistration()
 
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      syncController ! SyncController.WrappedSyncProtocol(
+        SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      )
 
       testScheduler.timePasses(30.minutes)
       networkPeerManager.expectNoMessage(200.millis)
@@ -116,7 +124,9 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       val beforeHash = blockchainReader.getBestBlockHeader.get.hash
       val beforeWeight: Option[ChainWeight] = blockchainReader.getChainWeightByHash(beforeHash)
 
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(100), BigInt(100000))
+      syncController ! SyncController.WrappedSyncProtocol(
+        SyncProtocol.CalibrateChainWeightFromPeer(BigInt(100), BigInt(100000))
+      )
 
       blockchainReader.getChainWeightByHash(beforeHash) shouldBe beforeWeight
     }
@@ -129,7 +139,9 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
 
       // 24e21 * 24720000 / 25000000 ≈ 2.37×10^22 >> 1.7×10^13 threshold
       val peerTD: BigInt = BigInt("24000000000000000000000")
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(peerTD, BigInt(25000000))
+      syncController ! SyncController.WrappedSyncProtocol(
+        SyncProtocol.CalibrateChainWeightFromPeer(peerTD, BigInt(25000000))
+      )
 
       val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(
         blockchainReader.getBestBlockHeader.get.hash
@@ -156,7 +168,9 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       setBestBlockHeader(h10)
 
       drainRegistration()
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      syncController ! SyncController.WrappedSyncProtocol(
+        SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      )
 
       // Expected: anchorTD + h8.difficulty + h9.difficulty + h10.difficulty
       val expectedTD: BigInt = anchorTD + h8.difficulty + h9.difficulty + h10.difficulty
@@ -175,7 +189,9 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       drainRegistration()
 
       // No chain weight stored for the best block → walk hits genesis.parentHash (None) → abort
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      syncController ! SyncController.WrappedSyncProtocol(
+        SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      )
 
       testScheduler.timePasses(30.minutes)
       networkPeerManager.expectMsg(CalibrateChainWeightNow)
@@ -193,7 +209,9 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       drainRegistration()
 
       // Walk finds anchor at h10 itself (zero gap), re-writes same value
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      syncController ! SyncController.WrappedSyncProtocol(
+        SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      )
 
       val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(h10.hash)
       stored.get.totalDifficulty shouldBe correctTD
@@ -218,7 +236,9 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
 
       val beforeWeight: Option[ChainWeight] = blockchainReader.getChainWeightByHash(h10.hash)
 
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      syncController ! SyncController.WrappedSyncProtocol(
+        SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      )
 
       // Weight unchanged — abort on broken chain
       blockchainReader.getChainWeightByHash(h10.hash) shouldBe beforeWeight
@@ -252,7 +272,9 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       drainRegistration()
 
       val beforeWeight: Option[ChainWeight] = blockchainReader.getChainWeightByHash(h1.hash)
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      syncController ! SyncController.WrappedSyncProtocol(
+        SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      )
 
       // 1.1×10^13 < 1.7×10^13 (genesisWeight × 1000) → write gate rejects → weight unchanged
       blockchainReader.getChainWeightByHash(h1.hash) shouldBe beforeWeight
@@ -279,7 +301,9 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       setBestBlockHeader(bestHdr)
       drainRegistration()
 
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      syncController ! SyncController.WrappedSyncProtocol(
+        SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      )
 
       val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(bestHdr.hash)
       stored shouldBe defined
@@ -305,7 +329,9 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       drainRegistration()
 
       val beforeWeight: Option[ChainWeight] = blockchainReader.getChainWeightByHash(bestHdr.hash)
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      syncController ! SyncController.WrappedSyncProtocol(
+        SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      )
 
       blockchainReader.getChainWeightByHash(bestHdr.hash) shouldBe beforeWeight
       testScheduler.timePasses(30.minutes)
@@ -330,7 +356,9 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       setBestBlockHeader(h15)
       drainRegistration()
 
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      syncController ! SyncController.WrappedSyncProtocol(
+        SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      )
 
       // Should use anchorTD_10 (found first walking back from h15), NOT anchorTD_5
       val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(h15.hash)
@@ -349,12 +377,16 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       drainRegistration()
 
       // Attempt 1 → no anchor → retry scheduled
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      syncController ! SyncController.WrappedSyncProtocol(
+        SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      )
       testScheduler.timePasses(30.minutes)
       networkPeerManager.expectMsg(CalibrateChainWeightNow)
 
       // Simulate NPA sending another sentinel (no ETH68 peers yet)
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      syncController ! SyncController.WrappedSyncProtocol(
+        SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      )
       testScheduler.timePasses(30.minutes)
       networkPeerManager.expectMsg(CalibrateChainWeightNow)
     }
@@ -366,7 +398,9 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       drainRegistration()
 
       // Attempt 1 fails
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      syncController ! SyncController.WrappedSyncProtocol(
+        SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      )
       testScheduler.timePasses(30.minutes)
       networkPeerManager.expectMsg(CalibrateChainWeightNow)
 
@@ -378,7 +412,9 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       setBestBlockHeader(bestHdr)
 
       // Attempt 2 succeeds → no retry scheduled
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      syncController ! SyncController.WrappedSyncProtocol(
+        SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      )
       testScheduler.timePasses(30.minutes)
       networkPeerManager.expectNoMessage(200.millis)
     }
@@ -390,13 +426,15 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       drainRegistration()
 
       // Attempt 1: sentinel, no anchor → retry scheduled
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      syncController ! SyncController.WrappedSyncProtocol(
+        SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      )
       testScheduler.timePasses(30.minutes)
       networkPeerManager.expectMsg(CalibrateChainWeightNow)
 
       // Attempt 2: ETH68 peer data (tier 2) — no retry expected
       val peerTD: BigInt = BigInt("24000000000000000000000")
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(peerTD, BigInt(0))
+      syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.CalibrateChainWeightFromPeer(peerTD, BigInt(0)))
 
       val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(
         blockchainReader.getBestBlockHeader.get.hash
@@ -497,7 +535,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
     )
 
     /** Start SyncController and kick into regular sync mode. */
-    def startSync(): Unit = syncController ! SyncProtocol.Start
+    def startSync(): Unit = syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
 
     /** Start sync and drain all startup messages sent to networkPeerManager.
       *

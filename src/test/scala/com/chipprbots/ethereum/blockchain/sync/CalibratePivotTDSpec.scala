@@ -180,7 +180,7 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
 
       // Simulate CalibrateChainWeightNow round-trip: NPA sends CalibrateChainWeightFromPeer
       // back with peerTD (Tier 2 path: STATUS only, no NewBlock blockNum)
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(peerTD, BigInt(0))
+      syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.CalibrateChainWeightFromPeer(peerTD, BigInt(0)))
 
       val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(
         blockchainReader.getBestBlockHeader.get.hash
@@ -207,7 +207,9 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
 
       // Simulate Restart #9: peerTD ≈ correctedTD (chain progressed a little)
       val restart9PeerTD: BigInt = correctedTD + BigInt("100000000000000000") // +0.01e21
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(restart9PeerTD, BigInt(0))
+      syncController ! SyncController.WrappedSyncProtocol(
+        SyncProtocol.CalibrateChainWeightFromPeer(restart9PeerTD, BigInt(0))
+      )
 
       val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(
         blockchainReader.getBestBlockHeader.get.hash
@@ -227,7 +229,7 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
       drainRegistration()
 
       // Mixed network: NPA has ETH68 STATUS TD, no NewBlock blockNum yet
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(peerTD, BigInt(0))
+      syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.CalibrateChainWeightFromPeer(peerTD, BigInt(0)))
 
       val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(
         blockchainReader.getBestBlockHeader.get.hash
@@ -246,7 +248,9 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
       drainRegistration()
 
       // Attempt 1: pure ETH69, no anchor reachable → retry
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      syncController ! SyncController.WrappedSyncProtocol(
+        SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      )
       testScheduler.timePasses(30.minutes)
       networkPeerManager.expectMsg(CalibrateChainWeightNow)
 
@@ -257,7 +261,9 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
       setBestBlockHeader(chain(0))
 
       // Attempt 2: anchor found, TD written
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      syncController ! SyncController.WrappedSyncProtocol(
+        SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0))
+      )
       testScheduler.timePasses(30.minutes)
       networkPeerManager.expectNoMessage(200.millis) // no retry after success
     }
@@ -272,7 +278,9 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
       setupBestBlockWithTD(BigInt(24720000), correctTD)
       drainRegistration()
 
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(correctTD, BigInt(0))
+      syncController ! SyncController.WrappedSyncProtocol(
+        SyncProtocol.CalibrateChainWeightFromPeer(correctTD, BigInt(0))
+      )
 
       val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(
         blockchainReader.getBestBlockHeader.get.hash
@@ -289,7 +297,7 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
       setupBestBlockWithTD(bestBlockNum, BigInt("3320000000000000000"))
       drainRegistration()
 
-      syncController ! SyncProtocol.CalibrateChainWeightFromPeer(peerTD, peerBlock)
+      syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.CalibrateChainWeightFromPeer(peerTD, peerBlock))
 
       val expectedTD: BigInt = peerTD * bestBlockNum / peerBlock
       val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(
@@ -378,7 +386,7 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
     blockchainWriter.storeChainWeight(Fixtures.Blocks.Genesis.header.parentHash, ChainWeight.zero).commit()
 
     def drainRegistration(): Unit = {
-      syncController ! SyncProtocol.Start
+      syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
       networkPeerManager.expectMsgClass(classOf[RegisterChainWeightCalibrationTarget])
       testScheduler.timePasses(31.seconds)
       // Fish past N GetHandshakedPeers (one per PeerListSupportNg actor) until the T+30s startup
