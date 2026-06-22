@@ -1,45 +1,11 @@
-# Fukuii Modernization — Pending Tasks
+# Fukuii Modernization — Open Items
 
 **Branch:** `scala3-cleanup-june`
-**Public document — code-pattern observations only. No internal dev commentary.**
-
-Quick-reference checklist of what genuinely remains. See `SPRINT-QUEUE.md` for full
-sprint history and `DEFERRED-BACKLOG.md` for the authoritative backlog.
+**Completed items:** See `completed/PENDING.md` for archived done work.
 
 ---
 
-## Immediate (no gate)
-
-- [x] **testEssential baseline** — ✅ 3,601/0 (3499+26+11+65), 11:02. Baseline confirmed. Phase 2 in progress.
-
----
-
-## Behavior[Any] Narrowing — Phase 2
-
-Three actors remain as `Behavior[Any]` and need sealed Command ADTs.
-All gates are satisfied (CAPSTONE ✅, S4 ✅, S7 ✅, NET ✅, NET2 ✅).
-
-| # | Actor | File | LOC | Complexity | Status |
-|---|-------|------|-----|------------|--------|
-| 1 | **NetworkPeerManagerActor** | `network/NetworkPeerManagerActor.scala` | 1,317 | Medium — shell+core, 2 `sender()` paths already wrapped | ✅ `be305095f` — Classic shell (`NetworkPeerManagerShell`) absorbs 9 legacy types, Typed core narrowed to `Behavior[Command]`. 131/131. |
-| 2 | **FastSync** | `blockchain/sync/fast/FastSync.scala` | 1,415 | High — 7 `Behavior[Any]` states, PRH children via Classic | ✅ `e41f50b7d` (SNAP2-a) — ADT rebuilt (15 cases); 20 `Behavior[Any]` sites flipped; SyncController cross-file wrap (`private[sync]`); `FastSyncSpec` 3 test sites fixed. |
-| 3 | **SyncController** | `blockchain/sync/SyncController.scala` | 2,183 | Very High — 11 named behaviors, `ctx.toClassic.sender()` widespread, `GetStatus/GetProgress` reply-to pattern | To do |
-
-**Order:** NetworkPeerManagerActor → FastSync → SyncController (NET2 → SNAP2 → ROOT).
-SyncController must come last — it is the parent of both FastSync and the SNAP coordinator tree.
-
-**Note on SyncController:** After narrowing, the 7 `SyncTest`-tagged spec tests that currently
-fail (pre-existing since SNAP2) need a fixing pass. Those tests are excluded from testEssential
-so they don't block the baseline, but they gate a PR.
-
----
-
-## Chase-Queue Housekeeping
-
-- [x] **PivotBlockSelector UnsubscribeAllCmd** — DONE. Cleared entry added to CHASE-QUEUE; open entry removed. S4b (`e82f41cac`) fixed all 5 sites.
-
-- [ ] **PoWMiningCoordinator MUTABLE** — FORGE-gated. Waiting for FORGE review before
-  any fix. See `threading-model-audit.md §B2`. No estimated date.
+## Chase-Queue Housekeeping — Open
 
 ---
 
@@ -58,11 +24,90 @@ so they don't block the baseline, but they gate a PR.
 
 ---
 
-## Done (reference)
+## Clearout Prompts
 
-| Area | Completion |
-|------|------------|
-| Wave 1 (wildcard migration, `-source:future`, warnings) | ✅ 6 commits |
-| Wave 2 P0–P3c (compiler warnings, Pekko faucet/jsonrpc/transactions/mining, given/using, extension methods, isInstanceOf, enums, Thread.sleep) | ✅ all committed |
-| Network/sync Pekko migration: W1, W2, S1–S7, PLN, NET, NET2, S3, S4, SNAP1, SNAP2, ROOT, CAPSTONE | ✅ root flipped to `ActorSystem[Nothing]` |
-| Phase 1 ADT narrowing: S1/S2/S4/S5/S6 + S3 coordinators sealed | ✅ `948a25008` |
+**Run order — this file:**
+| # | Batch | Prompt | Parallel-safe? |
+|---|-------|--------|---------------|
+| A2 | Batch A (read-only) | P1 FORGE PoWMiningCoordinator | ✅ run with CODEBASE-AUDIT P1, DEFERRED P4, DEFERRED P6 |
+| B3 | Batch B step 3 | P2 MITHRIL E165 TestProbe | Sequential after Batch A; can interleave with other Batch B steps if files don't overlap |
+
+**Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
+
+---
+
+### P1 — FORGE: PoWMiningCoordinator threading assessment
+
+**Agent:** FORGE
+**Files:** `src/main/scala/com/chipprbots/ethereum/consensus/pow/PoWMiningCoordinator.scala`
+**Files also read:** `threading-model-audit.md §B2` (rationale)
+**Prerequisite:** FORGE review gating — do not send to MITHRIL without FORGE verdict first.
+
+**Prompt:**
+> On branch `scala3-cleanup-june`, assess `PoWMiningCoordinator.scala` for thread-safety
+> correctness.
+>
+> Read `threading-model-audit.md §B2` first for the prior finding context.
+>
+> Evaluate:
+> 1. Are the `@volatile` fields correct-as-is, redundant, or masking a race?
+> 2. Is `mutex.synchronized` providing correct happens-before guarantees for all access paths?
+> 3. Is there any concurrently-callable method that accesses state outside the mutex?
+> 4. What is the verdict: SAFE-AS-IS / REDUNDANT-VOLATILE-ONLY / TRUE-RACE-FIX-REQUIRED?
+>
+> If SAFE-AS-IS or REDUNDANT-VOLATILE-ONLY: note what MITHRIL may safely clean up
+> (cosmetic `@volatile` removal, etc.) and whether a compile test is sufficient gate.
+> If TRUE-RACE-FIX-REQUIRED: spec the minimal fix — do not implement it here.
+>
+> No code changes in this prompt. Report verdict + rationale only.
+
+**Verification:** Written verdict returned; no source edits
+
+**Documentation updates when complete:**
+- `working-docs/PENDING.md` — remove the PoWMiningCoordinator MUTABLE open item from "Chase-Queue Housekeeping — Open"
+- `completed/PENDING.md` — append under new "Chase-Queue Housekeeping — Cleared" heading:
+  `- [x] **PoWMiningCoordinator MUTABLE FORGE assessment** — DONE. Verdict: [VERDICT]. See modernization-log/consensus/pow.md.`
+- `modernization-log/consensus/pow.md` — move the open item out of "Open"; add under new "Quality Assessment (FORGE)" section:
+  `#### FORGE verdict — PoWMiningCoordinator thread-safety: [VERDICT]`
+  `- **Rationale:** [one-line from FORGE report]; follow-on: [none required / MITHRIL @volatile removal]`
+
+**Rejection criteria:** Edits to source; assessment without reading threading-model-audit.md §B2
+
+---
+
+### P2 — MITHRIL: Fix E165 TestProbe warnings in FastSyncBranchResolverSpec
+
+**Agent:** MITHRIL
+**Files:** `src/test/scala/com/chipprbots/ethereum/blockchain/sync/fast/FastSyncBranchResolverActorSpec.scala`
+**Prerequisite:** None. Low-risk test-only change.
+
+**Prompt:**
+> On branch `scala3-cleanup-june`, fix the 5 pre-existing E165 warnings in
+> `FastSyncBranchResolverActorSpec.scala`.
+>
+> The warnings come from `TestProbe` instances without a narrowed type parameter — pattern
+> selectors on `Any` trigger E165 in Scala 3. The fix is to add explicit type parameters
+> to `TestProbe[...]` declarations where the probe receives a known message type.
+>
+> Steps:
+> 1. Run: `grep -n "TestProbe\b" src/test/.../FastSyncBranchResolverActorSpec.scala`
+>    to locate all 5 unnarrowed sites.
+> 2. For each site, determine what message type the probe expects from context.
+> 3. Add `TestProbe[MessageType]` type parameter.
+> 4. Compile: `sbt compile-all` — confirm E165 count drops by exactly 5; no new errors.
+> 5. Run: `sbt testOnly *FastSyncBranchResolverActorSpec` — all existing tests must pass
+>    (pre-existing failures expected; confirm count is unchanged at pre-existing baseline).
+>
+> Do NOT change any production source files.
+
+**Verification:** E165 count −5; test pass count unchanged from baseline
+
+**Documentation updates when complete:**
+- `working-docs/PENDING.md` — remove the E165 TestProbe open item from "Test Hygiene"
+- `completed/PENDING.md` — append under new "Test Hygiene — Cleared" heading:
+  `- [x] **E165 TestProbe in FastSyncBranchResolverSpec** — DONE. 5 probe type params narrowed. Commit: [SHA].`
+- `modernization-log/sync/fast.md` — remove the E165 line from "Open / Deferred"; add under "Quality Fixes":
+  `#### [SHA] — E165: TestProbe type params narrowed in FastSyncBranchResolverActorSpec`
+  `- **What:** 5 unnarrowed TestProbe → TestProbe[MessageType]; E165 count −5, test baseline unchanged`
+
+**Rejection criteria:** Production file edits; adding new test cases; changing test logic
