@@ -1,7 +1,6 @@
 package com.chipprbots.ethereum.network
 
 import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.actor.typed
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext as TypedActorContext
@@ -74,16 +73,16 @@ object NetworkPeerManagerActor {
   // Deferred blacklist request: re-enters the actor mailbox via a single-shot
   // Typed timer (P7) instead of a Classic scheduler.scheduleOnce callback, which
   // would run on the HashedWheelTimer thread off the actor mailbox.
-  private[network] final case class DeferredBlacklistCmd(
+  final private[network] case class DeferredBlacklistCmd(
       request: PeerManagerActor.AddToBlacklistRequest
   ) extends Command
 
   // Timer keys for the deferred-blacklist single-shot timers. One key family per
   // schedule site; each carries the peer address so concurrent evictions get
   // independent timers (a static key would coalesce and drop all but the last).
-  private sealed trait BlacklistTimerKey
-  private final case class LaggingPeerBlacklistTimerKey(address: String) extends BlacklistTimerKey
-  private final case class TdProxyGapBlacklistTimerKey(address: String) extends BlacklistTimerKey
+  sealed private trait BlacklistTimerKey
+  final private case class LaggingPeerBlacklistTimerKey(address: String) extends BlacklistTimerKey
+  final private case class TdProxyGapBlacklistTimerKey(address: String) extends BlacklistTimerKey
 
   // =========================================================================
   // Typed behavior factory
@@ -176,8 +175,6 @@ object NetworkPeerManagerActor {
   ) {
 
     private val log = ctx.log
-    implicit private val ec: scala.concurrent.ExecutionContext = ctx.executionContext
-    private def scheduler: Scheduler = ctx.system.classicSystem.scheduler
 
     private[network] type PeersWithInfo = Map[PeerId, PeerWithInfo]
 
@@ -303,6 +300,11 @@ object NetworkPeerManagerActor {
         case ConnectToPeerForwardCmd(uri) =>
           log.info("Forwarding ConnectToPeer({}) to PeerManagerActor", uri)
           peerManagerActor ! PeerManagerActor.ConnectToPeerCmd(uri)
+          Behaviors.same
+
+        case DeferredBlacklistCmd(request) =>
+          // Delivered on the actor mailbox by a single-shot timer; forward to PeerManagerActor.
+          peerManagerActor ! PeerManagerActor.AddToBlacklistCmd(request, ActorRef.noSender)
           Behaviors.same
 
         // ── Timer ticks ───────────────────────────────────────────────────────
