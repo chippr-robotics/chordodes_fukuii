@@ -450,8 +450,8 @@ trait NetworkPeerManagerActorBuilder {
     BlockchainBuilder & BlockchainConfigBuilder =>
 
   lazy val networkPeerManager: ActorRef = classicSystem
-    .spawn(
-      NetworkPeerManagerActor.behavior(
+    .actorOf(
+      NetworkPeerManagerShell.props(
         peerManager,
         peerEventBus,
         storagesInstance.storages.appStateStorage,
@@ -463,7 +463,6 @@ trait NetworkPeerManagerActorBuilder {
       ),
       "network-peer-manager"
     )
-    .toClassic
 
 }
 

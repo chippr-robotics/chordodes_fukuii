@@ -20,7 +20,7 @@ import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.mpt.*
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor
+import com.chipprbots.ethereum.network.NetworkPeerManagerShell
 import com.chipprbots.ethereum.network.PeerEventBusActor
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerId
@@ -58,8 +58,8 @@ class SnapServingActorSpec extends AnyFlatSpec with Matchers with MockFactory wi
       mptStorageOpt: Option[com.chipprbots.ethereum.db.storage.MptStorage] = None,
       blockchainReader: Option[BlockchainReader] = None
   ): ActorRef = system
-    .spawnAnonymous(
-      NetworkPeerManagerActor.behavior(
+    .actorOf(
+      NetworkPeerManagerShell.props(
         peerManagerActor = peerManager.ref.toTyped[PeerManagerActor.Command],
         peerEventBusActor = peerEventBus.ref.toTyped[PeerEventBusActor.Command],
         appStateStorage = appStateStorage,
@@ -71,7 +71,6 @@ class SnapServingActorSpec extends AnyFlatSpec with Matchers with MockFactory wi
         isPoWChain = false
       )
     )
-    .toClassic
 
   /** Build a state trie with n EOA accounts and return (rootHash, storage). */
   private def buildAccountTrie(n: Int): (ByteString, TestMptStorage) = {

@@ -21,6 +21,7 @@ import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
+import com.chipprbots.ethereum.network.NetworkPeerManagerShell
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerHandshakeSuccessful
@@ -66,8 +67,8 @@ class NetworkPeerManagerActorHandshakeSpec
     val pm = TestProbe()
     val bus = TestProbe()
     val ref = system
-      .spawnAnonymous(
-        NetworkPeerManagerActor.behavior(
+      .actorOf(
+        NetworkPeerManagerShell.props(
           pm.ref.toTyped[PeerManagerActor.Command],
           bus.ref.toTyped[PeerEventBusActor.Command],
           new AppStateStorage(EphemDataSource()),
@@ -75,7 +76,6 @@ class NetworkPeerManagerActorHandshakeSpec
           isPoWChain = false
         )
       )
-      .toClassic
     (ref, pm, bus)
   }
 

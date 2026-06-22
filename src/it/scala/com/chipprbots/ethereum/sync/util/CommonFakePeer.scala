@@ -47,8 +47,8 @@ import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.network.ForkResolver
 import com.chipprbots.ethereum.network.KnownNodesManager
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
+import com.chipprbots.ethereum.network.NetworkPeerManagerShell
 import com.chipprbots.ethereum.network.PeerEventBusActor
 import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.network.PeerManagerActor.FastSyncHostConfiguration
@@ -265,10 +265,9 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
   )
 
   lazy val etcPeerManager: ActorRef = system
-    .spawnAnonymous(
-      NetworkPeerManagerActor.behavior(peerManager, peerEventBus, storagesInstance.storages.appStateStorage, None)
+    .actorOf(
+      NetworkPeerManagerShell.props(peerManager, peerEventBus, storagesInstance.storages.appStateStorage, None)
     )
-    .toClassic
 
   // Integration-test fake peer — PendingTransactionsManager isn't exercised by the sync harness,
   // so an actor that discards everything suffices to satisfy the ctor requirement added with the

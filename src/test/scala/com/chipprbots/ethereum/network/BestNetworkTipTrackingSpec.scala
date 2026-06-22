@@ -18,6 +18,7 @@ import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.*
+import com.chipprbots.ethereum.network.NetworkPeerManagerShell
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerHandshakeSuccessful
@@ -147,8 +148,8 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
     val calibrationTarget: TestProbe = TestProbe()
 
     val peersInfoHolder = classicSystem
-      .spawnAnonymous(
-        NetworkPeerManagerActor.behavior(
+      .actorOf(
+        NetworkPeerManagerShell.props(
           peerManager.ref.toTyped[PeerManagerActor.Command],
           peerEventBus.ref.toTyped[PeerEventBusActor.Command],
           storagesInstance.storages.appStateStorage,
@@ -156,7 +157,6 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
           isPoWChain = true
         )
       )
-      .toClassic
 
     val fakeNodeId: ByteString = ByteString()
 
