@@ -28,6 +28,7 @@ import com.chipprbots.ethereum.ledger.BranchResolution
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.ommers.OmmersPool
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
+import com.chipprbots.ethereum.blockchain.sync.WormToBrainBar
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 object RegularSync {
@@ -251,6 +252,15 @@ object RegularSync {
           s"RegularSync: current=${progressState.currentBlock} best=${progressState.bestKnownNetworkBlock} " +
             s"lag=$lag rate=${f"$rate%.1f"}/s eta=$etaStr"
         )
+        val wormBar =
+          if progressState.bestKnownNetworkBlock == 0 then WormToBrainBar.renderUnknown(WormToBrainBar.WormState.Active)
+          else if progressState.currentBlock >= progressState.bestKnownNetworkBlock then
+            WormToBrainBar.renderUnknown(WormToBrainBar.WormState.Complete)
+          else
+            val p = (progressState.currentBlock - progressState.initialBlock).toDouble /
+              (progressState.bestKnownNetworkBlock - progressState.initialBlock).toDouble
+            WormToBrainBar.renderKnown(p)
+        log.info(s"$wormBar — RegularSync")
         running(
           progressState.copy(lastPrintBlock = progressState.currentBlock, lastPrintTimeMs = now),
           fetcher,
