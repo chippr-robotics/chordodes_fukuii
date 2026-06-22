@@ -45,7 +45,7 @@
 - **Note:** Structural seal (move subtypes to `SyncProtocol.scala`) tracked in CHASE-QUEUE
 - **Source:** CODEBASE-AUDIT W17
 
-#### [pending SHA] — W17: RegularSyncCommand sealed
+#### `923b18ba7` — W17: RegularSyncCommand sealed
 - **What:** `FetcherStatusTick`, `PrintStatusTick`, `ProgressProtocol` moved from `RegularSync.scala` → `SyncProtocol.scala`; `trait RegularSyncCommand` is now `sealed`; fallthrough `case _ => Behaviors.unhandled` arm deleted; `RegularSync.ProgressProtocol` type alias + val forwarding preserves all call sites in `BlockImporter`, `BlockFetcher`, `SyncController`, test utils without import changes
 - **Result:** 31/31 `RegularSyncSpec` tests pass; 0 compile errors; E112 does not appear
 
