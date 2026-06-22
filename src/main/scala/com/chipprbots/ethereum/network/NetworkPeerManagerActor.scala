@@ -6,6 +6,7 @@ import org.apache.pekko.actor.typed
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext as TypedActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
@@ -40,12 +41,13 @@ object NetworkPeerManagerActor {
   // =========================================================================
   // Command ADT — internal Typed dispatch protocol.
   //
-  // non-sealed: PeerEvent subtypes arrive via the event bus messageAdapter
-  // wrapper (PeerEventCmd) — not a true cross-package constraint but mirrors
-  // PeerManagerActor.Command for consistency.
+  // Sealed: all subtypes are defined in this companion object. PeerEvent
+  // subtypes arrive wrapped in PeerEventCmd, so no external extension is
+  // needed. Sealing enables exhaustiveness checking on the receiveMessage
+  // dispatch.
   // =========================================================================
 
-  trait Command
+  sealed trait Command
 
   // Ask-path commands (carry the Classic replier captured by the shell's sender()):
   final case class GetHandshakedPeersCmd(replyTo: ActorRef) extends Command
@@ -68,6 +70,20 @@ object NetworkPeerManagerActor {
 
   // PeerEvent wrapper delivered via messageAdapter from the event bus:
   final case class PeerEventCmd(event: PeerEvent) extends Command
+
+  // Deferred blacklist request: re-enters the actor mailbox via a single-shot
+  // Typed timer (P7) instead of a Classic scheduler.scheduleOnce callback, which
+  // would run on the HashedWheelTimer thread off the actor mailbox.
+  private[network] final case class DeferredBlacklistCmd(
+      request: PeerManagerActor.AddToBlacklistRequest
+  ) extends Command
+
+  // Timer keys for the deferred-blacklist single-shot timers. One key family per
+  // schedule site; each carries the peer address so concurrent evictions get
+  // independent timers (a static key would coalesce and drop all but the last).
+  private sealed trait BlacklistTimerKey
+  private final case class LaggingPeerBlacklistTimerKey(address: String) extends BlacklistTimerKey
+  private final case class TdProxyGapBlacklistTimerKey(address: String) extends BlacklistTimerKey
 
   // =========================================================================
   // Typed behavior factory
@@ -128,6 +144,7 @@ object NetworkPeerManagerActor {
 
         new Impl(
           ctx,
+          timers,
           eventAdapter,
           peerManagerActor,
           peerEventBusActor,
@@ -145,6 +162,7 @@ object NetworkPeerManagerActor {
   // scalastyle:off number.of.methods
   final private class Impl(
       ctx: TypedActorContext[Command],
+      timers: TimerScheduler[Command],
       eventAdapter: ActorRef,
       peerManagerActor: typed.ActorRef[PeerManagerActor.Command],
       peerEventBusActor: typed.ActorRef[PeerEventBusActor.Command],
@@ -300,8 +318,15 @@ object NetworkPeerManagerActor {
           val inbound = peersWithInfo.values.count(_.peer.incomingConnection)
           val outbound = active - inbound
           log.info(
-            s"Network [60s]: active=$active ($snapPeers snap) in=$inbound out=$outbound | " +
-              s"+$tcpFailed tcp-fail +$authFailed auth-fail +$authTimeout auth-timeout +$emptyHeaders empty-hdrs"
+            "Network [60s]: active={} ({} snap) in={} out={} | +{} tcp-fail +{} auth-fail +{} auth-timeout +{} empty-hdrs",
+            active,
+            snapPeers,
+            inbound,
+            outbound,
+            tcpFailed,
+            authFailed,
+            authTimeout,
+            emptyHeaders
           )
           Behaviors.same
 
@@ -322,9 +347,7 @@ object NetworkPeerManagerActor {
               if !recentlySignaled then {
                 val bestHash = peerInfo.remoteStatus.bestHash
                 val probe: MessageSerializable =
-                  if Capability.usesRequestId(peerInfo.remoteStatus.capability) then
-                    ETHPackets.GetBlockHeaders(ETHPackets.nextRequestId, Right(bestHash), 1, 0, reverse = false)
-                  else ETHPackets.GetBlockHeaders(ETHPackets.nextRequestId, Right(bestHash), 1, 0, reverse = false)
+                  ETHPackets.GetBlockHeaders(ETHPackets.nextRequestId, Right(bestHash), 1, 0, reverse = false)
                 log.debug(
                   "BEST_BLOCK_REPROBE: peer={} cap={} maxBlock={} — periodic refresh",
                   peer.id,
@@ -416,16 +439,19 @@ object NetworkPeerManagerActor {
                   peer.ref ! DisconnectPeer(Disconnect.Reasons.UselessPeer)
                   // PeerClosedConnection will apply a short-tier (2-min) blacklist for UselessPeer.
                   // Schedule a longer override that lands AFTER PeerClosedConnection's short-tier add.
-                  scheduler.scheduleOnce(LaggingPeerBlacklistOverrideDelay) {
-                    peerManagerActor ! PeerManagerActor.AddToBlacklistCmd(
+                  // Single-shot Typed timer (P7) re-enters the mailbox via DeferredBlacklistCmd.
+                  val blacklistAddress = peer.remoteAddress.getHostString
+                  timers.startSingleTimer(
+                    LaggingPeerBlacklistTimerKey(blacklistAddress),
+                    DeferredBlacklistCmd(
                       PeerManagerActor.AddToBlacklistRequest(
-                        address = peer.remoteAddress.getHostString,
+                        address = blacklistAddress,
                         duration = Some(LaggingPeerBlacklistDuration),
                         reason = Disconnect.reasonToString(Disconnect.Reasons.UselessPeer)
-                      ),
-                      ActorRef.noSender
-                    )
-                  }
+                      )
+                    ),
+                    LaggingPeerBlacklistOverrideDelay
+                  )
                   laggingPeerSince.remove(peerId)
                 }
               }
@@ -554,8 +580,6 @@ object NetworkPeerManagerActor {
 
         case PeerEventCmd(_) =>
           Behaviors.same
-
-        case _ => Behaviors.same
       }
 
     private def handlePeerHandshakeSuccessful(
@@ -628,16 +652,19 @@ object NetworkPeerManagerActor {
                     ratio
                   )
                   peer.ref ! DisconnectPeer(Disconnect.Reasons.UselessPeer)
-                  scheduler.scheduleOnce(LaggingPeerBlacklistOverrideDelay) {
-                    peerManagerActor ! PeerManagerActor.AddToBlacklistCmd(
+                  // Single-shot Typed timer (P7) re-enters the mailbox via DeferredBlacklistCmd.
+                  val blacklistAddress = peer.remoteAddress.getHostString
+                  timers.startSingleTimer(
+                    TdProxyGapBlacklistTimerKey(blacklistAddress),
+                    DeferredBlacklistCmd(
                       PeerManagerActor.AddToBlacklistRequest(
-                        address = peer.remoteAddress.getHostString,
+                        address = blacklistAddress,
                         duration = Some(5.minutes),
                         reason = "TD-PROXY-GAP: stale chain weight, reconnect after calibration"
-                      ),
-                      ActorRef.noSender
-                    )
-                  }
+                      )
+                    ),
+                    LaggingPeerBlacklistOverrideDelay
+                  )
                 } else
                   log.warn(
                     "TD-DIVERGE: Peer {} TD={} > our TD={} at block {}. We may be on a lighter fork or behind.",
@@ -687,9 +714,7 @@ object NetworkPeerManagerActor {
         if peerInfo.remoteStatus.capability != Capability.ETH69 && !peerInfo.isAtGenesis then {
           val bestHash = peerInfo.remoteStatus.bestHash
           val probe: MessageSerializable =
-            if Capability.usesRequestId(peerInfo.remoteStatus.capability) then
-              ETHPackets.GetBlockHeaders(ETHPackets.nextRequestId, Right(bestHash), 1, 0, reverse = false)
-            else ETHPackets.GetBlockHeaders(ETHPackets.nextRequestId, Right(bestHash), 1, 0, reverse = false)
+            ETHPackets.GetBlockHeaders(ETHPackets.nextRequestId, Right(bestHash), 1, 0, reverse = false)
           log.debug(
             "BEST_BLOCK_PROBE: peer={} cap={} bestHash={} — asking for header at bestHash to discover block number",
             peer.id,
@@ -854,13 +879,14 @@ object NetworkPeerManagerActor {
     private def handleGetAccountRange(
         msg: GetAccountRange,
         peerId: PeerId,
-        peerWithInfo: Option[PeerWithInfo]
+        // None is expected for pre-handshake SNAP requests (hive devp2p snap test client
+        // sends GetAccountRange immediately after RLPx hello, before ETH-status exchange).
+        // Reserved for future per-peer rate limiting.
+        @annotation.unused peerWithInfo: Option[PeerWithInfo]
     ): Unit = {
       log.debug(
         s"Received GetAccountRange request from peer $peerId: requestId=${msg.requestId}, root=${msg.rootHash.take(4).toHex}, start=${msg.startingHash.take(4).toHex}, limit=${msg.limitHash.take(4).toHex}, bytes=${msg.responseBytes}"
       )
-
-      val _ = peerWithInfo
       val response: AccountRange =
         try
           mptStorageOpt match {
@@ -920,13 +946,14 @@ object NetworkPeerManagerActor {
     private def handleGetStorageRanges(
         msg: GetStorageRanges,
         peerId: PeerId,
-        peerWithInfo: Option[PeerWithInfo]
+        // None is expected for pre-handshake SNAP requests (hive devp2p snap test client
+        // sends GetStorageRanges immediately after RLPx hello, before ETH-status exchange).
+        // Reserved for future per-peer rate limiting.
+        @annotation.unused peerWithInfo: Option[PeerWithInfo]
     ): Unit = {
       log.debug(
         s"Received GetStorageRanges request from peer $peerId: requestId=${msg.requestId}, root=${msg.rootHash.take(4).toHex}, accounts=${msg.accountHashes.size}, start=${msg.startingHash.take(4).toHex}, limit=${msg.limitHash.take(4).toHex}, bytes=${msg.responseBytes}"
       )
-
-      val _ = peerWithInfo
       val response = mptStorageOpt match {
         case Some(storage) =>
           import com.chipprbots.ethereum.network.snapserver.SnapServer
@@ -938,7 +965,11 @@ object NetworkPeerManagerActor {
                 val node = storage.get(msg.rootHash.toArray)
                 if node == NullNode then None else Some(node)
               }
-            catch { case _: Throwable => None }
+            catch {
+              case e: Throwable =>
+                log.warn("MPT traversal error in handleGetStorageRanges (state root load): {}", e.getMessage)
+                None
+            }
           val accountRoot: ByteString => Option[ByteString] = { accountHash =>
             val nibbles = SnapServer.hashToNibbles(accountHash)
             try
@@ -969,7 +1000,11 @@ object NetworkPeerManagerActor {
                 }
                 find(rootNode, nibbles)
               }
-            catch { case _: Throwable => None }
+            catch {
+              case e: Throwable =>
+                log.warn("MPT traversal error in handleGetStorageRanges: {}", e.getMessage)
+                None
+            }
           }
           try
             SnapServer.serveStorageRanges(
@@ -1005,13 +1040,14 @@ object NetworkPeerManagerActor {
     private def handleGetTrieNodes(
         msg: GetTrieNodes,
         peerId: PeerId,
-        peerWithInfo: Option[PeerWithInfo]
+        // None is expected for pre-handshake SNAP requests (hive devp2p snap test client
+        // sends GetTrieNodes immediately after RLPx hello, before ETH-status exchange).
+        // Reserved for future per-peer rate limiting.
+        @annotation.unused peerWithInfo: Option[PeerWithInfo]
     ): Unit = {
       log.debug(
         s"Received GetTrieNodes request from peer $peerId: requestId=${msg.requestId}, root=${msg.rootHash.take(4).toHex}, paths=${msg.paths.size}, bytes=${msg.responseBytes}"
       )
-
-      val _ = peerWithInfo
       val response: TrieNodes =
         try
           mptStorageOpt match {
@@ -1045,13 +1081,14 @@ object NetworkPeerManagerActor {
     private def handleGetByteCodes(
         msg: GetByteCodes,
         peerId: PeerId,
-        peerWithInfo: Option[PeerWithInfo]
+        // None is expected for pre-handshake SNAP requests (hive devp2p snap test client
+        // sends GetByteCodes immediately after RLPx hello, before ETH-status exchange).
+        // Reserved for future per-peer rate limiting.
+        @annotation.unused peerWithInfo: Option[PeerWithInfo]
     ): Unit = {
       log.debug(
         s"Received GetByteCodes request from peer $peerId: requestId=${msg.requestId}, hashes=${msg.hashes.size}, bytes=${msg.responseBytes}"
       )
-
-      val _ = peerWithInfo
       val response: ByteCodes =
         try
           evmCodeStorageOpt match {
