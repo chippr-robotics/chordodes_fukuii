@@ -45,22 +45,23 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 /** Top-level sync orchestrator.
   *
-  * Pekko Typed migration (Group ROOT): converted to a Typed actor whose behavior type is `Behavior[Any]`. The `Any`
-  * domain is forced — `SyncController` is the central hub that receives heterogeneous raw Classic case classes from
-  * many still-Classic senders: `NetworkPeerManagerActor` (`HandshakedPeers`, `CalibrateChainWeightFromPeer`),
-  * `ForkChoiceManager` (`BeaconHead` via its Classic `setListener(ActorRef)` callback), the JSON-RPC layer (Classic
-  * `askFor[SyncProtocol.Status](SyncProtocol.GetStatus)`), and its children (`SNAPSyncController`, the recovery actors,
-  * `ChainDownloader`, the Classic `FastSync` / `RegularSync` / `PeersClient` / `PivotHeaderBootstrap`). It also
-  * `forward`s arbitrary messages to those children. Replies to a Classic ask go out via `ctx.toClassic.sender()` (same
-  * idiom as `RegularSync`); `forward` becomes `child.tell(msg, ctx.toClassic.sender())`.
+  * Pekko Typed migration (Group ROOT, Phase 2 complete): converted to a Typed actor with behavior type
+  * `Behavior[Command]`. Heterogeneous external case classes from still-Classic senders arrive via two wrappers:
+  * `WrappedExternal` (child fire-and-forget replies via a `messageAdapter`) and `WrappedSyncProtocol` (JSON-RPC asks
+  * that preserve `sender()` for the OQ-5 reply path). Callers include `NetworkPeerManagerActor` (`HandshakedPeers`,
+  * `CalibrateChainWeightFromPeer`), `ForkChoiceManager` (`BeaconHead` via its Classic `setListener(ActorRef)`
+  * callback), the JSON-RPC layer (`SyncProtocol.GetStatus`), and its children (`SNAPSyncController`, the recovery
+  * actors, `ChainDownloader`, the Classic `FastSync` / `RegularSync` / `PeersClient` / `PivotHeaderBootstrap`). Replies
+  * to a Classic ask go out via `ctx.toClassic.sender()` (same idiom as `RegularSync`); forwarding becomes
+  * `child.tell(msg, ctx.toClassic.sender())`.
   *
-  * Each former `context.become(stateX)` becomes a named `Behavior[Any]` factory method on `Impl`. Stored-sender slots
-  * (`healingServeRootRequester`, `recentRootRequester`) capture the Classic `ctx.toClassic.sender()` and reply later.
-  * Timers (`RestartFastSyncNow`, `PollRecoveryPeers`, recent-root / healing-serve-root timeouts, TD calibration) move
-  * to a `TimerScheduler`. `PivotHeaderBootstrap` (now Typed) is spawned via `ctx.spawn`; the remaining Classic children
-  * are spawned via `ctx.toClassic.actorOf`. The Classic `OQ-5` ask path (`SyncProtocol.GetStatus`) is preserved as-is:
-  * `syncController` stays a Classic `ActorRef` to all callers via the `.toClassic` bridge until CAPSTONE flips the
-  * root.
+  * Each former `context.become(stateX)` becomes a named `Behavior[Command]` factory method on `Impl`. Stored-sender
+  * slots (`healingServeRootRequester`, `recentRootRequester`) capture the Classic `ctx.toClassic.sender()` and reply
+  * later. Timers (`RestartFastSyncNow`, `PollRecoveryPeers`, recent-root / healing-serve-root timeouts, TD calibration)
+  * use a `TimerScheduler`. `PivotHeaderBootstrap` (now Typed) is spawned via `ctx.spawn`; the remaining Classic
+  * children are spawned via `ctx.toClassic.actorOf`. The Classic `OQ-5` ask path (`SyncProtocol.GetStatus`) is
+  * preserved as-is: `syncController` stays a Classic `ActorRef` to all callers via the `.toClassic` bridge until
+  * CAPSTONE flips the root.
   */
 object SyncController {
 
@@ -119,6 +120,28 @@ object SyncController {
   //      ask's temp actor, reachable only via `ctx.toClassic.sender()` (which a `messageAdapter` would lose). These
   //      travel as `WrappedSyncProtocol` constructed BY THE CALLER; Phase 3 edits the JSON-RPC / NodeBuilder callers to
   //      wrap. The handler keeps the OQ-5 sender-reply idiom (`ctx.toClassic.sender()`), so no `replyTo` field is added.
+  // INFO-4/INFO-11: concrete message types currently routed through WrappedExternal (child fire-and-forget only).
+  // All arrive via the shared `externalAdapter` messageAdapter registered in `apply()`. Update this list when new
+  // child reply types are added or removed.
+  //
+  //   From SNAPSyncController (child reply-target = externalAdapter.toClassic):
+  //     SNAPSyncController.SnapSyncFinalized, SNAPSyncController.Done, SNAPSyncController.FallbackToFastSync,
+  //     SNAPSyncController.RequestHealingServeRoot, SNAPSyncController.StartRegularSyncBootstrap,
+  //     SNAPSyncController.StartRegularSyncBootstrapByHash, SNAPSyncController.BootstrapComplete,
+  //     SNAPSyncController.PivotBootstrapFailed, SyncProtocol.HealingImpossible, SyncProtocol.Status.Progress
+  //
+  //   From PivotHeaderBootstrap (replyTo = externalAdapter.toClassic):
+  //     PivotHeaderBootstrap.Completed, PivotHeaderBootstrap.Failed
+  //
+  //   From NetworkPeerManagerActor (reply-target = externalAdapter.toClassic, via GetHandshakedPeersCmd):
+  //     NetworkPeerManagerActor.HandshakedPeers
+  //     NetworkPeerManagerActor.CalibrateChainWeightFromPeer (RegisterChainWeightCalibrationTarget)
+  //
+  //   From ForkChoiceManager (listener = externalAdapter.toClassic):
+  //     ForkChoiceManager.BeaconHead
+  //
+  //   From FastSync, RegularSync, CombinedRecoveryScanActor, ChainDownloader (child replies forwarded):
+  //     FastSync.Done, FastSync.FallbackToSnapSync, RegularSync.ProgressProtocol.*, recovery scanner events
   final private[sync] case class WrappedExternal(msg: Any) extends Command
   // Public: external Classic callers (JSON-RPC asks, miner, NodeBuilder startup) construct this to wrap their raw
   // SyncProtocol.* sends so the messages survive the Behavior[Command] boundary. The handler unwraps and replies via
