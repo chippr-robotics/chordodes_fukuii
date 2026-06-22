@@ -36,7 +36,6 @@ and add a dated log entry at the bottom.
 | `ledger/LocalVM.scala` | whole file | Part 8f sweep: `object LocalVM extends VM[InMemoryWorldStateProxy, InMemoryWorldStateProxyStorage]` — 1 grep hit (definition only). Not imported or referenced anywhere in main or test sources. Pure deletion — no call-site changes required. | DEAD | PRISM | 2026-06-22 |
 | `blockchain/sync/AdaptiveSyncStrategy.scala` | whole file (193 lines) | Part 8f sweep: `AdaptiveSyncController`, `SyncStrategy`, `NetworkConditions`, `SyncResult` all unreferenced outside the file. No actor spawns it; no config wires it; no test covers it. Speculative-generality state machine predating the current sync architecture. Pure deletion — no call-site changes required. | DEAD | PRISM | 2026-06-22 |
 | `network/discovery/StaticNodesLoader.scala` | whole file (95 lines) | Part 8f sweep: duplicate of `network/StaticNodesLoader.scala` (the production impl). Discovery version has weaker validation (prefix-only, no port/pubkey check) and is used only by `DiscoveryConfig`. Fix: redirect `DiscoveryConfig` to call `com.chipprbots.ethereum.network.StaticNodesLoader.load(datadir).map(_.toString).toSet` (1-line change), then delete file + migrate or delete `StaticNodesLoaderSpec`. | DEAD | PRISM | 2026-06-22 |
-| `blockchain/sync/SyncControllerSpec.scala` | SyncStateAutoPilot | 7 pre-existing test failures: `SyncControllerSpec.SyncStateAutoPilot.run` throws `MatchError` on `GetHandshakedPeersCmd` because the test autopilot mock does not handle that message (introduced when NPMA shell was removed and callers were rewired). Unrelated to scala3-cleanup-june WRAITH/LOOM commits — confirmed reproducible on parent baseline. Fix: update `SyncStateAutoPilot` to handle `GetHandshakedPeersCmd` and return a plausible `HandshakedPeers` response. Cluster with SyncController spec cleanup. | CLASSIC | MITHRIL | 2026-06-22 |
 
 ---
 
@@ -66,6 +65,7 @@ When 5+ entries share a Type or package, open a dedicated sprint:
 | PoWMining.scala MUTABLE (startMiningProcess) | `consensus/pow/PoWMining.scala:103–132` | Cleared 2026-06-21: FORGE assessment — **SAFE AS-IS, no fix required.** `mutex.synchronized` wraps the entire compound check-then-act (both isEmpty guards and the write), so no race is possible. `startMiningProcess` is private and called exactly once sequentially at boot via `StdNode.start()`. A double-spawn would cause duplicate mining work only — no consensus violation (Ethash verification, ECIP-1017 rewards, state root, fork dispatch all unaffected). `AtomicBoolean` would be redundant. `@volatile` on the three fields is redundant given the synchronized block (cosmetic only — safe to remove in a MITHRIL pass). MITHRIL correctly flagged the pattern but the guard was already correct. | — | FORGE | 2026-06-21 |
 | RegularSync divergence path EXCEPT | `BlockImporter.scala:797` `handleForkRecovery` | Cleared 2026-06-21: HERALD audit confirmed gap — three-path recovery (stale-tip rewind / UnknownBranch rewind / handleForkRecovery) all use blind 128-block rewind with no LCA knowledge. Will eventually converge (iterates 128 blocks per ForkDetectThreshold cycle) but destructively mutates canonical chain during recovery. MESS makes >128-block forks near-impossible on ETC mainnet. Fix spec: generalize `FastSyncBranchResolverActor.fastSync: ClassicActorRef` → `replyTo: ActorRef[BranchResolverResponse]`, add `ResolvingFork` behavior to `BlockImporterLogic`, replace 4-line blind rewind with actor spawn + response. Size S. Routed to DEFERRED-BACKLOG. | — | — | 2026-06-21 |
 | RegularSyncCommand sealed | `SyncProtocol.scala` + `RegularSync.scala` | Cleared 2026-06-22: `923b18ba7` — `FetcherStatusTick`, `PrintStatusTick`, `ProgressProtocol` moved from `RegularSync.scala` → `SyncProtocol.scala`; `trait RegularSyncCommand` is now `sealed`; fallthrough `case _ => Behaviors.unhandled` arm deleted; `RegularSync.ProgressProtocol` type alias preserves all call sites; 31/31 `RegularSyncSpec` tests pass; 0 compile errors. | — | MITHRIL | 2026-06-22 |
+| SyncControllerSpec SyncStateAutoPilot | `SyncControllerSpec.scala` | Cleared 2026-06-22: `fc1030410` — GetHandshakedPeersCmd handler added to autopilot; 7 pre-existing failures resolved. |
 
 ---
 
@@ -160,53 +160,11 @@ Suggested new protocol name: **exception-as-control-flow** — covers `throw` in
 | # | Batch | Prompt | Parallel-safe? |
 |---|-------|--------|---------------|
 | ~~B1~~ | ~~Batch B step 1~~ | ~~P1 MITHRIL Seal RegularSyncCommand~~ | ✅ DONE 2026-06-22 |
-| B2 | Batch B step 2 | P2 MITHRIL SyncControllerSpec autopilot | Run after P1 compiles clean |
+| ~~B2~~ | ~~Batch B step 2~~ | ~~P2 MITHRIL SyncControllerSpec autopilot~~ | ✅ DONE 2026-06-22 — 7 failures resolved |
 | B3 | Batch B step 3 | P3 WRAITH Delete 3 dead files | No compile dependency on P1/P2; safe to run after either |
 | B4 | Batch B step 4 | P4 WRAITH DiscoveryConfig redirect + delete | Run after P3 compile-verified |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
-
----
-
-### P2 — MITHRIL: Fix SyncControllerSpec SyncStateAutoPilot failures
-
-**Agent:** MITHRIL
-**Files:** `src/test/scala/com/chipprbots/ethereum/blockchain/sync/SyncControllerSpec.scala`
-**Prerequisite:** None. Test-only fix. Pre-existing on parent baseline (not introduced here).
-
-**Prompt:**
-> On branch `scala3-cleanup-june`, fix the 7 pre-existing `SyncControllerSpec` failures.
->
-> **Root cause:** `SyncStateAutoPilot.run` throws `MatchError` on `GetHandshakedPeersCmd`
-> because the test autopilot mock does not handle that message. The message was added to
-> `SyncController` when NPMA callers were rewired; the autopilot was not updated.
->
-> **Fix:**
-> 1. Read `SyncControllerSpec.scala` and find the `SyncStateAutoPilot` class/object.
-> 2. Find the `run` method's match block.
-> 3. Add a `GetHandshakedPeersCmd` case that returns a plausible `HandshakedPeers`
->    response (e.g., empty peers list or a minimal stub peer set).
->    The response type must match what `SyncController` expects when it sends that message.
-> 4. Compile: `sbt compile-all` — 0 errors.
-> 5. Run: `sbt testOnly *SyncControllerSpec` — 7 previously failing tests must now pass.
->    No new failures; total passing count must increase by exactly 7.
->
-> Do NOT change any production source files.
-
-**Verification:** 7 failures resolved; `sbt testOnly *SyncControllerSpec` passes all; no production edits
-
-**MANDATORY final step — complete BEFORE closing thread:**
-- `working-docs/CHASE-QUEUE.md` run order table — change `| B2 | Batch B step 2 | P2 ...` to `| ~~B2~~ | ~~Batch B step 2~~ | ~~P2 MITHRIL SyncControllerSpec autopilot~~ | ✅ DONE [date] — 7 failures resolved |`
-- `working-docs/CHASE-QUEUE.md` — remove the SyncControllerSpec open entry from "Open entries" table
-- Add to "Cleared entries log": `| SyncControllerSpec SyncStateAutoPilot | SyncControllerSpec.scala | Cleared [date]: [SHA] — GetHandshakedPeersCmd handler added to autopilot; 7 pre-existing failures resolved. |`
-- `completed/SPRINT-QUEUE.md` — append row: `| [SHA] | SyncControllerSpec — SyncStateAutoPilot GetHandshakedPeersCmd handler (7 pre-existing failures fixed) |`
-- `modernization-log/sync/controller.md` — add under "Quality Fixes" (or create section if absent):
-  `#### [SHA] — SyncControllerSpec: SyncStateAutoPilot GetHandshakedPeersCmd handler`
-  `- **What:** 7 pre-existing MatchError failures fixed; autopilot now handles GetHandshakedPeersCmd → HandshakedPeers stub`
-
-**Opportunistic clearout:** Apply the protocol in CODEBASE-AUDIT.md. `SyncControllerSpec.scala` is a high-value file — scan for other open CHASE-QUEUE or DEFERRED-BACKLOG items in the spec while it is open and address or draft prompts for them.
-
-**Rejection criteria:** Production file edits; changing SyncController logic; adding new test cases unrelated to the fix
 
 ---
 
@@ -235,11 +193,13 @@ Suggested new protocol name: **exception-as-control-flow** — covers `throw` in
 **Verification:** `sbt compile-all` 0 errors after deletion; grep confirms no remaining callers
 
 **MANDATORY final step — complete BEFORE closing thread:**
-- `working-docs/CHASE-QUEUE.md` run order table — change `| B3 | Batch B step 3 | P3 ...` to `| ~~B3~~ | ~~Batch B step 3~~ | ~~P3 WRAITH Delete 3 dead files~~ | ✅ DONE [date] — [N] files deleted |`
+- `working-docs/CHASE-QUEUE.md` run order table — change `| B3 | Batch B step 3 | P3 ...` to `| ~~B3~~ | ~~Batch B step 3~~ | ~~P3 WRAITH Delete 3 dead files~~ | ✅ DONE [date] — 3 files deleted |`
 - `working-docs/CHASE-QUEUE.md` — remove the 3 DEAD entries from Open entries table
+- `working-docs/CHASE-QUEUE.md` — delete this entire `### P3` section from the Clearout Prompts section
 - Add to Cleared entries log: `| MetricsAlreadyConfiguredError + LocalVM + AdaptiveSyncStrategy | Part 8f dead code | Cleared [date]: [SHA] — 3 confirmed dead files deleted. |`
-- `completed/SPRINT-QUEUE.md` — append row: `| [SHA] | Part 8f — delete MetricsAlreadyConfiguredError + LocalVM + AdaptiveSyncStrategy |`
-- `modernization-log/` — no entry needed (dead code deletion, not modernization)
+- `completed/CHORE-QUEUE.md` — append new section following the C1–C5 pattern:
+  `### C[N] — Delete 3 confirmed dead files (P3) ✅ DONE ([SHA])`
+  `[2-4 lines: which files, grep-confirmed 0 callers, compile result]`
 
 **Opportunistic clearout:** Apply the protocol in CODEBASE-AUDIT.md. After grep-confirming each file has no callers, check whether any other DEAD or NULL entries in CHASE-QUEUE are in the same packages — if so, add them to the deletion list or draft a follow-on prompt.
 
@@ -280,8 +240,11 @@ Suggested new protocol name: **exception-as-control-flow** — covers `throw` in
 **MANDATORY final step — complete BEFORE closing thread:**
 - `working-docs/CHASE-QUEUE.md` run order table — change `| B4 | Batch B step 4 | P4 ...` to `| ~~B4~~ | ~~Batch B step 4~~ | ~~P4 WRAITH DiscoveryConfig redirect + delete~~ | ✅ DONE [date] — redirect + delete |`
 - `working-docs/CHASE-QUEUE.md` — remove the `discovery/StaticNodesLoader.scala` DEAD entry from Open entries
+- `working-docs/CHASE-QUEUE.md` — delete this entire `### P4` section from the Clearout Prompts section
 - Add to Cleared entries log: `| discovery/StaticNodesLoader.scala | Part 8f dead code | Cleared [date]: [SHA] — DiscoveryConfig redirected to network.StaticNodesLoader; duplicate deleted. |`
-- `completed/SPRINT-QUEUE.md` — append row: `| [SHA] | Part 8f — redirect DiscoveryConfig, delete discovery/StaticNodesLoader |`
+- `completed/CHORE-QUEUE.md` — append new section following the C1–C5 pattern:
+  `### C[N] — Redirect DiscoveryConfig + delete duplicate StaticNodesLoader (P4) ✅ DONE ([SHA])`
+  `[2-4 lines: caller redirected, duplicate removed, compile + test result]`
 - `modernization-log/network/discovery.md` — add under "Quality Fixes":
   `#### [SHA] — Part 8f: duplicate StaticNodesLoader deleted`
   `- **What:** DiscoveryConfig redirected to network.StaticNodesLoader (stricter validation); discovery/StaticNodesLoader.scala removed`
