@@ -95,6 +95,32 @@ object SyncController {
   private case class BytecodeRecoveryTerminated(ref: ActorRef) extends Command
   private case class StorageRecoveryTerminated(ref: ActorRef) extends Command
 
+  // ── Phase 2 (ROOT-b): wrappers for heterogeneous external messages ──────────────────────────────────────
+  //
+  // SyncController is the central sync hub: it receives raw case classes from many senders that do NOT share a common
+  // sealed trait (`FastSync.Done`, `SNAPSyncController.SnapSyncFinalized`, `PivotHeaderBootstrap.Completed`,
+  // `RegularSync.ProgressProtocol.ImportedBlock`, `ForkChoiceManager.BeaconHead`, `NetworkPeerManagerActor.*`, the
+  // recovery actors, `ChainDownloader.*`, plus `SyncProtocol.*` from JSON-RPC asks). Introducing per-source umbrella
+  // traits would require editing those (mostly still-Classic or mid-S3-migration) child files — out of ROOT-b scope.
+  //
+  // Phase 2 therefore uses TWO wrappers, mirroring FastSync (commit e41f50b7d) but with one umbrella for the
+  // sender-independent traffic:
+  //
+  //   1. `WrappedExternal(msg: Any)` — every CHILD-ORIGINATED, fire-and-forget message (no `sender()` needed). A single
+  //      `ctx.messageAdapter[Any]` is registered in `apply()`; we hand its `.toClassic` ref to children as their
+  //      `replyTo`/listener (instead of the bare self-ref Classic adapter), so each child reply arrives as `WrappedExternal`.
+  //      The handler unwraps and dispatches on the payload type — the existing match arms move under
+  //      `case WrappedExternal(msg) => msg match { ... }`. Forwarding catch-alls inside that block still work because
+  //      the parent is the message's destination, not a relay needing the original sender.
+  //
+  //   2. `WrappedSyncProtocol(msg)` — EXTERNAL-SENDER ask / reply-dependent traffic (`sender()` needed). The JSON-RPC
+  //      layer asks `syncController.askFor[SyncProtocol.Status](SyncProtocol.GetStatus)` and expects a reply to the
+  //      ask's temp actor, reachable only via `ctx.toClassic.sender()` (which a `messageAdapter` would lose). These
+  //      travel as `WrappedSyncProtocol` constructed BY THE CALLER; Phase 3 edits the JSON-RPC / NodeBuilder callers to
+  //      wrap. The handler keeps the OQ-5 sender-reply idiom (`ctx.toClassic.sender()`), so no `replyTo` field is added.
+  final private[sync] case class WrappedExternal(msg: Any) extends Command
+  final private[sync] case class WrappedSyncProtocol(msg: SyncProtocol.SyncProtocolMsg) extends Command
+
   // scalastyle:off parameter.number
   def apply(
       blockchain: Blockchain,
@@ -163,8 +189,8 @@ object SyncController {
   // scalastyle:off number.of.methods
   // scalastyle:off parameter.number
   private class Impl(
-      ctx: ActorContext[Any],
-      timers: TimerScheduler[Any],
+      ctx: ActorContext[Command],
+      timers: TimerScheduler[Command],
       blockchain: Blockchain,
       blockchainReader: BlockchainReader,
       blockchainWriter: BlockchainWriter,
@@ -256,7 +282,7 @@ object SyncController {
       if clPivotEnabled then {
         forkChoiceManagerOpt.foreach { fcm =>
           // ForkChoiceManager.setListener takes a Classic ActorRef; bridge ctx.self.
-          fcm.setListener(ctx.self.toClassic)
+          fcm.setListener(externalAdapter.toClassic)
           log.info(
             "Registered SyncController as ForkChoiceManager listener (post-merge chain TTD={}); " +
               "SNAP pivot will be CL-driven once first forkchoiceUpdated arrives.",
@@ -269,20 +295,22 @@ object SyncController {
     private def onPostStop(): Unit =
       forkChoiceManagerOpt.foreach(_.clearListener())
 
-    /** Wrap a behavior with the shared `PostStop` cleanup so listener deregistration runs from every state. */
-    def withPostStop(b: Behavior[Any]): Behavior[Any] =
+    /** Wrap a behavior with the shared `PostStop` cleanup so listener deregistration runs from every state. Retyped to
+      * `[Command, Command]` in Phase 2 (ROOT-b) now that the behavior domain is `Command`.
+      */
+    def withPostStop(b: Behavior[Command]): Behavior[Command] =
       Behaviors.intercept(() =>
-        new org.apache.pekko.actor.typed.BehaviorInterceptor[Any, Any]() {
+        new org.apache.pekko.actor.typed.BehaviorInterceptor[Command, Command]() {
           override def aroundReceive(
-              c: org.apache.pekko.actor.typed.TypedActorContext[Any],
-              msg: Any,
-              target: org.apache.pekko.actor.typed.BehaviorInterceptor.ReceiveTarget[Any]
-          ): Behavior[Any] = target(c, msg)
+              c: org.apache.pekko.actor.typed.TypedActorContext[Command],
+              msg: Command,
+              target: org.apache.pekko.actor.typed.BehaviorInterceptor.ReceiveTarget[Command]
+          ): Behavior[Command] = target(c, msg)
           override def aroundSignal(
-              c: org.apache.pekko.actor.typed.TypedActorContext[Any],
+              c: org.apache.pekko.actor.typed.TypedActorContext[Command],
               signal: org.apache.pekko.actor.typed.Signal,
-              target: org.apache.pekko.actor.typed.BehaviorInterceptor.SignalTarget[Any]
-          ): Behavior[Any] = {
+              target: org.apache.pekko.actor.typed.BehaviorInterceptor.SignalTarget[Command]
+          ): Behavior[Command] = {
             signal match {
               case org.apache.pekko.actor.typed.PostStop => onPostStop()
               case _                                     => ()
@@ -372,6 +400,23 @@ object SyncController {
       */
     def scheduler: Scheduler = externalSchedulerOpt.getOrElse(ctx.system.classicSystem.scheduler)
 
+    /** Phase 2 (ROOT-b) unwrap shim. Each behavior receives `Command`; the heterogeneous external traffic is wrapped
+      * (`WrappedExternal` via the message adapter, `WrappedSyncProtocol` constructed by callers). Unwrapping to the raw
+      * payload here lets the existing per-behavior match arms (which key on the concrete external types and on the
+      * internal `Command` markers) stay unchanged. Internal Commands (timers, death-watch markers, status queries) fall
+      * through the wildcard and match themselves. `WrappedSyncProtocol` preserves the ask `sender()` because callers
+      * `.tell` it with the original sender; `WrappedExternal` is fire-and-forget (its arms never read `sender()`).
+      */
+    private def unwrap(cmd: Command): Any = cmd match {
+      case WrappedExternal(m)     => m
+      case WrappedSyncProtocol(m) => m
+      case m                      => m
+    }
+
+    // Shared message adapter: children we spawn get `externalAdapter.toClassic` as their reply target, so every
+    // fire-and-forget child message lands here as `WrappedExternal(msg)`. Registered once per actor instance.
+    val externalAdapter: TypedActorRef[Any] = ctx.messageAdapter[Any](WrappedExternal.apply)
+
     /** Load SNAP sync configuration with fallback to defaults */
     private def loadSnapSyncConfig(): SNAPSyncConfig =
       try
@@ -382,7 +427,8 @@ object SyncController {
           SNAPSyncConfig()
       }
 
-    def idle(): Behavior[Command] = Behaviors.receive { (_, msg) =>
+    def idle(): Behavior[Command] = Behaviors.receive { (_, cmd) =>
+      val msg = unwrap(cmd)
       msg match {
         case SyncProtocol.Start =>
           start()
@@ -402,7 +448,8 @@ object SyncController {
       }
     }
 
-    def runningFastSync(fastSync: ActorRef): Behavior[Command] = Behaviors.receive { (_, msg) =>
+    def runningFastSync(fastSync: ActorRef): Behavior[Command] = Behaviors.receive { (_, cmd) =>
+      val msg = unwrap(cmd)
       msg match {
         case SyncProtocol.ResetFastSync =>
           handleResetFastSync(ctx.toClassic.sender())
@@ -443,7 +490,8 @@ object SyncController {
       }
     }
 
-    def runningSnapSync(snapSync: ActorRef): Behavior[Command] = Behaviors.receive { (_, msg) =>
+    def runningSnapSync(snapSync: ActorRef): Behavior[Command] = Behaviors.receive { (_, cmd) =>
+      val msg = unwrap(cmd)
       msg match {
         case SyncProtocol.ResetFastSync =>
           handleResetFastSync(ctx.toClassic.sender())
@@ -471,7 +519,7 @@ object SyncController {
                   peersClient,
                   blockchainWriter,
                   targetBlock,
-                  replyTo = ctx.self.toClassic,
+                  replyTo = externalAdapter.toClassic,
                   syncConfig,
                   preferSnapPeers = true
                 ),
@@ -505,7 +553,7 @@ object SyncController {
                   peersClient,
                   blockchainWriter,
                   headHash,
-                  replyTo = ctx.self.toClassic,
+                  replyTo = externalAdapter.toClassic,
                   syncConfig,
                   preferSnapPeers = false
                 ),
@@ -583,7 +631,9 @@ object SyncController {
         // and reply HealingServeRoot to the child. Run inline — no transition into the deadlock-prone bootstrap state.
         case SNAPSyncController.RequestHealingServeRoot =>
           if healingServeRootRequester.isEmpty && healingServeRootBootstrap.isEmpty then {
-            healingServeRootRequester = Some(ctx.toClassic.sender())
+            // Phase 2 (ROOT-b): reply to the known SNAP child ref directly rather than `ctx.toClassic.sender()`, which
+            // would resolve to the shared message adapter now that SNAP routes to `externalAdapter.toClassic`.
+            healingServeRootRequester = Some(snapSync)
             log.info("[HEAL-SERVE-ROOT] Healing requested a newest-servable root. Polling peers for the network head.")
             networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeers
           } else {
@@ -658,7 +708,7 @@ object SyncController {
                 peersClient,
                 blockchainWriter,
                 recentBlock,
-                replyTo = ctx.self.toClassic,
+                replyTo = externalAdapter.toClassic,
                 syncConfig,
                 preferSnapPeers = true
               ),
@@ -707,8 +757,8 @@ object SyncController {
         healingServeRootRequester = None
       }
 
-    def runningRegularSync(regularSync: ActorRef): Behavior[Command] = Behaviors.receive { (_, other) =>
-      handleRegularSyncMsg(regularSync, other)
+    def runningRegularSync(regularSync: ActorRef): Behavior[Command] = Behaviors.receive { (_, cmd) =>
+      handleRegularSyncMsg(regularSync, unwrap(cmd))
     }
 
     /** Shared message handler for the regular-sync states. Returns the next `Behavior[Any]`. Extracted so the backfill
@@ -818,7 +868,8 @@ object SyncController {
       * delegated to `runningRegularSync(regularSync)`.
       */
     def runningRegularSyncWithBackfill(regularSync: ActorRef, snapSync: ActorRef): Behavior[Command] =
-      Behaviors.receive { (_, msg) =>
+      Behaviors.receive { (_, cmd) =>
+        val msg = unwrap(cmd)
         msg match {
           case com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.Done =>
             log.info("SNAP background backfill complete; shutting down SNAPSyncController.")
@@ -840,7 +891,7 @@ object SyncController {
             log.info("Restart triggered while SNAP backfill was running; poison-pilling SNAP backfill actor first.")
             ctx.unwatch(snapSync.toTyped[Nothing])
             snapSync ! PoisonPill
-            ctx.self ! m // Re-deliver so the new state handles it.
+            ctx.self ! cmd // Re-deliver the original Command so the new state handles it.
             runningRegularSync(regularSync)
 
           case m =>
@@ -883,7 +934,8 @@ object SyncController {
         regularSync: ActorRef,
         targetBlock: BigInt,
         originalSnapSyncRef: ActorRef
-    ): Behavior[Command] = Behaviors.receive { (_, msg) =>
+    ): Behavior[Command] = Behaviors.receive { (_, cmd) =>
+      val msg = unwrap(cmd)
       msg match {
         case SyncProtocol.ResetFastSync =>
           handleResetFastSync(ctx.toClassic.sender())
@@ -936,7 +988,8 @@ object SyncController {
         headerBootstrap: ActorRef,
         targetBlock: BigInt,
         originalSnapSyncRef: ActorRef
-    ): Behavior[Command] = Behaviors.receive { (_, msg) =>
+    ): Behavior[Command] = Behaviors.receive { (_, cmd) =>
+      val msg = unwrap(cmd)
       msg match {
         case SyncProtocol.ResetFastSync =>
           handleResetFastSync(ctx.toClassic.sender())
@@ -996,7 +1049,7 @@ object SyncController {
                   newPeersClient,
                   blockchainWriter,
                   newTargetBlock,
-                  replyTo = ctx.self.toClassic,
+                  replyTo = externalAdapter.toClassic,
                   syncConfig,
                   preferSnapPeers = true
                 ),
@@ -1047,7 +1100,8 @@ object SyncController {
         // using the slot). U2: declining keeps the child's current serve root.
         case SNAPSyncController.RequestHealingServeRoot =>
           log.debug("[HEAL-SERVE-ROOT] Request arrived during pivot header bootstrap — declining (serve root kept).")
-          ctx.toClassic.sender() ! SNAPSyncController.HealingServeRoot(0, None)
+          // Phase 2 (ROOT-b): reply to the known SNAP child ref (the request's origin) rather than `sender()`.
+          originalSnapSyncRef ! SNAPSyncController.HealingServeRoot(0, None)
           Behaviors.same
 
         case msg if isInternalMarker(msg) =>
@@ -1419,7 +1473,7 @@ object SyncController {
             blacklist,
             syncConfig,
             configBuilder,
-            ctx.self.toClassic
+            externalAdapter.toClassic
           ),
           s"fast-sync-$syncGeneration",
           DispatcherSelector.fromConfig("sync-dispatcher")
@@ -1450,7 +1504,7 @@ object SyncController {
             snapSyncConfig,
             scheduler,
             blacklist,
-            syncController = ctx.self.toClassic
+            syncController = externalAdapter.toClassic
           ),
           s"snap-sync-$syncGeneration",
           DispatcherSelector.fromConfig("sync-dispatcher")
@@ -1516,7 +1570,7 @@ object SyncController {
       // cumulative TD when it detects a TD-PROXY-GAP at peer handshake (stale genesis-proxy TD
       // stored by SNAP finalization when no ETH68 peers were available at that time).
       networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor
-        .RegisterChainWeightCalibrationTarget(ctx.self.toClassic)
+        .RegisterChainWeightCalibrationTarget(externalAdapter.toClassic)
 
       // Unconditional timed calibration: fire CalibrateChainWeightNow 30s after RegularSync starts.
       // NPA forwards bestNetworkTip (best ETH68 peer TD seen since startup) to this actor.
@@ -1604,7 +1658,7 @@ object SyncController {
               networkPeerManager = networkPeerManager,
               peerEventBus = peerEventBus,
               syncConfig = syncConfig,
-              replyTo = ctx.self.toClassic,
+              replyTo = externalAdapter.toClassic,
               maxConcurrentRequests = snapSyncConfig.chainBackfillConcurrentRequests,
               requestTimeout = snapSyncConfig.chainDownloadTimeout
             ),
@@ -1622,7 +1676,8 @@ object SyncController {
       * of routing through a lingering `SNAPSyncController`.
       */
     def runningRegularSyncWithStandaloneBackfill(regularSync: ActorRef, resumer: ActorRef): Behavior[Command] =
-      Behaviors.receive { (_, msg) =>
+      Behaviors.receive { (_, cmd) =>
+        val msg = unwrap(cmd)
         msg match {
           case com.chipprbots.ethereum.blockchain.sync.snap.ChainDownloader.Done =>
             log.info("Standalone chain backfill resume complete.")
@@ -1648,7 +1703,7 @@ object SyncController {
             log.info("Restart triggered while standalone backfill was running; poison-pilling backfill resumer first.")
             ctx.unwatch(resumer.toTyped[Nothing])
             resumer ! PoisonPill
-            ctx.self ! m // Re-deliver so the new state handles it.
+            ctx.self ! cmd // Re-deliver the original Command so the new state handles it.
             runningRegularSync(regularSync)
 
           case m =>
@@ -1688,7 +1743,7 @@ object SyncController {
                 stateStorage,
                 evmCodeStorage,
                 appStateStorage,
-                ctx.self.toClassic,
+                externalAdapter.toClassic,
                 pivotBlock,
                 snapSyncConfig
               ),
@@ -1709,7 +1764,7 @@ object SyncController {
                         evmCodeStorage,
                         appStateStorage,
                         networkPeerManager,
-                        ctx.self.toClassic,
+                        externalAdapter.toClassic,
                         pivotBlock,
                         snapSyncConfig
                       ),
@@ -1730,7 +1785,7 @@ object SyncController {
                         appStateStorage,
                         flatSlotStorage,
                         networkPeerManager,
-                        ctx.self.toClassic,
+                        externalAdapter.toClassic,
                         pivotBlock,
                         snapSyncConfig
                       ),
@@ -1765,7 +1820,8 @@ object SyncController {
         stateRoot: ByteString,
         pivotBlock: BigInt,
         snapSyncConfig: com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncConfig
-    ): Behavior[Command] = Behaviors.receive { (_, msg) =>
+    ): Behavior[Command] = Behaviors.receive { (_, cmd) =>
+      val msg = unwrap(cmd)
       msg match {
         case CombinedRecoveryScanActor.CombinedScanComplete(byteGaps, storGaps) =>
           val effByte = if needBytecode then byteGaps else Nil
@@ -1786,7 +1842,7 @@ object SyncController {
                       evmCodeStorage,
                       appStateStorage,
                       networkPeerManager,
-                      ctx.self.toClassic,
+                      externalAdapter.toClassic,
                       pivotBlock,
                       snapSyncConfig,
                       effByte
@@ -1808,7 +1864,7 @@ object SyncController {
                       appStateStorage,
                       flatSlotStorage,
                       networkPeerManager,
-                      ctx.self.toClassic,
+                      externalAdapter.toClassic,
                       pivotBlock,
                       snapSyncConfig,
                       effStor
@@ -1860,7 +1916,7 @@ object SyncController {
         bytecodeActor.foreach(a => ctx.watchWith(a.toTyped[Nothing], BytecodeRecoveryTerminated(a)))
         storageActor.foreach(a => ctx.watchWith(a.toTyped[Nothing], StorageRecoveryTerminated(a)))
         networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterSnapSyncController(
-          ctx.self.toClassic
+          externalAdapter.toClassic
         )
         timers.startTimerWithFixedDelay(RecoveryPollerKey, PollRecoveryPeers, 2.seconds, 5.seconds)
         runningRecovery(bytecodeActor, storageActor, bytecodeComplete, storageComplete)
@@ -1884,7 +1940,8 @@ object SyncController {
         storageActor: Option[ActorRef],
         bytecodeComplete: Boolean,
         storageComplete: Boolean
-    ): Behavior[Command] = Behaviors.receive { (_, msg) =>
+    ): Behavior[Command] = Behaviors.receive { (_, cmd) =>
+      val msg = unwrap(cmd)
       msg match {
         case BytecodeRecoveryActor.RecoveryComplete =>
           log.info(s"[SNAP-RECOVERY] bytecode recovery complete (storage done: $storageComplete)")
@@ -2008,7 +2065,7 @@ object SyncController {
                 peersClient,
                 blockchainWriter,
                 recentBlock,
-                replyTo = ctx.self.toClassic,
+                replyTo = externalAdapter.toClassic,
                 syncConfig,
                 preferSnapPeers = true
               ),
