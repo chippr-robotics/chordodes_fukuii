@@ -522,15 +522,6 @@ object NetworkPeerManagerActor {
                 bru.latestBlockHash
               )
               lastBlockSignalMs(peerId) = System.currentTimeMillis()
-            case bru: ETH69.BlockRangeUpdate => // legacy path (Phase 3 cleanup)
-              log.info(
-                "ETH69_BRU_RECEIVED: peer={} earliest={} latest={} latestHash={}",
-                peerId,
-                bru.earliestBlock,
-                bru.latestBlock,
-                bru.latestBlockHash
-              )
-              lastBlockSignalMs(peerId) = System.currentTimeMillis()
             case _: ETHPackets.BlockHeaders | _: ETHPackets.NewBlock | _: NewBlockHashes =>
               lastBlockSignalMs(peerId) = System.currentTimeMillis()
             case _ => // not a block-height signal
@@ -870,8 +861,6 @@ object NetworkPeerManagerActor {
         case m: NewBlockHashes =>
           update(m.hashes.map(h => (h.number, h.hash)))
         case m: ETHPackets.BlockRangeUpdate =>
-          update(Seq((m.latestBlock, m.latestBlockHash)))
-        case m: ETH69.BlockRangeUpdate => // legacy path (Phase 3 cleanup)
           update(Seq((m.latestBlock, m.latestBlockHash)))
         case _ => initialPeerInfo
       }

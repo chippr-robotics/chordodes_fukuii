@@ -31,7 +31,7 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.*
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.Codes
-import com.chipprbots.ethereum.network.p2p.messages.ETH69.BlockRangeUpdate
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockRangeUpdate
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockHeaders
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.GetBlockHeaders
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
@@ -130,14 +130,13 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
   ) in new TestSetup {
     // ETH/69 peers send BlockRangeUpdate instead of NewBlock to announce their chain tip.
     // NetworkPeerManagerActor must update peerInfo.maxBlockNumber from BlockRangeUpdate.latestBlock.
-    import com.chipprbots.ethereum.network.p2p.messages.ETH69
-
+    // The inbound decoder produces ETHPackets.BlockRangeUpdate (not ETH69.BlockRangeUpdate).
     expectInitialSubscriptions()
     setupNewPeer(peer1, peer1Probe, peer1Info)
 
     val newLatestBlock: BigInt = peer1Info.maxBlockNumber + 7
     val newLatestBlockHash: ByteString = ByteString(Array.fill(32)(0xab.toByte))
-    val blockRangeUpdate: BlockRangeUpdate = ETH69.BlockRangeUpdate(
+    val blockRangeUpdate: BlockRangeUpdate = BlockRangeUpdate(
       earliestBlock = BigInt(0),
       latestBlock = newLatestBlock,
       latestBlockHash = newLatestBlockHash
@@ -155,14 +154,13 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     UnitTest,
     NetworkTest
   ) in new TestSetup {
-    import com.chipprbots.ethereum.network.p2p.messages.ETH69
-
     expectInitialSubscriptions()
     setupNewPeer(peer1, peer1Probe, peer1Info)
 
     // Send a BlockRangeUpdate with a lower block number — peer info should not regress
+    // The inbound decoder produces ETHPackets.BlockRangeUpdate (not ETH69.BlockRangeUpdate).
     val staleLatestBlock: BigInt = peer1Info.maxBlockNumber - 1
-    val blockRangeUpdate: BlockRangeUpdate = ETH69.BlockRangeUpdate(
+    val blockRangeUpdate: BlockRangeUpdate = BlockRangeUpdate(
       earliestBlock = BigInt(0),
       latestBlock = staleLatestBlock,
       latestBlockHash = ByteString(Array.fill(32)(0xcc.toByte))

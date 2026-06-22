@@ -216,6 +216,10 @@ object FastSync {
         msg match {
           case WrappedSyncProtocol(SyncProtocol.Start) => start()
           case GetStatusCmd(replyTo)                   => replyTo ! SyncProtocol.Status.NotSyncing; Behaviors.same
+          // By-design Classic bridge: sender() is always a Classic ask-temp actor here.
+          // GetStatusCmd is constructed internally from WrappedSyncProtocol(GetStatus);
+          // all external callers reach it via a Classic bridge ref. Safe as long as
+          // SyncController is never exposed as a Typed ActorRef[Command] to callers.
           case WrappedSyncProtocol(SyncProtocol.GetStatus) =>
             ctx.self ! GetStatusCmd(ctx.toClassic.sender()); Behaviors.same
           case _ => Behaviors.same
