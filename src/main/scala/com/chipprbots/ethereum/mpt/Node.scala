@@ -30,7 +30,9 @@ sealed abstract class MptNode {
 
   // Overriding equals is necessary to avoid array comparisons.
   override def equals(obj: Any): Boolean =
-    obj.isInstanceOf[MptNode] && hash.sameElements(obj.asInstanceOf[MptNode].hash)
+    obj match
+      case other: MptNode => hash.sameElements(other.hash)
+      case _              => false
 
   override def hashCode(): Int =
     17 + util.Arrays.hashCode(hash)
