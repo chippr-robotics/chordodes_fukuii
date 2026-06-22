@@ -38,9 +38,6 @@ case class Metrics(metricsPrefix: String, registry: MeterRegistry, serverPort: I
     server.close()
   }
 
-  def deltaSpike(name: String): DeltaSpikeGauge =
-    new DeltaSpikeGauge(mkName(name), this)
-
   /** Returns a [[io.micrometer.core.instrument.Gauge Gauge]].
     * @param computeValue
     *   A function that computes the current gauge value.
