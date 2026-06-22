@@ -8,8 +8,6 @@ import org.apache.pekko.actor.typed.scaladsl.Behaviors
 
 import cats.effect.unsafe.IORuntime
 
-import scala.concurrent.duration.DurationInt
-
 import com.chipprbots.ethereum.consensus.pow.PoWMiningCoordinator.CoordinatorProtocol
 import com.chipprbots.ethereum.consensus.pow.miners.EthashDAGManager
 import com.chipprbots.ethereum.consensus.pow.miners.EthashMiner
@@ -80,7 +78,6 @@ class PoWMiningCoordinator private (
 
   // CE3: Using global IORuntime for typed actor operations
   implicit private val scheduler: IORuntime = IORuntime.global
-  5.seconds
   private val log = context.log
   private val dagManager = new EthashDAGManager(blockCreator)
 
@@ -132,8 +129,6 @@ class PoWMiningCoordinator private (
     mine(miner, bestBlock)
   }
 
-  private def mine(miner: Miner, bestBlock: Block): Unit = {
-    import scala.concurrent.ExecutionContext.Implicits.global
-    miner.processMining(bestBlock).foreach(_ => context.self ! MineNext)
-  }
+  private def mine(miner: Miner, bestBlock: Block): Unit =
+    miner.processMining(bestBlock).foreach(_ => context.self ! MineNext)(context.executionContext)
 }
