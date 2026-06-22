@@ -919,7 +919,7 @@ trait EngineApiBuilder {
       blockchainWriter,
       blockExecution,
       forkChoiceManager,
-      pendingTransactionsManagerTyped
+      Some(pendingTransactionsManagerTyped)
     )(blockchainConfig, typedScheduler)
   }
 

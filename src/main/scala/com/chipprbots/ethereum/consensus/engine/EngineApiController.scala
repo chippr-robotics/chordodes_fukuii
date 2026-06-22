@@ -701,16 +701,19 @@ class EngineApiController(
   }
 
   private def encodePayloadStatus(status: PayloadStatusV1): JValue = {
-    var fields: List[(String, JValue)] = List("status" -> JString(status.status.value))
-    fields =
-      fields :+ ("latestValidHash" -> status.latestValidHash.map(h => JString(byteStringToHex(h))).getOrElse(JNull))
-    fields = fields :+ ("validationError" -> status.validationError.map(JString(_)).getOrElse(JNull))
+    val fields: List[(String, JValue)] = List(
+      "status" -> JString(status.status.value),
+      "latestValidHash" -> status.latestValidHash.map(h => JString(byteStringToHex(h))).getOrElse(JNull),
+      "validationError" -> status.validationError.map(JString(_)).getOrElse(JNull)
+    )
     JObject(fields)
   }
 
   private def encodeForkchoiceUpdatedResponse(response: ForkchoiceUpdatedResponse): JValue = {
-    var fields: List[(String, JValue)] = List("payloadStatus" -> encodePayloadStatus(response.payloadStatus))
-    fields = fields :+ ("payloadId" -> response.payloadId.map(id => JString(byteStringToHex(id))).getOrElse(JNull))
+    val fields: List[(String, JValue)] = List(
+      "payloadStatus" -> encodePayloadStatus(response.payloadStatus),
+      "payloadId" -> response.payloadId.map(id => JString(byteStringToHex(id))).getOrElse(JNull)
+    )
     JObject(fields)
   }
 

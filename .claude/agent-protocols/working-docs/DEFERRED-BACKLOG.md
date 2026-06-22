@@ -998,13 +998,15 @@ VERIFY: `compile-all` — 0 errors. `testOnly *EngineApi*` — 16/16 ✅.
 |-------------------|---------|-------|------|
 | Classic actor — Wave 3 LOOM sprint | `sync/snap/SNAPSyncController.scala` | 33 | Wave 3 network/sync migration (SNAP1) |
 | Consensus-critical — FORGE review | `vm/VM.scala`, `vm/OpCode.scala`, `vm/PrecompiledContracts.scala`, `ledger/BlockPreparator.scala`, `mpt/StackTrie.scala`, `consensus/validators/std/StdSignedTransactionValidator.scala` | 6 | FORGE sign-off per file |
+| Consensus-path (ETH Engine API) — BEACON review | `consensus/engine/EngineApiController.scala:96` (`handleNewPayload`, malformed-payload decode `Left` branch), `consensus/engine/EngineApiController.scala:226` (`handleForkchoiceUpdated`, malformed-params decode `Left` branch) | 2 | BEACON sign-off (S3-D) |
 
 **Full ratchet lock checklist:**
 1. ~~C2 chore clears ~52 sites~~ ✅ DONE `9eb1f4e06`
 2. ~~LOOM Phase 0 for TNHC clears 11 sites~~ ✅ DONE `7a48c5988`
 3. FORGE reviews and clears 6 consensus sites (1 cleared: consensus/engine/JwtAuthenticator.scala — S3-C) ← add to relevant FORGE sessions
-4. Wave 3 SNAP1 migration sprint clears SNAPSyncController 33 sites ← gated on NET2
-5. After all above: run `sbt scalafixAll` to confirm 0 violations → ratchet locked
+4. BEACON reviews and clears 2 ETH Engine API sites — `EngineApiController.scala:96` + `:226` (S3-D). Both are early-`return IO.pure(...)` decode-error guards inside large consensus-path method bodies; removing the `return` requires wrapping ~90 lines of post-decode body into the `Right`/`else` branch. Deferred from S3-A/S3-D/S3-F commit (2026-06-22): the byte-for-byte response behavior must be preserved across the re-indent; gated on a focused BEACON pass, not bundled with the low-risk Option/val changes.
+5. Wave 3 SNAP1 migration sprint clears SNAPSyncController 33 sites ← gated on NET2
+6. After all above: run `sbt scalafixAll` to confirm 0 violations → ratchet locked
 
 **Other rules to evaluate enabling (unchanged from original plan):**
 ```
@@ -1014,9 +1016,9 @@ ExplicitResultTypes      # explicit return types on public defs (enable graduall
 ```
 These are lower priority and unblocked — add one at a time, fix violations, commit together.
 
-**Gate**: Full ratchet lock gated on LOOM S3 (TNHC) + FORGE (consensus files) + Wave 3 (SNAP).
+**Gate**: Full ratchet lock gated on LOOM S3 (TNHC) + FORGE (consensus files) + BEACON (ETH Engine API S3-D) + Wave 3 (SNAP).
 Partial progress (C2) is safe to run any time.
-**Agent**: MITHRIL (rule evaluation); FORGE (consensus files); LOOM (TNHC + SNAPSyncController).
+**Agent**: MITHRIL (rule evaluation); FORGE (consensus files); BEACON (Engine API S3-D); LOOM (TNHC + SNAPSyncController).
 
 ---
 

@@ -167,7 +167,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         blockchainWriter,
         blockExec,
         forkChoiceManager,
-        pendingTxManager
+        Some(pendingTxManager)
       )(blockchainConfig, typedScheduler)
 
       // Build a post-merge genesis block with accounts

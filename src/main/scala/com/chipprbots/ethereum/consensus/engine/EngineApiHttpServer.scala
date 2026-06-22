@@ -166,15 +166,15 @@ class EngineApiHttpServer(
   }
 
   private def responseToJson(resp: JsonRpcResponse): JValue = {
-    var fields: List[(String, JValue)] = List("jsonrpc" -> JString(resp.jsonrpc))
-    resp.result.foreach(r => fields = fields :+ ("result" -> r))
-    resp.error.foreach(e =>
-      fields = fields :+ ("error" -> JObject(
+    val resultField: List[(String, JValue)] = resp.result.map(r => "result" -> r).toList
+    val errorField: List[(String, JValue)] = resp.error.map { e =>
+      "error" -> JObject(
         "code" -> JInt(e.code),
         "message" -> JString(e.message)
-      ))
-    )
-    fields = fields :+ ("id" -> resp.id)
+      )
+    }.toList
+    val fields: List[(String, JValue)] =
+      ("jsonrpc" -> JString(resp.jsonrpc)) :: resultField ::: errorField ::: List("id" -> resp.id)
     JObject(fields)
   }
 
