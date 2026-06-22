@@ -244,6 +244,15 @@ invocation. `sbt compile-all` → 0 errors after deletion. 200 lines removed.
 
 ---
 
+### C17 — Redirect DiscoveryConfig + delete duplicate StaticNodesLoader (P4) ✅ DONE (`ff2fc219c`)
+DiscoveryConfig.scala redirected from discovery.StaticNodesLoader to network.StaticNodesLoader
+(stricter validation: full pubkey + port check vs prefix-only). URI results converted to Set[String]
+via `.map(_.toString).toSet` for NodeParser.parseNodes type compatibility. discovery/StaticNodesLoader.scala
+and discovery/StaticNodesLoaderSpec.scala removed. Stale logback.xml entry deleted.
+sbt compile-all: 0 errors before and after deletion. testOnly *DiscoveryConfig* *StaticNodesLoader*: 18/18 passed.
+
+---
+
 ### C14 ✅ SyncController Classic scheduler → Typed ctx.system.scheduler (2 sites) — DONE (`8d460a145`)
 
 PRISM post-capstone finding. `fix(pekko): replace Classic scheduler with Typed ctx.system.scheduler in SyncController (7d)`
@@ -280,3 +289,4 @@ PRISM post-capstone finding. `fix(pekko): replace Classic scheduler with Typed c
 | 30 min | C14 SyncController Classic scheduler → Typed `ctx.system.scheduler` (2 sites) | ✅ DONE `8d460a145` | — |
 | 10 min | C15 SyncControllerSpec autopilot GetHandshakedPeersCmd handler (P2) | ✅ DONE `fc1030410` | — |
 | 10 min | C16 Delete 3 confirmed dead files (P3) | ✅ DONE `fa57df9b9` | — |
+| 15 min | C17 Redirect DiscoveryConfig + delete duplicate StaticNodesLoader (P4) | ✅ DONE `ff2fc219c` | — |

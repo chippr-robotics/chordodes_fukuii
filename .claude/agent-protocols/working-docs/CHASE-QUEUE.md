@@ -32,7 +32,6 @@ and add a dated log entry at the bottom.
 | File | Line(s) | Pattern | Type | Agent | Date |
 |------|---------|---------|------|-------|------|
 | `consensus/pow/PoWMiningCoordinator.scala` | — | Threading model finding (R9/8d B2): FORGE-gated. See `threading-model-audit.md §B2` for detail. FORGE review required before any fix. | MUTABLE | PRISM | 2026-06-21 |
-| `network/discovery/StaticNodesLoader.scala` | whole file (95 lines) | Part 8f sweep: duplicate of `network/StaticNodesLoader.scala` (the production impl). Discovery version has weaker validation (prefix-only, no port/pubkey check) and is used only by `DiscoveryConfig`. Fix: redirect `DiscoveryConfig` to call `com.chipprbots.ethereum.network.StaticNodesLoader.load(datadir).map(_.toString).toSet` (1-line change), then delete file + migrate or delete `StaticNodesLoaderSpec`. | DEAD | PRISM | 2026-06-22 |
 
 ---
 
@@ -64,6 +63,7 @@ When 5+ entries share a Type or package, open a dedicated sprint:
 | RegularSyncCommand sealed | `SyncProtocol.scala` + `RegularSync.scala` | Cleared 2026-06-22: `923b18ba7` — `FetcherStatusTick`, `PrintStatusTick`, `ProgressProtocol` moved from `RegularSync.scala` → `SyncProtocol.scala`; `trait RegularSyncCommand` is now `sealed`; fallthrough `case _ => Behaviors.unhandled` arm deleted; `RegularSync.ProgressProtocol` type alias preserves all call sites; 31/31 `RegularSyncSpec` tests pass; 0 compile errors. | — | MITHRIL | 2026-06-22 |
 | SyncControllerSpec SyncStateAutoPilot | `SyncControllerSpec.scala` | Cleared 2026-06-22: `fc1030410` — GetHandshakedPeersCmd handler added to autopilot; 7 pre-existing failures resolved. |
 | MetricsAlreadyConfiguredError + LocalVM + AdaptiveSyncStrategy | Part 8f dead code | Cleared 2026-06-22: `fa57df9b9` — 3 confirmed dead files deleted. grep-verified 0 callers each; no test files existed; sbt compile-all 0 errors. |
+| discovery/StaticNodesLoader.scala | Part 8f dead code | Cleared 2026-06-22: `ff2fc219c` — DiscoveryConfig redirected to network.StaticNodesLoader (stricter validation: full pubkey + port check vs prefix-only); duplicate deleted. |
 
 ---
 
@@ -160,54 +160,7 @@ Suggested new protocol name: **exception-as-control-flow** — covers `throw` in
 | ~~B1~~ | ~~Batch B step 1~~ | ~~P1 MITHRIL Seal RegularSyncCommand~~ | ✅ DONE 2026-06-22 |
 | ~~B2~~ | ~~Batch B step 2~~ | ~~P2 MITHRIL SyncControllerSpec autopilot~~ | ✅ DONE 2026-06-22 — 7 failures resolved |
 | ~~B3~~ | ~~Batch B step 3~~ | ~~P3 WRAITH Delete 3 dead files~~ | ✅ DONE 2026-06-22 — 3 files deleted |
-| B4 | Batch B step 4 | P4 WRAITH DiscoveryConfig redirect + delete | Run after P3 compile-verified |
+| ~~B4~~ | ~~Batch B step 4~~ | ~~P4 WRAITH DiscoveryConfig redirect + delete~~ | ✅ DONE 2026-06-22 — redirect + delete |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
 
----
-
-### P4 — WRAITH: Redirect DiscoveryConfig + delete duplicate StaticNodesLoader
-
-**Agent:** WRAITH
-**Files:**
-- `src/main/scala/.../network/discovery/StaticNodesLoader.scala` (95 lines — delete)
-- Caller: `DiscoveryConfig.scala` (update 1 call site)
-**Prerequisite:** P3 compile-verified (not strictly required, but keeps the build clean between commits).
-
-**Prompt:**
-> On branch `scala3-cleanup-june`, fix the duplicate StaticNodesLoader identified in the
-> Part 8f sweep. The `network/discovery/` version duplicates `network/StaticNodesLoader.scala`
-> with weaker validation (prefix-only, no port/pubkey check).
->
-> Steps:
-> 1. Read both files to confirm they are functionally equivalent (same `.load(datadir)` API).
-> 2. Find the one call site in `DiscoveryConfig.scala` that references the discovery version:
->    `grep -n "StaticNodesLoader" src/.../network/discovery/DiscoveryConfig.scala`
-> 3. Update that import + call to use `com.chipprbots.ethereum.network.StaticNodesLoader`
->    (the production impl with proper validation).
-> 4. Compile: `sbt compile-all` — 0 errors.
-> 5. Delete the duplicate: `git rm src/.../network/discovery/StaticNodesLoader.scala`
-> 6. Compile again: `sbt compile-all` — 0 errors.
-> 7. Run: `sbt testOnly *DiscoveryConfig* *StaticNodesLoader*` — existing tests pass.
-> 8. Single commit: `Part 8f — redirect DiscoveryConfig to network.StaticNodesLoader, delete duplicate`.
->
-> If a `StaticNodesLoaderSpec` exists under `discovery/`, update its imports to reference
-> `network.StaticNodesLoader` instead (or delete if it only tested the removed weaker impl).
-
-**Verification:** `sbt compile-all` 0 errors; targeted tests pass; grep shows no remaining imports of the deleted file
-
-**MANDATORY final step — complete BEFORE closing thread:**
-- `working-docs/CHASE-QUEUE.md` run order table — change `| B4 | Batch B step 4 | P4 ...` to `| ~~B4~~ | ~~Batch B step 4~~ | ~~P4 WRAITH DiscoveryConfig redirect + delete~~ | ✅ DONE [date] — redirect + delete |`
-- `working-docs/CHASE-QUEUE.md` — remove the `discovery/StaticNodesLoader.scala` DEAD entry from Open entries
-- `working-docs/CHASE-QUEUE.md` — delete this entire `### P4` section from the Clearout Prompts section
-- Add to Cleared entries log: `| discovery/StaticNodesLoader.scala | Part 8f dead code | Cleared [date]: [SHA] — DiscoveryConfig redirected to network.StaticNodesLoader; duplicate deleted. |`
-- `completed/CHORE-QUEUE.md` — append new section following the C1–C5 pattern:
-  `### C[N] — Redirect DiscoveryConfig + delete duplicate StaticNodesLoader (P4) ✅ DONE ([SHA])`
-  `[2-4 lines: caller redirected, duplicate removed, compile + test result]`
-- `modernization-log/network/discovery.md` — add under "Quality Fixes":
-  `#### [SHA] — Part 8f: duplicate StaticNodesLoader deleted`
-  `- **What:** DiscoveryConfig redirected to network.StaticNodesLoader (stricter validation); discovery/StaticNodesLoader.scala removed`
-
-**Opportunistic clearout:** Apply the protocol in CODEBASE-AUDIT.md. While `DiscoveryConfig.scala` is open, scan it and the surrounding `network/discovery/` package for other weak-validation or duplicate patterns. Draft a prompt for anything found.
-
-**Rejection criteria:** Deleting the production `network/StaticNodesLoader.scala` (keep that one); skipping the compile step between redirect and deletion
