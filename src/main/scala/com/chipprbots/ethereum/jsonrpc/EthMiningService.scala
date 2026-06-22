@@ -18,6 +18,7 @@ import scala.collection.concurrent.Map as ConcurrentMap
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration.FiniteDuration
 
+import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.consensus.blocks.PendingBlockAndState
 import com.chipprbots.ethereum.consensus.mining.CoinbaseProvider
@@ -162,8 +163,10 @@ class EthMiningService(
               Right(SubmitWorkResponse(false))
             } else {
               import pendingBlock.*
-              syncingController ! SyncProtocol.MinedBlock(
-                block.copy(header = block.header.copy(nonce = req.nonce, mixHash = req.mixHash))
+              syncingController ! SyncController.WrappedSyncProtocol(
+                SyncProtocol.MinedBlock(
+                  block.copy(header = block.header.copy(nonce = req.nonce, mixHash = req.mixHash))
+                )
               )
               PoWMiningMetrics.recordBlockMined(0L) // duration tracked at coordinator level
               Right(SubmitWorkResponse(true))

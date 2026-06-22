@@ -15,6 +15,7 @@ import org.json4s.JsonDSL.*
 import org.json4s.jvalue2extractable
 import org.json4s.jvalue2monadic
 
+import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps
@@ -66,7 +67,8 @@ object NodeStatusTool {
 
   def execute(deps: McpDependencies)(implicit timeout: Timeout, @unused ec: ExecutionContext): IO[String] = {
     given scheduler: typed.Scheduler = deps.scheduler
-    val syncStatusIO = deps.syncController.askFor[SyncProtocol.Status](SyncProtocol.GetStatus)
+    val syncStatusIO =
+      deps.syncController.askFor[SyncProtocol.Status](SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus))
     val peersIO = deps.peerManager.askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
 
     for {
@@ -136,7 +138,7 @@ object SyncStatusTool {
 
   def execute(deps: McpDependencies)(implicit timeout: Timeout, @unused ec: ExecutionContext): IO[String] =
     deps.syncController
-      .askFor[SyncProtocol.Status](SyncProtocol.GetStatus)
+      .askFor[SyncProtocol.Status](SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus))
       .recover { case _ =>
         SyncProtocol.Status.NotSyncing
       }

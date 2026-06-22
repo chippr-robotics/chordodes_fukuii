@@ -13,6 +13,7 @@ import scala.concurrent.duration.*
 import scala.util.Failure
 import scala.util.Success
 
+import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.consensus.blocks.PendingBlockAndState
 import com.chipprbots.ethereum.consensus.mining.wrongMiningArgument
@@ -200,7 +201,10 @@ private class MockedMiner(
         minedBlock.idTag,
         minedBlock.body.transactionList.map(_.hash.toHex)
       )
-      syncEventListener ! SyncProtocol.MinedBlock(minedBlock)
+      // ROOT-c: syncEventListener (= node.syncController) is now a Behavior[Command] ref; wrap the raw SyncProtocol
+      // send so it survives the Typed boundary (a bare send would ClassCastException → dead-letter and the mined
+      // block would never reach RegularSync).
+      syncEventListener ! SyncController.WrappedSyncProtocol(SyncProtocol.MinedBlock(minedBlock))
       // because of using seconds to calculate block timestamp, we can't mine blocks faster than one block per second
       context.scheduleOnce(1.second, context.self, MineBlock)
       working(numBlocks - 1, withTransactions, minedBlock, Some(state))

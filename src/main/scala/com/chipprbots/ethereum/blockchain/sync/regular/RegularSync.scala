@@ -12,6 +12,7 @@ import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist
 import com.chipprbots.ethereum.blockchain.sync.PeersClient
+import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
@@ -218,12 +219,16 @@ object RegularSync {
         // Forward escape-valve signal to SyncController (our parent). BlockImporter detects this
         // condition and emits the message; we just relay it up so SyncController can re-trigger
         // SNAP sync from a recent pivot.
+        // ROOT-c: SyncController is now Behavior[Command]; its real ref (= ctx.toClassic.parent here, since
+        // RegularSync is spawned as a direct child) only accepts SyncController.Command. Wrap the raw SyncProtocol
+        // message so it survives the Typed boundary and is unwrapped by handleRegularSyncMsg (a bare send would
+        // ClassCastException → dead-letter, silently disabling the SNAP re-sync escape valve).
         log.warning(
           "Regular sync stuck on block {} (missing {}); forwarding to SyncController for SNAP re-sync",
           msg.blockNumber,
           msg.missingHash
         )
-        ctx.toClassic.parent ! msg
+        ctx.toClassic.parent ! SyncController.WrappedSyncProtocol(msg)
         Behaviors.same
 
       case FetcherStatusTick =>

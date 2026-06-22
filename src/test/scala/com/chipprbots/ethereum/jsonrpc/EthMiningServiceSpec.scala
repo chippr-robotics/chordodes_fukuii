@@ -21,6 +21,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Mocks.MockValidatorsAlwaysSucceed
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
+import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.consensus.blocks.PendingBlock
 import com.chipprbots.ethereum.consensus.blocks.PendingBlockAndState
@@ -417,7 +418,10 @@ class EthMiningServiceSpec
       .unsafeRunSync()
 
     result shouldEqual Right(SubmitWorkResponse(true))
-    syncingController.expectMsgType[SyncProtocol.MinedBlock]
+    // ROOT-c: EthMiningService now wraps the MinedBlock send in SyncController.WrappedSyncProtocol so it survives the
+    // SyncController Behavior[Command] boundary. The TestProbe therefore receives the wrapper, not the raw MinedBlock.
+    val wrapped = syncingController.expectMsgType[SyncController.WrappedSyncProtocol]
+    wrapped.msg shouldBe a[SyncProtocol.MinedBlock]
   }
 
   it should "set and get the etherbase address" taggedAs (UnitTest, RPCTest) in new TestSetup {

@@ -65,8 +65,8 @@ object SyncController {
 
   /** Sealed protocol for the top-level sync orchestrator (ROOT-a narrowing, Phase 1).
     *
-    * This ADT covers the messages SyncController OWNS: self/timer ticks, death-watch termination markers, and the
-    * OQ-5 status queries. Heterogeneous external case classes still arrive from many Classic senders (SyncProtocol,
+    * This ADT covers the messages SyncController OWNS: self/timer ticks, death-watch termination markers, and the OQ-5
+    * status queries. Heterogeneous external case classes still arrive from many Classic senders (SyncProtocol,
     * FastSync, SNAPSyncController, PivotHeaderBootstrap, RegularSync.ProgressProtocol, ForkChoiceManager.BeaconHead,
     * NetworkPeerManagerActor, the recovery actors, CombinedRecoveryScanActor) — those are NOT yet members of this
     * Command ADT. Phases 2+ will introduce wrapper Commands and rewrite the match arms; Phase 1 only defines the ADT
@@ -119,7 +119,10 @@ object SyncController {
   //      travel as `WrappedSyncProtocol` constructed BY THE CALLER; Phase 3 edits the JSON-RPC / NodeBuilder callers to
   //      wrap. The handler keeps the OQ-5 sender-reply idiom (`ctx.toClassic.sender()`), so no `replyTo` field is added.
   final private[sync] case class WrappedExternal(msg: Any) extends Command
-  final private[sync] case class WrappedSyncProtocol(msg: SyncProtocol.SyncProtocolMsg) extends Command
+  // Public: external Classic callers (JSON-RPC asks, miner, NodeBuilder startup) construct this to wrap their raw
+  // SyncProtocol.* sends so the messages survive the Behavior[Command] boundary. The handler unwraps and replies via
+  // ctx.toClassic.sender() (preserved because callers `.tell`/`?` with the original sender), so no replyTo is added.
+  final case class WrappedSyncProtocol(msg: SyncProtocol.SyncProtocolMsg) extends Command
 
   // scalastyle:off parameter.number
   def apply(

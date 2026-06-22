@@ -10,6 +10,7 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
+import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncMetrics
 import com.chipprbots.ethereum.consensus.mining.StdMiningBuilder
@@ -176,7 +177,8 @@ abstract class BaseNode extends Node {
     networkConfig.Server.advertisedAddress.map(java.net.InetAddress.getByName)
   )
 
-  private def startSyncController(): Unit = syncController ! SyncProtocol.Start
+  private def startSyncController(): Unit =
+    syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
 
   private def startMining(): Unit = mining.startProtocol(this)
 

@@ -5,6 +5,7 @@ import org.apache.pekko.util.ByteString
 
 import scala.concurrent.Future
 
+import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.consensus.pow.PoWMiningCoordinator
 import com.chipprbots.ethereum.consensus.pow.PoWMiningCoordinator.CoordinatorProtocol
@@ -35,8 +36,10 @@ trait Miner extends Logger {
           ByteStringUtils.hash2string(nonce)
         )
 
-        syncController ! SyncProtocol.MinedBlock(
-          block.copy(header = block.header.copy(nonce = nonce, mixHash = mixHash))
+        syncController ! SyncController.WrappedSyncProtocol(
+          SyncProtocol.MinedBlock(
+            block.copy(header = block.header.copy(nonce = nonce, mixHash = mixHash))
+          )
         )
         PoWMiningCoordinator.MiningSuccessful
       case _ =>

@@ -24,6 +24,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.Timeouts
+import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.MinedBlock
 import com.chipprbots.ethereum.consensus.blocks.PendingBlock
 import com.chipprbots.ethereum.consensus.blocks.PendingBlockAndState
@@ -139,9 +140,9 @@ class PoWMiningCoordinatorSpec
         setBlockForMining(parentBlock)
         coordinator ! SetMiningMode(RecurrentMining)
 
-        sync.expectMsgType[MinedBlock](Timeouts.veryLongTimeout)
-        sync.expectMsgType[MinedBlock](Timeouts.veryLongTimeout)
-        sync.expectMsgType[MinedBlock](Timeouts.veryLongTimeout)
+        sync.expectMsgType[SyncController.WrappedSyncProtocol](Timeouts.veryLongTimeout).msg shouldBe a[MinedBlock]
+        sync.expectMsgType[SyncController.WrappedSyncProtocol](Timeouts.veryLongTimeout).msg shouldBe a[MinedBlock]
+        sync.expectMsgType[SyncController.WrappedSyncProtocol](Timeouts.veryLongTimeout).msg shouldBe a[MinedBlock]
 
         coordinator ! StopMining
         probe.expectTerminated(coordinator.ref.toClassic)
@@ -175,9 +176,9 @@ class PoWMiningCoordinatorSpec
         setBlockForMining(parentBlock)
         coordinator ! SetMiningMode(RecurrentMining)
 
-        sync.expectMsgType[MinedBlock](Timeouts.veryLongTimeout)
-        sync.expectMsgType[MinedBlock](Timeouts.veryLongTimeout)
-        sync.expectMsgType[MinedBlock](Timeouts.veryLongTimeout)
+        sync.expectMsgType[SyncController.WrappedSyncProtocol](Timeouts.veryLongTimeout).msg shouldBe a[MinedBlock]
+        sync.expectMsgType[SyncController.WrappedSyncProtocol](Timeouts.veryLongTimeout).msg shouldBe a[MinedBlock]
+        sync.expectMsgType[SyncController.WrappedSyncProtocol](Timeouts.veryLongTimeout).msg shouldBe a[MinedBlock]
 
         coordinator ! StopMining
         probe.expectTerminated(coordinator.ref.toClassic)

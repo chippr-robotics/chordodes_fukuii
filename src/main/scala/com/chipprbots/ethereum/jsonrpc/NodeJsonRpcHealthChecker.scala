@@ -11,6 +11,7 @@ import cats.syntax.parallel.*
 
 import com.typesafe.config.Config as TypesafeConfig
 
+import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.*
 import com.chipprbots.ethereum.healthcheck.HealthcheckResponse
@@ -73,7 +74,10 @@ class NodeJsonRpcHealthChecker(
 
   private val syncStatusHC =
     JsonRpcHealthcheck
-      .fromTask("syncStatus", syncingController.askFor[SyncProtocol.Status](SyncProtocol.GetStatus))
+      .fromTask(
+        "syncStatus",
+        syncingController.askFor[SyncProtocol.Status](SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus))
+      )
       .map(_.withInfo {
         case NotSyncing                                          => "STARTING"
         case s: Syncing if isConsideredSyncing(s.blocksProgress) => "SYNCING"
@@ -120,7 +124,7 @@ class NodeJsonRpcHealthChecker(
   /** Try to fetch best block number from the sync controller or fallback to ethBlocksService */
   private def getBestKnownBlockTask =
     syncingController
-      .askFor[SyncProtocol.Status](SyncProtocol.GetStatus)
+      .askFor[SyncProtocol.Status](SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus))
       .flatMap {
         case NotSyncing | SyncDone =>
           ethBlocksService
@@ -132,7 +136,7 @@ class NodeJsonRpcHealthChecker(
   /** Try to fetch best fetching number from the sync controller or fallback to ethBlocksService */
   private def getBestFetchingBlockTask =
     syncingController
-      .askFor[SyncProtocol.Status](SyncProtocol.GetStatus)
+      .askFor[SyncProtocol.Status](SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus))
       .flatMap {
         case NotSyncing | SyncDone =>
           ethBlocksService

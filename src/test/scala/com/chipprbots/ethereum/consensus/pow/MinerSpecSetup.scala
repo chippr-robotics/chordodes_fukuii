@@ -17,6 +17,7 @@ import org.scalamock.handlers.CallHandler4
 import org.scalamock.handlers.CallHandler6
 
 import com.chipprbots.ethereum.Fixtures
+import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.consensus.blocks.PendingBlockAndState
 import com.chipprbots.ethereum.consensus.mining.FullMiningConfig
@@ -260,8 +261,11 @@ trait MinerSpecSetup
   }
 
   protected def waitForMinedBlock(implicit timeout: Duration): Block =
-    sync.expectMsgPF[Block](timeout) { case m: SyncProtocol.MinedBlock =>
-      m.block
+    // ROOT-c: miners now wrap mined-block sends in SyncController.WrappedSyncProtocol so they survive SyncController's
+    // Behavior[Command] boundary. The sync probe therefore receives the wrapper; unwrap to the MinedBlock here.
+    sync.expectMsgPF[Block](timeout) {
+      case SyncController.WrappedSyncProtocol(m: SyncProtocol.MinedBlock) => m.block
+      case m: SyncProtocol.MinedBlock                                     => m.block
     }
 
   protected def expectNoNewBlockMsg(timeout: FiniteDuration): Unit =

@@ -10,6 +10,7 @@ import cats.syntax.either.*
 import scala.annotation.unused
 import scala.reflect.ClassTag
 
+import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
@@ -106,7 +107,10 @@ class EthInfoService(
     */
   def syncing(@unused req: SyncingRequest): ServiceResponse[SyncingResponse] =
     syncingController
-      .askFor(SyncProtocol.GetStatus)(timeout = askTimeout, implicitly[ClassTag[SyncProtocol.Status]])
+      .askFor(SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus))(
+        timeout = askTimeout,
+        implicitly[ClassTag[SyncProtocol.Status]]
+      )
       .map {
         case Status.Syncing(startingBlockNumber, blocksProgress, maybeStateNodesProgress) =>
           val stateNodesProgress = maybeStateNodesProgress.getOrElse(Progress.empty)

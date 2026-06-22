@@ -10,6 +10,7 @@ import scala.annotation.unused
 import scala.collection.immutable.NumericRange
 import scala.concurrent.duration.*
 
+import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.jsonrpc.FukuiiService.GetAccountTransactionsRequest
@@ -65,11 +66,11 @@ class FukuiiService(
 
   def resetFastSync(@unused request: ResetFastSyncRequest): ServiceResponse[ResetFastSyncResponse] =
     syncController
-      .askFor[SyncProtocol.ResetFastSyncResponse](SyncProtocol.ResetFastSync)
+      .askFor[SyncProtocol.ResetFastSyncResponse](SyncController.WrappedSyncProtocol(SyncProtocol.ResetFastSync))
       .map(resp => Right(ResetFastSyncResponse(resp.reset)))
 
   def restartFastSync(@unused request: RestartFastSyncRequest): ServiceResponse[RestartFastSyncResponse] =
     syncController
-      .askFor[SyncProtocol.RestartFastSyncResponse](SyncProtocol.RestartFastSync)
+      .askFor[SyncProtocol.RestartFastSyncResponse](SyncController.WrappedSyncProtocol(SyncProtocol.RestartFastSync))
       .map(resp => Right(RestartFastSyncResponse(resp.started, resp.cooldownUntilMillis)))
 }
