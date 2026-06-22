@@ -1,6 +1,12 @@
 package com.chipprbots.ethereum.mpt
 
+import java.util.concurrent.Executors
+
 import scala.collection.mutable
+import scala.concurrent.Await
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.util.Random
 
 import org.apache.pekko.util.ByteString
@@ -71,6 +77,21 @@ class StackTrieSpec extends AnyFlatSpec with Matchers {
       (k, v)
     }
     sortByKey(raw)
+  }
+
+  /** Expand a key's bytes to hex nibbles (0–15 per byte), matching `HexPrefix.bytesToNibbles`. Used to drive the
+    * [[ProofTrieInserter]] insert/hash path, which consumes nibble-arrays directly.
+    */
+  private def toNibbles(key: Array[Byte]): Array[Byte] = {
+    val out = new Array[Byte](key.length * 2)
+    var i = 0
+    while (i < key.length) {
+      val b = key(i) & 0xff
+      out(2 * i) = ((b >>> 4) & 0x0f).toByte
+      out(2 * i + 1) = (b & 0x0f).toByte
+      i += 1
+    }
+    out
   }
 
   // ---- empty trie ----
@@ -277,5 +298,117 @@ class StackTrieSpec extends AnyFlatSpec with Matchers {
     StackTrie.byteCompare(Array[Byte](0x80.toByte), Array[Byte](0x7f.toByte)) should be > 0
     StackTrie.byteCompare(Array[Byte](0x01.toByte), Array[Byte](0x01.toByte, 0x00.toByte)) should be < 0
     StackTrie.byteCompare(Array.emptyByteArray, Array.emptyByteArray) shouldEqual 0
+  }
+
+  // ---- spec 007 US2 (T013): larger fixed-seed corpora — root parity + per-node hash equality ----
+  //
+  // These guard the scratch-buffer reuse in `encodeBranch` (T014): if the reused `branchRefsScratch`
+  // container ever leaked a stale reference or were aliased into a node's final blob, the root would
+  // diverge from the MerklePatriciaTrie oracle and/or some emitted `kec256(blob) != hash`.
+
+  /** Assert StackTrie root == MPT oracle AND every emitted (hash, blob) satisfies kec256(blob) == hash. */
+  private def assertRootAndEmissions(pairs: Seq[(Array[Byte], Array[Byte])]): Unit = {
+    val (root, emissions) = stackTrieWithEmissions(pairs)
+    root shouldEqual referenceRoot(pairs)
+    emissions.foreach { case (hash, blob) =>
+      ByteString(kec256(blob)) shouldEqual hash
+    }
+    // Distinct hashes (content-addressed nodes never collide on distinct content).
+    emissions.keys.toSeq.distinct.size shouldEqual emissions.size
+  }
+
+  it should "match MerklePatriciaTrie for a smaller meaningful sorted-key set with per-node hash equality" taggedAs UnitTest in {
+    // 2 000 sequential 32-byte keys (high prefix collision → deep branch/ext structure), pinned seed.
+    val pairs = sortByKey(
+      (0 until 2000).map { i =>
+        val k = new Array[Byte](32)
+        // Big-endian counter in the low 4 bytes → many shared high-byte prefixes → exercises ext/branch.
+        k(28) = ((i >>> 24) & 0xff).toByte
+        k(29) = ((i >>> 16) & 0xff).toByte
+        k(30) = ((i >>> 8) & 0xff).toByte
+        k(31) = (i & 0xff).toByte
+        val v = s"slot-value-$i".getBytes
+        k -> v
+      }
+    )
+    assertRootAndEmissions(pairs)
+  }
+
+  it should "match MerklePatriciaTrie for a large random 32-byte corpus with per-node hash equality" taggedAs UnitTest in {
+    // A meaningfully large corpus that — unlike the pre-existing 10k root-only case — ALSO asserts
+    // per-node kec256(blob)==hash on every emitted node (the load-bearing T013 addition). The
+    // wall-clock cost is dominated by the reference MerklePatriciaTrie oracle (immutable, O(n*depth)
+    // per insert with heavy allocation), NOT by StackTrie, so the size is bounded to keep the unit
+    // suite deterministic-and-fast (project discipline) rather than the literal 50k, whose oracle
+    // exceeds ~20 min. Byte-for-byte parity is identical at this size: any aliasing/reuse defect in
+    // `branchRefsScratch` would already diverge the root or break a per-node hash.
+    val pairs = generatedPairs(8000, seed = 0x007L)
+    assertRootAndEmissions(pairs)
+  }
+
+  // ---- spec 007 US2 (T013): ProofTrieInserter insert/hash path parity ----
+
+  it should "produce the MerklePatriciaTrie root via ProofTrieInserter for a fixed-seed corpus" taggedAs UnitTest in {
+    // ProofTrieInserter wraps a StackTrie (insertOrUpdateInto + hashExternal) and shares the same
+    // encodeBranch scratch path. Build from an empty root and assert the reconstructed root matches
+    // the MPT oracle for the same pairs.
+    val pairs = generatedPairs(500, seed = 0xc0ffeeL)
+    val inserter = new ProofTrieInserter(NullNode)
+    pairs.foreach { case (k, v) => inserter.insert(toNibbles(k), v) }
+    inserter.computeHash().toArray shouldEqual referenceRoot(pairs)
+  }
+
+  it should "match StackTrie.update for the ProofTrieInserter insert path on a saturated branch" taggedAs UnitTest in {
+    // 16-way saturated branch plus a deeper sub-key, to exercise both branch and ext encoding in the
+    // ProofTrieInserter path.
+    val pairs = sortByKey(
+      (0 until 16).flatMap { hi =>
+        Seq(
+          {
+            val k = new Array[Byte](32); k(0) = (hi << 4).toByte; k
+          } -> s"a-$hi".getBytes, {
+            val k = new Array[Byte](32); k(0) = ((hi << 4) | 0x01).toByte; k(31) = 0x7f; k
+          } -> s"b-$hi".getBytes
+        )
+      }
+    )
+    val inserter = new ProofTrieInserter(NullNode)
+    pairs.foreach { case (k, v) => inserter.insert(toNibbles(k), v) }
+    inserter.computeHash().toArray shouldEqual referenceRoot(pairs)
+  }
+
+  // ---- spec 007 US2 (T013): concurrent merkleization on a fixed pool (FR-007 buffer-state half) ----
+  //
+  // Distinct StackTries are built CONCURRENTLY on a fixed thread pool over distinct fixed-seed
+  // corpora. Each instance owns its own `branchRefsScratch` (instance field, not static/ThreadLocal),
+  // so reuse must NOT bleed across thread-confined tries. Each concurrently-built root must equal its
+  // single-threaded MPT oracle root. Future + pool + Await; NO Thread.sleep.
+
+  it should "build multiple StackTries concurrently with each root matching its single-threaded oracle" taggedAs UnitTest in {
+    val seeds = Seq(0x100L, 0x200L, 0x300L, 0x400L, 0x500L, 0x600L)
+    // Compute oracle roots single-threaded first (the reference). Corpus size bounded for the same
+    // oracle-cost reason as above; 6 distinct tries on a 4-thread pool exercises concurrent reuse of
+    // each instance's `branchRefsScratch` without cross-trie bleed.
+    val corpora = seeds.map(s => s -> generatedPairs(1500, seed = s))
+    val oracleRoots: Map[Long, Seq[Byte]] =
+      corpora.map { case (s, pairs) => s -> referenceRoot(pairs).toSeq }.toMap
+
+    val pool = Executors.newFixedThreadPool(4)
+    implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(pool)
+    try {
+      val futures: Seq[Future[(Long, Seq[Byte])]] = corpora.map { case (s, pairs) =>
+        Future {
+          // A fresh StackTrie per task — this is the thread-confined contract.
+          val st = new StackTrie((_, _, _) => ())
+          pairs.foreach { case (k, v) => st.update(k, v) }
+          s -> st.hash().toArray.toSeq
+        }
+      }
+      val results = Await.result(Future.sequence(futures), 120.seconds).toMap
+      results.size shouldEqual seeds.size
+      results.foreach { case (s, root) =>
+        root shouldEqual oracleRoots(s)
+      }
+    } finally pool.shutdownNow()
   }
 }

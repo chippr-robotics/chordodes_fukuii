@@ -141,18 +141,17 @@ Read it before planning or implementing. Highlights:
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/005-subtree-complete-verification/plan.md` (make the post-SNAP heal completeness
-VERIFICATION O(missing-frontier) instead of O(whole ~90M-node trie), eliminating the
-~16-20h full re-walk. fukuii is the only major MPT client that reads the whole trie to
-verify; geth/nethermind/besu use descend-and-stop. Add a durable, content-addressed,
-root-INDEPENDENT per-subtree-complete record in the existing CF 'g' (additive/monotone,
-never cleared); the verification prunes any present, recorded-complete subtree. Seed the
-records during the SNAP/heal write path so the FIRST verification on a fresh node is
-already O(missing) (FR-003). Crash-safe: record written only AFTER its subtree's bytes are
-durably committed (descend-on-missing-record fallback); terminal marker fsynced. Byte-for-
-byte completion parity via the single existing chokepoint (FR-005); the walk does no state
-writes. Hash-scheme only; config default-on with full-walk fallback. Consensus-adjacent;
-forge-reviewed; composes with/generalizes spec 003 scoped verification. Needs build + one
-redeploy.) Prior plans: `specs/004-decoupled-heal-serve-root/plan.md`,
-`specs/003-scoped-heal-verification/plan.md`, `specs/002-bfs-heal-performance/plan.md`.
+`specs/007-hotpath-alloc-reduction/plan.md` (reduce hot-path CPU allocations on the
+keccak-256 + SNAP inline-merkleization paths to cut GC/allocation pressure and return CPU
+to sync — PURE PERFORMANCE, byte-for-byte identical consensus output. P1: replace per-call
+`new KeccakDigest(256)` with a thread-confined `ThreadLocal[KeccakDigest]` reset-on-entry
+(the load-bearing parity mechanism — guards the aborted-mid-update window). P2: reuse
+StackTrie transient scratch but NEVER the aliased final node blob (chain-split risk). P3:
+single-`Array[Byte]` `kec256` overload, `SnapHashTrie.emit` clone elision, `RLP.encode`
+O(n²)→O(n) — each FR-010-gated on proven parity + measured win. forge protocol; byte-for-byte
+gate via crypto/MPT/ethereum-tests + dedicated keccak vector/reset-after-abort/concurrency
+spec + A/B replay; perf is report-and-record, parity is the hard gate. Honest expectation:
+low single-digit to low-double-digit % throughput; the real CPU fix remains more cores.)
+Prior plans: `specs/004-decoupled-heal-serve-root/plan.md`,
+`specs/003-scoped-heal-verification/plan.md`.
 <!-- SPECKIT END -->

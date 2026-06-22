@@ -1,3 +1,1 @@
-{
-  "feature_directory": "specs/005-subtree-complete-verification"
-}
+{ "feature_directory": "specs/007-hotpath-alloc-reduction" }

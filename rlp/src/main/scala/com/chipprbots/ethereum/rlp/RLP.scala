@@ -90,8 +90,23 @@ private[rlp] object RLP {
   private[rlp] def encode(input: RLPEncodeable): Array[Byte] =
     input match {
       case list: RLPList =>
-        val output = list.items.foldLeft(Array[Byte]())((acum, item) => acum ++ encode(item))
-        encodeLength(output.length, OffsetShortList) ++ output
+        // Spec 007 US3 / T020 (FR-010-gated): build the concatenated item payload in a single
+        // sized buffer instead of `foldLeft(Array())(_ ++ _)`, which reallocated and recopied the
+        // whole accumulator per item (O(n^2) in list size). Byte-identical: items are encoded in
+        // the same order and the same `encodeLength(payloadLen, OffsetShortList) ++ payload` prefix
+        // is applied. Two passes: encode each item once (cached), sum lengths, then arraycopy.
+        val encodedItems = list.items.map(encode)
+        var contentLen = 0
+        encodedItems.foreach(contentLen += _.length)
+        val header = encodeLength(contentLen, OffsetShortList)
+        val out = new Array[Byte](header.length + contentLen)
+        System.arraycopy(header, 0, out, 0, header.length)
+        var pos = header.length
+        encodedItems.foreach { item =>
+          System.arraycopy(item, 0, out, pos, item.length)
+          pos += item.length
+        }
+        out
       case value: RLPValue =>
         val inputAsBytes = value.bytes
         if (inputAsBytes.length == 1 && (inputAsBytes(0) & 0xff) < 0x80) inputAsBytes
