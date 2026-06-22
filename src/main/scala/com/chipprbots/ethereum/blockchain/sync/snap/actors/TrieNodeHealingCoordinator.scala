@@ -59,6 +59,20 @@ class TrieNodeHealingCoordinator(
     frontierBackpressureMaxWaitMs: Long = TrieNodeHealingCoordinator.FrontierBackpressureMaxWaitMs,
     scopedHealVerification: Boolean = true,
     scopedHealMaxPaths: Int = TrieNodeHealingCoordinator.DefaultScopedHealMaxPaths,
+    // spec 005 (Pruned descend-and-stop verification). When true AND `storageScheme == Hash`, the completeness walk
+    // prunes any present node that has a durable subtree-complete record (HealingFrontierStorage CF 'g'), making a
+    // fresh node's first verification O(missing-frontier). Off OR Path scheme ⇒ the unchanged full-trie walk. Consensus
+    // safety rests on the never-false-prune invariant: prune iff present AND recorded-complete (records written only
+    // AFTER the subtree's bytes are durably committed). See `prunedEnabled`.
+    prunedHealVerification: Boolean = true,
+    // spec 002/003 (frontier persistence + resume + completeness marker). Gates the LAYER-2 frontier MIRROR writes
+    // (persistFrontier/unpersistFrontier/clearPersistedFrontier), the [HEAL-RESTART] resume-from-persisted-frontier
+    // path, and the spec-002 `markComplete()` snapshot marker. Decoupled from store PRESENCE: spec 005 makes the store
+    // present whenever `prunedHealVerification` is on (to host the subtree-complete records), but these persistence
+    // features must stay dark unless `healing-frontier-persistence` is explicitly enabled (default off), preserving
+    // FR-005 byte-for-byte parity with pre-spec-005 behavior. The spec-005 subtree records (markSubtreeComplete /
+    // isSubtreeComplete / the descend-and-stop oracle) are gated on `prunedEnabled`, NOT on this flag.
+    frontierPersistenceEnabled: Boolean = false,
     // spec 004 (Decoupled Heal Serve-Root). When true, the GetTrieNodes fetch targets `serveRoot` (an advancing
     // newest-servable root) instead of the walk root `stateRoot`; when false, the fetch uses `stateRoot` (coupled,
     // byte-identical to pre-spec-004). Completeness is ALWAYS judged against `stateRoot`, regardless of this flag.
@@ -213,17 +227,19 @@ class TrieNodeHealingCoordinator(
     * identically, so re-queues and resume-loads are harmless.
     */
   private def persistFrontier(entries: Seq[HealingEntry]): Unit =
-    healingFrontierStorage.foreach { store =>
-      if (entries.nonEmpty) store.update(Nil, entries.map(e => e.hash -> e.pathset)).commit()
-    }
+    if (frontierPersistenceEnabled)
+      healingFrontierStorage.foreach { store =>
+        if (entries.nonEmpty) store.update(Nil, entries.map(e => e.hash -> e.pathset)).commit()
+      }
 
   /** Delete healed nodes from the persisted frontier. Safe to call from the healing-writer thread (touches only the
     * immutable storage handle + thread-safe RocksDB). Removing an absent key is a no-op.
     */
   private def unpersistFrontier(hashes: Seq[ByteString]): Unit =
-    healingFrontierStorage.foreach { store =>
-      if (hashes.nonEmpty) store.update(hashes, Nil).commit()
-    }
+    if (frontierPersistenceEnabled)
+      healingFrontierStorage.foreach { store =>
+        if (hashes.nonEmpty) store.update(hashes, Nil).commit()
+      }
 
   /** Clear the entire persisted frontier by deleting every outstanding hash. Because the persisted set equals
     * `pendingTasks ∪ in-flight`, deleting those hashes empties the CF without a namespace-wipe primitive. MUST be
@@ -233,13 +249,15 @@ class TrieNodeHealingCoordinator(
     // FR/T013: a same-root HealingPivotRefreshed no longer reaches here — its early guard returns first.
     // Reaching this method therefore always means a genuine invalidation (differing-root refresh or
     // abandonment), so dropping the completeness marker below is always correct.
-    healingFrontierStorage.foreach { store =>
-      val outstanding =
-        pendingTasks.iterator.map(_.hash).toSeq ++ activeRequests.values.iterator.flatMap(_.tasks.iterator.map(_.hash))
-      if (outstanding.nonEmpty) store.update(outstanding, Nil).commit()
-      // The snapshot is no longer valid/complete — drop the marker so a restart re-walks rather than resuming stale.
-      store.clearComplete()
-    }
+    if (frontierPersistenceEnabled)
+      healingFrontierStorage.foreach { store =>
+        val outstanding =
+          pendingTasks.iterator.map(_.hash).toSeq ++ activeRequests.values.iterator
+            .flatMap(_.tasks.iterator.map(_.hash))
+        if (outstanding.nonEmpty) store.update(outstanding, Nil).commit()
+        // The snapshot is no longer valid/complete — drop the marker so a restart re-walks rather than resuming stale.
+        store.clearComplete()
+      }
 
   /** Publish the live healing backlog/in-flight gauges for the Grafana healing-analytics section. */
   private def emitHealingFrontierGauges(): Unit = {
@@ -318,6 +336,26 @@ class TrieNodeHealingCoordinator(
   private var scopedVerificationStartMs: Long = 0L
   private var scopedVerificationSeedCount: Int = 0
   private var scopedVerificationActive: Boolean = false
+
+  // --- spec 005 (Pruned descend-and-stop verification, D5/T005) ---
+  // Single scheme gate consulted at the verification entry and inside the per-child descent oracle: pruning is
+  // effective ONLY when the config flag is on AND the node uses Hash addressing (the subtree-complete record keys on
+  // the bare keccak hash — well-defined only under Hash scheme; under Path the nodes are nibble-path-keyed). Off OR
+  // Path scheme ⇒ the unchanged full-trie walk (`startVerificationBFS`), byte-identical to today. A healing frontier
+  // store must also be present for any record read/write — `prunedEnabled` is necessary but `healingFrontierStorage`
+  // is the actual record sink, so each record site additionally guards on it being defined.
+  private val prunedEnabled: Boolean =
+    prunedHealVerification && storageScheme == StorageScheme.Hash && healingFrontierStorage.isDefined
+
+  // spec 005 C8/FR-009: observability for the IN-FLIGHT pruned verification run — count of present subtrees pruned
+  // (descend-and-stop hits) and the run start time, set when the verification entry takes the pruned path and read by
+  // the VerificationBFSComplete handler to emit the [HEAL-VERIFY-PRUNED] completion log + duration/pruned-count gauges.
+  private var prunedVerificationActive: Boolean = false
+  private var prunedVerificationStartMs: Long = 0L
+  // Pruned-subtree hits accumulated across the BFS sub-ranges of the current verification walk. AtomicLong because the
+  // oracle fires on `healingReaderEc` sub-range threads (parallel levels). Reset at the start of each pruned walk.
+  private val prunedSubtreeCount: java.util.concurrent.atomic.AtomicLong =
+    new java.util.concurrent.atomic.AtomicLong(0L)
 
   /** Reset the scoped-verification healed-paths set (spec 003 C1). Called at the round-invalidation / round-close sites
     * — differing-root HealingPivotRefreshed, HealingForceComplete, and after a verified StateHealingComplete — NOT on a
@@ -462,6 +500,15 @@ class TrieNodeHealingCoordinator(
   private val rawFlushThreshold = 1000
   private var flushing: Boolean = false
 
+  // spec 005 C3b/D2/T009/T012: heal-side subtree-complete seeding, DEFERRED until durable. discoverMissingChildren
+  // identifies a candidate X (a just-healed node whose direct children are ALL present on disk AND themselves
+  // recorded subtree-complete ⇒ X's whole subtree is present by induction). But X's OWN bytes are still in
+  // `rawNodeBuffer` (NOT durable) at discovery time, so recording then would be unsound (crash before flush ⇒ record
+  // present but X's bytes lost ⇒ false prune). Instead we stage candidates here and write the record ONLY in the
+  // flush path, AFTER `mptStorage.persist()` durably commits the buffered nodes (T012 record-after-persist). A crash
+  // before the flush drops the in-memory candidate ⇒ safe descend. Records are written iff `prunedEnabled`.
+  private val pendingSubtreeRecords = mutable.Set[ByteString]()
+
   // Internal message for async flush completion
   private case class FlushComplete(count: Int)
 
@@ -480,12 +527,30 @@ class TrieNodeHealingCoordinator(
   // permanently blocking every future walk (including the watchdog) until restart.
   private case object FrontierWalkFailed
 
+  /** spec 005 C3b/D2/T009/T012: write the staged heal-side subtree-complete records whose node-bytes were just durably
+    * committed by a flush. `flushedHashes` is the set of hashes this flush persisted; `toRecord` is the
+    * already-computed (on the actor thread) intersection with `pendingSubtreeRecords`. This MUST be called ONLY after
+    * `mptStorage.persist()` returns (the subtree bytes are durable) so the record-after-persist ordering (D3) holds; a
+    * `HealingFrontierStorage.markSubtreeComplete` is an ordinary WAL-ordered `update` (loss ⇒ safe descend). No-op
+    * unless `prunedEnabled`.
+    */
+  private def writeDurableSubtreeRecords(toRecord: Seq[ByteString]): Unit =
+    if (prunedEnabled && toRecord.nonEmpty)
+      healingFrontierStorage.foreach { store =>
+        toRecord.foreach(store.markSubtreeComplete)
+        log.debug(s"[HEAL-VERIFY-PRUNED] Seeded ${toRecord.size} heal-closed subtree-complete records (post-flush)")
+      }
+
   /** Synchronous flush — used only for final completion flush (small buffer, safe to block). */
   private def flushRawNodesSync(): Unit =
     if (rawNodeBuffer.nonEmpty) {
       val flushed = rawNodeBuffer.toSeq
+      // spec 005 T012: compute the staged records this flush makes durable BEFORE persist, write them AFTER.
+      val toRecord = flushed.iterator.map(_._1).filter(pendingSubtreeRecords.contains).toSeq
+      toRecord.foreach(pendingSubtreeRecords.remove)
       mptStorage.storeRawNodes(flushed)
       mptStorage.persist()
+      writeDurableSubtreeRecords(toRecord) // post-persist (D3) — bytes durable before the record
       unpersistFrontier(flushed.map(_._1)) // Layer 2: healed nodes leave the persisted frontier
       val count = flushed.size
       rawNodeBuffer.clear()
@@ -500,6 +565,10 @@ class TrieNodeHealingCoordinator(
       flushing = true
       val nodes = rawNodeBuffer.toSeq
       rawNodeBuffer.clear()
+      // spec 005 T012: snapshot the staged records this flush will make durable on the ACTOR thread (pendingSubtreeRecords
+      // is actor state), then write them on the worker thread AFTER persist. Crash before persist ⇒ records dropped ⇒ safe.
+      val toRecord = nodes.iterator.map(_._1).filter(pendingSubtreeRecords.contains).toSeq
+      toRecord.foreach(pendingSubtreeRecords.remove)
       import scala.concurrent.{Future, blocking}
       val selfRef = self
       val ec = healingWriterEc
@@ -507,6 +576,9 @@ class TrieNodeHealingCoordinator(
         blocking {
           mptStorage.storeRawNodes(nodes)
           mptStorage.persist()
+          writeDurableSubtreeRecords(
+            toRecord
+          ) // post-persist (D3); HealingFrontierStorage writes are DB-lock-safe off-thread
           unpersistFrontier(nodes.map(_._1)) // Layer 2: healed nodes leave the persisted frontier (post-durable-write)
           nodes.size
         }
@@ -556,7 +628,11 @@ class TrieNodeHealingCoordinator(
         )
         val selfRef = self
         val ec = healingWriterEc
-        val frontierStore = healingFrontierStorage
+        // spec 002/003 resume gate: only consult the persisted frontier when frontier persistence is explicitly
+        // enabled. With it off (default), `frontierStore` is None ⇒ `resumed` is None ⇒ the code falls through to the
+        // full-state BFS exactly as pre-spec-005 (FR-005 parity). The spec-005 store may be PRESENT (to host
+        // subtree-complete records), but its mirror/marker are not a valid resume basis unless persistence is on.
+        val frontierStore = if (frontierPersistenceEnabled) healingFrontierStorage else None
         import scala.concurrent.Future
         import scala.util.control.NonFatal
         Future {
@@ -639,10 +715,15 @@ class TrieNodeHealingCoordinator(
       // The full-state rebuild BFS walked the entire trie; every still-missing node is now persisted.
       // Mark the snapshot complete so a future restart may resume it instead of re-walking (Layer 2).
       verificationBFSRunning = false // rebuild walk finished — release the single-flight gate
-      healingFrontierStorage.foreach { store =>
-        store.markComplete()
-        log.info("[HEAL-RESTART] Full-state rebuild complete — persisted frontier marked as a complete snapshot")
-      }
+      // spec 002 marker: gated on frontier persistence (default off). With it off, `FrontierRebuildComplete` is never
+      // reached via the resume path anyway (that path requires `frontierStore` defined), but guard defensively so the
+      // snapshot marker is only ever written when persistence is enabled (FR-005 parity; the marker also gates the
+      // spec-003 scoped path, which must stay dark by default).
+      if (frontierPersistenceEnabled)
+        healingFrontierStorage.foreach { store =>
+          store.markComplete()
+          log.info("[HEAL-RESTART] Full-state rebuild complete — persisted frontier marked as a complete snapshot")
+        }
 
     case FrontierWalkFailed =>
       verificationBFSRunning = false
@@ -905,8 +986,23 @@ class TrieNodeHealingCoordinator(
           // equivalent to (and cleaner than) writing the marker inside VerificationBFSComplete.
           if (verificationPassComplete) {
             healingFrontierStorage.foreach { store =>
-              store.markComplete()
-              log.info("[HEAL-RESTART] Verification BFS complete — persisted frontier marked as a complete snapshot")
+              // spec 005 C2/C4/T007/T012: GENUINE zero-missing closure of the whole trie from `stateRoot` — the
+              // verification BFS just confirmed zero missing descendants (verificationPassComplete && isComplete) and
+              // `flushRawNodesSync()` above durably committed every healed node-byte. ONLY now (subtree bytes durable)
+              // is it crash-safe to record the root subtree-complete (ordinary WAL-ordered `update`). This is a real
+              // closure, NOT a `visitedLru`-faked queue-drain: the gate required isComplete (no pending/active
+              // frontier) AND a clean BFS pass. Recorded only under `prunedEnabled` (Hash scheme) so a Path-scheme
+              // node never writes a hash-keyed record. The terminal `markComplete()` (fsync) follows last (D3 order).
+              if (prunedEnabled) store.markSubtreeComplete(stateRoot) // spec 005 root record — gated on prunedEnabled
+              // spec 002 snapshot marker — gated on frontier persistence (default off). MUST stay separate from the
+              // spec-005 root record above: with persistence off, the marker is never written, so the spec-003 scoped
+              // path (which keys off `store.isComplete`) stays dark and behavior is byte-for-byte pre-spec-005 (FR-005).
+              if (frontierPersistenceEnabled) {
+                store.markComplete()
+                log.info(
+                  "[HEAL-RESTART] Verification BFS complete — persisted frontier marked as a complete snapshot"
+                )
+              }
             }
           }
           snapSyncController ! SNAPSyncController.StateHealingComplete
@@ -961,6 +1057,21 @@ class TrieNodeHealingCoordinator(
           )
           SNAPSyncMetrics.setHealingScopedDurationMs(elapsedMs)
           scopedVerificationActive = false
+        }
+        // spec 005 C8/FR-009: pruned-path completion observability — emit the savings (subtrees pruned vs nodes
+        // visited) + elapsed so an operator can confirm engagement. Same single chokepoint (C5); no new completion
+        // path. The actual root record (T007) is written crash-safely in HealingCheckCompletion AFTER the node-bytes
+        // flush, alongside the terminal markComplete (D3/T012).
+        if (prunedVerificationActive) {
+          val prunedElapsedMs = System.currentTimeMillis() - prunedVerificationStartMs
+          val pruned = prunedSubtreeCount.get()
+          log.info(
+            s"[HEAL-VERIFY-PRUNED] Pruned verification complete in ${prunedElapsedMs}ms — " +
+              s"$pruned present subtrees pruned (descend-and-stop), zero missing found — declaring completion"
+          )
+          SNAPSyncMetrics.setHealingPrunedSubtrees(pruned)
+          SNAPSyncMetrics.setHealingPrunedDurationMs(prunedElapsedMs)
+          prunedVerificationActive = false
         }
         log.info(
           s"[HEAL-VERIFY] Verification BFS complete — no missing nodes found. " +
@@ -1562,6 +1673,23 @@ class TrieNodeHealingCoordinator(
     val visitedCount = new java.util.concurrent.atomic.AtomicLong(0L)
     val frontierCount = new java.util.concurrent.atomic.AtomicLong(0L)
 
+    // --- spec 005 (Pruned descend-and-stop oracle, C2/T006/T014) ---
+    // The store is consulted ONLY when `prunedEnabled` (config on AND Hash scheme AND store present). When pruning is
+    // disabled, `prunedStore` is None and the oracle below is inert — the walk descends EVERY present child exactly as
+    // today (byte-identical full walk). The oracle's contract (FR-001/FR-004, never-false-prune): a present child X is
+    // pruned (treated as a verified leaf, NOT enqueued, so its whole subtree is skipped) IFF `prunedEnabled` AND X has
+    // a durable subtree-complete record. A present-but-not-recorded child and any missing child are ALWAYS descended /
+    // emitted — pruning narrows the walk only where completeness is durably proven, never where it is merely assumed.
+    // Returns true when the child was pruned (caller must NOT enqueue it). Increments the pruned-subtree counter on a
+    // hit. `markIfNew` has already de-duplicated the child, so each pruned subtree is counted once per walk.
+    val prunedStore: Option[HealingFrontierStorage] = if (prunedEnabled) healingFrontierStorage else None
+    def pruneIfSubtreeComplete(childHash: ByteString): Boolean =
+      prunedStore.exists { store =>
+        val recorded = store.isSubtreeComplete(childHash)
+        if (recorded) prunedSubtreeCount.incrementAndGet()
+        recorded
+      }
+
     // --- spec 002 US2 observability (observation-only, FR-006/FR-007/FR-008) ---
     // Per-level coarse-phase timers (nanos) accumulated across chunks/sub-ranges, and re-walk inflation
     // counters. These are read and reset at each level boundary. They are pure instrumentation: they never
@@ -1627,13 +1755,17 @@ class TrieNodeHealingCoordinator(
                           // Observation-only (FR-008/FR-023): count this child reference before the de-dup gate.
                           childRefsSeen.incrementAndGet()
                           if (markIfNew(childHash)) {
-                            distinctEnqueued.incrementAndGet()
-                            val childNibbles = nibbles :+ i.toByte
-                            val childCompact = ByteString(HexPrefix.encode(childNibbles, isLeaf = false))
-                            val childPathset =
-                              if (entry.isStorage) Seq(pathset.head.toArray, childCompact.toArray)
-                              else Seq(childCompact.toArray)
-                            nextBuf += ((hashChild.hashNode, childPathset, entry.isStorage))
+                            // spec 005 C2/T006: prune a present, recorded-complete child — do NOT enqueue it, so its
+                            // whole subtree is skipped (descend-and-stop). Else descend exactly as today.
+                            if (!pruneIfSubtreeComplete(childHash)) {
+                              distinctEnqueued.incrementAndGet()
+                              val childNibbles = nibbles :+ i.toByte
+                              val childCompact = ByteString(HexPrefix.encode(childNibbles, isLeaf = false))
+                              val childPathset =
+                                if (entry.isStorage) Seq(pathset.head.toArray, childCompact.toArray)
+                                else Seq(childCompact.toArray)
+                              nextBuf += ((hashChild.hashNode, childPathset, entry.isStorage))
+                            }
                           }
                         case _ =>
                       }
@@ -1645,13 +1777,16 @@ class TrieNodeHealingCoordinator(
                           // Observation-only (FR-008/FR-023): count this child reference before the de-dup gate.
                           childRefsSeen.incrementAndGet()
                           if (markIfNew(childHash)) {
-                            distinctEnqueued.incrementAndGet()
-                            val childNibbles = nibbles ++ ext.sharedKey.toArray
-                            val childCompact = ByteString(HexPrefix.encode(childNibbles, isLeaf = false))
-                            val childPathset =
-                              if (entry.isStorage) Seq(pathset.head.toArray, childCompact.toArray)
-                              else Seq(childCompact.toArray)
-                            nextBuf += ((hashChild.hashNode, childPathset, entry.isStorage))
+                            // spec 005 C2/T006: prune a present, recorded-complete child (descend-and-stop); else descend.
+                            if (!pruneIfSubtreeComplete(childHash)) {
+                              distinctEnqueued.incrementAndGet()
+                              val childNibbles = nibbles ++ ext.sharedKey.toArray
+                              val childCompact = ByteString(HexPrefix.encode(childNibbles, isLeaf = false))
+                              val childPathset =
+                                if (entry.isStorage) Seq(pathset.head.toArray, childCompact.toArray)
+                                else Seq(childCompact.toArray)
+                              nextBuf += ((hashChild.hashNode, childPathset, entry.isStorage))
+                            }
                           }
                         case _ =>
                       }
@@ -1665,20 +1800,24 @@ class TrieNodeHealingCoordinator(
                           account.storageRoot != Account.EmptyStorageRootHash &&
                           markIfNew(account.storageRoot)
                         ) {
-                          distinctEnqueued.incrementAndGet()
-                          val allNibbles = nibbles ++ leaf.key.toArray
-                          if (allNibbles.length == 64) {
-                            val accountHashBytes =
-                              allNibbles.grouped(2).map(g => ((g(0) << 4) | g(1)).toByte).toArray
-                            val accountHash = ByteString(accountHashBytes)
-                            val emptyStoragePath = ByteString(HexPrefix.encode(Array.empty[Byte], isLeaf = false))
-                            nextBuf += (
-                              (
-                                account.storageRoot.toArray,
-                                Seq(accountHash.toArray, emptyStoragePath.toArray),
-                                true
+                          // spec 005 C2/T006: prune a present, recorded-complete storage-trie root (descend-and-stop) —
+                          // do NOT enqueue the storage subtree. Else descend it exactly as today.
+                          if (!pruneIfSubtreeComplete(account.storageRoot)) {
+                            distinctEnqueued.incrementAndGet()
+                            val allNibbles = nibbles ++ leaf.key.toArray
+                            if (allNibbles.length == 64) {
+                              val accountHashBytes =
+                                allNibbles.grouped(2).map(g => ((g(0) << 4) | g(1)).toByte).toArray
+                              val accountHash = ByteString(accountHashBytes)
+                              val emptyStoragePath = ByteString(HexPrefix.encode(Array.empty[Byte], isLeaf = false))
+                              nextBuf += (
+                                (
+                                  account.storageRoot.toArray,
+                                  Seq(accountHash.toArray, emptyStoragePath.toArray),
+                                  true
+                                )
                               )
-                            )
+                            }
                           }
                         }
                       }
@@ -1877,6 +2016,27 @@ class TrieNodeHealingCoordinator(
     // distinguish the two paths, and mark the in-flight run as NOT scoped for the completion handler.
     scopedVerificationActive = false
     SNAPSyncMetrics.setHealingScopedVerification(0L)
+    // spec 005 C2/C8/T024: this full-root walk is the SAME traversal whether or not pruning is engaged — the
+    // descend-and-stop oracle (pruneIfSubtreeComplete) is inert unless `prunedEnabled`. Reset the per-run pruned
+    // counter and record engagement so the completion handler can emit the [HEAL-VERIFY-PRUNED] savings, and surface
+    // the engaged/disabled path here at the verification entry (FR-009/FR-007).
+    prunedSubtreeCount.set(0L)
+    prunedVerificationActive = prunedEnabled
+    prunedVerificationStartMs = System.currentTimeMillis()
+    SNAPSyncMetrics.setHealingPrunedVerification(if (prunedEnabled) 1L else 0L)
+    SNAPSyncMetrics.setHealingPrunedSubtrees(0L)
+    if (prunedEnabled)
+      log.info(
+        s"[HEAL-VERIFY-PRUNED] Pruned (descend-and-stop) verification engaged on root " +
+          s"${Hex.toHexString(root.take(4).toArray)} — present, recorded-complete subtrees are pruned " +
+          s"(O(missing-frontier)); present-but-unrecorded and missing nodes are descended"
+      )
+    else
+      log.info(
+        s"[HEAL-VERIFY-PRUNED] Pruning disabled (flag=$prunedHealVerification scheme=$storageScheme " +
+          s"store=${healingFrontierStorage.isDefined}) — full-trie verification on root " +
+          s"${Hex.toHexString(root.take(4).toArray)}"
+      )
     startFrontierBFS(root, rootPath, isStor = false, () => selfRef ! VerificationBFSComplete)
   }
 
@@ -1897,6 +2057,10 @@ class TrieNodeHealingCoordinator(
     scopedVerificationActive = true
     scopedVerificationSeedCount = seeds.size
     scopedVerificationStartMs = System.currentTimeMillis()
+    // spec 005: a scoped run is attributed to the SCOPED path, not the pruned path — clear any stale pruned-run flag
+    // from a prior full-root walk so the VerificationBFSComplete handler does not mis-emit [HEAL-VERIFY-PRUNED]. The
+    // descend-and-stop oracle still prunes recorded subtrees WITHIN this scoped walk (correctness preserved).
+    prunedVerificationActive = false
     log.info(
       s"[HEAL-VERIFY-SCOPED] Scoped verification engaged — ${seeds.size} healed subtrees " +
         s"(root ${Hex.toHexString(stateRoot.take(4).toArray)}); skipping full-root re-walk"
@@ -1929,16 +2093,26 @@ class TrieNodeHealingCoordinator(
       val isStorageTrie = pathset.size > 1 // Seq(accountHash, path) vs Seq(path)
 
       val newEntries = mutable.Buffer.empty[HealingEntry]
+      // spec 005 C3b/D2/T009/T015: collect the DIRECT child hashes confirmed PRESENT on disk this call, and whether
+      // ANY direct child is still pending (frontier / not-yet-healed). X is a subtree-complete CANDIDATE only when it
+      // has zero missing children, none pending, AND every present child is ITSELF recorded subtree-complete — the
+      // sound inductive closure (a leaf with no children is trivially complete; a node all of whose children are
+      // recorded-complete has a fully-present subtree). This is the genuine zero-missing-DESCENDANTS closure D2
+      // requires — NOT merely zero-missing direct children, which would be unsound. The actual record write is
+      // deferred to the durable flush (T012); here we only stage the candidate.
+      val presentChildren = mutable.Buffer.empty[ByteString]
+      var anyChildPending = false
 
       decoded match {
         case branch: BranchNode =>
           // Collect all non-pending HashNode children, then check storage in one multiGetNodes call.
-          val toCheck = (0 until 16)
-            .collect {
-              case i if branch.children(i).isInstanceOf[HashNode] =>
-                (i, ByteString(branch.children(i).asInstanceOf[HashNode].hashNode))
-            }
-            .filterNot { case (_, h) => pendingHashSet.contains(h) }
+          val allHashChildren = (0 until 16).collect {
+            case i if branch.children(i).isInstanceOf[HashNode] =>
+              (i, ByteString(branch.children(i).asInstanceOf[HashNode].hashNode))
+          }
+          // spec 005 T009/T015: a child still in the frontier (pending heal) means X's subtree is NOT yet complete.
+          if (allHashChildren.exists { case (_, h) => pendingHashSet.contains(h) }) anyChildPending = true
+          val toCheck = allHashChildren.filterNot { case (_, h) => pendingHashSet.contains(h) }
           if (toCheck.nonEmpty) {
             val storageResults = mptStorage.multiGetNodes(toCheck.map(_._2.toArray))
             toCheck.zip(storageResults).foreach { case ((i, childHash), nodeOpt) =>
@@ -1947,7 +2121,8 @@ class TrieNodeHealingCoordinator(
                 val childCompact = ByteString(HexPrefix.encode(childNibbles, isLeaf = false))
                 val childPathset = if (isStorageTrie) Seq(pathset.head, childCompact) else Seq(childCompact)
                 newEntries += HealingEntry(childPathset, childHash)
-              }
+              } else
+                presentChildren += childHash // present on disk — a subtree-complete-candidate prerequisite
             }
           }
 
@@ -1955,14 +2130,16 @@ class TrieNodeHealingCoordinator(
           ext.next match {
             case hash: HashNode =>
               val childHash = ByteString(hash.hashNode)
-              if (!pendingHashSet.contains(childHash)) {
+              if (pendingHashSet.contains(childHash)) anyChildPending = true
+              else {
                 val storageResults = mptStorage.multiGetNodes(Seq(childHash.toArray))
                 if (storageResults.headOption.flatten.isEmpty) {
                   val childNibbles = parentNibbles ++ ext.sharedKey.toArray
                   val childCompact = ByteString(HexPrefix.encode(childNibbles, isLeaf = false))
                   val childPathset = if (isStorageTrie) Seq(pathset.head, childCompact) else Seq(childCompact)
                   newEntries += HealingEntry(childPathset, childHash)
-                }
+                } else
+                  presentChildren += childHash
               }
             case _ => // Already inline-encoded — no missing child
           }
@@ -1971,28 +2148,31 @@ class TrieNodeHealingCoordinator(
           // ARCH-LEAF-SEED: Account trie leaf — decode account, seed storage trie if missing.
           // Besu equivalent: getChildRequests() → getStorageTrieNodeRequests() on account leaf values.
           Account(leaf.value).foreach { account =>
-            if (
-              account.storageRoot != Account.EmptyStorageRootHash &&
-              !pendingHashSet.contains(account.storageRoot) &&
-              !isNodeInStorage(account.storageRoot)
-            ) {
-              val leafNibbles = leaf.key.toArray
-              val allNibbles = parentNibbles ++ leafNibbles
-              if (allNibbles.length == 64) {
-                val accountHashBytes = allNibbles
-                  .grouped(2)
-                  .map { g =>
-                    ((g(0) << 4) | g(1)).toByte
-                  }
-                  .toArray
-                val accountHash = ByteString(accountHashBytes)
-                val emptyStoragePath = ByteString(HexPrefix.encode(Array.empty[Byte], isLeaf = false))
-                newEntries += HealingEntry(Seq(accountHash, emptyStoragePath), account.storageRoot)
-                log.debug(
-                  s"[HEAL-LEAF] Seeded storage trie root ${Hex.toHexString(account.storageRoot.take(4).toArray)} " +
-                    s"for account ${Hex.toHexString(accountHashBytes.take(4))}"
-                )
-              }
+            if (account.storageRoot != Account.EmptyStorageRootHash) {
+              if (pendingHashSet.contains(account.storageRoot)) anyChildPending = true
+              else if (!isNodeInStorage(account.storageRoot)) {
+                val leafNibbles = leaf.key.toArray
+                val allNibbles = parentNibbles ++ leafNibbles
+                if (allNibbles.length == 64) {
+                  val accountHashBytes = allNibbles
+                    .grouped(2)
+                    .map { g =>
+                      ((g(0) << 4) | g(1)).toByte
+                    }
+                    .toArray
+                  val accountHash = ByteString(accountHashBytes)
+                  val emptyStoragePath = ByteString(HexPrefix.encode(Array.empty[Byte], isLeaf = false))
+                  newEntries += HealingEntry(Seq(accountHash, emptyStoragePath), account.storageRoot)
+                  log.debug(
+                    s"[HEAL-LEAF] Seeded storage trie root ${Hex.toHexString(account.storageRoot.take(4).toArray)} " +
+                      s"for account ${Hex.toHexString(accountHashBytes.take(4))}"
+                  )
+                } else
+                  // 64-nibble guard failed — cannot derive the storage seed path; do NOT treat as complete.
+                  anyChildPending = true
+              } else
+                // Storage root present on disk — X is complete only if the storage subtree is recorded-complete.
+                presentChildren += account.storageRoot
             }
           }
 
@@ -2009,6 +2189,19 @@ class TrieNodeHealingCoordinator(
             s"[HEAL-DISCOVER] Inline children queued: $childrenDiscoveredTotal total " +
               s"(+${newEntries.size} from this node, pending: ${pendingTasks.size})"
           )
+      } else if (
+        // spec 005 C3b/D2/T009/T015: GENUINE zero-missing-descendants closure for X. Stage the record (written
+        // post-flush in T012) iff: pruning on AND Hash scheme; no missing direct children just discovered; no child
+        // pending heal; and every present child is itself recorded subtree-complete (the inductive step). A storage
+        // leaf / account leaf with empty or recorded-complete storage has no unproven child ⇒ trivially complete.
+        prunedEnabled && !anyChildPending && {
+          val recorded =
+            if (presentChildren.isEmpty) Set.empty[ByteString]
+            else healingFrontierStorage.fold(Set.empty[ByteString])(_.multiIsSubtreeComplete(presentChildren.toSeq))
+          presentChildren.forall(recorded.contains)
+        }
+      ) {
+        pendingSubtreeRecords += ByteString(decoded.hash) // X's keccak hash; record deferred to durable flush (T012)
       }
     } catch {
       case NonFatal(e) =>
@@ -2149,6 +2342,8 @@ object TrieNodeHealingCoordinator {
       frontierBackpressureMaxWaitMs: Long = FrontierBackpressureMaxWaitMs,
       scopedHealVerification: Boolean = true,
       scopedHealMaxPaths: Int = DefaultScopedHealMaxPaths,
+      prunedHealVerification: Boolean = true,
+      frontierPersistenceEnabled: Boolean = false,
       decoupledHealServeRoot: Boolean = false,
       decoupledHealMaxAttemptsNoRefresh: Int = DefaultDecoupledHealMaxAttemptsNoRefresh
   ): Props =
@@ -2176,6 +2371,8 @@ object TrieNodeHealingCoordinator {
         frontierBackpressureMaxWaitMs,
         scopedHealVerification,
         scopedHealMaxPaths,
+        prunedHealVerification,
+        frontierPersistenceEnabled,
         decoupledHealServeRoot,
         decoupledHealMaxAttemptsNoRefresh
       )

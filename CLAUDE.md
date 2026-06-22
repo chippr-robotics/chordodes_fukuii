@@ -141,14 +141,18 @@ Read it before planning or implementing. Highlights:
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/004-decoupled-heal-serve-root/plan.md` (decouple the post-SNAP heal's local
-completeness walk from the serve-window-bound node fetch: hold the WALK root fixed for
-the whole walk (a local read needing no peers) while fetching missing nodes from an
-advancing SERVE root that stays inside peers' ~128-block snap serve window. Trie nodes
-are content-addressed and the fetched node is verified keccak256==hash before store
-(the load-bearing guardrail), so a newer servable root safely supplies the deep nodes.
-Cures the serve-window-vs-walk-time deadlock that stalls heal at ~99%. Consensus-adjacent;
-forge-reviewed; byte-for-byte completion parity (FR-007); default-on; composes with the
-hold-pivot fix #1357 as its durable generalization. Needs build + one redeploy.) Prior
-plans: `specs/003-scoped-heal-verification/plan.md`, `specs/002-bfs-heal-performance/plan.md`.
+`specs/005-subtree-complete-verification/plan.md` (make the post-SNAP heal completeness
+VERIFICATION O(missing-frontier) instead of O(whole ~90M-node trie), eliminating the
+~16-20h full re-walk. fukuii is the only major MPT client that reads the whole trie to
+verify; geth/nethermind/besu use descend-and-stop. Add a durable, content-addressed,
+root-INDEPENDENT per-subtree-complete record in the existing CF 'g' (additive/monotone,
+never cleared); the verification prunes any present, recorded-complete subtree. Seed the
+records during the SNAP/heal write path so the FIRST verification on a fresh node is
+already O(missing) (FR-003). Crash-safe: record written only AFTER its subtree's bytes are
+durably committed (descend-on-missing-record fallback); terminal marker fsynced. Byte-for-
+byte completion parity via the single existing chokepoint (FR-005); the walk does no state
+writes. Hash-scheme only; config default-on with full-walk fallback. Consensus-adjacent;
+forge-reviewed; composes with/generalizes spec 003 scoped verification. Needs build + one
+redeploy.) Prior plans: `specs/004-decoupled-heal-serve-root/plan.md`,
+`specs/003-scoped-heal-verification/plan.md`, `specs/002-bfs-heal-performance/plan.md`.
 <!-- SPECKIT END -->
