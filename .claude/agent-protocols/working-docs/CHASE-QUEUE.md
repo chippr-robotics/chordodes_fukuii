@@ -31,7 +31,6 @@ and add a dated log entry at the bottom.
 
 | File | Line(s) | Pattern | Type | Agent | Date |
 |------|---------|---------|------|-------|------|
-| `blockchain/sync/fast/PivotBlockSelector.scala` | all `UnsubscribeAllCmd` call sites (×4) | After Command ADT narrowing, `MessageClassifier` subscriptions will be registered under `blockHeadersAdapter.toClassic` (not `ctx.self.toClassic`). The four existing `UnsubscribeAllCmd(ctx.self.toClassic)` calls (`sendResponseAndCleanup`, `ElectionPivotBlockTimeout`, `votingProcess`, `idle`) will miss all adapter-keyed subscriptions — bus key mismatch, subscriptions silently linger until CAPSTONE watch fires asynchronously. LOOM must replace each with `UnsubscribeAllCmd(blockHeadersAdapter.toClassic)`. Same fix applies to per-peer `UnsubscribeCmd` in `runningPivotBlockElection`. | EXCEPT | HERALD | 2026-06-21 |
 | `consensus/pow/PoWMiningCoordinator.scala` | — | Threading model finding (R9/8d B2): FORGE-gated. See `threading-model-audit.md §B2` for detail. FORGE review required before any fix. | MUTABLE | PRISM | 2026-06-21 |
 
 ---
@@ -51,6 +50,8 @@ When 5+ entries share a Type or package, open a dedicated sprint:
 ---
 
 ## Cleared entries log
+
+| PivotBlockSelector UnsubscribeAllCmd ×4 + UnsubscribeCmd ×1 | `blockchain/sync/fast/PivotBlockSelector.scala` | Cleared 2026-06-21: S4b (`e82f41cac`) fixed all 5 unsubscribe sites — `UnsubscribeAllCmd(ctx.self.toClassic)` → `UnsubscribeAllCmd(blockHeadersAdapter.toClassic)` at `sendResponseAndCleanup`, `ElectionPivotBlockTimeout`, `votingProcess`, `idle`; `UnsubscribeCmd` in `runningPivotBlockElection` likewise updated. Subscription ref mismatch eliminated. | — | LOOM | 2026-06-21 |
 
 | EngineApiService H1 MUTABLE | `consensus/engine/EngineApiService.scala:42–75` | Cleared 2026-06-21: BEACON review complete. 6 maps (PRISM missed `acceptedChildrenByParent` line 74). CLASS A (4 payloadId-keyed) → bounded LRU+TTL, CONDUIT owner (§8c-H1-A). CLASS B (2 hash-keyed) → finalized-watermark prune, BEACON impl (§8c-H1-B). No source files touched. | — | — | 2026-06-21 |
 | IMPLICIT ×3 / P4a EXCEPT | various | Cleared 2026-06-21: (1) IMPLICIT ×3 — `*Enc extends MessageSerializableImplicit`/`RLPSerializable` subtype polymorphism + `ReceiptBloom*` wildcard collision — permanent deferrals (P3b); no fix planned. (2) P4a SSC `GetProgress` idle-state gap — fixed `74db726d1`. | — | — | 2026-06-21 |
