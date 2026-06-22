@@ -236,6 +236,14 @@ only handled the legacy `GetHandshakedPeers` case object. Added `case GetHandsha
 
 ---
 
+### C16 — Delete 3 confirmed dead files (P3) ✅ DONE (`fa57df9b9`)
+
+`MetricsAlreadyConfiguredError`, `LocalVM`, `AdaptiveSyncStrategy` — grep-confirmed 0 callers each
+across all of `src/`. No test files existed for any of the three. All deleted in a single `git rm`
+invocation. `sbt compile-all` → 0 errors after deletion. 200 lines removed.
+
+---
+
 ### C14 ✅ SyncController Classic scheduler → Typed ctx.system.scheduler (2 sites) — DONE (`8d460a145`)
 
 PRISM post-capstone finding. `fix(pekko): replace Classic scheduler with Typed ctx.system.scheduler in SyncController (7d)`
@@ -271,3 +279,4 @@ PRISM post-capstone finding. `fix(pekko): replace Classic scheduler with Typed c
 | 15 min | C13 `Actor.noSender` → `ActorRef.noSender` (3 files) | ✅ DONE `417165930` | — |
 | 30 min | C14 SyncController Classic scheduler → Typed `ctx.system.scheduler` (2 sites) | ✅ DONE `8d460a145` | — |
 | 10 min | C15 SyncControllerSpec autopilot GetHandshakedPeersCmd handler (P2) | ✅ DONE `fc1030410` | — |
+| 10 min | C16 Delete 3 confirmed dead files (P3) | ✅ DONE `fa57df9b9` | — |

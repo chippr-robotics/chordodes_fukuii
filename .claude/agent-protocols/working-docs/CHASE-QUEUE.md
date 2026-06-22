@@ -32,9 +32,6 @@ and add a dated log entry at the bottom.
 | File | Line(s) | Pattern | Type | Agent | Date |
 |------|---------|---------|------|-------|------|
 | `consensus/pow/PoWMiningCoordinator.scala` | — | Threading model finding (R9/8d B2): FORGE-gated. See `threading-model-audit.md §B2` for detail. FORGE review required before any fix. | MUTABLE | PRISM | 2026-06-21 |
-| `metrics/MetricsAlreadyConfiguredError.scala` | whole file | Part 8f sweep: `case class MetricsAlreadyConfiguredError` has 1 grep hit (its own definition). Never thrown, never caught, never imported. Pure deletion — no call-site changes required. | DEAD | PRISM | 2026-06-22 |
-| `ledger/LocalVM.scala` | whole file | Part 8f sweep: `object LocalVM extends VM[InMemoryWorldStateProxy, InMemoryWorldStateProxyStorage]` — 1 grep hit (definition only). Not imported or referenced anywhere in main or test sources. Pure deletion — no call-site changes required. | DEAD | PRISM | 2026-06-22 |
-| `blockchain/sync/AdaptiveSyncStrategy.scala` | whole file (193 lines) | Part 8f sweep: `AdaptiveSyncController`, `SyncStrategy`, `NetworkConditions`, `SyncResult` all unreferenced outside the file. No actor spawns it; no config wires it; no test covers it. Speculative-generality state machine predating the current sync architecture. Pure deletion — no call-site changes required. | DEAD | PRISM | 2026-06-22 |
 | `network/discovery/StaticNodesLoader.scala` | whole file (95 lines) | Part 8f sweep: duplicate of `network/StaticNodesLoader.scala` (the production impl). Discovery version has weaker validation (prefix-only, no port/pubkey check) and is used only by `DiscoveryConfig`. Fix: redirect `DiscoveryConfig` to call `com.chipprbots.ethereum.network.StaticNodesLoader.load(datadir).map(_.toString).toSet` (1-line change), then delete file + migrate or delete `StaticNodesLoaderSpec`. | DEAD | PRISM | 2026-06-22 |
 
 ---
@@ -66,6 +63,7 @@ When 5+ entries share a Type or package, open a dedicated sprint:
 | RegularSync divergence path EXCEPT | `BlockImporter.scala:797` `handleForkRecovery` | Cleared 2026-06-21: HERALD audit confirmed gap — three-path recovery (stale-tip rewind / UnknownBranch rewind / handleForkRecovery) all use blind 128-block rewind with no LCA knowledge. Will eventually converge (iterates 128 blocks per ForkDetectThreshold cycle) but destructively mutates canonical chain during recovery. MESS makes >128-block forks near-impossible on ETC mainnet. Fix spec: generalize `FastSyncBranchResolverActor.fastSync: ClassicActorRef` → `replyTo: ActorRef[BranchResolverResponse]`, add `ResolvingFork` behavior to `BlockImporterLogic`, replace 4-line blind rewind with actor spawn + response. Size S. Routed to DEFERRED-BACKLOG. | — | — | 2026-06-21 |
 | RegularSyncCommand sealed | `SyncProtocol.scala` + `RegularSync.scala` | Cleared 2026-06-22: `923b18ba7` — `FetcherStatusTick`, `PrintStatusTick`, `ProgressProtocol` moved from `RegularSync.scala` → `SyncProtocol.scala`; `trait RegularSyncCommand` is now `sealed`; fallthrough `case _ => Behaviors.unhandled` arm deleted; `RegularSync.ProgressProtocol` type alias preserves all call sites; 31/31 `RegularSyncSpec` tests pass; 0 compile errors. | — | MITHRIL | 2026-06-22 |
 | SyncControllerSpec SyncStateAutoPilot | `SyncControllerSpec.scala` | Cleared 2026-06-22: `fc1030410` — GetHandshakedPeersCmd handler added to autopilot; 7 pre-existing failures resolved. |
+| MetricsAlreadyConfiguredError + LocalVM + AdaptiveSyncStrategy | Part 8f dead code | Cleared 2026-06-22: `fa57df9b9` — 3 confirmed dead files deleted. grep-verified 0 callers each; no test files existed; sbt compile-all 0 errors. |
 
 ---
 
@@ -161,49 +159,10 @@ Suggested new protocol name: **exception-as-control-flow** — covers `throw` in
 |---|-------|--------|---------------|
 | ~~B1~~ | ~~Batch B step 1~~ | ~~P1 MITHRIL Seal RegularSyncCommand~~ | ✅ DONE 2026-06-22 |
 | ~~B2~~ | ~~Batch B step 2~~ | ~~P2 MITHRIL SyncControllerSpec autopilot~~ | ✅ DONE 2026-06-22 — 7 failures resolved |
-| B3 | Batch B step 3 | P3 WRAITH Delete 3 dead files | No compile dependency on P1/P2; safe to run after either |
+| ~~B3~~ | ~~Batch B step 3~~ | ~~P3 WRAITH Delete 3 dead files~~ | ✅ DONE 2026-06-22 — 3 files deleted |
 | B4 | Batch B step 4 | P4 WRAITH DiscoveryConfig redirect + delete | Run after P3 compile-verified |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
-
----
-
-### P3 — WRAITH: Delete 3 confirmed dead files
-
-**Agent:** WRAITH
-**Files (delete all three):**
-- `src/main/scala/.../metrics/MetricsAlreadyConfiguredError.scala`
-- `src/main/scala/.../blockchain/ledger/LocalVM.scala`
-- `src/main/scala/.../blockchain/sync/AdaptiveSyncStrategy.scala` (193 lines)
-**Prerequisite:** None — PRISM confirmed zero external references for all three.
-
-**Prompt:**
-> On branch `scala3-cleanup-june`, delete three confirmed dead files found in the Part 8f
-> dead code sweep. Each has exactly 1 grep hit (its own definition). No call-site changes needed.
->
-> For each file:
-> 1. Confirm with `grep -rn "MetricsAlreadyConfiguredError\|LocalVM\b\|AdaptiveSyncStrategy\|AdaptiveSyncController\|SyncStrategy\b\|NetworkConditions\|SyncResult\b" src/ --include="*.scala"` — expect only the definition files themselves.
-> 2. If confirmed, delete the file: `git rm path/to/File.scala`
-> 3. After all three deletions: `sbt compile-all` — 0 errors (no callers means no broken imports).
-> 4. Single commit covering all three: `Part 8f — delete 3 confirmed dead files`.
->
-> Do NOT delete any test files for these classes. If test files exist for LocalVM or
-> AdaptiveSyncStrategy, add them as DEAD entries to CHASE-QUEUE.md for a follow-on pass.
-
-**Verification:** `sbt compile-all` 0 errors after deletion; grep confirms no remaining callers
-
-**MANDATORY final step — complete BEFORE closing thread:**
-- `working-docs/CHASE-QUEUE.md` run order table — change `| B3 | Batch B step 3 | P3 ...` to `| ~~B3~~ | ~~Batch B step 3~~ | ~~P3 WRAITH Delete 3 dead files~~ | ✅ DONE [date] — 3 files deleted |`
-- `working-docs/CHASE-QUEUE.md` — remove the 3 DEAD entries from Open entries table
-- `working-docs/CHASE-QUEUE.md` — delete this entire `### P3` section from the Clearout Prompts section
-- Add to Cleared entries log: `| MetricsAlreadyConfiguredError + LocalVM + AdaptiveSyncStrategy | Part 8f dead code | Cleared [date]: [SHA] — 3 confirmed dead files deleted. |`
-- `completed/CHORE-QUEUE.md` — append new section following the C1–C5 pattern:
-  `### C[N] — Delete 3 confirmed dead files (P3) ✅ DONE ([SHA])`
-  `[2-4 lines: which files, grep-confirmed 0 callers, compile result]`
-
-**Opportunistic clearout:** Apply the protocol in CODEBASE-AUDIT.md. After grep-confirming each file has no callers, check whether any other DEAD or NULL entries in CHASE-QUEUE are in the same packages — if so, add them to the deletion list or draft a follow-on prompt.
-
-**Rejection criteria:** Deleting files with external callers; deleting test files in the same commit; bundling with unrelated changes
 
 ---
 
