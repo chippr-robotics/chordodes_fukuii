@@ -20,8 +20,9 @@ import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.domain.ChainWeight
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerEventCmd
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
-import com.chipprbots.ethereum.network.NetworkPeerManagerShell
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerHandshakeSuccessful
@@ -67,15 +68,17 @@ class NetworkPeerManagerActorHandshakeSpec
     val pm = TestProbe()
     val bus = TestProbe()
     val ref = system
-      .actorOf(
-        NetworkPeerManagerShell.props(
+      .spawn(
+        NetworkPeerManagerActor.behavior(
           pm.ref.toTyped[PeerManagerActor.Command],
           bus.ref.toTyped[PeerEventBusActor.Command],
           new AppStateStorage(EphemDataSource()),
           forkResolverOpt = None,
           isPoWChain = false
-        )
+        ),
+        s"npma-handshake-${java.util.UUID.randomUUID()}"
       )
+      .toClassic
     (ref, pm, bus)
   }
 
@@ -110,7 +113,7 @@ class NetworkPeerManagerActorHandshakeSpec
     val (npma, _, bus) = newNpma()
     drainInitialSubscriptions(bus)
 
-    npma ! PeerHandshakeSuccessful(outboundPeer(), peerInfo)
+    npma ! PeerEventCmd(PeerHandshakeSuccessful(outboundPeer(), peerInfo))
 
     bus.expectMsgType[SubscribeCmd] // PeerDisconnectedClassifier
     bus.expectMsgType[SubscribeCmd] // MessageClassifier
@@ -124,11 +127,11 @@ class NetworkPeerManagerActorHandshakeSpec
     val (npma, _, bus) = newNpma()
     drainInitialSubscriptions(bus)
 
-    npma ! PeerHandshakeSuccessful(outboundPeer(), peerInfo)
+    npma ! PeerEventCmd(PeerHandshakeSuccessful(outboundPeer(), peerInfo))
     bus.expectMsgType[SubscribeCmd]
     bus.expectMsgType[SubscribeCmd]
 
-    npma ! PeerHandshakeSuccessful(inboundPeer(), peerInfo) // same PeerId, inbound wins
+    npma ! PeerEventCmd(PeerHandshakeSuccessful(inboundPeer(), peerInfo)) // same PeerId, inbound wins
     bus.expectNoMessage(100.millis)
   }
 
@@ -138,12 +141,12 @@ class NetworkPeerManagerActorHandshakeSpec
   it should "suppress PeerDisconnected for the dying outbound after inbound-wins" taggedAs UnitTest in {
     val (npma, _, bus) = newNpma()
     drainInitialSubscriptions(bus)
-    npma ! PeerHandshakeSuccessful(outboundPeer(), peerInfo)
+    npma ! PeerEventCmd(PeerHandshakeSuccessful(outboundPeer(), peerInfo))
     bus.expectMsgType[SubscribeCmd]; bus.expectMsgType[SubscribeCmd]
-    npma ! PeerHandshakeSuccessful(inboundPeer(), peerInfo)
+    npma ! PeerEventCmd(PeerHandshakeSuccessful(inboundPeer(), peerInfo))
     bus.expectNoMessage(100.millis)
 
-    npma ! PeerDisconnected(peerId) // outbound dying — should be suppressed
+    npma ! PeerEventCmd(PeerDisconnected(peerId)) // outbound dying — should be suppressed
     bus.expectNoMessage(300.millis)
   }
 
@@ -152,14 +155,14 @@ class NetworkPeerManagerActorHandshakeSpec
   it should "retain the inbound peer after outbound PeerDisconnected is suppressed" taggedAs UnitTest in {
     val (npma, _, bus) = newNpma()
     drainInitialSubscriptions(bus)
-    npma ! PeerHandshakeSuccessful(outboundPeer(), peerInfo)
+    npma ! PeerEventCmd(PeerHandshakeSuccessful(outboundPeer(), peerInfo))
     bus.expectMsgType[SubscribeCmd]; bus.expectMsgType[SubscribeCmd]
-    npma ! PeerHandshakeSuccessful(inboundPeer(), peerInfo)
-    npma ! PeerDisconnected(peerId) // outbound dying — suppressed
+    npma ! PeerEventCmd(PeerHandshakeSuccessful(inboundPeer(), peerInfo))
+    npma ! PeerEventCmd(PeerDisconnected(peerId)) // outbound dying — suppressed
     bus.expectNoMessage(200.millis)
 
     // Genuine disconnect from the inbound must now evict the peer normally
-    npma ! PeerDisconnected(peerId)
+    npma ! PeerEventCmd(PeerDisconnected(peerId))
     bus.expectMsgType[UnsubscribeCmd]
     bus.expectMsgType[UnsubscribeCmd]
   }
@@ -168,14 +171,14 @@ class NetworkPeerManagerActorHandshakeSpec
   it should "drop a second outbound for the same PeerId without adding a duplicate Subscribe" taggedAs UnitTest in {
     val (npma, _, bus) = newNpma()
     drainInitialSubscriptions(bus)
-    npma ! PeerHandshakeSuccessful(outboundPeer(), peerInfo)
+    npma ! PeerEventCmd(PeerHandshakeSuccessful(outboundPeer(), peerInfo))
     bus.expectMsgType[SubscribeCmd]; bus.expectMsgType[SubscribeCmd]
 
-    npma ! PeerHandshakeSuccessful(outboundPeer2(), peerInfo) // duplicate outbound — DROPPED
+    npma ! PeerEventCmd(PeerHandshakeSuccessful(outboundPeer2(), peerInfo)) // duplicate outbound — DROPPED
     bus.expectNoMessage(100.millis)
 
     // Original peer is still retained
-    npma ! PeerDisconnected(peerId)
+    npma ! PeerEventCmd(PeerDisconnected(peerId))
     bus.expectMsgType[UnsubscribeCmd]
     bus.expectMsgType[UnsubscribeCmd]
   }
@@ -184,23 +187,25 @@ class NetworkPeerManagerActorHandshakeSpec
   it should "drop a second inbound for the same PeerId without adding a duplicate Subscribe" taggedAs UnitTest in {
     val (npma, _, bus) = newNpma()
     drainInitialSubscriptions(bus)
-    npma ! PeerHandshakeSuccessful(inboundPeer(), peerInfo)
+    npma ! PeerEventCmd(PeerHandshakeSuccessful(inboundPeer(), peerInfo))
     bus.expectMsgType[SubscribeCmd]; bus.expectMsgType[SubscribeCmd]
 
-    npma ! PeerHandshakeSuccessful(
-      Peer(
-        peerId,
-        new InetSocketAddress("127.0.0.1", 55556),
-        TestProbe().ref,
-        incomingConnection = true,
-        nodeId = Some(nodeIdBytes)
-      ),
-      peerInfo
+    npma ! PeerEventCmd(
+      PeerHandshakeSuccessful(
+        Peer(
+          peerId,
+          new InetSocketAddress("127.0.0.1", 55556),
+          TestProbe().ref,
+          incomingConnection = true,
+          nodeId = Some(nodeIdBytes)
+        ),
+        peerInfo
+      )
     )
     bus.expectNoMessage(100.millis)
 
     // Original peer is still retained
-    npma ! PeerDisconnected(peerId)
+    npma ! PeerEventCmd(PeerDisconnected(peerId))
     bus.expectMsgType[UnsubscribeCmd]
     bus.expectMsgType[UnsubscribeCmd]
   }
@@ -209,15 +214,15 @@ class NetworkPeerManagerActorHandshakeSpec
   it should "evict a peer on genuine PeerDisconnected and ignore a subsequent one for the same PeerId" taggedAs UnitTest in {
     val (npma, _, bus) = newNpma()
     drainInitialSubscriptions(bus)
-    npma ! PeerHandshakeSuccessful(outboundPeer(), peerInfo)
+    npma ! PeerEventCmd(PeerHandshakeSuccessful(outboundPeer(), peerInfo))
     bus.expectMsgType[SubscribeCmd]; bus.expectMsgType[SubscribeCmd]
 
-    npma ! PeerDisconnected(peerId)
+    npma ! PeerEventCmd(PeerDisconnected(peerId))
     bus.expectMsgType[UnsubscribeCmd]
     bus.expectMsgType[UnsubscribeCmd]
 
     // Peer is now gone — second disconnect must be ignored (no Unsubscribes)
-    npma ! PeerDisconnected(peerId)
+    npma ! PeerEventCmd(PeerDisconnected(peerId))
     bus.expectNoMessage(200.millis)
   }
 }

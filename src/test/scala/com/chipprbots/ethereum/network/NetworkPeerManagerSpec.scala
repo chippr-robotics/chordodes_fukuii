@@ -22,7 +22,6 @@ import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.*
-import com.chipprbots.ethereum.network.NetworkPeerManagerShell
 import com.chipprbots.ethereum.network.PeerActor.DisconnectPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
@@ -51,15 +50,15 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     setupNewPeer(peer2, peer2Probe, peer2Info)
 
     // PeersInfoRequest should work properly
-    requestSender.send(peersInfoHolder, PeerInfoRequest(peer1.id))
+    peersInfoHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
     requestSender.expectMsg(PeerInfoResponse(Some(peer1Info)))
-    requestSender.send(peersInfoHolder, PeerInfoRequest(peer2.id))
+    peersInfoHolder ! PeerInfoRequestCmd(peer2.id, requestSender.ref)
     requestSender.expectMsg(PeerInfoResponse(Some(peer2Info)))
-    requestSender.send(peersInfoHolder, PeerInfoRequest(peer3.id))
+    peersInfoHolder ! PeerInfoRequestCmd(peer3.id, requestSender.ref)
     requestSender.expectMsg(PeerInfoResponse(None))
 
     // GetHandshakedPeers should work properly
-    requestSender.send(peersInfoHolder, GetHandshakedPeers)
+    peersInfoHolder ! GetHandshakedPeersCmd(requestSender.ref)
     requestSender.expectMsg(HandshakedPeers(Map(peer1 -> peer1Info, peer2 -> peer2Info)))
   }
 
@@ -76,11 +75,11 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     val secondBlock: NewBlock = NewBlock(Block(secondHeader, BlockBody(Nil, Nil)), newBlockWeight.totalDifficulty)
 
     // when
-    peersInfoHolder ! MessageFromPeer(firstBlock, peer1.id)
-    peersInfoHolder ! MessageFromPeer(secondBlock, peer1.id)
+    peersInfoHolder ! PeerEventCmd(MessageFromPeer(firstBlock, peer1.id))
+    peersInfoHolder ! PeerEventCmd(MessageFromPeer(secondBlock, peer1.id))
 
     // then
-    requestSender.send(peersInfoHolder, PeerInfoRequest(peer1.id))
+    peersInfoHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
     val expectedPeerInfo: PeerInfo = initialPeerInfo
       .withBestBlockData(initialPeerInfo.maxBlockNumber + 4, firstHeader.hash)
       .withChainWeight(newBlockWeight)
@@ -96,13 +95,12 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     val secondHeader: BlockHeader = baseBlockHeader.copy(number = peer1Info.maxBlockNumber + 2)
 
     // when
-    peersInfoHolder ! MessageFromPeer(
-      BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader, blockchainReader.genesisHeader)),
-      peer1.id
+    peersInfoHolder ! PeerEventCmd(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader, blockchainReader.genesisHeader)), peer1.id)
     )
 
     // then
-    requestSender.send(peersInfoHolder, PeerInfoRequest(peer1.id))
+    peersInfoHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
     requestSender.expectMsg(
       PeerInfoResponse(Some(peer1Info.withBestBlockData(initialPeerInfo.maxBlockNumber + 4, firstHeader.hash)))
     )
@@ -117,10 +115,10 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     val secondBlockHash: BlockHash = BlockHash(ByteString(Hex.decode("01" * 32)), peer1Info.maxBlockNumber + 5)
 
     // when
-    peersInfoHolder ! MessageFromPeer(NewBlockHashes(Seq(firstBlockHash, secondBlockHash)), peer1.id)
+    peersInfoHolder ! PeerEventCmd(MessageFromPeer(NewBlockHashes(Seq(firstBlockHash, secondBlockHash)), peer1.id))
 
     // then
-    requestSender.send(peersInfoHolder, PeerInfoRequest(peer1.id))
+    peersInfoHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
     requestSender.expectMsg(
       PeerInfoResponse(Some(peer1Info.withBestBlockData(peer1Info.maxBlockNumber + 5, secondBlockHash.hash)))
     )
@@ -145,9 +143,9 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
       latestBlockHash = newLatestBlockHash
     )
 
-    peersInfoHolder ! MessageFromPeer(blockRangeUpdate, peer1.id)
+    peersInfoHolder ! PeerEventCmd(MessageFromPeer(blockRangeUpdate, peer1.id))
 
-    requestSender.send(peersInfoHolder, PeerInfoRequest(peer1.id))
+    peersInfoHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
     requestSender.expectMsg(
       PeerInfoResponse(Some(peer1Info.withBestBlockData(newLatestBlock, newLatestBlockHash)))
     )
@@ -170,9 +168,9 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
       latestBlockHash = ByteString(Array.fill(32)(0xcc.toByte))
     )
 
-    peersInfoHolder ! MessageFromPeer(blockRangeUpdate, peer1.id)
+    peersInfoHolder ! PeerEventCmd(MessageFromPeer(blockRangeUpdate, peer1.id))
 
-    requestSender.send(peersInfoHolder, PeerInfoRequest(peer1.id))
+    peersInfoHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
     // maxBlockNumber should remain unchanged
     requestSender.expectMsg(PeerInfoResponse(Some(peer1Info)))
   }
@@ -188,10 +186,10 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     val newBlock: NewBlock = NewBlock(baseBlock, initialPeerInfo.chainWeight.totalDifficulty + 1)
 
     // when
-    peersInfoHolder ! MessageFromPeer(newBlock, peer1.id)
+    peersInfoHolder ! PeerEventCmd(MessageFromPeer(newBlock, peer1.id))
 
     // then
-    requestSender.send(peersInfoHolder, PeerInfoRequest(peer1.id))
+    peersInfoHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
     requestSender.expectMsg(
       PeerInfoResponse(Some(peer1Info.withChainWeight(ChainWeight.totalDifficultyOnly(newBlock.totalDifficulty))))
     )
@@ -205,10 +203,10 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     val blockHeaders: BlockHeaders = BlockHeaders(BigInt(0), Seq(DaoForkBlock.header))
 
     // when
-    peersInfoHolder ! MessageFromPeer(blockHeaders, peer1.id)
+    peersInfoHolder ! PeerEventCmd(MessageFromPeer(blockHeaders, peer1.id))
 
     // then
-    requestSender.send(peersInfoHolder, PeerInfoRequest(peer1.id))
+    peersInfoHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
     requestSender.expectMsg(PeerInfoResponse(Some(peer1Info.withForkAccepted(true))))
   }
 
@@ -221,10 +219,10 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
       BlockHeaders(BigInt(0), Seq(Genesis.header.copy(number = Fixtures.Blocks.DaoForkBlock.header.number)))
 
     // when
-    peersInfoHolder ! MessageFromPeer(blockHeaders, peer1.id)
+    peersInfoHolder ! PeerEventCmd(MessageFromPeer(blockHeaders, peer1.id))
 
     // then
-    requestSender.send(peersInfoHolder, PeerInfoRequest(peer1.id))
+    peersInfoHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
     requestSender.expectMsg(PeerInfoResponse(Some(peer1Info)))
     peer1Probe.expectMsg(DisconnectPeer(Disconnect.Reasons.UselessPeer))
   }
@@ -235,32 +233,32 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     setupNewPeer(peer1, peer1Probe, peer1Info)
     setupNewPeer(peer2, peer2Probe, peer2Info)
 
-    peersInfoHolder ! PeerDisconnected(peer2.id)
+    peersInfoHolder ! PeerEventCmd(PeerDisconnected(peer2.id))
 
     // PeersInfoRequest should work properly
-    requestSender.send(peersInfoHolder, PeerInfoRequest(peer1.id))
+    peersInfoHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
     requestSender.expectMsg(PeerInfoResponse(Some(peer1Info)))
-    requestSender.send(peersInfoHolder, PeerInfoRequest(peer2.id))
+    peersInfoHolder ! PeerInfoRequestCmd(peer2.id, requestSender.ref)
     requestSender.expectMsg(PeerInfoResponse(None))
-    requestSender.send(peersInfoHolder, PeerInfoRequest(peer3.id))
+    peersInfoHolder ! PeerInfoRequestCmd(peer3.id, requestSender.ref)
     requestSender.expectMsg(PeerInfoResponse(None))
 
     // GetHandshakedPeers should work properly
-    requestSender.send(peersInfoHolder, GetHandshakedPeers)
+    peersInfoHolder ! GetHandshakedPeersCmd(requestSender.ref)
     requestSender.expectMsg(HandshakedPeers(Map(peer1 -> peer1Info)))
 
-    peersInfoHolder ! PeerDisconnected(peer1.id)
+    peersInfoHolder ! PeerEventCmd(PeerDisconnected(peer1.id))
 
     // PeersInfoRequest should work properly
-    requestSender.send(peersInfoHolder, PeerInfoRequest(peer1.id))
+    peersInfoHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
     requestSender.expectMsg(PeerInfoResponse(None))
-    requestSender.send(peersInfoHolder, PeerInfoRequest(peer2.id))
+    peersInfoHolder ! PeerInfoRequestCmd(peer2.id, requestSender.ref)
     requestSender.expectMsg(PeerInfoResponse(None))
-    requestSender.send(peersInfoHolder, PeerInfoRequest(peer3.id))
+    peersInfoHolder ! PeerInfoRequestCmd(peer3.id, requestSender.ref)
     requestSender.expectMsg(PeerInfoResponse(None))
 
     // GetHandshakedPeers should work properly
-    requestSender.send(peersInfoHolder, GetHandshakedPeers)
+    peersInfoHolder ! GetHandshakedPeersCmd(requestSender.ref)
     requestSender.expectMsg(HandshakedPeers(Map.empty))
   }
 
@@ -274,17 +272,17 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
 
     // All handshaked peers are now returned immediately (peerHasUpdatedBestBlock = always true,
     // Besu-aligned: ETH/68 peers always have maxBlockNumber=0 at handshake; gating deadlocks them)
-    requestSender.send(peersInfoHolder, GetHandshakedPeers)
+    peersInfoHolder ! GetHandshakedPeersCmd(requestSender.ref)
     requestSender.expectMsg(HandshakedPeers(Map(freshPeer -> freshPeerInfo.copy(maxBlockNumber = 0))))
 
     val newMaxBlock: BigInt = freshPeerInfo.maxBlockNumber + 1
     val firstHeader: BlockHeader = baseBlockHeader.copy(number = newMaxBlock)
 
     // Fresh peer received best block
-    peersInfoHolder ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(firstHeader)), freshPeer.id)
+    peersInfoHolder ! PeerEventCmd(MessageFromPeer(BlockHeaders(BigInt(0), Seq(firstHeader)), freshPeer.id))
 
     // After receiving peer best block number, peer should be provided as handshaked peer
-    requestSender.send(peersInfoHolder, GetHandshakedPeers)
+    peersInfoHolder ! GetHandshakedPeersCmd(requestSender.ref)
     requestSender.expectMsg(
       HandshakedPeers(Map(freshPeer -> freshPeerInfo.withBestBlockData(newMaxBlock, firstHeader.hash)))
     )
@@ -302,14 +300,16 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     setupNewPeer(freshPeer, freshPeerProbe, genesisInfo)
 
     // if peer best block is its genesis block then it is available right from the start
-    requestSender.send(peersInfoHolder, GetHandshakedPeers)
+    peersInfoHolder ! GetHandshakedPeersCmd(requestSender.ref)
     requestSender.expectMsg(HandshakedPeers(Map(freshPeer -> genesisInfo)))
 
     // Fresh peer received best block
-    peersInfoHolder ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(Fixtures.Blocks.Genesis.header)), freshPeer.id)
+    peersInfoHolder ! PeerEventCmd(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(Fixtures.Blocks.Genesis.header)), freshPeer.id)
+    )
 
     // receiving best block does not change a thing, as peer best block is it genesis
-    requestSender.send(peersInfoHolder, GetHandshakedPeers)
+    peersInfoHolder ! GetHandshakedPeersCmd(requestSender.ref)
     requestSender.expectMsg(HandshakedPeers(Map(freshPeer -> genesisInfo)))
   }
 
@@ -323,7 +323,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     val genesisInfo: PeerInfo = createGenesisPeerInfo()
 
     // Send handshake successful for peer at genesis
-    peersInfoHolder ! PeerHandshakeSuccessful(peer1, genesisInfo)
+    peersInfoHolder ! PeerEventCmd(PeerHandshakeSuccessful(peer1, genesisInfo))
 
     // Expect subscriptions as usual
     peerEventBus.expectMsgType[SubscribeCmd].to shouldBe PeerDisconnectedClassifier(PeerSelector.WithId(peer1.id))
@@ -353,7 +353,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     peerManager.expectNoMessage(100.millis)
 
     // Verify peer is still added to handshaked peers
-    requestSender.send(peersInfoHolder, PeerInfoRequest(peer1.id))
+    peersInfoHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
     requestSender.expectMsg(PeerInfoResponse(Some(genesisInfo)))
   }
 
@@ -368,7 +368,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     val eth68Status: RemoteStatus = peer1Info.remoteStatus.copy(capability = Capability.ETH68)
     val eth68Info: PeerInfo = peer1Info.copy(remoteStatus = eth68Status, maxBlockNumber = 0)
 
-    peersInfoHolder ! PeerHandshakeSuccessful(peer1, eth68Info)
+    peersInfoHolder ! PeerEventCmd(PeerHandshakeSuccessful(peer1, eth68Info))
 
     // Drain the two subscriptions that always follow handshake.
     peerEventBus.expectMsgType[SubscribeCmd].to shouldBe PeerDisconnectedClassifier(PeerSelector.WithId(peer1.id))
@@ -397,7 +397,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     val eth69Status: RemoteStatus = peer1Info.remoteStatus.copy(capability = Capability.ETH69)
     val eth69Info: PeerInfo = peer1Info.copy(remoteStatus = eth69Status)
 
-    peersInfoHolder ! PeerHandshakeSuccessful(peer1, eth69Info)
+    peersInfoHolder ! PeerEventCmd(PeerHandshakeSuccessful(peer1, eth69Info))
 
     // Drain the two subscriptions.
     peerEventBus.expectMsgType[SubscribeCmd].to shouldBe PeerDisconnectedClassifier(PeerSelector.WithId(peer1.id))
@@ -424,9 +424,9 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     // header carries the bestHash from STATUS and a real block number; updateMaxBlock
     // should pick up the number and write it into PeerInfo.maxBlockNumber.
     val probeReply: BlockHeader = baseBlockHeader.copy(number = 24463116)
-    peersInfoHolder ! MessageFromPeer(BlockHeaders(BigInt(0), Seq(probeReply)), peer1.id)
+    peersInfoHolder ! PeerEventCmd(MessageFromPeer(BlockHeaders(BigInt(0), Seq(probeReply)), peer1.id))
 
-    requestSender.send(peersInfoHolder, PeerInfoRequest(peer1.id))
+    peersInfoHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
     val resp: PeerInfoResponse = requestSender.expectMsgType[PeerInfoResponse]
     resp.peerInfo.map(_.maxBlockNumber) shouldBe Some(BigInt(24463116))
   }
@@ -438,7 +438,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     expectInitialSubscriptions()
 
     // Register SNAP sync controller
-    peersInfoHolder ! RegisterSnapSyncController(snapSyncController.ref)
+    peersInfoHolder ! RegisterSnapSyncControllerCmd(snapSyncController.ref)
 
     // Setup a peer
     setupNewPeer(peer1, peer1Probe, peer1Info)
@@ -469,10 +469,10 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     )
 
     // When SNAP messages are received from peer
-    peersInfoHolder ! MessageFromPeer(accountRange, peer1.id)
-    peersInfoHolder ! MessageFromPeer(storageRanges, peer1.id)
-    peersInfoHolder ! MessageFromPeer(trieNodes, peer1.id)
-    peersInfoHolder ! MessageFromPeer(byteCodes, peer1.id)
+    peersInfoHolder ! PeerEventCmd(MessageFromPeer(accountRange, peer1.id))
+    peersInfoHolder ! PeerEventCmd(MessageFromPeer(storageRanges, peer1.id))
+    peersInfoHolder ! PeerEventCmd(MessageFromPeer(trieNodes, peer1.id))
+    peersInfoHolder ! PeerEventCmd(MessageFromPeer(byteCodes, peer1.id))
 
     // Then they should be routed to SNAPSyncController wrapped in Command ADT
     snapSyncController.expectMsg(SNAPSyncController.AccountRangeResponse(accountRange))
@@ -501,10 +501,10 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
 
     // When SNAP message is received without registered controller
     // It should not crash, just ignore the routing
-    peersInfoHolder ! MessageFromPeer(accountRange, peer1.id)
+    peersInfoHolder ! PeerEventCmd(MessageFromPeer(accountRange, peer1.id))
 
     // Peer info should still be updated normally
-    requestSender.send(peersInfoHolder, PeerInfoRequest(peer1.id))
+    peersInfoHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
     requestSender.expectMsg(PeerInfoResponse(Some(peer1Info)))
   }
 
@@ -572,15 +572,17 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     val peerEventBus: TestProbe = TestProbe()
 
     val peersInfoHolder = classicSystem
-      .actorOf(
-        NetworkPeerManagerShell.props(
+      .spawn(
+        NetworkPeerManagerActor.behavior(
           peerManager.ref.toTyped[PeerManagerActor.Command],
           peerEventBus.ref.toTyped[PeerEventBusActor.Command],
           storagesInstance.storages.appStateStorage,
           Some(forkResolver),
           isPoWChain = true
-        )
+        ),
+        s"npma-spec-${java.util.UUID.randomUUID()}"
       )
+      .toClassic
 
     val requestSender: TestProbe = TestProbe()
 
@@ -608,7 +610,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
 
     def setupNewPeer(peer: Peer, peerProbe: TestProbe, peerInfo: PeerInfo): Unit = {
 
-      peersInfoHolder ! PeerHandshakeSuccessful(peer, peerInfo)
+      peersInfoHolder ! PeerEventCmd(PeerHandshakeSuccessful(peer, peerInfo))
 
       peerEventBus.expectMsgType[SubscribeCmd].to shouldBe PeerDisconnectedClassifier(PeerSelector.WithId(peer.id))
 

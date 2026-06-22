@@ -49,8 +49,9 @@ class DebugServiceSpec
     val cmd1 = peerManager.expectMsgType[PeerManagerActor.GetPeersCmd]
     cmd1.replyTo ! Peers(Map(peer1 -> PeerActor.Status.Connecting))
 
-    etcPeerManager.expectMsg(NetworkPeerManagerActor.PeerInfoRequest(peer1.id))
-    etcPeerManager.reply(NetworkPeerManagerActor.PeerInfoResponse(Some(peer1Info)))
+    val cmd1Npma = etcPeerManager.expectMsgType[NetworkPeerManagerActor.PeerInfoRequestCmd]
+    cmd1Npma.peerId shouldBe peer1.id
+    cmd1Npma.replyTo ! NetworkPeerManagerActor.PeerInfoResponse(Some(peer1Info))
 
     result.futureValue shouldBe Right(ListPeersInfoResponse(List(peer1Info)))
   }
@@ -72,8 +73,9 @@ class DebugServiceSpec
     val cmd3 = peerManager.expectMsgType[PeerManagerActor.GetPeersCmd]
     cmd3.replyTo ! Peers(Map(peer1 -> PeerActor.Status.Connecting))
 
-    etcPeerManager.expectMsg(NetworkPeerManagerActor.PeerInfoRequest(peer1.id))
-    etcPeerManager.reply(NetworkPeerManagerActor.PeerInfoResponse(None))
+    val cmd3Npma = etcPeerManager.expectMsgType[NetworkPeerManagerActor.PeerInfoRequestCmd]
+    cmd3Npma.peerId shouldBe peer1.id
+    cmd3Npma.replyTo ! NetworkPeerManagerActor.PeerInfoResponse(None)
 
     result.futureValue shouldBe Right(ListPeersInfoResponse(List.empty))
   }

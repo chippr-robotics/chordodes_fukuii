@@ -18,7 +18,6 @@ import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.*
-import com.chipprbots.ethereum.network.NetworkPeerManagerShell
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerHandshakeSuccessful
@@ -44,8 +43,8 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
     setupNewPeer(peer1, mkInfo(Capability.ETH68, td = BigInt(100), blockNum = 0))
     setupNewPeer(peer2, mkInfo(Capability.ETH68, td = BigInt(200), blockNum = 0))
 
-    peersInfoHolder ! RegisterChainWeightCalibrationTarget(calibrationTarget.ref)
-    peersInfoHolder ! CalibrateChainWeightNow
+    peersInfoHolder ! RegisterChainWeightCalibrationTargetCmd(calibrationTarget.ref)
+    peersInfoHolder ! CalibrateChainWeightNowCmd
 
     calibrationTarget.expectMsg(SyncProtocol.CalibrateChainWeightFromPeer(BigInt(200), BigInt(0)))
   }
@@ -61,10 +60,10 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
     // NewBlock arrives with higher TD and exact block number
     val newBlockHeader: BlockHeader = Fixtures.Blocks.Genesis.header.copy(number = BigInt(1000))
     val nb: NewBlock = NewBlock(Block(newBlockHeader, BlockBody(Nil, Nil)), BigInt(300))
-    peersInfoHolder ! MessageFromPeer(nb, peer1.id)
+    peersInfoHolder ! PeerEventCmd(MessageFromPeer(nb, peer1.id))
 
-    peersInfoHolder ! RegisterChainWeightCalibrationTarget(calibrationTarget.ref)
-    peersInfoHolder ! CalibrateChainWeightNow
+    peersInfoHolder ! RegisterChainWeightCalibrationTargetCmd(calibrationTarget.ref)
+    peersInfoHolder ! CalibrateChainWeightNowCmd
 
     calibrationTarget.expectMsg(SyncProtocol.CalibrateChainWeightFromPeer(BigInt(300), BigInt(1000)))
   }
@@ -75,10 +74,10 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
     setupNewPeer(peer1, mkInfo(Capability.ETH68, td = BigInt(500), blockNum = 0))
 
     // Simulate disconnect
-    peersInfoHolder ! PeerDisconnected(peer1.id)
+    peersInfoHolder ! PeerEventCmd(PeerDisconnected(peer1.id))
 
-    peersInfoHolder ! RegisterChainWeightCalibrationTarget(calibrationTarget.ref)
-    peersInfoHolder ! CalibrateChainWeightNow
+    peersInfoHolder ! RegisterChainWeightCalibrationTargetCmd(calibrationTarget.ref)
+    peersInfoHolder ! CalibrateChainWeightNowCmd
 
     // TD must still be forwarded despite disconnect — bestNetworkTip is persistent
     calibrationTarget.expectMsg(SyncProtocol.CalibrateChainWeightFromPeer(BigInt(500), BigInt(0)))
@@ -88,8 +87,8 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
   it should "forward sentinel (0, 0) when no peers ever connected" taggedAs (UnitTest, NetworkTest) in new TestSetup {
     expectInitialSubscriptions()
 
-    peersInfoHolder ! RegisterChainWeightCalibrationTarget(calibrationTarget.ref)
-    peersInfoHolder ! CalibrateChainWeightNow
+    peersInfoHolder ! RegisterChainWeightCalibrationTargetCmd(calibrationTarget.ref)
+    peersInfoHolder ! CalibrateChainWeightNowCmd
 
     calibrationTarget.expectMsg(SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0)))
   }
@@ -105,8 +104,8 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
     setupNewPeer(peer1, mkInfo(Capability.ETH69, td = BigInt(0), blockNum = BigInt(24720000)))
     setupNewPeer(peer2, mkInfo(Capability.ETH69, td = BigInt(0), blockNum = BigInt(24720000)))
 
-    peersInfoHolder ! RegisterChainWeightCalibrationTarget(calibrationTarget.ref)
-    peersInfoHolder ! CalibrateChainWeightNow
+    peersInfoHolder ! RegisterChainWeightCalibrationTargetCmd(calibrationTarget.ref)
+    peersInfoHolder ! CalibrateChainWeightNowCmd
 
     calibrationTarget.expectMsg(SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0)))
   }
@@ -121,14 +120,16 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
 
     // High-TD NewBlock arrives first
     val hdrHigh: BlockHeader = Fixtures.Blocks.Genesis.header.copy(number = BigInt(5000))
-    peersInfoHolder ! MessageFromPeer(NewBlock(Block(hdrHigh, BlockBody(Nil, Nil)), BigInt(1500)), peer1.id)
+    peersInfoHolder ! PeerEventCmd(
+      MessageFromPeer(NewBlock(Block(hdrHigh, BlockBody(Nil, Nil)), BigInt(1500)), peer1.id)
+    )
 
     // Lower-TD NewBlock — must NOT downgrade bestNetworkTip
     val hdrLow: BlockHeader = Fixtures.Blocks.Genesis.header.copy(number = BigInt(4800))
-    peersInfoHolder ! MessageFromPeer(NewBlock(Block(hdrLow, BlockBody(Nil, Nil)), BigInt(100)), peer1.id)
+    peersInfoHolder ! PeerEventCmd(MessageFromPeer(NewBlock(Block(hdrLow, BlockBody(Nil, Nil)), BigInt(100)), peer1.id))
 
-    peersInfoHolder ! RegisterChainWeightCalibrationTarget(calibrationTarget.ref)
-    peersInfoHolder ! CalibrateChainWeightNow
+    peersInfoHolder ! RegisterChainWeightCalibrationTargetCmd(calibrationTarget.ref)
+    peersInfoHolder ! CalibrateChainWeightNowCmd
 
     calibrationTarget.expectMsg(SyncProtocol.CalibrateChainWeightFromPeer(BigInt(1500), BigInt(5000)))
   }
@@ -148,15 +149,17 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
     val calibrationTarget: TestProbe = TestProbe()
 
     val peersInfoHolder = classicSystem
-      .actorOf(
-        NetworkPeerManagerShell.props(
+      .spawn(
+        NetworkPeerManagerActor.behavior(
           peerManager.ref.toTyped[PeerManagerActor.Command],
           peerEventBus.ref.toTyped[PeerEventBusActor.Command],
           storagesInstance.storages.appStateStorage,
           Some(forkResolver),
           isPoWChain = true
-        )
+        ),
+        s"npma-tip-${java.util.UUID.randomUUID()}"
       )
+      .toClassic
 
     val fakeNodeId: ByteString = ByteString()
 
@@ -183,7 +186,7 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
     }
 
     def setupNewPeer(peer: Peer, info: PeerInfo): Unit = {
-      peersInfoHolder ! PeerHandshakeSuccessful(peer, info)
+      peersInfoHolder ! PeerEventCmd(PeerHandshakeSuccessful(peer, info))
       // Each peer generates two peerEventBus Subscribe messages:
       //   1. PeerDisconnectedClassifier — so NPA can observe this peer's disconnect
       //   2. MessageClassifier for per-peer ETH/SNAP message codes
