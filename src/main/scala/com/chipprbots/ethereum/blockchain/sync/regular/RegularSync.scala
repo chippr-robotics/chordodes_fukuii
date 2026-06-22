@@ -32,14 +32,14 @@ import com.chipprbots.ethereum.blockchain.sync.WormToBrainBar
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 object RegularSync {
-  // non-sealed: SyncProtocol cases (Start, GetStatus, MinedBlock, RegularSyncStuck) sent
-  // by Classic SyncController also extend this via SyncProtocol.RegularSyncCommand (P7)
   type Command = SyncProtocol.RegularSyncCommand
 
-  private[regular] case object FetcherStatusTick extends SyncProtocol.RegularSyncCommand
-  private[regular] case object PrintStatusTick extends SyncProtocol.RegularSyncCommand
   private val FetcherStatusKey = "RegularSyncFetcherStatus"
   private val PrintStatusKey = "RegularSyncPrintStatus"
+
+  /** Type alias so callers using `RegularSync.ProgressProtocol` keep working without import changes. */
+  type ProgressProtocol = SyncProtocol.ProgressProtocol
+  val ProgressProtocol: SyncProtocol.ProgressProtocol.type = SyncProtocol.ProgressProtocol
 
   // scalastyle:off parameter.number
   def apply(
@@ -113,8 +113,12 @@ object RegularSync {
             "block-importer"
           )
 
-        timers.startTimerWithFixedDelay(FetcherStatusKey, FetcherStatusTick, syncConfig.printStatusInterval)
-        timers.startTimerWithFixedDelay(PrintStatusKey, PrintStatusTick, 60.seconds)
+        timers.startTimerWithFixedDelay(
+          FetcherStatusKey,
+          SyncProtocol.FetcherStatusTick,
+          syncConfig.printStatusInterval
+        )
+        timers.startTimerWithFixedDelay(PrintStatusKey, SyncProtocol.PrintStatusTick, 60.seconds)
 
         running(
           ProgressState(startedFetching = false, initialBlock = 0, currentBlock = 0, bestKnownNetworkBlock = 0),
@@ -232,11 +236,11 @@ object RegularSync {
         ctx.toClassic.parent ! SyncController.WrappedSyncProtocol(msg)
         Behaviors.same
 
-      case FetcherStatusTick =>
+      case SyncProtocol.FetcherStatusTick =>
         fetcher ! BlockFetcher.PrintStatus
         Behaviors.same
 
-      case PrintStatusTick =>
+      case SyncProtocol.PrintStatusTick =>
         val lag = progressState.bestKnownNetworkBlock - progressState.currentBlock
         val now = System.currentTimeMillis()
         val dtSecs =
@@ -269,12 +273,6 @@ object RegularSync {
           ctx
         )
 
-      case unexpected =>
-        log.warning(
-          "RegularSync: unhandled command type={} — dropping",
-          unexpected.getClass.getSimpleName
-        )
-        Behaviors.unhandled
     }
 
   case class ProgressState(
@@ -295,13 +293,6 @@ object RegularSync {
       }
   }
 
-  sealed trait ProgressProtocol extends SyncProtocol.RegularSyncCommand
-  object ProgressProtocol {
-    case object StartedFetching extends ProgressProtocol
-    case class StartingFrom(blockNumber: BigInt) extends ProgressProtocol
-    case class GotNewBlock(blockNumber: BigInt) extends ProgressProtocol
-    case class ImportedBlock(blockNumber: BigInt, internally: Boolean) extends ProgressProtocol
-  }
 }
 
 // Logger name anchor — never instantiated

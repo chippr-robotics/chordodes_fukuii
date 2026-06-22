@@ -2,8 +2,26 @@ package com.chipprbots.ethereum.blockchain.sync
 import com.chipprbots.ethereum.domain.Block
 
 object SyncProtocol {
-  // non-sealed: sync.regular.RegularSync cases (ProgressProtocol, timer ticks) also extend (P7)
-  trait RegularSyncCommand
+
+  /** All direct subtypes are defined in this file — sealed is now valid (W17 fix). Direct subtypes: Start, GetStatus,
+    * MinedBlock, RegularSyncStuck (below), FetcherStatusTick, PrintStatusTick, ProgressProtocol (all in this file).
+    */
+  sealed trait RegularSyncCommand
+
+  /** Internal timer ticks used only by RegularSync (in the `sync.regular` sub-package). These are `sealed` variants so
+    * external callers cannot accidentally send them; they are not part of the public SyncProtocol API surface.
+    */
+  case object FetcherStatusTick extends RegularSyncCommand
+  case object PrintStatusTick extends RegularSyncCommand
+
+  /** Progress messages sent from BlockFetcher / BlockImporter back to RegularSync. */
+  sealed trait ProgressProtocol extends RegularSyncCommand
+  object ProgressProtocol {
+    case object StartedFetching extends ProgressProtocol
+    case class StartingFrom(blockNumber: BigInt) extends ProgressProtocol
+    case class GotNewBlock(blockNumber: BigInt) extends ProgressProtocol
+    case class ImportedBlock(blockNumber: BigInt, internally: Boolean) extends ProgressProtocol
+  }
 
   sealed trait SyncProtocolMsg
   case object Start extends SyncProtocolMsg with RegularSyncCommand
