@@ -18,8 +18,16 @@ import com.chipprbots.ethereum.crypto
   * `update` is the only mutating method; `hash` finalises the right boundary and returns the root hash. After `hash`
   * the StackTrie cannot be updated again unless `reset` is called first.
   *
-  * The `onTrieNode(path, hash, blob)` callback is invoked once per finalised non-inlined node. Receivers must deep-copy
-  * `path` and `blob` if they want to retain them: the StackTrie reuses internal buffers across calls.
+  * The `onTrieNode(path, hash, blob)` callback is invoked once per finalised non-inlined node.
+  *
+  * Blob ownership contract (spec 007 US3 / T021): the emitted `blob` is a FRESHLY-OWNED array, allocated per node by
+  * `encodeLeaf`/`encodeExt`/`encodeBranch` (each returns a `new Array[Byte](...)`) and never reused or aliased across
+  * emissions. `finalise` stores the node's HASH (not the blob) in `node.value`, so the StackTrie retains no reference
+  * to the emitted blob after the callback returns. Receivers MAY therefore retain the `blob` directly without copying.
+  * Note: this ownership guarantee covers only the emitted `blob`. The transient scratch the StackTrie DOES reuse across
+  * calls (`branchRefsScratch`, see below) is fully consumed inside `encodeBranch` and is never the emitted blob. The
+  * `path` argument is still a per-descent allocation that the StackTrie may reuse — receivers must deep-copy `path` if
+  * they want to retain it.
   *
   * Boundary handling (left-skip on resume, right-discard on abort, RocksDB batch ownership) is the wrapper's
   * responsibility. This class is strictly write-only: it never reads from any backing storage.
@@ -30,6 +38,23 @@ final class StackTrie(onTrieNode: (Array[Byte], ByteString, Array[Byte]) => Unit
   private var root: StNode = StNode.empty
   // last hex key seen, for strict-ascending sort enforcement
   private var last: Array[Byte] = Array.emptyByteArray
+
+  // Reusable scratch for the branch child-reference container (spec 007 US2 / T014).
+  //
+  // SAFETY (INV-6, the consumed-then-discarded proof): this 17-slot array holds *references* that
+  // are produced and fully consumed entirely within a single `encodeBranch` call — populated by the
+  // `encodeChildRef` loop, summed for length, then each element `System.arraycopy`'d into the node's
+  // freshly-allocated `out` blob. The container itself is NEVER aliased into any node's final
+  // encoding (only the bytes of its elements are copied, and those bytes are owned elsewhere — child
+  // `value`s or fresh `encodeBytes` results), NEVER escapes `encodeBranch`, and is NEVER read after
+  // the call returns. `encodeBranch` is also non-reentrant: `hashNode` finalises ALL children
+  // (recursively, to `Hashed`) BEFORE calling `encodeBranch`, so no nested `encodeBranch` runs while
+  // this scratch is live. Reusing one instance-field array is therefore byte-identical to allocating
+  // a fresh one per call. StackTrie is single-writer / thread-confined (one per task/trie), so an
+  // instance field — not a static or ThreadLocal — bounds the footprint without cross-thread bleed.
+  //
+  // It does NOT hold the node's final blob/`value` (INV-5): that stays the freshly-owned `out` array.
+  private val branchRefsScratch: Array[Array[Byte]] = new Array[Array[Byte]](17)
 
   /** Insert `value` under `key`. Keys must arrive in strictly ascending order after conversion to hex nibbles. Empty
     * values are rejected (use a real "delete" model if you need removals — SNAP sync never deletes).
@@ -292,7 +317,9 @@ final class StackTrie(onTrieNode: (Array[Byte], ByteString, Array[Byte]) => Unit
     * are fixed-length 32-byte hashes), so slot 17 is always the empty string.
     */
   private def encodeBranch(node: StNode): Array[Byte] = {
-    val refs = new Array[Array[Byte]](17)
+    // Reuse the instance-field scratch container (T014). Safe: see `branchRefsScratch` doc — fully
+    // consumed within this call, never aliased into `out`, never read after return, non-reentrant.
+    val refs = branchRefsScratch
     var i = 0
     while (i < 16) {
       refs(i) = encodeChildRef(node.children(i))

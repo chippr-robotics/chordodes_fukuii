@@ -92,8 +92,11 @@ final class SnapHashTrie(
   // ---- internals ----
 
   private def emit(hash: ByteString, blob: Array[Byte]): Unit = {
-    // StackTrie reuses internal buffers across emissions — deep-copy.
-    pending += hash -> blob.clone()
+    // Spec 007 US3 / T021 (FR-010-gated): the emitted `blob` is freshly owned per node (StackTrie
+    // allocates a new array per `encodeLeaf`/`encodeExt`/`encodeBranch` and retains no reference to
+    // it after the callback — it stores the node's HASH in `node.value`, not the blob). See the
+    // StackTrie blob-ownership contract. So we can retain the blob directly without a defensive copy.
+    pending += hash -> blob
     pendingBytes += blob.length
     if (pendingBytes >= batchSizeThreshold) flush()
   }

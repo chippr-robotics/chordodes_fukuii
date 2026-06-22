@@ -141,14 +141,17 @@ Read it before planning or implementing. Highlights:
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/004-decoupled-heal-serve-root/plan.md` (decouple the post-SNAP heal's local
-completeness walk from the serve-window-bound node fetch: hold the WALK root fixed for
-the whole walk (a local read needing no peers) while fetching missing nodes from an
-advancing SERVE root that stays inside peers' ~128-block snap serve window. Trie nodes
-are content-addressed and the fetched node is verified keccak256==hash before store
-(the load-bearing guardrail), so a newer servable root safely supplies the deep nodes.
-Cures the serve-window-vs-walk-time deadlock that stalls heal at ~99%. Consensus-adjacent;
-forge-reviewed; byte-for-byte completion parity (FR-007); default-on; composes with the
-hold-pivot fix #1357 as its durable generalization. Needs build + one redeploy.) Prior
-plans: `specs/003-scoped-heal-verification/plan.md`, `specs/002-bfs-heal-performance/plan.md`.
+`specs/007-hotpath-alloc-reduction/plan.md` (reduce hot-path CPU allocations on the
+keccak-256 + SNAP inline-merkleization paths to cut GC/allocation pressure and return CPU
+to sync — PURE PERFORMANCE, byte-for-byte identical consensus output. P1: replace per-call
+`new KeccakDigest(256)` with a thread-confined `ThreadLocal[KeccakDigest]` reset-on-entry
+(the load-bearing parity mechanism — guards the aborted-mid-update window). P2: reuse
+StackTrie transient scratch but NEVER the aliased final node blob (chain-split risk). P3:
+single-`Array[Byte]` `kec256` overload, `SnapHashTrie.emit` clone elision, `RLP.encode`
+O(n²)→O(n) — each FR-010-gated on proven parity + measured win. forge protocol; byte-for-byte
+gate via crypto/MPT/ethereum-tests + dedicated keccak vector/reset-after-abort/concurrency
+spec + A/B replay; perf is report-and-record, parity is the hard gate. Honest expectation:
+low single-digit to low-double-digit % throughput; the real CPU fix remains more cores.)
+Prior plans: `specs/004-decoupled-heal-serve-root/plan.md`,
+`specs/003-scoped-heal-verification/plan.md`.
 <!-- SPECKIT END -->

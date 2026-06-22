@@ -29,31 +29,85 @@ package object crypto {
   private val keccakSize = 512
   val kec512 = new KeccakDigest(keccakSize)
 
+  // Spec 007 US1 (FR-001/FR-002): reuse one KeccakDigest(256) per thread instead of allocating
+  // one per hash (keccak is the single hottest op — once per trie node across millions of nodes).
+  //
+  // Byte-for-byte safety (verified via `javap -c` on the pinned bcprov-jdk18on 1.84 jar,
+  // project/Dependencies.scala:139): `reset()` calls `init(fixedOutputLength)`, the SAME method
+  // the constructor calls with the bit-length; for fixed length 256 this runs the identical
+  // `init(256) -> initSponge(1600 - 512)` path which zeroes state[25], fills dataQueue[192] with 0,
+  // sets rate, bitsInQueue=0, squeezing=false, fixedOutputLength. A reset digest is therefore
+  // observably identical to `new KeccakDigest(256)` for output purposes ⇒ byte-identical hashes.
+  //
+  // Thread-confinement guard (research §2.c / R4/R5): hashing runs on PLATFORM-THREAD Pekko
+  // dispatchers ONLY. Do NOT call kec256 on a per-task virtual-thread executor (Thread.ofVirtual /
+  // newVirtualThreadPerTaskExecutor) without revisiting this design — millions of vthreads would
+  // each lazily allocate an un-pooled digest. The digest reference MUST NEVER be returned, stored
+  // in a field, or captured by a Future/closure (INV-2): it must not leave its kec256 method body.
+  private val kec256Digest: ThreadLocal[KeccakDigest] =
+    ThreadLocal.withInitial(() => new KeccakDigest(256))
+
   def kec256(input: Array[Byte], start: Int, length: Int): Array[Byte] = {
-    val digest = new KeccakDigest(256)
-    val output = Array.ofDim[Byte](digest.getDigestSize)
-    digest.update(input, start, length)
-    digest.doFinal(output, 0)
+    val d = kec256Digest.get()
+    d.reset() // reset-on-entry (INV-1/FR-002): clears any state left by a prior aborted hash
+    val output = Array.ofDim[Byte](d.getDigestSize)
+    d.update(input, start, length)
+    d.doFinal(output, 0)
     output
   }
 
+  // Spec 007 US3 / T019 (FR-010-gated): dedicated single-Array overload.
+  //
+  // Without this, every single-arg `kec256(x: Array[Byte])` bound to the varargs overload below,
+  // allocating an `ArraySeq`/`Seq` wrapper per call on top of the 32-byte output. This fixed-arity
+  // overload removes that wrapper for all single-Array-arg sites at once.
+  //
+  // Overload resolution (Scala 3): a fixed-arity method is strictly more specific than a varargs
+  // one, so every existing `kec256(x: Array[Byte])` re-binds here WITHOUT ambiguity. Output is
+  // byte-identical — the same single argument is delegated to the 3-arg form which hashes the same
+  // bytes. Genuine multi-arg callers (e.g. `kec256(a, b)`) still bind to the varargs overload.
+  def kec256(input: Array[Byte]): Array[Byte] =
+    kec256(input, 0, input.length)
+
   def kec256(input: Array[Byte]*): Array[Byte] = {
-    val digest = new KeccakDigest(256)
-    val output = Array.ofDim[Byte](digest.getDigestSize)
-    input.foreach(i => digest.update(i, 0, i.length))
-    digest.doFinal(output, 0)
+    val d = kec256Digest.get()
+    d.reset() // reset-on-entry (INV-1/FR-002): clears any state left by a prior aborted hash
+    val output = Array.ofDim[Byte](d.getDigestSize)
+    input.foreach(i => d.update(i, 0, i.length))
+    d.doFinal(output, 0)
     output
   }
 
   def kec256(input: ByteString): ByteString =
     ByteString(kec256(input.toArray))
 
+  /** Test-only hook for the spec-007 bounded-footprint invariant (FR-009/SC-006, INV-2): returns the
+    * identity hash of THIS thread's reused KeccakDigest WITHOUT exposing the digest reference itself,
+    * so a test can assert exactly one digest instance per thread and none shared across threads. Do not
+    * use in production code; it must never be widened to return the digest (that would violate INV-2).
+    */
+  private[crypto] def kec256DigestIdentityForCurrentThread(): Int =
+    System.identityHashCode(kec256Digest.get())
+
+  /** Test-only hook for the spec-007 reset-after-abort parity check (INV-1/FR-002): dirties THIS
+    * thread's reused digest with `update(...)` and then throws BEFORE `doFinal` — exactly the
+    * aborted-mid-update window that `doFinal`'s success-path-only reset never covers. The digest
+    * reference never escapes (INV-2). The test calls this, catches the throw, then asserts the NEXT
+    * `kec256` on the SAME thread is correct (proving reset-on-entry discarded the stale bytes).
+    */
+  private[crypto] def dirtyThreadDigestThenThrow(): Unit = {
+    val d = kec256Digest.get()
+    d.update(Array[Byte](1, 2, 3, 4, 5), 0, 5)
+    throw new RuntimeException("aborted between update and doFinal (test hook)")
+  }
+
   def kec256PoW(header: Array[Byte], nonce: Array[Byte]): Array[Byte] = {
-    val digest = new KeccakDigest(256)
-    digest.update(header, 0, header.length)
-    digest.update(nonce, 0, nonce.length)
+    val d = kec256Digest.get()
+    d.reset() // reset-on-entry (INV-1/FR-002): clears any state left by a prior aborted hash
+    d.update(header, 0, header.length)
+    d.update(nonce, 0, nonce.length)
     val output = Array.ofDim[Byte](32)
-    digest.doFinal(output, 0)
+    d.doFinal(output, 0)
     output
   }
 

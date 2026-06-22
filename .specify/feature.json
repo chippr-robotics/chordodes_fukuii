@@ -1,3 +1,1 @@
-{
-  "feature_directory": "specs/004-decoupled-heal-serve-root"
-}
+{ "feature_directory": "specs/007-hotpath-alloc-reduction" }
