@@ -6,6 +6,7 @@ import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.DispatcherSelector
+import org.apache.pekko.actor.typed.PostStop
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
@@ -13,6 +14,7 @@ import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.duration.*
+import scala.util.Try
 
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSync
 import com.chipprbots.ethereum.blockchain.sync.regular.RegularSync
@@ -297,26 +299,22 @@ object SyncController {
     private def onPostStop(): Unit =
       forkChoiceManagerOpt.foreach(_.clearListener())
 
-    /** Wrap a behavior with the shared `PostStop` cleanup so listener deregistration runs from every state. Retyped to
-      * `[Command, Command]` in Phase 2 (ROOT-b) now that the behavior domain is `Command`.
+    /** Wrap a behavior with the shared `PostStop` cleanup so listener deregistration runs from every state.
+      *
+      * MIGRATION (W10): replaced the full `BehaviorInterceptor` (whose `aroundReceive` was a pure identity
+      * pass-through) with `BehaviorSignalInterceptor` — a built-in Pekko helper that only intercepts signals and lets
+      * all messages pass through unmodified (no `aroundReceive` override needed). This eliminates ~15 lines and the
+      * unnecessary identity `aroundReceive` allocation.
       */
     def withPostStop(b: Behavior[Command]): Behavior[Command] =
       Behaviors.intercept(() =>
-        new org.apache.pekko.actor.typed.BehaviorInterceptor[Command, Command]() {
-          override def aroundReceive(
-              c: org.apache.pekko.actor.typed.TypedActorContext[Command],
-              msg: Command,
-              target: org.apache.pekko.actor.typed.BehaviorInterceptor.ReceiveTarget[Command]
-          ): Behavior[Command] = target(c, msg)
+        new org.apache.pekko.actor.typed.BehaviorSignalInterceptor[Command]() {
           override def aroundSignal(
               c: org.apache.pekko.actor.typed.TypedActorContext[Command],
               signal: org.apache.pekko.actor.typed.Signal,
               target: org.apache.pekko.actor.typed.BehaviorInterceptor.SignalTarget[Command]
           ): Behavior[Command] = {
-            signal match {
-              case org.apache.pekko.actor.typed.PostStop => onPostStop()
-              case _                                     => ()
-            }
+            if signal == PostStop then onPostStop()
             target(c, signal)
           }
         }
@@ -675,6 +673,13 @@ object SyncController {
           stopHealingServeRootBootstrap()
           healingServeRootRequester.foreach(_ ! SNAPSyncController.HealingServeRoot(0, None))
           healingServeRootRequester = None
+          Behaviors.same
+
+        // W3: HandshakedPeers not consumed by the guarded arm above (bootstrap already in flight, or no healing request
+        // in progress) must NOT fall through to the catch-all and be forwarded to snapSync, which does not handle the
+        // raw NetworkPeerManagerActor.HandshakedPeers message (it uses its own messageAdapter → WrappedHandshakedPeers).
+        // Silence all remaining HandshakedPeers arrivals here (msg is already unwrapped by unwrap(cmd)).
+        case com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers(_) =>
           Behaviors.same
 
         case msg if isInternalMarker(msg) =>
@@ -1279,15 +1284,26 @@ object SyncController {
       if appStateStorage.getBestBlockNumber() == 0 && !appStateStorage.isSnapSyncDone() then {
         val fileOpt: Option[java.nio.file.Path] = syncConfig.checkpointSyncFile.orElse {
           syncConfig.checkpointSyncUrl.flatMap { url =>
-            val datadir = java.nio.file.Paths.get(System.getProperty("fukuii.datadir", "."))
-            val target = datadir.resolve("checkpoint.bin")
-            log.info("[CHECKPOINT DOWNLOAD] {} -> {}", url, target)
-            val downloader = new com.chipprbots.ethereum.blockchain.checkpoint.CheckpointDownloader()
-            downloader.download(url, target) match {
-              case Right(_) => Some(target)
-              case Left(err) =>
-                log.error("[CHECKPOINT DOWNLOAD] failed: {} — falling through to SNAP/Fast/Regular", err)
-                None
+            // INFO-5: normalize + validate to prevent path-traversal from a crafted system-property value.
+            val rawDatadir = java.nio.file.Paths.get(System.getProperty("fukuii.datadir", "."))
+            val datadir = rawDatadir.normalize().toAbsolutePath()
+            val target = datadir.resolve("checkpoint.bin").normalize().toAbsolutePath()
+            if !target.startsWith(datadir) then {
+              log.warn(
+                "[CHECKPOINT DOWNLOAD] Resolved path {} escapes datadir {} — skipping checkpoint download",
+                target,
+                datadir
+              )
+              None
+            } else {
+              log.info("[CHECKPOINT DOWNLOAD] {} -> {}", url, target)
+              val downloader = new com.chipprbots.ethereum.blockchain.checkpoint.CheckpointDownloader()
+              downloader.download(url, target) match {
+                case Right(_) => Some(target)
+                case Left(err) =>
+                  log.error("[CHECKPOINT DOWNLOAD] failed: {} — falling through to SNAP/Fast/Regular", err)
+                  None
+              }
             }
           }
         }
@@ -1561,12 +1577,17 @@ object SyncController {
         seeds.split(",").foreach { seed =>
           seed.trim.split(":") match {
             case Array(hashHex, tdStr) =>
-              val hash = ByteString(com.chipprbots.ethereum.utils.Hex.decode(hashHex.stripPrefix("0x")))
-              val td = BigInt(tdStr.trim)
-              blockchainWriter
-                .storeChainWeight(hash, com.chipprbots.ethereum.domain.ChainWeight.totalDifficultyOnly(td))
-                .commit()
-              log.warn("seed-chain-weights: wrote TD={} for hash={}...", td, hashHex.take(16))
+              // INFO-6: guard against NumberFormatException from a malformed fukuii.seed-chain-weights property.
+              Try(BigInt(tdStr.trim)).toOption match {
+                case Some(td) =>
+                  val hash = ByteString(com.chipprbots.ethereum.utils.Hex.decode(hashHex.stripPrefix("0x")))
+                  blockchainWriter
+                    .storeChainWeight(hash, com.chipprbots.ethereum.domain.ChainWeight.totalDifficultyOnly(td))
+                    .commit()
+                  log.warn("seed-chain-weights: wrote TD={} for hash={}...", td, hashHex.take(16))
+                case None =>
+                  log.warn("seed-chain-weights: invalid TD value '{}' in entry '{}' — skipping", tdStr.trim, seed.trim)
+              }
             case _ =>
               log.warn("seed-chain-weights: invalid entry '{}' (expected HASH:TD)", seed.trim)
           }
