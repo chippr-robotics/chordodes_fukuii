@@ -997,12 +997,12 @@ VERIFY: `compile-all` — 0 errors. `testOnly *EngineApi*` — 16/16 ✅.
 | Deferred category | File(s) | Count | Gate |
 |-------------------|---------|-------|------|
 | Classic actor — Wave 3 LOOM sprint | `sync/snap/SNAPSyncController.scala` | 33 | Wave 3 network/sync migration (SNAP1) |
-| Consensus-critical — FORGE review | `vm/VM.scala`, `vm/OpCode.scala`, `vm/PrecompiledContracts.scala`, `ledger/BlockPreparator.scala`, `mpt/StackTrie.scala`, `consensus/validators/std/StdSignedTransactionValidator.scala`, `consensus/engine/` | 7 | FORGE sign-off per file |
+| Consensus-critical — FORGE review | `vm/VM.scala`, `vm/OpCode.scala`, `vm/PrecompiledContracts.scala`, `ledger/BlockPreparator.scala`, `mpt/StackTrie.scala`, `consensus/validators/std/StdSignedTransactionValidator.scala` | 6 | FORGE sign-off per file |
 
 **Full ratchet lock checklist:**
 1. ~~C2 chore clears ~52 sites~~ ✅ DONE `9eb1f4e06`
 2. ~~LOOM Phase 0 for TNHC clears 11 sites~~ ✅ DONE `7a48c5988`
-3. FORGE reviews and clears 7 consensus sites ← add to relevant FORGE sessions
+3. FORGE reviews and clears 6 consensus sites (1 cleared: consensus/engine/JwtAuthenticator.scala — S3-C) ← add to relevant FORGE sessions
 4. Wave 3 SNAP1 migration sprint clears SNAPSyncController 33 sites ← gated on NET2
 5. After all above: run `sbt scalafixAll` to confirm 0 violations → ratchet locked
 

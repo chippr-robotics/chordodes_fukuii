@@ -47,24 +47,22 @@ class JwtAuthenticator(secretHex: String) extends Logger {
     val expectedSig = hmacSha256(headerPayload)
     val actualSig = parts(2)
 
-    if !constantTimeEquals(base64UrlDecode(expectedSig), base64UrlDecode(actualSig)) then {
-      return Left("Invalid JWT signature")
-    }
-
-    // Decode payload and check iat (issued-at) claim
-    val payloadJson = new String(java.util.Base64.getUrlDecoder.decode(parts(1)))
-    val iatPattern = """"iat"\s*:\s*(\d+)""".r
-    iatPattern.findFirstMatchIn(payloadJson) match {
-      case Some(m) =>
-        val iat = m.group(1).toLong
-        val now = Instant.now().getEpochSecond
-        if Math.abs(now - iat) > MaxClockSkewSeconds then {
-          Left(s"JWT expired: iat=$iat, now=$now, skew=${Math.abs(now - iat)}s")
-        } else {
-          Right(())
-        }
-      case None => Left("Missing iat claim")
-    }
+    if !constantTimeEquals(base64UrlDecode(expectedSig), base64UrlDecode(actualSig)) then Left("Invalid JWT signature")
+    else
+      // Decode payload and check iat (issued-at) claim
+      val payloadJson = new String(java.util.Base64.getUrlDecoder.decode(parts(1)))
+      val iatPattern = """"iat"\s*:\s*(\d+)""".r
+      iatPattern.findFirstMatchIn(payloadJson) match {
+        case Some(m) =>
+          val iat = m.group(1).toLong
+          val now = Instant.now().getEpochSecond
+          if Math.abs(now - iat) > MaxClockSkewSeconds then {
+            Left(s"JWT expired: iat=$iat, now=$now, skew=${Math.abs(now - iat)}s")
+          } else {
+            Right(())
+          }
+        case None => Left("Missing iat claim")
+      }
   }
 
   private def hmacSha256(data: String): String = {
