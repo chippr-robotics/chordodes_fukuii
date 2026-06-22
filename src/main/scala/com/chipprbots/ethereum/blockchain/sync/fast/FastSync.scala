@@ -64,7 +64,7 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
 object FastSync {
 
   // scalastyle:off parameter.number method.length number.of.methods
-  /** Typed core factory for FastSync. Returns a `Behavior[Any]` because the core receives a heterogeneous message
+  /** Typed core factory for FastSync. Returns a `Behavior[Command]` because the core receives a heterogeneous message
     * stream (external `SyncProtocol`, coordinator messages, internal ticks, and `PeerRequestHandler.Result` via an
     * id-keyed adapter). `syncController` replaces the Classic `context.parent` reply target.
     */
@@ -1290,11 +1290,11 @@ object FastSync {
         var i = 0
         while i < slots do {
           if i < wormPos then sb.append('=')
-          else if i == wormPos then sb.append("🪱")
+          else if i == wormPos then sb.append(">")
           else sb.append('.')
           i += 1
         }
-        sb.append("🧠")
+        sb.append('|')
         sb.append(']')
         sb.toString
       }
@@ -1334,7 +1334,7 @@ object FastSync {
 
         val blacklistedIds = blacklist.keys
         log.info(
-          s"""|🧠🪱 FastSync Progress: phase=$phase, blocks=$lastFull/$blockTarget (${blockPercent}%), state=$savedNodes/$totalNodes (${nodePercent}%),
+          s"""|[WORM-TO-BRAIN] FastSync Progress: phase=$phase, blocks=$lastFull/$blockTarget (${blockPercent}%), state=$savedNodes/$totalNodes (${nodePercent}%),
           |to_brain=$blocksToBrain, rates=${formatRate(blocksPerSec)} blocks, ${formatRate(
                nodesPerSec
              )} nodes, queues=bodies=${s.syncState.blockBodiesQueue.size}, receipts=${s.syncState.receiptsQueue.size},
