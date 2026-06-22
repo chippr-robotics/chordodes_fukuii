@@ -259,7 +259,12 @@ object RegularSync {
           ctx
         )
 
-      case _ => Behaviors.same
+      case unexpected =>
+        log.warning(
+          "RegularSync: unhandled command type={} — dropping",
+          unexpected.getClass.getSimpleName
+        )
+        Behaviors.unhandled
     }
 
   case class ProgressState(
