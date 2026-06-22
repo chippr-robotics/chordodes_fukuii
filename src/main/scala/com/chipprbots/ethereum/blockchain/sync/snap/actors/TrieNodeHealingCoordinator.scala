@@ -519,7 +519,11 @@ class TrieNodeHealingCoordinator(
 
   // Layer 2: the full-state rebuild BFS finished — the persisted frontier is now a COMPLETE snapshot.
   // Sent after the final FrontierRebuilt so the completeness marker is set only once every node is persisted.
-  private case object FrontierRebuildComplete
+  // spec 006 C1/D3/FR-004: carries the rebuild's outcome so the handler can decide early completion soundly.
+  //   missingEmitted = the walk's frontierCount (number of missing nodes emitted); 0 ⇒ found everything present.
+  //   walkRoot       = the root the finished walk traversed (captured at launch); compared against the live
+  //                    stateRoot to exclude a stale completion after a pivot refresh (F-E).
+  private case class FrontierRebuildComplete(missingEmitted: Long, walkRoot: ByteString)
 
   // A frontier walk Future died with an exception. Resets the walk flags WITHOUT setting any
   // completion marker, so the watchdog / HealingCheckCompletion gates can start a fresh walk.
@@ -687,7 +691,16 @@ class TrieNodeHealingCoordinator(
               startVerificationBFS(root, emptyPath)
             case None =>
               // Mark the persisted frontier authoritative when the full walk is done (all workers complete).
-              startFrontierBFS(root, emptyPath, isStor = false, () => selfRef ! FrontierRebuildComplete)
+              // spec 006 C1/D3/FR-004: forward the walk's missing-node count (missingEmitted) and the root
+              // this walk traversed (`root`, captured in this closure) so the handler can decide early
+              // completion. `root` is the launch-time root; comparing it to the live stateRoot in the handler
+              // excludes a stale completion after a pivot refresh (F-E).
+              startFrontierBFS(
+                root,
+                emptyPath,
+                isStor = false,
+                (missingEmitted: Long) => selfRef ! FrontierRebuildComplete(missingEmitted, root)
+              )
           }
         }(ec)
       } else {
@@ -711,19 +724,55 @@ class TrieNodeHealingCoordinator(
       lastHealedAtMs = System.currentTimeMillis()
       tryRedispatchPendingTasks()
 
-    case FrontierRebuildComplete =>
+    case FrontierRebuildComplete(missingEmitted, walkRoot) =>
       // The full-state rebuild BFS walked the entire trie; every still-missing node is now persisted.
       // Mark the snapshot complete so a future restart may resume it instead of re-walking (Layer 2).
       verificationBFSRunning = false // rebuild walk finished — release the single-flight gate
-      // spec 002 marker: gated on frontier persistence (default off). With it off, `FrontierRebuildComplete` is never
-      // reached via the resume path anyway (that path requires `frontierStore` defined), but guard defensively so the
-      // snapshot marker is only ever written when persistence is enabled (FR-005 parity; the marker also gates the
-      // spec-003 scoped path, which must stay dark by default).
+      // spec 002/005 marker: gated on frontier persistence (default off). With it off, `FrontierRebuildComplete` is
+      // never reached via the resume path anyway (that path requires `frontierStore` defined), but guard defensively
+      // so the snapshot marker is only ever written when persistence is enabled (FR-005 parity; the marker also gates
+      // the spec-003 scoped path, which must stay dark by default).
       if (frontierPersistenceEnabled)
         healingFrontierStorage.foreach { store =>
           store.markComplete()
           log.info("[HEAL-RESTART] Full-state rebuild complete — persisted frontier marked as a complete snapshot")
         }
+      // spec 006 C2/D2/FR-001/FR-002/FR-003: on a genuinely CLEAN rebuild, declare completion after this
+      // single walk instead of waiting for the dead-pulse watchdog to force-start a redundant second
+      // (verification) walk over the identical trie (~16-20h on ETC mainnet). The rebuild walk fully
+      // recurses into account-leaf storageRoots (the BUG-1 gap the verification walk was built for), so on
+      // a clean rebuild it IS the full traversal the verification would re-run. Declare early IFF every
+      // conjunct holds — each excludes a specific false-completion path (research D2 + adversarial verdict):
+      //   missingEmitted == 0    — the deciding walk found nothing missing (no gap discovered).
+      //   totalNodesHealed == 0  — nothing healed during the walk (excludes heal-during-walk mutation;
+      //                            conservative `== 0`, D5; cumulative counter preserved across pivots).
+      //   isComplete             — pendingTasks.isEmpty && activeRequests.isEmpty: no outstanding frontier
+      //                            or in-flight request (excludes outstanding work).
+      //   !flushing              — no async raw-node write/flush in flight (mirrors the HealingCheckCompletion
+      //                            gate's flush guard; never mark complete ahead of durable state).
+      //   !trieWalkInProgress    — the controller's interleave trie walk is not running. Defense-in-depth: makes
+      //                            the early precondition EXACTLY match the HealingCheckCompletion gate (:932), so
+      //                            guard-passes ⇒ gate-passes (no benign "guard fires, gate blocks, watchdog
+      //                            suppressed" interleave case on the re-heal path). First-heal: always false.
+      //   walkRoot == stateRoot  — LOAD-BEARING (D4/FR-005): a HealingPivotRefreshed to a new root does NOT
+      //                            cancel this in-flight walk, so a stale completion can land against a new
+      //                            stateRoot; this excludes that stale-root completion. Explicit guard — does
+      //                            NOT rely on the incidental "pivot re-seeds pendingTasks" property.
+      // Route via `self ! HealingCheckCompletion` (NOT a direct StateHealingComplete) so the marker write
+      // and the StateHealingComplete send flow through the single existing chokepoint (D1, byte-parity).
+      // verificationPassComplete = true also suppresses the dead-pulse watchdog (no walk #2, FR-006). The
+      // else (do nothing new) is byte-identical to today — the node idles and the watchdog runs walk #2.
+      if (
+        missingEmitted == 0 && totalNodesHealed == 0 && isComplete && !flushing && !trieWalkInProgress &&
+        walkRoot == stateRoot
+      ) {
+        verificationPassComplete = true
+        self ! HealingCheckCompletion
+        log.info(
+          "[HEAL-RESTART] Clean rebuild (0 missing, 0 healed, current root) — declaring completion after one " +
+            "walk via HealingCheckCompletion; skipping the redundant verification walk (spec 006)"
+        )
+      }
 
     case FrontierWalkFailed =>
       verificationBFSRunning = false
@@ -1120,6 +1169,10 @@ class TrieNodeHealingCoordinator(
       // verification BFS, no pending tasks, no active requests, and zero healing progress.
       // Primary fix is startVerificationBFS in HealingCheckCompletion and HealingPivotRefreshed;
       // this watchdog catches any residual edge case (e.g. stale state after pivot race).
+      // spec 006 C4/FR-006: this is also the FALLBACK when the clean-rebuild early completion does NOT
+      // fire (any guard conjunct false) — it force-starts the verification walk exactly as today. After
+      // an early completion `verificationPassComplete == true`, so the `&& !verificationPassComplete`
+      // conjunct below self-suppresses this branch (no double-start / no redundant walk #2). UNCHANGED.
       if (
         !trieWalkInProgress && !verificationBFSRunning &&
         pendingTasks.isEmpty && activeRequests.isEmpty &&
@@ -1623,10 +1676,11 @@ class TrieNodeHealingCoordinator(
       selfRef: ActorRef,
       queue: BfsQueueStorage,
       effectiveParallelism: Int
-  ): Unit =
+  ): Long =
     // spec 003 C2: byte-identical thin wrapper over the multi-seed kernel for a single seed. The
     // full-root / crash-recovery / pivot-reseed callers reach the SAME traversal as before — the only
     // generalization is that the kernel seeds markIfNew + enqueueBatch over a SET (level 0) instead of one.
+    // spec 006: returns the kernel's missing-node count (propagated unchanged).
     rebuildFrontierBFS(Seq((startHash, startPathset, isStor)), selfRef, queue, effectiveParallelism)
 
   /** Multi-seed frontier-rebuild BFS kernel (spec 003 C2/FR-002/FR-003). Seeds the level-0 frontier with EVERY
@@ -1642,7 +1696,7 @@ class TrieNodeHealingCoordinator(
       selfRef: ActorRef,
       queue: BfsQueueStorage,
       effectiveParallelism: Int
-  ): Unit = {
+  ): Long = {
     import com.chipprbots.ethereum.mpt.{BranchNode, ExtensionNode, HashNode, LeafNode}
     import com.chipprbots.ethereum.mpt.HexPrefix
     import com.chipprbots.ethereum.domain.Account
@@ -1931,9 +1985,14 @@ class TrieNodeHealingCoordinator(
 
     queue.clear()
 
+    val totalMissing = frontierCount.get()
     log.info(
-      s"[HEAL-BFS] Complete: ${visitedCount.get()} nodes across $levelIndex levels, ${frontierCount.get()} missing nodes identified"
+      s"[HEAL-BFS] Complete: ${visitedCount.get()} nodes across $levelIndex levels, $totalMissing missing nodes identified"
     )
+    // spec 006 C1/D3/FR-004: return the count of missing nodes this walk emitted so the launcher
+    // can pass it to onComplete (→ FrontierRebuildComplete.missingEmitted). The walk does NO state
+    // writes; this is a pure read of the in-kernel AtomicLong.
+    totalMissing
   }
 
   /** Launch a frontier rebuild or verification BFS on the healing writer executor.
@@ -1945,7 +2004,7 @@ class TrieNodeHealingCoordinator(
       root: ByteString,
       rootPath: ByteString,
       isStor: Boolean,
-      onComplete: () => Unit
+      onComplete: Long => Unit
   ): Unit =
     // spec 003 C2/C3: byte-identical thin wrapper over the multi-seed launcher for a single seed. The
     // full-root / crash-recovery / pivot-reseed callers reach the SAME walk (the kernel collapses one
@@ -1960,7 +2019,7 @@ class TrieNodeHealingCoordinator(
     */
   private def startFrontierBFS(
       seeds: Seq[(ByteString, Seq[ByteString], Boolean)],
-      onComplete: () => Unit
+      onComplete: Long => Unit
   ): Unit = {
     val selfRef = self
     // Effective parallelism floor (spec 002 R3 §1, T034): min(cfg, max(minParallelism, nproc − reservedCores)).
@@ -1986,8 +2045,11 @@ class TrieNodeHealingCoordinator(
     verificationBFSRunning = true
     Future {
       try {
-        rebuildFrontierBFS(seeds, selfRef, bfsQueue, effectiveParallelism)
-        onComplete()
+        // spec 006 C1/D3/FR-004: feed the walk's missing-node count into onComplete so the rebuild
+        // callback can build FrontierRebuildComplete(missingEmitted, walkRoot). Verification callbacks
+        // ignore the count (they signal VerificationBFSComplete unconditionally).
+        val missingEmitted = rebuildFrontierBFS(seeds, selfRef, bfsQueue, effectiveParallelism)
+        onComplete(missingEmitted)
       } catch {
         case scala.util.control.NonFatal(e) =>
           // Never call onComplete() on failure — for the crash-recovery rebuild that would set the
@@ -2037,7 +2099,10 @@ class TrieNodeHealingCoordinator(
           s"store=${healingFrontierStorage.isDefined}) — full-trie verification on root " +
           s"${Hex.toHexString(root.take(4).toArray)}"
       )
-    startFrontierBFS(root, rootPath, isStor = false, () => selfRef ! VerificationBFSComplete)
+    // spec 006: verification ignores the missing-node count — it always signals VerificationBFSComplete,
+    // whose handler re-checks `isComplete` to decide. Only the rebuild path consumes missingEmitted. The
+    // callback arity (`Long => Unit`) matches the merged startFrontierBFS definition.
+    startFrontierBFS(root, rootPath, isStor = false, (_: Long) => selfRef ! VerificationBFSComplete)
   }
 
   /** Launch a SCOPED verification BFS seeded from the healed-paths set (spec 003 C3/FR-002/FR-006). Each healed node's
@@ -2068,7 +2133,8 @@ class TrieNodeHealingCoordinator(
     SNAPSyncMetrics.setHealingScopedVerification(1L)
     SNAPSyncMetrics.setHealingScopedSubtrees(seeds.size.toLong)
     val bfsSeeds = seeds.map(e => (e.hash, e.pathset, e.pathset.size > 1))
-    startFrontierBFS(bfsSeeds, () => selfRef ! VerificationBFSComplete)
+    // spec 006: scoped verification likewise ignores the missing-node count (signals VerificationBFSComplete).
+    startFrontierBFS(bfsSeeds, (_: Long) => selfRef ! VerificationBFSComplete)
   }
 
   /** Inline child discovery after each healed node — Besu/geth scheduler-driven alignment. Decodes the healed node,
