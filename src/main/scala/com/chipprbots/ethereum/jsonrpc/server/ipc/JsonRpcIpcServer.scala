@@ -9,7 +9,6 @@ import java.net.Socket
 import cats.effect.unsafe.IORuntime
 
 import scala.annotation.tailrec
-import scala.compiletime.uninitialized
 import scala.concurrent.duration.*
 import scala.util.Try
 
@@ -32,18 +31,20 @@ class JsonRpcIpcServer(jsonRpcController: JsonRpcController, config: JsonRpcIpcS
 
   given runtime: IORuntime = IORuntime.global
 
-  var serverSocket: ServerSocket = uninitialized
+  // None until run() assigns; close() is a no-op when None.
+  var serverSocket: Option[ServerSocket] = None
 
   def run(): Unit = {
     log.info(s"Starting IPC server: ${config.socketFile}")
 
     removeSocketFile()
 
-    serverSocket = new UnixDomainServerSocket(config.socketFile)
+    val socket = new UnixDomainServerSocket(config.socketFile)
+    serverSocket = Some(socket)
     new Thread {
       override def run(): Unit =
-        while !serverSocket.isClosed do {
-          val clientSocket = serverSocket.accept()
+        while !socket.isClosed do {
+          val clientSocket = socket.accept()
           // Note: consider using a thread pool to limit the number of connections/requests
           new ClientThread(jsonRpcController, clientSocket).start()
         }
@@ -51,7 +52,8 @@ class JsonRpcIpcServer(jsonRpcController: JsonRpcController, config: JsonRpcIpcS
   }
 
   def close(): Unit = {
-    Try(serverSocket.close())
+    serverSocket.foreach(s => Try(s.close()))
+    serverSocket = None
     removeSocketFile()
   }
 
