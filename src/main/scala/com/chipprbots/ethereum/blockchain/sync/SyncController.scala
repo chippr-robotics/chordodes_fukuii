@@ -417,6 +417,10 @@ object SyncController {
         case other if isInternalMarker(other) =>
           // Late self/death-watch marker for a child stopped before this transition — drop silently.
           Behaviors.same
+        case spMsg: SyncProtocol.SyncProtocolMsg =>
+          // FastSync is Typed (Behavior[Command]); wrap external SyncProtocol messages so they arrive as Commands.
+          fastSync.tell(FastSync.WrappedSyncProtocol(spMsg), ctx.toClassic.sender())
+          Behaviors.same
         case other =>
           fastSync.tell(other, ctx.toClassic.sender())
           Behaviors.same
@@ -1405,7 +1409,7 @@ object SyncController {
           DispatcherSelector.fromConfig("sync-dispatcher")
         )
         .toClassic
-      fastSync ! SyncProtocol.Start
+      fastSync ! FastSync.WrappedSyncProtocol(SyncProtocol.Start)
       runningFastSync(fastSync)
     }
 

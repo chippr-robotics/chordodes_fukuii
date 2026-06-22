@@ -133,10 +133,10 @@ class FastSyncSpec
       ()
     }
 
-    val startSync: IO[Unit] = IO(fastSync ! SyncProtocol.Start)
+    val startSync: IO[Unit] = IO(fastSync ! FastSync.WrappedSyncProtocol(SyncProtocol.Start))
 
     val getSyncStatus: IO[Status] =
-      IO.fromFuture(IO((fastSync ? SyncProtocol.GetStatus).mapTo[Status]))
+      IO.fromFuture(IO((fastSync ? FastSync.WrappedSyncProtocol(SyncProtocol.GetStatus)).mapTo[Status]))
   }
 
   override def createFixture(): Fixture = new Fixture
@@ -189,7 +189,7 @@ class FastSyncSpec
 
           val watcher = TestProbe()
           watcher.watch(fastSync)
-          fastSync ! ResponseReceived(peer, msg, timeTaken = 0L)
+          fastSync ! FastSync.WrappedPrhResult(ResponseReceived(peer, msg, timeTaken = 0L))
 
           // If the actor crashes, we'll receive Terminated.
           watcher.expectNoMessage(500.millis)
