@@ -22,6 +22,7 @@ import org.scalatest.prop.TableFor1
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.Fixtures
+import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
 import com.chipprbots.ethereum.consensus.blocks.PendingBlock
@@ -92,7 +93,7 @@ class JsonRpcControllerEthSpec
   }
 
   it should "eth_syncing" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
-    syncingController.setAutoPilot(simpleAutoPilot { case SyncProtocol.GetStatus =>
+    syncingController.setAutoPilot(simpleAutoPilot { case SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus) =>
       SyncProtocol.Status.Syncing(999, Progress(200, 10000), Some(Progress(100, 144)))
     })
 

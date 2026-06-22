@@ -43,7 +43,7 @@ import com.chipprbots.ethereum.domain.BlockHeaderImplicits.*
 import com.chipprbots.ethereum.ledger.*
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeers
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeersCmd
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.Peer
@@ -121,7 +121,7 @@ class RegularSyncSpec
 
       "subscribe to handshaked peers list" taggedAs (UnitTest, SyncTest) in sync(new Fixture(testSystem) {
         regularSync // unlazy
-        networkPeerManager.expectMsg(NetworkPeerManagerActor.GetHandshakedPeers)
+        networkPeerManager.expectMsgType[NetworkPeerManagerActor.GetHandshakedPeersCmd]
       })
     }
 
@@ -638,8 +638,8 @@ class RegularSyncSpec
       "broadcast imported block" in sync(new OnTopFixture(testSystem) {
         networkPeerManager.setAutoPilot(new AutoPilot {
           def run(sender: ActorRef, msg: Any): AutoPilot = msg match {
-            case GetHandshakedPeers =>
-              sender ! HandshakedPeers(handshakedPeers)
+            case cmd: GetHandshakedPeersCmd =>
+              cmd.replyTo ! HandshakedPeers(handshakedPeers)
               this
             case _ => this
           }
@@ -721,8 +721,8 @@ class RegularSyncSpec
       "broadcast after successful import" in sync(new OnTopFixture(testSystem) {
         goToTop()
 
-        networkPeerManager.expectMsg(GetHandshakedPeers)
-        networkPeerManager.reply(HandshakedPeers(handshakedPeers))
+        val peersCmd724 = networkPeerManager.expectMsgType[GetHandshakedPeersCmd]
+        peersCmd724.replyTo ! HandshakedPeers(handshakedPeers)
 
         regularSync ! SyncProtocol.MinedBlock(newBlock)
 
@@ -749,8 +749,8 @@ class RegularSyncSpec
 
           networkPeerManager.setAutoPilot(new AutoPilot {
             def run(sender: ActorRef, msg: Any): AutoPilot = msg match {
-              case GetHandshakedPeers =>
-                sender ! HandshakedPeers(Map(peerWithETH63._1 -> peerWithETH63._2))
+              case cmd: GetHandshakedPeersCmd =>
+                cmd.replyTo ! HandshakedPeers(Map(peerWithETH63._1 -> peerWithETH63._2))
                 this
               case _ => this
             }

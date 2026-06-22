@@ -18,6 +18,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.*
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
+import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
 import com.chipprbots.ethereum.consensus.mining.MiningConfigs
@@ -62,7 +63,7 @@ class EthServiceSpec
   }
 
   it should "return syncing info if the peer is syncing" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    syncingController.setAutoPilot(simpleAutoPilot { case SyncProtocol.GetStatus =>
+    syncingController.setAutoPilot(simpleAutoPilot { case SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus) =>
       SyncProtocol.Status.Syncing(999, Progress(200, 10000), Some(Progress(100, 144)))
     })
 
@@ -83,7 +84,7 @@ class EthServiceSpec
 
   // scalastyle:off magic.number
   it should "return no syncing info if the peer is not syncing" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    syncingController.setAutoPilot(simpleAutoPilot { case SyncProtocol.GetStatus =>
+    syncingController.setAutoPilot(simpleAutoPilot { case SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus) =>
       SyncProtocol.Status.NotSyncing
     })
 
@@ -93,7 +94,7 @@ class EthServiceSpec
   }
 
   it should "return no syncing info if sync is done" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    syncingController.setAutoPilot(simpleAutoPilot { case SyncProtocol.GetStatus =>
+    syncingController.setAutoPilot(simpleAutoPilot { case SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus) =>
       SyncProtocol.Status.SyncDone
     })
 
