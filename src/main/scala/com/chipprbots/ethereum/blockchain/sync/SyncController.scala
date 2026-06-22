@@ -12,7 +12,6 @@ import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSync
@@ -1489,6 +1488,9 @@ object SyncController {
     }
 
     def startSnapSync(minPivotBlock: Option[BigInt] = None): Behavior[Command] = {
+      // MIGRATION: EC.global removed (C2). SNAPSyncController.apply requires an implicit EC;
+      // provide the actor's dedicated dispatcher so Futures it creates stay off the global pool.
+      given scala.concurrent.ExecutionContext = ctx.executionContext
       log.info("Starting SNAP sync mode")
       syncGeneration += 1
 
