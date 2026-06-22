@@ -31,9 +31,13 @@ object DiscoveryConfig extends Logger {
   ): DiscoveryConfig = {
     val discoveryConfig = etcClientConfig.getConfig("network.discovery")
 
-    // Load static nodes from datadir/static-nodes.json if it exists
+    // Load static nodes from datadir/static-nodes.json if it exists.
+    // MIGRATION: redirected from discovery.StaticNodesLoader (prefix-only check) to
+    // network.StaticNodesLoader (full pubkey + port validation, matching Besu reference).
+    // network.StaticNodesLoader.load() returns Seq[URI]; convert to Set[String] for NodeParser.
     val datadir = etcClientConfig.getString("datadir")
-    val staticNodes = StaticNodesLoader.loadFromDatadir(datadir)
+    val staticNodes: Set[String] =
+      com.chipprbots.ethereum.network.StaticNodesLoader.load(datadir).map(_.toString).toSet
 
     // Resolve DNS discovery domains (EIP-1459) to enode URLs
     val dnsNodes: Set[String] = if dnsDiscoveryDomains.nonEmpty then {
