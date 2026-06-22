@@ -877,6 +877,10 @@ class SyncControllerSpec
             sender ! handshakedPeers
             this
 
+          case NetworkPeerManagerActor.GetHandshakedPeersCmd(replyTo) =>
+            replyTo ! handshakedPeers
+            this
+
           // Handle ETH66 GetBlockHeaders (with requestId)
           case SendMessage(msg: ETHPackets.GetBlockHeaders.GetBlockHeadersEnc, peer) =>
             val underlyingMessage = msg.underlyingMsg
