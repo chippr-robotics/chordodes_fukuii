@@ -141,21 +141,18 @@ Read it before planning or implementing. Highlights:
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/006-skip-redundant-verify-walk/plan.md` (eliminate the REDUNDANT second full-trie
-verification walk on a CLEAN post-SNAP heal. On a restart with a persisted frontier but no
-completeness marker, the heal runs TWO identical rebuildFrontierBFS walks before
-StateHealingComplete — the rebuild walk (FrontierRebuildComplete only writes the marker, never
-sets verificationPassComplete) then a watchdog-forced verification walk — doubling a ~16-20h
-walk to ~30-40h on ETC mainnet for no completeness gain. Fix: in the FrontierRebuildComplete
-handler, when the rebuild was GENUINELY CLEAN (missingEmitted==0 && totalNodesHealed==0 &&
-isComplete && !flushing && walkRoot==stateRoot), set verificationPassComplete=true and
-self ! HealingCheckCompletion — declaring completion after ONE walk through the single existing
-chokepoint (byte-parity). Makes FrontierRebuildComplete a case class carrying missingEmitted
-(frontierCount) + walkRoot (explicit stale-root guard). Unconditional; the dead-pulse watchdog
-stays as the built-in fallback; the verification walk still guards the shallow inline-discovery
-path (Chesterton's Fence preserved). Consensus-adjacent; forge adversarially verified — no false-
-completion path. Independent of spec 005. Needs build + one redeploy; cannot help an in-flight
-walk.) Prior plans: `specs/005-subtree-complete-verification/plan.md`,
-`specs/004-decoupled-heal-serve-root/plan.md`, `specs/003-scoped-heal-verification/plan.md`,
-`specs/002-bfs-heal-performance/plan.md`.
+`specs/005-subtree-complete-verification/plan.md` (make the post-SNAP heal completeness
+VERIFICATION O(missing-frontier) instead of O(whole ~90M-node trie), eliminating the
+~16-20h full re-walk. fukuii is the only major MPT client that reads the whole trie to
+verify; geth/nethermind/besu use descend-and-stop. Add a durable, content-addressed,
+root-INDEPENDENT per-subtree-complete record in the existing CF 'g' (additive/monotone,
+never cleared); the verification prunes any present, recorded-complete subtree. Seed the
+records during the SNAP/heal write path so the FIRST verification on a fresh node is
+already O(missing) (FR-003). Crash-safe: record written only AFTER its subtree's bytes are
+durably committed (descend-on-missing-record fallback); terminal marker fsynced. Byte-for-
+byte completion parity via the single existing chokepoint (FR-005); the walk does no state
+writes. Hash-scheme only; config default-on with full-walk fallback. Consensus-adjacent;
+forge-reviewed; composes with/generalizes spec 003 scoped verification. Needs build + one
+redeploy.) Prior plans: `specs/004-decoupled-heal-serve-root/plan.md`,
+`specs/003-scoped-heal-verification/plan.md`, `specs/002-bfs-heal-performance/plan.md`.
 <!-- SPECKIT END -->
