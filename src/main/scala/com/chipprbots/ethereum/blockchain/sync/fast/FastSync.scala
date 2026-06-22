@@ -58,6 +58,7 @@ import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.utils.ByteStringUtils
+import com.chipprbots.ethereum.blockchain.sync.WormToBrainBar
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 // scalastyle:off file.size.limit
@@ -1281,24 +1282,6 @@ object FastSync {
       def formatRate(valuePerSec: Double): String =
         f"$valuePerSec%.2f/s"
 
-      def wormToBrainBar(percent: Int, travelSlots: Int = 24): String = {
-        val p = percent.max(0).min(100)
-        val slots = travelSlots.max(4)
-        val wormPos = ((p.toDouble / 100.0) * (slots - 1)).round.toInt.max(0).min(slots - 1)
-        val sb = new StringBuilder(slots + 3)
-        sb.append('[')
-        var i = 0
-        while i < slots do {
-          if i < wormPos then sb.append('=')
-          else if i == wormPos then sb.append(">")
-          else sb.append('.')
-          i += 1
-        }
-        sb.append('|')
-        sb.append(']')
-        sb.toString
-      }
-
       val nowMs = System.currentTimeMillis()
       val dtSeconds = ((nowMs - lastProgressLogMs).toDouble / 1000.0).max(0.001)
 
@@ -1319,7 +1302,7 @@ object FastSync {
         val blockPercent = pct(lastFull, blockTarget)
         val nodePercent = (((savedNodes.toDouble / totalNodes.toDouble) * 100.0).toInt).max(0).min(100)
 
-        val blocksToBrain = wormToBrainBar(blockPercent)
+        val overallProgress = blockPercent.toDouble / 100.0
 
         val phase =
           if !s.syncState.isBlockchainWorkFinished then {
@@ -1334,13 +1317,14 @@ object FastSync {
 
         val blacklistedIds = blacklist.keys
         log.info(
-          s"""|[WORM-TO-BRAIN] FastSync Progress: phase=$phase, blocks=$lastFull/$blockTarget (${blockPercent}%), state=$savedNodes/$totalNodes (${nodePercent}%),
-          |to_brain=$blocksToBrain, rates=${formatRate(blocksPerSec)} blocks, ${formatRate(
+          s"""|FastSync Progress: phase=$phase, blocks=$lastFull/$blockTarget (${blockPercent}%), state=$savedNodes/$totalNodes (${nodePercent}%),
+          |rates=${formatRate(blocksPerSec)} blocks, ${formatRate(
                nodesPerSec
              )} nodes, queues=bodies=${s.syncState.blockBodiesQueue.size}, receipts=${s.syncState.receiptsQueue.size},
               |peers=waiting=${s.assignedHandlers.size}, connected=${handshakedPeers.size}, blacklisted=${blacklistedIds.size}, elapsed=${totalMinutesTaken()}m
               |""".stripMargin.replace("\n", " ")
         )
+        log.info(s"${WormToBrainBar.renderKnown(overallProgress)} — FastSync")
 
         lastProgressLogMs = nowMs
         lastLoggedFullBlock = lastFull
