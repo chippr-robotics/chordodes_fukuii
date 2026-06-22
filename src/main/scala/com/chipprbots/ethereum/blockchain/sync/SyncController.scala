@@ -2286,10 +2286,15 @@ object SyncController {
     def startRegularSyncForBootstrap(): ActorRef = {
       log.info("Starting regular sync for SNAP sync bootstrap")
 
+      // Version the child names so a re-invocation does not collide with a prior
+      // instance whose context.stop has not yet completed (InvalidActorNameException).
+      bootstrapGeneration += 1
+      val gen = bootstrapGeneration
+
       val peersClient =
         ctx.spawn(
           PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig),
-          "peers-client-bootstrap"
+          s"peers-client-bootstrap-$gen"
         )
       val regularSync = ctx.toClassic.actorOf(
         RegularSync.props(
@@ -2311,7 +2316,7 @@ object SyncController {
           blockTopic,
           configBuilder
         ),
-        "regular-sync-bootstrap"
+        s"regular-sync-bootstrap-$gen"
       )
       regularSync ! SyncProtocol.Start
       regularSync
