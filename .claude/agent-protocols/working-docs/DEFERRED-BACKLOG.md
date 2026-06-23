@@ -8,28 +8,6 @@ Active sprint plan: `/home/dev/.claude/plans/we-are-working-on-noble-whisper.md`
 
 ---
 
-## scala3-cleanup-june Sprint — COMPLETE
-
-All in-scope work is committed on `scala3-cleanup-june`. Summary:
-
-| Commit | Phase | What |
-|--------|-------|------|
-| `b25d117b3` | prereq | Scala 3.3.8 LTS bump + scapegoat 3.3.6 |
-| `003752df3` | prereq | June dep sync (enumeratum, scalatest, scalamock, cats-effect, fs2, etc.) |
-| `655240c68` | 1a | Pre-fix mixed-selector and cats bare wildcard imports |
-| `333aab3fc` | 1b | bytes/, crypto/, rlp/ wildcard migration + `-source:future` enabled |
-| `3693906d1` | 2 | 730-file warning elimination (ScalaMock E008, open class, type wildcards, `.scalafix.conf`) |
-| `a53c039fd` | 1c | 633-file main src/ wildcard migration (incremental compiler had masked these) |
-
-**End state**: `sbt compile-all` → 0 errors, 134 warnings (all pre-existing Pekko Classic E165
-from un-migrated actors — resolved in the Pekko migration follow-up sprint below).
-
-**Items that were NOT brought in (intentionally):**
-- `c77c2ebf7` (ResourceHealthMonitor) — new feature added on `june-sprint`; does not belong on a cleanup branch
-- Pekko Classic→Typed migrations — scope was too broad and insufficiently planned; promoted to own sprint (Part 2 below)
-
----
-
 ## Part 1: Deferred — Remaining Compiler Warnings
 
 **Status: W2-P1 sweep COMPLETE (7 commits, 2026-06-21). ~507 non-E165 → 87 non-E165 remaining.**
@@ -47,13 +25,13 @@ from un-migrated actors — resolved in the Pekko migration follow-up sprint bel
 | `823732397` | `BootstrapDownload`: `new URL(String)` → `URI.create().toURL()` |
 
 **Fixed in earlier phases (not part of W2-P1 sweep):**
-- ~~#1 `BlockHeaderValidatorSkeleton.scala:218` unused implicit `_blockchainConfig`~~ — cleared
-- ~~#2 `PeersClient.scala:326` unused param `_peer`~~ — cleared
-- ~~#3 `extvm/VMClient.scala:22` unused constructor param~~ — cleared (C4 deleted extvm entirely)
-- ~~#4/#5 `PathNodeStorage.scala` unused `hash` params~~ — cleared
-- ~~#6 `ETHPackets.scala:106` E092 `@unchecked`~~ — cleared
-- ~~E003 `with` in self-types (337 occurrences)~~ — cleared in W2-P3a + W2-P1
-- ~~E198 unused test symbols~~ — addressed
+- #1 `BlockHeaderValidatorSkeleton.scala:218` unused implicit `_blockchainConfig` — cleared
+- #2 `PeersClient.scala:326` unused param `_peer` — cleared
+- #3 `extvm/VMClient.scala:22` unused constructor param — cleared (C4 deleted extvm entirely)
+- #4/#5 `PathNodeStorage.scala` unused `hash` params — cleared
+- #6 `ETHPackets.scala:106` E092 `@unchecked` — cleared
+- E003 `with` in self-types (337 occurrences) — cleared in W2-P3a + W2-P1
+- E198 unused test symbols — addressed
 
 ### Remaining 87 Non-E165 Warnings (all externally gated)
 
@@ -119,8 +97,8 @@ sprint below.
 
 | Item | Location | Issue | Fix | Gate |
 |------|----------|-------|-----|------|
-| ~~`@annotation.unused timers`~~ | ~~`PeerManagerActor.Impl:272`~~ | ~~Impl receives `TimerScheduler[Command]` from `Behaviors.withTimers` but uses `classicSystem.scheduler` exclusively. Suppressed with `@annotation.unused` during C3b.~~ | ✅ DONE `4b101b612` — `Behaviors.withTimers` wrapper dropped entirely; `@annotation.unused timers: TimerScheduler[Command]` removed from Impl constructor; import dropped. `classicSystem.scheduler` private def stays — still used for `scheduleWithFixedDelay` (node-update, status-refresh) and `scheduleOnce` (connect retries). 61/61 PeerManager tests green. Full typed-timer migration deferred to network/P2P sprint. | — |
-| ~~NET-01~~ | ~~`NetworkPeerManagerActor.scala:165,451,663`~~ | ~~`classicSystem.scheduler` for two fire-and-forget blacklist-delay `scheduleOnce` calls. HERALD verified by-design (2026-06-21).~~ | ✅ DONE `6b506a63f` (partial) — `@annotation.unused timers: TimerScheduler[Any]` removed from NPMA Impl constructor; `timers,` removed from `new Impl(ctx, timers, ...)` call; TimerScheduler import dropped. `private def scheduler = ctx.system.classicSystem.scheduler` stays — correct for the two fire-and-forget `AddToBlacklistCmd` delays. Full treatment (path b: typed timers) deferred to network/P2P sprint. | — |
+| `@annotation.unused timers` | `PeerManagerActor.Impl:272` | Impl receives `TimerScheduler[Command]` from `Behaviors.withTimers` but uses `classicSystem.scheduler` exclusively. Suppressed with `@annotation.unused` during C3b. | ✅ DONE `4b101b612` — `Behaviors.withTimers` wrapper dropped entirely; `@annotation.unused timers: TimerScheduler[Command]` removed from Impl constructor; import dropped. `classicSystem.scheduler` private def stays — still used for `scheduleWithFixedDelay` (node-update, status-refresh) and `scheduleOnce` (connect retries). 61/61 PeerManager tests green. Full typed-timer migration deferred to network/P2P sprint. | — |
+| NET-01 | `NetworkPeerManagerActor.scala:165,451,663` | `classicSystem.scheduler` for two fire-and-forget blacklist-delay `scheduleOnce` calls. HERALD verified by-design (2026-06-21). | ✅ DONE `6b506a63f` (partial) — `@annotation.unused timers: TimerScheduler[Any]` removed from NPMA Impl constructor; `timers,` removed from `new Impl(ctx, timers, ...)` call; TimerScheduler import dropped. `private def scheduler = ctx.system.classicSystem.scheduler` stays — correct for the two fire-and-forget `AddToBlacklistCmd` delays. Full treatment (path b: typed timers) deferred to network/P2P sprint. | — |
 
 ### Network/P2P Sprint — Pekko Migration Completion Gate
 
@@ -222,10 +200,10 @@ Audit hot paths; replace with pattern matching / algebraic data types.
 **Risk**: LOW
 **Constraint**: NEVER migrate hierarchies with `case class` subtypes.
 **Priority**: LOW-MEDIUM — elevated from "optional" because high-value candidates exist:
-- ~~`SyncPhase`~~ ✅ DONE `adf4e69ea` — 8-member single-line enum; `SyncPhase.*` imported at 5 call sites
-- ~~`ForkId` message codes~~ ✅ DONE `adf4e69ea` — `ForkIdValidationResult` 3-member enum; 4 external callers updated
-- ~~`Blacklist.BlacklistReason`~~ ❌ REJECTED — has 7 `final case class` subtypes (`EmptyBlockBodies`, `EmptyReceipts`, `InvalidReceipts`, `FastSyncRequestFailed`, `InvalidStateResponse`, `RegularSyncRequestFailed`, `BlockImportError`). Not a pure discriminant; cannot be an enum.
-- ~~`Blacklist.BlacklistReasonType`~~ ❌ REJECTED — non-trivial behavior fields (`code: Int`, `name: String`) and mixin group traits (`FastSyncBlacklistGroup` etc.). Not a pure discriminant enum.
+- `SyncPhase` ✅ DONE `adf4e69ea` — 8-member single-line enum; `SyncPhase.*` imported at 5 call sites
+- `ForkId` message codes ✅ DONE `adf4e69ea` — `ForkIdValidationResult` 3-member enum; 4 external callers updated
+- `Blacklist.BlacklistReason` ❌ REJECTED — has 7 `final case class` subtypes (`EmptyBlockBodies`, `EmptyReceipts`, `InvalidReceipts`, `FastSyncRequestFailed`, `InvalidStateResponse`, `RegularSyncRequestFailed`, `BlockImportError`). Not a pure discriminant; cannot be an enum.
+- `Blacklist.BlacklistReasonType` ❌ REJECTED — non-trivial behavior fields (`code: Int`, `name: String`) and mixin group traits (`FastSyncBlacklistGroup` etc.). Not a pure discriminant enum.
 - `SyncProtocol.SyncStatus` equivalents — still candidate; verify subtypes are pure `case object` before migrating
 
 Enum promotes exhaustiveness checking and derives `ordinal`, `values`, `fromOrdinal` for free.
@@ -383,7 +361,7 @@ Post-Typed migration: evaluate replacing Actor mailboxes with Ox `supervised` sc
 
 ## Part 6: Tech Debt Deletion
 
-### ~~6a — extvm/ Dead Code Deletion~~ ✅ DONE (`a948fda1d`)
+### 6a — extvm/ Dead Code Deletion ✅ DONE (`a948fda1d`)
 
 18 files deleted, 1,423 deletions. All 3 pre-checks passed.
 
@@ -404,89 +382,6 @@ Post-Typed migration: evaluate replacing Actor mailboxes with Ox `supervised` sc
 These items gate on CAPSTONE complete (all actors Typed, ActorSystem[Nothing] root, adapter.* removed).
 The mechanical migration preserves Classic-era design decisions. Once the scaffolding is gone, these
 three phases evaluate and improve the code as a native Typed system.
-
-### ~~7a~~ ✅ Non-sealed Command ADT Consolidation (W2-P3d) — DONE
-
-**What**: BCC and likely SRC/ARC/TNHC/SSC use `trait Command` (non-sealed) because message cases
-are declared in `Messages.scala` across package boundaries — Scala 3 cannot seal across files.
-Post-CAPSTONE, consolidate: move all message definitions for each coordinator into its own companion
-object, then seal the trait. This enables exhaustiveness checking at every `match` site.
-
-**Scope**: `snap/actors/Messages.scala` refactor — redistribute cases into coordinator companions.
-Update all callers (SSC is the primary sender; it will need import updates). One commit per actor.
-
-**Gate**: CAPSTONE complete (all coordinators Typed; SSC Typed — SNAP1 done).
-**Priority**: Medium — correctness improvement (exhaustiveness checking catches missing cases at compile time).
-**Agent**: MITHRIL + WRAITH (compile verification after each redistribution).
-
-**Status: ✅ COMPLETE**
-
-| Actor | Commit | Notes |
-|-------|--------|-------|
-| BCC — ByteCodeCoordinator | prior session | Command cases moved to companion; sealed |
-| SRC — StorageRangeCoordinator | prior session | Command cases moved to companion; sealed |
-| ARC — AccountRangeCoordinator | prior session | Command cases moved to companion; sealed |
-| TNHC — TrieNodeHealingCoordinator | `04615ad43` | Command cases moved to companion; sealed |
-| SSC — SNAPSyncController | prior session | Command companion from SNAP1; sealed in 7a |
-| Format | `4e8b42263` | `sbt scalafmtAll` after all redistributions |
-
-Verification: All 5 sealed `trait Command` confirmed in companion objects. `Messages.scala` → empty tombstone object. 173/173 coordinator specs ✅. testEssential: **3,600 / 0** ✅.
-
-Gate for **7c** (Supervision) and **7e** (Design Review) now satisfied.
-
----
-
-### ~~7b~~ ✅ EventStream → Topic[T] — DONE
-
-**✅ DONE** — LOOM. 2 commits on `scala3-cleanup-june`:
-- `849c0dcf0` — P1: `NewPendingTransaction` → `Topic[NewPendingTransaction]` (PTM, SubscriptionManager)
-- `b35b35cf6` — P2: `NewBlockImported` → `Topic[NewBlockImported]` (BlockImporter, RegularSync, SyncController)
-
-**Design:** `EventTopicsBuilder` trait introduced in `NodeBuilder.scala` providing `pendingTxTopic` and `blockTopic` as lazy vals; mixed into concrete node builders.
-
-**Scope:** 13 files — wider than estimated (~5); `blockTopic` required threading through RegularSync and SyncController.
-
-**Verification:** `compile-all` clean; `grep eventStream` → 0 (event bus fully retired for both types); SM 10/10, PTM 13/13, FM 5/5, SyncControllerSpec 84/84, RS+calibration 65/65; `scalafmtAll` clean. Left untouched: `LegacyTransactionHistoryServiceSpec.scala` (in-flight Typed migration, unrelated).
-
----
-
-**R5 status: ✅ COMPLETE** — topology at `.local/docs/moderization-review-june/eventstream-topology.md`
-
-**R5 findings:**
-- 8 sites across 3 files, 2 event types, 1 consumer
-- Zero `.toClassic.eventStream` bridges — CAPSTONE Phase 3 (`f5ece260a`) already completed the Classic→Typed lift
-- All 8 sites already use `EventStream.Publish` / `EventStream.Subscribe`
-- Topology: `BlockImporter` → `NewBlockImported` → `SubscriptionManager`; `PendingTransactionsManager` → `NewPendingTransaction` → `SubscriptionManager`
-- Both relationships are cross-subsystem → direct typed channels architecturally wrong; both map cleanly to `Topic[T]`
-- No `@SerializabilityTrait` needed (single JVM, no Pekko remoting)
-- No FORGE or HERALD gates — application-layer events; `NewBlockImported` fires after consensus complete
-
-**7b implementation — UNBLOCKED. Effort: Small.**
-- Spawn 2 `Topic[T]` actors in `NodeBuilder` (line 971 confirmed)
-- Pass `Topic[NewPendingTransaction]` ref to PTM, `Topic[NewBlockImported]` ref to `BlockImporter`
-- Replace `eventStream.Subscribe` in `SubscriptionManager`
-- Order: `NewPendingTransaction` first (2 producer sites), then `NewBlockImported` (2 publish sites in `BlockImporter`)
-
-**What**: The Classic `context.system.eventStream` is still used for cross-cutting concerns
-(transaction events, mining notifications, etc.) routed via `ctx.messageAdapter` / `toClassic.eventStream`
-bridges (noted in Part 2 bridge table: PTM's `toClassic.eventStream` is the primary site).
-Typed replacement is `pekko.actor.typed.pubsub.Topic[T]` — more efficient, fully type-safe,
-no bridge needed.
-
-**Research thread first (R5)**: Map all `eventStream.publish` and `eventStream.subscribe` sites across
-the codebase. Categorize by message type and producer/consumer set. Determine which can become
-`Topic[T]`, which can become direct parent→child typed messages, and which legitimately need a bus.
-
-```bash
-grep -rn "eventStream\.publish\|eventStream\.subscribe\|eventStream\.unsubscribe" \
-  src/ --include="*.scala"
-```
-
-**Gate**: CAPSTONE complete (root flip removes the Classic eventStream as the natural integration point). ✅
-**Priority**: Medium — removes last Classic-era cross-cutting coupling; improves message traceability.
-**Agent**: HERALD (pub/sub topology) + LOOM (per-site migration).
-
----
 
 ### 7c — Typed Supervision Hierarchy
 
@@ -553,128 +448,9 @@ become permanent technical debt.
 
 ---
 
-### ~~7e~~ ✅ Typed API Design Review (Idiomatic Rewrite Pass) — DONE
+### 7e — Design Review Summary
 
-**Status: ✅ COMPLETE** — findings at `.local/docs/moderization-review-june/typed-api-design-review.md`
-
-**Accepted redesigns (3 items):**
-
-| ID | Pattern | Finding | Priority | Effort |
-|----|---------|---------|----------|--------|
-| P4 | SSC idle-state catch-all (line 655) | `case other =>` suppresses exhaustiveness checking. Enumerate explicit per-case handlers; future additions require an explicit decision. | MED | M |
-| P2 | HealingState extraction | 6 healing-specific vars (`trieWalkInProgress`, `healingServeRootRequestInFlight`, etc.) are phase-local; extract to `case class HealingState` behavior parameter to prevent bleeding across pivot refreshes. | LOW | S–M |
-| P3 | CheckDownloadStagnation timer | ChainDownloader should push `DownloadStagnated` to SSC rather than SSC polling progress timestamps. | LOW | S |
-
-**No changes (5 items):**
-- P1 fire-and-forget chains: all correct — no ack semantics needed, no throughput risk
-- P3 four 1-second dispatch timers: polling-by-design (SSC drives, coordinators execute)
-- P5 eventStream: already fully Typed API; cross-subsystem relationships correctly use event bus
-
-No FORGE or HERALD gates triggered. 7a gate (sealed ADTs) confirmed satisfied — `Messages.scala` empty tombstone; all 5 SNAP actors have sealed `Command` traits.
-
-**What**: The mechanical migration preserves Classic-era logic design. Once the scaffolding is gone
-and the artifact audit is clean, evaluate whether the code's internal design would be written
-differently if it had been designed for Typed from the start. This is not a correctness pass —
-it is a design improvement pass.
-
-**Patterns to evaluate** (each is a candidate sub-thread):
-
-**Fire-and-forget → ask with typed reply**
-Classic actors used `!` for most communication because `?` (ask) was expensive and required
-`Future`-wrapping. In Typed, `replyTo` ask is first-class and cheap. Coordinator→SSC notification
-chains (e.g., `AccountRangeSyncComplete`, `ByteCodeSyncComplete`) that currently fire unacknowledged
-could become typed request/response pairs, giving SSC the ability to apply back-pressure or confirm
-receipt. Evaluate which notification chains would benefit from acknowledgment.
-
-**Impl-class mutable state → functional state threading**
-The mechanical migration puts all mutable state on `Impl` classes (SSC has ~58 fields, NPMA has 8+,
-ARC has more). Idiomatic Typed design threads state through behavior parameters for actors with
-clear phase transitions. This improves testability (no mutable state to reset between test cases)
-and makes state transitions explicit and auditable. Evaluate per actor: which fields change together
-on a state transition (those become a state parameter tuple), vs. which are persistent across all
-phases (those stay on Impl). SNAPSyncController is the highest-value target — its `SyncPhase` enum
-already models the phases; the question is whether the ~58 fields can be partitioned into per-phase
-and cross-phase sets.
-
-**Event bus pub/sub → direct parent/child typed channels**
-After 7b (Topic[T] migration), evaluate whether any remaining pub/sub relationships would be
-cleaner as direct typed parent→child channels. The event bus pattern from Classic was often used
-to avoid direct actor references (which were untyped and fragile). With Typed ADTs, direct typed
-refs are safe and more explicit. Coordinator workers receiving tasks directly from their coordinator
-(rather than via a bus) is the primary target.
-
-**Timer-driven polling → request/response with back-pressure**
-Several coordinators use recurring 1-second timers (`RequestAccountRanges`, `RequestByteCodes`, etc.)
-to poll for readiness and dispatch work. This is a Classic-era pattern (Classic actors couldn't
-efficiently wait for a reply and then dispatch). In Typed, a coordinator could dispatch a task,
-wait for typed acknowledgment from the worker, then dispatch the next — eliminating the polling
-timer entirely and naturally applying back-pressure. Evaluate which dispatch loops are polling-by-design
-vs. polling-because-Classic.
-
-**Non-sealed ADT exhaustiveness cleanup** (depends on 7a complete)
-After ADTs are sealed, the compiler will flag any `match` site missing a case. Review each
-`Behaviors.unhandled` or `case other =>` that the compiler now requires explicitly — some represent
-genuine design holes (missing handler for a real message), others are correct catch-alls.
-
-**Output**: Per-pattern research report + prioritized implementation queue. Each pattern is a
-separate sub-thread; not all patterns will have actionable findings for every actor.
-
-**Gate**: 7d (artifact audit) complete. 7a (sealed ADTs) ideally complete for the exhaustiveness pass.
-**Priority**: Medium-High — this is where the Typed migration delivers compounding design value beyond
-the mechanical correctness improvements. The longer this is deferred, the more the Classic design
-calcifies as "the way it works."
-**Agent**: PRISM (design review across 8 lenses) + HERALD (wire-protocol design patterns) + LOOM
-(implementation of accepted redesigns). Each accepted redesign is its own scoped implementation thread.
-
----
-
-### ~~7e-P4~~ ✅ SSC Idle-State Catch-All Exhaustiveness — DONE
-
-**What**: `SNAPSyncController` idle state has a blanket `case other => ...` at line 655 that
-suppresses Scala 3 exhaustiveness checking for the sealed `Command` trait. Every future `Command`
-addition silently falls through without a compile-time error. Enumerate explicit per-case handlers
-(or explicit `case _: SpecificCommand => Behaviors.unhandled`) so the compiler catches missing cases.
-
-**Scope**: `sync/snap/SNAPSyncController.scala` — idle-state receive block only. One LOOM session.
-**Gate**: 7a complete (sealed `Command` trait — ✅ done).
-**Priority**: MED — correctness guard; prevents silent no-op on new Commands in idle state.
-**Effort**: M — requires reviewing every `Command` subtype and deciding idle-state behaviour for each.
-**Agent**: LOOM (implementation) + EYE (verify 74/74 SNAPSync specs still pass).
-
-**Status: ✅ COMPLETE**
-
-Removed `case other => ctx.log.debug(...)` catch-all from `idle()` (lines 655–657). Added 59 explicit
-handlers covering every `Command` variant. Decision table:
-
-| Category | Treatment | Examples |
-|----------|-----------|---------|
-| Unexpected signals | `log.warn` + `Behaviors.unhandled` | `BootstrapComplete`, `AccountRangeSyncComplete`, `StateHealingComplete` |
-| Stale timer/coordinator messages | `log.debug` + `Behaviors.unhandled` | `RetrySnapSyncStart`, `TuneRateTracker`, `ChainDownloaderProgress` |
-| High-frequency request ticks | silent drop (`Behaviors.same`) | `RequestAccountRanges`, `RequestByteCodes`, progress deltas |
-
-**Commit:** `1da94de11`. Compile: 0 errors, 1 pre-existing E165 (line 546, unrelated). VERIFY: `SNAPSyncControllerSpec` 69/69 ✅.
-
-**Design gap flagged (tracked below as 7e-P4a):** `GetProgress` has no reply path in `idle()` —
-ask-pattern callers will time out. `GetStatus` replies `NotSyncing` in idle; `GetProgress` should
-reply with `progressMonitor.currentProgress` (same pattern as `completed()`). Separate task.
-
----
-
-### ~~7e-P4a~~ ✅ GetProgress Missing Idle-State Handler (SSC) — DONE
-
-**✅ DONE** — `74db726d1`. Replaced 7-line warn-and-drop block at SSC:658 with `replyTo ! progressMonitor.currentProgress`, matching `syncing()` at line 1775. Compile: 0 errors (pre-existing E165 unrelated). SNAPSyncControllerSpec: 69/69 ✅.
-
-**What**: `GetProgress` (companion query to `GetStatus`) is handled in `syncing()`, `completed()`,
-and `completedWithBackfill()` but has no handler in `idle()`. `GetStatus` correctly replies
-`NotSyncing` in idle; `GetProgress` silently drops the message, causing ask-pattern callers to
-time out. Fix: add `case GetProgress(replyTo) => replyTo ! progressMonitor.currentProgress` to
-`idle()` — the same pattern already used in `completed()`.
-
-**Scope**: `sync/snap/SNAPSyncController.scala` — `idle()` receive block only. XS effort (1 line + test).
-**Gate**: P4 complete (✅ — idle() is now exhaustively enumerated, making this gap visible).
-**Priority**: MED — any caller invoking `GetProgress` before sync starts will hang until ask timeout.
-**Effort**: XS.
-**Agent**: LOOM (1-line fix) + EYE (verify `SNAPSyncControllerSpec` idle-state `GetProgress` path).
+Completed portions (P4, P4a) → `completed/DEFERRED-BACKLOG.md`. Open items below.
 
 ---
 
@@ -824,173 +600,13 @@ housekeeping task during test waits for specific domain files.
 
 ---
 
-### ~~8c~~ ✅ Memory / Resource Leak Audit — DONE
-
-**Output:** `.local/docs/moderization-review-june/memory-leak-audit.md` — 4 HIGH / 4 MEDIUM / 3 LOW.
-
-**Recommended first fixes:** H2 + H3 (single-line additions to `StdNode.shutdown()`) — immediate hang/data-loss risk on every graceful stop. H1 needs BEACON sign-off on eviction policy.
-
-| ID | Severity | File | Issue | Status |
-|----|----------|------|-------|--------|
-| **H1** | HIGH | `consensus/engine/EngineApiService.scala:42–75` | **6×** `ConcurrentHashMap` fields (PRISM missed `acceptedChildrenByParent` line 74) — no eviction; multi-GB heap growth over days | ✅ CLASS A `4f5a678fa` + CLASS B `8911135d9` |
-| **H2** | HIGH | `StdNode.scala:208–219` | Secondary `ActorSystem` for `PeriodicConsistencyCheck` created and discarded — never terminated on `shutdown()` | ✅ `4907406fe` |
-| **H3** | HIGH | `StdNode.scala:238–265` | `EngineApiHttpServer` (its own `ActorSystem` + `IORuntime`) never stopped in `shutdown()` — leaves port 8551 bound after node death | ✅ `4907406fe` |
-| **H4** | HIGH | `EthashDAGManager.scala:64–78` | `FileOutputStream` closed in `Try(...)` outside `finally` — leaks descriptor + leaves corrupt file on disk if write throws | ✅ `ef75a5608` — `Using` wrap + corrupt partial file deleted on throw |
-| M1 | MEDIUM | `EthashDAGManager.scala:84–104` | `FileInputStream` with 3 exit paths that skip `close()` | ✅ `ef75a5608` — `Using` wrap; `Try[Array[Array[Int]]]` return contract preserved via `.flatten` |
-| M2 | MEDIUM | `PeerDiscoveryManager.scala:84` | `Resource.allocated` release IO stored correctly but no `PostStop` handler — UDP socket leaks on actor crash | **DEFERRED** — needs actor migration context (W2-P2 network sprint) |
-| M3 | MEDIUM | `FileUtils.scala:28` | `getReader` returns raw `BufferedSource` with no lifecycle contract | ✅ `4907406fe` — Scaladoc only; sole caller (`SSLContextFactory.scala:22–27`) already closes in `finally` |
-| M4 | MEDIUM | `NodeBuilder.scala:1102` | Race window between `portForwarding.allocated` placeholder and real cleanup IO write | **DEFERRED** |
-| L1 | LOW | `TrieNodeHealingCoordinator.scala:365` | `healAttempts` map unbounded when serve-root is slow | **DEFERRED** — batch with future SNAP cleanup |
-| L2 | LOW | `StorageRangeCoordinator.scala:126` | `accountSubtaskCounters` entries never removed after account completes | **DEFERRED** — batch with future SNAP cleanup |
-| L3 | LOW | `PeerRateTracker.scala:25` | Disconnected peers never evicted from `peers` map | **DEFERRED** — batch with future network cleanup |
-
----
-
-### ~~8d~~ ✅ IO / Concurrency Threading Model Audit — DONE
-
-**Overall risk: MEDIUM.** Dispatcher architecture is sound — sync, healing, account-trie, engine-api, and block-forger all have properly isolated bounded pools; four `blocking { }` sentinels in SNAP coordinators correctly placed. Two real problems; everything else vestigial imports, startup/shutdown `Await`s (by-design), or `Thread.sleep` on dedicated non-actor threads (by-design).
-
-**Output:** `.local/docs/moderization-review-june/threading-model-audit.md`
-
-**Findings:**
-
-| ID | File | Issue | Severity | Gate | Status |
-|----|------|-------|----------|------|--------|
-| **A1** | `consensus/engine/EngineApiService.scala:561` | `Await.result(future, 3.seconds)` inside `forkchoiceUpdated`'s `IO { }` body (= `IO.delay`) — executes on CE3 compute pool; blocks compute thread up to 3s per CL invocation; threatens staking availability under load. Fix: `IO.fromFuture(IO(ask))` | **fix-now** | BEACON | tracked below as §8d-A1 |
-| **B1** ✅ | `jsonrpc/JsonRpcBaseController.scala:41` | `EC.global` as implicit `ExecutionContext` — all `Future` combinators and Pekko asks in RPC services (incl. KeyStore file I/O) run on unbounded global pool. Fix: replace with `actorSystem.dispatcher` | defer | `276c77735` | tracked below as §8d-B1 |
-| **B2** | `consensus/pow/PoWMiningCoordinator.scala` | FORGE-gated finding — see CHASE-QUEUE | defer | FORGE | CHASE-QUEUE |
-
----
-
-### ~~8c-H1-A~~ ✅ EngineApiService CLASS A: Bounded LRU + TTL Eviction — DONE (`4f5a678fa`)
-
-**Files**: `consensus/engine/EngineApiService.scala` — 4 payloadId-keyed build caches: `pendingPayloads`, `pendingPayloadRequests`, `pendingPayloadBlobsBundle`, `pendingPayloadReceipts`.
-
-**Why CL-driven eviction is impossible**: The Engine API has no "discard payload" call; FCU never references `payloadId`. Eviction must be EL-self-driven.
-
-**Implementation (Option 2 — shared timestamp map):** Added `pendingPayloadTimestamps: ConcurrentHashMap[ByteString, Long]` as a 5th eviction-index map. Helpers: `removePayloadEntry(id)` removes from all 5 atomically; `evictOldestIfAtCapacity()` synchronized on `evictionLock` — scans for smallest nanoTime when `size >= 64`. PUT site calls `evictOldestIfAtCapacity()` then timestamps before the 4 existing `.put()` calls (unchanged). GET site checks `nanoTime - insertedAt > PayloadTtlNs`; if stale, calls `removePayloadEntry` and returns `Left("Payload not available")` — naturally cleans up orphaned `pendingPayloadRequests` from V1/V2/V3 `getPayload` calls.
-
-VERIFY: 16/16 tests pass.
-
-**Gate**: None beyond BEACON review (already complete).
-**Owner**: CONDUIT — touches `getPayload` accessor signatures (service lines 835–859).
-**Effort**: S–M.
-
----
-
-### ~~8c-H1-B~~ ✅ EngineApiService CLASS B: Finalized-Watermark Prune — DONE (`8911135d9`)
-
-**Files**: `consensus/engine/EngineApiService.scala` — 2 hash-keyed correctness maps: `invalidBlocks`, `acceptedChildrenByParent`.
-
-**Why TTL is unsafe**: `invalidBlocks` must not be evicted while any hash could still be referenced as an FCU head — early eviction = consensus fault.
-
-**Safe trigger**: Prune entries for blocks at or below `forkChoiceState.finalizedBlockHash` height. This value is already parsed at service:432 and controller:686.
-
-**`acceptedChildrenByParent` note**: Self-prunes on the invalidation path but leaks entries whose ancestor is never revealed invalid. Same finalized-watermark trigger applies.
-
-**Implementation:** Insertion point — inside `case Right(())` in `forkchoiceUpdated`, after mempool purge and before payload-attributes validation (~line 532). This is the exact moment `forkChoiceState` (including `finalizedBlockHash`) has been committed. When `finalizedHash != zeroHash`, resolves its block number from `blockchainReader` (synchronous `Option[BlockHeader]`), then calls `removeIf` on both maps: `invalidBlocks` keys are invalid block hashes, pruned where `block.number <= finalizedNumber`; `acceptedChildrenByParent` keys are parent block hashes, pruned where `parent.number <= finalizedNumber`. Blocks above the watermark are untouched — an invalid block not yet finalized may still be an FCU head candidate.
-
-VERIFY: `compile-all` — 0 errors. `testOnly *EngineApi*` — 16/16 ✅.
-
-**Gate**: BEACON impl thread — consensus-correctness-touching; requires BEACON review before implementing.
-**Owner**: BEACON.
-**Effort**: S.
-
----
-
-### ~~8c-H2/H3~~ ✅ StdNode.shutdown() Missing Teardown — DONE (`4907406fe`)
-
-**Files**: `StdNode.scala:208–219` (H2) and `StdNode.scala:238–265` (H3)
-
-**H2**: Secondary `ActorSystem` spawned for `PeriodicConsistencyCheck` is created and discarded — never terminated on `shutdown()`. On every graceful stop, this system's threads remain alive until the JVM exits.
-
-**H3**: `EngineApiHttpServer` owns its own `ActorSystem` + `IORuntime`. Neither is stopped in `shutdown()`. Port 8551 remains bound after node death, preventing restart without `kill -9`.
-
-**Fix**: Both are single-line additions to `StdNode.shutdown()` — call `.terminate()` on the consistency-check system and `.stop()` on the engine-API server/runtime. No logic changes.
-
-**Gate**: None. BEACON awareness only (H3 is engine-api adjacent but the fix is lifecycle plumbing, not protocol logic).
-**Priority**: fix-now / HIGH — affects every graceful node stop.
-**Effort**: XS (2 lines total).
-**Agent**: Any (LOOM or standalone).
-
----
-
-### ~~8c-H4~~ ✅ EthashDAGManager Stream Safety — DONE (`ef75a5608`)
-
-**File**: `EthashDAGManager.scala:64–78` (H4) and `64–104` (M1 alongside)
-
-**H4**: `FileOutputStream` closed in `Try(...)` outside `finally` — on a write exception, the stream is not closed and the partially-written DAG file is left on disk uncorrupted. Next boot will read a corrupt DAG.
-
-**M1**: `FileInputStream` at lines 84–104 has 3 exit paths that bypass `close()`.
-
-**Fix**: Wrap both in `Using(new FileOutputStream(...)) { ... }` / `Using(new FileInputStream(...)) { ... }` (Scala `scala.util.Using`).
-
-**Gate**: FORGE — EthashDAGManager is in the PoW/consensus path; stream-handling change needs FORGE sign-off even though it is pure I/O plumbing.
-**Priority**: HIGH (H4) / MEDIUM (M1) — DAG corruption is unrecoverable without manual delete.
-**Effort**: XS.
-**Agent**: FORGE review → any implementer.
-
----
-
-### ~~8c-M3~~ ✅ FileUtils.getReader Resource Contract — DONE (`4907406fe`)
-
-**File**: `FileUtils.scala:28`
-
-**Problem**: `getReader` returns a raw `BufferedSource` with no lifecycle contract — callers are responsible for calling `.close()` but nothing enforces this. Unclosed sources leak file descriptors.
-
-**Fix**: Change return type to use `Using`-managed pattern or return `Resource[IO, BufferedSource]` / `Using.Manager`. Alternatively, change callers to wrap in `Using(FileUtils.getReader(...)) { src => ... }` at each call site.
-
-**Gate**: None.
-**Priority**: fix-now / MEDIUM — accumulates on long-lived nodes.
-**Effort**: XS–S (depends on caller count).
-**Agent**: Any.
-
----
-
-### ~~8d-A1~~ ✅ EngineApiService Blocking Await on CE3 Compute Thread — DONE (`0a8ed3038`)
-
-**File**: `consensus/engine/EngineApiService.scala:561`
-
-**Problem**: `Await.result(future, 3.seconds)` nested inside `forkchoiceUpdated`'s `IO { }` body (`IO.delay`) — blocked CE3 compute thread up to 3s per CL invocation.
-
-**Fix applied**:
-- `IO { }` → `IO.defer { }` (defers evaluation; body must return `IO[A]`)
-- `Await.result(ask(...), 3.seconds)` → `IO.fromFuture(IO(pendingTransactionsManager.ask[...]))` — no thread blocked
-- All early-exit branches wrapped in `IO.pure(...)` to satisfy `IO.defer` contract
-- `handleErrorWith` on the ask handles timeouts/failures (same empty-tx fallback as before)
-- `import scala.concurrent.Await` removed (now unused)
-
-**Verify**: 16/16 `EngineApiSpec` tests pass, `sbt compile-all` clean.
-
----
-
-### ~~8d-B1~~ ✅ JsonRpcBaseController EC.global → actorSystem.dispatcher — DONE (`276c77735`)
-
-**File**: `jsonrpc/JsonRpcBaseController.scala:41`
-
-**Implementation** (10 files):
-
-| File | Change |
-|------|--------|
-| `JsonRpcBaseController.scala` | `implicit def executionContext` → `abstract` |
-| `JsonRpcController.scala` | Add `actorSystem: ActorSystem` field; `override implicit def executionContext = actorSystem.dispatcher` |
-| `NodeBuilder.scala` | `JSONRpcControllerBuilder` self-type adds `ActorSystemBuilder`; passes `classicSystem` |
-| `FaucetJsonRpcController.scala` | Add `actorSystem: ActorSystem` param; same override |
-| `FaucetBuilder.scala` | `FaucetJsonRpcControllerBuilder` self-type adds `ActorSystemBuilder`; passes `system` |
-| `JsonRpcControllerFixture.scala`, `FukuiiJRCSpec.scala`, `QaJRCSpec.scala` | Pass `system`/`testSystem` as last arg |
-| `JsonRpcHttpServerSpec.scala`, `GraphQLHttpRouteSpec.scala` | Test-only mock stubs override with `EC.global` (mock framework intercepts all calls — no production path) |
-
-**Verify**: `sbt compile-all` → 0 errors in jsonrpc files. `testOnly *JsonRpc*` blocked by pre-existing compile error in `NetworkPeerManagerActor.scala` (in-progress LOOM migration, unrelated).
-
----
-
 ### 8e — ScalaFix Ruleset Expansion + `noReturns` Ratchet Lock
 
 **Work done (2026-06-18):**
 - `DisableSyntax.noReturns = true` — **already in `.scalafix.conf`** (pre-done).
 - `NoAutoTupling` — **already in `.scalafix.conf`** (pre-done).
-- ~~C2 chore removes `return` from ~52 non-actor non-consensus sites~~ — **✅ DONE `9eb1f4e06`** (guard clauses, while-loop early exits, try-block returns, match-arm returns, complex multi-return methods; 19 files; 0 compile errors).
-- ~~TNHC 4 (actual 11) returns~~ — **✅ DONE `7a48c5988`** (LOOM Phase 0, S3 TNHC thread).
+- C2 chore removes `return` from ~52 non-actor non-consensus sites — **✅ DONE `9eb1f4e06`** (guard clauses, while-loop early exits, try-block returns, match-arm returns, complex multi-return methods; 19 files; 0 compile errors).
+- TNHC 4 (actual 11) returns — **✅ DONE `7a48c5988`** (LOOM Phase 0, S3 TNHC thread).
 
 **Remaining to lock the ratchet** (`sbt scalafixAll` not yet green): 40 deferred sites.
 
@@ -1001,8 +617,8 @@ VERIFY: `compile-all` — 0 errors. `testOnly *EngineApi*` — 16/16 ✅.
 | Consensus-path (ETH Engine API) — BEACON review | `consensus/engine/EngineApiController.scala:96` (`handleNewPayload`, malformed-payload decode `Left` branch), `consensus/engine/EngineApiController.scala:226` (`handleForkchoiceUpdated`, malformed-params decode `Left` branch) | 2 | BEACON sign-off (S3-D) |
 
 **Full ratchet lock checklist:**
-1. ~~C2 chore clears ~52 sites~~ ✅ DONE `9eb1f4e06`
-2. ~~LOOM Phase 0 for TNHC clears 11 sites~~ ✅ DONE `7a48c5988`
+1. C2 chore clears ~52 sites ✅ DONE `9eb1f4e06`
+2. LOOM Phase 0 for TNHC clears 11 sites ✅ DONE `7a48c5988`
 3. FORGE reviews and clears 6 consensus sites (1 cleared: consensus/engine/JwtAuthenticator.scala — S3-C) ← add to relevant FORGE sessions
 4. BEACON reviews and clears 2 ETH Engine API sites — `EngineApiController.scala:96` + `:226` (S3-D). Both are early-`return IO.pure(...)` decode-error guards inside large consensus-path method bodies; removing the `return` requires wrapping ~90 lines of post-decode body into the `Right`/`else` branch. Deferred from S3-A/S3-D/S3-F commit (2026-06-22): the byte-for-byte response behavior must be preserved across the re-indent; gated on a focused BEACON pass, not bundled with the low-risk Option/val changes.
 5. Wave 3 SNAP1 migration sprint clears SNAPSyncController 33 sites ← gated on NET2
@@ -1022,7 +638,9 @@ Partial progress (C2) is safe to run any time.
 
 ---
 
-### 8f — Dead Code Audit (Broader than extvm)
+### 8f — Dead Code Audit (Broader than extvm) ✅ RESEARCH DONE (2026-06-22)
+
+**PRISM sweep complete.** 4 high-confidence candidates identified (see CHASE-QUEUE.md DEAD entries 2026-06-22). No `FIXME`/`HACK`/`TODO` markers found. Deletion sprint pending.
 
 **Part 6a** covers `extvm/` (10 files). Additional dead code likely exists beyond it.
 
@@ -1044,7 +662,7 @@ grep -rn "TODO\|FIXME\|HACK\|XXX\b" src/ --include="*.scala" | wc -l
 ```
 
 **Known candidates beyond extvm**:
-- ~~`FastSyncBranchResolverActor`~~ ✅ WIRED `ea60c4f29` — `FastSync.scala` `handleBlockHeaders` `ParentChainWeightNotFound` case now spawns the actor (binary search for true common ancestor) and transitions to `waitingForBranchResolution()`; `BranchResolvedSuccessful` resets cursors/queues; `BranchResolutionFailed` falls back to N-block rewind. 15/15 tests pass. testEssential 3,600/0 ✅.
+- `FastSyncBranchResolverActor` ✅ WIRED `ea60c4f29` — `FastSync.scala` `handleBlockHeaders` `ParentChainWeightNotFound` case now spawns the actor (binary search for true common ancestor) and transitions to `waitingForBranchResolution()`; `BranchResolvedSuccessful` resets cursors/queues; `BranchResolutionFailed` falls back to N-block rewind. 15/15 tests pass. testEssential 3,600/0 ✅.
 - Test helpers with `@Ignore` annotations (56 occurrences in tests) — audit which are permanently dead
 
 **Output**: `dead-code-audit.md` — file list, confidence level (definitely dead / possibly dead / uncertain).
@@ -1155,7 +773,7 @@ EYE (full codec test suite after each change).
 
 ### 8j — Test Quality: Thread.sleep and Timing Sensitivity
 
-**Current state**: 56 occurrences of `Thread.sleep` / `@Ignore` in test files.
+**Current state**: 56 occurrences of `Thread.sleep` / `@Ignore` in test files (original baseline). **EYE baseline 2026-06-22**: combined grep now 49 lines (36 `@Ignore`/ignore + 13 `Thread.sleep` raw hits). Live `Thread.sleep` call sites: **2** (comments-only in 3 other files). Prior audit count of 56 reflected a different codebase state.
 
 ```bash
 grep -rn "Thread\.sleep\|@Ignore\b\|ignore\b" src/test/ --include="*.scala" | wc -l  # 56
@@ -1168,7 +786,7 @@ slower than dev machine → timeouts). `@Ignore` annotations silently hide untes
 - `Thread.sleep` → replace with `eventually(...)` from ScalaTest or Pekko's `TestProbe.expectMsg(duration)`
 - `@Ignore` → determine if the test is permanently dead (delete) or blocked on missing infra (document why)
 
-**Gate**: R2 audit ✅ COMPLETE (`test-quality-audit.md`, 303 lines). All 7 confirmed Tier B — see `thread-sleep-audit.md §B1–B5` for recipes.
+**Gate**: R2 audit ✅ COMPLETE (`test-quality-audit.md`, 303 lines). All 7 confirmed Tier B — see `thread-sleep-audit.md §B1–B5` for recipes. **EYE baseline verified 2026-06-22**: 2 live call sites (SubscriptionManagerSpec:249, EthMiningServiceSpec:302). 11 comment-only references (PoWMiningCoordinatorSpec ×3 comments, PendingTransactionsManagerSpec ×4 Scaladoc anti-patterns, SNAPSyncControllerResumeSpec ×1, GcPressureSamplerSpec ×1). No new FLAKY sites beyond the 2 live calls.
 **Parallel-safe**: YES — each test file fix is independent. Good downtime task during long test runs.
 **Priority**: LOW-MEDIUM — prevents CI flakiness as the test suite grows.
 **Agent**: EYE (test validation after fixes).
@@ -1189,15 +807,15 @@ dependencies on each other and can be picked up in any order when the primary tr
 | **Network/sync Pekko** | S3→S4/S7→NET2→SNAP1→SNAP2→ROOT→CAPSTONE (see SPRINT-QUEUE.md) | LOOM, FORGE, HERALD | Part 2 complete |
 | **→ CAPSTONE** | Root flip: ActorSystem[Nothing], bridge/adapter removal, Behavior[Any] narrowing | LOOM | All actors Typed |
 | **7d — Artifact audit** | Post-CAPSTONE sweep: surviving Classic patterns, adapter imports, raw schedulers | PRISM, HERALD | CAPSTONE merged |
-| ~~**7a — ADT consolidation**~~ ✅ | ~~Seal Command traits: move Messages.scala cases into companion objects~~ DONE — `04615ad43` `4e8b42263`; 173/173; 3,600/0 | MITHRIL, WRAITH | ✅ |
-| ~~**7b — EventStream**~~ ✅ | ~~R5 research → Topic[T] migration for eventStream pub/sub sites~~ DONE — `849c0dcf0` (NewPendingTransaction) + `b35b35cf6` (NewBlockImported); `EventTopicsBuilder` trait; 13 files; grep eventStream → 0 | HERALD, LOOM | ✅ |
-| ~~**7e — Design review**~~ ✅ | ~~Typed API optimization~~ DONE — 3 accepted redesigns (P4 SSC idle catch-all, P2 HealingState extraction, P3 CD stagnation push); 5 no-change verdicts | PRISM, HERALD, LOOM | ✅ |
+| **7a — ADT consolidation** ✅ | Seal Command traits: move Messages.scala cases into companion objects DONE — `04615ad43` `4e8b42263`; 173/173; 3,600/0 | MITHRIL, WRAITH | ✅ |
+| **7b — EventStream** ✅ | R5 research → Topic[T] migration for eventStream pub/sub sites DONE — `849c0dcf0` (NewPendingTransaction) + `b35b35cf6` (NewBlockImported); `EventTopicsBuilder` trait; 13 files; grep eventStream → 0 | HERALD, LOOM | ✅ |
+| **7e — Design review** ✅ | Typed API optimization DONE — 3 accepted redesigns (P4 SSC idle catch-all, P2 HealingState extraction, P3 CD stagnation push); 5 no-change verdicts | PRISM, HERALD, LOOM | ✅ |
 | **7c — Supervision** | Explicit Behaviors.supervise per actor with typed failure strategies | PRISM, LOOM | 7a done |
 | **8b — Opaque types** | Domain value type safety: BlockNumber, Hash, Address, Balance | MITHRIL, FORGE | Part 3a done |
 | **8i — RLP derivation** | Replace handwritten product-type RLP codecs with derivation | MITHRIL, FORGE, EYE | Part 3a + R7 done |
 | **Scala 3 idioms** | Part 3a implicit→given (198 files) | MITHRIL + scalafix | After Pekko migration |
-| ~~**Scala 3 idioms**~~ | Part 3b COMPLETE `c0a3612b4` — non-consensus; consensus deferred (forge gate) | MITHRIL | ✅ |
-| **Scala 3 idioms** | Part 3c isInstanceOf audit | MITHRIL | Any sprint |
+| **Scala 3 idioms** | Part 3b COMPLETE `c0a3612b4` — non-consensus; consensus deferred (forge gate) | MITHRIL | ✅ |
+| **Scala 3 idioms** | ~~Part 3c isInstanceOf audit~~ ✅ DONE `7cc9eda3a` — 1 site in mpt/Node.scala; 0 in consensus/vm/crypto/domain | MITHRIL | ✅ |
 | **Dep upgrades** | Part 4a JLine 4.x | — | Dedicated sprint |
 | **Dep upgrades** | Part 4e Jackson 3 → then 4b logstash | — | Ecosystem gate |
 | **Scala 3.9** | Part 5a | — | 3.9 release gate |
@@ -1213,12 +831,12 @@ No actor migration gate. Commit individually; do not bundle with primary-track m
 |------|------|--------|--------|
 | **Part 1** | Remaining 5 compiler warnings | WRAITH | ~30 min |
 | **6a — extvm deletion** | Delete `extvm/` (10 files) after grep-verify | WRAITH | ~1h |
-| **8f — Dead code audit** | Broader sweep beyond extvm; delete confirmed dead files | PRISM | ~2h research |
+| **8f — Dead code audit** ✅ research done | 4 candidates in CHASE-QUEUE (DEAD 2026-06-22); deletion sprint pending | WRAITH | ~30 min deletions |
 | **3d — enum polish** | Migrate `SyncPhase`, `BlacklistReason`, `ForkId` codes to enum | MITHRIL | ~1h per file |
 | **3e — console→logging** | Replace 24 `println`/`System.out` calls with SLF4J | MITHRIL | ~1h |
 | **8e — ScalaFix expansion** | Rules in .scalafix.conf ✅; C2 ✅ `9eb1f4e06`; TNHC ✅ `7a48c5988`; remaining: 7 consensus (FORGE) + 33 SSC (SNAP1) | FORGE / LOOM | gated |
-| **8g — braceless config** | Add scalafmt braceless-prefer config (no mass rewrite) | MITHRIL | ~15 min |
-| **8j — Thread.sleep** | Replace test timing sensitivity (56 occurrences) | EYE | ~2h |
+| **8g — braceless config** ✅ `34a55a025` | Deferred settings documented in .scalafmt.conf; indent.defnSite + topLevelStatementBlankLines each trigger ~400-file reformats → gated for per-subsystem pass post-CAPSTONE | MITHRIL | done |
+| **8j — Thread.sleep** | Replace test timing sensitivity (2 live call sites — baseline verified EYE 2026-06-22) | EYE | ~30 min |
 | **3f — manual sync** | Audit 5 `.synchronized` outside actors | PRISM | ~1h |
 | **8a-retro** | Migrate already-completed actors' tests from TestKit → ActorTestKit | LOOM, EYE | ~3h |
 
@@ -1242,16 +860,16 @@ No actor migration gate. Commit individually; do not bundle with primary-track m
 | **Pekko migration** | Part 2: faucet → jsonrpc → transactions → consensus/mining | LOOM, FORGE | scala3-cleanup-june merged |
 | **Warning cleanup** | Part 1 remaining 5 warnings | WRAITH | Any sprint |
 | **Scala 3 idioms** | Part 3a implicit→given (198 files) | MITHRIL + scalafix | After Pekko migration |
-| ~~**Scala 3 idioms**~~ | Part 3b COMPLETE `c0a3612b4` — non-consensus done; consensus deferred (forge gate) | MITHRIL | ✅ |
-| **Scala 3 idioms** | Part 3c isInstanceOf audit | MITHRIL | Any sprint |
+| **Scala 3 idioms** | Part 3b COMPLETE `c0a3612b4` — non-consensus done; consensus deferred (forge gate) | MITHRIL | ✅ |
+| **Scala 3 idioms** | ~~Part 3c isInstanceOf audit~~ ✅ DONE `7cc9eda3a` — 1 site in mpt/Node.scala; 0 in consensus/vm/crypto/domain | MITHRIL | ✅ |
 | **Dep upgrades** | Part 4a JLine 4.x | — | Dedicated sprint |
 | **Dep upgrades** | Part 4e Jackson 3 → then 4b logstash | — | Ecosystem gate |
 | **Network/sync Pekko** | S3→S4/S7→NET2→SNAP1→SNAP2→ROOT→CAPSTONE (see SPRINT-QUEUE.md) | LOOM, FORGE, HERALD | Active sprint |
 | **→ CAPSTONE** | Root flip: ActorSystem[Nothing], bridge/adapter removal, Behavior[Any] narrowing | LOOM | All actors Typed |
 | **7d — Artifact audit** | Post-CAPSTONE sweep: any surviving Classic patterns, adapter imports, raw schedulers | PRISM, HERALD | CAPSTONE merged |
-| ~~**7a — ADT consolidation**~~ ✅ | ~~Seal Command traits: move Messages.scala cases into companion objects~~ DONE — `04615ad43` `4e8b42263`; 173/173; 3,600/0 | MITHRIL, WRAITH | ✅ |
-| ~~**7b — EventStream**~~ ✅ | ~~R5 research → Topic[T] migration for eventStream pub/sub sites~~ DONE — `849c0dcf0` (NewPendingTransaction) + `b35b35cf6` (NewBlockImported); `EventTopicsBuilder` trait; 13 files; grep eventStream → 0 | HERALD, LOOM | ✅ |
-| ~~**7e — Design review**~~ ✅ | ~~Typed API optimization~~ DONE — 3 accepted redesigns (P4 SSC idle catch-all, P2 HealingState extraction, P3 CD stagnation push); 5 no-change verdicts | PRISM, HERALD, LOOM | ✅ |
+| **7a — ADT consolidation** ✅ | Seal Command traits: move Messages.scala cases into companion objects DONE — `04615ad43` `4e8b42263`; 173/173; 3,600/0 | MITHRIL, WRAITH | ✅ |
+| **7b — EventStream** ✅ | R5 research → Topic[T] migration for eventStream pub/sub sites DONE — `849c0dcf0` (NewPendingTransaction) + `b35b35cf6` (NewBlockImported); `EventTopicsBuilder` trait; 13 files; grep eventStream → 0 | HERALD, LOOM | ✅ |
+| **7e — Design review** ✅ | Typed API optimization DONE — 3 accepted redesigns (P4 SSC idle catch-all, P2 HealingState extraction, P3 CD stagnation push); 5 no-change verdicts | PRISM, HERALD, LOOM | ✅ |
 | **7c — Supervision** | Explicit Behaviors.supervise per actor with typed failure strategies | PRISM, LOOM | 7a done |
 | **Scala 3.9** | Part 5a | — | 3.9 release gate |
 | **Constitution** | Part 5c | — | After 5a |
@@ -1259,171 +877,273 @@ No actor migration gate. Commit individually; do not bundle with primary-track m
 
 ---
 
-## Part 9 — ETH Test Coverage (BEACON sprint)
+## Clearout Prompts (Unblocked Items)
 
-Source: `eth-coverage-audit.md` (2026-06-20). Pre-existing gaps, not sprint-introduced.
-Sprint verdict: adequate for modernization scope. Follow-up session when ready.
+Items below are actionable now on `scala3-cleanup-june` without external gates.
+Each prompt can run independently. Commit individually.
 
----
+**Run order — this file:**
+| # | Batch | Prompt | Parallel-safe? |
+|---|-------|--------|---------------|
+| ~~A3~~ | ~~Batch A~~ | ~~P4 PRISM dead code audit~~ | ✅ DONE 2026-06-22 — 4 items in CHASE-QUEUE |
+| ~~A4~~ | ~~Batch A~~ | ~~P6 EYE Thread.sleep audit~~ | ✅ DONE 2026-06-22 — 2 pre-existing (both NECESSARY) |
+| ~~B4~~ | ~~Batch B step 4~~ | ~~P5 MITHRIL scalafmt config~~ | ✅ DONE 2026-06-22 — `34a55a025` — deferred settings documented; indent.defnSite + topLevelStatementBlankLines both trigger mass reformats, gated for per-subsystem pass |
+| ~~C1~~ | ~~Batch C step 1~~ | ~~P1 MITHRIL isInstanceOf (83 instances)~~ | ✅ DONE 2026-06-22 — 1 site fixed (`7cc9eda3a`); consensus/vm/crypto/domain had 0 hits |
+| ~~C2~~ | ~~Batch C step 2~~ | ~~P2 MITHRIL enum candidates~~ | ✅ DONE 2026-06-22 — 4 types converted (`b305ef41b`) |
+| C3 | Batch C step 3 | P3 MITHRIL console→logging (28 sites) | Run after C2 |
+| C4 | Batch C step 4 | P4 MITHRIL/EYE E165 sprint (777 sites / 83 files) | Run after C1-C3; multi-session sprint |
 
-### G1 — PostMergeBlockHeaderValidator: zero unit test coverage (HIGHEST VALUE)
-
-**File:** `src/main/scala/.../consensus/validators/PostMergeBlockHeaderValidator.scala`
-**Gap:** Touched by scala3-cleanup-june (syntax-only changes). Zero test coverage at any
-tier (testEssential / testStandard / testComprehensive).
-**Fix:** Write a unit spec covering: valid post-merge header passes, parentHash mismatch
-fails, mixHash non-zero fails, nonce non-zero fails, difficulty non-zero fails, withdrawals
-root mismatch fails, excess blob gas validation (EIP-4844). Wiring already exists
-(BlockHeaderValidatorSpec pattern).
-**Agent:** BEACON
-**Gate:** None — standalone test addition, no production code changes.
-**Status:** DONE — `583aded58` (8 cases, all passing via `testOnly *PostMergeBlockHeader*`).
+**Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
 
 ---
 
-### ~~G2 — No ethereum/tests ETH vectors below testComprehensive (STRUCTURAL)~~ ✅ DONE `dbef878`
+### P1 — MITHRIL: isInstanceOf → pattern match (Part 3c, 83 instances)
 
-**What was done:** `EthSmokeSpec.scala` (44 lines) — 5 vectors (4 Berlin, 1 Istanbul). `EthSmoke` tag added to `Tags.scala`. `testEthSmoke` build alias added to `build.sbt` scoped to `IntegrationTest / EthSmoke`. All 5 vectors pass in 21s.
+**Agent:** MITHRIL
+**Files:** Non-consensus `src/main/` (skip `consensus/`, `vm/`, `crypto/`, `domain/` — FORGE gate)
+**Prerequisite:** None for non-consensus files.
 
-**Implementation notes (preserved for future extensions):**
-- **Fork coverage gap** — no London/Cancun/EIP-4844 vectors exist locally (only Berlin + Istanbul in `src/it/resources/`; post-merge paths point at the CI-only `ets/tests` submodule). Spec follows guardrail: real verified vectors only. Extend with post-merge vectors once submodule is populated. → **researched in G2-R: see below**.
-- **Tag conflict trap** — tagging with both `(IntegrationTest, EthSmoke)` causes zero tests to run: `commonSettings` injects `-l IntegrationTest` as a global exclusion. Fix: tag with `EthSmoke` only — tests are already in `IntegrationTest` config by directory.
+**Prompt:**
+> On branch `scala3-cleanup-june`, address Part 3c: replace `isInstanceOf[T]` with
+> pattern matching in non-consensus source files.
+>
+> Steps:
+> 1. Inventory: `grep -rn "isInstanceOf\[" src/main/ --include="*.scala" | grep -v "consensus/\|vm/\|crypto/\|domain/"` — count and list files.
+> 2. For each occurrence, replace:
+>    ```scala
+>    // Before
+>    if x.isInstanceOf[Foo] then ...
+>    // After
+>    x match { case _: Foo => true; case _ => false }
+>    // or inline: x match { case _: Foo => doThing(); case _ => () }
+>    ```
+>    Use the cleaner form that fits the context (val guard, if-expression, match block).
+> 3. After each file: `sbt compile-all` — 0 errors.
+> 4. At the end: `sbt testOnly` for any spec in the same package.
+> 5. Do NOT touch `consensus/`, `vm/`, `crypto/`, or `domain/` — those require FORGE review.
+>    Add any occurrences found there to CHASE-QUEUE.md as ISINST entries.
 
----
+**Verification:** `grep -rn "isInstanceOf\[" src/main/ --include="*.scala" | grep -v "consensus/\|vm/\|crypto/\|domain/"` → 0 results
 
-### G2-R — Post-Merge EthSmoke Vector Candidates ✅ IMPLEMENTED `00166a555`
+**MANDATORY final step — complete BEFORE closing thread:**
+- `working-docs/DEFERRED-BACKLOG.md` run order table — change `| C1 | Batch C step 1 | P1 MITHRIL isInstanceOf...` to `| ~~C1~~ | ~~Batch C step 1~~ | ~~P1 MITHRIL isInstanceOf (83 instances)~~ | ✅ DONE [date] — N sites fixed |`
+- `working-docs/DEFERRED-BACKLOG.md` — mark Part 3c row in Housekeeping Track with ✅ and commit SHA
+- `completed/SPRINT-QUEUE.md` — append row: `| [SHA(s)] | Part 3c — isInstanceOf → pattern match (non-consensus, N instances) |`
+- `modernization-log/[subsystem].md` for each touched subsystem — add under "Scala 3 Idioms":
+  `#### [SHA] — 3c: isInstanceOf → pattern match`
+  `- **What:** N sites in [package] replaced; consensus/vm/crypto/domain deferred (FORGE gate)`
 
-**Doc:** `.local/docs/moderization-review-june/eth-smoke-vector-candidates.md`
-**Status:** Implemented. 5 JSON files committed under `src/it/resources/ethereum-tests/` (flat layout). 10 new vectors wired in `EthSmokeSpec` but `ignore`d pending G5. CI: 5 pass / 0 fail / 10 ignored / 18.7s.
+**Opportunistic clearout:** Apply the protocol in CODEBASE-AUDIT.md. While reading each file for `isInstanceOf`, scan for other CHASE-QUEUE ISINST, NULL, or MUTABLE entries in the same file and address them inline or draft a prompt.
 
-**Corpus finding:** The `ethereum/tests` checkout regenerates vectors with only `Cancun` and `Prague` as `network` field values — pre-Cancun labels (`London`, `Paris`, `Shanghai`) exist in filenames but decode to `['Cancun', 'Prague']` internally. Feature-equivalent vectors per fork are available:
-
-| Target Fork | Feature | Candidate File |
-|-------------|---------|----------------|
-| London | EIP-1559 basefee | `basefeeExample.json` |
-| Merge/Paris | EIP-3675 | `mergeExample.json` |
-| Shanghai | EIP-4895 withdrawals | `shanghaiExample.json` |
-| Cancun | EIP-1153 tload | `tloadDoesNotPersistCrossTxn.json` |
-| Cancun | EIP-4844 blobs | `blockWithAllTransactionTypes.json` |
-
-Each file yields 2 vectors (`_Cancun` + `_Prague`) → 5 files = 10 new vectors. Access pattern: copy JSONs into `src/it/resources/ethereum-tests/`; use existing `smoke()` / classpath `runSingleTest` pattern (not `runTestFile` with `.claude/` path — breaks in CI).
-
-**Critical caveat — `EthereumTestsAdapter.scala` is pre-merge-shaped:**
-`TestBlockHeader` drops `baseFeePerGas`, `withdrawalsRoot`, `excessBlobGas`, `blobGasUsed`, `parentBeaconBlockRoot`. `TestBlock` ignores the `withdrawals` array. Circe silently discards unknown fields so files decode and run as smoke, but they are **not byte-exact header/withdrawal conformance** — executor checks balance/nonce/storage only, not state root. Vectors run shallow until the decoder is extended.
-
-**Gate:** None — copy files + add `smoke()` calls. Extend `EthereumTestsAdapter` for byte-exact conformance as a separate follow-up.
-**Skip:** Hive's 67 JSONs are GraphQL/RPC/genesis fixtures — not `BlockchainTest` format.
-
----
-
-### G3 — Missing `osaka` case in TestConverter.networkToConfig() (TEST HARNESS)
-
-**File:** `src/it/scala/.../ethtest/TestConverter.scala` — `networkToConfig()` method
-**Gap:** Osaka (Sepolia's currently-active fork) has no case in the network→config mapping.
-Any ethereum/tests vector tagged `Osaka` is silently unmappable; execution harness falls
-through to default (pre-osaka config), producing wrong results without failing loudly.
-**Production impact:** None — production fork dispatch (`EvmConfig.forTimestamp`) is intact.
-Test harness only.
-**Fix:** Add `case "Osaka" | "Prague" => sepoliaConfig.copy(...)` with the correct Osaka
-fork block/timestamp. Verify against `OsakaOpCodes` activation in ETH genesis config.
-**Agent:** BEACON
-**Gate:** None — standalone test-harness fix.
-**Status:** DONE — `ef5ad3376` (osaka case added to both fork-block and forkTimestamps match blocks; `IntegrationTest / compile` clean).
+**Rejection criteria:** Touching consensus/vm/crypto/domain files; changing behavior (match arms must preserve identical semantics); bundling with other unrelated changes
 
 ---
 
-### ~~G4 — EthereumTestsSpec.runSingleTest() dead code (PARSE-ONLY TODO)~~ ✅ DONE `f4746250e`
+### P2 — MITHRIL: Enum remaining candidates (Part 3d) ✅ DONE `b305ef41b` 2026-06-22
 
-**File:** `src/it/scala/.../ethtest/EthereumTestsSpec.scala`
-**What changed:** `runSingleTest(resourcePath, testName)` — loads suite via `loadTestSuite`, looks up test by exact key, calls `executeTest()` on hit, returns `Left` with available names on miss. `runTestFile(filePath)` — reads from real filesystem path, decodes via circe `BlockchainTestSuite` decoder, maps each case through `executeTest()`. Both route through `EthereumTestExecutor.executeTest → EthereumTestHelper → BlockExecution.executeAndValidateBlock()`, using chainId=1 / forTimestamp / Berlin→Prague+Osaka — same path as batch subclasses. Signature change: original stub was `runSingleTest(testName, test: BlockchainTest)` (pre-supplied object); changed to `runSingleTest(resourcePath, testName)` to do actual suite lookup as the spec intended.
-**Compile:** `sbt compile-all` → 0 errors. 54 insertions, 30 deletions.
+**Agent:** MITHRIL
+**Files:** Files containing `SyncPhase`, `BlacklistReason`, `ForkId` — confirm with grep first
+**Prerequisite:** None. `SyncPhase` and `ForkId` are already partially done (check first).
 
----
+**Result:** 4 types converted. `SyncPhase` and `ForkId` already converted in prior parts.
+Converted: `NetworkType`, `VmConfig.VmMode`, `FaucetStatus`, `SealEngineType`.
+Skipped: `MiningMode` (consensus/pow — FORGE gate), `ServerStatus`/`PruningMode` (valid enum
+candidates but wider refactor scope than this batch), everything in consensus/vm/domain (FORGE gate).
 
-### ~~G5 — EthereumTestsAdapter post-merge extension~~ ✅ DONE `12a79b7c3`
+**Prompt:**
+> On branch `scala3-cleanup-june`, address Part 3d: migrate remaining sealed trait + case
+> object hierarchies to Scala 3 `enum` where the pattern is a pure value enumeration.
+>
+> Steps:
+> 1. Run: `grep -rn "sealed trait\|sealed abstract class" src/main/ --include="*.scala" | grep -v "Command\|Response\|Event\|Message\|Protocol"` — list candidates.
+> 2. For each candidate: confirm it is a pure value set (case objects only, no state, no constructor args that vary). If yes → enum candidate. If has varied constructor args → skip.
+> 3. For confirmed candidates, rewrite to:
+>    ```scala
+>    enum MyEnum:
+>      case ValueA
+>      case ValueB(field: Type)
+>    ```
+> 4. Check for companion object `.values`, `withName`, ordering dependencies — migrate those.
+> 5. After each file: `sbt compile-all` — 0 errors.
+> 6. Run targeted spec: `sbt testOnly *[FileName]*`
 
-**Result:** 15/15 pass, 0 ignored. `sbt compile-all` → 0 errors.
+**Verification:** `sbt compile-all` clean; targeted tests pass
 
-**4 defects fixed:**
-1. **`gasPrice` optional** — changed from required `String` to `Option[String]`; missing `gasPrice` on type-0x02/0x03 defaults to `BigInt(0)`. Unblocked 8 vectors.
-2. **Genesis header fields** — added `withdrawalsRoot`, `baseFeePerGas`, `blobGasUsed`, `excessBlobGas`, `parentBeaconBlockRoot`, `requestsHash` to `TestBlockHeader`. Reconstructed genesis now selects correct `HeaderExtraFields` variant (`HefPostPrague` / `HefPostCancun` / `HefPostShanghai` / `HefPostOlympia` / `HefEmpty`); RLP item count matches; genesis hash aligns with `block[0].parentHash`. Unblocked shanghai vector.
-3. **ETC Olympia EIP-2935 path fired on ETH vectors** — `networkToConfig` was defaulting to `NetworkType.ETC`, triggering the block-number EIP-2935 guard on ETH timestamp-fork vectors. Fix: set `NetworkType.ETH` for ETH test chains.
-4. **EIP-4895 withdrawals dropped** — `TestBlock` ignored the `withdrawals` array; state-root mismatch on shanghai vector with non-empty withdrawals. Fix: added `TestWithdrawal` decoder, threaded withdrawals into `BlockBody`.
+**MANDATORY final step — complete BEFORE closing thread:**
+- `working-docs/DEFERRED-BACKLOG.md` run order table — change `| C2 | Batch C step 2 | P2 MITHRIL enum candidates...` to `| ~~C2~~ | ~~Batch C step 2~~ | ~~P2 MITHRIL enum candidates~~ | ✅ DONE [date] — N types converted |`
+- `working-docs/DEFERRED-BACKLOG.md` — mark Part 3d row with ✅ and commit SHA(s)
+- `completed/SPRINT-QUEUE.md` — append row: `| [SHA(s)] | Part 3d — enum migration (N types converted) |`
+- `modernization-log/[subsystem].md` for each file touched — add under "Scala 3 Idioms":
+  `#### [SHA] — 3d: [TypeName] → enum`
+  `- **What:** sealed trait + N case objects → Scala 3 enum`
 
-~~**Latent issue — FORGE assessed, fix required before Olympia activation:**~~
+**Opportunistic clearout:** Apply the protocol in CODEBASE-AUDIT.md. For each file touched, scan for `isInstanceOf` (P1 overlap), `println` (P3 overlap), or CHASE-QUEUE entries in the same file — fix inline or draft prompts.
 
-~~`BlockExecution.applyEip2935`~~ ✅ `bbc5f1df8` — account-existence gap **FIXED** (2026-06-21). 2 files, `scala3-cleanup-june`.
-
-**What was done**: Removed `isActivationBlock` variable entirely (was only used in the `w1` branch condition; `blockchainReader.getBlockHeaderByHash` call removed with it). Changed `w1` condition from `if isActivationBlock && world.getCode(HistoryStorageAddress).isEmpty` to `if world.getCode(HistoryStorageAddress).isEmpty` — code-absence is now the sole deployment guard, matching `applyEip4788`. Self-heals any absent-account scenario on post-activation blocks. New regression test in `BlockHashHistorySpec`: runs `olympiaBlock + 1` on `emptyWorld` (no pre-seeded account), asserts code deployed + slot written — threw `IllegalStateException` at `getGuaranteedAccount` before fix, passes now. `sbt compile-all` → 0 errors; `scalafmtAll` clean; `testOnly *BlockHash* *BlockExecution* *Eip2935*` → 21/21; `BlockHashHistorySpec` → 6/6 (5 pre-existing + 1 new).
-
----
-
-### Execution order
-
-~~G3 → G1 → G4 → G2 → G2-R → G5~~ ✅ **G-SERIES COMPLETE.** 15/15 EthSmoke vectors passing.
-All four are BEACON-only; no FORGE involvement unless ETC fork config is touched.
-
----
-
-## PRISM Post-Capstone Artifact Audit
-
-**Report:** `.local/docs/moderization-review-june/post-capstone-artifact-audit.md`
-**Date:** 2026-06-21
-**Summary:** 4 resolved, 38 intentional, 5 fix-now
-
-### Resolved (4)
-
-Pre-existing findings that are already addressed on `scala3-cleanup-june`. No action needed.
-
-### Intentional (38)
-
-Pervasive `toClassic` / `toTyped` bridges and `Behavior[Any]` occurrences throughout the codebase. PRISM confirmed all 38 are load-bearing interop at the `PeerEventBus` Classic subscriber boundary — not misuse. No regressions. Do not touch without a full PeerEventBus Typed migration (LOOM).
-
-### Fix-Now (5) — routed to C13 / C14
-
-| File | Line | Issue | Fix |
-|------|------|-------|-----|
-| `jsonrpc/AdminService.scala` | 10 | `o.a.p.actor.Actor` imported for `Actor.noSender` | → `ActorRef.noSender` |
-| `jsonrpc/AkkaTaskOps.scala` | 3 | Same `Actor.noSender` misuse | → `ActorRef.noSender` |
-| `nodebuilder/StdNode.scala` | 3 | Same `Actor.noSender` misuse | → `ActorRef.noSender` |
-| `blockchain/sync/SyncController.scala` | 1507 | Classic `scheduler.scheduleOnce` inside Typed actor | → `ctx.scheduleOnce` or `Behaviors.withTimers` |
-| `blockchain/sync/SyncController.scala` | 2140 | Same Classic scheduler (30-min delay) | → same fix |
-
-All PRISM-gate — no migration work required. See CHORE-QUEUE C13/C14.
+**Rejection criteria:** Converting Command/Response/Protocol traits (those are ADTs, not enums); adding behavior to enum cases beyond simple fields; touching consensus-critical types without FORGE review
 
 ---
 
-## ~~Regular Sync LCA Recovery — handleForkRecovery Precise Rollback~~ ✅ DONE (`0d290019e`)
+### P3 — MITHRIL: console → SLF4J logging (Part 3e, 28 printlns)
 
-**Audit:** HERALD (2026-06-21). **Source:** `post-capstone-artifact-audit.md` chain / CHASE-QUEUE cleared log.
+**Agent:** MITHRIL
+**Files:** `src/main/` (all packages)
+**Prerequisite:** None.
 
-### Background
+**Prompt:**
+> On branch `scala3-cleanup-june`, address Part 3e: replace `println` / `System.out.println`
+> calls in production code with SLF4J logging.
+>
+> Steps:
+> 1. Inventory: `grep -rn "println\|System\.out\." src/main/ --include="*.scala"` — count (expect ~28).
+> 2. For each occurrence:
+>    - Identify the appropriate log level (most `println` → `log.info`; error/warning context → `log.warn`/`log.error`)
+>    - Replace with the class's existing logger. If the class has no logger, add:
+>      ```scala
+>      private val log = LoggerFactory.getLogger(getClass)
+>      ```
+>      (or use Pekko `ActorLogging` / the project's preferred `logging-standards.md` pattern)
+>    - Read `.claude/agent-protocols/logging-standards.md` before starting — use the correct logger acquisition pattern for the class type (Actor vs plain class)
+> 3. After each file: `sbt compile-all` — 0 errors.
 
-Regular sync has three divergence-recovery paths (escalating):
+**Verification:** `grep -rn "println\|System\.out\." src/main/ --include="*.scala"` → 0 results
 
-| Path | Trigger | Action |
-|------|---------|--------|
-| A — stale-tip rewind | `HeaderRejectionRewindThreshold` = 3 consecutive rejections from distinct peers | `invalidateBlocksFrom(lastBlock - 128)` — blind 128-block rewind |
-| B — UnknownBranch rewind | `BranchResolution.resolveBranch` returns `UnknownBranch` (parent not in canonical chain) | `InvalidateBlocksFrom(currentBlock - branchResolutionRequestSize)` — blind rewind |
-| C — handleForkRecovery | `ForkDetectThreshold` = 5 consecutive `UnknownParent \| BlockImportFailed` on same block hash | `setCanonicalChainHead(currentBest - 128, ...)` — destructive 128-block canonical-chain rollback, iterates |
+**MANDATORY final step — complete BEFORE closing thread:**
+- `working-docs/DEFERRED-BACKLOG.md` run order table — change `| C3 | Batch C step 3 | P3 MITHRIL console→logging...` to `| ~~C3~~ | ~~Batch C step 3~~ | ~~P3 MITHRIL console→logging (28 sites)~~ | ✅ DONE [date] — N sites fixed |`
+- `working-docs/DEFERRED-BACKLOG.md` — mark Part 3e row with ✅ and commit SHA
+- `completed/SPRINT-QUEUE.md` — append row: `| [SHA] | Part 3e — console → SLF4J (28 println sites) |`
+- No modernization-log entry needed for this housekeeping change
 
-### Gap
+**Opportunistic clearout:** Apply the protocol in CODEBASE-AUDIT.md. While reading each file to replace `println`, scan for `isInstanceOf` (P1) and enum candidates (P2) in the same file — fix inline if small or draft follow-on prompts.
 
-Paths A and B use a blind fixed-size rewind. Path C (the most aggressive, `BlockImporter.scala:797`) iterates: it rolls back the canonical chain 128 blocks per `ForkDetectThreshold` cycle, permanently mutating chain index entries (and serving wrong data to peers) during recovery. On a fork deeper than 128 blocks it cycles repeatedly — each iteration takes minutes (5 strikes × peer response timeouts). It converges but has no concept of the LCA.
+**Rejection criteria:** Removing meaningful log output (preserve the message content); changing log levels in a way that would silence errors; touching test files (`src/test/` printlns are acceptable in tests)
 
-**ETC mainnet impact:** Low — MESS makes forks deeper than 128 blocks near-impossible. More relevant on Mordor.
+---
 
-### Fix
+### P4 — MITHRIL/EYE: E165 test harness cleanup sprint (777 sites / 83 files)
 
-`FastSyncBranchResolverActor` already implements the full LCA search (recent-header scan + binary search fallback). One parameter generalization makes it reusable here:
+**Agent:** MITHRIL (type parameter additions), EYE (compile + test verification per batch)
+**Files:** `src/test/` — 83 files with unnarrowed TestProbe instances
+**Prerequisite:** Batch C P1–P3 complete. Multi-session sprint; commit in batches of ~10 files.
 
-1. **Generalize constructor**: `fastSync: ClassicActorRef` → `replyTo: ActorRef[BranchResolverResponse]` (one-line change)
-2. **Add `ResolvingFork` behavior** to `BlockImporterLogic`: suspends import dispatch; waits for `BranchResolvedSuccessful(lca, _)` or `BranchResolutionFailed`
-3. **Replace blind rollback** in `handleForkRecovery` (`BlockImporter.scala:797`): spawn branch resolver → on `BranchResolvedSuccessful` call `setCanonicalChainHead(lca, ...)` once, precisely, then `InvalidateBlocksFrom(lca + 1)`; on `BranchResolutionFailed` fall back to current 128-block blind rewind
+**Context:** EYE S5 sweep (2026-06-22) found 777 unnarrowed TestProbe sites across 83 test files.
+Prior "5 in FastSyncBranchResolverSpec" was stale — that file is clean. Highest-density files:
+`TrieNodeHealingCoordinatorSpec` (58), `ByteCodeCoordinatorSpec` (56), `AccountRangeCoordinatorSpec` (54),
+`StorageRangeCoordinatorSpec` (39), `PeerManagerSpec` (32).
 
-No consensus code touched. No new network protocol. Binary search reuses existing `GetBlockHeaders` path.
+**Prompt:**
+> On branch `scala3-cleanup-june`, work through the E165 TestProbe cleanup sprint.
+>
+> E165 = pattern selectors on `Any` from unnarrowed `TestProbe` type parameters.
+> Fix: add `TestProbe[ExpectedMessageType]` wherever the probe's `expectMsg` call
+> reveals what message type it receives.
+>
+> Strategy (for 777 sites across 83 files — work in batches of ~10 files per session):
+> 1. Start with highest-density files (list above) — they have established patterns.
+> 2. For each file:
+>    a. `grep -n "TestProbe\b" path/to/Spec.scala | grep -v "\["` — list unnarrowed sites
+>    b. For each site, read surrounding `expectMsg`/`expectMsgType`/`fishForMessage` to
+>       determine the expected message type
+>    c. Add `TestProbe[MessageType]` type parameter
+>    d. `sbt compile-all` after each file — confirm E165 count decreasing
+> 3. Commit each batch: `E165 batch N — TestProbe type params (N files, N sites)`
+> 4. Do NOT change any production source files or any test logic.
+> 5. If a probe receives heterogeneous message types with no common supertype, leave as
+>    `TestProbe[Any]` and add `// E165: heterogeneous` comment.
 
-**Dependency:** FastSyncBranchResolverActor wiring in `FastSync.scala` — ✅ `ea60c4f29`.
-**Size:** S. **Gate:** None. **Agent:** LOOM (new behavior state) + HERALD pre-flight.
+**Verification (per batch):** `grep -rn "TestProbe\b" src/test/ --include="*.scala" | grep -v "\[" | wc -l` decreasing each batch
 
-**Implementation:** `handleForkRecovery` (`BlockImporter.scala:797`) spawns `FastSyncBranchResolverActor` with a typed `replyTo` adapter; enters new `resolvingFork` suspended state. `BranchResolvedSuccessful(lca, _)` → `setCanonicalChainHead(lca)` + `InvalidateBlocksFrom(lca + 1)` (precise rollback). `BranchResolutionFailed` → original 128-block blind rewind (safe degradation). 46/46 targeted tests pass.
+**MANDATORY final step — complete after EACH batch commit AND when sprint is fully done:**
+- **Per batch:** `working-docs/PENDING.md` — update Test Hygiene item with running count (e.g., "777→N remaining")
+- `modernization-log/node/testing-infra.md` — add entry per batch:
+  `#### [SHA] — E165 batch N: TestProbe type params (N files, N sites)`
+  `- **What:** [list files]; E165 count −N`
+- **When fully complete:** remove item from `PENDING.md` Test Hygiene; add to `completed/PENDING.md`; mark run order table row: `| ~~C4~~ | ~~Batch C step 4~~ | ~~P4 MITHRIL/EYE E165 sprint~~ | ✅ DONE [date] — 777→0 sites |`
+
+**Opportunistic clearout:** Apply the protocol in CODEBASE-AUDIT.md. While working through each test file, check for Thread.sleep (P6 DONE — 2 known sites), wall-clock assertions (CHASE-QUEUE wall-clock-assertion section), or missing test coverage for the class under test — draft prompts for anything new found.
+
+**Rejection criteria:** Production file edits; test logic changes; leaving heterogeneous probes without the `// E165: heterogeneous` comment
+
+---
+
+### P5 — MITHRIL: braceless scalafmt config (Part 8g, ~15 min)
+
+**Agent:** MITHRIL
+**Files:** `.scalafmt.conf`
+**Prerequisite:** None. Config-only change; no mass rewrite.
+
+**Prompt:**
+> On branch `scala3-cleanup-june`, address Part 8g: add the braceless-prefer configuration
+> to `.scalafmt.conf` so that new code written with braceless syntax formats correctly.
+>
+> This is a config addition only — do NOT run a mass-rewrite of existing files.
+>
+> Steps:
+> 1. Read `.scalafmt.conf` to find the current config structure.
+> 2. Add the braceless preference setting (Scala 3 indentation-based syntax):
+>    ```
+>    runner.dialect = Scala3
+>    indent.defnSite = 2
+>    newlines.topLevelStatementBlankLines = [{ blanks { before = 1 } }]
+>    ```
+>    (Adjust if already partially configured — only add what's missing.)
+> 3. Run: `sbt scalafmtAll` — must complete without errors. Diff should be small (config line only; no source reformat should happen from this change alone).
+> 4. Compile: `sbt compile-all` — 0 errors.
+
+**Verification:** `sbt scalafmtAll` clean; `sbt compile-all` clean; diff is `.scalafmt.conf` only
+
+**MANDATORY final step — complete BEFORE closing thread:**
+- `working-docs/DEFERRED-BACKLOG.md` run order table — change `| B4 | Batch B step 4 | P5 MITHRIL scalafmt config...` to `| ~~B4~~ | ~~Batch B step 4~~ | ~~P5 MITHRIL scalafmt config~~ | ✅ DONE [date] — config updated |`
+- `working-docs/DEFERRED-BACKLOG.md` — mark Part 8g row with ✅ and commit SHA
+- `completed/SPRINT-QUEUE.md` — append row: `| [SHA] | Part 8g — braceless scalafmt config added |`
+
+**Opportunistic clearout:** Apply the protocol in CODEBASE-AUDIT.md. While `.scalafmt.conf` is open, check if any other scalafmt/scalafix configuration gaps (from the Part 1 warning cleanup or `.scalafix.conf` expansion in §8e) can be added in the same commit.
+
+**Rejection criteria:** Triggering mass source reformatting; modifying any `.scala` source files; using an incompatible scalafmt version option
+
+---
+
+---
+
+## Part 9: Dead Code — Deferred Wiring Candidates
+
+Items identified during dead-code sweeps where the verdict was DEFER rather than DELETE.
+See `agent-protocols/dead-code-review.md` for the full assessment protocol.
+
+### 9a — SyncStartupStrategy extraction (from deleted AdaptiveSyncStrategy)
+
+**Context:** `AdaptiveSyncStrategy.scala` (193 lines) was deleted in Part 8f as
+unintegrated dead code. However, the design logic it contained addresses a real
+gap: `SyncController.start()` selects sync mode from static config booleans with
+no peer-count or latency pre-flight. If `doSnapSync=true` but fewer than 3 peers
+are available, SNAP attempts and fails N times before reactive fallback triggers.
+
+**What should be built:** A lightweight pure function:
+```scala
+def selectSyncMode(peerCount: Int, snapCapablePeers: Int, latencyMs: Long,
+                   config: SyncConfig): SyncMode
+```
+This is NOT the full `AdaptiveSyncController` class (mutable state, strategy objects).
+It is the decision logic only — extracted, tested as a pure function, wired into
+`SyncController.start()` at the sync mode selection branch (~line 1387).
+
+**Wiring point:** `SyncController.start()` — the 5-branch pattern-match on
+`(isSnapSyncDone, isFastSyncDone, doSnapSync, doFastSync)` config booleans.
+Add a pre-flight check: if `doSnapSync && snapCapablePeers < 3`, downgrade to
+`doFastSync` mode rather than attempting SNAP and waiting for reactive failure.
+
+**Benefit:** Reduces day-1 sync latency on low-peer-count or high-latency networks.
+Turns "wait for N failures then fallback" into "check conditions upfront, start on
+the right mode immediately."
+
+**Prerequisite:** None. Not consensus-critical. Candidate for a standalone task
+after the current sprint queue clears.
+
+**Agent:** Sonnet (pure function + SyncController wiring, not consensus-critical)
+
+---
+
+~~### P6 — EYE: Thread.sleep audit~~ ✅ DONE 2026-06-22
+
+**Result:** 2 pre-existing sites found — `EthMiningServiceSpec.scala:302` (timeout window advance,
+NECESSARY) and `SubscriptionManagerSpec.scala:249` (topic propagation wait, NECESSARY). Neither
+is flaky. No CHASE-QUEUE entries needed. Part 8j baseline: 2 sites, both intentional.

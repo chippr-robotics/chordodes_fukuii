@@ -296,3 +296,5 @@ wait times. No gate dependency on the primary sprint groups above.
 | — | Part 8f — dead code audit (research; 4 candidates identified): `MetricsAlreadyConfiguredError.scala`, `LocalVM.scala`, `AdaptiveSyncStrategy.scala` (pure deletions); `network/discovery/StaticNodesLoader.scala` (duplicate — 1-line `DiscoveryConfig` migration then delete). No `TODO`/`FIXME`/`HACK`/`XXX` in main sources. Candidates in CHASE-QUEUE.md (DEAD 2026-06-22). | DEFERRED-BACKLOG.md §8f | — |
 | `923b18ba7` | W17 — RegularSyncCommand sealed (subtypes moved to SyncProtocol.scala) | CHASE-QUEUE.md W17 | — |
 | `34a55a025` | Part 8g — braceless scalafmt config added |
+| `7cc9eda3a` | Part 3c — isInstanceOf → pattern match (non-consensus, 1 instance: mpt/Node.scala:33) |
+| `b305ef41b` | Part 3d (DEFERRED batch) — enum migration: NetworkType, VmConfig.VmMode, FaucetStatus, SealEngineType (4 types converted) |
