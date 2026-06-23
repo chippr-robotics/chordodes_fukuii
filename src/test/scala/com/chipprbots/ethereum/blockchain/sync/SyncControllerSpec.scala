@@ -26,6 +26,7 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.LongPatience
 import com.chipprbots.ethereum.Mocks
+import com.chipprbots.ethereum.blockchain.sync.fast.FastSync
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSync.SyncState
 import com.chipprbots.ethereum.consensus.mining.GetBlockHeaderByHash
 import com.chipprbots.ethereum.consensus.mining.TestMining
@@ -242,7 +243,7 @@ class SyncControllerSpec
     }
   }
 
-  it should "not change best block after receiving faraway block" taggedAs DisabledTest in withTestSetup() {
+  it should "not change best block after receiving faraway block" taggedAs (UnitTest, SyncTest) in withTestSetup() {
     testSetup =>
       import testSetup.*
 
@@ -260,12 +261,15 @@ class SyncControllerSpec
       setupAutoPilot(networkPeerManager, handshakedPeers, defaultPivotBlockHeader, BlockchainData(newBlocks))
       val fast = syncController.children.find(_.path.name.startsWith("fast-sync")).get
 
-      // Send block that is way forward, we should ignore that block and blacklist that peer
+      // Inject far-ahead headers into Typed FastSync via WrappedPrhResult (private[sync] — accessible here).
+      // FastSync must ignore them (stale/unassigned delivery) and not change the pivot.
       val futureHeaders = Seq(defaultPivotBlockHeader.copy(number = defaultPivotBlockHeader.number + 20))
-      val futureHeadersMessage =
+      val futureResult =
         PeerRequestHandler.ResponseReceived(peer2, ETHPackets.BlockHeaders(BigInt(0), futureHeaders), 2L)
       implicit val ec = system.dispatcher
-      system.scheduler.scheduleAtFixedRate(0.seconds, 0.5.seconds, fast, futureHeadersMessage)
+      system.scheduler.scheduleAtFixedRate(0.seconds, 0.5.seconds)(() =>
+        fast.toTyped[FastSync.Command] ! FastSync.WrappedPrhResult(futureResult)
+      )
 
       eventually {
         someTimePasses()
