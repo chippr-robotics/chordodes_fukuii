@@ -147,6 +147,27 @@ All 5 ETH coverage gaps closed:
 
 ---
 
+## SyncTest Tag Rescue — P8 (COMPLETE)
+
+#### `3aef474a9` — test(p8): SyncTest audit — rescue 40 tests to UnitTest; docs `537397983`
+- **What:** Audited 8 files tagged `SyncTest` (excluded from all tiers in `build.sbt:85`). 40 tests rescused to `UnitTest`; 36 kept `SyncTest` (real wall-clock / multi-actor integration).
+- **Rescued (40):** `RetryStrategySpec` (15 — pure backoff math), `PeersClientSpec` (7 — pure data-structure), `CacheBasedBlacklistSpec` (6 — fake clock via `FakeTicker.advance()`), `BlockchainHostActorSpec` (12 — hermetic TestProbe + in-memory blockchain)
+- **Kept SyncTest (36):** `StateStorageActorSpec` (1 — `eventually` + NormalPatience), `StateSyncSpec` (5 — `expectMsg(20.seconds)`), `FastSyncSpec` (6 — IO fiber waits), `SyncControllerSpec` (~24 — LongPatience multi-actor)
+- **testEssential count after rescue:** 3,539; updated in `fukuii-test-timing.md`
+- **Pre-existing failure logged:** `BlockchainHostActorSpec` "return Receipts for block hashes" — `Subscribe(...)` vs `SubscribeCmd(...)` tag-type mismatch; pre-dates P8; CHASE-QUEUE entry added
+
+---
+
+## Classic Interop Audit — §8k-R1 (COMPLETE, read-only)
+
+**Research only — no commits.** PRISM produced `.local/docs/classic-interop-audit.md` (535 lines, 2026-06-23).
+
+- **Census:** ~130 production bridge sites + 2 test `actorSelection`. Permanent floor: 4 TCP bridges. Eliminatable: ~126 production + 2 test.
+- **14 clusters, 8 root-cause families.** Execution order: §8k-A → §8k-C → §8k-D → §8k-E → §8k-F → §8k-G → §8k-H → §8k-I → §8k-B (post-CAPSTONE TCP floor verification).
+- **Working docs updated:** DEFERRED-BACKLOG (§8k root-cause table, §8k-A scope expanded to 4 SNAP workers, 6 new prompts §8k-C through §8k-I); SPRINT-QUEUE (bridge elimination sprint table); CHASE-QUEUE (audit completion).
+
+---
+
 ## Open / Deferred
 
 - **E165 `expectMsgType[Any]` — COMPLETE** (`8cdf1290d`) — 0 remaining. §8a-gated remainder:

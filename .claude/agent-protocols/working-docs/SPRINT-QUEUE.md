@@ -61,3 +61,19 @@ When the clearout prompts above are done, the branch is ready for:
 2. **PR open** — `white-b0x:scala3-cleanup-june` → `chippr-robotics:staging`
 3. **DEFERRED-BACKLOG unblocked items** — see `working-docs/DEFERRED-BACKLOG.md` Clearout Prompts
    (3c isInstanceOf, 3d enum candidates, 3e console→logging, 8f dead code audit, 8g braceless scalafmt)
+
+### Classic Bridge Elimination Track (pre-CAPSTONE, sequential)
+
+Source: `§8k-R1` audit complete 2026-06-23 — `.local/docs/classic-interop-audit.md`. ~130 prod bridge sites, ~126 eliminatable. Run in order; each sprint gates the next.
+
+| Sprint | Work | Agent | Sites eliminated | Gate |
+|--------|------|-------|-----------------|------|
+| **§8k-A** | All 4 SNAP worker `coordinator: ActorRef` → Typed (AccountRange/ByteCode/StorageRange/TrieNodeHealing) | MITHRIL | ~12 prod + 2 test | §8k-R1 ✅ |
+| **§8k-C** | SNAP coordinator `snapSyncController: ActorRef` → Typed (4 coordinators + SSC spawn sites) | MITHRIL | ~7 | §8k-A |
+| **§8k-D** | `PeerEventBusActor.SubscribeCmd(subscriber: ActorRef)` → Typed (Clusters A+M, 9 files) | HERALD+MITHRIL | ~27 | §8k-C |
+| **§8k-E** | `NPMA.GetHandshakedPeersCmd(replyTo: ActorRef)` → Typed (Cluster B, 7 files) | MITHRIL | ~15 | §8k-D |
+| **§8k-F** | RegularSync Classic→Typed migration (full LOOM; Clusters C/D/N) | LOOM | ~15 | §8k-E |
+| **§8k-G** | OQ-5 kill: jsonrpc callers → Typed ask; delete AkkaTaskOps (Clusters C+E+L) | CONDUIT+MITHRIL | ~74 | §8k-F |
+| **§8k-H** | PeerActor `watchWith` — remove `context.toClassic.parent` sends (Clusters G+H) | MITHRIL | ~8 | §8k-G |
+| **§8k-I** | NodeBuilder 3 Classic bridge actors → callers use Typed ask (Cluster J) | MITHRIL | ~21 | §8k-G+H |
+| **§8k-B** | Post-CAPSTONE: verify TCP floor (4 bridges), delete adapter imports | PRISM | — | §8k-I + CAPSTONE |
