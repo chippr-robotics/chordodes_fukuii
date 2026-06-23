@@ -49,8 +49,7 @@ class PoWMiningSpec
 
   it should "use RestrictedPoWBlockGeneratorImpl block generator for RestrictedPoWMinerData" taggedAs (
     UnitTest,
-    ConsensusTest,
-    SlowTest
+    ConsensusTest
   ) in new TestSetup {
     // MIGRATION: Can't mock Java classes in Scala 3 - use real instance instead
     val key: AsymmetricCipherKeyPair = com.chipprbots.ethereum.crypto.generateKeyPair(new java.security.SecureRandom)
@@ -89,8 +88,7 @@ class PoWMiningSpec
 
   it should "start only one mocked miner when miner protocol is MockedPow" taggedAs (
     UnitTest,
-    ConsensusTest,
-    SlowTest
+    ConsensusTest
   ) in new TestSetup {
     val configNoMining: MiningConfig = miningConfig.copy(miningEnabled = true, protocol = Protocol.MockedPow)
     val fullMiningConfig: FullMiningConfig[EthashConfig] = FullMiningConfig(configNoMining, ethashConfig)
@@ -112,8 +110,7 @@ class PoWMiningSpec
 
   it should "start only the normal miner when miner protocol is PoW" taggedAs (
     UnitTest,
-    ConsensusTest,
-    SlowTest
+    ConsensusTest
   ) in new TestSetup {
     val configNoMining: MiningConfig = miningConfig.copy(miningEnabled = true, protocol = Protocol.PoW)
     val fullMiningConfig: FullMiningConfig[EthashConfig] = FullMiningConfig(configNoMining, ethashConfig)
@@ -135,8 +132,7 @@ class PoWMiningSpec
 
   it should "start only the normal miner when miner protocol is RestrictedPoW" taggedAs (
     UnitTest,
-    ConsensusTest,
-    SlowTest
+    ConsensusTest
   ) in new TestSetup {
     val configNoMining: MiningConfig = miningConfig.copy(miningEnabled = true, protocol = Protocol.RestrictedPoW)
     val fullMiningConfig: FullMiningConfig[EthashConfig] = FullMiningConfig(configNoMining, ethashConfig)

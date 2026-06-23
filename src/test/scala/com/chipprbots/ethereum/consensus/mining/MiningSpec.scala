@@ -7,14 +7,14 @@ import com.chipprbots.ethereum.testing.Tags.*
 
 class MiningSpec extends AnyFlatSpec with Matchers {
 
-  "KnownProtocols" should "have unique names" taggedAs (UnitTest, ConsensusTest, SlowTest) in {
+  "KnownProtocols" should "have unique names" taggedAs (UnitTest, ConsensusTest) in {
     val protocols = Protocol.KnownProtocols
     val names = Protocol.KnownProtocolNames
 
     protocols.size shouldBe names.size
   }
 
-  it should "contain ethash" taggedAs (UnitTest, ConsensusTest, SlowTest) in {
+  it should "contain ethash" taggedAs (UnitTest, ConsensusTest) in {
     Protocol.find(Protocol.PoW.name).isDefined shouldBe true
   }
 }
