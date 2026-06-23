@@ -59,8 +59,7 @@ class PoWMiningCoordinatorSpec
     "should throw exception when starting with other message than StartMining(mode)" taggedAs (
       UnitTest,
       ConsensusTest,
-      SlowTest,
-      FlakyTest
+      SlowTest
     ) in new TestSetup {
       override def coordinatorName = "FailedCoordinator"
       LoggingTestKit.error("StopMining").expect {
@@ -71,8 +70,7 @@ class PoWMiningCoordinatorSpec
     "should start recurrent mining when receiving message StartMining(RecurrentMining)" taggedAs (
       UnitTest,
       ConsensusTest,
-      SlowTest,
-      FlakyTest
+      SlowTest
     ) in new TestSetup {
       override def coordinatorName = "RecurrentMiningSetup"
       setBlockForMining(parentBlock)
@@ -88,8 +86,7 @@ class PoWMiningCoordinatorSpec
     "should start on demand mining when receiving message StartMining(OnDemandMining)" taggedAs (
       UnitTest,
       ConsensusTest,
-      SlowTest,
-      FlakyTest
+      SlowTest
     ) in new TestSetup {
       override def coordinatorName = "OnDemandMining"
 
@@ -102,25 +99,13 @@ class PoWMiningCoordinatorSpec
     }
 
     "in Recurrent Mining" - {
-      "MineNext starts EthashMiner" taggedAs (
-        UnitTest,
-        ConsensusTest,
-        SlowTest,
-        FlakyTest
-      ) in new TestSetup {
-        override def coordinatorName = "EthashMining"
-        (() => blockchainReader.getBestBlock).expects().returns(Some(parentBlock)).anyNumberOfTimes()
-        setBlockForMining(parentBlock)
+      // DELETED (P10): "MineNext starts EthashMiner"
+      // The mock for PoWBlockGenerator.generateBlock was never set up, so EthashMiner fired a
+      // TestFailedException inside its processMining Future on every run. The exception was swallowed
+      // by EthashMiner's error handler, so the test "passed" while emitting a spurious ERROR log.
+      // Full recurrent mining coverage is provided by "Miners mine recurrently" (InstantMiner).
 
-        coordinator ! SetMiningMode(RecurrentMining)
-
-        // Give the coordinator time to process the message using expectNoMessage instead of Thread.sleep
-        sync.expectNoMessage(100.millis)
-
-        coordinator ! StopMining
-      }
-
-      "Miners mine recurrently" taggedAs (UnitTest, ConsensusTest, SlowTest, FlakyTest) in new TestSetup {
+      "Miners mine recurrently" taggedAs (UnitTest, ConsensusTest, SlowTest) in new TestSetup {
         override def coordinatorName: String = s"AutomaticMining-${System.nanoTime()}"
         val probe: TestProbe = TestProbe()
         val testMiner = new InstantMiner(blockCreator, sync.ref, ethMiningService)
@@ -152,8 +137,7 @@ class PoWMiningCoordinatorSpec
       "Continue to attempt to mine if blockchainReader.getBestBlock return None" taggedAs (
         UnitTest,
         ConsensusTest,
-        SlowTest,
-        FlakyTest
+        SlowTest
       ) in new TestSetup {
         override def coordinatorName: String = s"AlwaysAttemptToMine-${System.nanoTime()}"
         val probe: TestProbe = TestProbe()
@@ -185,7 +169,7 @@ class PoWMiningCoordinatorSpec
         probe.expectTerminated(coordinator.ref.toClassic)
       }
 
-      "StopMining stops PoWMinerCoordinator" taggedAs (UnitTest, ConsensusTest, SlowTest, FlakyTest) in new TestSetup {
+      "StopMining stops PoWMinerCoordinator" taggedAs (UnitTest, ConsensusTest, SlowTest) in new TestSetup {
         override def coordinatorName: String = s"StoppingMining-${System.nanoTime()}"
         val probe: TestProbe = TestProbe()
         override val coordinator: org.apache.pekko.actor.typed.ActorRef[CoordinatorProtocol] = testKit.spawn(

@@ -236,8 +236,7 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
       // Termination of fastSync is our regression signal: it proves the handler ran.
       "actor exits syncing loop on NetworkIncompatible — ETH68-only network escape valve" taggedAs (
         UnitTest,
-        SyncTest,
-        FlakyTest
+        SyncTest
       ) in testCaseM { (fixture: Fixture) =>
         import fixture.*
         (for {
@@ -279,17 +278,20 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
 
       "returns Syncing when pivot block is selected and started fetching data" taggedAs (
         UnitTest,
-        SyncTest,
-        FlakyTest
+        SyncTest
       ) in testCaseM { (fixture: Fixture) =>
         import fixture.*
 
         (for {
-          _ <- startSync
           _ <- saveGenesis
+          // Subscribe BEFORE startSync so no topic events can be missed under load.
+          pivotFiber <- networkPeerManager.pivotBlockSelected.head.compile.lastOrError.start
+          headersFiber <- networkPeerManager.fetchedHeaders.head.compile.lastOrError.start
+          _ <- cats.effect.IO.cede // yield: allow subscription fibers to register before Pekko dispatch
+          _ <- startSync
           _ <- networkPeerManager.onPeersConnected
-          _ <- networkPeerManager.pivotBlockSelected.head.compile.lastOrError
-          _ <- networkPeerManager.fetchedHeaders.head.compile.lastOrError
+          _ <- pivotFiber.joinWith(cats.effect.IO.raiseError(new RuntimeException("pivot fiber canceled")))
+          _ <- headersFiber.joinWith(cats.effect.IO.raiseError(new RuntimeException("headers fiber canceled")))
           status <- getSyncStatus
         } yield status match {
           case Status.Syncing(startingBlockNumber, blocksProgress, stateNodesProgress) =>
@@ -303,18 +305,21 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
 
       "returns Syncing with block progress once both header and body is fetched" taggedAs (
         UnitTest,
-        SyncTest,
-        FlakyTest
+        SyncTest
       ) in testCaseM { (fixture: Fixture) =>
         import fixture.*
 
         (for {
           _ <- saveGenesis
           _ <- saveTestBlocksWithWeights
+          // Subscribe BEFORE startSync so no topic events can be missed under load.
+          pivotFiber <- networkPeerManager.pivotBlockSelected.head.compile.lastOrError.start
+          blocksFiber <- networkPeerManager.fetchedBlocks.head.compile.lastOrError.start
+          _ <- cats.effect.IO.cede // yield: allow subscription fibers to register before Pekko dispatch
           _ <- startSync
           _ <- networkPeerManager.onPeersConnected
-          _ <- networkPeerManager.pivotBlockSelected.head.compile.lastOrError
-          blocksBatch <- networkPeerManager.fetchedBlocks.head.compile.lastOrError
+          _ <- pivotFiber.joinWith(cats.effect.IO.raiseError(new RuntimeException("pivot fiber canceled")))
+          blocksBatch <- blocksFiber.joinWith(cats.effect.IO.raiseError(new RuntimeException("blocks fiber canceled")))
           status <- getSyncStatus
           lastBlockFromBatch = blocksBatch.lastOption.map(_.number).getOrElse(BigInt(0))
         } yield status match {
@@ -328,7 +333,7 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
           .timeout(timeout.duration)
       }
 
-      "returns Syncing with state nodes progress" taggedAs (UnitTest, SyncTest, FlakyTest) in customTestCaseM(
+      "returns Syncing with state nodes progress" taggedAs (UnitTest, SyncTest) in customTestCaseM(
         new Fixture {
           override lazy val syncConfig: SyncConfig =
             defaultSyncConfig.copy(
@@ -344,9 +349,12 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
         (for {
           _ <- saveGenesis
           _ <- saveTestBlocksWithWeights
+          // Subscribe BEFORE startSync so no topic events can be missed under load.
+          pivotFiber <- networkPeerManager.pivotBlockSelected.head.compile.lastOrError.start
+          _ <- cats.effect.IO.cede // yield: allow subscription fibers to register before Pekko dispatch
           _ <- startSync
           _ <- networkPeerManager.onPeersConnected
-          _ <- networkPeerManager.pivotBlockSelected.head.compile.lastOrError
+          _ <- pivotFiber.joinWith(cats.effect.IO.raiseError(new RuntimeException("pivot fiber canceled")))
           _ <- Stream
             .awakeEvery[IO](10.millis)
             .evalMap(_ => getSyncStatus)

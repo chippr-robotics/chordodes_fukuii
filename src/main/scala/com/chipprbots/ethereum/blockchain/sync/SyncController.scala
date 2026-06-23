@@ -892,6 +892,10 @@ object SyncController {
         case msg if isInternalMarker(msg) =>
           // Late self/death-watch marker for a child stopped before this transition — drop silently.
           Behaviors.same
+        case FastSync.Done =>
+          // Late arrival after sync switch (syncSwitchDelay races) — ignore rather than forwarding
+          // to RegularSync, which would crash with ClassCastException.
+          Behaviors.same
         case msg =>
           regularSync.tell(msg, ctx.toClassic.sender())
           Behaviors.same
