@@ -53,7 +53,16 @@
 
 #### `86c76fd4e` — P9: re-enabled RegularSyncSpec:522 "retry fetching node if validation failed"
 - **What:** Removed `DisabledTest` tag. Test uses `WrongNodeDataPeersClientAutoPilot` (no ScalaMock) — passed as-is; tag was the only blocker.
-- **Deferred:** `RegularSyncSpec:552` "save fetched node" — ScalaMock `stub[BranchResolution]` never intercepts under Scala 3; replace with anonymous class double → §P9-SAVENODE (DEFERRED-BACKLOG Part 15)
+
+---
+
+## §P9-SAVENODE — RegularSyncSpec:552 "save fetched node" (Part 15)
+
+#### `abe9dccc1` — test: re-enable "save fetched node" — replace ScalaMock stubs with explicit test doubles
+- **Root cause:** `stub[BranchResolution]`, `stub[Blockchain]`, `stub[BlockchainReader]`, and `stub[StorageDataSource]` (ScalaMock) never intercept under Scala 3 — ScalaMock uses Scala 2 `ScalaSig` bytecode metadata for runtime proxy creation, which is absent from Scala 3 class files. `stub[BranchResolution].evaluateBranch(...)` always dispatched to the real (null) implementation.
+- **Fix:** Replaced all 4 ScalaMock stubs with explicit anonymous-class implementations. Added `evaluateBranch` override handling the `PickedBlocks → importBlocks → tryImportBlocks` path — without it, the path NPE'd on `null.consensus`. Added missing `import io.iohk.ethereum.blockchain.sync.regular.BlockImporter.NotUsed` for `StateStorage`.
+- **Result:** 33/34 `RegularSyncSpec` tests pass (1 pre-existing unrelated failure unaffected); `DisabledTest` tag removed.
+- **Docs:** `203dc66a3` (CHASE-QUEUE + CODEBASE-AUDIT strikethrough); `dc5296f33` (§P9-SAVENODE section deleted from DEFERRED-BACKLOG)
 
 ---
 
@@ -78,5 +87,5 @@
 - INFO-13/14: Classic `LoggingAdapter` via `Logging(ctx.system.classicSystem, ...)` bridge — Network/P2P sprint
 - `RegularSync.scala:228`: `log.warning(...)` Classic spelling → `log.warn(...)` — Network/P2P sprint
 - RegularSyncSpec divergence path EXCEPT (LCA-less blind rewind) — HERALD audit done; fix spec deferred
-- §P9-SAVENODE: RegularSyncSpec:552 ScalaMock stub → anonymous class double (DEFERRED-BACKLOG Part 15)
+- ~~§P9-SAVENODE: RegularSyncSpec:552~~ — ✅ DONE 2026-06-23 (`abe9dccc1`)
 - RegularSyncSpec (entire file) — Wave 3 migration gate (Resource[IO, ActorSystem] lifecycle)

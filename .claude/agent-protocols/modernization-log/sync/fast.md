@@ -90,10 +90,14 @@
 - **Result:** 1/1 pass; no regressions in `testOnly *SyncControllerSpec*`
 - **Cross-refs:** `sync/controller.md` (§P9-NOTCHANGE deferred entry cleared)
 
+#### `5a12c7f09` — test: cancel scheduleAtFixedRate Cancellable after `eventually` blocks
+- **What:** The `Runnable`-based `scheduleAtFixedRate` from `37037a89b` continued firing after the `eventually` blocks completed, occasionally injecting `WrappedPrhResult` into the actor system during teardown of the subsequent test — triggering a `RejectedExecutionException` against the terminating dispatcher. Fix: store the `Cancellable` returned by `scheduleAtFixedRate` in a `val`, then cancel it inside a `try/finally` block wrapping both `eventually` assertions. Guarantees the injection loop stops before actor teardown.
+- **Source:** F11 continuation (P9-NOTCHANGE thread)
+
 ---
 
 ## Open / Deferred
 
 - E165 TestProbe in `FastSyncBranchResolverSpec` — 5 pre-existing warnings, deferred (PENDING.md)
 - ~~INFO-10: fragile adapter-pinning tuple `FastSync.scala:180–183`~~ — ✅ DONE 2026-06-22 (D4)
-- ~~§P9-NOTCHANGE: SyncControllerSpec:243~~ — ✅ DONE 2026-06-23 (`37037a89b`)
+- ~~§P9-NOTCHANGE: SyncControllerSpec:243~~ — ✅ DONE 2026-06-23 (`37037a89b` + `5a12c7f09`)

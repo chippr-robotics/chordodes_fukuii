@@ -127,14 +127,18 @@ All 5 ETH coverage gaps closed:
 - **Status:** DEFERRED — parallel-safe, no prerequisite (but do before E5d)
 
 #### E5c — §8a-infra-b: worker teardown leak audit (DEFERRED-BACKLOG Part 8)
-- **Problem:** `testKit.stop(ref)` is a silent no-op for classic workers spawned via `PropsAdapter` (pekko-typed-api.md P15). Some coordinator/heal specs may have lingering workers.
-- **Fix:** Replace `testKit.stop(bridge)` with `testKit.system.classicSystem.stop(bridge)` at all actor teardown sites; verify with `testKit.system.classicSystem.whenTerminated`.
-- **Status:** DEFERRED — after E5b + F4 (§8a-retro batch 5)
+- **Status:** ✅ DONE 2026-06-23 — EYE audit (`722576ef4`) found **no leaks**. All coordinator workers are Typed `context.spawnAnonymous` children (not classic `context.actorOf`); stopped automatically by Pekko actor hierarchy when coordinator stops. `classicSystem.stop(workerRef)` in `ByteCodeCoordinatorSpec` is intentional mid-test scenario simulation, not a leak mitigation. 150/150 coordinator tests ×2 JVM runs confirmed no cross-test isolation issues.
+- **New deferred (E5e):** `actorSelection`-based worker-ref pattern in `ByteCodeCoordinatorSpec` + `AccountRangeCoordinatorSpec` — cosmetic; replace with Typed `TestProbe` injection (DEFERRED-BACKLOG §8a-infra-c; after E5d)
 
 #### E5d — §8a-retro batch 4b: TestProbe narrowing ~209 sites (DEFERRED-BACKLOG Part 8)
 - **Problem:** ~209 `TestProbe()` sites (Classic, untyped) remain across migrated specs. These cannot be narrowed without upgrading to Typed `TestProbe[T]` from `ActorTestKit`.
 - **Fix:** Per-spec pass replacing `TestProbe()` with `testKit.createTestProbe[ConcreteType]()` + corresponding `expectMessage[T]` calls.
 - **Status:** DEFERRED — after E5b
+
+#### E5e — §8a-infra-c: `actorSelection` worker-ref cleanup in coordinator specs (DEFERRED-BACKLOG Part 8)
+- **Problem:** `ByteCodeCoordinatorSpec` + `AccountRangeCoordinatorSpec` use classic `actorSelection` to obtain worker refs during test scenarios. Cosmetic; workers resolve correctly but the pattern bypasses type safety.
+- **Fix:** Replace `actorSelection` pattern with Typed `TestProbe[T]` injection at coordinator construction.
+- **Status:** DEFERRED — cosmetic; after E5d; tracked in DEFERRED-BACKLOG §8a-infra-c (`e23001ccb`)
 
 ---
 
@@ -147,6 +151,7 @@ All 5 ETH coverage gaps closed:
 - **Wall-clock assertions** — 3 known test files; S5 sweep (CODEBASE-AUDIT) not yet run
 - **TestKit Batch 5** — DEFERRED-BACKLOG §8a-retro batch 5 (F4)
 - **E5b** — `application-test.conf` infra fix — DEFERRED-BACKLOG Part 8
-- **E5c** — worker teardown leak audit — DEFERRED-BACKLOG Part 8, after E5b + F4
+- ~~**E5c** — worker teardown leak audit~~ — ✅ DONE 2026-06-23 (`722576ef4`) — no leaks found; see above
 - **E5d** — TestProbe narrowing ~209 sites — DEFERRED-BACKLOG Part 8, after E5b
+- **E5e** — `actorSelection` worker-ref cleanup in 2 coordinator specs — DEFERRED-BACKLOG §8a-infra-c, after E5d
 - `PeerRequestHandler` `ClassTag` unsound → `TypeTest[A,B]` — deferred

@@ -124,8 +124,9 @@ Every prompt that touches source files must apply this before committing:
 | ~~F9~~ | ~~Batch F~~ | ~~DEFERRED Part 14 §ETH-BRU — BEACON ETH/69 BlockRangeUpdate type fix: change `ETH69.BlockRangeUpdate` → `ETHPackets.BlockRangeUpdate` in PeerActor:551 + BlockFetcher:486 match arms; rebuild BlockFetcherSpec:298-305 against the correct production type to eliminate false-positive coverage~~ | ✅ DONE 2026-06-23 — `931c615dd` — ETH69→ETHPackets in PeerActor:551 + BlockFetcher:486; unused ETH69 imports removed; BlockFetcherSpec rebuilt against ETHPackets type. 26/26 tests pass. |
 | ~~F10~~ | ~~Batch F~~ | ~~DEFERRED Part 15 §P9-JSON4S — CONDUIT: re-enable 4 jsonrpc DisabledTests blocked by json4s ScalaSig/Scala 3 reflection failure under testEssential~~ | ✅ DONE 2026-06-23 — 2803d192f — added RpcErrorJsonSerializer to JsonSerializers.formats; 3,600/0 testEssential |
 | ~~F11~~ | ~~Batch F~~ | ~~DEFERRED Part 15 §P9-NOTCHANGE — EYE/LOOM: re-enable SyncControllerSpec:243 "not change best block" — rewrite test to inject PeerRequestHandler.ResponseReceived via Typed FastSync injection path (prhResultAdapter private)~~ | ✅ DONE 2026-06-23 — 37037a89b — inject via WrappedPrhResult (private[sync]) + fast.toTyped[FastSync.Command]; 1/1 pass |
-| ~~F12~~ | ~~Batch F~~ | ~~DEFERRED Part 15 §P9-SAVENODE — EYE/MITHRIL: re-enable RegularSyncSpec:552 "save fetched node" — replace stub[BranchResolution] and other ScalaMock stubs with explicit anonymous-class test doubles (Scala 3 stub interception broken)~~ **CLEARED abe9dccc1** | ~~After F6/F7 cleared (RegularSyncSpec conflict risk)~~ |
+| ~~F12~~ | ~~Batch F~~ | ~~DEFERRED Part 15 §P9-SAVENODE — EYE/MITHRIL: re-enable RegularSyncSpec:552 "save fetched node" — replace stub[BranchResolution] and other ScalaMock stubs with explicit anonymous-class test doubles (Scala 3 stub interception broken)~~ | ✅ DONE 2026-06-23 — `abe9dccc1` (4 ScalaMock stubs → anon classes; `evaluateBranch` override; `StateStorage` import; 33/34 pass); docs `203dc66a3` + `dc5296f33` |
 | ~~F13~~ | ~~Batch F~~ | ~~DEFERRED Part 15 §P9-TXRECEIPT — EYE/CONDUIT: re-enable EthTxServiceSpec:369 "calculate correct contract address" — update logIndex + topics container type in assertion to match current production shape~~ | ✅ DONE 2026-06-23 — 21d2a46f0 |
+| §P9-FRESHPIVOT | Batch F | DEFERRED §P9-FRESHPIVOT — EYE: fix flaky SyncControllerSpec:393 "start state download only when pivot block is fresh enough" — split combined `eventually` so `stateDownloadStarted shouldBe true` is checked first, then `getSyncState().foreach(_.pivotBlock shouldBe ...)` as soft secondary; eliminating `None.get` race at line 437 under JVM load | No — standalone; clearing prompt in DEFERRED-BACKLOG `781c8e985` |
 
 **Global sequence across all files:**
 - ~~**Batch A** (parallel, all read-only)~~ ✅ COMPLETE
@@ -134,8 +135,8 @@ Every prompt that touches source files must apply this before committing:
 - ~~**Gate**~~ ✅ COMPLETE — 11:02 (662s), 3,595 / 0 fail (2026-06-22)
 - ~~**Batch D** (parallel, after gate)~~ ✅ COMPLETE — G1 (all 12 Behavior[Any] → Behavior[Command]) ∥ G2 (S3-B fixed, INFO-8 monitored, S3-E → D2) ∥ P7 (timing baseline 680s)
 - ~~**Batch E** (parallel, all unblocked)~~ ✅ COMPLETE — E1 (`0cefe5c25`) ∥ E2 (pre-fixed) ∥ E3 (`cc63882fa`)
-- ~~**Batch F** — F1+F2+F3+F4+F5+F6+F7+F8+F9+F10+F11+F13+E5b~~ ✅ DONE
-- **Batch F (remaining)**: F12 ∥ E5c ∥ E5d (all parallel-safe now)
+- ~~**Batch F** — F1+F2+F3+F4+F5+F6+F7+F8+F9+F10+F11+F12+F13+E5b+E5c~~ ✅ DONE
+- **Batch F (remaining)**: E5d ∥ E5e ∥ §P9-FRESHPIVOT (all parallel-safe now)
 - **Final gate** (after G1 + G2 + Wave 4 collaborator migration): **POST-MIGRATION-SWEEP** — zero Classic residue verification + BRIDGE-A/B/C elimination
 
 ---

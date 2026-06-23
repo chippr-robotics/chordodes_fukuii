@@ -75,6 +75,7 @@
 - W4: `ctx.self ! cmd` re-delivers wrapped Command (document invariant) — deferred
 - W15: `unwrap returns Any` — Wave 3 LOOM gate (`WrappedExternal` elimination)
 - INFO-9: `GetHandshakedPeersCmd.replyTo: ActorRef` untyped — Network/P2P sprint
-- ~~§P9-NOTCHANGE: SyncControllerSpec:243~~ — ✅ DONE 2026-06-23 (`37037a89b`) — see `sync/fast.md`
+- ~~§P9-NOTCHANGE: SyncControllerSpec:243~~ — ✅ DONE 2026-06-23 (`37037a89b` + `5a12c7f09`) — see `sync/fast.md`
 - ~~`handleRegularSyncMsg:895-897` catch-all `FastSync.Done` bug~~ — ✅ DONE 2026-06-23 (`ab98f1370`)
 - §8a-retro batch 5: `SyncControllerSpec`, `CalibratePivotTDSpec`, `ChainWeightCalibrationSpec` — deferred comments added; Wave 3 gate
+- §P9-FRESHPIVOT: SyncControllerSpec:393 "start state download only when pivot block is fresh enough" — intermittently flaky (`None.get` at line 437); `CombinedRecoveryScanActor` races `GetNodeData` under JVM load; fix: split combined `eventually` into `stateDownloadStarted shouldBe true` first, then `getSyncState().foreach(_.pivotBlock shouldBe ...)` as soft secondary; clearing prompt in DEFERRED-BACKLOG (`781c8e985`)
