@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
@@ -12,9 +12,8 @@ import com.chipprbots.ethereum.blockchain.sync.snap.*
 /** TrieNodeHealingWorker fetches trie nodes from a peer.
   *
   * Proxy worker — announces peer availability to the coordinator, which owns all healing logic, and forwards responses
-  * back. Pekko Typed leaf actor (Group W1). `coordinator` remains a Classic ref during co-existence; sends to it use
-  * the classic `tell` via the typed→classic adapter. The idle watchdog uses a Typed `TimerScheduler` rather than
-  * `system.scheduler.scheduleOnce`.
+  * back. Pekko Typed leaf actor (Group W1). `coordinator` is a typed ref (§8k-A). The idle watchdog uses a Typed
+  * `TimerScheduler` rather than `system.scheduler.scheduleOnce`.
   */
 object TrieNodeHealingWorker {
 
@@ -23,15 +22,15 @@ object TrieNodeHealingWorker {
   type Command = WorkerMessage
 
   /** @param coordinator
-    *   Parent coordinator that manages all healing logic (Classic)
+    *   Parent coordinator that manages all healing logic (Typed)
     * @param networkPeerManager
     *   Network manager (unused by this proxy; retained for call-site symmetry)
     * @param requestTracker
     *   Request tracker (unused by this proxy; retained for call-site symmetry)
     */
   def apply(
-      coordinator: ActorRef,
-      @annotation.unused networkPeerManager: ActorRef,
+      coordinator: ActorRef[TrieNodeHealingCoordinator.Command],
+      @annotation.unused networkPeerManager: org.apache.pekko.actor.ActorRef,
       @annotation.unused requestTracker: SNAPRequestTracker
   ): Behavior[Command] =
     Behaviors.withTimers { timers =>
@@ -39,7 +38,7 @@ object TrieNodeHealingWorker {
     }
 
   private def idle(
-      coordinator: ActorRef,
+      coordinator: ActorRef[TrieNodeHealingCoordinator.Command],
       timers: TimerScheduler[Command],
       currentRequestId: Option[BigInt]
   ): Behavior[Command] =
@@ -47,7 +46,7 @@ object TrieNodeHealingWorker {
       msg match {
         case FetchTrieNodes(_, peer) =>
           // Request work from coordinator by notifying it of peer availability
-          coordinator.tell(HealingPeerAvailable(peer), org.apache.pekko.actor.ActorRef.noSender)
+          coordinator ! HealingPeerAvailable(peer)
           timers.startSingleTimer(HealingCheckIdle, 30.seconds)
           working(coordinator, timers, currentRequestId)
         case _ => Behaviors.same
@@ -55,7 +54,7 @@ object TrieNodeHealingWorker {
     }
 
   private def working(
-      coordinator: ActorRef,
+      coordinator: ActorRef[TrieNodeHealingCoordinator.Command],
       timers: TimerScheduler[Command],
       currentRequestId: Option[BigInt]
   ): Behavior[Command] =
@@ -63,7 +62,7 @@ object TrieNodeHealingWorker {
       msg match {
         case TrieNodesResponseMsg(response) =>
           // Forward response to coordinator for processing
-          coordinator.tell(TrieNodesResponseMsg(response), org.apache.pekko.actor.ActorRef.noSender)
+          coordinator ! TrieNodesResponseMsg(response)
           idle(coordinator, timers, currentRequestId = None)
 
         case HealingCheckIdle =>
@@ -77,7 +76,7 @@ object TrieNodeHealingWorker {
           currentRequestId match {
             case Some(reqId) if reqId == requestId =>
               context.log.warn(s"Healing request $requestId timed out")
-              coordinator.tell(HealingTaskFailed(requestId, "Timeout"), org.apache.pekko.actor.ActorRef.noSender)
+              coordinator ! HealingTaskFailed(requestId, "Timeout")
               idle(coordinator, timers, currentRequestId = None)
             case _ => Behaviors.same
           }

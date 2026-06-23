@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
@@ -12,9 +12,8 @@ import com.chipprbots.ethereum.blockchain.sync.snap.*
 /** StorageRangeWorker fetches storage ranges from a peer.
   *
   * Proxy worker — announces peer availability to the coordinator, which owns all storage sync logic, and forwards
-  * responses back. Pekko Typed leaf actor (Group W1). `coordinator` remains a Classic ref during co-existence; sends to
-  * it use the classic `tell` via the typed→classic adapter. The idle watchdog uses a Typed `TimerScheduler` rather than
-  * `system.scheduler.scheduleOnce`.
+  * responses back. Pekko Typed leaf actor (Group W1). `coordinator` is a typed ref (§8k-A). The idle watchdog uses a
+  * Typed `TimerScheduler` rather than `system.scheduler.scheduleOnce`.
   */
 object StorageRangeWorker {
 
@@ -23,15 +22,15 @@ object StorageRangeWorker {
   type Command = WorkerMessage
 
   /** @param coordinator
-    *   Parent coordinator that manages all storage sync logic (Classic)
+    *   Parent coordinator that manages all storage sync logic (Typed)
     * @param networkPeerManager
     *   Network manager (unused by this proxy; retained for call-site symmetry)
     * @param requestTracker
     *   Request tracker (unused by this proxy; retained for call-site symmetry)
     */
   def apply(
-      coordinator: ActorRef,
-      @annotation.unused networkPeerManager: ActorRef,
+      coordinator: ActorRef[StorageRangeCoordinator.Command],
+      @annotation.unused networkPeerManager: org.apache.pekko.actor.ActorRef,
       @annotation.unused requestTracker: SNAPRequestTracker
   ): Behavior[Command] =
     Behaviors.withTimers { timers =>
@@ -39,7 +38,7 @@ object StorageRangeWorker {
     }
 
   private def idle(
-      coordinator: ActorRef,
+      coordinator: ActorRef[StorageRangeCoordinator.Command],
       timers: TimerScheduler[Command],
       currentRequestId: Option[BigInt]
   ): Behavior[Command] =
@@ -47,7 +46,7 @@ object StorageRangeWorker {
       msg match {
         case FetchStorageRanges(_, peer) =>
           // Request work from coordinator by notifying it of peer availability
-          coordinator.tell(StoragePeerAvailable(peer), org.apache.pekko.actor.ActorRef.noSender)
+          coordinator ! StoragePeerAvailable(peer)
           timers.startSingleTimer(StorageCheckIdle, 30.seconds)
           working(coordinator, timers, currentRequestId)
         case _ => Behaviors.same
@@ -55,7 +54,7 @@ object StorageRangeWorker {
     }
 
   private def working(
-      coordinator: ActorRef,
+      coordinator: ActorRef[StorageRangeCoordinator.Command],
       timers: TimerScheduler[Command],
       currentRequestId: Option[BigInt]
   ): Behavior[Command] =
@@ -63,7 +62,7 @@ object StorageRangeWorker {
       msg match {
         case StorageRangesResponseMsg(response) =>
           // Forward response to coordinator for processing
-          coordinator.tell(StorageRangesResponseMsg(response), org.apache.pekko.actor.ActorRef.noSender)
+          coordinator ! StorageRangesResponseMsg(response)
           idle(coordinator, timers, currentRequestId = None)
 
         case StorageCheckIdle =>
@@ -77,7 +76,7 @@ object StorageRangeWorker {
           currentRequestId match {
             case Some(reqId) if reqId == requestId =>
               context.log.warn(s"Storage request $requestId timed out")
-              coordinator.tell(StorageTaskFailed(requestId, "Timeout"), org.apache.pekko.actor.ActorRef.noSender)
+              coordinator ! StorageTaskFailed(requestId, "Timeout")
               idle(coordinator, timers, currentRequestId = None)
             case _ => Behaviors.same
           }

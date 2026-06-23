@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.PostStop
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
@@ -23,9 +23,8 @@ import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
   *   1. Created by coordinator when needed 2. Fetches one task 3. Reports result 4. Can be reused for next task or
   *      stopped
   *
-  * Pekko Typed leaf actor (Group W1). `coordinator` and `networkPeerManager` remain Classic refs because their owners
-  * (the AccountRangeCoordinator / NetworkPeerManagerActor) are still Classic during co-existence — sends to them use
-  * the classic `tell` via the typed→classic adapter.
+  * Pekko Typed leaf actor (Group W1). `coordinator` is a typed ref (§8k-A). `networkPeerManager` remains a Classic ref
+  * via the typed→classic adapter.
   */
 object AccountRangeWorker {
 
@@ -34,15 +33,15 @@ object AccountRangeWorker {
   type Command = WorkerMessage
 
   /** @param coordinator
-    *   Parent coordinator actor (Classic)
+    *   Parent coordinator actor (Typed)
     * @param networkPeerManager
     *   Actor for network communication (Classic)
     * @param requestTracker
     *   Tracker for requests
     */
   def apply(
-      coordinator: ActorRef,
-      networkPeerManager: ActorRef,
+      coordinator: ActorRef[AccountRangeCoordinator.Command],
+      networkPeerManager: org.apache.pekko.actor.ActorRef,
       requestTracker: SNAPRequestTracker
   ): Behavior[Command] =
     Behaviors.setup { context =>
@@ -56,8 +55,8 @@ object AccountRangeWorker {
   // the Merkle proof verification that runs when the response arrives.
 
   private def idle(
-      coordinator: ActorRef,
-      networkPeerManager: ActorRef,
+      coordinator: ActorRef[AccountRangeCoordinator.Command],
+      networkPeerManager: org.apache.pekko.actor.ActorRef,
       requestTracker: SNAPRequestTracker,
       currentTask: Option[(AccountTask, Peer, BigInt, ByteString)]
   ): Behavior[Command] =
@@ -114,8 +113,8 @@ object AccountRangeWorker {
       .receiveSignal(postStopSignal(currentTask))
 
   private def working(
-      coordinator: ActorRef,
-      networkPeerManager: ActorRef,
+      coordinator: ActorRef[AccountRangeCoordinator.Command],
+      networkPeerManager: org.apache.pekko.actor.ActorRef,
       requestTracker: SNAPRequestTracker,
       currentTask: Option[(AccountTask, Peer, BigInt, ByteString)]
   ): Behavior[Command] = {
@@ -190,14 +189,11 @@ object AccountRangeWorker {
                       context.log.warn(
                         s"AccountRange validation/proof failed for reqId=$reqId range=${task.rangeString}: $error"
                       )
-                    coordinator.tell(TaskFailed(reqId, error), org.apache.pekko.actor.ActorRef.noSender)
+                    coordinator ! TaskFailed(reqId, error)
 
                   case Right(_) =>
                     context.log.debug(s"Successfully received $accountCount accounts")
-                    coordinator.tell(
-                      TaskComplete(reqId, Right((accountCount, response.accounts, response.proof))),
-                      org.apache.pekko.actor.ActorRef.noSender
-                    )
+                    coordinator ! TaskComplete(reqId, Right((accountCount, response.accounts, response.proof)))
                 }
 
                 // Return to idle state for potential reuse
@@ -212,7 +208,7 @@ object AccountRangeWorker {
             currentTask match {
               case Some((_, _, currentReqId, _)) if currentReqId == reqId =>
                 context.log.warn(s"Request $reqId timed out")
-                coordinator.tell(TaskFailed(reqId, "Request timeout"), org.apache.pekko.actor.ActorRef.noSender)
+                coordinator ! TaskFailed(reqId, "Request timeout")
                 goIdle
 
               case _ =>
@@ -225,7 +221,7 @@ object AccountRangeWorker {
               case Some((_, peer, reqId, _)) if peer.id.value == peerId =>
                 context.log.debug(s"Peer $peerId disconnected — re-queuing task immediately (reqId=$reqId)")
                 requestTracker.completeRequest(reqId, 0)
-                coordinator.tell(TaskFailed(reqId, "Peer disconnected"), org.apache.pekko.actor.ActorRef.noSender)
+                coordinator ! TaskFailed(reqId, "Peer disconnected")
                 goIdle
               case _ => Behaviors.same // Different peer or no task; ignore
             }
@@ -245,7 +241,7 @@ object AccountRangeWorker {
 
           case _: FetchAccountRange =>
             context.log.warn("Worker is busy, cannot accept new task")
-            coordinator.tell(TaskFailed(0, "Worker busy"), org.apache.pekko.actor.ActorRef.noSender)
+            coordinator ! TaskFailed(0, "Worker busy")
             Behaviors.same
         }
       }

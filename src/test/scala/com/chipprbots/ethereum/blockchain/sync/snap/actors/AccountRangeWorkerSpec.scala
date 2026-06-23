@@ -1,7 +1,8 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
-import org.apache.pekko.testkit.TestProbe
+import org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe
+import org.apache.pekko.testkit.TestProbe as ClassicTestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.duration.*
@@ -22,6 +23,10 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
+  // accountRangeCoordinator is now a typed ref — use typed TestProbe
+  private def makeCoordinatorProbe(): TestProbe[AccountRangeCoordinator.Command] =
+    testKit.createTestProbe[AccountRangeCoordinator.Command]()
+
   private val zeroHash = ByteString(new Array[Byte](32))
   private val maxHash = ByteString(Array.fill(32)(0xff.toByte))
   private val dummyRoot = ByteString(Array.fill(32)(0xca.toByte))
@@ -36,8 +41,8 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
   }
 
   private def makeWorker(
-      coordinator: TestProbe,
-      networkPeerManager: TestProbe
+      coordinator: TestProbe[AccountRangeCoordinator.Command],
+      networkPeerManager: ClassicTestProbe
   ): org.apache.pekko.actor.typed.ActorRef[AccountRangeWorker.Command] = {
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     testKit.spawn(
@@ -46,9 +51,9 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
   }
 
   "AccountRangeWorker" should "send GetAccountRange to peer via NetworkPeerManager on FetchAccountRange" taggedAs UnitTest in {
-    val coordinator = TestProbe()
-    val networkPeerManager = TestProbe()
-    val peerProbe = TestProbe()
+    val coordinator = makeCoordinatorProbe()
+    val networkPeerManager = ClassicTestProbe()
+    val peerProbe = ClassicTestProbe()
     val peer = PeerTestHelpers.createTestPeer("ar-peer-1", peerProbe.ref)
     val worker = makeWorker(coordinator, networkPeerManager)
 
@@ -65,9 +70,9 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
   }
 
   it should "report TaskComplete to coordinator on proof-only empty-range response" taggedAs UnitTest in {
-    val coordinator = TestProbe()
-    val networkPeerManager = TestProbe()
-    val peerProbe = TestProbe()
+    val coordinator = makeCoordinatorProbe()
+    val networkPeerManager = ClassicTestProbe()
+    val peerProbe = ClassicTestProbe()
     val peer = PeerTestHelpers.createTestPeer("ar-peer-2", peerProbe.ref)
     val worker = makeWorker(coordinator, networkPeerManager)
     val (root, rangeProof) = proofOnlyRange()
@@ -79,7 +84,7 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
     val emptyResponse = AccountRange(requestId = reqId, accounts = Seq.empty, proof = rangeProof)
     worker ! AccountRangeCoordinator.AccountRangeResponseMsg(emptyResponse)
 
-    val msg = coordinator.expectMsgType[AccountRangeCoordinator.TaskComplete](1.second)
+    val msg = coordinator.expectMessageType[AccountRangeCoordinator.TaskComplete](1.second)
     msg.requestId shouldBe reqId
     msg.result.isRight shouldBe true
     val (count, accounts, returnedProof) = msg.result.toOption.get
@@ -91,9 +96,9 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
   it should "report TaskComplete on terminal empty account range for non-empty root" taggedAs UnitTest in {
     // go-ethereum accepts accounts=0 + proof=0 unconditionally as a valid terminal-empty range.
     // The worker should complete the task rather than failing it.
-    val coordinator = TestProbe()
-    val networkPeerManager = TestProbe()
-    val peerProbe = TestProbe()
+    val coordinator = makeCoordinatorProbe()
+    val networkPeerManager = ClassicTestProbe()
+    val peerProbe = ClassicTestProbe()
     val peer = PeerTestHelpers.createTestPeer("ar-peer-2b", peerProbe.ref)
     val worker = makeWorker(coordinator, networkPeerManager)
 
@@ -105,14 +110,14 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
       AccountRange(requestId = reqId, accounts = Seq.empty, proof = Seq.empty)
     )
 
-    val msg = coordinator.expectMsgType[AccountRangeCoordinator.TaskComplete](1.second)
+    val msg = coordinator.expectMessageType[AccountRangeCoordinator.TaskComplete](1.second)
     msg.requestId shouldBe reqId
   }
 
   it should "report TaskFailed to coordinator on RequestTimeout" taggedAs UnitTest in {
-    val coordinator = TestProbe()
-    val networkPeerManager = TestProbe()
-    val peerProbe = TestProbe()
+    val coordinator = makeCoordinatorProbe()
+    val networkPeerManager = ClassicTestProbe()
+    val peerProbe = ClassicTestProbe()
     val peer = PeerTestHelpers.createTestPeer("ar-peer-3", peerProbe.ref)
     val worker = makeWorker(coordinator, networkPeerManager)
 
@@ -122,15 +127,15 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
 
     worker ! AccountRangeCoordinator.RequestTimeout(reqId)
 
-    val failed = coordinator.expectMsgType[AccountRangeCoordinator.TaskFailed](1.second)
+    val failed = coordinator.expectMessageType[AccountRangeCoordinator.TaskFailed](1.second)
     failed.requestId shouldBe reqId
     failed.reason shouldBe "Request timeout"
   }
 
   it should "report TaskFailed to coordinator on WorkerPeerDisconnected" taggedAs UnitTest in {
-    val coordinator = TestProbe()
-    val networkPeerManager = TestProbe()
-    val peerProbe = TestProbe()
+    val coordinator = makeCoordinatorProbe()
+    val networkPeerManager = ClassicTestProbe()
+    val peerProbe = ClassicTestProbe()
     val peer = PeerTestHelpers.createTestPeer("ar-peer-4", peerProbe.ref)
     val worker = makeWorker(coordinator, networkPeerManager)
 
@@ -140,15 +145,15 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
 
     worker ! AccountRangeCoordinator.WorkerPeerDisconnected(peer.id.value)
 
-    val failed = coordinator.expectMsgType[AccountRangeCoordinator.TaskFailed](1.second)
+    val failed = coordinator.expectMessageType[AccountRangeCoordinator.TaskFailed](1.second)
     failed.requestId shouldBe reqId
     failed.reason shouldBe "Peer disconnected"
   }
 
   it should "report TaskFailed(0, Worker busy) when FetchAccountRange arrives while already working" taggedAs UnitTest in {
-    val coordinator = TestProbe()
-    val networkPeerManager = TestProbe()
-    val peerProbe = TestProbe()
+    val coordinator = makeCoordinatorProbe()
+    val networkPeerManager = ClassicTestProbe()
+    val peerProbe = ClassicTestProbe()
     val peer = PeerTestHelpers.createTestPeer("ar-peer-5", peerProbe.ref)
     val worker = makeWorker(coordinator, networkPeerManager)
 
@@ -160,15 +165,15 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
     val reqId2 = BigInt(6)
     worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId2, defaultBytes)
 
-    val failed = coordinator.expectMsgType[AccountRangeCoordinator.TaskFailed](1.second)
+    val failed = coordinator.expectMessageType[AccountRangeCoordinator.TaskFailed](1.second)
     failed.requestId shouldBe 0
     failed.reason shouldBe "Worker busy"
   }
 
   it should "return to idle after timeout and accept a new task" taggedAs UnitTest in {
-    val coordinator = TestProbe()
-    val networkPeerManager = TestProbe()
-    val peerProbe = TestProbe()
+    val coordinator = makeCoordinatorProbe()
+    val networkPeerManager = ClassicTestProbe()
+    val peerProbe = ClassicTestProbe()
     val peer = PeerTestHelpers.createTestPeer("ar-peer-6", peerProbe.ref)
     val worker = makeWorker(coordinator, networkPeerManager)
 
@@ -176,7 +181,7 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
     worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId1, defaultBytes)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
     worker ! AccountRangeCoordinator.RequestTimeout(reqId1)
-    coordinator.expectMsgType[AccountRangeCoordinator.TaskFailed](1.second)
+    coordinator.expectMessageType[AccountRangeCoordinator.TaskFailed](1.second)
 
     // Worker should now be in idle — second task accepted
     val reqId2 = BigInt(8)
@@ -186,9 +191,9 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
   }
 
   it should "ignore response with mismatched request ID" taggedAs UnitTest in {
-    val coordinator = TestProbe()
-    val networkPeerManager = TestProbe()
-    val peerProbe = TestProbe()
+    val coordinator = makeCoordinatorProbe()
+    val networkPeerManager = ClassicTestProbe()
+    val peerProbe = ClassicTestProbe()
     val peer = PeerTestHelpers.createTestPeer("ar-peer-7", peerProbe.ref)
     val worker = makeWorker(coordinator, networkPeerManager)
 
@@ -207,9 +212,9 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
   // Cross-reference: core-geth eth/downloader/downloader_test.go — responses from dropped peers
   // are silently ignored (dropped atomic flag). AccountRangeWorker achieves the same via idle state.
   it should "silently drop a late response (correct reqId) that arrives after RequestTimeout" taggedAs UnitTest in {
-    val coordinator = TestProbe()
-    val networkPeerManager = TestProbe()
-    val peerProbe = TestProbe()
+    val coordinator = makeCoordinatorProbe()
+    val networkPeerManager = ClassicTestProbe()
+    val peerProbe = ClassicTestProbe()
     val peer = PeerTestHelpers.createTestPeer("ar-peer-8", peerProbe.ref)
     val worker = makeWorker(coordinator, networkPeerManager)
 
@@ -219,7 +224,7 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
 
     // Timeout fires — worker sends TaskFailed and transitions to idle
     worker ! AccountRangeCoordinator.RequestTimeout(reqId)
-    coordinator.expectMsg(1.second, AccountRangeCoordinator.TaskFailed(reqId, "Request timeout"))
+    coordinator.expectMessage(1.second, AccountRangeCoordinator.TaskFailed(reqId, "Request timeout"))
 
     // Late response arrives with the correct reqId — worker is now idle (handles only FetchAccountRange)
     // → message is unhandled/dropped; coordinator receives NO second message

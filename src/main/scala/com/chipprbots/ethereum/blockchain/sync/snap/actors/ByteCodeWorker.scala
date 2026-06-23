@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.StashBuffer
@@ -15,9 +15,9 @@ import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
   *
   * Simplified worker that just handles network communication. All business logic is in ByteCodeCoordinator.
   *
-  * Pekko Typed leaf actor (Group W1). `coordinator` and `networkPeerManager` remain Classic refs during co-existence;
-  * sends to them use the classic `tell` via the typed→classic adapter. Busy-state back-pressure is provided by a
-  * `Behaviors.withStash` buffer (replacing the Classic `Stash` mixin).
+  * Pekko Typed leaf actor (Group W1). `coordinator` is a typed ref (§8k-A). `networkPeerManager` remains a Classic ref
+  * via the typed→classic adapter. Busy-state back-pressure is provided by a `Behaviors.withStash` buffer (replacing the
+  * Classic `Stash` mixin).
   */
 object ByteCodeWorker {
 
@@ -28,15 +28,15 @@ object ByteCodeWorker {
   private val StashCapacity = 100
 
   /** @param coordinator
-    *   Parent coordinator (Classic)
+    *   Parent coordinator (Typed)
     * @param networkPeerManager
     *   Network manager (Classic)
     * @param requestTracker
     *   Request tracker
     */
   def apply(
-      coordinator: ActorRef,
-      networkPeerManager: ActorRef,
+      coordinator: ActorRef[ByteCodeCoordinator.Command],
+      networkPeerManager: org.apache.pekko.actor.ActorRef,
       requestTracker: SNAPRequestTracker
   ): Behavior[Command] =
     Behaviors.withStash[Command](StashCapacity) { stash =>
@@ -44,8 +44,8 @@ object ByteCodeWorker {
     }
 
   private def idle(
-      coordinator: ActorRef,
-      networkPeerManager: ActorRef,
+      coordinator: ActorRef[ByteCodeCoordinator.Command],
+      networkPeerManager: org.apache.pekko.actor.ActorRef,
       requestTracker: SNAPRequestTracker,
       stash: StashBuffer[Command]
   ): Behavior[Command] =
@@ -90,8 +90,8 @@ object ByteCodeWorker {
     }
 
   private def working(
-      coordinator: ActorRef,
-      networkPeerManager: ActorRef,
+      coordinator: ActorRef[ByteCodeCoordinator.Command],
+      networkPeerManager: org.apache.pekko.actor.ActorRef,
       requestTracker: SNAPRequestTracker,
       stash: StashBuffer[Command],
       currentTask: (ByteCodeTask, Peer, BigInt)
@@ -107,7 +107,7 @@ object ByteCodeWorker {
             // IMPORTANT: mark the request complete so SNAPRequestTracker doesn't fire a timeout.
             requestTracker.completeRequest(requestId, response.codes.size.max(1))
             context.log.debug(s"Received bytecodes response for request $requestId")
-            coordinator.tell(ByteCodesResponseMsg(response), org.apache.pekko.actor.ActorRef.noSender)
+            coordinator ! ByteCodesResponseMsg(response)
             goIdle
           } else {
             context.log.debug("Received response for wrong or old request")
@@ -119,7 +119,7 @@ object ByteCodeWorker {
             // RequestTracker already removed this request when firing the callback; this is defensive.
             requestTracker.completeRequest(requestId)
             context.log.warn(s"Bytecode request $requestId timed out")
-            coordinator.tell(ByteCodeTaskFailed(requestId, "Timeout"), org.apache.pekko.actor.ActorRef.noSender)
+            coordinator ! ByteCodeTaskFailed(requestId, "Timeout")
             goIdle
           } else Behaviors.same
 

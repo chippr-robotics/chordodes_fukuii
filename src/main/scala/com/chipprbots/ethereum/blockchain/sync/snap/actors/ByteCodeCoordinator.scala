@@ -703,10 +703,7 @@ private class ByteCodeCoordinatorImpl(
   private def createWorker(): WorkerRef = {
     val worker: WorkerRef = context.spawnAnonymous(
       ByteCodeWorker(
-        // ByteCodeWorker takes a Classic `ActorRef` and replies via `.tell`; route those replies back to
-        // this Typed coordinator's mailbox through the typed→classic adapter. The reply types
-        // (ByteCodesResponseMsg, ByteCodeTaskFailed) are members of the Command ADT.
-        coordinator = context.self.toClassic,
+        coordinator = context.self,
         networkPeerManager = networkPeerManager,
         requestTracker = requestTracker
       ),

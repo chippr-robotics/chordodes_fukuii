@@ -1055,9 +1055,7 @@ private class AccountRangeCoordinatorImpl(
   private def createWorker(): WorkerRef = {
     val worker: WorkerRef = ctx.spawnAnonymous(
       AccountRangeWorker(
-        // AccountRangeWorker.coordinator is a Classic ActorRef; the worker replies via the Classic
-        // adapter. Pass our own Typed self adapted back to Classic.
-        coordinator = ctx.self.toClassic,
+        coordinator = ctx.self,
         networkPeerManager = networkPeerManager,
         requestTracker = requestTracker
       ),
