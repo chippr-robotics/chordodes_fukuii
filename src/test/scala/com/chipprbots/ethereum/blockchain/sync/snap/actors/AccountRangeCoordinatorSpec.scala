@@ -22,9 +22,9 @@ import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestMptStorage
 
 /** AccountRangeCoordinator is a Typed actor (Group S3). These tests run in a Classic ActorSystem so they can use the
-  * established `system.actorOf` / `expectMsg` / `actorSelection` machinery against the coordinator and its (Typed)
-  * worker children; the coordinator is spawned through `PropsAdapter` to bridge the Classic system to the Typed
-  * Behavior. Mirrors the `.props(...)` factory the actor previously exposed, and follows the ByteCodeCoordinatorSpec /
+  * established `system.actorOf` / `expectMsg` machinery against the coordinator and its (Typed) worker children; the
+  * coordinator is spawned through `PropsAdapter` to bridge the Classic system to the Typed Behavior. Mirrors the
+  * `.props(...)` factory the actor previously exposed, and follows the ByteCodeCoordinatorSpec /
   * StorageRangeCoordinatorSpec precedent.
   *
   * White-box tests that previously poked `coordinator.underlyingActor` internal state (strike maps, `taskStackTries`,
@@ -61,18 +61,19 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       )
     )
 
-  /** Resolve the coordinator's single (concurrency = 1) worker child by selection. Replaces the former
-    * `coordinator.underlyingActor.activeTasks(reqId)._2`, which is unavailable on the Typed coordinator. The worker is
-    * a Classic-adapted `ActorRef`; tests send it Typed worker commands (`RequestTimeout`, `WorkerPeerDisconnected`,
-    * `AccountRangeResponseMsg`) via the Classic `!`.
+  /** Resolve the coordinator's single (concurrency = 1) worker child via actorSelection; returns a Typed ref so sends
+    * are compile-time checked. Replaces the former `coordinator.underlyingActor.activeTasks(reqId)._2`, which is
+    * unavailable on the Typed coordinator.
     */
   private def resolveWorkerChild(
       coordinator: org.apache.pekko.actor.typed.ActorRef[?]
-  ): org.apache.pekko.actor.ActorRef =
-    Await.result(
-      classicSystem.actorSelection(coordinator.path / "*").resolveOne(3.seconds),
-      3.seconds
-    )
+  ): org.apache.pekko.actor.typed.ActorRef[AccountRangeCoordinator.WorkerMessage] =
+    Await
+      .result(
+        classicSystem.actorSelection(coordinator.path / "*").resolveOne(3.seconds),
+        3.seconds
+      )
+      .toTyped[AccountRangeCoordinator.WorkerMessage]
 
   "AccountRangeCoordinator" should "initialize and create workers on demand" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("test-state-root"))

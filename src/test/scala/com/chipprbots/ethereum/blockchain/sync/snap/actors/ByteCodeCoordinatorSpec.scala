@@ -38,9 +38,9 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
   )
 
   // ByteCodeCoordinator is a Typed actor (Group S3). These tests run in a Classic ActorSystem so they can use
-  // the established `system.actorOf` / `expectMsg` / `actorSelection` machinery against the coordinator and its
-  // (Typed) worker children; the coordinator is spawned through PropsAdapter to bridge the Classic system to the
-  // Typed Behavior. Mirrors the `.props(...)` factory the actor previously exposed.
+  // the established `system.actorOf` / `expectMsg` machinery against the coordinator and its (Typed) worker
+  // children; the coordinator is spawned through PropsAdapter to bridge the Classic system to the Typed Behavior.
+  // Mirrors the `.props(...)` factory the actor previously exposed.
   private def bccProps(
       evmCodeStorage: TestEvmCodeStorage,
       networkPeerManager: org.apache.pekko.actor.ActorRef,
@@ -65,16 +65,19 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       )
     )
 
-  // Resolve the coordinator's single worker child by selection. Replaces the former
-  // `coordinator.underlyingActor.workers.head`, which is unavailable on the Typed coordinator.
+  // Resolve the coordinator's single worker child via actorSelection; returns a Typed ref so all
+  // sends are compile-time checked. Replaces the former `coordinator.underlyingActor.workers.head`,
+  // which is unavailable on the Typed coordinator.
   private def resolveWorkerChild(
       coordinator: org.apache.pekko.actor.typed.ActorRef[?]
-  ): org.apache.pekko.actor.ActorRef = {
+  ): org.apache.pekko.actor.typed.ActorRef[ByteCodeCoordinator.WorkerMessage] = {
     import scala.concurrent.Await
-    Await.result(
-      classicSystem.actorSelection(coordinator.path / "*").resolveOne(3.seconds),
-      3.seconds
-    )
+    Await
+      .result(
+        classicSystem.actorSelection(coordinator.path / "*").resolveOne(3.seconds),
+        3.seconds
+      )
+      .toTyped[ByteCodeCoordinator.WorkerMessage]
   }
 
   "ByteCodeCoordinator" should "initialize with empty task queue" taggedAs UnitTest in {
@@ -202,9 +205,8 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
 
     // ByteCodeWorker uses a `working` behavior and stashes ByteCodeWorkerFetchTask in that state.
     // Release it first so the worker transitions to idle; the coordinator's subsequent
-    // tryRedispatchPendingTasks() dispatch will then be accepted rather than stashed. The single
-    // worker child is reachable via the coordinator's child selection.
-    classicSystem.actorSelection(coordinator.path / "*") ! ByteCodeCoordinator.ByteCodeWorkerRelease(reqId)
+    // tryRedispatchPendingTasks() dispatch will then be accepted rather than stashed.
+    resolveWorkerChild(coordinator) ! ByteCodeCoordinator.ByteCodeWorkerRelease(reqId)
 
     // Complete the in-flight task at coordinator level — calls markWorkerIdle + tryRedispatchPendingTasks()
     coordinator ! ByteCodeCoordinator.ByteCodeTaskComplete(reqId, Right(1))
@@ -293,7 +295,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
     req1.hashes shouldEqual Seq(h1, h2, h3)
 
     // Respond with a single middle element (gap allowed by snap/1 semantics)
-    classicSystem.actorSelection(coordinator.path / "*") ! ByteCodeCoordinator.ByteCodesResponseMsg(
+    resolveWorkerChild(coordinator) ! ByteCodeCoordinator.ByteCodesResponseMsg(
       ByteCodes(req1.requestId, Seq(code2))
     )
 
@@ -342,7 +344,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
     req1.hashes shouldEqual Seq(h1, h2)
 
     // Respond out-of-order (violates snap/1 ordering requirement)
-    classicSystem.actorSelection(coordinator.path / "*") ! ByteCodeCoordinator.ByteCodesResponseMsg(
+    resolveWorkerChild(coordinator) ! ByteCodeCoordinator.ByteCodesResponseMsg(
       ByteCodes(req1.requestId, Seq(code2, code1))
     )
 
@@ -394,7 +396,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
     req1.hashes shouldEqual Seq(h1)
 
     // Duplicate code for the same hash should be rejected
-    classicSystem.actorSelection(coordinator.path / "*") ! ByteCodeCoordinator.ByteCodesResponseMsg(
+    resolveWorkerChild(coordinator) ! ByteCodeCoordinator.ByteCodesResponseMsg(
       ByteCodes(req1.requestId, Seq(code1, code1))
     )
 
@@ -443,7 +445,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
     req1.hashes shouldEqual Seq(h1)
 
     // Respond with empty ByteCodes (peer had none of the requested hashes)
-    classicSystem.actorSelection(coordinator.path / "*") ! ByteCodeCoordinator.ByteCodesResponseMsg(
+    resolveWorkerChild(coordinator) ! ByteCodeCoordinator.ByteCodesResponseMsg(
       ByteCodes(req1.requestId, Seq.empty)
     )
 
@@ -485,7 +487,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
     val req1 = send1.message.asInstanceOf[GetByteCodesEnc].underlyingMsg
 
     // Empty response → peer enters cooldown
-    classicSystem.actorSelection(coordinator.path / "*") ! ByteCodeCoordinator.ByteCodesResponseMsg(
+    resolveWorkerChild(coordinator) ! ByteCodeCoordinator.ByteCodesResponseMsg(
       ByteCodes(req1.requestId, Seq.empty)
     )
 
@@ -579,7 +581,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
     req1.hashes shouldEqual Seq(realHash)
 
     // Respond with a code whose hash != realHash (corrupted / wrong code)
-    classicSystem.actorSelection(coordinator.path / "*") ! ByteCodeCoordinator.ByteCodesResponseMsg(
+    resolveWorkerChild(coordinator) ! ByteCodeCoordinator.ByteCodesResponseMsg(
       ByteCodes(req1.requestId, Seq(corruptCode))
     )
 
@@ -734,10 +736,10 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
     // Worker created and request dispatched
     networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessage]
 
-    // Resolve the single worker child via selection (the Typed coordinator exposes no `.underlyingActor`)
+    // Resolve the single worker child (the Typed coordinator exposes no `.underlyingActor`)
     // and stop it permanently. `context.watchWith` delivers WorkerTerminated to the coordinator.
     val workerRef = resolveWorkerChild(coordinator)
-    classicSystem.stop(workerRef)
+    classicSystem.stop(workerRef.toClassic)
 
     // Task was re-queued after WorkerTerminated handling — providing peer again triggers re-dispatch,
     // which is observable proof the dead worker was removed and the task re-queued.
@@ -773,7 +775,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
     val workerRef = resolveWorkerChild(coordinator)
     coordinator ! ByteCodeCoordinator.NoMoreByteCodeTasks
 
-    classicSystem.stop(workerRef)
+    classicSystem.stop(workerRef.toClassic)
 
     // Coordinator stays operational after the worker stops — a GetProgress query still returns.
     coordinator ! ByteCodeCoordinator.ByteCodeGetProgress(statusProbe.ref)
