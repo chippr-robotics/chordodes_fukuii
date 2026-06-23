@@ -29,7 +29,7 @@ sealed abstract class MptNode {
   val parsedRlp: Option[RLPEncodeable]
 
   // Overriding equals is necessary to avoid array comparisons.
-  override def equals(obj: Any): Boolean =
+  override def equals(obj: Any): Boolean = // Any: java.lang.Object.equals — no typed alternative
     obj match
       case other: MptNode => hash.sameElements(other.hash)
       case _              => false

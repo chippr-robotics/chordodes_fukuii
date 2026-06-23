@@ -82,7 +82,7 @@ class Stack private (private val underlying: Vector[UInt256], val maxSize: Int) 
     */
   def toSeq: Seq[UInt256] = underlying.reverse
 
-  override def equals(that: Any): Boolean = that match {
+  override def equals(that: Any): Boolean = that match { // §3h: FORGE-gate
     case that: Stack => this.underlying == that.underlying
     case _           => false
   }

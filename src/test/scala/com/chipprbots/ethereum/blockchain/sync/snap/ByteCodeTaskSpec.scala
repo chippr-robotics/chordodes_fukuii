@@ -42,29 +42,29 @@ class ByteCodeTaskSpec extends AnyFlatSpec with Matchers {
 
   it should "track pending and done states" taggedAs UnitTest in {
     val codeHash = kec256(ByteString("code"))
-    val task = ByteCodeTask(Seq(codeHash))
+    var task = ByteCodeTask(Seq(codeHash))
 
     task.isComplete shouldBe false
     task.isPending shouldBe false
 
-    task.pending = true
+    task = task.copy(pending = true)
     task.isPending shouldBe true
     task.isComplete shouldBe false
 
-    task.done = true
+    task = task.copy(done = true)
     task.isComplete shouldBe true
   }
 
   it should "calculate progress correctly" taggedAs UnitTest in {
     val codeHashes = (1 to 5).map(i => kec256(ByteString(s"code$i")))
-    val task = ByteCodeTask(codeHashes)
+    var task = ByteCodeTask(codeHashes)
 
     task.progress shouldBe 0.0
 
-    task.bytecodes = Seq(ByteString("code1"), ByteString("code2"))
+    task = task.copy(bytecodes = Seq(ByteString("code1"), ByteString("code2")))
     task.progress shouldBe 0.4 // 2/5
 
-    task.done = true
+    task = task.copy(done = true)
     task.progress shouldBe 1.0
   }
 

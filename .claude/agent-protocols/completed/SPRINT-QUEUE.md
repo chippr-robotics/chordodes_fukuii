@@ -299,3 +299,10 @@ wait times. No gate dependency on the primary sprint groups above.
 | `7cc9eda3a` | Part 3c — isInstanceOf → pattern match (non-consensus, 1 instance: mpt/Node.scala:33) |
 | `b305ef41b` | Part 3d (DEFERRED batch) — enum migration: NetworkType, VmConfig.VmMode, FaucetStatus, SealEngineType (4 types converted) |
 | `c3fec6390` | Part 3e — console → SLF4J (12 println sites; EngineApiController, EngineApiService, VM; 8 intentional CLI/TUI calls preserved) |
+| `c1ecd9706` | Part 3d-followup-A — ServerStatus → enum (2 cases, 10 callers across jsonrpc/network/nodebuilder/test) |
+| `7f9c987cc` | Part 3d-followup-B — PruningMode → enum (3 cases, export aliases; PruningModeComponent/Storages/StoragesComponent unaffected) |
+| `75a3d8c5d` | Part 3d-followup-C — MiningMode → enum (FORGE-approved; runtime-only flag, no consensus impact; 3 files: PoWMiningCoordinator + PoWMining caller + spec import) |
+| `8cdf1290d` | Part 4 / P4 — E165 batch 1 (Classic Pekko): 20 `expectMsgType[Any]` sites replaced with typed `expectMsgType[ConcreteType]` across test specs; §8a Typed TestKit migration gated by E165 TestProbe[T] blocker (Classic TestProbe has no type param) |
+| pre-fixed | CHASE-QUEUE P8 — G1-sweep PRISM 4 items: FastSync null→Option (`0c7d6781b` W13+W14), expandTypedReceipts Try.fold (`0c7d6781b` W13), NPMA dead if/else (`504b4ca16` W1/W2/W12/W16), SyncController EC.global→ctx.executionContext (`a5132aa80` C2) — all 4 items pre-fixed before P8 session |
+| pre-fixed // | CHASE-QUEUE P8 — G1-sweep PRISM 4 items (FastSync null→Option , expandTypedReceipts Try.fold , NPMA dead if/else , SyncController EC.global→ctx.executionContext ) — all 4 pre-fixed before P8 session |
+| uncommitted — §3h | E3 (Batch E): Any type signature cleanup — 15 sites documented `// Any:` (Pekko messageAdapter×8, Micrometer gauge×3, Java equals×3, GraphQL dynamic, any-thunk); 7 FORGE-gated with `// §3h: FORGE-gate` markers (domain×2, vm×2, ledger×3); 0 type changes (all remaining Any uses are intentional); sbt compile-all clean. Scope doc: `.local/docs/birdseye-review/01-gap-analysis/G8-any-type-scope.md`. CHASE-QUEUE updated (FORGE). |

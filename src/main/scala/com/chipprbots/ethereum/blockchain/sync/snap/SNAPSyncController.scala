@@ -535,12 +535,12 @@ private class SNAPSyncControllerImpl(
       handshakedPeersAdapter
     )
 
-  /** OQ-2: reply target for ChainDownloader's `Done`/`Progress`. ChainDownloader (Behavior[Any], S6) sends to this
-    * Classic adapter, which bridges into SSC's sealed mailbox as ChainDownloaderDone / ChainDownloaderProgress.
+  /** OQ-2: reply target for ChainDownloader's `Done`/`Progress`. ChainDownloader (Behavior[Command], S6 narrowed) sends
+    * to this Classic adapter, which bridges into SSC's sealed mailbox as ChainDownloaderDone / ChainDownloaderProgress.
     */
   private val chainDownloaderReplyAdapter: org.apache.pekko.actor.ActorRef =
     ctx
-      .messageAdapter[Any] {
+      .messageAdapter[Any] { // Any: Pekko messageAdapter — wraps Classic replies
         case ChainDownloader.Done => ChainDownloaderDone
         case p: ChainDownloader.Progress =>
           ChainDownloaderProgress(p.headersDownloaded, p.bodiesDownloaded, p.receiptsDownloaded, p.targetBlock)
@@ -1283,20 +1283,16 @@ private class SNAPSyncControllerImpl(
                 actors.AccountRangeCoordinator.AccountGetStorageFileInfo(replyTo)
               )
               .foreach { info =>
-                if info.filePath != null then {
-                  appStateStorage.putSnapSyncStorageFilePath(info.filePath.toString).commit()
-                  ctx.log.info(s"Persisted storage file path for recovery: ${info.filePath} (${info.count} entries)")
-                }
+                appStateStorage.putSnapSyncStorageFilePath(info.filePath.toString).commit()
+                ctx.log.info(s"Persisted storage file path for recovery: ${info.filePath} (${info.count} entries)")
               }
             coordinator
               .ask[actors.AccountRangeCoordinator.CodeHashesFileInfoResponse](replyTo =>
                 actors.AccountRangeCoordinator.AccountGetCodeHashesFileInfo(replyTo)
               )
               .foreach { info =>
-                if info.filePath != null then {
-                  appStateStorage.putSnapSyncCodeHashesPath(info.filePath.toString).commit()
-                  ctx.log.info(s"Persisted codeHashes file path for recovery: ${info.filePath} (${info.count} entries)")
-                }
+                appStateStorage.putSnapSyncCodeHashesPath(info.filePath.toString).commit()
+                ctx.log.info(s"Persisted codeHashes file path for recovery: ${info.filePath} (${info.count} entries)")
               }
           }
 
@@ -4866,8 +4862,8 @@ object SNAPSyncController {
   final case class TrieNodesResponse(msg: SNAP.TrieNodes) extends Command
 
   // ── Group: ChainDownloader wrappers (OQ-2) ─────────────────────────────────
-  // ChainDownloader is Behavior[Any] (S6). Its outbound Progress/Done messages are
-  // wrapped so SSC's sealed mailbox accepts them.
+  // ChainDownloader is Behavior[Command] (S6 narrowed). Its outbound Progress/Done messages are
+  // wrapped so SSC's sealed mailbox accepts them via the Classic adapter bridge.
   final private[snap] case class ChainDownloaderProgress(
       currentBlock: BigInt,
       bodiesDownloaded: BigInt,

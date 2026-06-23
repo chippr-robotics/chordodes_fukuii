@@ -209,6 +209,15 @@ Audit hot paths; replace with pattern matching / algebraic data types.
 Enum promotes exhaustiveness checking and derives `ordinal`, `values`, `fromOrdinal` for free.
 **Parallel-safe**: Can be done file-by-file, no actor migration gate. Good housekeeping task.
 
+#### §3d residual — SyncProtocol.SyncStatus candidate
+
+One remaining candidate not yet assessed:
+```bash
+grep -rn "SyncProtocol\.SyncStatus\|sealed.*SyncStatus\|case object.*SyncStatus" \
+  src/main/ --include="*.scala"
+```
+If all subtypes are pure `case object` (no fields, no methods, no constructor params): migrate to `enum` in the same commit pattern as `SyncPhase` (`adf4e69ea`). If any subtype has fields → reject (add ❌ REJECTED note here). This is a 5-minute check + 15-minute migration if confirmed. Handle opportunistically when already in `sync/` files.
+
 ### 3g — StateValidator.scala Exception Swallowing (FORGE — RESOLVED)
 
 **Source:** R0 audit Cat 5 (exception swallowing)
@@ -283,6 +292,41 @@ site, which can only *add* an already-idempotent heal target. Compile: `sbt comp
 | 5 | `blockchain/sync/snap/actors/TrieNodeHealingCoordinator.scala` | 1617 | D | Left as-is — `visitedLru.synchronized` on `LinkedHashMap`-backed bounded FIFO-eviction set; `ConcurrentHashMap` was the prior implementation and produced a silent correctness hole (comment at lines 1607–1614 documents why). |
 
 No Bucket C violations (no actor-internal state accessed outside actor thread).
+
+---
+
+### 3h — `Any` in Type Signatures (type erasure cleanup)
+
+**Added:** 2026-06-22 (birdseye-review G8 scope)
+**Agent:** MITHRIL (non-consensus sites); FORGE-gated (vm/, consensus/, domain/)
+**Risk:** LOW–MEDIUM (no consensus logic in most sites; vm/ sites need forge sign-off)
+
+**Counts (pre-scan 2026-06-22):**
+| Pattern | Count | Primary subsystems |
+|---------|-------|-------------------|
+| `: Any` in type signatures | ~~20~~ → 1 ungated remaining | 15 documented `// Any:`, 4 FORGE-gated (domain×2, vm×2), 1 per-scan GraphQLSchema (has `// cast:` comment) |
+| `[Any]` generic parameter | ~~22~~ → 0 ungated remaining | all documented `// Any:` or FORGE-gated |
+| `=> Any` return type | ~~2~~ → 0 ungated remaining | both documented `// Any:` |
+| `Behavior[Any]` (Pekko) | ~~12~~ **0** | ✅ DONE 2026-06-22 — all 12 actors narrowed to Behavior[Command] |
+
+**Note:** `Behavior[Any]` sites are Wave 3 scope (LOOM). Wave 3 is complete as of 2026-06-22 — all
+12 actors narrowed to `Behavior[Command]`, stale Scaladoc comments updated. The remaining ~44
+non-Pekko sites (`: Any` in type signatures, `[Any]` generics, `=> Any` returns) are the target of this item.
+
+**Remediation pattern:**
+- `def process(msg: Any)` → `def process(msg: Command)` (sealed ADT)
+- `Map[String, Any]` → case class or `io.circe.Json` (circe already in codebase)
+- `List[Any]` (mixed types) → sealed ADT with `List[A | B]`
+- `def result: Any` → sealed trait / enum / generic `[T]`
+- EXCEPTION: Intentional reflection sites → `// Any: reflection — no typed alternative` comment
+
+**Gate:** G8-findings must categorize all sites. Wave 3 (Behavior[Any] removal) is DONE.
+Remaining sites ~44. Add `DisableSyntax.noAny` to scalafix.conf after cleanup
+(check R6-findings for rule availability).
+
+**Scope prompt:** `birdseye-review/01-gap-analysis/G8-any-type-scope.md`
+
+**✅ DONE 2026-06-22** — MITHRIL pass complete. 15 sites documented `// Any:`, 7 FORGE-gated (markers added, logged in CHASE-QUEUE). 0 type changes (all remaining uses are intentional: Pekko messageAdapter, Micrometer gauge, Java interop, or FORGE-gated). See G8 scope doc for post-fix baseline.
 
 ---
 
@@ -557,6 +601,99 @@ were not converted: address in a dedicated test-cleanup sprint (8a-retro).
 **Priority**: HIGH — should be embedded in each LOOM thread, not deferred.
 **Agent**: LOOM (test migration paired with production migration per actor).
 
+**What §8a unlocks (beyond the obvious):**
+
+1. **777 Classic `TestProbe` without `[T]`** — `org.apache.pekko.testkit.TestProbe` has no type
+   parameter. The 777-site grep metric (`TestProbe\b` without `[`) cannot be driven to zero without
+   §8a. Once a test file is migrated to `ActorTestKit`, use
+   `org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[T]` which accepts type params.
+
+2. **20 `fishForMessage` E165 sites** (11 files: `StateSyncSpec`, `ChainWeightCalibrationSpec`,
+   `CalibratePivotTDSpec`, `RegularSyncFixtures`, `PeerManagerSpec`, and 6 scoped-verification
+   SNAP specs) — Classic `TestProbe.fishForMessage` takes `PartialFunction[Any, Boolean]`, making
+   every `case Foo(...) =>` inside it an E165 selector on `Any`. These are part of the intentional
+   333 E165 floor and cannot be fixed without §8a migration. After migration, replace
+   `fishForMessage { case T => true }` with `expectMessageType[T]` on a Typed probe.
+
+**Research prompt (before starting remaining §8a-retro batches):**
+> Read `.claude/agent-protocols/working-docs/DEFERRED-BACKLOG.md` §8a retro batch notes (lines ~525–553)
+> for established patterns (PatienceConfig ambiguity, top-level-actor guardian, `system.toClassic`
+> for HTTP/pekko-http). Then list the test files for the next migration wave:
+> ```bash
+> grep -rn "org.apache.pekko.testkit.TestKit" src/test/ --include="*.scala" -l | grep -v "ActorTestKit"
+> ```
+> For each file, identify: (a) which production actor it tests (must already be Typed), (b) any
+> `fishForMessage` calls to replace with `expectMessageType`, (c) any `system.toClassic` needs
+> (Pekko HTTP, Classic eventStream). Produce a migration plan per file before touching any code.
+
+---
+
+#### §8a-retro batch 3 — LOOM: TestKit→ActorTestKit for G1-narrowed network/sync actors
+
+**Agent:** LOOM (migration) + EYE (verify each file)
+**Risk:** LOW — test files only; no production code changed
+**Prerequisite:** Batch 3 actors must be confirmed Typed (`Behavior[Command]`, not `Behavior[Any]`). G1 sprint narrowed 12 network/sync actors 2026-06-22 (`Behavior[Any]` = 0). All are confirmed Typed.
+**Parallel-safe with Batch E:** YES — modifies `src/test/` only; E1/E2/E3 modify `src/main/`.
+
+**Established patterns (from batches 1+2 — read before touching anything):**
+
+| Issue | Root cause | Fix |
+|-------|-----------|-----|
+| `PatienceConfig` ambiguity | `NormalPatience`/`LongPatience` conflicts with `ScalaTestWithActorTestKit.patience` | Drop patience trait; test kit default (10s) sufficient |
+| `cannot create top-level actor from the outside` | Classic adapter `system.spawnAnonymous(...)` blocked by Typed guardian | Thread `ActorTestKit` as implicit param into fixture; use `actorTestKit.spawn(...)` |
+| `override` error on `def timeout` | `ActorTestKitBase` already declares `def timeout: Timeout` | Add `override` modifier |
+| `system.toTyped.scheduler` invalid | `system` is already `ActorSystem[Nothing]` after CAPSTONE | Change to `system.scheduler` |
+| No `afterAll` → resource leak | `WithActorSystemShutDown` was providing cleanup | `ScalaTestWithActorTestKit` handles shutdown automatically |
+
+**Step 0 — Identify remaining Classic TestKit test files:**
+```bash
+# Files still using Classic TestKit that test Typed actors (network/sync)
+grep -rn "org.apache.pekko.testkit.TestKit\b" src/test/ --include="*.scala" -l \
+  | grep -v "ActorTestKit"
+
+# Confirm Behavior[Any] = 0 in production (G1 complete)
+grep -rn "Behavior\[Any\]" src/main/ --include="*.scala" | grep -v "//"
+```
+
+**Step 1 — Map each test file to its production actor:**
+For each file returned by Step 0, read its `extends TestKit(ActorSystem(...))` constructor and identify the actor(s) under test. Skip files where the production actor is still Classic (unmigtrated — those belong to their LOOM wave, not retro).
+
+Only migrate test files where ALL production actors they test are confirmed Typed.
+
+**Step 2 — Migrate one file at a time:**
+For each eligible file:
+1. Replace `extends TestKit(ActorSystem(...))` with `extends ScalaTestWithActorTestKit`
+2. Replace `system.spawn(...)` with `testKit.spawn(...)` where needed
+3. Replace `TestProbe()` (untyped) with `TestProbe[MessageType]()` (typed) — unlocks 777-site E165 reduction
+4. Replace `fishForMessage { case T => true }` with `expectMessageType[T]` on typed probe
+5. For `system.toClassic` needs (Pekko HTTP, raw scheduler): preserve via `testKit.system.classicSystem`
+6. `sbt compile-all` after each file; `sbt "testOnly *<SpecName>*"` to confirm passes
+
+**Step 3 — Commit per file (or per logical group):**
+Format: `test(8a-retro): migrate <SpecName> to ActorTestKit — N/N tests`
+
+**Verification:**
+```bash
+sbt compile-all
+# Confirm test count for migrated specs:
+sbt "testOnly *<SpecName>*"
+# Run full baseline:
+./local/scripts/fukuii-test
+# Confirm 3,595+ tests, 0 failures (count grows as Classic TestProbe[T] migration unlocks E165 sites)
+```
+
+**MANDATORY final step — complete BEFORE closing thread:**
+- Update run-order table in this file: strikethrough E4, add `✅ DONE [date] — N specs migrated, commit hashes`
+- Add each commit to `completed/SPRINT-QUEUE.md` with format: `| <sha> | 8a-retro batch 3 — <SpecName>: N tests migrated |`
+- Update `fukuii-test-timing.md` if test count changed
+- DELETE this section
+
+**Rejection criteria:**
+- Migrating a test file whose production actor is NOT yet Typed (still `extends Actor`)
+- Weakening test assertions during the migration
+- Removing `fishForMessage` without providing typed-probe equivalent
+- Bundling with production code changes
+
 ---
 
 ### 8b — Opaque Types for Domain Value Concepts
@@ -612,7 +749,7 @@ housekeeping task during test waits for specific domain files.
 
 | Deferred category | File(s) | Count | Gate |
 |-------------------|---------|-------|------|
-| Classic actor — Wave 3 LOOM sprint | `sync/snap/SNAPSyncController.scala` | 33 | Wave 3 network/sync migration (SNAP1) |
+| Classic actor — Wave 3 LOOM sprint | `sync/snap/SNAPSyncController.scala` | 36 | Wave 3 network/sync migration (SNAP1) |
 | Consensus-critical — FORGE review | `vm/VM.scala`, `vm/OpCode.scala`, `vm/PrecompiledContracts.scala`, `ledger/BlockPreparator.scala`, `mpt/StackTrie.scala`, `consensus/validators/std/StdSignedTransactionValidator.scala` | 6 | FORGE sign-off per file |
 | Consensus-path (ETH Engine API) — BEACON review | `consensus/engine/EngineApiController.scala:96` (`handleNewPayload`, malformed-payload decode `Left` branch), `consensus/engine/EngineApiController.scala:226` (`handleForkchoiceUpdated`, malformed-params decode `Left` branch) | 2 | BEACON sign-off (S3-D) |
 
@@ -621,7 +758,7 @@ housekeeping task during test waits for specific domain files.
 2. LOOM Phase 0 for TNHC clears 11 sites ✅ DONE `7a48c5988`
 3. FORGE reviews and clears 6 consensus sites (1 cleared: consensus/engine/JwtAuthenticator.scala — S3-C) ← add to relevant FORGE sessions
 4. BEACON reviews and clears 2 ETH Engine API sites — `EngineApiController.scala:96` + `:226` (S3-D). Both are early-`return IO.pure(...)` decode-error guards inside large consensus-path method bodies; removing the `return` requires wrapping ~90 lines of post-decode body into the `Right`/`else` branch. Deferred from S3-A/S3-D/S3-F commit (2026-06-22): the byte-for-byte response behavior must be preserved across the re-indent; gated on a focused BEACON pass, not bundled with the low-risk Option/val changes.
-5. Wave 3 SNAP1 migration sprint clears SNAPSyncController 33 sites ← gated on NET2
+5. Wave 3 SNAP1 migration sprint clears SNAPSyncController 36 sites ← gated on NET2
 6. After all above: run `sbt scalafixAll` to confirm 0 violations → ratchet locked
 
 **Other rules to evaluate enabling (unchanged from original plan):**
@@ -829,16 +966,16 @@ No actor migration gate. Commit individually; do not bundle with primary-track m
 
 | Task | Work | Agents | Effort |
 |------|------|--------|--------|
-| **Part 1** | Remaining 5 compiler warnings | WRAITH | ~30 min |
-| **6a — extvm deletion** | Delete `extvm/` (10 files) after grep-verify | WRAITH | ~1h |
-| **8f — Dead code audit** ✅ research done | 4 candidates in CHASE-QUEUE (DEAD 2026-06-22); deletion sprint pending | WRAITH | ~30 min deletions |
-| **3d — enum polish** | Migrate `SyncPhase`, `BlacklistReason`, `ForkId` codes to enum | MITHRIL | ~1h per file |
+| ~~**Part 1**~~ | ~~Remaining 5 compiler warnings~~ | ~~WRAITH~~ | ✅ DONE `bd2d691c3` — 5 warnings cleared |
+| ~~**6a — extvm deletion**~~ | ~~Delete `extvm/` (10 files) after grep-verify~~ | ~~WRAITH~~ | ✅ DONE `a948fda1d` — 18 files deleted (extvm/ + proto + sbt-protoc) |
+| ~~**8f — Dead code audit**~~ | ~~research + deletion sprint~~ | ~~WRAITH~~ | ✅ DONE — `fa57df9b9` (MetricsAlreadyConfiguredError + LocalVM + AdaptiveSyncStrategy), `c6b3da4cb` (DeltaSpikeGauge), `ff2fc219c` (StaticNodesLoader); branch-wide audit 2026-06-22 confirmed no further candidates |
+| ~~**3d — enum polish**~~ | ~~Migrate `SyncPhase`, `BlacklistReason`, `ForkId` codes to enum~~ | ~~MITHRIL~~ | ✅ DONE — `adf4e69ea` (SyncPhase + ForkIdValidationResult), `b305ef41b` (NetworkType/VmMode/FaucetStatus/SealEngineType), `c1ecd9706` (ServerStatus), `7f9c987cc` (PruningMode), `75a3d8c5d` (MiningMode). BlacklistReason/BlacklistReasonType ❌ REJECTED (case class subtypes). **`SyncProtocol.SyncStatus` still candidate** — see §3d residual note |
 | ~~**3e — console→logging**~~ | ~~Replace 24 `println`/`System.out` calls with SLF4J~~ | ~~MITHRIL~~ | ✅ DONE `c3fec6390` 2026-06-22 — 12 sites fixed (3 files); 8 intentional CLI/TUI calls preserved |
-| **8e — ScalaFix expansion** | Rules in .scalafix.conf ✅; C2 ✅ `9eb1f4e06`; TNHC ✅ `7a48c5988`; remaining: 7 consensus (FORGE) + 33 SSC (SNAP1) | FORGE / LOOM | gated |
+| **8e — ScalaFix expansion** | Rules in .scalafix.conf ✅; C2 ✅ `9eb1f4e06`; TNHC ✅ `7a48c5988`; remaining: 7 consensus (FORGE) + 36 SSC (SNAP1) | FORGE / LOOM | gated |
 | **8g — braceless config** ✅ `34a55a025` | Deferred settings documented in .scalafmt.conf; indent.defnSite + topLevelStatementBlankLines each trigger ~400-file reformats → gated for per-subsystem pass post-CAPSTONE | MITHRIL | done |
-| **8j — Thread.sleep** | Replace test timing sensitivity (2 live call sites — baseline verified EYE 2026-06-22) | EYE | ~30 min |
-| **3f — manual sync** | Audit 5 `.synchronized` outside actors | PRISM | ~1h |
-| **8a-retro** | Migrate already-completed actors' tests from TestKit → ActorTestKit | LOOM, EYE | ~3h |
+| **8j — Thread.sleep** | 2 live call sites (EthMiningServiceSpec:302, SubscriptionManagerSpec:249) — both NECESSARY; defer to §8a-retro (Typed TestKit enables proper replacement) | EYE | deferred to §8a |
+| ~~**3f — manual sync**~~ | ~~Audit 5 `.synchronized` outside actors~~ | ~~PRISM~~ | ✅ DONE `cf33cfa87` — MapCache:19+30 fixed (TrieMap); CombinedRecoveryScanner + TNHC left as-is (documented); PoWMining FORGE-gated (CHASE-QUEUE) |
+| **8a-retro** | Batches 1+2 DONE — **batch 3 (G1 network/sync actors)** needs TestKit→ActorTestKit migration; clearout prompt in §8a below | LOOM, EYE | ~3h |
 
 ### Research Threads (run before implementation; can overlap with primary track)
 
@@ -891,358 +1028,70 @@ Each prompt can run independently. Commit individually.
 | ~~C1~~ | ~~Batch C step 1~~ | ~~P1 MITHRIL isInstanceOf (83 instances)~~ | ✅ DONE 2026-06-22 — 1 site fixed (`7cc9eda3a`); consensus/vm/crypto/domain had 0 hits |
 | ~~C2~~ | ~~Batch C step 2~~ | ~~P2 MITHRIL enum candidates~~ | ✅ DONE 2026-06-22 — 4 types converted (`b305ef41b`) |
 | ~~C3~~ | ~~Batch C step 3~~ | ~~P3 MITHRIL console→logging (28 sites)~~ | ✅ DONE 2026-06-22 — 12 sites fixed |
-| C4 | Batch C step 4 | P4 MITHRIL/EYE E165 sprint (777 sites / 83 files) | Run after C1-C3; multi-session sprint |
+| ~~C4~~ | ~~Batch C step 4~~ | ~~P4 MITHRIL/EYE E165 sprint — expectMsgType[Any]~~ | ✅ DONE 2026-06-22 — `8cdf1290d` — 20 sites → 0; 777 TestProbe metric + 20 fishForMessage sites §8a-gated (see §8a research prompt) |
+| ~~D3~~ | ~~Batch D~~ | ~~P7 EYE test timing audit~~ | ✅ DONE 2026-06-22 — 680s (11m 20s) baseline, 3,595 tests, 0 code changes; both Thread.sleep sites defer to §8a; all wall-clock bounds safe. Note: captured pre-Batch-D; rerun after G1/G2 if test count grows. |
+| ~~E3~~ | ~~Batch E~~ | ~~§3h — Any type signature cleanup~~ | ✅ DONE 2026-06-22 — 0 types changed; 15 sites documented `// Any:`; 7 FORGE-gated (vm/domain/ledger); compile clean |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
 
 ---
 
-### P1 — MITHRIL: isInstanceOf → pattern match (Part 3c, 83 instances)
+## Part 10: Test Suite Performance
 
-**Agent:** MITHRIL
-**Files:** Non-consensus `src/main/` (skip `consensus/`, `vm/`, `crypto/`, `domain/` — FORGE gate)
-**Prerequisite:** None for non-consensus files.
+### P7 — EYE/MITHRIL: Test timing audit + slow-test reduction
 
-**Prompt:**
-> On branch `scala3-cleanup-june`, address Part 3c: replace `isInstanceOf[T]` with
-> pattern matching in non-consensus source files.
->
-> Steps:
-> 1. Inventory: `grep -rn "isInstanceOf\[" src/main/ --include="*.scala" | grep -v "consensus/\|vm/\|crypto/\|domain/"` — count and list files.
-> 2. For each occurrence, replace:
->    ```scala
->    // Before
->    if x.isInstanceOf[Foo] then ...
->    // After
->    x match { case _: Foo => true; case _ => false }
->    // or inline: x match { case _: Foo => doThing(); case _ => () }
->    ```
->    Use the cleaner form that fits the context (val guard, if-expression, match block).
-> 3. After each file: `sbt compile-all` — 0 errors.
-> 4. At the end: `sbt testOnly` for any spec in the same package.
-> 5. Do NOT touch `consensus/`, `vm/`, `crypto/`, or `domain/` — those require FORGE review.
->    Add any occurrences found there to CHASE-QUEUE.md as ISINST entries.
+**Agent:** EYE (timing profiler), MITHRIL (Thread.sleep replacement)
+**Prerequisite:** testEssential gate passed. Run AFTER Batch D (G1/G2) so that any new test files
+from the Behavior[Any] narrowing sprint are included in the timing baseline.
 
-**Verification:** `grep -rn "isInstanceOf\[" src/main/ --include="*.scala" | grep -v "consensus/\|vm/\|crypto/\|domain/"` → 0 results
+**Context:** testEssential baseline was ~24:22 (3,601 tests). Batch C cleanup (dead code deletion,
+E165 expectMsgType narrowing, enum conversions) may have affected this. After Batch D the suite will
+grow slightly (narrowing adds typed actor specs). This prompt captures the new baseline and identifies
+actionable slow tests.
 
-**MANDATORY final step — complete BEFORE closing thread:**
-- `working-docs/DEFERRED-BACKLOG.md` run order table — change `| C1 | Batch C step 1 | P1 MITHRIL isInstanceOf...` to `| ~~C1~~ | ~~Batch C step 1~~ | ~~P1 MITHRIL isInstanceOf (83 instances)~~ | ✅ DONE [date] — N sites fixed |`
-- `working-docs/DEFERRED-BACKLOG.md` — mark Part 3c row in Housekeeping Track with ✅ and commit SHA
-- `completed/SPRINT-QUEUE.md` — append row: `| [SHA(s)] | Part 3c — isInstanceOf → pattern match (non-consensus, N instances) |`
-- `modernization-log/[subsystem].md` for each touched subsystem — add under "Scala 3 Idioms":
-  `#### [SHA] — 3c: isInstanceOf → pattern match`
-  `- **What:** N sites in [package] replaced; consensus/vm/crypto/domain deferred (FORGE gate)`
+**Steps:**
 
-**Opportunistic clearout:** Apply the protocol in CODEBASE-AUDIT.md. While reading each file for `isInstanceOf`, scan for other CHASE-QUEUE ISINST, NULL, or MUTABLE entries in the same file and address them inline or draft a prompt.
+1. **Capture new baseline:**
+   ```bash
+   cd /media/dev/2tb/dev/fukuii
+   time .local/scripts/fukuii-test 2>&1 | tee /tmp/fukuii-test-timing.log
+   ```
+   Record total wall time from `time` output.
 
-**Rejection criteria:** Touching consensus/vm/crypto/domain files; changing behavior (match arms must preserve identical semantics); bundling with other unrelated changes
+2. **Identify slow tests (>2s per test):**
+   ```bash
+   grep -E "\([0-9]+ seconds" /tmp/fukuii-test-timing.log | sort -t'(' -k2 -rn | head -20
+   ```
+   List the top 20 slowest individual tests.
 
----
+3. **Assess Thread.sleep sites (2 known):**
+   - `EthMiningServiceSpec.scala:302` — timeout window advance; check if `TestScheduler` can replace
+   - `SubscriptionManagerSpec.scala:249` — topic propagation wait 200ms; check if `awaitAssert` with short poll replaces it
+   For each: if replaceable with `TestScheduler` or `eventually(timeout(500.ms), interval(10.ms))`,
+   fix inline. If requires Typed TestKit migration → defer to §8a.
 
-### P2 — MITHRIL: Enum remaining candidates (Part 3d) ✅ DONE `b305ef41b` 2026-06-22
+4. **Assess wall-clock assertions (3 known + 1 borderline):**
+   - `WorkNotifierSpec` L103–108 (`elapsed should be < 500L`) — can the upper bound be raised to reduce flakiness?
+   - `MerkleProofVerifierPhase3Spec` L584–603 — already has generous bounds; record observed times
+   - `TrieNodeHealingCoordinatorSpec` L316–327 (`elapsedMs should be < 5000L`) — record observed time
+   - `SnapServerLimitsSpec` L89–90 — borderline; record whether it flaps
+   If any bound is routinely met with <50% margin, either raise the bound or replace with a
+   non-time-based assertion.
 
-**Agent:** MITHRIL
-**Files:** Files containing `SyncPhase`, `BlacklistReason`, `ForkId` — confirm with grep first
-**Prerequisite:** None. `SyncPhase` and `ForkId` are already partially done (check first).
+5. **Check for accidentally slow test infrastructure:**
+   ```bash
+   grep -rn "Thread\.sleep\|Await\.result\|blocking {" src/test/ --include="*.scala"
+   ```
+   Any new sites not in the known list → log to CHASE-QUEUE.
 
-**Result:** 4 types converted. `SyncPhase` and `ForkId` already converted in prior parts.
-Converted: `NetworkType`, `VmConfig.VmMode`, `FaucetStatus`, `SealEngineType`.
-Skipped: `MiningMode` (consensus/pow — FORGE gate), `ServerStatus`/`PruningMode` (valid enum
-candidates but wider refactor scope than this batch), everything in consensus/vm/domain (FORGE gate).
-
-**Prompt:**
-> On branch `scala3-cleanup-june`, address Part 3d: migrate remaining sealed trait + case
-> object hierarchies to Scala 3 `enum` where the pattern is a pure value enumeration.
->
-> Steps:
-> 1. Run: `grep -rn "sealed trait\|sealed abstract class" src/main/ --include="*.scala" | grep -v "Command\|Response\|Event\|Message\|Protocol"` — list candidates.
-> 2. For each candidate: confirm it is a pure value set (case objects only, no state, no constructor args that vary). If yes → enum candidate. If has varied constructor args → skip.
-> 3. For confirmed candidates, rewrite to:
->    ```scala
->    enum MyEnum:
->      case ValueA
->      case ValueB(field: Type)
->    ```
-> 4. Check for companion object `.values`, `withName`, ordering dependencies — migrate those.
-> 5. After each file: `sbt compile-all` — 0 errors.
-> 6. Run targeted spec: `sbt testOnly *[FileName]*`
-
-**Verification:** `sbt compile-all` clean; targeted tests pass
+**Verification:** New baseline ≤ prior baseline (23 min target). All 3,601+ tests pass.
 
 **MANDATORY final step — complete BEFORE closing thread:**
-- `working-docs/DEFERRED-BACKLOG.md` run order table — change `| C2 | Batch C step 2 | P2 MITHRIL enum candidates...` to `| ~~C2~~ | ~~Batch C step 2~~ | ~~P2 MITHRIL enum candidates~~ | ✅ DONE [date] — N types converted |`
-- `working-docs/DEFERRED-BACKLOG.md` — mark Part 3d row with ✅ and commit SHA(s)
-- `completed/SPRINT-QUEUE.md` — append row: `| [SHA(s)] | Part 3d — enum migration (N types converted) |`
-- `modernization-log/[subsystem].md` for each file touched — add under "Scala 3 Idioms":
-  `#### [SHA] — 3d: [TypeName] → enum`
-  `- **What:** sealed trait + N case objects → Scala 3 enum`
+- `working-docs/DEFERRED-BACKLOG.md` run order table — add: `| D3 | Batch D | P7 EYE test timing audit | No |` and strikethrough when done: `| ~~D3~~ | ~~Batch D~~ | ~~P7 EYE test timing audit~~ | ✅ DONE [date] — Xs baseline, N improvements |`
+- Update `fukuii-test-timing.md` (`.local/docs/`) with new baseline
+- Any Thread.sleep fixes → `completed/SPRINT-QUEUE.md` row
 
-**Opportunistic clearout:** Apply the protocol in CODEBASE-AUDIT.md. For each file touched, scan for `isInstanceOf` (P1 overlap), `println` (P3 overlap), or CHASE-QUEUE entries in the same file — fix inline or draft prompts.
-
-**Rejection criteria:** Converting Command/Response/Protocol traits (those are ADTs, not enums); adding behavior to enum cases beyond simple fields; touching consensus-critical types without FORGE review
-
----
-
-### P2-followup-AB — MITHRIL: `ServerStatus` + `PruningMode` → enum (Part 3d deferred, combined batch)
-
-**Agent:** MITHRIL
-**Files:**
-- `src/main/scala/com/chipprbots/ethereum/utils/NodeStatus.scala` + callers in `jsonrpc/`, `network/`, `nodebuilder/`
-- `src/main/scala/com/chipprbots/ethereum/db/storage/pruning/package.scala` + `PruningModeComponent`, `Storages`, `StoragesComponent`
-
-**Prerequisite:** P2 (3d main batch) ✅ DONE. No FORGE gate on either type (neither participates in consensus math).
-
-**Background (from Part 3d):**
-- `ServerStatus` (`utils/NodeStatus.scala`) — `NotListening` + `Listening(address: InetSocketAddress)`. Valid enum. Deferred because 10+ callers span multiple packages.
-- `PruningMode` (`db/storage/pruning/package.scala`) — `BasicPruning(history: Int)` + `InMemoryPruning(history: Int)`. Valid enum. Deferred because it is wired into three component traits and integration tests.
-
-Both are pure style changes: no consensus semantics, no serialization format change, no ordinal-dependent logic. One commit each.
-
-**Prompt:**
-> On branch `scala3-cleanup-june`, convert two deferred sealed-trait hierarchies to Scala 3 `enum`.
-> Do them sequentially — complete and commit each before starting the next.
->
-> ─── TYPE 1: ServerStatus ───
->
-> 1. Read `src/main/scala/com/chipprbots/ethereum/utils/NodeStatus.scala` — confirm all cases.
-> 2. Find all call sites:
->    ```bash
->    grep -rn "ServerStatus" src/ --include="*.scala"
->    ```
->    Check for any `extends ServerStatus` usage (open hierarchy → abort and CHASE-QUEUE instead).
-> 3. Rewrite to:
->    ```scala
->    enum ServerStatus:
->      case NotListening
->      case Listening(address: java.net.InetSocketAddress)
->    ```
->    Keep companion helpers if any. Pattern-match arms using `case x: ServerStatus.Listening =>`
->    become `case ServerStatus.Listening(addr) =>` — update these.
-> 4. After each file edited: `sbt compile-all` — 0 errors before moving on.
-> 5. Run targeted specs: `sbt "testOnly *NodeStatus* *Network* *AdminService*"` — all green.
-> 6. Commit: `3d-A: ServerStatus → Scala 3 enum (2 cases, N call sites)`
->
-> ─── TYPE 2: PruningMode ───
->
-> 7. Read `src/main/scala/com/chipprbots/ethereum/db/storage/pruning/package.scala` — confirm all cases and any companion helpers (`fromString`, factory methods).
-> 8. Find all call sites including component traits:
->    ```bash
->    grep -rn "PruningMode\|BasicPruning\|InMemoryPruning" src/ --include="*.scala"
->    ```
->    Check for `extends PruningMode` anywhere (open hierarchy → abort and CHASE-QUEUE instead).
-> 9. Rewrite to:
->    ```scala
->    enum PruningMode:
->      case BasicPruning(history: Int)
->      case InMemoryPruning(history: Int)
->    ```
->    Migrate companion helpers. The type name `PruningMode` is unchanged so most field/param
->    declarations compile without modification; the `PruningModeComponent`, `Storages`, and
->    `StoragesComponent` trait members should be unaffected — confirm with compile.
-> 10. After each file: `sbt compile-all` — 0 errors.
-> 11. Run: `sbt "testOnly *Storages* *Pruning*"` + `sbt "IntegrationTest / testOnly *Pruning*"` — all green.
-> 12. Commit: `3d-B: PruningMode → Scala 3 enum (2 cases, component traits unaffected)`
->
-> ─── Shared rules ───
->
-> - One commit per type — do not batch into a single commit.
-> - After each file edit: `sbt compile-all` — 0 errors mandatory before touching the next file.
-> - If `extends <Type>` is found anywhere, stop that type immediately and add a CHASE-QUEUE note;
->   proceed with the other type.
-> - Do NOT touch `consensus/`, `vm/`, `crypto/`, `domain/`.
-
-**Verification:**
-- `grep -rn "sealed.*ServerStatus\|sealed.*PruningMode" src/ --include="*.scala"` → 0 results
-- `sbt compile-all` 0 errors
-- All targeted tests green
-
-**MANDATORY final step — complete BEFORE closing thread:**
-- `working-docs/DEFERRED-BACKLOG.md` — mark this entry ✅ with both commit SHAs and date
-- `completed/SPRINT-QUEUE.md` — append two rows:
-  `| [SHA-A] | Part 3d-followup-A — ServerStatus → enum (2 cases, N callers) |`
-  `| [SHA-B] | Part 3d-followup-B — PruningMode → enum (2 cases, component traits) |`
-- `modernization-log/node.md` (or `utils.md`) — add under "Scala 3 Idioms":
-  `#### [SHA-A] — 3d-A: ServerStatus → enum`
-  `- **What:** sealed trait + 2 cases → Scala 3 enum; N call sites in jsonrpc/network/nodebuilder updated`
-- `modernization-log/storage.md` — add under "Scala 3 Idioms":
-  `#### [SHA-B] — 3d-B: PruningMode → enum`
-  `- **What:** sealed trait + 2 param cases → Scala 3 enum; PruningModeComponent/Storages unaffected`
-
-**Opportunistic clearout:** While reading each caller file, scan for `isInstanceOf` (P1 overlap) and `println` (P3 overlap) — fix inline if trivial, CHASE-QUEUE if complex.
-
-**Rejection criteria:** `extends ServerStatus` / `extends PruningMode` found anywhere; touching consensus/vm/crypto/domain files; bundling both types into a single commit; ordinal-dependent serialization of either type (check before converting).
-
----
-
-### P2-followup-C — FORGE ASSESSMENT: `MiningMode` enum eligibility (Part 3d deferred, consensus gate)
-
-**Agent:** FORGE (assessment only; MITHRIL implements if approved)
-**Files:** `src/main/scala/com/chipprbots/ethereum/consensus/pow/PoWMiningCoordinator.scala`
-**Prerequisite:** P2 (3d main batch) ✅ DONE.
-
-**Background (from Part 3d):** `MiningMode` is a 2-case discriminant sealed trait in
-`consensus/pow/`. The type itself is a pure flag (no math, no hash, no state root), but the file
-lives under `consensus/pow/` which requires FORGE review before any style change. MITHRIL
-deferred it here; FORGE must assess before any conversion is attempted.
-
-**Prompt (for FORGE):**
-> Assess whether `MiningMode` in
-> `src/main/scala/com/chipprbots/ethereum/consensus/pow/PoWMiningCoordinator.scala`
-> is safe to convert from `sealed trait + case objects` to a Scala 3 `enum`
-> as a pure style change.
->
-> Assessment steps:
-> 1. Read `PoWMiningCoordinator.scala` — identify the `MiningMode` definition and every usage
->    within the file.
-> 2. `grep -rn "MiningMode" src/ --include="*.scala"` — list all callers outside the file.
-> 3. Determine:
->    a. Does `MiningMode` participate in any consensus computation (EVM execution, block validation,
->       hash calculation, reward calculation, PoW difficulty)? Or is it purely a runtime mode flag
->       (start/stop mining)?
->    b. Are there any `extends MiningMode` usages that make this an open hierarchy?
->    c. Are there serialization/RLP/codec usages of `MiningMode` that could be affected by enum
->       ordinal changes?
-> 4. Produce a verdict:
->    - **APPROVED**: The conversion is a pure style change with no consensus-semantic impact.
->      Provide the exact enum definition to use and note any companion helpers to migrate.
->    - **CONDITIONAL**: Approved with specific constraints (list them).
->    - **REJECTED**: Explain what consensus-semantic impact exists and why the current sealed trait
->      must remain as-is (or be addressed differently).
-> 5. If APPROVED, draft the MITHRIL prompt to implement the conversion (one file, sbt compile-all,
->    targeted testOnly, single commit). Add it as a sub-note below this entry.
-
-**After FORGE verdict:**
-- If APPROVED → spawn MITHRIL with the generated prompt from step 5.
-- If REJECTED → add `MiningMode` to the FORGE-gated enum candidates section of CHASE-QUEUE.md.
-
-**MANDATORY final step — complete BEFORE closing thread (regardless of verdict):**
-- `working-docs/DEFERRED-BACKLOG.md` — mark this entry ✅ with date and FORGE verdict (APPROVED/REJECTED)
-- If APPROVED + implemented: `completed/SPRINT-QUEUE.md` — append MITHRIL implementation SHA
-- If REJECTED: `working-docs/CHASE-QUEUE.md` — add entry under FORGE-GATED section:
-  `MiningMode sealed trait in consensus/pow/PoWMiningCoordinator.scala — FORGE rejected enum conversion on [date]: [reason]`
-
-**Rejection criteria for FORGE assessment:** Changing any mining/consensus code during the assessment; implementing the conversion without explicit APPROVED verdict.
-
----
-
-### P3 — MITHRIL: console → SLF4J logging (Part 3e, 28 printlns)
-
-**Agent:** MITHRIL
-**Files:** `src/main/` (all packages)
-**Prerequisite:** None.
-
-**Prompt:**
-> On branch `scala3-cleanup-june`, address Part 3e: replace `println` / `System.out.println`
-> calls in production code with SLF4J logging.
->
-> Steps:
-> 1. Inventory: `grep -rn "println\|System\.out\." src/main/ --include="*.scala"` — count (expect ~28).
-> 2. For each occurrence:
->    - Identify the appropriate log level (most `println` → `log.info`; error/warning context → `log.warn`/`log.error`)
->    - Replace with the class's existing logger. If the class has no logger, add:
->      ```scala
->      private val log = LoggerFactory.getLogger(getClass)
->      ```
->      (or use Pekko `ActorLogging` / the project's preferred `logging-standards.md` pattern)
->    - Read `.claude/agent-protocols/logging-standards.md` before starting — use the correct logger acquisition pattern for the class type (Actor vs plain class)
-> 3. After each file: `sbt compile-all` — 0 errors.
-
-**Verification:** `grep -rn "println\|System\.out\." src/main/ --include="*.scala"` → 0 results
-
-**MANDATORY final step — complete BEFORE closing thread:**
-- `working-docs/DEFERRED-BACKLOG.md` run order table — change `| C3 | Batch C step 3 | P3 MITHRIL console→logging...` to `| ~~C3~~ | ~~Batch C step 3~~ | ~~P3 MITHRIL console→logging (28 sites)~~ | ✅ DONE [date] — N sites fixed |`
-- `working-docs/DEFERRED-BACKLOG.md` — mark Part 3e row with ✅ and commit SHA
-- `completed/SPRINT-QUEUE.md` — append row: `| [SHA] | Part 3e — console → SLF4J (28 println sites) |`
-- No modernization-log entry needed for this housekeeping change
-
-**Opportunistic clearout:** Apply the protocol in CODEBASE-AUDIT.md. While reading each file to replace `println`, scan for `isInstanceOf` (P1) and enum candidates (P2) in the same file — fix inline if small or draft follow-on prompts.
-
-**Rejection criteria:** Removing meaningful log output (preserve the message content); changing log levels in a way that would silence errors; touching test files (`src/test/` printlns are acceptable in tests)
-
----
-
-### P4 — MITHRIL/EYE: E165 test harness cleanup sprint (777 sites / 83 files)
-
-**Agent:** MITHRIL (type parameter additions), EYE (compile + test verification per batch)
-**Files:** `src/test/` — 83 files with unnarrowed TestProbe instances
-**Prerequisite:** Batch C P1–P3 complete. Multi-session sprint; commit in batches of ~10 files.
-
-**Context:** EYE S5 sweep (2026-06-22) found 777 unnarrowed TestProbe sites across 83 test files.
-Prior "5 in FastSyncBranchResolverSpec" was stale — that file is clean. Highest-density files:
-`TrieNodeHealingCoordinatorSpec` (58), `ByteCodeCoordinatorSpec` (56), `AccountRangeCoordinatorSpec` (54),
-`StorageRangeCoordinatorSpec` (39), `PeerManagerSpec` (32).
-
-**Prompt:**
-> On branch `scala3-cleanup-june`, work through the E165 TestProbe cleanup sprint.
->
-> E165 = pattern selectors on `Any` from unnarrowed `TestProbe` type parameters.
-> Fix: add `TestProbe[ExpectedMessageType]` wherever the probe's `expectMsg` call
-> reveals what message type it receives.
->
-> Strategy (for 777 sites across 83 files — work in batches of ~10 files per session):
-> 1. Start with highest-density files (list above) — they have established patterns.
-> 2. For each file:
->    a. `grep -n "TestProbe\b" path/to/Spec.scala | grep -v "\["` — list unnarrowed sites
->    b. For each site, read surrounding `expectMsg`/`expectMsgType`/`fishForMessage` to
->       determine the expected message type
->    c. Add `TestProbe[MessageType]` type parameter
->    d. `sbt compile-all` after each file — confirm E165 count decreasing
-> 3. Commit each batch: `E165 batch N — TestProbe type params (N files, N sites)`
-> 4. Do NOT change any production source files or any test logic.
-> 5. If a probe receives heterogeneous message types with no common supertype, leave as
->    `TestProbe[Any]` and add `// E165: heterogeneous` comment.
-
-**Verification (per batch):** `grep -rn "TestProbe\b" src/test/ --include="*.scala" | grep -v "\[" | wc -l` decreasing each batch
-
-**MANDATORY final step — complete after EACH batch commit AND when sprint is fully done:**
-- **Per batch:** `working-docs/PENDING.md` — update Test Hygiene item with running count (e.g., "777→N remaining")
-- `modernization-log/node/testing-infra.md` — add entry per batch:
-  `#### [SHA] — E165 batch N: TestProbe type params (N files, N sites)`
-  `- **What:** [list files]; E165 count −N`
-- **When fully complete:** remove item from `PENDING.md` Test Hygiene; add to `completed/PENDING.md`; mark run order table row: `| ~~C4~~ | ~~Batch C step 4~~ | ~~P4 MITHRIL/EYE E165 sprint~~ | ✅ DONE [date] — 777→0 sites |`
-
-**Opportunistic clearout:** Apply the protocol in CODEBASE-AUDIT.md. While working through each test file, check for Thread.sleep (P6 DONE — 2 known sites), wall-clock assertions (CHASE-QUEUE wall-clock-assertion section), or missing test coverage for the class under test — draft prompts for anything new found.
-
-**Rejection criteria:** Production file edits; test logic changes; leaving heterogeneous probes without the `// E165: heterogeneous` comment
-
----
-
-### P5 — MITHRIL: braceless scalafmt config (Part 8g, ~15 min)
-
-**Agent:** MITHRIL
-**Files:** `.scalafmt.conf`
-**Prerequisite:** None. Config-only change; no mass rewrite.
-
-**Prompt:**
-> On branch `scala3-cleanup-june`, address Part 8g: add the braceless-prefer configuration
-> to `.scalafmt.conf` so that new code written with braceless syntax formats correctly.
->
-> This is a config addition only — do NOT run a mass-rewrite of existing files.
->
-> Steps:
-> 1. Read `.scalafmt.conf` to find the current config structure.
-> 2. Add the braceless preference setting (Scala 3 indentation-based syntax):
->    ```
->    runner.dialect = Scala3
->    indent.defnSite = 2
->    newlines.topLevelStatementBlankLines = [{ blanks { before = 1 } }]
->    ```
->    (Adjust if already partially configured — only add what's missing.)
-> 3. Run: `sbt scalafmtAll` — must complete without errors. Diff should be small (config line only; no source reformat should happen from this change alone).
-> 4. Compile: `sbt compile-all` — 0 errors.
-
-**Verification:** `sbt scalafmtAll` clean; `sbt compile-all` clean; diff is `.scalafmt.conf` only
-
-**MANDATORY final step — complete BEFORE closing thread:**
-- `working-docs/DEFERRED-BACKLOG.md` run order table — change `| B4 | Batch B step 4 | P5 MITHRIL scalafmt config...` to `| ~~B4~~ | ~~Batch B step 4~~ | ~~P5 MITHRIL scalafmt config~~ | ✅ DONE [date] — config updated |`
-- `working-docs/DEFERRED-BACKLOG.md` — mark Part 8g row with ✅ and commit SHA
-- `completed/SPRINT-QUEUE.md` — append row: `| [SHA] | Part 8g — braceless scalafmt config added |`
-
-**Opportunistic clearout:** Apply the protocol in CODEBASE-AUDIT.md. While `.scalafmt.conf` is open, check if any other scalafmt/scalafix configuration gaps (from the Part 1 warning cleanup or `.scalafix.conf` expansion in §8e) can be added in the same commit.
-
-**Rejection criteria:** Triggering mass source reformatting; modifying any `.scala` source files; using an incompatible scalafmt version option
-
----
+**Rejection criteria:** Weakening test assertions beyond 2× measured time; skipping tests to reduce count; modifying test logic (only timing assertions and sleep replacement are in scope)
 
 ---
 
@@ -1289,3 +1138,470 @@ after the current sprint queue clears.
 **Result:** 2 pre-existing sites found — `EthMiningServiceSpec.scala:302` (timeout window advance,
 NECESSARY) and `SubscriptionManagerSpec.scala:249` (topic propagation wait, NECESSARY). Neither
 is flaky. No CHASE-QUEUE entries needed. Part 8j baseline: 2 sites, both intentional.
+
+---
+
+## Part 11: Full Test Suite Coverage Audit
+
+**Goal:** 100% coverage of the test suite — no test permanently hidden behind an exclusion tag
+without a documented verdict. Every excluded test gets one of: Fix & enable / Delete / Defer with
+written reason. P7 covered only `testEssential`; this part closes the gap.
+
+**Tag inventory at 2026-06-22:**
+| Tag | Count | Currently excluded from | Intent (per ADR-017 / Tags.scala) |
+|-----|-------|------------------------|----------------------------------|
+| `SyncTest` | ~50+ tests, 8 files | ALL tiers | "blockchain synchronisation" — many are actually pure unit tests, mislabelled |
+| `DisabledTest` | 9 tests, 5 files | ALL tiers | "temporarily disabled due to known issues — should be re-enabled" |
+| `FlakyTest` | 8 tests, 3 files | ALL tiers | "investigate and fix but temporarily marked to avoid blocking CI" |
+| `SlowTest` | ~30 tests, 8 files | testEssential only | Legitimately slow (PoW/DAG CPU) — some may be mislabelled |
+| `StressTest` | unknown | ALL tiers | Long-running stress — not yet assessed |
+| `ManualTest` | unknown | ALL tiers | Requires human verification — may be deletable or automatable |
+
+**Run order — this section:**
+| # | Batch | Prompt | Parallel-safe? |
+|---|-------|--------|----------------|
+| E1 | Batch E | P8 EYE SyncTest tag audit | Yes |
+| E2 | Batch E | P9 EYE/MITHRIL DisabledTest audit | Yes |
+| E3 | Batch E | P10 EYE/MITHRIL FlakyTest root cause | No (one spec at a time) |
+| E4 | Batch E | P11 testStandard baseline + SlowTest audit | No (long-running) |
+| E5 | Batch E | P12 Tag taxonomy + build target architecture review | Yes (read-only) |
+
+---
+
+### P8 — EYE: SyncTest tag audit — rescue mis-tagged unit tests
+
+**Agent:** EYE (read, grep, verdict per test)
+**Prerequisite:** None. Read-only — no code changes, only assessment and a verdict file.
+
+**Context:** `SyncTest` is excluded from ALL tiers in `build.sbt:85`. The tag description says
+"Tests for blockchain synchronisation." However, grep reveals ~50 tests across 8 files using this
+tag, many of which look like pure unit tests (exponential backoff math, cache data structures, peer
+selection logic) that don't require live sync or any actor timing. They were probably tagged
+`SyncTest` because they live in sync-related packages, not because they actually need the exclusion.
+
+Rescuing mis-labelled tests to `UnitTest` would immediately add them to `testEssential`.
+
+**Files to audit:**
+- `RetryStrategySpec.scala` — 12 tests: exponential backoff, delay caps, jitter, fluent config. Likely all pure unit.
+- `PeersClientSpec.scala` — 5 tests: peer selection data structures (BestPeer, filter by block number).
+- `CacheBasedBlacklistSpec.scala` — 5 tests: blacklist cache add/expire/remove/keys.
+- `BlockchainHostActorSpec.scala` — 8 tests: actor serves block data using TestProbe. Actor-based but hermetic.
+- `StateStorageActorSpec.scala` — 1 test: actor persists fast sync state.
+- `StateSyncSpec.scala` — 2 tests: state sync to tries.
+- `FastSyncSpec.scala` — 3 tests tagged `(UnitTest, SyncTest, FlakyTest)` + 1 tagged same. (FlakyTest root cause is P10.)
+- `SyncControllerSpec.scala` — `FlakyTest` ones are P10. Remaining SyncTest-only tests assessed here.
+
+**Steps:**
+1. For each file above, read the test bodies. For each test, answer:
+   - Does it require a live network connection or real peer handshake? → Keep `SyncTest`
+   - Does it use real clock / wall-time sensitivity? → Keep `SyncTest` or add `FlakyTest`
+   - Is it a pure function / data-structure test with TestProbe? → Candidate for `UnitTest` rescue
+   - Is it tagged `SyncTest` AND `FlakyTest`? → Skip (P10 handles FlakyTest cases)
+
+2. Produce a verdict table:
+   ```
+   | File | Test description | Current tags | Verdict | Reason |
+   ```
+   With verdicts: `RESCUE→UnitTest` / `KEEP SyncTest` / `REASSIGN→IntegrationTest` / `DEFER (P10)`.
+
+3. For each `RESCUE` verdict: remove `SyncTest`, add `UnitTest` if not already present.
+   - `SyncTest` appears in two patterns: `taggedAs (UnitTest, SyncTest)` and `taggedAs (UnitTest, SyncTest, FlakyTest)`
+   - Only edit the `UnitTest, SyncTest` (no FlakyTest) ones in this prompt
+   - Compile after each file: `sbt compile-all`
+
+4. Run `testEssential` after all rescues to confirm the rescued tests pass in Tier 1.
+
+**Verification:** `sbt compile-all` clean. Rescued tests appear in `testEssential` output and pass.
+`testEssential` count increases by the number of rescued tests.
+
+**MANDATORY final step:**
+- Update run-order table above: strikethrough E1, note rescued-count and commit hash.
+- Update `fukuii-test-timing.md` with new testEssential count.
+- **Track toward SyncTest removal from build.sbt:** Record in a CHASE-QUEUE entry how many
+  SyncTest-tagged tests remain that are NOT yet in any active tier. The explicit end-state
+  goal — once P8 + P10 are both complete — is to remove `-l SyncTest` from the
+  `testEssential`, `testStandard`, and `testComprehensive` exclusion lists in `build.sbt`.
+  Sync is core behavior; it belongs in testEssential. The exclusion is a workaround, not
+  a design decision.
+
+**Rejection criteria:** Rescuing any test that uses `Thread.sleep`, real wall-clock assertions, or
+live network/peer connections. Rescue only hermetic tests.
+
+---
+
+### P9 — EYE/MITHRIL: DisabledTest audit — fix, wire, or delete
+
+**Agent:** EYE (assess each test), MITHRIL (implement fixes where needed)
+**Prerequisite:** None. Can run parallel to P8.
+
+**Context:** 9 tests across 5 files are tagged `DisabledTest`, which ADR-017 defines as
+"temporarily disabled due to known issues — should be re-enabled." These are not dead code —
+they are tests with a stated intent. But "temporarily" may have become permanent. Each needs
+a verdict: Fix & enable / Delete (the test is wrong or the feature is gone) / Defer with
+written reason and a GitHub issue link.
+
+**Inventory (9 tests, 5 files):**
+
+| File | Line | Test description |
+|------|------|-----------------|
+| `RegularSyncSpec.scala` | 522 | "retry fetching node if validation failed" |
+| `RegularSyncSpec.scala` | 550 | "save fetched node" |
+| `SyncControllerSpec.scala` | 243 | "not change best block after receiving faraway block" |
+| `SyncControllerSpec.scala` | 434 | "re-enqueue block bodies when empty response is received" |
+| `JsonRpcControllerSpec.scala` | 76 | (read to determine description) |
+| `JsonRpcControllerSpec.scala` | 127 | (read to determine description) |
+| `JsonRpcControllerEthSpec.scala` | 559 | (read to determine description) |
+| `JsonRpcControllerEthSpec.scala` | 852 | (read to determine description) |
+| `EthTxServiceSpec.scala` | 372 | (read to determine description) |
+
+**Steps for each test:**
+1. Read the test body (±20 lines around the listed line).
+2. Run `git log -p --follow -S "DisabledTest" -- <file>` to find when/why it was disabled.
+3. Attempt to compile and run the test alone: `sbt "testOnly *SpecName* -- -n DisabledTest"` — does it pass?
+4. Verdict:
+   - **FIX**: If the test fails with a specific error → fix the underlying issue, remove `DisabledTest`, add appropriate tier tag.
+   - **DELETE**: If the feature under test was removed, renamed, or the test was clearly wrong → delete the test and note why.
+   - **DEFER**: If fixing requires significant new implementation or blocked on an external gate → document the block, create a CHASE-QUEUE entry, leave `DisabledTest` tag but add a comment with the reason.
+
+5. Commit fixed tests individually. Format: "test: re-enable <TestName> — <one-line fix>"
+
+**Verification:** After each fix, `sbt compile-all` + `sbt "testOnly *SpecName*"` passes.
+
+**MANDATORY final step:**
+- Update run-order table: strikethrough E2, note fix-count / delete-count / defer-count and commit hashes.
+- Add any DEFERed items to CHASE-QUEUE with `[DisabledTest]` prefix.
+
+**Rejection criteria:** Re-enabling a test without understanding why it was disabled. Never remove
+`DisabledTest` without verifying the test actually passes.
+
+---
+
+### P10 — EYE/MITHRIL: FlakyTest root cause audit — fix or delete
+
+**Agent:** EYE (diagnose root cause), MITHRIL (fix with deterministic patterns)
+**Prerequisite:** P8 complete (so SyncTest+FlakyTest overlap is clear).
+
+**Context:** 8 tests across 3 files are tagged `FlakyTest`. ADR-017 says "investigate and fix but
+temporarily marked to avoid blocking CI." These are the tests most likely to contain real bugs —
+race conditions, wall-clock sensitivity, or non-deterministic actor interactions. None of them run
+in any tier. Fixing them is high-value: these cover sync state, PoW mining, and peer management.
+
+**Inventory (8 tests, 3 files):**
+
+| File | Line | Test description | Also tagged |
+|------|------|-----------------|-------------|
+| `FastSyncSpec.scala` | ~244 | (read to determine) | UnitTest, SyncTest |
+| `FastSyncSpec.scala` | ~287 | (read to determine) | UnitTest, SyncTest |
+| `FastSyncSpec.scala` | ~311 | (read to determine) | UnitTest, SyncTest |
+| `FastSyncSpec.scala` | ~336 | "returns Syncing with state nodes progress" | UnitTest, SyncTest |
+| `SyncControllerSpec.scala` | ~385 | (read to determine) | (check) |
+| `SyncControllerSpec.scala` | ~470 | (read to determine) | (check) |
+| `PoWMiningCoordinatorSpec.scala` | ~123 | "Miners mine recurrently" | UnitTest, ConsensusTest, SlowTest |
+| `PoWMiningCoordinatorSpec.scala` | ~188 | "StopMining stops PoWMinerCoordinator" | UnitTest, ConsensusTest, SlowTest |
+
+**Steps for each test (one at a time, no parallel):**
+1. Read the full test body.
+2. `git log -p --follow -S "FlakyTest" -- <file>` to find when it was marked flaky and what comment was left.
+3. Identify the root cause category:
+   - **`Thread.sleep` / wall-clock assertion** → Replace with `TestScheduler` / `eventually` / `awaitAssert`
+   - **Non-deterministic actor message ordering** → Add `TestProbe.expectMsgAllOf` or reorder assertions
+   - **Race between actor startup and first message** → Add `awaitAssert` or `expectMsgType` with explicit timeout
+   - **Real PoW computation timing** (PoWMiningCoordinatorSpec) → Inject a fake miner that succeeds immediately
+   - **Test depends on external state** → Isolate with mocks or hermetic fixtures
+4. Attempt the fix. Compile: `sbt compile-all`.
+5. Run 10× to confirm not flaky: `for i in $(seq 10); do sbt "testOnly *SpecName*" && echo "PASS $i" || echo "FAIL $i"; done`
+6. If not fixable without major refactor → verdict DELETE, with rationale written in test comment before removal.
+   Never leave a flaky test enabled — either fix it or delete it.
+7. Remove `FlakyTest` tag once confirmed stable (10/10 passes). Add correct tier tag.
+
+**Special case — PoWMiningCoordinatorSpec:** These two tests involve real Ethash PoW computation,
+which is inherently variable. The fix is almost certainly a fake/mock miner that completes
+instantly, not a timing adjustment. Check if `EthashMiner` is injectable; if not, MITHRIL adds
+a `MinerFactory` seam.
+
+**Verification:** Fixed tests pass 10/10 in `testOnly`. No `FlakyTest` tags remain in the fixed files.
+
+**MANDATORY final step:**
+- Update run-order table: strikethrough E3, note fixed-count / deleted-count + commit hashes.
+- If any tests rescued from `SyncTest` too (P8 overlap) → update P8 verdict table.
+- Update `fukuii-test-timing.md` test count after fixes land in testEssential.
+
+**Rejection criteria:** Re-tagging a flaky test as `SlowTest` or `DisabledTest` to avoid fixing it.
+A test must be either reliably passing or deleted — no half-measures.
+
+---
+
+### P11 — EYE: testStandard baseline + SlowTest tag audit
+
+**Agent:** EYE (run testStandard, assess SlowTest tag accuracy)
+**Prerequisite:** P8, P9, P10 complete (so the test count is stable before capturing the baseline).
+
+**Context:** `testStandard` (~30 min) adds `SlowTest` and `IntegrationTest` to the essential tier.
+No baseline has ever been recorded for this tier. Additionally, some `SlowTest` tagged tests
+appear mislabelled (e.g., `MiningSpec:10` — "KnownProtocols have unique names" — should not be
+slow). This prompt captures the Standard baseline and audits SlowTest label accuracy.
+
+**SlowTest inventory for label-accuracy check:**
+
+| File | Tests | Why tagged SlowTest? | Likely correct? |
+|------|-------|---------------------|-----------------|
+| `DAGGenerationSpec.scala` | 7 | Ethash cache+DAG CPU computation | ✅ Yes — legitimately slow |
+| `EthashNonceSearchSpec.scala` | 6 | PoW nonce search (CPU-bound) | ✅ Yes |
+| `EthashMinerSpec.scala` | 2 | Mining valid blocks (actual PoW) | ✅ Yes |
+| `PoWBlockHeaderValidatorSpec.scala` | 1 | Ethash header validation | Possibly — assess observed time |
+| `PoWMiningCoordinatorSpec.scala` | ~7 | Mining coordinator w/ actor timing | Possibly — assess |
+| `PoWMiningSpec.scala:71` | 1 | "not start miner when miningEnabled=false" | ❓ Likely mislabelled |
+| `MiningSpec.scala:10,17` | 2 | "unique names" / "contain ethash" | ❌ Almost certainly mislabelled |
+| `MerkleProofVerifierPhase3Spec.scala:573` | 1 | Quadratic growth regression check | ✅ Yes — 100-1000 acct comparison |
+
+**Steps:**
+1. Check system resources: `free -h && uptime` (load < 4.0 before starting).
+2. Run testStandard and capture timing:
+   ```bash
+   cd /media/dev/2tb/dev/fukuii
+   start_time=$(date +%s)
+   .local/scripts/fukuii-test standard 2>&1 | tee /tmp/fukuii-teststandard-timing.log
+   end_time=$(date +%s)
+   echo "TOTAL_ELAPSED: $((end_time - start_time)) seconds" | tee -a /tmp/fukuii-teststandard-timing.log
+   ```
+
+3. After completion, identify the top 20 slowest tests:
+   ```bash
+   grep -E "\([0-9]+ seconds" /tmp/fukuii-teststandard-timing.log | sort -t'(' -k2 -rn | head -20
+   ```
+
+4. For each test tagged `SlowTest`: compare its actual observed time against the `SlowTest` definition
+   (">100ms, <5 seconds"). If actual time is <100ms → `MISLABELLED` → remove `SlowTest`, add `UnitTest`.
+
+5. For `MiningSpec:10,17` and `PoWMiningSpec:71` specifically: if observed time is <100ms →
+   remove `SlowTest` tag and add `UnitTest`, which promotes them to `testEssential`.
+
+6. Record the testStandard baseline in `fukuii/.local/docs/fukuii-test-timing.md`.
+
+**Verification:** All testStandard tests pass (0 failures). Baseline recorded.
+
+**MANDATORY final step:**
+- Update run-order table: strikethrough E4, note wall time, test count, mislabelled-count.
+- Update `fukuii-test-timing.md` with testStandard baseline.
+- Any mislabelled SlowTest promotions → note commit hash.
+
+**Rejection criteria:** Removing `SlowTest` from a test that actually takes >100ms. Observe the
+time, don't guess. `DAGGenerationSpec` and `EthashNonceSearchSpec` must remain `SlowTest`.
+
+---
+
+### P12 — MITHRIL: Tag taxonomy + build target architecture review + gaps
+
+**Agent:** MITHRIL (read-only analysis → build.sbt edits for new targets)
+**Prerequisite:** P8, P9, P10 complete (stable tag counts before auditing the architecture).
+**Parallel-safe:** Yes (read-only except for new `addCommandAlias` additions).
+
+**Architectural principle (read this first):**
+
+> Test groupings must reflect reality, not hide failures. An exclusion tag is only legitimate
+> when the test is *correctly categorised* as non-essential (too slow, genuine live-network
+> requirement, compliance-only). An exclusion that exists because a test is *broken* is a
+> workaround that buries technical debt. `testEssential` must include everything that is
+> essential — if it's too slow for the essential gate, create a `testFast` tier for speed,
+> not an exclusion that erases the test from CI entirely.
+
+**Legitimate exclusions (keep):**
+- `SlowTest` from `testEssential` — correct: too slow for daily commit gate; runs in Standard
+- `BenchmarkTest` / `EthereumTest` from Essential+Standard — correct: 3-hour compliance suite
+- `IntegrationTest` from `testEssential` — assess: may belong there if actor system tests are fast enough
+
+**Workaround exclusions (must go to zero after P8–P10):**
+- `SyncTest` from ALL tiers — workaround for broken/flaky sync tests; not a categorisation
+- `DisabledTest` from ALL tiers — workaround for broken tests that need fixing or deleting
+- `FlakyTest` from ALL tiers — workaround for non-deterministic tests that need fixing or deleting
+
+**Context:** The tag system has grown organically. After P8–P10 clean up individual tests,
+this prompt steps back and asks: is the *architecture* right? Four questions:
+
+1. **Tag coverage gaps** — Which tags defined in `Tags.scala` have no corresponding `sbt`
+   inclusion command? (`ConsensusTest`, `StateTest`, `RPCTest`, `OlympiaTest`, etc.)
+2. **Tier completeness** — Are all tiers running the right submodule tests? (`testStandard`
+   skips `rlp / test`, `bytes / test`, `crypto / test` — is that intentional?)
+3. **Missing tiers / new build targets** — Should new tiers exist? What would `testConsensus`,
+   `testRPC`, `testMining` enable? Should `testFast` exist as a <2-min subset of testEssential
+   for pre-commit hooks, freeing `testEssential` to be truly comprehensive?
+4. **Workaround exclusion removal** — Capstone of P8+P10. Remove every workaround exclusion
+   from the tier definitions. `testEssential` must include all essential tests. Sync is
+   essential. RPC is essential. State is essential. If a test in those domains is currently
+   excluded because it's broken, fixing it (P8/P9/P10) is the prerequisite — not permanent
+   exclusion.
+
+**Known gaps to assess:**
+
+| Issue | Current state | Proposed fix |
+|-------|--------------|--------------|
+| **`-l SyncTest` in ALL tiers** | Core sync logic has zero CI coverage — a workaround, not a design | **Remove from all tiers** once P8+P10 complete; sync tests belong in testEssential |
+| `ConsensusTest` tag — no sbt target | Tests included in tiers but can't be run in isolation | Add `testConsensus` alias: `-n ConsensusTest` |
+| `RPCTest` tag — no sbt target | Same problem for JSON-RPC layer tests | Add `testRPC` alias: `-n RPCTest` |
+| `StateTest` tag — no sbt target | Same for state management | Add `testState` alias: `-n StateTest` |
+| `OlympiaTest` tag — no sbt target | Fork-specific tests can't be run in isolation | Add `testOlympia` alias: `-n OlympiaTest` |
+| `testStandard` skips rlp/bytes/crypto submodules | Possible coverage gap | Assess whether these submodule tests are covered elsewhere |
+| `testMining` — no dedicated target | Ethash/PoW tests scattered across SlowTest+ConsensusTest | Consider adding `testMining` alias for CI on mining-heavy PRs |
+| `StressTest` / `ManualTest` — defined but unused | No tests use them, no commands reference them | Assess: forward-declared or dead tag definitions? |
+| `testAll` runs bare `test` without submodule isolation | `testAll` and `testComprehensive` overlap | Confirm no double-execution or gaps |
+
+**Steps:**
+
+0. **Exclusion legitimacy audit** — For every `-l TAG` in every tier definition, classify:
+   ```
+   testEssential excludes:  SlowTest | IntegrationTest | SyncTest | DisabledTest | FlakyTest
+   testStandard excludes:   BenchmarkTest | EthereumTest | SyncTest | DisabledTest | FlakyTest
+   testComprehensive excludes: SyncTest | FlakyTest | DisabledTest
+   ```
+   For each: answer "Is this exclusion *categorisation* (the test genuinely does not belong
+   here) or *workaround* (the test belongs here but is broken)?"
+
+   | Tag excluded | Type | Verdict after P8–P10 |
+   |-------------|------|----------------------|
+   | `SlowTest` from testEssential | Categorisation | Keep — legitimately slow |
+   | `IntegrationTest` from testEssential | Assess | May belong; actor tests can be hermetic |
+   | `BenchmarkTest` from Essential+Standard | Categorisation | Keep — 3h compliance suite |
+   | `EthereumTest` from Essential+Standard | Categorisation | Keep — 3h compliance suite |
+   | `SyncTest` from ALL tiers | **Workaround** | **Remove after P8+P10** |
+   | `DisabledTest` from ALL tiers | **Workaround** | **Remove after P9 (no tests left disabled)** |
+   | `FlakyTest` from ALL tiers | **Workaround** | **Remove after P10 (no tests left flaky)** |
+
+   The end state: `testEssential` excludes ONLY `SlowTest`, `BenchmarkTest`, `EthereumTest`
+   (legitimate speed categorisations), nothing else. `FlakyTest`, `DisabledTest`, `SyncTest`
+   disappear from the exclusion lists because no tests carry those tags any more.
+
+   If `IntegrationTest` from `testEssential` is also a workaround (actor tests that are actually
+   fast and hermetic), reschedule those tests too.
+
+1. **Tag usage census** — For each tag in `Tags.scala`, count actual usages:
+   ```bash
+   for tag in UnitTest FastTest IntegrationTest SlowTest EthereumTest BenchmarkTest StressTest CryptoTest RLPTest VMTest NetworkTest MPTTest StateTest ConsensusTest RPCTest DatabaseTest SyncTest FlakyTest DisabledTest ManualTest EthSmoke OlympiaTest; do
+     count=$(grep -rn "taggedAs.*$tag\|$tag," src/test/ --include="*.scala" | grep -v "import\|object $tag\|//\|class.*Tag" | wc -l)
+     echo "$tag: $count"
+   done
+   ```
+
+2. **Submodule test coverage** — Run each submodule standalone and check counts:
+   ```bash
+   sbt "rlp / test" 2>&1 | grep "Tests:" | tail -1
+   sbt "bytes / test" 2>&1 | grep "Tests:" | tail -1
+   sbt "crypto / test" 2>&1 | grep "Tests:" | tail -1
+   ```
+   Confirm these are covered by `testEssential` (they are — lines 526-528) but NOT by
+   `testStandard` (line 540 — only `testOnly` without submodule prefix). Document this gap.
+
+3. **New build targets** — For each proposed new alias, verify the tag is actually used by
+   enough tests to warrant a dedicated command (threshold: ≥3 tests). Propose the `addCommandAlias`
+   line for each justified target.
+
+4. **Tier gap fix proposal** — For `testStandard`, determine if adding submodule test runs is
+   needed or if the existing `testEssential` coverage is sufficient. If a gap exists, propose
+   adding `; rlp / test ; bytes / test ; crypto / test` to `testStandard`.
+
+5. **Dead tag removal** — If `StressTest` or `ManualTest` have 0 usages, either:
+   - Remove from `Tags.scala` if no near-term plan to use them (clean up dead definitions)
+   - Add a comment in `Tags.scala` marking them as "reserved for future use" if there's a plan
+
+6. **Write a tag taxonomy document** at `fukuii/.local/docs/test-tag-taxonomy.md`:
+   ```markdown
+   # Test Tag Taxonomy
+   | Tag | Usage count | sbt command | Tier coverage | Notes |
+   ```
+   One row per tag. This becomes the authoritative reference for tagging new tests.
+
+7. **Remove `-l SyncTest` from all tier definitions** (capstone step — only after P8+P10 complete):
+   - Confirm zero SyncTest tests remain without a proper tier tag (UnitTest or IntegrationTest).
+   - Edit `build.sbt` lines 525, 540, 557: remove `-l SyncTest` from each `testOnly` invocation.
+   - Remove the build.sbt comment block explaining the exclusion (the workaround is gone).
+   - Run `testEssential` to confirm the newly-included sync tests pass and the count is correct.
+   - Commit: `"build: remove -l SyncTest exclusion — sync tests now in testEssential (P8+P10 complete)"`
+
+8. **Add justified `addCommandAlias` entries** to `build.sbt` — place after the existing domain
+   aliases. Include a comment explaining the purpose of each.
+
+**Target end state for `testEssential` in `build.sbt`:**
+```scala
+// BEFORE (workarounds present):
+testOnly -- -l SlowTest -l IntegrationTest -l SyncTest -l DisabledTest -l FlakyTest
+
+// AFTER (only legitimate categorisations remain):
+testOnly -- -l SlowTest -l BenchmarkTest -l EthereumTest
+```
+If `IntegrationTest` is also found to be a workaround (actor tests that are hermetic and fast),
+it is removed too. If a `testFast` tier is warranted (e.g., pre-commit hook, <2 min), it is
+added as a new alias — not as a reason to exclude essential tests from `testEssential`.
+
+**Verification:** `sbt compile-all` clean after all `build.sbt` edits. `testEssential` passes
+with sync tests included and a higher test count than the P7 baseline. `sbt testConsensus` (and
+other new targets) each find ≥3 tests. Zero `-l SyncTest`, `-l DisabledTest`, `-l FlakyTest`
+lines remain in any tier definition.
+
+**MANDATORY final step:**
+- Update run-order table: strikethrough E5, record the final testEssential exclusion list.
+- Commit build.sbt changes in two commits: (1) domain targets added, (2) workaround exclusions removed.
+- Write `test-tag-taxonomy.md` with final tag census and tier membership for each tag.
+- Update `fukuii-test-timing.md` with new testEssential count and the clean exclusion list.
+- Update MEMORY.md `fukuii-test-timing.md` entry with final test count.
+
+**Rejection criteria:** Removing a workaround exclusion before the underlying tests are fixed
+(P8+P10 must be complete first). Adding a build target for a tag with 0–1 test usages.
+Introducing a new exclusion that is a workaround — if a test is broken, fix or delete it,
+do not exclude it. Tiers must reflect reality.
+
+---
+
+## Part 12: Pre-Olympia Consensus Correctness Gate
+
+### §G5 — BlockExecution.applyEip2935 account-existence gap (BEACON + FORGE)
+
+**Source:** CHASE-QUEUE `BlockExecution.applyEip2935` entry (cleared 2026-06-21, routed here)
+**Branch:** Any post-Olympia-gated branch
+**Risk:** MEDIUM — consensus-adjacent storage write; pre-Olympia correctness gap; Hive compliance blocker
+
+**Background:**
+
+`BlockExecution.applyEip2935` writes to `HistoryStorageAddress` storage without first
+guaranteeing the account exists. The parallel method `applyEip4788` does create the account
+if absent before writing. Currently masked on real ETC mainnet by deployment order (the
+`HistoryStorageAddress` account pre-exists at activation block), but:
+
+1. **Hive compliance:** EIP-2935 Hive tests construct `emptyWorld` + post-activation block;
+   the absent-account path hits `getGuaranteedAccount` → `IllegalStateException` → test failure.
+2. **Test construction trap:** Any `BlockHashHistorySpec` scenario starting from an empty world
+   after the activation block will silently fail to write or throw.
+3. **Olympia activation risk:** If activation block ordering or genesis conditions ever shift,
+   the storage write silently fails or corrupts state (storage on a non-existent account).
+
+**Current code pattern** (analogous to applyEip4788 — read both before touching either):
+```bash
+grep -n "applyEip2935\|applyEip4788\|HistoryStorageAddress\|BlockHashHistory" \
+  src/main/scala/io/iohk/ethereum/blockchain/ledger/BlockExecution.scala
+```
+
+**Fix (FORGE + BEACON reviewed verdict — do not implement without confirmation):**
+- Drop `isActivationBlock &&` from the `w1` branch condition so the account-existence guard
+  runs on every post-activation block (not just the activation block itself)
+- OR adopt the same "create if absent" guard pattern used in `applyEip4788`
+- Exact approach must be confirmed with FORGE (ETC/Olympia) + BEACON (EIP-2935 spec)
+
+**New test required:** `BlockHashHistorySpec` absent-account scenario:
+```scala
+// Test pattern: emptyWorld + post-activation block → storage write succeeds + account exists
+// Verify: no IllegalStateException, HistoryStorageAddress account exists after call
+// Mirrors: existing applyEip4788 test coverage pattern
+```
+
+**Gate condition:** BEACON review (EIP-2935 spec compliance) + FORGE review (ETC/Olympia
+activation block semantics) BOTH required before any code change. This touches consensus
+ledger logic and both chains are affected.
+
+**Owner:** BEACON + FORGE — do not delegate to MITHRIL or WRAITH alone.
+
+**Priority:** HIGH — Hive EIP-2935 compliance blocker for Olympia acceptance testing.
+Handle before any Hive ETC Olympia test suite run.
+
+**MANDATORY final step (after fix):**
+- Add `BlockHashHistorySpec` absent-account test (see test pattern above)
+- `./local/scripts/fukuii-test` → confirm baseline holds
+- Update CHASE-QUEUE cleared entries log with commit SHA
+- DELETE this section

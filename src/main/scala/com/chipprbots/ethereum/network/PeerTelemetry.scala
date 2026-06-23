@@ -68,7 +68,7 @@ case object PeerTelemetry extends MetricsContainer with Logger {
       // Replace any stale series for this peer first (e.g. reconnect before a disconnect was processed).
       removeMeter(infoMeters, peer.id)
       val infoGauge = Gauge
-        .builder(InfoMetricName, this, (_: Any) => 1.0)
+        .builder(InfoMetricName, this, (_: Any) => 1.0) // Any: Micrometer gauge state — library API
         .tags(tags*)
         .strongReference(true)
         .register(metrics.registry)
@@ -77,7 +77,7 @@ case object PeerTelemetry extends MetricsContainer with Logger {
       removeMeter(bestBlockMeters, peer.id)
       val bestBlock = peerInfo.maxBlockNumber.toDouble
       val blockGauge = Gauge
-        .builder(BestBlockMetricName, this, (_: Any) => bestBlock)
+        .builder(BestBlockMetricName, this, (_: Any) => bestBlock) // Any: Micrometer gauge state — library API
         .tags("peer", peer.id.value)
         .strongReference(true)
         .register(metrics.registry)

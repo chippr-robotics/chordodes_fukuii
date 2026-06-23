@@ -18,9 +18,9 @@ case class ByteCodeTask(
     codeHashes: Seq[ByteString],
     accountHashes: Seq[ByteString] = Seq.empty,
     // Runtime fields
-    var pending: Boolean = false,
-    var done: Boolean = false,
-    var bytecodes: Seq[ByteString] = Seq.empty
+    pending: Boolean = false,
+    done: Boolean = false,
+    bytecodes: Seq[ByteString] = Seq.empty
 ) {
 
   require(codeHashes.nonEmpty, "ByteCodeTask must have at least one code hash")

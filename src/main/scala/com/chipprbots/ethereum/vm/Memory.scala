@@ -109,7 +109,7 @@ class Memory private (private val underlying: ByteString) {
     */
   def size: Int = underlying.size
 
-  override def equals(that: Any): Boolean =
+  override def equals(that: Any): Boolean = // §3h: FORGE-gate
     that match {
       case that: Memory => this.underlying.equals(that.underlying)
       case _            => false

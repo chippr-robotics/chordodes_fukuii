@@ -527,7 +527,7 @@ object BlockExecution {
 }
 
 sealed trait BlockExecutionError {
-  val reason: Any
+  val reason: Any // §3h: FORGE-gate
 }
 
 sealed trait BlockExecutionSuccess
@@ -535,7 +535,7 @@ sealed trait BlockExecutionSuccess
 case object BlockExecutionSuccess extends BlockExecutionSuccess
 
 object BlockExecutionError {
-  final case class ValidationBeforeExecError(reason: Any) extends BlockExecutionError
+  final case class ValidationBeforeExecError(reason: Any) extends BlockExecutionError // §3h: FORGE-gate
 
   final case class StateBeforeFailure(worldState: InMemoryWorldStateProxy, acumGas: BigInt, acumReceipts: Seq[Receipt])
 
@@ -545,7 +545,7 @@ object BlockExecutionError {
   final case class ValidationAfterExecError(reason: String) extends BlockExecutionError
 
   case object MissingParentError extends BlockExecutionError {
-    override val reason: Any = "Cannot find parent"
+    override val reason: Any = "Cannot find parent" // §3h: FORGE-gate
   }
 
   final case class MPTError(reason: MPTException) extends BlockExecutionError

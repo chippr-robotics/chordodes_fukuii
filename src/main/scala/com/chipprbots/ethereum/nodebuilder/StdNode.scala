@@ -244,7 +244,7 @@ abstract class BaseNode extends Node {
   }
 
   override def shutdown: () => Unit = () => {
-    def tryAndLogFailure(f: () => Any): Unit = Try(f()) match {
+    def tryAndLogFailure(f: () => Any): Unit = Try(f()) match { // Any: accepts any thunk — return value discarded
       case Failure(e) => log.warn("Error while shutting down...", e)
       case Success(_) =>
     }

@@ -23,7 +23,7 @@ and add a dated log entry at the bottom.
 | File | Line(s) | Pattern | Type | Agent | Date |
 ```
 
-**Type codes:** `LOG` `WARN` `RETURN` `SENDER` `CLASSIC` `MUTABLE` `EXCEPT` `IMPLICIT` `ISINST` `DEAD` `NULL`
+**Type codes:** `LOG` `WARN` `RETURN` `SENDER` `CLASSIC` `MUTABLE` `EXCEPT` `IMPLICIT` `ISINST` `DEAD` `NULL` `FORGE`
 
 ---
 
@@ -32,6 +32,8 @@ and add a dated log entry at the bottom.
 | File | Line(s) | Pattern | Type | Agent | Date |
 |------|---------|---------|------|-------|------|
 | `consensus/pow/PoWMiningCoordinator.scala` | — | Threading model finding (R9/8d B2): FORGE-gated. See `threading-model-audit.md §B2` for detail. FORGE review required before any fix. | MUTABLE | PRISM | 2026-06-21 |
+| `ledger/BlockExecution.scala` | 530, 538, 548 | §3h: `val reason: Any` in `BlockExecutionError` sealed trait + `ValidationBeforeExecError(reason: Any)` + `MissingParentError.reason: Any`. Could be narrowed to `String` (all construction sites pass strings). FORGE sign-off required before changing — used directly by `consensus/pow/validators/ValidatorsExecutor` and `consensus/validators/Validators`. | FORGE | MITHRIL | 2026-06-22 |
+| `domain/Address.scala` `domain/UInt256.scala` `vm/Memory.scala` `vm/Stack.scala` | 52, 171, 112, 85 | §3h: `override def equals(that: Any)` in FORGE-gated packages — all are required `java.lang.Object.equals` overrides, no typed alternative exists. FORGE to confirm leave-as-is (markers `// §3h: FORGE-gate` already added). | FORGE | MITHRIL | 2026-06-22 |
 
 ---
 
@@ -63,7 +65,14 @@ When 5+ entries share a Type or package, open a dedicated sprint:
 | RegularSyncCommand sealed | `SyncProtocol.scala` + `RegularSync.scala` | Cleared 2026-06-22: `923b18ba7` — `FetcherStatusTick`, `PrintStatusTick`, `ProgressProtocol` moved from `RegularSync.scala` → `SyncProtocol.scala`; `trait RegularSyncCommand` is now `sealed`; fallthrough `case _ => Behaviors.unhandled` arm deleted; `RegularSync.ProgressProtocol` type alias preserves all call sites; 31/31 `RegularSyncSpec` tests pass; 0 compile errors. | — | MITHRIL | 2026-06-22 |
 | SyncControllerSpec SyncStateAutoPilot | `SyncControllerSpec.scala` | Cleared 2026-06-22: `fc1030410` — GetHandshakedPeersCmd handler added to autopilot; 7 pre-existing failures resolved. |
 | MetricsAlreadyConfiguredError + LocalVM + AdaptiveSyncStrategy | Part 8f dead code | Cleared 2026-06-22: `fa57df9b9` — 3 confirmed dead files deleted. grep-verified 0 callers each; no test files existed; sbt compile-all 0 errors. |
+| DeltaSpikeGauge + Metrics.deltaSpike() | Part 8f dead code | Cleared 2026-06-22: `c6b3da4cb` — unused spike metric, 0 call sites, pattern superseded by counter/gauge. |
 | discovery/StaticNodesLoader.scala | Part 8f dead code | Cleared 2026-06-22: `ff2fc219c` — DiscoveryConfig redirected to network.StaticNodesLoader (stricter validation: full pubkey + port check vs prefix-only); duplicate deleted. |
+| Branch-wide dead-code audit | scala3-cleanup-june all deletions | Cleared 2026-06-22: 19 files audited (19 Scala files across 5 commits), verdicts: 17 DELETE-CORRECT, 1 DEFER (AdaptiveSyncStrategy already in DEFERRED-BACKLOG 9a), 1 NOT-DELETED (DumpChainActor class removed; companion object constants retained). New DEFERRED-BACKLOG entries: none (9a was pre-existing). Opportunistic: Versions.scalapb dead constant → scoped immediately as C20. |
+| `project/Versions.scala` — orphaned `val scalapb` | `project/Versions.scala` | Cleared 2026-06-22 (C20): `Versions.scalapb = "0.11.20"` sole consumer was `project/scalapb.sbt` (deleted in `a948fda1d` extvm cleanup). No other reference in `build.sbt`, `Dependencies.scala`, or any source. Entire `project/Versions.scala` deleted (only val). `sbt compile-all` clean. |
+| FastSync NULL vars (P8-Item1) | `blockchain/sync/fast/FastSync.scala:343,363–364` | Cleared 2026-06-22: `0c7d6781b` (W13+W14) — `var syncState/syncStateStorageActor/syncStateScheduler = null` replaced with `Option[T]`/`None` during G1 var-accumulator sweep. Pre-fixed before P8 session. |
+| FastSync EXCEPT expandTypedReceipts (P8-Item2) | `blockchain/sync/fast/FastSync.scala:571–591` | Cleared 2026-06-22: `0c7d6781b` (W13) — `throw new RuntimeException` + try/catch replaced with `scala.util.Try(...).fold(...)`. Pre-fixed before P8 session. |
+| NPMA DEAD identical if/else arms (P8-Item3) | `network/NetworkPeerManagerActor.scala:325–327,689–692` | Cleared 2026-06-22: `504b4ca16` (NPMA W1/W2/W12/W16) — dead branches removed during NPMA dead-branch/command-seal pass; `usesRequestId` predicate confirmed pure. Pre-fixed before P8 session. |
+| SyncController IMPLICIT EC.global (P8-Item4) | `blockchain/sync/SyncController.scala:15` | Cleared 2026-06-22: `a5132aa80` (C2) — `import scala.concurrent.ExecutionContext.Implicits.global` removed; `given ec: ExecutionContext = ctx.executionContext` added. Pre-fixed before P8 session. |
 
 ---
 
@@ -118,40 +127,6 @@ IntegrationTest tag conflict (discovered G2, 2026-06-21): Do not tag Integration
 
 ---
 
-## scala3-cleanup-june: null-initialized actor session state (PRISM, 2026-06-22)
-
-| File | Line(s) | Pattern | Type | Agent | Date |
-|------|---------|---------|------|-------|------|
-| `blockchain/sync/fast/FastSync.scala` | 343,363–364 | `var syncState: SyncState = null` + `var syncStateStorageActor: ActorRef = null` + `var syncStateScheduler: TypedActorRef[...] = null` — NPE risk if any Command arrives before `initSyncSession()`. Replace with `Option[T]`. | NULL | PRISM | 2026-06-22 |
-
----
-
-## scala3-cleanup-june: dead if/else branches (PRISM, 2026-06-22)
-
-| File | Line(s) | Pattern | Type | Agent | Date |
-|------|---------|---------|------|-------|------|
-| `network/NetworkPeerManagerActor.scala` | 325–327,689–692 | `if Capability.usesRequestId(...) then X else X` — both arms identical; condition has no effect. DEAD code. | DEAD | PRISM | 2026-06-22 |
-
----
-
-## scala3-cleanup-june: throw-and-catch as control flow (PRISM, 2026-06-22)
-
-Suggested new protocol name: **exception-as-control-flow** — covers `throw` inside a `try` block in the same method used as a non-error signal rather than a true error boundary. Recurs in `FastSync.expandTypedReceipts` (line 578) and likely in other receipt/codec paths. Fix: replace with `Either`/`Option` return.
-
-| File | Line(s) | Pattern | Type | Agent | Date |
-|------|---------|---------|------|-------|------|
-| `blockchain/sync/fast/FastSync.scala` | 571–591 | `throw new RuntimeException(...)` caught 6 lines later in the same function — control-flow exception. Convert to `Either`. | EXCEPT | PRISM | 2026-06-22 |
-
----
-
-## scala3-cleanup-june: global ExecutionContext import in actor (PRISM, 2026-06-22)
-
-| File | Line(s) | Pattern | Type | Agent | Date |
-|------|---------|---------|------|-------|------|
-| `blockchain/sync/SyncController.scala` | 15 | `import scala.concurrent.ExecutionContext.Implicits.global` at file scope in an actor class — any `Future.map` will silently use the global pool instead of the actor dispatcher. Replace with `given ec: ExecutionContext = ctx.executionContext`. | IMPLICIT | PRISM | 2026-06-22 |
-
----
-
 ## Clearout Prompts
 
 **Run order — this file:**
@@ -161,6 +136,12 @@ Suggested new protocol name: **exception-as-control-flow** — covers `throw` in
 | ~~B2~~ | ~~Batch B step 2~~ | ~~P2 MITHRIL SyncControllerSpec autopilot~~ | ✅ DONE 2026-06-22 — 7 failures resolved |
 | ~~B3~~ | ~~Batch B step 3~~ | ~~P3 WRAITH Delete 3 dead files~~ | ✅ DONE 2026-06-22 — 3 files deleted |
 | ~~B4~~ | ~~Batch B step 4~~ | ~~P4 WRAITH DiscoveryConfig redirect + delete~~ | ✅ DONE 2026-06-22 — redirect + delete |
+| ~~B5~~ | ~~Batch B step 5~~ | ~~P7 PRISM Retrospective dead-code audit (branch-wide)~~ | ✅ DONE 2026-06-22 — 19 files audited, 0 new deferred |
+| ~~E2~~ | ~~Batch E~~ | ~~P8 — MITHRIL G1-sweep PRISM items (FastSync + NPMA + SyncController)~~ | ✅ DONE 2026-06-22 — pre-fixed in `0c7d6781b`/`504b4ca16`/`a5132aa80` (all 4 items resolved during G1 sweep) |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
+
+---
+
+
 

@@ -12,8 +12,8 @@ import com.chipprbots.ethereum.utils.Logger
 class TuiUpdater(
     tui: Tui,
     config: TuiConfig,
-    peerManager: Option[Any],
-    syncController: Option[Any],
+    peerManager: Option[Any], // Any: Classic vs Typed ActorRef have no common typed supertype; only .isDefined is used
+    syncController: Option[Any], // Any: same — Classic ActorRef vs Typed ActorRef[Command]; only .isDefined is used
     networkName: String,
     shutdownHook: () => Unit
 )(using @annotation.unused _system: ActorSystem)
@@ -97,8 +97,8 @@ object TuiUpdater:
   /** Create a TUI updater with default configuration. */
   def apply(
       tui: Tui,
-      peerManager: Option[Any],
-      syncController: Option[Any],
+      peerManager: Option[Any], // Any: see class comment — mixed Classic/Typed actor refs
+      syncController: Option[Any], // Any: see class comment — mixed Classic/Typed actor refs
       networkName: String,
       shutdownHook: () => Unit
   )(using system: ActorSystem): TuiUpdater =
@@ -108,8 +108,8 @@ object TuiUpdater:
   def apply(
       tui: Tui,
       config: TuiConfig,
-      peerManager: Option[Any],
-      syncController: Option[Any],
+      peerManager: Option[Any], // Any: see class comment — mixed Classic/Typed actor refs
+      syncController: Option[Any], // Any: see class comment — mixed Classic/Typed actor refs
       networkName: String,
       shutdownHook: () => Unit
   )(using system: ActorSystem): TuiUpdater =
