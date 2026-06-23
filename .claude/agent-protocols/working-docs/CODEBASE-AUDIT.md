@@ -124,7 +124,7 @@ Every prompt that touches source files must apply this before committing:
 | F10 | Batch F | DEFERRED Part 15 §P9-JSON4S — CONDUIT: re-enable 4 jsonrpc DisabledTests blocked by json4s ScalaSig/Scala 3 reflection failure under testEssential (JsonRpcControllerSpec:73,124 + JsonRpcControllerEthSpec:556,849) | Yes — no conflicts |
 | F11 | Batch F | DEFERRED Part 15 §P9-NOTCHANGE — EYE/LOOM: re-enable SyncControllerSpec:243 "not change best block" — rewrite test to inject PeerRequestHandler.ResponseReceived via Typed FastSync injection path (prhResultAdapter private) | After F7 (SyncControllerSpec conflict) |
 | F12 | Batch F | DEFERRED Part 15 §P9-SAVENODE — EYE/MITHRIL: re-enable RegularSyncSpec:552 "save fetched node" — replace stub[BranchResolution] and other ScalaMock stubs with explicit anonymous-class test doubles (Scala 3 stub interception broken) | After F6/F7 cleared (RegularSyncSpec conflict risk) |
-| F13 | Batch F | DEFERRED Part 15 §P9-TXRECEIPT — EYE/CONDUIT: re-enable EthTxServiceSpec:369 "calculate correct contract address" — update logIndex + topics container type in assertion to match current production shape | Yes — no conflicts |
+| ~~F13~~ | ~~Batch F~~ | ~~DEFERRED Part 15 §P9-TXRECEIPT — EYE/CONDUIT: re-enable EthTxServiceSpec:369 "calculate correct contract address" — update logIndex + topics container type in assertion to match current production shape~~ | ✅ DONE 2026-06-23 — 21d2a46f0 |
 
 **Global sequence across all files:**
 - ~~**Batch A** (parallel, all read-only)~~ ✅ COMPLETE
