@@ -112,7 +112,7 @@ Every prompt that touches source files must apply this before committing:
 | ~~F1~~ | ~~Batch F~~ | ~~DEFERRED §8a-retro batch 3 — LOOM TestKit→ActorTestKit for G1 network/sync actors~~ | ✅ DONE 2026-06-23 — 25 specs; `12c23cf8a` (14) + `a719520db` (11 + NPMAFake fix) |
 | ~~F2~~ | ~~Batch F~~ | ~~CHASE-QUEUE F1 — FORGE §3h residual + PoWMiningCoordinator threading model consultation~~ | ✅ DONE 2026-06-23 — Item A REJECTED (`72a755efa`); Item B CONFIRMED (`7c951fd44`); Item C SAFE AS-IS |
 | ~~F3~~ | ~~Batch F~~ | ~~DEFERRED §8a-retro batch 4 — LOOM coordinator/heal specs (HealingTrieFixtures PropsAdapter fix, 14 specs)~~ | ✅ DONE 2026-06-23 — `5eae34c21` (135 tests, 0 fail); fixture PropsAdapter→spawn fix; P14/P15 pitfalls added to pekko-typed-api.md; E5b/E5c/E5d drafted |
-| F4 | Batch F | DEFERRED §8a-retro batch 5 — LOOM multi-system + TestActorRef specs (3 assessable now, 2 Wave 3 gate) | Partial — F6 ✅ DONE; no more RegularSyncSpec conflict; can start now |
+| ~~F4~~ | ~~Batch F~~ | ~~DEFERRED §8a-retro batch 5 — LOOM multi-system + TestActorRef specs (3 assessable now, 2 Wave 3 gate)~~ | ✅ DONE 2026-06-23 — `5ff14017b` |
 | ~~F5~~ | ~~Batch F~~ | ~~DEFERRED §3i — MITHRIL+FORGE+BEACON BlockExecutionError hierarchy redesign: union type + `describe`~~ | ✅ DONE 2026-06-23 — `64ab4786e` (30 tests pass; FORGE+BEACON both approved; ETH error variants confirmed complete); docs `d4344962f` |
 | ~~F6~~ | ~~Batch F~~ | ~~DEFERRED Part 11 P9 — EYE/MITHRIL DisabledTest audit~~ | ✅ DONE 2026-06-23 — `86c76fd4e` — 2 fixed (re-enqueue block bodies, retry fetching node), 0 deleted, 7 deferred to CHASE-QUEUE |
 | F7 | Batch F | DEFERRED Part 11 P10 — EYE/MITHRIL FlakyTest root cause audit | No (one spec at a time) — after F6; *FastSyncSpec + SyncControllerSpec lines shifted post-F1; use grep* |
@@ -133,8 +133,8 @@ Every prompt that touches source files must apply this before committing:
 - ~~**Gate**~~ ✅ COMPLETE — 11:02 (662s), 3,595 / 0 fail (2026-06-22)
 - ~~**Batch D** (parallel, after gate)~~ ✅ COMPLETE — G1 (all 12 Behavior[Any] → Behavior[Command]) ∥ G2 (S3-B fixed, INFO-8 monitored, S3-E → D2) ∥ P7 (timing baseline 680s)
 - ~~**Batch E** (parallel, all unblocked)~~ ✅ COMPLETE — E1 (`0cefe5c25`) ∥ E2 (pre-fixed) ∥ E3 (`cc63882fa`)
-- ~~**Batch F partial** — F1+F2+F3+F5+F6+F8~~ ✅ DONE — testEssential gate needed before F4/F7
-- **Batch F (remaining)**: F4 ∥ F7 ∥ F9 ∥ F10 ∥ F13 ∥ E5b (parallel) — F11+F12 after F7; E5c after E5b+F4; E5d after E5b
+- ~~**Batch F partial** — F1+F2+F3+F4+F5+F6+F8+F9+F13+E5b~~ ✅ DONE
+- **Batch F (remaining)**: F7 ∥ F10 (parallel) — F11+F12 after F7; E5c ∥ E5d (both unblocked: E5b+F4 done)
 - **Final gate** (after G1 + G2 + Wave 4 collaborator migration): **POST-MIGRATION-SWEEP** — zero Classic residue verification + BRIDGE-A/B/C elimination
 
 ---
