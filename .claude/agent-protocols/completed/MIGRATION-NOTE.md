@@ -22,10 +22,10 @@ All active sprint/queue work is now tracked here:
 Completed sprint archives go in:
 
 ```
-.claude/agent-protocols/completed-sprints/
+.claude/agent-protocols/completed/
 ```
 
-(currently empty — populate as sprints close out)
+(currently populated — see other files in this directory)
 
 ---
 
@@ -75,7 +75,6 @@ sprint session, delete the old copies and remove refs from MEMORY.md.
 ```
 .claude/agent-protocols/working-docs/DEFERRED-BACKLOG.md   ← backlog + gate status
 .claude/agent-protocols/working-docs/SPRINT-QUEUE.md       ← thread prompts
-.claude/agent-protocols/working-docs/CHORE-QUEUE.md        ← downtime tasks
 .claude/agent-protocols/working-docs/CHASE-QUEUE.md        ← cross-file issues
 ```
 
@@ -84,5 +83,5 @@ those copies are frozen as of 2026-06-21 and will diverge.
 
 When a sprint phase closes out, append a summary entry to the relevant file in:
 ```
-.claude/agent-protocols/completed-sprints/
+.claude/agent-protocols/completed/
 ```

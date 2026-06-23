@@ -73,6 +73,7 @@ Tracked protocols that all agents reference live in `.claude/agent-protocols/`:
 | `pre-migration-checklist.md` | LOOM pre-flight: grep each actor for sender(), returns, timers, workers before migrating |
 | `migration-handoff.md` | Continuation file protocol when a thread ends mid-migration |
 | `storage-rocksdb.md` | DataSource contract, column families, iterator lifecycle, WriteBatch, EphemDataSource, RocksDB config |
+| `dead-code-review.md` | Three verdicts before any deletion: Wire it / Delete it / Defer — assess gap, git history, and supersession before `git rm` |
 
 Working documents (public, code patterns only): `.claude/agent-protocols/working-docs/`
 - `CHASE-QUEUE.md` — cross-file issues logged during inline sessions, batched into sprint clusters

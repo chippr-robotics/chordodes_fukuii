@@ -37,6 +37,7 @@ When a finding maps to an established protocol, cite it so the downstream fix ag
 - Warning suppression findings (broad -Wconf, buried @nowarn): `~/.claude/agent-protocols/warning-ratchet.md`
 - Multi-bucket commit advice (mixing A/B/C risks in one diff): `~/.claude/agent-protocols/risk-stratified-commit.md`
 - Test quality gaps (Thread.sleep, missing tier coverage, non-determinism): `~/.claude/agent-protocols/testing-protocol.md`
+- Dead code candidates (zero callers, orphaned implementations, unregistered strategies): `~/.claude/agent-protocols/dead-code-review.md` — before labelling something DEAD, apply the three-verdict assessment: Wire it / Delete it / Defer
 
 **Contributing protocols**: If a finding type recurs across multiple reviews and no protocol covers it yet, note it in `~/.claude/agent-protocols/working-docs/CHASE-QUEUE.md` with a suggested protocol name. Prism reviews surface systemic issues — those are the right inputs for new protocols.
 

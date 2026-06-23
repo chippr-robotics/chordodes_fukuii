@@ -57,9 +57,29 @@ All 5 ETH coverage gaps closed:
 
 ---
 
+## expectMsgType[Any] → concrete type (E165 batch 1)
+
+#### `8cdf1290d` — Narrow 20 expectMsgType[Any] calls in 4 SNAP sync specs
+- **What:** `expectMsgType[Any]` → `expectMsgType[ConcreteType]` in TrieNodeHealingCoordinatorSpec (6),
+  ByteCodeCoordinatorSpec (4), AccountRangeCoordinatorSpec (4), StorageRangeCoordinatorSpec (6)
+- **Types used:** `HealingStatistics`, `ByteCodeCoordinator.ByteCodeProgress`,
+  `NetworkPeerManagerActor.SendMessage`, `StorageRangeCoordinator.SyncStatistics`
+- **Files changed:** 4 test specs; 104 tests pass; compile clean
+- **Blocker documented:** Classic Pekko `TestProbe` (`org.apache.pekko.testkit.TestProbe`)
+  has no type parameter — `TestProbe[T]()` syntax is invalid for these files. The P4
+  fix strategy's `TestProbe[T]()` is only valid for Typed TestProbe
+  (`org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[T]`). The 777-site grep
+  metric tracks Classic TestProbe declarations without brackets and cannot be reduced
+  without migrating to Typed TestKit infrastructure. See PENDING.md and DEFERRED-BACKLOG P4.
+
+---
+
 ## Open / Deferred
 
-- **E165 TestProbe in `FastSyncBranchResolverSpec`** — 5 pre-existing E165 warnings; deferred to spec-cleanup pass (PENDING.md)
+- **E165 `expectMsgType[Any]` — COMPLETE** (`8cdf1290d`) — 0 remaining. §8a-gated remainder:
+  - 777 Classic `TestProbe` without `[T]` (requires ActorTestKit migration)
+  - 20 `fishForMessage` PF[Any,Boolean] sites in 11 files (replace with `expectMessageType[T]` post-§8a)
+  - Both in intentional 333 E165 floor; see DEFERRED-BACKLOG §8a research prompt.
 - **Wall-clock assertions** — 3 known test files; S5 sweep (CODEBASE-AUDIT) not yet run
 - **TestKit Batch 3** — DEFERRED-BACKLOG §8a open
 - `PeerRequestHandler` `ClassTag` unsound → `TypeTest[A,B]` — deferred

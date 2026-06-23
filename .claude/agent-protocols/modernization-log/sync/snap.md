@@ -1,0 +1,58 @@
+# sync/snap — SNAP Sync
+
+**Package:** `blockchain/sync/snap/`, `blockchain/sync/checkpoint/`
+**Gate:** None (sync infrastructure); `herald` for SNAP wire protocol
+**Key files:** `SNAPSyncController.scala`, `AccountRangeCoordinator.scala`, `ByteCodeCoordinator.scala`, `HealingCoordinator.scala`
+
+---
+
+## Pekko Classic → Typed Migration (Wave 3, Part 6)
+
+#### W3-SNAP1/SNAP2 commits — SNAPSyncController + coordinators Typed
+- **What:** `extends Actor` → `Behaviors.receive`; sealed Command ADTs; explicit `replyTo`
+- **HERALD pre-flight:** HERALD-3 (SNAP protocol), HERALD-5 (healing coordinator)
+- **Cross-refs:** `sync/fast.md` (FastSync is SNAP client), `network/snap-server.md` (serve side)
+
+---
+
+## SSC Design Review (7e — DEFERRED-BACKLOG)
+
+#### `1da94de11` — 7e-P4: SSC Idle-State Catch-All redesign
+- **What:** 59 explicit handlers added to SNAPSyncController idle state; removed unsafe catch-all
+- **Scope:** `SNAPSyncController.scala` idle behavior block
+
+#### `74db726d1` — 7e-P4a: GetProgress missing idle-state handler
+- **What:** `GetProgress` command lacked an idle-state handler; added explicit response
+- **Source:** Chase-queue housekeeping: PivotBlockSelector UnsubscribeAllCmd follow-up
+
+---
+
+## Quality Fixes
+
+#### W3-WormToBrainBar `c8a1ddbfc` — worm bar deleted from FastSync inline; shared utility wired in
+- **Cross-refs:** `sync/fast.md` (utility origin), `sync/regular.md`
+
+---
+
+## Quality Fixes (G2 sprint — 2026-06-22)
+
+#### `[pending]` — S3-B: Remove dead null guards on `info.filePath` in SNAPSyncController
+- **What:** Removed `if info.filePath != null then` guards at former lines 1286/1296 in `AccountRangeSyncComplete` handler. Both `contractStorageFile` and `uniqueCodeHashesFile` are `private val` fields in `AccountRangeCoordinator` initialized by `Files.createTempFile()` — they are never null. The response case classes use non-nullable `filePath: java.nio.file.Path`. Guards were dead code.
+- **Fix:** Removed the `if` wrapping, made both `.foreach { info => ... }` bodies unconditional.
+- **Scope:** `SNAPSyncController.scala` (2 sites, same handler)
+
+---
+
+#### `8cdf1290d` — S3-E: SNAP task types immutable (D2)
+- **What:** Converted all `var` constructor fields to `val` in three `case class` task types: `AccountTask` (9 fields), `ByteCodeTask` (3 fields), `StorageTask` (4 fields). Updated 34 coordinator mutation sites to `.copy(...)` in `AccountRangeCoordinator`, `ByteCodeCoordinator`, and `StorageRangeCoordinator`. Updated `ByteCodeTaskSpec` to use `.copy()` for state-transition assertions. `HealingTask` (plain `class` with `var`) left unchanged — intentional.
+- **Scope:** 6 production files, 1 test file
+- **Verification:** `sbt compile-all` clean; 63/63 targeted tests pass (`*SNAPSyncController* *AccountRange* *ByteCode* *StorageRange*`)
+- **Note:** Local iteration vars `var i` / `var carry` inside `StorageTask.incrementHash32` method body are correct as-is — not case class fields
+
+---
+
+## Open / Deferred
+
+- INFO-8: `refreshFreshRootCache` function no longer exists in SNAPSyncController (searched 2026-06-22, 0 results). `getBlockHeaderByNumber` has 7 scattered call sites, none in a tight loop. No run-logs available. Marking MONITORED — no action needed.
+- 36 `return` statements in SNAPSyncController (§8e ratchet — up from 33 at last audit; 3 new returns added since previous count)
+- Wave 3 SNAP servo is the primary next network migration sprint target

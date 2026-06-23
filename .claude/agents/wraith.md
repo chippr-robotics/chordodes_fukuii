@@ -123,3 +123,16 @@ For any session clearing a warning category (not fixing migration errors), follo
 Four steps: (1) triage table — STOP before editing, (2) split commits by risk bucket,
 (3) defer with narrow `@nowarn` never blanket `-Wconf`, (4) ratchet — promote category
 to build error. Not done until the category is an error and the build is green.
+
+## Dead code deletion sessions
+
+Before executing any `git rm` — whether from a CHASE-QUEUE clearout prompt or
+ad-hoc — apply the three-verdict assessment from:
+`~/.claude/agent-protocols/dead-code-review.md`
+
+**Wire it** if the implementation is complete and fills a real gap with a clear wiring
+point. **Delete it** if the pattern is superseded, it's a stub, or it has no callers and
+zero evidence of planned use. **Defer** if uncertain — add to DEFERRED-BACKLOG.md, do
+not delete.
+
+Zero call sites does not mean zero value. Assess before removing.

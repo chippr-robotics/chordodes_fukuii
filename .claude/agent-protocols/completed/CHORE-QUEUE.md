@@ -266,6 +266,27 @@ PRISM post-capstone finding. `fix(pekko): replace Classic scheduler with Typed c
 
 ---
 
+### C18 — Delete DeltaSpikeGauge (Part 8f) ✅ DONE (`c6b3da4cb`)
+
+Unused spike metric with factory method in Metrics.scala. 0 call sites in 6+ years. Pattern superseded by counter/gauge for discrete events. sbt compile-all: 0 errors.
+
+- `src/main/scala/com/chipprbots/ethereum/metrics/DeltaSpikeGauge.scala` — deleted (29 lines)
+- `Metrics.scala` lines 41–42 — `deltaSpike()` factory method removed; no import to remove (same package)
+
+---
+
+### C19 — Retrospective dead-code audit P7 ✅ DONE (2026-06-22)
+
+19 Scala files audited across 5 commits on `scala3-cleanup-june`. Verdicts: 17 DELETE-CORRECT (extvm/ subsystem ×11, FaucetHandlerSelector, DumpChainActor class, MessageHandlerSpec, VMClientSpec, StaticNodesLoaderSpec [duplicate], MetricsAlreadyConfiguredError, LocalVM, DeltaSpikeGauge), 1 DEFER (AdaptiveSyncStrategy — gap real but pre-logged in DEFERRED-BACKLOG §9a), 1 NOT-DELETED (DumpChainActor companion object constants retained for FixtureProvider). No new DEFERRED-BACKLOG entries required. Opportunistic: `Versions.scalapb` dead constant scoped immediately → C20.
+
+---
+
+### C20 — Delete orphaned `project/Versions.scala` ✅ DONE (2026-06-22)
+
+`Versions.scalapb = "0.11.20"` was the sole val in `project/Versions.scala`. Its only consumer was `project/scalapb.sbt` (deleted in `a948fda1d` extvm cleanup). No reference in `build.sbt`, `Dependencies.scala`, or any source file. Entire `project/Versions.scala` deleted (3 lines). `sbt compile-all`: 0 errors.
+
+---
+
 ## Quick reference — pick by time available
 
 | Time | Task | Risk | Commit type |
@@ -290,3 +311,5 @@ PRISM post-capstone finding. `fix(pekko): replace Classic scheduler with Typed c
 | 10 min | C15 SyncControllerSpec autopilot GetHandshakedPeersCmd handler (P2) | ✅ DONE `fc1030410` | — |
 | 10 min | C16 Delete 3 confirmed dead files (P3) | ✅ DONE `fa57df9b9` | — |
 | 15 min | C17 Redirect DiscoveryConfig + delete duplicate StaticNodesLoader (P4) | ✅ DONE `ff2fc219c` | — |
+| ~24h | C19 Retrospective dead-code audit P7 (19 files, branch-wide) | ✅ DONE 2026-06-22 | — |
+| 5 min | C20 Delete orphaned `project/Versions.scala` (scalapb constant) | ✅ DONE 2026-06-22 | — |

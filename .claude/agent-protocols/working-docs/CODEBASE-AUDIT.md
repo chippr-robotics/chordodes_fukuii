@@ -62,12 +62,15 @@ The following findings are tracked but blocked on external conditions. No prompt
 | **W7** — 900-line NPMA `Impl` extraction | Wave 3 LOOM gate: NPMA is primary target of next network migration sprint | Network/P2P sprint |
 | ~~**W13**~~ — ~~exception-as-control-flow in `expandTypedReceipts`~~ | ~~Lower priority; no blocking correctness risk~~ | ✅ DONE 2026-06-22 |
 | ~~**W14**~~ — ~~`var nextBehavior` accumulator (2 sites)~~ | ~~Lower priority FP cleanup~~ | ✅ DONE 2026-06-22 |
-| **S3-B** — `SNAPSyncController:1286,1296` null `filePath` | SNAP cleanup sprint (profile allocation pressure first) | SNAP sprint |
-| **S3-E** — mutable `case class` task types (4 SNAP files) | SNAP cleanup sprint; profile allocation before deciding `class` vs `val` | SNAP sprint |
-| **INFO-8** — `refreshFreshRootCache` 128 calls in actor loop | Monitor SNAP serve latency; only fix if observed | SNAP sprint |
+| ~~**S3-B**~~ — ~~`SNAPSyncController:1286,1296` null `filePath`~~ | ~~SNAP cleanup sprint~~ | ✅ DONE 2026-06-22 — removed dead null guards; `contractStorageFile`/`uniqueCodeHashesFile` are `private val` initialized by `Files.createTempFile()`, never null |
+| ~~**S3-E**~~ — ~~mutable `case class` task types (3 SNAP files: `AccountTask`, `ByteCodeTask`, `StorageTask`)~~ | ~~Profile allocation before converting 35+ mutation sites to `.copy()`~~ | ✅ DONE 2026-06-22 — all `var` constructor fields → `val`; 34 coordinator mutation sites converted to `.copy()`; 63/63 targeted tests pass |
+| ~~**INFO-8**~~ — ~~`refreshFreshRootCache` 128 calls in actor loop~~ | ~~Monitor SNAP serve latency~~ | ✅ MONITORED 2026-06-22 — `refreshFreshRootCache` does not exist in SSC; 7 scattered `getBlockHeaderByNumber` calls, none in a loop; no latency concern |
 | **INFO-9** — `GetHandshakedPeersCmd.replyTo` untyped | Network/P2P sprint upgrades this ref | Network/P2P sprint |
 | ~~**INFO-10**~~ — ~~fragile adapter-pinning tuple in `FastSync:180–183`~~ | ~~Retire when FastSync narrowing is complete~~ | ✅ DONE 2026-06-22 |
 | **INFO-13/14** — Classic `LoggingAdapter` in `RegularSync.scala` | Network/P2P sprint migrates `RegularSync` | Network/P2P sprint |
+| **BRIDGE-A** — `ctx.toClassic.sender()` hub: FastSync×3, RegularSync×1, SyncController×24 | External callers (EthInfoService, JsonRpc, McpTools) adopt typed `replyTo` — SyncProtocol messages need `replyTo: ActorRef[_]` fields; SyncController forwarding refactored | POST-MIGRATION-SWEEP |
+| **BRIDGE-B** — `ctx.self.toClassic` reply-target: SNAPSyncController×7, ByteCodeCoordinator, AccountRangeCoordinator, BlockImporter, StorageRecoveryActor, PeerActor | Collaborator worker actors accept `TypedActorRef` params instead of `ClassicActorRef` — resolves per-worker in Wave 4 | POST-MIGRATION-SWEEP |
+| **BRIDGE-C** — Untyped `ActorRef` in Typed constructors: `fastSyncClassicSelf`, `peerEventBus: ActorRef`, `networkPeerManager: ActorRef`, `syncController: ActorRef`, `parentRef` in PivotBlockSelector + SyncStateSchedulerActor | Per-collaborator migration: PivotBlockSelector + SyncStateSchedulerActor in Wave 3 G1; remaining in Wave 4 | G1 (partial) / POST-MIGRATION-SWEEP (remainder) |
 
 ---
 
@@ -100,17 +103,23 @@ Every prompt that touches source files must apply this before committing:
 | ~~A1~~ | ~~Batch A~~ | ~~P1 EYE S5 scan~~ | ✅ DONE 2026-06-22 |
 | ~~C4~~ | ~~Batch C~~ | ~~D4 — INFO-10 FastSync tuple investigation~~ | ✅ DONE 2026-06-22 |
 | ~~C5~~ | ~~Batch C~~ | ~~D3 — MITHRIL W13 + W14~~ | ✅ DONE 2026-06-22 |
-| D1 | Batch D | G1 — Start Behavior[Any] narrowing sprint (lifts D1 gate) | Parallel with G2 |
-| D2 | Batch D | G2 — Start SNAP cleanup sprint (lifts D2 gate) | Parallel with G1 |
+| ~~D1~~ | ~~Batch D~~ | ~~G1 — Start Behavior[Any] narrowing sprint (lifts D1 gate)~~ | ✅ DONE 2026-06-22 — sprint already complete, all 12 actors narrowed to Behavior[Command]; stale comments cleaned up |
+| ~~D2~~ | ~~Batch D~~ | ~~G2 — Start SNAP cleanup sprint (lifts D2 gate)~~ | ✅ DONE 2026-06-22 — S3-B fixed (dead null guards removed); INFO-8 monitored (function never existed); S3-E deferred to D2 pending profiling (35+ mutation sites, 3 task types) |
+| ~~D3~~ | ~~Batch D~~ | ~~P7 — EYE/MITHRIL test timing audit + slow-test reduction~~ | ✅ DONE 2026-06-22 — 680s baseline, 3,595 / 0 fail; Thread.sleep deferred to §8a |
+| ~~E1~~ | ~~Batch E~~ | ~~D2 — SNAP S3-E: mutable task types → immutable (unlocked by G2)~~ | ✅ DONE 2026-06-22 |
+| E2 | Batch E | CHASE-QUEUE P8 — G1-sweep PRISM items (FastSync + NPMA + SyncController) | Yes |
+| E3 | Batch E | DEFERRED §3h — Any type signature cleanup (non-consensus sites) | Yes |
+| E4 | Batch E | DEFERRED §8a-retro batch 3 — LOOM TestKit→ActorTestKit for G1 network/sync actors | Yes (test files only; E1/E2/E3 modify src/main/) |
 
 **Global sequence across all files:**
 - ~~**Batch A** (parallel, all read-only)~~ ✅ COMPLETE
-- **Batch B** (sequential, code changes): ~~CHASE-QUEUE P1~~ ✅ → CHASE-QUEUE P2 → CHASE-QUEUE P3 → CHASE-QUEUE P4 → DEFERRED P5
-- **Batch C** (sequential, larger sweeps): DEFERRED P1 → DEFERRED P2 → DEFERRED P3 → **CODEBASE-AUDIT D4** → **CODEBASE-AUDIT D3** → DEFERRED P4 (E165 multi-session)
-- **Gate**: `./local/scripts/fukuii-test` (testEssential) after all Batch B+C commits land
-- **Batch D** (parallel, after gate): CODEBASE-AUDIT G1 ∥ CODEBASE-AUDIT G2
-  - G1 completion unlocks: CODEBASE-AUDIT D1 (inline fixes during narrowing)
-  - G2 completion unlocks: CODEBASE-AUDIT D2 (SNAP cleanup sprint)
+- ~~**Batch B** (sequential, code changes)~~ ✅ COMPLETE
+- ~~**Batch C** (sequential, larger sweeps)~~ ✅ COMPLETE
+- ~~**Gate**~~ ✅ COMPLETE — 11:02 (662s), 3,595 / 0 fail (2026-06-22)
+- ~~**Batch D** (parallel, after gate)~~ ✅ COMPLETE — G1 (all 12 Behavior[Any] → Behavior[Command]) ∥ G2 (S3-B fixed, INFO-8 monitored, S3-E → D2) ∥ P7 (timing baseline 680s)
+- **Batch E** (parallel, all unblocked): CODEBASE-AUDIT D2 ∥ CHASE-QUEUE P8 ∥ DEFERRED §3h ∥ DEFERRED §8a-retro batch 3
+- **Gate** (after Batch E): `./local/scripts/fukuii-test` testEssential
+- **Final gate** (after G1 + G2 + Wave 4 collaborator migration): **POST-MIGRATION-SWEEP** — zero Classic residue verification + BRIDGE-A/B/C elimination
 
 ---
 
@@ -245,75 +254,159 @@ At the start of the Network/P2P Pekko migration sprint, before migrating each ac
 
 ---
 
-#### D2 — SNAP Sprint: Address deferred S3-B, S3-E, INFO-8 findings
+#### D2 — SNAP Sprint: Convert mutable `case class` task types to immutable (S3-E)
 
-**Gate:** SNAP cleanup sprint (profile allocation pressure first — do not start S3-E before profiling)
-**Agent:** MITHRIL (S3-B, S3-E) + EYE validation
+**Gate:** None remaining — G2 research is complete. S3-B ✅ DONE 2026-06-22. INFO-8 ✅ MONITORED 2026-06-22 (function never existed). Only S3-E remains.
+**Agent:** MITHRIL (conversion) + EYE (validation)
 **Files:**
-- `blockchain/sync/snap/SNAPSyncController.scala` (S3-B lines 1286/1296; INFO-8)
-- 4 SNAP task-type files (S3-E — identify with `grep -rn "case class.*var " src/main/scala/blockchain/sync/snap/`)
+- `blockchain/sync/snap/AccountTask.scala` — 10 var fields, 12+ mutation sites in `AccountRangeCoordinator.scala`
+- `blockchain/sync/snap/ByteCodeTask.scala` — 3 var fields, 6+ mutation sites in `ByteCodeCoordinator.scala`
+- `blockchain/sync/snap/StorageTask.scala` — 4 var fields, 11+ mutation sites in `StorageRangeCoordinator.scala`
+- `blockchain/sync/snap/actors/AccountRangeCoordinator.scala` — primary mutation site for AccountTask
+- `blockchain/sync/snap/actors/ByteCodeCoordinator.scala` — primary mutation site for ByteCodeTask
+- `blockchain/sync/snap/actors/StorageRangeCoordinator.scala` — primary mutation site for StorageTask
+
+**G2 research findings (do not re-research):**
+- `HealingTask` is already a `class` with `var` fields ✅ — correct, leave it
+- No RLP serialization: task types do NOT participate in RLP encode/decode — no RLP round-trip check needed
+- Instantiation density: 24 total across all three types (cold path → `case class` with `val` is correct target)
+- Mutation pattern: all mutations are `task.pending = true/false`, `task.done = true`, `task.requeueCount = N`, `task.slots = ...`, `task.proof = ...` — convert to `task = task.copy(...)` at each site
+- The mutation sites hold `task` in mutable local vars or mutable collections — `task` references are rebindable
 
 **Prompt:**
 
-**S3-B — Null `filePath` at SNAPSyncController:1286,1296:**
-Read lines 1280–1310 of `SNAPSyncController.scala`. Both sites construct a path with a potentially null segment. Replace with `Option[Path]` parameter threading or validated path construction that fails fast rather than propagating null. This is not consensus-critical — MITHRIL handles it.
+**Step 1 — Confirm current state:**
+```bash
+grep -rn "case class.*\bvar \|^\s*var " \
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/AccountTask.scala \
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/ByteCodeTask.scala \
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/StorageTask.scala
+```
+If output is empty: S3-E is already done — mark complete and stop.
 
-**S3-E — Mutable `case class` task types (4 files):**
-First, run the profiler to check allocation pressure under SNAP sync load — if these task objects are hot, prefer `val` fields in a regular `class`; if cold, convert to immutable `case class`. After profiling, update each of the 4 files. Grep: `grep -rn "case class.*\bvar " src/main/scala/blockchain/sync/snap/ --include="*.scala"` to confirm the 4 files.
+**Step 2 — Convert each task type:**
+For each file (`AccountTask.scala`, `ByteCodeTask.scala`, `StorageTask.scala`):
+1. Change all `var` fields to `val` — the case class remains a `case class`
+2. Grep the corresponding coordinator(s) for `task.fieldName =` mutation sites
+3. At each mutation site, replace `task.field = newVal` with `task = task.copy(field = newVal)`
+4. Where `task` is a `val` in the coordinator, change it to `var task` so it can be rebound
 
-**INFO-8 — `refreshFreshRootCache` 128 calls in actor loop (conditional):**
-Check SNAP serve latency logs first. If no latency spike is observed in staging/Mordor testing, skip this item — the 128 calls may be cache hits with negligible overhead. Only action if `serve` latency exceeds 50ms p99 in profiling. If actioned: cache the lookup result at the start of the serve loop.
+Key mutation sites from G2 research:
+- `AccountRangeCoordinator.scala`: `task.done = true` (×2), `task.pending = true/false` (×5), `task.requeueCount = 0` (×2), `task.pending = false; task.done = false` (×1)
+- `ByteCodeCoordinator.scala`: `task.pending = false/true` (×6), `task.done = true` (×1), `active.task.pending = false` (×1 — needs `active = active.copy(task = active.task.copy(pending = false))`)
+- `StorageRangeCoordinator.scala`: `task.pending = false/true` (×9), `task.done = true` (×3), `task.slots = ...` (×1), `task.proof = ...` (×1), `batchTasks.foreach(_.pending = true)` (×1 — needs `.map(_.copy(pending = true))` + reassignment)
 
-**Verification:** `sbt compile-all`. Run SNAP-specific tests: `./local/scripts/fukuii-test SNAPSync`. Confirm S3-B has no null-propagation paths; confirm S3-E test types serialize correctly under RLP round-trip.
+**Step 3 — Verify:**
+```bash
+sbt compile-all
+.local/scripts/fukuii-test only "*SNAPSyncController* *AccountRange* *ByteCode* *StorageRange*"
+```
+Confirm: no null/mutation compile errors; 72+ SNAPSyncController tests pass; coordinator tests pass.
 
-**Opportunistic clearout:** While `SNAPSyncController.scala` is open, check for other CHASE-QUEUE items in that file. At 5,052 LOC it is the most likely file to have additional inline-fixable findings.
+**Opportunistic clearout:** The three coordinator files are large — while open, apply the inline clearout protocol for any CHASE-QUEUE items visible in those files.
 
 **MANDATORY final step — complete BEFORE closing thread:**
-- No separate run order update — D2 runs inline during G2; the G2 MANDATORY step handles row `D2` strikethrough.
-- Remove S3-B, S3-E, INFO-8 rows from the DEFERRED table as each is addressed. Add entries to `modernization-log/sync/snap-sync-controller.md`.
+- Remove `S3-E` row from the DEFERRED table in this file.
+- Add `#### [SHA] — S3-E: task types immutable` entry to `modernization-log/sync/snap.md`.
+- No run-order update needed (D2 gate was G2, already struck through).
 
 ---
 
-#### D3 — MITHRIL Session: W13 + W14 (no external gate — lowest priority)
+---
 
-**Gate:** Any available MITHRIL session (no sprint dependency — can slot into any cleanup thread)
-**Agent:** MITHRIL
-**Files:**
-- `blockchain/sync/` — find `expandTypedReceipts` (W13): `grep -rn "expandTypedReceipts" src/main/ --include="*.scala"`
-- Find `var nextBehavior` (W14): `grep -rn "var nextBehavior" src/main/ --include="*.scala"`
+#### POST-MIGRATION-SWEEP — Final Classic Bridge Elimination
 
-**Prompt:**
-
-**W13 — Exception-as-control-flow in `expandTypedReceipts`:**
-Read the method. It uses `try/catch` to control normal flow rather than to handle exceptional conditions. Refactor to return `Either[DecodeError, List[TypedReceipt]]` (or equivalent) and propagate the result to callers. Check callers to confirm they can receive an `Either`. This is a readability/FP idiom fix, not a consensus change — no FORGE review needed unless the method touches state root computation.
-
-**W14 — `var nextBehavior` accumulator (2 sites):**
-Read both sites. Replace the mutable accumulator with a tail-recursive helper or `foldLeft` over the input. Confirm the replacement produces identical output by running the existing tests for the enclosing actor.
-
-**Verification:** `sbt compile-all`. Run `./local/scripts/fukuii-test` for the enclosing actor/spec.
-
-**Opportunistic clearout:** While these files are open, check for other CHASE-QUEUE MUTABLE or ISINST entries in the same files and apply the inline-fix tier if bounded.
-
-**MANDATORY final step — complete BEFORE closing thread:**
-- `working-docs/CODEBASE-AUDIT.md` run order table — change `| C5 | Batch C | D3 ...` to `| ~~C5~~ | ~~Batch C~~ | ~~D3 — MITHRIL W13 + W14~~ | ✅ DONE [date] |`
-- Remove W13 and W14 rows from the DEFERRED table. Add entries to the relevant `modernization-log/` subsystem file.
+**Gate:** Wave 3 (G1 + G2) complete AND Wave 4 collaborator migration complete (PivotBlockSelector, SyncStateSchedulerActor, PeerRequestHandler, all coordinator workers migrated to Typed signatures)
+**Agent:** HERALD (topology audit first) + LOOM (per-site elimination) + MITHRIL (SyncProtocol replyTo refactor) + WRAITH (compile errors)
+**Purpose:** The migration goal is zero Classic residue outside the three deliberate TCP bridges. All `.toClassic` calls, untyped `ActorRef` params, and `ctx.toClassic.sender()` sites in Typed actors are migration debt — they are correct transitional patterns now, but must be eliminated before the codebase is declared fully migrated.
 
 ---
 
-#### D4 — FastSync Narrowing Complete: Retire INFO-10 adapter-pinning tuple
+**Step 0 — Research: run all greps before any changes**
 
-**Gate:** FastSync Pekko narrowing is complete (FastSync migration thread closes)
-**Agent:** LOOM (or MITHRIL if narrowing is already done)
-**Files:**
-- `blockchain/sync/fast/FastSync.scala` lines 180–183
+```bash
+cd /media/dev/2tb/dev/fukuii
 
-**Prompt:**
-Read `FastSync.scala` lines 175–195. The tuple at 180–183 pins an adapter to a specific message order — this is fragile and was deferred until the narrowing removed the dependency. With FastSync fully narrowed, read the tuple usage, confirm the adapter is no longer load-bearing, and remove it. Replace with a direct typed message send or a named case class if the tuple was packing multiple fields.
+# BRIDGE-A: Classic sender access (target: 0)
+grep -rn "toClassic\.sender()" src/main/ --include="*.scala" | grep -v "//"
 
-**Verification:** `sbt compile-all`. Run `./local/scripts/fukuii-test FastSync`.
+# BRIDGE-B: self as Classic ref (target: 0 outside TCP bridges)
+grep -rn "ctx\.self\.toClassic\|context\.self\.toClassic" src/main/ --include="*.scala" \
+  | grep -v "ServerActor\|RLPxConnectionHandler"
 
-**Opportunistic clearout:** With FastSync migration complete, scan the file for any remaining `sender()`, untyped `ActorRef`, or `context.become` that narrowing may have missed.
+# BRIDGE-C: untyped ActorRef in Typed actor constructors (target: 0)
+grep -rn ":\s*ActorRef\b[^[{]" src/main/ --include="*.scala" \
+  | grep -v "TypedActorRef\|import\|//\|sealed\|type \|ServerActor\|RLPxConnectionHandler\|PeerEventBus"
+
+# BRIDGE-D: Behavior[Any] in code (target: 0)
+grep -rn "Behavior\[Any\]" src/main/ --include="*.scala" | grep -v "//"
+
+# BRIDGE-E: Classic LoggingAdapter (target: 0)
+grep -rn "LoggingAdapter\|Logging(ctx\.system\|Logging(system\b" src/main/ --include="*.scala" | grep -v "//"
+
+# BRIDGE-F sanity check: deliberate TCP bridges still present (expected: 3 hits)
+grep -rn "extends Actor\b\|extends ClassicActor\b" src/main/ --include="*.scala"
+
+# Total .toClassic conversions (for context — not all are bugs)
+grep -rn "\.toClassic\b" src/main/ --include="*.scala" | grep -v "//\|classicSystem" | wc -l
+```
+
+Produce a triage table with current counts. If all BRIDGE-A/B/C/D/E return 0: migration is complete — record in all relevant `modernization-log/` files and archive this prompt to `completed/CODEBASE-AUDIT.md`.
+
+---
+
+**Step 1 — BRIDGE-A: Eliminate `ctx.toClassic.sender()` (add `replyTo` to SyncProtocol)**
+
+This is the highest-risk change. Do NOT start until HERALD confirms the full call graph.
+
+HERALD pre-flight: for every message type that currently uses `ctx.toClassic.sender()` as reply target (GetStatus, ResetFastSync, RestartFastSync, etc.), trace ALL send sites. Confirm whether they are Classic ask/tell or Typed tell. Determine whether the Classic callers (EthInfoService, JsonRpcBaseController, McpService, McpResources, NetService) can be changed to pass explicit `replyTo: ActorRef[StatusMsg]` fields, or whether a Classic bridge adapter layer is the more incremental path.
+
+For each message type confirmed safe to add `replyTo`:
+1. Add `replyTo: TypedActorRef[ResponseType]` to the message case class in `SyncProtocol.scala`
+2. Update the handler: replace `ctx.toClassic.sender() ! response` with `replyTo ! response`
+3. Update all Classic callers: wrap in a Typed ask using `AskPattern` or add an adapter in `SyncController`
+4. `sbt compile-all` after each message type — do NOT batch multiple types
+
+Commit per message type: `refactor(sync): add replyTo to SyncProtocol.X — BRIDGE-A`
+
+---
+
+**Step 2 — BRIDGE-B: Eliminate `ctx.self.toClassic` in Typed actors**
+
+For each BRIDGE-B site (SNAPSyncController, ByteCodeCoordinator, AccountRangeCoordinator, BlockImporter, StorageRecoveryActor, PeerActor):
+1. Identify the worker actor or message recipient that receives this Classic ref
+2. Confirm that worker has been migrated to accept `TypedActorRef` (gate: Wave 4)
+3. Replace `ctx.self.toClassic` with `ctx.self` (or appropriate `TypedActorRef` of the right message type)
+4. Update the message constructor at the call site to use the Typed ref
+5. `sbt compile-all` after each file
+
+Commit per actor file: `refactor(sync): remove ctx.self.toClassic in ActorName — BRIDGE-B`
+
+---
+
+**Step 3 — BRIDGE-C: Remaining untyped `ActorRef` constructor params**
+
+For each constructor that still takes `ClassicActorRef` where the actor is now fully Typed:
+1. Change the param type to `TypedActorRef[MessageType]` (the concrete message type the actor sends to that ref)
+2. Update the call site (usually in `SyncController` or `NodeBuilder`)
+3. Remove any `.toClassic` conversion at the call site
+4. `sbt compile-all`
+
+Commit per collaborator: `refactor: type ActorRef param to TypedActorRef — ColaboratorName BRIDGE-C`
+
+---
+
+**Verification (final)**
+```bash
+# All BRIDGE-A/B/C/D/E greps must return 0
+# BRIDGE-F must return exactly 3 (TCP bridges unchanged)
+./local/scripts/fukuii-test essential   # full Tier 1 suite — 3621 tests, 0 failures
+```
 
 **MANDATORY final step — complete BEFORE closing thread:**
-- `working-docs/CODEBASE-AUDIT.md` run order table — change `| C4 | Batch C | D4 ...` to `| ~~C4~~ | ~~Batch C~~ | ~~D4 — INFO-10 FastSync tuple investigation~~ | ✅ DONE [date] |`
-- Remove INFO-10 row from the DEFERRED table. Add entry to `modernization-log/sync/fast-sync.md`.
+- Mark BRIDGE-A, BRIDGE-B, BRIDGE-C rows in DEFERRED table as ✅ DONE
+- Archive this prompt to `completed/CODEBASE-AUDIT.md` under the Post-Migration Target State section
+- Add entries to `modernization-log/sync/`, `modernization-log/network/` per file touched
+- Update `completed/CODEBASE-AUDIT.md` Post-Migration Target State: change "not completed yet" to the completion date + commit SHA
+
+**Rejection criteria:** Any BRIDGE-A/B/C/D/E grep returning non-zero; any new `extends Actor` added; TCP bridges (`ServerActor`, `RLPxConnectionHandler`) altered; consensus files touched without FORGE/BEACON review.
