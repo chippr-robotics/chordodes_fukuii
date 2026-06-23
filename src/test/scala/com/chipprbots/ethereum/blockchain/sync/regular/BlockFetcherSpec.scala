@@ -37,8 +37,7 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.MessageClassifier
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.Codes
-import com.chipprbots.ethereum.network.p2p.messages.ETH69
-import com.chipprbots.ethereum.network.p2p.messages.ETH69.BlockRangeUpdate
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockRangeUpdate
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
 import com.chipprbots.ethereum.security.SecureRandomBuilder
@@ -302,7 +301,7 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
       startFetcher()
       // ETH/69 peer announces latest block at 100; fetcher should immediately request headers
       val update: BlockRangeUpdate =
-        ETH69.BlockRangeUpdate(BigInt(0), BigInt(100), org.apache.pekko.util.ByteString.empty)
+        ETHPackets.BlockRangeUpdate(BigInt(0), BigInt(100), org.apache.pekko.util.ByteString.empty)
       blockFetcher ! AdaptedMessageFromEventBus(update, fakePeer.id)
       peersClient.expectMsgPF() {
         case PeersClient.Request(msg: ETHPackets.GetBlockHeaders, _, _, _) if msg.block == Left(1) => ()

@@ -41,7 +41,6 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.messages.Codes
-import com.chipprbots.ethereum.network.p2p.messages.ETH69
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes
 import com.chipprbots.ethereum.utils.ByteStringUtils
@@ -483,7 +482,7 @@ class BlockFetcher(
         supervisor ! ProgressProtocol.GotNewBlock(newState.knownTop)
         fetchBlocks(newState)
 
-      case AdaptedMessageFromEventBus(msg: ETH69.BlockRangeUpdate, _) =>
+      case AdaptedMessageFromEventBus(msg: ETHPackets.BlockRangeUpdate, _) =>
         log.debug("Received BlockRangeUpdate earliest={} latest={}", msg.earliestBlock, msg.latestBlock)
         val newState = state.withPossibleNewTopAt(msg.latestBlock)
         supervisor ! ProgressProtocol.GotNewBlock(newState.knownTop)

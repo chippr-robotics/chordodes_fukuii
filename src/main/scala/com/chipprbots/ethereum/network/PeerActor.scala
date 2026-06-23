@@ -548,7 +548,7 @@ object PeerActor {
 
         case RLPxConnectionHandler.MessageReceived(message) =>
           message match {
-            case bru: com.chipprbots.ethereum.network.p2p.messages.ETH69.BlockRangeUpdate =>
+            case bru: com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockRangeUpdate =>
               if bru.earliestBlock > bru.latestBlock || bru.latestBlockHash == org.apache.pekko.util.ByteString(
                   new Array[Byte](32)
                 )
