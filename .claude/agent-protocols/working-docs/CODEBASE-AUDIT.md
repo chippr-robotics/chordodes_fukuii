@@ -127,6 +127,7 @@ Every prompt that touches source files must apply this before committing:
 | ~~F12~~ | ~~Batch F~~ | ~~DEFERRED Part 15 §P9-SAVENODE — EYE/MITHRIL: re-enable RegularSyncSpec:552 "save fetched node" — replace stub[BranchResolution] and other ScalaMock stubs with explicit anonymous-class test doubles (Scala 3 stub interception broken)~~ | ✅ DONE 2026-06-23 — `abe9dccc1` (4 ScalaMock stubs → anon classes; `evaluateBranch` override; `StateStorage` import; 33/34 pass); docs `203dc66a3` + `dc5296f33` |
 | ~~F13~~ | ~~Batch F~~ | ~~DEFERRED Part 15 §P9-TXRECEIPT — EYE/CONDUIT: re-enable EthTxServiceSpec:369 "calculate correct contract address" — update logIndex + topics container type in assertion to match current production shape~~ | ✅ DONE 2026-06-23 — 21d2a46f0 |
 | ~~§P9-FRESHPIVOT~~ | ~~Batch F~~ | ~~DEFERRED §P9-FRESHPIVOT — EYE: fix flaky SyncControllerSpec:393 "start state download only when pivot block is fresh enough"~~ | ✅ DONE 2026-06-23 — `083f08836` — `eventually` kept unified; `.get` → `.map(_.pivotBlock).getOrElse(defaultPivotBlockHeader)`; 88/88 × 3 runs |
+| ~~E4~~ | ~~Batch G~~ | ~~CHASE-QUEUE P11 — EYE testStandard baseline + SlowTest tag audit (MiningSpec ×2, PoWMiningSpec ×4/6)~~ | ✅ DONE 2026-06-23 — 961s (16m 1s) wall time, 3,579 tests, 6 mislabelled promoted to UnitTest — `edfb69f35`; DnsDiscoverySpec network-flaky (Mordor DNS returned 9/10 enodes); BlockchainHostActorSpec pre-existing failure fixed by parallel agent `07e5d505f` |
 
 **Global sequence across all files:**
 - ~~**Batch A** (parallel, all read-only)~~ ✅ COMPLETE
