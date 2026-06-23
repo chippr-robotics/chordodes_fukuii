@@ -307,8 +307,7 @@ private[actors] class StorageRangeCoordinatorImpl(
         val staleCount = activeTasks.size
         activeTasks.values.foreach { case (_, batchTasks, _) =>
           batchTasks.foreach { task =>
-            task.pending = false
-            tasks.enqueue(task)
+            tasks.enqueue(task.copy(pending = false))
           }
         }
         activeTasks.clear()
@@ -789,11 +788,10 @@ private[actors] class StorageRangeCoordinatorImpl(
           inFlight.foreach { reqId =>
             activeTasks.remove(reqId).foreach { case (_, batchTasks, _) =>
               batchTasks.foreach { task =>
-                task.pending = false
                 val key = (task.accountHash, task.next)
                 if !pendingTaskKeys.contains(key) then {
                   pendingTaskKeys += key
-                  tasks.enqueue(task)
+                  tasks.enqueue(task.copy(pending = false))
                 }
               }
             }
@@ -902,8 +900,7 @@ private[actors] class StorageRangeCoordinatorImpl(
         val cancelledCount = activeTasks.size
         activeTasks.values.foreach { case (_, batchTasks, _) =>
           batchTasks.foreach { task =>
-            task.pending = false
-            tasks.enqueue(task)
+            tasks.enqueue(task.copy(pending = false))
           }
         }
         activeTasks.clear()
@@ -1084,8 +1081,8 @@ private[actors] class StorageRangeCoordinatorImpl(
           responseBytes = requestedBytes
         )
 
-        batchTasks.foreach(_.pending = true)
-        activeTasks.put(requestId, (peer, batchTasks, requestedBytes))
+        val activeBatchTasks = batchTasks.map(_.copy(pending = true))
+        activeTasks.put(requestId, (peer, activeBatchTasks, requestedBytes))
 
         requestTracker.trackRequest(
           requestId,
@@ -1166,9 +1163,7 @@ private[actors] class StorageRangeCoordinatorImpl(
     // IMPORTANT: do NOT mark the peer stateless — it served a valid, well-formed response.
     // Only fall through to stateless marking when proofs == 0 (peer gave us nothing at all).
     def handleProofOfAbsence(): Unit = {
-      val task = tasks.head
-      task.done = true
-      task.pending = false
+      val task = tasks.head.copy(done = true, pending = false)
       recordCompletedTask(task)
       log.warn(
         s"Storage proof-of-absence accepted: account=${task.accountString} " +
@@ -1207,9 +1202,8 @@ private[actors] class StorageRangeCoordinatorImpl(
 
         if attempts >= maxEmptyResponsesPerTask then {
           skipped += 1
-          task.done = true
-          task.pending = false
-          recordCompletedTask(task)
+          val doneTask = task.copy(done = true, pending = false)
+          recordCompletedTask(doneTask)
           // Discard any partial streaming trie for this account — committing now would
           // produce a wrong root (missing slots). Already-flushed content-addressed nodes
           // stay on disk and healing reconciles when the contract is revisited.
@@ -1221,8 +1215,7 @@ private[actors] class StorageRangeCoordinatorImpl(
               s"account=${task.accountHash.toHex} storageRoot=${task.storageRoot.toHex} range=${task.rangeString}"
           )
         } else {
-          task.pending = false
-          this.tasks.enqueue(task)
+          this.tasks.enqueue(task.copy(pending = false))
           log.debug(
             s"Empty StorageRanges for task (attempt $attempts/$maxEmptyResponsesPerTask); re-queueing: " +
               s"account=${task.accountHash.take(4).toHex} range=${task.rangeString}"
@@ -1279,15 +1272,14 @@ private[actors] class StorageRangeCoordinatorImpl(
     if unservedTasks.nonEmpty then {
       log.debug(s"Re-queueing ${unservedTasks.size} unserved storage tasks")
       unservedTasks.foreach { task =>
-        task.pending = false
-        this.tasks.enqueue(task)
+        this.tasks.enqueue(task.copy(pending = false))
       }
     }
 
     // Track total received bytes across all served tasks for adaptive byte budgeting
     var totalReceivedBytes: Long = 0
 
-    servedTasks.zipWithIndex.foreach { case (task, idx) =>
+    servedTasks.zipWithIndex.foreach { case (task0, idx) =>
       val accountSlots =
         if response.slots.nonEmpty && idx < response.slots.size then response.slots(idx)
         else Seq.empty
@@ -1295,8 +1287,7 @@ private[actors] class StorageRangeCoordinatorImpl(
       // Best-practice: apply proof nodes only to the last served slot-set.
       val proofForThisTask = if idx == servedCount - 1 then response.proof else Seq.empty
 
-      task.slots = accountSlots
-      task.proof = proofForThisTask
+      var task = task0.copy(slots = accountSlots, proof = proofForThisTask)
 
       val verifier = MerkleProofVerifier(task.storageRoot)
       val storageEndHash = accountSlots.lastOption.map(_._1).getOrElse(task.last)
@@ -1305,8 +1296,7 @@ private[actors] class StorageRangeCoordinatorImpl(
           log.warn(s"Storage proof verification failed for account ${task.accountString}: $error")
           recordPeerCooldown(peer, s"verification failed: $error")
           adjustResponseBytesOnFailure(peer, s"verification failed: $error")
-          task.pending = false
-          this.tasks.enqueue(task)
+          this.tasks.enqueue(task.copy(pending = false))
 
         case Right(_) =>
           val slotBytes = accountSlots.map { case (hash, value) => hash.size + value.size }.sum
@@ -1390,13 +1380,11 @@ private[actors] class StorageRangeCoordinatorImpl(
               }
             }
 
-            task.done = true
-            task.pending = false
+            task = task.copy(done = true, pending = false)
             recordCompletedTask(task)
           } else {
             // No slots to store — mark task done
-            task.done = true
-            task.pending = false
+            task = task.copy(done = true, pending = false)
             recordCompletedTask(task)
           }
       }
@@ -1421,11 +1409,10 @@ private[actors] class StorageRangeCoordinatorImpl(
       adjustResponseBytesOnFailure(peer, "request timeout")
 
       batchTasks.foreach { task =>
-        task.pending = false
         val key = (task.accountHash, task.next)
         if !pendingTaskKeys.contains(key) then {
           pendingTaskKeys += key
-          tasks.enqueue(task)
+          tasks.enqueue(task.copy(pending = false))
         }
       }
 

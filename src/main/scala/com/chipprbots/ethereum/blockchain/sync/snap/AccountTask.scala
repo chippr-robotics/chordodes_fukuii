@@ -17,28 +17,28 @@ import com.chipprbots.ethereum.domain.Account
   *   State root hash for verification
   */
 case class AccountTask(
-    var next: ByteString,
+    val next: ByteString,
     last: ByteString,
-    var rootHash: ByteString,
+    val rootHash: ByteString,
     // Runtime fields
-    var pending: Boolean = false,
-    var done: Boolean = false,
-    var accounts: Seq[(ByteString, Account)] = Seq.empty,
-    var proof: Seq[ByteString] = Seq.empty,
+    val pending: Boolean = false,
+    val done: Boolean = false,
+    val accounts: Seq[(ByteString, Account)] = Seq.empty,
+    val proof: Seq[ByteString] = Seq.empty,
     // Defensive counter against unbounded re-queue loops. Incremented every time the
     // coordinator re-queues this task on failure or proof-less empty response. When
     // it crosses MaxRequeuesPerTask the coordinator escalates via PivotStateUnservable
     // instead of looping forever.
-    var requeueCount: Int = 0,
+    val requeueCount: Int = 0,
     // Storage subtask tracking for large-storage contracts (spec 005).
     // Maps accountHash → in-flight StorageTask subtasks for parallel slot-range download.
     // Populated by StorageRangeCoordinator when continuation detected on first response.
     // Analogous to go-ethereum accountTask.SubTasks (sync.go:303).
-    var storageSubs: Map[ByteString, Seq[StorageTask]] = Map.empty,
+    val storageSubs: Map[ByteString, Seq[StorageTask]] = Map.empty,
     // Count of in-flight storage subtasks across all contracts in this account range.
     // Decremented per subtask completion; when 0 the task is ready to forward.
     // Analogous to go-ethereum accountTask.pend (sync.go:316).
-    var pend: Int = 0
+    val pend: Int = 0
 ) {
 
   /** Check if this task is completed */

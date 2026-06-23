@@ -272,9 +272,7 @@ private class AccountRangeCoordinatorImpl(
             if BigInt(1, savedNext.toArray.padTo(32, 0.toByte)) >=
               BigInt(1, task.last.toArray.padTo(32, 0.toByte)) =>
           // Range fully traversed — mark as done
-          task.next = task.last
-          task.done = true
-          task
+          task.copy(next = task.last, done = true)
         case Some(savedNext) =>
           // Partial range: the mid-range cursor is NOT safe to resume on the StackTrie path.
           // The per-task SnapHashTrie is in-memory + write-only and was lost on restart; a fresh
@@ -374,8 +372,7 @@ private class AccountRangeCoordinatorImpl(
         worker ! WorkerRequestCancelled(reqId)
         // 2. Re-queue the task. Do NOT increment requeueCount — drain is recovery, not a
         //    per-task failure; bumping would prematurely trip MaxRequeuesPerTask.
-        task.pending = false
-        pendingTasks.enqueue(task)
+        pendingTasks.enqueue(task.copy(pending = false))
         // 3. Mark the worker idle in the coordinator's pool (idempotent).
         markWorkerIdle(worker)
         // 4. Remove the slot.
@@ -639,7 +636,8 @@ private class AccountRangeCoordinatorImpl(
           // that misses silent peers. Drain BEFORE re-applying the root so all drained tasks
           // land in pendingTasks first, then pendingTasks.foreach re-tags them to the new root.
           drainActiveTasks(s"pivot refresh to ${newStateRoot.take(4).toHex}")
-          pendingTasks.foreach(_.rootHash = newStateRoot)
+          val updatedForPivot = pendingTasks.dequeueAll.map(_.copy(rootHash = newStateRoot))
+          pendingTasks.enqueue(updatedForPivot*)
 
           // Clear stateless AND snapless tracking — peers get a fresh slate at the new root.
           //
@@ -776,8 +774,7 @@ private class AccountRangeCoordinatorImpl(
               s"[ACCOUNT-COORD] Re-queuing task ${task.rangeString} from terminated worker (reqId=$reqId)"
             )
             activeTasks -= reqId
-            task.pending = false
-            pendingTasks.enqueue(task)
+            pendingTasks.enqueue(task.copy(pending = false))
             tryRedispatchPendingTasks()
           }
           Behaviors.same
@@ -1140,8 +1137,7 @@ private class AccountRangeCoordinatorImpl(
       // Mark worker busy
       idleWorkers -= worker
 
-      val task = pendingTasks.dequeue()
-      task.pending = true
+      val task = pendingTasks.dequeue().copy(pending = true)
 
       val requestId = requestTracker.generateRequestId()
       activeTasks.put(requestId, (task, worker, peer))
@@ -1169,7 +1165,7 @@ private class AccountRangeCoordinatorImpl(
         log.warn(
           s"[ACCOUNT-COORD] TaskComplete for unknown reqId=$requestId — task was already drained. Ignored."
         )
-      case Some((task, worker, peer)) =>
+      case Some((task0, worker, peer)) =>
         // #1184: progress signal — used by CheckDispatchStalled.
         lastDispatchOrResponseMs = System.currentTimeMillis()
         markWorkerIdle(worker)
@@ -1191,7 +1187,7 @@ private class AccountRangeCoordinatorImpl(
               recordPeerSuccess(peer.id)
             }
 
-            task.pending = false
+            var task = task0.copy(pending = false)
 
             if accountCount == 0 then {
               if proof.nonEmpty || task.rootHash == ByteString(MerklePatriciaTrie.EmptyRootHash) then {
@@ -1211,14 +1207,15 @@ private class AccountRangeCoordinatorImpl(
               }
             } else {
               // Real account data → reset requeue budget (transient failures earlier are now resolved).
-              task.requeueCount = 0
+              task = task.copy(requeueCount = 0)
 
               // Identify contract accounts
               identifyContractAccounts(accounts)
 
               // Update task progress before starting async storage.
               // This sets task.next so re-queuing (if needed) uses the correct start.
-              val isTaskDone = updateTaskProgress(task, accounts)
+              val (isTaskDone, updatedTask) = updateTaskProgress(task, accounts)
+              task = updatedTask
 
               // Update statistics
               val accountBytes = accounts.map { case (hash, _) =>
@@ -1240,22 +1237,21 @@ private class AccountRangeCoordinatorImpl(
           case Left(error) =>
             log.warn(s"Task completed with error: $error")
             // Re-queue task for retry
-            task.pending = false
-            requeueOrEscalate(task, s"task completed with error: $error")
+            requeueOrEscalate(task0.copy(pending = false), s"task completed with error: $error")
         }
     }
 
-  private def updateTaskProgress(task: AccountTask, accounts: Seq[(ByteString, Account)]): Boolean =
+  private def updateTaskProgress(task: AccountTask, accounts: Seq[(ByteString, Account)]): (Boolean, AccountTask) =
     // Empty responses are handled before this method. A no-proof empty response is a peer refusal; a proof-only empty
     // response is a valid proof that the requested tail is exhausted.
     if accounts.isEmpty then {
-      false
+      (false, task)
     } else {
       val lastHash = accounts.last._1
       if isMaxHash(lastHash) then {
         // Cannot advance beyond 0xFF..; this must be the end.
         consumedKeyspace += task.remainingKeyspace
-        true
+        (true, task)
       } else {
         val nextStart = incrementHash32(lastHash)
         // Track keyspace consumed: distance from old next to new next
@@ -1263,14 +1259,14 @@ private class AccountRangeCoordinatorImpl(
         val newNext = BigInt(1, nextStart.toArray.padTo(32, 0.toByte))
         val advanced = (newNext - oldNext).max(BigInt(0))
         consumedKeyspace += advanced
-        task.next = nextStart
+        val updatedTask = task.copy(next = nextStart)
 
         // If this task has no upper bound, keep going until peer returns empty.
-        if task.last.isEmpty then {
-          false
+        if updatedTask.last.isEmpty then {
+          (false, updatedTask)
         } else {
           // Treat `last` as an exclusive upper bound.
-          compareUnsigned32(nextStart, task.last) >= 0
+          (compareUnsigned32(nextStart, updatedTask.last) >= 0, updatedTask)
         }
       }
     }
@@ -1313,9 +1309,7 @@ private class AccountRangeCoordinatorImpl(
   private def completeEmptyTaskRange(task: AccountTask, proofNodes: Int): Unit = {
     val range = task.rangeString
     consumedKeyspace += task.remainingKeyspace
-    task.next = task.last
-    task.done = true
-    completedTasks += task
+    completedTasks += task.copy(next = task.last, done = true)
     log.info(
       s"Account range COMPLETE: $range by empty proof-of-absence " +
         s"(proofNodes=$proofNodes, ${completedTasks.size}/$concurrency ranges done, $accountsDownloaded accounts total)"
@@ -1346,8 +1340,7 @@ private class AccountRangeCoordinatorImpl(
           )
         }
         log.warn(s"Task failed: $reason")
-        task.pending = false
-        task.rootHash = stateRoot
+        val failedTask = task.copy(pending = false, rootHash = stateRoot)
 
         // Apply cooldown and reduce byte budget for protocol failures; skip for network-level
         // disconnects since the peer is already gone and will reconnect fresh.
@@ -1356,7 +1349,7 @@ private class AccountRangeCoordinatorImpl(
           adjustResponseBytesOnFailure(peer, reason)
         }
 
-        requeueOrEscalate(task, reason)
+        requeueOrEscalate(failedTask, reason)
     }
 
   /** Re-queue a task or escalate to the controller after too many consecutive requeues.
@@ -1367,17 +1360,16 @@ private class AccountRangeCoordinatorImpl(
     * recordCriticalFailure -> fallbackToFastSync after enough refreshes without progress.
     */
   private def requeueOrEscalate(task: AccountTask, reason: String): Unit = {
-    task.requeueCount += 1
+    val newCount = task.requeueCount + 1
     com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncMetrics.incrementRequestRetry()
-    if task.requeueCount > AccountRangeCoordinator.MaxRequeuesPerTask then {
+    if newCount > AccountRangeCoordinator.MaxRequeuesPerTask then {
       log.error(
         s"Account task ${task.rangeString} exhausted requeue budget " +
-          s"(${task.requeueCount} > ${AccountRangeCoordinator.MaxRequeuesPerTask}, last reason: $reason). " +
+          s"($newCount > ${AccountRangeCoordinator.MaxRequeuesPerTask}, last reason: $reason). " +
           s"Escalating PivotStateUnservable to controller; task will be retried on the next root."
       )
       // Reset the counter so the next pivot has a fresh budget; preserve task position.
-      task.requeueCount = 0
-      pendingTasks.enqueue(task)
+      pendingTasks.enqueue(task.copy(requeueCount = 0))
       // Gate the escalation on pivotRefreshRequested so only the FIRST task to exhaust its
       // budget escalates per pivot cycle. Without this, all ~16 ranges escalate at once when a
       // serve window expires, producing a PivotStateUnservable burst (observed ~50 in one log).
@@ -1394,9 +1386,9 @@ private class AccountRangeCoordinatorImpl(
     } else {
       log.info(
         s"[ACCOUNT-REQUEUE] task ${task.rangeString} requeued " +
-          s"(${task.requeueCount}/${AccountRangeCoordinator.MaxRequeuesPerTask}): $reason"
+          s"($newCount/${AccountRangeCoordinator.MaxRequeuesPerTask}): $reason"
       )
-      pendingTasks.enqueue(task)
+      pendingTasks.enqueue(task.copy(requeueCount = newCount))
     }
     tryRedispatchPendingTasks()
   }
@@ -1528,8 +1520,7 @@ private class AccountRangeCoordinatorImpl(
         // Mark task done / re-enqueue BEFORE potentially spawning async flush — so the
         // task tracking is up to date by the time we re-enter `receive` after flushing.
         if isTaskRangeComplete then {
-          task.done = true
-          completedTasks += task
+          completedTasks += task.copy(done = true)
           // On the StackTrie path, the task's per-range StackTrie has accumulated all of
           // this range's accounts; commit it to finalise the right boundary and flush the
           // remaining pending batch to RocksDB. The fragment root is logged for diagnostics
@@ -1565,9 +1556,7 @@ private class AccountRangeCoordinatorImpl(
       case e: Exception =>
         log.error(s"Failed to store account chunk: ${e.getMessage}", e)
         // Re-queue task for retry
-        task.pending = false
-        task.done = false
-        pendingTasks.enqueue(task)
+        pendingTasks.enqueue(task.copy(pending = false, done = false))
     }
   }
 

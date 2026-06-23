@@ -27,10 +27,10 @@ case class StorageTask(
     next: ByteString,
     last: ByteString,
     // Runtime fields
-    var pending: Boolean = false,
-    var done: Boolean = false,
-    var slots: Seq[(ByteString, ByteString)] = Seq.empty, // (slotHash, slotValue)
-    var proof: Seq[ByteString] = Seq.empty
+    val pending: Boolean = false,
+    val done: Boolean = false,
+    val slots: Seq[(ByteString, ByteString)] = Seq.empty, // (slotHash, slotValue)
+    val proof: Seq[ByteString] = Seq.empty
 ) {
 
   /** Check if this task is completed */

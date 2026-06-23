@@ -269,8 +269,7 @@ private class ByteCodeCoordinatorImpl(
           val idleBefore = idleWorkers.size
           inFlight.foreach { case (reqId, worker, task) =>
             activeTasks.remove(reqId)
-            task.pending = false
-            pendingTasks.enqueue(task)
+            pendingTasks.enqueue(task.copy(pending = false))
             worker ! ByteCodeWorkerRelease(reqId)
             markWorkerIdle(worker) // restore to idle pool — matches invariant at every other release site
           }
@@ -314,12 +313,10 @@ private class ByteCodeCoordinatorImpl(
 
       case ByteCodeTaskFailed(requestId, error) =>
         activeTasks.remove(requestId).foreach { active =>
-          val task = active.task
           val worker = active.worker
           val peer = active.peer
           log.warn(s"Re-queuing bytecode task after failure: $error")
-          task.pending = false
-          pendingTasks.enqueue(task)
+          pendingTasks.enqueue(active.task.copy(pending = false))
           recordPeerCooldown(peer, cooldownConfig.baseTimeout, s"request failed: $error")
           adjustResponseBytesTargetOnFailure(peer, s"request failed: $error")
           markWorkerIdle(worker)
@@ -378,8 +375,7 @@ private class ByteCodeCoordinatorImpl(
         activeTasks.find { case (_, active) => active.worker == worker }.foreach { case (reqId, active) =>
           log.warn(s"Re-queuing bytecode task from terminated worker (${active.task.codeHashes.size} hashes)")
           activeTasks -= reqId
-          active.task.pending = false
-          pendingTasks.enqueue(active.task)
+          pendingTasks.enqueue(active.task.copy(pending = false))
         }
         tryRedispatchPendingTasks()
         Behaviors.same
@@ -465,12 +461,11 @@ private class ByteCodeCoordinatorImpl(
       // Mark worker busy.
       idleWorkers -= worker
 
-      val task = pendingTasks.dequeue()
+      val task = pendingTasks.dequeue().copy(pending = true)
       val requestId = requestTracker.generateRequestId()
 
       val requestedBytes = responseBytesTargetFor(peer)
 
-      task.pending = true
       activeTasks.put(
         requestId,
         ActiveByteCodeRequest(task, worker, peer, requestedBytes = requestedBytes, startedAtMillis = nowMillis)
@@ -536,8 +531,7 @@ private class ByteCodeCoordinatorImpl(
           case Left(error) =>
             log.warn(s"Bytecode verification failed: $error")
             activeTasks.remove(response.requestId)
-            task.pending = false
-            pendingTasks.enqueue(task)
+            pendingTasks.enqueue(task.copy(pending = false))
 
             // Spec violation or malicious peer - back off harder than empty responses.
             recordPeerCooldown(peer, cooldownConfig.baseInvalid, s"invalid ByteCodes: $error")
@@ -552,8 +546,7 @@ private class ByteCodeCoordinatorImpl(
               case Left(error) =>
                 log.warn(s"Failed to store bytecodes: $error")
                 activeTasks.remove(response.requestId)
-                task.pending = false
-                pendingTasks.enqueue(task)
+                pendingTasks.enqueue(task.copy(pending = false))
 
                 // Storage failure isn't necessarily the peer's fault, but to be a good neighbor
                 // (and avoid tight loops), briefly cool down this peer.
@@ -617,9 +610,7 @@ private class ByteCodeCoordinatorImpl(
                 consecutiveTaskFailures = 0
 
                 // Only mark the task completed if nothing remains; large batches may be partially served due to bytes.
-                task.pending = false
                 if remainingHashes.isEmpty then {
-                  task.done = true
                   // task.bytecodes was assigned to the in-flight task purely so the old buffer
                   // could retain it; now that we only track a count, we no longer need to attach
                   // the blob to the task struct — the bytes have already been written via
