@@ -92,7 +92,7 @@ class EngineApiController(
         payloadOpt match {
           case Left(ex) =>
             val msg = Option(ex.getMessage).getOrElse(ex.getClass.getSimpleName)
-            System.err.println(s"[ENGINE-API] newPayload v$version decode failure: $msg")
+            log.warn("[ENGINE-API] newPayload v{} decode failure: {}", version, msg)
             return IO.pure(
               JsonRpcResponse(
                 "2.0",

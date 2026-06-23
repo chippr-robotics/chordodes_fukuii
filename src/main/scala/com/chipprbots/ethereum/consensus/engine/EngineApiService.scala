@@ -149,9 +149,11 @@ class EngineApiService(
     val block = payloadToBlock(payload)
 
     if block.header.hash != payload.blockHash then {
-      System.err.println(
-        s"[ENGINE-API] newPayload #${payload.blockNumber}: block-hash mismatch " +
-          s"computed=${block.header.hashAsHexString} payload=${com.chipprbots.ethereum.utils.ByteStringUtils.hash2string(payload.blockHash)}"
+      log.warn(
+        "[ENGINE-API] newPayload #{}: block-hash mismatch computed={} payload={}",
+        payload.blockNumber,
+        block.header.hashAsHexString,
+        com.chipprbots.ethereum.utils.ByteStringUtils.hash2string(payload.blockHash)
       )
       // Hash mismatch: integrity error of the payload envelope. Per execution-apis PR #338
       // (https://github.com/ethereum/execution-apis/pull/338), starting from Shanghai (V2+)
@@ -323,7 +325,7 @@ class EngineApiService(
                         s"(supplied=${suppliedRequests.size}, derived=${derivedRequests.size})"
                     )
                   )
-                  System.err.println(s"[ENGINE-API] newPayload #${payload.blockNumber}: INVALID_REQUESTS")
+                  log.warn("[ENGINE-API] newPayload #{}: INVALID_REQUESTS", payload.blockNumber)
                   Some(false)
                 } else {
                   // Detect whether this payload extends canonical (parent == current best) or is a
@@ -341,11 +343,13 @@ class EngineApiService(
                   // remain available for an alternative sibling payload on the same parent
                   // (hive 'Sidechain Reorg' test). Pool removal happens in forkchoiceUpdated
                   // once the block is promoted.
-                  System.err.println(
-                    s"[ENGINE-API] newPayload #${payload.blockNumber}: EXECUTED OK " +
-                      s"(${block.body.numberOfTxs} txs, sidechain=${!extendsCanonical}, " +
-                      s"requests=${derivedRequests.size}, " +
-                      s"headerStateRoot=${block.header.stateRoot.take(8).map("%02x".format(_)).mkString}...)"
+                  log.info(
+                    "[ENGINE-API] newPayload #{}: EXECUTED OK (txs={} sidechain={} requests={} headerStateRoot={}...)",
+                    payload.blockNumber,
+                    block.body.numberOfTxs,
+                    !extendsCanonical,
+                    derivedRequests.size,
+                    block.header.stateRoot.take(8).map("%02x".format(_)).mkString
                   )
                   Some(true) // fully executed
                 }
@@ -354,9 +358,7 @@ class EngineApiService(
                   case com.chipprbots.ethereum.ledger.BlockExecutionError.MPTError(_) |
                       com.chipprbots.ethereum.ledger.BlockExecutionError.MissingParentError =>
                     // Missing state — can't validate, return SYNCING
-                    System.err.println(
-                      s"[ENGINE-API] newPayload #${payload.blockNumber}: missing state, SYNCING"
-                    )
+                    log.warn("[ENGINE-API] newPayload #{}: missing state, SYNCING", payload.blockNumber)
                     None
                   case _ =>
                     // Genuine validation failure (wrong stateRoot, gasUsed, receipts, etc.)
@@ -364,23 +366,17 @@ class EngineApiService(
                     blockchainWriter.removeBlockByHash(payload.blockHash).commit()
                     markInvalidRecursive(payload.blockHash, lvh)
                     executionErrorReason.set(Some(error.reason.toString))
-                    System.err.println(
-                      s"[ENGINE-API] newPayload #${payload.blockNumber}: INVALID: ${error.reason}"
-                    )
+                    log.warn("[ENGINE-API] newPayload #{}: INVALID reason={}", payload.blockNumber, error.reason)
                     Some(false)
                 }
             }
           catch {
             case _: com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MPTException =>
               // Missing state nodes — can't execute, return SYNCING
-              System.err.println(
-                s"[ENGINE-API] newPayload #${payload.blockNumber}: MPT error, SYNCING"
-              )
+              log.warn("[ENGINE-API] newPayload #{}: MPT error, SYNCING", payload.blockNumber)
               None
             case e: Exception =>
-              System.err.println(
-                s"[ENGINE-API] newPayload #${payload.blockNumber}: error: ${e.getMessage}, SYNCING"
-              )
+              log.warn("[ENGINE-API] newPayload #{}: error={} SYNCING", payload.blockNumber, e.getMessage)
               None
           }
         } else {
@@ -417,9 +413,7 @@ class EngineApiService(
                 _ => java.util.concurrent.ConcurrentHashMap.newKeySet[ByteString]()
               )
               .add(payload.blockHash)
-            System.err.println(
-              s"[ENGINE-API] newPayload #${payload.blockNumber}: ACCEPTED (parent unknown)"
-            )
+            log.info("[ENGINE-API] newPayload #{}: ACCEPTED (parent unknown)", payload.blockNumber)
             EngineApiMetrics.recordNewPayload("ACCEPTED", payload.blockNumber.toLong, payload.timestamp)
             PayloadStatusV1(Accepted)
         }
@@ -1027,7 +1021,7 @@ class EngineApiService(
       "engine_getClientVersionV1",
       "engine_exchangeCapabilities"
     )
-    log.info(s"exchangeCapabilities: CL supports ${clCapabilities.size} methods, we support ${supported.size}")
+    log.info("exchangeCapabilities: clMethods={} supported={}", clCapabilities.size, supported.size)
     supported
   }
 

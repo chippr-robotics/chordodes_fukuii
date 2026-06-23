@@ -220,13 +220,17 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
         state.env.tracer.foreach(_.onStep(opCode, state, newState))
         import newState.*
         log.trace(
-          s"$opCode | pc: $pc | depth: ${env.callDepth} | gasUsed: ${state.gas - gas} | gas: $gas | stack: $stack"
+          "op={} pc={} depth={} gasUsed={} gas={} stack={}",
+          opCode,
+          pc,
+          env.callDepth,
+          state.gas - gas,
+          gas,
+          stack
         )
         // Opcode-level tracing for targeted debugging
         if DebugTrace.enabledForBlock(state.env.blockHeader.number) && state.env.callDepth == 0 then {
-          System.err.println(
-            s"[EVM] pc=${state.pc} op=$opCode gas=${state.gas} -> gasAfter=$gas depth=${env.callDepth}"
-          )
+          log.debug("[EVM] pc={} op={} gas={} gasAfter={} depth={}", state.pc, opCode, state.gas, gas, env.callDepth)
         }
         if newState.halted then newState
         else exec(newState)
