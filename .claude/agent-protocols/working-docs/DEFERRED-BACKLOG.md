@@ -941,7 +941,7 @@ slower than dev machine → timeouts). `@Ignore` annotations silently hide untes
 | Cluster | Sites | Root cause | Pre/Post-CAPSTONE | Sprint |
 |---------|-------|-----------|-------------------|--------|
 | A — `messageAdapter.toClassic` (PeerEventBus subscriptions) | ~26 | `PeerEventBusActor.SubscribeCmd(subscriber: ActorRef)` | Pre-CAPSTONE | §8k-D ✅ DONE 93bcedb12 |
-| B — `handshakedPeersAdapter.toClassic` | ~15 | `NPMA.GetHandshakedPeersCmd(replyTo: ActorRef)` | Pre-CAPSTONE | §8k-E |
+| B — `handshakedPeersAdapter.toClassic` | ~15 | `NPMA.GetHandshakedPeersCmd(replyTo: ActorRef)` | Pre-CAPSTONE | §8k-E ✅ DONE c42316b39 |
 | C — `ctx.toClassic.sender()` in SyncController/FastSync | ~27 | OQ-5 Classic ask path from jsonrpc callers | Pre-CAPSTONE | §8k-G |
 | D — `ctx.toClassic.actorOf(RegularSync)` | 2 | RegularSync has no `Behavior[Command]` | Pre-CAPSTONE | §8k-F |
 | E — `externalAdapter.toClassic` in SyncController | ~29 | OQ-5 Classic ask path (same root as C) | Pre-CAPSTONE | §8k-G |
@@ -1050,45 +1050,6 @@ Step 5 — Output the full audit to `.local/docs/classic-interop-audit.md`.
 
 ---
 
-
-#### §8k-E — MITHRIL: Lift `NetworkPeerManagerActor.GetHandshakedPeersCmd(replyTo: ActorRef)` to Typed
-
-**Agent:** MITHRIL
-**Risk:** LOW-MEDIUM — command ADT change in NPMA; 15 call sites updated across sync subsystem
-**Gate:** §8k-D complete (PEBA subscriber protocol clean first; NPMA subscribes to PEBA at line 108)
-**Bridge sites eliminated:** ~15 (Cluster B `handshakedPeersAdapter.toClassic` across FastSync, SyncStateSchedulerActor, PeersClient, BlockBroadcaster, ChainDownloader) + 1 (Cluster K NPMA spawn .toClassic in NodeBuilder if callers migrate)
-
-**Background:**
-`NPMA.GetHandshakedPeersCmd(replyTo: ActorRef)` is untyped. Typed callers must convert their
-`messageAdapter` to `.toClassic` (15 sites). Changing to `GetHandshakedPeersCmd(replyTo: ActorRef[HandshakedPeers])`
-removes all 15 sites and unblocks the NPMA spawn `.toClassic` in NodeBuilder.
-
-**Steps:**
-1. In `NPMA.Command` ADT: change `GetHandshakedPeersCmd(replyTo: ActorRef)` →
-   `GetHandshakedPeersCmd(replyTo: ActorRef[HandshakedPeers])`.
-2. Update the NPMA handler that replies with `HandshakedPeers`: `replyTo ! HandshakedPeers(...)` (already Typed tell).
-3. Update the Classic shell absorption block (`NetworkPeerManagerShell`) that wraps `GetHandshakedPeersCmd`
-   from external Classic callers — it can now forward directly since replyTo is Typed.
-4. Remove `.toClassic` at all 15 Cluster B call sites. Each uses a `handshakedPeersAdapter: ActorRef[HandshakedPeers]`
-   already — simply pass it directly: `GetHandshakedPeersCmd(replyTo = handshakedPeersAdapter)`.
-5. `sbt compile-all` after each file.
-
-**Verify:**
-```bash
-grep -rn "handshakedPeersAdapter\.toClassic\|toClassic.*GetHandshakedPeers" \
-  src/main/ --include="*.scala"
-# Expected: 0
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. Stage NPMA + 7 Cluster B caller files
-3. `git commit -m "refactor(8k-E): typed GetHandshakedPeersCmd replyTo in NPMA — remove ~15 .toClassic sites (Cluster B)"`
-4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(8k-E): clearout — $SHA"`
-5. **DELETE §8k-E**
-
----
 
 #### §8k-F — LOOM: RegularSync full Typed migration
 
