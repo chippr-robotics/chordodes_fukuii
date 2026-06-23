@@ -381,16 +381,60 @@ class SyncControllerSpec
     }
   }
 
-  // DELETED (P10): "start state download only when pivot block is fresh enough"
-  // The test expected a pivot update from 399509→399519 (delta=10) but the staleness threshold
-  // is pivotBlockOffset(500) + maxPivotBlockAge(30) = 530. Delta 10 never cleared that threshold,
-  // so the pivot update was mathematically impossible on every run. The test was intermittently
-  // passing only due to JVM timing accidents from the original Thread.sleep-based Mantis impl.
-  //
-  // Coverage note: "update pivot block during state sync if it goes stale" covers the runtime
-  // staleness refresh path, but NOT the pre-start freshness gate (initial check before state sync
-  // begins). A properly parameterized replacement test should set the new peer block to
-  // currentPivot + 531+ so delta >= 530 triggers the update. Logged in CHASE-QUEUE.
+  // REWRITTEN (P10): original had delta=10 < threshold(530) — pivot update was impossible.
+  // New test covers the stalePivotAfterRestart rejection path: when PivotBlockSelector returns the
+  // *same* pivot number as the pre-restart value, FastSync rejects it (stalePivotAfterRestart guard
+  // in newPivotIsGoodEnough), increments pivotBlockUpdateFailures, and retries. State download must
+  // NOT start until a genuinely fresh pivot (higher number) is accepted.
+  it should "start state download only when pivot block is fresh enough" taggedAs (
+    UnitTest,
+    SyncTest
+  ) in withTestSetup() { testSetup =>
+    import testSetup.*
+
+    // beforeRestartPivot.number = defaultExpectedPivotBlock - 1 = 399499
+    startWithState(defaultStateBeforeNodeRestart)
+    syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
+
+    val newBlocks =
+      getHeaders(defaultStateBeforeNodeRestart.bestBlockHeaderNumber + 1, syncConfig.blockHeadersPerRequest)
+
+    // Peers at bestBlock - 1 = 399999: PivotBlockSelector picks 399999 - 500 = 399499 = beforeRestartPivot.
+    // SyncRestart rejects same-height pivot (stalePivotAfterRestart guard) → failure increments,
+    // state download does NOT start.
+    val sameLevelPeerInfo = defaultPeer1Info.copy(maxBlockNumber = bestBlock - 1)
+    val sameLevelPeers = HandshakedPeers(Map(peer1 -> sameLevelPeerInfo))
+
+    val pilot = setupAutoPilot(
+      networkPeerManager,
+      sameLevelPeers,
+      beforeRestartPivot,
+      BlockchainData(newBlocks),
+      onlyPivot = true
+    )
+
+    // At least one stalePivotAfterRestart rejection must have occurred; exact count is timing-sensitive.
+    eventually {
+      someTimePasses()
+      storagesInstance.storages.fastSyncStateStorage.getSyncState().get.pivotBlockUpdateFailures should be > 0
+    }
+    stateDownloadStarted shouldBe false
+
+    // Peers advance to bestBlock = 400000: PivotBlockSelector picks 400000 - 500 = 399500 > 399499.
+    // newPivotIsGoodEnough returns true → pivot accepted → state download begins.
+    pilot.updateAutoPilot(
+      HandshakedPeers(singlePeer),
+      defaultPivotBlockHeader,
+      BlockchainData(newBlocks)
+    )
+
+    eventually {
+      someTimePasses()
+      val syncState = storagesInstance.storages.fastSyncStateStorage.getSyncState().get
+      syncState.pivotBlock shouldBe defaultPivotBlockHeader
+      stateDownloadStarted shouldBe true
+    }
+  }
 
   it should "re-enqueue block bodies when empty response is received" taggedAs (UnitTest, SyncTest) in withTestSetup() {
     testSetup =>
