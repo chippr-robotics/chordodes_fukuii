@@ -577,7 +577,9 @@ final private class BlockImporterLogic(
   private def tryImportBlocks(
       blocks: List[Block],
       importedBlocks: List[Block] = Nil
-  ): IO[(List[Block], Option[Any])] = // Any: union of MissingNodeException subtypes | BlockImportFailed | UnknownParent — no shared supertype
+  ): IO[
+    (List[Block], Option[Any])
+  ] = // Any: union of MissingNodeException subtypes | BlockImportFailed | UnknownParent — no shared supertype
     NonEmptyList.fromList(blocks) match {
       case None =>
         importedBlocks.headOption.foreach(block =>

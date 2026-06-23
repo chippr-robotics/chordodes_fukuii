@@ -142,7 +142,8 @@ object SyncController {
   //
   //   From FastSync, RegularSync, CombinedRecoveryScanActor, ChainDownloader (child replies forwarded):
   //     FastSync.Done, FastSync.FallbackToSnapSync, RegularSync.ProgressProtocol.*, recovery scanner events
-  final private[sync] case class WrappedExternal(msg: Any) extends Command // Any: Pekko messageAdapter boundary — Classic msgs arrive untyped
+  final private[sync] case class WrappedExternal(msg: Any)
+      extends Command // Any: Pekko messageAdapter boundary — Classic msgs arrive untyped
   // Public: external Classic callers (JSON-RPC asks, miner, NodeBuilder startup) construct this to wrap their raw
   // SyncProtocol.* sends so the messages survive the Behavior[Command] boundary. The handler unwraps and replies via
   // ctx.toClassic.sender() (preserved because callers `.tell`/`?` with the original sender), so no replyTo is added.
@@ -438,7 +439,8 @@ object SyncController {
 
     // Shared message adapter: children we spawn get `externalAdapter.toClassic` as their reply target, so every
     // fire-and-forget child message lands here as `WrappedExternal(msg)`. Registered once per actor instance.
-    val externalAdapter: TypedActorRef[Any] = ctx.messageAdapter[Any](WrappedExternal.apply) // Any: messageAdapter ref — Classic side is untyped
+    val externalAdapter: TypedActorRef[Any] =
+      ctx.messageAdapter[Any](WrappedExternal.apply) // Any: messageAdapter ref — Classic side is untyped
 
     /** Load SNAP sync configuration with fallback to defaults */
     private def loadSnapSyncConfig(): SNAPSyncConfig =
@@ -793,11 +795,14 @@ object SyncController {
       handleRegularSyncMsg(regularSync, unwrap(cmd))
     }
 
-    /** Shared message handler for the regular-sync states. Returns the next `Behavior[Command]`. Extracted so the backfill
-      * variants can delegate to it after handling their own backfill-specific messages (former `runningRegularSync(...)
-      * .apply(msg)` Classic partial-function delegation).
+    /** Shared message handler for the regular-sync states. Returns the next `Behavior[Command]`. Extracted so the
+      * backfill variants can delegate to it after handling their own backfill-specific messages (former
+      * `runningRegularSync(...) .apply(msg)` Classic partial-function delegation).
       */
-    private def handleRegularSyncMsg(regularSync: ActorRef, other: Any): Behavior[Command] = // Any: unwrapped Classic msg
+    private def handleRegularSyncMsg(
+        regularSync: ActorRef,
+        other: Any
+    ): Behavior[Command] = // Any: unwrapped Classic msg
       other match {
         case RegularSyncTerminated(actor) if actor == regularSync =>
           log.error("RegularSync actor terminated unexpectedly — restarting regular sync.")
@@ -943,11 +948,12 @@ object SyncController {
       case _                                => false
     }
 
-    /** Internal `Behavior[Command]` self / death-watch markers that must NEVER be forwarded to a Classic child. A watched
-      * child can terminate after the parent has already transitioned to a state that does not handle its marker (e.g.
-      * `RegularSyncStuck` poison-pills regularSync and enters `runningSnapSync`); the late `RegularSyncTerminated` then
-      * lands in `runningSnapSync`'s catch-all. Without this guard it would be `tell`-forwarded to the SNAP child and
-      * crash it with a ClassCastException. Every forwarding catch-all drops these silently.
+    /** Internal `Behavior[Command]` self / death-watch markers that must NEVER be forwarded to a Classic child. A
+      * watched child can terminate after the parent has already transitioned to a state that does not handle its marker
+      * (e.g. `RegularSyncStuck` poison-pills regularSync and enters `runningSnapSync`); the late
+      * `RegularSyncTerminated` then lands in `runningSnapSync`'s catch-all. Without this guard it would be
+      * `tell`-forwarded to the SNAP child and crash it with a ClassCastException. Every forwarding catch-all drops
+      * these silently.
       */
     private def isInternalMarker(msg: Any): Boolean = msg match { // Any: Classic msg from adapter
       case _: SnapSyncTerminated         => true
@@ -1581,8 +1587,8 @@ object SyncController {
       runningSnapSync(snapSync)
     }
 
-    /** Starts (or restarts) regular sync. Returns the spawned `regularSync` ref AND the next `Behavior[Command]` to enter:
-      * normally `runningRegularSync`, or — when `resumeBackfill` triggers a standalone backfill resumer —
+    /** Starts (or restarts) regular sync. Returns the spawned `regularSync` ref AND the next `Behavior[Command]` to
+      * enter: normally `runningRegularSync`, or — when `resumeBackfill` triggers a standalone backfill resumer —
       * `runningRegularSyncWithStandaloneBackfill`. Callers that need the ref for a death-watch (e.g. the SNAP-finalised
       * path) use `._1`; callers that just transition use `._2`.
       */
