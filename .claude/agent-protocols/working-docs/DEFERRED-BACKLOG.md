@@ -940,7 +940,7 @@ slower than dev machine → timeouts). `@Ignore` annotations silently hide untes
 
 | Cluster | Sites | Root cause | Pre/Post-CAPSTONE | Sprint |
 |---------|-------|-----------|-------------------|--------|
-| A — `messageAdapter.toClassic` (PeerEventBus subscriptions) | ~26 | `PeerEventBusActor.SubscribeCmd(subscriber: ActorRef)` | Pre-CAPSTONE | §8k-D |
+| A — `messageAdapter.toClassic` (PeerEventBus subscriptions) | ~26 | `PeerEventBusActor.SubscribeCmd(subscriber: ActorRef)` | Pre-CAPSTONE | §8k-D ✅ DONE 93bcedb12 |
 | B — `handshakedPeersAdapter.toClassic` | ~15 | `NPMA.GetHandshakedPeersCmd(replyTo: ActorRef)` | Pre-CAPSTONE | §8k-E |
 | C — `ctx.toClassic.sender()` in SyncController/FastSync | ~27 | OQ-5 Classic ask path from jsonrpc callers | Pre-CAPSTONE | §8k-G |
 | D — `ctx.toClassic.actorOf(RegularSync)` | 2 | RegularSync has no `Behavior[Command]` | Pre-CAPSTONE | §8k-F |
@@ -952,7 +952,7 @@ slower than dev machine → timeouts). `@Ignore` annotations silently hide untes
 | J — `classicSystem.actorOf` bridge actors in NodeBuilder | 3 | KNM/PDM/PTM have Classic callers via legacy case objects | Pre-CAPSTONE | §8k-I |
 | K — `peerEventBus.toClassic` + spawn `.toClassic` in NodeBuilder | 3 | SyncController/NPMA returned as Classic refs to callers | Pre-CAPSTONE | §8k-G/§8k-I |
 | L — `AkkaTaskOps.askFor` (jsonrpc, ~18 call sites) | ~18 | Commands carry `replyTo: ActorRef` not `ActorRef[T]` | Pre-CAPSTONE | §8k-G |
-| M — `peerEventBus.toClassic` watchWith in PEBA itself | 1 | PEBA internal Classic watch | Pre-CAPSTONE | §8k-D |
+| M — `peerEventBus.toClassic` watchWith in PEBA itself | 1 | PEBA internal Classic watch | Pre-CAPSTONE | §8k-D ✅ DONE 93bcedb12 |
 | N — `ctx.self.toClassic` / `fetcherReplyTo.toClassic` in BlockImporter | 4 | RegularSync spawned Classic → BlockImporter props take Classic refs | Pre-CAPSTONE | §8k-F |
 
 **Principle**: Each `.toClassic` call is a symptom, not the disease. The disease is an unconverted classic actor upstream. The fix strategy is: **migrate the upstream actor first (LOOM), then delete the bridge**. Bridges must never be removed before the upstream is converted — that produces a type error at the call site that blocks compilation.
@@ -1050,50 +1050,6 @@ Step 5 — Output the full audit to `.local/docs/classic-interop-audit.md`.
 
 ---
 
-
-#### §8k-D — HERALD + MITHRIL: Lift `PeerEventBusActor.SubscribeCmd(subscriber: ActorRef)` to Typed
-
-**Agent:** HERALD (protocol audit) pre-flight, then MITHRIL (implementation)
-**Risk:** MEDIUM — PeerEventBusActor's internal Classic `EventBus` registry stores `subscriber: ActorRef`;
-         changing to `ActorRef[PeerEvent]` requires either a dispatch wrapper or a typed registry.
-**Gate:** §8k-C complete. HERALD pre-flight mandatory before touching PEBA internals.
-**Bridge sites eliminated:** ~27 (all Cluster A `messageAdapter.toClassic` subscription sites + BlockFetcher subscribeAdapter child + Cluster M watchWith)
-
-**Background:**
-`PeerEventBusActor.SubscribeCmd` and `UnsubscribeCmd` accept `subscriber: ActorRef` (Classic). Every
-Typed subscriber must call `.toClassic` on its `messageAdapter` ref (26 sites across 9 files — see
-Cluster A in `.local/docs/classic-interop-audit.md`). The root cause is the internal Classic `EventBus`
-machinery. Two valid approaches:
-- **(A) Typed registry overlay**: PEBA stores `ActorRef[PeerEvent]` alongside the Classic ref; delivers
-  to Typed ref directly and drops the Classic path.
-- **(B) Dispatch wrapper**: Keep Classic EventBus internally; add a thin Typed-→Classic adapter at
-  subscribe time (opposite direction — the adapter converts Typed delivery to the Classic registry).
-
-HERALD pre-flight determines which approach avoids wire-protocol changes.
-
-**Steps:**
-1. HERALD: read `network/PeerEventBusActor.scala` fully. Assess EventBus internal. Recommend A or B.
-2. MITHRIL: implement the chosen approach. Change `SubscribeCmd(to, subscriber: ActorRef)` param.
-3. Remove `.toClassic` at all ~26 call sites in Clusters A (9 files). Remove the `BlockFetcher`
-   subscribeAdapter bridge child (replace with direct `messageAdapter`).
-4. Remove `peerEventBus.toClassic` watchWith in PEBA:44 (Cluster M).
-5. `sbt compile-all` after each file group.
-
-**Verify:**
-```bash
-grep -rn "\.toClassic" src/main/scala/com/chipprbots/ethereum/network/ --include="*.scala"
-# Expected: 0 after this sprint (except TCP bridges in ServerActor / RLPxConnectionHandler)
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. Stage PEBA + all 9 subscriber files + BlockFetcher
-3. `git commit -m "refactor(8k-D): typed PeerEventBusActor subscriber protocol — remove ~27 .toClassic sites (Clusters A+M)"`
-4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(8k-D): clearout — $SHA"`
-5. **DELETE §8k-D**
-
----
 
 #### §8k-E — MITHRIL: Lift `NetworkPeerManagerActor.GetHandshakedPeersCmd(replyTo: ActorRef)` to Typed
 
@@ -2275,3 +2231,173 @@ Handle before any Hive ETC Olympia test suite run.
 
 Deferred during P9 audit (2026-06-23, commit `86c76fd4e`). Four targeted fixes listed below.
 The `handleRegularSyncMsg` production bug (SyncController:895-897) is tracked under P10 (F7).
+
+---
+
+## Part 16: ETH69/ETH70 PoW Safety — Hardening (P1/P2)
+
+**Source:** Wire Protocol audit 2026-06-23 — `.local/Wire-Protocol-Modernization/eth69-pow-safety-audit.md`
+**P0 items** (G1 TD gate, G5 backlink) → `SPRINT-QUEUE.md §ETH69-A/B` — implement first.
+**P1 items** (G2 Tier3 accuracy, G6 BRU) and **P2 items** (G3/G4 archive node) tracked here.
+**Gate:** §ETH69-A and §ETH69-B must be complete before hardening items are useful.
+
+---
+
+### §ETH69-C — MITHRIL: BlockchainReader Tier3 rolling-window median (G2, P1)
+
+**Agent:** MITHRIL
+**Risk:** MEDIUM — changes Tier3 TD estimation formula; affects peer ranking and chainWeight accuracy
+**Gate:** §ETH69-A complete (TD gate in place) + §ETH69-B complete
+**File:** `src/main/scala/com/chipprbots/ethereum/domain/BlockchainReader.scala:217-221`
+
+**Background:**
+Tier3 `POW_SCALING` uses current head difficulty as the marginal rate in:
+```scala
+val rate = rollingWindowDiff(head, ourBestTD)  // 10K-block rolling avg, fallback to head.difficulty
+val gap  = (latestBlock - ourBestNum).max(BigInt(0))
+val estimatedTD = ourBestTD + rate * gap
+```
+Under flex-load difficulty oscillation (±50% swing observed in `ETH69OscillationChainWeightSpec.scala:142-156`),
+this causes Tier3 to systematically overestimate or underestimate TD by 10-50%. Archive nodes
+receiving an inflated Tier3 estimate are never corrected (monotonic guard + no NewBlock sent).
+Peers arriving mid-oscillation trough are deprioritised unfairly.
+
+**Steps:**
+1. **Read** `BlockchainReader.scala:199-248` in full — understand `rollingWindowDiff`,
+   `resolveETH69ChainWeight`, and what `head` / `ourBestTD` are.
+2. **Read** `ETH69OscillationChainWeightSpec.scala` — understand existing oscillation test cases
+   and what accuracy targets they assert.
+3. **Implement** a 1,000-block rolling-median difficulty store:
+   - On each new block import (hook into the existing block-update path), record
+     `header.difficulty` in a ring buffer of size 1,000.
+   - Expose `rollingMedianDifficulty: BigInt` as a new `BlockchainReader` method.
+   - Replace `rollingWindowDiff(head, ourBestTD)` call in Tier3 with `rollingMedianDifficulty`
+     (fallback to `head.difficulty` if buffer is not yet full).
+4. **Add test cases** to `ETH69OscillationChainWeightSpec`:
+   - Verify Tier3 estimate variance is < ±20% under 50% oscillation (rolling median dampens swings)
+   - Verify rolling median correctly averages out high/low difficulty alternation
+5. `sbt "testOnly *BlockchainReader* *ETH69*"` after changes.
+
+**Verify:**
+```bash
+grep -n "rollingWindowDiff\|rollingMedian\|rate = " \
+  src/main/scala/com/chipprbots/ethereum/domain/BlockchainReader.scala
+
+sbt "testOnly *ETH69Oscillation*"
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/main/scala/.../domain/BlockchainReader.scala src/test/.../ETH69OscillationChainWeightSpec.scala`
+3. `git commit -m "fix(sync): ETH69 Tier3 POW_SCALING — rolling-median difficulty reduces estimate variance (G2)"`
+4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(eth69-c): clearout — $SHA"`
+5. **DELETE §ETH69-C**
+
+---
+
+### §ETH69-D — MITHRIL: Tier3 accuracy telemetry (P1)
+
+**Agent:** MITHRIL
+**Risk:** LOW — instrumentation only, no logic change
+**Gate:** §ETH69-A complete
+**File:** `src/main/scala/com/chipprbots/ethereum/network/NetworkPeerManagerActor.scala:794-799`
+
+**Background:**
+When an ETH69 peer sends a `NewBlock`, `updateChainWeight` directly replaces the peer's
+chainWeight with the NewBlock TD — no monotonic guard. This is the only moment where the
+**actual** TD is revealed after a Tier3 estimate. Capturing the estimate-vs-actual delta
+at this point provides the data needed to tune the Tier3 formula and detect systematic bias.
+
+**Steps:**
+1. **Read** `NetworkPeerManagerActor.scala:789-810` — understand `updateChainWeight` and how
+   `NewBlock.totalDifficulty` and `initialPeerInfo.chainWeight` are accessible together.
+2. **Add logging** at the point of NewBlock TD replacement (inside `updateChainWeight`):
+   ```scala
+   case newBlock: ETHPackets.NewBlock =>
+     val prevTD      = initialPeerInfo.chainWeight.totalDifficulty
+     val actualTD    = newBlock.totalDifficulty
+     val delta       = actualTD - prevTD
+     val deltaPercent = if (prevTD > 0) (delta * 100) / prevTD else BigInt(0)
+     log.debug(
+       "ETH69_TIER3_ACCURACY: peer={} prevTD={} actualTD={} delta={} deltaPercent={}%",
+       initialPeerInfo.remoteStatus.bestHash,
+       prevTD, actualTD, delta, deltaPercent
+     )
+     initialPeerInfo.copy(chainWeight = ChainWeight.totalDifficultyOnly(newBlock.totalDifficulty))
+   ```
+3. **No test change required** — this is debug logging only. Confirm it compiles.
+4. `sbt compile-all` to confirm no errors.
+
+**Verify:**
+```bash
+grep -n "ETH69_TIER3_ACCURACY\|deltaPercent" \
+  src/main/scala/com/chipprbots/ethereum/network/NetworkPeerManagerActor.scala
+# Must see the log line
+
+sbt compile-all
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/main/scala/.../network/NetworkPeerManagerActor.scala`
+3. `git commit -m "feat(telemetry): ETH69 Tier3 estimate-vs-actual TD logging on NewBlock (G2 instrumentation)"`
+4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(eth69-d): clearout — $SHA"`
+5. **DELETE §ETH69-D**
+
+---
+
+### §ETH69-E — MITHRIL: Archive node monotonic guard exemption (G3/G4, P2)
+
+**Agent:** MITHRIL
+**Risk:** LOW — refinement to chainWeight update guard; no consensus impact
+**Gate:** §ETH69-C complete (rolling-median in place provides more stable Tier3 before disabling guard)
+**Files:** `src/main/scala/com/chipprbots/ethereum/network/NetworkPeerManagerActor.scala:841-851, 335-366`
+
+**Background:**
+Non-mining peers (archive nodes, light-mode relayers) on ETH69 never emit NewBlock.
+Their chainWeight is set at handshake via Tier3 POW_SCALING and can only be updated via
+the periodic `RefreshPeerBestBlocksTick` path (every ~5 min, lines 335-366), which calls
+`resolveETH69ChainWeight` and applies:
+```scala
+val isImprovement = cw.totalDifficulty > updated.chainWeight.totalDifficulty
+if isImprovement && source != "COLD_START" then updated.withChainWeight(cw)
+else updated
+```
+The monotonic guard (`isImprovement`) prevents downward corrections. If Tier3 overestimated
+at handshake (e.g., peer arrived during a difficulty spike), the chainWeight is permanently
+inflated for archive nodes. They are ranked higher than honest active peers in some contexts.
+
+**Steps:**
+1. **Read** `NetworkPeerManagerActor.scala:823-867` (`updateMaxBlock` function) in full.
+2. **Read** `NetworkPeerManagerActor.scala:335-366` (`RefreshPeerBestBlocksTick` path).
+3. **Implement archive node detection:** Track `lastMaxBlockNumber` per peer across
+   consecutive `RefreshPeerBestBlocksTick` probes. If `maxBlockNumber` has not advanced
+   in N consecutive probes (N=3, configurable), classify peer as "static" (not mining).
+4. **Exempt static peers from the monotonic guard** in the Tier3 re-resolve path:
+   ```scala
+   val isPeerStatic = consecutiveUnchangedProbes(peerId) >= 3
+   val shouldUpdate = (isImprovement || isPeerStatic) && source != "COLD_START"
+   if shouldUpdate then updated.withChainWeight(cw)
+   else updated
+   ```
+5. **Write tests** in NetworkPeerManagerActorSpec:
+   - Mining peer (maxBlockNumber advances each probe) → monotonic guard active
+   - Archive peer (maxBlockNumber unchanged 3× probes) → downward Tier3 correction allowed
+   - Archive peer corrects from inflated Tier3 estimate to accurate actual TD
+
+**Verify:**
+```bash
+grep -n "isImprovement\|consecutiveUnchanged\|isPeerStatic" \
+  src/main/scala/com/chipprbots/ethereum/network/NetworkPeerManagerActor.scala
+
+sbt "testOnly *NetworkPeerManager*"
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/main/scala/.../network/NetworkPeerManagerActor.scala src/test/.../NetworkPeerManagerActorSpec.scala`
+3. `git commit -m "fix(sync): ETH69 archive node Tier3 chainWeight — exempt static peers from monotonic guard (G3/G4)"`
+4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(eth69-e): clearout — $SHA"`
+5. **DELETE §ETH69-E**
