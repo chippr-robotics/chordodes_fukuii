@@ -101,6 +101,8 @@ When 5+ entries share a Type or package, open a dedicated sprint:
 
 Fix: narrow each `TestProbe` with a `[M]` type parameter matching the expected message type. Pattern selectors on `Any` from untyped probes produce E165 warnings in strict Scala 3. The coordinator/heal specs require the `HealingTrieFixtures` PropsAdapter fix (§8a-retro batch 4) before they can be migrated. Route remaining non-coordinator files to a dedicated test-harness cleanup sprint after batch 4.
 
+**COMPLETE (§8a-retro batch 4b, 2026-06-23, a193bc794):** 14 coordinator/heal specs in `sync/snap/actors/` fully narrowed — all untyped `TestProbe()` replaced with `testKit.createTestProbe[M]()`, `awaitAssert` → `eventually`, `fishForMessage` ported to `FishingOutcomes.complete/continueAndIgnore`, death-probe pattern removed. 141 tests, 0 failures. Floor dropped from 92 → **65** unnarrowed sites. Remaining sites are in non-coordinator test files outside this batch's scope.
+
 ---
 
 ## wall-clock-assertion (protocol candidate)

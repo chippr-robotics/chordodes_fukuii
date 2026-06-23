@@ -653,66 +653,6 @@ were not converted: address in a dedicated test-cleanup sprint (8a-retro).
 
 ---
 
-#### §8a-retro batch 4b — MITHRIL: E165 TestProbe narrowing in coordinator/heal specs
-
-**Agent:** MITHRIL (Scala 3 modernization)
-**Risk:** LOW — test files only; no production code changed
-**Prerequisite:** §8a-retro batch 4 complete (`5eae34c21`). The 14 specs are on `ActorTestKit` but kept `TestProbe()` (classic, unnarrowed) via `system.classicSystem`. That was the safe short-term fix; this batch narrows them to typed.
-**Gate:** Run any time. Highest E165 reduction opportunity remaining in the codebase.
-
-**Background (batch 4 finding):**
-The 4 coordinator specs + 10 heal specs now extend `ScalaTestWithActorTestKit(ConfigFactory.load())`. Their `TestProbe()` instances were left as classic (obtained via `testKit.system.classicSystem`) because narrowing to `TestProbe[M]` requires knowing the exact message type at each site — that assessment was deferred to this batch. Current unnarrowed counts: TNHC ~59, ByteCode ~57, AccountRange ~54, StorageRange ~39 = ~209 E165 sites across the 4 coordinator specs alone. The 10 heal specs add further sites.
-
-**Step 0 — Recount current E165 floor:**
-```bash
-cd /media/dev/2tb/dev/fukuii
-grep -rn "org.apache.pekko.testkit.TestProbe\b" src/test/ --include="*.scala" | grep -v "\[" | wc -l
-# Record this number as the starting floor.
-```
-
-**Step 1 — Read each coordinator spec and map probe usage:**
-For each of the 4 coordinator specs, identify what messages the probe receives (look at `probe.expectMsg`, `probe.fishForMessage`, `probe.lastMessage`, `probe.ref` usage). The type parameter for `TestProbe[M]` must match the single narrowest common supertype of all expected messages at that probe's sites.
-
-**Step 2 — Narrow TestProbe in the 4 coordinator specs (one at a time):**
-For each spec:
-- Replace `val probe = TestProbe()` with `val probe = TestProbe[M]()` where `M` is the narrowed type
-- Update any `case m: M` destructuring to match the typed probe API
-- Replace `fishForMessage { case T => true }` with `probe.expectMessageType[T]`
-- Compile + `testOnly *<SpecName>*` after each file
-
-**Step 3 — Narrow TestProbe in the 10 heal family specs:**
-Same process. These specs route through `HealingTrieFixtures.spawnCoordinator` which now returns `ActorRef[TrieNodeHealingCoordinator.Command]` — so the typed actor is already available; only the probe types need narrowing.
-
-**Step 4 — Recount E165 floor and record reduction:**
-```bash
-grep -rn "org.apache.pekko.testkit.TestProbe\b" src/test/ --include="*.scala" | grep -v "\[" | wc -l
-# Compare to Step 0 count.
-```
-
-**Verification:**
-```bash
-sbt compile-all
-sbt "testOnly *CoordinatorSpec* *HealSpec* *Scoped* *Frontier* *Rebuild* *Decoupled*"
-./local/scripts/fukuii-test  # confirm 3,595+ tests, 0 failures
-```
-
-**MANDATORY final step — IN THIS ORDER:**
-1. `sbt scalafmtAll`
-2. `git add <all 14 spec files>` (never `git add .`)
-3. `git commit -m "test(8a-retro): narrow TestProbe[M] in coordinator/heal specs — N E165 sites cleared"`
-4. `SHA=$(git rev-parse --short HEAD)`
-5. Update CHASE-QUEUE.md E165 section with new floor count
-6. `git add .claude/` → `git commit -m "docs(8a-retro): clearout batch 4b — $SHA"`
-7. **DELETE this section**
-
-**Rejection criteria:**
-- Changing any production actor behavior
-- Using `TestProbe[Any]` as a shortcut (defeats the purpose)
-- Leaving `fishForMessage` where `expectMessageType[T]` is viable
-- Bundling production code changes with probe narrowing
-
----
-
 #### §8a-infra-c — MITHRIL: replace classic `actorSelection` worker-ref pattern with Typed TestProbe injection in ByteCodeCoordinatorSpec + AccountRangeCoordinatorSpec
 
 **Agent:** MITHRIL (Scala 3 / Typed modernization)
@@ -1320,7 +1260,7 @@ Each prompt can run independently. Commit individually.
 | ~~E5~~ | ~~Batch E~~ | ~~§8a-retro batch 4 — 14 coordinator/heal specs (PropsAdapter fixture fix)~~ | ✅ DONE 2026-06-23 — `5eae34c21` (14 specs + HealingTrieFixtures to ActorTestKit, 135 tests) |
 | ~~E5b~~ | ~~Batch E~~ | ~~§8a-infra — create `application-test.conf` (bare ctor fix + `throughput=1`)~~ | ✅ DONE 2026-06-23 — `8b9bef67d` |
 | ~~E5c~~ | ~~Batch E~~ | ~~§8a-infra-b — audit + fix worker teardown leaks in coordinator/heal specs~~ | ✅ DONE 2026-06-23 — `781c8e985` — no leaks; workers are Typed `spawnAnonymous` children, stopped by hierarchy; 150/150 ×2 |
-| E5d | Batch E | §8a-retro batch 4b — E165 TestProbe narrowing in coordinator/heal specs (~209 sites) | No — one spec at a time; MITHRIL; run after E5b |
+| ~~E5d~~ | ~~Batch E~~ | ~~§8a-retro batch 4b — E165 TestProbe narrowing in coordinator/heal specs (~209 sites)~~ | ✅ DONE 2026-06-23 — `a193bc794` (14 specs, 141 tests, floor 92→65) |
 | E5e | Batch E | §8a-infra-c — MITHRIL: replace classic `actorSelection` worker-ref pattern with Typed injection in ByteCodeCoordinatorSpec + AccountRangeCoordinatorSpec | No — cosmetic; run after E5d |
 | E6 | Batch E | §8a-retro batch 5 — multi-system + TestActorRef specs (3 assessable, 2 Wave 3 gate) | Partial — BlockFetcherSpec + PendingTxMgr + RegularSyncSpec assessable now; PeerActor + RLPx wait for Wave 3 |
 | ~~F1~~ | ~~Batch F~~ | ~~§3i MITHRIL+FORGE — BlockExecutionError hierarchy redesign: union type + `describe`~~ | ✅ DONE 2026-06-23 — `64ab4786e` |
