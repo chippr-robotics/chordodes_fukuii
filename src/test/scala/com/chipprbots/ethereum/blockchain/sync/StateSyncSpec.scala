@@ -5,10 +5,9 @@ import java.util.concurrent.ThreadLocalRandom
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestActor.AutoPilot
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -16,14 +15,12 @@ import scala.concurrent.duration.*
 import scala.util.Random
 
 import org.scalactic.anyvals.PosInt
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.ObjectGenerators
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.StateSyncUtils.MptNodeData
 import com.chipprbots.ethereum.blockchain.sync.StateSyncUtils.TrieProvider
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler
@@ -49,12 +46,10 @@ import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 
 class StateSyncSpec
-    extends TestKit(ActorSystem("StateSyncSpec"))
+    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
     with AnyFlatSpecLike
     with Matchers
-    with BeforeAndAfterAll
-    with ScalaCheckPropertyChecks
-    with WithActorSystemShutDown {
+    with ScalaCheckPropertyChecks {
 
   // those tests are somewhat long running 3 successful evaluation should be fine
   implicit override val generatorDrivenConfig: PropertyCheckConfiguration =
@@ -133,7 +128,7 @@ class StateSyncSpec
   }
 
   class TestSetup extends EphemBlockchainTestSetup with TestSyncConfig {
-    implicit override lazy val classicSystem: ActorSystem = StateSyncSpec.this.system
+    implicit override lazy val classicSystem: ActorSystem = StateSyncSpec.this.system.classicSystem
     type PeerConfig = Map[PeerId, PeerAction]
     val syncInit: TestProbe = TestProbe()
 
@@ -220,8 +215,8 @@ class StateSyncSpec
                   this
               }
 
-            case GetHandshakedPeers =>
-              sender ! HandshakedPeers(peersMap)
+            case GetHandshakedPeersCmd(replyTo) =>
+              replyTo ! HandshakedPeers(peersMap)
               this
           }
       })
@@ -253,7 +248,7 @@ class StateSyncSpec
 
     lazy val syncStateSchedulerActor: TypedActorRef[SyncStateSchedulerActor.Command] = {
       val (blockchainReader, _) = buildBlockChain()
-      classicSystem.spawnAnonymous(
+      testKit.spawn(
         SyncStateSchedulerActor.behavior(
           SyncStateScheduler(
             blockchainReader,

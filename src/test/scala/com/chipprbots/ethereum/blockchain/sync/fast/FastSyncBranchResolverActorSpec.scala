@@ -4,11 +4,10 @@ import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.pattern.gracefulStop
 import org.apache.pekko.testkit.TestActor.AutoPilot
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
@@ -27,7 +26,6 @@ import org.scalatest.freespec.AnyFreeSpecLike
 
 import com.chipprbots.ethereum.BlockHelpers
 import com.chipprbots.ethereum.NormalPatience
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.*
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSyncBranchResolverActor.BranchResolutionFailed
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSyncBranchResolverActor.BranchResolutionFailed.NoCommonBlockFound
@@ -47,12 +45,11 @@ import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Logger
 
 class FastSyncBranchResolverActorSpec
-    extends TestKit(ActorSystem("FastSyncBranchResolver_testing"))
+    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
     with AnyFreeSpecLike
     with ScalaFutures
-    with NormalPatience
-    with WithActorSystemShutDown { self =>
-  implicit val timeout: Timeout = Timeout(30.seconds)
+    with NormalPatience { self =>
+  implicit override val timeout: Timeout = Timeout(30.seconds)
 
   import FastSyncBranchResolverActorSpec.*
 
@@ -62,7 +59,7 @@ class FastSyncBranchResolverActorSpec
         UnitTest,
         SyncTest
       ) in new TestSetup {
-        implicit override lazy val system: ActorSystem = self.system
+        implicit override lazy val system: ActorSystem = self.system.classicSystem
         implicit override lazy val ioRuntime: IORuntime = IORuntime.global
 
         val sender: TestProbe = TestProbe("sender")
@@ -109,7 +106,7 @@ class FastSyncBranchResolverActorSpec
 
       "The chain is repaired doing binary searching with the new master peer and then remove the last invalid blocks" - {
         "highest common block is in the middle" taggedAs (UnitTest, SyncTest) in new TestSetup {
-          implicit override lazy val system: ActorSystem = self.system
+          implicit override lazy val system: ActorSystem = self.system.classicSystem
           implicit override lazy val ioRuntime: IORuntime = IORuntime.global
 
           val sender: TestProbe = TestProbe("sender")
@@ -146,7 +143,7 @@ class FastSyncBranchResolverActorSpec
           assert(getBestPeers.contains(response.masterPeer))
         }
         "highest common block is in the first half" taggedAs (UnitTest, SyncTest) in new TestSetup {
-          implicit override lazy val system: ActorSystem = self.system
+          implicit override lazy val system: ActorSystem = self.system.classicSystem
           implicit override lazy val ioRuntime: IORuntime = IORuntime.global
 
           val sender: TestProbe = TestProbe("sender")
@@ -185,7 +182,7 @@ class FastSyncBranchResolverActorSpec
         }
 
         "highest common block is in the second half" taggedAs (UnitTest, SyncTest) in new TestSetup {
-          implicit override lazy val system: ActorSystem = self.system
+          implicit override lazy val system: ActorSystem = self.system.classicSystem
           implicit override lazy val ioRuntime: IORuntime = IORuntime.global
 
           val sender: TestProbe = TestProbe("sender")
@@ -224,7 +221,7 @@ class FastSyncBranchResolverActorSpec
       }
 
       "No common block is found" taggedAs (UnitTest, SyncTest) in new TestSetup {
-        implicit override lazy val system: ActorSystem = self.system
+        implicit override lazy val system: ActorSystem = self.system.classicSystem
         implicit override lazy val ioRuntime: IORuntime = IORuntime.global
 
         val sender: TestProbe = TestProbe("sender")
@@ -310,7 +307,7 @@ class FastSyncBranchResolverActorSpec
         networkPeerManager: ActorRef,
         blacklist: Blacklist
     ): TypedActorRef[FastSyncBranchResolverActor.Command] =
-      system.spawn(
+      self.testKit.spawn(
         FastSyncBranchResolverActor(
           replyTo = fastSync.toTyped[FastSyncBranchResolverActor.BranchResolverResponse],
           peerEventBus = TestProbe("peer_event_bus").ref,
@@ -324,7 +321,7 @@ class FastSyncBranchResolverActorSpec
       )
 
     def stopController(actorRef: TypedActorRef[FastSyncBranchResolverActor.Command]): Unit =
-      awaitCond(gracefulStop(actorRef.toClassic, actorAskTimeout.duration).futureValue)
+      self.testKit.stop(actorRef)
 
     def getBestPeers: List[Peer] = {
       val maxBlock = handshakedPeers.toList.map { case (_, peerInfo) => peerInfo.maxBlockNumber }.max
@@ -351,8 +348,8 @@ object FastSyncBranchResolverActorSpec extends Logger {
 
     def run(sender: ActorRef, msg: Any): NetworkPeerManagerAutoPilot = {
       msg match {
-        case NetworkPeerManagerActor.GetHandshakedPeers =>
-          sender ! NetworkPeerManagerActor.HandshakedPeers(peers)
+        case NetworkPeerManagerActor.GetHandshakedPeersCmd(replyTo) =>
+          replyTo ! NetworkPeerManagerActor.HandshakedPeers(peers)
           peersConnected.complete(()).handleError(_ => ()).unsafeRunSync()
         case NetworkPeerManagerActor.SendMessage(rawMsg, peerId) =>
           val response = rawMsg.underlyingMsg match {

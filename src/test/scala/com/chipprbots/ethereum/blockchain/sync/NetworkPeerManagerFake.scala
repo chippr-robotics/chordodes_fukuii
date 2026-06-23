@@ -113,8 +113,8 @@ object NetworkPeerManagerFake {
       extends AutoPilot {
     def run(sender: ActorRef, msg: Any): NetworkPeerManagerAutoPilot = {
       msg match {
-        case NetworkPeerManagerActor.GetHandshakedPeers =>
-          sender ! NetworkPeerManagerActor.HandshakedPeers(peers)
+        case NetworkPeerManagerActor.GetHandshakedPeersCmd(replyTo) =>
+          replyTo ! NetworkPeerManagerActor.HandshakedPeers(peers)
           peersConnected.complete(()).handleError(_ => ()).unsafeRunSync()
         case sendMsg @ NetworkPeerManagerActor.SendMessage(rawMsg, peerId) =>
           requests.publish1(sendMsg).unsafeRunSync()

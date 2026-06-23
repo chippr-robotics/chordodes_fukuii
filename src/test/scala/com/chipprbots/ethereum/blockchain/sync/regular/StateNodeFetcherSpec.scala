@@ -1,16 +1,14 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
-import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.compiletime.uninitialized
 import scala.concurrent.duration.*
 
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
@@ -38,12 +36,13 @@ import com.chipprbots.ethereum.testing.Tags.*
   *     empty set, and empty/wrong responses add the responding peer so each retry samples a different snap server.
   */
 class StateNodeFetcherSpec
-    extends TestKit(ActorSystem("StateNodeFetcherSpec"))
+    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
     with AnyFreeSpecLike
     with Matchers
     with BeforeAndAfterEach
-    with BeforeAndAfterAll
     with TestSyncConfig {
+
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
   // Each test gets its own typed test kit, shut down after the test.
   private var typedKit: ActorTestKit = uninitialized
@@ -53,8 +52,6 @@ class StateNodeFetcherSpec
 
   override def afterEach(): Unit =
     typedKit.shutdownTestKit()
-
-  override def afterAll(): Unit = TestKit.shutdownActorSystem(system, verifySystemShutdown = false)
 
   /** Fixture that wires up:
     *   - a classic TestProbe playing peersClient (catches outgoing Requests)

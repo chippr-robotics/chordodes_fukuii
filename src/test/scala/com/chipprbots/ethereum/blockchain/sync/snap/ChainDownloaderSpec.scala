@@ -1,9 +1,8 @@
 package com.chipprbots.ethereum.blockchain.sync.snap
 
-import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 
 import scala.concurrent.duration.*
@@ -12,7 +11,6 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.TestSyncConfig
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.db.storage.AppStateStorage
@@ -28,13 +26,14 @@ import com.chipprbots.ethereum.testing.Tags.*
   * used as a synchronisation barrier and as a liveness probe: a reply proves the dispatch loop did not wedge.
   */
 class ChainDownloaderSpec
-    extends TestKit(ActorSystem("ChainDownloaderSpec"))
+    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
     with AnyFlatSpecLike
-    with WithActorSystemShutDown
     with Matchers
     with Eventually
     with org.scalamock.scalatest.MockFactory
     with TestSyncConfig {
+
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
   // Regression for #1162: chain backfill keeps running in the background after SNAPSyncController
   // emits SnapSyncFinalized, but at lower priority. ChainDownloader needs a `YieldToRegularSync(n)`
@@ -65,7 +64,7 @@ class ChainDownloaderSpec
     downloader ! ChainDownloader.YieldToRegularSync(5)
     expectProgress(downloader)
 
-    system.stop(downloader)
+    testKit.stop(downloader)
   }
 
   it should "stay responsive after BoostConcurrency then a downward YieldToRegularSync" taggedAs UnitTest in {
@@ -78,7 +77,7 @@ class ChainDownloaderSpec
     downloader ! ChainDownloader.YieldToRegularSync(2)
     expectProgress(downloader)
 
-    system.stop(downloader)
+    testKit.stop(downloader)
   }
 
   // Issue #1169: persist a BackfillTarget at Start so that a node killed mid-backfill can
@@ -94,7 +93,7 @@ class ChainDownloaderSpec
 
     appStateStorage.getBackfillTarget() shouldBe target
 
-    system.stop(downloader)
+    testKit.stop(downloader)
   }
 
   // Issue #1169: an UpdateTarget message during the downloading phase persists the bumped
@@ -115,13 +114,15 @@ class ChainDownloaderSpec
     expectProgress(downloader)
     appStateStorage.getBackfillTarget() shouldBe BigInt(1500)
 
-    system.stop(downloader)
+    testKit.stop(downloader)
   }
 
   /** Sends `GetProgress` and waits for the `Progress` reply — both a synchronisation barrier (the actor has drained its
     * mailbox up to this point) and a liveness probe (a reply means the behavior did not wedge or stop).
     */
-  private def expectProgress(downloader: org.apache.pekko.actor.ActorRef): ChainDownloader.Progress = {
+  private def expectProgress(
+      downloader: TypedActorRef[ChainDownloader.Command]
+  ): ChainDownloader.Progress = {
     val probe = TestProbe()
     val typedProbe: TypedActorRef[ChainDownloader.Progress] = probe.ref.toTyped[ChainDownloader.Progress]
     downloader ! ChainDownloader.GetProgress(typedProbe)
@@ -133,19 +134,20 @@ class ChainDownloaderSpec
     * no real blockchain or peer infrastructure required. `peersScanInterval` is 1h in TestSyncConfig, so the periodic
     * peer scan never fires during a test (the immediate startup poll lands harmlessly on a fresh probe).
     */
-  private def newDownloader(): (org.apache.pekko.actor.ActorRef, AppStateStorage, TestProbe) = {
+  private def newDownloader(): (TypedActorRef[ChainDownloader.Command], AppStateStorage, TestProbe) = {
     val blockchainReader = mock[BlockchainReader]
     val blockchainWriter = mock[BlockchainWriter]
     val appStateStorage = new AppStateStorage(EphemDataSource())
     val networkPeerManager = TestProbe()
     val peerEventBus = TestProbe()
+    val replyToProbe = TestProbe()
 
     blockchainReader.getBlockHeaderByNumber
       .expects(BigInt(1))
       .returning(None)
       .anyNumberOfTimes()
 
-    val downloader = system
+    val downloader: TypedActorRef[ChainDownloader.Command] = testKit
       .spawn(
         ChainDownloader(
           blockchainReader = blockchainReader,
@@ -154,12 +156,11 @@ class ChainDownloaderSpec
           networkPeerManager = networkPeerManager.ref,
           peerEventBus = peerEventBus.ref,
           syncConfig = defaultSyncConfig,
-          replyTo = testActor,
+          replyTo = replyToProbe.ref,
           maxConcurrentRequests = 4
         ),
         s"chain-downloader-${System.nanoTime()}"
       )
-      .toClassic
 
     (downloader, appStateStorage, networkPeerManager)
   }

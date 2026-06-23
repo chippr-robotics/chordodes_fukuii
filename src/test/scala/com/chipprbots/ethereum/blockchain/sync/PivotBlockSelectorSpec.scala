@@ -3,10 +3,9 @@ package com.chipprbots.ethereum.blockchain.sync
 import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.ExplicitlyTriggeredScheduler
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -18,7 +17,6 @@ import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.fast.PivotBlockSelector
 import com.chipprbots.ethereum.blockchain.sync.fast.PivotBlockSelector.Result
 import com.chipprbots.ethereum.blockchain.sync.fast.PivotBlockSelector.SelectPivotBlock
@@ -48,13 +46,12 @@ import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 class PivotBlockSelectorSpec
-    extends TestKit(
-      ActorSystem("FastSyncPivotBlockSelectorSpec_System", ConfigFactory.load("explicit-scheduler"))
-    )
+    extends ScalaTestWithActorTestKit(ConfigFactory.load("explicit-scheduler"))
     with AnyFlatSpecLike
     with Matchers
-    with BeforeAndAfter
-    with WithActorSystemShutDown {
+    with BeforeAndAfter {
+
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
   "FastSyncPivotBlockSelector" should "download pivot block from peers" taggedAs (UnitTest, SyncTest) in new TestSetup {
     updateHandshakedPeers(HandshakedPeers(threeAcceptedPeers))
@@ -617,7 +614,7 @@ class PivotBlockSelectorSpec
     val networkPeerManager: TestProbe = TestProbe()
     networkPeerManager.ignoreMsg {
       case NetworkPeerManagerActor.SendMessage(msg, _) if isNewBlock(msg.underlyingMsg) => true
-      case NetworkPeerManagerActor.GetHandshakedPeers                                   => true
+      case _: NetworkPeerManagerActor.GetHandshakedPeersCmd                             => true
     }
 
     val peerMessageBus: TestProbe = TestProbe()
@@ -649,9 +646,10 @@ class PivotBlockSelectorSpec
 
     val fastSync: TestProbe = TestProbe()
 
-    def testScheduler: ExplicitlyTriggeredScheduler = system.scheduler.asInstanceOf[ExplicitlyTriggeredScheduler]
+    def testScheduler: ExplicitlyTriggeredScheduler =
+      classicSystem.scheduler.asInstanceOf[ExplicitlyTriggeredScheduler]
 
-    lazy val pivotBlockSelector: ActorRef = system
+    lazy val pivotBlockSelector: ActorRef = testKit
       .spawn(
         PivotBlockSelector(
           networkPeerManager.ref,
@@ -678,10 +676,10 @@ class PivotBlockSelectorSpec
     val nextAnotherDifferentBlockHeader: BlockHeader =
       baseBlockHeader.copy(number = expectedPivotBlock, extraData = ByteString("different3"))
 
-    val peer1TestProbe: TestProbe = TestProbe("peer1")(system)
-    val peer2TestProbe: TestProbe = TestProbe("peer2")(system)
-    val peer3TestProbe: TestProbe = TestProbe("peer3")(system)
-    val peer4TestProbe: TestProbe = TestProbe("peer4")(system)
+    val peer1TestProbe: TestProbe = TestProbe("peer1")(classicSystem)
+    val peer2TestProbe: TestProbe = TestProbe("peer2")(classicSystem)
+    val peer3TestProbe: TestProbe = TestProbe("peer3")(classicSystem)
+    val peer4TestProbe: TestProbe = TestProbe("peer4")(classicSystem)
 
     val peer1: Peer = Peer(PeerId("peer1"), new InetSocketAddress("127.0.0.1", 0), peer1TestProbe.ref, false)
     val peer2: Peer = Peer(PeerId("peer2"), new InetSocketAddress("127.0.0.2", 0), peer2TestProbe.ref, false)

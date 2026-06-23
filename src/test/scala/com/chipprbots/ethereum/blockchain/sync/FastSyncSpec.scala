@@ -2,9 +2,9 @@ package com.chipprbots.ethereum.blockchain.sync
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.pattern.ask
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.Timeout
 
@@ -18,7 +18,6 @@ import com.chipprbots.ethereum.BlockHelpers
 import com.chipprbots.ethereum.FreeSpecBase
 import com.chipprbots.ethereum.ObjectGenerators
 import com.chipprbots.ethereum.SpecFixtures
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.PeerRequestHandler.ResponseReceived
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
@@ -39,14 +38,13 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
 import com.chipprbots.ethereum.utils.GenOps.GenOps
 
 class FastSyncSpec
-    extends TestKit(ActorSystem("FastSync_testing"))
+    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
     with FreeSpecBase
-    with SpecFixtures
-    with WithActorSystemShutDown { self =>
-  implicit val timeout: Timeout = Timeout(60.seconds)
+    with SpecFixtures { self =>
+  implicit override val timeout: Timeout = Timeout(60.seconds)
 
   class Fixture extends EphemBlockchainTestSetup with TestSyncConfig with TestSyncPeers {
-    implicit override lazy val system: ActorSystem = self.system
+    implicit override lazy val system: ActorSystem = self.system.classicSystem
 
     val blacklistMaxElems: Int = 100
     val blacklist: CacheBasedBlacklist = CacheBasedBlacklist.empty(blacklistMaxElems)
@@ -85,8 +83,8 @@ class FastSyncSpec
       )
     lazy val peerEventBus: TestProbe = TestProbe("peer_event-bus")
     lazy val syncControllerProbe: TestProbe = TestProbe("sync-controller")
-    lazy val fastSync: ActorRef = system
-      .spawnAnonymous(
+    lazy val fastSync: ActorRef = self.testKit
+      .spawn(
         FastSync.behavior(
           fastSyncStateStorage = storagesInstance.storages.fastSyncStateStorage,
           appStateStorage = storagesInstance.storages.appStateStorage,

@@ -1,15 +1,16 @@
 package com.chipprbots.ethereum.blockchain.sync.snap
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.duration.*
 
-import org.scalatest.BeforeAndAfterAll
+import org.scalatest.concurrent.Eventually
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.time.Millis
+import org.scalatest.time.Span
 
 import com.chipprbots.ethereum.blockchain.sync.PeerRateTracker
 import com.chipprbots.ethereum.domain.Account
@@ -19,15 +20,14 @@ import com.chipprbots.ethereum.testing.PeerTestHelpers.*
 import com.chipprbots.ethereum.testing.Tags.*
 
 class SNAPRequestTrackerSpec
-    extends TestKit(ActorSystem("SNAPRequestTrackerSpec"))
+    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
     with AnyFlatSpecLike
     with Matchers
-    with BeforeAndAfterAll {
+    with Eventually {
 
-  override def afterAll(): Unit =
-    TestKit.shutdownActorSystem(system)
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
-  implicit val scheduler: org.apache.pekko.actor.Scheduler = system.scheduler
+  implicit val scheduler: org.apache.pekko.actor.Scheduler = classicSystem.scheduler
 
   "SNAPRequestTracker" should "generate unique request IDs" taggedAs UnitTest in {
     val tracker = new SNAPRequestTracker()
@@ -90,8 +90,10 @@ class SNAPRequestTrackerSpec
 
     tracker.isPending(requestId) shouldBe true
 
-    // Wait for timeout to trigger using awaitCond
-    awaitCond(!tracker.isPending(requestId), max = 300.millis)
+    // Wait for timeout to trigger
+    eventually(timeout(Span(300, Millis))) {
+      assert(!tracker.isPending(requestId))
+    }
 
     tracker.isPending(requestId) shouldBe false
     timeoutCalled shouldBe true
@@ -109,12 +111,12 @@ class SNAPRequestTrackerSpec
     }
 
     // Complete the request quickly
-    within(100.millis) {
-      tracker.completeRequest(requestId)
-    }
+    tracker.completeRequest(requestId)
 
     // Wait a bit longer than timeout to ensure callback doesn't fire
-    awaitCond(true, max = 300.millis)
+    eventually(timeout(Span(300, Millis))) {
+      assert(true)
+    }
 
     timeoutCalled shouldBe false
   }
@@ -304,7 +306,9 @@ class SNAPRequestTrackerSpec
       timeoutCalled = true
     }
 
-    awaitCond(timeoutCalled, max = 500.millis)
+    eventually(timeout(Span(500, Millis))) {
+      assert(timeoutCalled)
+    }
     tracker.isPending(requestId) shouldBe false
   }
 

@@ -5,10 +5,10 @@ import java.net.URI
 import java.util.concurrent.TimeUnit
 
 import org.apache.pekko.actor.*
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.ExplicitlyTriggeredScheduler
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -28,8 +28,6 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 import com.chipprbots.ethereum.Fixtures
-import com.chipprbots.ethereum.NormalPatience
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistId
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
 import com.chipprbots.ethereum.blockchain.sync.CacheBasedBlacklist
@@ -61,15 +59,13 @@ import Arbitrary.arbitrary
 
 // scalastyle:off magic.number
 class PeerManagerSpec
-    extends TestKit(
-      ActorSystem("PeerManagerSpec_System", ConfigFactory.load("explicit-scheduler"))
-    )
+    extends ScalaTestWithActorTestKit(ConfigFactory.load("explicit-scheduler"))
     with AnyFlatSpecLike
-    with WithActorSystemShutDown
     with Matchers
     with Eventually
-    with NormalPatience
     with ScalaCheckDrivenPropertyChecks {
+
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
   behavior.of("PeerManagerActor")
 
@@ -985,7 +981,8 @@ class PeerManagerSpec
   }
 
   trait TestSetup {
-    def testScheduler: ExplicitlyTriggeredScheduler = system.scheduler.asInstanceOf[ExplicitlyTriggeredScheduler]
+    def testScheduler: ExplicitlyTriggeredScheduler =
+      classicSystem.scheduler.asInstanceOf[ExplicitlyTriggeredScheduler]
 
     case class TestPeer(peer: Peer, probe: TestProbe)
     var createdPeers: Seq[TestPeer] = Seq.empty
@@ -1057,7 +1054,7 @@ class PeerManagerSpec
     )
 
     val peerManager: typed.ActorRef[PeerManagerActor.Command] =
-      system.spawn(
+      testKit.spawn(
         PeerManagerActor.behavior(
           peerEventBus.ref.toTyped[PeerEventBusActor.Command],
           peerDiscoveryManager.ref.toTyped[PeerDiscoveryManager.Command],
