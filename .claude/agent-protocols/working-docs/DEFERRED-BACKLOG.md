@@ -328,6 +328,133 @@ Remaining sites ~44. Add `DisableSyntax.noAny` to scalafix.conf after cleanup
 
 **✅ DONE 2026-06-22** — MITHRIL pass complete. 15 sites documented `// Any:`, 7 FORGE-gated (markers added, logged in CHASE-QUEUE). 0 type changes (all remaining uses are intentional: Pekko messageAdapter, Micrometer gauge, Java interop, or FORGE-gated). See G8 scope doc for post-fix baseline.
 
+### 3i — BlockExecutionError hierarchy redesign (Scala 3 union types)
+
+**Added:** 2026-06-23 (F1 FORGE thread finding)
+**Agent:** MITHRIL (implementation); FORGE (pre-approval — error types cross into `consensus/` packages)
+**Risk:** LOW — API change only; no consensus logic change.
+
+**Finding (F1 thread, 2026-06-23):**
+
+FORGE rejected narrowing `ValidationBeforeExecError(reason: Any)` to `String` (Item A) because the
+construction sites at `StdValidators:76` and `ValidatorsExecutor:106` pass the `.left` of a
+`for`-comprehension whose type is `BlockHeaderError | BlockError | OmmersError`. But `Any` is also
+not idiomatic Scala 3. The base trait `val reason: Any` is a leaky abstraction — each subtype has
+an incompatible reason type — and all consumers use `.reason` exclusively via string interpolation
+(implicit `.toString`). The trait is expressing `def describe: String`, not `val reason: Any`.
+
+**Proposed redesign:**
+
+```scala
+// Before:
+sealed trait BlockExecutionError { val reason: Any }
+final case class ValidationBeforeExecError(reason: Any) extends BlockExecutionError
+case object MissingParentError extends BlockExecutionError { override val reason: Any = "Cannot find parent" }
+final case class MPTError(reason: MPTException) extends BlockExecutionError
+
+// After:
+sealed trait BlockExecutionError:
+  def describe: String
+
+type ValidationError = BlockHeaderError | BlockError | OmmersError
+
+final case class ValidationBeforeExecError(error: ValidationError) extends BlockExecutionError:
+  def describe = error.toString
+
+final case class TxsExecutionError(stx: SignedTransaction, stateBeforeError: StateBeforeFailure, reason: String)
+    extends BlockExecutionError:
+  def describe = reason
+
+final case class ValidationAfterExecError(reason: String) extends BlockExecutionError:
+  def describe = reason
+
+case object MissingParentError extends BlockExecutionError:
+  def describe = "Cannot find parent"
+
+final case class MPTError(error: MPTException) extends BlockExecutionError:
+  def describe = error.getMessage
+```
+
+**Call sites (~4 total):**
+```bash
+grep -rn "\.reason\b" src/ --include="*.scala"
+# BlockExecution.scala:194  — log.debug(s"...due to ${error.reason}")
+# ConsensusAdapter.scala:79, :143
+# EngineApiService.scala:368
+```
+All use `.reason` only in string interpolation — mechanical rename to `.describe`.
+
+**Files affected:** `ledger/BlockExecution.scala` + ~4 call-site files.
+
+**Gate:** FORGE pre-approval (see clearout prompt below). No other external gate.
+**Parallel-safe:** YES — single-subsystem change; no actor migration dependency.
+**Priority:** LOW-MEDIUM — eliminates the only remaining `Any`-typed public field in the error
+hierarchy after the §3h sweep.
+
+---
+
+#### §3i clearout prompt — MITHRIL + FORGE
+
+**Agent:** MITHRIL (implementation after FORGE approval)
+**Parallel-safe:** YES
+
+**Step 0 — FORGE pre-approval (mandatory, no source change without this):**
+
+> Run FORGE with the following: "Read `src/main/scala/com/chipprbots/ethereum/ledger/BlockExecution.scala`
+> lines 529–555 and the construction sites `StdValidators.scala:76` and `ValidatorsExecutor.scala:106`.
+> Confirm that changing `ValidationBeforeExecError(reason: Any)` to
+> `ValidationBeforeExecError(error: BlockHeaderError | BlockError | OmmersError)` and replacing
+> `val reason: Any` in the sealed base trait with `def describe: String` (implemented per subtype)
+> does NOT affect: (a) any RLP encoding of `BlockExecutionError` subtypes, (b) any JSON serialization
+> path, (c) pattern-match exhaustiveness on `BlockExecutionError` at any call site in consensus code.
+> Approve or reject with a rationale."
+
+If FORGE rejects: update §3i gate note with the reason, add `// §3i: FORGE-rejected — <reason>` comment to `BlockExecution.scala`, close this prompt with no source change.
+
+**Step 1 — Redesign `BlockExecution.scala` (FORGE-approved only):**
+
+1. Replace the sealed trait declaration:
+   - `sealed trait BlockExecutionError { val reason: Any }` → `sealed trait BlockExecutionError:\n  def describe: String`
+2. Add type alias immediately after the trait: `type ValidationError = BlockHeaderError | BlockError | OmmersError`
+3. Update `ValidationBeforeExecError`: `final case class ValidationBeforeExecError(error: ValidationError)` + implement `def describe = error.toString`
+4. Update `TxsExecutionError`: keep `reason: String` field, add `def describe = reason`
+5. Update `ValidationAfterExecError`: keep `reason: String` field, add `def describe = reason`
+6. Update `MissingParentError`: remove `override val reason: Any = "Cannot find parent"`, add `def describe = "Cannot find parent"`
+7. Update `MPTError`: rename `reason: MPTException` → `error: MPTException`, add `def describe = error.getMessage`
+
+**Step 2 — Update call sites:**
+```bash
+grep -rn "\.reason\b" src/ --include="*.scala"
+```
+Replace every `error.reason` / `.reason` with `.describe`. Confirm with a second grep (expect 0 hits).
+
+**Step 3 — Compile:**
+```bash
+sbt compile-all  # must be 0 errors
+```
+
+**Step 4 — Test:**
+```bash
+sbt "testOnly *BlockExecution* *Consensus* *Validators* *StdValidators*"
+```
+All must pass.
+
+**MANDATORY final step — complete IN THIS ORDER:**
+1. `sbt scalafmtAll`
+2. `git add src/main/scala/com/chipprbots/ethereum/ledger/BlockExecution.scala <call-site files>` — stage only modified files; never `git add .`
+3. `git commit -m "refactor(ledger): §3i — BlockExecutionError: union type + describe, drop reason: Any (FORGE-approved)"`
+4. `SHA=$(git rev-parse --short HEAD)` — capture exact SHA
+5. Strikethrough F1 in DEFERRED-BACKLOG run-order table: `| ~~F1~~ | ~~Batch F~~ | ~~§3i MITHRIL BlockExecutionError hierarchy redesign~~ | ✅ DONE [date] — $SHA |`
+6. Strikethrough G1 in CHASE-QUEUE run-order table with same SHA
+7. `git add .claude/` → `git commit -m "docs(3i): clearout — $SHA"`
+8. **DELETE this section**
+
+**Rejection criteria:**
+- Any source change without explicit FORGE approval
+- Changing consensus logic — only API/type signatures change
+- Changing `MissingParentError` from `case object` to a `case class`
+- `sbt compile-all` with any errors
+
 ---
 
 ## Part 4: Dependency Upgrades (blocked or deferred)
@@ -1133,6 +1260,7 @@ Each prompt can run independently. Commit individually.
 | ~~E4~~ | ~~Batch E~~ | ~~§8a-retro batch 3 — 25 network/sync specs~~ | ✅ DONE 2026-06-23 — `12c23cf8a` (14 specs) + `a719520db` (11 specs + NPMAFake fix) |
 | E5 | Batch E | §8a-retro batch 4 — 14 coordinator/heal specs (PropsAdapter fixture fix) | No — HealingTrieFixtures → 4 coordinator specs → 10 heal specs in order |
 | E6 | Batch E | §8a-retro batch 5 — multi-system + TestActorRef specs (3 assessable, 2 Wave 3 gate) | Partial — BlockFetcherSpec + PendingTxMgr + RegularSyncSpec assessable now; PeerActor + RLPx wait for Wave 3 |
+| F1 | Batch F | §3i MITHRIL+FORGE — BlockExecutionError hierarchy redesign: union type + `describe` | Yes — single subsystem, no actor migration dependency |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
 

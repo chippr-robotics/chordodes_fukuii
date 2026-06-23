@@ -141,6 +141,7 @@ IntegrationTest tag conflict (discovered G2, 2026-06-21): Do not tag Integration
 | ~~B5~~ | ~~Batch B step 5~~ | ~~P7 PRISM Retrospective dead-code audit (branch-wide)~~ | ✅ DONE 2026-06-22 — 19 files audited, 0 new deferred |
 | ~~E2~~ | ~~Batch E~~ | ~~P8 — MITHRIL G1-sweep PRISM items (FastSync + NPMA + SyncController)~~ | ✅ DONE 2026-06-22 — pre-fixed in `0c7d6781b`/`504b4ca16`/`a5132aa80` (all 4 items resolved during G1 sweep) |
 | ~~F1~~ | ~~Batch F~~ | ~~FORGE §3h residual~~ | ✅ DONE 2026-06-23 |
+| G1 | Batch G | §3i MITHRIL+FORGE — BlockExecutionError hierarchy redesign: union type + `describe` — full prompt in DEFERRED-BACKLOG §3i | Yes |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
 
