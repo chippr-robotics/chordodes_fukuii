@@ -7,11 +7,9 @@ import org.bouncycastle.crypto.params.ECPublicKeyParameters
 
 import com.chipprbots.ethereum.network.*
 
-sealed trait ServerStatus
-object ServerStatus {
-  case object NotListening extends ServerStatus
-  case class Listening(address: InetSocketAddress) extends ServerStatus
-}
+enum ServerStatus:
+  case NotListening
+  case Listening(address: InetSocketAddress)
 
 case class NodeStatus(key: AsymmetricCipherKeyPair, serverStatus: ServerStatus, discoveryStatus: ServerStatus) {
 
