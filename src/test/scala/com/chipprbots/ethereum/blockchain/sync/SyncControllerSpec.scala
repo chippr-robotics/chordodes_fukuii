@@ -431,7 +431,7 @@ class SyncControllerSpec
     }
   }
 
-  it should "re-enqueue block bodies when empty response is received" taggedAs DisabledTest in withTestSetup() {
+  it should "re-enqueue block bodies when empty response is received" taggedAs (UnitTest, SyncTest) in withTestSetup() {
     testSetup =>
       import testSetup.*
 
@@ -879,6 +879,12 @@ class SyncControllerSpec
 
           case NetworkPeerManagerActor.GetHandshakedPeersCmd(replyTo) =>
             replyTo ! handshakedPeers
+            this
+
+          case NetworkPeerManagerActor.RegisterChainWeightCalibrationTarget(_) =>
+            this
+
+          case NetworkPeerManagerActor.CalibrateChainWeightNow =>
             this
 
           // Handle ETH66 GetBlockHeaders (with requestId)

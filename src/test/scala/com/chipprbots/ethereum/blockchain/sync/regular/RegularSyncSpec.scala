@@ -519,33 +519,35 @@ class RegularSyncSpec
         fishForBlacklistPeer(failingPeer)
       })
 
-      "retry fetching node if validation failed" taggedAs DisabledTest in sync(new MissingStateNodeFixture(testSystem) {
-        def fishForFailingBlockNodeRequest(): Boolean = peersClient.fishForSpecificMessage(max = 10.seconds) {
-          case PeersClient.Request(GetNodeData(hash :: Nil), _, _, _) if hash == failingBlock.hash => true
-        }
-
-        class WrongNodeDataPeersClientAutoPilot(var handledRequests: Int = 0) extends PeersClientAutoPilot {
-          override def overrides(sender: ActorRef): PartialFunction[Any, Option[AutoPilot]] = {
-            case PeersClient.Request(GetNodeData(_), _, _, replyTo) =>
-              val response = handledRequests match {
-                case 0 => Some(PeersClient.Response(peerByNumber(1), NodeData(Nil)))
-                case 1 => Some(PeersClient.Response(peerByNumber(2), NodeData(List(ByteString("foo")))))
-                case _ => None
-              }
-
-              response.foreach(replyTo ! _)
-              Some(new WrongNodeDataPeersClientAutoPilot(handledRequests + 1))
+      "retry fetching node if validation failed" taggedAs (UnitTest, SyncTest) in sync(
+        new MissingStateNodeFixture(testSystem) {
+          def fishForFailingBlockNodeRequest(): Boolean = peersClient.fishForSpecificMessage(max = 10.seconds) {
+            case PeersClient.Request(GetNodeData(hash :: Nil), _, _, _) if hash == failingBlock.hash => true
           }
+
+          class WrongNodeDataPeersClientAutoPilot(var handledRequests: Int = 0) extends PeersClientAutoPilot {
+            override def overrides(sender: ActorRef): PartialFunction[Any, Option[AutoPilot]] = {
+              case PeersClient.Request(GetNodeData(_), _, _, replyTo) =>
+                val response = handledRequests match {
+                  case 0 => Some(PeersClient.Response(peerByNumber(1), NodeData(Nil)))
+                  case 1 => Some(PeersClient.Response(peerByNumber(2), NodeData(List(ByteString("foo")))))
+                  case _ => None
+                }
+
+                response.foreach(replyTo ! _)
+                Some(new WrongNodeDataPeersClientAutoPilot(handledRequests + 1))
+            }
+          }
+
+          peersClient.setAutoPilot(new WrongNodeDataPeersClientAutoPilot())
+
+          regularSync ! SyncProtocol.Start
+
+          fishForFailingBlockNodeRequest()
+          fishForFailingBlockNodeRequest()
+          fishForFailingBlockNodeRequest()
         }
-
-        peersClient.setAutoPilot(new WrongNodeDataPeersClientAutoPilot())
-
-        regularSync ! SyncProtocol.Start
-
-        fishForFailingBlockNodeRequest()
-        fishForFailingBlockNodeRequest()
-        fishForFailingBlockNodeRequest()
-      })
+      )
 
       "save fetched node" taggedAs DisabledTest in sync(new Fixture(testSystem) {
         override lazy val blockchain: BlockchainImpl = stub[BlockchainImpl]
