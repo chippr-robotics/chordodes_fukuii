@@ -74,6 +74,34 @@ All 5 ETH coverage gaps closed:
 
 ---
 
+## Pekko TestKit Migration — Batch 5 (multi-system + TestActorRef specs)
+
+#### `5ff14017b` — §8a-retro batch 5: 2 migrated, 8 deferred to Wave 3 (testEssential 3,595/0, 665s)
+
+**Migrated (2):**
+- `BlockFetcherSpec` (`regular/`) — extended `ScalaTestWithActorTestKit(ConfigFactory.load())`; Classic `TestProbe`s via `classicSystem`; `testKit.stop(blockFetcher)` per-test; `classicSystem.scheduler` for `scheduleOnce`.
+- `PendingTransactionsManagerSpec` (`transactions/`) — migrated; dropped `NormalPatience` (conflicts with `ScalaTestWithActorTestKitBase.patience`); implicit `classicSystem` + `typedScheduler` wired from `testKit`.
+
+**Deferred to Wave 3 (8) — deferred comments added in file headers:**
+- `RegularSyncSpec` — `Resource[IO, ActorSystem]` lifecycle is load-bearing; migrate when `RegularSync` itself is Typed. See `sync/regular.md`.
+- `PeerActorSpec`, `PeerActorHandshakingSpec` — `TestActorRef` is Classic-only; migrate when `PeerActor` is Typed (Wave 3 network sprint). See `network/peers.md`.
+- `RLPxConnectionHandlerSpec` — Classic parent-injection (`TestActorRef(Props, parent.ref)`); Wave 3 gate.
+- `CalibratePivotTDSpec`, `ChainWeightCalibrationSpec` — `TestActorRef`-based lifecycle; Wave 3 gate.
+- `SyncControllerSpec` — deferred comment added; migrate when full sync actor hierarchy is Typed. See `sync/controller.md`.
+- `WithActorSystemShutDown.scala` — left in place; still referenced by the 8 deferred specs.
+
+---
+
+## application-test.conf — E5b (COMPLETE)
+
+#### `8b9bef67d` — test(infra): application-test.conf created; ConfigFactory.load() stripped from 25 specs
+- **What:** Created `src/test/resources/application-test.conf` (`include "application.conf"` + `throughput=1`). Bare `ScalaTestWithActorTestKit()` ctor now loads `sync-dispatcher` and all custom dispatchers without a `ConfigFactory.load()` workaround. Verified: `SNAPRequestTrackerSpec` passes 16/16 with bare ctor, no `ConfigurationException`.
+- **Cleanup:** Stripped `ScalaTestWithActorTestKit(ConfigFactory.load())` → `ScalaTestWithActorTestKit()` across 25 affected sync/snap specs. `PivotBlockSelectorSpec` (uses `ConfigFactory.load("explicit-scheduler")`) left unchanged.
+- **pekko-typed-api.md P14:** Bare ctor pitfall marked resolved.
+- **E5c, E5d** remain open.
+
+---
+
 ## Pekko TestKit Migration — Batch 4 (SNAP coordinator/heal specs)
 
 #### `5eae34c21` — §8a-retro batch 4: coordinator/heal specs → ActorTestKit (135 tests)

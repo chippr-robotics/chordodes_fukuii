@@ -59,10 +59,22 @@
 
 ---
 
+#### `ab98f1370` — P10: SyncController FastSync.Done production guard + SyncControllerSpec FlakyTests
+- **Production fix:** Added `case FastSync.Done => Behaviors.same` guard in `handleRegularSyncMsg` before the catch-all `regularSync.tell(msg, ...)` forward. When `FastSync.Done` arrives late (after `syncSwitchDelay = 0.5s`), it no longer crashes RegularSync with `ClassCastException: FastSync$Done$ cannot be cast to RegularSyncCommand`. Root cause of the "start state download" FlakyTest cluster eliminated.
+- **SyncControllerSpec FlakyTests:** 1 de-tagged (now stable); 2 deleted — "start state download only when pivot block is fresh enough" (depended on the production bug; deleted) and coverage gap filled by rewrite below.
+- **Cross-refs:** `sync/fast.md` (FastSyncSpec FlakyTests same thread)
+
+#### `18ceefa5b` + `0023c90be` — P10: stalePivotAfterRestart coverage gap filled
+- **What:** `SyncControllerSpec` coverage gap logged during P10: the `stalePivotAfterRestart` path in `newPivotIsGoodEnough` had no test. Replacement test written: peers at `bestBlock-1=399999` produce pivot `399499=currentPivot` (rejected); then peers at `bestBlock=400000` produce pivot `399500>399499` (accepted → `stateDownloadStarted=true`). Assertion uses `should be > 0` (not `shouldBe 1`) to avoid timing flakiness. 3/3 passes confirmed. CHASE-QUEUE entry cleared.
+- **Cross-refs:** F7 (P10 thread)
+
+---
+
 ## Open / Deferred
 
 - W4: `ctx.self ! cmd` re-delivers wrapped Command (document invariant) — deferred
 - W15: `unwrap returns Any` — Wave 3 LOOM gate (`WrappedExternal` elimination)
 - INFO-9: `GetHandshakedPeersCmd.replyTo: ActorRef` untyped — Network/P2P sprint
-- §P9-NOTCHANGE: SyncControllerSpec:243 — prhResultAdapter injection path rewrite (DEFERRED-BACKLOG Part 15)
-- `handleRegularSyncMsg:895-897` catch-all `FastSync.Done` bug — P10/F7 pending
+- ~~§P9-NOTCHANGE: SyncControllerSpec:243~~ — ✅ DONE 2026-06-23 (`37037a89b`) — see `sync/fast.md`
+- ~~`handleRegularSyncMsg:895-897` catch-all `FastSync.Done` bug~~ — ✅ DONE 2026-06-23 (`ab98f1370`)
+- §8a-retro batch 5: `SyncControllerSpec`, `CalibratePivotTDSpec`, `ChainWeightCalibrationSpec` — deferred comments added; Wave 3 gate

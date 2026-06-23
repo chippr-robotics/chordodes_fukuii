@@ -74,7 +74,26 @@
 
 ---
 
+## FlakyTest Audit — FastSync (Part 11 P10)
+
+#### `ab98f1370` — P10: FastSyncSpec FlakyTests de-tagged (4 tests, Part 11 P10)
+- **Tests fixed (4, now UnitTest + SyncTest):** The 4 FastSyncSpec FlakyTests were race conditions caused by non-deterministic actor startup / message ordering. Fixed by adding `awaitAssert` / `expectMsgAllOf` / deterministic actor-message ordering. `FlakyTest` tag removed from all 4.
+- **Verification:** 10/10 passes per test via repeated `testOnly *FastSyncSpec*` runs
+- **Cross-refs:** `sync/controller.md` (SyncControllerSpec FlakyTests, production FastSync.Done guard)
+
+---
+
+## §P9-NOTCHANGE — SyncControllerSpec:243 "not change best block" (Part 15)
+
+#### `37037a89b` — test: re-enable "not change best block" via Typed FastSync injection path
+- **What:** Test was injecting `PeerRequestHandler.ResponseReceived` via a classic `ActorRef` to the Typed FastSync actor, bypassing its private `prhResultAdapter`. After migration, FastSync only accepts `PeerRequestHandler.Result` via `WrappedPrhResult` (the private adapter wrapper). Fix: access via `WrappedPrhResult` (package-private `private[sync]`) + `fast.toTyped[FastSync.Command]` to convert the ref. The test now exercises the real production injection path.
+- **Result:** 1/1 pass; no regressions in `testOnly *SyncControllerSpec*`
+- **Cross-refs:** `sync/controller.md` (§P9-NOTCHANGE deferred entry cleared)
+
+---
+
 ## Open / Deferred
 
 - E165 TestProbe in `FastSyncBranchResolverSpec` — 5 pre-existing warnings, deferred (PENDING.md)
 - ~~INFO-10: fragile adapter-pinning tuple `FastSync.scala:180–183`~~ — ✅ DONE 2026-06-22 (D4)
+- ~~§P9-NOTCHANGE: SyncControllerSpec:243~~ — ✅ DONE 2026-06-23 (`37037a89b`)

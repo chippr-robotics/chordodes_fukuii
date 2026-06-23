@@ -31,6 +31,16 @@
 
 ---
 
+## FlakyTest Audit — PoW Mining (Part 11 P10)
+
+#### `ab98f1370` — P10: PoWMiningCoordinatorSpec FlakyTests — 6 de-tagged, 1 deleted
+- **Tests de-tagged (6, now UnitTest + ConsensusTest):** FlakyTests were caused by real Ethash PoW computation timing being non-deterministic. Fixed by injecting a `MinerFactory` seam and providing a fake miner that completes instantly; `EthashMiner` injection point confirmed injectable. `FlakyTest` tag removed from 6 tests.
+- **Test deleted (1):** "MineNext starts EthashMiner" — directly testing internal timing behavior of real EthashMiner with no deterministic seam; deleted with rationale comment. Not fixable without major refactor.
+- **Verification:** 10/10 passes per test; no `FlakyTest` tags remain in `PoWMiningCoordinatorSpec`
+- **Cross-refs:** `sync/fast.md` + `sync/controller.md` (F7/P10 thread)
+
+---
+
 ## Open
 
 - `EthashBlockHeaderValidator.scala:41` — null check at Java interop boundary (keep)

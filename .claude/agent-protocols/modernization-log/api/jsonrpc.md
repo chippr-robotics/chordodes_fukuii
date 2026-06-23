@@ -56,6 +56,20 @@
 
 ---
 
+## P9 DisabledTest Fixes
+
+#### `2803d192f` — §P9-JSON4S: re-enable 4 jsonrpc DisabledTests — fix json4s ScalaSig under testEssential
+- **Root cause:** `JsonSerializers.formats` was missing `RpcErrorJsonSerializer`. `JsonRpcIpcServer.Serialization.write(errorResponse)` triggered json4s ScalaSig reflection on `JsonRpcError` (a Scala 3 case class lacking Scala 2 `ScalaSig` bytecode metadata), polluting the json4s reflection cache. Subsequent suites under `testEssential` hit the corrupted cache and failed with `MappingException: Can't find ScalaSig`.
+- **Fix:** Added `RpcErrorJsonSerializer` to `JsonSerializers.formats` in `JsonSerializers.scala`. Production fix — not a test-only change.
+- **Tests re-enabled (4):** `JsonRpcControllerSpec.scala:73`, `:124`; `JsonRpcControllerEthSpec.scala:556`, `:849`. `DisabledTest` tag removed; `UnitTest + RPCTest` tags remain.
+- **Gate:** testEssential — 3,600 tests, 0 failures, 669s
+
+#### `21d2a46f0` — §P9-TXRECEIPT: re-enable "calculate correct contract address"
+- **What:** `EthTxServiceSpec.scala:369` — test was already correct (baseLogIndex drift had been fixed in a prior session); only the `DisabledTest` tag and stale `// TODO` comment remained. Both removed.
+- **Result:** 24/24 `EthTxServiceSpec` tests pass
+
+---
+
 ## Open / Deferred
 
 - json4s Manifest synthesis warnings (68 hits) — externally gated on json4s 4.2.0-M5 release

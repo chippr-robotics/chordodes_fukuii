@@ -133,8 +133,8 @@ Every prompt that touches source files must apply this before committing:
 - ~~**Gate**~~ ✅ COMPLETE — 11:02 (662s), 3,595 / 0 fail (2026-06-22)
 - ~~**Batch D** (parallel, after gate)~~ ✅ COMPLETE — G1 (all 12 Behavior[Any] → Behavior[Command]) ∥ G2 (S3-B fixed, INFO-8 monitored, S3-E → D2) ∥ P7 (timing baseline 680s)
 - ~~**Batch E** (parallel, all unblocked)~~ ✅ COMPLETE — E1 (`0cefe5c25`) ∥ E2 (pre-fixed) ∥ E3 (`cc63882fa`)
-- ~~**Batch F partial** — F1+F2+F3+F4+F5+F6+F8+F9+F13+E5b~~ ✅ DONE
-- **Batch F (remaining)**: F7 ∥ F10 (parallel) — F11+F12 after F7; E5c ∥ E5d (both unblocked: E5b+F4 done)
+- ~~**Batch F** — F1+F2+F3+F4+F5+F6+F7+F8+F9+F10+F11+F13+E5b~~ ✅ DONE
+- **Batch F (remaining)**: F12 ∥ E5c ∥ E5d (all parallel-safe now)
 - **Final gate** (after G1 + G2 + Wave 4 collaborator migration): **POST-MIGRATION-SWEEP** — zero Classic residue verification + BRIDGE-A/B/C elimination
 
 ---

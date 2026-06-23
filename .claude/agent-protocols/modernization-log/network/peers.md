@@ -78,9 +78,20 @@ Note: `ServerActor` and `RLPxConnectionHandler` intentionally remain Classic TCP
 
 ---
 
+## ETH/69 Inbound Type Fix (Part 14 §ETH-BRU)
+
+#### `931c615dd` — fix: ETH/69 BlockRangeUpdate inbound type — ETH69→ETHPackets in PeerActor (Part 14 §ETH-BRU)
+- **What:** `PeerActor.scala:551` match arm for inbound BlockRangeUpdate was matching `ETH69.BlockRangeUpdate` (an outbound-only type); the decoder actually emits `ETHPackets.BlockRangeUpdate`. The malformed-update validation arm and `BreachOfProtocol` disconnect guard were dead code — abusive ETH/Sepolia peers were not being disconnected. Fixed by changing the matched type to `ETHPackets.BlockRangeUpdate`; all validation logic and disconnect behavior preserved unchanged.
+- **Root cause:** Sprint commit `13aa7585e` (W5/W11, NPMA migration) swept NPMA to `ETHPackets.BlockRangeUpdate` but did not sweep the two sibling inbound handlers in `PeerActor` and `BlockFetcher`. See `sync/regular.md` for BlockFetcher fix.
+- **Verification:** 15/15 PeerActorSpec tests pass
+- **Cross-refs:** `sync/regular.md` (BlockFetcher:486 sibling fix), F8 BEACON ETH-bias sweep (source finding)
+
+---
+
 ## Open / Deferred
 
 - W7: 900-line NPMA `Impl` with 9 responsibilities — Wave 3 LOOM gate (Network/P2P sprint)
 - INFO-9: `GetHandshakedPeersCmd.replyTo: ActorRef` untyped — Network/P2P sprint
 - `PeerRequestHandler` `ClassTag` unsound → `TypeTest[A,B]` — deferred
 - 35 remaining Classic actors in devp2p/rlpx (Wave 3 network migration plan complete, implementation not started)
+- §8a-retro batch 5: `PeerActorSpec` deferred — `TestActorRef` is Classic-only; migrate when PeerActor is Typed (Wave 3 network sprint)

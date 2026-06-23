@@ -57,9 +57,26 @@
 
 ---
 
+## ETH/69 Inbound Type Fix (Part 14 §ETH-BRU)
+
+#### `931c615dd` — fix: ETH/69 BlockRangeUpdate inbound type — ETH69→ETHPackets in BlockFetcher (Part 14 §ETH-BRU)
+- **What:** `BlockFetcher.scala:486` match arm `AdaptedMessageFromEventBus(msg: ETH69.BlockRangeUpdate, _)` matched a type that the decoder never emits at runtime — peer-pushed chain-tip advances via `withPossibleNewTopAt` were silently dropped on ETH/Sepolia; head-following degraded to periodic re-probe only. Fixed by changing to `ETHPackets.BlockRangeUpdate`. Unused `ETH69` import removed.
+- **BlockFetcherSpec.scala:298-305** — Rebuilt: test was constructing `ETH69.BlockRangeUpdate` directly (false-positive coverage masking the production gap); changed to `ETHPackets.BlockRangeUpdate` to exercise the real inbound path.
+- **Verification:** 11/11 BlockFetcherSpec tests pass
+- **Cross-refs:** `network/peers.md` (PeerActor:551 sibling fix), F8 BEACON ETH-bias sweep (source finding)
+
+---
+
+## §8a-retro batch 5 — RegularSyncSpec deferred
+
+`RegularSyncSpec` uses a `Resource[IO, ActorSystem]` lifecycle that is load-bearing (Cats Effect error handling, cleanup ordering). Migration to `ScalaTestWithActorTestKit` would require restructuring the resource lifecycle. **Deferred to Wave 3** when `RegularSync` itself becomes a Typed actor and the test can be rewritten from scratch.
+
+---
+
 ## Open / Deferred
 
 - INFO-13/14: Classic `LoggingAdapter` via `Logging(ctx.system.classicSystem, ...)` bridge — Network/P2P sprint
 - `RegularSync.scala:228`: `log.warning(...)` Classic spelling → `log.warn(...)` — Network/P2P sprint
 - RegularSyncSpec divergence path EXCEPT (LCA-less blind rewind) — HERALD audit done; fix spec deferred
 - §P9-SAVENODE: RegularSyncSpec:552 ScalaMock stub → anonymous class double (DEFERRED-BACKLOG Part 15)
+- RegularSyncSpec (entire file) — Wave 3 migration gate (Resource[IO, ActorSystem] lifecycle)
