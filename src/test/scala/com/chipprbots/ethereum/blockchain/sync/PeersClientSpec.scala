@@ -25,8 +25,7 @@ class PeersClientSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyC
   import Peers.*
 
   "PeerClient" should "determine the best peer based on total difficulty" taggedAs (
-    UnitTest,
-    SyncTest
+    UnitTest
   ) in {
     val table: TableFor3[Map[PeerId, PeerWithInfo], Option[Peer], String] =
       Table[Map[PeerId, PeerWithInfo], Option[Peer], String](
@@ -78,7 +77,7 @@ class PeersClientSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyC
     }
   }
 
-  it should "exclude peers stuck at genesis even if their TD is higher" taggedAs (UnitTest, SyncTest) in {
+  it should "exclude peers stuck at genesis even if their TD is higher" taggedAs (UnitTest) in {
     // Sepolia/ETC reproducer: bootnode at genesis with the original POW TD (131072)
     // and a real chain-head peer with a lower TD (e.g. ETH/69 block-number proxy).
     // Pre-fix #1201: the legacy `bestPeer` selected the genesis peer because
@@ -89,7 +88,7 @@ class PeersClientSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyC
     PeersClient.bestPeer(Map(genesisOnly, chainHead)) shouldEqual Some(peer2)
   }
 
-  it should "return None when every available peer is at genesis" taggedAs (UnitTest, SyncTest) in {
+  it should "return None when every available peer is at genesis" taggedAs (UnitTest) in {
     val onlyGenesis = Map(
       peer1.id -> PeerWithInfo(peer1, peerInfoAtGenesis(td = 50)),
       peer2.id -> PeerWithInfo(peer2, peerInfoAtGenesis(td = 200))
@@ -97,7 +96,7 @@ class PeersClientSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyC
     PeersClient.bestPeer(onlyGenesis) shouldEqual None
   }
 
-  it should "filter peers by maxBlockNumber for absolute-block requests" taggedAs (UnitTest, SyncTest) in {
+  it should "filter peers by maxBlockNumber for absolute-block requests" taggedAs (UnitTest) in {
     // Sepolia repro: PivotHeaderBootstrap asks for block 10789531. Among the
     // peer pool, only peers whose advertised maxBlockNumber is at least the
     // target should be selected. Peers reporting `latestBlock=9707885` (older
@@ -109,7 +108,7 @@ class PeersClientSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyC
     PeersClient.bestPeerWithMinBlock(pool, BigInt(10789531)) shouldEqual Some(peer2)
   }
 
-  it should "fall back to maxBlockNumber=0 peers when no peer is known to be ahead" taggedAs (UnitTest, SyncTest) in {
+  it should "fall back to maxBlockNumber=0 peers when no peer is known to be ahead" taggedAs (UnitTest) in {
     // ETH/64-68 peers post-merge have maxBlockNumber=0 (no STATUS field carries
     // the block number, no incoming block messages to update). They MIGHT have
     // the block; we just don't know. Better to try them than fail outright.
@@ -120,7 +119,7 @@ class PeersClientSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyC
     PeersClient.bestPeerWithMinBlock(pool, BigInt(10789531)) shouldEqual Some(peer1)
   }
 
-  it should "exclude tried peers from BestPeerWithMinBlockExcluding" taggedAs (UnitTest, SyncTest) in {
+  it should "exclude tried peers from BestPeerWithMinBlockExcluding" taggedAs (UnitTest) in {
     val peerAhead = peer1.id -> PeerWithInfo(peer1, peerInfo(td = 200).copy(maxBlockNumber = 10_789_600))
     val peerAlsoAhead = peer2.id -> PeerWithInfo(peer2, peerInfo(td = 100).copy(maxBlockNumber = 10_789_600))
     // peer1 excluded (already tried) → peer2 selected despite lower TD
@@ -132,8 +131,7 @@ class PeersClientSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyC
   }
 
   it should "return None from BestPeerWithMinBlockExcluding when all eligible peers are excluded" taggedAs (
-    UnitTest,
-    SyncTest
+    UnitTest
   ) in {
     val onlyPeer = peer1.id -> PeerWithInfo(peer1, peerInfo(td = 200).copy(maxBlockNumber = 10_789_600))
     PeersClient.bestPeerWithMinBlockExcluding(
