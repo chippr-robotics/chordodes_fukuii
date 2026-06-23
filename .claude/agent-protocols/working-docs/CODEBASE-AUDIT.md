@@ -110,9 +110,13 @@ Every prompt that touches source files must apply this before committing:
 | ~~E2~~ | ~~Batch E~~ | ~~CHASE-QUEUE P8 — G1-sweep PRISM items (FastSync + NPMA + SyncController)~~ | ✅ DONE 2026-06-22 — pre-fixed: `0c7d6781b` (null vars + EXCEPT→Try), `504b4ca16` (NPMA dead arms), `a5132aa80` (EC.global) |
 | ~~E3~~ | ~~Batch E~~ | ~~DEFERRED §3h — Any type signature cleanup (non-consensus sites)~~ | ✅ DONE 2026-06-22 — `cc63882fa` (15 sites documented, 7 FORGE-gated, 0 type changes) |
 | ~~F1~~ | ~~Batch F~~ | ~~DEFERRED §8a-retro batch 3 — LOOM TestKit→ActorTestKit for G1 network/sync actors~~ | ✅ DONE 2026-06-23 — 25 specs; `12c23cf8a` (14) + `a719520db` (11 + NPMAFake fix) |
-| F2 | Batch F | CHASE-QUEUE F1 — FORGE §3h residual + PoWMiningCoordinator threading model consultation | Yes (read-only) |
-| F3 | Batch F | §8a-retro batch 4 — LOOM coordinator/heal specs (HealingTrieFixtures PropsAdapter fix, 14 specs) | No — fixture → 4 coordinator specs → 10 heal specs in order |
-| F4 | Batch F | §8a-retro batch 5 — LOOM multi-system + TestActorRef specs (3 assessable now, 2 Wave 3 gate) | Partial |
+| ~~F2~~ | ~~Batch F~~ | ~~CHASE-QUEUE F1 — FORGE §3h residual + PoWMiningCoordinator threading model consultation~~ | ✅ DONE 2026-06-23 — Item A REJECTED (`72a755efa`); Item B CONFIRMED (`7c951fd44`); Item C SAFE AS-IS |
+| F3 | Batch F | DEFERRED §8a-retro batch 4 — LOOM coordinator/heal specs (HealingTrieFixtures PropsAdapter fix, 14 specs) | No — fixture → 4 coordinator specs → 10 heal specs in order |
+| F4 | Batch F | DEFERRED §8a-retro batch 5 — LOOM multi-system + TestActorRef specs (3 assessable now, 2 Wave 3 gate) | Partial — after F6 (RegularSyncSpec conflict) |
+| F5 | Batch F | DEFERRED §3i — MITHRIL+FORGE BlockExecutionError hierarchy redesign: union type + `describe` | Yes — ledger/ only; no conflicts |
+| F6 | Batch F | DEFERRED Part 11 P9 — EYE/MITHRIL DisabledTest audit | Yes — *SyncControllerSpec line numbers shifted post-F1; use grep* |
+| F7 | Batch F | DEFERRED Part 11 P10 — EYE/MITHRIL FlakyTest root cause audit | No (one spec at a time) — after F6; *FastSyncSpec + SyncControllerSpec lines shifted post-F1; use grep* |
+| ~~F8~~ | ~~Batch F~~ | ~~DEFERRED Part 13 P13 — BEACON sprint ETC-bias sweep: shared ETC+ETH paths changed without BEACON review~~ | ✅ DONE 2026-06-23 — `ef4989169` — 1 cluster: ETH/69 BlockRangeUpdate type confusion (PeerActor:551 + BlockFetcher:486 match never-emitted `ETH69.BlockRangeUpdate`; NPMA swept to `ETHPackets.BlockRangeUpdate` in `13aa7585e`, siblings left stale). All other shared-path diffs syntax-only. |
 
 **Global sequence across all files:**
 - ~~**Batch A** (parallel, all read-only)~~ ✅ COMPLETE
@@ -120,9 +124,9 @@ Every prompt that touches source files must apply this before committing:
 - ~~**Batch C** (sequential, larger sweeps)~~ ✅ COMPLETE
 - ~~**Gate**~~ ✅ COMPLETE — 11:02 (662s), 3,595 / 0 fail (2026-06-22)
 - ~~**Batch D** (parallel, after gate)~~ ✅ COMPLETE — G1 (all 12 Behavior[Any] → Behavior[Command]) ∥ G2 (S3-B fixed, INFO-8 monitored, S3-E → D2) ∥ P7 (timing baseline 680s)
-- ~~**Batch E** (parallel, all unblocked)~~ ✅ COMPLETE — E1 (`0cefe5c25`) ∥ E2 (pre-fixed) ∥ E3 (`cc63882fa`) — *§8a-retro batch 3 rolled to Batch F as F1*
-- **Gate** (after Batch E / before Batch F): `./local/scripts/fukuii-test` testEssential — **run this before F2–F4**
-- **Batch F** (post-gate): ~~F1 (§8a-retro batch 3)~~ ✅ DONE — then F2 (FORGE §3h+PoWMining, parallel) ∥ F3 (§8a-retro batch 4, sequential after gate) → F4 (§8a-retro batch 5, after F3)
+- ~~**Batch E** (parallel, all unblocked)~~ ✅ COMPLETE — E1 (`0cefe5c25`) ∥ E2 (pre-fixed) ∥ E3 (`cc63882fa`)
+- ~~**Batch F partial** — F1 + F2~~ ✅ DONE — Gate needed before F3–F7: `./local/scripts/fukuii-test` testEssential
+- **Batch F (continued)**: F3 ∥ F5 ∥ F6 ∥ F8 (start simultaneously) → after F6: F4 ∥ F7 (parallel with each other); F8 parallel throughout
 - **Final gate** (after G1 + G2 + Wave 4 collaborator migration): **POST-MIGRATION-SWEEP** — zero Classic residue verification + BRIDGE-A/B/C elimination
 
 ---
