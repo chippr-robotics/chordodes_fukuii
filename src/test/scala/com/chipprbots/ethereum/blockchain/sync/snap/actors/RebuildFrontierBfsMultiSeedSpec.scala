@@ -29,7 +29,10 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   * a direct one-seed walk over the same root. Both descend the identical stored subtree, so identical frontier counts
   * over a deterministic fixture demonstrate the wrapper and a one-element multi-seed call agree.
   */
-class RebuildFrontierBfsMultiSeedSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
+class RebuildFrontierBfsMultiSeedSpec
+    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
+    with AnyFlatSpecLike
+    with Matchers {
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit

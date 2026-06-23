@@ -1825,3 +1825,275 @@ Both specs must show 0 failures.
 7. `git add .claude/agent-protocols/working-docs/DEFERRED-BACKLOG.md .claude/agent-protocols/working-docs/CHASE-QUEUE.md` → `git commit -m "docs(part14-eth-bru): clearout — $SHA"`
 8. DELETE this section
 
+---
+
+## Part 15: P9 DisabledTest Deferred — Resolution Prompts
+
+Deferred during P9 audit (2026-06-23, commit `86c76fd4e`). Four targeted fixes listed below.
+The `handleRegularSyncMsg` production bug (SyncController:895-897) is tracked under P10 (F7).
+
+---
+
+### §P9-JSON4S — json4s ScalaSig reflection cluster (4 tests, CONDUIT)
+
+**Agent:** CONDUIT (jsonrpc layer — no consensus touch)
+**Prerequisite:** None. Standalone sprint.
+**Source:** CHASE-QUEUE `[DisabledTest P9]` entries 2026-06-23
+
+**Context:** Four tests across two files fail with
+`MappingException: Can't find ScalaSig for class ... JsonRpcError` when run under the
+`testEssential` alias but pass in isolation. The root cause is json4s using Scala 2
+`ScalaSig` bytecode metadata for runtime type extraction — metadata that Scala 3 class
+files do not emit. Some earlier test in the testEssential sequence pollutes the json4s
+reflection cache, making subsequent `extract[T]` calls fail.
+
+**Affected tests:**
+
+| File | Line | Test |
+|------|------|------|
+| `JsonRpcControllerSpec.scala` | 73 | "fail when invalid request is received" |
+| `JsonRpcControllerSpec.scala` | 124 | "only allow to call methods of enabled apis" |
+| `JsonRpcControllerEthSpec.scala` | 556 | "return error with custom error data in eth_getBalance" |
+| `JsonRpcControllerEthSpec.scala` | 849 | "return error with custom error data in eth_getProof" |
+
+All four already have `// Re-silenced:` comments with the root cause. Read them before starting.
+
+**Pre-flight reads:**
+```bash
+# Confirm the 4 test locations and read their Re-silenced comments
+grep -n "Re-silenced\|DisabledTest\|ScalaSig\|MappingException" \
+  src/test/scala/com/chipprbots/ethereum/jsonrpc/JsonRpcControllerSpec.scala \
+  src/test/scala/com/chipprbots/ethereum/jsonrpc/JsonRpcControllerEthSpec.scala
+
+# Find where json4s is used for JsonRpcError serialization in production
+grep -rn "json4s\|extract\[JsonRpcError\]\|Extraction\|DefaultFormats" \
+  src/main/scala/com/chipprbots/ethereum/jsonrpc/ --include="*.scala" | head -30
+
+# Find the json4s version in use
+grep "json4s" build.sbt
+```
+
+**Diagnosis step — reproduce the failure under testEssential ordering:**
+```bash
+# Run just the failing spec alone (should PASS):
+sbt "testOnly *JsonRpcControllerSpec* -- -n DisabledTest"
+
+# Run with testEssential and note which suite immediately precedes the failure in the output
+```
+
+**Fix options (evaluate in order — implement whichever is the narrowest change):**
+
+**(a) Upgrade json4s to Scala 3 native** — check whether a json4s version ≥ 4.0 with
+`"org.json4s" %% "json4s-native-core"` drops the ScalaSig dependency. If yes, update
+`build.sbt` and verify the 4 tests re-enable cleanly.
+
+**(b) Replace JsonRpcError codec with circe or hand-written Scala 3 approach** — if json4s
+upgrade is not available, identify the specific `extract[JsonRpcError]` call site and replace
+with a hand-written codec using the existing circe dependency (already in scope for other
+jsonrpc layers).
+
+**(c) JVM fork isolation** — if (a) and (b) are not viable within a single sprint, configure
+`Test / fork := true` scoped to the jsonrpc test module. Escape hatch only.
+
+**Compile + test after implementing fix:**
+```bash
+sbt compile-all
+sbt "testOnly *JsonRpcControllerSpec* *JsonRpcControllerEthSpec* -- -n DisabledTest"
+# ALL 4 tests must pass
+sbt testEssential   # end-of-thread gate — confirm no regressions
+```
+
+After tests pass — remove `DisabledTest` tag from all 4 tests. `UnitTest, RPCTest` tags already present.
+
+**MANDATORY final steps — complete IN THIS ORDER:**
+1. `sbt scalafmtAll`
+2. `git add src/test/scala/com/chipprbots/ethereum/jsonrpc/JsonRpcControllerSpec.scala src/test/scala/com/chipprbots/ethereum/jsonrpc/JsonRpcControllerEthSpec.scala` (+ any production files changed)
+3. `git commit -m "test(p9-json4s): re-enable 4 jsonrpc DisabledTests — fix json4s ScalaSig under testEssential"`
+4. `SHA=$(git rev-parse --short HEAD)`
+5. Update CHASE-QUEUE: strikethrough the 4 `[DisabledTest P9]` json4s entries
+6. `git add .claude/` → `git commit -m "docs(p9-json4s): clearout — $SHA"`
+7. DELETE this section
+
+---
+
+### §P9-NOTCHANGE — SyncControllerSpec:243 "not change best block" (EYE/LOOM)
+
+**Agent:** EYE (diagnose + implement), LOOM if actor API change is needed
+**Prerequisite:** None. Standalone sprint.
+**Source:** CHASE-QUEUE `[DisabledTest P9]` entry 2026-06-23
+
+**Context:** Test at `SyncControllerSpec.scala:243` injects `PeerRequestHandler.ResponseReceived`
+directly to `fast` (a classic `ActorRef` pointing to the Typed `FastSync` actor) via
+`system.scheduler.scheduleAtFixedRate`. Post-migration, FastSync is Typed and receives
+`PeerRequestHandler.Result` messages only via its private `prhResultAdapter`
+(`ctx.messageAdapter[PeerRequestHandler.Result](WrappedPrhResult(_))`, `FastSync.scala:158`).
+No external injection path exists — sending via a classic ref bypasses the adapter, causing
+`PeerRequestHandler$ResponseReceived cannot be cast to FastSync$Command`.
+
+**What the test asserts:**
+- A `BlockHeaders` response containing a block far ahead of pivot (`pivotNumber + 20`) is sent to FastSync
+- FastSync must ignore it (not change the pivot block)
+- FastSync must still complete normally
+
+**Pre-flight reads:**
+```bash
+# Read the full test body
+sed -n '243,278p' src/test/scala/com/chipprbots/ethereum/blockchain/sync/SyncControllerSpec.scala
+
+# Read prhResultAdapter and WrappedPrhResult in FastSync — understand the real injection path
+grep -n "prhResultAdapter\|WrappedPrhResult\|PeerRequestHandler" \
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/fast/FastSync.scala | head -20
+
+# Check FastSync Command ADT
+grep -n "sealed.*Command\|extends Command\|case class\|case object" \
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/fast/FastSync.scala | head -30
+```
+
+**Fix approach:**
+
+**(a) Drive FastSync through the AutoPilot** — FastSync creates `PeerRequestHandler` children
+for peer requests. The AutoPilot already handles `GetBlockHeaders` requests. Add a case that
+responds with the `futureHeaders` message on the second or subsequent request, while the
+first request gets the normal response. The `PeerRequestHandler` child sends the result back
+through `prhResultAdapter` automatically — this is the production-correct injection path.
+Read how `setupAutoPilot` and `SyncStateAutoPilot.run()` handle `GetBlockHeaders` in the
+existing passing tests before implementing.
+
+**(b) Widen prhResultAdapter visibility (`private[fast]`)** — exposes the adapter to test
+code in `src/test/.../fast/` without changing the external API surface. Only viable if
+tests are in the same package.
+
+**Note:** The `handleRegularSyncMsg` catch-all at `SyncController.scala:895-897` is a
+related production bug (late `FastSync.Done` forwarded to RegularSync → ClassCastException).
+It is tracked separately under P10 (F7). Fixing §P9-NOTCHANGE does NOT require fixing that bug.
+
+**MANDATORY final steps — complete IN THIS ORDER:**
+1. `sbt compile-all` after every file edit
+2. `sbt "testOnly *SyncControllerSpec*"` — the specific test must pass; no regressions
+3. `sbt scalafmtAll`
+4. `git add src/test/scala/com/chipprbots/ethereum/blockchain/sync/SyncControllerSpec.scala` (+ any production files)
+5. `git commit -m "test(p9): re-enable 'not change best block' — rewrite injection path for Typed FastSync"`
+6. `SHA=$(git rev-parse --short HEAD)`
+7. Update CHASE-QUEUE: strikethrough `[DisabledTest P9]` SyncControllerSpec:243 entry
+8. `git add .claude/` → `git commit -m "docs(p9-notchange): clearout — $SHA"`
+9. DELETE this section
+
+---
+
+### §P9-SAVENODE — RegularSyncSpec:552 "save fetched node" (EYE/MITHRIL)
+
+**Agent:** EYE (diagnose), MITHRIL (replace ScalaMock stubs with explicit test doubles)
+**Prerequisite:** None. Standalone sprint, ~45 min.
+**Source:** CHASE-QUEUE `[DisabledTest P9]` entry 2026-06-23
+
+**Context:** Test at `RegularSyncSpec.scala:552` uses `stub[BranchResolution]` (ScalaMock).
+The expectation `branchResolution.resolveBranch.when(*).returns(NewBetterBranch(Nil)).atLeastOnce()`
+is never satisfied — the stub never intercepts the call. This is a known Scala 3 incompatibility:
+ScalaMock `stub[T]` relies on Scala 2 runtime class proxies that do not function correctly with
+Scala 3 class files. The method call passes through to the real implementation instead of
+being intercepted.
+
+The same fixture also stubs `BlockchainImpl`, `ConsensusAdapter`, `BlockchainReader` — same risk,
+but their expectations are `any number of times` so failures are silent.
+
+**Pre-flight reads:**
+```bash
+# Read the full test body
+sed -n '552,587p' src/test/scala/com/chipprbots/ethereum/blockchain/sync/regular/RegularSyncSpec.scala
+
+# Find BranchResolution trait — understand resolveBranch signature and return type
+grep -rn "trait BranchResolution\|def resolveBranch\|NewBetterBranch" \
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/regular/ | head -10
+
+# Read the companion test that passes (MissingStateNodeFixture) for fixture comparison
+grep -n "MissingStateNodeFixture\|WrongNodeDataPeersClientAutoPilot" \
+  src/test/scala/com/chipprbots/ethereum/blockchain/sync/regular/RegularSyncSpec.scala | head -10
+```
+
+**Fix — replace all stubs in this Fixture override with anonymous class implementations:**
+
+```scala
+// Before (ScalaMock stub — broken in Scala 3):
+override lazy val branchResolution: BranchResolution = stub[BranchResolution]
+branchResolution.resolveBranch.when(*).returns(NewBetterBranch(Nil)).atLeastOnce()
+
+// After (explicit test double):
+var resolveBranchWasCalled: Boolean = false
+override lazy val branchResolution: BranchResolution = new BranchResolution {
+  override def resolveBranch(peer: Peer, block: Block): BranchResolutionResult = {
+    resolveBranchWasCalled = true
+    NewBetterBranch(Nil)
+  }
+}
+```
+
+Apply the same anonymous-class replacement to the `BlockchainImpl`, `ConsensusAdapter`,
+and `BlockchainReader` stubs in this specific `Fixture` override. The test's key assertion
+is `awaitCond(saveNodeWasCalled)` — preserve that logic exactly.
+
+**MANDATORY final steps — complete IN THIS ORDER:**
+1. `sbt compile-all` after every file edit
+2. `sbt "testOnly *RegularSyncSpec*"` — "save fetched node" must pass; no regressions
+3. `sbt scalafmtAll`
+4. `git add src/test/scala/com/chipprbots/ethereum/blockchain/sync/regular/RegularSyncSpec.scala`
+5. `git commit -m "test(p9): re-enable 'save fetched node' — replace ScalaMock stubs with explicit test doubles"`
+6. `SHA=$(git rev-parse --short HEAD)`
+7. Update CHASE-QUEUE: strikethrough `[DisabledTest P9]` RegularSyncSpec:550 entry
+8. `git add .claude/` → `git commit -m "docs(p9-savenode): clearout — $SHA"`
+9. DELETE this section
+
+---
+
+### §P9-TXRECEIPT — EthTxServiceSpec:369 "calculate correct contract address" (EYE/CONDUIT)
+
+**Agent:** EYE (diagnose actual vs expected), CONDUIT (jsonrpc service layer)
+**Prerequisite:** None. Standalone sprint, ~30 min.
+**Source:** CHASE-QUEUE `[DisabledTest P9]` entry 2026-06-23
+
+**Context:** Test at `EthTxServiceSpec.scala:369` — "calculate correct contract address for
+contract creating by transaction" — has assertion drift. Existing `// TODO` comment at
+lines 365-368 documents:
+
+- `logIndex`: assertion value drifted (comment says "actual logIndex=1 vs expected=0"; the
+  test uses `baseLogIndex = 1` at line 405 — run the test to confirm the actual failure direction)
+- `topics`: container type changed from `List` to `Vector` in `TxLog` or
+  `TransactionReceiptResponse` construction
+
+The feature under test (correct contract address in a receipt for a contract-creating
+transaction) is still valid and the production logic is correct. Only assertion shape needs
+updating to match current production types.
+
+**Pre-flight reads:**
+```bash
+# Read full test body + TODO comment
+sed -n '365,410p' src/test/scala/com/chipprbots/ethereum/jsonrpc/EthTxServiceSpec.scala
+
+# Find TxLog and TransactionReceiptResponse — look at topics and logIndex field types
+grep -rn "case class TxLog\|logIndex\|topics.*List\|topics.*Vector" \
+  src/main/scala/com/chipprbots/ethereum/jsonrpc/ --include="*.scala" | head -20
+
+# Find fakeReceipt definition
+grep -n "fakeReceipt\|val fakeReceipt\|TxLog" \
+  src/test/scala/com/chipprbots/ethereum/jsonrpc/EthTxServiceSpec.scala | head -15
+```
+
+**Fix — run test in isolation, read actual failure, update assertions:**
+```bash
+sbt "testOnly *EthTxServiceSpec* -- -n DisabledTest"
+```
+
+From the failure output:
+1. Update `baseLogIndex` to the actual value the production code returns
+2. Update `topics` assertion to use `Vector` instead of `List` (or whichever is current)
+3. Do NOT change production code — this is assertion drift only, not a bug
+
+**MANDATORY final steps — complete IN THIS ORDER:**
+1. `sbt "testOnly *EthTxServiceSpec*"` — all tests in this file must pass
+2. `sbt scalafmtAll`
+3. `git add src/test/scala/com/chipprbots/ethereum/jsonrpc/EthTxServiceSpec.scala`
+4. `git commit -m "test(p9): re-enable 'calculate correct contract address' — update logIndex+topics assertion shape"`
+5. `SHA=$(git rev-parse --short HEAD)`
+6. Update CHASE-QUEUE: strikethrough `[DisabledTest P9]` EthTxServiceSpec:372 entry
+7. `git add .claude/` → `git commit -m "docs(p9-txreceipt): clearout — $SHA"`
+8. DELETE this section
+

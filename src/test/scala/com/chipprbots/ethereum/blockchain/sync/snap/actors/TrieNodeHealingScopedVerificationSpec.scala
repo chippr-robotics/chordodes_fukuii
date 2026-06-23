@@ -43,7 +43,10 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   *   - V3: a healed node with a deeper MISSING descendant must NOT declare completion — the gap surfaces in the open
   *     frontier (queued or in-flight) and the round stays open until it is clean (FR-006).
   */
-class TrieNodeHealingScopedVerificationSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
+class TrieNodeHealingScopedVerificationSpec
+    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
+    with AnyFlatSpecLike
+    with Matchers {
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit

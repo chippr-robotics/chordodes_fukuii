@@ -33,7 +33,10 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   * dropped: a Typed `Behavior` exposes no `underlyingActor`. The behavioral coverage that survives is asserted through
   * observable effects on the `networkPeerManager` and `snapSyncController` probes — the same approach used in BCC/SRC.
   */
-class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
+class AccountRangeCoordinatorSpec
+    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
+    with AnyFlatSpecLike
+    with Matchers {
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   private val statusProbe = org.apache.pekko.testkit.TestProbe()

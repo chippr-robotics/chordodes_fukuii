@@ -39,7 +39,10 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   * never recomputes or rewrites the state root — it is a pure local read — so the only observable is the marker + the
   * signal, which must match across the config flip.
   */
-class ScopedVerificationParitySpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
+class ScopedVerificationParitySpec
+    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
+    with AnyFlatSpecLike
+    with Matchers {
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit

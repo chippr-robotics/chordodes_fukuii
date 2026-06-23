@@ -47,7 +47,10 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   * F3 (restart-lost / empty set) is structurally an empty set, the same fallback F4 exercises (over-bound latches the
   * set empty); a true restart-lost set is covered by the resume/restart path and the data-model lifecycle.
   */
-class ScopedVerificationFallbackSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
+class ScopedVerificationFallbackSpec
+    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
+    with AnyFlatSpecLike
+    with Matchers {
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit

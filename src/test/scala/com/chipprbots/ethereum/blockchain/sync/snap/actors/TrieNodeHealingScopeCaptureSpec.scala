@@ -40,7 +40,10 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   * heals against a marker-complete root and asserting the gauge equals N proves the capture is complete; re-serving a
   * duplicate hash and asserting the count is unchanged proves dedup.
   */
-class TrieNodeHealingScopeCaptureSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
+class TrieNodeHealingScopeCaptureSpec
+    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
+    with AnyFlatSpecLike
+    with Matchers {
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit

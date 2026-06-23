@@ -20,7 +20,10 @@ import com.chipprbots.ethereum.testing.PeerTestHelpers
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestEvmCodeStorage
 
-class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
+class ByteCodeCoordinatorSpec
+    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
+    with AnyFlatSpecLike
+    with Matchers {
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   private val awaiter = org.apache.pekko.testkit.TestProbe()
@@ -740,7 +743,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit with AnyFlatSpec
     // Resolve the single worker child via selection (the Typed coordinator exposes no `.underlyingActor`)
     // and stop it permanently. `context.watchWith` delivers WorkerTerminated to the coordinator.
     val workerRef = resolveWorkerChild(coordinator)
-    testKit.stop(workerRef)
+    classicSystem.stop(workerRef)
 
     // Task was re-queued after WorkerTerminated handling — providing peer again triggers re-dispatch,
     // which is observable proof the dead worker was removed and the task re-queued.
@@ -776,7 +779,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit with AnyFlatSpec
     val workerRef = resolveWorkerChild(coordinator)
     coordinator ! ByteCodeCoordinator.NoMoreByteCodeTasks
 
-    testKit.stop(workerRef)
+    classicSystem.stop(workerRef)
 
     // Coordinator stays operational after the worker stops — a GetProgress query still returns.
     coordinator ! ByteCodeCoordinator.ByteCodeGetProgress(statusProbe.ref.toTyped[ByteCodeCoordinator.ByteCodeProgress])
