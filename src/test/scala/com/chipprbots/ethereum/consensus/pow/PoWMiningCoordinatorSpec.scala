@@ -30,6 +30,7 @@ import com.chipprbots.ethereum.consensus.blocks.PendingBlock
 import com.chipprbots.ethereum.consensus.blocks.PendingBlockAndState
 import com.chipprbots.ethereum.consensus.mining.CoinbaseProvider
 import com.chipprbots.ethereum.consensus.pow.PoWMiningCoordinator.*
+import com.chipprbots.ethereum.consensus.pow.PoWMiningCoordinator.MiningMode.*
 import com.chipprbots.ethereum.consensus.pow.blocks.PoWBlockGenerator
 import com.chipprbots.ethereum.consensus.pow.miners.Miner
 import com.chipprbots.ethereum.consensus.pow.miners.MinerProtocol

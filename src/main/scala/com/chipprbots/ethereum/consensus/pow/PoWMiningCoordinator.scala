@@ -31,11 +31,10 @@ object PoWMiningCoordinator {
   case object MiningUnsuccessful extends CoordinatorProtocol
 
   // MiningMode will allow to remove MockerMiner
-  sealed trait MiningMode
-
-  case object RecurrentMining extends MiningMode // for normal mining
-
-  case object OnDemandMining extends MiningMode // for testing
+  enum MiningMode {
+    case RecurrentMining // for normal mining
+    case OnDemandMining  // for testing
+  }
 
   sealed trait MiningResponse
 
@@ -75,6 +74,7 @@ class PoWMiningCoordinator private (
 
   import configBuilder.*
   import PoWMiningCoordinator.*
+  import PoWMiningCoordinator.MiningMode.*
 
   // CE3: Using global IORuntime for typed actor operations
   implicit private val scheduler: IORuntime = IORuntime.global

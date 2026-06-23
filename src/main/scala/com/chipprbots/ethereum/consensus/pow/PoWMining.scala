@@ -83,7 +83,7 @@ class PoWMining private (
         for { ref <- mockedMinerRef; sys <- minerSystem } ref ! MockedMiner.Send(mineBlocks, sys.ignoreRef)
       case MinerProtocol.StartMining =>
         for { ref <- mockedMinerRef; sys <- minerSystem } ref ! MockedMiner.Send(MockedMiner.StartMining, sys.ignoreRef)
-        minerCoordinatorRef.foreach(_ ! PoWMiningCoordinator.SetMiningMode(PoWMiningCoordinator.RecurrentMining))
+        minerCoordinatorRef.foreach(_ ! PoWMiningCoordinator.SetMiningMode(PoWMiningCoordinator.MiningMode.RecurrentMining))
       case MinerProtocol.StopMining =>
         for { ref <- mockedMinerRef; sys <- minerSystem } ref ! MockedMiner.Send(MockedMiner.StopMining, sys.ignoreRef)
         minerCoordinatorRef.foreach(_ ! PoWMiningCoordinator.StopMining)
