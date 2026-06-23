@@ -18,7 +18,8 @@ object JsonSerializers {
 
   given formats: Formats =
     DefaultFormats + UnformattedDataJsonSerializer + QuantitiesSerializer +
-      OptionNoneToJNullSerializer + AddressJsonSerializer + EthTransactionResponseSerializer +
+      OptionNoneToJNullSerializer + AddressJsonSerializer + RpcErrorJsonSerializer +
+      EthTransactionResponseSerializer +
       makeTransactionResponseSerializer + makeTransactionReceiptResponseSerializer + makeBlockResponseSerializer
 
   object UnformattedDataJsonSerializer
