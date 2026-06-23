@@ -34,6 +34,24 @@ and `CODEBASE-AUDIT.md` (P1 S5 EYE sweep).
 
 ---
 
+### §8a-retro batch 4 — coordinator/heal spec ActorTestKit migration
+
+| 5eae34c21 | 8a-retro batch 4 — 14 coordinator/heal specs + HealingTrieFixtures migrated to ActorTestKit (135 tests, 0 failures) |
+|------|------|
+
+Root cause fixed: `HealingTrieFixtures.coordinatorProps` (PropsAdapter→Props) crashed the typed
+`ActorTestKitGuardian` on child stop. Now `spawnCoordinator(...)(implicit ActorTestKit)` spawns the
+`Behavior[Command]` natively. The four S3 coordinator specs + ten heal specs moved off
+`TestKit(ActorSystem)`+`ImplicitSender` to `ScalaTestWithActorTestKit(ConfigFactory.load())`
+(explicit config load is required — the typed kit defaults to `application-test.conf`, which omits
+the `sync-dispatcher` the coordinators' worker children spawn on).
+
+Note: `TestProbe()` call sites are still **classic/unnarrowed** (kept via `system.classicSystem`),
+so this batch does NOT reduce the E165 unnarrowed-`TestProbe` count — it only removes the spawn
+crash that blocked migration. `TestProbe[M]` narrowing is a separate follow-up.
+
+---
+
 ## Next Sprint Targets
 
 When the clearout prompts above are done, the branch is ready for:
