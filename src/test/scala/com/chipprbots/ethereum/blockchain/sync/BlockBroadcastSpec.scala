@@ -3,6 +3,7 @@ package com.chipprbots.ethereum.blockchain.sync
 import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 
@@ -10,7 +11,6 @@ import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockBroadcast
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockBroadcast.BlockToBroadcast
@@ -32,11 +32,9 @@ import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.Bl
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes
 import com.chipprbots.ethereum.testing.Tags.*
 
-class BlockBroadcastSpec
-    extends TestKit(ActorSystem("BlockBroadcastSpec_System"))
-    with AnyFlatSpecLike
-    with WithActorSystemShutDown
-    with Matchers {
+class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
+
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
   it should "send a new block when it is not known by the peer (known by comparing chain weights)" taggedAs (
     UnitTest,

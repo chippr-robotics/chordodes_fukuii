@@ -1,7 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.testkit.TestProbe
 
 import scala.collection.immutable.Queue
@@ -11,16 +10,13 @@ import org.scalatest.wordspec.AnyWordSpecLike
 
 import com.chipprbots.ethereum.BlockHelpers
 import com.chipprbots.ethereum.Mocks.MockValidatorsAlwaysSucceed
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcherState.HeadersNotMatchingReadyBlocks
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.testing.Tags.*
 
-class BlockFetcherStateSpec
-    extends TestKit(ActorSystem("BlockFetcherStateSpec_System"))
-    with AnyWordSpecLike
-    with WithActorSystemShutDown
-    with Matchers {
+class BlockFetcherStateSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike with Matchers {
+
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
   lazy val validators = new MockValidatorsAlwaysSucceed
 

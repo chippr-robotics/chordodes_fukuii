@@ -3,11 +3,9 @@ package com.chipprbots.ethereum.network
 import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.stream.scaladsl.Sink
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -16,8 +14,6 @@ import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures
-import com.chipprbots.ethereum.NormalPatience
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
@@ -35,21 +31,17 @@ import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Ping
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Pong
 import com.chipprbots.ethereum.testing.Tags.*
 
-class PeerEventBusActorSpec
-    extends TestKit(ActorSystem("PeerEventBusActorSpec_System"))
-    with AnyFlatSpecLike
-    with WithActorSystemShutDown
-    with Matchers
-    with ScalaFutures
-    with NormalPatience {
+class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers with ScalaFutures {
+
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
   "PeerEventBusActor" should "relay messages received to subscribers" taggedAs (
     UnitTest,
     NetworkTest
   ) in new TestSetup {
 
-    val probe1: TestProbe = TestProbe()(system)
-    val probe2: TestProbe = TestProbe()(system)
+    val probe1: TestProbe = TestProbe()(classicSystem)
+    val probe2: TestProbe = TestProbe()(classicSystem)
     val classifier1: MessageClassifier = MessageClassifier(Set(Ping.code), PeerSelector.WithId(PeerId("1")))
     val classifier2: MessageClassifier = MessageClassifier(Set(Ping.code), PeerSelector.AllPeers)
     peerEventBusActor ! SubscribeCmd(classifier1, probe1.ref)
@@ -83,7 +75,7 @@ class PeerEventBusActorSpec
 
     // Sync: syncProbe subscribed after both stream SubscribeCmds (same test thread → FIFO).
     // Once syncProbe confirms both publishes, both stream actors have their elements buffered.
-    val syncProbe: TestProbe = TestProbe()(system)
+    val syncProbe: TestProbe = TestProbe()(classicSystem)
     peerEventBusActor ! SubscribeCmd(classifier2, syncProbe.ref)
 
     val msgFromPeer: MessageFromPeer = MessageFromPeer(Ping(), PeerId("1"))
@@ -291,7 +283,7 @@ class PeerEventBusActorSpec
 
   trait TestSetup {
     val peerEventBusActor: typed.ActorRef[PeerEventBusActor.Command] =
-      system.spawn(PeerEventBusActor.behavior(), s"pea-${java.util.UUID.randomUUID()}")
+      testKit.spawn(PeerEventBusActor.behavior(), s"pea-${java.util.UUID.randomUUID()}")
 
     val peerStatus: RemoteStatus = RemoteStatus(
       capability = Capability.ETH63,

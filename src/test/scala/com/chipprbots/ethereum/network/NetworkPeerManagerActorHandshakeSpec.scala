@@ -3,16 +3,14 @@ package com.chipprbots.ethereum.network
 import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.duration.*
 
 import org.bouncycastle.util.encoders.Hex
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
@@ -36,13 +34,9 @@ import com.chipprbots.ethereum.testing.Tags.*
 // observe Subscribe / Unsubscribe messages sent to the peerEventBus TestProbe rather
 // than inspecting internal state. This means the tests are robust to internal
 // refactors while still covering the critical paths.
-class NetworkPeerManagerActorHandshakeSpec
-    extends TestKit(ActorSystem("NetworkPeerManagerActorHandshakeSpec"))
-    with AnyFlatSpecLike
-    with Matchers
-    with BeforeAndAfterAll {
+class NetworkPeerManagerActorHandshakeSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
 
-  override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
   private val nodeIdHex = "aa" * 64
   private val nodeIdBytes = ByteString(Hex.decode(nodeIdHex))
@@ -67,7 +61,7 @@ class NetworkPeerManagerActorHandshakeSpec
   private def newNpma(): (ActorRef, TestProbe, TestProbe) = {
     val pm = TestProbe()
     val bus = TestProbe()
-    val ref = system
+    val ref = testKit
       .spawn(
         NetworkPeerManagerActor.behavior(
           pm.ref.toTyped[PeerManagerActor.Command],

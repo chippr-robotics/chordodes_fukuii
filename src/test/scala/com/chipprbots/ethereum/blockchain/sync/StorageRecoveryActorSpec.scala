@@ -1,9 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -13,7 +10,6 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncConfig
 import com.chipprbots.ethereum.blockchain.sync.snap.actors
 import com.chipprbots.ethereum.db.cache.LruCache
@@ -38,11 +34,12 @@ import com.chipprbots.ethereum.utils.Config
   *     of abandoning — so the resync can't get permanently wedged on a stale pivot. Bounded + falls back to abandon.
   */
 class StorageRecoveryActorSpec
-    extends TestKit(ActorSystem("StorageRecoveryActorSpec_System"))
+    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
     with AnyFlatSpecLike
-    with WithActorSystemShutDown
     with Matchers
     with Eventually {
+
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
   private val fakeStateRoot: ByteString = ByteString(Array.fill[Byte](32)(0x11))
   private val fakeAccountHash: ByteString = ByteString(Array.fill[Byte](32)(0x22))
@@ -80,10 +77,10 @@ class StorageRecoveryActorSpec
       coordinator: TestProbe,
       abandonAfter: FiniteDuration,
       maxRolls: Int = 8
-  ): (ActorRef, AppStateStorage) = {
+  ): (org.apache.pekko.actor.typed.ActorRef[StorageRecoveryActor.Command], AppStateStorage) = {
     val networkPeerManager = TestProbe(s"npm_$testLabel")
     val (stateStorage, appStateStorage, flatSlots) = newStorages()
-    val actor = system
+    val actor = testKit
       .spawn(
         StorageRecoveryActor.testApply(
           stateRoot = fakeStateRoot,
@@ -99,7 +96,6 @@ class StorageRecoveryActorSpec
         ),
         s"storage-recovery-spec-$testLabel"
       )
-      .toClassic
     // The actor enters `downloading` and immediately hands the missing list to the coordinator.
     coordinator.expectMsgType[actors.StorageRangeCoordinator.AddStorageTasks](2.seconds)
     (actor, appStateStorage)
@@ -122,7 +118,7 @@ class StorageRecoveryActorSpec
 
       syncController.expectMsg(3.seconds, StorageRecoveryActor.RecoveryComplete)
       appStateStorage.isStorageRecoveryDone() shouldBe true
-      system.stop(actor)
+      testKit.stop(actor)
     }
 
   it should "roll the download root onto the coordinator when SyncController supplies a recent root" taggedAs (
@@ -145,7 +141,7 @@ class StorageRecoveryActorSpec
     // The roll cancelled the abandon timer → no RecoveryComplete follows.
     syncController.expectNoMessage(1.second)
     appStateStorage.isStorageRecoveryDone() shouldBe false
-    system.stop(actor)
+    testKit.stop(actor)
   }
 
   it should "not roll when the recent root equals the current download root, and still abandon" taggedAs (
@@ -166,7 +162,7 @@ class StorageRecoveryActorSpec
     // Abandon timer (armed on the unservable) still fires.
     syncController.expectMsg(2.seconds, StorageRecoveryActor.RecoveryComplete)
     appStateStorage.isStorageRecoveryDone() shouldBe true
-    system.stop(actor)
+    testKit.stop(actor)
   }
 
   it should "stop requesting rolls after maxRootRolls and fall back to abandon" taggedAs (
@@ -185,7 +181,7 @@ class StorageRecoveryActorSpec
 
     actor ! pivotUnservable() // still unservable, but the single roll is spent → no new request
     syncController.expectMsg(3.seconds, StorageRecoveryActor.RecoveryComplete) // abandons the residue
-    system.stop(actor)
+    testKit.stop(actor)
   }
 
   it should "NOT abandon if slot progress arrives between unservable events" taggedAs (
@@ -211,6 +207,6 @@ class StorageRecoveryActorSpec
     // after progress, so abandon is still pending — we only assert it did not PREMATURELY fire.
     syncController.expectNoMessage((abandonAfter.toMillis / 2).millis)
     appStateStorage.isStorageRecoveryDone() shouldBe false
-    system.stop(actor)
+    testKit.stop(actor)
   }
 }

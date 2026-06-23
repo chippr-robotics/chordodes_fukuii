@@ -4,18 +4,15 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicReference
 
-import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.io.Tcp
-import org.apache.pekko.testkit.ImplicitSender
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 
-import scala.concurrent.duration.*
-
-import org.scalatest.BeforeAndAfterAll
+import org.scalatest.concurrent.Eventually
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.time.SpanSugar.*
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist
 import com.chipprbots.ethereum.blockchain.sync.CacheBasedBlacklist
@@ -23,14 +20,9 @@ import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.NodeStatus
 import com.chipprbots.ethereum.utils.ServerStatus
 
-class ServerActorSpec
-    extends TestKit(ActorSystem("ServerActorSpec"))
-    with ImplicitSender
-    with AnyFlatSpecLike
-    with Matchers
-    with BeforeAndAfterAll {
+class ServerActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers with Eventually {
 
-  override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
   private val keyPair = com.chipprbots.ethereum.crypto.generateKeyPair(new java.security.SecureRandom)
 
@@ -47,7 +39,7 @@ class ServerActorSpec
     val pm = TestProbe()
     // TCP probe absorbs the Bind request so no real socket binding happens.
     val tcpProbe = TestProbe()
-    val actor = system.spawn(ServerActor.testApply(holder, pm.ref, blacklist, tcpProbe.ref), "server-test-1")
+    val actor = testKit.spawn(ServerActor.testApply(holder, pm.ref, blacklist, tcpProbe.ref), "server-test-1")
 
     val explicit = InetAddress.getByName("1.2.3.4")
     val localAddr = new InetSocketAddress("0.0.0.0", 30303)
@@ -56,12 +48,12 @@ class ServerActorSpec
     val bindHandler = tcpProbe.expectMsgType[Tcp.Bind].handler
     bindHandler ! Tcp.Bound(localAddr)
 
-    awaitCond(
-      holder.get().serverStatus.isInstanceOf[ServerStatus.Listening],
-      max = 1.second,
-      interval = 50.millis,
-      message = "ServerStatus should have transitioned to Listening"
-    )
+    eventually(timeout(1.second), interval(50.millis)) {
+      assert(
+        holder.get().serverStatus.isInstanceOf[ServerStatus.Listening],
+        "ServerStatus should have transitioned to Listening"
+      )
+    }
     holder.get().serverStatus match {
       case ServerStatus.Listening(address) => address.getAddress shouldBe explicit
       case other                           => fail(s"Expected Listening, got $other")
@@ -75,7 +67,7 @@ class ServerActorSpec
     val holder = freshHolder()
     val pm = TestProbe()
     val tcpProbe = TestProbe()
-    val actor = system.spawn(ServerActor.testApply(holder, pm.ref, blacklist, tcpProbe.ref), "server-test-2")
+    val actor = testKit.spawn(ServerActor.testApply(holder, pm.ref, blacklist, tcpProbe.ref), "server-test-2")
 
     val localAddr = new InetSocketAddress("0.0.0.0", 30304)
     val detectedIp = InetAddress.getByName("5.6.7.8")
@@ -90,12 +82,12 @@ class ServerActorSpec
     // Simulate the Future result returning from the async IP detection
     actor ! ServerActor.DetectedIP(Some(detectedIp))
 
-    awaitCond(
-      holder.get().serverStatus.isInstanceOf[ServerStatus.Listening],
-      max = 2.seconds,
-      interval = 50.millis,
-      message = "ServerStatus should reach Listening after DetectedIP"
-    )
+    eventually(timeout(2.seconds), interval(50.millis)) {
+      assert(
+        holder.get().serverStatus.isInstanceOf[ServerStatus.Listening],
+        "ServerStatus should reach Listening after DetectedIP"
+      )
+    }
     holder.get().serverStatus match {
       case ServerStatus.Listening(address) => address.getAddress shouldBe detectedIp
       case other                           => fail(s"Expected Listening, got $other")
@@ -106,7 +98,7 @@ class ServerActorSpec
     val holder = freshHolder()
     val pm = TestProbe()
     val tcpProbe = TestProbe()
-    val actor = system.spawn(ServerActor.testApply(holder, pm.ref, blacklist, tcpProbe.ref), "server-test-3")
+    val actor = testKit.spawn(ServerActor.testApply(holder, pm.ref, blacklist, tcpProbe.ref), "server-test-3")
 
     val localAddr = new InetSocketAddress("0.0.0.0", 30305)
     actor ! ServerActor.StartServer(localAddr, None)
@@ -115,12 +107,12 @@ class ServerActorSpec
     actor ! ServerActor.TcpBound(localAddr)
     actor ! ServerActor.DetectedIP(None)
 
-    awaitCond(
-      holder.get().serverStatus.isInstanceOf[ServerStatus.Listening],
-      max = 2.seconds,
-      interval = 50.millis,
-      message = "ServerStatus should reach Listening (loopback) after DetectedIP(None)"
-    )
+    eventually(timeout(2.seconds), interval(50.millis)) {
+      assert(
+        holder.get().serverStatus.isInstanceOf[ServerStatus.Listening],
+        "ServerStatus should reach Listening (loopback) after DetectedIP(None)"
+      )
+    }
     holder.get().serverStatus match {
       case ServerStatus.Listening(address) => address.getAddress shouldBe InetAddress.getLoopbackAddress
       case other                           => fail(s"Expected Listening, got $other")

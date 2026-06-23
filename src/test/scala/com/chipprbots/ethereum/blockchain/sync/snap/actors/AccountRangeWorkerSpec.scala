@@ -1,15 +1,11 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.testkit.ImplicitSender
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.duration.*
 
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
@@ -22,14 +18,9 @@ import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetAccountRange.GetAcco
 import com.chipprbots.ethereum.testing.PeerTestHelpers
 import com.chipprbots.ethereum.testing.Tags.*
 
-class AccountRangeWorkerSpec
-    extends TestKit(ActorSystem("AccountRangeWorkerSpec"))
-    with ImplicitSender
-    with AnyFlatSpecLike
-    with Matchers
-    with BeforeAndAfterAll {
+class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
 
-  override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
   private val zeroHash = ByteString(new Array[Byte](32))
   private val maxHash = ByteString(Array.fill(32)(0xff.toByte))
@@ -48,8 +39,8 @@ class AccountRangeWorkerSpec
       coordinator: TestProbe,
       networkPeerManager: TestProbe
   ): org.apache.pekko.actor.typed.ActorRef[AccountRangeWorker.Command] = {
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
-    system.spawnAnonymous(
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
+    testKit.spawn(
       AccountRangeWorker(coordinator.ref, networkPeerManager.ref, requestTracker)
     )
   }

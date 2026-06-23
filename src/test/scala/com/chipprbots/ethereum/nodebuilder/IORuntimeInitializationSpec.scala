@@ -1,14 +1,12 @@
 package com.chipprbots.ethereum.nodebuilder
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
 
 import scala.concurrent.duration.*
 
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
@@ -24,14 +22,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   * mixed together. Making it `implicit lazy val` ensures it's initialized only when first accessed, avoiding null
   * pointer exceptions.
   */
-class IORuntimeInitializationSpec
-    extends TestKit(ActorSystem("IORuntimeInitializationSpec"))
-    with AnyFlatSpecLike
-    with Matchers
-    with BeforeAndAfterAll {
-
-  override def afterAll(): Unit =
-    TestKit.shutdownActorSystem(system)
+class IORuntimeInitializationSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
 
   behavior.of("IORuntime initialization in NodeBuilder traits")
 

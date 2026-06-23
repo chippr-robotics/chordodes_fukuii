@@ -3,18 +3,14 @@ package com.chipprbots.ethereum.blockchain.sync
 import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import cats.data.NonEmptyList
 
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
-import org.scalatest.matchers.must.Matchers
 
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.fast.DownloaderState
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.SyncResponse
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateSchedulerActor.NoUsefulDataInResponse
@@ -27,12 +23,9 @@ import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NodeData
 import com.chipprbots.ethereum.testing.Tags.*
 
-class SyncStateDownloaderStateSpec
-    extends TestKit(ActorSystem("SyncStateDownloaderStateSpec_System"))
-    with AnyFlatSpecLike
-    with Matchers
-    with BeforeAndAfterAll
-    with WithActorSystemShutDown {
+class SyncStateDownloaderStateSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike {
+
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
   "DownloaderState" should "schedule requests for retrieval" taggedAs (UnitTest, SyncTest) in new TestSetup {
     val newState: DownloaderState = initialState.scheduleNewNodesForRetrieval(potentialNodesHashes)

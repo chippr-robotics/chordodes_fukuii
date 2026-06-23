@@ -1,8 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -11,7 +9,6 @@ import scala.concurrent.duration.*
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.WithActorSystemShutDown
 import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncConfig
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.db.dataSource.EphemDataSource
@@ -28,10 +25,11 @@ import com.chipprbots.ethereum.testing.Tags.*
   * underlying scanner computes them — so the controller can drive the downloads.
   */
 class CombinedRecoveryScanActorSpec
-    extends TestKit(ActorSystem("CombinedRecoveryScanActorSpec_System"))
+    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
     with AnyFlatSpecLike
-    with WithActorSystemShutDown
     with Matchers {
+
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
   private def fixtures()
       : (StateStorage, EvmCodeStorage, AppStateStorage, ByteString, Set[ByteString], Set[ByteString]) = {
@@ -83,7 +81,7 @@ class CombinedRecoveryScanActorSpec
     val (stateStorage, evm, appState, root, expectedCode, expectedStorageRoots) = fixtures()
     val parent = TestProbe("parent")
 
-    system.spawn(
+    testKit.spawn(
       CombinedRecoveryScanActor(
         stateRoot = root,
         stateStorage = stateStorage,
