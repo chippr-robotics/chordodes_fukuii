@@ -1,3 +1,4 @@
+// §8a-retro batch 5: DEFERRED — TestActorRef requires Classic-only API; migrate when PeerActor is Typed (Wave 3 network sprint)
 package com.chipprbots.ethereum.network.p2p
 
 import java.net.InetSocketAddress

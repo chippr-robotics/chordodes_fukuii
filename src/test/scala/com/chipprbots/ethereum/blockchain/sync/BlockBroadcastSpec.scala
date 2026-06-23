@@ -4,7 +4,6 @@ import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 
 import org.scalatest.flatspec.AnyFlatSpecLike
@@ -592,44 +591,47 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     SyncTest
   ) in {
     // Both PoW and PoS configurations must send NewBlock to ETH68 peers
-    for isPoW <- Seq(true, false) do
-      new TestKit(ActorSystem(s"BlockBroadcastSpec_eth68_$isPoW")) {
-        val pm: TestProbe = TestProbe()
-        val bb = new BlockBroadcast(pm.ref, isPoWChain = isPoW)
+    for isPoW <- Seq(true, false) do {
+      val pm: TestProbe = TestProbe()(testKit.system.classicSystem)
+      val bb = new BlockBroadcast(pm.ref, isPoWChain = isPoW)
 
-        val blockHeader: BlockHeader = Fixtures.Blocks.Block3125369.header.copy(number = BigInt(1001))
-        val ourWeight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt(99999))
-        val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
+      val blockHeader: BlockHeader = Fixtures.Blocks.Block3125369.header.copy(number = BigInt(1001))
+      val ourWeight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt(99999))
+      val block: Block = Block(blockHeader, BlockBody(Nil, Nil))
 
-        val eth68Status: RemoteStatus = RemoteStatus(
-          capability = Capability.ETH68,
-          networkId = 1,
-          chainWeight = ChainWeight.totalDifficultyOnly(BigInt(1000)),
-          bestHash = Fixtures.Blocks.Block3125369.header.hash,
-          genesisHash = Fixtures.Blocks.Genesis.header.hash
+      val eth68Status: RemoteStatus = RemoteStatus(
+        capability = Capability.ETH68,
+        networkId = 1,
+        chainWeight = ChainWeight.totalDifficultyOnly(BigInt(1000)),
+        bestHash = Fixtures.Blocks.Block3125369.header.hash,
+        genesisHash = Fixtures.Blocks.Genesis.header.hash
+      )
+      val eth68PeerInfo: PeerInfo = PeerInfo(
+        remoteStatus = eth68Status,
+        chainWeight = eth68Status.chainWeight,
+        forkAccepted = true,
+        maxBlockNumber = BigInt(1000),
+        bestBlockHash = eth68Status.bestHash
+      )
+      val p: Peer =
+        Peer(
+          PeerId(s"eth68peer-$isPoW"),
+          new java.net.InetSocketAddress("127.0.0.1", 0),
+          TestProbe()(testKit.system.classicSystem).ref,
+          false
         )
-        val eth68PeerInfo: PeerInfo = PeerInfo(
-          remoteStatus = eth68Status,
-          chainWeight = eth68Status.chainWeight,
-          forkAccepted = true,
-          maxBlockNumber = BigInt(1000),
-          bestBlockHash = eth68Status.bestHash
-        )
-        val p: Peer =
-          Peer(PeerId(s"eth68peer-$isPoW"), new java.net.InetSocketAddress("127.0.0.1", 0), TestProbe().ref, false)
 
-        bb.broadcastBlock(BlockToBroadcast(block, ourWeight), Map(p.id -> PeerWithInfo(p, eth68PeerInfo)))
+      bb.broadcastBlock(BlockToBroadcast(block, ourWeight), Map(p.id -> PeerWithInfo(p, eth68PeerInfo)))
 
-        import scala.concurrent.duration.*
-        val messages: Seq[AnyRef] = pm.receiveN(2, 3.seconds)
-        val hasNewBlock: Boolean = messages.exists {
-          case NetworkPeerManagerActor.SendMessage(msg, _) => msg.underlyingMsg.isInstanceOf[ETHPackets.NewBlock]
-          case _                                           => false
-        }
-        hasNewBlock shouldBe true // ETH68 always gets NewBlock
-        pm.expectNoMessage()
-        TestKit.shutdownActorSystem(system)
+      import scala.concurrent.duration.*
+      val messages: Seq[AnyRef] = pm.receiveN(2, 3.seconds)
+      val hasNewBlock: Boolean = messages.exists {
+        case NetworkPeerManagerActor.SendMessage(msg, _) => msg.underlyingMsg.isInstanceOf[ETHPackets.NewBlock]
+        case _                                           => false
       }
+      hasNewBlock shouldBe true // ETH68 always gets NewBlock
+      pm.expectNoMessage()
+    }
   }
 
   it should "NEVER send BRU to ETH68 peer (BRU is ETH69-only)" taggedAs (
@@ -658,7 +660,7 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
 
   // -------------------------------------------------------------------------
 
-  class TestSetup(implicit system: ActorSystem) {
+  class TestSetup(implicit system: org.apache.pekko.actor.ActorSystem) {
     val networkPeerManagerProbe: TestProbe = TestProbe()
 
     val blockBroadcast = new BlockBroadcast(networkPeerManagerProbe.ref, isPoWChain = true)
@@ -704,7 +706,7 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
   }
 
   /** Same as TestSetup but with isPoWChain=false (PoS / ETH / Sepolia). */
-  class PoSTestSetup(implicit system: ActorSystem) extends TestSetup {
+  class PoSTestSetup(implicit system: org.apache.pekko.actor.ActorSystem) extends TestSetup {
     override val blockBroadcast = new BlockBroadcast(networkPeerManagerProbe.ref, isPoWChain = false)
   }
 }

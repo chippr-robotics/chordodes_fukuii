@@ -2,23 +2,21 @@ package com.chipprbots.ethereum.transactions
 
 import java.net.InetSocketAddress
 
-import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.duration.*
 
+import com.typesafe.config.ConfigFactory
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair
-import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.NormalPatience
 import com.chipprbots.ethereum.Timeouts
 import com.chipprbots.ethereum.consensus.eip1559.BaseFeeCalculator
 import com.chipprbots.ethereum.crypto
@@ -153,27 +151,11 @@ import com.chipprbots.ethereum.utils.TxPoolConfig
   */
 
 class PendingTransactionsManagerSpec
-    extends AnyFlatSpec
+    extends ScalaTestWithActorTestKit(ConfigFactory.load())
+    with AnyFlatSpecLike
     with Matchers
     with ScalaFutures
-    with Eventually
-    with BeforeAndAfterEach
-    with NormalPatience {
-
-  // Track all actor systems created during tests for cleanup (ADR-017)
-  private var actorSystems: List[ActorSystem] = List.empty
-
-  override def afterEach(): Unit = {
-    // Shutdown all actor systems to prevent hanging tests
-    actorSystems.foreach { as =>
-      try
-        TestKit.shutdownActorSystem(as, verifySystemShutdown = false)
-      catch {
-        case _: Exception => // Ignore errors during cleanup
-      }
-    }
-    actorSystems = List.empty
-  }
+    with Eventually {
 
   "PendingTransactionsManager" should "store pending transactions received from peers" taggedAs (UnitTest) in new TestSetup {
     val msg: Set[SignedTransactionWithSender] = (1 to 10).map(e => newStx(e)).toSet
@@ -374,7 +356,7 @@ class PendingTransactionsManagerSpec
       override val pendingTxManagerQueryTimeout: FiniteDuration = Timeouts.veryLongTimeout
     }
 
-    override val pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[Command] = system.spawn(
+    override val pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[Command] = testKit.spawn(
       PendingTransactionsManager(txPoolConfig, peerManager.ref, etcPeerManager.ref, peerMessageBus.ref, pendingTxTopic),
       s"ptm-test-timeout-${java.util.UUID.randomUUID()}"
     )
@@ -563,7 +545,7 @@ class PendingTransactionsManagerSpec
         override def getBestBlock: Option[Block] = Some(blockWithBaseFee)
       }
 
-    override val pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[Command] = system.spawn(
+    override val pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[Command] = testKit.spawn(
       PendingTransactionsManager(
         txPoolConfig,
         peerManager.ref,
@@ -585,11 +567,7 @@ class PendingTransactionsManagerSpec
   }
 
   trait TestSetup extends SecureRandomBuilder {
-    implicit val system: ActorSystem = {
-      val as = ActorSystem("PendingTransactionsManagerSpec_System")
-      actorSystems = as :: actorSystems
-      as
-    }
+    implicit val classicSystem: org.apache.pekko.actor.ActorSystem = testKit.system.classicSystem
 
     val keyPair1: AsymmetricCipherKeyPair = crypto.generateKeyPair(secureRandom)
     val keyPair2: AsymmetricCipherKeyPair = crypto.generateKeyPair(secureRandom)
@@ -619,7 +597,7 @@ class PendingTransactionsManagerSpec
       override val getTransactionFromPoolTimeout: FiniteDuration = Timeouts.veryLongTimeout
     }
 
-    implicit lazy val typedScheduler: org.apache.pekko.actor.typed.Scheduler = system.toTyped.scheduler
+    implicit lazy val typedScheduler: org.apache.pekko.actor.typed.Scheduler = testKit.system.scheduler
     implicit val askTimeout: org.apache.pekko.util.Timeout = org.apache.pekko.util.Timeout(Timeouts.veryLongTimeout)
 
     val peerManager: TestProbe = TestProbe()
@@ -627,13 +605,13 @@ class PendingTransactionsManagerSpec
     val peerMessageBus: TestProbe = TestProbe()
     val pendingTxTopic: org.apache.pekko.actor.typed.ActorRef[
       org.apache.pekko.actor.typed.pubsub.Topic.Command[com.chipprbots.ethereum.jsonrpc.NewPendingTransaction]
-    ] = system.spawn(
+    ] = testKit.spawn(
       org.apache.pekko.actor.typed.pubsub.Topic[com.chipprbots.ethereum.jsonrpc.NewPendingTransaction](
         "pending-tx-topic"
       ),
       s"pending-tx-topic-${java.util.UUID.randomUUID()}"
     )
-    val pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[Command] = system.spawn(
+    val pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[Command] = testKit.spawn(
       PendingTransactionsManager(txPoolConfig, peerManager.ref, etcPeerManager.ref, peerMessageBus.ref, pendingTxTopic),
       s"ptm-test-${java.util.UUID.randomUUID()}"
     )

@@ -1,3 +1,4 @@
+// §8a-retro batch 5: DEFERRED — Resource[IO, ActorSystem] lifecycle is load-bearing; migrate when RegularSync is Typed (Wave 3)
 package com.chipprbots.ethereum.blockchain.sync.regular
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef

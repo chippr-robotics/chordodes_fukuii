@@ -1,3 +1,5 @@
+// §8a-retro batch 5: DEFERRED — TestActorRef used for .children inspection (Classic-only API);
+// migrate when SyncController test no longer needs child inspection (Wave 3 network sprint)
 package com.chipprbots.ethereum.blockchain.sync
 
 import org.apache.pekko.actor.ActorSystem

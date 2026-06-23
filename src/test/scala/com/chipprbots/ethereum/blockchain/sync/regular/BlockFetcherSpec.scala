@@ -1,18 +1,17 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 
 import java.net.InetSocketAddress
+import java.util.UUID
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.*
 
-import org.scalatest.BeforeAndAfterEach
+import com.typesafe.config.ConfigFactory
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 
@@ -37,30 +36,19 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.MessageClassifier
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.Codes
-import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockRangeUpdate
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
+import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockRangeUpdate
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
 import com.chipprbots.ethereum.security.SecureRandomBuilder
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
-class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfterEach with SecureRandomBuilder {
-
-  // Track all actor systems created during tests for cleanup
-  private var actorSystems: List[ActorSystem] = List.empty
-
-  override def afterEach(): Unit = {
-    // Shutdown all actor systems to prevent hanging tests
-    actorSystems.foreach { as =>
-      try
-        TestKit.shutdownActorSystem(as, verifySystemShutdown = false)
-      catch {
-        case _: Exception => // Ignore errors during cleanup
-      }
-    }
-    actorSystems = List.empty
-  }
+class BlockFetcherSpec
+    extends ScalaTestWithActorTestKit(ConfigFactory.load())
+    with AnyFreeSpecLike
+    with Matchers
+    with SecureRandomBuilder {
 
   "BlockFetcher" - {
 
@@ -99,7 +87,7 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
       peersClient.expectMsgPF() {
         case PeersClient.Request(msg: ETHPackets.GetBlockHeaders, _, _, _) if msg.block == Left(1) => ()
       }
-      shutdownActorSystem()
+      testKit.stop(blockFetcher)
     }
 
     "should not requests headers upon invalidation while a request is already in progress, should resume after failure in response" in new TestSetup {
@@ -127,7 +115,7 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
       peersClient.expectMsgPF() {
         case PeersClient.Request(msg: ETHPackets.GetBlockHeaders, _, _, _) if msg.block == Left(1) => ()
       }
-      shutdownActorSystem()
+      testKit.stop(blockFetcher)
     }
 
     "should not enqueue requested blocks if the received bodies do not match" in new TestSetup {
@@ -150,7 +138,7 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
       // Fetcher should not enqueue any new block
       importer.send(blockFetcher.toClassic, PickBlocks(syncConfig.blocksBatchSize, importer.ref))
       importer.expectNoMessage(100.millis)
-      shutdownActorSystem()
+      testKit.stop(blockFetcher)
     }
 
     "should be able to handle block bodies received in several parts" in new TestSetup {
@@ -182,7 +170,7 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
       secondBodiesReplyTo ! PeersClient.Response(fakePeer, getBlockBodiesResponse2)
 
       // We need to wait a while in order to allow fetcher to process all the blocks
-      as.scheduler.scheduleOnce(Timeouts.shortTimeout) {
+      testKit.system.classicSystem.scheduler.scheduleOnce(Timeouts.shortTimeout) {
         // Fetcher should enqueue all the received blocks
         importer.send(blockFetcher.toClassic, PickBlocks(firstBlocksBatch.size, importer.ref))
       }
@@ -190,7 +178,7 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
       importer.expectMsgPF() { case BlockFetcher.PickedBlocks(blocks) =>
         blocks.map(_.hash).toList shouldEqual firstBlocksBatch.map(_.hash)
       }
-      shutdownActorSystem()
+      testKit.stop(blockFetcher)
     }
 
     "should stop requesting, without blacklist the peer, in case empty bodies are received" in new TestSetup {
@@ -224,7 +212,7 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
       importer.expectMsgPF() { case BlockFetcher.PickedBlocks(blocks) =>
         blocks.map(_.hash).toList shouldEqual subChain1.map(_.hash)
       }
-      shutdownActorSystem()
+      testKit.stop(blockFetcher)
     }
 
     "should ensure blocks passed to importer are always forming chain" in new TestSetup {
@@ -279,7 +267,7 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
         val headers = blocks.map(_.header).toList
         assert(HeadersSeq.areChain(headers))
       }
-      shutdownActorSystem()
+      testKit.stop(blockFetcher)
     }
 
     // BF-1A: ETH/69 head-following via BlockRangeUpdate
@@ -291,7 +279,7 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
           codes should contain(Codes.BlockRangeUpdateCode)
         case _ => fail("Expected MessageClassifier subscription")
       }
-      shutdownActorSystem()
+      testKit.stop(blockFetcher)
     }
 
     "should request headers when BlockRangeUpdate announces a new chain tip" taggedAs (
@@ -306,7 +294,7 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
       peersClient.expectMsgPF() {
         case PeersClient.Request(msg: ETHPackets.GetBlockHeaders, _, _, _) if msg.block == Left(1) => ()
       }
-      shutdownActorSystem()
+      testKit.stop(blockFetcher)
     }
 
     // BF-1B: PrintStatus heartbeat probes for next block when on top
@@ -341,7 +329,7 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
       peersClient.fishForSpecificMessage() {
         case PeersClient.Request(msg: ETHPackets.GetBlockHeaders, _, _, _) if msg.block == Left(BigInt(7)) => true
       }
-      shutdownActorSystem()
+      testKit.stop(blockFetcher)
     }
 
     // BF-2: partial header batch still advances nextBlockToFetch correctly
@@ -363,7 +351,7 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
       peersClient.fishForSpecificMessage() {
         case PeersClient.Request(msg: ETHPackets.GetBlockHeaders, _, _, _) if msg.block == Left(6) => true
       }
-      shutdownActorSystem()
+      testKit.stop(blockFetcher)
     }
 
     "should properly handle a request timeout" in new TestSetup {
@@ -385,22 +373,15 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
       peersClient.expectMsgPF(syncConfig.peerResponseTimeout + 5.seconds) {
         case PeersClient.Request(msg: ETHPackets.GetBlockHeaders, _, _, _) if msg.block == Left(1) => ()
       }
-      shutdownActorSystem()
+      testKit.stop(blockFetcher)
     }
   }
 
   trait TestSetup extends TestSyncConfig {
-    val as: ActorSystem = {
-      val system = ActorSystem("BlockFetcherSpec_System")
-      actorSystems = system :: actorSystems
-      system
-    }
-    val atks: ActorTestKit = ActorTestKit(as.toTyped)
-
-    val peersClient: TestProbe = TestProbe()(as)
-    val peerEventBus: TestProbe = TestProbe()(as)
-    val importer: TestProbe = TestProbe()(as)
-    val regularSync: TestProbe = TestProbe()(as)
+    val peersClient: TestProbe = TestProbe()(testKit.system.classicSystem)
+    val peerEventBus: TestProbe = TestProbe()(testKit.system.classicSystem)
+    val importer: TestProbe = TestProbe()(testKit.system.classicSystem)
+    val regularSync: TestProbe = TestProbe()(testKit.system.classicSystem)
 
     lazy val validators = new MockValidatorsAlwaysSucceed
 
@@ -413,17 +394,18 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
       peerResponseTimeout = 5.minutes
     )
 
-    val fakePeerActor: TestProbe = TestProbe()(as)
+    val fakePeerActor: TestProbe = TestProbe()(testKit.system.classicSystem)
     val fakePeer: Peer = Peer(PeerId("fakePeer"), new InetSocketAddress("127.0.0.1", 9000), fakePeerActor.ref, false)
 
-    lazy val blockFetcher: ActorRef[BlockFetcher.FetchCommand] = atks.spawn(
+    lazy val blockFetcher: ActorRef[BlockFetcher.FetchCommand] = testKit.spawn(
       BlockFetcher(
         peersClient.ref.toTyped[PeersClient.Command],
         peerEventBus.ref,
         regularSync.ref,
         syncConfig,
         validators.blockValidator
-      )
+      ),
+      s"blockFetcher-${UUID.randomUUID()}"
     )
 
     def startFetcher(fromBlock: BigInt = 0): Unit = {
@@ -433,11 +415,6 @@ class BlockFetcherSpec extends AnyFreeSpecLike with Matchers with BeforeAndAfter
         Set(Codes.NewBlockCode, Codes.NewBlockHashesCode, Codes.BlockHeadersCode, Codes.BlockRangeUpdateCode),
         PeerSelector.AllPeers
       )
-    }
-
-    def shutdownActorSystem(): Unit = {
-      atks.shutdownTestKit()
-      TestKit.shutdownActorSystem(as, verifySystemShutdown = true)
     }
 
     // Sending a far away block as a NewBlock message
