@@ -51,8 +51,15 @@
 
 ---
 
+#### `86c76fd4e` — P9: re-enabled RegularSyncSpec:522 "retry fetching node if validation failed"
+- **What:** Removed `DisabledTest` tag. Test uses `WrongNodeDataPeersClientAutoPilot` (no ScalaMock) — passed as-is; tag was the only blocker.
+- **Deferred:** `RegularSyncSpec:552` "save fetched node" — ScalaMock `stub[BranchResolution]` never intercepts under Scala 3; replace with anonymous class double → §P9-SAVENODE (DEFERRED-BACKLOG Part 15)
+
+---
+
 ## Open / Deferred
 
 - INFO-13/14: Classic `LoggingAdapter` via `Logging(ctx.system.classicSystem, ...)` bridge — Network/P2P sprint
 - `RegularSync.scala:228`: `log.warning(...)` Classic spelling → `log.warn(...)` — Network/P2P sprint
 - RegularSyncSpec divergence path EXCEPT (LCA-less blind rewind) — HERALD audit done; fix spec deferred
+- §P9-SAVENODE: RegularSyncSpec:552 ScalaMock stub → anonymous class double (DEFERRED-BACKLOG Part 15)

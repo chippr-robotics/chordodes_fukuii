@@ -46,8 +46,23 @@
 
 ---
 
+#### `86c76fd4e` — P9: re-enabled SyncControllerSpec:434 "re-enqueue block bodies when empty response received"
+- **What:** Added `RegisterChainWeightCalibrationTarget` and `CalibrateChainWeightNow` no-op handlers to `SyncStateAutoPilot`. SyncController started sending these messages after RegularSync integration work; their absence caused `MatchError` crashes that blocked this test. Test-only change.
+- **Verification:** Test passes; no regressions in `testOnly *SyncControllerSpec*`
+
+#### Known production bug — `handleRegularSyncMsg` catch-all (fix pending in F7/P10)
+- **Location:** `SyncController.scala:895-897`
+- **What:** `handleRegularSyncMsg` forwards all unhandled messages to RegularSync via `regularSync.tell(msg, ctx.toClassic.sender())`. When `FastSync.Done` arrives late (after `syncSwitchDelay = 0.5s`, after SyncController has transitioned to `runningRegularSync`), it hits this catch-all and crashes RegularSync with `ClassCastException: FastSync$Done$ cannot be cast to RegularSyncCommand`.
+- **Root cause of:** "start state download" FlakyTest in `SyncControllerSpec`
+- **Fix:** Add `case FastSync.Done => Behaviors.same` guard before the catch-all
+- **Status:** In P10 prompt (DEFERRED-BACKLOG Part 11 §P10), committed as part of F7
+
+---
+
 ## Open / Deferred
 
 - W4: `ctx.self ! cmd` re-delivers wrapped Command (document invariant) — deferred
 - W15: `unwrap returns Any` — Wave 3 LOOM gate (`WrappedExternal` elimination)
 - INFO-9: `GetHandshakedPeersCmd.replyTo: ActorRef` untyped — Network/P2P sprint
+- §P9-NOTCHANGE: SyncControllerSpec:243 — prhResultAdapter injection path rewrite (DEFERRED-BACKLOG Part 15)
+- `handleRegularSyncMsg:895-897` catch-all `FastSync.Done` bug — P10/F7 pending

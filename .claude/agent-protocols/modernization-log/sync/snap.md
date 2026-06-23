@@ -51,8 +51,22 @@
 
 ---
 
+#### `5eae34c21` — §8a-retro batch 4: coordinator/heal specs → ActorTestKit (135 tests)
+- **What:** Migrated 15 test files from Pekko Classic `TestKit` to `ScalaTestWithActorTestKit`. Root cause fixed: `HealingTrieFixtures.coordinatorProps` returned `Props` via `PropsAdapter`; under `ActorTestKitGuardian`, stopping the bridge sent classic `StopChild` to the guardian (which only accepts `TestKitCommand`) → `ClassCastException` → whole-system shutdown cascade across all 14 specs. Fix: replaced `coordinatorProps(...): Props` with `spawnCoordinator(...)(implicit testKit: ActorTestKit): ActorRef[Command]` via `testKit.spawn`.
+- **Specs migrated:** `HealingTrieFixtures` (shared fixture); `AccountRangeCoordinatorSpec`, `ByteCodeCoordinatorSpec`, `StorageRangeCoordinatorSpec`, `TrieNodeHealingCoordinatorSpec` (4 direct coordinator specs); `DecoupledHealObservabilitySpec`, `DecoupledHealSafetySpec`, `DecoupledHealServeRootSpec`, `ScopedVerificationObservabilitySpec`, `ScopedVerificationParitySpec`, `ScopedVerificationFallbackSpec`, `TrieNodeHealingScopedVerificationSpec`, `TrieNodeHealingScopeCaptureSpec`, `HealingFrontierResumeSpec`, `RebuildFrontierBfsMultiSeedSpec` (10 heal family specs)
+- **Verification:** 135 tests, 0 failures; `sbt compile-all` clean
+- **Workaround still in place:** `ScalaTestWithActorTestKit(ConfigFactory.load())` — proper fix is E5b (`application-test.conf`)
+- **Deferred:** ~209 E165 `TestProbe()` sites (unnarrowed classic probes) → E5d; worker teardown audit → E5c
+- **New pitfalls documented:** pekko-typed-api.md P14 (bare ctor config), P15 (`testKit.stop` no-op for classic workers)
+- **Cross-refs:** `node/testing-infra.md` (E5b/E5c/E5d)
+
+---
+
 ## Open / Deferred
 
 - INFO-8: `refreshFreshRootCache` function no longer exists in SNAPSyncController (searched 2026-06-22, 0 results). `getBlockHeaderByNumber` has 7 scattered call sites, none in a tight loop. No run-logs available. Marking MONITORED — no action needed.
 - 36 `return` statements in SNAPSyncController (§8e ratchet — up from 33 at last audit; 3 new returns added since previous count)
 - Wave 3 SNAP servo is the primary next network migration sprint target
+- E5b: create `application-test.conf` (bare ctor fix — DEFERRED-BACKLOG Part 8)
+- E5c: worker teardown leak audit (DEFERRED-BACKLOG Part 8)
+- E5d: E165 TestProbe narrowing ~209 sites (DEFERRED-BACKLOG Part 8 — after E5b)

@@ -653,60 +653,192 @@ were not converted: address in a dedicated test-cleanup sprint (8a-retro).
 
 ---
 
-#### §8a-retro batch 4 — LOOM: coordinator/heal specs (PropsAdapter fixture fix)
+#### §8a-infra — Create `application-test.conf` so bare `ScalaTestWithActorTestKit()` ctor works
 
-**Agent:** LOOM (test migration)
-**Risk:** LOW — test files and shared test fixture only; no production code changed
-**Prerequisite:** None on production code. The coordinator behaviors are already Typed — the blocker is the test fixture.
-**Gate:** Can run any time after batch 3. Recommend running before Wave 3 network sprint to reduce the E165 floor (these 4 files alone account for 187 of the 777 untyped `TestProbe` sites).
+**Agent:** Any (trivial — one new file)
+**Risk:** NONE — test-only resource file, no production code, no existing file replaced
+**Prerequisite:** None
+**Gate:** Run any time. Unblocks removing `ConfigFactory.load()` from all migrated specs.
 
-**Root cause (batch 3 discovery):**
-`HealingTrieFixtures.coordinatorProps` returns `Props` via `PropsAdapter`. Specs call `system.actorOf(props)` to spawn coordinators. Under the Typed `ActorTestKitGuardian`, when the PropsAdapter bridge actor stops a child it sends classic `StopChild` to the guardian which only accepts `TestKitCommand` → `ClassCastException` → whole-system shutdown → cascade of `cannot create children while terminating`. The same crash surfaces in the 4 direct coordinator specs that call `system.actorOf(PropsAdapter(...))` without `HealingTrieFixtures`.
+**Background (batch 4 finding):**
+`ScalaTestWithActorTestKit()` (bare ctor, no args) calls `ActorTestKit.apply(name)` which uses `ActorTestKit.defaultConfig`. That config loads only from `reference.conf` (bundled in the Pekko testkit jar — provides timeout defaults, `single-expect-default = 3s`, etc.) plus a `throughput = 1` override. It does **not** load `src/test/resources/application.conf`. As a result, any actor spawned with `withDispatcherFromConfig("sync-dispatcher")` throws `ConfigurationException: Dispatcher [sync-dispatcher] not configured` at test time.
 
-**Fix strategy:**
-Update `HealingTrieFixtures` to accept an implicit `ActorTestKit` and spawn coordinators via `testKit.spawn(behavior, name)` directly. The coordinator behaviors are already `Behavior[Command]` — no PropsAdapter is needed once the test kit supplies the typed system. The 4 direct coordinator specs similarly replace `system.actorOf(PropsAdapter(...))` with `testKit.spawn(...)`.
+Current workaround across all §8a-retro batch 4 specs: `ScalaTestWithActorTestKit(ConfigFactory.load())` which explicitly loads `application.conf`.
 
-**Files to migrate (14):**
+The clean fix: create `application-test.conf` so the bare ctor finds it on the classpath and loads both custom dispatchers AND the standard Pekko test throughput setting.
 
-*4 direct coordinator specs:*
-- `snap/actors/AccountRangeCoordinatorSpec.scala` — 20 `actorOf` sites; heaviest fixture use
-- `snap/actors/ByteCodeCoordinatorSpec.scala` — 22 `actorOf` sites
-- `snap/actors/StorageRangeCoordinatorSpec.scala` — 14 `actorOf` sites; `BehaviorTestKit` white-box helper also present — assess separately
-- `snap/actors/TrieNodeHealingCoordinatorSpec.scala` — 26 `actorOf` sites; heaviest `HealingTrieFixtures` usage
+**Verified reference.conf from `pekko-actor-testkit-typed_3-1.1.5.jar`:**
+```hocon
+pekko.actor.testkit.typed {
+  timefactor = 1.0
+  single-expect-default = 3s
+  expect-no-message-default = 100ms
+  default-timeout = 5s
+  system-shutdown-default = 10s
+  throw-on-shutdown-timeout = true
+  filter-leeway = 3s
+}
+```
+These are always loaded from the jar — `application-test.conf` does not need to repeat them.
 
-*10 heal family specs (route through `HealingTrieFixtures.coordinatorProps`):*
-- `snap/actors/DecoupledHealObservabilitySpec.scala`
-- `snap/actors/DecoupledHealSafetySpec.scala`
-- `snap/actors/DecoupledHealServeRootSpec.scala`
-- `snap/actors/ScopedVerificationObservabilitySpec.scala`
-- `snap/actors/ScopedVerificationParitySpec.scala`
-- `snap/actors/ScopedVerificationFallbackSpec.scala`
-- `snap/actors/TrieNodeHealingScopedVerificationSpec.scala`
-- `snap/actors/TrieNodeHealingScopeCaptureSpec.scala`
-- `snap/actors/HealingFrontierResumeSpec.scala`
-- `snap/actors/RebuildFrontierBfsMultiSeedSpec.scala`
+**Target file content — `src/test/resources/application-test.conf`:**
+```hocon
+# application-test.conf — loaded by ScalaTestWithActorTestKit() bare ctor.
+# Includes full test configuration so no ConfigFactory.load() workaround is needed.
 
-**Step 0 — Locate fixture and confirm remaining Classic files:**
-```bash
-grep -rn "coordinatorProps\|HealingTrieFixtures" src/test/ --include="*.scala" -l
-grep -rn "org.apache.pekko.testkit.TestKit\b" src/test/ --include="*.scala" -l \
-  | grep -v "ActorTestKit"
+include "application.conf"
+
+# Pekko's recommended setting for test dispatchers: process one message at a time
+# for more deterministic concurrency in tests. ActorTestKit.defaultConfig sets this,
+# but it is NOT inherited when application-test.conf is present — must be explicit.
+pekko.actor.default-dispatcher.throughput = 1
 ```
 
-**Step 1 — Read `HealingTrieFixtures` first:**
-Understand `coordinatorProps` signature, what parameters it takes, and how each of the 10 heal specs uses it. Map the refactor scope before touching anything.
+**Step 1 — Create the file:**
+```bash
+cat > /media/dev/2tb/dev/fukuii/src/test/resources/application-test.conf << 'EOF'
+# application-test.conf — loaded by ScalaTestWithActorTestKit() bare ctor.
+# Includes full test configuration so no ConfigFactory.load() workaround is needed.
 
-**Step 2 — Update `HealingTrieFixtures`:**
-Change `coordinatorProps` from `Props` (PropsAdapter) to `(implicit testKit: ActorTestKit): ActorRef[Command]`. Spawn via `testKit.spawn(behavior, name)`. Where the fixture also builds child actors via PropsAdapter, switch those to `testKit.spawn(childBehavior)`. Compile after this change alone before touching any spec.
+include "application.conf"
 
-**Step 3 — Migrate 4 direct coordinator specs:**
-For each: replace `extends TestKit(ActorSystem(...))` → `extends ScalaTestWithActorTestKit(ConfigFactory.load())`. Replace `system.actorOf(PropsAdapter(behavior))` → `testKit.spawn(behavior)`. Replace untyped `TestProbe()` → `TestProbe[MessageType]()` — this is the highest-value E165 reduction opportunity in the codebase (TNHC=58, ByteCode=56, AccountRange=54, StorageRange=39).
+# Pekko's recommended setting for test dispatchers: process one message at a time
+# for more deterministic concurrency in tests. ActorTestKit.defaultConfig sets this,
+# but it is NOT inherited when application-test.conf is present — must be explicit.
+pekko.actor.default-dispatcher.throughput = 1
+EOF
+```
 
-**Step 4 — Migrate 10 heal family specs:**
-Each becomes a standard batch 1+2+3 migration once the fixture is updated. Migrate one at a time: replace `extends TestKit` → `extends ScalaTestWithActorTestKit(ConfigFactory.load())`, `system.spawn` → `testKit.spawn`, drop `WithActorSystemShutDown`. Compile + `testOnly` after each.
+**Step 2 — Verify it fixes the problem (run a coordinator spec with the bare ctor):**
+Temporarily change one `ConfigFactory.load()` spec to bare ctor, compile + run, confirm no `ConfigurationException`, then revert if you decide not to do step 3 yet.
 
-**Step 5 — Replace `fishForMessage` with `expectMessageType[T]`:**
-These specs collectively have the highest `fishForMessage` density. After migrating probes to typed, replace all `fishForMessage { case T => true }` with `probe.expectMessageType[T]`.
+**Step 3 (optional) — Strip `ConfigFactory.load()` from batch 4 specs:**
+```bash
+grep -rn "ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())\|ScalaTestWithActorTestKit(ConfigFactory.load())" src/test/ --include="*.scala" -l
+```
+For each file (except `PivotBlockSelectorSpec` which uses `ConfigFactory.load("explicit-scheduler")` — leave that one): replace `ScalaTestWithActorTestKit(ConfigFactory.load())` → `ScalaTestWithActorTestKit()`. Compile + run the targeted suite.
+
+**Step 4 — Confirm full suite green:**
+```bash
+cd /media/dev/2tb/dev/fukuii
+sbt compile-all
+./local/scripts/fukuii-test  # confirm 3,595+ tests, 0 failures
+```
+
+**MANDATORY final step — IN THIS ORDER:**
+1. `sbt scalafmtAll`
+2. `git add src/test/resources/application-test.conf` (+ any spec cleanups from step 3)
+3. `git commit -m "test(infra): add application-test.conf — bare ScalaTestWithActorTestKit() ctor now loads sync-dispatcher"`
+4. `SHA=$(git rev-parse --short HEAD)`
+5. Update CHASE-QUEUE.md P14 note: bare ctor pitfall resolved
+6. `git add .claude/` → `git commit -m "docs(8a-infra): clearout application-test.conf prompt — $SHA"`
+7. **DELETE this section**
+
+**Rejection criteria:**
+- Removing `explicit-scheduler.conf` or changing specs that depend on it (`PivotBlockSelectorSpec`)
+- Overriding testkit timeout values (let the jar's `reference.conf` provide defaults)
+- Any change to `src/main/` or production config files
+
+---
+
+#### §8a-infra-b — Audit and fix worker teardown leaks in coordinator/heal specs
+
+**Agent:** EYE (investigate) → LOOM (fix, test-only)
+**Risk:** LOW — test teardown only; no production code changed
+**Prerequisite:** §8a-retro batch 4 complete (`5eae34c21`)
+**Gate:** Run any time. Resource leaks in test teardown don't cause test failures but inflate system-under-test state between tests and may cause intermittent failures on slow machines.
+
+**Background (batch 4 finding):**
+`testKit.stop(ref)` only terminates `ActorRef` values returned by `testKit.spawn(...)`. Coordinator specs spawn the coordinator via `testKit.spawn(behavior)` (now correct), but coordinators internally spawn workers via classic `context.actorOf(...)`. Tests that obtain references to those workers via `actorSelection` get classic `ActorRef` values. `testKit.stop(classicWorkerRef)` is a silent no-op — workers remain running until the testkit system shuts down after the full suite.
+
+This is a resource leak, not a correctness bug. However, leaked workers from one test case can interfere with the next if they share state (unlikely for SNAP workers but worth confirming).
+
+**Step 1 — Identify specs with explicit worker stop calls:**
+```bash
+cd /media/dev/2tb/dev/fukuii
+grep -rn "testKit.stop\|system.stop\|classicSystem.stop\|actorSelection" \
+  src/test/scala/com/chipprbots/ethereum/blockchain/sync/snap/actors/ \
+  --include="*.scala" | grep -v "//.*stop" | head -40
+```
+Note which specs call `testKit.stop` on actors they did NOT spawn via `testKit.spawn` — those are the silent no-ops.
+
+**Step 2 — For each spec with classic worker refs, add proper teardown:**
+In each `afterEach` or `afterAll` (or within the test body), replace:
+```scala
+// WRONG — silent no-op for classic-resolved worker:
+testKit.stop(workerRef)
+```
+with:
+```scala
+// CORRECT — stop classic child via classic system:
+testKit.system.classicSystem.stop(workerRef)
+```
+
+If the spec has no explicit worker teardown at all and coordinators clean up their own children on stop, that is acceptable — verify by reading the coordinator's `PostStop` handler to confirm it stops workers.
+
+**Step 3 — Confirm no test isolation regressions:**
+Run the coordinator suite twice back-to-back in the same JVM to expose any cross-test actor state:
+```bash
+cd /media/dev/2tb/dev/fukuii
+sbt "testOnly *CoordinatorSpec* *HealSpec* *Scoped* *Frontier* *Rebuild* *Decoupled*; testOnly *CoordinatorSpec* *HealSpec* *Scoped* *Frontier* *Rebuild* *Decoupled*"
+```
+
+**Verification:**
+```bash
+sbt compile-all
+./local/scripts/fukuii-test  # confirm 3,595+ tests, 0 failures
+```
+
+**MANDATORY final step — IN THIS ORDER:**
+1. `sbt scalafmtAll`
+2. `git add <affected spec files>` (never `git add .`)
+3. `git commit -m "test(8a-infra-b): fix worker teardown leaks in coordinator/heal specs — classicSystem.stop for classic worker refs"`
+4. `SHA=$(git rev-parse --short HEAD)`
+5. `git add .claude/` → `git commit -m "docs(8a-infra-b): clearout worker teardown prompt — $SHA"`
+6. **DELETE this section**
+
+**Rejection criteria:**
+- Changing any coordinator production behavior (e.g., PostStop handlers)
+- Stopping workers that the coordinator itself owns cleanup for (double-stop)
+- Any change to `src/main/`
+
+---
+
+#### §8a-retro batch 4b — MITHRIL: E165 TestProbe narrowing in coordinator/heal specs
+
+**Agent:** MITHRIL (Scala 3 modernization)
+**Risk:** LOW — test files only; no production code changed
+**Prerequisite:** §8a-retro batch 4 complete (`5eae34c21`). The 14 specs are on `ActorTestKit` but kept `TestProbe()` (classic, unnarrowed) via `system.classicSystem`. That was the safe short-term fix; this batch narrows them to typed.
+**Gate:** Run any time. Highest E165 reduction opportunity remaining in the codebase.
+
+**Background (batch 4 finding):**
+The 4 coordinator specs + 10 heal specs now extend `ScalaTestWithActorTestKit(ConfigFactory.load())`. Their `TestProbe()` instances were left as classic (obtained via `testKit.system.classicSystem`) because narrowing to `TestProbe[M]` requires knowing the exact message type at each site — that assessment was deferred to this batch. Current unnarrowed counts: TNHC ~59, ByteCode ~57, AccountRange ~54, StorageRange ~39 = ~209 E165 sites across the 4 coordinator specs alone. The 10 heal specs add further sites.
+
+**Step 0 — Recount current E165 floor:**
+```bash
+cd /media/dev/2tb/dev/fukuii
+grep -rn "org.apache.pekko.testkit.TestProbe\b" src/test/ --include="*.scala" | grep -v "\[" | wc -l
+# Record this number as the starting floor.
+```
+
+**Step 1 — Read each coordinator spec and map probe usage:**
+For each of the 4 coordinator specs, identify what messages the probe receives (look at `probe.expectMsg`, `probe.fishForMessage`, `probe.lastMessage`, `probe.ref` usage). The type parameter for `TestProbe[M]` must match the single narrowest common supertype of all expected messages at that probe's sites.
+
+**Step 2 — Narrow TestProbe in the 4 coordinator specs (one at a time):**
+For each spec:
+- Replace `val probe = TestProbe()` with `val probe = TestProbe[M]()` where `M` is the narrowed type
+- Update any `case m: M` destructuring to match the typed probe API
+- Replace `fishForMessage { case T => true }` with `probe.expectMessageType[T]`
+- Compile + `testOnly *<SpecName>*` after each file
+
+**Step 3 — Narrow TestProbe in the 10 heal family specs:**
+Same process. These specs route through `HealingTrieFixtures.spawnCoordinator` which now returns `ActorRef[TrieNodeHealingCoordinator.Command]` — so the typed actor is already available; only the probe types need narrowing.
+
+**Step 4 — Recount E165 floor and record reduction:**
+```bash
+grep -rn "org.apache.pekko.testkit.TestProbe\b" src/test/ --include="*.scala" | grep -v "\[" | wc -l
+# Compare to Step 0 count.
+```
 
 **Verification:**
 ```bash
@@ -717,20 +849,18 @@ sbt "testOnly *CoordinatorSpec* *HealSpec* *Scoped* *Frontier* *Rebuild* *Decoup
 
 **MANDATORY final step — IN THIS ORDER:**
 1. `sbt scalafmtAll`
-2. `git add <HealingTrieFixtures + all 14 spec files>` (never `git add .`)
-3. `git commit -m "test(8a-retro): migrate coordinator/heal specs to ActorTestKit — 14 specs, N tests"`
+2. `git add <all 14 spec files>` (never `git add .`)
+3. `git commit -m "test(8a-retro): narrow TestProbe[M] in coordinator/heal specs — N E165 sites cleared"`
 4. `SHA=$(git rev-parse --short HEAD)`
-5. Strikethrough E5 in run-order table; add `| $SHA | 8a-retro batch 4 — 14 coordinator/heal specs |` to `SPRINT-QUEUE.md`
-6. Update CHASE-QUEUE.md E165 note: TNHC/ByteCode/AccountRange/StorageRange are now migrated; recount untyped `TestProbe` sites
-7. Update `fukuii-test-timing.md` if test count changed
-8. `git add .claude/` → `git commit -m "docs(8a-retro): clearout batch 4 — $SHA"`
-9. **DELETE this section**
+5. Update CHASE-QUEUE.md E165 section with new floor count
+6. `git add .claude/` → `git commit -m "docs(8a-retro): clearout batch 4b — $SHA"`
+7. **DELETE this section**
 
 **Rejection criteria:**
 - Changing any production actor behavior
-- Using `system.actorOf(PropsAdapter(...))` in any migrated spec
-- Leaving `fishForMessage` without a typed `expectMessageType[T]` replacement
-- Bundling production code changes with test fixture changes
+- Using `TestProbe[Any]` as a shortcut (defeats the purpose)
+- Leaving `fishForMessage` where `expectMessageType[T]` is viable
+- Bundling production code changes with probe narrowing
 
 ---
 
@@ -1130,7 +1260,10 @@ Each prompt can run independently. Commit individually.
 | ~~D3~~ | ~~Batch D~~ | ~~P7 EYE test timing audit~~ | ✅ DONE 2026-06-22 — 680s (11m 20s) baseline, 3,595 tests, 0 code changes; both Thread.sleep sites defer to §8a; all wall-clock bounds safe. Note: captured pre-Batch-D; rerun after G1/G2 if test count grows. |
 | ~~E3~~ | ~~Batch E~~ | ~~§3h — Any type signature cleanup~~ | ✅ DONE 2026-06-22 — 0 types changed; 15 sites documented `// Any:`; 7 FORGE-gated (vm/domain/ledger); compile clean |
 | ~~E4~~ | ~~Batch E~~ | ~~§8a-retro batch 3 — 25 network/sync specs~~ | ✅ DONE 2026-06-23 — `12c23cf8a` (14 specs) + `a719520db` (11 specs + NPMAFake fix) |
-| E5 | Batch E | §8a-retro batch 4 — 14 coordinator/heal specs (PropsAdapter fixture fix) | No — HealingTrieFixtures → 4 coordinator specs → 10 heal specs in order |
+| ~~E5~~ | ~~Batch E~~ | ~~§8a-retro batch 4 — 14 coordinator/heal specs (PropsAdapter fixture fix)~~ | ✅ DONE 2026-06-23 — `5eae34c21` (14 specs + HealingTrieFixtures to ActorTestKit, 135 tests) |
+| E5b | Batch E | §8a-infra — create `application-test.conf` (bare ctor fix + `throughput=1`) | No |
+| E5c | Batch E | §8a-infra-b — audit + fix worker teardown leaks in coordinator/heal specs | No — EYE audit first; LOOM fixes |
+| E5d | Batch E | §8a-retro batch 4b — E165 TestProbe narrowing in coordinator/heal specs (~209 sites) | No — one spec at a time; MITHRIL; run after E5b |
 | E6 | Batch E | §8a-retro batch 5 — multi-system + TestActorRef specs (3 assessable, 2 Wave 3 gate) | Partial — BlockFetcherSpec + PendingTxMgr + RegularSyncSpec assessable now; PeerActor + RLPx wait for Wave 3 |
 | ~~F1~~ | ~~Batch F~~ | ~~§3i MITHRIL+FORGE — BlockExecutionError hierarchy redesign: union type + `describe`~~ | ✅ DONE 2026-06-23 — `64ab4786e` |
 
@@ -1410,6 +1543,27 @@ in any tier. Fixing them is high-value: these cover sync state, PoW mining, and 
 | `SyncControllerSpec.scala` | ~470 | (read to determine) | (check) |
 | `PoWMiningCoordinatorSpec.scala` | ~123 | "Miners mine recurrently" | UnitTest, ConsensusTest, SlowTest |
 | `PoWMiningCoordinatorSpec.scala` | ~188 | "StopMining stops PoWMinerCoordinator" | UnitTest, ConsensusTest, SlowTest |
+
+**Known root cause — SyncControllerSpec FlakyTests (identified in P9 thread, 2026-06-23):**
+
+`SyncController.scala:895-897` — `handleRegularSyncMsg` forwards all unhandled messages to
+`RegularSync` via `regularSync.tell(msg, ctx.toClassic.sender())`. When `FastSync.Done` arrives
+late (after `syncSwitchDelay = 0.5s`, i.e. after SyncController has already transitioned to
+`runningRegularSync`), it lands in this catch-all and is `tell`-forwarded to the RegularSync
+classic child, which crashes with `ClassCastException: FastSync$Done$ cannot be cast to
+RegularSyncCommand`.
+
+**Fix (apply before diagnosing the tests):** Add a guard arm before the catch-all in
+`handleRegularSyncMsg`:
+```scala
+case FastSync.Done => Behaviors.same  // late arrival after sync switch — ignore
+```
+Confirm the arm is placed BEFORE the `regularSync.tell` catch-all. Compile:
+```bash
+sbt compile-all
+```
+Then run the two SyncControllerSpec FlakyTests 5× to confirm the race is resolved before
+proceeding with the remaining inventory.
 
 **Steps for each test (one at a time, no parallel):**
 1. Read the full test body.

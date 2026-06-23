@@ -111,12 +111,15 @@ Every prompt that touches source files must apply this before committing:
 | ~~E3~~ | ~~Batch E~~ | ~~DEFERRED §3h — Any type signature cleanup (non-consensus sites)~~ | ✅ DONE 2026-06-22 — `cc63882fa` (15 sites documented, 7 FORGE-gated, 0 type changes) |
 | ~~F1~~ | ~~Batch F~~ | ~~DEFERRED §8a-retro batch 3 — LOOM TestKit→ActorTestKit for G1 network/sync actors~~ | ✅ DONE 2026-06-23 — 25 specs; `12c23cf8a` (14) + `a719520db` (11 + NPMAFake fix) |
 | ~~F2~~ | ~~Batch F~~ | ~~CHASE-QUEUE F1 — FORGE §3h residual + PoWMiningCoordinator threading model consultation~~ | ✅ DONE 2026-06-23 — Item A REJECTED (`72a755efa`); Item B CONFIRMED (`7c951fd44`); Item C SAFE AS-IS |
-| F3 | Batch F | DEFERRED §8a-retro batch 4 — LOOM coordinator/heal specs (HealingTrieFixtures PropsAdapter fix, 14 specs) | No — fixture → 4 coordinator specs → 10 heal specs in order |
-| F4 | Batch F | DEFERRED §8a-retro batch 5 — LOOM multi-system + TestActorRef specs (3 assessable now, 2 Wave 3 gate) | Partial — after F6 (RegularSyncSpec conflict) |
-| F5 | Batch F | DEFERRED §3i — MITHRIL+FORGE BlockExecutionError hierarchy redesign: union type + `describe` | Yes — ledger/ only; no conflicts |
+| ~~F3~~ | ~~Batch F~~ | ~~DEFERRED §8a-retro batch 4 — LOOM coordinator/heal specs (HealingTrieFixtures PropsAdapter fix, 14 specs)~~ | ✅ DONE 2026-06-23 — `5eae34c21` (135 tests, 0 fail); fixture PropsAdapter→spawn fix; P14/P15 pitfalls added to pekko-typed-api.md; E5b/E5c/E5d drafted |
+| F4 | Batch F | DEFERRED §8a-retro batch 5 — LOOM multi-system + TestActorRef specs (3 assessable now, 2 Wave 3 gate) | Partial — F6 ✅ DONE; no more RegularSyncSpec conflict; can start now |
+| ~~F5~~ | ~~Batch F~~ | ~~DEFERRED §3i — MITHRIL+FORGE+BEACON BlockExecutionError hierarchy redesign: union type + `describe`~~ | ✅ DONE 2026-06-23 — `64ab4786e` (30 tests pass; FORGE+BEACON both approved; ETH error variants confirmed complete); docs `d4344962f` |
 | ~~F6~~ | ~~Batch F~~ | ~~DEFERRED Part 11 P9 — EYE/MITHRIL DisabledTest audit~~ | ✅ DONE 2026-06-23 — `86c76fd4e` — 2 fixed (re-enqueue block bodies, retry fetching node), 0 deleted, 7 deferred to CHASE-QUEUE |
 | F7 | Batch F | DEFERRED Part 11 P10 — EYE/MITHRIL FlakyTest root cause audit | No (one spec at a time) — after F6; *FastSyncSpec + SyncControllerSpec lines shifted post-F1; use grep* |
 | ~~F8~~ | ~~Batch F~~ | ~~DEFERRED Part 13 P13 — BEACON sprint ETC-bias sweep: shared ETC+ETH paths changed without BEACON review~~ | ✅ DONE 2026-06-23 — `ef4989169` — 1 cluster: ETH/69 BlockRangeUpdate type confusion (PeerActor:551 + BlockFetcher:486 match never-emitted `ETH69.BlockRangeUpdate`; NPMA swept to `ETHPackets.BlockRangeUpdate` in `13aa7585e`, siblings left stale). All other shared-path diffs syntax-only. |
+| E5b | Batch F | DEFERRED Part 8 §8a-infra — Any: create `src/test/resources/application-test.conf` (include application.conf + throughput=1) so bare `ScalaTestWithActorTestKit()` ctor works without `ConfigFactory.load()` workaround | Yes — new file only; no conflicts |
+| E5c | Batch F | DEFERRED Part 8 §8a-infra-b — EYE→LOOM: audit coordinator/heal specs for classic worker teardown leaks; replace `testKit.stop(workerRef)` (silent no-op) with `testKit.system.classicSystem.stop(workerRef)` or confirm coordinator PostStop covers cleanup | No — after E5b + F3; EYE audit first |
+| E5d | Batch F | DEFERRED Part 8 §8a-retro batch 4b — MITHRIL: narrow ~209 E165 `TestProbe()` sites in 14 coordinator/heal specs to typed `TestProbe[M]()` | No — one spec at a time; after E5b |
 | F9 | Batch F | DEFERRED Part 14 §ETH-BRU — BEACON ETH/69 BlockRangeUpdate type fix: change `ETH69.BlockRangeUpdate` → `ETHPackets.BlockRangeUpdate` in PeerActor:551 + BlockFetcher:486 match arms; rebuild BlockFetcherSpec:298-305 against the correct production type to eliminate false-positive coverage | Yes — no conflicts with F3–F7 |
 | F10 | Batch F | DEFERRED Part 15 §P9-JSON4S — CONDUIT: re-enable 4 jsonrpc DisabledTests blocked by json4s ScalaSig/Scala 3 reflection failure under testEssential (JsonRpcControllerSpec:73,124 + JsonRpcControllerEthSpec:556,849) | Yes — no conflicts |
 | F11 | Batch F | DEFERRED Part 15 §P9-NOTCHANGE — EYE/LOOM: re-enable SyncControllerSpec:243 "not change best block" — rewrite test to inject PeerRequestHandler.ResponseReceived via Typed FastSync injection path (prhResultAdapter private) | After F7 (SyncControllerSpec conflict) |
@@ -130,8 +133,8 @@ Every prompt that touches source files must apply this before committing:
 - ~~**Gate**~~ ✅ COMPLETE — 11:02 (662s), 3,595 / 0 fail (2026-06-22)
 - ~~**Batch D** (parallel, after gate)~~ ✅ COMPLETE — G1 (all 12 Behavior[Any] → Behavior[Command]) ∥ G2 (S3-B fixed, INFO-8 monitored, S3-E → D2) ∥ P7 (timing baseline 680s)
 - ~~**Batch E** (parallel, all unblocked)~~ ✅ COMPLETE — E1 (`0cefe5c25`) ∥ E2 (pre-fixed) ∥ E3 (`cc63882fa`)
-- ~~**Batch F partial** — F1 + F2~~ ✅ DONE — Gate needed before F3–F7: `./local/scripts/fukuii-test` testEssential
-- **Batch F (continued)**: F3 ∥ F5 ∥ F6 ∥ F9 (start simultaneously) → after F6: F4 ∥ F7 (parallel with each other); F9 parallel throughout
+- ~~**Batch F partial** — F1+F2+F3+F5+F6+F8~~ ✅ DONE — testEssential gate needed before F4/F7
+- **Batch F (remaining)**: F4 ∥ F7 ∥ F9 ∥ F10 ∥ F13 ∥ E5b (parallel) — F11+F12 after F7; E5c after E5b+F4; E5d after E5b
 - **Final gate** (after G1 + G2 + Wave 4 collaborator migration): **POST-MIGRATION-SWEEP** — zero Classic residue verification + BRIDGE-A/B/C elimination
 
 ---

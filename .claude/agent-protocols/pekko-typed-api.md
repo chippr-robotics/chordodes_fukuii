@@ -410,6 +410,30 @@ Await.result(stream, 5.seconds)  // may time out under load
 
 ---
 
+## Test-kit pitfalls (discovered §8a-retro batch 4, 2026-06-23)
+
+**P14 — Missing `application-test.conf` causes `ConfigurationException` with bare ctor**
+
+`ScalaTestWithActorTestKit()` (bare ctor) loads `application-test.conf` from the classpath. If it doesn't exist, Pekko falls back to jar-bundled `reference.conf` only — which does **not** include `src/test/resources/application.conf`. Any actor spawned with `withDispatcherFromConfig("sync-dispatcher")` throws `ConfigurationException: Dispatcher [sync-dispatcher] not configured`.
+
+**Proper fix:** Create `src/test/resources/application-test.conf` (§8a-infra backlog item):
+```hocon
+include "application.conf"
+pekko.actor.default-dispatcher.throughput = 1
+```
+
+**Workaround until §8a-infra is done:** `extends ScalaTestWithActorTestKit(ConfigFactory.load())`
+
+---
+
+**P15 — `testKit.stop` is a silent no-op for classic-resolved worker children**
+
+`testKit.stop(ref)` only terminates actors returned by `testKit.spawn(...)`. Coordinator workers are spawned internally via classic `context.actorOf` and resolved by tests via `actorSelection` — these hold classic `ActorRef` values. Calling `testKit.stop` on them does nothing, leaving workers running between tests.
+
+**Proper fix:** Audit affected specs and add `testKit.system.classicSystem.stop(workerRef)` in teardown for classic-resolved refs, OR verify the coordinator's own `PostStop` handler stops workers (§8a-infra-b backlog item).
+
+---
+
 ## Anti-patterns — flag in PRISM review
 
 | Pattern | Problem | Correct |
@@ -420,6 +444,8 @@ Await.result(stream, 5.seconds)  // may time out under load
 | `context.system.scheduler` in Typed actor | Manual lifecycle | `withTimers` |
 | Unnamed child actors | Invisible in diagnostics | Named with stable discriminator |
 | `preStop` / `postStop` override in Typed | Classic API | `PostStop` signal |
+| `ScalaTestWithActorTestKit()` bare ctor without `application-test.conf` | `sync-dispatcher` not found → `ConfigurationException` | Create `application-test.conf` (P14 / §8a-infra) |
+| `testKit.stop(classicWorkerRef)` | Silent no-op; worker resource leak | `testKit.system.classicSystem.stop(workerRef)` (P15 / §8a-infra-b) |
 
 ---
 

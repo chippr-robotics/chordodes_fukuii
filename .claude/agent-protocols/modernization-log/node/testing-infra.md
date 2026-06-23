@@ -74,6 +74,42 @@ All 5 ETH coverage gaps closed:
 
 ---
 
+## Pekko TestKit Migration — Batch 4 (SNAP coordinator/heal specs)
+
+#### `5eae34c21` — §8a-retro batch 4: coordinator/heal specs → ActorTestKit (135 tests)
+- **Root cause fixed:** `HealingTrieFixtures.coordinatorProps` returned `Props` via `PropsAdapter`. Under `ActorTestKitGuardian`, stopping the bridge sent classic `StopChild` to the guardian (which only accepts `TestKitCommand`) → `ClassCastException` → whole-system shutdown cascade across all 14 specs. Fix: replaced `coordinatorProps(...): Props` with `spawnCoordinator(...)(implicit testKit: ActorTestKit): ActorRef[Command]` via `testKit.spawn`.
+- **Specs migrated:** `HealingTrieFixtures` (shared fixture) + 4 direct coordinator specs + 10 heal family specs (15 files total)
+- **Verification:** 135 tests, 0 failures; `sbt compile-all` clean
+- **Workaround still in place:** `ScalaTestWithActorTestKit(ConfigFactory.load())` — proper fix is E5b below
+- **New pitfalls documented in pekko-typed-api.md:** P14 (bare `ScalaTestWithActorTestKit()` ctor doesn't load `application.conf`), P15 (`testKit.stop` is a no-op for classic workers spawned via `PropsAdapter`)
+- **Cross-refs:** `sync/snap.md` (5eae34c21 entry)
+
+---
+
+## Testing Infrastructure — Deferred Items (E5b / E5c / E5d)
+
+#### E5b — §8a-infra: `application-test.conf` (DEFERRED-BACKLOG Part 8)
+- **Problem:** `ScalaTestWithActorTestKit()` bare ctor does not load `application.conf`; custom dispatchers like `sync-dispatcher` throw `ConfigurationException` at runtime. Current workaround: `ConfigFactory.load()` passed explicitly to every test class.
+- **Fix:** Create `src/test/resources/application-test.conf`:
+  ```hocon
+  include "application.conf"
+  pekko.actor.default-dispatcher.throughput = 1
+  ```
+  Then remove `ConfigFactory.load()` from all migrated test classes.
+- **Status:** DEFERRED — parallel-safe, no prerequisite (but do before E5d)
+
+#### E5c — §8a-infra-b: worker teardown leak audit (DEFERRED-BACKLOG Part 8)
+- **Problem:** `testKit.stop(ref)` is a silent no-op for classic workers spawned via `PropsAdapter` (pekko-typed-api.md P15). Some coordinator/heal specs may have lingering workers.
+- **Fix:** Replace `testKit.stop(bridge)` with `testKit.system.classicSystem.stop(bridge)` at all actor teardown sites; verify with `testKit.system.classicSystem.whenTerminated`.
+- **Status:** DEFERRED — after E5b + F4 (§8a-retro batch 5)
+
+#### E5d — §8a-retro batch 4b: TestProbe narrowing ~209 sites (DEFERRED-BACKLOG Part 8)
+- **Problem:** ~209 `TestProbe()` sites (Classic, untyped) remain across migrated specs. These cannot be narrowed without upgrading to Typed `TestProbe[T]` from `ActorTestKit`.
+- **Fix:** Per-spec pass replacing `TestProbe()` with `testKit.createTestProbe[ConcreteType]()` + corresponding `expectMessage[T]` calls.
+- **Status:** DEFERRED — after E5b
+
+---
+
 ## Open / Deferred
 
 - **E165 `expectMsgType[Any]` — COMPLETE** (`8cdf1290d`) — 0 remaining. §8a-gated remainder:
@@ -81,5 +117,8 @@ All 5 ETH coverage gaps closed:
   - 20 `fishForMessage` PF[Any,Boolean] sites in 11 files (replace with `expectMessageType[T]` post-§8a)
   - Both in intentional 333 E165 floor; see DEFERRED-BACKLOG §8a research prompt.
 - **Wall-clock assertions** — 3 known test files; S5 sweep (CODEBASE-AUDIT) not yet run
-- **TestKit Batch 3** — DEFERRED-BACKLOG §8a open
+- **TestKit Batch 5** — DEFERRED-BACKLOG §8a-retro batch 5 (F4)
+- **E5b** — `application-test.conf` infra fix — DEFERRED-BACKLOG Part 8
+- **E5c** — worker teardown leak audit — DEFERRED-BACKLOG Part 8, after E5b + F4
+- **E5d** — TestProbe narrowing ~209 sites — DEFERRED-BACKLOG Part 8, after E5b
 - `PeerRequestHandler` `ClassTag` unsound → `TypeTest[A,B]` — deferred
