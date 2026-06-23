@@ -1864,3 +1864,92 @@ Handle before any Hive ETC Olympia test suite run.
 7. `git add .claude/agent-protocols/working-docs/DEFERRED-BACKLOG.md .claude/agent-protocols/working-docs/CHASE-QUEUE.md` → `git commit -m "docs(part12-g5): clearout — $SHA"`
 8. DELETE this section
 
+---
+
+## Part 14: ETH/69 BlockRangeUpdate Type Confusion
+
+### §ETH-BRU — PeerActor + BlockFetcher inbound match stale type (BEACON)
+
+**Source:** CHASE-QUEUE `## ETH-Side Coverage Gaps (Part 13)` (2026-06-23), finding cluster F9
+**Branch:** `scala3-cleanup-june` (or any successor branch)
+**Risk:** HIGH — ETH/Sepolia path only; PoW/ETC chains unaffected. Two inbound handlers
+match a type (`ETH69.BlockRangeUpdate`) that the decoder never emits at runtime. One test
+masks the gap by constructing the wrong type and giving false-positive coverage.
+
+**Background:**
+
+Sprint commit `13aa7585e` (W5/W11, NPMA Pekko migration) correctly updated
+`NetworkPeerManagerActor` to match `ETHPackets.BlockRangeUpdate` — the type actually
+produced by `MessageDecoders.scala:234` on inbound ETH/69 messages. However, two sibling
+inbound handlers were not swept:
+
+1. **`network/PeerActor.scala:551`** — The malformed-update validation arm and
+   `BreachOfProtocol` disconnect guard. The runtime type is `ETHPackets.BlockRangeUpdate`,
+   so this arm falls through to `case _ =>`. The unvalidated message is published without
+   the expected protocol-breach check — abusive ETH/Sepolia peers are not disconnected.
+
+2. **`blockchain/sync/regular/BlockFetcher.scala:486`** — The
+   `AdaptedMessageFromEventBus(msg: ETH69.BlockRangeUpdate, _)` arm that calls
+   `withPossibleNewTopAt` to advance the chain tip. This arm never matches in production,
+   so peer-pushed BlockRangeUpdate tip advances are silently dropped. Head-following
+   degrades to the periodic re-probe fallback only.
+
+3. **`src/test/.../BlockFetcherSpec.scala:298-305`** (test) — Constructs
+   `ETH69.BlockRangeUpdate` directly, which matches the buggy line 486 and makes the
+   test pass. The production decode path (`ETHPackets.BlockRangeUpdate`) would not trigger
+   the head-follow. This is false-positive coverage.
+
+**Pre-flight reads — run before touching any file:**
+```bash
+# Confirm both call sites and their surrounding match structure
+grep -n "ETH69\.BlockRangeUpdate\|ETHPackets\.BlockRangeUpdate" \
+  src/main/scala/com/chipprbots/ethereum/network/PeerActor.scala \
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/regular/BlockFetcher.scala \
+  src/test/scala/com/chipprbots/ethereum/blockchain/sync/regular/BlockFetcherSpec.scala
+
+# Confirm NPMA was already swept to the correct type (the reference fix to mirror)
+grep -n "ETH69\.BlockRangeUpdate\|ETHPackets\.BlockRangeUpdate" \
+  src/main/scala/com/chipprbots/ethereum/network/NetworkPeerManagerActor.scala
+
+# Confirm MessageDecoders emits ETHPackets.BlockRangeUpdate (authoritative source of truth)
+grep -n "BlockRangeUpdate" \
+  src/main/scala/com/chipprbots/ethereum/network/p2p/messages/MessageDecoders.scala
+```
+
+**Fix — three targeted changes:**
+
+**(a) `network/PeerActor.scala:551`**
+Read the existing match arm fully. Change the matched type from `ETH69.BlockRangeUpdate`
+to `ETHPackets.BlockRangeUpdate`. Preserve the validation logic and `BreachOfProtocol`
+disconnect exactly — only the type name changes.
+
+**(b) `blockchain/sync/regular/BlockFetcher.scala:486`**
+Change `AdaptedMessageFromEventBus(msg: ETH69.BlockRangeUpdate, _)` to
+`AdaptedMessageFromEventBus(msg: ETHPackets.BlockRangeUpdate, _)`.
+Preserve the `withPossibleNewTopAt` call and any surrounding guard logic exactly.
+
+**(c) `src/test/.../BlockFetcherSpec.scala:298-305`**
+Change the test to construct `ETHPackets.BlockRangeUpdate` instead of
+`ETH69.BlockRangeUpdate`. The message must travel through the same
+`AdaptedMessageFromEventBus` wrapper path that production uses so that it exercises
+the real inbound arm. The test "should request headers when BlockRangeUpdate announces
+a new chain tip" must pass against the corrected production code.
+
+**Compile + test after each change:**
+```bash
+sbt compile-all                                  # after each file edit
+sbt "testOnly *BlockFetcherSpec*"               # after (b) + (c)
+sbt "testOnly *PeerActorSpec*"                  # after (a)
+```
+Both specs must show 0 failures.
+
+**MANDATORY final steps — complete IN THIS ORDER:**
+1. `sbt scalafmtAll`
+2. `git add src/main/scala/com/chipprbots/ethereum/network/PeerActor.scala src/main/scala/com/chipprbots/ethereum/blockchain/sync/regular/BlockFetcher.scala src/test/scala/com/chipprbots/ethereum/blockchain/sync/regular/BlockFetcherSpec.scala`
+3. `git commit -m "fix(network,sync): ETH/69 BlockRangeUpdate inbound type — ETH69→ETHPackets in PeerActor+BlockFetcher (Part 14 §ETH-BRU)"`
+4. `SHA=$(git rev-parse --short HEAD)` — capture exact SHA
+5. `sbt "testOnly *BlockFetcherSpec* *PeerActorSpec*"` — confirm 0 failures; record result
+6. Add to `CHASE-QUEUE.md` cleared entries log: `| ETH/69 BlockRangeUpdate type confusion Part 14 §ETH-BRU | Cleared [date]: $SHA — ETH69→ETHPackets in PeerActor:551 + BlockFetcher:486; BlockFetcherSpec rebuilt against ETHPackets type |`
+7. `git add .claude/agent-protocols/working-docs/DEFERRED-BACKLOG.md .claude/agent-protocols/working-docs/CHASE-QUEUE.md` → `git commit -m "docs(part14-eth-bru): clearout — $SHA"`
+8. DELETE this section
+

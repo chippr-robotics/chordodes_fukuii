@@ -117,6 +117,7 @@ Every prompt that touches source files must apply this before committing:
 | F6 | Batch F | DEFERRED Part 11 P9 — EYE/MITHRIL DisabledTest audit | Yes — *SyncControllerSpec line numbers shifted post-F1; use grep* |
 | F7 | Batch F | DEFERRED Part 11 P10 — EYE/MITHRIL FlakyTest root cause audit | No (one spec at a time) — after F6; *FastSyncSpec + SyncControllerSpec lines shifted post-F1; use grep* |
 | ~~F8~~ | ~~Batch F~~ | ~~DEFERRED Part 13 P13 — BEACON sprint ETC-bias sweep: shared ETC+ETH paths changed without BEACON review~~ | ✅ DONE 2026-06-23 — `ef4989169` — 1 cluster: ETH/69 BlockRangeUpdate type confusion (PeerActor:551 + BlockFetcher:486 match never-emitted `ETH69.BlockRangeUpdate`; NPMA swept to `ETHPackets.BlockRangeUpdate` in `13aa7585e`, siblings left stale). All other shared-path diffs syntax-only. |
+| F9 | Batch F | DEFERRED Part 14 §ETH-BRU — BEACON ETH/69 BlockRangeUpdate type fix: change `ETH69.BlockRangeUpdate` → `ETHPackets.BlockRangeUpdate` in PeerActor:551 + BlockFetcher:486 match arms; rebuild BlockFetcherSpec:298-305 against the correct production type to eliminate false-positive coverage | Yes — no conflicts with F3–F7 |
 
 **Global sequence across all files:**
 - ~~**Batch A** (parallel, all read-only)~~ ✅ COMPLETE
@@ -126,7 +127,7 @@ Every prompt that touches source files must apply this before committing:
 - ~~**Batch D** (parallel, after gate)~~ ✅ COMPLETE — G1 (all 12 Behavior[Any] → Behavior[Command]) ∥ G2 (S3-B fixed, INFO-8 monitored, S3-E → D2) ∥ P7 (timing baseline 680s)
 - ~~**Batch E** (parallel, all unblocked)~~ ✅ COMPLETE — E1 (`0cefe5c25`) ∥ E2 (pre-fixed) ∥ E3 (`cc63882fa`)
 - ~~**Batch F partial** — F1 + F2~~ ✅ DONE — Gate needed before F3–F7: `./local/scripts/fukuii-test` testEssential
-- **Batch F (continued)**: F3 ∥ F5 ∥ F6 ∥ F8 (start simultaneously) → after F6: F4 ∥ F7 (parallel with each other); F8 parallel throughout
+- **Batch F (continued)**: F3 ∥ F5 ∥ F6 ∥ F9 (start simultaneously) → after F6: F4 ∥ F7 (parallel with each other); F9 parallel throughout
 - **Final gate** (after G1 + G2 + Wave 4 collaborator migration): **POST-MIGRATION-SWEEP** — zero Classic residue verification + BRIDGE-A/B/C elimination
 
 ---
