@@ -249,7 +249,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
             )
             (Block(correctHeader, block.body), receipts)
           case Left(error) =>
-            throw new RuntimeException(s"Failed to execute block: ${error.reason}")
+            throw new RuntimeException(s"Failed to execute block: ${error.describe}")
         }
       }
 

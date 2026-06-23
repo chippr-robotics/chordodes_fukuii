@@ -76,7 +76,7 @@ class ConsensusAdapter(
           }
           validated.flatMap {
             case Left(error) =>
-              IO.pure(BlockImportFailed(error.reason.toString))
+              IO.pure(BlockImportFailed(error.describe))
             case Right(BlockExecutionSuccess) =>
               enqueueAndGetBranch(block, bestHeader.number)
                 .map(forwardAndTranslateConsensusResult) // a new branch was created so we give it to consensus
@@ -140,7 +140,7 @@ class ConsensusAdapter(
             log.debug(
               "Error while validating block with hash {} before execution: {}",
               Hex.toHexString(block.hash.toArray),
-              error.reason.toString
+              error.describe
             )
           )
         case Right(_) => IO(log.debug("Block with hash {} validated successfully", Hex.toHexString(block.hash.toArray)))

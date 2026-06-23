@@ -365,8 +365,8 @@ class EngineApiService(
                     val lvh = parentHeader.map(_.hash).getOrElse(zeroHash)
                     blockchainWriter.removeBlockByHash(payload.blockHash).commit()
                     markInvalidRecursive(payload.blockHash, lvh)
-                    executionErrorReason.set(Some(error.reason.toString))
-                    log.warn("[ENGINE-API] newPayload #{}: INVALID reason={}", payload.blockNumber, error.reason)
+                    executionErrorReason.set(Some(error.describe))
+                    log.warn("[ENGINE-API] newPayload #{}: INVALID reason={}", payload.blockNumber, error.describe)
                     Some(false)
                 }
             }

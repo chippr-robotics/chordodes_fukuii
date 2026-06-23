@@ -6,6 +6,9 @@ import cats.implicits.*
 
 import scala.annotation.tailrec
 
+import com.chipprbots.ethereum.consensus.pow.validators.OmmersValidator.OmmersError
+import com.chipprbots.ethereum.consensus.validators.BlockHeaderError
+import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.BlockError
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.ledger.BlockExecutionError.MissingParentError
@@ -191,7 +194,7 @@ class BlockExecution(
     blockTxsExecResult match {
       case Right(_) => log.debug(s"All txs from block $hashAsHexString were executed successfully")
       case Left(error) =>
-        log.debug(s"Not all txs from block $hashAsHexString were executed correctly, due to ${error.reason}")
+        log.debug(s"Not all txs from block $hashAsHexString were executed correctly, due to ${error.describe}")
     }
     blockTxsExecResult
   }
@@ -526,27 +529,31 @@ object BlockExecution {
   )
 }
 
-sealed trait BlockExecutionError {
-  val reason: Any // §3h: FORGE-confirmed — Any required
-}
+sealed trait BlockExecutionError:
+  def describe: String
+
+type ValidationError = BlockHeaderError | BlockError | OmmersError
 
 sealed trait BlockExecutionSuccess
 
 case object BlockExecutionSuccess extends BlockExecutionSuccess
 
 object BlockExecutionError {
-  final case class ValidationBeforeExecError(reason: Any) extends BlockExecutionError // §3h: FORGE-confirmed — Any required
+  final case class ValidationBeforeExecError(error: ValidationError) extends BlockExecutionError:
+    def describe: String = error.toString
 
   final case class StateBeforeFailure(worldState: InMemoryWorldStateProxy, acumGas: BigInt, acumReceipts: Seq[Receipt])
 
   final case class TxsExecutionError(stx: SignedTransaction, stateBeforeError: StateBeforeFailure, reason: String)
-      extends BlockExecutionError
+      extends BlockExecutionError:
+    def describe: String = reason
 
-  final case class ValidationAfterExecError(reason: String) extends BlockExecutionError
+  final case class ValidationAfterExecError(reason: String) extends BlockExecutionError:
+    def describe: String = reason
 
-  case object MissingParentError extends BlockExecutionError {
-    override val reason: Any = "Cannot find parent" // §3h: FORGE-confirmed — Any required
-  }
+  case object MissingParentError extends BlockExecutionError:
+    override def describe: String = "Cannot find parent"
 
-  final case class MPTError(reason: MPTException) extends BlockExecutionError
+  final case class MPTError(error: MPTException) extends BlockExecutionError:
+    def describe: String = error.toString
 }
