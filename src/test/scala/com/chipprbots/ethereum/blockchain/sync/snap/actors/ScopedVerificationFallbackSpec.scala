@@ -5,17 +5,15 @@ import java.nio.file.Files
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.ImplicitSender
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
 
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
@@ -49,14 +47,11 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   * F3 (restart-lost / empty set) is structurally an empty set, the same fallback F4 exercises (over-bound latches the
   * set empty); a true restart-lost set is covered by the resume/restart path and the data-model lifecycle.
   */
-class ScopedVerificationFallbackSpec
-    extends TestKit(ActorSystem("ScopedVerificationFallbackSpec"))
-    with ImplicitSender
-    with AnyFlatSpecLike
-    with Matchers
-    with BeforeAndAfterAll {
+class ScopedVerificationFallbackSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
 
-  override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
+  implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
+  private val awaiter = org.apache.pekko.testkit.TestProbe()
 
   private def gaugeValue(name: String): Double = {
     val gauge = Metrics.get().registry.find(name).gauge()
@@ -95,7 +90,9 @@ class ScopedVerificationFallbackSpec
       scoped: Boolean,
       maxPaths: Int,
       markComplete: Boolean
-  )(body: (ActorRef, HealingFrontierStorage, TestProbe, ByteString) => Unit): Unit = {
+  )(
+      body: (ActorRef[TrieNodeHealingCoordinator.Command], HealingFrontierStorage, TestProbe, ByteString) => Unit
+  ): Unit = {
     val pool = Executors.newSingleThreadExecutor()
     val ec = ExecutionContext.fromExecutorService(pool)
     val dbPath = Files.createTempDirectory("scoped-fallback-rocksdb").toAbsolutePath.toString
@@ -119,27 +116,25 @@ class ScopedVerificationFallbackSpec
     val storage = new TestMptStorage()
     val root = storedRoot(storage)
     val controller = TestProbe()
-    val coordinator = system.actorOf(
-      HealingTrieFixtures.coordinatorProps(
-        stateRoot = root,
-        networkPeerManager = TestProbe().ref,
-        requestTracker = new SNAPRequestTracker()(system.scheduler),
-        mptStorage = storage,
-        batchSize = 64,
-        snapSyncController = controller.ref,
-        healingFrontierStorage = Some(store),
-        frontierPersistenceEnabled = true,
-        healingWriterEcOverride = Some(ec),
-        scopedHealVerification = scoped,
-        scopedHealMaxPaths = maxPaths
-      )
+    val coordinator = HealingTrieFixtures.spawnCoordinator(
+      stateRoot = root,
+      networkPeerManager = TestProbe().ref,
+      requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+      mptStorage = storage,
+      batchSize = 64,
+      snapSyncController = controller.ref,
+      healingFrontierStorage = Some(store),
+      frontierPersistenceEnabled = true,
+      healingWriterEcOverride = Some(ec),
+      scopedHealVerification = scoped,
+      scopedHealMaxPaths = maxPaths
     )
     val death = TestProbe()
-    death.watch(coordinator)
+    death.watch(coordinator.toClassic)
     try body(coordinator, store, controller, root)
     finally {
-      system.stop(coordinator)
-      death.expectTerminated(coordinator, 5.seconds)
+      testKit.stop(coordinator)
+      death.expectTerminated(coordinator.toClassic, 5.seconds)
       pool.shutdown()
       pool.awaitTermination(5, TimeUnit.SECONDS)
       dataSource.destroy()
@@ -148,13 +143,16 @@ class ScopedVerificationFallbackSpec
   }
 
   /** Heal one clean storage leaf, then assert the round completes via the FULL-ROOT path (gauge == 0). */
-  private def healOneAndAssertFullRoot(coordinator: ActorRef, controller: TestProbe): Unit = {
+  private def healOneAndAssertFullRoot(
+      coordinator: ActorRef[TrieNodeHealingCoordinator.Command],
+      controller: TestProbe
+  ): Unit = {
     // Seed the mode gauge to a sentinel so "0" can only come from the full-root path actually running.
     SNAPSyncMetrics.setHealingScopedVerification(-1L)
     val node = cleanLeaf(0)
     val peer = PeerTestHelpers.createTestPeer("fallback-peer", TestProbe().ref)
     coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(Seq((node._1, node._2)))
-    coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), TestProbe().ref)
+    coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
     coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = Seq(node._3)))
     awaitStateHealingComplete(controller)
     // Full-root verification sets the mode gauge to 0; scoped would have set 1.
@@ -190,7 +188,7 @@ class ScopedVerificationFallbackSpec
     withFixture(scoped = true, maxPaths = 200000, markComplete = true) { (coordinator, store, _, _) =>
       store.isComplete shouldBe true
       coordinator ! TrieNodeHealingCoordinator.HealingPivotRefreshed(kec256(ByteString("fallback-different-root")))
-      awaitAssert(store.isComplete shouldBe false, 3.seconds, 100.millis)
+      awaiter.awaitAssert(store.isComplete shouldBe false, 3.seconds, 100.millis)
     }
   }
 }

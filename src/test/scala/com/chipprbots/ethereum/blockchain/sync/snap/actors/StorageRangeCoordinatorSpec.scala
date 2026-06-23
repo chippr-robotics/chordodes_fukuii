@@ -1,19 +1,16 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.actor.Props
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+
 import org.apache.pekko.actor.testkit.typed.scaladsl.BehaviorTestKit
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.testkit.ImplicitSender
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
 import scala.concurrent.duration.*
 
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
@@ -30,15 +27,10 @@ import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestMptStorage
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 
-class StorageRangeCoordinatorSpec
-    extends TestKit(ActorSystem("StorageRangeCoordinatorSpec"))
-    with ImplicitSender
-    with AnyFlatSpecLike
-    with Matchers
-    with BeforeAndAfterAll {
+class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
 
-  override def afterAll(): Unit =
-    TestKit.shutdownActorSystem(system)
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
+  private val statusProbe = org.apache.pekko.testkit.TestProbe()
 
   // StorageRangeCoordinator is a Typed actor (Group S3). These tests run in a Classic ActorSystem so they can keep
   // the established `system.actorOf` / `expectMsg` machinery; the coordinator is spawned through PropsAdapter to
@@ -56,8 +48,8 @@ class StorageRangeCoordinatorSpec
       initialMaxInFlightPerPeer: Int = 5,
       backpressureHighWatermark: Int = 100000,
       backpressureLowWatermark: Int = 50000
-  ): Props =
-    PropsAdapter(
+  ): org.apache.pekko.actor.typed.ActorRef[StorageRangeCoordinator.Command] =
+    testKit.spawn(
       StorageRangeCoordinator(
         stateRoot = stateRoot,
         networkPeerManager = networkPeerManager,
@@ -77,7 +69,7 @@ class StorageRangeCoordinatorSpec
   // Typed `StorageGetProgress` carries a `replyTo: ActorRef[SyncStatistics]`. In these Classic tests the reply target
   // is the test actor (ImplicitSender); adapt it to a typed ref so the coordinator can reply.
   private def getProgress: StorageRangeCoordinator.StorageGetProgress =
-    StorageRangeCoordinator.StorageGetProgress(testActor.toTyped[StorageRangeCoordinator.SyncStatistics])
+    StorageRangeCoordinator.StorageGetProgress(statusProbe.ref.toTyped[StorageRangeCoordinator.SyncStatistics])
 
   // White-box helper: build the `StorageRangeCoordinatorImpl` directly through a synchronous `BehaviorTestKit`,
   // capturing the Impl instance so tests can drive `private[actors]` accumulator/counter logic in isolation (the
@@ -107,7 +99,7 @@ class StorageRangeCoordinatorSpec
           timers,
           initialStateRoot = stateRoot,
           networkPeerManager = TestProbe().ref,
-          requestTracker = new SNAPRequestTracker()(system.scheduler),
+          requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
           mptStorage = new TestMptStorage(),
           flatSlotStorage = flatSlotStorage,
           maxAccountsPerBatch = maxAccountsPerBatch,
@@ -129,22 +121,20 @@ class StorageRangeCoordinatorSpec
   "StorageRangeCoordinator" should "initialize correctly" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
 
-    val coordinator = system.actorOf(
-      srcProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-        maxAccountsPerBatch = 8,
-        maxInFlightRequests = 8,
-        requestTimeout = 30.seconds,
-        snapSyncController = snapSyncController.ref
-      )
+    val coordinator = srcProps(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
+      maxAccountsPerBatch = 8,
+      maxInFlightRequests = 8,
+      requestTimeout = 30.seconds,
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator should not be null
@@ -153,25 +143,23 @@ class StorageRangeCoordinatorSpec
   it should "handle peer availability" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
     val peerProbe = TestProbe()
 
     val peer = PeerTestHelpers.createTestPeer("test-peer", peerProbe.ref)
 
-    val coordinator = system.actorOf(
-      srcProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-        maxAccountsPerBatch = 8,
-        maxInFlightRequests = 8,
-        requestTimeout = 30.seconds,
-        snapSyncController = snapSyncController.ref
-      )
+    val coordinator = srcProps(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
+      maxAccountsPerBatch = 8,
+      maxInFlightRequests = 8,
+      requestTimeout = 30.seconds,
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)
@@ -179,56 +167,52 @@ class StorageRangeCoordinatorSpec
 
     // Should handle peer availability (may or may not send request depending on tasks)
     coordinator ! getProgress
-    expectMsgType[StorageRangeCoordinator.SyncStatistics](3.seconds)
+    statusProbe.expectMsgType[StorageRangeCoordinator.SyncStatistics](3.seconds)
   }
 
   it should "handle task completion" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
 
-    val coordinator = system.actorOf(
-      srcProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-        maxAccountsPerBatch = 8,
-        maxInFlightRequests = 8,
-        requestTimeout = 30.seconds,
-        snapSyncController = snapSyncController.ref
-      )
+    val coordinator = srcProps(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
+      maxAccountsPerBatch = 8,
+      maxInFlightRequests = 8,
+      requestTimeout = 30.seconds,
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! StorageRangeCoordinator.StorageTaskComplete(BigInt(123), Right(10))
 
     // Coordinator should handle completion
     coordinator ! getProgress
-    expectMsgType[StorageRangeCoordinator.SyncStatistics](3.seconds)
+    statusProbe.expectMsgType[StorageRangeCoordinator.SyncStatistics](3.seconds)
   }
 
   it should "report completion when no storage tasks" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
 
-    val coordinator = system.actorOf(
-      srcProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-        maxAccountsPerBatch = 8,
-        maxInFlightRequests = 8,
-        requestTimeout = 30.seconds,
-        snapSyncController = snapSyncController.ref
-      )
+    val coordinator = srcProps(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
+      maxAccountsPerBatch = 8,
+      maxInFlightRequests = 8,
+      requestTimeout = 30.seconds,
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)
@@ -245,50 +229,46 @@ class StorageRangeCoordinatorSpec
   it should "handle task failures" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
 
-    val coordinator = system.actorOf(
-      srcProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-        maxAccountsPerBatch = 8,
-        maxInFlightRequests = 8,
-        requestTimeout = 30.seconds,
-        snapSyncController = snapSyncController.ref
-      )
+    val coordinator = srcProps(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
+      maxAccountsPerBatch = 8,
+      maxInFlightRequests = 8,
+      requestTimeout = 30.seconds,
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! StorageRangeCoordinator.StorageTaskFailed(BigInt(123), "Test failure")
 
     // Coordinator should still be operational
     coordinator ! getProgress
-    expectMsgType[StorageRangeCoordinator.SyncStatistics](3.seconds)
+    statusProbe.expectMsgType[StorageRangeCoordinator.SyncStatistics](3.seconds)
   }
 
   it should "accept AddStorageTasks and remain operational" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
 
-    val coordinator = system.actorOf(
-      srcProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-        maxAccountsPerBatch = 8,
-        maxInFlightRequests = 8,
-        requestTimeout = 30.seconds,
-        snapSyncController = snapSyncController.ref
-      )
+    val coordinator = srcProps(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
+      maxAccountsPerBatch = 8,
+      maxInFlightRequests = 8,
+      requestTimeout = 30.seconds,
+      snapSyncController = snapSyncController.ref
     )
 
     val accountHash1 = kec256(ByteString("account-1"))
@@ -299,28 +279,26 @@ class StorageRangeCoordinatorSpec
 
     // Should remain operational after adding tasks
     coordinator ! getProgress
-    expectMsgType[StorageRangeCoordinator.SyncStatistics](3.seconds)
+    statusProbe.expectMsgType[StorageRangeCoordinator.SyncStatistics](3.seconds)
   }
 
   it should "accept StoragePivotRefreshed and update state root" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("old-state-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
 
-    val coordinator = system.actorOf(
-      srcProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-        maxAccountsPerBatch = 8,
-        maxInFlightRequests = 8,
-        requestTimeout = 30.seconds,
-        snapSyncController = snapSyncController.ref
-      )
+    val coordinator = srcProps(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
+      maxAccountsPerBatch = 8,
+      maxInFlightRequests = 8,
+      requestTimeout = 30.seconds,
+      snapSyncController = snapSyncController.ref
     )
 
     val newStateRoot = kec256(ByteString("new-state-root"))
@@ -328,7 +306,7 @@ class StorageRangeCoordinatorSpec
 
     // Coordinator should still respond to progress queries after pivot refresh
     coordinator ! getProgress
-    expectMsgType[StorageRangeCoordinator.SyncStatistics](3.seconds)
+    statusProbe.expectMsgType[StorageRangeCoordinator.SyncStatistics](3.seconds)
   }
 
   it should "signal StorageRangeSyncComplete to controller when NoMoreStorageTasks received with no pending tasks" taggedAs UnitTest in {
@@ -336,22 +314,20 @@ class StorageRangeCoordinatorSpec
     // the coordinator must complete immediately on NoMoreStorageTasks + StorageCheckCompletion.
     val stateRoot = kec256(ByteString("empty-state-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
 
-    val coordinator = system.actorOf(
-      srcProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-        maxAccountsPerBatch = 8,
-        maxInFlightRequests = 8,
-        requestTimeout = 30.seconds,
-        snapSyncController = snapSyncController.ref
-      )
+    val coordinator = srcProps(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
+      maxAccountsPerBatch = 8,
+      maxInFlightRequests = 8,
+      requestTimeout = 30.seconds,
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)
@@ -370,7 +346,7 @@ class StorageRangeCoordinatorSpec
     // eligible to receive the next task via dispatchIfPossible().
     val stateRoot = kec256(ByteString("proof-of-absence-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
     val peerProbe = TestProbe()
@@ -388,19 +364,17 @@ class StorageRangeCoordinatorSpec
     // satisfying the proof-of-absence guard (response.proof.nonEmpty && tasks.size == 1).
     // initialMaxInFlightPerPeer=1 ensures only one request is in-flight at a time so the
     // second request is sent only after the first is resolved.
-    val coordinator = system.actorOf(
-      srcProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-        maxAccountsPerBatch = 1,
-        maxInFlightRequests = 2,
-        requestTimeout = 30.seconds,
-        snapSyncController = snapSyncController.ref,
-        initialMaxInFlightPerPeer = 1
-      )
+    val coordinator = srcProps(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
+      maxAccountsPerBatch = 1,
+      maxInFlightRequests = 2,
+      requestTimeout = 30.seconds,
+      snapSyncController = snapSyncController.ref,
+      initialMaxInFlightPerPeer = 1
     )
 
     coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)
@@ -438,22 +412,20 @@ class StorageRangeCoordinatorSpec
   it should "signal StorageRangeSyncForceCompleted immediately on ForceCompleteStorage even with pending tasks" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("force-complete-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
 
-    val coordinator = system.actorOf(
-      srcProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-        maxAccountsPerBatch = 8,
-        maxInFlightRequests = 4,
-        requestTimeout = 30.seconds,
-        snapSyncController = snapSyncController.ref
-      )
+    val coordinator = srcProps(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
+      maxAccountsPerBatch = 8,
+      maxInFlightRequests = 4,
+      requestTimeout = 30.seconds,
+      snapSyncController = snapSyncController.ref
     )
 
     // Add tasks that will not be dispatched (no peer)
@@ -477,25 +449,23 @@ class StorageRangeCoordinatorSpec
     // tick must be a no-op — not trigger a spurious pivot refresh that aborts the sync.
     val stateRoot = kec256(ByteString("no-stall-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
     val peerProbe = TestProbe()
 
     val peer = PeerTestHelpers.createTestPeer("storage-peer-nostall", peerProbe.ref)
 
-    val coordinator = system.actorOf(
-      srcProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-        maxAccountsPerBatch = 1,
-        maxInFlightRequests = 1,
-        requestTimeout = 30.seconds,
-        snapSyncController = snapSyncController.ref
-      )
+    val coordinator = srcProps(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
+      maxAccountsPerBatch = 1,
+      maxInFlightRequests = 1,
+      requestTimeout = 30.seconds,
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)
@@ -754,22 +724,20 @@ class StorageRangeCoordinatorSpec
   it should "construct and accept lifecycle messages" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("storage-stacktrie-construct-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
 
-    val coordinator = system.actorOf(
-      srcProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-        maxAccountsPerBatch = 8,
-        maxInFlightRequests = 8,
-        requestTimeout = 30.seconds,
-        snapSyncController = snapSyncController.ref
-      )
+    val coordinator = srcProps(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
+      maxAccountsPerBatch = 8,
+      maxInFlightRequests = 8,
+      requestTimeout = 30.seconds,
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator should not be null
@@ -777,9 +745,9 @@ class StorageRangeCoordinatorSpec
     // Smoke: accept the basic lifecycle messages without error.
     coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)
     coordinator ! getProgress
-    expectMsgType[StorageRangeCoordinator.SyncStatistics](3.seconds)
+    statusProbe.expectMsgType[StorageRangeCoordinator.SyncStatistics](3.seconds)
 
-    system.stop(coordinator)
+    testKit.stop(coordinator)
   }
 
   // ── Back-pressure on the pending storage-task queue ───────────────────────
@@ -793,25 +761,23 @@ class StorageRangeCoordinatorSpec
   it should "emit StorageBackpressureChanged when the pending queue crosses watermarks" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("backpressure-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
 
     // Tiny watermarks so the test can drive the transition without enqueuing 100K tasks.
-    val coordinator = system.actorOf(
-      srcProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-        maxAccountsPerBatch = 8,
-        maxInFlightRequests = 8,
-        requestTimeout = 30.seconds,
-        snapSyncController = snapSyncController.ref,
-        backpressureHighWatermark = 5,
-        backpressureLowWatermark = 2
-      )
+    val coordinator = srcProps(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
+      maxAccountsPerBatch = 8,
+      maxInFlightRequests = 8,
+      requestTimeout = 30.seconds,
+      snapSyncController = snapSyncController.ref,
+      backpressureHighWatermark = 5,
+      backpressureLowWatermark = 2
     )
 
     coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)

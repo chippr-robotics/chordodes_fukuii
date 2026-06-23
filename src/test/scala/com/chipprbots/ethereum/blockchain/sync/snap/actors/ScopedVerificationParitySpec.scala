@@ -5,17 +5,15 @@ import java.nio.file.Files
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.ImplicitSender
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
 
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
@@ -41,14 +39,10 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   * never recomputes or rewrites the state root — it is a pure local read — so the only observable is the marker + the
   * signal, which must match across the config flip.
   */
-class ScopedVerificationParitySpec
-    extends TestKit(ActorSystem("ScopedVerificationParitySpec"))
-    with ImplicitSender
-    with AnyFlatSpecLike
-    with Matchers
-    with BeforeAndAfterAll {
+class ScopedVerificationParitySpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
 
-  override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
+  implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
 
   private def gaugeValue(name: String): Double = {
     val gauge = Metrics.get().registry.find(name).gauge()
@@ -114,25 +108,23 @@ class ScopedVerificationParitySpec
     val root = storedRoot(storage)
     val nodes = (0 until 3).map(cleanLeaf)
     val controller = TestProbe()
-    val coordinator: ActorRef = system.actorOf(
-      HealingTrieFixtures.coordinatorProps(
-        stateRoot = root,
-        networkPeerManager = TestProbe().ref,
-        requestTracker = new SNAPRequestTracker()(system.scheduler),
-        mptStorage = storage,
-        batchSize = 64,
-        snapSyncController = controller.ref,
-        healingFrontierStorage = Some(store),
-        healingWriterEcOverride = Some(ec),
-        scopedHealVerification = scoped
-      )
+    val coordinator: ActorRef[TrieNodeHealingCoordinator.Command] = HealingTrieFixtures.spawnCoordinator(
+      stateRoot = root,
+      networkPeerManager = TestProbe().ref,
+      requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+      mptStorage = storage,
+      batchSize = 64,
+      snapSyncController = controller.ref,
+      healingFrontierStorage = Some(store),
+      healingWriterEcOverride = Some(ec),
+      scopedHealVerification = scoped
     )
     val death = TestProbe()
-    death.watch(coordinator)
+    death.watch(coordinator.toClassic)
     try {
       val peer = PeerTestHelpers.createTestPeer(s"parity-peer-$scoped", TestProbe().ref)
       coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
-      coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), TestProbe().ref)
+      coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
       coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(
         SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3))
       )
@@ -144,8 +136,8 @@ class ScopedVerificationParitySpec
       root shouldBe storedRoot(new TestMptStorage())
       store.isComplete
     } finally {
-      system.stop(coordinator)
-      death.expectTerminated(coordinator, 5.seconds)
+      testKit.stop(coordinator)
+      death.expectTerminated(coordinator.toClassic, 5.seconds)
       pool.shutdown()
       pool.awaitTermination(5, TimeUnit.SECONDS)
       dataSource.destroy()

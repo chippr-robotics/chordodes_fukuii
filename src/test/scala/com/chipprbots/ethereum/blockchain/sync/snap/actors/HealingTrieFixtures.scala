@@ -1,8 +1,8 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
 import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.Props
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
+import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.ExecutionContext
@@ -44,13 +44,14 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   */
 object HealingTrieFixtures {
 
-  /** Test-only `Props` shim for the now-Typed [[TrieNodeHealingCoordinator]] (Group S3). The coordinator's production
-    * factory is `apply(...): Behavior[Command]`; these Classic `TestKit` specs spawn it through `PropsAdapter` so they
-    * keep the established `system.actorOf` / `expectMsg` machinery. Mirrors the named params of the former
-    * `HealingTrieFixtures.coordinatorProps(...)` so the call sites only needed the object renamed. The `PropsAdapter`
-    * wrapper lives here (test tree) rather than in production, matching the BCC/SRC/ARC convention.
+  /** Test-only spawn shim for the now-Typed [[TrieNodeHealingCoordinator]] (Group S3). The coordinator's production
+    * factory is `apply(...): Behavior[Command]`; these specs spawn it through an [[ActorTestKit]] supplied by
+    * [[org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit]]. Returns the typed `ActorRef` directly
+    * (no `PropsAdapter`) -- under the typed test kit's user guardian a `PropsAdapter` bridge child crashes the whole
+    * system on stop (`StopChild` reaches a guardian that only accepts `TestKitCommand`), so the coordinator behaviour
+    * is spawned natively instead. Mirrors the named params of the former `coordinatorProps(...)`.
     */
-  def coordinatorProps(
+  def spawnCoordinator(
       stateRoot: ByteString,
       networkPeerManager: ActorRef,
       requestTracker: SNAPRequestTracker,
@@ -75,8 +76,8 @@ object HealingTrieFixtures {
       scopedHealMaxPaths: Int = TrieNodeHealingCoordinator.DefaultScopedHealMaxPaths,
       decoupledHealServeRoot: Boolean = false,
       decoupledHealMaxAttemptsNoRefresh: Int = TrieNodeHealingCoordinator.DefaultDecoupledHealMaxAttemptsNoRefresh
-  ): Props =
-    PropsAdapter(
+  )(implicit testKit: ActorTestKit): TypedActorRef[TrieNodeHealingCoordinator.Command] =
+    testKit.spawn(
       TrieNodeHealingCoordinator(
         stateRoot = stateRoot,
         networkPeerManager = networkPeerManager,

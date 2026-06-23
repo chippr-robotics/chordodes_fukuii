@@ -1,15 +1,12 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
-import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.ImplicitSender
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.duration.*
 
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
@@ -33,14 +30,11 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   * asserting the walk-root / serve-root gauges equal `shortRootLabel` of distinct roots no other test uses — that value
   * can only have been written by this coordinator's preStart / refresh handler.
   */
-class DecoupledHealObservabilitySpec
-    extends TestKit(ActorSystem("DecoupledHealObservabilitySpec"))
-    with ImplicitSender
-    with AnyFlatSpecLike
-    with Matchers
-    with BeforeAndAfterAll {
+class DecoupledHealObservabilitySpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
 
-  override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
+  implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
+  private val awaiter = org.apache.pekko.testkit.TestProbe()
 
   private def gaugeValue(name: String): Double = {
     val gauge = Metrics.get().registry.find(name).gauge()
@@ -68,19 +62,17 @@ class DecoupledHealObservabilitySpec
   private def buildCoordinator(
       stateRoot: ByteString,
       decoupled: Boolean
-  ): (ActorRef, TestProbe) = {
+  ): (ActorRef[TrieNodeHealingCoordinator.Command], TestProbe) = {
     val networkPeerManager = TestProbe()
-    val coordinator = system.actorOf(
-      HealingTrieFixtures.coordinatorProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = new SNAPRequestTracker()(system.scheduler),
-        mptStorage = new TestMptStorage(),
-        batchSize = 16,
-        snapSyncController = TestProbe().ref,
-        healingWriterEcOverride = Some(system.dispatcher),
-        decoupledHealServeRoot = decoupled
-      )
+    val coordinator = HealingTrieFixtures.spawnCoordinator(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+      mptStorage = new TestMptStorage(),
+      batchSize = 16,
+      snapSyncController = TestProbe().ref,
+      healingWriterEcOverride = Some(classicSystem.dispatcher),
+      decoupledHealServeRoot = decoupled
     )
     (coordinator, networkPeerManager)
   }
@@ -94,7 +86,7 @@ class DecoupledHealObservabilitySpec
 
       // preStart engagement signal: decoupled engaged = 1, walk-root gauge seeded to the walk root's short label,
       // serve-root gauge seeded equal to the walk root (serveRoot == stateRoot at init).
-      awaitAssert(
+      awaiter.awaitAssert(
         {
           gaugeValue("snapsync.healing.decoupled.engaged.gauge") shouldBe 1.0 +- 1e-9
           gaugeValue("snapsync.healing.decoupled.walk_root.gauge") shouldBe shortRootLabel(stateRoot).toDouble +- 1e-9
@@ -108,7 +100,7 @@ class DecoupledHealObservabilitySpec
       // gauge stays pinned to the walk root — the two roots are observably distinct after the advance.
       val newServeRoot = kec256(ByteString("observ-t7-on-serve-root"))
       coordinator ! TrieNodeHealingCoordinator.HealingServeRootRefresh(newServeRoot)
-      awaitAssert(
+      awaiter.awaitAssert(
         {
           gaugeValue("snapsync.healing.decoupled.serve_root.gauge") shouldBe shortRootLabel(
             newServeRoot
@@ -129,7 +121,7 @@ class DecoupledHealObservabilitySpec
 
       // preStart takes the "decoupling disabled" path: engaged gauge = 0. The walk-root gauge is still seeded
       // (observation-only, always set), and the serve-root gauge equals the walk root (no decoupling).
-      awaitAssert(
+      awaiter.awaitAssert(
         {
           gaugeValue("snapsync.healing.decoupled.engaged.gauge") shouldBe 0.0 +- 1e-9
           gaugeValue("snapsync.healing.decoupled.walk_root.gauge") shouldBe shortRootLabel(stateRoot).toDouble +- 1e-9
@@ -142,7 +134,7 @@ class DecoupledHealObservabilitySpec
       val nodeHash = kec256(ByteString("observ-t7-off-missing-node"))
       coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(Seq((Seq(ByteString(Array[Byte](0x00))), nodeHash)))
       val peer = PeerTestHelpers.createTestPeer("observ-t7-off-peer", TestProbe().ref)
-      coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), TestProbe().ref)
+      coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
       val send = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
       getTrieNodesOf(send).rootHash shouldBe stateRoot
     }

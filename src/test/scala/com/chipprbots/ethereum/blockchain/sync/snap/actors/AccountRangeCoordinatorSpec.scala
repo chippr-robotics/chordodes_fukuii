@@ -1,18 +1,14 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
-import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.actor.Props
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.testkit.ImplicitSender
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.Await
 import scala.concurrent.duration.*
 
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
@@ -37,27 +33,22 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   * dropped: a Typed `Behavior` exposes no `underlyingActor`. The behavioral coverage that survives is asserted through
   * observable effects on the `networkPeerManager` and `snapSyncController` probes — the same approach used in BCC/SRC.
   */
-class AccountRangeCoordinatorSpec
-    extends TestKit(ActorSystem("AccountRangeCoordinatorSpec"))
-    with ImplicitSender
-    with AnyFlatSpecLike
-    with Matchers
-    with BeforeAndAfterAll {
+class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
 
-  override def afterAll(): Unit =
-    TestKit.shutdownActorSystem(system)
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
+  private val statusProbe = org.apache.pekko.testkit.TestProbe()
 
   private def arcProps(
       stateRoot: ByteString,
-      networkPeerManager: ActorRef,
+      networkPeerManager: org.apache.pekko.actor.ActorRef,
       requestTracker: SNAPRequestTracker,
       mptStorage: TestMptStorage,
       concurrency: Int,
-      snapSyncController: ActorRef,
+      snapSyncController: org.apache.pekko.actor.ActorRef,
       resumeProgress: Map[ByteString, ByteString] = Map.empty,
       initialMaxInFlightPerPeer: Int = 5
-  ): Props =
-    PropsAdapter(
+  ): org.apache.pekko.actor.typed.ActorRef[AccountRangeCoordinator.Command] =
+    testKit.spawn(
       AccountRangeCoordinator(
         stateRoot = stateRoot,
         networkPeerManager = networkPeerManager,
@@ -67,7 +58,7 @@ class AccountRangeCoordinatorSpec
         snapSyncController = snapSyncController,
         resumeProgress = resumeProgress,
         initialMaxInFlightPerPeer = initialMaxInFlightPerPeer,
-        accountTrieEcOverride = Some(system.dispatcher)
+        accountTrieEcOverride = Some(classicSystem.dispatcher)
       )
     )
 
@@ -76,28 +67,28 @@ class AccountRangeCoordinatorSpec
     * a Classic-adapted `ActorRef`; tests send it Typed worker commands (`RequestTimeout`, `WorkerPeerDisconnected`,
     * `AccountRangeResponseMsg`) via the Classic `!`.
     */
-  private def resolveWorkerChild(coordinator: ActorRef): ActorRef =
+  private def resolveWorkerChild(
+      coordinator: org.apache.pekko.actor.typed.ActorRef[?]
+  ): org.apache.pekko.actor.ActorRef =
     Await.result(
-      system.actorSelection(coordinator.path / "*").resolveOne(3.seconds),
+      classicSystem.actorSelection(coordinator.path / "*").resolveOne(3.seconds),
       3.seconds
     )
 
   "AccountRangeCoordinator" should "initialize and create workers on demand" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
 
-    val coordinator = system.actorOf(
-      arcProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        concurrency = 4,
-        snapSyncController = snapSyncController.ref
-      )
+    val coordinator = arcProps(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      concurrency = 4,
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
@@ -108,22 +99,20 @@ class AccountRangeCoordinatorSpec
   it should "distribute tasks to workers when peers are available" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
     val peerProbe = TestProbe()
 
     val peer = PeerTestHelpers.createTestPeer("test-peer", peerProbe.ref)
 
-    val coordinator = system.actorOf(
-      arcProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        concurrency = 4,
-        snapSyncController = snapSyncController.ref
-      )
+    val coordinator = arcProps(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      concurrency = 4,
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
@@ -135,25 +124,23 @@ class AccountRangeCoordinatorSpec
   it should "handle task completion and report progress" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
 
-    val coordinator = system.actorOf(
-      arcProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        concurrency = 4,
-        snapSyncController = snapSyncController.ref
-      )
+    val coordinator = arcProps(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      concurrency = 4,
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
 
-    coordinator ! AccountRangeCoordinator.AccountGetProgress(self.toTyped[AccountRangeStats])
-    val progress = expectMsgType[AccountRangeStats](3.seconds)
+    coordinator ! AccountRangeCoordinator.AccountGetProgress(statusProbe.ref.toTyped[AccountRangeStats])
+    val progress = statusProbe.expectMsgType[AccountRangeStats](3.seconds)
 
     progress.accountsDownloaded shouldBe 0
     progress.tasksPending should be > 0
@@ -162,19 +149,17 @@ class AccountRangeCoordinatorSpec
   it should "report completion when all tasks are done" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
 
-    val coordinator = system.actorOf(
-      arcProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        concurrency = 1, // Small concurrency for test
-        snapSyncController = snapSyncController.ref
-      )
+    val coordinator = arcProps(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      concurrency = 1, // Small concurrency for test
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
@@ -187,53 +172,49 @@ class AccountRangeCoordinatorSpec
   it should "handle task failures gracefully" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
 
-    val coordinator = system.actorOf(
-      arcProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        concurrency = 4,
-        snapSyncController = snapSyncController.ref
-      )
+    val coordinator = arcProps(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      concurrency = 4,
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
     coordinator ! AccountRangeCoordinator.TaskFailed(BigInt(123), "Test failure")
 
     // Coordinator should still be operational
-    coordinator ! AccountRangeCoordinator.AccountGetProgress(self.toTyped[AccountRangeStats])
-    expectMsgType[AccountRangeStats](3.seconds)
+    coordinator ! AccountRangeCoordinator.AccountGetProgress(statusProbe.ref.toTyped[AccountRangeStats])
+    statusProbe.expectMsgType[AccountRangeStats](3.seconds)
   }
 
   it should "collect contract accounts for bytecode download" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
 
-    val coordinator = system.actorOf(
-      arcProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        concurrency = 4,
-        snapSyncController = snapSyncController.ref
-      )
+    val coordinator = arcProps(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      concurrency = 4,
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
 
     coordinator ! AccountRangeCoordinator.AccountGetContractAccounts(
-      self.toTyped[AccountRangeCoordinator.ContractAccountsResponse]
+      statusProbe.ref.toTyped[AccountRangeCoordinator.ContractAccountsResponse]
     )
-    val response = expectMsgType[AccountRangeCoordinator.ContractAccountsResponse](3.seconds)
+    val response = statusProbe.expectMsgType[AccountRangeCoordinator.ContractAccountsResponse](3.seconds)
 
     response.accounts shouldBe empty
   }
@@ -241,25 +222,23 @@ class AccountRangeCoordinatorSpec
   it should "provide statistics on request" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
 
-    val coordinator = system.actorOf(
-      arcProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        concurrency = 4,
-        snapSyncController = snapSyncController.ref
-      )
+    val coordinator = arcProps(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      concurrency = 4,
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
-    coordinator ! AccountRangeCoordinator.AccountGetProgress(self.toTyped[AccountRangeStats])
+    coordinator ! AccountRangeCoordinator.AccountGetProgress(statusProbe.ref.toTyped[AccountRangeStats])
 
-    val progress = expectMsgType[AccountRangeStats](3.seconds)
+    val progress = statusProbe.expectMsgType[AccountRangeStats](3.seconds)
     progress.progress should be >= 0.0
     progress.progress should be <= 1.0
     progress.elapsedTimeMs should be >= 0L
@@ -270,22 +249,20 @@ class AccountRangeCoordinatorSpec
   it should "complete task on proof-only empty account range response" taggedAs UnitTest in {
     val stateRoot = ByteString(MerklePatriciaTrie.EmptyRootHash)
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
     val peerProbe = TestProbe()
 
     val peer = PeerTestHelpers.createTestPeer("empty-range-peer", peerProbe.ref)
 
-    val coordinator = system.actorOf(
-      arcProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        concurrency = 1,
-        snapSyncController = snapSyncController.ref
-      )
+    val coordinator = arcProps(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      concurrency = 1,
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
@@ -320,15 +297,13 @@ class AccountRangeCoordinatorSpec
     val peerB = PeerTestHelpers.createTestPeer("reuse-peerB", peerProbeB.ref)
     val syncController = TestProbe()
 
-    val coordinator = system.actorOf(
-      arcProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = new SNAPRequestTracker()(system.scheduler),
-        mptStorage = new TestMptStorage(),
-        concurrency = 1, // exactly one worker so reuse is unambiguous
-        snapSyncController = syncController.ref
-      )
+    val coordinator = arcProps(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+      mptStorage = new TestMptStorage(),
+      concurrency = 1, // exactly one worker so reuse is unambiguous
+      snapSyncController = syncController.ref
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
@@ -346,7 +321,7 @@ class AccountRangeCoordinatorSpec
     coordinator ! AccountRangeCoordinator.PeerAvailable(peerB)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
 
-    system.stop(coordinator)
+    testKit.stop(coordinator)
   }
 
   // NOTE: The snapless-peer promotion tests (#1197) and the post-PivotRefreshed redispatch test
@@ -362,22 +337,20 @@ class AccountRangeCoordinatorSpec
   it should "escalate PivotStateUnservable to controller after MaxRequeuesPerTask+1 consecutive failures" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("requeue-test-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
     val peerProbe = TestProbe()
     val peer = PeerTestHelpers.createTestPeer("requeue-peer", peerProbe.ref)
 
-    val coordinator = system.actorOf(
-      arcProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        concurrency = 1,
-        snapSyncController = snapSyncController.ref,
-        initialMaxInFlightPerPeer = 1
-      )
+    val coordinator = arcProps(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      concurrency = 1,
+      snapSyncController = snapSyncController.ref,
+      initialMaxInFlightPerPeer = 1
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
@@ -401,22 +374,20 @@ class AccountRangeCoordinatorSpec
     val rootR1 = kec256(ByteString("stale-guard-root-r1"))
     val rootR2 = kec256(ByteString("stale-guard-root-r2"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
     val peerProbe = TestProbe()
     val peer = PeerTestHelpers.createTestPeer("stale-guard-peer", peerProbe.ref)
 
-    val coordinator = system.actorOf(
-      arcProps(
-        stateRoot = rootR1,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        concurrency = 1,
-        snapSyncController = snapSyncController.ref,
-        initialMaxInFlightPerPeer = 1
-      )
+    val coordinator = arcProps(
+      stateRoot = rootR1,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      concurrency = 1,
+      snapSyncController = snapSyncController.ref,
+      initialMaxInFlightPerPeer = 1
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(rootR1)
@@ -434,8 +405,8 @@ class AccountRangeCoordinatorSpec
 
     // GetProgress as a synchronization barrier — by the time we get a response, the coordinator has
     // fully processed the TaskFailed (including any re-dispatch attempts).
-    coordinator ! AccountRangeCoordinator.AccountGetProgress(self.toTyped[AccountRangeStats])
-    expectMsgType[AccountRangeStats](2.seconds)
+    coordinator ! AccountRangeCoordinator.AccountGetProgress(statusProbe.ref.toTyped[AccountRangeStats])
+    statusProbe.expectMsgType[AccountRangeStats](2.seconds)
 
     // PivotStateUnservable must NOT have been sent — peer was not marked stateless for rootR2
     snapSyncController.expectNoMessage(200.millis)
@@ -446,24 +417,22 @@ class AccountRangeCoordinatorSpec
   it should "send AccountRangeProgress snapshot to controller when stopped" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("poststop-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
 
-    val coordinator = system.actorOf(
-      arcProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        concurrency = 1,
-        snapSyncController = snapSyncController.ref
-      )
+    val coordinator = arcProps(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      concurrency = 1,
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
     // Stop the coordinator — PostStop fires and sends AccountRangeProgress
-    system.stop(coordinator)
+    testKit.stop(coordinator)
 
     val progressMsg = snapSyncController.expectMsgType[SNAPSyncController.AccountRangeProgressCmd](3.seconds)
     // concurrency=1 → 1 task → 1 entry in the progress map
@@ -479,22 +448,20 @@ class AccountRangeCoordinatorSpec
     val rootR1 = kec256(ByteString("pivot-clear-root-r1"))
     val rootR2 = kec256(ByteString("pivot-clear-root-r2"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
     val peerProbe = TestProbe()
     val peer = PeerTestHelpers.createTestPeer("pivot-clear-peer", peerProbe.ref)
 
-    val coordinator = system.actorOf(
-      arcProps(
-        stateRoot = rootR1,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        concurrency = 1,
-        snapSyncController = snapSyncController.ref,
-        initialMaxInFlightPerPeer = 1
-      )
+    val coordinator = arcProps(
+      stateRoot = rootR1,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      concurrency = 1,
+      snapSyncController = snapSyncController.ref,
+      initialMaxInFlightPerPeer = 1
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(rootR1)
@@ -516,7 +483,7 @@ class AccountRangeCoordinatorSpec
   it should "re-queue in-flight task and redispatch to a different peer after PeerUnavailable" taggedAs UnitTest in {
     val root = kec256(ByteString("disconnect-mid-flight-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
     val peerProbe1 = TestProbe()
@@ -524,16 +491,14 @@ class AccountRangeCoordinatorSpec
     val peer1 = PeerTestHelpers.createTestPeer("disconnect-peer-1", peerProbe1.ref)
     val peer2 = PeerTestHelpers.createTestPeer("disconnect-peer-2", peerProbe2.ref)
 
-    val coordinator = system.actorOf(
-      arcProps(
-        stateRoot = root,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        concurrency = 1,
-        snapSyncController = snapSyncController.ref,
-        initialMaxInFlightPerPeer = 1
-      )
+    val coordinator = arcProps(
+      stateRoot = root,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      concurrency = 1,
+      snapSyncController = snapSyncController.ref,
+      initialMaxInFlightPerPeer = 1
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(root)
@@ -553,22 +518,20 @@ class AccountRangeCoordinatorSpec
   it should "not fire a second TaskFailed when a late response arrives after RequestTimeout" taggedAs UnitTest in {
     val root = kec256(ByteString("late-response-guard-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
     val peerProbe = TestProbe()
     val peer = PeerTestHelpers.createTestPeer("late-resp-peer", peerProbe.ref)
 
-    val coordinator = system.actorOf(
-      arcProps(
-        stateRoot = root,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        concurrency = 1,
-        snapSyncController = snapSyncController.ref,
-        initialMaxInFlightPerPeer = 1
-      )
+    val coordinator = arcProps(
+      stateRoot = root,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      concurrency = 1,
+      snapSyncController = snapSyncController.ref,
+      initialMaxInFlightPerPeer = 1
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(root)
@@ -599,7 +562,7 @@ class AccountRangeCoordinatorSpec
   it should "not dispatch a task to a peer that is still in cooldown after a timeout failure" taggedAs UnitTest in {
     val root = kec256(ByteString("cooldown-root"))
     val storage = new TestMptStorage()
-    val requestTracker = new SNAPRequestTracker()(system.scheduler)
+    val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
     val peerProbe1 = TestProbe()
@@ -607,16 +570,14 @@ class AccountRangeCoordinatorSpec
     val peer1 = PeerTestHelpers.createTestPeer("cooldown-peer-1", peerProbe1.ref)
     val peer2 = PeerTestHelpers.createTestPeer("cooldown-peer-2", peerProbe2.ref)
 
-    val coordinator = system.actorOf(
-      arcProps(
-        stateRoot = root,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = requestTracker,
-        mptStorage = storage,
-        concurrency = 2,
-        snapSyncController = snapSyncController.ref,
-        initialMaxInFlightPerPeer = 1
-      )
+    val coordinator = arcProps(
+      stateRoot = root,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = requestTracker,
+      mptStorage = storage,
+      concurrency = 2,
+      snapSyncController = snapSyncController.ref,
+      initialMaxInFlightPerPeer = 1
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(root)
@@ -649,16 +610,14 @@ class AccountRangeCoordinatorSpec
     val peerProbe = TestProbe()
     val peer = PeerTestHelpers.createTestPeer("resume-complete-peer", peerProbe.ref)
 
-    val coord = system.actorOf(
-      arcProps(
-        stateRoot = root,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = new SNAPRequestTracker()(system.scheduler),
-        mptStorage = new TestMptStorage(),
-        concurrency = 1,
-        snapSyncController = TestProbe().ref,
-        resumeProgress = Map(rangeLast -> rangeLast) // savedNext == last => fully complete
-      )
+    val coord = arcProps(
+      stateRoot = root,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+      mptStorage = new TestMptStorage(),
+      concurrency = 1,
+      snapSyncController = TestProbe().ref,
+      resumeProgress = Map(rangeLast -> rangeLast) // savedNext == last => fully complete
     )
 
     coord ! AccountRangeCoordinator.StartAccountRangeSync(root)
@@ -667,7 +626,7 @@ class AccountRangeCoordinatorSpec
     // Nothing to download — no GetAccountRange dispatched.
     networkPeerManager.expectNoMessage(500.millis)
 
-    system.stop(coord)
+    testKit.stop(coord)
   }
 
   // ── Storage / bytecode back-pressure pause/resume (#1232 follow-up) ────────
@@ -675,15 +634,13 @@ class AccountRangeCoordinatorSpec
   it should "skip dispatch while storage back-pressure is set, resume on release" taggedAs UnitTest in {
     val networkPeerManager = TestProbe()
     val root = kec256(ByteString("backpressure-dispatch-root"))
-    val coord = system.actorOf(
-      arcProps(
-        stateRoot = root,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = new SNAPRequestTracker()(system.scheduler),
-        mptStorage = new TestMptStorage(),
-        concurrency = 4,
-        snapSyncController = TestProbe().ref
-      )
+    val coord = arcProps(
+      stateRoot = root,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+      mptStorage = new TestMptStorage(),
+      concurrency = 4,
+      snapSyncController = TestProbe().ref
     )
 
     val peerProbe = TestProbe()
@@ -706,15 +663,13 @@ class AccountRangeCoordinatorSpec
   it should "treat storage and bytecode pressure as ANY-of: only release once every source clears" taggedAs UnitTest in {
     val networkPeerManager = TestProbe()
     val root = kec256(ByteString("two-source-backpressure-root"))
-    val coord = system.actorOf(
-      arcProps(
-        stateRoot = root,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = new SNAPRequestTracker()(system.scheduler),
-        mptStorage = new TestMptStorage(),
-        concurrency = 4,
-        snapSyncController = TestProbe().ref
-      )
+    val coord = arcProps(
+      stateRoot = root,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+      mptStorage = new TestMptStorage(),
+      concurrency = 4,
+      snapSyncController = TestProbe().ref
     )
 
     val peerProbe = TestProbe()

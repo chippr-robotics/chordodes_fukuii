@@ -1,16 +1,13 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.ImplicitSender
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.duration.*
 
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
@@ -36,14 +33,10 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   *   - T-6 (FR-008/SC-006, C3): with the feature off, the `GetTrieNodes` always carries `rootHash == stateRoot` and a
   *     `HealingServeRootRefresh` is ignored — byte-identical to the coupled path.
   */
-class DecoupledHealServeRootSpec
-    extends TestKit(ActorSystem("DecoupledHealServeRootSpec"))
-    with ImplicitSender
-    with AnyFlatSpecLike
-    with Matchers
-    with BeforeAndAfterAll {
+class DecoupledHealServeRootSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
 
-  override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
+  implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
 
   /** Extract the underlying `GetTrieNodes` from the captured `NetworkPeerManagerActor.SendMessage`. The coordinator
     * wraps the request in a `GetTrieNodesEnc` (a `MessageSerializable`); `underlyingMsg` is the original message.
@@ -51,7 +44,7 @@ class DecoupledHealServeRootSpec
   private def getTrieNodesOf(send: NetworkPeerManagerActor.SendMessage): SNAP.GetTrieNodes =
     send.message.underlyingMsg.asInstanceOf[SNAP.GetTrieNodes]
 
-  private def pendingTasks(coordinator: ActorRef): Int = {
+  private def pendingTasks(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int = {
     val probe = TestProbe()
     coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref.toTyped[HealingStatistics])
     probe.expectMsgType[HealingStatistics](2.seconds).pendingTasks
@@ -63,20 +56,18 @@ class DecoupledHealServeRootSpec
   private def buildCoordinator(
       stateRoot: ByteString,
       decoupled: Boolean
-  ): (ActorRef, TestProbe, TestProbe) = {
+  ): (ActorRef[TrieNodeHealingCoordinator.Command], TestProbe, TestProbe) = {
     val networkPeerManager = TestProbe()
     val snapSyncController = TestProbe()
-    val coordinator = system.actorOf(
-      HealingTrieFixtures.coordinatorProps(
-        stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref,
-        requestTracker = new SNAPRequestTracker()(system.scheduler),
-        mptStorage = new TestMptStorage(),
-        batchSize = 16,
-        snapSyncController = snapSyncController.ref,
-        healingWriterEcOverride = Some(system.dispatcher),
-        decoupledHealServeRoot = decoupled
-      )
+    val coordinator = HealingTrieFixtures.spawnCoordinator(
+      stateRoot = stateRoot,
+      networkPeerManager = networkPeerManager.ref,
+      requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+      mptStorage = new TestMptStorage(),
+      batchSize = 16,
+      snapSyncController = snapSyncController.ref,
+      healingWriterEcOverride = Some(classicSystem.dispatcher),
+      decoupledHealServeRoot = decoupled
     )
     (coordinator, networkPeerManager, snapSyncController)
   }
@@ -96,7 +87,7 @@ class DecoupledHealServeRootSpec
       coordinator ! TrieNodeHealingCoordinator.HealingServeRootRefresh(serveRoot)
       val nodeHash = kec256(ByteString("decoupled-t1-missing-node"))
       coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(Seq((Seq(ByteString(Array[Byte](0x00))), nodeHash)))
-      coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), TestProbe().ref)
+      coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
 
       val send = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
       val request = getTrieNodesOf(send)
@@ -139,7 +130,7 @@ class DecoupledHealServeRootSpec
 
     // And the fetch now uses the advanced serve root, proving the refresh took effect on serveRoot alone.
     val peer = PeerTestHelpers.createTestPeer("decoupled-t2-peer", TestProbe().ref)
-    coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), TestProbe().ref)
+    coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
     val send = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
     getTrieNodesOf(send).rootHash shouldBe serveRoot
   }
@@ -158,7 +149,7 @@ class DecoupledHealServeRootSpec
       coordinator ! TrieNodeHealingCoordinator.HealingServeRootRefresh(serveRoot)
       val nodeHash = kec256(ByteString("coupled-t6-missing-node"))
       coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(Seq((Seq(ByteString(Array[Byte](0x00))), nodeHash)))
-      coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), TestProbe().ref)
+      coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
 
       val send = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
       val request = getTrieNodesOf(send)

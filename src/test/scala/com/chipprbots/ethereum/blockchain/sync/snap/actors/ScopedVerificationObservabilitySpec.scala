@@ -5,18 +5,15 @@ import java.nio.file.Files
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-import org.apache.pekko.actor.ActorRef
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.ImplicitSender
-import org.apache.pekko.testkit.TestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
 
-import com.typesafe.config.ConfigFactory
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
@@ -42,25 +39,10 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   * are made through the static gauge registry — the gauge is moved on the same code path that emits the log and is a
   * stronger, deterministic signal than the log text.
   */
-class ScopedVerificationObservabilitySpec
-    extends TestKit(
-      ActorSystem(
-        "ScopedVerificationObservabilitySpec",
-        ConfigFactory
-          .parseString(
-            """pekko.loggers = ["org.apache.pekko.testkit.TestEventListener"]
-              |pekko.loglevel = "INFO"
-              |""".stripMargin
-          )
-          .withFallback(ConfigFactory.load())
-      )
-    )
-    with ImplicitSender
-    with AnyFlatSpecLike
-    with Matchers
-    with BeforeAndAfterAll {
+class ScopedVerificationObservabilitySpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
 
-  override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
+  implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
 
   private def gaugeValue(name: String): Double = {
     val gauge = Metrics.get().registry.find(name).gauge()
@@ -94,7 +76,9 @@ class ScopedVerificationObservabilitySpec
       case _                                         => false
     }
 
-  private def withFixture(scoped: Boolean)(body: (ActorRef, HealingFrontierStorage, TestProbe) => Unit): Unit = {
+  private def withFixture(
+      scoped: Boolean
+  )(body: (ActorRef[TrieNodeHealingCoordinator.Command], HealingFrontierStorage, TestProbe) => Unit): Unit = {
     val pool = Executors.newSingleThreadExecutor()
     val ec = ExecutionContext.fromExecutorService(pool)
     val dbPath = Files.createTempDirectory("scoped-obs-rocksdb").toAbsolutePath.toString
@@ -118,25 +102,23 @@ class ScopedVerificationObservabilitySpec
     val storage = new TestMptStorage()
     val root = storedRoot(storage)
     val controller = TestProbe()
-    val coordinator = system.actorOf(
-      HealingTrieFixtures.coordinatorProps(
-        stateRoot = root,
-        networkPeerManager = TestProbe().ref,
-        requestTracker = new SNAPRequestTracker()(system.scheduler),
-        mptStorage = storage,
-        batchSize = 64,
-        snapSyncController = controller.ref,
-        healingFrontierStorage = Some(store),
-        healingWriterEcOverride = Some(ec),
-        scopedHealVerification = scoped
-      )
+    val coordinator = HealingTrieFixtures.spawnCoordinator(
+      stateRoot = root,
+      networkPeerManager = TestProbe().ref,
+      requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+      mptStorage = storage,
+      batchSize = 64,
+      snapSyncController = controller.ref,
+      healingFrontierStorage = Some(store),
+      healingWriterEcOverride = Some(ec),
+      scopedHealVerification = scoped
     )
     val death = TestProbe()
-    death.watch(coordinator)
+    death.watch(coordinator.toClassic)
     try body(coordinator, store, controller)
     finally {
-      system.stop(coordinator)
-      death.expectTerminated(coordinator, 5.seconds)
+      testKit.stop(coordinator)
+      death.expectTerminated(coordinator.toClassic, 5.seconds)
       pool.shutdown()
       pool.awaitTermination(5, TimeUnit.SECONDS)
       dataSource.destroy()
@@ -144,11 +126,11 @@ class ScopedVerificationObservabilitySpec
     }
   }
 
-  private def driveHeal(coordinator: ActorRef, peerName: String): Int = {
+  private def driveHeal(coordinator: ActorRef[TrieNodeHealingCoordinator.Command], peerName: String): Int = {
     val nodes = (0 until 3).map(cleanLeaf)
     val peer = PeerTestHelpers.createTestPeer(peerName, TestProbe().ref)
     coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
-    coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), TestProbe().ref)
+    coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
     coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(
       SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3))
     )

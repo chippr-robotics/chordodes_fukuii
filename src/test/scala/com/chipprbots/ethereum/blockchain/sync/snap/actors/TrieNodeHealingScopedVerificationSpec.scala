@@ -5,18 +5,15 @@ import java.nio.file.Files
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.ImplicitSender
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
 
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
@@ -46,14 +43,11 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   *   - V3: a healed node with a deeper MISSING descendant must NOT declare completion — the gap surfaces in the open
   *     frontier (queued or in-flight) and the round stays open until it is clean (FR-006).
   */
-class TrieNodeHealingScopedVerificationSpec
-    extends TestKit(ActorSystem("TrieNodeHealingScopedVerificationSpec"))
-    with ImplicitSender
-    with AnyFlatSpecLike
-    with Matchers
-    with BeforeAndAfterAll {
+class TrieNodeHealingScopedVerificationSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
 
-  override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
+  implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
+  private val awaiter = org.apache.pekko.testkit.TestProbe()
 
   private def gaugeValue(name: String): Double = {
     val gauge = Metrics.get().registry.find(name).gauge()
@@ -98,7 +92,7 @@ class TrieNodeHealingScopedVerificationSpec
     * non-deterministic pipelining detail; the FR-006 invariant is that it stays in the open frontier (pending OR
     * active), keeping the round open (`isComplete == false`) so no completion is declared while the gap is unhealed.
     */
-  private def openFrontier(coordinator: ActorRef): Int = {
+  private def openFrontier(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int = {
     val probe = TestProbe()
     coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref.toTyped[HealingStatistics])
     val stats = probe.expectMsgType[HealingStatistics](2.seconds)
@@ -127,7 +121,7 @@ class TrieNodeHealingScopedVerificationSpec
   private def withMarkerCompleteFixture(
       stateRoot: ByteString,
       storage: TestMptStorage
-  )(body: (ActorRef, HealingFrontierStorage, TestProbe) => Unit): Unit = {
+  )(body: (ActorRef[TrieNodeHealingCoordinator.Command], HealingFrontierStorage, TestProbe) => Unit): Unit = {
     val pool = Executors.newSingleThreadExecutor()
     val ec = ExecutionContext.fromExecutorService(pool)
     val dbPath = Files.createTempDirectory("scoped-verify-rocksdb").toAbsolutePath.toString
@@ -149,24 +143,22 @@ class TrieNodeHealingScopedVerificationSpec
     store.markComplete()
 
     val controllerProbe = TestProbe()
-    val coordinator = system.actorOf(
-      HealingTrieFixtures.coordinatorProps(
-        stateRoot = stateRoot,
-        networkPeerManager = TestProbe().ref,
-        requestTracker = new SNAPRequestTracker()(system.scheduler),
-        mptStorage = storage,
-        batchSize = 64,
-        snapSyncController = controllerProbe.ref,
-        healingFrontierStorage = Some(store),
-        healingWriterEcOverride = Some(ec)
-      )
+    val coordinator = HealingTrieFixtures.spawnCoordinator(
+      stateRoot = stateRoot,
+      networkPeerManager = TestProbe().ref,
+      requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+      mptStorage = storage,
+      batchSize = 64,
+      snapSyncController = controllerProbe.ref,
+      healingFrontierStorage = Some(store),
+      healingWriterEcOverride = Some(ec)
     )
     val death = TestProbe()
-    death.watch(coordinator)
+    death.watch(coordinator.toClassic)
     try body(coordinator, store, controllerProbe)
     finally {
-      system.stop(coordinator)
-      death.expectTerminated(coordinator, 5.seconds)
+      testKit.stop(coordinator)
+      death.expectTerminated(coordinator.toClassic, 5.seconds)
       pool.shutdown()
       pool.awaitTermination(5, TimeUnit.SECONDS)
       dataSource.destroy()
@@ -186,7 +178,7 @@ class TrieNodeHealingScopedVerificationSpec
         store.isComplete shouldBe true
         val peer = PeerTestHelpers.createTestPeer("scoped-clean-peer", TestProbe().ref)
         coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
-        coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), TestProbe().ref)
+        coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
         coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(
           SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3))
         )
@@ -211,7 +203,7 @@ class TrieNodeHealingScopedVerificationSpec
       withMarkerCompleteFixture(stateRoot, storage) { (coordinator, _, controller) =>
         val peer = PeerTestHelpers.createTestPeer("scoped-gap-peer", TestProbe().ref)
         coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(Seq((pathset, hash)))
-        coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), TestProbe().ref)
+        coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
         // Heal the branch — its only child is missing, so a gap remains below the healed node.
         coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(
           SNAP.TrieNodes(requestId = 1, nodes = Seq(encoded))
@@ -220,7 +212,7 @@ class TrieNodeHealingScopedVerificationSpec
         // The missing descendant must surface in the OPEN frontier (pending OR in-flight); the round MUST stay open.
         // Inline discovery enqueues it, then the non-empty heal response pipelines it straight into an active
         // request — so it is in `activeTasks`, not necessarily `pendingTasks`. Either keeps `isComplete` false.
-        awaitAssert(openFrontier(coordinator) should be >= 1, 5.seconds, 100.millis)
+        awaiter.awaitAssert(openFrontier(coordinator) should be >= 1, 5.seconds, 100.millis)
         // No completion is declared while the gap is unhealed (FR-006). ProgressNodesHealed is allowed.
         assertNoCompletion(controller, 1.second)
         missingChild.length shouldBe 32 // sanity: the gap hash is a real keccak-256 child reference

@@ -5,18 +5,15 @@ import java.nio.file.Files
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.testkit.ImplicitSender
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
 
-import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
@@ -51,14 +48,11 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   *   - T-5 (FR-007/SC-003, C6): the same final healed state reaches an identical completion (StateHealingComplete + CF
   *     `g` marker + unchanged state root) decoupled vs coupled (flag flip).
   */
-class DecoupledHealSafetySpec
-    extends TestKit(ActorSystem("DecoupledHealSafetySpec"))
-    with ImplicitSender
-    with AnyFlatSpecLike
-    with Matchers
-    with BeforeAndAfterAll {
+class DecoupledHealSafetySpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
 
-  override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
+  implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
+  implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
+  private val awaiter = org.apache.pekko.testkit.TestProbe()
 
   private def gaugeValue(name: String): Double = {
     val gauge = Metrics.get().registry.find(name).gauge()
@@ -68,7 +62,7 @@ class DecoupledHealSafetySpec
   private def getTrieNodesOf(send: NetworkPeerManagerActor.SendMessage): SNAP.GetTrieNodes =
     send.message.underlyingMsg.asInstanceOf[SNAP.GetTrieNodes]
 
-  private def stats(coordinator: ActorRef): HealingStatistics = {
+  private def stats(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): HealingStatistics = {
     val probe = TestProbe()
     coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref.toTyped[HealingStatistics])
     probe.expectMsgType[HealingStatistics](2.seconds)
@@ -113,17 +107,15 @@ class DecoupledHealSafetySpec
       val storage = new TestMptStorage()
       val networkPeerManager = TestProbe()
       val snapSyncController = TestProbe()
-      val coordinator = system.actorOf(
-        HealingTrieFixtures.coordinatorProps(
-          stateRoot = stateRoot,
-          networkPeerManager = networkPeerManager.ref,
-          requestTracker = new SNAPRequestTracker()(system.scheduler),
-          mptStorage = storage,
-          batchSize = 16,
-          snapSyncController = snapSyncController.ref,
-          healingWriterEcOverride = Some(system.dispatcher),
-          decoupledHealServeRoot = true
-        )
+      val coordinator = HealingTrieFixtures.spawnCoordinator(
+        stateRoot = stateRoot,
+        networkPeerManager = networkPeerManager.ref,
+        requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+        mptStorage = storage,
+        batchSize = 16,
+        snapSyncController = snapSyncController.ref,
+        healingWriterEcOverride = Some(classicSystem.dispatcher),
+        decoupledHealServeRoot = true
       )
 
       // Queue a task whose hash is a fixed value we control; the response will carry DIFFERENT bytes whose
@@ -133,7 +125,7 @@ class DecoupledHealSafetySpec
         Seq((Seq(ByteString(Array[Byte](0x00))), requestedHash))
       )
       val peer = PeerTestHelpers.createTestPeer("safety-t3-peer", TestProbe().ref)
-      coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), TestProbe().ref)
+      coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
       val send = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
       val reqId = getTrieNodesOf(send).requestId
 
@@ -144,7 +136,7 @@ class DecoupledHealSafetySpec
       )
 
       // The wrong-content node is dropped: not stored, not counted as healed, and the task is re-queued.
-      awaitAssert(
+      awaiter.awaitAssert(
         {
           val s = stats(coordinator)
           s.totalNodes shouldBe 0 // not counted as healed
@@ -171,18 +163,16 @@ class DecoupledHealSafetySpec
       val storage = new TestMptStorage()
       val networkPeerManager = TestProbe()
       val snapSyncController = TestProbe()
-      val coordinator = system.actorOf(
-        HealingTrieFixtures.coordinatorProps(
-          stateRoot = stateRoot,
-          networkPeerManager = networkPeerManager.ref,
-          requestTracker = new SNAPRequestTracker()(system.scheduler),
-          mptStorage = storage,
-          batchSize = 16,
-          snapSyncController = snapSyncController.ref,
-          healingWriterEcOverride = Some(system.dispatcher),
-          decoupledHealServeRoot = true,
-          decoupledHealMaxAttemptsNoRefresh = maxAttempts
-        )
+      val coordinator = HealingTrieFixtures.spawnCoordinator(
+        stateRoot = stateRoot,
+        networkPeerManager = networkPeerManager.ref,
+        requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+        mptStorage = storage,
+        batchSize = 16,
+        snapSyncController = snapSyncController.ref,
+        healingWriterEcOverride = Some(classicSystem.dispatcher),
+        decoupledHealServeRoot = true,
+        decoupledHealMaxAttemptsNoRefresh = maxAttempts
       )
 
       // The single unservable task. We drive repeated unsatisfied attempts via the TIMEOUT path: each timeout
@@ -196,12 +186,12 @@ class DecoupledHealSafetySpec
 
       def dispatchAndTimeout(round: Int): Unit = {
         val peer = PeerTestHelpers.createTestPeer(s"safety-t4-peer-$round", TestProbe().ref)
-        coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), TestProbe().ref)
+        coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
         val send = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
         val reqId = getTrieNodesOf(send).requestId
         coordinator ! TrieNodeHealingCoordinator.HealingRequestTimeout(reqId)
         // The task must be back in the pending frontier after the timeout (never abandoned).
-        awaitAssert(stats(coordinator).pendingTasks shouldBe 1, 5.seconds, 100.millis)
+        awaiter.awaitAssert(stats(coordinator).pendingTasks shouldBe 1, 5.seconds, 100.millis)
       }
 
       dispatchAndTimeout(1) // attempts(hash) = 1  (below threshold)
@@ -213,7 +203,7 @@ class DecoupledHealSafetySpec
       // The gauge is the deterministic, machine-checkable observable; we await it because the actor sets it on
       // its own thread. It is a global singleton, so we assert it reaches the expected count rather than an
       // exact start value.
-      awaitAssert(
+      awaiter.awaitAssert(
         gaugeValue("snapsync.healing.decoupled.unservable_tasks.gauge") shouldBe 1.0 +- 1e-9,
         5.seconds,
         100.millis
@@ -225,7 +215,7 @@ class DecoupledHealSafetySpec
       // A serve-root advance is the legitimate retry trigger: it clears the per-task attempt counters and
       // resets the unservable gauge to 0 (the task gets a fresh budget under the new serve root).
       coordinator ! TrieNodeHealingCoordinator.HealingServeRootRefresh(kec256(ByteString("safety-t4-new-serve-root")))
-      awaitAssert(
+      awaiter.awaitAssert(
         gaugeValue("snapsync.healing.decoupled.unservable_tasks.gauge") shouldBe 0.0 +- 1e-9,
         5.seconds,
         100.millis
@@ -275,21 +265,19 @@ class DecoupledHealSafetySpec
 
     val nodes = (0 until 3).map(cleanLeaf)
     val controller = TestProbe()
-    val coordinator = system.actorOf(
-      HealingTrieFixtures.coordinatorProps(
-        stateRoot = root,
-        networkPeerManager = TestProbe().ref,
-        requestTracker = new SNAPRequestTracker()(system.scheduler),
-        mptStorage = storage,
-        batchSize = 64,
-        snapSyncController = controller.ref,
-        healingFrontierStorage = Some(store),
-        healingWriterEcOverride = Some(ec),
-        decoupledHealServeRoot = decoupled
-      )
+    val coordinator = HealingTrieFixtures.spawnCoordinator(
+      stateRoot = root,
+      networkPeerManager = TestProbe().ref,
+      requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
+      mptStorage = storage,
+      batchSize = 64,
+      snapSyncController = controller.ref,
+      healingFrontierStorage = Some(store),
+      healingWriterEcOverride = Some(ec),
+      decoupledHealServeRoot = decoupled
     )
     val death = TestProbe()
-    death.watch(coordinator)
+    death.watch(coordinator.toClassic)
     try {
       // Under decoupling, advancing the serve root must not change the completion outcome (it supplies node
       // bytes only; completion is decided against the unchanged walk root). The served node bytes are the
@@ -300,7 +288,7 @@ class DecoupledHealSafetySpec
         )
       val peer = PeerTestHelpers.createTestPeer(s"parity-peer-$decoupled", TestProbe().ref)
       coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
-      coordinator.tell(TrieNodeHealingCoordinator.HealingPeerAvailable(peer), TestProbe().ref)
+      coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
       coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(
         SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3))
       )
@@ -326,8 +314,8 @@ class DecoupledHealSafetySpec
       root shouldBe freshRoot
       store.isComplete
     } finally {
-      system.stop(coordinator)
-      death.expectTerminated(coordinator, 5.seconds)
+      testKit.stop(coordinator)
+      death.expectTerminated(coordinator.toClassic, 5.seconds)
       pool.shutdown()
       pool.awaitTermination(5, TimeUnit.SECONDS)
       dataSource.destroy()
