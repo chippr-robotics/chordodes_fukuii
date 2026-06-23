@@ -25,6 +25,7 @@ import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerEventBusActor.Command as PeerEventBusCommand
+import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
@@ -45,8 +46,8 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
   * (`idle` / `runningPivotBlockElection`). Peer-list responsibilities move to [[PeerListHelper]] (replacing the
   * self-typed `PeerListSupportNg` trait). The three `scheduler.scheduleOnce` calls become `Behaviors.withTimers`.
   *
-  * Direct `PeerEventBusActor` subscriptions for `BlockHeaders` use `blockHeadersAdapter.toClassic` as the subscriber
-  * identity; PeerListHelper's `PeerDisconnected` subscription uses a separate `messageAdapter` ref. Selection state
+  * Direct `PeerEventBusActor` subscriptions for `BlockHeaders` use `blockHeadersAdapter` (TypedActorRef[PeerEvent]);
+  * PeerListHelper's `PeerDisconnected` subscription uses a separate `messageAdapter` ref. Selection state
   * (`pivotBlockRetryCount`, `totalSelectionAttempts`, `pivotRetryState`) is threaded as immutable [[PivotState]]
   * through behavior factory closures — no mutable `Impl` fields.
   */
@@ -76,10 +77,16 @@ object PivotBlockSelector {
   ): Behavior[Command] =
     Behaviors.setup[Command] { ctx =>
       Behaviors.withTimers[Command] { timers =>
-        val peerDisconnectedAdapter: TypedActorRef[PeerDisconnected] =
-          ctx.messageAdapter[PeerDisconnected](WrappedPeerDisconnected(_))
-        val blockHeadersAdapter: TypedActorRef[MessageFromPeer] =
-          ctx.messageAdapter[MessageFromPeer](WrappedMessageFromPeer(_))
+        val peerDisconnectedAdapter: TypedActorRef[PeerEvent] =
+          ctx.messageAdapter[PeerEvent] {
+            case pd: PeerDisconnected => WrappedPeerDisconnected(pd)
+            case e                    => throw new MatchError(s"unexpected PeerEvent from bus: $e")
+          }
+        val blockHeadersAdapter: TypedActorRef[PeerEvent] =
+          ctx.messageAdapter[PeerEvent] {
+            case mfp: MessageFromPeer => WrappedMessageFromPeer(mfp)
+            case e                    => throw new MatchError(s"unexpected PeerEvent from bus: $e")
+          }
         val handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers] =
           ctx.messageAdapter[NetworkPeerManagerActor.HandshakedPeers](WrappedHandshakedPeers(_))
         val peerListHelper = new PeerListHelper(
@@ -148,7 +155,7 @@ object PivotBlockSelector {
       fastSync: ClassicActorRef,
       blacklist: Blacklist,
       peerListHelper: PeerListHelper,
-      blockHeadersAdapter: TypedActorRef[MessageFromPeer],
+      blockHeadersAdapter: TypedActorRef[PeerEvent],
       handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers]
   ) {
     import syncConfig.*
@@ -178,7 +185,7 @@ object PivotBlockSelector {
                 maxTotalSelectionAttempts
               )
               fastSync ! SelectionFailed
-              peerEventBus ! UnsubscribeAllCmd(blockHeadersAdapter.toClassic)
+              peerEventBus ! UnsubscribeAllCmd(blockHeadersAdapter)
               Behaviors.stopped
             } else {
               startPivotBlockSelection(
@@ -257,7 +264,7 @@ object PivotBlockSelector {
           case WrappedMessageFromPeer(MessageFromPeer(blockHeaders: ETHPackets.BlockHeaders, peerId)) =>
             peerEventBus ! UnsubscribeCmd(
               MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peerId)),
-              blockHeadersAdapter.toClassic
+              blockHeadersAdapter
             )
             val updatedPeersToAsk = peersToAsk - peerId
             blockHeaders.headers.find(_.number == pivotBlockNumber) match {
@@ -277,7 +284,7 @@ object PivotBlockSelector {
             }
           case ElectionPivotBlockTimeout =>
             peersToAsk.foreach(peerId => blacklist.add(peerId, blacklistDuration, PivotBlockElectionTimeout))
-            peerEventBus ! UnsubscribeAllCmd(blockHeadersAdapter.toClassic)
+            peerEventBus ! UnsubscribeAllCmd(blockHeadersAdapter)
             ctx.log.warn(
               "Pivot block header receive timeout. Scheduling retry with backoff (attempt {})",
               state.pivotRetryState.attempt + 1
@@ -308,7 +315,7 @@ object PivotBlockSelector {
           timers.startSingleTimer(ElectionTimeoutKey, ElectionPivotBlockTimeout, peerResponseTimeout)
           runningPivotBlockElection(peersToAsk + additionalPeer, newWaitingPeers, pivotBlockNumber, headers, state)
         } else {
-          peerEventBus ! UnsubscribeAllCmd(blockHeadersAdapter.toClassic)
+          peerEventBus ! UnsubscribeAllCmd(blockHeadersAdapter)
           ctx.log.warn(
             "Not enough votes for pivot block. Scheduling retry with backoff (attempt {})",
             state.pivotRetryState.attempt + 1
@@ -347,13 +354,13 @@ object PivotBlockSelector {
         attempts
       )
       fastSync ! Result(pivotBlockHeader)
-      peerEventBus ! UnsubscribeAllCmd(blockHeadersAdapter.toClassic)
+      peerEventBus ! UnsubscribeAllCmd(blockHeadersAdapter)
     }
 
     private def obtainBlockHeaderFromPeer(peer: PeerId, blockNumber: BigInt): Unit = {
       peerEventBus ! SubscribeCmd(
         MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer)),
-        blockHeadersAdapter.toClassic
+        blockHeadersAdapter
       )
       val getBlockHeadersMsg: MessageSerializable = peerListHelper.handshakedPeers.get(peer) match {
         case Some(peerWithInfo) if Capability.usesRequestId(peerWithInfo.peerInfo.remoteStatus.capability) =>

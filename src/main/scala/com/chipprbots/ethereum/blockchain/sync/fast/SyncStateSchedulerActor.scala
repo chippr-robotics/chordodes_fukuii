@@ -34,6 +34,7 @@ import com.chipprbots.ethereum.mpt.HexPrefix
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerId
+import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.Codes
@@ -79,8 +80,11 @@ object SyncStateSchedulerActor {
   ): Behavior[Command] =
     Behaviors.setup[Command] { ctx =>
       Behaviors.withTimers[Command] { timers =>
-        val peerDisconnectedAdapter: TypedActorRef[PeerDisconnected] =
-          ctx.messageAdapter[PeerDisconnected](WrappedPeerDisconnected(_))
+        val peerDisconnectedAdapter: TypedActorRef[PeerEvent] =
+          ctx.messageAdapter[PeerEvent] {
+            case pd: PeerDisconnected => WrappedPeerDisconnected(pd)
+            case e                    => throw new MatchError(s"unexpected PeerEvent from bus: $e")
+          }
         val peerListHelper = new PeerListHelper(peerEventBus, blacklist, peerDisconnectedAdapter, ctx.log)
         val handshakedPeersAdapter =
           ctx.messageAdapter[NetworkPeerManagerActor.HandshakedPeers](hp => WrappedHandshakedPeers(hp.peers))

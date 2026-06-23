@@ -5,7 +5,6 @@ import java.time.Clock
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -34,11 +33,11 @@ object PeerStatisticsActor {
       }
 
       // Subscribe to messages received from handshaked peers to maintain stats.
-      peerEventBus ! SubscribeCmd(MessageSubscriptionClassifier, eventAdapter.toClassic)
+      peerEventBus ! SubscribeCmd(MessageSubscriptionClassifier, eventAdapter)
       // Removing peers is an optimisation to free space, but eventually the stats would be overwritten anyway.
       peerEventBus ! SubscribeCmd(
         SubscriptionClassifier.PeerDisconnectedClassifier(PeerSelector.AllPeers),
-        eventAdapter.toClassic
+        eventAdapter
       )
 
       active(TimeSlotStats[PeerId, PeerStat](slotDuration, slotCount))

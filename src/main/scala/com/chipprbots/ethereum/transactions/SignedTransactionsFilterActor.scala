@@ -3,7 +3,6 @@ package com.chipprbots.ethereum.transactions
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
@@ -11,6 +10,7 @@ import cats.effect.unsafe.IORuntime
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.domain.SignedTransactionWithSender
 import com.chipprbots.ethereum.network.PeerEventBusActor.Command as PeerEventBusCommand
+import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
@@ -64,22 +64,21 @@ object SignedTransactionsFilterActor {
     var nextRecoveryId: Long = 0L
     var recoveries: Map[Long, RecoveryState] = Map.empty
 
-    // Message adapter: bridges Classic PeerEvent.MessageFromPeer → Typed Command.
-    // The Classic peerEventBus registers the sender() of a Subscribe message.
-    // We use peerMsgAdapter.toClassic as the explicit sender when telling peerEventBus,
-    // so the bus delivers MessageFromPeer events to this Classic-facing adapter,
-    // which wraps them and routes them to this Typed actor as typed Commands.
-    val peerMsgAdapter: ActorRef[MessageFromPeer] =
-      context.messageAdapter[MessageFromPeer] { msg =>
-        msg.message match {
-          case txs: SignedTransactions => PeerSignedTransactions(txs, msg.peerId)
-          case _                       => PeerSignedTransactions(SignedTransactions(Nil), msg.peerId)
-        }
+    // Message adapter: bridges PeerEvent.MessageFromPeer → Typed Command.
+    // The Typed peerEventBus registers the subscriber as a TypedActorRef[PeerEvent].
+    val peerMsgAdapter: ActorRef[PeerEvent] =
+      context.messageAdapter[PeerEvent] {
+        case msg: MessageFromPeer =>
+          msg.message match {
+            case txs: SignedTransactions => PeerSignedTransactions(txs, msg.peerId)
+            case _                       => PeerSignedTransactions(SignedTransactions(Nil), msg.peerId)
+          }
+        case e => throw new MatchError(s"unexpected PeerEvent from bus: $e")
       }
 
     peerEventBus ! SubscribeCmd(
       MessageClassifier(Set(Codes.SignedTransactionsCode), PeerSelector.AllPeers),
-      peerMsgAdapter.toClassic
+      peerMsgAdapter
     )
 
     def recoverSmallBatch(newTransactions: Seq[SignedTransaction], peerId: PeerId): Unit =

@@ -49,6 +49,7 @@ import com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeer
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
@@ -164,7 +165,7 @@ class RegularSyncSpec
         SyncTest
       ) in sync(
         new Fixture(testSystem) {
-          var blockFetcher: ActorRef = uninitialized
+          var blockFetcher: TypedActorRef[PeerEvent] = uninitialized
 
           regularSync ! SyncProtocol.Start
           val sub168 = peerEventBus.expectMsgType[SubscribeCmd]
@@ -464,7 +465,7 @@ class RegularSyncSpec
         regularSync ! SyncProtocol.Start
 
         val sub445 = peerEventBus.expectMsgType[SubscribeCmd]
-        val blockFetcher: ActorRef = sub445.subscriber
+        val blockFetcher: TypedActorRef[PeerEvent] = sub445.subscriber
         sub445.subscriber ! MessageFromPeer(
           NewBlock(originalBranch.last, ChainWeight(originalBranch.last.number).totalDifficulty),
           defaultPeer.id

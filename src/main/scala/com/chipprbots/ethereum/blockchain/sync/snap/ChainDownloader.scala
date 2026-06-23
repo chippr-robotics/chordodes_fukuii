@@ -29,6 +29,7 @@ import com.chipprbots.ethereum.domain.Receipt
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.Capability
@@ -949,8 +950,11 @@ object ChainDownloader {
   ): Behavior[Command] =
     Behaviors.setup { context =>
       Behaviors.withTimers { timers =>
-        val peerDisconnectedAdapter: TypedActorRef[PeerDisconnected] =
-          context.messageAdapter[PeerDisconnected](d => PeerGone(d.peerId))
+        val peerDisconnectedAdapter: TypedActorRef[PeerEvent] =
+          context.messageAdapter[PeerEvent] {
+            case PeerDisconnected(peerId) => PeerGone(peerId)
+            case e                        => throw new MatchError(s"unexpected PeerEvent from bus: $e")
+          }
 
         val peerListHelper = new PeerListHelper(
           peerEventBus,

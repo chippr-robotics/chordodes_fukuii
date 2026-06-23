@@ -52,6 +52,7 @@ import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerId
+import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.p2p.messages.Codes
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
@@ -89,8 +90,11 @@ object FastSync {
   ): Behavior[Command] =
     Behaviors.setup[Command] { ctx =>
       Behaviors.withTimers[Command] { timers =>
-        val peerDisconnectedAdapter: TypedActorRef[PeerDisconnected] =
-          ctx.messageAdapter[PeerDisconnected](WrappedPeerDisconnected(_))
+        val peerDisconnectedAdapter: TypedActorRef[PeerEvent] =
+          ctx.messageAdapter[PeerEvent] {
+            case pd: PeerDisconnected => WrappedPeerDisconnected(pd)
+            case e                    => throw new MatchError(s"unexpected PeerEvent from bus: $e")
+          }
         val handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers] =
           ctx.messageAdapter[NetworkPeerManagerActor.HandshakedPeers](WrappedHandshakedPeers(_))
         // Immediate first poll + periodic rescans (matches PeerListSupportNg's 0-delay scheduleWithFixedDelay).
@@ -141,7 +145,7 @@ object FastSync {
       val syncConfig: SyncConfig,
       configBuilder: BlockchainConfigBuilder,
       syncController: ActorRef,
-      peerDisconnectedAdapter: TypedActorRef[PeerDisconnected],
+      peerDisconnectedAdapter: TypedActorRef[PeerEvent],
       handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers]
   ) extends ReceiptsValidator
       with SyncBlocksValidator {

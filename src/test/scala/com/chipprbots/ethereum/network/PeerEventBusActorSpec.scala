@@ -2,9 +2,9 @@ package com.chipprbots.ethereum.network
 
 import java.net.InetSocketAddress
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.stream.scaladsl.Sink
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
@@ -17,6 +17,7 @@ import com.chipprbots.ethereum.Fixtures
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
+import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerHandshakeSuccessful
@@ -44,9 +45,9 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     val probe2: TestProbe = TestProbe()(classicSystem)
     val classifier1: MessageClassifier = MessageClassifier(Set(Ping.code), PeerSelector.WithId(PeerId("1")))
     val classifier2: MessageClassifier = MessageClassifier(Set(Ping.code), PeerSelector.AllPeers)
-    peerEventBusActor ! SubscribeCmd(classifier1, probe1.ref)
+    peerEventBusActor ! SubscribeCmd(classifier1, probe1.ref.toTyped[PeerEvent])
 
-    peerEventBusActor ! SubscribeCmd(classifier2, probe2.ref)
+    peerEventBusActor ! SubscribeCmd(classifier2, probe2.ref.toTyped[PeerEvent])
 
     val msgFromPeer: MessageFromPeer = MessageFromPeer(Ping(), PeerId("1"))
     peerEventBusActor ! PublishCmd(msgFromPeer)
@@ -54,7 +55,7 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     probe1.expectMsg(msgFromPeer)
     probe2.expectMsg(msgFromPeer)
 
-    peerEventBusActor ! UnsubscribeCmd(classifier1, probe1.ref)
+    peerEventBusActor ! UnsubscribeCmd(classifier1, probe1.ref.toTyped[PeerEvent])
 
     val msgFromPeer2: MessageFromPeer = MessageFromPeer(Ping(), PeerId("99"))
     peerEventBusActor ! PublishCmd(msgFromPeer2)
@@ -76,7 +77,7 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     // Sync: syncProbe subscribed after both stream SubscribeCmds (same test thread → FIFO).
     // Once syncProbe confirms both publishes, both stream actors have their elements buffered.
     val syncProbe: TestProbe = TestProbe()(classicSystem)
-    peerEventBusActor ! SubscribeCmd(classifier2, syncProbe.ref)
+    peerEventBusActor ! SubscribeCmd(classifier2, syncProbe.ref.toTyped[PeerEvent])
 
     val msgFromPeer: MessageFromPeer = MessageFromPeer(Ping(), PeerId("1"))
     peerEventBusActor ! PublishCmd(msgFromPeer)
@@ -95,7 +96,7 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
 
     val probe1: TestProbe = TestProbe()
     val classifier1: MessageClassifier = MessageClassifier(Set(Ping.code), PeerSelector.WithId(PeerId("1")))
-    peerEventBusActor ! SubscribeCmd(classifier1, probe1.ref)
+    peerEventBusActor ! SubscribeCmd(classifier1, probe1.ref.toTyped[PeerEvent])
 
     val msgFromPeer: MessageFromPeer = MessageFromPeer(Ping(), PeerId("1"))
     peerEventBusActor ! PublishCmd(msgFromPeer)
@@ -111,9 +112,18 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
 
     val probe1: TestProbe = TestProbe()
     val probe2: TestProbe = TestProbe()
-    peerEventBusActor ! SubscribeCmd(PeerDisconnectedClassifier(PeerSelector.WithId(PeerId("1"))), probe1.ref)
-    peerEventBusActor ! SubscribeCmd(PeerDisconnectedClassifier(PeerSelector.WithId(PeerId("2"))), probe1.ref)
-    peerEventBusActor ! SubscribeCmd(PeerDisconnectedClassifier(PeerSelector.WithId(PeerId("2"))), probe2.ref)
+    peerEventBusActor ! SubscribeCmd(
+      PeerDisconnectedClassifier(PeerSelector.WithId(PeerId("1"))),
+      probe1.ref.toTyped[PeerEvent]
+    )
+    peerEventBusActor ! SubscribeCmd(
+      PeerDisconnectedClassifier(PeerSelector.WithId(PeerId("2"))),
+      probe1.ref.toTyped[PeerEvent]
+    )
+    peerEventBusActor ! SubscribeCmd(
+      PeerDisconnectedClassifier(PeerSelector.WithId(PeerId("2"))),
+      probe2.ref.toTyped[PeerEvent]
+    )
 
     val msgPeerDisconnected: PeerDisconnected = PeerDisconnected(PeerId("2"))
     peerEventBusActor ! PublishCmd(msgPeerDisconnected)
@@ -121,7 +131,10 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     probe1.expectMsg(msgPeerDisconnected)
     probe2.expectMsg(msgPeerDisconnected)
 
-    peerEventBusActor ! UnsubscribeCmd(PeerDisconnectedClassifier(PeerSelector.WithId(PeerId("2"))), probe1.ref)
+    peerEventBusActor ! UnsubscribeCmd(
+      PeerDisconnectedClassifier(PeerSelector.WithId(PeerId("2"))),
+      probe1.ref.toTyped[PeerEvent]
+    )
 
     peerEventBusActor ! PublishCmd(msgPeerDisconnected)
     probe1.expectNoMessage()
@@ -132,8 +145,8 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
 
     val probe1: TestProbe = TestProbe()
     val probe2: TestProbe = TestProbe()
-    peerEventBusActor ! SubscribeCmd(PeerHandshaked, probe1.ref)
-    peerEventBusActor ! SubscribeCmd(PeerHandshaked, probe2.ref)
+    peerEventBusActor ! SubscribeCmd(PeerHandshaked, probe1.ref.toTyped[PeerEvent])
+    peerEventBusActor ! SubscribeCmd(PeerHandshaked, probe2.ref.toTyped[PeerEvent])
 
     val peerHandshaked =
       new Peer(
@@ -149,7 +162,7 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     probe1.expectMsg(msgPeerHandshaked)
     probe2.expectMsg(msgPeerHandshaked)
 
-    peerEventBusActor ! UnsubscribeCmd(PeerHandshaked, probe1.ref)
+    peerEventBusActor ! UnsubscribeCmd(PeerHandshaked, probe1.ref.toTyped[PeerEvent])
 
     peerEventBusActor ! PublishCmd(msgPeerHandshaked)
     probe1.expectNoMessage()
@@ -164,11 +177,11 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     val probe1: TestProbe = TestProbe()
     peerEventBusActor ! SubscribeCmd(
       MessageClassifier(Set(Ping.code, Ping.code), PeerSelector.WithId(PeerId("1"))),
-      probe1.ref
+      probe1.ref.toTyped[PeerEvent]
     )
     peerEventBusActor ! SubscribeCmd(
       MessageClassifier(Set(Ping.code, Pong.code), PeerSelector.WithId(PeerId("1"))),
-      probe1.ref
+      probe1.ref.toTyped[PeerEvent]
     )
 
     val msgFromPeer: MessageFromPeer = MessageFromPeer(Ping(), PeerId("1"))
@@ -186,11 +199,11 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     val probe1: TestProbe = TestProbe()
     peerEventBusActor ! SubscribeCmd(
       MessageClassifier(Set(Ping.code), PeerSelector.WithId(PeerId("1"))),
-      probe1.ref
+      probe1.ref.toTyped[PeerEvent]
     )
     peerEventBusActor ! SubscribeCmd(
       MessageClassifier(Set(Ping.code), PeerSelector.AllPeers),
-      probe1.ref
+      probe1.ref.toTyped[PeerEvent]
     )
 
     val msgFromPeer: MessageFromPeer = MessageFromPeer(Ping(), PeerId("1"))
@@ -206,7 +219,10 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     // Receive based on AllPeers subscription
     probe1.expectMsg(msgFromPeer2)
 
-    peerEventBusActor ! UnsubscribeCmd(MessageClassifier(Set(Ping.code), PeerSelector.AllPeers), probe1.ref)
+    peerEventBusActor ! UnsubscribeCmd(
+      MessageClassifier(Set(Ping.code), PeerSelector.AllPeers),
+      probe1.ref.toTyped[PeerEvent]
+    )
     peerEventBusActor ! PublishCmd(msgFromPeer)
 
     // Still received after unsubscribing from AllPeers
@@ -218,11 +234,11 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     val probe1: TestProbe = TestProbe()
     peerEventBusActor ! SubscribeCmd(
       MessageClassifier(Set(Ping.code), PeerSelector.WithId(PeerId("1"))),
-      probe1.ref
+      probe1.ref.toTyped[PeerEvent]
     )
     peerEventBusActor ! SubscribeCmd(
       MessageClassifier(Set(Ping.code, Pong.code), PeerSelector.WithId(PeerId("1"))),
-      probe1.ref
+      probe1.ref.toTyped[PeerEvent]
     )
 
     val msgFromPeer: MessageFromPeer = MessageFromPeer(Pong(), PeerId("1"))
@@ -236,11 +252,11 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     val probe1: TestProbe = TestProbe()
     peerEventBusActor ! SubscribeCmd(
       MessageClassifier(Set(Ping.code), PeerSelector.WithId(PeerId("1"))),
-      probe1.ref
+      probe1.ref.toTyped[PeerEvent]
     )
     peerEventBusActor ! SubscribeCmd(
       MessageClassifier(Set(), PeerSelector.WithId(PeerId("1"))),
-      probe1.ref
+      probe1.ref.toTyped[PeerEvent]
     )
 
     val msgFromPeer: MessageFromPeer = MessageFromPeer(Ping(), PeerId("1"))
@@ -254,7 +270,7 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     val probe1: TestProbe = TestProbe()
     peerEventBusActor ! SubscribeCmd(
       MessageClassifier(Set(Ping.code, Pong.code), PeerSelector.WithId(PeerId("1"))),
-      probe1.ref
+      probe1.ref.toTyped[PeerEvent]
     )
 
     val msgFromPeer1: MessageFromPeer = MessageFromPeer(Ping(), PeerId("1"))
@@ -265,7 +281,10 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     probe1.expectMsg(msgFromPeer1)
     probe1.expectMsg(msgFromPeer2)
 
-    peerEventBusActor ! UnsubscribeCmd(MessageClassifier(Set(Pong.code), PeerSelector.WithId(PeerId("1"))), probe1.ref)
+    peerEventBusActor ! UnsubscribeCmd(
+      MessageClassifier(Set(Pong.code), PeerSelector.WithId(PeerId("1"))),
+      probe1.ref.toTyped[PeerEvent]
+    )
 
     peerEventBusActor ! PublishCmd(msgFromPeer1)
     peerEventBusActor ! PublishCmd(msgFromPeer2)
@@ -273,7 +292,7 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     probe1.expectMsg(msgFromPeer1)
     probe1.expectNoMessage()
 
-    peerEventBusActor ! UnsubscribeAllCmd(probe1.ref)
+    peerEventBusActor ! UnsubscribeAllCmd(probe1.ref.toTyped[PeerEvent])
 
     peerEventBusActor ! PublishCmd(msgFromPeer1)
     peerEventBusActor ! PublishCmd(msgFromPeer2)

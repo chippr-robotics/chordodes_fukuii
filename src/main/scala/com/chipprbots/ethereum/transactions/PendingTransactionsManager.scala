@@ -6,7 +6,6 @@ import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.MailboxSelector
 import org.apache.pekko.actor.typed.pubsub.Topic
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.duration.*
@@ -114,12 +113,12 @@ object PendingTransactionsManager {
       context.messageAdapter[PeerEvent](WrappedPeerEvent.apply)
 
     // Subscribe to peer events via the peerEventBus
-    peerEventBus ! SubscribeCmd(SubscriptionClassifier.PeerHandshaked, peerEventAdapter.toClassic)
+    peerEventBus ! SubscribeCmd(SubscriptionClassifier.PeerHandshaked, peerEventAdapter)
     peerEventBus ! SubscribeCmd(
       SubscriptionClassifier.PeerDisconnectedClassifier(
         com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector.AllPeers
       ),
-      peerEventAdapter.toClassic
+      peerEventAdapter
     )
     // Subscribe to NewPooledTransactionHashes and PooledTransactions for tx pool protocol
     peerEventBus ! SubscribeCmd(
@@ -127,7 +126,7 @@ object PendingTransactionsManager {
         Set(Codes.NewPooledTransactionHashesCode, Codes.PooledTransactionsCode),
         com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector.AllPeers
       ),
-      peerEventAdapter.toClassic
+      peerEventAdapter
     )
 
     /** stores information which tx hashes are "known" by which peers */

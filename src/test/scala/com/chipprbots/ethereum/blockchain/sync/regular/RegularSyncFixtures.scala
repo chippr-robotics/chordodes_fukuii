@@ -4,6 +4,7 @@ import java.net.InetSocketAddress
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.PoisonPill
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.pattern.ask
 import org.apache.pekko.testkit.TestActor.AutoPilot
@@ -41,6 +42,7 @@ import com.chipprbots.ethereum.ledger.*
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
 import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.MessageClassifier
@@ -461,7 +463,7 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
 
     override lazy val consensusAdapter: ConsensusAdapter = stub[ConsensusAdapter]
 
-    var blockFetcher: ActorRef = uninitialized
+    var blockFetcher: TypedActorRef[PeerEvent] = uninitialized
 
     var importedNewBlock = false
     var importedLastTestBlock = false

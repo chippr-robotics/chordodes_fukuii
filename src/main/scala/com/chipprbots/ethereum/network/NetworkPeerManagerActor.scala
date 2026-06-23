@@ -105,7 +105,7 @@ object NetworkPeerManagerActor {
         // deliver to the Typed core. The same adapter ref is used as the sender for all
         // Subscribe / Unsubscribe calls to PeerEventBusActor (which runs via its own Classic
         // shell that captures sender() as the subscriber).
-        val eventAdapter: ActorRef = ctx.messageAdapter[PeerEvent](PeerEventCmd(_)).toClassic
+        val eventAdapter: typed.ActorRef[PeerEvent] = ctx.messageAdapter[PeerEvent](PeerEventCmd(_))
 
         // Subscribe to the event of any peer getting handshaked
         peerEventBusActor ! SubscribeCmd(PeerHandshaked, eventAdapter)
@@ -162,7 +162,7 @@ object NetworkPeerManagerActor {
   final private class Impl(
       ctx: TypedActorContext[Command],
       timers: TimerScheduler[Command],
-      eventAdapter: ActorRef,
+      eventAdapter: typed.ActorRef[PeerEvent],
       peerManagerActor: typed.ActorRef[PeerManagerActor.Command],
       peerEventBusActor: typed.ActorRef[PeerEventBusActor.Command],
       appStateStorage: AppStateStorage,

@@ -14,6 +14,7 @@ import com.chipprbots.ethereum.blockchain.sync.regular.BlockBroadcast.BlockToBro
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
@@ -36,7 +37,11 @@ object BlockBroadcasterActor {
   ): Behavior[BroadcasterMsg] =
     Behaviors.setup { ctx =>
       Behaviors.withTimers { timers =>
-        val peerDisconnectedAdapter = ctx.messageAdapter[PeerDisconnected](WrappedPeerDisconnected.apply)
+        val peerDisconnectedAdapter: TypedActorRef[PeerEvent] =
+          ctx.messageAdapter[PeerEvent] {
+            case pd: PeerDisconnected => WrappedPeerDisconnected(pd)
+            case e                    => throw new MatchError(s"unexpected PeerEvent from bus: $e")
+          }
         val handshakedPeersAdapter =
           ctx.messageAdapter[NetworkPeerManagerActor.HandshakedPeers](msg => WrappedHandshakedPeers(msg.peers))
 

@@ -11,6 +11,7 @@ import scala.reflect.ClassTag
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerEventBusActor.Command as PeerEventBusCommand
+import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
@@ -60,20 +61,29 @@ object PeerRequestHandler {
           case _                              => None
         }
 
-        val msgAdapter = ctx.messageAdapter[MessageFromPeer] { case MessageFromPeer(m, _) => MessageFromPeerCmd(m) }
-        val disconnectAdapter = ctx.messageAdapter[PeerDisconnected] { case PeerDisconnected(pid) => PeerLeftCmd(pid) }
+        val msgAdapter: TypedActorRef[PeerEvent] =
+          ctx.messageAdapter[PeerEvent] {
+            case MessageFromPeer(m, _) => MessageFromPeerCmd(m)
+            case e                     => throw new MatchError(s"unexpected PeerEvent from bus: $e")
+          }
+        val disconnectAdapter: TypedActorRef[PeerEvent] =
+          ctx.messageAdapter[PeerEvent] {
+            case PeerDisconnected(pid) => PeerLeftCmd(pid)
+            case e                     => throw new MatchError(s"unexpected PeerEvent from bus: $e")
+          }
 
+        // Classic tell with sender: msgAdapter.toClassic is a TCP bridge constraint, not a subscription call.
         networkPeerManager.tell(
           NetworkPeerManagerActor.SendMessage(toSerializable(requestMsg), peer.id),
           msgAdapter.toClassic
         )
         peerEventBus ! SubscribeCmd(
           PeerDisconnectedClassifier(PeerSelector.WithId(peer.id)),
-          disconnectAdapter.toClassic
+          disconnectAdapter
         )
         peerEventBus ! SubscribeCmd(
           MessageClassifier(Set(responseMsgCode), PeerSelector.WithId(peer.id)),
-          msgAdapter.toClassic
+          msgAdapter
         )
         timers.startSingleTimer("timeout", TimeoutCmd, responseTimeout)
 
@@ -81,8 +91,8 @@ object PeerRequestHandler {
 
         def cleanup(): Unit = {
           timers.cancel("timeout")
-          peerEventBus ! UnsubscribeAllCmd(msgAdapter.toClassic)
-          peerEventBus ! UnsubscribeAllCmd(disconnectAdapter.toClassic)
+          peerEventBus ! UnsubscribeAllCmd(msgAdapter)
+          peerEventBus ! UnsubscribeAllCmd(disconnectAdapter)
         }
 
         Behaviors.receiveMessage {

@@ -7,7 +7,6 @@ import org.apache.pekko.actor.typed.scaladsl.AbstractBehavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
@@ -84,25 +83,22 @@ class BlockFetcher(
     )
   context.watch(stateNodeFetcher)
 
-  private def subscribeAdapter(
-      fetcher: ActorRef[BlockFetcher.AdaptedMessageFromEventBus]
-  ): Behaviors.Receive[MessageFromPeer] =
-    Behaviors.receiveMessage[PeerEventBusActor.PeerEvent.MessageFromPeer] { case MessageFromPeer(message, peerId) =>
-      fetcher ! AdaptedMessageFromEventBus(message, peerId)
-      Behaviors.same
-    }
-
   override def onMessage(message: FetchCommand): Behavior[FetchCommand] =
     message match {
       case Start(importer, fromBlock) =>
         log.debug("BlockFetcher starting from block {} with importer {}", fromBlock, importer)
-        val sa = context.spawn(subscribeAdapter(context.self), "fetcher-subscribe-adapter")
+        // messageAdapter typed at PeerEvent so the ref satisfies SubscribeCmd's TypedActorRef[PeerEvent] parameter.
+        // Only MessageFromPeer arrives here because the classifier filters to message codes only.
+        val sa: ActorRef[PeerEventBusActor.PeerEvent] =
+          context.messageAdapter[PeerEventBusActor.PeerEvent] { case MessageFromPeer(m, p) =>
+            AdaptedMessageFromEventBus(m, p)
+          }
         peerEventBus ! SubscribeCmd(
           MessageClassifier(
             Set(Codes.NewBlockCode, Codes.NewBlockHashesCode, Codes.BlockHeadersCode, Codes.BlockRangeUpdateCode),
             PeerSelector.AllPeers
           ),
-          sa.toClassic
+          sa
         )
         log.debug("BlockFetcher subscribed to peer events")
         // 500ms stall-recovery heartbeat: fills open header slots if the primary reactive

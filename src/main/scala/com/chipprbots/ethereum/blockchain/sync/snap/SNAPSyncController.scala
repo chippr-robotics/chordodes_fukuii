@@ -96,9 +96,11 @@ private class SNAPSyncControllerImpl(
     new PeerListHelper(
       peerEventBus,
       blacklist,
-      ctx.messageAdapter[com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected](ev =>
-        WrappedPeerDisconnected(ev.peerId)
-      ),
+      ctx.messageAdapter[com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent] {
+        case com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected(peerId) =>
+          WrappedPeerDisconnected(peerId)
+        case e => throw new MatchError(s"unexpected PeerEvent from bus: $e")
+      },
       org.slf4j.LoggerFactory.getLogger(getClass)
     ) {
       override protected def onPeerListUpdated(

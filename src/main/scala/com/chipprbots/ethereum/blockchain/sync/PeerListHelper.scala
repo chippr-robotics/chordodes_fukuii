@@ -1,7 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync
 
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -13,7 +12,7 @@ import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerEventBusActor.Command as PeerEventBusCommand
-import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
+import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.PeerDisconnectedClassifier
@@ -34,7 +33,7 @@ import com.chipprbots.ethereum.network.PeerId
 class PeerListHelper(
     peerEventBus: TypedActorRef[PeerEventBusCommand],
     blacklist: Blacklist,
-    peerDisconnectedAdapter: TypedActorRef[PeerDisconnected],
+    peerDisconnectedAdapter: TypedActorRef[PeerEvent],
     log: Logger,
     sharedRateTracker: Option[PeerRateTracker] = None
 ) {
@@ -140,7 +139,7 @@ class PeerListHelper(
         log.debug("Peer {} chainWeight: {}", peerId, peerWithInfo.peerInfo.chainWeight)
         peerEventBus ! SubscribeCmd(
           PeerDisconnectedClassifier(PeerSelector.WithId(peerId)),
-          peerDisconnectedAdapter.toClassic
+          peerDisconnectedAdapter
         )
       }
     }
@@ -167,7 +166,7 @@ class PeerListHelper(
       log.debug("Removing disconnected peer {} ({})", peerId, peerInfo.peer.remoteAddress)
       peerEventBus ! UnsubscribeCmd(
         PeerDisconnectedClassifier(PeerSelector.WithId(peerId)),
-        peerDisconnectedAdapter.toClassic
+        peerDisconnectedAdapter
       )
       ethRateTracker.removePeer(peerId.value)
       blacklist.remove(peerId)

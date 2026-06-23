@@ -22,6 +22,7 @@ import com.chipprbots.ethereum.domain.Blockchain
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.Codes
@@ -122,8 +123,11 @@ object FastSyncBranchResolverActor {
   ): Behavior[Command] =
     Behaviors.setup { context =>
       Behaviors.withTimers { timers =>
-        val peerDisconnectedAdapter: TypedActorRef[PeerDisconnected] =
-          context.messageAdapter[PeerDisconnected](PeerDisconnectedMsg(_))
+        val peerDisconnectedAdapter: TypedActorRef[PeerEvent] =
+          context.messageAdapter[PeerEvent] {
+            case pd: PeerDisconnected => PeerDisconnectedMsg(pd)
+            case e                    => throw new MatchError(s"unexpected PeerEvent from bus: $e")
+          }
 
         val handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers] =
           context.messageAdapter[NetworkPeerManagerActor.HandshakedPeers](HandshakedPeersMsg(_))

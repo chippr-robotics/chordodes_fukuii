@@ -5,7 +5,6 @@ import org.apache.pekko.actor.typed
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
@@ -70,8 +69,8 @@ object BlockchainHostActor {
 
     // Typed subscriber ref: PEA's Classic shell captures sender() as the subscriber. The adapter lifts
     // delivered PeerEvents into this behavior's Command, then routes them back through the Classic event bus.
-    val peerEventAdapter: ActorRef =
-      context.messageAdapter[PeerEvent](PeerEventReceived(_)).toClassic
+    val peerEventAdapter: typed.ActorRef[PeerEvent] =
+      context.messageAdapter[PeerEvent](PeerEventReceived(_))
 
     peerEventBusActor ! SubscribeCmd(MessageClassifier(requestMsgsCodes, PeerSelector.AllPeers), peerEventAdapter)
 

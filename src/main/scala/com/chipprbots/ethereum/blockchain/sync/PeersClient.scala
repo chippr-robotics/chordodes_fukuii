@@ -16,6 +16,7 @@ import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MaintainedPeersChanged
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.PeerEventBusActor.Command as PeerEventBusCommand
@@ -90,15 +91,19 @@ object PeersClient {
         ctx.messageAdapter[NetworkPeerManagerActor.HandshakedPeers] {
           case NetworkPeerManagerActor.HandshakedPeers(peers) => HandshakedPeersCmd(peers)
         }
-      val peerDisconnectedAdapter =
-        ctx.messageAdapter[PeerDisconnected] { case PeerDisconnected(peerId) => PeerDisconnectedCmd(peerId) }
-      val maintainedAdapter =
-        ctx.messageAdapter[MaintainedPeersChanged] { case MaintainedPeersChanged(nodeIds) =>
-          MaintainedPeersChangedCmd(nodeIds)
+      val peerDisconnectedAdapter: TypedActorRef[PeerEvent] =
+        ctx.messageAdapter[PeerEvent] {
+          case PeerDisconnected(peerId) => PeerDisconnectedCmd(peerId)
+          case e                        => throw new MatchError(s"unexpected PeerEvent from bus: $e")
+        }
+      val maintainedAdapter: TypedActorRef[PeerEvent] =
+        ctx.messageAdapter[PeerEvent] {
+          case MaintainedPeersChanged(nodeIds) => MaintainedPeersChangedCmd(nodeIds)
+          case e                               => throw new MatchError(s"unexpected PeerEvent from bus: $e")
         }
 
       // Besu alignment: subscribe at startup so updates arrive before any BlacklistPeer message.
-      peerEventBus ! SubscribeCmd(MaintainedPeersClassifier, maintainedAdapter.toClassic)
+      peerEventBus ! SubscribeCmd(MaintainedPeersClassifier, maintainedAdapter)
 
       Behaviors.withTimers { timers =>
         timers.startTimerWithFixedDelay("scan-peers", ScanPeersTick, 0.seconds, syncConfig.peersScanInterval)
@@ -129,7 +134,7 @@ object PeersClient {
       blacklist: Blacklist,
       syncConfig: SyncConfig,
       handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers],
-      peerDisconnectedAdapter: TypedActorRef[PeerDisconnected]
+      peerDisconnectedAdapter: TypedActorRef[PeerEvent]
   ) {
 
     private var _maintainedNodeIdHexes: Set[String] = Set.empty

@@ -194,14 +194,11 @@ object PeerManagerActor {
       }
 
     // HERALD-2 #2: the core's own subscriber ref for PeerEventBus events. Spawned PeerActors publish
-    // PeerHandshakeSuccessful to the event bus, which delivers it here as PeerEventReceived. This adapter is ALSO used
-    // as the Classic `sender()` when the core tells a PeerActor HandleConnection / ConnectTo: a PeerActor that replies
-    // to its sender (or a test probe standing in for one that does) lands the reply back on this adapter, so the
-    // handshake event reaches the core whether it arrives via the event bus or via a direct parent-reply.
-    private val peerEventAdapter: ActorRef =
-      context.messageAdapter[PeerEvent](PeerEventReceived(_)).toClassic
+    // PeerHandshakeSuccessful to the event bus, which delivers it here as PeerEventReceived.
+    private val peerEventAdapter: typed.ActorRef[PeerEvent] =
+      context.messageAdapter[PeerEvent](PeerEventReceived(_))
 
-    // Subscribe the core (via its peerEventAdapter as the Classic sender()) to the handshake event of any peer.
+    // Subscribe the core to the handshake event of any peer.
     peerEventBus ! SubscribeCmd(SubscriptionClassifier.PeerHandshaked, peerEventAdapter)
 
     /** Maximum number of blacklisted nodes will never be larger than number of peers provided by discovery Discovery
@@ -570,7 +567,8 @@ object PeerManagerActor {
           val (peer, newConnectedPeers) = createPeer(address, incomingConnection = true, connectedPeers)
           // Send with peerEventAdapter as the Classic sender so a reply (in tests, probe.reply(PeerHandshakeSuccessful))
           // routes back to the core as PeerEventReceived. In production the real PeerActor publishes to the event bus.
-          peer.ref.tell(PeerActor.HandleConnection(connection, remoteAddress), peerEventAdapter)
+          // `.toClassic` here is a Classic tell constraint (sender: ActorRef), not a subscription bridge.
+          peer.ref.tell(PeerActor.HandleConnection(connection, remoteAddress), peerEventAdapter.toClassic)
           listening(newConnectedPeers)
 
         case Left(error) =>
@@ -608,7 +606,7 @@ object PeerManagerActor {
       validConnection match {
         case Right(address) =>
           val (peer, newConnectedPeers) = createPeer(address, incomingConnection = false, connectedPeers)
-          peer.ref.tell(PeerActor.ConnectTo(uri), peerEventAdapter)
+          peer.ref.tell(PeerActor.ConnectTo(uri), peerEventAdapter.toClassic)
           if maintainedPeersByNodeId.values.exists(_ == uri) then {
             pendingMaintainedConnections(peer.ref) = uri
           }

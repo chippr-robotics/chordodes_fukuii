@@ -1,12 +1,10 @@
 package com.chipprbots.ethereum.network
 
 import org.apache.pekko.NotUsed
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.event.ActorEventBus
 import org.apache.pekko.stream.OverflowStrategy
 import org.apache.pekko.stream.scaladsl.Source
 
@@ -43,7 +41,7 @@ object PeerEventBusActor {
       .actorRef[MessageFromPeer](PartialFunction.empty, PartialFunction.empty, 64, OverflowStrategy.dropHead)
       .watch(peerEventBus.toClassic)
       .mapMaterializedValue { actorRef =>
-        peerEventBus ! SubscribeCmd(messageClassifier, actorRef)
+        peerEventBus ! SubscribeCmd(messageClassifier, actorRef.toTyped[PeerEvent])
         NotUsed
       }
 
@@ -80,14 +78,11 @@ object PeerEventBusActor {
     case class MaintainedPeersChanged(nodeIds: Set[String]) extends PeerEvent
   }
 
-  case class Subscription(subscriber: ActorRef, classifier: SubscriptionClassifier)
+  case class Subscription(subscriber: TypedActorRef[PeerEvent], classifier: SubscriptionClassifier)
 
-  class PeerEventBus extends ActorEventBus {
+  class PeerEventBus {
 
-    override type Event = PeerEvent
-    override type Classifier = SubscriptionClassifier
-
-    private var messageSubscriptions: Map[(Subscriber, PeerSelector), Set[Int]] = Map.empty
+    private var messageSubscriptions: Map[(TypedActorRef[PeerEvent], PeerSelector), Set[Int]] = Map.empty
     private var connectionSubscriptions: Seq[Subscription] = Nil
 
     /** Subscribes the subscriber to a requested event
@@ -98,7 +93,7 @@ object PeerEventBusActor {
       * @return
       *   true if successful and false if not (because it was already subscribed to that Classifier, or otherwise)
       */
-    override def subscribe(subscriber: ActorRef, to: Classifier): Boolean = to match {
+    def subscribe(subscriber: TypedActorRef[PeerEvent], to: SubscriptionClassifier): Boolean = to match {
       case msgClassifier: MessageClassifier => subscribeToMessageReceived(subscriber, msgClassifier)
       case _                                => subscribeToConnectionEvent(subscriber, to)
     }
@@ -111,7 +106,7 @@ object PeerEventBusActor {
       * @return
       *   true if successful and false if not (because it wasn't subscribed to that Classifier, or otherwise)
       */
-    override def unsubscribe(subscriber: ActorRef, from: Classifier): Boolean = from match {
+    def unsubscribe(subscriber: TypedActorRef[PeerEvent], from: SubscriptionClassifier): Boolean = from match {
       case msgClassifier: MessageClassifier => unsubscribeFromMessageReceived(subscriber, msgClassifier)
       case _                                => unsubscribeFromConnectionEvent(subscriber, from)
     }
@@ -120,14 +115,14 @@ object PeerEventBusActor {
       *
       * @param subscriber
       */
-    override def unsubscribe(subscriber: ActorRef): Unit = {
+    def unsubscribe(subscriber: TypedActorRef[PeerEvent]): Unit = {
       messageSubscriptions = messageSubscriptions.filter { case ((sub, _), _) =>
         sub != subscriber
       }
       connectionSubscriptions = connectionSubscriptions.filterNot(_.subscriber == subscriber)
     }
 
-    override def publish(event: PeerEvent): Unit = {
+    def publish(event: PeerEvent): Unit = {
       val interestedSubscribers = event match {
         case MessageFromPeer(message, peerId) =>
           messageSubscriptions
@@ -164,7 +159,7 @@ object PeerEventBusActor {
       * @return
       *   true if successful and false if not (because it was already subscribed to that Classifier, or otherwise)
       */
-    private def subscribeToMessageReceived(subscriber: ActorRef, to: MessageClassifier): Boolean = {
+    private def subscribeToMessageReceived(subscriber: TypedActorRef[PeerEvent], to: MessageClassifier): Boolean = {
       val newSubscriptions = messageSubscriptions.get((subscriber, to.peerSelector)) match {
         case Some(messageCodes) =>
           messageSubscriptions + ((subscriber, to.peerSelector) -> (messageCodes ++ to.messageCodes))
@@ -185,7 +180,10 @@ object PeerEventBusActor {
       * @return
       *   true if successful and false if not (because it was already subscribed to that Classifier, or otherwise)
       */
-    private def subscribeToConnectionEvent(subscriber: ActorRef, to: Classifier): Boolean = {
+    private def subscribeToConnectionEvent(
+        subscriber: TypedActorRef[PeerEvent],
+        to: SubscriptionClassifier
+    ): Boolean = {
       val subscription = Subscription(subscriber, to)
       if connectionSubscriptions.contains(subscription) then {
         false
@@ -203,7 +201,7 @@ object PeerEventBusActor {
       * @return
       *   true if successful and false if not (because it wasn't subscribed to that Classifier, or otherwise)
       */
-    private def unsubscribeFromMessageReceived(subscriber: ActorRef, from: MessageClassifier): Boolean =
+    private def unsubscribeFromMessageReceived(subscriber: TypedActorRef[PeerEvent], from: MessageClassifier): Boolean =
       messageSubscriptions.get((subscriber, from.peerSelector)).exists { messageCodes =>
         val newMessageCodes = messageCodes -- from.messageCodes
         if messageCodes == newMessageCodes then false
@@ -223,7 +221,10 @@ object PeerEventBusActor {
       * @return
       *   true if successful and false if not (because it wasn't subscribed to that Classifier, or otherwise)
       */
-    private def unsubscribeFromConnectionEvent(subscriber: ActorRef, from: Classifier): Boolean = {
+    private def unsubscribeFromConnectionEvent(
+        subscriber: TypedActorRef[PeerEvent],
+        from: SubscriptionClassifier
+    ): Boolean = {
       val subscription = Subscription(subscriber, from)
       if connectionSubscriptions.contains(subscription) then {
         connectionSubscriptions = connectionSubscriptions.filterNot(_ == subscription)
@@ -251,25 +252,24 @@ object PeerEventBusActor {
     *
     * The Classic wire messages [[Subscribe]] / [[Unsubscribe]] / [[Publish]] carry no subscriber — the subscriber is
     * the Classic `sender()`. The Typed core cannot observe `sender()`, so each subscriber is carried explicitly.
-    * Subscribers are held as Classic [[ActorRef]] because the dispatch class [[PeerEventBus]] delivers to Classic refs;
-    * a Typed subscriber supplies one via `messageAdapter[PeerEvent](...).toClassic` (the established HERALD-2 path).
+    * Subscribers are held as [[TypedActorRef]][PeerEvent]; callers supply one via `context.messageAdapter[PeerEvent]`.
     */
   sealed trait Command
 
   /** Subscribe `subscriber` to events matching `to`. */
-  final case class SubscribeCmd(to: SubscriptionClassifier, subscriber: ActorRef) extends Command
+  final case class SubscribeCmd(to: SubscriptionClassifier, subscriber: TypedActorRef[PeerEvent]) extends Command
 
   /** Unsubscribe `subscriber` from events matching `from`. */
-  final case class UnsubscribeCmd(from: SubscriptionClassifier, subscriber: ActorRef) extends Command
+  final case class UnsubscribeCmd(from: SubscriptionClassifier, subscriber: TypedActorRef[PeerEvent]) extends Command
 
   /** Unsubscribe `subscriber` from all events. */
-  final case class UnsubscribeAllCmd(subscriber: ActorRef) extends Command
+  final case class UnsubscribeAllCmd(subscriber: TypedActorRef[PeerEvent]) extends Command
 
   /** Publish `ev` to all interested subscribers. */
   final case class PublishCmd(ev: PeerEvent) extends Command
 
   /** Internal: a watched subscriber terminated; drop all its subscriptions. */
-  final private case class SubscriberTerminated(subscriber: ActorRef) extends Command
+  final private case class SubscriberTerminated(subscriber: TypedActorRef[PeerEvent]) extends Command
 
   /** Typed dispatch core. Holds the classifier state in a [[PeerEventBus]] and watches subscribers so their
     * subscriptions are dropped on termination (replacing the Classic `context.watch` + `Terminated`).
@@ -282,7 +282,7 @@ object PeerEventBusActor {
         case SubscribeCmd(to, subscriber) =>
           peerEventBus.subscribe(subscriber, to)
           // watchWith lifts the subscriber's death into a typed Command (no Classic Terminated in Typed).
-          ctx.watchWith(subscriber.toTyped[Nothing], SubscriberTerminated(subscriber))
+          ctx.watchWith(subscriber, SubscriberTerminated(subscriber))
           Behaviors.same
 
         case UnsubscribeCmd(from, subscriber) =>
