@@ -98,7 +98,7 @@ object FastSync {
         val handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers] =
           ctx.messageAdapter[NetworkPeerManagerActor.HandshakedPeers](WrappedHandshakedPeers(_))
         // Immediate first poll + periodic rescans (matches PeerListSupportNg's 0-delay scheduleWithFixedDelay).
-        networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter.toClassic)
+        networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter)
         timers.startTimerWithFixedDelay(ScanPeersTick, syncConfig.peersScanInterval)
         new Impl(
           ctx,
@@ -200,7 +200,7 @@ object FastSync {
     private def handlePeerList(msg: Command): Boolean =
       msg match {
         case ScanPeersTick =>
-          networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter.toClassic)
+          networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter)
           true
         case WrappedHandshakedPeers(hp) =>
           peerHelper.handleHandshakedPeers(hp.peers)

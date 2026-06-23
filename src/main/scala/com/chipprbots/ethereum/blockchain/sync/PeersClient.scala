@@ -3,7 +3,6 @@ package com.chipprbots.ethereum.blockchain.sync
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed.{ActorRef as TypedActorRef, Behavior}
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 
 import scala.collection.mutable
 import scala.concurrent.duration.*
@@ -149,7 +148,7 @@ object PeersClient {
     def running(requesters: Map[Int, TypedActorRef[ResponseMessage]]): Behavior[Command] =
       Behaviors.receiveMessage {
         case ScanPeersTick =>
-          networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter.toClassic)
+          networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter)
           Behaviors.same
 
         case HandshakedPeersCmd(peers) =>

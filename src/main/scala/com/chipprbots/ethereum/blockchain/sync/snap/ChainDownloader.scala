@@ -130,7 +130,7 @@ class ChainDownloader private (
   /** Shared peer-list / scan handling for every state. Returns `Some(next)` if the message was handled. */
   private def handleCommon(message: Command): Option[Behavior[Command]] = message match {
     case ScanPeers =>
-      networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter.toClassic)
+      networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter)
       Some(Behaviors.same)
     case HandshakedPeersMsg(peers) =>
       peerListHelper.handleHandshakedPeers(peers)
@@ -981,7 +981,7 @@ object ChainDownloader {
         )
 
         // Immediate poll, then periodic poll for handshaked peers (replaces PeerListSupportNg's scheduleWithFixedDelay).
-        networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(downloader.handshakedPeersAdapter.toClassic)
+        networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(downloader.handshakedPeersAdapter)
         timers.startTimerWithFixedDelay(ScanKey, ScanPeers, syncConfig.peersScanInterval)
 
         downloader.idle()

@@ -522,15 +522,16 @@ private class SNAPSyncControllerImpl(
     idle()
   }
 
-  /** OQ-3: ask NetworkPeerManagerActor for the current handshaked peers; the reply (a Classic `HandshakedPeers`) is
-    * bridged back into the Command ADT via a `.toClassic` message adapter.
+  /** OQ-3: ask NetworkPeerManagerActor for the current handshaked peers; the reply (`HandshakedPeers`) is bridged back
+    * into the Command ADT via a Typed message adapter.
     */
-  private val handshakedPeersAdapter: org.apache.pekko.actor.ActorRef =
+  private val handshakedPeersAdapter: org.apache.pekko.actor.typed.ActorRef[
+    com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers
+  ] =
     ctx
       .messageAdapter[com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers](m =>
         WrappedHandshakedPeers(m.peers)
       )
-      .toClassic
 
   private def pollHandshakedPeers(): Unit =
     networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeersCmd(

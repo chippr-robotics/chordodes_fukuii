@@ -95,7 +95,7 @@ object PivotBlockSelector {
           peerDisconnectedAdapter,
           ctx.log
         )
-        networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter.toClassic)
+        networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter)
         timers.startTimerWithFixedDelay(ScanKey, ScanPeers, syncConfig.peersScanInterval)
         val initialState = PivotState(
           pivotBlockRetryCount = 0,
@@ -164,7 +164,7 @@ object PivotBlockSelector {
 
     private def handleCommon(message: Command): Option[Behavior[Command]] = message match {
       case ScanPeers =>
-        networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter.toClassic)
+        networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter)
         Some(Behaviors.same)
       case WrappedHandshakedPeers(NetworkPeerManagerActor.HandshakedPeers(peers)) =>
         peerListHelper.handleHandshakedPeers(peers)

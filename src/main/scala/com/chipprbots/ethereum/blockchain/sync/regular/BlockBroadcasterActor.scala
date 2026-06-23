@@ -3,7 +3,6 @@ package com.chipprbots.ethereum.blockchain.sync.regular
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 
 import com.chipprbots.ethereum.network.PeerEventBusActor.Command as PeerEventBusCommand
@@ -52,7 +51,7 @@ object BlockBroadcasterActor {
           log = org.slf4j.LoggerFactory.getLogger(classOf[BlockBroadcasterImpl])
         )
 
-        networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter.toClassic)
+        networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter)
         timers.startTimerWithFixedDelay(ScanKey, ScanPeers, syncConfig.peersScanInterval)
 
         running(peerListHelper, broadcast, networkPeerManager, handshakedPeersAdapter)
@@ -67,7 +66,7 @@ object BlockBroadcasterActor {
   ): Behavior[BroadcasterMsg] =
     Behaviors.receiveMessage {
       case ScanPeers =>
-        networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter.toClassic)
+        networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter)
         Behaviors.same
 
       case WrappedHandshakedPeers(peers) =>

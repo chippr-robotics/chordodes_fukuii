@@ -48,8 +48,8 @@ object NetworkPeerManagerActor {
 
   sealed trait Command
 
-  // Ask-path commands (carry the Classic replier captured by the shell's sender()):
-  final case class GetHandshakedPeersCmd(replyTo: ActorRef) extends Command
+  // Ask-path commands:
+  final case class GetHandshakedPeersCmd(replyTo: typed.ActorRef[HandshakedPeers]) extends Command
   final case class PeerInfoRequestCmd(peerId: PeerId, replyTo: ActorRef) extends Command
 
   // Timer tick self-messages (keys and payloads for Behaviors.withTimers):

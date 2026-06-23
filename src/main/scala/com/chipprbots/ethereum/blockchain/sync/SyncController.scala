@@ -133,7 +133,7 @@ object SyncController {
   //   From PivotHeaderBootstrap (replyTo = externalAdapter.toClassic):
   //     PivotHeaderBootstrap.Completed, PivotHeaderBootstrap.Failed
   //
-  //   From NetworkPeerManagerActor (reply-target = externalAdapter.toClassic, via GetHandshakedPeersCmd):
+  //   From NetworkPeerManagerActor (reply-target = externalAdapter, via GetHandshakedPeersCmd):
   //     NetworkPeerManagerActor.HandshakedPeers
   //     NetworkPeerManagerActor.CalibrateChainWeightFromPeer (RegisterChainWeightCalibrationTarget)
   //
@@ -661,7 +661,7 @@ object SyncController {
             healingServeRootRequester = Some(snapSync)
             log.info("[HEAL-SERVE-ROOT] Healing requested a newest-servable root. Polling peers for the network head.")
             networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeersCmd(
-              externalAdapter.toClassic
+              externalAdapter
             )
           } else {
             log.debug("[HEAL-SERVE-ROOT] Healing serve-root request already in flight; ignoring duplicate.")
@@ -2022,7 +2022,7 @@ object SyncController {
 
         case PollRecoveryPeers =>
           networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeersCmd(
-            externalAdapter.toClassic
+            externalAdapter
           )
           Behaviors.same
 
@@ -2049,7 +2049,7 @@ object SyncController {
             recentRootRequester = Some(replyTo)
             log.info("Recovery requested a recent root to roll off the aged pivot. Polling peers for the network head.")
             networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeersCmd(
-              externalAdapter.toClassic
+              externalAdapter
             )
           } else {
             log.debug("Recovery recent-root request already in flight; ignoring duplicate.")
