@@ -27,7 +27,7 @@ import com.chipprbots.ethereum.mpt.MptNode
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerSelector
-import com.chipprbots.ethereum.network.PeerEventBusActor.Subscribe
+import com.chipprbots.ethereum.network.PeerEventBusActor.SubscribeCmd
 import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.MessageClassifier
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.PeerManagerActor.FastSyncHostConfiguration
@@ -46,19 +46,15 @@ import com.chipprbots.ethereum.utils.Config
 class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
 
   it should "return Receipts for block hashes" taggedAs (UnitTest) in new TestSetup {
-    peerEventBus.expectMsg(
-      Subscribe(
-        MessageClassifier(
-          Set(
-            Codes.GetPooledTransactionsCode,
-            Codes.GetNodeDataCode,
-            Codes.GetReceiptsCode,
-            Codes.GetBlockBodiesCode,
-            Codes.GetBlockHeadersCode
-          ),
-          PeerSelector.AllPeers
-        )
-      )
+    peerEventBus.expectMsgType[SubscribeCmd].to shouldBe MessageClassifier(
+      Set(
+        Codes.GetPooledTransactionsCode,
+        Codes.GetNodeDataCode,
+        Codes.GetReceiptsCode,
+        Codes.GetBlockBodiesCode,
+        Codes.GetBlockHeadersCode
+      ),
+      PeerSelector.AllPeers
     )
 
     // given
