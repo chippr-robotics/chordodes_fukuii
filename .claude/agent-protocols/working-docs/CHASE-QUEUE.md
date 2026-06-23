@@ -147,3 +147,41 @@ IntegrationTest tag conflict (discovered G2, 2026-06-21): Do not tag Integration
 
 ---
 
+## ETH-Side Coverage Gaps (Part 13)
+
+BEACON read-only audit of `scala3-cleanup-june` (`upstream/staging..HEAD`, 222
+commits) for shared ETC+ETH paths changed with ETC-only / FORGE-only / Pekko-only
+scope. §3i (`64ab4786e`, BlockExecutionError union + `describe`) excluded per
+prior BEACON thread.
+
+**Headline finding:** the sprint touched ETH/69 `BlockRangeUpdate` inbound
+routing in NPMA (`13aa7585e`, W5/W11) and corrected NPMA to the type the decoder
+actually produces (`ETHPackets.BlockRangeUpdate`), but left two sibling inbound
+handlers (`PeerActor`, `BlockFetcher`) matching the never-emitted
+`ETH69.BlockRangeUpdate` type. Both arms are dead on the real inbound path. ETH/69
+is the only protocol that sends BlockRangeUpdate, so this is an ETH-path-only
+regression masked by a test that constructs the wrong type.
+
+| File | Sprint commit | Nature of gap | ETH risk | Recommended action |
+|------|--------------|---------------|----------|--------------------|
+| `network/PeerActor.scala:551` | `e6ccc5ac1` (Typed migration) + sibling of `13aa7585e` cleanup | Inbound `case bru: ETH69.BlockRangeUpdate` malformed-update validation/`BreachOfProtocol` disconnect. Decoder emits `ETHPackets.BlockRangeUpdate` (MessageDecoders.scala:234), so the arm never matches → falls through `case _ =>` and publishes unvalidated. NPMA was swept to `ETHPackets.BlockRangeUpdate`; PeerActor was not. | **High** — ETH/69-only message; malformed BlockRangeUpdate from an ETH/Sepolia peer is no longer rejected; the protocol-breach disconnect guard is dead. | BEACON: change match to `ETHPackets.BlockRangeUpdate`; add a decode→PeerActor test asserting malformed inbound triggers disconnect. |
+| `blockchain/sync/regular/BlockFetcher.scala:486` | `5e3908f7f` (Behavior[Command] narrowing) + sibling of `13aa7585e` cleanup | Inbound `case AdaptedMessageFromEventBus(msg: ETH69.BlockRangeUpdate, _)` chain-tip follow (`withPossibleNewTopAt`). Subscribes to `Codes.BlockRangeUpdateCode` (line 103) but matches the wrong runtime type → head-follow signal silently dropped. | **High** — on ETH/Sepolia sync, peer-pushed chain-tip advances via BlockRangeUpdate are ignored; head following degrades to the periodic re-probe fallback only. | BEACON: change match to `ETHPackets.BlockRangeUpdate`. |
+| `src/test/.../BlockFetcherSpec.scala:298-305` | pre-sprint (`6f0c606bc`), unchanged by sprint | Test "should request headers when BlockRangeUpdate announces a new chain tip" constructs `ETH69.BlockRangeUpdate`, matching the buggy line 486 — so it passes while the production decode path (`ETHPackets.BlockRangeUpdate`) would not. Test masks the gap. | **Medium** — false-positive coverage hides the High-risk gap above. | BEACON/EYE: rebuild the test to feed the decoder output type (`ETHPackets.BlockRangeUpdate`) so it exercises the real inbound path. |
+
+**No other gaps found.** All other shared-path diffs in `domain/`, `vm/`,
+`ledger/`, `network/p2p/` are mechanical Scala 3 syntax (`_`→`*`, `if () {}`→
+`if … then`, `implicit class`→`extension`, wildcard imports) or are ETH-aware by
+construction:
+- `domain/Block.scala` / `BlockBody.scala`: `asInstanceOf[RLPList]` → guarded
+  pattern match that throws on malformed RLP. Behaviour-preserving, applies to
+  both chains, and the EIP-4895 withdrawals decode comments are ETH-correct. Not a gap.
+- `vm/EvmConfig.scala`: timestamp-fork dispatch (`isShanghaiTimestamp` /
+  `isCancunTimestamp` / `isOsakaTimestamp`, `OsakaOpCodes`) preserved verbatim — syntax only.
+- `vm/OpCode.scala`, `vm/PrecompiledContracts.scala`: no opcode-list, fork-gate,
+  or gas-constant changes — syntax only.
+- `network/p2p/messages/{ETH69,ETHPackets,Capability}.scala`: no ADT member,
+  message-code, or negotiation-logic changes — `implicit class`→`extension` + syntax.
+- No new `@nowarn` / `@unused` in shared `domain/`, `vm/`, `ledger/`, `network/`.
+
+---
+
