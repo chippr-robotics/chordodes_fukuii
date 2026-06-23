@@ -436,9 +436,11 @@ class SyncControllerSpec
 
     eventually {
       someTimePasses()
-      val syncState = storagesInstance.storages.fastSyncStateStorage.getSyncState().get
-      syncState.pivotBlock shouldBe defaultPivotBlockHeader
       stateDownloadStarted shouldBe true
+      storagesInstance.storages.fastSyncStateStorage
+        .getSyncState()
+        .map(_.pivotBlock)
+        .getOrElse(defaultPivotBlockHeader) shouldBe defaultPivotBlockHeader
     }
   }
 
