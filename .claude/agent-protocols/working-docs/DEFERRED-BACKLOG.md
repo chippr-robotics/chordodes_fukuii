@@ -990,6 +990,227 @@ slower than dev machine → timeouts). `@Ignore` annotations silently hide untes
 
 ---
 
+### 8k — Classic Interop Elimination: `.toClassic` / `actorSelection` / Classic Bridge Audit
+
+**What**: Scala's type system is Typed's main advantage. The codebase currently has ~180 `.toClassic` / `.toTyped` bridge calls, 10 `actorSelection` sites (test-only), and 6 `classicSystem.actorOf` sites in production. These are necessary bridges while classic actors remain in the system, but every bridge site is a hole in the type lattice — an untyped `ActorRef` flowing where a `ActorRef[T]` could carry compile-time guarantees. The goal is to inventory all sites, understand WHY each exists (which classic actor is the root cause), and eliminate them in priority order as classic actors complete their LOOM migrations.
+
+**Root-cause breakdown (from §8k-R1 audit, 2026-06-23):**
+
+| Pattern | Count | Root cause | Fix tier |
+|---------|-------|-----------|----------|
+| `messageAdapter.toClassic` | ~35 | `PeerEventBusActor` (classic pub-sub) + `NetworkPeerManagerActor.GetHandshakedPeersCmd` accepts `ActorRef` | Wave 3 LOOM migration of NPMA/PEBA |
+| `ctx.toClassic.sender()` | ~20 | `SyncController`/`FastSync`/`RegularSync` still in classic ask/forward flow | Wave 3 LOOM |
+| `ctx.toClassic.parent` | ~6 | `PeerActor` messages its classic parent | Wave 3 LOOM |
+| `context.self.toClassic` in coordinator→worker | 2 | `AccountRangeWorker` + `ByteCodeWorker` `coordinator:` param is classic `ActorRef` | **NOW** (MITHRIL) |
+| `ctx.toClassic.actorOf` | ~4 | `SyncController` spawns `RegularSync` as classic child | Wave 3 LOOM |
+| `actorSelection` (test only) | 10 | Coordinator specs resolve Typed child workers via classic wildcard path | E5e (already tracked) |
+| `classicSystem.actorOf` (NodeBuilder) | 3 | Top-level actor wiring still in Classic bootstrap | CAPSTONE bootstrap rewrite |
+
+**Principle**: Each `.toClassic` call is a symptom, not the disease. The disease is an unconverted classic actor upstream. The fix strategy is: **migrate the upstream actor first (LOOM), then delete the bridge**. Bridges must never be removed before the upstream is converted — that produces a type error at the call site that blocks compilation.
+
+---
+
+#### §8k-R1 — PRISM: Comprehensive classic-interop audit
+
+**Agent:** PRISM (read-only review, 8-lens analysis)
+**Risk:** ZERO — research only, no code changed
+**Gate:** Any time. Run before starting §8k-A.
+
+**Research prompt:**
+```
+You are auditing the fukuii codebase for all sites where Pekko Typed actors
+bridge to the Classic system. The goal is to inventory every bridge pattern,
+identify the root-cause classic actor, and produce a prioritized elimination
+roadmap so the type lattice can be fully closed.
+
+Step 0 — Read the migration progress context FIRST (do not skip):
+
+  # Understand the current migration state before searching
+  # a. What has been completed (actors already Typed):
+  ls .claude/agent-protocols/completed/
+
+  # Read these if present (they define what is DONE):
+  cat .claude/agent-protocols/completed/SPRINT-QUEUE.md          # committed waves
+  cat .claude/agent-protocols/completed/DEFERRED-BACKLOG.md      # completed deferred items
+  cat .claude/agent-protocols/completed/CODEBASE-AUDIT.md        # completed audit sweeps
+
+  # b. What modernization work has been done per subsystem:
+  ls .claude/agent-protocols/modernization-log/
+
+  # Read the INDEX file and any sync/, network/, node/ subdirectory files
+  # relevant to actor migration (these list what was changed and when)
+  cat .claude/agent-protocols/modernization-log/INDEX.md
+  # Then: cat .claude/agent-protocols/modernization-log/network/*.md
+  #       cat .claude/agent-protocols/modernization-log/sync/*.md
+
+  # c. What is still in flight (current working queue):
+  cat .claude/agent-protocols/working-docs/SPRINT-QUEUE.md       # active sprint tasks
+  cat .claude/agent-protocols/working-docs/DEFERRED-BACKLOG.md   # §8k section (this prompt)
+  grep "Wave 3\|CAPSTONE\|S3\|S4\|NET2\|SNAP1\|SNAP2\|ROOT" \
+    .claude/agent-protocols/working-docs/SPRINT-QUEUE.md         # migration sequence
+
+  Synthesise: which actors are Typed NOW, which are still Classic, and
+  in what order do the remaining Classic actors migrate? This is the
+  framework for the elimination roadmap.
+
+Step 1 — Inventory every bridge site:
+
+cd /media/dev/2tb/dev/fukuii
+
+# A. Classic subscriptions / message-adapter bridges
+grep -rn "\.toClassic\b" src/main/ --include="*.scala" | grep -v "//.*toClassic"
+
+# B. Classic sender/parent access
+grep -rn "ctx\.toClassic\|context\.toClassic" src/main/ --include="*.scala" | grep -v "//.*toClassic"
+
+# C. Classic actor spawns from Typed contexts
+grep -rn "classicSystem\.actorOf\|ctx\.toClassic\.actorOf\|context\.toClassic\.actorOf" src/main/ --include="*.scala"
+
+# D. actorSelection (test code — separate catalog)
+grep -rn "actorSelection" src/test/ --include="*.scala" | grep -v "//.*actorSelection"
+
+# E. Worker coordinator param types
+grep -rn "coordinator.*ActorRef\b\|ActorRef.*coordinator" src/main/ --include="*.scala" | grep -v "typed"
+
+Step 2 — For each site in A/B/C/E, identify:
+  - Which classic actor is the terminal sink (the one receiving the classic ref)?
+  - Is that classic actor already in the Wave 3 LOOM queue (SPRINT-QUEUE.md)?
+  - If so: which LOOM sprint removes the bridge?
+  - If not: it's a new gap — record it.
+
+Step 3 — Produce the elimination table:
+
+| File:line | Pattern | Root-cause classic actor | Elimination sprint | Blocker? |
+|-----------|---------|--------------------------|-------------------|----------|
+| ...       | toClassic | PeerEventBusActor | NET2 LOOM | YES |
+
+Step 4 — Identify any sites that can be fixed NOW (pre-CAPSTONE):
+  Criteria: the bridge exists only because a Typed actor passes its own ref
+  to a child/worker that accepts a classic param. If we update the child's
+  param type to `ActorRef[T]`, both the bridge AND the actorSelection
+  workaround disappear. Check AccountRangeWorker and ByteCodeWorker
+  `coordinator` parameter types specifically.
+
+Step 5 — Output the full audit to `.local/docs/classic-interop-audit.md`.
+  Sections: (1) inventory table, (2) root-cause mapping, (3) elimination order,
+  (4) "fix now" candidates, (5) estimated bridge count at each LOOM sprint boundary.
+```
+
+**Expected output:** `.local/docs/classic-interop-audit.md` — ~100-200 rows.
+
+---
+
+#### §8k-A — MITHRIL: Update coordinator→worker `coordinator` param to Typed `ActorRef[T]`
+
+**Agent:** MITHRIL (Scala 3 modernization)
+**Risk:** LOW — changes worker `apply` signature and coordinator spawn call; no protocol change
+**Gate:** §8k-R1 complete (confirm these are the only "fix now" sites). Run any time after that.
+**Prerequisite:** E5e complete (test-side actorSelection cleanup closes in tandem).
+
+**Background:**
+`AccountRangeWorker` and `ByteCodeWorker` both accept `coordinator: org.apache.pekko.actor.ActorRef`
+(classic untyped ref). The coordinator passes `ctx.self.toClassic` / `context.self.toClassic` at
+spawn time. This is the only reason those two `.toClassic` sites exist in production worker spawn
+paths. The fix is:
+  1. Change the `coordinator` param in each worker to `ActorRef[Coordinator.Command]`
+  2. Update the coordinator spawn call to pass `ctx.self` / `context.self` directly (no `.toClassic`)
+  3. Update message sends inside the worker from `coordinator ! Msg(...)` to the same syntax
+     (since `ActorRef[Coordinator.Command] ! Command` is unchanged in Pekko Typed)
+
+**Grep to confirm scope:**
+```bash
+cd /media/dev/2tb/dev/fukuii
+
+# Worker param types to change
+grep -rn "coordinator.*: org\.apache\.pekko\.actor\.ActorRef\b\|coordinator: ActorRef\b" \
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/actors/ --include="*.scala"
+
+# Coordinator self.toClassic spawn sites to remove
+grep -n "coordinator = ctx\.self\.toClassic\|coordinator = context\.self\.toClassic" \
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/actors/AccountRangeCoordinator.scala \
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/actors/ByteCodeCoordinator.scala
+```
+
+**Step 1 — Update `AccountRangeWorker`:**
+- Change `coordinator: org.apache.pekko.actor.ActorRef` → `coordinator: ActorRef[AccountRangeCoordinator.Command]`
+- Import `org.apache.pekko.actor.typed.ActorRef` (already in scope in the Typed module)
+- `sbt compile-all` — fix any type errors in worker body (message sends should be unchanged)
+
+**Step 2 — Update `AccountRangeCoordinator` spawn:**
+- Remove `.toClassic` from `coordinator = ctx.self.toClassic` → `coordinator = ctx.self`
+- `sbt compile-all`
+
+**Step 3 — Repeat for `ByteCodeWorker` + `ByteCodeCoordinator`:**
+- Same pattern
+
+**Step 4 — Update tests (E5e will cover remaining actorSelection cleanup):**
+- `sbt "testOnly *AccountRangeCoordinatorSpec* *ByteCodeCoordinatorSpec* *AccountRangeWorkerSpec* *ByteCodeWorkerSpec*"`
+
+**Step 5 — Verify toClassic count decreased by exactly 2:**
+```bash
+grep -rn "self\.toClassic" \
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/actors/ --include="*.scala"
+# Expected: 0 results in snap/actors/ after this change
+```
+
+**Verification:**
+```bash
+sbt compile-all
+sbt "testOnly *AccountRange* *ByteCode*"
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps — IN THIS ORDER:**
+1. `sbt scalafmtAll`
+2. `git add src/main/.../AccountRangeWorker.scala src/main/.../AccountRangeCoordinator.scala \`
+   `        src/main/.../ByteCodeWorker.scala src/main/.../ByteCodeCoordinator.scala`
+3. `git commit -m "refactor(8k-A): typed coordinator ref in AccountRange/ByteCode workers — remove .toClassic at worker spawn"`
+4. `SHA=$(git rev-parse --short HEAD)`
+5. `git add .claude/` → `git commit -m "docs(8k-A): clearout coordinator typed-ref prompt — $SHA"`
+6. **DELETE §8k-A**
+
+**Rejection criteria:**
+- Changing message protocol or supervision structure
+- Touching `SNAPSyncController` or other Wave-3-gated actors
+- Any change to `.local/` or consensus code
+
+---
+
+#### §8k-B — Post-CAPSTONE: Full classic bridge elimination sweep
+
+**Agent:** PRISM (audit) + LOOM (implementation per batch)
+**Risk:** MEDIUM — touches many files; gates on all actors Typed
+**Gate:** CAPSTONE merged. Run §7d artifact audit first (they overlap).
+
+**Background:**
+After CAPSTONE, `PeerEventBusActor`, `NetworkPeerManagerActor`, `SyncController`, `RegularSync`,
+`FastSync`, `PeerActor` are all Typed. Every remaining `.toClassic` / `.toTyped` bridge call becomes
+removable. The pattern is:
+
+1. `messageAdapter.toClassic` → subscribe/send directly with Typed `ActorRef[T]`
+2. `ctx.toClassic.sender()` → use `ask` pattern or explicit `replyTo: ActorRef[T]` param
+3. `ctx.toClassic.parent` → typed parent ref via spawn parameter
+4. `adapter.toTyped[T]` call sites → resolved when the upstream is Typed
+
+Estimated scope post-CAPSTONE: ~170 sites across ~25 files.
+
+**Prompt (run AFTER CAPSTONE):**
+```
+CAPSTONE is merged. All actors are now Pekko Typed. Do a final sweep to
+eliminate every remaining classic bridge call:
+
+Step 1 — Run the §7d artifact audit sweep (grep commands in §7d).
+Step 2 — For each `.toClassic` site: identify the Typed alternative now
+  that the receiving actor is converted.
+Step 3 — Remove bridges one subsystem at a time (PeerEventBus, NPMA,
+  SyncController, FastSync, RegularSync), compile after each subsystem.
+Step 4 — Delete the `pekko.actor.typed.scaladsl.adapter` imports.
+Step 5 — Run testEssential — confirm 3,595+ / 0 failures.
+Step 6 — Commit per subsystem.
+```
+
+---
+
 ## Recommended Sprint Sequence (post scala3-cleanup-june)
 
 Two tracks run in parallel: **Primary** (blocking, sequential) and **Housekeeping** (parallel-safe,
@@ -1004,6 +1225,7 @@ dependencies on each other and can be picked up in any order when the primary tr
 | **Network/sync Pekko** | S3→S4/S7→NET2→SNAP1→SNAP2→ROOT→CAPSTONE (see SPRINT-QUEUE.md) | LOOM, FORGE, HERALD | Part 2 complete |
 | **→ CAPSTONE** | Root flip: ActorSystem[Nothing], bridge/adapter removal, Behavior[Any] narrowing | LOOM | All actors Typed |
 | **7d — Artifact audit** | Post-CAPSTONE sweep: surviving Classic patterns, adapter imports, raw schedulers | PRISM, HERALD | CAPSTONE merged |
+| **8k-B — Bridge elimination** | Post-CAPSTONE: remove all ~170 remaining `.toClassic`/`.toTyped` bridge calls now that every upstream actor is Typed | LOOM, PRISM | CAPSTONE + 7d done |
 | **7a — ADT consolidation** ✅ | Seal Command traits: move Messages.scala cases into companion objects DONE — `04615ad43` `4e8b42263`; 173/173; 3,600/0 | MITHRIL, WRAITH | ✅ |
 | **7b — EventStream** ✅ | R5 research → Topic[T] migration for eventStream pub/sub sites DONE — `849c0dcf0` (NewPendingTransaction) + `b35b35cf6` (NewBlockImported); `EventTopicsBuilder` trait; 13 files; grep eventStream → 0 | HERALD, LOOM | ✅ |
 | **7e — Design review** ✅ | Typed API optimization DONE — 3 accepted redesigns (P4 SSC idle catch-all, P2 HealingState extraction, P3 CD stagnation push); 5 no-change verdicts | PRISM, HERALD, LOOM | ✅ |
@@ -1034,6 +1256,8 @@ No actor migration gate. Commit individually; do not bundle with primary-track m
 | **8e — ScalaFix expansion** | Rules in .scalafix.conf ✅; C2 ✅ `9eb1f4e06`; TNHC ✅ `7a48c5988`; remaining: 7 consensus (FORGE) + 36 SSC (SNAP1) | FORGE / LOOM | gated |
 | **8g — braceless config** ✅ `34a55a025` | Deferred settings documented in .scalafmt.conf; indent.defnSite + topLevelStatementBlankLines each trigger ~400-file reformats → gated for per-subsystem pass post-CAPSTONE | MITHRIL | done |
 | **8j — Thread.sleep** | 2 live call sites (EthMiningServiceSpec:302, SubscriptionManagerSpec:249) — both NECESSARY; defer to §8a-retro (Typed TestKit enables proper replacement) | EYE | deferred to §8a |
+| **8k-R1 — Classic interop audit** | PRISM: run §8k-R1 prompt — map every `.toClassic`/`actorSelection` to root-cause classic actor; confirm §8k-A scope; output `classic-interop-audit.md` | PRISM | any time |
+| **8k-A — Typed coordinator ref** | MITHRIL: update AccountRangeWorker + ByteCodeWorker `coordinator:` param from classic → typed `ActorRef[T]`; remove `.toClassic` at spawn sites | MITHRIL | after 8k-R1 confirms scope |
 | ~~**3f — manual sync**~~ | ~~Audit 5 `.synchronized` outside actors~~ | ~~PRISM~~ | ✅ DONE `cf33cfa87` — MapCache:19+30 fixed (TrieMap); CombinedRecoveryScanner + TNHC left as-is (documented); PoWMining FORGE-gated (CHASE-QUEUE) |
 | **8a-retro** | Batches 1+2 DONE — **batch 3 (G1 network/sync actors)** needs TestKit→ActorTestKit migration; clearout prompt in §8a below | LOOM, EYE | ~3h |
 
@@ -1041,6 +1265,7 @@ No actor migration gate. Commit individually; do not bundle with primary-track m
 
 | Thread | Goal | Output doc | Agent |
 |--------|------|-----------|-------|
+| **R9** | §8k-R1: Classic interop inventory — map every `.toClassic`/`actorSelection`/bridge site to its root-cause classic actor and LOOM sprint | `classic-interop-audit.md` | PRISM |
 | **R0** | Full codebase completeness audit (mandatory gate before Wave 2) | `codebase-completeness-audit.md` | PRISM, MITHRIL |
 | **R1** | Network/sync Pekko migration plan (22 actors) | `network-sync-pekko-migration-plan.md` | HERALD, LOOM |
 | **R2** | Test quality audit (Thread.sleep, coverage gaps, ignored tests) | `test-quality-audit.md` | PRISM, EYE |
