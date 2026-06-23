@@ -31,9 +31,9 @@ and add a dated log entry at the bottom.
 
 | File | Line(s) | Pattern | Type | Agent | Date |
 |------|---------|---------|------|-------|------|
-| `consensus/pow/PoWMiningCoordinator.scala` | — | Threading model finding (R9/8d B2): FORGE-gated. See `threading-model-audit.md §B2` for detail. FORGE review required before any fix. | MUTABLE | PRISM | 2026-06-21 |
-| `ledger/BlockExecution.scala` | 530, 538, 548 | §3h: `val reason: Any` in `BlockExecutionError` sealed trait + `ValidationBeforeExecError(reason: Any)` + `MissingParentError.reason: Any`. Could be narrowed to `String` (all construction sites pass strings). FORGE sign-off required before changing — used directly by `consensus/pow/validators/ValidatorsExecutor` and `consensus/validators/Validators`. | FORGE | MITHRIL | 2026-06-22 |
-| `domain/Address.scala` `domain/UInt256.scala` `vm/Memory.scala` `vm/Stack.scala` | 52, 171, 112, 85 | §3h: `override def equals(that: Any)` in FORGE-gated packages — all are required `java.lang.Object.equals` overrides, no typed alternative exists. FORGE to confirm leave-as-is (markers `// §3h: FORGE-gate` already added). | FORGE | MITHRIL | 2026-06-22 |
+| ~~`consensus/pow/PoWMiningCoordinator.scala`~~ | ~~—~~ | ~~Threading model finding (R9/8d B2): FORGE-gated.~~ **CLEARED 2026-06-23 (F1, Item C): FORGE-confirmed SAFE AS-IS.** B2 (`EC.global` escaping actor dispatch) already remediated in current source — line 133 supplies `(context.executionContext)` for the `.foreach` continuation. Heavy PoW runs off-thread via `unsafeToFuture`; self-send `MineNext` sequenced through actor mailbox. No change required. | ~~MUTABLE~~ | PRISM | 2026-06-21 |
+| ~~`ledger/BlockExecution.scala`~~ | ~~530, 538, 548~~ | ~~§3h: `val reason: Any` could be narrowed to `String`.~~ **CLEARED 2026-06-23 (F1, Item A): REJECT narrowing — `72a755efa`.** `reason` holds the LUB of three unrelated sealed error hierarchies (`BlockHeaderError`, `BlockError`, `OmmersError`) passed to `ValidationBeforeExecError`; consumers render via `.toString`. Narrowing breaks `StdValidators:76` / `ValidatorsExecutor:106`. Markers → `// §3h: FORGE-confirmed — Any required`. | ~~FORGE~~ | MITHRIL | 2026-06-22 |
+| ~~`domain/Address.scala` `domain/UInt256.scala` `vm/Memory.scala` `vm/Stack.scala`~~ | ~~52, 171, 112, 85~~ | ~~§3h: `override def equals(that: Any)`.~~ **CLEARED 2026-06-23 (F1, Item B): CONFIRMED — `7c951fd44`.** All four are standard `java.lang.Object.equals` overrides; JVM provides no typed alternative. Markers → `// §3h: FORGE-confirmed — java.lang.Object.equals signature is fixed by JVM`. Comment-only, no logic change. | ~~FORGE~~ | MITHRIL | 2026-06-22 |
 
 ---
 
@@ -138,10 +138,9 @@ IntegrationTest tag conflict (discovered G2, 2026-06-21): Do not tag Integration
 | ~~B4~~ | ~~Batch B step 4~~ | ~~P4 WRAITH DiscoveryConfig redirect + delete~~ | ✅ DONE 2026-06-22 — redirect + delete |
 | ~~B5~~ | ~~Batch B step 5~~ | ~~P7 PRISM Retrospective dead-code audit (branch-wide)~~ | ✅ DONE 2026-06-22 — 19 files audited, 0 new deferred |
 | ~~E2~~ | ~~Batch E~~ | ~~P8 — MITHRIL G1-sweep PRISM items (FastSync + NPMA + SyncController)~~ | ✅ DONE 2026-06-22 — pre-fixed in `0c7d6781b`/`504b4ca16`/`a5132aa80` (all 4 items resolved during G1 sweep) |
+| ~~F1~~ | ~~Batch F~~ | ~~FORGE §3h residual~~ | ✅ DONE 2026-06-23 |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
 
 ---
-
-
 
