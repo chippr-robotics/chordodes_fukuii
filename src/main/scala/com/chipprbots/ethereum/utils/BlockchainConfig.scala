@@ -14,17 +14,15 @@ import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.utils.NumericUtils.*
 
 /** Identifies whether the chain follows ETC (PoW indefinitely) or ETH (post-Merge PoS via CL). */
-sealed trait NetworkType
-object NetworkType {
-  case object ETC extends NetworkType
-  case object ETH extends NetworkType
+enum NetworkType:
+  case ETC
+  case ETH
 
-  def fromString(s: String): NetworkType = s.toLowerCase match {
+object NetworkType:
+  def fromString(s: String): NetworkType = s.toLowerCase match
     case "etc" => ETC
     case "eth" => ETH
     case other => throw new IllegalArgumentException(s"Unknown network-type: $other (expected 'etc' or 'eth')")
-  }
-}
 
 /** Timestamp-based fork activation for post-Merge Ethereum forks. */
 case class ForkTimestamps(

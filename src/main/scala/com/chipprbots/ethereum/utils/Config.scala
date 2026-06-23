@@ -477,11 +477,9 @@ case class VmConfig(mode: VmMode, externalConfig: Option[VmConfig.ExternalConfig
 
 object VmConfig {
 
-  sealed trait VmMode
-  object VmMode {
-    case object Internal extends VmMode
-    case object External extends VmMode
-  }
+  enum VmMode:
+    case Internal
+    case External
 
   object ExternalConfig {
     val VmTypeFukuii = "fukuii"
