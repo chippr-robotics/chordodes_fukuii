@@ -130,15 +130,20 @@ All 5 ETH coverage gaps closed:
 - **Status:** ✅ DONE 2026-06-23 — EYE audit (`722576ef4`) found **no leaks**. All coordinator workers are Typed `context.spawnAnonymous` children (not classic `context.actorOf`); stopped automatically by Pekko actor hierarchy when coordinator stops. `classicSystem.stop(workerRef)` in `ByteCodeCoordinatorSpec` is intentional mid-test scenario simulation, not a leak mitigation. 150/150 coordinator tests ×2 JVM runs confirmed no cross-test isolation issues.
 - **New deferred (E5e):** `actorSelection`-based worker-ref pattern in `ByteCodeCoordinatorSpec` + `AccountRangeCoordinatorSpec` — cosmetic; replace with Typed `TestProbe` injection (DEFERRED-BACKLOG §8a-infra-c; after E5d)
 
-#### E5d — §8a-retro batch 4b: TestProbe narrowing ~209 sites (DEFERRED-BACKLOG Part 8)
-- **Problem:** ~209 `TestProbe()` sites (Classic, untyped) remain across migrated specs. These cannot be narrowed without upgrading to Typed `TestProbe[T]` from `ActorTestKit`.
-- **Fix:** Per-spec pass replacing `TestProbe()` with `testKit.createTestProbe[ConcreteType]()` + corresponding `expectMessage[T]` calls.
-- **Status:** DEFERRED — after E5b
+#### E5d — §8a-retro batch 4b: TestProbe narrowing (COMPLETE)
 
-#### E5e — §8a-infra-c: `actorSelection` worker-ref cleanup in coordinator specs (DEFERRED-BACKLOG Part 8)
-- **Problem:** `ByteCodeCoordinatorSpec` + `AccountRangeCoordinatorSpec` use classic `actorSelection` to obtain worker refs during test scenarios. Cosmetic; workers resolve correctly but the pattern bypasses type safety.
-- **Fix:** Replace `actorSelection` pattern with Typed `TestProbe[T]` injection at coordinator construction.
-- **Status:** DEFERRED — cosmetic; after E5d; tracked in DEFERRED-BACKLOG §8a-infra-c (`e23001ccb`)
+#### `a193bc794` — test(8a-retro): narrow TestProbe[M] in 14 coordinator/heal specs — E165 cleared (batch 4b)
+- **What:** All Classic `TestProbe()` sites in 14 SNAP coordinator/heal specs converted to typed `testKit.createTestProbe[M]()`. Transformations: `import org.apache.pekko.testkit.TestProbe` removed; `expectMsgType[T]` → `expectMessageType[T]`; `fishForMessage { => bool }` → `FishingOutcomes.complete / continueAndIgnore`; `expectTerminated` → `testKit.stop`; untyped `assertNoCompletion` loops → typed `fishForMessage`. Note: `FishingOutcomes` is in `org.apache.pekko.actor.testkit.typed.scaladsl` (not parent package) — corrected across 6 files.
+- **E165 floor:** 92 → 65 unnarrowed sites (65 in non-coordinator files; scoped to future batches)
+- **Result:** 141/141 tests pass; docs `76668d9fd`
+- **Left unstaged:** `SyncControllerSpec.scala` — 5-line race fix from concurrent §P9-FRESHPIVOT thread; committed separately as `083f08836`
+
+#### E5e — §8a-infra-c: `actorSelection` worker-ref cleanup (COMPLETE)
+
+#### `5f28e8ae6` — test(8a-e5e): replace actorSelection worker-ref with Typed ActorRef in 2 coordinator specs
+- **What:** `ByteCodeCoordinatorSpec` + `AccountRangeCoordinatorSpec` — `resolveWorkerChild()` helpers now return `ActorRef[WorkerMessage]` via `.toTyped[WorkerMessage]` instead of raw classic `ActorRef`. All `actorSelection(coordinator.path / "*") ! message` sends replaced with typed `resolveWorkerChild(coordinator) ! message`. `classicSystem.stop(ref.toClassic)` used for worker stop (preserves fire-and-forget; `testKit.stop()` timed out on real child actors and cascaded to corrupt testKit state for subsequent tests).
+- **Note:** Full injection (factory param at coordinator construction) was not feasible without production code changes — coordinators expose no factory parameter. `.toTyped[]` on the resolved ref is the correct test-only fix.
+- **Result:** 40/40 pass (21 ByteCodeCoordinatorSpec + 19 AccountRangeCoordinatorSpec); docs `b1b55ecb0`
 
 ---
 
@@ -152,6 +157,6 @@ All 5 ETH coverage gaps closed:
 - **TestKit Batch 5** — DEFERRED-BACKLOG §8a-retro batch 5 (F4)
 - **E5b** — `application-test.conf` infra fix — DEFERRED-BACKLOG Part 8
 - ~~**E5c** — worker teardown leak audit~~ — ✅ DONE 2026-06-23 (`722576ef4`) — no leaks found; see above
-- **E5d** — TestProbe narrowing ~209 sites — DEFERRED-BACKLOG Part 8, after E5b
-- **E5e** — `actorSelection` worker-ref cleanup in 2 coordinator specs — DEFERRED-BACKLOG §8a-infra-c, after E5d
+- ~~**E5d** — TestProbe narrowing~~ — ✅ DONE 2026-06-23 (`a193bc794`) — 141/141; E165 floor 92→65
+- ~~**E5e** — `actorSelection` worker-ref cleanup~~ — ✅ DONE 2026-06-23 (`5f28e8ae6`) — 40/40
 - `PeerRequestHandler` `ClassTag` unsound → `TypeTest[A,B]` — deferred
