@@ -77,3 +77,190 @@ Source: `§8k-R1` audit complete 2026-06-23 — `.local/docs/classic-interop-aud
 | **§8k-H** | PeerActor `watchWith` — remove `context.toClassic.parent` sends (Clusters G+H) | MITHRIL | ~8 | §8k-G |
 | **§8k-I** | NodeBuilder 3 Classic bridge actors → callers use Typed ask (Cluster J) | MITHRIL | ~21 | §8k-G+H |
 | **§8k-B** | Post-CAPSTONE: verify TCP floor (4 bridges), delete adapter imports | PRISM | — | §8k-I + CAPSTONE |
+
+---
+
+## ETH69/ETH70 PoW Safety Track (security — run independently of Classic Bridge track)
+
+**Source:** Wire Protocol audit 2026-06-23 — `.local/Wire-Protocol-Modernization/`
+**Risk level:** P0 items must ship before ETH69 pivot election is used on ETC mainnet.
+**Branch:** post-PR-#1333 merge. These items are independent of the Classic Bridge track.
+
+| Sprint | Work | Agent | Severity | Gate |
+|--------|------|-------|----------|------|
+| **§ETH69-A** | `collectVoters`: add TD consensus gate — filter peer pool by `chainWeight.totalDifficulty >= ourBestTD × 0.8` | FORGE | **P0 CRITICAL** | None |
+| **§ETH69-B** | `SNAPSyncController`: parent-chain backlink validation (N=20 headers) before SNAP bootstrap | FORGE | **P0 HIGH** | §ETH69-A |
+| **§ETH69-F** | `PeerActor:551` + `BlockFetcher:486`: `ETH69.BlockRangeUpdate` → `ETHPackets.BlockRangeUpdate`; fix `BlockFetcherSpec:298-305` | BEACON | **P1 HIGH** | None (parallel with §ETH69-B) |
+
+P1/P2 hardening items → `DEFERRED-BACKLOG.md Part 16` (§ETH69-C/D/E)
+
+---
+
+#### §ETH69-A — FORGE: PivotBlockSelector TD consensus gate (G1)
+
+**Agent:** FORGE
+**Risk:** HIGH — changes pivot election criteria for ETC snap sync
+**Gate:** None — P0 security fix, implement immediately post-PR-#1333
+**Spec:** `.local/Wire-Protocol-Modernization/G1-pivot-td-gate.md`
+
+**Background:**
+`PivotBlockSelector.collectVoters` (`PivotBlockSelector.scala:373-395`) builds the snap sync
+voter pool sorting peers by `maxBlockNumber` only. Zero `chainWeight` references. An attacker
+with modest hashrate on a long-low-difficulty fork receives a plausible Tier3 TD estimate at
+handshake (computed from the honest network's difficulty), enters the voter pool by block-number
+ranking, and can win pivot election with K sybil peers. The elected pivot's state root is then
+used as the SNAP sync anchor without further validation.
+
+**Steps:**
+1. **Read** `PivotBlockSelector.scala` in full to locate `collectVoters`, understand `PeerInfo`
+   structure (identify `chainWeight` accessor), and find where local best TD is accessible.
+2. **Read** `NetworkPeerManagerActor.scala` — grep for `case class PeerInfo` and `chainWeight`
+   to confirm field names and types.
+3. **Read** `.local/Wire-Protocol-Modernization/G1-pivot-td-gate.md` for the full spec.
+4. **Implement** the TD gate in `collectVoters`:
+   - Compute `ourBestTD` from the local blockchain state
+   - Set `minPeerTD = ourBestTD * 8 / 10` (80% threshold — covers Tier3 ±20% typical variance)
+   - Add `peerInfo.chainWeight.totalDifficulty >= minPeerTD` to the peer collector filter
+   - **Liveness fallback:** if no peers pass the TD gate, log `ETH69_PIVOT_TD_GATE_EMPTY` and
+     fall back to block-number-only ranking rather than blocking sync indefinitely
+5. **Write tests** in `PivotBlockSelectorSpec`:
+   - Low-TD peer excluded (chainWeight < 80% local best)
+   - High-TD peer included (chainWeight ≥ 80%)
+   - Sybil scenario: K low-TD peers + 1 honest peer → honest peer wins
+   - All-peers-below-threshold fallback path triggers liveness mode
+
+**Verify:**
+```bash
+grep -n "chainWeight\|totalDifficulty" \
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/fast/PivotBlockSelector.scala
+# Must see chainWeight in collectVoters
+
+sbt "testOnly *PivotBlock*"
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/main/scala/.../sync/fast/PivotBlockSelector.scala src/test/.../PivotBlockSelectorSpec.scala`
+3. `git commit -m "fix(sync): ETH69 pivot TD consensus gate in collectVoters — exclude low-TD peers (G1)"`
+4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(eth69-a): clearout — $SHA"`
+5. **DELETE §ETH69-A**
+
+---
+
+#### §ETH69-B — FORGE: SNAPSyncController pivot parent-chain backlink validation (G5)
+
+**Agent:** FORGE
+**Risk:** HIGH — adds mandatory header probe between pivot election and SNAP bootstrap
+**Gate:** §ETH69-A complete
+**Spec:** `.local/Wire-Protocol-Modernization/G5-pivot-backlink.md`
+
+**Background:**
+Even with the G1 TD gate in place, a peer whose Tier3 estimate passes the 80% threshold can
+still present a pivot on a low-TD fork. After pivot election, `PivotBlockSelector.sendResponseAndCleanup`
+(lines 340-351) sends the pivot header to FastSync with no parent-chain validation. No PoW
+nonce check, no back-link to a known canonical ancestor. SNAP sync bootstraps from the pivot's
+state root immediately.
+
+**Steps:**
+1. **Read** `.local/Wire-Protocol-Modernization/G5-pivot-backlink.md` for full context.
+2. **Read** `SNAPSyncController.scala` — locate the bootstrap entry point and how pivot header
+   is consumed. Grep: `bootstrap|pivotBlock|pivotStateRoot|FastSyncState|PivotBlock`.
+3. **Read** `PivotBlockSelector.scala` — locate `sendResponseAndCleanup` (lines 340-351).
+4. **FORGE pre-flight decision required:**
+   - What is the right backlink depth N? (Initial recommendation: 20 headers)
+   - Failure mode: pivot rejection + retry, or disconnect-all-voters + retry?
+   - Is there an existing `GetBlockHeaders` request path usable from `PivotBlockSelector`?
+5. **Implement** post-election backlink probe:
+   - Send `GetBlockHeaders(pivot.hash, count=N, skip=0, reverse=true)` to pivot-voting peers
+   - Walk N parent headers verifying PoW validity (nonce, difficulty, parentHash chain)
+   - Check if ANY parent header matches `blockchainReader.getBlockHeaderByNumber(h.number)` + hash
+   - If canonical match found within N hops → proceed with pivot
+   - If no match → reject pivot, log `ETH69_PIVOT_BACKLINK_FAIL`, retry
+6. **Write tests** in SNAPSyncController spec:
+   - Canonical parent within 5 hops → proceeds
+   - Canonical parent at exactly hop N → proceeds
+   - No canonical parent in N hops → rejected + retry
+   - Invalid PoW in parent headers → immediate rejection
+
+**Verify:**
+```bash
+grep -n "sendResponseAndCleanup\|Result\|pivotBlock" \
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/fast/PivotBlockSelector.scala
+# Must see backlink probe call before Result(...) emission
+
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. Stage `PivotBlockSelector.scala`, `SNAPSyncController.scala`, and test files
+3. `git commit -m "fix(sync): ETH69 pivot parent-chain backlink validation before SNAP bootstrap (G5)"`
+4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(eth69-b): clearout — $SHA"`
+5. **DELETE §ETH69-B**
+
+---
+
+#### §ETH69-F — BEACON: BlockRangeUpdate type mismatch — dead protocol-breach disconnect (G6)
+
+**Agent:** BEACON
+**Risk:** HIGH (ETH/Sepolia path) — malformed BRU from ETH69 peer not rejected; chain-tip follow silently dropped
+**Gate:** None — runs parallel with §ETH69-B
+**Source:** CHASE-QUEUE.md Part 13 findings; confirmed in audit 2026-06-23
+
+**Background:**
+The inbound `BlockRangeUpdate` decoder emits `ETHPackets.BlockRangeUpdate`
+(`MessageDecoders.scala:234`), but two production handlers match on the **wrong type**:
+- `PeerActor.scala:551`: `case bru: ETH69.BlockRangeUpdate` → BreachOfProtocol disconnect
+  arm is dead. Malformed BRU from an ETH/69 peer no longer triggers a disconnect.
+- `BlockFetcher.scala:486`: `case AdaptedMessageFromEventBus(msg: ETH69.BlockRangeUpdate, _)` →
+  chain-tip follow (`withPossibleNewTopAt`) is dead. On ETH/Sepolia sync, peer-pushed chain-tip
+  advances via BRU are silently dropped; head-following degrades to periodic re-probe only.
+- `BlockFetcherSpec.scala:298-305`: test constructs `ETH69.BlockRangeUpdate`, matches the buggy
+  arm, passes — masks the gap with a false-positive.
+
+**Steps:**
+1. **Read** `PeerActor.scala` lines 540-570 — locate the BRU match arm, understand context
+   (what triggers BreachOfProtocol disconnect, what happens after the dead arm is reached).
+2. **Read** `BlockFetcher.scala` lines 475-500 — locate the BRU match arm in
+   `AdaptedMessageFromEventBus`, understand `withPossibleNewTopAt` call and what it needs.
+3. **Read** `BlockFetcherSpec.scala` lines 290-315 — understand the failing test pattern.
+4. **Fix `PeerActor.scala:551`:**
+   ```scala
+   // Before:
+   case bru: ETH69.BlockRangeUpdate => ...
+   // After:
+   case bru: ETHPackets.BlockRangeUpdate => ...
+   ```
+5. **Fix `BlockFetcher.scala:486`:**
+   ```scala
+   // Before:
+   case AdaptedMessageFromEventBus(msg: ETH69.BlockRangeUpdate, _) => ...
+   // After:
+   case AdaptedMessageFromEventBus(msg: ETHPackets.BlockRangeUpdate, _) => ...
+   ```
+6. **Fix `BlockFetcherSpec.scala:298-305`:** Rebuild test to feed decoder output type
+   (`ETHPackets.BlockRangeUpdate`) so it exercises the real inbound path.
+   ```scala
+   // Before: ETH69.BlockRangeUpdate(...)
+   // After: ETHPackets.BlockRangeUpdate(...)
+   ```
+7. `sbt compile-all` after each file. `sbt "testOnly *BlockFetcher*"` after spec fix.
+
+**Verify:**
+```bash
+grep -rn "ETH69\.BlockRangeUpdate" \
+  src/main/scala/com/chipprbots/ethereum/network/PeerActor.scala \
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/regular/BlockFetcher.scala
+# Expected: 0 matches (all changed to ETHPackets.BlockRangeUpdate)
+
+sbt "testOnly *BlockFetcher*"
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/main/scala/.../network/PeerActor.scala src/main/scala/.../sync/regular/BlockFetcher.scala src/test/.../BlockFetcherSpec.scala`
+3. `git commit -m "fix(p2p): ETH69 BlockRangeUpdate type mismatch — restore BreachOfProtocol disconnect and chain-tip follow (G6)"`
+4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(eth69-f): clearout — $SHA"`
+5. **DELETE §ETH69-F**
