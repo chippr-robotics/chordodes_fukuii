@@ -49,7 +49,7 @@ class Address private (val bytes: ByteString) {
 
   def toUInt256: UInt256 = UInt256(bytes)
 
-  override def equals(that: Any): Boolean = that match { // §3h: FORGE-gate
+  override def equals(that: Any): Boolean = that match { // §3h: FORGE-confirmed — java.lang.Object.equals signature is fixed by JVM
     case addr: Address => addr.bytes == bytes
     case _             => false
   }
