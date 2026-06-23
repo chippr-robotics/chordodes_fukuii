@@ -682,11 +682,16 @@ sbt "testOnly *<SpecName>*"
 # Confirm 3,595+ tests, 0 failures (count grows as Classic TestProbe[T] migration unlocks E165 sites)
 ```
 
-**MANDATORY final step — complete BEFORE closing thread:**
-- Update run-order table in this file: strikethrough E4, add `✅ DONE [date] — N specs migrated, commit hashes`
-- Add each commit to `completed/SPRINT-QUEUE.md` with format: `| <sha> | 8a-retro batch 3 — <SpecName>: N tests migrated |`
-- Update `fukuii-test-timing.md` if test count changed
-- DELETE this section
+**MANDATORY final step — complete IN THIS ORDER:**
+1. `sbt scalafmtAll` — format all modules after all migrations
+2. `git add <test-spec files modified>` — stage only the migrated test files (never `git add .`)
+3. `git commit -m "test(8a-retro): migrate Classic TestKit → ActorTestKit — N specs, M tests"`
+4. `SHA=$(git rev-parse --short HEAD)` — capture exact SHA; use it in all entries below
+5. Update run-order table in this file: strikethrough E4 → `| ~~E4~~ | ~~Batch E~~ | ~~DEFERRED §8a-retro batch 3~~ | ✅ DONE [date] — N specs migrated, $SHA |`
+6. Add each commit to `completed/SPRINT-QUEUE.md`: `| $SHA | 8a-retro batch 3 — N specs migrated to ActorTestKit |`
+7. Update `fukuii-test-timing.md` if test count changed
+8. `git add .claude/` → `git commit -m "docs(8a-retro): clearout — $SHA"`
+9. DELETE this section
 
 **Rejection criteria:**
 - Migrating a test file whose production actor is NOT yet Typed (still `extends Actor`)
@@ -1086,10 +1091,15 @@ actionable slow tests.
 
 **Verification:** New baseline ≤ prior baseline (23 min target). All 3,601+ tests pass.
 
-**MANDATORY final step — complete BEFORE closing thread:**
-- `working-docs/DEFERRED-BACKLOG.md` run order table — add: `| D3 | Batch D | P7 EYE test timing audit | No |` and strikethrough when done: `| ~~D3~~ | ~~Batch D~~ | ~~P7 EYE test timing audit~~ | ✅ DONE [date] — Xs baseline, N improvements |`
-- Update `fukuii-test-timing.md` (`.local/docs/`) with new baseline
-- Any Thread.sleep fixes → `completed/SPRINT-QUEUE.md` row
+**MANDATORY final step — complete IN THIS ORDER:**
+1. `sbt scalafmtAll` — if any test files were modified
+2. `git add <specific test files changed>` — stage only modified files; skip if no source changes
+3. `git commit -m "test(timing): P7 — replace wall-clock assertions, N fixes"` — omit if no source changes
+4. `SHA=$(git rev-parse --short HEAD)` — capture SHA (or note "no source commit" if step 3 skipped)
+5. Update run-order table: strikethrough D3 → `| ~~D3~~ | ~~Batch D~~ | ~~P7 EYE test timing audit~~ | ✅ DONE [date] — Xs baseline, N improvements, $SHA |`
+6. Update `fukuii-test-timing.md` with new baseline
+7. Any Thread.sleep fixes → `completed/SPRINT-QUEUE.md` row with `$SHA`
+8. `git add .claude/` → `git commit -m "docs(p7): clearout — $SHA"`
 
 **Rejection criteria:** Weakening test assertions beyond 2× measured time; skipping tests to reduce count; modifying test logic (only timing assertions and sleep replacement are in scope)
 
@@ -1214,15 +1224,15 @@ Rescuing mis-labelled tests to `UnitTest` would immediately add them to `testEss
 **Verification:** `sbt compile-all` clean. Rescued tests appear in `testEssential` output and pass.
 `testEssential` count increases by the number of rescued tests.
 
-**MANDATORY final step:**
-- Update run-order table above: strikethrough E1, note rescued-count and commit hash.
-- Update `fukuii-test-timing.md` with new testEssential count.
-- **Track toward SyncTest removal from build.sbt:** Record in a CHASE-QUEUE entry how many
-  SyncTest-tagged tests remain that are NOT yet in any active tier. The explicit end-state
-  goal — once P8 + P10 are both complete — is to remove `-l SyncTest` from the
-  `testEssential`, `testStandard`, and `testComprehensive` exclusion lists in `build.sbt`.
-  Sync is core behavior; it belongs in testEssential. The exclusion is a workaround, not
-  a design decision.
+**MANDATORY final step — complete IN THIS ORDER:**
+1. `sbt scalafmtAll`
+2. `git add <specific test files modified>` — stage only the rescued/fixed test files
+3. `git commit -m "test(p8): SyncTest audit — rescue N tests, delete M"`
+4. `SHA=$(git rev-parse --short HEAD)` — capture exact SHA
+5. Update run-order table in `CODEBASE-AUDIT.md`: strikethrough E1 → `| ~~E1~~ | ... | ✅ DONE [date] — N rescued, $SHA |`
+6. Update `fukuii-test-timing.md` with new testEssential count
+7. Add CHASE-QUEUE entry: remaining SyncTest count and path to `-l SyncTest` removal (P8+P10 prerequisite)
+8. `git add .claude/` → `git commit -m "docs(p8): clearout — $SHA"`
 
 **Rejection criteria:** Rescuing any test that uses `Thread.sleep`, real wall-clock assertions, or
 live network/peer connections. Rescue only hermetic tests.
@@ -1267,9 +1277,14 @@ written reason and a GitHub issue link.
 
 **Verification:** After each fix, `sbt compile-all` + `sbt "testOnly *SpecName*"` passes.
 
-**MANDATORY final step:**
-- Update run-order table: strikethrough E2, note fix-count / delete-count / defer-count and commit hashes.
-- Add any DEFERed items to CHASE-QUEUE with `[DisabledTest]` prefix.
+**MANDATORY final step — complete IN THIS ORDER:**
+1. `sbt scalafmtAll`
+2. `git add <specific test files modified>` — stage only the fixed/deleted test files
+3. `git commit -m "test(p9): DisabledTest audit — fix N, delete M, defer K"` — one commit per test or per file is also fine (see step 5 in the prompt above)
+4. `SHA=$(git rev-parse --short HEAD)` — capture the final commit SHA (or comma-separate multiple SHAs if committed individually)
+5. Update run-order table in `CODEBASE-AUDIT.md`: strikethrough E2 → `| ~~E2~~ | ... | ✅ DONE [date] — N fixed, M deleted, $SHA |`
+6. Add any DEFERred items to CHASE-QUEUE with `[DisabledTest]` prefix
+7. `git add .claude/` → `git commit -m "docs(p9): clearout — $SHA"`
 
 **Rejection criteria:** Re-enabling a test without understanding why it was disabled. Never remove
 `DisabledTest` without verifying the test actually passes.
@@ -1321,10 +1336,15 @@ a `MinerFactory` seam.
 
 **Verification:** Fixed tests pass 10/10 in `testOnly`. No `FlakyTest` tags remain in the fixed files.
 
-**MANDATORY final step:**
-- Update run-order table: strikethrough E3, note fixed-count / deleted-count + commit hashes.
-- If any tests rescued from `SyncTest` too (P8 overlap) → update P8 verdict table.
-- Update `fukuii-test-timing.md` test count after fixes land in testEssential.
+**MANDATORY final step — complete IN THIS ORDER:**
+1. `sbt scalafmtAll`
+2. `git add <specific test files modified>` — stage only fixed/deleted test files
+3. `git commit -m "test(p10): FlakyTest audit — fix N, delete M"` — or per-test commits (format in step 5 above)
+4. `SHA=$(git rev-parse --short HEAD)` — capture final commit SHA (comma-separate if multiple)
+5. Update run-order table in `CODEBASE-AUDIT.md`: strikethrough E3 → `| ~~E3~~ | ... | ✅ DONE [date] — N fixed, M deleted, $SHA |`
+6. If any tests also rescued from SyncTest → update P8 verdict table with those SHAs
+7. Update `fukuii-test-timing.md` test count after fixes land in testEssential
+8. `git add .claude/` → `git commit -m "docs(p10): clearout — $SHA"`
 
 **Rejection criteria:** Re-tagging a flaky test as `SlowTest` or `DisabledTest` to avoid fixing it.
 A test must be either reliably passing or deleted — no half-measures.
@@ -1380,10 +1400,14 @@ slow). This prompt captures the Standard baseline and audits SlowTest label accu
 
 **Verification:** All testStandard tests pass (0 failures). Baseline recorded.
 
-**MANDATORY final step:**
-- Update run-order table: strikethrough E4, note wall time, test count, mislabelled-count.
-- Update `fukuii-test-timing.md` with testStandard baseline.
-- Any mislabelled SlowTest promotions → note commit hash.
+**MANDATORY final step — complete IN THIS ORDER:**
+1. `sbt scalafmtAll` — only if test files were modified
+2. `git add <specific test files modified>` — stage only files with tag changes; skip if no source changes
+3. `git commit -m "test(p11): promote N mislabelled SlowTest → UnitTest"` — omit if no source changes
+4. `SHA=$(git rev-parse --short HEAD)` — capture SHA (note "no source commit" if step 3 skipped)
+5. Update run-order table in `CODEBASE-AUDIT.md`: strikethrough E4 → `| ~~E4~~ | ... | ✅ DONE [date] — Xs wall time, N tests, M mislabelled fixed, $SHA |`
+6. Update `fukuii-test-timing.md` with testStandard baseline and timing
+7. `git add .claude/` → `git commit -m "docs(p11): clearout — $SHA"`
 
 **Rejection criteria:** Removing `SlowTest` from a test that actually takes >100ms. Observe the
 time, don't guess. `DAGGenerationSpec` and `EthashNonceSearchSpec` must remain `SlowTest`.
@@ -1536,12 +1560,17 @@ with sync tests included and a higher test count than the P7 baseline. `sbt test
 other new targets) each find ≥3 tests. Zero `-l SyncTest`, `-l DisabledTest`, `-l FlakyTest`
 lines remain in any tier definition.
 
-**MANDATORY final step:**
-- Update run-order table: strikethrough E5, record the final testEssential exclusion list.
-- Commit build.sbt changes in two commits: (1) domain targets added, (2) workaround exclusions removed.
-- Write `test-tag-taxonomy.md` with final tag census and tier membership for each tag.
-- Update `fukuii-test-timing.md` with new testEssential count and the clean exclusion list.
-- Update MEMORY.md `fukuii-test-timing.md` entry with final test count.
+**MANDATORY final step — complete IN THIS ORDER:**
+1. `sbt scalafmtAll`
+2. `git add build.sbt` → `git commit -m "build(p12): add domain test targets (testConsensus, testCrypto, testVM, testNetwork)"` — commit 1: new aliases only
+3. `SHA1=$(git rev-parse --short HEAD)` — capture SHA for commit 1
+4. `git add build.sbt <any test files re-tagged>` → `git commit -m "build(p12): remove workaround exclusions from testEssential — SyncTest/DisabledTest/FlakyTest"` — commit 2: exclusion removal (only after P8+P10 complete)
+5. `SHA2=$(git rev-parse --short HEAD)` — capture SHA for commit 2
+6. Update run-order table in `CODEBASE-AUDIT.md`: strikethrough E5 → `| ~~E5~~ | ... | ✅ DONE [date] — $SHA1 (aliases), $SHA2 (exclusion removal) |`
+7. Write `test-tag-taxonomy.md` at `.local/docs/`
+8. Update `fukuii-test-timing.md` with new testEssential count and the clean exclusion list
+9. Update MEMORY.md `fukuii-test-timing.md` entry with final test count
+10. `git add .claude/ .local/docs/test-tag-taxonomy.md .local/docs/fukuii-test-timing.md` → `git commit -m "docs(p12): clearout — $SHA1 $SHA2"`
 
 **Rejection criteria:** Removing a workaround exclusion before the underlying tests are fixed
 (P8+P10 must be complete first). Adding a build target for a tag with 0–1 test usages.
@@ -1600,8 +1629,12 @@ ledger logic and both chains are affected.
 **Priority:** HIGH — Hive EIP-2935 compliance blocker for Olympia acceptance testing.
 Handle before any Hive ETC Olympia test suite run.
 
-**MANDATORY final step (after fix):**
-- Add `BlockHashHistorySpec` absent-account test (see test pattern above)
-- `./local/scripts/fukuii-test` → confirm baseline holds
-- Update CHASE-QUEUE cleared entries log with commit SHA
-- DELETE this section
+**MANDATORY final step — complete IN THIS ORDER:**
+1. `sbt scalafmtAll`
+2. `git add src/main/scala/.../ledger/BlockExecution.scala src/test/scala/.../ledger/BlockHashHistorySpec.scala` — stage only the two files changed
+3. `git commit -m "fix(ledger): applyEip2935 account-existence guard — match applyEip4788 pattern (Part 12 §G5)"`
+4. `SHA=$(git rev-parse --short HEAD)` — capture exact SHA
+5. `./local/scripts/fukuii-test` → confirm 3,595+ tests, 0 failures; record timing
+6. Add to `CHASE-QUEUE.md` cleared entries log: `| BlockExecution.applyEip2935 Part 12 §G5 | Cleared [date]: $SHA — account-existence guard added; BlockHashHistorySpec absent-account test added |`
+7. `git add .claude/agent-protocols/working-docs/DEFERRED-BACKLOG.md .claude/agent-protocols/working-docs/CHASE-QUEUE.md` → `git commit -m "docs(part12-g5): clearout — $SHA"`
+8. DELETE this section

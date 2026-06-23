@@ -166,9 +166,15 @@ Apply the Opportunistic Clearout Protocol while each file is open. While each ac
 **Verification per actor:** `grep -n "Behavior\[Any\]" <file>.scala` returns 0 lines.
 **Verification end of sprint:** `grep -rn "Behavior\[Any\]" src/main/ --include="*.scala"` → 0 results (excluding comments).
 
-**MANDATORY final step — complete BEFORE closing thread:**
-- `working-docs/CODEBASE-AUDIT.md` run order table — change `| D1 | Batch D | G1 ...` to `| ~~D1~~ | ~~Batch D~~ | ~~G1 — Start Behavior[Any] narrowing sprint~~ | ✅ DONE [date] — sprint in progress / complete |`
-- On sprint completion: update `network-sync-pekko-migration-plan.md` status from "RESEARCH ONLY" to "COMPLETE — [SHA]". Add entries to `modernization-log/network/` and `modernization-log/sync/` per actor narrowed. Update the DEFERRED table: move D1 items to "DONE" as each file is reached.
+**MANDATORY final step — complete IN THIS ORDER (per actor migrated):**
+1. `sbt scalafmtAll`
+2. `git add <actor.scala> [<actor-spec.scala>]` — stage only the files you modified for this actor
+3. `git commit -m "refactor(g1): narrow Behavior[Any] → Behavior[Command] — ActorName"`
+4. `SHA=$(git rev-parse --short HEAD)` — capture exact SHA
+5. Update DEFERRED table in this file for the D1 item corresponding to this actor: add `✅ DONE $SHA`
+6. Add `#### $SHA — ActorName: Behavior[Command] narrowing` entry to `modernization-log/network/` or `modernization-log/sync/`
+7. `git add .claude/` → `git commit -m "docs(g1): ActorName clearout — $SHA"`
+8. When ALL actors complete: update run-order table strikethrough for D1 and update `network-sync-pekko-migration-plan.md` status to `COMPLETE — [final SHA]`
 
 **Rejection criteria:** Touching Classic TCP bridge inner classes; changing consensus logic; mass-edit without per-actor compile verification.
 
@@ -211,9 +217,15 @@ Check `run-logs/` for SNAP serve latency data, or grep comments near the call si
 
 **Opportunistic clearout:** While `SNAPSyncController.scala` is open (5,324 LOC), check for any CHASE-QUEUE or DEFERRED items in the file and apply the three-tier decision. Note the 33 deferred `return` statements (§8e ratchet) — separate gate, but log density if changed since last audit.
 
-**MANDATORY final step — complete BEFORE closing thread:**
-- `working-docs/CODEBASE-AUDIT.md` run order table — change `| D2 | Batch D | G2 ...` to `| ~~D2~~ | ~~Batch D~~ | ~~G2 — Start SNAP cleanup sprint~~ | ✅ DONE [date] — sprint in progress / complete |`
-- Remove addressed rows (S3-B, S3-E, INFO-8) from the DEFERRED table. Add entries to `modernization-log/sync/snap.md`.
+**MANDATORY final step — complete IN THIS ORDER:**
+1. `sbt scalafmtAll`
+2. `git add <specific source files modified>` — stage only the files you changed
+3. `git commit -m "chore(snap): G2 — <description of what was fixed>"`
+4. `SHA=$(git rev-parse --short HEAD)` — capture exact SHA
+5. Update run-order table: strikethrough D2 → `| ~~D2~~ | ~~Batch D~~ | ~~G2 — Start SNAP cleanup sprint~~ | ✅ DONE [date] — $SHA |`
+6. Remove addressed rows (S3-B, S3-E, INFO-8) from the DEFERRED table; add `✅ DONE $SHA`
+7. Add `#### $SHA — G2: <description>` entry to `modernization-log/sync/snap.md`
+8. `git add .claude/` → `git commit -m "docs(g2): clearout — $SHA"`
 
 **Rejection criteria:** Touching 33 `return` statements (separate §8e SNAP1 gate); changing SNAP protocol logic; skipping the current-state assessment in Step 0.
 
@@ -247,10 +259,12 @@ At the start of the Network/P2P Pekko migration sprint, before migrating each ac
 
 **Opportunistic clearout:** Apply the protocol in CODEBASE-AUDIT.md while each actor file is open. The Network/P2P sprint will open many large files — any CHASE-QUEUE or DEFERRED items in those files should be addressed inline per the three-tier decision.
 
-**MANDATORY final step — complete BEFORE closing thread:**
-- No separate run order update — D1 runs inline during G1; the G1 MANDATORY step handles row `D1` strikethrough.
-- Remove W7, W15, INFO-9, INFO-13/14 rows from the DEFERRED table as each actor is reached.
-- Add a `#### [SHA] — description` entry to `modernization-log/network/` and `modernization-log/sync/` for each actor migrated.
+**MANDATORY final step — complete IN THIS ORDER (inline with G1 — per actor):**
+1. Source commit is handled by G1 MANDATORY step — no separate D1 source commit needed
+2. `SHA=$(git rev-parse --short HEAD)` — use the G1 actor commit SHA
+3. Remove W7 / W15 / INFO-9 / INFO-13/14 row from DEFERRED table as each actor is reached; add `✅ DONE $SHA`
+4. Add `#### $SHA — D1: <item> fixed inline during ActorName migration` entry to `modernization-log/network/` or `modernization-log/sync/`
+5. Doc commit is handled by G1 MANDATORY step — include these doc files in G1's `git add .claude/` step
 
 ---
 
@@ -305,10 +319,14 @@ Confirm: no null/mutation compile errors; 72+ SNAPSyncController tests pass; coo
 
 **Opportunistic clearout:** The three coordinator files are large — while open, apply the inline clearout protocol for any CHASE-QUEUE items visible in those files.
 
-**MANDATORY final step — complete BEFORE closing thread:**
-- Remove `S3-E` row from the DEFERRED table in this file.
-- Add `#### [SHA] — S3-E: task types immutable` entry to `modernization-log/sync/snap.md`.
-- No run-order update needed (D2 gate was G2, already struck through).
+**MANDATORY final step — complete IN THIS ORDER:**
+1. `sbt scalafmtAll`
+2. `git add <AccountTask.scala> <StorageTask.scala> <ByteCodeTask.scala> <*Coordinator.scala files>` — stage only modified source files
+3. `git commit -m "chore(snap): S3-E — task types immutable, coordinator .copy() sites"`
+4. `SHA=$(git rev-parse --short HEAD)` — capture exact SHA
+5. Remove `S3-E` row from the DEFERRED table in this file; add `✅ DONE $SHA`
+6. Add `#### $SHA — S3-E: task types immutable` entry to `modernization-log/sync/snap.md`
+7. `git add .claude/` → `git commit -m "docs(d2-s3e): clearout — $SHA"`
 
 ---
 
@@ -403,10 +421,16 @@ Commit per collaborator: `refactor: type ActorRef param to TypedActorRef — Col
 ./local/scripts/fukuii-test essential   # full Tier 1 suite — 3621 tests, 0 failures
 ```
 
-**MANDATORY final step — complete BEFORE closing thread:**
-- Mark BRIDGE-A, BRIDGE-B, BRIDGE-C rows in DEFERRED table as ✅ DONE
-- Archive this prompt to `completed/CODEBASE-AUDIT.md` under the Post-Migration Target State section
-- Add entries to `modernization-log/sync/`, `modernization-log/network/` per file touched
-- Update `completed/CODEBASE-AUDIT.md` Post-Migration Target State: change "not completed yet" to the completion date + commit SHA
+**MANDATORY final step — complete IN THIS ORDER:**
+1. `sbt scalafmtAll`
+2. `git add <specific source files per collaborator>` — stage per-collaborator (commit per collaborator as described above)
+3. `git commit -m "refactor: type ActorRef param to TypedActorRef — CollaboratorName BRIDGE-C"` — repeat per collaborator
+4. `SHA=$(git rev-parse --short HEAD)` — capture final SHA (or note all SHAs if multiple commits)
+5. Verify all BRIDGE greps return 0 (BRIDGE-F must still return exactly 3)
+6. `./local/scripts/fukuii-test` → confirm 3,621+ tests, 0 failures
+7. Mark BRIDGE-A, BRIDGE-B, BRIDGE-C rows in DEFERRED table as ✅ DONE $SHA
+8. Add entries to `modernization-log/sync/`, `modernization-log/network/` per file touched
+9. Archive this prompt section to `completed/CODEBASE-AUDIT.md` Post-Migration Target State, recording completion date + $SHA
+10. `git add .claude/` → `git commit -m "docs(post-migration-sweep): clearout — $SHA"`
 
 **Rejection criteria:** Any BRIDGE-A/B/C/D/E grep returning non-zero; any new `extends Actor` added; TCP bridges (`ServerActor`, `RLPxConnectionHandler`) altered; consensus files touched without FORGE/BEACON review.
