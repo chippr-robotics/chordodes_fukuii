@@ -934,27 +934,37 @@ slower than dev machine → timeouts). `@Ignore` annotations silently hide untes
 
 **What**: Scala's type system is Typed's main advantage. The codebase currently has ~180 `.toClassic` / `.toTyped` bridge calls, 10 `actorSelection` sites (test-only), and 6 `classicSystem.actorOf` sites in production. These are necessary bridges while classic actors remain in the system, but every bridge site is a hole in the type lattice — an untyped `ActorRef` flowing where a `ActorRef[T]` could carry compile-time guarantees. The goal is to inventory all sites, understand WHY each exists (which classic actor is the root cause), and eliminate them in priority order as classic actors complete their LOOM migrations.
 
-**Root-cause breakdown (from §8k-R1 audit, 2026-06-23):**
+**Root-cause breakdown (§8k-R1 audit COMPLETE 2026-06-23 — full detail at `.local/docs/classic-interop-audit.md`):**
 
-| Pattern | Count | Root cause | Fix tier |
-|---------|-------|-----------|----------|
-| `messageAdapter.toClassic` | ~35 | `PeerEventBusActor` (classic pub-sub) + `NetworkPeerManagerActor.GetHandshakedPeersCmd` accepts `ActorRef` | Wave 3 LOOM migration of NPMA/PEBA |
-| `ctx.toClassic.sender()` | ~20 | `SyncController`/`FastSync`/`RegularSync` still in classic ask/forward flow | Wave 3 LOOM |
-| `ctx.toClassic.parent` | ~6 | `PeerActor` messages its classic parent | Wave 3 LOOM |
-| `context.self.toClassic` in coordinator→worker | 2 | `AccountRangeWorker` + `ByteCodeWorker` `coordinator:` param is classic `ActorRef` | **NOW** (MITHRIL) |
-| `ctx.toClassic.actorOf` | ~4 | `SyncController` spawns `RegularSync` as classic child | Wave 3 LOOM |
-| `actorSelection` (test only) | 10 | Coordinator specs resolve Typed child workers via classic wildcard path | E5e (already tracked) |
-| `classicSystem.actorOf` (NodeBuilder) | 3 | Top-level actor wiring still in Classic bootstrap | CAPSTONE bootstrap rewrite |
+~130 production bridge sites + 2 test `actorSelection` sites. Permanent floor: 4 TCP bridges. Eliminatable: ~126 production + 2 test.
+
+| Cluster | Sites | Root cause | Pre/Post-CAPSTONE | Sprint |
+|---------|-------|-----------|-------------------|--------|
+| A — `messageAdapter.toClassic` (PeerEventBus subscriptions) | ~26 | `PeerEventBusActor.SubscribeCmd(subscriber: ActorRef)` | Pre-CAPSTONE | §8k-D |
+| B — `handshakedPeersAdapter.toClassic` | ~15 | `NPMA.GetHandshakedPeersCmd(replyTo: ActorRef)` | Pre-CAPSTONE | §8k-E |
+| C — `ctx.toClassic.sender()` in SyncController/FastSync | ~27 | OQ-5 Classic ask path from jsonrpc callers | Pre-CAPSTONE | §8k-G |
+| D — `ctx.toClassic.actorOf(RegularSync)` | 2 | RegularSync has no `Behavior[Command]` | Pre-CAPSTONE | §8k-F |
+| E — `externalAdapter.toClassic` in SyncController | ~29 | OQ-5 Classic ask path (same root as C) | Pre-CAPSTONE | §8k-G |
+| F — `ctx.self.toClassic` coordinator→worker + SSC→coordinator | ~15 | Worker `coordinator: ActorRef` params untyped | **NOW** (MITHRIL) | §8k-A + §8k-C |
+| G — `context.toClassic.parent` in PeerActor | 7 | PeerActor notifies PeerManager via Classic parent | Pre-CAPSTONE | §8k-H |
+| H — `ctx.spawn(...).toClassic` for PeerActor ref | 1 | PeerManagerActor stores spawned child as Classic | Pre-CAPSTONE | §8k-H |
+| I — TCP I/O bridge (RLPxConnectionHandler, ServerActor) | 4 | Akka TCP requires Classic `sender()` — **permanent** | N/A | — |
+| J — `classicSystem.actorOf` bridge actors in NodeBuilder | 3 | KNM/PDM/PTM have Classic callers via legacy case objects | Pre-CAPSTONE | §8k-I |
+| K — `peerEventBus.toClassic` + spawn `.toClassic` in NodeBuilder | 3 | SyncController/NPMA returned as Classic refs to callers | Pre-CAPSTONE | §8k-G/§8k-I |
+| L — `AkkaTaskOps.askFor` (jsonrpc, ~18 call sites) | ~18 | Commands carry `replyTo: ActorRef` not `ActorRef[T]` | Pre-CAPSTONE | §8k-G |
+| M — `peerEventBus.toClassic` watchWith in PEBA itself | 1 | PEBA internal Classic watch | Pre-CAPSTONE | §8k-D |
+| N — `ctx.self.toClassic` / `fetcherReplyTo.toClassic` in BlockImporter | 4 | RegularSync spawned Classic → BlockImporter props take Classic refs | Pre-CAPSTONE | §8k-F |
 
 **Principle**: Each `.toClassic` call is a symptom, not the disease. The disease is an unconverted classic actor upstream. The fix strategy is: **migrate the upstream actor first (LOOM), then delete the bridge**. Bridges must never be removed before the upstream is converted — that produces a type error at the call site that blocks compilation.
 
 ---
 
-#### §8k-R1 — PRISM: Comprehensive classic-interop audit
+#### §8k-R1 — PRISM: Comprehensive classic-interop audit ✅ DONE 2026-06-23
 
 **Agent:** PRISM (read-only review, 8-lens analysis)
 **Risk:** ZERO — research only, no code changed
 **Gate:** Any time. Run before starting §8k-A.
+**Output:** `.local/docs/classic-interop-audit.md` (535 lines, 14 clusters, bridge census ~130 prod + 2 test).
 
 **Research prompt:**
 ```
@@ -1040,113 +1050,471 @@ Step 5 — Output the full audit to `.local/docs/classic-interop-audit.md`.
 
 ---
 
-#### §8k-A — MITHRIL: Update coordinator→worker `coordinator` param to Typed `ActorRef[T]`
+#### §8k-A — MITHRIL: Update all 4 SNAP worker `coordinator` params to Typed `ActorRef[T]`
 
 **Agent:** MITHRIL (Scala 3 modernization)
 **Risk:** LOW — changes worker `apply` signature and coordinator spawn call; no protocol change
-**Gate:** §8k-R1 complete (confirm these are the only "fix now" sites). Run any time after that.
-**Prerequisite:** E5e complete (test-side actorSelection cleanup closes in tandem).
+**Gate:** §8k-R1 complete ✅. Run now.
+**Prerequisite:** None. Zero LOOM dependency.
 
 **Background:**
-`AccountRangeWorker` and `ByteCodeWorker` both accept `coordinator: org.apache.pekko.actor.ActorRef`
-(classic untyped ref). The coordinator passes `ctx.self.toClassic` / `context.self.toClassic` at
-spawn time. This is the only reason those two `.toClassic` sites exist in production worker spawn
-paths. The fix is:
-  1. Change the `coordinator` param in each worker to `ActorRef[Coordinator.Command]`
-  2. Update the coordinator spawn call to pass `ctx.self` / `context.self` directly (no `.toClassic`)
-  3. Update message sends inside the worker from `coordinator ! Msg(...)` to the same syntax
-     (since `ActorRef[Coordinator.Command] ! Command` is unchanged in Pekko Typed)
+All four SNAP workers (`AccountRangeWorker`, `ByteCodeWorker`, `StorageRangeWorker`, `TrieNodeHealingWorker`)
+accept `coordinator: org.apache.pekko.actor.ActorRef` (classic untyped ref). Each coordinator passes
+`ctx.self.toClassic` / `context.self.toClassic` at spawn time. This is the only reason those
+`.toClassic` sites exist in production worker spawn paths.
+
+**Bridge sites eliminated:** ~12 production sites (Cluster F coordinator spawn sites) + 2 test
+`actorSelection` sites (AccountRangeCoordinatorSpec:73, ByteCodeCoordinatorSpec:77).
+
+**Worker → Command type mapping:**
+| Worker | Typed coordinator param |
+|--------|------------------------|
+| AccountRangeWorker | `ActorRef[AccountRangeCoordinator.Command]` |
+| ByteCodeWorker | `ActorRef[ByteCodeCoordinator.Command]` |
+| StorageRangeWorker | `ActorRef[StorageRangeCoordinator.Command]` |
+| TrieNodeHealingWorker | `ActorRef[TrieNodeHealingCoordinator.Command]` |
+
+Messages workers send up to coordinator are already in the sealed Command ADTs — no protocol change.
 
 **Grep to confirm scope:**
 ```bash
 cd /media/dev/2tb/dev/fukuii
 
-# Worker param types to change
+# Worker param types to change (all 4 workers)
 grep -rn "coordinator.*: org\.apache\.pekko\.actor\.ActorRef\b\|coordinator: ActorRef\b" \
   src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/actors/ --include="*.scala"
 
-# Coordinator self.toClassic spawn sites to remove
-grep -n "coordinator = ctx\.self\.toClassic\|coordinator = context\.self\.toClassic" \
-  src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/actors/AccountRangeCoordinator.scala \
-  src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/actors/ByteCodeCoordinator.scala
+# Coordinator self.toClassic spawn sites to remove (all 4 coordinators)
+grep -rn "coordinator = ctx\.self\.toClassic\|coordinator = context\.self\.toClassic" \
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/actors/ --include="*.scala"
 ```
 
-**Step 1 — Update `AccountRangeWorker`:**
-- Change `coordinator: org.apache.pekko.actor.ActorRef` → `coordinator: ActorRef[AccountRangeCoordinator.Command]`
-- Import `org.apache.pekko.actor.typed.ActorRef` (already in scope in the Typed module)
-- `sbt compile-all` — fix any type errors in worker body (message sends should be unchanged)
+**Per-worker steps (repeat × 4):**
 
-**Step 2 — Update `AccountRangeCoordinator` spawn:**
-- Remove `.toClassic` from `coordinator = ctx.self.toClassic` → `coordinator = ctx.self`
+**Step 1 — AccountRangeWorker + AccountRangeCoordinator:**
+- `AccountRangeWorker`: `coordinator: org.apache.pekko.actor.ActorRef` → `coordinator: ActorRef[AccountRangeCoordinator.Command]`
+- `AccountRangeCoordinator:1060`: `coordinator = ctx.self.toClassic` → `coordinator = ctx.self`
 - `sbt compile-all`
 
-**Step 3 — Repeat for `ByteCodeWorker` + `ByteCodeCoordinator`:**
-- Same pattern
+**Step 2 — ByteCodeWorker + ByteCodeCoordinator:**
+- `ByteCodeWorker`: same lift → `ActorRef[ByteCodeCoordinator.Command]`
+- `ByteCodeCoordinator:709`: `coordinator = context.self.toClassic` → `coordinator = context.self`
+- `sbt compile-all`
 
-**Step 4 — Update tests (E5e will cover remaining actorSelection cleanup):**
-- `sbt "testOnly *AccountRangeCoordinatorSpec* *ByteCodeCoordinatorSpec* *AccountRangeWorkerSpec* *ByteCodeWorkerSpec*"`
+**Step 3 — StorageRangeWorker + StorageRangeCoordinator:**
+- `StorageRangeWorker`: lift → `ActorRef[StorageRangeCoordinator.Command]`
+- SRC spawn sites (SSC:3353/3390/3417): `coordinator = ctx.self.toClassic` → `coordinator = ctx.self`
+- `sbt compile-all`
 
-**Step 5 — Verify toClassic count decreased by exactly 2:**
+**Step 4 — TrieNodeHealingWorker + TrieNodeHealingCoordinator:**
+- `TrieNodeHealingWorker`: lift → `ActorRef[TrieNodeHealingCoordinator.Command]`
+- TNHC spawn sites (SSC:3605/3673): `coordinator = ctx.self.toClassic` → `coordinator = ctx.self`
+- `sbt compile-all`
+
+**Step 5 — Verify:**
 ```bash
-grep -rn "self\.toClassic" \
+grep -rn "self\.toClassic\|self\.toClassic" \
   src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/actors/ --include="*.scala"
 # Expected: 0 results in snap/actors/ after this change
-```
 
-**Verification:**
-```bash
-sbt compile-all
-sbt "testOnly *AccountRange* *ByteCode*"
+sbt "testOnly *AccountRange* *ByteCode* *StorageRange* *TrieNodeHealing*"
 ./local/scripts/fukuii-test
 ```
 
 **MANDATORY final steps — IN THIS ORDER:**
 1. `sbt scalafmtAll`
-2. `git add src/main/.../AccountRangeWorker.scala src/main/.../AccountRangeCoordinator.scala \`
-   `        src/main/.../ByteCodeWorker.scala src/main/.../ByteCodeCoordinator.scala`
-3. `git commit -m "refactor(8k-A): typed coordinator ref in AccountRange/ByteCode workers — remove .toClassic at worker spawn"`
+2. `git add` the 8 modified files (4 workers + 4 coordinators)
+3. `git commit -m "refactor(8k-A): typed coordinator ref in all 4 SNAP workers — remove .toClassic at worker spawn"`
 4. `SHA=$(git rev-parse --short HEAD)`
-5. `git add .claude/` → `git commit -m "docs(8k-A): clearout coordinator typed-ref prompt — $SHA"`
+5. `git add .claude/` → `git commit -m "docs(8k-A): clearout — $SHA"`
 6. **DELETE §8k-A**
 
 **Rejection criteria:**
 - Changing message protocol or supervision structure
-- Touching `SNAPSyncController` or other Wave-3-gated actors
+- Touching `SNAPSyncController` send path (Cluster F SSC→coordinator untyped overload — that's §8k-C)
 - Any change to `.local/` or consensus code
 
 ---
 
-#### §8k-B — Post-CAPSTONE: Full classic bridge elimination sweep
+#### §8k-C — MITHRIL: Lift SNAP coordinator `snapSyncController: ActorRef` to Typed
 
-**Agent:** PRISM (audit) + LOOM (implementation per batch)
-**Risk:** MEDIUM — touches many files; gates on all actors Typed
-**Gate:** CAPSTONE merged. Run §7d artifact audit first (they overlap).
+**Agent:** MITHRIL
+**Risk:** LOW — coordinator factory param type lift only; no protocol change
+**Gate:** §8k-A complete (all 4 workers use typed coordinator refs first, so both levels close together)
+**Bridge sites eliminated:** ~7 (Cluster F: SSC `ctx.self.toClassic` at coordinator spawn sites in SNAPSyncController)
 
 **Background:**
-After CAPSTONE, `PeerEventBusActor`, `NetworkPeerManagerActor`, `SyncController`, `RegularSync`,
-`FastSync`, `PeerActor` are all Typed. Every remaining `.toClassic` / `.toTyped` bridge call becomes
-removable. The pattern is:
+After §8k-A, the coordinators themselves still accept `snapSyncController: org.apache.pekko.actor.ActorRef`
+in their untyped `apply` factory overloads. SNAPSyncController passes `ctx.self.toClassic` when
+spawning ARC/BCC/SRC/TNHC. Lifting the coordinator factory param removes these remaining SSC→coordinator
+bridge sites.
 
-1. `messageAdapter.toClassic` → subscribe/send directly with Typed `ActorRef[T]`
-2. `ctx.toClassic.sender()` → use `ask` pattern or explicit `replyTo: ActorRef[T]` param
-3. `ctx.toClassic.parent` → typed parent ref via spawn parameter
-4. `adapter.toTyped[T]` call sites → resolved when the upstream is Typed
+**Grep to confirm scope:**
+```bash
+cd /media/dev/2tb/dev/fukuii
 
-Estimated scope post-CAPSTONE: ~170 sites across ~25 files.
+# Coordinator untyped factory overloads
+grep -rn "snapSyncController: org\.apache\.pekko\.actor\.ActorRef\b\|snapSyncController: ActorRef\b" \
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/actors/ --include="*.scala"
 
-**Prompt (run AFTER CAPSTONE):**
+# SSC spawn sites using ctx.self.toClassic for coordinators
+grep -n "ctx\.self\.toClassic\|context\.self\.toClassic" \
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/SNAPSyncController.scala
 ```
-CAPSTONE is merged. All actors are now Pekko Typed. Do a final sweep to
-eliminate every remaining classic bridge call:
 
-Step 1 — Run the §7d artifact audit sweep (grep commands in §7d).
-Step 2 — For each `.toClassic` site: identify the Typed alternative now
-  that the receiving actor is converted.
-Step 3 — Remove bridges one subsystem at a time (PeerEventBus, NPMA,
-  SyncController, FastSync, RegularSync), compile after each subsystem.
-Step 4 — Delete the `pekko.actor.typed.scaladsl.adapter` imports.
-Step 5 — Run testEssential — confirm 3,595+ / 0 failures.
-Step 6 — Commit per subsystem.
+**Steps:**
+1. In each coordinator (`AccountRangeCoordinator`, `ByteCodeCoordinator`, `StorageRangeCoordinator`,
+   `TrieNodeHealingCoordinator`): change `snapSyncController: ActorRef` param in the untyped `apply`
+   overload to `snapSyncController: ActorRef[SNAPSyncController.Command]`. Remove the FQN classic import
+   if now unused.
+2. In `SNAPSyncController`: at each coordinator spawn site change `snapSyncController = ctx.self.toClassic`
+   → `snapSyncController = ctx.self`.
+3. `sbt compile-all` after each coordinator.
+
+**Verify toClassic count in SSC drops by 7:**
+```bash
+grep -c "\.toClassic" \
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/SNAPSyncController.scala
+# before vs after
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add` the 5 modified files (4 coordinators + SNAPSyncController)
+3. `git commit -m "refactor(8k-C): typed snapSyncController ref in SNAP coordinators — remove .toClassic at SSC spawn"`
+4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(8k-C): clearout — $SHA"`
+5. **DELETE §8k-C**
+
+---
+
+#### §8k-D — HERALD + MITHRIL: Lift `PeerEventBusActor.SubscribeCmd(subscriber: ActorRef)` to Typed
+
+**Agent:** HERALD (protocol audit) pre-flight, then MITHRIL (implementation)
+**Risk:** MEDIUM — PeerEventBusActor's internal Classic `EventBus` registry stores `subscriber: ActorRef`;
+         changing to `ActorRef[PeerEvent]` requires either a dispatch wrapper or a typed registry.
+**Gate:** §8k-C complete. HERALD pre-flight mandatory before touching PEBA internals.
+**Bridge sites eliminated:** ~27 (all Cluster A `messageAdapter.toClassic` subscription sites + BlockFetcher subscribeAdapter child + Cluster M watchWith)
+
+**Background:**
+`PeerEventBusActor.SubscribeCmd` and `UnsubscribeCmd` accept `subscriber: ActorRef` (Classic). Every
+Typed subscriber must call `.toClassic` on its `messageAdapter` ref (26 sites across 9 files — see
+Cluster A in `.local/docs/classic-interop-audit.md`). The root cause is the internal Classic `EventBus`
+machinery. Two valid approaches:
+- **(A) Typed registry overlay**: PEBA stores `ActorRef[PeerEvent]` alongside the Classic ref; delivers
+  to Typed ref directly and drops the Classic path.
+- **(B) Dispatch wrapper**: Keep Classic EventBus internally; add a thin Typed-→Classic adapter at
+  subscribe time (opposite direction — the adapter converts Typed delivery to the Classic registry).
+
+HERALD pre-flight determines which approach avoids wire-protocol changes.
+
+**Steps:**
+1. HERALD: read `network/PeerEventBusActor.scala` fully. Assess EventBus internal. Recommend A or B.
+2. MITHRIL: implement the chosen approach. Change `SubscribeCmd(to, subscriber: ActorRef)` param.
+3. Remove `.toClassic` at all ~26 call sites in Clusters A (9 files). Remove the `BlockFetcher`
+   subscribeAdapter bridge child (replace with direct `messageAdapter`).
+4. Remove `peerEventBus.toClassic` watchWith in PEBA:44 (Cluster M).
+5. `sbt compile-all` after each file group.
+
+**Verify:**
+```bash
+grep -rn "\.toClassic" src/main/scala/com/chipprbots/ethereum/network/ --include="*.scala"
+# Expected: 0 after this sprint (except TCP bridges in ServerActor / RLPxConnectionHandler)
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. Stage PEBA + all 9 subscriber files + BlockFetcher
+3. `git commit -m "refactor(8k-D): typed PeerEventBusActor subscriber protocol — remove ~27 .toClassic sites (Clusters A+M)"`
+4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(8k-D): clearout — $SHA"`
+5. **DELETE §8k-D**
+
+---
+
+#### §8k-E — MITHRIL: Lift `NetworkPeerManagerActor.GetHandshakedPeersCmd(replyTo: ActorRef)` to Typed
+
+**Agent:** MITHRIL
+**Risk:** LOW-MEDIUM — command ADT change in NPMA; 15 call sites updated across sync subsystem
+**Gate:** §8k-D complete (PEBA subscriber protocol clean first; NPMA subscribes to PEBA at line 108)
+**Bridge sites eliminated:** ~15 (Cluster B `handshakedPeersAdapter.toClassic` across FastSync, SyncStateSchedulerActor, PeersClient, BlockBroadcaster, ChainDownloader) + 1 (Cluster K NPMA spawn .toClassic in NodeBuilder if callers migrate)
+
+**Background:**
+`NPMA.GetHandshakedPeersCmd(replyTo: ActorRef)` is untyped. Typed callers must convert their
+`messageAdapter` to `.toClassic` (15 sites). Changing to `GetHandshakedPeersCmd(replyTo: ActorRef[HandshakedPeers])`
+removes all 15 sites and unblocks the NPMA spawn `.toClassic` in NodeBuilder.
+
+**Steps:**
+1. In `NPMA.Command` ADT: change `GetHandshakedPeersCmd(replyTo: ActorRef)` →
+   `GetHandshakedPeersCmd(replyTo: ActorRef[HandshakedPeers])`.
+2. Update the NPMA handler that replies with `HandshakedPeers`: `replyTo ! HandshakedPeers(...)` (already Typed tell).
+3. Update the Classic shell absorption block (`NetworkPeerManagerShell`) that wraps `GetHandshakedPeersCmd`
+   from external Classic callers — it can now forward directly since replyTo is Typed.
+4. Remove `.toClassic` at all 15 Cluster B call sites. Each uses a `handshakedPeersAdapter: ActorRef[HandshakedPeers]`
+   already — simply pass it directly: `GetHandshakedPeersCmd(replyTo = handshakedPeersAdapter)`.
+5. `sbt compile-all` after each file.
+
+**Verify:**
+```bash
+grep -rn "handshakedPeersAdapter\.toClassic\|toClassic.*GetHandshakedPeers" \
+  src/main/ --include="*.scala"
+# Expected: 0
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. Stage NPMA + 7 Cluster B caller files
+3. `git commit -m "refactor(8k-E): typed GetHandshakedPeersCmd replyTo in NPMA — remove ~15 .toClassic sites (Cluster B)"`
+4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(8k-E): clearout — $SHA"`
+5. **DELETE §8k-E**
+
+---
+
+#### §8k-F — LOOM: RegularSync full Typed migration
+
+**Agent:** LOOM (one actor per session, follow pre-migration-checklist.md)
+**Risk:** HIGH — RegularSync is a Classic actor with `Props`, `sender()`, `context.parent`, and timers.
+         Full LOOM migration protocol mandatory.
+**Gate:** §8k-E complete. HERALD pre-flight on BlockImporter props callers.
+**Bridge sites eliminated:** ~15 (Cluster D: 2 × `ctx.toClassic.actorOf(RegularSync)` in SyncController;
+         Cluster C: `ctx.toClassic.parent` at RegularSync:236; Clusters N: BlockImporter `.toClassic` sites)
+
+**Background:**
+`RegularSync` is the last major Classic actor in the sync subsystem. It is spawned via
+`ctx.toClassic.actorOf(RegularSync.props(...))` by SyncController (2 sites), sends to its Classic
+parent (`ctx.toClassic.parent ! WrappedSyncProtocol(...)` at RegularSync:236), and passes its own
+`ctx.self.toClassic` / `broadcaster.toClassic` into `BlockImporter.Props` (Clusters N).
+
+**LOOM pre-flight (mandatory — run before any edit):**
+```bash
+cd /media/dev/2tb/dev/fukuii/src/main/scala/com/chipprbots/ethereum/blockchain/sync/regular/
+
+# sender() usages
+grep -n "sender()\|context\.sender()" RegularSync.scala
+
+# context.parent
+grep -n "context\.parent\|context\.toClassic\.parent" RegularSync.scala
+
+# timers
+grep -n "context\.system\.scheduler\|timers\." RegularSync.scala
+
+# worker/child spawns
+grep -n "context\.actorOf\|context\.toClassic\.actorOf\|ctx\.spawn" RegularSync.scala
+```
+
+**Migration outline (LOOM fills in details):**
+1. Create `RegularSync.Command` sealed trait (reuse existing `RegularSyncCommand` if already defined).
+2. Convert `class RegularSync extends Actor { def receive = ... }` → `Behaviors.receive[RegularSyncCommand]`.
+3. Replace `context.parent ! WrappedSyncProtocol(msg)` with typed parent ref injected at spawn via
+   `SyncController` passing `ctx.self.narrow[WrappedSyncProtocol]`.
+4. Replace `sender()` capture in ask handlers with `replyTo: ActorRef[T]` in commands.
+5. In `SyncController`: change `ctx.toClassic.actorOf(RegularSync.props(...))` → `ctx.spawn(RegularSync.behavior(...))`.
+6. In `BlockImporter.Props`: remove `supervisor: ActorRef` (Classic) → `supervisor: ActorRef[RegularSync.ProgressProtocol]`.
+   Remove `broadcaster.toClassic` (Cluster N).
+7. `sbt compile-all` after each phase.
+
+**Verify:**
+```bash
+grep -rn "RegularSync\.props\|ctx\.toClassic\.actorOf.*RegularSync\|context\.toClassic\.parent" \
+  src/main/ --include="*.scala"
+# Expected: 0
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. Stage RegularSync + BlockImporter + SyncController (2 spawn sites)
+3. `git commit -m "refactor(8k-F): RegularSync Classic→Typed migration — remove ctx.toClassic.actorOf + parent bridge (Clusters C/D/N)"`
+4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(8k-F): clearout — $SHA"`
+5. **DELETE §8k-F**
+
+**Rejection criteria:** Any change to consensus, mining, or domain code. Block validation logic must not move.
+
+---
+
+#### §8k-G — CONDUIT + MITHRIL: OQ-5 kill — migrate jsonrpc callers to Typed ask
+
+**Agent:** CONDUIT (jsonrpc layer audit), then MITHRIL (implementation)
+**Risk:** MEDIUM — ~74 bridge sites across SyncController + jsonrpc layer; touches live RPC path
+**Gate:** §8k-F complete (RegularSync Typed — SyncController OQ-5 reply path must be clean first)
+**Bridge sites eliminated:** ~56 (Clusters C + E: `ctx.toClassic.sender()` + `externalAdapter.toClassic` in SyncController/FastSync)
+         + ~18 (Cluster L: `AkkaTaskOps.askFor` call sites in jsonrpc) = **~74 total**
+
+**Background:**
+`EthInfoService`, `NodeJsonRpcHealthChecker`, `McpResources`, `McpTools`, `FukuiiService` and others
+use Classic `?` ask against `SyncController`'s Classic ref (OQ-5). This forces SyncController to
+capture `ctx.toClassic.sender()` (~27 sites) and maintain `externalAdapter.toClassic` (~29 sites).
+`AkkaTaskOps.askFor` is the shared adapter that carries an untyped `replyTo: ActorRef` at ~18 call sites.
+
+**Steps:**
+1. Add `replyTo: ActorRef[T]` to `SyncProtocol.GetStatus`, `ResetFastSync`, `RestartFastSync`
+   (and any other commands in Clusters C/E that currently use `sender()`).
+2. In SyncController: replace every `ctx.toClassic.sender()` with `cmd.replyTo ! response`.
+   Replace every `externalAdapter.toClassic` with `cmd.replyTo` (Typed).
+3. In jsonrpc callers: replace `Classic ?` ask on the SyncController classic ref with
+   `AskPattern.ask[SyncProtocol.StatusResponse](syncControllerTyped, replyTo => GetStatus(replyTo))`.
+4. Delete `AkkaTaskOps.askFor` (now unused) and its import sites.
+5. In NodeBuilder: `classicSystem.spawn(SyncController(...)).toClassic` (Cluster K) → callers now
+   hold the Typed ref directly; remove the `.toClassic` conversion.
+6. `sbt compile-all` after each file group (jsonrpc callers can be done in parallel — independent files).
+
+**Verify:**
+```bash
+grep -rn "ctx\.toClassic\.sender()\|externalAdapter\.toClassic\|AkkaTaskOps" \
+  src/main/ --include="*.scala"
+# Expected: 0
+grep -rn "toClassic" src/main/scala/com/chipprbots/ethereum/jsonrpc/ --include="*.scala"
+# Expected: 0
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. Stage SyncController + FastSync + all jsonrpc caller files + AkkaTaskOps deletion
+3. `git commit -m "refactor(8k-G): OQ-5 kill — typed ask in jsonrpc, remove ~74 .toClassic sites (Clusters C+E+L)"`
+4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(8k-G): clearout — $SHA"`
+5. **DELETE §8k-G**
+
+---
+
+#### §8k-H — MITHRIL: PeerActor parent notification → `watchWith` + typed Command
+
+**Agent:** MITHRIL
+**Risk:** LOW — PeerManagerActor is already Typed; change is localized to PeerActor and its PMA spawn site
+**Gate:** §8k-G complete (PeerManagerActor changes coincide with other jsonrpc callers)
+**Bridge sites eliminated:** 7 (Cluster G: `context.toClassic.parent ! PeerClosedConnection`) + 1 (Cluster H: `ctx.spawn(...).toClassic`)
+
+**Background:**
+`PeerActor` sends `PeerClosedConnection(id)` to its parent (`PeerManagerActor`) via
+`context.toClassic.parent ! PeerClosedConnection(...)` (6 sites). PeerManagerActor spawns PeerActor
+via `ctx.spawn(...)` so the parent IS Typed, but PeerActor uses the Classic parent path. There are
+two clean fixes; (B) is preferred:
+
+**(A)** Add `PeerClosedConnection` to `PeerManagerActor.Command` ADT; PeerActor sends via
+       `context.toTyped[PeerManagerActor.Command] ! PeerClosedConnection(id)`.
+
+**(B)** Use `watchWith` at the spawn site: `ctx.watchWith(peerRef, PeerClosed(id))`.
+       PeerActor needs to stop (or throw) rather than send the notification; PMA receives `PeerClosed`
+       on child termination. Eliminates all 6 active `context.toClassic.parent !` sends.
+       Already used elsewhere in the codebase — preferred pattern.
+
+Also: `PeerManagerActor.scala:1022` stores the spawned PeerActor as `ctx.spawn(...).toClassic`
+(Cluster H). After (B), PMA no longer needs the Classic ref stored for `sender()` reply purposes.
+
+**Steps:**
+1. At PeerActor spawn site in PMActor: replace `ctx.spawn(behavior, id).toClassic` with `ctx.spawn(behavior, id)`.
+   Use `ctx.watchWith(typedRef, PeerClosed(id))` to receive termination.
+2. In PeerActor: remove all 6 `context.toClassic.parent ! PeerClosedConnection(...)` sends.
+   PeerActor should simply stop (throw / return `Behaviors.stopped`) when it detects disconnection —
+   the PMA watchWith will fire.
+3. Remove `context.self.toClassic` at PeerActor:535 (stored in `Peer` case class as Classic ref).
+   Update `Peer` to hold `ActorRef[PeerActor.Command]` instead.
+4. `sbt compile-all` + `sbt "testOnly *PeerActor* *PeerManager*"`.
+
+**Verify:**
+```bash
+grep -rn "context\.toClassic\.parent\|context\.self\.toClassic" \
+  src/main/scala/com/chipprbots/ethereum/network/PeerActor.scala
+# Expected: 0
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. Stage PeerActor + PeerManagerActor + Peer case class
+3. `git commit -m "refactor(8k-H): PeerActor watchWith — remove context.toClassic.parent sends (Clusters G+H)"`
+4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(8k-H): clearout — $SHA"`
+5. **DELETE §8k-H**
+
+---
+
+#### §8k-I — MITHRIL: NodeBuilder Classic bridge actor elimination
+
+**Agent:** MITHRIL
+**Risk:** MEDIUM — touches node bootstrap wiring in NodeBuilder; verify all callers still reach their target
+**Gate:** §8k-G complete (PTM `AkkaTaskOps` migration done) + §8k-H complete (PeerManagerActor clean)
+**Bridge sites eliminated:** 3 anonymous Classic bridge actors in NodeBuilder (Cluster J) + ~18 call sites
+         in FilterManager/PersonalService/GraphQLSchema/TestService using `pendingTransactionsManager: ActorRef`
+
+**Background:**
+`NodeBuilder.scala` wires 3 anonymous Classic bridge actors (Cluster J) to service callers that still
+use legacy Classic ask/tell patterns:
+1. `knownNodesManager` bridge (line 210): PeerManagerActor sends `GetKnownNodes` to a Classic bridge
+   which forwards as a Typed ask to `knownNodesManagerTyped`.
+2. `peerDiscoveryManager` bridge (line 269): PeerManagerActor/StdNode send `GetDiscoveredNodesInfo`
+   via Classic bridge.
+3. `pendingTransactionsManager` bridge (line 547): FilterManager/PersonalService/GraphQLSchema/TestService
+   use Classic `?` ask for `GetPendingTransactions`.
+
+For each bridge, the callers need to switch to the existing Typed `*Req(replyTo: ActorRef[T])` variant
+that is already present in the respective Typed actor's Command ADT.
+
+**Steps:**
+1. **KnownNodesManager bridge**: Find every `knownNodesManager.tell(GetKnownNodes, sender)` call site.
+   Replace with `AskPattern.ask(knownNodesManagerTyped, KnownNodesManagerActor.GetKnownNodesReq(_))`.
+   Delete the bridge actor at NodeBuilder:210.
+
+2. **PeerDiscoveryManager bridge**: Find every `peerDiscoveryManager.tell(GetDiscoveredNodesInfo, sender)`
+   / `GetRandomNodeInfo`. Replace with Typed ask to `peerDiscoveryManagerTyped`.
+   Delete the bridge actor at NodeBuilder:269.
+
+3. **PTM bridge**: FilterManager, PersonalService, GraphQLSchema, TestService — replace Classic
+   `?` ask for `GetPendingTransactions` with `AskPattern.ask(pendingTransactionsManagerTyped, ...)`.
+   Delete the bridge actor at NodeBuilder:547.
+
+4. `sbt compile-all` after each bridge deletion.
+
+**Verify:**
+```bash
+grep -rn "classicSystem\.actorOf" src/main/ --include="*.scala"
+# Expected: 0 in NodeBuilder (only TCP bridges in ServerActor remain)
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. Stage NodeBuilder + caller files (PeerManagerActor, FilterManager, PersonalService, etc.)
+3. `git commit -m "refactor(8k-I): delete 3 NodeBuilder Classic bridge actors — callers use Typed ask (Cluster J)"`
+4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(8k-I): clearout — $SHA"`
+5. **DELETE §8k-I**
+6. After this commit, verify total `.toClassic` count = 4 (TCP permanent floor only):
+   ```bash
+   grep -rn "\.toClassic" src/main/ --include="*.scala" | grep -v "//.*toClassic"
+   # Expected: 4 lines (ServerActor.TcpEventBridge + RLPxConnectionHandler ×2 + sa.toClassic in BlockFetcher)
+   ```
+
+---
+
+#### §8k-B — Post-CAPSTONE: Final classic bridge verification sweep
+
+**Agent:** PRISM (verification only)
+**Risk:** LOW — read-only final check
+**Gate:** §8k-I complete AND CAPSTONE merged. Run §7d artifact audit first (they overlap).
+
+**Background:**
+After §8k-A through §8k-I, only 4 intentional TCP permanent bridges should remain.
+This sprint verifies that claim and deletes the `pekko.actor.typed.scaladsl.adapter` imports
+that are no longer needed anywhere outside the TCP path.
+
+**Expected state after §8k-A–I:**
+- `grep -rn "\.toClassic" src/main/ --include="*.scala" | grep -v "//"` → 4 lines only (TCP)
+- `grep -rn "toClassic\|toTyped" src/main/ --include="*.scala" | wc -l` → ≤ 4
+- `import org.apache.pekko.actor.typed.scaladsl.adapter` → only in TCP-path files
+
+**Prompt (run AFTER §8k-I + CAPSTONE):**
+```
+§8k-A through §8k-I are complete. Verify the TCP floor:
+
+Step 1 — grep for any remaining .toClassic / .toTyped outside of:
+  ServerActor.scala, RLPxConnectionHandler.scala (TCP I/O — permanent)
+Step 2 — If found: identify which sprint was supposed to clear it and create
+  a §8k-J follow-up entry in DEFERRED-BACKLOG.md.
+Step 3 — Delete all `import org.apache.pekko.actor.typed.scaladsl.adapter`
+  lines from files that no longer use the adapter.
+Step 4 — Run §7d artifact audit sweep (grep commands in §7d).
+Step 5 — Run testEssential — confirm baseline holds.
+Step 6 — git commit -m "chore(8k-B): remove adapter imports — TCP floor verified (4 bridges)"
 ```
 
 ---
@@ -1398,7 +1766,7 @@ written reason. P7 covered only `testEssential`; this part closes the gap.
 **Run order — this section:**
 | # | Batch | Prompt | Parallel-safe? |
 |---|-------|--------|----------------|
-| E1 | Batch E | P8 EYE SyncTest tag audit | Yes |
+| ~~E1~~ | ~~Batch E~~ | ~~P8 EYE SyncTest tag audit~~ | ✅ DONE 2026-06-23 — 40 rescued (15 RetryStrategy + 7 PeersClient + 6 Blacklist + 12 BlockchainHostActor), 36 kept SyncTest, `3aef474a9` |
 | E2 | Batch E | P9 EYE/MITHRIL DisabledTest audit | Yes |
 | E3 | Batch E | P10 EYE/MITHRIL FlakyTest root cause | No (one spec at a time) |
 | E4 | Batch E | P11 testStandard baseline + SlowTest audit | No (long-running) |
