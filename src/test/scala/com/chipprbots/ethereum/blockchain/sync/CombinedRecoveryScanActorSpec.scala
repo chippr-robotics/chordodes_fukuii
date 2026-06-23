@@ -24,10 +24,7 @@ import com.chipprbots.ethereum.testing.Tags.*
 /** The scan-actor wrapper must run the combined parallel scan once and emit BOTH gap sets to its parent, exactly as the
   * underlying scanner computes them — so the controller can drive the downloads.
   */
-class CombinedRecoveryScanActorSpec
-    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
-    with AnyFlatSpecLike
-    with Matchers {
+class CombinedRecoveryScanActorSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers {
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 

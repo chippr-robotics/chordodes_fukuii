@@ -37,10 +37,7 @@ import com.chipprbots.ethereum.utils.ByteUtils
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 import com.chipprbots.ethereum.utils.GenOps.GenOps
 
-class FastSyncSpec
-    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
-    with FreeSpecBase
-    with SpecFixtures { self =>
+class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with SpecFixtures { self =>
   implicit override val timeout: Timeout = Timeout(60.seconds)
 
   class Fixture extends EphemBlockchainTestSetup with TestSyncConfig with TestSyncPeers {

@@ -23,10 +23,7 @@ import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.testing.Tags.*
 
-class PivotHeaderBootstrapSpec
-    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
-    with AnyFlatSpecLike
-    with Matchers {
+class PivotHeaderBootstrapSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers {
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 

@@ -33,11 +33,7 @@ import com.chipprbots.ethereum.utils.Config
   *     SyncController for a recent root and, on receiving one, sends `StoragePivotRefreshed` to the coordinator instead
   *     of abandoning — so the resync can't get permanently wedged on a stale pivot. Bounded + falls back to abandon.
   */
-class StorageRecoveryActorSpec
-    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
-    with AnyFlatSpecLike
-    with Matchers
-    with Eventually {
+class StorageRecoveryActorSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers with Eventually {
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 

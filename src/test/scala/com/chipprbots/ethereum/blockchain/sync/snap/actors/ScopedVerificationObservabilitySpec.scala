@@ -39,10 +39,7 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   * are made through the static gauge registry — the gauge is moved on the same code path that emits the log and is a
   * stronger, deterministic signal than the log text.
   */
-class ScopedVerificationObservabilitySpec
-    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
-    with AnyFlatSpecLike
-    with Matchers {
+class ScopedVerificationObservabilitySpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers {
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit

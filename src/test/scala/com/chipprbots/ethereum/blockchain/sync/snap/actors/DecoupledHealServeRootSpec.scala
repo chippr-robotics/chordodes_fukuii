@@ -33,10 +33,7 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   *   - T-6 (FR-008/SC-006, C3): with the feature off, the `GetTrieNodes` always carries `rootHash == stateRoot` and a
   *     `HealingServeRootRefresh` is ignored — byte-identical to the coupled path.
   */
-class DecoupledHealServeRootSpec
-    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
-    with AnyFlatSpecLike
-    with Matchers {
+class DecoupledHealServeRootSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers {
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit

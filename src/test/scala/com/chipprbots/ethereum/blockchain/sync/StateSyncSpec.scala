@@ -46,7 +46,7 @@ import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 
 class StateSyncSpec
-    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
+    extends ScalaTestWithActorTestKit()
     with AnyFlatSpecLike
     with Matchers
     with ScalaCheckPropertyChecks {

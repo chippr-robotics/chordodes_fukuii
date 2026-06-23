@@ -32,11 +32,7 @@ import com.chipprbots.ethereum.utils.Config
   * T4: Coordinator crashes mid-download → Terminated handler commits flag and fires RecoveryComplete. T5: No
   * peer/progress arrives within timeout → abandon fires, RecoveryComplete emitted.
   */
-class BytecodeRecoveryActorSpec
-    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
-    with AnyFlatSpecLike
-    with Matchers
-    with Eventually {
+class BytecodeRecoveryActorSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers with Eventually {
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 

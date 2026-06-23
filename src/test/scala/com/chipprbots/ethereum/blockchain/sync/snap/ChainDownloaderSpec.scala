@@ -26,7 +26,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   * used as a synchronisation barrier and as a liveness probe: a reply proves the dispatch loop did not wedge.
   */
 class ChainDownloaderSpec
-    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
+    extends ScalaTestWithActorTestKit()
     with AnyFlatSpecLike
     with Matchers
     with Eventually

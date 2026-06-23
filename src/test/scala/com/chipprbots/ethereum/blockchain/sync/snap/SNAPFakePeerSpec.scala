@@ -21,10 +21,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   *
   * Model: core-geth eth/downloader/skeleton_test.go skeletonTestPeer usage pattern.
   */
-class SNAPFakePeerSpec
-    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
-    with AnyFlatSpecLike
-    with Matchers {
+class SNAPFakePeerSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers {
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 

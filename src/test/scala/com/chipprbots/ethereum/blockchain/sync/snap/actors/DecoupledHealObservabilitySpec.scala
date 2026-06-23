@@ -30,10 +30,7 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   * asserting the walk-root / serve-root gauges equal `shortRootLabel` of distinct roots no other test uses — that value
   * can only have been written by this coordinator's preStart / refresh handler.
   */
-class DecoupledHealObservabilitySpec
-    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
-    with AnyFlatSpecLike
-    with Matchers {
+class DecoupledHealObservabilitySpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers {
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit

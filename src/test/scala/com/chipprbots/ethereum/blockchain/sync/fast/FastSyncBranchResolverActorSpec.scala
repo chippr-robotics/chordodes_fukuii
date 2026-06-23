@@ -45,7 +45,7 @@ import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Logger
 
 class FastSyncBranchResolverActorSpec
-    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
+    extends ScalaTestWithActorTestKit()
     with AnyFreeSpecLike
     with ScalaFutures
     with NormalPatience { self =>

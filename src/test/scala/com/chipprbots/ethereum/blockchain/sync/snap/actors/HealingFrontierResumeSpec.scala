@@ -41,10 +41,7 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   * fixture stops the actor (await termination) AND drains that EC before destroying the DataSource, so an in-flight
   * `loadAll` can never `newIterator` on a freed column-family handle (native SIGSEGV).
   */
-class HealingFrontierResumeSpec
-    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
-    with AnyFlatSpecLike
-    with Matchers {
+class HealingFrontierResumeSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers {
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit

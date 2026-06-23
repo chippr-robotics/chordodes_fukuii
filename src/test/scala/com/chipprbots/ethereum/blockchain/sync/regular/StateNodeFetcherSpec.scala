@@ -36,7 +36,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   *     empty set, and empty/wrong responses add the responding peer so each retry samples a different snap server.
   */
 class StateNodeFetcherSpec
-    extends ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())
+    extends ScalaTestWithActorTestKit()
     with AnyFreeSpecLike
     with Matchers
     with BeforeAndAfterEach
