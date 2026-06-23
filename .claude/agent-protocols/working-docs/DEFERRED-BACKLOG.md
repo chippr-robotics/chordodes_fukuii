@@ -1945,6 +1945,153 @@ time, don't guess. `DAGGenerationSpec` and `EthashNonceSearchSpec` must remain `
 
 ---
 
+### P11b — Docs: migrate `fukuii-test-timing.md` → `test-quality-log.md`
+
+**Agent:** Any (pure documentation — no compilation or test runs required)
+**Parallel-safe:** YES — touches only `.local/docs/` and working docs
+**Priority:** LOW — do before P12, since P12's final steps reference the old filename
+
+**Context (2026-06-23):** After P11 we have two sources of test-suite knowledge:
+`fukuii-test-timing.md` (tier baselines, slowest tests, wall-clock assertions, Thread.sleep
+inventory) and ad-hoc findings scattered across CHASE-QUEUE, DEFERRED-BACKLOG, and sprint
+notes. Consolidating them into a single curated `test-quality-log.md` gives future agents
+one canonical place to check before making tag or tier decisions. The file stays in
+`.local/docs/` (gitignored — machine-specific observations, not portable).
+
+**What the new file must contain (in this order):**
+
+```
+# fukuii test-quality-log
+
+## Tier baselines
+
+### testEssential (Tier 1)
+Table: Date | Wall time | Tests | Failures | Notes
+(migrate from current fukuii-test-timing.md Current baseline table)
+
+### testStandard (Tier 2)
+Table: Date | Wall time | Tests | Failures | Notes
+(migrate from current fukuii-test-timing.md testStandard baseline table)
+
+### testComprehensive (Tier 3)
+Table: Date | Wall time | Tests | Failures | Notes
+(no entries yet — placeholder)
+
+## Top slowest tests
+
+### testEssential top 10 (2026-06-22 run)
+(migrate from fukuii-test-timing.md "Slow tests >2s" table — add Spec class column)
+
+### testStandard additions (2026-06-23 run, P11)
+Any tests that appear in testStandard but not testEssential that take >5s
+(derive from P11 log or leave as TODO if not available)
+
+## Known flakes
+
+Table: Spec | Test | Failure mode | Root cause | Status
+- DnsDiscoverySpec | "should resolve enodes from Mordor DNS tree" | `9 >= 10` assertion | Live Mordor DNS peer count near threshold — network-dependent | OPEN: raise threshold or widen retry
+- EthMiningServiceSpec | multiple | AskTimeoutException (20s/60s timeouts) | TestProbe never receives ask reply under JVM load | OPEN: tracked in §8j
+
+## SlowTest audit history
+
+Table: Date | Prompt | Spec | Test | Observed time | Decision | SHA
+(populate from P11 2026-06-23 audit findings)
+
+Rows to add:
+- 2026-06-23 | P11 | MiningSpec | "have unique names" | 17ms | SlowTest→UnitTest | edfb69f35
+- 2026-06-23 | P11 | MiningSpec | "contain ethash" | 0ms | SlowTest→UnitTest | edfb69f35
+- 2026-06-23 | P11 | PoWMiningSpec | "use RestrictedPoWBlockGeneratorImpl..." | 56ms | SlowTest→UnitTest | edfb69f35
+- 2026-06-23 | P11 | PoWMiningSpec | "start only one mocked miner...MockedPow" | 56ms | SlowTest→UnitTest | edfb69f35
+- 2026-06-23 | P11 | PoWMiningSpec | "start only the normal miner...PoW" | 50ms | SlowTest→UnitTest | edfb69f35
+- 2026-06-23 | P11 | PoWMiningSpec | "start only the normal miner...RestrictedPoW" | 40ms | SlowTest→UnitTest | edfb69f35
+- 2026-06-23 | P11 | PoWMiningSpec | "use NoAdditionalPoWData..." | 202ms | kept SlowTest | — (actor system init on first test)
+- 2026-06-23 | P11 | PoWMiningSpec | "not start a miner when miningEnabled=false" | 425ms | kept SlowTest | — (TestMiningNode init)
+
+## Infrastructure traps
+
+Patterns that inflate per-test timing and can cause mislabelling:
+
+- **ScalaTestWithActorTestKit first-test overhead**: The first test in a class that extends
+  `ScalaTestWithActorTestKit` pays Pekko actor system initialization (~150-250ms under warm JVM).
+  Subsequent tests in the same class are much faster (40-60ms). Use `-oD` timing across the
+  full class, not just the first test, when deciding whether to remove SlowTest.
+- **TestMiningNode initialization**: Tests that call `startProtocol(new TestMiningNode())` pay
+  heavy setup cost (~400ms) because `TestMiningNode extends StdNode with EphemBlockchainTestSetup`.
+  This is not mining computation — it is node bootstrap overhead. Tests with this pattern are
+  legitimately SlowTest even though no PoW occurs.
+- **ScalaMock stub teardown noise**: Tests that spawn coordinator actors with mocked dependencies
+  produce ERROR log lines after teardown when the coordinator calls a mock that has already been
+  verified. These are NOT test failures — they are expected cleanup noise.
+
+## How to measure: SlowTest calibration
+
+To measure per-test timings before making tag decisions:
+```bash
+sbt "testOnly <fully.qualified.SpecClass> -- -oD"
+```
+The `-oD` flag makes ScalaTest print each test's duration in milliseconds.
+Only remove SlowTest if the observed time is <100ms. Do not guess from suite-level totals.
+DAGGenerationSpec and EthashNonceSearchSpec must always remain SlowTest (CPU-bound PoW).
+
+## Wall-clock assertion inventory
+
+(migrate from fukuii-test-timing.md — keep as-is)
+
+## Thread.sleep inventory
+
+(migrate from fukuii-test-timing.md — keep as-is)
+```
+
+**Steps:**
+
+1. Read `.local/docs/fukuii-test-timing.md` in full.
+2. Create `.local/docs/test-quality-log.md` using the structure above. Migrate all content
+   from `fukuii-test-timing.md` into the appropriate sections. Do not truncate or summarise
+   existing data — move it verbatim then add the new sections around it.
+3. Delete `.local/docs/fukuii-test-timing.md`.
+4. Update every reference to `fukuii-test-timing.md` in DEFERRED-BACKLOG.md — replace with
+   `test-quality-log.md`. Do NOT rename `/tmp/fukuii-test-timing.log` references (lines that
+   reference a temp log path, not the persistent doc). Affected lines: 1610, 1743, 1877, 1930,
+   1940, 2102, 2103, 2104 (verify by grep — line numbers may shift after this prompt is
+   inserted).
+   ```bash
+   grep -n "fukuii-test-timing\.md" .claude/agent-protocols/working-docs/DEFERRED-BACKLOG.md
+   ```
+5. Update `~/.claude/projects/-media-dev-2tb-dev/memory/MEMORY.md`: change the
+   `fukuii-test-timing.md` entry to point at `test-quality-log.md` and update the description.
+6. Update `~/.claude/projects/-media-dev-2tb-dev/memory/fukuii-test-timing.md`: rename to
+   `fukuii-test-quality-log.md`, update `name:`, `description:`, and body to reflect the new
+   file and its expanded scope.
+7. Update `~/.claude/projects/-media-dev-2tb-dev/memory/feedback_test_visibility.md`: change
+   the `[[fukuii-test-timing]]` link to `[[fukuii-test-quality-log]]`.
+8. Verify no remaining references to the old filename:
+   ```bash
+   grep -rn "fukuii-test-timing\.md" \
+     .claude/agent-protocols/working-docs/ \
+     ~/.claude/projects/-media-dev-2tb-dev/memory/
+   ```
+   Expected output: zero results.
+9. Commit:
+   ```bash
+   git add .claude/agent-protocols/working-docs/DEFERRED-BACKLOG.md
+   git commit -m "docs(p11b): migrate fukuii-test-timing.md → test-quality-log.md"
+   SHA=$(git rev-parse --short HEAD)
+   ```
+10. Update CODEBASE-AUDIT.md run-order table — add and immediately strike through:
+    `| ~~P11b~~ | ~~Batch G~~ | ~~Docs: migrate fukuii-test-timing.md → test-quality-log.md~~ | ✅ DONE [date] — $SHA |`
+11. Stage and commit docs:
+    ```bash
+    git add .claude/agent-protocols/working-docs/CODEBASE-AUDIT.md
+    git commit -m "docs(p11b): clearout — $SHA"
+    ```
+
+**Rejection criteria:** Symlinking the old name to the new file — clean delete only. Truncating
+or summarising existing data from `fukuii-test-timing.md` instead of migrating it verbatim.
+Renaming `/tmp/fukuii-test-timing.log` references (temp paths, not the persistent doc).
+Missing any of the 8 `fukuii-test-timing.md` references in DEFERRED-BACKLOG.md.
+
+---
+
 ### P12 — MITHRIL: Tag taxonomy + build target architecture review + gaps
 
 **Agent:** MITHRIL (read-only analysis → build.sbt edits for new targets)
