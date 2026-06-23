@@ -833,7 +833,7 @@ No actor migration gate. Commit individually; do not bundle with primary-track m
 | **6a — extvm deletion** | Delete `extvm/` (10 files) after grep-verify | WRAITH | ~1h |
 | **8f — Dead code audit** ✅ research done | 4 candidates in CHASE-QUEUE (DEAD 2026-06-22); deletion sprint pending | WRAITH | ~30 min deletions |
 | **3d — enum polish** | Migrate `SyncPhase`, `BlacklistReason`, `ForkId` codes to enum | MITHRIL | ~1h per file |
-| **3e — console→logging** | Replace 24 `println`/`System.out` calls with SLF4J | MITHRIL | ~1h |
+| ~~**3e — console→logging**~~ | ~~Replace 24 `println`/`System.out` calls with SLF4J~~ | ~~MITHRIL~~ | ✅ DONE `c3fec6390` 2026-06-22 — 12 sites fixed (3 files); 8 intentional CLI/TUI calls preserved |
 | **8e — ScalaFix expansion** | Rules in .scalafix.conf ✅; C2 ✅ `9eb1f4e06`; TNHC ✅ `7a48c5988`; remaining: 7 consensus (FORGE) + 33 SSC (SNAP1) | FORGE / LOOM | gated |
 | **8g — braceless config** ✅ `34a55a025` | Deferred settings documented in .scalafmt.conf; indent.defnSite + topLevelStatementBlankLines each trigger ~400-file reformats → gated for per-subsystem pass post-CAPSTONE | MITHRIL | done |
 | **8j — Thread.sleep** | Replace test timing sensitivity (2 live call sites — baseline verified EYE 2026-06-22) | EYE | ~30 min |
@@ -890,7 +890,7 @@ Each prompt can run independently. Commit individually.
 | ~~B4~~ | ~~Batch B step 4~~ | ~~P5 MITHRIL scalafmt config~~ | ✅ DONE 2026-06-22 — `34a55a025` — deferred settings documented; indent.defnSite + topLevelStatementBlankLines both trigger mass reformats, gated for per-subsystem pass |
 | ~~C1~~ | ~~Batch C step 1~~ | ~~P1 MITHRIL isInstanceOf (83 instances)~~ | ✅ DONE 2026-06-22 — 1 site fixed (`7cc9eda3a`); consensus/vm/crypto/domain had 0 hits |
 | ~~C2~~ | ~~Batch C step 2~~ | ~~P2 MITHRIL enum candidates~~ | ✅ DONE 2026-06-22 — 4 types converted (`b305ef41b`) |
-| C3 | Batch C step 3 | P3 MITHRIL console→logging (28 sites) | Run after C2 |
+| ~~C3~~ | ~~Batch C step 3~~ | ~~P3 MITHRIL console→logging (28 sites)~~ | ✅ DONE 2026-06-22 — 12 sites fixed |
 | C4 | Batch C step 4 | P4 MITHRIL/EYE E165 sprint (777 sites / 83 files) | Run after C1-C3; multi-session sprint |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
@@ -980,6 +980,148 @@ candidates but wider refactor scope than this batch), everything in consensus/vm
 **Opportunistic clearout:** Apply the protocol in CODEBASE-AUDIT.md. For each file touched, scan for `isInstanceOf` (P1 overlap), `println` (P3 overlap), or CHASE-QUEUE entries in the same file — fix inline or draft prompts.
 
 **Rejection criteria:** Converting Command/Response/Protocol traits (those are ADTs, not enums); adding behavior to enum cases beyond simple fields; touching consensus-critical types without FORGE review
+
+---
+
+### P2-followup-AB — MITHRIL: `ServerStatus` + `PruningMode` → enum (Part 3d deferred, combined batch)
+
+**Agent:** MITHRIL
+**Files:**
+- `src/main/scala/com/chipprbots/ethereum/utils/NodeStatus.scala` + callers in `jsonrpc/`, `network/`, `nodebuilder/`
+- `src/main/scala/com/chipprbots/ethereum/db/storage/pruning/package.scala` + `PruningModeComponent`, `Storages`, `StoragesComponent`
+
+**Prerequisite:** P2 (3d main batch) ✅ DONE. No FORGE gate on either type (neither participates in consensus math).
+
+**Background (from Part 3d):**
+- `ServerStatus` (`utils/NodeStatus.scala`) — `NotListening` + `Listening(address: InetSocketAddress)`. Valid enum. Deferred because 10+ callers span multiple packages.
+- `PruningMode` (`db/storage/pruning/package.scala`) — `BasicPruning(history: Int)` + `InMemoryPruning(history: Int)`. Valid enum. Deferred because it is wired into three component traits and integration tests.
+
+Both are pure style changes: no consensus semantics, no serialization format change, no ordinal-dependent logic. One commit each.
+
+**Prompt:**
+> On branch `scala3-cleanup-june`, convert two deferred sealed-trait hierarchies to Scala 3 `enum`.
+> Do them sequentially — complete and commit each before starting the next.
+>
+> ─── TYPE 1: ServerStatus ───
+>
+> 1. Read `src/main/scala/com/chipprbots/ethereum/utils/NodeStatus.scala` — confirm all cases.
+> 2. Find all call sites:
+>    ```bash
+>    grep -rn "ServerStatus" src/ --include="*.scala"
+>    ```
+>    Check for any `extends ServerStatus` usage (open hierarchy → abort and CHASE-QUEUE instead).
+> 3. Rewrite to:
+>    ```scala
+>    enum ServerStatus:
+>      case NotListening
+>      case Listening(address: java.net.InetSocketAddress)
+>    ```
+>    Keep companion helpers if any. Pattern-match arms using `case x: ServerStatus.Listening =>`
+>    become `case ServerStatus.Listening(addr) =>` — update these.
+> 4. After each file edited: `sbt compile-all` — 0 errors before moving on.
+> 5. Run targeted specs: `sbt "testOnly *NodeStatus* *Network* *AdminService*"` — all green.
+> 6. Commit: `3d-A: ServerStatus → Scala 3 enum (2 cases, N call sites)`
+>
+> ─── TYPE 2: PruningMode ───
+>
+> 7. Read `src/main/scala/com/chipprbots/ethereum/db/storage/pruning/package.scala` — confirm all cases and any companion helpers (`fromString`, factory methods).
+> 8. Find all call sites including component traits:
+>    ```bash
+>    grep -rn "PruningMode\|BasicPruning\|InMemoryPruning" src/ --include="*.scala"
+>    ```
+>    Check for `extends PruningMode` anywhere (open hierarchy → abort and CHASE-QUEUE instead).
+> 9. Rewrite to:
+>    ```scala
+>    enum PruningMode:
+>      case BasicPruning(history: Int)
+>      case InMemoryPruning(history: Int)
+>    ```
+>    Migrate companion helpers. The type name `PruningMode` is unchanged so most field/param
+>    declarations compile without modification; the `PruningModeComponent`, `Storages`, and
+>    `StoragesComponent` trait members should be unaffected — confirm with compile.
+> 10. After each file: `sbt compile-all` — 0 errors.
+> 11. Run: `sbt "testOnly *Storages* *Pruning*"` + `sbt "IntegrationTest / testOnly *Pruning*"` — all green.
+> 12. Commit: `3d-B: PruningMode → Scala 3 enum (2 cases, component traits unaffected)`
+>
+> ─── Shared rules ───
+>
+> - One commit per type — do not batch into a single commit.
+> - After each file edit: `sbt compile-all` — 0 errors mandatory before touching the next file.
+> - If `extends <Type>` is found anywhere, stop that type immediately and add a CHASE-QUEUE note;
+>   proceed with the other type.
+> - Do NOT touch `consensus/`, `vm/`, `crypto/`, `domain/`.
+
+**Verification:**
+- `grep -rn "sealed.*ServerStatus\|sealed.*PruningMode" src/ --include="*.scala"` → 0 results
+- `sbt compile-all` 0 errors
+- All targeted tests green
+
+**MANDATORY final step — complete BEFORE closing thread:**
+- `working-docs/DEFERRED-BACKLOG.md` — mark this entry ✅ with both commit SHAs and date
+- `completed/SPRINT-QUEUE.md` — append two rows:
+  `| [SHA-A] | Part 3d-followup-A — ServerStatus → enum (2 cases, N callers) |`
+  `| [SHA-B] | Part 3d-followup-B — PruningMode → enum (2 cases, component traits) |`
+- `modernization-log/node.md` (or `utils.md`) — add under "Scala 3 Idioms":
+  `#### [SHA-A] — 3d-A: ServerStatus → enum`
+  `- **What:** sealed trait + 2 cases → Scala 3 enum; N call sites in jsonrpc/network/nodebuilder updated`
+- `modernization-log/storage.md` — add under "Scala 3 Idioms":
+  `#### [SHA-B] — 3d-B: PruningMode → enum`
+  `- **What:** sealed trait + 2 param cases → Scala 3 enum; PruningModeComponent/Storages unaffected`
+
+**Opportunistic clearout:** While reading each caller file, scan for `isInstanceOf` (P1 overlap) and `println` (P3 overlap) — fix inline if trivial, CHASE-QUEUE if complex.
+
+**Rejection criteria:** `extends ServerStatus` / `extends PruningMode` found anywhere; touching consensus/vm/crypto/domain files; bundling both types into a single commit; ordinal-dependent serialization of either type (check before converting).
+
+---
+
+### P2-followup-C — FORGE ASSESSMENT: `MiningMode` enum eligibility (Part 3d deferred, consensus gate)
+
+**Agent:** FORGE (assessment only; MITHRIL implements if approved)
+**Files:** `src/main/scala/com/chipprbots/ethereum/consensus/pow/PoWMiningCoordinator.scala`
+**Prerequisite:** P2 (3d main batch) ✅ DONE.
+
+**Background (from Part 3d):** `MiningMode` is a 2-case discriminant sealed trait in
+`consensus/pow/`. The type itself is a pure flag (no math, no hash, no state root), but the file
+lives under `consensus/pow/` which requires FORGE review before any style change. MITHRIL
+deferred it here; FORGE must assess before any conversion is attempted.
+
+**Prompt (for FORGE):**
+> Assess whether `MiningMode` in
+> `src/main/scala/com/chipprbots/ethereum/consensus/pow/PoWMiningCoordinator.scala`
+> is safe to convert from `sealed trait + case objects` to a Scala 3 `enum`
+> as a pure style change.
+>
+> Assessment steps:
+> 1. Read `PoWMiningCoordinator.scala` — identify the `MiningMode` definition and every usage
+>    within the file.
+> 2. `grep -rn "MiningMode" src/ --include="*.scala"` — list all callers outside the file.
+> 3. Determine:
+>    a. Does `MiningMode` participate in any consensus computation (EVM execution, block validation,
+>       hash calculation, reward calculation, PoW difficulty)? Or is it purely a runtime mode flag
+>       (start/stop mining)?
+>    b. Are there any `extends MiningMode` usages that make this an open hierarchy?
+>    c. Are there serialization/RLP/codec usages of `MiningMode` that could be affected by enum
+>       ordinal changes?
+> 4. Produce a verdict:
+>    - **APPROVED**: The conversion is a pure style change with no consensus-semantic impact.
+>      Provide the exact enum definition to use and note any companion helpers to migrate.
+>    - **CONDITIONAL**: Approved with specific constraints (list them).
+>    - **REJECTED**: Explain what consensus-semantic impact exists and why the current sealed trait
+>      must remain as-is (or be addressed differently).
+> 5. If APPROVED, draft the MITHRIL prompt to implement the conversion (one file, sbt compile-all,
+>    targeted testOnly, single commit). Add it as a sub-note below this entry.
+
+**After FORGE verdict:**
+- If APPROVED → spawn MITHRIL with the generated prompt from step 5.
+- If REJECTED → add `MiningMode` to the FORGE-gated enum candidates section of CHASE-QUEUE.md.
+
+**MANDATORY final step — complete BEFORE closing thread (regardless of verdict):**
+- `working-docs/DEFERRED-BACKLOG.md` — mark this entry ✅ with date and FORGE verdict (APPROVED/REJECTED)
+- If APPROVED + implemented: `completed/SPRINT-QUEUE.md` — append MITHRIL implementation SHA
+- If REJECTED: `working-docs/CHASE-QUEUE.md` — add entry under FORGE-GATED section:
+  `MiningMode sealed trait in consensus/pow/PoWMiningCoordinator.scala — FORGE rejected enum conversion on [date]: [reason]`
+
+**Rejection criteria for FORGE assessment:** Changing any mining/consensus code during the assessment; implementing the conversion without explicit APPROVED verdict.
 
 ---
 

@@ -298,3 +298,4 @@ wait times. No gate dependency on the primary sprint groups above.
 | `34a55a025` | Part 8g — braceless scalafmt config added |
 | `7cc9eda3a` | Part 3c — isInstanceOf → pattern match (non-consensus, 1 instance: mpt/Node.scala:33) |
 | `b305ef41b` | Part 3d (DEFERRED batch) — enum migration: NetworkType, VmConfig.VmMode, FaucetStatus, SealEngineType (4 types converted) |
+| `c3fec6390` | Part 3e — console → SLF4J (12 println sites; EngineApiController, EngineApiService, VM; 8 intentional CLI/TUI calls preserved) |
