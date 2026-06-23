@@ -1053,9 +1053,9 @@ trait SyncControllerBuilder extends SyncControllerRefBuilder {
     */
   def forkChoiceManagerForSync: Option[com.chipprbots.ethereum.consensus.engine.ForkChoiceManager] = None
 
-  // SyncController is Pekko Typed (Group ROOT) — a `Behavior[Any]`. Spawn it via the Classic→Typed adapter and convert
-  // the resulting Typed ref back to Classic so all callers (`syncController: ActorRef`, the JSON-RPC `askFor` path,
-  // `ForkChoiceManager.setListener`) keep compiling. The root flip to a fully-Typed ref is CAPSTONE.
+  // SyncController is Pekko Typed (Group ROOT, narrowed) — a `Behavior[Command]`. Spawned via the Classic→Typed
+  // adapter; the resulting Typed ref is converted back to Classic so all callers (`syncController: ActorRef`, the
+  // JSON-RPC `askFor` path, `ForkChoiceManager.setListener`) keep compiling. Root flip to a fully-Typed ref is CAPSTONE.
   lazy val syncController: ActorRef = classicSystem
     .spawn(
       SyncController(

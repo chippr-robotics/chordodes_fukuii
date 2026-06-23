@@ -30,10 +30,10 @@ import com.chipprbots.ethereum.network.Peer
   * evmCodeStorage (due to the Bug 20 phase handoff timeout). Collects missing codeHashes and downloads them via SNAP
   * protocol using ByteCodeCoordinator.
   *
-  * Pekko Typed actor (`Behavior[Any]`): SyncController (Classic parent) sends both `ByteCodePeerAvailable` and
-  * `ByteCodeSyncComplete` / `ProgressBytecodesDownloaded` to this actor, which stays a Classic-visible ref via
-  * `.toClassic`. Using `Any` as the message type accepts those heterogeneous Classic messages without a bridge adapter
-  * while still providing all Typed machinery (named behavior functions, `Behaviors.withTimers`, `watchWith`).
+  * Pekko Typed actor (`Behavior[Command]`, narrowed S5): SyncController sends both `ByteCodePeerAvailable` and
+  * `ByteCodeSyncComplete` / `ProgressBytecodesDownloaded` to this actor. SyncController holds a Classic-visible ref via
+  * `.toClassic` (CAPSTONE bridge); all inbound messages are members of the sealed `Command` ADT, so `Behavior[Any]`
+  * is no longer needed — all Typed machinery (named behavior functions, `Behaviors.withTimers`, `watchWith`) is active.
   *
   * Lifecycle:
   *   1. Walk state trie, collect missing codeHashes (deduplicated) 2. If none missing → mark recovery done, report to

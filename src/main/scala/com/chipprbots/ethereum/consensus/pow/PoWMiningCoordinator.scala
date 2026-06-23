@@ -33,7 +33,7 @@ object PoWMiningCoordinator {
   // MiningMode will allow to remove MockerMiner
   enum MiningMode {
     case RecurrentMining // for normal mining
-    case OnDemandMining  // for testing
+    case OnDemandMining // for testing
   }
 
   sealed trait MiningResponse

@@ -41,9 +41,10 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
   *     mode.
   *
   * Pekko Typed migration (Group ROOT): converted to a `Behavior[Command]` with a sealed inbound ADT. The two outgoing
-  * messages [[Completed]] / [[Failed]] are delivered to a Classic `replyTo` ref — the still-`Behavior[Any]`
-  * `SyncController` parent (and its `ctx.self.toClassic`), which matches them as raw case classes in its bootstrap /
-  * recovery / healing states. `peersClient` is Typed (CAPSTONE Phase 2d); requests use the Typed `AskPattern`
+  * messages [[Completed]] / [[Failed]] are delivered to a Classic `replyTo` ref — `SyncController`'s
+  * `ctx.self.toClassic` CAPSTONE bridge — which matches them as raw case classes in its bootstrap / recovery / healing
+  * states. SyncController is itself now `Behavior[Command]`; the Classic ref is the co-existence bridge, not a sign
+  * of an un-narrowed actor. `peersClient` is Typed (CAPSTONE Phase 2d); requests use the Typed `AskPattern`
   * (`peersClient.ask`), which supplies the `replyTo` directly. The ask callbacks run off the actor thread, so they send
   * self-Commands via `ctx.self` and log via a plain SLF4J `asyncLog`. Retry / wait-for-peer scheduling moves from the
   * injected `scheduler` to `Behaviors.withTimers`.
@@ -59,7 +60,7 @@ object PivotHeaderBootstrap {
   final private case class Retry(reason: String) extends Command
   final private case class Fetched(header: BlockHeader) extends Command
 
-  // ----- Outgoing messages, delivered to the Classic `replyTo` parent (SyncController, Behavior[Any]) -----
+  // ----- Outgoing messages, delivered to the Classic `replyTo` parent (SyncController, Behavior[Command], CAPSTONE bridge) -----
   final case class Completed(targetBlock: BigInt, header: BlockHeader)
   final case class Failed(reason: String)
 

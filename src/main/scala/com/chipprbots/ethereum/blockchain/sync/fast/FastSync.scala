@@ -377,9 +377,8 @@ object FastSync {
         .toClassic
       storageActor ! StateStorageActor.Init(fastSyncStateStorage)
 
-      // SyncStateSchedulerActor (Group S4) is a Typed Behavior (Classic shell + Behavior[Any] core); spawn the shell
-      // via the Typed factory. We send it StartSyncingTo / RestartRequested and it replies with foreign messages that
-      // arrive on our Behavior[Any] core.
+      // SyncStateSchedulerActor (Group S4, narrowed S4) is a Typed Behavior (Behavior[Command]); spawn via ctx.spawn.
+      // We send it StartSyncingTo / RestartRequested and it replies with messages matched in our Behavior[Command] states.
       val scheduler = ctx
         .spawn(
           Behaviors

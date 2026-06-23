@@ -36,9 +36,9 @@ import com.chipprbots.ethereum.network.Peer
   * Runs concurrently with BytecodeRecoveryActor — they target different storage backends (MptStorage vs EvmCodeStorage)
   * with no data dependency.
   *
-  * Pekko Typed actor (`Behavior[Any]`): SyncController (Classic parent) sends `StoragePeerAvailable`, `RecentRoot`, and
-  * coordinator messages all arrive via this actor's Classic proxy. Using `Any` accepts those heterogeneous Classic
-  * messages while providing all Typed machinery (named behavior functions, `Behaviors.withTimers`, `watchWith`).
+  * Pekko Typed actor (`Behavior[Command]`, narrowed S5): SyncController sends `StoragePeerAvailable`, `RecentRoot`, and
+  * coordinator messages; all are members of the sealed `Command` ADT. SyncController holds a Classic-visible ref via
+  * `.toClassic` (CAPSTONE bridge); `Behavior[Any]` is no longer needed — all Typed machinery active.
   *
   * Lifecycle:
   *   1. Walk state trie, find contracts with missing storage tries 2. If none missing → mark recovery done, report to
