@@ -5,7 +5,6 @@ import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
@@ -858,7 +857,7 @@ object ByteCodeCoordinator {
       networkPeerManager: ActorRef,
       requestTracker: SNAPRequestTracker,
       batchSize: Int,
-      snapSyncController: ActorRef,
+      snapSyncController: org.apache.pekko.actor.typed.ActorRef[SNAPSyncController.Command],
       cooldownConfig: ByteCodePeerCooldownConfig = ByteCodePeerCooldownConfig.default,
       backpressureHighWatermark: Int = 50000,
       backpressureLowWatermark: Int = 25000
@@ -873,7 +872,7 @@ object ByteCodeCoordinator {
           requestTracker,
           batchSize,
           cooldownConfig,
-          snapSyncController.toTyped[SNAPSyncController.Command],
+          snapSyncController,
           backpressureHighWatermark = backpressureHighWatermark,
           backpressureLowWatermark = backpressureLowWatermark
         ).start()

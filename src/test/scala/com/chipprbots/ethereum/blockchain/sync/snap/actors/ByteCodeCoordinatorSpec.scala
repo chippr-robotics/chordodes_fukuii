@@ -46,7 +46,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       networkPeerManager: org.apache.pekko.actor.ActorRef,
       requestTracker: SNAPRequestTracker,
       batchSize: Int,
-      snapSyncController: org.apache.pekko.actor.ActorRef,
+      snapSyncController: org.apache.pekko.actor.typed.ActorRef[SNAPSyncController.Command],
       cooldownConfig: ByteCodeCoordinator.ByteCodePeerCooldownConfig =
         ByteCodeCoordinator.ByteCodePeerCooldownConfig.default,
       backpressureHighWatermark: Int = 50000,
@@ -91,7 +91,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       batchSize = 8,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator should not be null
@@ -108,7 +108,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       batchSize = 8,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     val codeHashes = Seq(
@@ -137,7 +137,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       batchSize = 8,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     val codeHashes = Seq(kec256(ByteString("code1")))
@@ -160,7 +160,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       batchSize = 8,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! ByteCodeCoordinator.ByteCodeTaskComplete(BigInt(123), Right(5))
@@ -188,7 +188,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       batchSize = 1,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       cooldownConfig = peerCooldown
     )
 
@@ -226,7 +226,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       batchSize = 8,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     // Start with empty contract list
@@ -251,7 +251,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       batchSize = 8,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! ByteCodeCoordinator.ByteCodeTaskFailed(BigInt(123), "Test failure")
@@ -275,7 +275,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       batchSize = 8,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     val code1 = ByteString("code1")
@@ -325,7 +325,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       batchSize = 8,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       cooldownConfig = testCooldownConfig
     )
 
@@ -379,7 +379,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       batchSize = 8,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       cooldownConfig = testCooldownConfig
     )
 
@@ -429,7 +429,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       batchSize = 8,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       cooldownConfig = testCooldownConfig
     )
 
@@ -474,7 +474,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       batchSize = 8,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       cooldownConfig = testCooldownConfig
     )
 
@@ -519,7 +519,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       batchSize = 8,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       cooldownConfig = testCooldownConfig
     )
 
@@ -563,7 +563,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       batchSize = 8,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       cooldownConfig = testCooldownConfig
     )
 
@@ -615,7 +615,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       batchSize = 8,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       cooldownConfig = testCooldownConfig
     )
 
@@ -653,7 +653,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       batchSize = 1,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       cooldownConfig = peerCooldown
     )
 
@@ -691,7 +691,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       batchSize = 8,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       cooldownConfig = testCooldownConfig
     )
 
@@ -726,7 +726,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       batchSize = 8,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       cooldownConfig = testCooldownConfig
     )
 
@@ -761,7 +761,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       batchSize = 8,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       cooldownConfig = testCooldownConfig
     )
 
@@ -805,7 +805,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       batchSize = 1,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       cooldownConfig = peerCooldown
     )
 
@@ -843,7 +843,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       batchSize = 1,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       cooldownConfig = testCooldownConfig,
       backpressureHighWatermark = 4,
       backpressureLowWatermark = 2

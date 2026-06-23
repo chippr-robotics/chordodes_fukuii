@@ -68,7 +68,7 @@ class DecoupledHealServeRootSpec extends ScalaTestWithActorTestKit() with AnyFla
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = new TestMptStorage(),
       batchSize = 16,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       healingWriterEcOverride = Some(classicSystem.dispatcher),
       decoupledHealServeRoot = decoupled
     )

@@ -84,7 +84,7 @@ class RebuildFrontierBfsMultiSeedSpec
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 16,
-      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref.toClassic,
+      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref,
       healingWriterEcOverride = Some(classicSystem.dispatcher)
     )
     try {

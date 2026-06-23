@@ -5,7 +5,6 @@ import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
@@ -2220,7 +2219,7 @@ object TrieNodeHealingCoordinator {
       requestTracker: SNAPRequestTracker,
       mptStorage: MptStorage,
       batchSize: Int,
-      snapSyncController: ActorRef,
+      snapSyncController: org.apache.pekko.actor.typed.ActorRef[SNAPSyncController.Command],
       concurrency: Int = 16,
       visitedCap: Int = DefaultVisitedCap,
       healingFrontierStorage: Option[HealingFrontierStorage] = None,
@@ -2250,7 +2249,7 @@ object TrieNodeHealingCoordinator {
           requestTracker = requestTracker,
           mptStorage = mptStorage,
           batchSize = batchSize,
-          snapSyncController = snapSyncController.toTyped[SNAPSyncController.Command],
+          snapSyncController = snapSyncController,
           concurrency = concurrency,
           visitedCap = visitedCap,
           healingFrontierStorage = healingFrontierStorage,

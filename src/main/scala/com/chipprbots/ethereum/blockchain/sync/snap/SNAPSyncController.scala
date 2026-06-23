@@ -2323,7 +2323,7 @@ private class SNAPSyncControllerImpl(
                     networkPeerManager = networkPeerManager,
                     requestTracker = requestTracker,
                     batchSize = ByteCodeTask.DEFAULT_BATCH_SIZE,
-                    snapSyncController = ctx.self.toClassic
+                    snapSyncController = ctx.self
                   ),
                   s"bytecode-coordinator-$coordinatorGeneration",
                   org.apache.pekko.actor.typed.DispatcherSelector.fromConfig("sync-dispatcher")
@@ -2346,7 +2346,7 @@ private class SNAPSyncControllerImpl(
                     maxAccountsPerBatch = snapSyncConfig.storageBatchSize,
                     maxInFlightRequests = snapSyncConfig.storageConcurrency,
                     requestTimeout = snapSyncConfig.timeout,
-                    snapSyncController = ctx.self.toClassic,
+                    snapSyncController = ctx.self,
                     initialMaxInFlightPerPeer = 3, // Recovery: accounts done, storage gets 3 of 5 per-peer budget
                     initialResponseBytes = snapSyncConfig.storageInitialResponseBytes,
                     minResponseBytes = snapSyncConfig.storageMinResponseBytes,
@@ -3350,7 +3350,7 @@ private class SNAPSyncControllerImpl(
           requestTracker = requestTracker,
           mptStorage = storage,
           concurrency = effectiveConcurrency,
-          snapSyncController = ctx.self.toClassic,
+          snapSyncController = ctx.self,
           resumeProgress = resumeProgress,
           initialMaxInFlightPerPeer =
             5, // Full per-peer budget during AccountRangeSync (storage+bytecode deferred to 0)
@@ -3387,7 +3387,7 @@ private class SNAPSyncControllerImpl(
             networkPeerManager = networkPeerManager,
             requestTracker = requestTracker,
             batchSize = ByteCodeTask.DEFAULT_BATCH_SIZE,
-            snapSyncController = ctx.self.toClassic
+            snapSyncController = ctx.self
           ),
           s"bytecode-coordinator-$coordinatorGeneration",
           org.apache.pekko.actor.typed.DispatcherSelector.fromConfig("sync-dispatcher")
@@ -3414,7 +3414,7 @@ private class SNAPSyncControllerImpl(
             maxAccountsPerBatch = snapSyncConfig.storageBatchSize,
             maxInFlightRequests = snapSyncConfig.storageConcurrency,
             requestTimeout = snapSyncConfig.timeout,
-            snapSyncController = ctx.self.toClassic,
+            snapSyncController = ctx.self,
             // 2-per-peer during AccountRangeSync. Original design used 0 here to defer storage
             // dispatch until accounts completed (prevents stale-root timeouts triggering false
             // pivot refreshes). That assumption breaks on huge chains like sepolia: account
@@ -3602,7 +3602,7 @@ private class SNAPSyncControllerImpl(
             requestTracker = requestTracker,
             mptStorage = storage,
             batchSize = snapSyncConfig.healingBatchSize,
-            snapSyncController = ctx.self.toClassic,
+            snapSyncController = ctx.self,
             concurrency = snapSyncConfig.healingConcurrency,
             visitedCap = snapSyncConfig.healingVisitedCap,
             healingFrontierStorage = healingFrontierStorageOpt,
@@ -3670,7 +3670,7 @@ private class SNAPSyncControllerImpl(
                 requestTracker = requestTracker,
                 mptStorage = storage,
                 batchSize = snapSyncConfig.healingBatchSize,
-                snapSyncController = ctx.self.toClassic,
+                snapSyncController = ctx.self,
                 concurrency = snapSyncConfig.healingConcurrency,
                 visitedCap = snapSyncConfig.healingVisitedCap,
                 healingFrontierStorage = healingFrontierStorageOpt,

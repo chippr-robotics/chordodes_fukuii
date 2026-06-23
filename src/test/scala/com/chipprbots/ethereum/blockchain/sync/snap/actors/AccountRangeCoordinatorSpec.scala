@@ -43,7 +43,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       requestTracker: SNAPRequestTracker,
       mptStorage: TestMptStorage,
       concurrency: Int,
-      snapSyncController: org.apache.pekko.actor.ActorRef,
+      snapSyncController: org.apache.pekko.actor.typed.ActorRef[SNAPSyncController.Command],
       resumeProgress: Map[ByteString, ByteString] = Map.empty,
       initialMaxInFlightPerPeer: Int = 5
   ): org.apache.pekko.actor.typed.ActorRef[AccountRangeCoordinator.Command] =
@@ -88,7 +88,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 4,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
@@ -112,7 +112,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 4,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
@@ -134,7 +134,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 4,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
@@ -159,7 +159,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 1, // Small concurrency for test
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
@@ -182,7 +182,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 4,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
@@ -206,7 +206,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 4,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
@@ -231,7 +231,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 4,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
@@ -261,7 +261,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 1,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
@@ -302,7 +302,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = new TestMptStorage(),
       concurrency = 1, // exactly one worker so reuse is unambiguous
-      snapSyncController = syncController.ref.toClassic
+      snapSyncController = syncController.ref
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
@@ -348,7 +348,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 1,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       initialMaxInFlightPerPeer = 1
     )
 
@@ -385,7 +385,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 1,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       initialMaxInFlightPerPeer = 1
     )
 
@@ -426,7 +426,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 1,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
@@ -459,7 +459,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 1,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       initialMaxInFlightPerPeer = 1
     )
 
@@ -496,7 +496,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 1,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       initialMaxInFlightPerPeer = 1
     )
 
@@ -529,7 +529,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 1,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       initialMaxInFlightPerPeer = 1
     )
 
@@ -575,7 +575,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 2,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       initialMaxInFlightPerPeer = 1
     )
 
@@ -615,7 +615,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = new TestMptStorage(),
       concurrency = 1,
-      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref.toClassic,
+      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref,
       resumeProgress = Map(rangeLast -> rangeLast) // savedNext == last => fully complete
     )
 
@@ -639,7 +639,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = new TestMptStorage(),
       concurrency = 4,
-      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref.toClassic
+      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref
     )
 
     val peerProbe = testKit.createTestProbe[Any]()
@@ -668,7 +668,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = new TestMptStorage(),
       concurrency = 4,
-      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref.toClassic
+      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref
     )
 
     val peerProbe = testKit.createTestProbe[Any]()

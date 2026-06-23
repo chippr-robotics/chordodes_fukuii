@@ -112,7 +112,7 @@ class HealingFrontierResumeSpec extends ScalaTestWithActorTestKit() with AnyFlat
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 16,
-      snapSyncController = controllerProbe.ref.toClassic,
+      snapSyncController = controllerProbe.ref,
       healingFrontierStorage = if persistence then Some(store) else None,
       frontierPersistenceEnabled = persistence,
       healingWriterEcOverride = Some(ec)

@@ -118,7 +118,7 @@ class DecoupledHealSafetySpec extends ScalaTestWithActorTestKit() with AnyFlatSp
         requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
         mptStorage = storage,
         batchSize = 16,
-        snapSyncController = snapSyncController.ref.toClassic,
+        snapSyncController = snapSyncController.ref,
         healingWriterEcOverride = Some(classicSystem.dispatcher),
         decoupledHealServeRoot = true
       )
@@ -170,7 +170,7 @@ class DecoupledHealSafetySpec extends ScalaTestWithActorTestKit() with AnyFlatSp
         requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
         mptStorage = storage,
         batchSize = 16,
-        snapSyncController = snapSyncController.ref.toClassic,
+        snapSyncController = snapSyncController.ref,
         healingWriterEcOverride = Some(classicSystem.dispatcher),
         decoupledHealServeRoot = true,
         decoupledHealMaxAttemptsNoRefresh = maxAttempts
@@ -269,7 +269,7 @@ class DecoupledHealSafetySpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 64,
-      snapSyncController = controller.ref.toClassic,
+      snapSyncController = controller.ref,
       healingFrontierStorage = Some(store),
       healingWriterEcOverride = Some(ec),
       decoupledHealServeRoot = decoupled

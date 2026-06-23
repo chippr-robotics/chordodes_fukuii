@@ -134,7 +134,7 @@ class TrieNodeHealingScopeCaptureSpec
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 64,
-      snapSyncController = controllerProbe.ref.toClassic,
+      snapSyncController = controllerProbe.ref,
       healingFrontierStorage = Some(store),
       healingWriterEcOverride = Some(ec)
     )

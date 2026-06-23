@@ -57,7 +57,7 @@ object HealingTrieFixtures {
       requestTracker: SNAPRequestTracker,
       mptStorage: MptStorage,
       batchSize: Int,
-      snapSyncController: ActorRef,
+      snapSyncController: org.apache.pekko.actor.typed.ActorRef[SNAPSyncController.Command],
       concurrency: Int = 16,
       visitedCap: Int = TrieNodeHealingCoordinator.DefaultVisitedCap,
       healingFrontierStorage: Option[HealingFrontierStorage] = None,

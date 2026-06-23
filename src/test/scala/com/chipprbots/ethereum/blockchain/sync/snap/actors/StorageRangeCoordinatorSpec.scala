@@ -44,7 +44,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       maxAccountsPerBatch: Int,
       maxInFlightRequests: Int,
       requestTimeout: FiniteDuration,
-      snapSyncController: org.apache.pekko.actor.ActorRef,
+      snapSyncController: org.apache.pekko.actor.typed.ActorRef[SNAPSyncController.Command],
       initialMaxInFlightPerPeer: Int = 5,
       backpressureHighWatermark: Int = 100000,
       backpressureLowWatermark: Int = 50000
@@ -81,7 +81,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
   private def newImpl(
       stateRoot: ByteString,
       flatSlotStorage: FlatSlotStorage,
-      snapSyncControllerRef: org.apache.pekko.actor.ActorRef,
+      snapSyncControllerRef: org.apache.pekko.actor.typed.ActorRef[SNAPSyncController.Command],
       flatBatchEntryThreshold: Int = 1000,
       flatBatchEcOverride: Option[scala.concurrent.ExecutionContext] = Some(
         scala.concurrent.ExecutionContext.parasitic
@@ -134,7 +134,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       maxAccountsPerBatch = 8,
       maxInFlightRequests = 8,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator should not be null
@@ -159,7 +159,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       maxAccountsPerBatch = 8,
       maxInFlightRequests = 8,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)
@@ -186,7 +186,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       maxAccountsPerBatch = 8,
       maxInFlightRequests = 8,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! StorageRangeCoordinator.StorageTaskComplete(BigInt(123), Right(10))
@@ -212,7 +212,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       maxAccountsPerBatch = 8,
       maxInFlightRequests = 8,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)
@@ -242,7 +242,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       maxAccountsPerBatch = 8,
       maxInFlightRequests = 8,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! StorageRangeCoordinator.StorageTaskFailed(BigInt(123), "Test failure")
@@ -268,7 +268,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       maxAccountsPerBatch = 8,
       maxInFlightRequests = 8,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     val accountHash1 = kec256(ByteString("account-1"))
@@ -298,7 +298,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       maxAccountsPerBatch = 8,
       maxInFlightRequests = 8,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     val newStateRoot = kec256(ByteString("new-state-root"))
@@ -327,7 +327,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       maxAccountsPerBatch = 8,
       maxInFlightRequests = 8,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)
@@ -373,7 +373,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       maxAccountsPerBatch = 1,
       maxInFlightRequests = 2,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       initialMaxInFlightPerPeer = 1
     )
 
@@ -422,7 +422,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       maxAccountsPerBatch = 8,
       maxInFlightRequests = 4,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     // Add tasks that will not be dispatched (no peer)
@@ -462,7 +462,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       maxAccountsPerBatch = 1,
       maxInFlightRequests = 1,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)
@@ -490,7 +490,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val (impl, kit) = newImpl(
       stateRoot = stateRoot,
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-      snapSyncControllerRef = snapSyncController.ref.toClassic
+      snapSyncControllerRef = snapSyncController.ref
     )
 
     // Simulate failures accumulated during AccountRange phase (before storage phase begins)
@@ -515,7 +515,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val (impl, kit) = newImpl(
       stateRoot = stateRoot,
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-      snapSyncControllerRef = snapSyncController.ref.toClassic
+      snapSyncControllerRef = snapSyncController.ref
     )
 
     // Accumulate 99 failures — one below the 100-failure force-complete threshold
@@ -558,7 +558,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val (impl, kit) = newImpl(
       stateRoot = stateRootArg,
       flatSlotStorage = flatSlotStorage,
-      snapSyncControllerRef = controller.ref.toClassic,
+      snapSyncControllerRef = controller.ref,
       flatBatchEntryThreshold = threshold,
       flatBatchEcOverride = Some(scala.concurrent.ExecutionContext.parasitic)
     )
@@ -738,7 +738,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       maxAccountsPerBatch = 8,
       maxInFlightRequests = 8,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator should not be null
@@ -776,7 +776,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       maxAccountsPerBatch = 8,
       maxInFlightRequests = 8,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       backpressureHighWatermark = 5,
       backpressureLowWatermark = 2
     )
@@ -808,7 +808,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val (impl, kit) = newImpl(
       stateRoot = stateRoot,
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-      snapSyncControllerRef = snapSyncController.ref.toClassic,
+      snapSyncControllerRef = snapSyncController.ref,
       backpressureHighWatermark = 5,
       backpressureLowWatermark = 2
     )
@@ -850,7 +850,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val (impl, _) = newImpl(
       stateRoot = kec256(ByteString("subtask-init-root")),
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-      snapSyncControllerRef = testKit.createTestProbe[SNAPSyncController.Command]().ref.toClassic
+      snapSyncControllerRef = testKit.createTestProbe[SNAPSyncController.Command]().ref
     )
 
     impl.accountSubtaskCounters shouldBe empty
@@ -862,7 +862,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val (impl, _) = newImpl(
       stateRoot = kec256(ByteString("subtask-complete-root")),
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-      snapSyncControllerRef = testKit.createTestProbe[SNAPSyncController.Command]().ref.toClassic
+      snapSyncControllerRef = testKit.createTestProbe[SNAPSyncController.Command]().ref
     )
 
     // Simulate: 3 subtasks registered for a large-storage account
@@ -890,7 +890,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val (impl, _) = newImpl(
       stateRoot = kec256(ByteString("subtask-nosplit-root")),
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-      snapSyncControllerRef = testKit.createTestProbe[SNAPSyncController.Command]().ref.toClassic
+      snapSyncControllerRef = testKit.createTestProbe[SNAPSyncController.Command]().ref
     )
 
     // No subtask entry for this account — small contract, single task, no split
@@ -907,7 +907,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val (impl, _) = newImpl(
       stateRoot = kec256(ByteString("subtask-two-accts-root")),
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-      snapSyncControllerRef = testKit.createTestProbe[SNAPSyncController.Command]().ref.toClassic
+      snapSyncControllerRef = testKit.createTestProbe[SNAPSyncController.Command]().ref
     )
 
     // Register 2 subtasks for A, 3 for B

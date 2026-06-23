@@ -76,7 +76,7 @@ class DecoupledHealObservabilitySpec
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = new TestMptStorage(),
       batchSize = 16,
-      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref.toClassic,
+      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref,
       healingWriterEcOverride = Some(classicSystem.dispatcher),
       decoupledHealServeRoot = decoupled
     )

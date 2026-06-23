@@ -45,7 +45,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = requestTracker,
       mptStorage = storage,
       batchSize = 16,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator should not be null
@@ -64,7 +64,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = requestTracker,
       mptStorage = storage,
       batchSize = 16,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     val node1Hash = kec256(ByteString("node1"))
@@ -97,7 +97,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = requestTracker,
       mptStorage = storage,
       batchSize = 16,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     val nodeHash = kec256(ByteString("node1"))
@@ -124,7 +124,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = requestTracker,
       mptStorage = storage,
       batchSize = 16,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! TrieNodeHealingCoordinator.HealingTaskComplete(BigInt(123), Right(5))
@@ -147,7 +147,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = requestTracker,
       mptStorage = storage,
       batchSize = 16,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! TrieNodeHealingCoordinator.HealingCheckCompletion
@@ -169,7 +169,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = requestTracker,
       mptStorage = storage,
       batchSize = 16,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! TrieNodeHealingCoordinator.HealingTaskFailed(BigInt(123), "Test failure")
@@ -192,7 +192,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = requestTracker,
       mptStorage = storage,
       batchSize = 16,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     coordinator ! TrieNodeHealingCoordinator.HealingForceComplete
@@ -216,7 +216,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = requestTracker,
       mptStorage = storage,
       batchSize = 16,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     val newStateRoot = kec256(ByteString("new-heal-root"))
@@ -245,7 +245,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = requestTracker,
       mptStorage = storage,
       batchSize = 16,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     val nodeHash = kec256(ByteString("missing-node"))
@@ -283,7 +283,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = requestTracker,
       mptStorage = storage,
       batchSize = 64,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       healingWriterEcOverride = Some(classicSystem.dispatcher)
     )
 
@@ -320,7 +320,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = requestTracker,
       mptStorage = storage,
       batchSize = 16,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       healingWriterEcOverride = Some(classicSystem.dispatcher)
     )
 
@@ -350,7 +350,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = requestTracker,
       mptStorage = storage,
       batchSize = 16,
-      snapSyncController = snapSyncController.ref.toClassic,
+      snapSyncController = snapSyncController.ref,
       healingWriterEcOverride = Some(classicSystem.dispatcher)
     )
 
@@ -378,7 +378,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = requestTracker,
       mptStorage = storage,
       batchSize = 16,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     // Queue tasks and make a peer available so some become active
@@ -549,7 +549,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = requestTracker,
       mptStorage = storage,
       batchSize = 1,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     // Provide a real task and dispatch it to the peer. (The walk root is absent, so StartTrieNodeHealing
@@ -585,7 +585,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = requestTracker,
       mptStorage = storage,
       batchSize = 1,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     // The walk root is absent, so StartTrieNodeHealing no longer seeds it (it signals HealingRootUnservable).
@@ -633,7 +633,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = requestTracker,
       mptStorage = storage,
       batchSize = 1,
-      snapSyncController = snapSyncController.ref.toClassic
+      snapSyncController = snapSyncController.ref
     )
 
     // Make peer stateless. The walk root is absent, so StartTrieNodeHealing no longer seeds it (it
@@ -682,7 +682,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 16,
-      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref.toClassic,
+      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref,
       healingWriterEcOverride = Some(classicSystem.dispatcher)
     )
 
@@ -725,7 +725,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 16,
-      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref.toClassic,
+      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref,
       healingWriterEcOverride = Some(ec),
       frontierHighWater = 1,
       frontierLowWater = 0,
@@ -791,7 +791,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 16,
-      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref.toClassic,
+      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref,
       healingWriterEcOverride = Some(classicSystem.dispatcher)
     )
 
@@ -836,7 +836,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 16,
-      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref.toClassic,
+      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref,
       healingWriterEcOverride = Some(classicSystem.dispatcher)
     )
 
@@ -879,7 +879,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 16,
-      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref.toClassic,
+      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref,
       healingWriterEcOverride = Some(classicSystem.dispatcher),
       bfsQueueStorageOpt = Some(bfsQueue)
     )
@@ -912,7 +912,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = fx.storage,
       batchSize = 16,
-      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref.toClassic,
+      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref,
       healingWriterEcOverride = Some(classicSystem.dispatcher)
     )
 
@@ -937,7 +937,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = fx.storage,
       batchSize = 16,
-      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref.toClassic,
+      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref,
       healingWriterEcOverride = Some(classicSystem.dispatcher)
     )
 
@@ -969,7 +969,7 @@ class TrieNodeHealingCoordinatorSpec
         requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
         mptStorage = fx.storage,
         batchSize = 16,
-        snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref.toClassic,
+        snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref,
         healingWriterEcOverride = Some(classicSystem.dispatcher),
         healingReaderEcOverride = readerEc,
         traversalParallelism = 1 // serial branch
@@ -1031,7 +1031,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = fx.storage,
       batchSize = 16,
-      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref.toClassic,
+      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref,
       healingWriterEcOverride = Some(writerEc),
       healingReaderEcOverride = Some(readerEc),
       traversalParallelism = 2,
@@ -1080,7 +1080,7 @@ class TrieNodeHealingCoordinatorSpec
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = fx.storage,
       batchSize = 16,
-      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref.toClassic,
+      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref,
       healingWriterEcOverride = Some(classicSystem.dispatcher),
       healingReaderEcOverride = Some(readerEc),
       traversalParallelism = 2,

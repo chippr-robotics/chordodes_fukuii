@@ -117,7 +117,7 @@ class ScopedVerificationParitySpec extends ScalaTestWithActorTestKit() with AnyF
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 64,
-      snapSyncController = controller.ref.toClassic,
+      snapSyncController = controller.ref,
       healingFrontierStorage = Some(store),
       healingWriterEcOverride = Some(ec),
       scopedHealVerification = scoped

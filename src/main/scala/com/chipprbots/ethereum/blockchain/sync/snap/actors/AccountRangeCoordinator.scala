@@ -11,7 +11,6 @@ import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
@@ -1876,7 +1875,7 @@ object AccountRangeCoordinator {
       requestTracker: SNAPRequestTracker,
       mptStorage: MptStorage,
       concurrency: Int,
-      snapSyncController: ActorRef,
+      snapSyncController: org.apache.pekko.actor.typed.ActorRef[SNAPSyncController.Command],
       resumeProgress: Map[ByteString, ByteString] = Map.empty,
       initialMaxInFlightPerPeer: Int = 5,
       initialResponseBytes: Int = 524288,
@@ -1895,7 +1894,7 @@ object AccountRangeCoordinator {
           requestTracker = requestTracker,
           mptStorage = mptStorage,
           concurrency = concurrency,
-          snapSyncController = snapSyncController.toTyped[SNAPSyncController.Command],
+          snapSyncController = snapSyncController,
           resumeProgress = resumeProgress,
           initialMaxInFlightPerPeer = initialMaxInFlightPerPeer,
           initialResponseBytesConfig = initialResponseBytes,
