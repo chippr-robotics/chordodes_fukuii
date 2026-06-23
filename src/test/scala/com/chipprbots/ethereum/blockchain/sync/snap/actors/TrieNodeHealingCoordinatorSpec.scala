@@ -84,7 +84,7 @@ class TrieNodeHealingCoordinatorSpec
 
     // Coordinator should queue the nodes
     coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(testActor.toTyped[HealingStatistics])
-    expectMsgType[Any](3.seconds)
+    expectMsgType[HealingStatistics](3.seconds)
   }
 
   it should "create workers when peers are available" taggedAs UnitTest in {
@@ -116,7 +116,7 @@ class TrieNodeHealingCoordinatorSpec
     coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
 
     // Should send request to network peer manager
-    networkPeerManager.expectMsgType[Any](3.seconds)
+    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
   }
 
   it should "handle task completion" taggedAs UnitTest in {
@@ -141,7 +141,7 @@ class TrieNodeHealingCoordinatorSpec
 
     // Coordinator should handle completion
     coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(testActor.toTyped[HealingStatistics])
-    expectMsgType[Any](3.seconds)
+    expectMsgType[HealingStatistics](3.seconds)
   }
 
   it should "report completion when all nodes healed" taggedAs UnitTest in {
@@ -190,7 +190,7 @@ class TrieNodeHealingCoordinatorSpec
 
     // Coordinator should still be operational
     coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(testActor.toTyped[HealingStatistics])
-    expectMsgType[Any](3.seconds)
+    expectMsgType[HealingStatistics](3.seconds)
   }
 
   it should "signal StateHealingComplete to controller on HealingForceComplete" taggedAs UnitTest in {
@@ -247,7 +247,7 @@ class TrieNodeHealingCoordinatorSpec
 
     // Coordinator remains operational.
     coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(testActor.toTyped[HealingStatistics])
-    expectMsgType[Any](3.seconds)
+    expectMsgType[HealingStatistics](3.seconds)
   }
 
   it should "not signal StateHealingComplete on HealingCheckCompletion when pending tasks exist" taggedAs UnitTest in {
@@ -425,7 +425,7 @@ class TrieNodeHealingCoordinatorSpec
     // HealingRootUnservable (do NOT seed the root). The QueueMissingNodes tasks are still real and get
     // dispatched to the peer below.
     snapSyncController.expectMsg(3.seconds, SNAPSyncController.HealingRootUnservable(stateRoot))
-    networkPeerManager.expectMsgType[Any](3.seconds) // queued task dispatched
+    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds) // task dispatched
 
     // ForceComplete while tasks are in-flight: abandon all, signal complete immediately
     coordinator ! TrieNodeHealingCoordinator.HealingForceComplete

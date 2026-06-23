@@ -129,7 +129,7 @@ class AccountRangeCoordinatorSpec
     coordinator ! AccountRangeCoordinator.StartAccountRangeSync(stateRoot)
     coordinator ! AccountRangeCoordinator.PeerAvailable(peer)
 
-    networkPeerManager.expectMsgType[Any](3.seconds)
+    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
   }
 
   it should "handle task completion and report progress" taggedAs UnitTest in {
@@ -293,7 +293,7 @@ class AccountRangeCoordinatorSpec
 
     // Worker dispatches a GetAccountRange — consume to keep the probe clean.
     // SNAPRequestTracker starts at nextRequestId=1, so the first task is requestId=BigInt(1).
-    networkPeerManager.expectMsgType[Any](3.seconds)
+    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
 
     // Simulate what the AccountRangeWorker sends back when it verifies a proof-only empty AccountRange.
     coordinator ! AccountRangeCoordinator.TaskComplete(
@@ -335,7 +335,7 @@ class AccountRangeCoordinatorSpec
     coordinator ! AccountRangeCoordinator.PeerAvailable(peerA)
 
     // First dispatch: real worker → networkPeerManager receives a SendMessage.
-    networkPeerManager.expectMsgType[Any](3.seconds)
+    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
 
     // Drain via PeerUnavailable. WorkerRequestCancelled goes to the worker (clears currentTask,
     // become(idle)); coordinator re-queues the task.
@@ -344,7 +344,7 @@ class AccountRangeCoordinatorSpec
     // Second dispatch via a fresh peer. Without the worker-reuse fix, the still-busy worker would
     // emit TaskFailed(0, "Worker busy") instead of dispatching. We assert that we DO see a second send.
     coordinator ! AccountRangeCoordinator.PeerAvailable(peerB)
-    networkPeerManager.expectMsgType[Any](3.seconds)
+    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
 
     system.stop(coordinator)
   }

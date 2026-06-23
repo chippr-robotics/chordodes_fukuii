@@ -127,7 +127,7 @@ class ByteCodeCoordinatorSpec
 
     // Coordinator should queue the contracts
     coordinator ! ByteCodeCoordinator.ByteCodeGetProgress(self.toTyped[ByteCodeCoordinator.ByteCodeProgress])
-    expectMsgType[Any](3.seconds)
+    expectMsgType[ByteCodeCoordinator.ByteCodeProgress](3.seconds)
   }
 
   it should "create workers when peers are available" taggedAs UnitTest in {
@@ -155,7 +155,7 @@ class ByteCodeCoordinatorSpec
     coordinator ! ByteCodeCoordinator.ByteCodePeerAvailable(peer)
 
     // Should send request to network peer manager
-    networkPeerManager.expectMsgType[Any](3.seconds)
+    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
   }
 
   it should "handle task completion" taggedAs UnitTest in {
@@ -178,7 +178,7 @@ class ByteCodeCoordinatorSpec
 
     // Coordinator should handle completion
     coordinator ! ByteCodeCoordinator.ByteCodeGetProgress(self.toTyped[ByteCodeCoordinator.ByteCodeProgress])
-    expectMsgType[Any](3.seconds)
+    expectMsgType[ByteCodeCoordinator.ByteCodeProgress](3.seconds)
   }
 
   // Verifies Fix 6 / P-5.4: ByteCodeTaskComplete must call tryRedispatchPendingTasks() so the
@@ -276,7 +276,7 @@ class ByteCodeCoordinatorSpec
 
     // Coordinator should still be operational
     coordinator ! ByteCodeCoordinator.ByteCodeGetProgress(self.toTyped[ByteCodeCoordinator.ByteCodeProgress])
-    expectMsgType[Any](3.seconds)
+    expectMsgType[ByteCodeCoordinator.ByteCodeProgress](3.seconds)
   }
 
   it should "accept ByteCodes as a subsequence and re-queue missing hashes" taggedAs UnitTest in {

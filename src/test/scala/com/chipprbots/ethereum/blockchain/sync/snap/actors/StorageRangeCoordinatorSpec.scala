@@ -179,7 +179,7 @@ class StorageRangeCoordinatorSpec
 
     // Should handle peer availability (may or may not send request depending on tasks)
     coordinator ! getProgress
-    expectMsgType[Any](3.seconds)
+    expectMsgType[StorageRangeCoordinator.SyncStatistics](3.seconds)
   }
 
   it should "handle task completion" taggedAs UnitTest in {
@@ -207,7 +207,7 @@ class StorageRangeCoordinatorSpec
 
     // Coordinator should handle completion
     coordinator ! getProgress
-    expectMsgType[Any](3.seconds)
+    expectMsgType[StorageRangeCoordinator.SyncStatistics](3.seconds)
   }
 
   it should "report completion when no storage tasks" taggedAs UnitTest in {
@@ -267,7 +267,7 @@ class StorageRangeCoordinatorSpec
 
     // Coordinator should still be operational
     coordinator ! getProgress
-    expectMsgType[Any](3.seconds)
+    expectMsgType[StorageRangeCoordinator.SyncStatistics](3.seconds)
   }
 
   it should "accept AddStorageTasks and remain operational" taggedAs UnitTest in {
@@ -299,7 +299,7 @@ class StorageRangeCoordinatorSpec
 
     // Should remain operational after adding tasks
     coordinator ! getProgress
-    expectMsgType[Any](3.seconds)
+    expectMsgType[StorageRangeCoordinator.SyncStatistics](3.seconds)
   }
 
   it should "accept StoragePivotRefreshed and update state root" taggedAs UnitTest in {
@@ -328,7 +328,7 @@ class StorageRangeCoordinatorSpec
 
     // Coordinator should still respond to progress queries after pivot refresh
     coordinator ! getProgress
-    expectMsgType[Any](3.seconds)
+    expectMsgType[StorageRangeCoordinator.SyncStatistics](3.seconds)
   }
 
   it should "signal StorageRangeSyncComplete to controller when NoMoreStorageTasks received with no pending tasks" taggedAs UnitTest in {
@@ -777,7 +777,7 @@ class StorageRangeCoordinatorSpec
     // Smoke: accept the basic lifecycle messages without error.
     coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)
     coordinator ! getProgress
-    expectMsgType[Any](3.seconds)
+    expectMsgType[StorageRangeCoordinator.SyncStatistics](3.seconds)
 
     system.stop(coordinator)
   }
