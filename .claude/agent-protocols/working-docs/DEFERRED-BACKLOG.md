@@ -1050,57 +1050,6 @@ Step 5 — Output the full audit to `.local/docs/classic-interop-audit.md`.
 
 ---
 
-#### §8k-C — MITHRIL: Lift SNAP coordinator `snapSyncController: ActorRef` to Typed
-
-**Agent:** MITHRIL
-**Risk:** LOW — coordinator factory param type lift only; no protocol change
-**Gate:** §8k-A complete (all 4 workers use typed coordinator refs first, so both levels close together)
-**Bridge sites eliminated:** ~7 (Cluster F: SSC `ctx.self.toClassic` at coordinator spawn sites in SNAPSyncController)
-
-**Background:**
-After §8k-A, the coordinators themselves still accept `snapSyncController: org.apache.pekko.actor.ActorRef`
-in their untyped `apply` factory overloads. SNAPSyncController passes `ctx.self.toClassic` when
-spawning ARC/BCC/SRC/TNHC. Lifting the coordinator factory param removes these remaining SSC→coordinator
-bridge sites.
-
-**Grep to confirm scope:**
-```bash
-cd /media/dev/2tb/dev/fukuii
-
-# Coordinator untyped factory overloads
-grep -rn "snapSyncController: org\.apache\.pekko\.actor\.ActorRef\b\|snapSyncController: ActorRef\b" \
-  src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/actors/ --include="*.scala"
-
-# SSC spawn sites using ctx.self.toClassic for coordinators
-grep -n "ctx\.self\.toClassic\|context\.self\.toClassic" \
-  src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/SNAPSyncController.scala
-```
-
-**Steps:**
-1. In each coordinator (`AccountRangeCoordinator`, `ByteCodeCoordinator`, `StorageRangeCoordinator`,
-   `TrieNodeHealingCoordinator`): change `snapSyncController: ActorRef` param in the untyped `apply`
-   overload to `snapSyncController: ActorRef[SNAPSyncController.Command]`. Remove the FQN classic import
-   if now unused.
-2. In `SNAPSyncController`: at each coordinator spawn site change `snapSyncController = ctx.self.toClassic`
-   → `snapSyncController = ctx.self`.
-3. `sbt compile-all` after each coordinator.
-
-**Verify toClassic count in SSC drops by 7:**
-```bash
-grep -c "\.toClassic" \
-  src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/SNAPSyncController.scala
-# before vs after
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add` the 5 modified files (4 coordinators + SNAPSyncController)
-3. `git commit -m "refactor(8k-C): typed snapSyncController ref in SNAP coordinators — remove .toClassic at SSC spawn"`
-4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(8k-C): clearout — $SHA"`
-5. **DELETE §8k-C**
-
----
 
 #### §8k-D — HERALD + MITHRIL: Lift `PeerEventBusActor.SubscribeCmd(subscriber: ActorRef)` to Typed
 
@@ -1479,7 +1428,7 @@ No actor migration gate. Commit individually; do not bundle with primary-track m
 | **8g — braceless config** ✅ `34a55a025` | Deferred settings documented in .scalafmt.conf; indent.defnSite + topLevelStatementBlankLines each trigger ~400-file reformats → gated for per-subsystem pass post-CAPSTONE | MITHRIL | done |
 | **8j — Thread.sleep** | 2 live call sites (EthMiningServiceSpec:302, SubscriptionManagerSpec:249) — both NECESSARY; defer to §8a-retro (Typed TestKit enables proper replacement) | EYE | deferred to §8a |
 | **8k-R1 — Classic interop audit** | PRISM: run §8k-R1 prompt — map every `.toClassic`/`actorSelection` to root-cause classic actor; confirm §8k-A scope; output `classic-interop-audit.md` | PRISM | any time |
-| **8k-A — Typed coordinator ref** | MITHRIL: update AccountRangeWorker + ByteCodeWorker `coordinator:` param from classic → typed `ActorRef[T]`; remove `.toClassic` at spawn sites | MITHRIL | after 8k-R1 confirms scope |
+| ~~**8k-A — Typed coordinator ref**~~ | ~~MITHRIL: update AccountRangeWorker + ByteCodeWorker `coordinator:` param from classic → typed `ActorRef[T]`; remove `.toClassic` at spawn sites~~ | ~~MITHRIL~~ | ✅ DONE — workers already use typed coordinator refs (`ActorRef[T.Command]`) |
 | ~~**3f — manual sync**~~ | ~~Audit 5 `.synchronized` outside actors~~ | ~~PRISM~~ | ✅ DONE `cf33cfa87` — MapCache:19+30 fixed (TrieMap); CombinedRecoveryScanner + TNHC left as-is (documented); PoWMining FORGE-gated (CHASE-QUEUE) |
 | **8a-retro** | Batches 1+2 DONE — **batch 3 (G1 network/sync actors)** needs TestKit→ActorTestKit migration; clearout prompt in §8a below | LOOM, EYE | ~3h |
 
@@ -1607,7 +1556,7 @@ actionable slow tests.
 3. `git commit -m "test(timing): P7 — replace wall-clock assertions, N fixes"` — omit if no source changes
 4. `SHA=$(git rev-parse --short HEAD)` — capture SHA (or note "no source commit" if step 3 skipped)
 5. Update run-order table: strikethrough D3 → `| ~~D3~~ | ~~Batch D~~ | ~~P7 EYE test timing audit~~ | ✅ DONE [date] — Xs baseline, N improvements, $SHA |`
-6. Update `fukuii-test-timing.md` with new baseline
+6. Update `test-quality-log.md` with new baseline
 7. Any Thread.sleep fixes → `completed/SPRINT-QUEUE.md` row with `$SHA`
 8. `git add .claude/` → `git commit -m "docs(p7): clearout — $SHA"`
 
@@ -1681,9 +1630,9 @@ written reason. P7 covered only `testEssential`; this part closes the gap.
 | # | Batch | Prompt | Parallel-safe? |
 |---|-------|--------|----------------|
 | ~~E1~~ | ~~Batch E~~ | ~~P8 EYE SyncTest tag audit~~ | ✅ DONE 2026-06-23 — 40 rescued (15 RetryStrategy + 7 PeersClient + 6 Blacklist + 12 BlockchainHostActor), 36 kept SyncTest, `3aef474a9` |
-| E2 | Batch E | P9 EYE/MITHRIL DisabledTest audit | Yes |
-| E3 | Batch E | P10 EYE/MITHRIL FlakyTest root cause | No (one spec at a time) |
-| E4 | Batch E | P11 testStandard baseline + SlowTest audit | No (long-running) |
+| ~~E2~~ | ~~Batch E~~ | ~~P9 EYE/MITHRIL DisabledTest audit~~ | ✅ DONE 2026-06-23 — `86c76fd4e` — 2 fixed, 7 deferred (F6 CODEBASE-AUDIT) |
+| ~~E3~~ | ~~Batch E~~ | ~~P10 EYE/MITHRIL FlakyTest root cause~~ | ✅ DONE 2026-06-23 — `ab98f1370` — 11 de-tagged, 2 deleted (F7 CODEBASE-AUDIT) |
+| ~~E4~~ | ~~Batch E~~ | ~~P11 testStandard baseline + SlowTest audit~~ | ✅ DONE 2026-06-23 — 961s/3,579 tests; 6 SlowTest→UnitTest `edfb69f35`; 2 failures: DNS flaky (Mordor DNS) + BHA pre-existing (fixed `07e5d505f`) |
 | E5 | Batch E | P12 Tag taxonomy + build target architecture review | Yes (read-only) |
 
 ---
@@ -1740,7 +1689,7 @@ Rescuing mis-labelled tests to `UnitTest` would immediately add them to `testEss
 3. `git commit -m "test(p8): SyncTest audit — rescue N tests, delete M"`
 4. `SHA=$(git rev-parse --short HEAD)` — capture exact SHA
 5. Update run-order table in `CODEBASE-AUDIT.md`: strikethrough E1 → `| ~~E1~~ | ... | ✅ DONE [date] — N rescued, $SHA |`
-6. Update `fukuii-test-timing.md` with new testEssential count
+6. Update `test-quality-log.md` with new testEssential count
 7. Add CHASE-QUEUE entry: remaining SyncTest count and path to `-l SyncTest` removal (P8+P10 prerequisite)
 8. `git add .claude/` → `git commit -m "docs(p8): clearout — $SHA"`
 
@@ -1874,7 +1823,7 @@ a `MinerFactory` seam.
 4. `SHA=$(git rev-parse --short HEAD)` — capture final commit SHA (comma-separate if multiple)
 5. Update run-order table in `CODEBASE-AUDIT.md`: strikethrough E3 → `| ~~E3~~ | ... | ✅ DONE [date] — N fixed, M deleted, $SHA |`
 6. If any tests also rescued from SyncTest → update P8 verdict table with those SHAs
-7. Update `fukuii-test-timing.md` test count after fixes land in testEssential
+7. Update `test-quality-log.md` test count after fixes land in testEssential
 8. `git add .claude/` → `git commit -m "docs(p10): clearout — $SHA"`
 
 **Rejection criteria:** Re-tagging a flaky test as `SlowTest` or `DisabledTest` to avoid fixing it.
@@ -1927,7 +1876,7 @@ slow). This prompt captures the Standard baseline and audits SlowTest label accu
 5. For `MiningSpec:10,17` and `PoWMiningSpec:71` specifically: if observed time is <100ms →
    remove `SlowTest` tag and add `UnitTest`, which promotes them to `testEssential`.
 
-6. Record the testStandard baseline in `fukuii/.local/docs/fukuii-test-timing.md`.
+6. Record the testStandard baseline in `fukuii/.local/docs/test-quality-log.md`.
 
 **Verification:** All testStandard tests pass (0 failures). Baseline recorded.
 
@@ -1937,7 +1886,7 @@ slow). This prompt captures the Standard baseline and audits SlowTest label accu
 3. `git commit -m "test(p11): promote N mislabelled SlowTest → UnitTest"` — omit if no source changes
 4. `SHA=$(git rev-parse --short HEAD)` — capture SHA (note "no source commit" if step 3 skipped)
 5. Update run-order table in `CODEBASE-AUDIT.md`: strikethrough E4 → `| ~~E4~~ | ... | ✅ DONE [date] — Xs wall time, N tests, M mislabelled fixed, $SHA |`
-6. Update `fukuii-test-timing.md` with testStandard baseline and timing
+6. Update `test-quality-log.md` with testStandard baseline and timing
 7. `git add .claude/` → `git commit -m "docs(p11): clearout — $SHA"`
 
 **Rejection criteria:** Removing `SlowTest` from a test that actually takes >100ms. Observe the
@@ -1946,6 +1895,9 @@ time, don't guess. `DAGGenerationSpec` and `EthashNonceSearchSpec` must remain `
 ---
 
 ### P11b — Docs: migrate `fukuii-test-timing.md` → `test-quality-log.md`
+
+**COMPLETE 2026-06-23** — `test-quality-log.md` created at `.local/docs/`, all content migrated,
+old file deleted, DEFERRED-BACKLOG references updated, MEMORY.md + memory file renamed.
 
 **Agent:** Any (pure documentation — no compilation or test runs required)
 **Parallel-safe:** YES — touches only `.local/docs/` and working docs
@@ -2246,9 +2198,9 @@ lines remain in any tier definition.
 5. `SHA2=$(git rev-parse --short HEAD)` — capture SHA for commit 2
 6. Update run-order table in `CODEBASE-AUDIT.md`: strikethrough E5 → `| ~~E5~~ | ... | ✅ DONE [date] — $SHA1 (aliases), $SHA2 (exclusion removal) |`
 7. Write `test-tag-taxonomy.md` at `.local/docs/`
-8. Update `fukuii-test-timing.md` with new testEssential count and the clean exclusion list
-9. Update MEMORY.md `fukuii-test-timing.md` entry with final test count
-10. `git add .claude/ .local/docs/test-tag-taxonomy.md .local/docs/fukuii-test-timing.md` → `git commit -m "docs(p12): clearout — $SHA1 $SHA2"`
+8. Update `test-quality-log.md` with new testEssential count and the clean exclusion list
+9. Update MEMORY.md `test-quality-log.md` entry with final test count
+10. `git add .claude/ .local/docs/test-tag-taxonomy.md .local/docs/test-quality-log.md` → `git commit -m "docs(p12): clearout — $SHA1 $SHA2"`
 
 **Rejection criteria:** Removing a workaround exclusion before the underlying tests are fixed
 (P8+P10 must be complete first). Adding a build target for a tag with 0–1 test usages.

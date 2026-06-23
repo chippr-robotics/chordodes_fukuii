@@ -62,6 +62,16 @@
 
 ---
 
+## Classic Interop — §8k-A (COMPLETE)
+
+#### `791c0211f` — refactor(8k-A): typed coordinator ref in all 4 SNAP workers; docs `4c333b178`
+- **What:** `AccountRangeWorker`, `ByteCodeWorker`, `StorageRangeWorker`, `TrieNodeHealingWorker` — `coordinator: org.apache.pekko.actor.ActorRef` param lifted to `ActorRef[<Coordinator>.Command]`. Corresponding `ctx.self.toClassic` / `context.self.toClassic` at coordinator spawn sites in each coordinator + `SNAPSyncController` removed (→ `ctx.self`).
+- **Scope:** 6 production files (4 workers + 2 coordinator spawn-site files), 4 test files
+- **Sites eliminated:** ~12 `.toClassic` from Cluster F (coordinator→worker spawn path)
+- **Verification:** 142 targeted tests pass; `sbt compile-all` clean; `scalafmtAll` applied
+
+---
+
 ## Open / Deferred
 
 - INFO-8: `refreshFreshRootCache` function no longer exists in SNAPSyncController (searched 2026-06-22, 0 results). `getBlockHeaderByNumber` has 7 scattered call sites, none in a tight loop. No run-logs available. Marking MONITORED — no action needed.

@@ -153,7 +153,7 @@ All 5 ETH coverage gaps closed:
 - **What:** Audited 8 files tagged `SyncTest` (excluded from all tiers in `build.sbt:85`). 40 tests rescused to `UnitTest`; 36 kept `SyncTest` (real wall-clock / multi-actor integration).
 - **Rescued (40):** `RetryStrategySpec` (15 — pure backoff math), `PeersClientSpec` (7 — pure data-structure), `CacheBasedBlacklistSpec` (6 — fake clock via `FakeTicker.advance()`), `BlockchainHostActorSpec` (12 — hermetic TestProbe + in-memory blockchain)
 - **Kept SyncTest (36):** `StateStorageActorSpec` (1 — `eventually` + NormalPatience), `StateSyncSpec` (5 — `expectMsg(20.seconds)`), `FastSyncSpec` (6 — IO fiber waits), `SyncControllerSpec` (~24 — LongPatience multi-actor)
-- **testEssential count after rescue:** 3,539; updated in `fukuii-test-timing.md`
+- **testEssential count after rescue:** 3,539; recorded in `test-quality-log.md` (migrated from `fukuii-test-timing.md` in P11b)
 - **Pre-existing failure logged:** `BlockchainHostActorSpec` "return Receipts for block hashes" — `Subscribe(...)` vs `SubscribeCmd(...)` tag-type mismatch; pre-dates P8; CHASE-QUEUE entry added
 
 ---
@@ -165,6 +165,22 @@ All 5 ETH coverage gaps closed:
 - **Census:** ~130 production bridge sites + 2 test `actorSelection`. Permanent floor: 4 TCP bridges. Eliminatable: ~126 production + 2 test.
 - **14 clusters, 8 root-cause families.** Execution order: §8k-A → §8k-C → §8k-D → §8k-E → §8k-F → §8k-G → §8k-H → §8k-I → §8k-B (post-CAPSTONE TCP floor verification).
 - **Working docs updated:** DEFERRED-BACKLOG (§8k root-cause table, §8k-A scope expanded to 4 SNAP workers, 6 new prompts §8k-C through §8k-I); SPRINT-QUEUE (bridge elimination sprint table); CHASE-QUEUE (audit completion).
+
+---
+
+## P11 — testStandard baseline + SlowTest promotions (COMPLETE)
+
+#### `edfb69f35` — test(p11): 6 mislabelled SlowTests promoted to UnitTest
+- **Baseline:** testStandard 961s (16m 1s), 3,579 tests
+- **Promoted (6):** `MiningSpec` "have unique names" (17ms), "contain ethash" (0ms); `PoWMiningSpec` "use RestrictedPoWBlockGeneratorImpl…" (56ms), "start only one mocked miner…MockedPow" (56ms), "start only the normal miner…PoW" (50ms), "start only the normal miner…RestrictedPoW" (40ms)
+- **Kept SlowTest (legitimately slow):** "use NoAdditionalPoWData…" (202ms), "not start a miner when miningEnabled=false" (425ms) — TestMiningNode initialization overhead
+- **testStandard failures:** 2 — DnsDiscoverySpec (Mordor DNS returned 9 enodes vs threshold 10, network-flaky, not a code issue); BlockchainHostActorSpec (pre-existing Subscribe→SubscribeCmd; fixed by parallel agent `07e5d505f`)
+
+## BHA-fix — BlockchainHostActorSpec Subscribe→SubscribeCmd (COMPLETE)
+
+#### `07e5d505f` — spec fix: expectMsg(Subscribe(…)) → expectMsgType[SubscribeCmd].to; docs `7dfb91c6b`
+- **What:** "return Receipts for block hashes" test in `BlockchainHostActorSpec` was matching Classic `Subscribe(classifier, ref)` but `BlockchainHostActor` sends Typed `SubscribeCmd(classifier, peerEventAdapter)`. Fixed: `expectMsgType[SubscribeCmd].to shouldBe classifier`. Import swapped: `Subscribe` → `SubscribeCmd`.
+- **Result:** 12/12 tests pass; test-only change, no production source edits
 
 ---
 
