@@ -267,20 +267,22 @@ class SyncControllerSpec
       val futureResult =
         PeerRequestHandler.ResponseReceived(peer2, ETHPackets.BlockHeaders(BigInt(0), futureHeaders), 2L)
       implicit val ec = system.dispatcher
-      system.scheduler.scheduleAtFixedRate(0.seconds, 0.5.seconds)(() =>
+      val injectionTask = system.scheduler.scheduleAtFixedRate(0.seconds, 0.5.seconds)(() =>
         fast.toTyped[FastSync.Command] ! FastSync.WrappedPrhResult(futureResult)
       )
 
-      eventually {
-        someTimePasses()
-        storagesInstance.storages.fastSyncStateStorage.getSyncState().get.pivotBlock shouldBe defaultPivotBlockHeader
-      }
+      try {
+        eventually {
+          someTimePasses()
+          storagesInstance.storages.fastSyncStateStorage.getSyncState().get.pivotBlock shouldBe defaultPivotBlockHeader
+        }
 
-      // even though we receive this future headers fast sync should finish
-      eventually {
-        someTimePasses()
-        assert(storagesInstance.storages.appStateStorage.isFastSyncDone())
-      }
+        // even though we receive this future headers fast sync should finish
+        eventually {
+          someTimePasses()
+          assert(storagesInstance.storages.appStateStorage.isFastSyncDone())
+        }
+      } finally injectionTask.cancel()
   }
 
   it should "update pivot block if pivot fail" taggedAs (UnitTest, SyncTest) in withTestSetup(
