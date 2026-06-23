@@ -160,28 +160,26 @@ object FastSync {
 
     // Typed adapters that replace the `ctx.self.toClassic` reply targets previously passed to the Classic-signature
     // collaborators (PivotBlockSelector, SyncStateSchedulerActor). All `messageAdapter` calls share one underlying
-    // ref and dispatch by message class, so passing any single adapter's `.toClassic` routes every registered foreign
+    // ref keyed by message class, so passing any single adapter's `.toClassic` routes every registered foreign
     // message class to the correct `Wrapped*` constructor. Each is registered once here and reused at every spawn site.
+    // The three @annotation.unused adapters below are registration-only: their `messageAdapter` calls are the
+    // load-bearing side effect (they populate the shared class→wrapper routing table). The returned TypedActorRef
+    // values are not referenced directly; `fastSyncClassicSelf` (derived from `pivotResultAdapter`) carries all routes.
     private val pivotResultAdapter: TypedActorRef[PivotBlockSelector.Result] =
       ctx.messageAdapter[PivotBlockSelector.Result](WrappedPivotResult(_))
+    @annotation.unused
     private val pivotFailedAdapter: TypedActorRef[PivotBlockSelector.SelectionFailed.type] =
       ctx.messageAdapter[PivotBlockSelector.SelectionFailed.type](_ => PivotSelectionFailed)
+    @annotation.unused
     private val schedulerResponseAdapter: TypedActorRef[SyncStateSchedulerActor.SyncStateSchedulerActorResponse] =
       ctx.messageAdapter[SyncStateSchedulerActor.SyncStateSchedulerActorResponse](WrappedSchedulerResponse(_))
+    @annotation.unused
     private val stateSyncStatsAdapter: TypedActorRef[SyncStateSchedulerActor.StateSyncStats] =
       ctx.messageAdapter[SyncStateSchedulerActor.StateSyncStats](WrappedStateSyncStats(_))
 
-    /** Single Classic reply target handed to the Classic-signature collaborators. Because all message adapters share
-      * one underlying ref keyed by message class, this one Classic ref delivers `PivotBlockSelector.Result`,
-      * `SelectionFailed`, every `SyncStateSchedulerActorResponse`, and `StateSyncStats` to their respective wrappers.
-      * The other adapter refs (`pivotFailedAdapter`, `schedulerResponseAdapter`, `stateSyncStatsAdapter`) only need to
-      * be *registered* (their `messageAdapter` call mutates the class→wrapper routing table); they are listed here so
-      * the registration is retained and the compiler does not flag them as unused.
-      */
-    private val fastSyncClassicSelf: ActorRef = {
-      val _ = (pivotFailedAdapter, schedulerResponseAdapter, stateSyncStatsAdapter)
-      pivotResultAdapter.toClassic
-    }
+    // Single Classic reply target handed to Classic-signature collaborators. Any adapter's `.toClassic` yields the
+    // same shared underlying ref; `pivotResultAdapter` is chosen arbitrarily as the source.
+    private val fastSyncClassicSelf: ActorRef = pivotResultAdapter.toClassic
 
     private val peerHelper =
       new PeerListHelper(peerEventBus, blacklist, peerDisconnectedAdapter, log, Some(ethRateTracker))
@@ -604,26 +602,23 @@ object FastSync {
             val receipts: Seq[Seq[Receipt]] = {
               import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs.*
               import ETHPackets.TypedTransaction.*
-              import com.chipprbots.ethereum.rlp.{RLPEncodeable, RLPException, RLPValue, rawDecode}
+              import com.chipprbots.ethereum.rlp.{RLPEncodeable, RLPValue, rawDecode}
 
               def expandTypedReceipts(items: Seq[RLPEncodeable]): Seq[RLPEncodeable] =
                 items.flatMap {
                   case v: RLPValue =>
                     val receiptBytes = v.bytes
-                    if receiptBytes.isEmpty then {
-                      throw new RuntimeException("Cannot decode Receipt: empty RLPValue")
-                    }
-                    val first = receiptBytes(0)
-                    // Typed receipt in wire format: RLPValue(typeByte || rlp(payload))
-                    // Expand it to Seq(RLPValue(typeByte), RLPList(payload)) for toTypedRLPEncodables.
-                    if (first & 0xff) < 0x7f && receiptBytes.length > 1 then {
-                      try
-                        Seq(RLPValue(Array(first)), rawDecode(receiptBytes.tail))
-                      catch {
-                        case _: RuntimeException | _: RLPException => Seq(v)
-                      }
-                    } else {
-                      Seq(v)
+                    if receiptBytes.isEmpty then Seq(v)
+                    else {
+                      val first = receiptBytes(0)
+                      // Typed receipt in wire format: RLPValue(typeByte || rlp(payload))
+                      // Expand it to Seq(RLPValue(typeByte), RLPList(payload)) for toTypedRLPEncodables.
+                      // rawDecode may fail on malformed wire data; fall back to passthrough on any failure.
+                      if (first & 0xff) < 0x7f && receiptBytes.length > 1 then
+                        scala.util
+                          .Try(rawDecode(receiptBytes.tail))
+                          .fold(_ => Seq(v), decoded => Seq(RLPValue(Array(first)), decoded))
+                      else Seq(v)
                     }
                   case other => Seq(other)
                 }
@@ -1425,12 +1420,8 @@ object FastSync {
 
     def processSyncing(): Behavior[Command] = {
       session match {
-        case None    => Behaviors.same
+        case None => Behaviors.same
         case Some(s) =>
-          // Accumulator mirrors the Classic "last context.become wins" semantics: the stale-state branch may transition
-          // to waitingForPivotBlockUpdate, then the final block may override it (or keep it). The method returns the
-          // last-decided behavior.
-          var nextBehavior: Behavior[Command] = Behaviors.same
           FastSyncMetrics.measure(s.syncState)
           log.debug(
             "Start of processSyncing: {}",
@@ -1464,26 +1455,30 @@ object FastSync {
           if s.stateSyncRestartRequested && !s.syncState.updatingPivotBlock then {
             updateSession(_.copy(stateSyncRestartRequested = false))
           }
-          // Re-read after potential update
-          session.foreach { s2 =>
-            if s2.stateSyncStarted && !s2.syncState.stateSyncFinished && !s2.stateSyncRestartRequested &&
-              !s2.syncState.updatingPivotBlock
-            then {
-              // Detect stale state root via two signals:
-              // 1. pivotBlockIsStale() — peers are ahead of our pivot
-              // 2. All peers blacklisted — evidence the root expired (peers return empty for this root)
-              val allPeersBlacklisted = peersToDownloadFrom.isEmpty && handshakedPeers.nonEmpty
-              if pivotBlockIsStale() || allPeersBlacklisted then {
-                log.info(
-                  "State root stale (allBlacklisted={}), requesting pivot update for state refresh",
-                  allPeersBlacklisted
-                )
-                s2.syncStateScheduler ! RestartRequested
-                updateSession(_.copy(stateSyncRestartRequested = true))
-                nextBehavior = askForPivotBlockUpdate(ImportedLastBlock)
-              }
+          // Re-read after potential update. Returns Some(pivotUpdateBehavior) if stale, None otherwise.
+          // The stale-state branch may transition to waitingForPivotBlockUpdate; the final block may
+          // override it (or keep it). The method returns the last-decided behavior.
+          val nextBehavior: Behavior[Command] = session
+            .flatMap { s2 =>
+              if s2.stateSyncStarted && !s2.syncState.stateSyncFinished && !s2.stateSyncRestartRequested &&
+                !s2.syncState.updatingPivotBlock
+              then {
+                // Detect stale state root via two signals:
+                // 1. pivotBlockIsStale() — peers are ahead of our pivot
+                // 2. All peers blacklisted — evidence the root expired (peers return empty for this root)
+                val allPeersBlacklisted = peersToDownloadFrom.isEmpty && handshakedPeers.nonEmpty
+                if pivotBlockIsStale() || allPeersBlacklisted then {
+                  log.info(
+                    "State root stale (allBlacklisted={}), requesting pivot update for state refresh",
+                    allPeersBlacklisted
+                  )
+                  s2.syncStateScheduler ! RestartRequested
+                  updateSession(_.copy(stateSyncRestartRequested = true))
+                  Some(askForPivotBlockUpdate(ImportedLastBlock))
+                } else None
+              } else None
             }
-          }
+            .getOrElse(Behaviors.same)
 
           // When blocks are done and state download is mostly complete but can't converge
           // (remaining nodes change every block), declare state done and let regular sync
@@ -1701,19 +1696,16 @@ object FastSync {
 
           // Drain the contiguous run from bestBlockHeaderNumber + 1. Each handleBlockHeaders call may decide a behavior
           // transition; the last decision wins (mirrors the Classic "last context.become wins" semantics).
-          var nextBehavior: Behavior[Command] = Behaviors.same
-          var continue = true
-          while continue do
+          @tailrec def drain(last: Behavior[Command]): Behavior[Command] =
             headerResponseBuffer.headOption match {
               case Some((blockNum, headers))
                   if session.exists(s => blockNum == s.syncState.bestBlockHeaderNumber + 1) =>
                 headerResponseBuffer.remove(blockNum)
-                nextBehavior = handleBlockHeaders(peer, headers)
-              case _ =>
-                continue = false
+                drain(handleBlockHeaders(peer, headers))
+              case _ => last
             }
           enqueueHeadersIfNeeded()
-          nextBehavior
+          drain(Behaviors.same)
       }
 
     private def blockchainDataToDownload: Boolean =
