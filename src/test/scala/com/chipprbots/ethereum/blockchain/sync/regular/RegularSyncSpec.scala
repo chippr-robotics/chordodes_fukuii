@@ -39,6 +39,7 @@ import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
 import com.chipprbots.ethereum.blockchain.sync.regular.RegularSync
 import com.chipprbots.ethereum.consensus.ConsensusAdapter
 import com.chipprbots.ethereum.crypto.kec256
+import com.chipprbots.ethereum.db.storage.StateStorage
 import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.BlockHeaderImplicits.*
 import com.chipprbots.ethereum.ledger.*
@@ -550,37 +551,66 @@ class RegularSyncSpec
         }
       )
 
-      "save fetched node" taggedAs DisabledTest in sync(new Fixture(testSystem) {
-        override lazy val blockchain: BlockchainImpl = stub[BlockchainImpl]
-        override lazy val consensusAdapter: ConsensusAdapter = stub[ConsensusAdapter]
-
-        override lazy val blockchainReader: BlockchainReader = stub[BlockchainReader]
+      "save fetched node" in sync(new Fixture(testSystem) {
         val failingBlock: Block = testBlocksChunked.head.head
+
+        override lazy val blockchainReader: BlockchainReader = new BlockchainReader(
+          storagesInstance.storages.blockHeadersStorage,
+          storagesInstance.storages.blockBodiesStorage,
+          storagesInstance.storages.blockNumberMappingStorage,
+          storagesInstance.storages.stateStorage,
+          storagesInstance.storages.receiptStorage,
+          storagesInstance.storages.appStateStorage,
+          storagesInstance.storages.chainWeightStorage
+        ) {
+          override def getBestBlockNumber: BigInt = BigInt(0)
+          override def getSnapSyncPivotBlock: Option[BigInt] = None
+          override def getBlockHeaderByNumber(number: BigInt): Option[BlockHeader] =
+            Some(BlockHelpers.genesis.header)
+        }
+
+        override lazy val blockchain: BlockchainImpl = BlockchainImpl(storagesInstance.storages, blockchainReader)
+
+        override lazy val consensusAdapter: ConsensusAdapter = new ConsensusAdapter(null, null, null, null, null) {
+          override def evaluateBranchBlock(block: Block)(implicit
+              blockExecutionScheduler: IORuntime,
+              blockchainConfig: BlockchainConfig
+          ): IO[BlockImportResult] =
+            IO.pure(BlockImportFailedDueToMissingNode(new MissingNodeException(failingBlock.hash)))
+
+          override def evaluateBranch(blocks: NonEmptyList[Block])(implicit
+              blockExecutionScheduler: IORuntime,
+              blockchainConfig: BlockchainConfig
+          ): IO[BlockImportResult] =
+            if saveNodeWasCalled then IO.pure(BlockImportedToTop(Nil))
+            else IO.pure(BlockImportFailedDueToMissingNode(new MissingNodeException(failingBlock.hash)))
+        }
+
+        override lazy val branchResolution: BranchResolution = new BranchResolution(blockchainReader) {
+          override def resolveBranch(headers: NonEmptyList[BlockHeader]): BranchResolutionResult =
+            NewBetterBranch(Nil)
+        }
+
         peersClient.setAutoPilot(new PeersClientAutoPilot)
-        override lazy val branchResolution: BranchResolution = stub[BranchResolution]
-        (() => blockchainReader.getBestBlockNumber).when().returns(0)
-        (() => blockchainReader.getSnapSyncPivotBlock).when().returns(None) // no SNAP sync pivot
-        branchResolution.resolveBranch.when(*).returns(NewBetterBranch(Nil)).atLeastOnce()
-        (consensusAdapter
-          .evaluateBranchBlock(_: Block)(_: IORuntime, _: BlockchainConfig))
-          .when(*, *, *)
-          .returns(IO.pure(BlockImportFailedDueToMissingNode(new MissingNodeException(failingBlock.hash))))
 
         var saveNodeWasCalled: Boolean = false
         val nodeData: List[ByteString] = List(ByteString(failingBlock.header.toBytes: Array[Byte]))
-        (() => blockchainReader.getBestBlockNumber).when().returns(0)
-        blockchainReader.getBlockHeaderByNumber.when(*).returns(Some(BlockHelpers.genesis.header))
-        stateStorage.saveNode
-          .when(*, *, *)
-          .onCall { (hash, encoded, totalDifficulty) =>
+
+        override val stateStorage: StateStorage = new StateStorage {
+          override def getBackingStorage(bn: BigInt): com.chipprbots.ethereum.db.storage.MptStorage = ???
+          override def getReadOnlyStorage: com.chipprbots.ethereum.db.storage.MptStorage = ???
+          override def onBlockSave(bn: BigInt, currentBestSavedBlock: BigInt)(f: () => Unit): Unit = ()
+          override def onBlockRollback(bn: BigInt, currentBestSavedBlock: BigInt)(f: () => Unit): Unit = ()
+          override def saveNode(nodeHash: ByteString, nodeEncoded: Array[Byte], bn: BigInt): Unit = {
             val expectedNode = nodeData.head
-
-            hash should be(kec256(expectedNode))
-            encoded should be(expectedNode.toArray)
-            totalDifficulty should be(failingBlock.number)
-
+            nodeHash should be(kec256(expectedNode))
+            nodeEncoded should be(expectedNode.toArray)
+            bn should be(failingBlock.number)
             saveNodeWasCalled = true
           }
+          override def getNode(nodeHash: ByteString): Option[com.chipprbots.ethereum.mpt.MptNode] = None
+          override def forcePersist(reason: StateStorage.FlushSituation): Boolean = true
+        }
 
         regularSync ! SyncProtocol.Start
 
