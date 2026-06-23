@@ -86,9 +86,11 @@ When 5+ entries share a Type or package, open a dedicated sprint:
 
 **Corrected baseline (S5 EYE sweep 2026-06-22):** 777 unnarrowed `TestProbe` sites across 83 test files. Prior entry stated "5 in FastSyncBranchResolverSpec" — that file now has 0 unnarrowed sites (was cleaned in a prior session). The 777 sites are pervasive across SNAP coordinator and network test suites.
 
-Highest-density files: `TrieNodeHealingCoordinatorSpec` (58), `ByteCodeCoordinatorSpec` (56), `AccountRangeCoordinatorSpec` (54), `StorageRangeCoordinatorSpec` (39), `PeerManagerSpec` (32).
+**Progress (§8a-retro batch 3, 2026-06-23):** 25 network/sync specs migrated to `ActorTestKit`; `PeerManagerSpec` (32 sites) migrated. Recount pending — run `grep -rn "org.apache.pekko.testkit.TestProbe\b" src/test/ --include="*.scala" | grep -v "\[" | wc -l` after batch 4 to update floor.
 
-Fix: narrow each `TestProbe` with a `[M]` type parameter matching the expected message type. Pattern selectors on `Any` from untyped probes produce E165 warnings in strict Scala 3. Touches the test harness across 83 specs — route to a dedicated test-harness cleanup sprint rather than inline fixes.
+Remaining highest-density files (all §8a-retro batch 4 scope): `TrieNodeHealingCoordinatorSpec` (58), `ByteCodeCoordinatorSpec` (56), `AccountRangeCoordinatorSpec` (54), `StorageRangeCoordinatorSpec` (39) — 207 sites total; primary batch 4 target.
+
+Fix: narrow each `TestProbe` with a `[M]` type parameter matching the expected message type. Pattern selectors on `Any` from untyped probes produce E165 warnings in strict Scala 3. The coordinator/heal specs require the `HealingTrieFixtures` PropsAdapter fix (§8a-retro batch 4) before they can be migrated. Route remaining non-coordinator files to a dedicated test-harness cleanup sprint after batch 4.
 
 ---
 

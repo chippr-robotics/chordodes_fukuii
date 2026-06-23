@@ -25,6 +25,8 @@ Active findings tracked in `working-docs/CODEBASE-AUDIT.md`.
 | `31c51a7cc` | RegularSync: WormToBrainBar wired in after PrintStatusTick |
 | `c8a1ddbfc` | FastSync: WormToBrainBar wired in (emoji → ASCII → restored via shared utility) |
 | `3c6be4512` | INFO-3/INFO-12 — FastSync scaladoc Behavior[Any]→[Command]; emoji handled via WormToBrainBar |
+| `12c23cf8a` | 8a-retro batch 3 part 1 — 14 specs to ActorTestKit (4 SNAP workers, 5 sync, 3 network, IORuntimeInit) |
+| `a719520db` | 8a-retro batch 3 part 2 — 11 specs + NPMAFake `GetHandshakedPeers`→`GetHandshakedPeersCmd` fix |
 
 **Audit sprint complete.** All 12 prompts (1–10 + 6b + 7b) resolved. Remaining items tracked in
 `CHASE-QUEUE.md` (P1 W17 seal, P2 SyncControllerSpec), `PENDING.md` (P1 FORGE verdict, P2 E165 fix),

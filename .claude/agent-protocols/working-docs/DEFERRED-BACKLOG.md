@@ -628,76 +628,170 @@ were not converted: address in a dedicated test-cleanup sprint (8a-retro).
 
 ---
 
-#### §8a-retro batch 3 — LOOM: TestKit→ActorTestKit for G1-narrowed network/sync actors
+**8a-retro batch 3 — network/sync (G1-narrowed) ✅ DONE** (`12c23cf8a` + `a719520db`). 25 specs migrated.
 
-**Agent:** LOOM (migration) + EYE (verify each file)
-**Risk:** LOW — test files only; no production code changed
-**Prerequisite:** Batch 3 actors must be confirmed Typed (`Behavior[Command]`, not `Behavior[Any]`). G1 sprint narrowed 12 network/sync actors 2026-06-22 (`Behavior[Any]` = 0). All are confirmed Typed.
-**Parallel-safe with Batch E:** YES — modifies `src/test/` only; E1/E2/E3 modify `src/main/`.
+| Commit | Files | Notes |
+|--------|-------|-------|
+| `12c23cf8a` | ByteCode/AccountRange/StorageRange/TrieNodeHealingWorkerSpec, StorageRecoveryActorSpec, BlockBroadcastSpec, SyncStateDownloaderStateSpec, CombinedRecoveryScanActorSpec, BlockFetcherStateSpec, SyncProgressMonitorSpec, ServerActorSpec, PeerEventBusActorSpec, NetworkPeerManagerActorHandshakeSpec, IORuntimeInitializationSpec | 14 specs, part 1 |
+| `a719520db` | StateSyncSpec, StateNodeFetcherSpec, PivotHeaderBootstrapSpec, PivotBlockSelectorSpec, BytecodeRecoveryActorSpec, FastSyncSpec, FastSyncBranchResolverActorSpec, ChainDownloaderSpec, SNAPRequestTrackerSpec, SNAPFakePeerSpec, PeerManagerSpec; also NetworkPeerManagerFake | 11 specs + NPMAFake `GetHandshakedPeers`→`GetHandshakedPeersCmd(replyTo)` fix |
 
-**Established patterns (from batches 1+2 — read before touching anything):**
+**New pitfalls discovered in batch 3 (added to established patterns table above):**
 
 | Issue | Root cause | Fix |
 |-------|-----------|-----|
-| `PatienceConfig` ambiguity | `NormalPatience`/`LongPatience` conflicts with `ScalaTestWithActorTestKit.patience` | Drop patience trait; test kit default (10s) sufficient |
-| `cannot create top-level actor from the outside` | Classic adapter `system.spawnAnonymous(...)` blocked by Typed guardian | Thread `ActorTestKit` as implicit param into fixture; use `actorTestKit.spawn(...)` |
-| `override` error on `def timeout` | `ActorTestKitBase` already declares `def timeout: Timeout` | Add `override` modifier |
-| `system.toTyped.scheduler` invalid | `system` is already `ActorSystem[Nothing]` after CAPSTONE | Change to `system.scheduler` |
-| No `afterAll` → resource leak | `WithActorSystemShutDown` was providing cleanup | `ScalaTestWithActorTestKit` handles shutdown automatically |
+| `system.stop(ref)` on kit-spawned actor | classic `StopChild` sent to Typed guardian → `ClassCastException` → system shutdown | `testKit.stop(typedRef)` |
+| Missing named dispatchers | default kit config lacks `sync-dispatcher`, `account-trie-dispatcher`, etc. | `ScalaTestWithActorTestKit(ConfigFactory.load())` |
+| `must.Matchers` conflicts with kit's `should.Matchers` | E164 on override | Drop `must.Matchers` mixin; use `should.*` throughout |
+| `awaitCond(cond, max, interval, msg)` gone | Classic TestKit method, absent from Typed kit | `eventually(timeout(X), interval(Y)) { assert(cond, msg) }` with `Eventually` + `SpanSugar.*` |
+| `adapter.*` needed for probe-as-typed-param | `TestProbe().ref` passed as typed param; adapter provides implicit conversion | Retain `import org.apache.pekko.actor.typed.scaladsl.adapter.*` in affected files |
 
-**Step 0 — Identify remaining Classic TestKit test files:**
+**Side-find:** `GetHandshakedPeers` → `GetHandshakedPeersCmd(replyTo)` — pre-existing failures in `PivotBlockSelectorSpec` and `FastSyncBranchResolverActorSpec` uncovered during migration (production side already updated; test AutoPilots lagged behind).
+
+**Remaining (blocked — see batches 4 and 5 below):**
+- 14 coordinator/heal specs: `PropsAdapter` child-stop incompatible with Typed `ActorTestKitGuardian` (§8a-retro batch 4)
+- 5 multi-system/`TestActorRef` specs: non-standard lifecycle or Classic-only testing APIs (§8a-retro batch 5)
+- `WithActorSystemShutDown.scala`: still referenced by `PeerActorSpec` + `RLPxConnectionHandlerSpec`; delete after batch 5
+
+---
+
+#### §8a-retro batch 4 — LOOM: coordinator/heal specs (PropsAdapter fixture fix)
+
+**Agent:** LOOM (test migration)
+**Risk:** LOW — test files and shared test fixture only; no production code changed
+**Prerequisite:** None on production code. The coordinator behaviors are already Typed — the blocker is the test fixture.
+**Gate:** Can run any time after batch 3. Recommend running before Wave 3 network sprint to reduce the E165 floor (these 4 files alone account for 187 of the 777 untyped `TestProbe` sites).
+
+**Root cause (batch 3 discovery):**
+`HealingTrieFixtures.coordinatorProps` returns `Props` via `PropsAdapter`. Specs call `system.actorOf(props)` to spawn coordinators. Under the Typed `ActorTestKitGuardian`, when the PropsAdapter bridge actor stops a child it sends classic `StopChild` to the guardian which only accepts `TestKitCommand` → `ClassCastException` → whole-system shutdown → cascade of `cannot create children while terminating`. The same crash surfaces in the 4 direct coordinator specs that call `system.actorOf(PropsAdapter(...))` without `HealingTrieFixtures`.
+
+**Fix strategy:**
+Update `HealingTrieFixtures` to accept an implicit `ActorTestKit` and spawn coordinators via `testKit.spawn(behavior, name)` directly. The coordinator behaviors are already `Behavior[Command]` — no PropsAdapter is needed once the test kit supplies the typed system. The 4 direct coordinator specs similarly replace `system.actorOf(PropsAdapter(...))` with `testKit.spawn(...)`.
+
+**Files to migrate (14):**
+
+*4 direct coordinator specs:*
+- `snap/actors/AccountRangeCoordinatorSpec.scala` — 20 `actorOf` sites; heaviest fixture use
+- `snap/actors/ByteCodeCoordinatorSpec.scala` — 22 `actorOf` sites
+- `snap/actors/StorageRangeCoordinatorSpec.scala` — 14 `actorOf` sites; `BehaviorTestKit` white-box helper also present — assess separately
+- `snap/actors/TrieNodeHealingCoordinatorSpec.scala` — 26 `actorOf` sites; heaviest `HealingTrieFixtures` usage
+
+*10 heal family specs (route through `HealingTrieFixtures.coordinatorProps`):*
+- `snap/actors/DecoupledHealObservabilitySpec.scala`
+- `snap/actors/DecoupledHealSafetySpec.scala`
+- `snap/actors/DecoupledHealServeRootSpec.scala`
+- `snap/actors/ScopedVerificationObservabilitySpec.scala`
+- `snap/actors/ScopedVerificationParitySpec.scala`
+- `snap/actors/ScopedVerificationFallbackSpec.scala`
+- `snap/actors/TrieNodeHealingScopedVerificationSpec.scala`
+- `snap/actors/TrieNodeHealingScopeCaptureSpec.scala`
+- `snap/actors/HealingFrontierResumeSpec.scala`
+- `snap/actors/RebuildFrontierBfsMultiSeedSpec.scala`
+
+**Step 0 — Locate fixture and confirm remaining Classic files:**
 ```bash
-# Files still using Classic TestKit that test Typed actors (network/sync)
+grep -rn "coordinatorProps\|HealingTrieFixtures" src/test/ --include="*.scala" -l
 grep -rn "org.apache.pekko.testkit.TestKit\b" src/test/ --include="*.scala" -l \
   | grep -v "ActorTestKit"
-
-# Confirm Behavior[Any] = 0 in production (G1 complete)
-grep -rn "Behavior\[Any\]" src/main/ --include="*.scala" | grep -v "//"
 ```
 
-**Step 1 — Map each test file to its production actor:**
-For each file returned by Step 0, read its `extends TestKit(ActorSystem(...))` constructor and identify the actor(s) under test. Skip files where the production actor is still Classic (unmigtrated — those belong to their LOOM wave, not retro).
+**Step 1 — Read `HealingTrieFixtures` first:**
+Understand `coordinatorProps` signature, what parameters it takes, and how each of the 10 heal specs uses it. Map the refactor scope before touching anything.
 
-Only migrate test files where ALL production actors they test are confirmed Typed.
+**Step 2 — Update `HealingTrieFixtures`:**
+Change `coordinatorProps` from `Props` (PropsAdapter) to `(implicit testKit: ActorTestKit): ActorRef[Command]`. Spawn via `testKit.spawn(behavior, name)`. Where the fixture also builds child actors via PropsAdapter, switch those to `testKit.spawn(childBehavior)`. Compile after this change alone before touching any spec.
 
-**Step 2 — Migrate one file at a time:**
-For each eligible file:
-1. Replace `extends TestKit(ActorSystem(...))` with `extends ScalaTestWithActorTestKit`
-2. Replace `system.spawn(...)` with `testKit.spawn(...)` where needed
-3. Replace `TestProbe()` (untyped) with `TestProbe[MessageType]()` (typed) — unlocks 777-site E165 reduction
-4. Replace `fishForMessage { case T => true }` with `expectMessageType[T]` on typed probe
-5. For `system.toClassic` needs (Pekko HTTP, raw scheduler): preserve via `testKit.system.classicSystem`
-6. `sbt compile-all` after each file; `sbt "testOnly *<SpecName>*"` to confirm passes
+**Step 3 — Migrate 4 direct coordinator specs:**
+For each: replace `extends TestKit(ActorSystem(...))` → `extends ScalaTestWithActorTestKit(ConfigFactory.load())`. Replace `system.actorOf(PropsAdapter(behavior))` → `testKit.spawn(behavior)`. Replace untyped `TestProbe()` → `TestProbe[MessageType]()` — this is the highest-value E165 reduction opportunity in the codebase (TNHC=58, ByteCode=56, AccountRange=54, StorageRange=39).
 
-**Step 3 — Commit per file (or per logical group):**
-Format: `test(8a-retro): migrate <SpecName> to ActorTestKit — N/N tests`
+**Step 4 — Migrate 10 heal family specs:**
+Each becomes a standard batch 1+2+3 migration once the fixture is updated. Migrate one at a time: replace `extends TestKit` → `extends ScalaTestWithActorTestKit(ConfigFactory.load())`, `system.spawn` → `testKit.spawn`, drop `WithActorSystemShutDown`. Compile + `testOnly` after each.
+
+**Step 5 — Replace `fishForMessage` with `expectMessageType[T]`:**
+These specs collectively have the highest `fishForMessage` density. After migrating probes to typed, replace all `fishForMessage { case T => true }` with `probe.expectMessageType[T]`.
 
 **Verification:**
 ```bash
 sbt compile-all
-# Confirm test count for migrated specs:
-sbt "testOnly *<SpecName>*"
-# Run full baseline:
-./local/scripts/fukuii-test
-# Confirm 3,595+ tests, 0 failures (count grows as Classic TestProbe[T] migration unlocks E165 sites)
+sbt "testOnly *CoordinatorSpec* *HealSpec* *Scoped* *Frontier* *Rebuild* *Decoupled*"
+./local/scripts/fukuii-test  # confirm 3,595+ tests, 0 failures
 ```
 
-**MANDATORY final step — complete IN THIS ORDER:**
-1. `sbt scalafmtAll` — format all modules after all migrations
-2. `git add <test-spec files modified>` — stage only the migrated test files (never `git add .`)
-3. `git commit -m "test(8a-retro): migrate Classic TestKit → ActorTestKit — N specs, M tests"`
-4. `SHA=$(git rev-parse --short HEAD)` — capture exact SHA; use it in all entries below
-5. Update run-order table in this file: strikethrough E4 → `| ~~E4~~ | ~~Batch E~~ | ~~DEFERRED §8a-retro batch 3~~ | ✅ DONE [date] — N specs migrated, $SHA |`
-6. Add each commit to `completed/SPRINT-QUEUE.md`: `| $SHA | 8a-retro batch 3 — N specs migrated to ActorTestKit |`
+**MANDATORY final step — IN THIS ORDER:**
+1. `sbt scalafmtAll`
+2. `git add <HealingTrieFixtures + all 14 spec files>` (never `git add .`)
+3. `git commit -m "test(8a-retro): migrate coordinator/heal specs to ActorTestKit — 14 specs, N tests"`
+4. `SHA=$(git rev-parse --short HEAD)`
+5. Strikethrough E5 in run-order table; add `| $SHA | 8a-retro batch 4 — 14 coordinator/heal specs |` to `SPRINT-QUEUE.md`
+6. Update CHASE-QUEUE.md E165 note: TNHC/ByteCode/AccountRange/StorageRange are now migrated; recount untyped `TestProbe` sites
 7. Update `fukuii-test-timing.md` if test count changed
-8. `git add .claude/` → `git commit -m "docs(8a-retro): clearout — $SHA"`
-9. DELETE this section
+8. `git add .claude/` → `git commit -m "docs(8a-retro): clearout batch 4 — $SHA"`
+9. **DELETE this section**
 
 **Rejection criteria:**
-- Migrating a test file whose production actor is NOT yet Typed (still `extends Actor`)
-- Weakening test assertions during the migration
-- Removing `fishForMessage` without providing typed-probe equivalent
-- Bundling with production code changes
+- Changing any production actor behavior
+- Using `system.actorOf(PropsAdapter(...))` in any migrated spec
+- Leaving `fishForMessage` without a typed `expectMessageType[T]` replacement
+- Bundling production code changes with test fixture changes
+
+---
+
+#### §8a-retro batch 5 — LOOM: multi-system and TestActorRef specs
+
+**Agent:** LOOM (assessment + selective migration)
+**Risk:** MEDIUM — non-standard lifecycle patterns; assess feasibility per file before migrating
+**Prerequisite:** Batch 4 complete. After batch 4, these 5 files are all that remain of Classic TestKit.
+**Gate:** `PeerActorSpec` and `RLPxConnectionHandlerSpec` are hard-blocked until Wave 3 migrates their production actors.
+
+**Files (5) — assess each independently:**
+
+| File | Current pattern | Assessment |
+|------|----------------|------------|
+| `regular/RegularSyncSpec.scala` | `WordSpecBase` + `Resource[IO, ActorSystem]` (31 tests) | ASSESS: multi-system Cats Effect Resource; migration requires restructuring resource lifecycle. May prefer deferring to Wave 3 when `RegularSync` itself migrates |
+| `regular/BlockFetcherSpec.scala` | `AnyFreeSpecLike` + per-fixture `ActorTestKit(as.toTyped)` (already Typed internally) | LOW EFFORT: already wraps Typed — only remaining Classic touch is the `as.toTyped` creation. Replace outer `as` with a direct `ScalaTestWithActorTestKit` kit |
+| `transactions/PendingTransactionsManagerSpec.scala` | `AnyFlatSpec` + `List[ActorSystem]` — manual per-test system lifecycle | ASSESS: if systems are independent per test, replace `List[ActorSystem]` with per-test `ScalaTestWithActorTestKit` via `withActorTestKit(config) { kit => ... }` |
+| `network/p2p/PeerActorSpec.scala` | `TestActorRef(PropsAdapter(...))` × 4 | HARD BLOCKED: `TestActorRef` is Classic-only; no Typed equivalent. Wait for Wave 3 PeerActor migration |
+| `network/rlpx/RLPxConnectionHandlerSpec.scala` | `TestActorRef(PropsAdapter(...), parent.ref)` | HARD BLOCKED: Classic parent-injection; no Typed equivalent. Wait for Wave 3 |
+
+**Step 0 — Confirm remaining Classic files after batch 4:**
+```bash
+grep -rn "org.apache.pekko.testkit.TestKit\b\|TestActorRef" src/test/ --include="*.scala" -l \
+  | grep -v "ActorTestKit"
+# Expected: exactly the 5 files above
+```
+
+**Step 1 — Migrate `BlockFetcherSpec` (LOW EFFORT):**
+Read the spec. The per-fixture `ActorTestKit(as.toTyped)` creation can be replaced: extend `ScalaTestWithActorTestKit(ConfigFactory.load())` and use `testKit` directly. Compile + `testOnly *BlockFetcherSpec*`.
+
+**Step 2 — Assess and migrate `PendingTransactionsManagerSpec`:**
+Read the spec. If `List[ActorSystem]` entries are truly independent per test case (no cross-system message passing), replace with `withActorTestKit(ConfigFactory.load()) { testKit => ... }` around each `it` block. If systems share state across tests, defer to Wave 3.
+
+**Step 3 — Assess and migrate `RegularSyncSpec`:**
+Read the `Resource[IO, ActorSystem]` lifecycle. If cleanly replaceable with `ScalaTestWithActorTestKit`, migrate. If the Cats Effect resource lifecycle is load-bearing (e.g., error handling, cleanup ordering), defer to Wave 3 (when `RegularSync` itself becomes a Typed actor and the test can be rewritten from scratch).
+
+**Step 4 — Skip `PeerActorSpec` and `RLPxConnectionHandlerSpec`:**
+Add a comment at the top of each: `// §8a-retro batch 5: DEFERRED — TestActorRef requires Classic-only API; migrate when PeerActor/RLPxConnectionHandler are Typed (Wave 3 network sprint)`.
+
+**Step 5 — Delete `WithActorSystemShutDown.scala` if no remaining references:**
+```bash
+grep -rn "WithActorSystemShutDown" src/test/ --include="*.scala"
+```
+If only `PeerActorSpec` and `RLPxConnectionHandlerSpec` reference it (both deferred to Wave 3), leave it — it will be deleted as part of those migrations. If zero references remain, `git rm` it now.
+
+**MANDATORY final step — IN THIS ORDER:**
+1. `sbt scalafmtAll`
+2. `git add <migrated test files>` (never `git add .`)
+3. `git commit -m "test(8a-retro): migrate multi-system specs — N specs, M deferred to Wave 3"`
+4. `SHA=$(git rev-parse --short HEAD)`
+5. Strikethrough E6 in run-order table; add to `SPRINT-QUEUE.md`
+6. If `WithActorSystemShutDown.scala` deleted: include in same commit; note in commit message
+7. Update `fukuii-test-timing.md` if test count changed
+8. `git add .claude/` → `git commit -m "docs(8a-retro): clearout batch 5 — $SHA"`
+9. **DELETE this section**
+
+**Rejection criteria:**
+- Migrating `PeerActorSpec` or `RLPxConnectionHandlerSpec` before production actors are Typed
+- Using `TestActorRef` or `PropsAdapter` in newly migrated test files
+- Deleting `WithActorSystemShutDown.scala` while it still has references in any test file
 
 ---
 
@@ -1036,6 +1130,9 @@ Each prompt can run independently. Commit individually.
 | ~~C4~~ | ~~Batch C step 4~~ | ~~P4 MITHRIL/EYE E165 sprint — expectMsgType[Any]~~ | ✅ DONE 2026-06-22 — `8cdf1290d` — 20 sites → 0; 777 TestProbe metric + 20 fishForMessage sites §8a-gated (see §8a research prompt) |
 | ~~D3~~ | ~~Batch D~~ | ~~P7 EYE test timing audit~~ | ✅ DONE 2026-06-22 — 680s (11m 20s) baseline, 3,595 tests, 0 code changes; both Thread.sleep sites defer to §8a; all wall-clock bounds safe. Note: captured pre-Batch-D; rerun after G1/G2 if test count grows. |
 | ~~E3~~ | ~~Batch E~~ | ~~§3h — Any type signature cleanup~~ | ✅ DONE 2026-06-22 — 0 types changed; 15 sites documented `// Any:`; 7 FORGE-gated (vm/domain/ledger); compile clean |
+| ~~E4~~ | ~~Batch E~~ | ~~§8a-retro batch 3 — 25 network/sync specs~~ | ✅ DONE 2026-06-23 — `12c23cf8a` (14 specs) + `a719520db` (11 specs + NPMAFake fix) |
+| E5 | Batch E | §8a-retro batch 4 — 14 coordinator/heal specs (PropsAdapter fixture fix) | No — HealingTrieFixtures → 4 coordinator specs → 10 heal specs in order |
+| E6 | Batch E | §8a-retro batch 5 — multi-system + TestActorRef specs (3 assessable, 2 Wave 3 gate) | Partial — BlockFetcherSpec + PendingTxMgr + RegularSyncSpec assessable now; PeerActor + RLPx wait for Wave 3 |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
 
