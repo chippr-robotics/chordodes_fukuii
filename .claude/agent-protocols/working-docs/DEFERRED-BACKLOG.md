@@ -653,70 +653,6 @@ were not converted: address in a dedicated test-cleanup sprint (8a-retro).
 
 ---
 
-
-#### §8a-infra-b — Audit and fix worker teardown leaks in coordinator/heal specs
-
-**Agent:** EYE (investigate) → LOOM (fix, test-only)
-**Risk:** LOW — test teardown only; no production code changed
-**Prerequisite:** §8a-retro batch 4 complete (`5eae34c21`)
-**Gate:** Run any time. Resource leaks in test teardown don't cause test failures but inflate system-under-test state between tests and may cause intermittent failures on slow machines.
-
-**Background (batch 4 finding):**
-`testKit.stop(ref)` only terminates `ActorRef` values returned by `testKit.spawn(...)`. Coordinator specs spawn the coordinator via `testKit.spawn(behavior)` (now correct), but coordinators internally spawn workers via classic `context.actorOf(...)`. Tests that obtain references to those workers via `actorSelection` get classic `ActorRef` values. `testKit.stop(classicWorkerRef)` is a silent no-op — workers remain running until the testkit system shuts down after the full suite.
-
-This is a resource leak, not a correctness bug. However, leaked workers from one test case can interfere with the next if they share state (unlikely for SNAP workers but worth confirming).
-
-**Step 1 — Identify specs with explicit worker stop calls:**
-```bash
-cd /media/dev/2tb/dev/fukuii
-grep -rn "testKit.stop\|system.stop\|classicSystem.stop\|actorSelection" \
-  src/test/scala/com/chipprbots/ethereum/blockchain/sync/snap/actors/ \
-  --include="*.scala" | grep -v "//.*stop" | head -40
-```
-Note which specs call `testKit.stop` on actors they did NOT spawn via `testKit.spawn` — those are the silent no-ops.
-
-**Step 2 — For each spec with classic worker refs, add proper teardown:**
-In each `afterEach` or `afterAll` (or within the test body), replace:
-```scala
-// WRONG — silent no-op for classic-resolved worker:
-testKit.stop(workerRef)
-```
-with:
-```scala
-// CORRECT — stop classic child via classic system:
-testKit.system.classicSystem.stop(workerRef)
-```
-
-If the spec has no explicit worker teardown at all and coordinators clean up their own children on stop, that is acceptable — verify by reading the coordinator's `PostStop` handler to confirm it stops workers.
-
-**Step 3 — Confirm no test isolation regressions:**
-Run the coordinator suite twice back-to-back in the same JVM to expose any cross-test actor state:
-```bash
-cd /media/dev/2tb/dev/fukuii
-sbt "testOnly *CoordinatorSpec* *HealSpec* *Scoped* *Frontier* *Rebuild* *Decoupled*; testOnly *CoordinatorSpec* *HealSpec* *Scoped* *Frontier* *Rebuild* *Decoupled*"
-```
-
-**Verification:**
-```bash
-sbt compile-all
-./local/scripts/fukuii-test  # confirm 3,595+ tests, 0 failures
-```
-
-**MANDATORY final step — IN THIS ORDER:**
-1. `sbt scalafmtAll`
-2. `git add <affected spec files>` (never `git add .`)
-3. `git commit -m "test(8a-infra-b): fix worker teardown leaks in coordinator/heal specs — classicSystem.stop for classic worker refs"`
-4. `SHA=$(git rev-parse --short HEAD)`
-5. `git add .claude/` → `git commit -m "docs(8a-infra-b): clearout worker teardown prompt — $SHA"`
-6. **DELETE this section**
-
-**Rejection criteria:**
-- Changing any coordinator production behavior (e.g., PostStop handlers)
-- Stopping workers that the coordinator itself owns cleanup for (double-stop)
-- Any change to `src/main/`
-
----
-
 #### §8a-retro batch 4b — MITHRIL: E165 TestProbe narrowing in coordinator/heal specs
 
 **Agent:** MITHRIL (Scala 3 modernization)
@@ -774,6 +710,49 @@ sbt "testOnly *CoordinatorSpec* *HealSpec* *Scoped* *Frontier* *Rebuild* *Decoup
 - Using `TestProbe[Any]` as a shortcut (defeats the purpose)
 - Leaving `fishForMessage` where `expectMessageType[T]` is viable
 - Bundling production code changes with probe narrowing
+
+---
+
+#### §8a-infra-c — MITHRIL: replace classic `actorSelection` worker-ref pattern with Typed TestProbe injection in ByteCodeCoordinatorSpec + AccountRangeCoordinatorSpec
+
+**Agent:** MITHRIL (Scala 3 / Typed modernization)
+**Risk:** LOW — test files only; no production code changed
+**Prerequisite:** §8a-retro batch 4 complete (`5eae34c21`)
+**Gate:** Run any time after E5d.
+
+**Background (E5c audit finding, 2026-06-23):**
+Two coordinator specs obtain worker refs via `classicSystem.actorSelection(coordinator.path / "*").resolveOne(3.seconds)`, returning classic `org.apache.pekko.actor.ActorRef`. These refs are then used to:
+- Send typed worker commands via classic `!` (e.g. `workerRef ! AccountRangeCoordinator.WorkerPeerDisconnected(...)`)
+- Simulate worker death via `classicSystem.stop(workerRef)` (test scenario — intentional, not teardown)
+
+The pattern works (the Typed workers are visible in the classic hierarchy), but it ties the test to `classicSystem.actorSelection` and an untyped ref. A cleaner approach:
+- Replace `resolveWorkerChild` with a `TestProbe[W]` injected as the worker factory (if the coordinator accepts a worker-factory override), OR
+- Convert to `toClassic`/`toTyped` ref bridging after spawn where both specs can hold a `ActorRef[Worker.Command]` directly
+
+This is cosmetic test-quality work; the existing pattern is correct and not a source of leaks or flakiness.
+
+**Files:**
+- `ByteCodeCoordinatorSpec.scala` — `resolveWorkerChild` at line 71; `classicSystem.stop(workerRef)` at lines 743, 779
+- `AccountRangeCoordinatorSpec.scala` — `resolveWorkerChild` at line 70; classic `!` sends at lines 365, 544, 591
+
+**Step 1 — Read each coordinator's worker spawn API:**
+Check `ByteCodeCoordinator` and `AccountRangeCoordinator` for whether a worker-factory override (`workerFactory: (context, ...) => ActorRef[Worker.Command]`) can be injected without modifying production behavior. If the factory is `private`, the injection approach requires a minimal production change (adding a `protected` hook); assess whether that's acceptable.
+
+**Step 2 — If injection is viable:** Replace `resolveWorkerChild` with an injected `TestProbe[Worker.Command]` factory. The test controls the ref from spawn time, eliminating `actorSelection` entirely.
+
+**Step 3 — If injection is not viable:** Document why and convert the `actorSelection` result to a Typed ref via `.toTyped[Worker.Command]` (after confirming the worker's `Command` supertype) so at least the send-side is typed.
+
+**Verification:**
+```bash
+sbt compile-all
+sbt "testOnly *ByteCodeCoordinatorSpec* *AccountRangeCoordinatorSpec*"
+./local/scripts/fukuii-test
+```
+
+**Rejection criteria:**
+- Changing production actor behavior or `private` visibility
+- Introducing a worker-factory parameter that changes the non-test code path
+- Any change to `src/main/` beyond a minimal `protected` hook if injection is chosen
 
 ---
 
@@ -1115,8 +1094,9 @@ Each prompt can run independently. Commit individually.
 | ~~E4~~ | ~~Batch E~~ | ~~§8a-retro batch 3 — 25 network/sync specs~~ | ✅ DONE 2026-06-23 — `12c23cf8a` (14 specs) + `a719520db` (11 specs + NPMAFake fix) |
 | ~~E5~~ | ~~Batch E~~ | ~~§8a-retro batch 4 — 14 coordinator/heal specs (PropsAdapter fixture fix)~~ | ✅ DONE 2026-06-23 — `5eae34c21` (14 specs + HealingTrieFixtures to ActorTestKit, 135 tests) |
 | ~~E5b~~ | ~~Batch E~~ | ~~§8a-infra — create `application-test.conf` (bare ctor fix + `throughput=1`)~~ | ✅ DONE 2026-06-23 — `8b9bef67d` |
-| E5c | Batch E | §8a-infra-b — audit + fix worker teardown leaks in coordinator/heal specs | No — EYE audit first; LOOM fixes |
+| ~~E5c~~ | ~~Batch E~~ | ~~§8a-infra-b — audit + fix worker teardown leaks in coordinator/heal specs~~ | ✅ DONE 2026-06-23 — `781c8e985` — no leaks; workers are Typed `spawnAnonymous` children, stopped by hierarchy; 150/150 ×2 |
 | E5d | Batch E | §8a-retro batch 4b — E165 TestProbe narrowing in coordinator/heal specs (~209 sites) | No — one spec at a time; MITHRIL; run after E5b |
+| E5e | Batch E | §8a-infra-c — MITHRIL: replace classic `actorSelection` worker-ref pattern with Typed injection in ByteCodeCoordinatorSpec + AccountRangeCoordinatorSpec | No — cosmetic; run after E5d |
 | E6 | Batch E | §8a-retro batch 5 — multi-system + TestActorRef specs (3 assessable, 2 Wave 3 gate) | Partial — BlockFetcherSpec + PendingTxMgr + RegularSyncSpec assessable now; PeerActor + RLPx wait for Wave 3 |
 | ~~F1~~ | ~~Batch F~~ | ~~§3i MITHRIL+FORGE — BlockExecutionError hierarchy redesign: union type + `describe`~~ | ✅ DONE 2026-06-23 — `64ab4786e` |
 
