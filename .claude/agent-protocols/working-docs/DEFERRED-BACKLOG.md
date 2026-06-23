@@ -653,93 +653,6 @@ were not converted: address in a dedicated test-cleanup sprint (8a-retro).
 
 ---
 
-#### §8a-infra — Create `application-test.conf` so bare `ScalaTestWithActorTestKit()` ctor works
-
-**Agent:** Any (trivial — one new file)
-**Risk:** NONE — test-only resource file, no production code, no existing file replaced
-**Prerequisite:** None
-**Gate:** Run any time. Unblocks removing `ConfigFactory.load()` from all migrated specs.
-
-**Background (batch 4 finding):**
-`ScalaTestWithActorTestKit()` (bare ctor, no args) calls `ActorTestKit.apply(name)` which uses `ActorTestKit.defaultConfig`. That config loads only from `reference.conf` (bundled in the Pekko testkit jar — provides timeout defaults, `single-expect-default = 3s`, etc.) plus a `throughput = 1` override. It does **not** load `src/test/resources/application.conf`. As a result, any actor spawned with `withDispatcherFromConfig("sync-dispatcher")` throws `ConfigurationException: Dispatcher [sync-dispatcher] not configured` at test time.
-
-Current workaround across all §8a-retro batch 4 specs: `ScalaTestWithActorTestKit(ConfigFactory.load())` which explicitly loads `application.conf`.
-
-The clean fix: create `application-test.conf` so the bare ctor finds it on the classpath and loads both custom dispatchers AND the standard Pekko test throughput setting.
-
-**Verified reference.conf from `pekko-actor-testkit-typed_3-1.1.5.jar`:**
-```hocon
-pekko.actor.testkit.typed {
-  timefactor = 1.0
-  single-expect-default = 3s
-  expect-no-message-default = 100ms
-  default-timeout = 5s
-  system-shutdown-default = 10s
-  throw-on-shutdown-timeout = true
-  filter-leeway = 3s
-}
-```
-These are always loaded from the jar — `application-test.conf` does not need to repeat them.
-
-**Target file content — `src/test/resources/application-test.conf`:**
-```hocon
-# application-test.conf — loaded by ScalaTestWithActorTestKit() bare ctor.
-# Includes full test configuration so no ConfigFactory.load() workaround is needed.
-
-include "application.conf"
-
-# Pekko's recommended setting for test dispatchers: process one message at a time
-# for more deterministic concurrency in tests. ActorTestKit.defaultConfig sets this,
-# but it is NOT inherited when application-test.conf is present — must be explicit.
-pekko.actor.default-dispatcher.throughput = 1
-```
-
-**Step 1 — Create the file:**
-```bash
-cat > /media/dev/2tb/dev/fukuii/src/test/resources/application-test.conf << 'EOF'
-# application-test.conf — loaded by ScalaTestWithActorTestKit() bare ctor.
-# Includes full test configuration so no ConfigFactory.load() workaround is needed.
-
-include "application.conf"
-
-# Pekko's recommended setting for test dispatchers: process one message at a time
-# for more deterministic concurrency in tests. ActorTestKit.defaultConfig sets this,
-# but it is NOT inherited when application-test.conf is present — must be explicit.
-pekko.actor.default-dispatcher.throughput = 1
-EOF
-```
-
-**Step 2 — Verify it fixes the problem (run a coordinator spec with the bare ctor):**
-Temporarily change one `ConfigFactory.load()` spec to bare ctor, compile + run, confirm no `ConfigurationException`, then revert if you decide not to do step 3 yet.
-
-**Step 3 (optional) — Strip `ConfigFactory.load()` from batch 4 specs:**
-```bash
-grep -rn "ScalaTestWithActorTestKit(com.typesafe.config.ConfigFactory.load())\|ScalaTestWithActorTestKit(ConfigFactory.load())" src/test/ --include="*.scala" -l
-```
-For each file (except `PivotBlockSelectorSpec` which uses `ConfigFactory.load("explicit-scheduler")` — leave that one): replace `ScalaTestWithActorTestKit(ConfigFactory.load())` → `ScalaTestWithActorTestKit()`. Compile + run the targeted suite.
-
-**Step 4 — Confirm full suite green:**
-```bash
-cd /media/dev/2tb/dev/fukuii
-sbt compile-all
-./local/scripts/fukuii-test  # confirm 3,595+ tests, 0 failures
-```
-
-**MANDATORY final step — IN THIS ORDER:**
-1. `sbt scalafmtAll`
-2. `git add src/test/resources/application-test.conf` (+ any spec cleanups from step 3)
-3. `git commit -m "test(infra): add application-test.conf — bare ScalaTestWithActorTestKit() ctor now loads sync-dispatcher"`
-4. `SHA=$(git rev-parse --short HEAD)`
-5. Update CHASE-QUEUE.md P14 note: bare ctor pitfall resolved
-6. `git add .claude/` → `git commit -m "docs(8a-infra): clearout application-test.conf prompt — $SHA"`
-7. **DELETE this section**
-
-**Rejection criteria:**
-- Removing `explicit-scheduler.conf` or changing specs that depend on it (`PivotBlockSelectorSpec`)
-- Overriding testkit timeout values (let the jar's `reference.conf` provide defaults)
-- Any change to `src/main/` or production config files
-
----
 
 #### §8a-infra-b — Audit and fix worker teardown leaks in coordinator/heal specs
 
@@ -1261,7 +1174,7 @@ Each prompt can run independently. Commit individually.
 | ~~E3~~ | ~~Batch E~~ | ~~§3h — Any type signature cleanup~~ | ✅ DONE 2026-06-22 — 0 types changed; 15 sites documented `// Any:`; 7 FORGE-gated (vm/domain/ledger); compile clean |
 | ~~E4~~ | ~~Batch E~~ | ~~§8a-retro batch 3 — 25 network/sync specs~~ | ✅ DONE 2026-06-23 — `12c23cf8a` (14 specs) + `a719520db` (11 specs + NPMAFake fix) |
 | ~~E5~~ | ~~Batch E~~ | ~~§8a-retro batch 4 — 14 coordinator/heal specs (PropsAdapter fixture fix)~~ | ✅ DONE 2026-06-23 — `5eae34c21` (14 specs + HealingTrieFixtures to ActorTestKit, 135 tests) |
-| E5b | Batch E | §8a-infra — create `application-test.conf` (bare ctor fix + `throughput=1`) | No |
+| ~~E5b~~ | ~~Batch E~~ | ~~§8a-infra — create `application-test.conf` (bare ctor fix + `throughput=1`)~~ | ✅ DONE 2026-06-23 — `8b9bef67d` |
 | E5c | Batch E | §8a-infra-b — audit + fix worker teardown leaks in coordinator/heal specs | No — EYE audit first; LOOM fixes |
 | E5d | Batch E | §8a-retro batch 4b — E165 TestProbe narrowing in coordinator/heal specs (~209 sites) | No — one spec at a time; MITHRIL; run after E5b |
 | E6 | Batch E | §8a-retro batch 5 — multi-system + TestActorRef specs (3 assessable, 2 Wave 3 gate) | Partial — BlockFetcherSpec + PendingTxMgr + RegularSyncSpec assessable now; PeerActor + RLPx wait for Wave 3 |

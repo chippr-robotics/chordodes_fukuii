@@ -422,7 +422,7 @@ include "application.conf"
 pekko.actor.default-dispatcher.throughput = 1
 ```
 
-**Workaround until §8a-infra is done:** `extends ScalaTestWithActorTestKit(ConfigFactory.load())`
+**Fixed in `8b9bef67d` (2026-06-23):** `src/test/resources/application-test.conf` created; `ConfigFactory.load()` stripped from 25 specs. Bare ctor now works.
 
 ---
 
