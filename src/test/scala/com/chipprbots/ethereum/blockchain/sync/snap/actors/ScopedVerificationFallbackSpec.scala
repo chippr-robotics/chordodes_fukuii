@@ -8,17 +8,19 @@ import java.util.concurrent.TimeUnit
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
 
+import org.apache.pekko.actor.testkit.typed.scaladsl.FishingOutcomes
+import org.scalatest.concurrent.Eventually
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.blockchain.sync.snap.*
 import com.chipprbots.ethereum.crypto.kec256
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.db.dataSource.RocksDbConfig
 import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource
 import com.chipprbots.ethereum.db.storage.HealingFrontierStorage
@@ -47,11 +49,14 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   * F3 (restart-lost / empty set) is structurally an empty set, the same fallback F4 exercises (over-bound latches the
   * set empty); a true restart-lost set is covered by the resume/restart path and the data-model lifecycle.
   */
-class ScopedVerificationFallbackSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers {
+class ScopedVerificationFallbackSpec
+    extends ScalaTestWithActorTestKit()
+    with AnyFlatSpecLike
+    with Matchers
+    with Eventually {
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
-  private val awaiter = org.apache.pekko.testkit.TestProbe()
 
   private def gaugeValue(name: String): Double = {
     val gauge = Metrics.get().registry.find(name).gauge()
@@ -78,11 +83,13 @@ class ScopedVerificationFallbackSpec extends ScalaTestWithActorTestKit() with An
     ()
   }
 
-  private def awaitStateHealingComplete(controller: TestProbe): Unit =
+  private def awaitStateHealingComplete(
+      controller: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
+  ): Unit =
     controller.fishForMessage(10.seconds) {
-      case SNAPSyncController.StateHealingComplete   => true
-      case _: SNAPSyncController.ProgressNodesHealed => false
-      case _                                         => false
+      case SNAPSyncController.StateHealingComplete   => FishingOutcomes.complete
+      case _: SNAPSyncController.ProgressNodesHealed => FishingOutcomes.continueAndIgnore
+      case _                                         => FishingOutcomes.continueAndIgnore
     }
 
   /** Build a marker-backed fixture with a present complete root and configurable scoped settings. */
@@ -91,7 +98,12 @@ class ScopedVerificationFallbackSpec extends ScalaTestWithActorTestKit() with An
       maxPaths: Int,
       markComplete: Boolean
   )(
-      body: (ActorRef[TrieNodeHealingCoordinator.Command], HealingFrontierStorage, TestProbe, ByteString) => Unit
+      body: (
+          ActorRef[TrieNodeHealingCoordinator.Command],
+          HealingFrontierStorage,
+          org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command],
+          ByteString
+      ) => Unit
   ): Unit = {
     val pool = Executors.newSingleThreadExecutor()
     val ec = ExecutionContext.fromExecutorService(pool)
@@ -115,26 +127,23 @@ class ScopedVerificationFallbackSpec extends ScalaTestWithActorTestKit() with An
 
     val storage = new TestMptStorage()
     val root = storedRoot(storage)
-    val controller = TestProbe()
+    val controller = testKit.createTestProbe[SNAPSyncController.Command]()
     val coordinator = HealingTrieFixtures.spawnCoordinator(
       stateRoot = root,
-      networkPeerManager = TestProbe().ref,
+      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]().ref.toClassic,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 64,
-      snapSyncController = controller.ref,
+      snapSyncController = controller.ref.toClassic,
       healingFrontierStorage = Some(store),
       frontierPersistenceEnabled = true,
       healingWriterEcOverride = Some(ec),
       scopedHealVerification = scoped,
       scopedHealMaxPaths = maxPaths
     )
-    val death = TestProbe()
-    death.watch(coordinator.toClassic)
     try body(coordinator, store, controller, root)
     finally {
       testKit.stop(coordinator)
-      death.expectTerminated(coordinator.toClassic, 5.seconds)
       pool.shutdown()
       pool.awaitTermination(5, TimeUnit.SECONDS)
       dataSource.destroy()
@@ -145,12 +154,12 @@ class ScopedVerificationFallbackSpec extends ScalaTestWithActorTestKit() with An
   /** Heal one clean storage leaf, then assert the round completes via the FULL-ROOT path (gauge == 0). */
   private def healOneAndAssertFullRoot(
       coordinator: ActorRef[TrieNodeHealingCoordinator.Command],
-      controller: TestProbe
+      controller: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
   ): Unit = {
     // Seed the mode gauge to a sentinel so "0" can only come from the full-root path actually running.
     SNAPSyncMetrics.setHealingScopedVerification(-1L)
     val node = cleanLeaf(0)
-    val peer = PeerTestHelpers.createTestPeer("fallback-peer", TestProbe().ref)
+    val peer = PeerTestHelpers.createTestPeer("fallback-peer", testKit.createTestProbe[Any]().ref.toClassic)
     coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(Seq((node._1, node._2)))
     coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
     coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = Seq(node._3)))
@@ -188,7 +197,7 @@ class ScopedVerificationFallbackSpec extends ScalaTestWithActorTestKit() with An
     withFixture(scoped = true, maxPaths = 200000, markComplete = true) { (coordinator, store, _, _) =>
       store.isComplete shouldBe true
       coordinator ! TrieNodeHealingCoordinator.HealingPivotRefreshed(kec256(ByteString("fallback-different-root")))
-      awaiter.awaitAssert(store.isComplete shouldBe false, 3.seconds, 100.millis)
+      eventually(timeout(3.seconds), interval(100.millis))(store.isComplete shouldBe false)
     }
   }
 }

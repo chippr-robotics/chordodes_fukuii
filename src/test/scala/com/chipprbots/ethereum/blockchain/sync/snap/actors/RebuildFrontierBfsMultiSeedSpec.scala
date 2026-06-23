@@ -3,16 +3,17 @@ package com.chipprbots.ethereum.blockchain.sync.snap.actors
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.duration.*
 
+import org.scalatest.concurrent.Eventually
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.blockchain.sync.snap.*
 import com.chipprbots.ethereum.crypto.kec256
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.mpt.BranchNode
 import com.chipprbots.ethereum.mpt.HashNode
 import com.chipprbots.ethereum.mpt.MptNode
@@ -29,11 +30,14 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   * a direct one-seed walk over the same root. Both descend the identical stored subtree, so identical frontier counts
   * over a deterministic fixture demonstrate the wrapper and a one-element multi-seed call agree.
   */
-class RebuildFrontierBfsMultiSeedSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers {
+class RebuildFrontierBfsMultiSeedSpec
+    extends ScalaTestWithActorTestKit()
+    with AnyFlatSpecLike
+    with Matchers
+    with Eventually {
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
-  private val awaiter = org.apache.pekko.testkit.TestProbe()
 
   private def emptyChildren: Array[MptNode] = Array.fill[MptNode](16)(NullNode)
 
@@ -68,32 +72,28 @@ class RebuildFrontierBfsMultiSeedSpec extends ScalaTestWithActorTestKit() with A
   }
 
   private def pendingTasks(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int = {
-    val probe = TestProbe()
-    coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref.toTyped[HealingStatistics])
-    probe.expectMsgType[HealingStatistics](2.seconds).pendingTasks
+    val probe = testKit.createTestProbe[HealingStatistics]()
+    coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref)
+    probe.expectMessageType[HealingStatistics].pendingTasks
   }
 
   private def runSingleSeedWalk(storage: TestMptStorage, root: ByteString): Int = {
     val coordinator = HealingTrieFixtures.spawnCoordinator(
       stateRoot = root,
-      networkPeerManager = TestProbe().ref,
+      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]().ref.toClassic,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 16,
-      snapSyncController = TestProbe().ref,
+      snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref.toClassic,
       healingWriterEcOverride = Some(classicSystem.dispatcher)
     )
     try {
       coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(root)
       var observed = -1
-      awaiter.awaitAssert(
-        {
-          observed = pendingTasks(coordinator)
-          observed should be > 0
-        },
-        5.seconds,
-        100.millis
-      )
+      eventually(timeout(5.seconds), interval(100.millis)) {
+        observed = pendingTasks(coordinator)
+        observed should be > 0
+      }
       observed
     } finally {
       testKit.stop(coordinator)

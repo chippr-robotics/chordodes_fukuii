@@ -8,17 +8,18 @@ import java.util.concurrent.TimeUnit
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
 
+import org.apache.pekko.actor.testkit.typed.scaladsl.FishingOutcomes
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.blockchain.sync.snap.*
 import com.chipprbots.ethereum.crypto.kec256
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.db.dataSource.RocksDbConfig
 import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource
 import com.chipprbots.ethereum.db.storage.HealingFrontierStorage
@@ -69,16 +70,24 @@ class ScopedVerificationObservabilitySpec extends ScalaTestWithActorTestKit() wi
     ()
   }
 
-  private def awaitStateHealingComplete(controller: TestProbe): Unit =
+  private def awaitStateHealingComplete(
+      controller: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
+  ): Unit =
     controller.fishForMessage(10.seconds) {
-      case SNAPSyncController.StateHealingComplete   => true
-      case _: SNAPSyncController.ProgressNodesHealed => false
-      case _                                         => false
+      case SNAPSyncController.StateHealingComplete   => FishingOutcomes.complete
+      case _: SNAPSyncController.ProgressNodesHealed => FishingOutcomes.continueAndIgnore
+      case _                                         => FishingOutcomes.continueAndIgnore
     }
 
   private def withFixture(
       scoped: Boolean
-  )(body: (ActorRef[TrieNodeHealingCoordinator.Command], HealingFrontierStorage, TestProbe) => Unit): Unit = {
+  )(
+      body: (
+          ActorRef[TrieNodeHealingCoordinator.Command],
+          HealingFrontierStorage,
+          org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
+      ) => Unit
+  ): Unit = {
     val pool = Executors.newSingleThreadExecutor()
     val ec = ExecutionContext.fromExecutorService(pool)
     val dbPath = Files.createTempDirectory("scoped-obs-rocksdb").toAbsolutePath.toString
@@ -101,24 +110,21 @@ class ScopedVerificationObservabilitySpec extends ScalaTestWithActorTestKit() wi
 
     val storage = new TestMptStorage()
     val root = storedRoot(storage)
-    val controller = TestProbe()
+    val controller = testKit.createTestProbe[SNAPSyncController.Command]()
     val coordinator = HealingTrieFixtures.spawnCoordinator(
       stateRoot = root,
-      networkPeerManager = TestProbe().ref,
+      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]().ref.toClassic,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 64,
-      snapSyncController = controller.ref,
+      snapSyncController = controller.ref.toClassic,
       healingFrontierStorage = Some(store),
       healingWriterEcOverride = Some(ec),
       scopedHealVerification = scoped
     )
-    val death = TestProbe()
-    death.watch(coordinator.toClassic)
     try body(coordinator, store, controller)
     finally {
       testKit.stop(coordinator)
-      death.expectTerminated(coordinator.toClassic, 5.seconds)
       pool.shutdown()
       pool.awaitTermination(5, TimeUnit.SECONDS)
       dataSource.destroy()
@@ -128,7 +134,7 @@ class ScopedVerificationObservabilitySpec extends ScalaTestWithActorTestKit() wi
 
   private def driveHeal(coordinator: ActorRef[TrieNodeHealingCoordinator.Command], peerName: String): Int = {
     val nodes = (0 until 3).map(cleanLeaf)
-    val peer = PeerTestHelpers.createTestPeer(peerName, TestProbe().ref)
+    val peer = PeerTestHelpers.createTestPeer(peerName, testKit.createTestProbe[Any]().ref.toClassic)
     coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
     coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
     coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(

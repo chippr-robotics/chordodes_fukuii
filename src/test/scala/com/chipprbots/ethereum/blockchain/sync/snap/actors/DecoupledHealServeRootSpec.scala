@@ -3,7 +3,6 @@ package com.chipprbots.ethereum.blockchain.sync.snap.actors
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.duration.*
@@ -45,9 +44,9 @@ class DecoupledHealServeRootSpec extends ScalaTestWithActorTestKit() with AnyFla
     send.message.underlyingMsg.asInstanceOf[SNAP.GetTrieNodes]
 
   private def pendingTasks(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int = {
-    val probe = TestProbe()
-    coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref.toTyped[HealingStatistics])
-    probe.expectMsgType[HealingStatistics](2.seconds).pendingTasks
+    val probe = testKit.createTestProbe[HealingStatistics]()
+    coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref)
+    probe.expectMessageType[HealingStatistics].pendingTasks
   }
 
   /** Build a coordinator with the given decoupling flag, returning (coordinator, networkPeerManager probe,
@@ -56,16 +55,20 @@ class DecoupledHealServeRootSpec extends ScalaTestWithActorTestKit() with AnyFla
   private def buildCoordinator(
       stateRoot: ByteString,
       decoupled: Boolean
-  ): (ActorRef[TrieNodeHealingCoordinator.Command], TestProbe, TestProbe) = {
-    val networkPeerManager = TestProbe()
-    val snapSyncController = TestProbe()
+  ): (
+      ActorRef[TrieNodeHealingCoordinator.Command],
+      org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[NetworkPeerManagerActor.SendMessage],
+      org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
+  ) = {
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
     val coordinator = HealingTrieFixtures.spawnCoordinator(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref,
+      networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = new TestMptStorage(),
       batchSize = 16,
-      snapSyncController = snapSyncController.ref,
+      snapSyncController = snapSyncController.ref.toClassic,
       healingWriterEcOverride = Some(classicSystem.dispatcher),
       decoupledHealServeRoot = decoupled
     )
@@ -81,7 +84,7 @@ class DecoupledHealServeRootSpec extends ScalaTestWithActorTestKit() with AnyFla
       serveRoot should not be stateRoot // distinct 32-byte roots
 
       val (coordinator, networkPeerManager, _) = buildCoordinator(stateRoot, decoupled = true)
-      val peer = PeerTestHelpers.createTestPeer("decoupled-t1-peer", TestProbe().ref)
+      val peer = PeerTestHelpers.createTestPeer("decoupled-t1-peer", testKit.createTestProbe[Any]().ref.toClassic)
 
       // Advance the serve root, then queue a missing node and make a peer available so a fetch dispatches.
       coordinator ! TrieNodeHealingCoordinator.HealingServeRootRefresh(serveRoot)
@@ -89,7 +92,7 @@ class DecoupledHealServeRootSpec extends ScalaTestWithActorTestKit() with AnyFla
       coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(Seq((Seq(ByteString(Array[Byte](0x00))), nodeHash)))
       coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
 
-      val send = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
+      val send = networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessage]
       val request = getTrieNodesOf(send)
       // C3: the fetch root is the advancing serve root, NOT the walk root.
       request.rootHash shouldBe serveRoot
@@ -129,9 +132,9 @@ class DecoupledHealServeRootSpec extends ScalaTestWithActorTestKit() with AnyFla
     snapSyncController.expectNoMessage(300.millis)
 
     // And the fetch now uses the advanced serve root, proving the refresh took effect on serveRoot alone.
-    val peer = PeerTestHelpers.createTestPeer("decoupled-t2-peer", TestProbe().ref)
+    val peer = PeerTestHelpers.createTestPeer("decoupled-t2-peer", testKit.createTestProbe[Any]().ref.toClassic)
     coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
-    val send = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
+    val send = networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessage]
     getTrieNodesOf(send).rootHash shouldBe serveRoot
   }
 
@@ -143,7 +146,7 @@ class DecoupledHealServeRootSpec extends ScalaTestWithActorTestKit() with AnyFla
       val serveRoot = kec256(ByteString("coupled-t6-serve-root"))
 
       val (coordinator, networkPeerManager, _) = buildCoordinator(stateRoot, decoupled = false)
-      val peer = PeerTestHelpers.createTestPeer("coupled-t6-peer", TestProbe().ref)
+      val peer = PeerTestHelpers.createTestPeer("coupled-t6-peer", testKit.createTestProbe[Any]().ref.toClassic)
 
       // A serve-root refresh must be a no-op when the feature is disabled.
       coordinator ! TrieNodeHealingCoordinator.HealingServeRootRefresh(serveRoot)
@@ -151,7 +154,7 @@ class DecoupledHealServeRootSpec extends ScalaTestWithActorTestKit() with AnyFla
       coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(Seq((Seq(ByteString(Array[Byte](0x00))), nodeHash)))
       coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
 
-      val send = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
+      val send = networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessage]
       val request = getTrieNodesOf(send)
       // C3 (off): the fetch root is the walk root, NOT the ignored serve root — coupled behavior.
       request.rootHash shouldBe stateRoot

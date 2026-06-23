@@ -5,7 +5,7 @@ import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.testkit.typed.scaladsl.BehaviorTestKit
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.testkit.TestProbe
+
 import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
@@ -30,7 +30,7 @@ import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers {
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
-  private val statusProbe = org.apache.pekko.testkit.TestProbe()
+  private val statusProbe = testKit.createTestProbe[StorageRangeCoordinator.SyncStatistics]()
 
   // StorageRangeCoordinator is a Typed actor (Group S3). These tests run in a Classic ActorSystem so they can keep
   // the established `system.actorOf` / `expectMsg` machinery; the coordinator is spawned through PropsAdapter to
@@ -69,7 +69,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
   // Typed `StorageGetProgress` carries a `replyTo: ActorRef[SyncStatistics]`. In these Classic tests the reply target
   // is the test actor (ImplicitSender); adapt it to a typed ref so the coordinator can reply.
   private def getProgress: StorageRangeCoordinator.StorageGetProgress =
-    StorageRangeCoordinator.StorageGetProgress(statusProbe.ref.toTyped[StorageRangeCoordinator.SyncStatistics])
+    StorageRangeCoordinator.StorageGetProgress(statusProbe.ref)
 
   // White-box helper: build the `StorageRangeCoordinatorImpl` directly through a synchronous `BehaviorTestKit`,
   // capturing the Impl instance so tests can drive `private[actors]` accumulator/counter logic in isolation (the
@@ -98,7 +98,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
           ctx,
           timers,
           initialStateRoot = stateRoot,
-          networkPeerManager = TestProbe().ref,
+          networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]().ref.toClassic,
           requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
           mptStorage = new TestMptStorage(),
           flatSlotStorage = flatSlotStorage,
@@ -122,19 +122,19 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = TestProbe()
-    val snapSyncController = TestProbe()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = srcProps(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref,
+      networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       mptStorage = storage,
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
       maxAccountsPerBatch = 8,
       maxInFlightRequests = 8,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref
+      snapSyncController = snapSyncController.ref.toClassic
     )
 
     coordinator should not be null
@@ -144,22 +144,22 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = TestProbe()
-    val snapSyncController = TestProbe()
-    val peerProbe = TestProbe()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
+    val peerProbe = testKit.createTestProbe[Any]()
 
-    val peer = PeerTestHelpers.createTestPeer("test-peer", peerProbe.ref)
+    val peer = PeerTestHelpers.createTestPeer("test-peer", peerProbe.ref.toClassic)
 
     val coordinator = srcProps(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref,
+      networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       mptStorage = storage,
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
       maxAccountsPerBatch = 8,
       maxInFlightRequests = 8,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref
+      snapSyncController = snapSyncController.ref.toClassic
     )
 
     coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)
@@ -167,52 +167,52 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
 
     // Should handle peer availability (may or may not send request depending on tasks)
     coordinator ! getProgress
-    statusProbe.expectMsgType[StorageRangeCoordinator.SyncStatistics](3.seconds)
+    statusProbe.expectMessageType[StorageRangeCoordinator.SyncStatistics]
   }
 
   it should "handle task completion" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = TestProbe()
-    val snapSyncController = TestProbe()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = srcProps(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref,
+      networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       mptStorage = storage,
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
       maxAccountsPerBatch = 8,
       maxInFlightRequests = 8,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref
+      snapSyncController = snapSyncController.ref.toClassic
     )
 
     coordinator ! StorageRangeCoordinator.StorageTaskComplete(BigInt(123), Right(10))
 
     // Coordinator should handle completion
     coordinator ! getProgress
-    statusProbe.expectMsgType[StorageRangeCoordinator.SyncStatistics](3.seconds)
+    statusProbe.expectMessageType[StorageRangeCoordinator.SyncStatistics]
   }
 
   it should "report completion when no storage tasks" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = TestProbe()
-    val snapSyncController = TestProbe()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = srcProps(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref,
+      networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       mptStorage = storage,
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
       maxAccountsPerBatch = 8,
       maxInFlightRequests = 8,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref
+      snapSyncController = snapSyncController.ref.toClassic
     )
 
     coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)
@@ -223,52 +223,52 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     coordinator ! StorageRangeCoordinator.StorageCheckCompletion
 
     // Should complete immediately since no tasks and sentinel received
-    snapSyncController.expectMsg(3.seconds, SNAPSyncController.StorageRangeSyncComplete)
+    snapSyncController.expectMessage(SNAPSyncController.StorageRangeSyncComplete)
   }
 
   it should "handle task failures" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = TestProbe()
-    val snapSyncController = TestProbe()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = srcProps(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref,
+      networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       mptStorage = storage,
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
       maxAccountsPerBatch = 8,
       maxInFlightRequests = 8,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref
+      snapSyncController = snapSyncController.ref.toClassic
     )
 
     coordinator ! StorageRangeCoordinator.StorageTaskFailed(BigInt(123), "Test failure")
 
     // Coordinator should still be operational
     coordinator ! getProgress
-    statusProbe.expectMsgType[StorageRangeCoordinator.SyncStatistics](3.seconds)
+    statusProbe.expectMessageType[StorageRangeCoordinator.SyncStatistics]
   }
 
   it should "accept AddStorageTasks and remain operational" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = TestProbe()
-    val snapSyncController = TestProbe()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = srcProps(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref,
+      networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       mptStorage = storage,
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
       maxAccountsPerBatch = 8,
       maxInFlightRequests = 8,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref
+      snapSyncController = snapSyncController.ref.toClassic
     )
 
     val accountHash1 = kec256(ByteString("account-1"))
@@ -279,26 +279,26 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
 
     // Should remain operational after adding tasks
     coordinator ! getProgress
-    statusProbe.expectMsgType[StorageRangeCoordinator.SyncStatistics](3.seconds)
+    statusProbe.expectMessageType[StorageRangeCoordinator.SyncStatistics]
   }
 
   it should "accept StoragePivotRefreshed and update state root" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("old-state-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = TestProbe()
-    val snapSyncController = TestProbe()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = srcProps(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref,
+      networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       mptStorage = storage,
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
       maxAccountsPerBatch = 8,
       maxInFlightRequests = 8,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref
+      snapSyncController = snapSyncController.ref.toClassic
     )
 
     val newStateRoot = kec256(ByteString("new-state-root"))
@@ -306,7 +306,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
 
     // Coordinator should still respond to progress queries after pivot refresh
     coordinator ! getProgress
-    statusProbe.expectMsgType[StorageRangeCoordinator.SyncStatistics](3.seconds)
+    statusProbe.expectMessageType[StorageRangeCoordinator.SyncStatistics]
   }
 
   it should "signal StorageRangeSyncComplete to controller when NoMoreStorageTasks received with no pending tasks" taggedAs UnitTest in {
@@ -315,26 +315,26 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val stateRoot = kec256(ByteString("empty-state-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = TestProbe()
-    val snapSyncController = TestProbe()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = srcProps(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref,
+      networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       mptStorage = storage,
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
       maxAccountsPerBatch = 8,
       maxInFlightRequests = 8,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref
+      snapSyncController = snapSyncController.ref.toClassic
     )
 
     coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)
     coordinator ! StorageRangeCoordinator.NoMoreStorageTasks
     coordinator ! StorageRangeCoordinator.StorageCheckCompletion
 
-    snapSyncController.expectMsg(3.seconds, SNAPSyncController.StorageRangeSyncComplete)
+    snapSyncController.expectMessage(SNAPSyncController.StorageRangeSyncComplete)
   }
 
   // ── K5: Proof-of-absence (BUG fix b38050e49) ──────────────────────────────
@@ -347,11 +347,11 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val stateRoot = kec256(ByteString("proof-of-absence-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = TestProbe()
-    val snapSyncController = TestProbe()
-    val peerProbe = TestProbe()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
+    val peerProbe = testKit.createTestProbe[Any]()
 
-    val peer = PeerTestHelpers.createTestPeer("storage-peer-poa", peerProbe.ref)
+    val peer = PeerTestHelpers.createTestPeer("storage-peer-poa", peerProbe.ref.toClassic)
 
     val account1 = kec256(ByteString("account-poa-1"))
     val account2 = kec256(ByteString("account-poa-2"))
@@ -366,14 +366,14 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     // second request is sent only after the first is resolved.
     val coordinator = srcProps(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref,
+      networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       mptStorage = storage,
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
       maxAccountsPerBatch = 1,
       maxInFlightRequests = 2,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref,
+      snapSyncController = snapSyncController.ref.toClassic,
       initialMaxInFlightPerPeer = 1
     )
 
@@ -382,7 +382,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     coordinator ! StorageRangeCoordinator.StoragePeerAvailable(peer)
 
     // Coordinator dispatches task1 to peer
-    val send1 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
+    val send1 = networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessage]
     val req1 = send1.message.asInstanceOf[GetStorageRangesEnc].underlyingMsg
     req1.accountHashes should have size 1
     req1.accountHashes.head shouldEqual account1
@@ -394,17 +394,14 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     )
 
     // Peer is NOT stateless — coordinator immediately pipelines task2 to the same peer
-    val send2 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](3.seconds)
+    val send2 = networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessage]
     val req2 = send2.message.asInstanceOf[GetStorageRangesEnc].underlyingMsg
     req2.accountHashes should have size 1
     req2.accountHashes.head shouldEqual account2
 
     // No pivot-refresh stall signal: peer served a valid proof-of-absence response.
-    // ProgressStorageContracts is a known-good progress update — filter it out and fail
-    // only if a PivotStateUnservable (erroneous stall) slips through.
-    snapSyncController.receiveWhile(300.millis) { case msg: SNAPSyncController.PivotStateUnservable =>
-      fail(s"Unexpected pivot stall after proof-of-absence: $msg")
-    }
+    // Coordinator dispatches task2 immediately; no PivotStateUnservable expected.
+    snapSyncController.expectNoMessage(300.millis)
   }
 
   // ── Category 1d: ForceCompleteStorage escape valve ─────────────────────────
@@ -413,19 +410,19 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val stateRoot = kec256(ByteString("force-complete-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = TestProbe()
-    val snapSyncController = TestProbe()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = srcProps(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref,
+      networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       mptStorage = storage,
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
       maxAccountsPerBatch = 8,
       maxInFlightRequests = 4,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref
+      snapSyncController = snapSyncController.ref.toClassic
     )
 
     // Add tasks that will not be dispatched (no peer)
@@ -438,7 +435,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     // Force completion without a peer — should immediately promote to healing
     coordinator ! StorageRangeCoordinator.ForceCompleteStorage
 
-    snapSyncController.expectMsg(3.seconds, SNAPSyncController.StorageRangeSyncForceCompleted)
+    snapSyncController.expectMessage(SNAPSyncController.StorageRangeSyncForceCompleted)
   }
 
   // ── K5: No false stall signal when task queue is empty (BUG fix b07c363e9) ─
@@ -450,22 +447,22 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val stateRoot = kec256(ByteString("no-stall-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = TestProbe()
-    val snapSyncController = TestProbe()
-    val peerProbe = TestProbe()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
+    val peerProbe = testKit.createTestProbe[Any]()
 
-    val peer = PeerTestHelpers.createTestPeer("storage-peer-nostall", peerProbe.ref)
+    val peer = PeerTestHelpers.createTestPeer("storage-peer-nostall", peerProbe.ref.toClassic)
 
     val coordinator = srcProps(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref,
+      networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       mptStorage = storage,
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
       maxAccountsPerBatch = 1,
       maxInFlightRequests = 1,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref
+      snapSyncController = snapSyncController.ref.toClassic
     )
 
     coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)
@@ -488,12 +485,12 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
 
   it should "reset consecutiveTaskFailures to 0 on StoragePivotRefreshed" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("reset-consec-root"))
-    val snapSyncController = TestProbe()
+    val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val (impl, kit) = newImpl(
       stateRoot = stateRoot,
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-      snapSyncControllerRef = snapSyncController.ref
+      snapSyncControllerRef = snapSyncController.ref.toClassic
     )
 
     // Simulate failures accumulated during AccountRange phase (before storage phase begins)
@@ -513,12 +510,12 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     // With the reset, a pivot refresh zeroes the counter so failures before and after a pivot
     // are counted independently — only a sustained run of 100 failures from one pivot epoch triggers.
     val stateRoot = kec256(ByteString("no-force-after-pivot-root"))
-    val snapSyncController = TestProbe()
+    val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val (impl, kit) = newImpl(
       stateRoot = stateRoot,
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-      snapSyncControllerRef = snapSyncController.ref
+      snapSyncControllerRef = snapSyncController.ref.toClassic
     )
 
     // Accumulate 99 failures — one below the 100-failure force-complete threshold
@@ -549,15 +546,19 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       flatSlotStorage: FlatSlotStorage,
       threshold: Int,
       stateRootArg: ByteString = kec256(ByteString("flat-batch-test-root"))
-  ): (StorageRangeCoordinatorImpl, BehaviorTestKit[StorageRangeCoordinator.Command], TestProbe) = {
-    val controller = TestProbe()
+  ): (
+      StorageRangeCoordinatorImpl,
+      BehaviorTestKit[StorageRangeCoordinator.Command],
+      org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
+  ) = {
+    val controller = testKit.createTestProbe[SNAPSyncController.Command]()
     // `parasitic` runs the flush Future + its onComplete callback inline, so the resulting
     // `FlatBatchFlushComplete` is already in the BehaviorTestKit self-inbox when the staging call returns.
     // `kit.runOne()` then processes it synchronously (decrementing inFlightFlatBatches).
     val (impl, kit) = newImpl(
       stateRoot = stateRootArg,
       flatSlotStorage = flatSlotStorage,
-      snapSyncControllerRef = controller.ref,
+      snapSyncControllerRef = controller.ref.toClassic,
       flatBatchEntryThreshold = threshold,
       flatBatchEcOverride = Some(scala.concurrent.ExecutionContext.parasitic)
     )
@@ -652,7 +653,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     slots.foreach { case (slotHash, value) =>
       flatSlots.getSlot(accountHash, slotHash) shouldBe Some(value)
     }
-    controller.expectMsg(3.seconds, SNAPSyncController.StorageRangeSyncForceCompleted)
+    controller.expectMessage(SNAPSyncController.StorageRangeSyncForceCompleted)
   }
 
   it should "drop bookkeeping for FlatBatchFlushComplete from a stale state root" taggedAs UnitTest in {
@@ -725,19 +726,19 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val stateRoot = kec256(ByteString("storage-stacktrie-construct-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = TestProbe()
-    val snapSyncController = TestProbe()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = srcProps(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref,
+      networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       mptStorage = storage,
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
       maxAccountsPerBatch = 8,
       maxInFlightRequests = 8,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref
+      snapSyncController = snapSyncController.ref.toClassic
     )
 
     coordinator should not be null
@@ -745,7 +746,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     // Smoke: accept the basic lifecycle messages without error.
     coordinator ! StorageRangeCoordinator.StartStorageRangeSync(stateRoot)
     coordinator ! getProgress
-    statusProbe.expectMsgType[StorageRangeCoordinator.SyncStatistics](3.seconds)
+    statusProbe.expectMessageType[StorageRangeCoordinator.SyncStatistics]
 
     testKit.stop(coordinator)
   }
@@ -762,20 +763,20 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val stateRoot = kec256(ByteString("backpressure-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = TestProbe()
-    val snapSyncController = TestProbe()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     // Tiny watermarks so the test can drive the transition without enqueuing 100K tasks.
     val coordinator = srcProps(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref,
+      networkPeerManager = networkPeerManager.ref.toClassic,
       requestTracker = requestTracker,
       mptStorage = storage,
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
       maxAccountsPerBatch = 8,
       maxInFlightRequests = 8,
       requestTimeout = 30.seconds,
-      snapSyncController = snapSyncController.ref,
+      snapSyncController = snapSyncController.ref.toClassic,
       backpressureHighWatermark = 5,
       backpressureLowWatermark = 2
     )
@@ -793,7 +794,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     coordinator ! StorageRangeCoordinator.AddStorageTasks(tasks)
 
     // Crossing the high-water mark triggers a pause signal upward.
-    snapSyncController.expectMsg(3.seconds, SNAPSyncController.StorageBackpressureChanged(paused = true))
+    snapSyncController.expectMessage(SNAPSyncController.StorageBackpressureChanged(paused = true))
 
     // Re-checking with the same depth must NOT emit another transition (no duplicate signals).
     coordinator ! StorageRangeCoordinator.StorageCheckCompletion
@@ -802,12 +803,12 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
 
   it should "release back-pressure once the queue drains below the low-water mark" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("backpressure-release-root"))
-    val snapSyncController = TestProbe()
+    val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val (impl, kit) = newImpl(
       stateRoot = stateRoot,
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-      snapSyncControllerRef = snapSyncController.ref,
+      snapSyncControllerRef = snapSyncController.ref.toClassic,
       backpressureHighWatermark = 5,
       backpressureLowWatermark = 2
     )
@@ -823,14 +824,14 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
         )
       )
     kit.run(StorageRangeCoordinator.AddStorageTasks(tasks))
-    snapSyncController.expectMsg(3.seconds, SNAPSyncController.StorageBackpressureChanged(paused = true))
+    snapSyncController.expectMessage(SNAPSyncController.StorageBackpressureChanged(paused = true))
 
     // Drain the underlying queue to 2 entries (≤ low-water mark) and trigger a check.
     val q = impl.tasks
     while q.size > 2 do q.dequeue()
 
     kit.run(StorageRangeCoordinator.StorageCheckCompletion)
-    snapSyncController.expectMsg(3.seconds, SNAPSyncController.StorageBackpressureChanged(paused = false))
+    snapSyncController.expectMessage(SNAPSyncController.StorageBackpressureChanged(paused = false))
   }
 
   // ========================================
@@ -849,7 +850,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val (impl, _) = newImpl(
       stateRoot = kec256(ByteString("subtask-init-root")),
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-      snapSyncControllerRef = TestProbe().ref
+      snapSyncControllerRef = testKit.createTestProbe[SNAPSyncController.Command]().ref.toClassic
     )
 
     impl.accountSubtaskCounters shouldBe empty
@@ -861,7 +862,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val (impl, _) = newImpl(
       stateRoot = kec256(ByteString("subtask-complete-root")),
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-      snapSyncControllerRef = TestProbe().ref
+      snapSyncControllerRef = testKit.createTestProbe[SNAPSyncController.Command]().ref.toClassic
     )
 
     // Simulate: 3 subtasks registered for a large-storage account
@@ -889,7 +890,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val (impl, _) = newImpl(
       stateRoot = kec256(ByteString("subtask-nosplit-root")),
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-      snapSyncControllerRef = TestProbe().ref
+      snapSyncControllerRef = testKit.createTestProbe[SNAPSyncController.Command]().ref.toClassic
     )
 
     // No subtask entry for this account — small contract, single task, no split
@@ -906,7 +907,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val (impl, _) = newImpl(
       stateRoot = kec256(ByteString("subtask-two-accts-root")),
       flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
-      snapSyncControllerRef = TestProbe().ref
+      snapSyncControllerRef = testKit.createTestProbe[SNAPSyncController.Command]().ref.toClassic
     )
 
     // Register 2 subtasks for A, 3 for B
