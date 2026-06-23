@@ -1863,3 +1863,4 @@ Handle before any Hive ETC Olympia test suite run.
 6. Add to `CHASE-QUEUE.md` cleared entries log: `| BlockExecution.applyEip2935 Part 12 §G5 | Cleared [date]: $SHA — account-existence guard added; BlockHashHistorySpec absent-account test added |`
 7. `git add .claude/agent-protocols/working-docs/DEFERRED-BACKLOG.md .claude/agent-protocols/working-docs/CHASE-QUEUE.md` → `git commit -m "docs(part12-g5): clearout — $SHA"`
 8. DELETE this section
+
