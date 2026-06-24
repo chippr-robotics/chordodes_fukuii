@@ -61,7 +61,8 @@ object RegularSync {
       blockTopic: TypedActorRef[
         org.apache.pekko.actor.typed.pubsub.Topic.Command[com.chipprbots.ethereum.jsonrpc.NewBlockImported]
       ],
-      configBuilder: BlockchainConfigBuilder
+      configBuilder: BlockchainConfigBuilder,
+      supervisor: TypedActorRef[SyncController.Command]
   ): Behavior[Command] =
     Behaviors.setup { ctx =>
       Behaviors.withTimers { timers =>
@@ -100,10 +101,10 @@ object RegularSync {
               branchResolution,
               syncConfig,
               ommersPool,
-              broadcaster.toClassic,
+              broadcaster,
               pendingTransactionsManager,
               blockTopic,
-              ctx.self.toClassic,
+              ctx.self,
               peerEventBus,
               networkPeerManager,
               blockchain,
@@ -124,60 +125,18 @@ object RegularSync {
           ProgressState(startedFetching = false, initialBlock = 0, currentBlock = 0, bestKnownNetworkBlock = 0),
           fetcher,
           importer,
+          supervisor,
           log,
           ctx
         )
       }
     }
 
-  // scalastyle:off parameter.number
-  def props(
-      peersClient: TypedActorRef[PeersClient.Command],
-      networkPeerManager: ActorRef,
-      peerEventBus: ActorRef,
-      consensus: ConsensusAdapter,
-      blockchain: Blockchain,
-      blockchainReader: BlockchainReader,
-      blockchainWriter: BlockchainWriter,
-      stateStorage: StateStorage,
-      evmCodeStorage: EvmCodeStorage,
-      branchResolution: BranchResolution,
-      blockValidator: BlockValidator,
-      blacklist: Blacklist,
-      syncConfig: SyncConfig,
-      ommersPool: TypedActorRef[OmmersPool.Command],
-      pendingTransactionsManager: TypedActorRef[PendingTransactionsManager.Command],
-      blockTopic: TypedActorRef[
-        org.apache.pekko.actor.typed.pubsub.Topic.Command[com.chipprbots.ethereum.jsonrpc.NewBlockImported]
-      ],
-      configBuilder: BlockchainConfigBuilder
-  ): org.apache.pekko.actor.Props =
-    org.apache.pekko.actor.typed.scaladsl.adapter.PropsAdapter(
-      apply(
-        peersClient,
-        networkPeerManager,
-        peerEventBus,
-        consensus,
-        blockchain,
-        blockchainReader,
-        blockchainWriter,
-        stateStorage,
-        evmCodeStorage,
-        branchResolution,
-        blockValidator,
-        blacklist,
-        syncConfig,
-        ommersPool,
-        pendingTransactionsManager,
-        blockTopic,
-        configBuilder
-      )
-    )
-
   private def running(
       progressState: ProgressState,
       fetcher: TypedActorRef[BlockFetcher.FetchCommand],
       importer: TypedActorRef[BlockImporter.Command],
+      supervisor: TypedActorRef[SyncController.Command],
       log: LoggingAdapter,
       ctx: org.apache.pekko.actor.typed.scaladsl.ActorContext[Command]
   ): Behavior[Command] =
@@ -197,18 +156,18 @@ object RegularSync {
         Behaviors.same
 
       case ProgressProtocol.StartedFetching =>
-        running(progressState.copy(startedFetching = true), fetcher, importer, log, ctx)
+        running(progressState.copy(startedFetching = true), fetcher, importer, supervisor, log, ctx)
 
       case ProgressProtocol.StartingFrom(blockNumber) =>
         val newState = progressState.copy(initialBlock = blockNumber, currentBlock = blockNumber)
         RegularSyncMetrics.setCurrentBlock(blockNumber)
-        running(newState, fetcher, importer, log, ctx)
+        running(newState, fetcher, importer, supervisor, log, ctx)
 
       case ProgressProtocol.GotNewBlock(blockNumber) =>
         log.debug(s"Got information about new block [number = $blockNumber]")
         val newState = progressState.copy(bestKnownNetworkBlock = blockNumber)
         RegularSyncMetrics.setBestKnownNetworkBlock(blockNumber)
-        running(newState, fetcher, importer, log, ctx)
+        running(newState, fetcher, importer, supervisor, log, ctx)
 
       case ProgressProtocol.ImportedBlock(blockNumber, internally) =>
         log.debug(s"Imported new block [number = $blockNumber, internally = $internally]")
@@ -218,22 +177,20 @@ object RegularSync {
         if internally then {
           fetcher ! InternalLastBlockImport(blockNumber)
         }
-        running(newState, fetcher, importer, log, ctx)
+        running(newState, fetcher, importer, supervisor, log, ctx)
 
       case msg: SyncProtocol.RegularSyncStuck =>
-        // Forward escape-valve signal to SyncController (our parent). BlockImporter detects this
-        // condition and emits the message; we just relay it up so SyncController can re-trigger
-        // SNAP sync from a recent pivot.
-        // ROOT-c: SyncController is now Behavior[Command]; its real ref (= ctx.toClassic.parent here, since
-        // RegularSync is spawned as a direct child) only accepts SyncController.Command. Wrap the raw SyncProtocol
-        // message so it survives the Typed boundary and is unwrapped by handleRegularSyncMsg (a bare send would
-        // ClassCastException → dead-letter, silently disabling the SNAP re-sync escape valve).
+        // Forward escape-valve signal to SyncController. BlockImporter detects this condition and emits the
+        // message; we just relay it up so SyncController can re-trigger SNAP sync from a recent pivot.
+        // 8k-F: SyncController is Behavior[Command]; its typed ref is injected as `supervisor` at spawn. Wrap
+        // the raw SyncProtocol message in WrappedSyncProtocol so it is unwrapped by handleRegularSyncMsg
+        // (the escape valve that re-runs SNAP sync from a recent pivot).
         log.warning(
           "Regular sync stuck on block {} (missing {}); forwarding to SyncController for SNAP re-sync",
           msg.blockNumber,
           msg.missingHash
         )
-        ctx.toClassic.parent ! SyncController.WrappedSyncProtocol(msg)
+        supervisor ! SyncController.WrappedSyncProtocol(msg)
         Behaviors.same
 
       case SyncProtocol.FetcherStatusTick =>
@@ -269,6 +226,7 @@ object RegularSync {
           progressState.copy(lastPrintBlock = progressState.currentBlock, lastPrintTimeMs = now),
           fetcher,
           importer,
+          supervisor,
           log,
           ctx
         )

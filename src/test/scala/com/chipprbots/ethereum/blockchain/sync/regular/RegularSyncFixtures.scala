@@ -87,6 +87,8 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
     val ommersPool: TestProbe = TestProbe()
     val pendingTransactionsManager: TestProbe = TestProbe()
     val peersClient: TestProbe = TestProbe()
+    // Stands in for the SyncController parent: RegularSync relays RegularSyncStuck here (8k-F).
+    val supervisor: TestProbe = TestProbe()
     val blacklist: CacheBasedBlacklist = CacheBasedBlacklist.empty(100)
     lazy val branchResolution = new BranchResolution(blockchainReader)
 
@@ -102,9 +104,11 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
       "block-imported-topic"
     )
 
-    lazy val regularSync: ActorRef = system.actorOf(
-      RegularSync
-        .props(
+    // spawnAnonymous (not a named spawn): RegularSyncSpec reuses one ActorSystem across many fixtures,
+    // so a fixed actor name would collide with InvalidActorNameException on the second test case.
+    lazy val regularSync: ActorRef = system
+      .spawnAnonymous(
+        RegularSync.apply(
           peersClient.ref.toTyped[PeersClient.Command],
           networkPeerManager.ref,
           peerEventBus.ref,
@@ -122,10 +126,13 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
           pendingTransactionsManager.ref
             .toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
           blockTopic,
-          this
-        )
-        .withDispatcher("pekko.actor.default-dispatcher")
-    )
+          this,
+          supervisor.ref.toTyped[SyncController.Command]
+        ),
+        org.apache.pekko.actor.typed.Props.empty
+          .withDispatcherFromConfig("pekko.actor.default-dispatcher")
+      )
+      .toClassic
 
     val defaultTd = 12345
 

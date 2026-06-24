@@ -1650,9 +1650,9 @@ object SyncController {
           s"peers-client-$syncGeneration",
           DispatcherSelector.fromConfig("sync-dispatcher")
         )
-      val regularSync = ctx.toClassic.actorOf(
-        RegularSync
-          .props(
+      val regularSync = ctx
+        .spawn(
+          RegularSync.apply(
             peersClient,
             networkPeerManager,
             peerEventBus,
@@ -1669,11 +1669,13 @@ object SyncController {
             ommersPool,
             pendingTransactionsManager,
             blockTopic,
-            configBuilder
-          )
-          .withDispatcher("sync-dispatcher"),
-        s"regular-sync-$syncGeneration"
-      )
+            configBuilder,
+            ctx.self
+          ),
+          s"regular-sync-$syncGeneration",
+          DispatcherSelector.fromConfig("sync-dispatcher")
+        )
+        .toClassic
       regularSync ! SyncProtocol.Start
       ctx.watchWith(regularSync.toTyped[Nothing], RegularSyncTerminated(regularSync))
       // After SNAP completes, chain backfill (#1162) writes headers / bodies / receipts in the
@@ -2306,28 +2308,31 @@ object SyncController {
           PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig),
           s"peers-client-bootstrap-$gen"
         )
-      val regularSync = ctx.toClassic.actorOf(
-        RegularSync.props(
-          peersClient,
-          networkPeerManager,
-          peerEventBus,
-          consensus,
-          blockchain,
-          blockchainReader,
-          blockchainWriter,
-          stateStorage,
-          evmCodeStorage,
-          { val br = new BranchResolution(blockchainReader); br.messConfig = messConfig; br },
-          validators.blockValidator,
-          blacklist,
-          syncConfig,
-          ommersPool,
-          pendingTransactionsManager,
-          blockTopic,
-          configBuilder
-        ),
-        s"regular-sync-bootstrap-$gen"
-      )
+      val regularSync = ctx
+        .spawn(
+          RegularSync.apply(
+            peersClient,
+            networkPeerManager,
+            peerEventBus,
+            consensus,
+            blockchain,
+            blockchainReader,
+            blockchainWriter,
+            stateStorage,
+            evmCodeStorage,
+            { val br = new BranchResolution(blockchainReader); br.messConfig = messConfig; br },
+            validators.blockValidator,
+            blacklist,
+            syncConfig,
+            ommersPool,
+            pendingTransactionsManager,
+            blockTopic,
+            configBuilder,
+            ctx.self
+          ),
+          s"regular-sync-bootstrap-$gen"
+        )
+        .toClassic
       regularSync ! SyncProtocol.Start
       regularSync
     }

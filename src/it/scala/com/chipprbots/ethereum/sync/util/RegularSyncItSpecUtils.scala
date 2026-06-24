@@ -174,10 +174,10 @@ object RegularSyncItSpecUtils {
           new BranchResolution(blockchainReader),
           syncConfig,
           ommersPool,
-          broadcasterRef.toClassic,
+          broadcasterRef,
           pendingTransactionsManager,
           blockTopic,
-          regularSync,
+          regularSync.toTyped[RegularSync.Command],
           peerEventBus.toClassic,
           etcPeerManager,
           bl,
@@ -187,27 +187,30 @@ object RegularSyncItSpecUtils {
         "block-importer"
       )
 
-    lazy val regularSync: ActorRef = system.actorOf(
-      RegularSync.props(
-        peersClient,
-        etcPeerManager,
-        peerEventBus.toClassic,
-        consensusAdapter,
-        bl,
-        blockchainReader,
-        blockchainWriter,
-        storagesInstance.storages.stateStorage,
-        storagesInstance.storages.evmCodeStorage,
-        new BranchResolution(blockchainReader),
-        validators.blockValidator,
-        blacklist,
-        testSyncConfig,
-        ommersPool,
-        pendingTransactionsManager,
-        blockTopic,
-        this
+    lazy val regularSync: ActorRef = system
+      .spawnAnonymous(
+        RegularSync.apply(
+          peersClient,
+          etcPeerManager,
+          peerEventBus.toClassic,
+          consensusAdapter,
+          bl,
+          blockchainReader,
+          blockchainWriter,
+          storagesInstance.storages.stateStorage,
+          storagesInstance.storages.evmCodeStorage,
+          new BranchResolution(blockchainReader),
+          validators.blockValidator,
+          blacklist,
+          testSyncConfig,
+          ommersPool,
+          pendingTransactionsManager,
+          blockTopic,
+          this,
+          system.toTyped.ignoreRef[com.chipprbots.ethereum.blockchain.sync.SyncController.Command]
+        )
       )
-    )
+      .toClassic
 
     def startRegularSync(): IO[Unit] = IO {
       regularSync ! SyncProtocol.Start
