@@ -26,13 +26,12 @@
 #### `4544b8025` — §8e-FORGE: StackTrie `return` conversions (FORGE-reviewed, 2026-06-24)
 - **`:223` (`hashNode` no-op guard)** — CLEAR. Unit method; `if guard then () else { match }` is byte-identical no-op guard.
 - **`:381` (`lengthAsBytes` zero guard)** — CLEAR. Pure function; guard→if/else, no mutable state crosses boundary.
-- **`:120` (`insert` Leaf exact-match update)** — DEFER (`// scalafix:ok DisableSyntax.return`). Early `return node` mixed with in-place `node.value = value` mutation inside MPT trie construction path (state-root). Restructuring mutable trie state is byte-level risky.
-- **`:462` (`byteCompare`)** — DEFER (`// scalafix:ok`). `return` inside a `while` loop; converting changes loop iteration semantics for a comparator that orders MPT keys (state-root sort order).
-- **Gate:** FORGE sign-off. **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8e-FORGE`
+- **`:120` (`insert` Leaf exact-match update)** — ~~DEFER~~ **CLEARED** in `09307c5a7` (§8e-StackTrie, 2026-06-24). Re-assessment: the exact-match `return node` short-circuited past a `throw` in the same scope (it never fell through). Restructured the inner `if/throw` into `if (exact) node else throw`, and merged the outer `if diff >= origKey.length` block into the existing `if/else-if/else` chain via `else if diff == 0`. The whole `Leaf` case is now a single expression yielding `node`/`branch`/`ext` or throwing. The `node.value = value` mutation is unchanged; only the control flow became expression-based. Byte-identical.
+- **`:462` (`byteCompare`)** — ~~DEFER~~ **CLEARED** in `09307c5a7` (§8e-StackTrie, 2026-06-24). Rewrote the `return`-in-`while` as a `var result` accumulator with loop guard `while result == 0 && i < n`, final expression `if result != 0 then result else Integer.compare(...)`. Pure comparator; ordering semantics identical (first differing byte wins, else length). 61 MPT/StackTrie tests pass.
+- **Gate:** FORGE sign-off. **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8e-FORGE`, `§8e-StackTrie`
 
 ---
 
 ## Open
 
 - `mpt/package.scala:19`, `MerklePatriciaTrie.scala:20` — RLP `given` instances (§3a scope)
-- `StackTrie.scala:120, 462` — `scalafix:ok` DEFER suppressions (see §8e-FORGE above); opportunistic cleanup when MPT subsystem is next touched for other reasons (FORGE review required)
