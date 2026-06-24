@@ -531,6 +531,140 @@ class PivotBlockSelectorSpec
     fastSync.expectMsg(Result(baseBlockHeader.copy(number = 900)))
   }
 
+  // ETH69 G1 — pivot TD consensus gate. The selector must exclude peers whose advertised chainWeight
+  // is below 80% of our local best TD, defeating the low-difficulty-fork sybil attack on snap-sync pivot.
+
+  it should "exclude a peer whose chainWeight is below 80% of our local best TD" taggedAs (
+    UnitTest,
+    SyncTest
+  ) in new TestSetup {
+    // ourBestTD = 100 => minPeerTD = 80. peer1/2/3 advertise TD = 100 (pass); peer4 advertises TD = 20 (fail).
+    ourBestTD = BigInt(100)
+
+    updateHandshakedPeers(
+      HandshakedPeers(
+        Map(
+          peer1 -> peerInfoWithTD(peer1Status, td = 100),
+          peer2 -> peerInfoWithTD(peer2Status, td = 100),
+          peer3 -> peerInfoWithTD(peer3Status, td = 100),
+          peer4 -> peerInfoWithTD(peer4Status, td = 20)
+        )
+      )
+    )
+
+    pivotBlockSelector ! SelectPivotBlock
+
+    // Only the three TD-passing peers are subscribed/asked; the low-TD peer4 is gated out.
+    expectSubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
+    )
+
+    expectGetBlockHeadersRequests(Seq(peer1, peer2, peer3), expectedPivotBlock)
+    networkPeerManager.expectNoMessage()
+  }
+
+  it should "include peers whose chainWeight is at or above 80% of our local best TD" taggedAs (
+    UnitTest,
+    SyncTest
+  ) in new TestSetup {
+    // ourBestTD = 100 => minPeerTD = 80. All three peers advertise exactly 80 (boundary, inclusive) and pass.
+    ourBestTD = BigInt(100)
+
+    updateHandshakedPeers(
+      HandshakedPeers(
+        Map(
+          peer1 -> peerInfoWithTD(peer1Status, td = 80),
+          peer2 -> peerInfoWithTD(peer2Status, td = 80),
+          peer3 -> peerInfoWithTD(peer3Status, td = 80)
+        )
+      )
+    )
+
+    pivotBlockSelector ! SelectPivotBlock
+
+    expectSubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
+    )
+
+    expectGetBlockHeadersRequests(Seq(peer1, peer2, peer3), expectedPivotBlock)
+  }
+
+  it should "elect the honest peer over K low-TD sybil peers" taggedAs (
+    UnitTest,
+    SyncTest
+  ) in new TestSetup {
+    // Sybil scenario: 3 low-TD sybils (TD = 1) + 1 honest peer (TD = 100). With minPeersToChoosePivotBlock = 1,
+    // the honest peer alone clears the TD gate and wins the pivot election; the sybils are excluded entirely.
+    override def minPeersToChoosePivotBlock = 1
+    override def peersToChoosePivotBlockMargin = 0
+
+    ourBestTD = BigInt(100) // minPeerTD = 80; sybils at TD = 1 are gated out, honest peer1 at TD = 100 passes.
+
+    updateHandshakedPeers(
+      HandshakedPeers(
+        Map(
+          peer1 -> peerInfoWithTD(peer1Status, td = 100),
+          peer2 -> peerInfoWithTD(peer2Status, td = 1),
+          peer3 -> peerInfoWithTD(peer3Status, td = 1),
+          peer4 -> peerInfoWithTD(peer4Status, td = 1)
+        )
+      )
+    )
+
+    pivotBlockSelector ! SelectPivotBlock
+
+    // Only the honest peer is subscribed/asked — no sybil is contacted.
+    expectSubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))
+    )
+    expectGetBlockHeadersRequests(Seq(peer1), expectedPivotBlock)
+    networkPeerManager.expectNoMessage()
+
+    // The honest peer's header is elected as pivot.
+    pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+      MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer1.id)
+    )
+
+    expectUnsubscribeCmdsWithAll(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))
+    )
+    fastSync.expectMsg(Result(pivotBlockHeader))
+  }
+
+  it should "fall back to block-number ranking when no peer passes the TD gate (liveness)" taggedAs (
+    UnitTest,
+    SyncTest
+  ) in new TestSetup {
+    // ourBestTD = 1000 => minPeerTD = 800, but every peer advertises TD = 20 (all below threshold).
+    // The gate finds no qualifying peer and must fall back to block-number-only ranking rather than
+    // blocking sync — all three peers are then asked.
+    ourBestTD = BigInt(1000)
+
+    updateHandshakedPeers(
+      HandshakedPeers(
+        Map(
+          peer1 -> peerInfoWithTD(peer1Status, td = 20),
+          peer2 -> peerInfoWithTD(peer2Status, td = 20),
+          peer3 -> peerInfoWithTD(peer3Status, td = 20)
+        )
+      )
+    )
+
+    pivotBlockSelector ! SelectPivotBlock
+
+    expectSubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
+    )
+
+    expectGetBlockHeadersRequests(Seq(peer1, peer2, peer3), expectedPivotBlock)
+  }
+
   class TestSetup extends TestSyncConfig {
 
     val blacklist: Blacklist = CacheBasedBlacklist.empty(100)
@@ -649,6 +783,10 @@ class PivotBlockSelectorSpec
     def testScheduler: ExplicitlyTriggeredScheduler =
       classicSystem.scheduler.asInstanceOf[ExplicitlyTriggeredScheduler]
 
+    // Local best total difficulty supplied to the pivot TD gate (ETH69 G1). Defaults to 0 so the gate is
+    // inert for existing tests (minPeerTD = 0); TD-gate tests override this before spawning the selector.
+    @volatile var ourBestTD: BigInt = BigInt(0)
+
     lazy val pivotBlockSelector: ActorRef = testKit
       .spawn(
         PivotBlockSelector(
@@ -656,7 +794,8 @@ class PivotBlockSelectorSpec
           peerMessageBus.ref,
           defaultSyncConfig,
           fastSync.ref,
-          blacklist
+          blacklist,
+          () => ourBestTD
         ),
         s"pivot-block-selector-${java.util.UUID.randomUUID()}"
       )
@@ -796,5 +935,15 @@ class PivotBlockSelectorSpec
 
     def updateHandshakedPeers(handshakedPeers: HandshakedPeers): Unit =
       pivotBlockSelector ! PivotBlockSelector.WrappedHandshakedPeers(handshakedPeers)
+
+    /** Build a forkAccepted PeerInfo at the standard bestBlock with the given advertised total difficulty. */
+    def peerInfoWithTD(status: RemoteStatus, td: BigInt): PeerInfo =
+      PeerInfo(
+        status,
+        forkAccepted = true,
+        chainWeight = ChainWeight.totalDifficultyOnly(td),
+        maxBlockNumber = bestBlock,
+        bestBlockHash = status.bestHash
+      )
   }
 }

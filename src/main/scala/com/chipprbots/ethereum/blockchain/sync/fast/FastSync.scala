@@ -233,6 +233,16 @@ object FastSync {
       }
     }
 
+    /** Local best total difficulty, used as the consensus floor for the pivot-block TD gate (ETH69 G1). Returns 0 when
+      * the best block / its chain weight is not yet available (e.g. early SNAP sync when only the pivot header is
+      * persisted) — a 0 floor makes the TD gate inert and lets block-number ranking apply.
+      */
+    private def ourBestTotalDifficulty(): BigInt =
+      blockchainReader.getBestBlock
+        .flatMap(best => blockchainReader.getChainWeightByHash(best.header.hash))
+        .map(_.totalDifficulty)
+        .getOrElse(BigInt(0))
+
     def startWithState(syncState: SyncState): Behavior[Command] = {
       // Check if headers in RocksDB go beyond the persisted bestBlockHeaderNumber.
       // This happens when SyncState was persisted mid-download but the node restarted —
@@ -261,7 +271,14 @@ object FastSync {
       log.info("Starting fast sync from scratch")
       val pivotBlockSelector = ctx
         .spawn(
-          PivotBlockSelector(networkPeerManager, peerEventBus, syncConfig, fastSyncClassicSelf, blacklist),
+          PivotBlockSelector(
+            networkPeerManager,
+            peerEventBus,
+            syncConfig,
+            fastSyncClassicSelf,
+            blacklist,
+            () => ourBestTotalDifficulty()
+          ),
           "pivot-block-selector"
         )
         .toClassic
@@ -278,7 +295,14 @@ object FastSync {
             log.info("Retrying pivot block selection")
             val pivotBlockSelector = ctx
               .spawn(
-                PivotBlockSelector(networkPeerManager, peerEventBus, syncConfig, fastSyncClassicSelf, blacklist),
+                PivotBlockSelector(
+                  networkPeerManager,
+                  peerEventBus,
+                  syncConfig,
+                  fastSyncClassicSelf,
+                  blacklist,
+                  () => ourBestTotalDifficulty()
+                ),
                 s"pivot-block-selector-retry-${java.util.UUID.randomUUID()}"
               )
               .toClassic
@@ -657,7 +681,14 @@ object FastSync {
       val pivotBlockSelector =
         ctx
           .spawn(
-            PivotBlockSelector(networkPeerManager, peerEventBus, syncConfig, fastSyncClassicSelf, blacklist),
+            PivotBlockSelector(
+              networkPeerManager,
+              peerEventBus,
+              syncConfig,
+              fastSyncClassicSelf,
+              blacklist,
+              () => ourBestTotalDifficulty()
+            ),
             s"$countActor-pivot-block-selector-update"
           )
           .toClassic

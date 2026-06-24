@@ -73,7 +73,8 @@ object PivotBlockSelector {
       peerEventBus: TypedActorRef[PeerEventBusCommand],
       syncConfig: SyncConfig,
       fastSync: ClassicActorRef,
-      blacklist: Blacklist
+      blacklist: Blacklist,
+      ourBestTotalDifficulty: () => BigInt
   ): Behavior[Command] =
     Behaviors.setup[Command] { ctx =>
       Behaviors.withTimers[Command] { timers =>
@@ -115,7 +116,8 @@ object PivotBlockSelector {
           blacklist,
           peerListHelper,
           blockHeadersAdapter,
-          handshakedPeersAdapter
+          handshakedPeersAdapter,
+          ourBestTotalDifficulty
         ).idle(initialState)
       }
     }
@@ -156,7 +158,8 @@ object PivotBlockSelector {
       blacklist: Blacklist,
       peerListHelper: PeerListHelper,
       blockHeadersAdapter: TypedActorRef[PeerEvent],
-      handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers]
+      handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers],
+      ourBestTotalDifficulty: () => BigInt
   ) {
     import syncConfig.*
 
@@ -378,10 +381,38 @@ object PivotBlockSelector {
     }
 
     private def collectVoters(previousBestBlockNumber: Option[BigInt] = None): ElectionDetails = {
-      val peersUsedToChooseTarget = peerListHelper.peersToDownloadFrom.collect {
-        case (_, PeerWithInfo(peer, PeerInfo(_, _, true, maxBlockNumber, _))) if maxBlockNumber > 0 =>
+      // ETH69 G1 — TD consensus gate (P0). Before this gate, peers entered the snap-sync voter pool
+      // by maxBlockNumber alone. An attacker on a long low-difficulty fork passes Tier3 TD estimation
+      // at handshake (estimate looks legitimate) and wins pivot election by block-number ranking with
+      // K sybil peers, anchoring SNAP sync to an attacker-chosen state root. Require each voter's
+      // advertised chainWeight to be within 80% of our local best TD (±20% slack absorbs Tier3
+      // estimation variance and genuine peer lag). Liveness fallback: if no peer clears the gate,
+      // fall back to block-number-only ranking rather than blocking sync indefinitely.
+      val ourBestTD = ourBestTotalDifficulty()
+      val minPeerTD = if ourBestTD > 0 then ourBestTD * 8 / 10 else BigInt(0)
+
+      val tdGatedPeers = peerListHelper.peersToDownloadFrom.collect {
+        case (_, PeerWithInfo(peer, PeerInfo(_, chainWeight, true, maxBlockNumber, _)))
+            if maxBlockNumber > 0 && chainWeight.totalDifficulty >= minPeerTD =>
           (peer, maxBlockNumber)
       }
+
+      val peersUsedToChooseTarget =
+        if tdGatedPeers.nonEmpty then tdGatedPeers
+        else {
+          val blockNumberOnlyPeers = peerListHelper.peersToDownloadFrom.collect {
+            case (_, PeerWithInfo(peer, PeerInfo(_, _, true, maxBlockNumber, _))) if maxBlockNumber > 0 =>
+              (peer, maxBlockNumber)
+          }
+          if blockNumberOnlyPeers.nonEmpty then
+            ctx.log.warn(
+              "ETH69_PIVOT_TD_GATE_EMPTY: no peers passed TD gate (ourBestTD={}, minPeerTD={}); " +
+                "falling back to block-number-only ranking for liveness",
+              ourBestTD,
+              minPeerTD
+            )
+          blockNumberOnlyPeers
+        }
 
       val peersSortedByBestNumber = peersUsedToChooseTarget.toList.sortBy { case (_, number) => -number }
       val bestPeerBestBlockNumber = peersSortedByBestNumber.headOption
