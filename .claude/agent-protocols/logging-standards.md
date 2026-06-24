@@ -178,6 +178,13 @@ reorgCounter.tag("depth-bucket", depthBucket(reorgDepth)).increment()
 - Context at transition time (height, peer, count)
 - For retries: attempt number, max, backoff interval
 
+**Multi-phase operations:** For operations that span multiple phases (SNAP sync phases,
+block import pipeline stages, trie healing passes), log EACH phase boundary — not just
+the top-level start and stop. A single elapsed-time metric covering the whole operation
+hides which phase is slow. Require one log entry per phase transition with phase-specific
+elapsed and item counts. The format in §1 (process lifecycle) applies at each phase boundary,
+not only at the operation boundary.
+
 ---
 
 ### 5. Error paths and unhappy paths

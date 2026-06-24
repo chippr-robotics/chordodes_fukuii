@@ -46,8 +46,16 @@
 
 ---
 
+## Classic Interop — §8k-G (COMMITTED `2ef2b6637`, testEssential pending)
+
+#### `2ef2b6637` — refactor(8k-G): NodeBuilder syncController type lifted (Cluster K)
+- **What:** `syncController` field in `NodeBuilder.scala` lifted from `TypedActorRef[Any]` → `TypedActorRef[SyncController.Command]`. Spawn-site `.toClassic` for `syncController` removed (Cluster K — 3 sites: SyncController, NPMA, RPC registration).
+- **Cross-refs:** `sync/controller.md` (Cluster C — OQ-5 sender() elimination), `api/jsonrpc.md` (Cluster L — jsonrpc service callers)
+
+---
+
 ## Open
 
 - `NodeBuilder.scala:236,1094` — `implicit` `ExecutionContext`/`IORuntime` → `given` candidates (§3a scope)
-- `MockedMiner.Send` envelope cleanup — noted in CAPSTONE post-mortem; deferred
-- `ProgressProtocol.ImportedBlock` in `runningRegularSyncBootstrap` — noted in ROOT Phase 3; deferred
+- `MockedMiner.Send` envelope cleanup — noted in CAPSTONE post-mortem; deferred (see DEFERRED-BACKLOG §9b prompt)
+- `ProgressProtocol.ImportedBlock` in `runningRegularSyncBootstrap` — noted in ROOT Phase 3; **gate NOW OPEN** (§8k-F `b24515637` + §8k-G `2ef2b6637` both committed). Actionable as a LOOM task: check whether `ImportedBlock` handler in `runningRegularSyncBootstrap` can be tightened now that RegularSync is fully Typed.

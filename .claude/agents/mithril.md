@@ -100,6 +100,23 @@ sbt scalafmtAll                        # keep formatting clean
 - Performance-critical inner loops (EVM dispatch, DAG, hashing): measure before
   and after; default to leaving them alone.
 
+## Destructive change rule (MANDATORY)
+
+Any recommendation or action that involves **deleting, removing entirely, or
+inlining-and-discarding** a class, trait, object, or method body of **≥ 20 lines**
+MUST include this block before proceeding:
+
+```
+⚠️ DELETION REQUIRED — [ClassName / method, ~N lines]
+Rationale: [why modification won't work]
+Chesterton's Fence: [why the code exists / what it does]
+Alternative considered: [e.g. "strip extends X instead of deleting the class"]
+Recommend: DELETE / KEEP-AND-MODIFY — state which
+```
+
+If you cannot fill in all four fields, recommend KEEP-AND-MODIFY by default and
+surface it to the main session before touching the file.
+
 ## Report
 
 For each module, note: transformations applied, type-safety/readability impact,

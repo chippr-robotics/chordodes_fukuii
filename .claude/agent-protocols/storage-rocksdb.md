@@ -94,6 +94,19 @@ it.seekToFirst()
 An iterator leak holds a snapshot of the DB open, preventing SST file deletion.
 The DB grows unboundedly until the JVM exits.
 
+**Iterator leak sweep:** When fixing any iterator leak, run a project-wide grep
+across the entire storage layer before committing:
+
+```bash
+grep -rn "db\.newIterator\|newIterator(" \
+  src/main/scala/com/chipprbots/ethereum/db/ --include="*.scala" \
+  | grep -v "withResources"
+```
+
+Any `newIterator` not inside `withResources` is a leak. Fix ALL occurrences in the
+same commit — partial fixes leave other code paths growing the DB unboundedly, and
+the issue only becomes visible under load when a different path happens to be hot.
+
 ---
 
 ## Write path
@@ -283,6 +296,42 @@ paths — wrong reads return wrong state; wrong writes corrupt the chain.
 | Changing namespace ID without migration | Silent data loss (reads empty) | New namespace + migration step |
 | Direct `RocksDB` calls outside `db/` | Bypasses EphemDataSource swap | All access through `DataSource` |
 | Missing `close()` on `ReadOptions`/`WriteOptions` | Native memory leak | `withResources` on all RocksDB objects |
+
+---
+
+## DataSource close protocol (M4 — by-design)
+
+**Verdict:** `RocksDbDataSource.close()` correctly does NOT call `cache.invalidateAll()`.
+This is by design — not a missing invalidation.
+
+**Why no invalidation in `close()`:**
+The overlay caches (`LruCache[NodeHash, HeapEntry]` in `CachedReferenceCountedStateStorage`,
+`MapCache` in `CachedNodeStorage`) live in `db/storage/` and are owned by `DefaultStorages`.
+`RocksDbDataSource` has no reference to any `Cache` object — the two layers are intentionally
+decoupled. Calling `cache.invalidateAll()` from inside `close()` would invert the abstraction
+(DataSource layer knowing about storage layer above it) and would also be incorrect: the
+`Cache` trait is not part of the `DataSource` contract.
+
+**Where the actual concern lives:**
+The stale-cache scenario only manifests when `dataSource.clear()` is called while a
+`CachedNodeStorage` or `CachedReferenceCountedStateStorage` over the same source remains
+alive — a test-isolation pattern, not a runtime node path (production nodes never re-open a
+closed DB within the same JVM). The fix belongs at the component boundary that owns both:
+
+```scala
+// In a test fixture that holds both a cache and a DataSource:
+dataSource.clear()
+nodeCache.clear()   // <-- the caller's responsibility, not DataSource's
+```
+
+**Test suite rule:** Any test that calls `dataSource.clear()` on a source backing a cached
+storage MUST also call `cache.clear()` on that storage's cache (or discard the cached storage
+instance and construct a fresh one). Add `afterEach { cache.clear(); dataSource.clear() }` to
+any spec that uses `CachedNodeStorage` or `CachedReferenceCountedStateStorage` with a shared
+`RocksDbDataSource` or `EphemDataSource`.
+
+**No code change made to `close()`.** A clarifying comment was added to
+`RocksDbDataSource.close()` documenting this rationale inline.
 
 ---
 

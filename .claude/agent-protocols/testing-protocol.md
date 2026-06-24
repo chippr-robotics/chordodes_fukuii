@@ -89,6 +89,14 @@ The thread-end `testEssential` run must show:
 - Failures: **0**
 - If count drops: investigate before closing the thread
 
+**Per-thread delta tracking:** Before starting any migration or sweep thread, record
+the current test count from the most recent `testEssential` run (see the test quality
+log at `.local/docs/test-quality-log.md` for the last known baseline). At thread end,
+compare. A negative delta — even by 1 — means a test class was silently deleted or a
+`@Test` annotation was dropped. This commonly happens when a Classic actor spec is
+deleted during migration but no Typed replacement spec is written. Investigate before
+closing; do not accept a lower count as the new baseline without a recorded reason.
+
 ---
 
 ## Inline test standards (when writing new tests)

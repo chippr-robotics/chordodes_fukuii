@@ -134,6 +134,22 @@ When a finding relates to a known library pattern or inspection, cross-check loc
 
 Full index: [`.claude/agents/REFERENCES.md`](REFERENCES.md)
 
+## Destructive change rule (findings output)
+
+Any finding that recommends **deleting, removing entirely, or inlining-and-discarding**
+a class, trait, object, or method body of **≥ 20 lines** MUST include this block
+in the findings output before the recommendation:
+
+```
+⚠️ DELETION REQUIRED — [ClassName / method, ~N lines]
+Rationale: [why modification won't work]
+Chesterton's Fence: [why the code exists / what it does]
+Alternative considered: [e.g. "strip extends X instead of deleting the class"]
+Recommend: DELETE / KEEP-AND-MODIFY — state which
+```
+
+The main session reviews this block before encoding findings into implementation prompts.
+
 ## Output format
 
 Report only lenses with findings. For each finding:

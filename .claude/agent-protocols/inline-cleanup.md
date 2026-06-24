@@ -81,6 +81,15 @@ When you spot an issue in a file you're NOT editing, append it to:
 | path/to/File.scala | line | pattern description | TYPE | AgentName | YYYY-MM-DD |
 ```
 
+After logging the entry, check whether the pattern is isolated or widespread:
+```bash
+# How many files share the same pattern?
+grep -rn "pattern_to_fix" src/main/ --include="*.scala" | wc -l
+```
+Include the count in the CHASE-QUEUE description (e.g., `log.warning→warn (N=12)`).
+Entries with `N=5+` cluster into sprint tasks faster, and the count helps the sprint
+agent decide whether to do a targeted fix or a full sweep.
+
 Public document — code patterns only, no internal dev commentary.
 Entries are batched into sprint sessions when a cluster forms (5+ of same type).
 

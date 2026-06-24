@@ -64,6 +64,14 @@
 
 ## Classic Interop — §8k-A (COMPLETE)
 
+#### `b4453d117` — refactor(8k-C): typed snapSyncController ref in SNAP coordinators
+- **What:** 4 coordinators (`AccountRangeCoordinator`, `ByteCodeCoordinator`, `StorageRangeCoordinator`, `TrieNodeHealingCoordinator`) — `snapSyncController: ActorRef` param lifted to `ActorRef[SNAPSyncController.Command]`. `SNAPSyncController`: 7 coordinator spawn sites `ctx.self.toClassic` → `ctx.self`.
+- **Scope:** 4 coordinator files + SNAPSyncController + 15 test specs (20 files total)
+- **Sites eliminated:** 7 `.toClassic` from SSC coordinator spawn sites (Cluster F SSC→coordinator). Remaining 3 in SSC (lines 524, 531, 549) are intentional message adapter bridges, not spawn sites.
+- **`.toClassic` count in SSC:** 7 → 3
+
+---
+
 #### `791c0211f` — refactor(8k-A): typed coordinator ref in all 4 SNAP workers; docs `4c333b178`
 - **What:** `AccountRangeWorker`, `ByteCodeWorker`, `StorageRangeWorker`, `TrieNodeHealingWorker` — `coordinator: org.apache.pekko.actor.ActorRef` param lifted to `ActorRef[<Coordinator>.Command]`. Corresponding `ctx.self.toClassic` / `context.self.toClassic` at coordinator spawn sites in each coordinator + `SNAPSyncController` removed (→ `ctx.self`).
 - **Scope:** 6 production files (4 workers + 2 coordinator spawn-site files), 4 test files

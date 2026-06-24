@@ -93,3 +93,23 @@ The inline-cleanup protocol (`inline-cleanup.md`) applies EVERYWHERE except
 consensus-critical paths. In those paths: flag patterns for specialist review,
 do not fix opportunistically. Write the flag in the continuation file or
 surface it to the user.
+
+---
+
+## Post-implementation caller verification
+
+After any consensus-boundary change, before closing the task, grep for callers
+of the changed types in non-consensus files:
+
+```bash
+grep -rn "ChangedType\|ChangedMessage\|newMethodName" src/main/ --include="*.scala" \
+  | grep -v "consensus/\|vm/\|crypto/\|domain/\|network/p2p/messages/"
+```
+
+For each caller not in scope for this task:
+- If the caller uses Classic bridge patterns (`.toClassic`, `ctx.toClassic.sender()`) against the
+  updated API → add a CHASE-QUEUE entry (`type: CLASSIC`) so the bridge is not forgotten
+- If the caller has a stale method signature after the change → surface to user for triage
+
+Consensus changes often require coordinated updates in the surrounding non-consensus call sites.
+Skipping this step leaves Classic bridge debt that compiles fine but accumulates silently.

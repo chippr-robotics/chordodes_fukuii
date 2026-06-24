@@ -53,6 +53,14 @@ Signals that deletion is correct:
 **Action:** grep-verify 0 callers, delete, compile-all (0 errors), commit with
 rationale: what it was, why it was dead, what superseded it.
 
+Before issuing the delete, also check for test-only callers:
+```bash
+grep -rn "ClassName\|methodName" src/test/ --include="*.scala"
+```
+If the candidate appears only in test sources: treat as WIRE, not DELETE. The test is either
+(a) testing behavior that needs the candidate wired to production code, or (b) itself dead.
+For (b), add a CHASE-QUEUE entry (`type: DEAD-TEST`) rather than silently dropping the test.
+
 ### DEFER — uncertain, needs context
 
 Signals that the decision should be escalated:

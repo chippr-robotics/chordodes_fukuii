@@ -183,6 +183,45 @@ Record: list of caller files and whether they're in-scope for this session.
 
 ---
 
+### 13. Constructor params — spawn-site `.toClassic` audit (MANDATORY)
+
+**This step is the primary cause of post-migration `.toClassic` slippage.** Migrating an actor's
+internals without updating its constructor params leaves every Typed caller still writing `.toClassic`
+at the spawn site — the bridge survives invisibly because it compiles fine.
+
+```bash
+# Find all Classic ActorRef params in this actor's constructor
+grep -n "ActorRef\b" src/main/scala/path/to/ActorName.scala \
+  | grep -v "typed\.ActorRef\|ActorRef\[" \
+  | head -20
+
+# Find all spawn sites in Typed callers
+grep -rn "ActorName\b\|ActorName\.apply\|Props(.*ActorName" src/main/ --include="*.scala" \
+  | grep -v "//\|Spec\|test"
+```
+
+For each Classic `ActorRef` param found:
+1. **Update the param** from `ActorRef` to `ActorRef[T]` where T is the specific message type
+   the caller should send (or `ActorRef[Any]` if the adapter pattern requires it).
+2. **Update all spawn sites**: callers that currently write `someTypedRef.toClassic` or
+   `externalAdapter.toClassic` to fill this param can drop `.toClassic` once the type is updated.
+3. **If the caller is not in scope for this session**: add a CHASE-QUEUE entry (`type: CLASSIC`)
+   flagging the spawn site so it is not forgotten.
+
+**Do not close a LOOM migration without either:**
+- Updating all constructor `ActorRef` params to `ActorRef[T]`, OR
+- Adding CHASE-QUEUE entries for each param that cannot be updated yet (with the gate condition)
+
+**Consensus-boundary spawn sites:** For each spawn site found, check whether the caller
+file is in `consensus/`, `vm/`, `crypto/`, `domain/`, or `network/p2p/messages/`. If yes:
+- Do NOT update the param type without FORGE (ETC) or BEACON (ETH) review
+- Add a CHASE-QUEUE entry flagged `consensus-boundary — route to FORGE/BEACON before updating`
+- The actor's internal Typed migration can proceed, but the spawn-site param update is gated on specialist review
+
+Record: param names, their proposed typed equivalent, and which spawn sites are affected.
+
+---
+
 ## Pre-flight facts block format (for LOOM prompt)
 
 ```

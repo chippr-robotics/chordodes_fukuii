@@ -86,12 +86,21 @@ the compiler will reject it with "cannot override final member."
 - `JsonMethodsImplicits.formats` — multiple subclasses override the base formats
   for different RPC namespaces
 
-**Rule:** Before converting any `implicit val/lazy val` to `given`, grep for
-subclass overrides:
+**Rule:** Before converting any `implicit val/lazy val` to `given`, run a two-pass grep:
+
 ```bash
-# Check if anything overrides the target field
+# Pass 1 — direct override in any subclass
 grep -rn "override.*implicit.*<fieldName>\|override.*given.*<fieldName>" src/ --include="*.scala"
+
+# Pass 2 — indirect: find all types that extend the parent, then check each for override
+grep -rn "extends.*<ParentTrait>\|with.*<ParentTrait>" src/ --include="*.scala"
+# For each found intermediate type, re-run pass 1 against that type name
 ```
+
+Pass 1 catches direct subclass overrides. Pass 2 catches chains where a concrete
+class extends an intermediate trait that itself overrides — the intermediate trait
+may not use the keyword `override` if it's the first override in the chain.
+If ANY type in the hierarchy overrides the field, leave it as `implicit val/lazy val`.
 
 If any override exists anywhere in the hierarchy, leave it as `implicit val/lazy
 val` and add a comment:

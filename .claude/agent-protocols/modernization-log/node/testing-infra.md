@@ -190,10 +190,11 @@ All 5 ETH coverage gaps closed:
   - 777 Classic `TestProbe` without `[T]` (requires ActorTestKit migration)
   - 20 `fishForMessage` PF[Any,Boolean] sites in 11 files (replace with `expectMessageType[T]` post-§8a)
   - Both in intentional 333 E165 floor; see DEFERRED-BACKLOG §8a research prompt.
-- **Wall-clock assertions** — 3 known test files; S5 sweep (CODEBASE-AUDIT) not yet run
-- **TestKit Batch 5** — DEFERRED-BACKLOG §8a-retro batch 5 (F4)
-- **E5b** — `application-test.conf` infra fix — DEFERRED-BACKLOG Part 8
+- ~~**Wall-clock assertions** — 3 known test files; S5 sweep (CODEBASE-AUDIT) not yet run~~ — ✅ DONE 2026-06-22 — S5 EYE sweep confirmed walls in known files only, no new ones discovered
+- ~~**TestKit Batch 5**~~ — ✅ DONE 2026-06-23 (`5ff14017b`) — 2 migrated (`BlockFetcherSpec`, `PendingTransactionsManagerSpec`); 8 deferred to Wave 3 network sprint (see DEFERRED-BACKLOG §8a "Remaining (blocked)"). `WithActorSystemShutDown.scala` stays until last deferred spec migrates (tracked in CHASE-QUEUE).
+- ~~**E5b** — `application-test.conf` infra fix~~ — ✅ DONE `8b9bef67d` — see "application-test.conf — E5b (COMPLETE)" section above
 - ~~**E5c** — worker teardown leak audit~~ — ✅ DONE 2026-06-23 (`722576ef4`) — no leaks found; see above
 - ~~**E5d** — TestProbe narrowing~~ — ✅ DONE 2026-06-23 (`a193bc794`) — 141/141; E165 floor 92→65
 - ~~**E5e** — `actorSelection` worker-ref cleanup~~ — ✅ DONE 2026-06-23 (`5f28e8ae6`) — 40/40
-- `PeerRequestHandler` `ClassTag` unsound → `TypeTest[A,B]` — deferred
+- `PeerRequestHandler` `ClassTag` unsound → `TypeTest[A,B]` — deferred (DEFERRED-BACKLOG Part 1 warnings)
+- Wave 3 deferred specs (8): `RegularSyncSpec`, `PeerActorSpec`, `PeerActorHandshakingSpec`, `RLPxConnectionHandlerSpec`, `CalibratePivotTDSpec`, `ChainWeightCalibrationSpec`, `SyncControllerSpec` — all gated on respective actor migrations in Wave 3 network sprint (DEFERRED-BACKLOG §8a "Remaining (blocked)")

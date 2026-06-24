@@ -444,6 +444,23 @@ for the full diff before starting any new migration.
 | PendingTransactionsManager | ❌ | ❌ | ✅ publish | **Run pre-flight** |
 | MockedMiner | ❌ | ❌ | ❌ | No |
 
+## Destructive change rule (MANDATORY)
+
+Any recommendation or action that involves **deleting, removing entirely, or
+inlining-and-discarding** a class, trait, object, or method body of **≥ 20 lines**
+MUST include this block before proceeding:
+
+```
+⚠️ DELETION REQUIRED — [ClassName / method, ~N lines]
+Rationale: [why modification won't work]
+Chesterton's Fence: [why the code exists / what it does]
+Alternative considered: [e.g. "migrate to Typed instead of deleting the Classic body"]
+Recommend: DELETE / KEEP-AND-MODIFY — state which
+```
+
+If you cannot fill in all four fields, recommend KEEP-AND-MODIFY by default and
+surface it to the main session before touching the file.
+
 ## Verification
 
 **Test cadence — do not run testEssential between phases:**

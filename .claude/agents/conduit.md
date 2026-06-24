@@ -129,6 +129,23 @@ sbt "testOnly *SubscriptionManager*"       # WebSocket subscriptions
 sbt "testOnly *JsonRpc*"                   # all JSON-RPC tests
 ```
 
+## Destructive change rule (MANDATORY)
+
+Any recommendation or action that involves **deleting, removing entirely, or
+inlining-and-discarding** a class, trait, object, or method body of **≥ 20 lines**
+MUST include this block before proceeding:
+
+```
+⚠️ DELETION REQUIRED — [ClassName / method, ~N lines]
+Rationale: [why modification won't work]
+Chesterton's Fence: [why the code exists / what it does]
+Alternative considered: [e.g. "deprecate the endpoint instead of removing the handler"]
+Recommend: DELETE / KEEP-AND-MODIFY — state which
+```
+
+If you cannot fill in all four fields, recommend KEEP-AND-MODIFY by default and
+surface it to the main session before touching the file.
+
 ## Discipline
 
 - Read the controller and serialization layer before diagnosing — most bugs are

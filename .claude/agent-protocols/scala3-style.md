@@ -60,6 +60,12 @@ grep -rn "implicit val\|implicit def\|implicit lazy val" src/main/ --include="*.
 Ratchet: GivenUsing scalafix rule — add to `.scalafix.conf` after confirming
 override-chain `implicit val` sites are excluded from the rule.
 
+**Scalafix rule ordering (CRITICAL):** Apply S3 before S4. Extension method bodies
+that call `given`-converted implicits need the new import form (`import X.{given, *}`)
+already in place. Applying S4 (extension methods) first creates false positives: the
+extension body compiles against the old `implicit` import but fails after S3 converts
+the implicit to a `given`. Order: **S3 → S4 → S5 → S6**.
+
 **Operational gotchas (discovered P3a):** See `scala3-given-migration.md` for:
 - G1: `import X.{given, *}` required at call sites after companion conversion
 - G2: anonymous `given` instances need explicit type annotations

@@ -142,6 +142,24 @@ the codebase evolves quickly. If a path has moved, search for the file by name.
 - Wire-protocol message format must match the negotiated capability (ETH68/ETH69).
 - Stack depth limit 1024 enforced; gas costs exact to spec.
 
+## Destructive change rule (MANDATORY)
+
+Any recommendation or action that involves **deleting, removing entirely, or
+inlining-and-discarding** a class, trait, object, or method body of **≥ 20 lines**
+MUST include this block before proceeding:
+
+```
+⚠️ DELETION REQUIRED — [ClassName / method, ~N lines]
+Rationale: [why modification won't work]
+Chesterton's Fence: [why the code exists / what it does]
+Alternative considered: [e.g. "disable via fork timestamp guard instead of deleting"]
+Recommend: DELETE / KEEP-AND-MODIFY — state which
+```
+
+If you cannot fill in all four fields, recommend KEEP-AND-MODIFY by default and
+surface it to the main session before touching the file. Consensus-code deletions
+are one-way doors — when in doubt, guard behind a fork timestamp rather than delete.
+
 ## Verification (run, do not assume)
 
 ```bash

@@ -105,6 +105,23 @@ For mechanical fixes on genuinely unmigrated files, the compiler can rewrite whe
 but check Wave 1 is complete first. Do not run `-source:3.0-migration -rewrite` on the
 fukuii codebase; Wave 1 already applied it.
 
+## Destructive change rule (MANDATORY)
+
+Any recommendation or action that involves **deleting, removing entirely, or
+inlining-and-discarding** a class, trait, object, or method body of **≥ 20 lines**
+MUST include this block before proceeding:
+
+```
+⚠️ DELETION REQUIRED — [ClassName / method, ~N lines]
+Rationale: [why modification won't work]
+Chesterton's Fence: [why the code exists / what it does]
+Alternative considered: [e.g. "add @nowarn annotation instead of removing the code"]
+Recommend: DELETE / KEEP-AND-MODIFY — state which
+```
+
+If you cannot fill in all four fields, recommend KEEP-AND-MODIFY by default and
+surface it to the main session before touching the file.
+
 ## Discipline
 
 - One pattern category at a time: fix, compile, confirm, then the next category.

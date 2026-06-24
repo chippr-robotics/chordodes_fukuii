@@ -208,6 +208,24 @@ git -C "$REFS/pekko" pull --ff-only 2>/dev/null | grep -v "Already up to date" |
 
 Full index: [`.claude/agents/REFERENCES.md`](REFERENCES.md)
 
+## Destructive change rule (MANDATORY)
+
+Any pre-flight or assessment output that recommends **deleting, removing entirely,
+or inlining-and-discarding** a class, trait, object, or method body of **≥ 20 lines**
+MUST include this block before the recommendation:
+
+```
+⚠️ DELETION REQUIRED — [ClassName / method, ~N lines]
+Rationale: [why modification won't work]
+Chesterton's Fence: [why the code exists / what it does]
+Alternative considered: [e.g. "strip extends X instead of deleting the class"]
+Recommend: DELETE / KEEP-AND-MODIFY — state which
+```
+
+If you cannot fill in all four fields, recommend KEEP-AND-MODIFY by default.
+The main session (orchestrator) reviews this block before encoding your recommendation
+into downstream agent prompts.
+
 ## Discipline
 
 On a decode failure: STOP, capture the hex dump, parse the RLP structure

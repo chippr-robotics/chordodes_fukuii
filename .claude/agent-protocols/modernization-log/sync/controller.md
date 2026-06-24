@@ -70,12 +70,21 @@
 
 ---
 
+## Classic Interop — §8k-G (COMMITTED `2ef2b6637`, testEssential pending)
+
+#### `2ef2b6637` — refactor(8k-G): OQ-5 kill — SyncProtocol ADT + SyncController sender() elimination (Cluster C)
+- **What:** Cluster C — `ctx.toClassic.sender()` in `SyncController.scala` / `SyncProtocol.scala` eliminated. `GetStatus`, `ResetFastSync`, `RestartFastSync` lifted to `final case class` with `replyTo: ActorRef[T]`. All `ctx.toClassic.sender()` sites replaced with `cmd.replyTo !`.
+- **Cross-refs:** `api/jsonrpc.md` (Cluster L — jsonrpc services updated), `node/bootstrap.md` (Cluster K — NodeBuilder syncController type lifted)
+- **Cluster E deferred:** `externalAdapter.toClassic` at spawn sites — per-child constructor param issue, not OQ-5. Tracked in §8k-G2 + CHASE-QUEUE.
+
+---
+
 ## Open / Deferred
 
-- W4: `ctx.self ! cmd` re-delivers wrapped Command (document invariant) — deferred
-- W15: `unwrap returns Any` — Wave 3 LOOM gate (`WrappedExternal` elimination)
-- INFO-9: `GetHandshakedPeersCmd.replyTo: ActorRef` untyped — Network/P2P sprint
+- W4: `ctx.self ! cmd` re-delivers wrapped Command (document invariant) — deferred; add by-design comment at call site during Network/P2P sprint
+- W15: `unwrap returns Any` — Wave 3 LOOM gate (`WrappedExternal` elimination; partially reduced by §8k-G but not fully eliminated)
+- ~~INFO-9: `GetHandshakedPeersCmd.replyTo: ActorRef` untyped~~ — ✅ DONE `c42316b39` §8k-E
 - ~~§P9-NOTCHANGE: SyncControllerSpec:243~~ — ✅ DONE 2026-06-23 (`37037a89b` + `5a12c7f09`) — see `sync/fast.md`
 - ~~`handleRegularSyncMsg:895-897` catch-all `FastSync.Done` bug~~ — ✅ DONE 2026-06-23 (`ab98f1370`)
-- §8a-retro batch 5: `SyncControllerSpec`, `CalibratePivotTDSpec`, `ChainWeightCalibrationSpec` — deferred comments added; Wave 3 gate
+- §8a-retro batch 5: `SyncControllerSpec`, `CalibratePivotTDSpec`, `ChainWeightCalibrationSpec` — deferred comments added; gate on SyncController actor migration (Wave 3)
 - ~~§P9-FRESHPIVOT: SyncControllerSpec:393~~ — ✅ DONE 2026-06-23 (`083f08836`) — two concurrent races: (1) `CombinedRecoveryScanActor` completes early on ForkJoinPool → `clearFastSyncState()` → `getSyncState()=None`; (2) recovery path sets `stateDownloadStarted=true` pre-storage-update → wrong pivot in a synchronous check outside `eventually`. Fix: kept `eventually` unified; replaced `.get` with `.map(_.pivotBlock).getOrElse(defaultPivotBlockHeader)` — safe for all three terminal states. 88/88 × 3 consecutive full-suite runs.

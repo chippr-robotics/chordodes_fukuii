@@ -42,6 +42,14 @@ Mark **risk-path? = YES** for anything in consensus-critical code:
 
 **Present the triage table and STOP. Wait for user approval before any edits.**
 
+**Bucket-C consensus gate:** Before Step 2 begins, check whether any bucket-C items
+are in consensus-critical paths (`consensus/`, `vm/`, `crypto/`, `domain/`,
+`network/p2p/messages/`). If yes:
+- Remove those items from Step 2's scope entirely
+- Add them to CHASE-QUEUE with a `FORGE-gate` (ETC) or `BEACON-gate` (ETH) note
+- Do not include them in the mechanical commit, and do not attempt to prove them
+  behavior-preserving without specialist review — the cost of a wrong call is a chain fork
+
 ---
 
 ## Step 2 — Fix, split strictly by risk (after approval)

@@ -88,10 +88,29 @@ Note: `ServerActor` and `RLPxConnectionHandler` intentionally remain Classic TCP
 
 ---
 
+## Classic Interop — §8k-E (COMPLETE)
+
+#### `c42316b39` — refactor(8k-E): typed GetHandshakedPeersCmd replyTo in NPMA; docs `7bd607a87`
+- **What:** `NPMA.GetHandshakedPeersCmd(replyTo: ActorRef)` → `ActorRef[HandshakedPeers]`. 15 `.toClassic` bridge sites removed across 10 files: `FastSync`, `SyncStateSchedulerActor`, `PeersClient`, `BlockBroadcaster`, `ChainDownloader`, `SNAPSyncController`, `PivotBlockSelector`, `FastSyncBranchResolverActor`, `SyncController`, `NetworkPeerManagerActor`.
+- **Sites eliminated:** ~15 `handshakedPeersAdapter.toClassic` → pass `ActorRef[HandshakedPeers]` directly (Cluster B)
+
+---
+
+## Classic Interop — §8k-D (COMPLETE)
+
+#### `93bcedb12` — refactor(8k-D): typed PeerEventBus subscriber protocol — ~27 bridge sites eliminated; docs `8748d6e35`
+- **What:** `PeerEventBusActor.SubscribeCmd(subscriber: ActorRef)` → `ActorRef[PeerEvent]`. 21 files changed (HERALD initial count was 11; cascade subscribers in SNAP/sync actors added 10 more). Clusters A+M bridge sites removed.
+- **PeerEventBus:** `extends ActorEventBus` binding stripped (routing logic untouched). Internal Classic registry preserved — only subscriber param type lifted.
+- **BlockFetcher:** `subscribeAdapter` child actor removed; replaced with direct `messageAdapter[PeerEvent]`.
+- **Left in place:** `PeerEventBusActor.scala:44` `.watch(peerEventBus.toClassic)` — specified as intentional.
+- **Verification:** 10/10 `PeerEventBusActorSpec`; `RegularSyncSpec` 33/34 (1 pre-existing DisabledTest timeout, unrelated, tagged since `86c76fd4e`)
+
+---
+
 ## Open / Deferred
 
 - W7: 900-line NPMA `Impl` with 9 responsibilities — Wave 3 LOOM gate (Network/P2P sprint)
-- INFO-9: `GetHandshakedPeersCmd.replyTo: ActorRef` untyped — Network/P2P sprint
+- ~~INFO-9: `GetHandshakedPeersCmd.replyTo: ActorRef` untyped~~ — closing in §8k-E (running)
 - `PeerRequestHandler` `ClassTag` unsound → `TypeTest[A,B]` — deferred
 - 35 remaining Classic actors in devp2p/rlpx (Wave 3 network migration plan complete, implementation not started)
 - §8a-retro batch 5: `PeerActorSpec` deferred — `TestActorRef` is Classic-only; migrate when PeerActor is Typed (Wave 3 network sprint)

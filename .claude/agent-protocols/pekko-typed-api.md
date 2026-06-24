@@ -191,6 +191,21 @@ ctx.watchWith(child, ChildStopped(child.path.name))
 ctx.watch(child)  // then: case Terminated(ref) => ...  (weaker typing)
 ```
 
+**Migration check — Classic peers that expected `Terminated`:**
+
+When migrating `context.watch` → `context.watchWith`, grep for Classic callers that
+relied on receiving `Terminated` from this actor's watched children as a lifecycle signal:
+
+```bash
+grep -rn "Terminated" src/main/ --include="*.scala" | grep -i "ActorName\|ChildName"
+```
+
+Classic actors watching a peer received `Terminated` automatically via the death watch
+system. After migrating to `watchWith`, the Typed actor sends a specific Command
+(e.g., `ChildStopped`) instead — `Terminated` is no longer propagated. Any Classic
+peer that relied on `Terminated` for lifecycle coordination must be updated or given
+an adapter. Add a CHASE-QUEUE entry for each such caller not in scope.
+
 ---
 
 ## P10 — Internal Commands for Future → actor-state writes
@@ -446,6 +461,56 @@ pekko.actor.default-dispatcher.throughput = 1
 | `preStop` / `postStop` override in Typed | Classic API | `PostStop` signal |
 | `ScalaTestWithActorTestKit()` bare ctor without `application-test.conf` | `sync-dispatcher` not found → `ConfigurationException` | Create `application-test.conf` (P14 / §8a-infra) |
 | `testKit.stop(classicWorkerRef)` | Silent no-op; worker resource leak | `testKit.system.classicSystem.stop(workerRef)` (P15 / §8a-infra-b) |
+
+---
+
+## P16 — Constructor params must use `ActorRef[T]`, not Classic `ActorRef`
+
+**Status:** Enforced in all migrated actors. The single most common source of spawn-site `.toClassic` slippage.
+
+When a Typed actor is spawned by another Typed actor, every constructor param that holds a ref to another
+actor must use `typed.ActorRef[T]`, not Classic `ActorRef`. A Classic param forces the spawning caller to
+write `typedRef.toClassic` at the spawn site — the bridge is invisible to the type checker but real tech debt.
+
+```bash
+# Find Typed actors with Classic ActorRef constructor params (grep the constructor line)
+grep -rn "class.*\(.*ActorRef\b" src/main/ --include="*.scala" \
+  | grep -v "typed\.ActorRef\|ActorRef\[" \
+  | grep -v "//.*ActorRef"
+# Target: 0 hits in fully-migrated Typed actors
+```
+
+**During a LOOM migration** (pre-CAPSTONE): updating constructor params is MANDATORY as part of the
+migration commit — not deferred. For each Classic `ActorRef` param:
+1. Change the param type to `ActorRef[T]` where T is the most specific message type the actor sends to it.
+   Use `ActorRef[Any]` only when the actor sends multiple unrelated types through a message adapter.
+2. Update internal usages — the `!` operator works identically on Classic and Typed refs; type changes only.
+3. Update all spawn sites to drop `.toClassic` at the call site.
+4. If a spawn site is in a file out of scope for this LOOM session, add a CHASE-QUEUE entry (type: CLASSIC).
+
+**Do NOT close a LOOM migration with Classic `ActorRef` params remaining.** If a param truly cannot be
+updated yet (e.g., because a shared command ADT is not owned by this actor), add the CHASE-QUEUE entry
+and document the gate condition.
+
+**Prefer:**
+```scala
+// Typed actor with typed refs — callers spawn cleanly, no .toClassic needed
+class FastSync(
+  syncController: ActorRef[SyncController.Command],  // ✅ typed
+  peerManager: ActorRef[PeerManagerActor.Command],   // ✅ typed
+  ...
+)
+```
+
+**Avoid:**
+```scala
+// Classic params survive migration — force callers to write .toClassic forever
+class FastSync(
+  syncController: ActorRef,  // ❌ Classic — every spawn site adds .toClassic
+  peerManager: ActorRef,     // ❌ Classic
+  ...
+)
+```
 
 ---
 
