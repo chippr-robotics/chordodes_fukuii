@@ -1,6 +1,6 @@
 # Fukuii Modernization — Deferred Backlog
 
-**Last updated**: 2026-06-24 (§9b DONE — divergence-path test written; §9d DONE — getSyncStatus TestProbe fix, 34/34 pass)
+**Last updated**: 2026-06-24 (§8k-G4a+G4b DONE `8c23a294e`; §8k-G4c-extended added — CalibrateChainWeightNow non-Cmd mismatch surfaced by G4b loom run)
 **Purpose**: Single reference for all deferred cleanup work — completed items,
 active deferred items, and follow-up sprint plans.
 
@@ -664,8 +664,8 @@ slower than dev machine → timeouts). `@Ignore` annotations silently hide untes
 
 **Agent:** MITHRIL
 **Risk:** LOW-MEDIUM per sub-task
-**Gate:** G4a: none. G4b: NPMA Classic shell wiring investigation. G4c: requires prior investigation.
-**Sub-tasks:** Three independent sites. Run in order G4a → G4b → G4c.
+**Gate:** G4a: none. G4b: NPMA Classic shell wiring investigation. G4c: requires prior investigation. G4c-ext: none. G4d: none. G4e: none. G4-FINAL: all G4a-G4e+G4c-ext done.
+**Sub-tasks:** Six typed-narrowing tasks + one deletion. G4a/G4c-ext/G4d/G4e are independent and can run in any order. G4b/G4c require prior investigation. G4-FINAL is the gate-keeper that removes externalAdapter.
 
 ---
 
@@ -820,6 +820,263 @@ Step 4 — In either case: remove .toClassic. Ensure no Classic ActorRef is used
   sbt compile-all, then targeted test: ./local/scripts/fukuii-test SNAPSyncControllerSpec
 
 Commit: "refactor(8k-G4c): [result of investigation] NPMA RegisterSnapSyncController — [intentional relay|bug fix]"
+```
+
+---
+
+**§8k-G4c-extended — SyncController sends CalibrateChainWeightNow (non-Cmd) to NPMA — both sites silently dropped** (small, no investigation needed)
+
+**Agent:** MITHRIL
+**Risk:** LOW — two call-site substitutions; no logic change
+**Gate:** None — independent of §8k-G4c
+**Context:** Surfaced by the §8k-G4b loom run. `handleMessages` in NPMA matches `CalibrateChainWeightNowCmd`
+(the Typed Command variant), but SyncController sends `CalibrateChainWeightNow` (the Classic-shell non-Cmd
+variant) at two sites. Both sends are silently dropped by the Typed dispatcher — the calibration round-trip
+started by §8k-G4b's `RegisterChainWeightCalibrationTargetCmd` fix never completes until this is resolved.
+
+**Two sites in SyncController.scala:**
+- Line ~1667 — `CalibrateChainWeightNow` sent inside the `FetchBlockHeaders` response handler
+- Line ~2312 — `CalibrateChainWeightNow` sent inside the recovery/restart handler
+
+**Fix:** At both sites, replace `CalibrateChainWeightNow(...)` → `CalibrateChainWeightNowCmd(...)`. No adapter
+needed — `CalibrateChainWeightNowCmd` extends `Command` and is sent directly to the Typed NPMA ref.
+
+**Resolution prompt:**
+```
+Fix §8k-G4c-extended: SyncController sends CalibrateChainWeightNow (non-Cmd) to NPMA at two sites; both
+are silently dropped because NPMA's handleMessages only matches CalibrateChainWeightNowCmd.
+
+Step 1 — Locate the two send sites:
+  grep -n "CalibrateChainWeightNow" \
+    src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala
+  Confirm exactly two non-Cmd hits (the Cmd variant should not appear at call sites yet).
+
+Step 2 — Read NPMA.scala to confirm CalibrateChainWeightNowCmd is the Typed Command:
+  grep -n "CalibrateChainWeightNow" \
+    src/main/scala/com/chipprbots/ethereum/network/NetworkPeerManagerActor.scala
+  Confirm: CalibrateChainWeightNowCmd extends Command; CalibrateChainWeightNow is the Classic-shell wrapper.
+
+Step 3 — At both SyncController sites, replace:
+  networkPeerManager ! CalibrateChainWeightNow(...)
+  with:
+  networkPeerManager ! CalibrateChainWeightNowCmd(...)
+  (The import for the Cmd variant should already exist from the RegisterChainWeightCalibrationTargetCmd work.)
+
+Step 4 — sbt compile-all. Fix any import errors.
+
+Step 5 — sbt scalafmtAll.
+
+Step 6 — Verify no non-Cmd variant remains at SyncController call sites:
+  grep -n "CalibrateChainWeightNow[^C]" \
+    src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala
+  Expected: 0 hits (only CalibrateChainWeightNowCmd should appear).
+
+Do NOT commit — user commits manually.
+
+Commit message: "fix(8k-G4c-ext): SyncController sends CalibrateChainWeightNowCmd not Classic-shell variant"
+```
+
+---
+
+**§8k-G4d — GetHandshakedPeersCmd: narrow reply-target from TypedActorRef[Any] → TypedActorRef[HandshakedPeers]** (3 send sites)
+
+**Agent:** MITHRIL
+**Risk:** LOW — changes a field type and 3 call sites; no logic change
+**Gate:** None — independent of G4a/b/c
+**Context:** §8k-G3-SSC eliminated SSC's use of `externalAdapter`. Three remaining sites still pass `externalAdapter: TypedActorRef[Any]` to `GetHandshakedPeersCmd`:
+- SyncController.scala line ~687 (healing-serve-root path — `RequestHealingServeRoot` handler)
+- SyncController.scala line ~2049 (recovery `runningRecovery` — `PollRecoveryPeers` handler)
+- SyncController.scala line ~2076 (recovery recentRootRequester path)
+
+NPMA sends exactly ONE message type in response: `NetworkPeerManagerActor.HandshakedPeers(peers)`.
+
+**Solution:**
+```scala
+// NetworkPeerManagerActor.scala — narrow the cmd field:
+// Before: final case class GetHandshakedPeersCmd(replyTo: TypedActorRef[Any]) extends Command
+// After:
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers
+final case class GetHandshakedPeersCmd(replyTo: TypedActorRef[HandshakedPeers]) extends Command
+
+// SyncController.scala — create one shared adapter and use at all 3 sites:
+val handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers] =
+  ctx.messageAdapter[NetworkPeerManagerActor.HandshakedPeers](WrappedExternal.apply)
+// Replace externalAdapter → handshakedPeersAdapter at lines ~687, ~2049, ~2076
+```
+
+**Resolution prompt:**
+```
+Implement §8k-G4d: narrow GetHandshakedPeersCmd.replyTo from TypedActorRef[Any] to TypedActorRef[HandshakedPeers].
+
+Goal: all 3 SyncController call sites that pass externalAdapter to GetHandshakedPeersCmd are replaced with a
+typed per-use adapter. This is Scala 3.3.8 + Pekko 1.6 Typed best practice — no ActorRef[Any] on wire.
+Do NOT commit — the user will review and commit manually.
+
+Step 1 — Read these files:
+  src/main/scala/com/chipprbots/ethereum/network/NetworkPeerManagerActor.scala
+    (find GetHandshakedPeersCmd definition; confirm replyTo field type and where HandshakedPeers is defined)
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala
+    (lines 680-695, 2040-2060, 2070-2085 — the three GetHandshakedPeersCmd call sites)
+    (lines 440-448 — existing externalAdapter + adapter pattern to follow)
+
+Step 2 — In NetworkPeerManagerActor.scala:
+  Change: GetHandshakedPeersCmd(replyTo: TypedActorRef[Any]) extends Command
+  To:     GetHandshakedPeersCmd(replyTo: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers]) extends Command
+  Check: wherever NPMA sends HandshakedPeers to replyTo — the send site syntax is unchanged (ref ! HandshakedPeers(...))
+  Check: if there is a Classic-shell variant (non-Cmd) that forwards to the Typed Cmd, update its field type too.
+
+Step 3 — In SyncController.scala, near the existing externalAdapter declaration (around line 440):
+  Add one shared adapter val (alongside snapAdapter, fcmAdapter etc.):
+    val handshakedPeersAdapter: org.apache.pekko.actor.typed.ActorRef[
+      com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers] =
+      ctx.messageAdapter[com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers](
+        WrappedExternal.apply)
+  Replace externalAdapter → handshakedPeersAdapter at all 3 GetHandshakedPeersCmd call sites.
+
+Step 4 — sbt compile-all. Fix any errors.
+
+Step 5 — sbt scalafmtAll.
+
+Step 6 — Verify:
+  grep -n "GetHandshakedPeersCmd" src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala
+  All occurrences must use handshakedPeersAdapter (or equivalent typed ref), not externalAdapter.
+  grep -n "externalAdapter" src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala
+  Count should be lower than before this change (3 fewer production usages).
+
+Report: files changed, compile result, grep counts before/after.
+```
+
+---
+
+**§8k-G4e — PivotHeaderBootstrap.replyTo: narrow from TypedActorRef[Any] → TypedActorRef[PivotBootstrapReply]** (2 spawn sites)
+
+**Agent:** MITHRIL
+**Risk:** LOW — changes a constructor param type and 2 spawn sites; no logic change
+**Gate:** None — independent of G4a/b/c/d
+**Context:** Two remaining spawn sites pass `replyTo = externalAdapter` to `PivotHeaderBootstrap`:
+- SyncController.scala line ~767 (healing-serve-root bootstrap — spawned inside `RequestHealingServeRoot` handler)
+- SyncController.scala line ~2158 (recovery recent-root bootstrap — spawned inside `recentRootRequester` handler)
+
+`PivotHeaderBootstrap` sends exactly two message types back to its `replyTo`: `Completed` and `Failed`
+(both defined in the PHB companion object).
+
+**Solution:**
+```scala
+// PivotHeaderBootstrap.scala — narrow the replyTo param:
+// Likely already: sealed trait Reply / case class Completed(...) extends Reply / case class Failed(...) extends Reply
+// If no sealed trait exists, add one:
+sealed trait PivotBootstrapReply
+final case class Completed(...) extends PivotBootstrapReply
+final case class Failed(...)    extends PivotBootstrapReply
+
+// Change constructor: replyTo: TypedActorRef[Any] → TypedActorRef[PivotHeaderBootstrap.PivotBootstrapReply]
+
+// SyncController.scala — create one shared adapter (or two independent ones) and pass at spawn sites:
+val pivotBootstrapAdapter: TypedActorRef[PivotHeaderBootstrap.PivotBootstrapReply] =
+  ctx.messageAdapter[PivotHeaderBootstrap.PivotBootstrapReply](WrappedExternal.apply)
+// Replace replyTo = externalAdapter → replyTo = pivotBootstrapAdapter at lines ~767, ~2158
+```
+
+**Resolution prompt:**
+```
+Implement §8k-G4e: narrow PivotHeaderBootstrap.replyTo from TypedActorRef[Any] to a typed reply trait.
+
+Goal: both SyncController spawn sites that pass externalAdapter as PivotHeaderBootstrap.replyTo are replaced
+with a typed per-use adapter. This is Scala 3.3.8 + Pekko 1.6 Typed best practice.
+Do NOT commit — the user will review and commit manually.
+
+Step 1 — Read these files:
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/PivotHeaderBootstrap.scala
+    (find the replyTo field in apply/Impl; find all message types sent to replyTo — likely Completed + Failed)
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala
+    (lines 760-780 and 2150-2170 — the two spawn sites)
+    (lines 440-448 — existing adapter pattern to follow)
+
+Step 2 — In PivotHeaderBootstrap.scala:
+  Check if Completed and Failed already share a sealed parent (e.g. sealed trait Reply).
+  If they do: use that type. If they don't: add one:
+    sealed trait PivotBootstrapReply
+    (have Completed and Failed extend it)
+  Change both constructor sites (apply factory + Impl class):
+    replyTo: TypedActorRef[Any] → TypedActorRef[PivotHeaderBootstrap.PivotBootstrapReply]
+  Change all send sites (ref ! Completed(...), ref ! Failed(...)) — syntax unchanged, type now enforced.
+
+Step 3 — In SyncController.scala, near the existing adapter declarations (around line 440):
+  Add a shared adapter val:
+    val pivotBootstrapAdapter: org.apache.pekko.actor.typed.ActorRef[
+      com.chipprbots.ethereum.blockchain.sync.snap.PivotHeaderBootstrap.PivotBootstrapReply] =
+      ctx.messageAdapter[...PivotHeaderBootstrap.PivotBootstrapReply](WrappedExternal.apply)
+  Replace replyTo = externalAdapter → replyTo = pivotBootstrapAdapter at both spawn sites.
+  Note: the spawn also calls .toClassic on the returned ActorRef (val bootstrap = ctx.spawn(...).toClassic).
+  That .toClassic is the spawn-site bridge to the Classic PivotHeaderBootstrap actor — leave it unless
+  PivotHeaderBootstrap itself has been migrated to Typed already. Only remove the replyTo externalAdapter usage.
+
+Step 4 — sbt compile-all. Fix any errors.
+
+Step 5 — sbt scalafmtAll.
+
+Step 6 — Verify:
+  grep -n "PivotHeaderBootstrap\|replyTo.*externalAdapter\|externalAdapter.*replyTo" \
+    src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala
+  No remaining `replyTo = externalAdapter` at PivotHeaderBootstrap spawn sites.
+
+Report: whether a sealed trait existed or was added, files changed, compile result.
+```
+
+---
+
+**§8k-G4-FINAL — Remove externalAdapter entirely once G4a + G4b + G4c + G4d + G4e are all done**
+
+**Agent:** MITHRIL
+**Risk:** LOW — deletion of a dead val and its declaration comment; no logic change
+**Gate:** ALL of §8k-G4a, §8k-G4b, §8k-G4c, §8k-G4c-extended, §8k-G4d, §8k-G4e must be committed first.
+**Goal:** Completes the full Pekko Typed modernization of `SyncController` — zero `TypedActorRef[Any]`
+in production sync-package code, no shared generic adapter, every child speaks a typed narrow interface.
+This is the final step toward a fully Scala 3.3.8 + Pekko 1.6 Typed codebase with zero Classic actor
+remnants in the sync layer.
+
+**What to delete:**
+```scala
+// SyncController.scala — delete this entire block (lines ~440-447 as of 2026-06-24):
+val externalAdapter: TypedActorRef[Any] =
+  ctx.messageAdapter[Any](WrappedExternal.apply)
+// ... and the INFO comment above it that explains the shared adapter
+```
+
+**Pre-deletion check:**
+```bash
+grep -n "externalAdapter" src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala
+# Expected: 0 production usages. Only the declaration itself (which you are about to delete).
+# If any production usages remain: STOP — one of G4a-G4e is incomplete.
+```
+
+**Resolution prompt:**
+```
+Implement §8k-G4-FINAL: remove externalAdapter from SyncController.
+
+GATE: Do NOT run this until all of §8k-G4a, §8k-G4b, §8k-G4c, §8k-G4c-extended, §8k-G4d, §8k-G4e are committed.
+
+Step 1 — Pre-flight check:
+  grep -n "externalAdapter" src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala
+  If any non-comment, non-declaration hits remain: STOP and report which G4 sub-item is incomplete.
+
+Step 2 — If pre-flight passes (only the val declaration line hits):
+  Delete the externalAdapter val declaration and its associated comment block (the INFO-4/INFO-11 block
+  that documents what types arrive via externalAdapter — this is now superseded by per-child adapters).
+  Keep the WrappedExternal case class definition (it is still used by all the per-child adapters).
+  Keep the per-child adapter vals (snapAdapter, fcmAdapter, cwAdapter, etc.).
+
+Step 3 — sbt compile-all. Fix any errors.
+
+Step 4 — sbt scalafmtAll.
+
+Step 5 — Final verification:
+  grep -rn "ActorRef\[Any\]" src/main/scala/com/chipprbots/ethereum/blockchain/sync/
+  Target: 0 hits in production code.
+  grep -n "externalAdapter" src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala
+  Target: 0 hits (the val is gone; remaining references are in comments only if any were left).
+
+Report: lines deleted, compile result, final grep counts. This commit closes the §8k-G cluster.
 ```
 
 ---

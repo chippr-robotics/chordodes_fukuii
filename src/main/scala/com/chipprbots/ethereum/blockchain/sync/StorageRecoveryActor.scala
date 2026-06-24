@@ -19,6 +19,7 @@ import org.slf4j.Logger
 import com.chipprbots.ethereum.blockchain.sync.ProgressMilestones
 import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncConfig
 import com.chipprbots.ethereum.blockchain.sync.snap.StorageTask
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.StorageRanges
 import com.chipprbots.ethereum.blockchain.sync.snap.actors
 import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.db.storage.FlatSlotStorage
@@ -61,6 +62,9 @@ object StorageRecoveryActor {
   private[sync] case class PivotUnservable(rootHash: ByteString, reason: String, emptyResponses: Int) extends Command
   // Catch-all for unexpected SSC messages arriving via the adapter
   private case object DroppedSrcMsg extends Command
+  // SyncController relays SNAP peer responses here so StorageRangeCoordinator receives them
+  // (no SNAPSyncController exists during recovery — SyncController acts as the routing relay).
+  private[sync] case class ForwardStorageRangesResponse(msg: StorageRanges) extends Command
 
   /** SyncController → recovery: a recent canonical `(blockNumber, stateRoot)`, or `stateRoot = None` if none could be
     * fetched (no peers / bootstrap failed).
@@ -427,6 +431,10 @@ object StorageRecoveryActor {
           finishRecovery("coordinator crashed")
 
         case DroppedSrcMsg => Behaviors.same
+
+        case ForwardStorageRangesResponse(msg) =>
+          coordinator ! actors.StorageRangeCoordinator.StorageRangesResponseMsg(msg)
+          Behaviors.same
 
         case ScanResult(_) => Behaviors.unhandled
       }

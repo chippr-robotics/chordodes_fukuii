@@ -18,6 +18,7 @@ import org.slf4j.Logger
 
 import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncConfig
 import com.chipprbots.ethereum.db.storage.AppStateStorage
+import com.chipprbots.ethereum.network.p2p.messages.SNAP.ByteCodes
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.StateStorage
 import com.chipprbots.ethereum.domain.Account
@@ -53,6 +54,9 @@ object BytecodeRecoveryActor {
   private[sync] case class ByteCodeDownloadProgress(n: Long) extends Command
   // Catch-all for unexpected SSC messages arriving via the adapter
   private case object DroppedBccMsg extends Command
+  // SyncController relays SNAP peer responses here so ByteCodeCoordinator receives them
+  // (no SNAPSyncController exists during recovery — SyncController acts as the routing relay).
+  private[sync] case class ForwardByteCodesResponse(msg: ByteCodes) extends Command
 
   /** Sent to SyncController when recovery is complete (or skipped) */
   case object RecoveryComplete
@@ -291,6 +295,10 @@ object BytecodeRecoveryActor {
           finishRecovery()
 
         case DroppedBccMsg => Behaviors.same
+
+        case ForwardByteCodesResponse(msg) =>
+          coordinator ! snap.actors.ByteCodeCoordinator.ByteCodesResponseMsg(msg)
+          Behaviors.same
 
         case ScanResult(_) => Behaviors.unhandled
       }

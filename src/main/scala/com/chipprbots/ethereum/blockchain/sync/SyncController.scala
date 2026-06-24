@@ -138,6 +138,12 @@ object SyncController {
   //
   //   From FastSync, RegularSync, CombinedRecoveryScanActor, ChainDownloader (child replies forwarded):
   //     FastSync.Done, FastSync.FallbackToSnapSync, RegularSync.ProgressProtocol.*, recovery scanner events
+  //
+  //   From NPMA SNAP routing during recovery (§8k-G4c): no SNAPSyncController is live; SyncController
+  //   is registered as the SNAP target and relays responses to the recovery coordinators:
+  //     SNAPSyncController.ByteCodesResponse  → BytecodeRecoveryActor.ForwardByteCodesResponse
+  //     SNAPSyncController.StorageRangesResponse → StorageRecoveryActor.ForwardStorageRangesResponse
+  //     SNAPSyncController.AccountRangeResponse, TrieNodesResponse → dropped (not used in recovery)
   final private[sync] case class WrappedExternal(msg: Any)
       extends Command // Any: Pekko messageAdapter boundary — Classic msgs arrive untyped
   // Public: external callers (JSON-RPC layer, miner, NodeBuilder startup) construct this to wrap their raw
@@ -2007,6 +2013,9 @@ object SyncController {
       } else {
         bytecodeActor.foreach(a => ctx.watchWith(a.toTyped[Nothing], BytecodeRecoveryTerminated(a)))
         storageActor.foreach(a => ctx.watchWith(a.toTyped[Nothing], StorageRecoveryTerminated(a)))
+        // §8k-G4c: register SyncController's externalAdapter as the SNAP routing target.
+        // No SNAPSyncController exists during recovery — SyncController relays ByteCodesResponse →
+        // BytecodeRecoveryActor and StorageRangesResponse → StorageRecoveryActor (see runningRecovery handlers).
         networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterSnapSyncController(
           externalAdapter.toClassic
         )
@@ -2071,6 +2080,27 @@ object SyncController {
           if recentRootRequester.isDefined && recentRootBootstrap.isEmpty then {
             maybeStartRecentRootBootstrap(peers)
           }
+          Behaviors.same
+
+        // §8k-G4c: SNAP protocol responses arrive here because beginRecoveryDownloads registers
+        // externalAdapter.toClassic with NPMA (no SNAPSyncController exists during recovery).
+        // SyncController acts as the routing relay: forward ByteCodesResponse to BytecodeRecoveryActor
+        // → ByteCodeCoordinator, and StorageRangesResponse to StorageRecoveryActor → StorageRangeCoordinator.
+        // AccountRangeResponse and TrieNodesResponse are not used in the recovery path — drop them.
+        case snap.SNAPSyncController.ByteCodesResponse(msg) =>
+          bytecodeActor.foreach(_ ! BytecodeRecoveryActor.ForwardByteCodesResponse(msg))
+          Behaviors.same
+
+        case snap.SNAPSyncController.StorageRangesResponse(msg) =>
+          storageActor.foreach(_ ! StorageRecoveryActor.ForwardStorageRangesResponse(msg))
+          Behaviors.same
+
+        case _: snap.SNAPSyncController.AccountRangeResponse =>
+          log.debug("Dropping AccountRangeResponse in recovery mode (not used by recovery coordinators)")
+          Behaviors.same
+
+        case _: snap.SNAPSyncController.TrieNodesResponse =>
+          log.debug("Dropping TrieNodesResponse in recovery mode (not used by recovery coordinators)")
           Behaviors.same
 
         // Storage recovery: the saved pivot root has aged out of every peer's serve window. Fetch a recent
