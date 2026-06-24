@@ -67,15 +67,20 @@ object StorageRecoveryActor {
     */
   final case class RecentRoot(blockNumber: BigInt, stateRoot: Option[ByteString]) extends Command
 
+  /** Sealed umbrella for the two message types sent from StorageRecoveryActor to SyncController. Enables a narrow
+    * `TypedActorRef[SyncControllerMsg]` adapter instead of `TypedActorRef[Any]`.
+    */
+  sealed trait SyncControllerMsg
+
   /** Sent to SyncController when recovery is complete (or skipped) */
-  case object RecoveryComplete
+  case object RecoveryComplete extends SyncControllerMsg
 
   /** Recovery → SyncController: the saved pivot root has aged out of every peer's snapshot serve window, so storage
     * downloads are returning empty. Please fetch a RECENT canonical header from a peer and reply with [[RecentRoot]] so
     * the download can roll onto a root peers can still serve. Carries `replyTo` so SyncController does not need
     * `sender()` to reply.
     */
-  case class RequestRecentRoot(replyTo: ActorRef)
+  case class RequestRecentRoot(replyTo: ActorRef) extends SyncControllerMsg
 
   def apply(
       stateRoot: ByteString,
@@ -83,7 +88,7 @@ object StorageRecoveryActor {
       appStateStorage: AppStateStorage,
       flatSlotStorage: FlatSlotStorage,
       networkPeerManager: ActorRef,
-      syncController: TypedActorRef[Any],
+      syncController: TypedActorRef[SyncControllerMsg],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig
   ): Behavior[Command] = scanning(
@@ -108,7 +113,7 @@ object StorageRecoveryActor {
       appStateStorage: AppStateStorage,
       flatSlotStorage: FlatSlotStorage,
       networkPeerManager: ActorRef,
-      syncController: TypedActorRef[Any],
+      syncController: TypedActorRef[SyncControllerMsg],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig,
       missing: Seq[(ByteString, ByteString)]
@@ -132,7 +137,7 @@ object StorageRecoveryActor {
       appStateStorage: AppStateStorage,
       flatSlotStorage: FlatSlotStorage,
       networkPeerManager: ActorRef,
-      syncController: TypedActorRef[Any],
+      syncController: TypedActorRef[SyncControllerMsg],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig,
       preloaded: Option[Seq[(ByteString, ByteString)]] = None,
@@ -156,7 +161,7 @@ object StorageRecoveryActor {
       appStateStorage: AppStateStorage,
       flatSlotStorage: FlatSlotStorage,
       networkPeerManager: ActorRef,
-      syncController: TypedActorRef[Any],
+      syncController: TypedActorRef[SyncControllerMsg],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig,
       preloaded: Option[Seq[(ByteString, ByteString)]],
@@ -265,7 +270,7 @@ object StorageRecoveryActor {
       stateRoot: ByteString,
       stateStorage: StateStorage,
       pivotBlockNumber: BigInt,
-      syncController: TypedActorRef[Any],
+      syncController: TypedActorRef[SyncControllerMsg],
       appStateStorage: AppStateStorage,
       snapSyncConfig: SNAPSyncConfig
   ): Behavior[Command] = {
@@ -307,7 +312,7 @@ object StorageRecoveryActor {
         RecoveryMetrics.setStoragePhase(RecoveryMetrics.PhaseComplete)
         appStateStorage.storageRecoveryDone().commit()
         ctx.log.info(s"Storage recovery finished ($reason).")
-        syncController.tell(RecoveryComplete, org.apache.pekko.actor.ActorRef.noSender)
+        syncController ! RecoveryComplete
         Behaviors.stopped
       }
 

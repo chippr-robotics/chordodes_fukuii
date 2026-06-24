@@ -43,7 +43,7 @@ object CombinedRecoveryScanActor {
       stateStorage: StateStorage,
       evmCodeStorage: EvmCodeStorage,
       appStateStorage: AppStateStorage,
-      syncController: ActorRef[Any],
+      syncController: ActorRef[CombinedScanComplete],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig
   ): Behavior[Command] =

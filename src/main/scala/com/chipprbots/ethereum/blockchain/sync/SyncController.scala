@@ -442,6 +442,23 @@ object SyncController {
     val externalAdapter: TypedActorRef[Any] =
       ctx.messageAdapter[Any](WrappedExternal.apply) // Any: messageAdapter ref — Classic side is untyped
 
+    // §8k-G3: per-child narrow typed adapters. Each wraps into WrappedExternal exactly as externalAdapter does.
+    // All produce the same underlying Classic ref as externalAdapter (Pekko's adapter routing table is keyed by
+    // Class[T] per actor, and multiple registrations on the same ActorContext share the same mailbox).
+    // SyncController's unwrap() / WrappedExternal dispatch is UNCHANGED.
+    val bytecodeRecoveryAdapter: TypedActorRef[BytecodeRecoveryActor.RecoveryComplete.type] =
+      ctx.messageAdapter[BytecodeRecoveryActor.RecoveryComplete.type](WrappedExternal.apply)
+    val storageRecoveryAdapter: TypedActorRef[StorageRecoveryActor.SyncControllerMsg] =
+      ctx.messageAdapter[StorageRecoveryActor.SyncControllerMsg](WrappedExternal.apply)
+    val combinedScanAdapter: TypedActorRef[CombinedRecoveryScanActor.CombinedScanComplete] =
+      ctx.messageAdapter[CombinedRecoveryScanActor.CombinedScanComplete](WrappedExternal.apply)
+    val pivotBootstrapAdapter: TypedActorRef[PivotHeaderBootstrap.Reply] =
+      ctx.messageAdapter[PivotHeaderBootstrap.Reply](WrappedExternal.apply)
+    val fastSyncAdapter: TypedActorRef[fast.FastSync.SyncControllerMsg] =
+      ctx.messageAdapter[fast.FastSync.SyncControllerMsg](WrappedExternal.apply)
+    val chainDownloaderAdapter: TypedActorRef[snap.ChainDownloader.Done.type] =
+      ctx.messageAdapter[snap.ChainDownloader.Done.type](WrappedExternal.apply)
+
     /** Load SNAP sync configuration with fallback to defaults */
     private def loadSnapSyncConfig(): SNAPSyncConfig =
       try
@@ -545,7 +562,7 @@ object SyncController {
                   peersClient,
                   blockchainWriter,
                   targetBlock,
-                  replyTo = externalAdapter,
+                  replyTo = pivotBootstrapAdapter,
                   syncConfig,
                   preferSnapPeers = true
                 ),
@@ -579,7 +596,7 @@ object SyncController {
                   peersClient,
                   blockchainWriter,
                   headHash,
-                  replyTo = externalAdapter,
+                  replyTo = pivotBootstrapAdapter,
                   syncConfig,
                   preferSnapPeers = false
                 ),
@@ -1092,7 +1109,7 @@ object SyncController {
                   newPeersClient,
                   blockchainWriter,
                   newTargetBlock,
-                  replyTo = externalAdapter,
+                  replyTo = pivotBootstrapAdapter,
                   syncConfig,
                   preferSnapPeers = true
                 ),
@@ -1527,7 +1544,7 @@ object SyncController {
             blacklist,
             syncConfig,
             configBuilder,
-            externalAdapter
+            fastSyncAdapter
           ),
           s"fast-sync-$syncGeneration",
           DispatcherSelector.fromConfig("sync-dispatcher")
@@ -1722,7 +1739,7 @@ object SyncController {
               networkPeerManager = networkPeerManager,
               peerEventBus = peerEventBus,
               syncConfig = syncConfig,
-              replyTo = externalAdapter,
+              replyTo = chainDownloaderAdapter,
               maxConcurrentRequests = snapSyncConfig.chainBackfillConcurrentRequests,
               requestTimeout = snapSyncConfig.chainDownloadTimeout
             ),
@@ -1807,7 +1824,7 @@ object SyncController {
                 stateStorage,
                 evmCodeStorage,
                 appStateStorage,
-                externalAdapter,
+                combinedScanAdapter,
                 pivotBlock,
                 snapSyncConfig
               ),
@@ -1828,7 +1845,7 @@ object SyncController {
                         evmCodeStorage,
                         appStateStorage,
                         networkPeerManager,
-                        externalAdapter,
+                        bytecodeRecoveryAdapter,
                         pivotBlock,
                         snapSyncConfig
                       ),
@@ -1849,7 +1866,7 @@ object SyncController {
                         appStateStorage,
                         flatSlotStorage,
                         networkPeerManager,
-                        externalAdapter,
+                        storageRecoveryAdapter,
                         pivotBlock,
                         snapSyncConfig
                       ),
@@ -1906,7 +1923,7 @@ object SyncController {
                       evmCodeStorage,
                       appStateStorage,
                       networkPeerManager,
-                      externalAdapter,
+                      bytecodeRecoveryAdapter,
                       pivotBlock,
                       snapSyncConfig,
                       effByte
@@ -1928,7 +1945,7 @@ object SyncController {
                       appStateStorage,
                       flatSlotStorage,
                       networkPeerManager,
-                      externalAdapter,
+                      storageRecoveryAdapter,
                       pivotBlock,
                       snapSyncConfig,
                       effStor

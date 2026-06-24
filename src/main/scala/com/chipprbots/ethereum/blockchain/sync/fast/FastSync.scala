@@ -86,7 +86,7 @@ object FastSync {
       blacklist: Blacklist,
       syncConfig: SyncConfig,
       configBuilder: BlockchainConfigBuilder,
-      syncController: TypedActorRef[Any]
+      syncController: TypedActorRef[SyncControllerMsg]
   ): Behavior[Command] =
     Behaviors.setup[Command] { ctx =>
       Behaviors.withTimers[Command] { timers =>
@@ -144,7 +144,7 @@ object FastSync {
       blacklist: Blacklist,
       val syncConfig: SyncConfig,
       configBuilder: BlockchainConfigBuilder,
-      syncController: TypedActorRef[Any],
+      syncController: TypedActorRef[SyncControllerMsg],
       peerDisconnectedAdapter: TypedActorRef[PeerEvent],
       handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers]
   ) extends ReceiptsValidator
@@ -1921,8 +1921,12 @@ object FastSync {
   case class EvmCodeHash(v: ByteString) extends HashType
   case class StorageRootHash(v: ByteString) extends HashType
 
-  case object Done
-  case object FallbackToSnapSync
+  /** Sealed umbrella for the two messages sent from FastSync to SyncController. Enables a narrow
+    * `TypedActorRef[SyncControllerMsg]` adapter instead of `TypedActorRef[Any]`.
+    */
+  sealed trait SyncControllerMsg
+  case object Done extends SyncControllerMsg
+  case object FallbackToSnapSync extends SyncControllerMsg
 
   sealed abstract class HeaderProcessingResult
   case object HeadersProcessingFinished extends HeaderProcessingResult

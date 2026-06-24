@@ -63,7 +63,7 @@ object BytecodeRecoveryActor {
       evmCodeStorage: EvmCodeStorage,
       appStateStorage: AppStateStorage,
       networkPeerManager: ActorRef,
-      syncController: TypedActorRef[Any],
+      syncController: TypedActorRef[RecoveryComplete.type],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig
   ): Behavior[Command] = scanning(
@@ -88,7 +88,7 @@ object BytecodeRecoveryActor {
       evmCodeStorage: EvmCodeStorage,
       appStateStorage: AppStateStorage,
       networkPeerManager: ActorRef,
-      syncController: TypedActorRef[Any],
+      syncController: TypedActorRef[RecoveryComplete.type],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig,
       missing: Seq[ByteString]
@@ -112,7 +112,7 @@ object BytecodeRecoveryActor {
       evmCodeStorage: EvmCodeStorage,
       appStateStorage: AppStateStorage,
       networkPeerManager: ActorRef,
-      syncController: TypedActorRef[Any],
+      syncController: TypedActorRef[RecoveryComplete.type],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig,
       preloaded: Option[Seq[ByteString]] = None,
@@ -136,7 +136,7 @@ object BytecodeRecoveryActor {
       evmCodeStorage: EvmCodeStorage,
       appStateStorage: AppStateStorage,
       networkPeerManager: ActorRef,
-      syncController: TypedActorRef[Any],
+      syncController: TypedActorRef[RecoveryComplete.type],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig,
       preloaded: Option[Seq[ByteString]],
@@ -211,7 +211,7 @@ object BytecodeRecoveryActor {
       ctx: ActorContext[Command],
       coordinator: org.apache.pekko.actor.typed.ActorRef[snap.actors.ByteCodeCoordinator.Command],
       expectedCount: Int,
-      syncController: TypedActorRef[Any],
+      syncController: TypedActorRef[RecoveryComplete.type],
       appStateStorage: AppStateStorage,
       snapSyncConfig: SNAPSyncConfig
   ): Behavior[Command] = {
@@ -234,7 +234,7 @@ object BytecodeRecoveryActor {
         timers.cancel("abandon")
         RecoveryMetrics.setBytecodePhase(RecoveryMetrics.PhaseComplete)
         appStateStorage.bytecodeRecoveryDone().commit()
-        syncController.tell(RecoveryComplete, org.apache.pekko.actor.ActorRef.noSender)
+        syncController ! RecoveryComplete
         Behaviors.stopped
       }
 

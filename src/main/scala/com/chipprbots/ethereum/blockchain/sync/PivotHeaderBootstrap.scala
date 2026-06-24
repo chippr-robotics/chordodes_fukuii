@@ -60,15 +60,19 @@ object PivotHeaderBootstrap {
   final private case class Fetched(header: BlockHeader) extends Command
 
   // ----- Outgoing messages, delivered to the Classic `replyTo` parent (SyncController, Behavior[Command], CAPSTONE bridge) -----
-  final case class Completed(targetBlock: BigInt, header: BlockHeader)
-  final case class Failed(reason: String)
+  /** Sealed umbrella for the two reply types sent to `replyTo` (SyncController). Enables a narrow
+    * `TypedActorRef[Reply]` adapter instead of `TypedActorRef[Any]`.
+    */
+  sealed trait Reply
+  final case class Completed(targetBlock: BigInt, header: BlockHeader) extends Reply
+  final case class Failed(reason: String) extends Reply
 
   /** Fetch by block number (the standard pre-merge / fast-sync / TD-driven SNAP path). */
   def apply(
       peersClient: ActorRef[PeersClient.Command],
       blockchainWriter: BlockchainWriter,
       targetBlock: BigInt,
-      replyTo: ActorRef[Any],
+      replyTo: ActorRef[Reply],
       syncConfig: SyncConfig,
       maxAttempts: Int = 10,
       initialRetryDelay: FiniteDuration = 1.second,
@@ -97,7 +101,7 @@ object PivotHeaderBootstrap {
       peersClient: ActorRef[PeersClient.Command],
       blockchainWriter: BlockchainWriter,
       headHash: ByteString,
-      replyTo: ActorRef[Any],
+      replyTo: ActorRef[Reply],
       syncConfig: SyncConfig,
       maxAttempts: Int = 10,
       initialRetryDelay: FiniteDuration = 1.second,
@@ -124,7 +128,7 @@ object PivotHeaderBootstrap {
       blockchainWriter: BlockchainWriter,
       targetBlock: BigInt,
       targetHash: Option[ByteString],
-      replyTo: ActorRef[Any],
+      replyTo: ActorRef[Reply],
       @annotation.unused syncConfig: SyncConfig,
       maxAttempts: Int,
       initialRetryDelay: FiniteDuration,
@@ -159,7 +163,7 @@ object PivotHeaderBootstrap {
       blockchainWriter: BlockchainWriter,
       targetBlock: BigInt,
       targetHash: Option[ByteString],
-      replyTo: ActorRef[Any],
+      replyTo: ActorRef[Reply],
       maxAttempts: Int,
       initialRetryDelay: FiniteDuration,
       maxRetryDelay: FiniteDuration,
