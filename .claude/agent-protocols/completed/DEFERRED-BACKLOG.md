@@ -1356,3 +1356,60 @@ guard to the error branch. ETC chains with Olympia active but treasury-address=0
 error (genuine misconfiguration). ETH/Sepolia chains are silent.
 
 **Cross-refs:** `storage/ledger.md §ETH-T3-LOG`, `working-docs/DEFERRED-BACKLOG.md Part 10`
+
+---
+
+## §9b — RegularSync Divergence-Path Spec Fix ✅ DONE 2026-06-24
+
+**Commits:** `0d290019e` (resolvingFork + FSBA wiring) · `69146a244` (divergence-path test)
+**Gate:** §8k-F (`b24515637`, RegularSync Typed) — was the blocker.
+
+**Context:** CHASE-QUEUE "RegularSync divergence path EXCEPT" — `BlockImporter.handleForkRecovery`
+performs a blind 128-block rewind with no LCA. MESS makes >128-block forks near-impossible on ETC
+mainnet, so this was latent-correctness risk. Gate was §8k-F.
+
+**Completed work:**
+- Items 1-3 (FSBA spawn + `resolvingFork` behavior + `blindRewind` fallback) — already in `0d290019e`
+- Item 4 (divergence-path test) — written 2026-06-24: `"rewind canonical chain to resolver LCA on BranchResolvedSuccessful (divergence path)"` in `RegularSyncSpec.scala` (96 lines, `UnitTest + SyncTest`)
+  - Spawns standalone `BlockImporter` via `PropsAdapter`
+  - Sends `StartForkRecovery(BigInt(15))` then `BranchResolverMsg(BranchResolvedSuccessful(lca=10, peer))`
+  - Asserts `InvalidateBlocksFrom(lca+1)` to fetcher and `setCanonicalChainHead(lca, ...)` via ScalaMock verify
+
+**Side-finding:** Exposed 4 `testCaseT` status tests failing — root cause and fix in §9d.
+
+**Verification:** `sbt compile-all` — 0 errors. `testOnly *RegularSyncSpec*` — 34 tests / 30 pass
+(4 pre-existing status failures from §9d, resolved after §9d fix → 34/34).
+
+---
+
+## §9d — RegularSyncFixtures `getSyncStatus` Classic ask → Typed send ✅ DONE 2026-06-24
+
+**Commit:** `69146a244`
+
+**Root cause:** `RegularSyncFixtures.getSyncStatus` used the Classic `?` ask:
+```scala
+IO.fromFuture(IO((regularSync ? SyncProtocol.GetStatus).mapTo[SyncProtocol.Status]))
+```
+`SyncProtocol.GetStatus` is `final case class GetStatus(replyTo: TypedActorRef[Status])`. The `?`
+operator passes the companion object (not an instance with `replyTo` set) and injects a Classic
+`sender()` temp actor as the implicit reply address. The `Behavior[RegularSyncCommand]` handler
+(`RegularSync.scala:154`) reads `msg.replyTo` — which is uninitialised — causing a
+`ClassCastException` at runtime. 4 `testCaseT`-based status tests failed silently.
+
+**Fix:**
+```scala
+val getSyncStatus: IO[SyncProtocol.Status] =
+  IO {
+    val probe = TestProbe()
+    regularSync ! SyncProtocol.GetStatus(probe.ref.toTyped[SyncProtocol.Status])
+    probe.expectMsgType[SyncProtocol.Status]
+  }
+```
+Also removed `import org.apache.pekko.pattern.ask`, `import org.apache.pekko.util.Timeout`, and
+the implicit `Timeout` value (all existed solely for the `?` pattern).
+
+**Note:** `IO { ... }` (not `IO.fromFuture`) — `expectMsgType` is blocking-synchronous, so the
+wrapping is `IO[Status]` directly, not `IO[Future[Status]]`.
+
+**Verification:** `sbt compile-all` — 0 errors. `testOnly *RegularSyncSpec*` — **34/34 pass**
+(was 30/34). `sbt scalafmtAll` — no reformats needed.

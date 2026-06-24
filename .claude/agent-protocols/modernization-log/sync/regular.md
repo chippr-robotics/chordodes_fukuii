@@ -82,10 +82,22 @@
 
 ---
 
+## Classic Interop — §8k-F (COMPLETE)
+
+#### `b24515637` — refactor(8k-F): RegularSync Classic→Typed migration — remove ctx.toClassic.actorOf + parent bridge (Clusters C/D/N); docs `806202cb9`
+- **What:** `RegularSync.scala` fully migrated from Classic `extends Actor` / `def receive` to `Behaviors.receive`; sealed Command ADT; explicit `replyTo`. `ctx.toClassic.actorOf(RegularSync.props)` in `SyncController` + `NodeBuilder` (Cluster D) → Typed `ctx.spawn(RegularSync.behavior)`. Parent-bridge sites in `BlockImporter` (Cluster N) eliminated. `ctx.toClassic.sender()` OQ-5 reply sites in SyncController (Cluster C subset) cleaned.
+- **Clusters resolved:** C (partial — SyncController OQ-5 actorOf call), D (`ctx.toClassic.actorOf` x2), N (`ctx.self.toClassic` + `fetcherReplyTo.toClassic` in BlockImporter x4)
+- **INFO-13/14 resolved:** Classic `Logging(ctx.system.classicSystem, ...)` bridge removed; Typed `ctx.log` (SLF4J) used throughout.
+- **`log.warning` resolved:** All Classic `log.warning(...)` spelling → `log.warn(...)` (SLF4J).
+- **Verification:** 33/34 RegularSyncSpec pass (1 pre-existing divergence-path EXCEPT — unrelated, tracked in DEFERRED-BACKLOG §9b); `sbt compile-all` clean
+
+---
+
 ## Open / Deferred
 
-- INFO-13/14: Classic `LoggingAdapter` via `Logging(ctx.system.classicSystem, ...)` bridge — Network/P2P sprint
-- `RegularSync.scala:228`: `log.warning(...)` Classic spelling → `log.warn(...)` — Network/P2P sprint
-- RegularSyncSpec divergence path EXCEPT (LCA-less blind rewind) — HERALD audit done; fix spec deferred
+- ~~INFO-13/14: Classic `LoggingAdapter` via `Logging(ctx.system.classicSystem, ...)` bridge~~ — ✅ resolved in §8k-F (`b24515637`)
+- ~~`RegularSync.scala:228`: `log.warning(...)` Classic spelling → `log.warn(...)`~~ — ✅ resolved in §8k-F (`b24515637`)
+- ~~RegularSyncSpec divergence path EXCEPT (LCA-less blind rewind)~~ — ✅ DONE 2026-06-24 (§9b): divergence-path test written; `resolvingFork` / FSBA wiring confirmed correct
+- ~~RegularSyncFixtures `getSyncStatus` broken — 4 status tests ClassCastException~~ — ✅ DONE 2026-06-24 (`69146a244`): Classic `?` ask replaced with `TestProbe` send; removed ask/Timeout imports; 34/34 pass (§9d)
 - ~~§P9-SAVENODE: RegularSyncSpec:552~~ — ✅ DONE 2026-06-23 (`abe9dccc1`)
-- RegularSyncSpec (entire file) — Wave 3 migration gate (Resource[IO, ActorSystem] lifecycle)
+- RegularSyncSpec (entire file) — Wave 3 migration gate now OPEN (`RegularSync.scala` is Typed as of `b24515637`); clearing prompt target: DEFERRED-BACKLOG §8a "Remaining (blocked)" batch

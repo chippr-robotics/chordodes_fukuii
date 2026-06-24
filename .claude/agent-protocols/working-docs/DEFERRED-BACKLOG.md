@@ -1,6 +1,6 @@
 # Fukuii Modernization — Deferred Backlog
 
-**Last updated**: 2026-06-24 (Part 10 added — ETH/Sepolia assumption audit Thread 1 findings: §ETH-T1-A/B WRONG sites in StdSignedTransactionValidator, §ETH-T1-C SUSPICIOUS mempool dispatch; Thread 3 fee routing functionally CORRECT but log.error false-alarm FIXED `f868b75a8`; §ETH-T2-A added — Thread 2 naming finding: rename `BlockHeader.isPostMerge` → `isPoS`/`isPoW` for chain-agnostic consistency)
+**Last updated**: 2026-06-24 (§9b DONE — divergence-path test written; §9d DONE — getSyncStatus TestProbe fix, 34/34 pass)
 **Purpose**: Single reference for all deferred cleanup work — completed items,
 active deferred items, and follow-up sprint plans.
 
@@ -643,7 +643,7 @@ slower than dev machine → timeouts). `@Ignore` annotations silently hide untes
 
 | Cluster | Sites | Root cause | Pre/Post-CAPSTONE | Sprint |
 |---------|-------|-----------|-------------------|--------|
-| E — `externalAdapter.toClassic` in SyncController | 21 remaining | Per-child adapter pattern: eliminated one spawn-site at a time when the receiving child updates its constructor param from `ActorRef` → `ActorRef[T]`. NOT the same as OQ-5. | Pre-CAPSTONE | §8k-G2 (immediate: FastSync + NPMA cmd) + per-child LOOM migration |
+| E — `externalAdapter.toClassic` in SyncController | 3 remaining (GATED) | §8k-G2 eliminated 8 IMMEDIATE sites (all Typed children updated to `ActorRef[Any]`). 3 GATED: FCM.setListener (line 309), NPMA CalibrateChainWeight (line 1635), NPMA SnapSyncController relay (line 1983). | Pre-CAPSTONE | §8k-G3 (ActorRef[Any] → specific types), §8k-G4a/b/c (GATED site resolution) |
 | I — TCP I/O bridge (RLPxConnectionHandler, ServerActor) | 4 | Akka TCP requires Classic `sender()` — **permanent** | N/A | — |
 
 **Principle**: Each `.toClassic` call is a symptom, not the disease. The disease is an unconverted classic actor upstream. The fix strategy is: **migrate the upstream actor first (LOOM), then delete the bridge**. Bridges must never be removed before the upstream is converted — that produces a type error at the call site that blocks compilation.
@@ -656,91 +656,266 @@ slower than dev machine → timeouts). `@Ignore` annotations silently hide untes
 
 ---
 
-#### §8k-G2 — PRISM + MITHRIL: Cluster E immediate cohort — spawn-site `.toClassic` elimination
+#### §8k-G3 — Per-child typed messageAdapters: eliminate `ActorRef[Any]` from child constructor params
 
-**Agent:** PRISM (audit which children are already Typed), then MITHRIL (update constructor params + spawn sites)
-**Risk:** LOW-MEDIUM — touches child constructor signatures and SyncController spawn sites; compile-verified
-**Gate:** §8k-G ✅ DONE
-**Bridge sites targeted:** subset of the 21 remaining `externalAdapter.toClassic` sites where the receiving
-child has already been migrated to Typed but its constructor param type was not updated to accept `ActorRef[T]`
+**Agent:** MITHRIL (SyncController + child actors)
+**Risk:** LOW — mechanical type substitution; behavior is unchanged (still wraps into WrappedExternal internally)
+**Gate:** None — can run any time. Does NOT require CAPSTONE.
+**Completes:** P16 properly. §8k-G2 replaced Classic `ActorRef` with `ActorRef[Any]` (correct, per P16 line 486 for the bridge adapter). This sprint replaces `ActorRef[Any]` with the most-specific type each child actually sends.
 
-**Pekko 2.x context:** This sprint implements **pekko-typed-api.md P16** — the protocol standard
-that constructor params must declare `ActorRef[T]` (Typed), not Classic `ActorRef`, whenever the
-receiving actor is a Typed Behavior. Pekko 2.x removes `org.apache.pekko.actor.typed.scaladsl.adapter`
-entirely: every `.toClassic` call on a Typed ref becomes a compile error. Each site eliminated here
-is one less blocker for `pekko-version := "2.x"` in `build.sbt`. The spawn-site `.toClassic` pattern
-is also the systematic gap that **pre-migration-checklist.md Step 13** is designed to catch: after
-any LOOM migration, verify the child's constructor param type matches the Typed caller's ActorRef.
+**Why `ActorRef[Any]` is a stepping stone, not the destination:**
+SyncController currently registers ONE universal messageAdapter: `ctx.messageAdapter[Any](WrappedExternal.apply)`.
+Every child gets this same `externalAdapter: TypedActorRef[Any]`. The type `Any` is honest — the adapter
+truly accepts any message — but it discards type information at the child's constructor boundary.
+The fix is per-child typed adapters. Since `messageAdapter[T]` wraps into whatever Command type you supply,
+we can create per-child adapters that still wrap into `WrappedExternal(msg)` internally — SyncController's
+existing `unwrap` dispatch doesn't change. Only the CHILD's constructor param becomes typed.
 
-**Background:**
-When §8k-G ran, CONDUIT correctly identified that `externalAdapter.toClassic` sites are per-child adapter
-patterns: each site disappears only when the receiving child's constructor param changes from Classic
-`ActorRef` to `ActorRef[T]`. Two known immediate candidates (child already Typed, param not yet updated):
+**Phase A — Per-child adapters, `WrappedExternal` preserved (this sprint):**
 
-1. **FastSync `syncController: ActorRef` param** — FastSync was cleaned up in §8k-F/§8k-G but its
-   constructor still declares `syncController: ActorRef` (Classic). SyncController passes `externalAdapter.toClassic`
-   at line ~1530. Since FastSync is already Typed, update the param to `ActorRef[Any]` (the adapter type)
-   and remove the `.toClassic` at the spawn site.
+For each child in the IMMEDIATE cohort, instead of passing `externalAdapter` directly, SyncController
+creates a narrow adapter:
+```scala
+// Current:
+val externalAdapter: TypedActorRef[Any] = ctx.messageAdapter[Any](WrappedExternal.apply)
+ctx.spawn(BytecodeRecoveryActor(... syncController = externalAdapter ...), ...)
 
-2. **NPMA `RegisterChainWeightCalibrationTarget(replyTo: ActorRef)`** — NPMA was migrated in §8k-E but
-   this command still carries a Classic `ActorRef`. SyncController sends `RegisterChainWeightCalibrationTarget(externalAdapter.toClassic)`
-   at line ~1635. Update the command field to `ActorRef[Any]` (or the specific type NPMA sends back)
-   and remove the `.toClassic`.
-
-There may be additional candidates (ForkChoiceManager, PivotHeaderBootstrap). PRISM audit identifies them.
-
-**PRISM audit step (run first):**
-```bash
-cd /media/dev/2tb/dev/fukuii
-
-# Find all 21 remaining externalAdapter.toClassic sites with their receiving actor
-grep -n "externalAdapter\.toClassic" \
-  src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala
-
-# For each receiving actor/command found, check if it's already a Typed Behavior:
-grep -rn "class FastSync\|object FastSync\|extends Behavior\|Behaviors\." \
-  src/main/scala/com/chipprbots/ethereum/blockchain/sync/fast/FastSync.scala | head -5
-
-grep -rn "RegisterChainWeightCalibrationTarget" \
-  src/main/scala/com/chipprbots/ethereum/network/ --include="*.scala"
-
-grep -rn "class ForkChoiceManager\|extends Behavior" \
-  src/main/scala/com/chipprbots/ethereum/blockchain/sync/ --include="*.scala"
-
-grep -rn "class PivotHeaderBootstrap\|extends Behavior" \
-  src/main/scala/com/chipprbots/ethereum/blockchain/sync/ --include="*.scala"
+// Target:
+val bytecodeAdapter: TypedActorRef[BytecodeRecoveryActor.RecoveryComplete.type] =
+  ctx.messageAdapter[BytecodeRecoveryActor.RecoveryComplete.type](WrappedExternal.apply)
+ctx.spawn(BytecodeRecoveryActor(... syncController = bytecodeAdapter ...), ...)
+// BCA constructor param: syncController: ActorRef[RecoveryComplete.type]
 ```
 
-For each site, PRISM should classify as:
-- **IMMEDIATE** — receiving actor is Typed; only constructor param type update needed
-- **GATED** — receiving actor is still Classic; blocked on that actor's LOOM migration
+**Child → message type mapping** (what each child actually sends to syncController):
 
-**MITHRIL implementation (immediate sites only):**
+| Child actor | Messages sent to syncController | Target param type |
+|-------------|--------------------------------|-------------------|
+| `BytecodeRecoveryActor` | `RecoveryComplete` | `ActorRef[BytecodeRecoveryActor.RecoveryComplete.type]` |
+| `StorageRecoveryActor` | `RecoveryComplete`, `RequestRecentRoot` | `ActorRef[StorageRecoveryActor.RecoveryComplete.type \| StorageRecoveryActor.RequestRecentRoot]` or sealed parent |
+| `CombinedRecoveryScanActor` | `CombinedScanComplete` | `ActorRef[CombinedRecoveryScanActor.CombinedScanComplete]` |
+| `PivotHeaderBootstrap` | `Completed`, `Failed` (sealed `Result`) | `ActorRef[PivotHeaderBootstrap.Result]` |
+| `FastSync` | `FallbackToSnapSync`, `Done` | sealed parent or union type |
+| `SNAPSyncController` | multiple — see SNAP reply types | `ActorRef[SNAPSyncController.SyncControllerReply]` (create sealed) |
+| `ChainDownloader` | `Done` | `ActorRef[ChainDownloader.Done.type]` |
 
-For each IMMEDIATE site:
-1. Update the receiving actor's constructor param from `ActorRef` (Classic) to `ActorRef[Any]`
-   (or a more specific `ActorRef[T]` if the sent message type is known and narrow).
-2. Update internal usages of that param inside the child (Classic `!` → Typed `!` — same syntax, type changes).
-3. In SyncController: remove `.toClassic` at the spawn site — pass `externalAdapter` directly.
-4. `sbt compile-all` after each actor.
+**StorageRecoveryActor note:** sends two different types. Options:
+- Define `sealed trait SyncControllerMsg` in SRA object, have both extend it
+- Use Scala 3 union type: `ActorRef[RecoveryComplete.type | RequestRecentRoot]`
+- Keep `ActorRef[Any]` only for SRA (defer until sealed parent defined)
 
-**Verify:**
-```bash
-# Count should decrease from 21 toward the gated-only floor
-grep -rn "externalAdapter\.toClassic" src/main/ --include="*.scala" | wc -l
+**Phase B — Replace `WrappedExternal(Any)` with typed Command wrappers (CAPSTONE sprint):**
+After Phase A, SyncController's internal `WrappedExternal(msg: Any)` can be replaced with specific wrappers:
+`case class BytecodeRecoveryDone() extends Command`, etc. This requires the full Command ADT redesign and
+is gated on CAPSTONE. Do NOT do Phase B in this sprint.
 
-# No new compilation errors
-sbt compile-all
-./media/dev/2tb/dev/fukuii/.local/scripts/fukuii-test
+**Resolution prompt:**
+```
+You are implementing §8k-G3: per-child typed messageAdapters in SyncController.
+
+Context:
+- SyncController.scala currently has one universal adapter:
+    val externalAdapter: TypedActorRef[Any] = ctx.messageAdapter[Any](WrappedExternal.apply)
+  All children receive this as their `syncController` / `replyTo` param (type: ActorRef[Any]).
+- Goal: each child gets a narrow typed adapter. SyncController's internal WrappedExternal dispatch
+  is UNCHANGED — only the per-child adapter's declared type changes.
+- pekko-typed-api.md P16 is the governing standard. Phase A only (no WrappedExternal changes).
+
+Step 1 — Read these files before making any changes:
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala (lines 108-145, 440-445)
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/BytecodeRecoveryActor.scala
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/StorageRecoveryActor.scala
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/CombinedRecoveryScanActor.scala
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/PivotHeaderBootstrap.scala
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/fast/FastSync.scala
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/SNAPSyncController.scala
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/ChainDownloader.scala
+
+Step 2 — For each child, identify the exact message type(s) sent to syncController/replyTo.
+  Grep: grep -n "syncController !\|replyTo !" src/main/scala/com/chipprbots/ethereum/blockchain/sync/**/*.scala
+
+Step 3 — For each child, create a per-child adapter in SyncController (at the spawn site or in a
+  shared adapter val section). The adapter wraps into WrappedExternal(msg) — do NOT change unwrap().
+  Example for BytecodeRecoveryActor:
+    val bytecodeAdapter = ctx.messageAdapter[BytecodeRecoveryActor.RecoveryComplete.type](WrappedExternal.apply)
+    // pass bytecodeAdapter at the BCA spawn site instead of externalAdapter
+
+Step 4 — Update each child's constructor param from ActorRef[Any] to the specific ActorRef[T].
+  For StorageRecoveryActor (two message types), define a sealed trait in the SRA object if not already
+  present, or use Scala 3 union type. Do NOT use ActorRef[Any] as the solution.
+
+Step 5 — sbt compile-all after each child. scalafmtAll before committing.
+
+Step 6 — Verify: grep -rn "ActorRef\[Any\]" src/main/scala/com/chipprbots/ethereum/blockchain/sync/
+  Target: 0 hits in child actor constructor params (SyncController's externalAdapter decl may remain
+  temporarily if not all children are converted in this sprint).
+
+Step 7 — git commit -m "refactor(8k-G3): per-child typed messageAdapters — eliminate ActorRef[Any] from child constructor params"
 ```
 
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. Stage SyncController + each updated child constructor file
-3. `git commit -m "refactor(8k-G2): Cluster E immediate cohort — drop externalAdapter.toClassic at Typed child spawn sites"`
-4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(8k-G2): clearout — $SHA"`
-5. Update CHASE-QUEUE: mark cleared sites as CLEARED with SHA
-6. **DELETE §8k-G2**
+---
+
+#### §8k-G4 — GATED site resolution: FCM.setListener + NPMA command field types
+
+**Agent:** MITHRIL
+**Risk:** LOW-MEDIUM per sub-task
+**Gate:** G4a: none. G4b: NPMA Classic shell wiring investigation. G4c: requires prior investigation.
+**Sub-tasks:** Three independent sites. Run in order G4a → G4b → G4c.
+
+---
+
+**§8k-G4a — FCM.setListener: Classic ActorRef → TypedActorRef[BeaconHead]** (easiest, no gate)
+
+`ForkChoiceManager` is a plain Scala class (not a Pekko actor). Its listener API currently uses Classic `ActorRef`:
+```scala
+// ForkChoiceManager.scala:33,49
+private val listenerRef: AtomicReference[Option[ActorRef]] = new AtomicReference(None)
+def setListener(ref: ActorRef): Unit = listenerRef.set(Some(ref))
+```
+FCM sends exactly ONE message type to the listener: `ForkChoiceManager.BeaconHead(headHash, knownHeader)` (line 95).
+
+**Fix:**
+```scala
+// ForkChoiceManager.scala — change listenerRef and setListener:
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+private val listenerRef: AtomicReference[Option[TypedActorRef[ForkChoiceManager.BeaconHead]]] =
+  new AtomicReference(None)
+def setListener(ref: TypedActorRef[ForkChoiceManager.BeaconHead]): Unit = listenerRef.set(Some(ref))
+// publishBeaconHead: ref ! BeaconHead(...) — syntax unchanged, type now enforced
+
+// SyncController.scala:309 — replace:
+fcm.setListener(externalAdapter.toClassic)
+// with a per-FCM messageAdapter (wraps into WrappedExternal, preserving existing dispatch):
+val fcmAdapter: TypedActorRef[ForkChoiceManager.BeaconHead] =
+  ctx.messageAdapter[ForkChoiceManager.BeaconHead](WrappedExternal.apply)
+fcm.setListener(fcmAdapter)
+```
+
+**Resolution prompt:**
+```
+Implement §8k-G4a: make ForkChoiceManager.setListener accept a Typed ActorRef.
+
+Files to change:
+1. src/main/scala/com/chipprbots/ethereum/consensus/engine/ForkChoiceManager.scala
+   - Add: import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+   - Change listenerRef type: AtomicReference[Option[ActorRef]] → AtomicReference[Option[TypedActorRef[ForkChoiceManager.BeaconHead]]]
+   - Change setListener param: ActorRef → TypedActorRef[ForkChoiceManager.BeaconHead]
+   - publishBeaconHead: ref ! BeaconHead(...) syntax unchanged; remove Classic ActorRef import if unused
+
+2. src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala:309
+   - Add a per-FCM adapter val (near the existing externalAdapter declaration):
+       val fcmAdapter: org.apache.pekko.actor.typed.ActorRef[ForkChoiceManager.BeaconHead] =
+         ctx.messageAdapter[ForkChoiceManager.BeaconHead](WrappedExternal.apply)
+   - Replace: fcm.setListener(externalAdapter.toClassic)
+     With:    fcm.setListener(fcmAdapter)
+
+Verify: sbt compile-all — must be green. Then:
+  grep -n "ForkChoiceManager\|setListener" src/main/scala/.../SyncController.scala
+  Confirm: no .toClassic at the FCM line.
+Commit: "refactor(8k-G4a): ForkChoiceManager.setListener accepts TypedActorRef[BeaconHead]"
+```
+
+---
+
+**§8k-G4b — NPMA RegisterChainWeightCalibrationTarget: Classic ActorRef → TypedActorRef[CalibrateChainWeightFromPeer]** (medium)
+
+NPMA receives `RegisterChainWeightCalibrationTarget(target: ActorRef)` and stores it as a Classic ref.
+It later sends `SyncProtocol.CalibrateChainWeightFromPeer(td, blockNum)` to that ref (lines 277, 636).
+SyncController passes `externalAdapter.toClassic` at line 1635.
+
+**Anatomy:**
+- `RegisterChainWeightCalibrationTarget` (non-Cmd, Classic shell variant) at NPMA.scala:1308
+- `RegisterChainWeightCalibrationTargetCmd` (Cmd, extends Command) at NPMA.scala:62 — this is what the Typed NPMA actually dispatches on
+- `chainWeightCalibrationTarget: Option[ActorRef]` stored var at NPMA.scala:207
+- Two send sites: NPMA.scala:277 (`CalibrateChainWeightNow` handler) and line 636 (peer connect handler)
+
+**Fix:**
+1. Change the `target` field in BOTH command variants to `TypedActorRef[SyncProtocol.CalibrateChainWeightFromPeer]`
+2. Change `chainWeightCalibrationTarget` var type accordingly
+3. In SyncController: create a per-NPMA adapter and pass it directly:
+   ```scala
+   val cwAdapter = ctx.messageAdapter[SyncProtocol.CalibrateChainWeightFromPeer](WrappedExternal.apply)
+   networkPeerManager ! RegisterChainWeightCalibrationTarget(cwAdapter)
+   ```
+4. **Investigate the Classic shell forwarding path**: `RegisterChainWeightCalibrationTarget` (non-Cmd) must arrive at the Typed NPMA as `RegisterChainWeightCalibrationTargetCmd`. There is likely a Classic `receive` that translates it. Find and update that translation to preserve the typed ref.
+
+**Resolution prompt:**
+```
+Implement §8k-G4b: make NPMA's calibration-target registration use a Typed ActorRef.
+
+Background: NPMA has Classic-shell command variants (non-Cmd) that are forwarded to the Typed NPMA
+as Cmd variants. RegisterChainWeightCalibrationTarget is one such pair. Both variants must be updated.
+
+Step 1 — Read these files completely:
+  src/main/scala/com/chipprbots/ethereum/network/NetworkPeerManagerActor.scala
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala (lines 1630-1640)
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncProtocol.scala (find CalibrateChainWeightFromPeer)
+
+Step 2 — Find the Classic shell forwarding code:
+  grep -n "RegisterChainWeightCalibration" src/main/scala/.../NetworkPeerManagerActor.scala
+  Locate the Classic receive{} block that translates RegisterChainWeightCalibrationTarget →
+  RegisterChainWeightCalibrationTargetCmd. Confirm the forwarding preserves the target ref.
+
+Step 3 — Update NPMA:
+  - Import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+  - Change RegisterChainWeightCalibrationTarget.target: ActorRef → TypedActorRef[SyncProtocol.CalibrateChainWeightFromPeer]
+  - Change RegisterChainWeightCalibrationTargetCmd.target: ActorRef → TypedActorRef[SyncProtocol.CalibrateChainWeightFromPeer]
+  - Change var chainWeightCalibrationTarget: Option[ActorRef] → Option[TypedActorRef[SyncProtocol.CalibrateChainWeightFromPeer]]
+  - Ensure .tell(msg, noSender) → ! msg at both send sites (lines ~277, ~636)
+
+Step 4 — Update SyncController (line 1635):
+  val cwAdapter = ctx.messageAdapter[SyncProtocol.CalibrateChainWeightFromPeer](WrappedExternal.apply)
+  // Replace: networkPeerManager ! RegisterChainWeightCalibrationTarget(externalAdapter.toClassic)
+  // With:    networkPeerManager ! RegisterChainWeightCalibrationTarget(cwAdapter)
+
+Step 5 — sbt compile-all. Check for any test fixtures that construct these commands with Classic refs.
+
+Commit: "refactor(8k-G4b): NPMA RegisterChainWeightCalibrationTarget uses TypedActorRef[CalibrateChainWeightFromPeer]"
+```
+
+---
+
+**§8k-G4c — NPMA RegisterSnapSyncController passing externalAdapter: investigate + fix** (complex, investigate first)
+
+At SyncController line 1982-1983, `externalAdapter.toClassic` is passed as the `snapSyncController` arg.
+NPMA converts it: `ref.toTyped[SNAPSyncController.Command]` — so it stores a `TypedActorRef[SSC.Command]`.
+NPMA then sends `SSC.AccountRangeResponse`, `.ByteCodesResponse`, `.StorageRangesResponse`, `.TrieNodesResponse`
+to this ref (lines 492-509). These are routed to SyncController's `WrappedExternal` dispatch, NOT to the
+actual SNAPSyncController.
+
+**Why this exists:** SyncController likely uses this to receive SNAP protocol responses BEFORE it has spawned
+a SNAPSyncController, acting as a routing relay — or this is a temporary routing path during recovery.
+**Investigate:** Compare with lines 369, 1572, 1994 where the actual `snapSync` ref is passed. What is the
+state-machine context at line 1983? Is externalAdapter passed intentionally to funnel responses to SyncController
+for dispatch, or is this a bug / stale code?
+
+**Resolution prompt:**
+```
+Investigate and fix §8k-G4c: why does SyncController pass externalAdapter to NPMA.RegisterSnapSyncController
+at line ~1983?
+
+Step 1 — Read SyncController.scala lines 1970-2010. Understand the state-machine context:
+  - What behavior/state is this code running in?
+  - Why is externalAdapter (SyncController's own adapter) passed instead of the actual snapSync ref?
+  - Compare with lines 369, 1572, 1994 where the real snapSync ref is passed.
+  - Is SyncController intentionally routing SNAP responses through WrappedExternal, OR is this a bug?
+
+Step 2 — If INTENTIONAL (SyncController relays SNAP responses to a not-yet-spawned SSC):
+  - Document this in a comment at the call site.
+  - The fix is to pass a dedicated per-NPMA typed adapter that routes to the correct behavior:
+    val snapRelayAdapter = ctx.messageAdapter[SNAPSyncController.Command](WrappedExternal.apply)
+    // The WrappedExternal(SSCCmd) must be handled by SyncController's unwrap dispatch
+  - Ensure SyncController's dispatch actually handles these messages correctly when received.
+
+Step 3 — If BUG (the actual snapSync ref should be passed but wasn't):
+  - Simply replace externalAdapter with the correct snapSync ref.
+  - Add a regression test to prove SNAP responses arrive at SSC.
+
+Step 4 — In either case: remove .toClassic. Ensure no Classic ActorRef is used.
+  sbt compile-all, then targeted test: ./local/scripts/fukuii-test SNAPSyncControllerSpec
+
+Commit: "refactor(8k-G4c): [result of investigation] NPMA RegisterSnapSyncController — [intentional relay|bug fix]"
+```
 
 ---
 
@@ -1008,22 +1183,16 @@ after the current sprint queue clears.
 
 ---
 
-### 9b — RegularSync Divergence-Path Spec Fix (gate OPEN — §8k-F done)
+### 9b — RegularSync Divergence-Path Spec Fix ✅ DONE 2026-06-24
 
 **Context:** CHASE-QUEUE "RegularSync divergence path EXCEPT" (cleared 2026-06-21) — HERALD audit confirmed the three-path fork recovery in `BlockImporter.scala` (`handleForkRecovery`) uses a blind 128-block rewind with no LCA knowledge. MESS makes >128-block forks near-impossible on ETC mainnet so this is latent-correctness, not active-risk. Gate was §8k-F (RegularSync Typed) — **now done** (`b24515637`).
 
-**Fix spec:**
-1. Confirm whether FSBA `replyTo: ActorRef[BranchResolverResponse]` was already wired (SNAP2 note in CHASE-QUEUE ~line 94)
-2. Add `ResolvingFork` behavior to `BlockImporterLogic` — spawn `FastSyncBranchResolverActor` + handle `FinishedBranchResolution` response
-3. Replace 4-line blind rewind in `handleForkRecovery` with actor spawn + response path
-4. Re-enable/rewrite the divergence-path EXCEPT test in `RegularSyncSpec`
+**Completed:**
+- Items 1-3 were already done in `0d290019e` — `resolvingFork` behavior, FSBA wiring, `blindRewind` as fallback
+- Item 4: divergence-path test written 2026-06-24 — `"rewind canonical chain to resolver LCA on BranchResolvedSuccessful (divergence path)"` in `RegularSyncSpec.scala` (96 lines, `UnitTest + SyncTest`)
+- Pre-flight P16 + Step 13: confirmed correct. `compile-all` green. 34 tests / 30 pass (4 pre-existing status failures → §9d).
 
-**Prompt (LOOM + EYE):**
-> `RegularSync.scala` is now fully Typed (`b24515637`). The divergence path EXCEPT in `RegularSyncSpec` is now actionable (DEFERRED-BACKLOG §9b). Read `sync/regular.md`, `sync/fast.md` (FSBA), and CHASE-QUEUE cleared entry "RegularSync divergence path EXCEPT". Implement the `ResolvingFork` behavior in `BlockImporterLogic` and re-enable the test. Gate: none.
->
-> **Pre-flight — pekko-typed-api.md P16 + pre-migration-checklist.md Step 13:** After wiring the FSBA spawn, confirm `FastSyncBranchResolverActor`'s constructor param declares `ActorRef[BranchResolverResponse]` (Typed), not Classic `ActorRef`. The spawn site must not write `.toClassic`. Run: `grep -n "ActorRef\b" BlockImporterLogic.scala | grep -v "typed\.\|ActorRef\["` — expected 0 hits.
-
-**Size:** S. **Agent:** LOOM + EYE. **Priority:** LOW.
+**Side-finding:** 4 `testCaseT` status tests (ClassCastException) — fixed in §9d (✅ DONE 2026-06-24, `69146a244`).
 
 ---
 
@@ -1039,6 +1208,12 @@ after the current sprint queue clears.
 > **Pre-flight — pre-migration-checklist.md Step 13:** After migrating, verify no spawn-site slippage was introduced: `grep -n "ActorRef\b" RegularSyncSpec.scala | grep -v "typed\.\|ActorRef\["` — expected 0 hits. Also opportunistically check `SyncProtocol.SyncStatus` for enum candidacy (§3d residual — 5-min check while in sync/ territory).
 
 **Size:** M. **Agent:** LOOM + EYE. **Priority:** MED — unblocks E165 TestProbe narrowing in this spec.
+
+---
+
+### 9d — RegularSyncFixtures `getSyncStatus` Classic ask → Typed send ✅ DONE 2026-06-24
+
+**Commit:** `69146a244` — see `completed/DEFERRED-BACKLOG.md §9d` for full context and fix details.
 
 ---
 
