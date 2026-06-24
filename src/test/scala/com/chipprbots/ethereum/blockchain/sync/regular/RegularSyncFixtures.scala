@@ -6,12 +6,10 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.PoisonPill
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.pattern.ask
 import org.apache.pekko.testkit.TestActor.AutoPilot
 import org.apache.pekko.testkit.TestKitBase
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
-import org.apache.pekko.util.Timeout
 
 import cats.Eq
 import cats.data.NonEmptyList
@@ -69,7 +67,6 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
       with EphemBlockchainTestSetup
       with TestSyncConfig
       with SecureRandomBuilder {
-    implicit lazy val timeout: Timeout = remainingOrDefault
     implicit override lazy val system: ActorSystem = _system
     implicit override lazy val ioRuntime: IORuntime = IORuntime.global
     override lazy val syncConfig: SyncConfig =
@@ -247,7 +244,11 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
       }
 
     val getSyncStatus: IO[SyncProtocol.Status] =
-      IO.fromFuture(IO((regularSync ? SyncProtocol.GetStatus).mapTo[SyncProtocol.Status]))
+      IO {
+        val probe = TestProbe()
+        regularSync ! SyncProtocol.GetStatus(probe.ref.toTyped[SyncProtocol.Status])
+        probe.expectMsgType[SyncProtocol.Status]
+      }
 
     def pollForStatus(predicate: SyncProtocol.Status => Boolean): IO[SyncProtocol.Status] = Stream
       .repeatEval(getSyncStatus.delayBy(10.millis))

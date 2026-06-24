@@ -34,6 +34,7 @@ import com.chipprbots.ethereum.WordSpecBase
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
 import com.chipprbots.ethereum.blockchain.sync.PeersClient
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
+import com.chipprbots.ethereum.blockchain.sync.fast.FastSyncBranchResolverActor
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
 import com.chipprbots.ethereum.blockchain.sync.regular.RegularSync
@@ -344,6 +345,101 @@ class RegularSyncSpec
             system.stop(importer)
             importerFetcher.expectNoMessage(200.millis)
           }
+        }
+      )
+
+      // §9b divergence path: after repeated UnknownParent strikes BlockImporter escalates to
+      // StartForkRecovery, spawns FastSyncBranchResolverActor, and transitions to `resolvingFork`.
+      // When the resolver replies BranchResolvedSuccessful(lca), the importer must rewind the
+      // canonical chain to the resolver's LCA (NOT the blind 128-block rewind) and invalidate
+      // the fetcher's blocks from lca + 1. We drive the importer directly into resolvingFork and
+      // inject the resolver reply via the public StartForkRecovery + private[regular] BranchResolverMsg
+      // commands, bypassing the heavy peer-driven binary search inside the real resolver.
+      "rewind canonical chain to resolver LCA on BranchResolvedSuccessful (divergence path)" taggedAs (
+        UnitTest,
+        SyncTest
+      ) in sync(
+        new Fixture(testSystem) {
+          val capturedBest: BigInt = testBlocks.last.number // 20
+          val lca: BigInt = BigInt(10)
+          val lcaHeader: BlockHeader = testBlocks.find(_.number == lca).get.header
+          val masterPeer: Peer = defaultPeer
+
+          override lazy val blockchainReader: BlockchainReader = stub[BlockchainReader]
+          (() => blockchainReader.getBestBlockNumber).when().returns(capturedBest)
+          (() => blockchainReader.getSnapSyncPivotBlock).when().returns(None)
+          (blockchainReader.getBlockHeaderByNumber(_: BigInt)).when(lca).returns(Some(lcaHeader))
+
+          override lazy val blockchainWriter: BlockchainWriter = stub[BlockchainWriter]
+
+          val importerFetcher: TestProbe = TestProbe("forkImporterFetcher")
+          val importerSupervisor: TestProbe = TestProbe("forkImporterSupervisor")
+          val importerBroadcaster: TestProbe = TestProbe("forkImporterBroadcaster")
+
+          val forkBlockTopic: org.apache.pekko.actor.typed.ActorRef[
+            org.apache.pekko.actor.typed.pubsub.Topic.Command[com.chipprbots.ethereum.jsonrpc.NewBlockImported]
+          ] = system.spawn(
+            org.apache.pekko.actor.typed.pubsub.Topic[com.chipprbots.ethereum.jsonrpc.NewBlockImported](
+              "fork-block-imported-topic"
+            ),
+            "fork-block-imported-topic"
+          )
+
+          val importer: ActorRef = system.actorOf(
+            org.apache.pekko.actor.typed.scaladsl.adapter.PropsAdapter(
+              BlockImporter.apply(
+                importerFetcher.ref.toTyped[BlockFetcher.FetchCommand],
+                consensusAdapter,
+                blockchainReader,
+                blockchainWriter,
+                stateStorage,
+                evmCodeStorage,
+                branchResolution,
+                syncConfig,
+                ommersPool.ref.toTyped[com.chipprbots.ethereum.ommers.OmmersPool.Command],
+                importerBroadcaster.ref,
+                pendingTransactionsManager.ref
+                  .toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
+                forkBlockTopic,
+                importerSupervisor.ref,
+                peerEventBus.ref,
+                networkPeerManager.ref,
+                blockchain,
+                blacklist,
+                this
+              )
+            ),
+            "test-fork-recovery-importer"
+          )
+
+          importer ! BlockImporter.Start
+          importerFetcher.expectMsgClass(3.seconds, classOf[BlockFetcher.Start])
+          importerSupervisor.expectMsgClass(3.seconds, classOf[RegularSync.ProgressProtocol.StartingFrom])
+
+          // Escalate to fork recovery — spawns FastSyncBranchResolverActor and enters resolvingFork.
+          importer ! BlockImporter.StartForkRecovery(BigInt(15))
+
+          // Inject the resolver's success reply directly (simulating BranchResolvedSuccessful).
+          importer ! BlockImporter.BranchResolverMsg(
+            FastSyncBranchResolverActor.BranchResolvedSuccessful(lca, masterPeer)
+          )
+
+          // The importer must invalidate the fetcher's blocks from lca + 1 (resolver-driven rollback).
+          val invalidate = importerFetcher.fishForSpecificMessage(5.seconds) {
+            case m: BlockFetcher.InvalidateBlocksFrom => m
+          }
+          assert(
+            invalidate.fromBlock == lca + 1,
+            s"expected InvalidateBlocksFrom(${lca + 1}), got ${invalidate.fromBlock}"
+          )
+
+          // The canonical chain head must be rewound to the resolver's LCA, not a blind 128-block rewind.
+          (blockchainWriter
+            .setCanonicalChainHead(_: BigInt, _: ByteString, _: BigInt))
+            .verify(lca, lcaHeader.hash, capturedBest)
+            .once()
+
+          system.stop(importer)
         }
       )
 
