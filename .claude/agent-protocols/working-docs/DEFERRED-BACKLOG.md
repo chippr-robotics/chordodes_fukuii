@@ -581,6 +581,45 @@ sbt "testOnly *EngineApi*"
 
 ---
 
+#### §8e-StackTrie — FORGE: StackTrie residual `return` → expression (2 `scalafix:ok` DEFER sites)
+
+**Agent:** FORGE
+**Risk:** LOW for `:462` (pure comparison function) / MEDIUM for `:120` (mutable trie state — re-assess carefully)
+**Gate:** None — FORGE-only; parallel-safe
+**Purpose:** Close out the 2 `scalafix:ok` DEFER suppressions from §8e-FORGE in `StackTrie.scala`; §8e-FORGE deferred conservatively — a focused re-read may clear one or both
+
+**Sites:**
+- `mpt/StackTrie.scala:120` (`insert` Leaf exact-match update) — `return node` after `node.value = value` mutation. §8e-FORGE: DEFER (mutable trie state). Re-assess: if the exact-match branch has no code below the mutation that is skipped by the `return`, then `{ node.value = v; return node }` → `{ node.value = v; node }` is byte-identical and CLEAR.
+- `mpt/StackTrie.scala:462` (`byteCompare`) — `return` inside a `while` loop. §8e-FORGE: DEFER (loop semantics). Re-assess: `byteCompare` is a pure comparison function. Rewrite as `@tailrec` or as a `while` loop with a result `var` — the comparison semantics are unchanged by either form. This site should CLEAR.
+
+**Steps:**
+1. **Read** `StackTrie.scala:110-140` in full — understand `insert`. Is `:120` the only exit in the exact-match branch, or does code run after the `return` in the same scope? If `if exactMatch { node.value = v; return node }; ...rest...` — determine if `...rest...` is reachable in the exact-match case. If unreachable: CLEAR (remove `return`, wrap remaining code in `else`). If reachable in any path: keep DEFER with updated comment.
+2. **Read** `StackTrie.scala:455-480` in full — understand `byteCompare`.
+3. **Implement `:462`** — rewrite `byteCompare` as a `@tailrec` helper or with a `var result` accumulator. Remove the `// scalafix:ok` annotation once the `return` is gone.
+4. **Implement `:120` if CLEAR** — remove `return`, make `node` the last expression of the if-branch. Remove the `// scalafix:ok` annotation.
+5. `sbt compile-all` after each site.
+
+**Verify:**
+```bash
+cd /media/dev/2tb/dev/fukuii
+grep -n "\breturn\b" \
+  src/main/scala/com/chipprbots/ethereum/mpt/StackTrie.scala
+# Expected: 0 on CLEAR sites; scalafix:ok annotations removed
+
+sbt compile-all
+sbt "testOnly *StackTrie* *MPT* *MerklePatricia*"
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. Stage `mpt/StackTrie.scala` only
+3. `git commit -m "refactor(8e-stacktrie): StackTrie residual return → expression — FORGE re-assessed §8e DEFER sites"`
+4. `SHA=$(git rev-parse --short HEAD)` → update `modernization-log/core/mpt.md` Open section (remove cleared sites; keep any confirmed DEFER with updated rationale)
+5. `git add .claude/agent-protocols/modernization-log/core/mpt.md` → `git commit -m "docs(8e-stacktrie): clearout — $SHA"`
+6. **DELETE §8e-StackTrie**
+
+---
+
 ### 8f — Dead Code Audit (Broader than extvm) ✅ RESEARCH DONE (2026-06-22) — see `completed/DEFERRED-BACKLOG.md`
 
 **FastSyncBranchResolverActor** ✅ WIRED `ea60c4f29` — see completed.
@@ -930,6 +969,48 @@ Step 6 — git commit -m "chore(8k-B): remove adapter imports — TCP floor veri
 
 ---
 
+## Part 8l: VM Tracer Model Modernization (research-first)
+
+**Background:** `VM.scala:140` carries a `// scalafix:ok DisableSyntax.return` suppression from §8e-FORGE. The `return` exits `create()` before `tracer.foreach(_.onCallExit(...))` fires. Converting it to an expression would cause `onCallExit` to fire during an initcode-too-large abort — a behaviour change whose correctness is spec-dependent. Two open questions must be resolved before touching this site:
+
+1. **Spec question:** Should `onCallExit` fire when `create()` aborts? ETC spec and core-geth `CaptureExit` are the reference. If yes → the `return` is a latent bug and the suppression is wrong. If no → the suppression is permanent and needs an explanatory comment.
+2. **Design question:** Is the current `Option[VMTracer]` callback model the right Scala 3 / Pekko Typed shape? Alternatives: ADT event stream (`sealed trait VMEvent`), `given VMTracer` typeclass, or a Typed actor receiving trace messages.
+
+---
+
+#### §8l-R1 — FORGE: VM tracer model research + spec verdict
+
+**Agent:** FORGE
+**Risk:** ZERO — read-only research, no code changes
+**Gate:** None — parallel-safe any time
+**Purpose:** Answer the spec question at `VM.scala:140`, map the current tracer model, and produce a design recommendation before any code changes are made
+
+**Steps:**
+1. **Read** `VM.scala` in full — map every `tracer.foreach(...)` call site. For each: method name, event type (`onCallEntry`/`onCallExit`/`onCreate`/etc.), and whether it fires before or after any `return` in the same method.
+2. **Read** core-geth at `reference-clients-evm/go-ethereum/core/vm/evm.go` and `interpreter.go` — specifically: does `CaptureExit` fire for a failed `create()` (e.g., initcode-too-large)? What arguments does it receive?
+3. **Spec verdict** — record one of:
+   - **SHOULD_FIRE** → the `return` is a latent tracer bug; the `scalafix:ok` suppression is incorrect. Implementation prompt §8l-I required.
+   - **SHOULD_NOT_FIRE** → the `return` is correct; suppression is permanent. Update the annotation: `// scalafix:ok DisableSyntax.return — onCallExit must NOT fire on initcode-too-large abort (spec: create abort ≠ normal call exit)`.
+4. **Tracer type inventory:** What is `VMTracer`? Interface, abstract class, or actor ref? Is it Classic or Typed? How is it threaded (constructor param, context, `given`)?
+5. **Scala 3 / Pekko Typed assessment** — given the tracer type, propose the appropriate modernisation shape:
+   - Interface/callback → `given VMTracer` typeclass, or ADT event stream
+   - Classic actor → LOOM candidate; identify which subsystem sprint gates it
+   - Already Typed → no structural change needed; spec fix at `:140` is sufficient
+6. **Write** `.local/docs/vm-tracer-model.md`:
+   ```markdown
+   # VM Tracer Model — Research (§8l-R1)
+   ## Spec verdict (SHOULD_FIRE / SHOULD_NOT_FIRE)
+   ## core-geth CaptureExit reference behaviour
+   ## Call site map (table: method | event | fires before/after return?)
+   ## Current tracer type and threading
+   ## Modernisation recommendation and proposed next step
+   ```
+7. `git add .local/docs/vm-tracer-model.md` → `git commit -m "docs(8l-r1): VM tracer model — spec verdict and design assessment"`
+8. **Update this section** — add the spec verdict as a one-line note after the background block; add `§8l-I` implementation prompt below if SHOULD_FIRE or a redesign is warranted; mark as RESOLVED-PERMANENT-DEFER and delete this prompt if SHOULD_NOT_FIRE.
+9. **DELETE §8l-R1**
+
+---
+
 ## Recommended Sprint Sequence (post scala3-cleanup-june)
 
 Two tracks run in parallel: **Primary** (blocking, sequential) and **Housekeeping** (parallel-safe,
@@ -969,7 +1050,8 @@ No actor migration gate. Commit individually; do not bundle with primary-track m
 
 | Task | Work | Agents | Effort |
 |------|------|--------|--------|
-| **8e — ScalaFix expansion** | C2+TNHC DONE — see completed; **§8e-FORGE DONE 2026-06-24** (all 6 consensus files: 6 CLEAR + 9 DEFER w/ scalafix:ok) + **§8e-BEACON** (EngineApiController S3-D, unblocked); 36 SSC gated (SNAP1) | BEACON / LOOM | partial |
+| **8e — ScalaFix expansion** | C2+TNHC DONE — see completed; **§8e-FORGE DONE 2026-06-24** (all 6 consensus files: 6 CLEAR + 9 DEFER w/ scalafix:ok) + **§8e-StackTrie** (2 DEFER re-assessment, unblocked) + **§8e-BEACON** (EngineApiController S3-D, unblocked); 36 SSC gated (SNAP1) | BEACON / FORGE | partial |
+| **8l — VM tracer research** | §8l-R1 FORGE research: spec verdict on `VM.scala:140` tracer call + tracer model Scala 3 / Typed design assessment | FORGE | unblocked |
 | **8j — Thread.sleep** | 2 live call sites (EthMiningServiceSpec:302, SubscriptionManagerSpec:249) — both NECESSARY; defer to §8a-retro | EYE | deferred to §8a |
 | **8a-retro** | Batches 1–4 DONE — see completed. **Batch 5:** BlockFetcherSpec + PendingTxMgrSpec DONE `5ff14017b`; RegularSyncSpec → §9c. PeerActorSpec + RLPxConnectionHandlerSpec wait for Wave 3. | LOOM, EYE | ~2h |
 
@@ -1028,6 +1110,8 @@ Each prompt can run independently. Commit individually.
 | G4 | Batch G | §8d-A1 — BEACON: EngineApiService `Await.result` on CE3 compute thread | MEDIUM priority; BEACON gate; prompt in §8d above |
 | G5 | Batch G | §8d-CONDUIT — CONDUIT: jsonrpc/ remaining IO boundary scan (Await/EC.global/blocking) | LOW priority; unblocked; 15-min scan; prompt in §8d above |
 | G6 | Batch G | §8c-M4 — VAULT: DataSource close cache invalidation verify-or-by-design | LOW priority; VAULT gate; prompt in §8c above |
+| G7 | Batch G | §8e-StackTrie — FORGE: StackTrie `:120`+`:462` DEFER re-assessment (2 `scalafix:ok` sites) | Parallel-safe; FORGE-only; unblocked |
+| G8 | Batch G | §8l-R1 — FORGE: VM tracer model research + spec verdict (read-only) | Parallel-safe; FORGE-only; unblocked |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
 
