@@ -50,9 +50,9 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
   * `WrappedExternal` (child fire-and-forget replies via a `messageAdapter`) and `WrappedSyncProtocol` (JSON-RPC asks
   * now using Typed ask with embedded `replyTo` in each `SyncProtocol.*` message). Callers include
   * `NetworkPeerManagerActor` (`HandshakedPeers`, `CalibrateChainWeightFromPeer`), `ForkChoiceManager` (`BeaconHead` via
-  * its Classic `setListener(ActorRef)` callback), the JSON-RPC layer (`SyncProtocol.GetStatus`, `ResetFastSync`,
-  * `RestartFastSync`), and its children (`SNAPSyncController`, the recovery actors, `ChainDownloader`, the Classic
-  * `FastSync` / `RegularSync` / `PeersClient` / `PivotHeaderBootstrap`).
+  * `fcmAdapter` — a typed `TypedActorRef[ForkChoiceManager.BeaconHead]`), the JSON-RPC layer (`SyncProtocol.GetStatus`,
+  * `ResetFastSync`, `RestartFastSync`), and its children (`SNAPSyncController`, the recovery actors, `ChainDownloader`,
+  * the Classic `FastSync` / `RegularSync` / `PeersClient` / `PivotHeaderBootstrap`).
   *
   * Each former `context.become(stateX)` becomes a named `Behavior[Command]` factory method on `Impl`. Stored-sender
   * slots (`healingServeRootRequester`, `recentRootRequester`) carry explicit `ActorRef[ReplyType]` fields. Timers
@@ -133,7 +133,7 @@ object SyncController {
   //     NetworkPeerManagerActor.HandshakedPeers
   //     NetworkPeerManagerActor.CalibrateChainWeightFromPeer (RegisterChainWeightCalibrationTarget)
   //
-  //   From ForkChoiceManager (listener = externalAdapter.toClassic):
+  //   From ForkChoiceManager (listener = fcmAdapter):
   //     ForkChoiceManager.BeaconHead
   //
   //   From FastSync, RegularSync, CombinedRecoveryScanActor, ChainDownloader (child replies forwarded):
@@ -305,8 +305,7 @@ object SyncController {
     def setup(): Unit =
       if clPivotEnabled then {
         forkChoiceManagerOpt.foreach { fcm =>
-          // ForkChoiceManager.setListener takes a Classic ActorRef; bridge ctx.self.
-          fcm.setListener(externalAdapter.toClassic)
+          fcm.setListener(fcmAdapter)
           log.info(
             "Registered SyncController as ForkChoiceManager listener (post-merge chain TTD={}); " +
               "SNAP pivot will be CL-driven once first forkchoiceUpdated arrives.",
@@ -462,6 +461,14 @@ object SyncController {
     // SyncProtocol.HealingImpossible), all sharing the SyncControllerReply marker trait.
     val snapAdapter: TypedActorRef[SyncProtocol.SyncControllerReply] =
       ctx.messageAdapter[SyncProtocol.SyncControllerReply](WrappedExternal.apply)
+    // §8k-G4a: narrow typed adapter for ForkChoiceManager's single reply type.
+    val fcmAdapter: TypedActorRef[ForkChoiceManager.BeaconHead] =
+      ctx.messageAdapter[ForkChoiceManager.BeaconHead](WrappedExternal.apply)
+    // §8k-G4b: narrow typed adapter registered with NPMA as the chain-weight calibration target.
+    // NPMA pushes SyncProtocol.CalibrateChainWeightFromPeer here on TD-PROXY-GAP / timed calibration;
+    // it arrives as WrappedExternal and is dispatched by the existing CalibrateChainWeightFromPeer arm.
+    val cwCalibrationAdapter: TypedActorRef[SyncProtocol.CalibrateChainWeightFromPeer] =
+      ctx.messageAdapter[SyncProtocol.CalibrateChainWeightFromPeer](WrappedExternal.apply)
 
     /** Load SNAP sync configuration with fallback to defaults */
     private def loadSnapSyncConfig(): SNAPSyncConfig =
@@ -1653,7 +1660,7 @@ object SyncController {
       // cumulative TD when it detects a TD-PROXY-GAP at peer handshake (stale genesis-proxy TD
       // stored by SNAP finalization when no ETH68 peers were available at that time).
       networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor
-        .RegisterChainWeightCalibrationTarget(externalAdapter.toClassic)
+        .RegisterChainWeightCalibrationTargetCmd(cwCalibrationAdapter)
 
       // Unconditional timed calibration: fire CalibrateChainWeightNow 30s after RegularSync starts.
       // NPA forwards bestNetworkTip (best ETH68 peer TD seen since startup) to this actor.

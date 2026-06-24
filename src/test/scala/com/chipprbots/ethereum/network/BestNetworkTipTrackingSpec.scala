@@ -43,7 +43,9 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
     setupNewPeer(peer1, mkInfo(Capability.ETH68, td = BigInt(100), blockNum = 0))
     setupNewPeer(peer2, mkInfo(Capability.ETH68, td = BigInt(200), blockNum = 0))
 
-    peersInfoHolder ! RegisterChainWeightCalibrationTargetCmd(calibrationTarget.ref)
+    peersInfoHolder ! RegisterChainWeightCalibrationTargetCmd(
+      calibrationTarget.ref.toTyped[SyncProtocol.CalibrateChainWeightFromPeer]
+    )
     peersInfoHolder ! CalibrateChainWeightNowCmd
 
     calibrationTarget.expectMsg(SyncProtocol.CalibrateChainWeightFromPeer(BigInt(200), BigInt(0)))
@@ -62,7 +64,9 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
     val nb: NewBlock = NewBlock(Block(newBlockHeader, BlockBody(Nil, Nil)), BigInt(300))
     peersInfoHolder ! PeerEventCmd(MessageFromPeer(nb, peer1.id))
 
-    peersInfoHolder ! RegisterChainWeightCalibrationTargetCmd(calibrationTarget.ref)
+    peersInfoHolder ! RegisterChainWeightCalibrationTargetCmd(
+      calibrationTarget.ref.toTyped[SyncProtocol.CalibrateChainWeightFromPeer]
+    )
     peersInfoHolder ! CalibrateChainWeightNowCmd
 
     calibrationTarget.expectMsg(SyncProtocol.CalibrateChainWeightFromPeer(BigInt(300), BigInt(1000)))
@@ -76,7 +80,9 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
     // Simulate disconnect
     peersInfoHolder ! PeerEventCmd(PeerDisconnected(peer1.id))
 
-    peersInfoHolder ! RegisterChainWeightCalibrationTargetCmd(calibrationTarget.ref)
+    peersInfoHolder ! RegisterChainWeightCalibrationTargetCmd(
+      calibrationTarget.ref.toTyped[SyncProtocol.CalibrateChainWeightFromPeer]
+    )
     peersInfoHolder ! CalibrateChainWeightNowCmd
 
     // TD must still be forwarded despite disconnect — bestNetworkTip is persistent
@@ -87,7 +93,9 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
   it should "forward sentinel (0, 0) when no peers ever connected" taggedAs (UnitTest, NetworkTest) in new TestSetup {
     expectInitialSubscriptions()
 
-    peersInfoHolder ! RegisterChainWeightCalibrationTargetCmd(calibrationTarget.ref)
+    peersInfoHolder ! RegisterChainWeightCalibrationTargetCmd(
+      calibrationTarget.ref.toTyped[SyncProtocol.CalibrateChainWeightFromPeer]
+    )
     peersInfoHolder ! CalibrateChainWeightNowCmd
 
     calibrationTarget.expectMsg(SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0)))
@@ -104,7 +112,9 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
     setupNewPeer(peer1, mkInfo(Capability.ETH69, td = BigInt(0), blockNum = BigInt(24720000)))
     setupNewPeer(peer2, mkInfo(Capability.ETH69, td = BigInt(0), blockNum = BigInt(24720000)))
 
-    peersInfoHolder ! RegisterChainWeightCalibrationTargetCmd(calibrationTarget.ref)
+    peersInfoHolder ! RegisterChainWeightCalibrationTargetCmd(
+      calibrationTarget.ref.toTyped[SyncProtocol.CalibrateChainWeightFromPeer]
+    )
     peersInfoHolder ! CalibrateChainWeightNowCmd
 
     calibrationTarget.expectMsg(SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0)))
@@ -128,7 +138,9 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
     val hdrLow: BlockHeader = Fixtures.Blocks.Genesis.header.copy(number = BigInt(4800))
     peersInfoHolder ! PeerEventCmd(MessageFromPeer(NewBlock(Block(hdrLow, BlockBody(Nil, Nil)), BigInt(100)), peer1.id))
 
-    peersInfoHolder ! RegisterChainWeightCalibrationTargetCmd(calibrationTarget.ref)
+    peersInfoHolder ! RegisterChainWeightCalibrationTargetCmd(
+      calibrationTarget.ref.toTyped[SyncProtocol.CalibrateChainWeightFromPeer]
+    )
     peersInfoHolder ! CalibrateChainWeightNowCmd
 
     calibrationTarget.expectMsg(SyncProtocol.CalibrateChainWeightFromPeer(BigInt(1500), BigInt(5000)))

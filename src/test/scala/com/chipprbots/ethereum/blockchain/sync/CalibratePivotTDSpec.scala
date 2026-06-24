@@ -25,7 +25,7 @@ import com.chipprbots.ethereum.domain.appstate.BlockInfo
 import com.chipprbots.ethereum.ledger.VMImpl
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.CalibrateChainWeightNow
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeers
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterChainWeightCalibrationTarget
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterChainWeightCalibrationTargetCmd
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
@@ -389,7 +389,7 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
 
     def drainRegistration(): Unit = {
       syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
-      networkPeerManager.expectMsgClass(classOf[RegisterChainWeightCalibrationTarget])
+      networkPeerManager.expectMsgClass(classOf[RegisterChainWeightCalibrationTargetCmd])
       testScheduler.timePasses(31.seconds)
       // Fish past N GetHandshakedPeers (one per PeerListSupportNg actor) until the T+30s startup
       // CalibrateChainWeightNow is consumed, leaving the probe queue empty for test assertions.

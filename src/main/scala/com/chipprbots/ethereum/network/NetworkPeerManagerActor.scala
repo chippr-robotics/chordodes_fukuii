@@ -59,7 +59,9 @@ object NetworkPeerManagerActor {
 
   // Fire-and-forget registrations forwarded by the Classic shell:
   final case class RegisterSnapSyncControllerCmd(ref: ActorRef) extends Command
-  final case class RegisterChainWeightCalibrationTargetCmd(target: ActorRef) extends Command
+  final case class RegisterChainWeightCalibrationTargetCmd(
+      target: typed.ActorRef[com.chipprbots.ethereum.blockchain.sync.SyncProtocol.CalibrateChainWeightFromPeer]
+  ) extends Command
   case object CalibrateChainWeightNowCmd extends Command
 
   // Wire protocol messages forwarded by the Classic shell:
@@ -204,7 +206,9 @@ object NetworkPeerManagerActor {
 
     // SyncController registers itself here so TD-PROXY-GAP events can push calibration data
     // (peer TD + block number from the STATUS message) before the offending peer is evicted.
-    private var chainWeightCalibrationTarget: Option[ActorRef] = None
+    private var chainWeightCalibrationTarget
+        : Option[typed.ActorRef[com.chipprbots.ethereum.blockchain.sync.SyncProtocol.CalibrateChainWeightFromPeer]] =
+      None
 
     // Best (TD, blockNumber) seen from any ETH68 peer this run: updated on ETH68 STATUS
     // handshake and on NewBlock receipt. Stays None for pure ETH69 networks.
@@ -1305,7 +1309,9 @@ object NetworkPeerManagerActor {
   case class RegisterSnapSyncController(snapSyncController: ActorRef)
 
   /** Register SyncController as the recipient for TD-PROXY-GAP calibration data. */
-  case class RegisterChainWeightCalibrationTarget(target: ActorRef)
+  case class RegisterChainWeightCalibrationTarget(
+      target: typed.ActorRef[com.chipprbots.ethereum.blockchain.sync.SyncProtocol.CalibrateChainWeightFromPeer]
+  )
 
   /** Unconditional timed calibration: sent by SyncController 30s after startRegularSync. */
   case object CalibrateChainWeightNow

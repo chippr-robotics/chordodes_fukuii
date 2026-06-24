@@ -26,7 +26,7 @@ import com.chipprbots.ethereum.domain.appstate.BlockInfo
 import com.chipprbots.ethereum.ledger.VMImpl
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.CalibrateChainWeightNow
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeers
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterChainWeightCalibrationTarget
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterChainWeightCalibrationTargetCmd
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
@@ -550,7 +550,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       */
     def drainRegistration(): Unit = {
       startSync()
-      networkPeerManager.expectMsgClass(classOf[RegisterChainWeightCalibrationTarget])
+      networkPeerManager.expectMsgClass(classOf[RegisterChainWeightCalibrationTargetCmd])
       testScheduler.timePasses(31.seconds)
       // Fish past however many GetHandshakedPeers arrive from PeerListSupportNg actors until
       // the initial 30s CalibrateChainWeightNow is consumed, leaving the probe queue empty.

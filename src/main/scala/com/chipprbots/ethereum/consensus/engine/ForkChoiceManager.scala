@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.consensus.engine
 
 import java.util.concurrent.atomic.AtomicReference
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.domain.BlockHeader
@@ -30,7 +30,8 @@ class ForkChoiceManager(
   // Listener that wants to know whenever the CL publishes a head, even when the head is unknown
   // (Left("SYNCING") branch) — that's exactly the trigger SNAP needs to begin / re-pivot. Set
   // by SyncController on post-merge chains; never set on ETC mainnet (terminalTotalDifficulty=None).
-  private val listenerRef: AtomicReference[Option[ActorRef]] = new AtomicReference(None)
+  private val listenerRef: AtomicReference[Option[TypedActorRef[ForkChoiceManager.BeaconHead]]] =
+    new AtomicReference(None)
 
   def isActive: Boolean = currentState.get().isDefined
 
@@ -46,7 +47,7 @@ class ForkChoiceManager(
     * listener. Only registered on post-merge chains (gated by `blockchainConfig.terminalTotalDifficulty.isDefined` in
     * SyncController).
     */
-  def setListener(ref: ActorRef): Unit = listenerRef.set(Some(ref))
+  def setListener(ref: TypedActorRef[ForkChoiceManager.BeaconHead]): Unit = listenerRef.set(Some(ref))
 
   /** Unregister the current listener (e.g. on shutdown / mode switch). */
   def clearListener(): Unit = listenerRef.set(None)

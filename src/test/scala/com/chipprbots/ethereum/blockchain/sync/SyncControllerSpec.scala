@@ -896,6 +896,9 @@ class SyncControllerSpec
           case NetworkPeerManagerActor.RegisterChainWeightCalibrationTarget(_) =>
             this
 
+          case NetworkPeerManagerActor.RegisterChainWeightCalibrationTargetCmd(_) =>
+            this
+
           case NetworkPeerManagerActor.CalibrateChainWeightNow =>
             this
 
