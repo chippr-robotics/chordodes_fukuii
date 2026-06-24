@@ -967,7 +967,7 @@ written reason. P7 covered only `testEssential`; this part closes the gap.
 
 ---
 
-### P12 — MITHRIL: Tag taxonomy + build target architecture review + gaps
+### P12 — MITHRIL: Tag taxonomy + build target architecture review + gaps — IN PROGRESS 2026-06-24
 
 **Agent:** MITHRIL (read-only analysis → build.sbt edits for new targets)
 **Prerequisite:** P8, P9, P10 complete (stable tag counts before auditing the architecture).
@@ -1140,72 +1140,6 @@ do not exclude it. Tiers must reflect reality.
 
 Deferred during P9 audit (2026-06-23, commit `86c76fd4e`). Four targeted fixes listed below.
 The `handleRegularSyncMsg` production bug (SyncController:895-897) is tracked under P10 (F7).
-
----
-
-## Part 16: ETH69/ETH70 PoW Safety — Hardening (P1/P2)
-
-**Source:** Wire Protocol audit 2026-06-23 — `.local/Wire-Protocol-Modernization/eth69-pow-safety-audit.md`
-**P0 items** (G1 TD gate, G5 backlink) → `SPRINT-QUEUE.md §ETH69-A/B` — implement first.
-**P1 items** (G2 Tier3 accuracy, G6 BRU) and **P2 items** (G3/G4 archive node) tracked here.
-**Gate:** §ETH69-A and §ETH69-B must be complete before hardening items are useful.
-
----
-
-### §ETH69-E — MITHRIL: Archive node monotonic guard exemption (G3/G4, P2)
-
-**Agent:** MITHRIL
-**Risk:** LOW — refinement to chainWeight update guard; no consensus impact
-**Gate:** §ETH69-C complete (rolling-median in place provides more stable Tier3 before disabling guard)
-**Files:** `src/main/scala/com/chipprbots/ethereum/network/NetworkPeerManagerActor.scala:841-851, 335-366`
-
-**Background:**
-Non-mining peers (archive nodes, light-mode relayers) on ETH69 never emit NewBlock.
-Their chainWeight is set at handshake via Tier3 POW_SCALING and can only be updated via
-the periodic `RefreshPeerBestBlocksTick` path (every ~5 min, lines 335-366), which calls
-`resolveETH69ChainWeight` and applies:
-```scala
-val isImprovement = cw.totalDifficulty > updated.chainWeight.totalDifficulty
-if isImprovement && source != "COLD_START" then updated.withChainWeight(cw)
-else updated
-```
-The monotonic guard (`isImprovement`) prevents downward corrections. If Tier3 overestimated
-at handshake (e.g., peer arrived during a difficulty spike), the chainWeight is permanently
-inflated for archive nodes. They are ranked higher than honest active peers in some contexts.
-
-**Steps:**
-1. **Read** `NetworkPeerManagerActor.scala:823-867` (`updateMaxBlock` function) in full.
-2. **Read** `NetworkPeerManagerActor.scala:335-366` (`RefreshPeerBestBlocksTick` path).
-3. **Implement archive node detection:** Track `lastMaxBlockNumber` per peer across
-   consecutive `RefreshPeerBestBlocksTick` probes. If `maxBlockNumber` has not advanced
-   in N consecutive probes (N=3, configurable), classify peer as "static" (not mining).
-4. **Exempt static peers from the monotonic guard** in the Tier3 re-resolve path:
-   ```scala
-   val isPeerStatic = consecutiveUnchangedProbes(peerId) >= 3
-   val shouldUpdate = (isImprovement || isPeerStatic) && source != "COLD_START"
-   if shouldUpdate then updated.withChainWeight(cw)
-   else updated
-   ```
-5. **Write tests** in NetworkPeerManagerActorSpec:
-   - Mining peer (maxBlockNumber advances each probe) → monotonic guard active
-   - Archive peer (maxBlockNumber unchanged 3× probes) → downward Tier3 correction allowed
-   - Archive peer corrects from inflated Tier3 estimate to accurate actual TD
-
-**Verify:**
-```bash
-grep -n "isImprovement\|consecutiveUnchanged\|isPeerStatic" \
-  src/main/scala/com/chipprbots/ethereum/network/NetworkPeerManagerActor.scala
-
-sbt "testOnly *NetworkPeerManager*"
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add src/main/scala/.../network/NetworkPeerManagerActor.scala src/test/.../NetworkPeerManagerActorSpec.scala`
-3. `git commit -m "fix(sync): ETH69 archive node Tier3 chainWeight — exempt static peers from monotonic guard (G3/G4)"`
-4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(eth69-e): clearout — $SHA"`
-5. **DELETE §ETH69-E**
 
 ---
 
