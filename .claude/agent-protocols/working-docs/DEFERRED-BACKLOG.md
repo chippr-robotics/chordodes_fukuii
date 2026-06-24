@@ -541,46 +541,6 @@ Partial progress (C2) is safe to run any time.
 
 ---
 
-#### §8e-BEACON — BEACON: EngineApiController `return` → expression (S3-D, 2 sites)
-
-**Agent:** BEACON
-**Risk:** MEDIUM — early-exit return guards in Engine API method bodies; removing `return` requires wrapping ~90 LOC into an else branch
-**Gate:** None — BEACON-only; parallel-safe with active migration tracks
-**Purpose:** Clear the 2 BEACON-gated sites for `DisableSyntax.noReturns = true` ratchet lock
-
-**Files:**
-- `consensus/engine/EngineApiController.scala:96` — `handleNewPayload` malformed-payload decode `Left` branch
-- `consensus/engine/EngineApiController.scala:226` — `handleForkchoiceUpdated` malformed-params decode `Left` branch
-
-Both are `return IO.pure(...)` decode-error guards inside large method bodies. Deferred from S3-A because removing the `return` requires wrapping the `Right`-path body (≥90 lines) into an `else { }` block. The byte-for-byte response behavior must be preserved.
-
-**Steps:**
-1. **Read** `EngineApiController.scala:80-130` (handleNewPayload) and `:210-270` (handleForkchoiceUpdated)
-2. **Verify** the exact error response shape (status code, error body) that must be preserved for both `Left` branches
-3. **Convert** site 1 (line :96): `if decode fails { return IO.pure(errResp) }` → `decode match { case Left(e) => IO.pure(errResp); case Right(params) => ... (existing body) }`
-4. **Convert** site 2 (line :226): same pattern
-5. `sbt compile-all` after each conversion — must be 0 errors
-
-**Verify:**
-```bash
-cd /media/dev/2tb/dev/fukuii
-grep -n "\breturn\b" \
-  src/main/scala/com/chipprbots/ethereum/consensus/engine/EngineApiController.scala
-# Expected: 0
-
-sbt "testOnly *EngineApi*"
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. Stage `EngineApiController.scala` only
-3. `git commit -m "refactor(8e-beacon): EngineApiController return → expression — S3-D BEACON cleared"`
-4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(8e-beacon): clearout — $SHA"`
-5. **DELETE §8e-BEACON**
-
----
-
 #### §8e-StackTrie — FORGE: StackTrie residual `return` → expression (2 `scalafix:ok` DEFER sites)
 
 **Agent:** FORGE
