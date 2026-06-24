@@ -76,9 +76,14 @@
 
 ---
 
-## §8a-retro batch 5 — RegularSyncSpec deferred
+## §8a-retro batch 5 → §9c — RegularSyncSpec migration ✅ DONE 2026-06-24
 
-`RegularSyncSpec` uses a `Resource[IO, ActorSystem]` lifecycle that is load-bearing (Cats Effect error handling, cleanup ordering). Migration to `ScalaTestWithActorTestKit` would require restructuring the resource lifecycle. **Deferred to Wave 3** when `RegularSync` itself becomes a Typed actor and the test can be rewritten from scratch.
+#### `57d638d49` — test(9c): RegularSyncSpec — migrate Resource[IO, ActorSystem] lifecycle to per-test ActorTestKit; drop unused _system param from fixtures
+- **What:** `ResourceFixtures` / `AsyncWordSpec` lifecycle replaced with per-fixture `ActorTestKit`. `ScalaTestWithActorTestKit` base avoided (conflicts with `AsyncWordSpecLike` — registers 0 tests). `_system: ActorSystem` param dropped from all three fixture classes; 28 call sites updated. Spawn sites → `testKit.spawn`; stop sites → `testKit.stop` (not `system.stop` — guardian `ClassCastException` pitfall per §8a-retro batch 4).
+- **Key pitfall resolved:** `system.stop(child)` on a testKit-guardian child crashes the system via `StopChild` dispatch → `ClassCastException`. Use `testKit.stop(child)`.
+- **Step 13 clean:** 0 unexpected `ActorRef` hits (all 17 are load-bearing AutoPilot `sender: ActorRef` signatures or typed refs).
+- **Result:** 34/34 `RegularSyncSpec` tests pass. `sbt compile-all` clean.
+- **Cross-refs:** `§9b` (divergence-path test, same spec), `§9d` (getSyncStatus ClassCastException fix)
 
 ---
 
@@ -100,4 +105,4 @@
 - ~~RegularSyncSpec divergence path EXCEPT (LCA-less blind rewind)~~ — ✅ DONE 2026-06-24 (§9b): divergence-path test written; `resolvingFork` / FSBA wiring confirmed correct
 - ~~RegularSyncFixtures `getSyncStatus` broken — 4 status tests ClassCastException~~ — ✅ DONE 2026-06-24 (`69146a244`): Classic `?` ask replaced with `TestProbe` send; removed ask/Timeout imports; 34/34 pass (§9d)
 - ~~§P9-SAVENODE: RegularSyncSpec:552~~ — ✅ DONE 2026-06-23 (`abe9dccc1`)
-- RegularSyncSpec (entire file) — Wave 3 migration gate now OPEN (`RegularSync.scala` is Typed as of `b24515637`); clearing prompt target: DEFERRED-BACKLOG §8a "Remaining (blocked)" batch
+- ~~RegularSyncSpec (entire file) — Wave 3 migration gate now OPEN~~ — ✅ DONE 2026-06-24 (`57d638d49`): per-test ActorTestKit; 34/34 pass (§9c)

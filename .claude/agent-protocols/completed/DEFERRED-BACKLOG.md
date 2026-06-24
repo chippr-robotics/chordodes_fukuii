@@ -1442,3 +1442,26 @@ wrapping is `IO[Status]` directly, not `IO[Future[Status]]`.
 **Files modified:** `SyncController.scala`, `BytecodeRecoveryActor.scala`, `StorageRecoveryActor.scala`, `CombinedRecoveryScanActor.scala`, `PivotHeaderBootstrap.scala`, `FastSync.scala`, `ChainDownloader.scala`
 
 **Remaining:** `§8k-G3-SSC` — SNAPSyncController still has `TypedActorRef[Any]` constructor param; `externalAdapter` in SyncController retained as its sole remaining consumer until §8k-G3-SSC completes. See working-docs `§8k-G3-SSC` section.
+
+---
+
+## §9c — RegularSyncSpec Full Migration ✅ DONE 2026-06-24
+
+**Commit:** `57d638d49`
+**Agent:** LOOM
+**Gate:** §8k-F (`b24515637` — `RegularSync.scala` fully Typed)
+
+**Root cause of deferral:** `RegularSyncSpec` used a `Resource[IO, ActorSystem]` lifecycle (Cats Effect `ResourceFixtures` / `AsyncWordSpec`) with a shared Classic `ActorSystem` created in `beforeEach` and torn down in `afterEach`. `ScalaTestWithActorTestKit` extends the synchronous `TestSuite` and conflicts with `AsyncWordSpecLike` — mixing it in registered 0 tests. The correct approach is to own `ActorTestKit` directly without the ScalaTest base trait.
+
+**Fix:** Per-test `ActorTestKit` owned by each fixture instance.
+
+- `RegularSyncFixtures.scala`: Each fixture creates its own `ActorTestKit()` internally. `system: ActorSystem` derives from `testKit.system.classicSystem`. Dropped `_system: ActorSystem` constructor param from `RegularSyncFixture`, `OnTopFixture`, and `MissingStateNodeFixture` (was marked `@scala.annotation.unused` in an intermediate step — removed properly). Added `shutdownFixture()` method; `Resource.make(...)` callers use it for teardown.
+- `RegularSyncSpec.scala`: Removed `beforeEach`/`afterEach` + `var testSystem`. Dropped `import org.apache.pekko.actor.ActorSystem`. Spawn sites use `testKit.spawn`; stop sites use `testKit.stop` (not `system.stop` — the latter sends `StopChild` to the guardian → `ClassCastException`). Updated 28 call sites: `new Fixture(testSystem)` → `new Fixture`.
+
+**Key pitfall (§8a-retro batch 4):** `system.stop(importer)` on a testKit-guardian child sends `StopChild` to the guardian → `ClassCastException` + whole-system crash. Use `testKit.stop(importer)` instead.
+
+**Step 13 (pre-migration-checklist.md):** `grep -n "ActorRef\b" RegularSyncSpec.scala | grep -v "typed\.\|ActorRef\["` — all 17 hits are Classic `AutoPilot.run(sender: ActorRef, ...)` signatures (load-bearing) and typed `ActorRef[T]` refs. Zero spawn-site slippage.
+
+**Opportunistic — SyncProtocol.Status enum candidacy:** `sealed trait Status` with `case object NotSyncing`, `case object SyncDone`, and `case class Syncing(...)`. Mixed payload/singleton ADT — not a clean enum candidate (parameterised case). Weak candidate only; deferred.
+
+**Verification:** `sbt "testOnly *RegularSyncSpec"` — **34/34 pass** (two consecutive runs, no guardian crash). `sbt compile-all` — 0 errors. `sbt scalafmtAll` — clean.

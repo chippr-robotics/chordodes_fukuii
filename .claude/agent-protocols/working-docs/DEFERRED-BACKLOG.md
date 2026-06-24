@@ -1209,18 +1209,9 @@ after the current sprint queue clears.
 
 ---
 
-### 9c — RegularSyncSpec Full Migration (gate OPEN — §8k-F done)
+### 9c — RegularSyncSpec Full Migration ✅ DONE 2026-06-24
 
-**Context:** `RegularSyncSpec` was deferred because it required `RegularSync` to be Typed first. **§8k-F (`b24515637`) opens the gate.**
-
-**Fix:** Migrate `RegularSyncSpec` from `Resource[IO, ActorSystem]` lifecycle to `ScalaTestWithActorTestKit`. Restructure teardown to use `testKit.system` + `testKit.shutdown()`.
-
-**Prompt (LOOM + EYE):**
-> `RegularSync.scala` is now fully Typed (`b24515637`). Migrate `RegularSyncSpec` from its `Resource[IO, ActorSystem]` lifecycle to `ScalaTestWithActorTestKit`. Read `node/testing-infra.md` §8a-retro batches for migration patterns. Verify 33/33 tests pass.
->
-> **Pre-flight — pre-migration-checklist.md Step 13:** After migrating, verify no spawn-site slippage was introduced: `grep -n "ActorRef\b" RegularSyncSpec.scala | grep -v "typed\.\|ActorRef\["` — expected 0 hits. Also opportunistically check `SyncProtocol.SyncStatus` for enum candidacy (§3d residual — 5-min check while in sync/ territory).
-
-**Size:** M. **Agent:** LOOM + EYE. **Priority:** MED — unblocks E165 TestProbe narrowing in this spec.
+**Commit:** `57d638d49` — see `completed/DEFERRED-BACKLOG.md §9c` for full context and fix details.
 
 ---
 
