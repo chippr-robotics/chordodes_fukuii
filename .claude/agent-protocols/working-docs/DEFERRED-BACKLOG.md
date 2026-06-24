@@ -474,31 +474,14 @@ housekeeping task during test waits for specific domain files.
 
 ### 8d — IO Threading Model Follow-Up (R9 audit items)
 
-**Context:** R9 research (`threading-model-audit.md`, DONE 2026-06-18) found 3 IO/threading issues. Two are cleared; A1 remains open.
-
-**B1+B2 DONE** — see `completed/DEFERRED-BACKLOG.md`.
+**Context:** R9 research (`threading-model-audit.md`, DONE 2026-06-18) found 3 IO/threading issues. B1, B2, and A1 are all cleared — see `completed/DEFERRED-BACKLOG.md §8d`.
 
 **Remaining open:**
-- **A1** — `EngineApiService.scala`: `Await.result` on CE3 compute thread — **OPEN, BEACON gate**
-- **Additional jsonrpc sites** — `api/jsonrpc.md` notes remaining IO boundary sites beyond A1 — **OPEN, CONDUIT review**
-
-#### A1 — EngineApiService `Await.result` on CE3 compute thread (BEACON gate)
-
-**Problem:** `EngineApiService` uses `Await.result(future, timeout)` on the Cats Effect 3 compute thread pool. Blocking a CE3 fiber thread starves the entire compute pool — any concurrent EC3 fiber that needs that thread will hang until `Await` returns.
-
-**Gate:** BEACON — confirm the call site and safe fix approach (defer to IO boundary, use `IO.fromFuture`, or confirm the call never executes on the CE3 pool).
-
-**Spec:** `.local/docs/threading-model-audit.md` — A1 entry.
-
-**Agent:** BEACON
-**Priority:** MEDIUM — latency/liveness issue under concurrent engine API load; not data-correctness.
-
-**Prompt (BEACON):**
-> Read `threading-model-audit.md` A1 entry and locate `Await.result` in `EngineApiService.scala`. Determine: (a) does this call execute on the CE3 compute pool or on a dedicated blocking dispatcher? (b) if on CE3, is the correct fix `IO.fromFuture` + returning `IO`, switching to a `blocking {}` wrapper, or moving to a dedicated EC? Implement the safer approach. Byte-for-byte response semantics must be preserved — only the threading model changes. Run `sbt compile-all` then `sbt "testOnly *EngineApi*"` to verify.
+- **Additional jsonrpc sites** — `api/jsonrpc.md` open section notes IO boundary sites not catalogued in `threading-model-audit.md` — **OPEN, CONDUIT review**
 
 #### Additional jsonrpc IO boundary sites
 
-**Problem:** `api/jsonrpc.md` open section notes "additional IO boundary sites" beyond A1 that were observed during the R9 research pass but not catalogued in `threading-model-audit.md`.
+**Problem:** Additional IO boundary sites in `jsonrpc/` observed during the R9 research pass but not catalogued in `threading-model-audit.md`.
 
 **Clearing prompt:** CONDUIT audit of `jsonrpc/` for any remaining `scala.concurrent.blocking`, `Await`, or `EC.global` usage not covered by B1/B2/A1. Output a short table of sites + severity.
 
@@ -899,12 +882,13 @@ Step 6 — git commit -m "chore(8k-B): remove adapter imports — TCP floor veri
 
 ---
 
-#### §8l-R1 — FORGE: VM tracer model research + spec verdict
+#### §8l-R1 — FORGE: VM tracer model research + spec verdict — RESOLVED-RESEARCH-COMPLETE
 
 **Agent:** FORGE
 **Risk:** ZERO — read-only research, no code changes
 **Gate:** None — parallel-safe any time
 **Purpose:** Answer the spec question at `VM.scala:140`, map the current tracer model, and produce a design recommendation before any code changes are made
+**Spec verdict: SHOULD_FIRE** — onCallExit must fire; early return at :143 leaves an unbalanced onCallEnter (no matching exit), corrupting CallTracer/VmTracer frame stacks. The `scalafix:ok` suppression masks a latent tracer bug. §8l-I implementation required. Full analysis: `.local/docs/vm-tracer-model.md`. (Note: core-geth fires *neither* enter nor exit for initcode-too-large because the EIP-3860 check short-circuits in the parent opcode's dynamic-gas stage before `create()` is entered; Fukuii already emits the enter, so balancing it with an exit is the minimal correct fix.)
 
 **Steps:**
 1. **Read** `VM.scala` in full — map every `tracer.foreach(...)` call site. For each: method name, event type (`onCallEntry`/`onCallExit`/`onCreate`/etc.), and whether it fires before or after any `return` in the same method.
@@ -929,6 +913,16 @@ Step 6 — git commit -m "chore(8k-B): remove adapter imports — TCP floor veri
 7. `git add .local/docs/vm-tracer-model.md` → `git commit -m "docs(8l-r1): VM tracer model — spec verdict and design assessment"`
 8. **Update this section** — add the spec verdict as a one-line note after the background block; add `§8l-I` implementation prompt below if SHOULD_FIRE or a redesign is warranted; mark as RESOLVED-PERMANENT-DEFER and delete this prompt if SHOULD_NOT_FIRE.
 9. **DELETE §8l-R1**
+
+---
+
+#### §8l-I — TBD: implement tracer fix per vm-tracer-model.md
+
+**Agent:** FORGE (consensus-adjacent; tracer output only, no consensus-result change)
+**Risk:** LOW — `onCallExit` is an observability hook; no gas/state-root/RLP impact
+**Gate:** §8l-R1 RESOLVED-RESEARCH-COMPLETE (done)
+**Verdict:** SHOULD_FIRE — see `.local/docs/vm-tracer-model.md`
+**Scope:** In `VM.create()` (VM.scala:138-147), convert the EIP-3860 initcode-too-large abort from an early `return` to an expression arm so the abort tuple flows through the trailing `onCallExit` block (VM.scala:206-209), restoring balanced enter/exit for `CallTracer`/`VmTracer`. Remove the `scalafix:ok DisableSyntax.return` suppression and DEFER comment at VM.scala:140-143. Add a `CallTracerSpec`/`VmTracer` regression asserting a balanced frame (one push, one pop; failed CREATE appears in parent `calls` with `InitCodeSizeLimit`, no orphaned frame). Validate: `sbt "testOnly *CallTracer*" "testOnly *VmTracer*" "testOnly *DebugTracingService*"`.
 
 ---
 
@@ -1028,7 +1022,7 @@ Each prompt can run independently. Commit individually.
 | G1 | Batch G | §8a-retro-5b — DONE `5ff14017b` (specs migrated in 8a-retro multi-system commit; clearout follows) | — |
 | ~~G2~~ | ~~Batch G~~ | ~~§8e-FORGE — 6 consensus `return` → expression conversions~~ | DONE 2026-06-24 — FORGE executed across all 6 files: 6 sites CLEAR (converted to if/else), 9 sites DEFER (`scalafix:ok DisableSyntax.return`: VM.scala tracer short-circuit, PrecompiledContracts KZG/BLS crypto + MODEXP guard, StackTrie MPT-mutation + loop comparator). Prior archive's "2/6 clear" assessment was inaccurate — BlockPreparator/StackTrie had real returns that were converted. |
 | ~~G3~~ | ~~Batch G~~ | ~~§8e-BEACON — EngineApiController S3-D `return` → expression (2 sites)~~ | DONE 2026-06-24 — `d78177bda` (3 sites: handleNewPayload, handleForkchoiceUpdated, priority-fee helper; 16/16 EngineApiSpec ✅) |
-| G4 | Batch G | §8d-A1 — BEACON: EngineApiService `Await.result` on CE3 compute thread | MEDIUM priority; BEACON gate; prompt in §8d above |
+| ~~G4~~ | ~~Batch G~~ | ~~§8d-A1 — BEACON: EngineApiService `Await.result` on CE3 compute thread~~ | DONE 2026-06-24 — verified already fixed: `IO.fromFuture` in place at lines 629–640 with explanatory comment; no code change needed |
 | G5 | Batch G | §8d-CONDUIT — CONDUIT: jsonrpc/ remaining IO boundary scan (Await/EC.global/blocking) | LOW priority; unblocked; 15-min scan; prompt in §8d above |
 | G6 | Batch G | §8c-M4 — VAULT: DataSource close cache invalidation verify-or-by-design | LOW priority; VAULT gate; prompt in §8c above |
 | ~~G7~~ | ~~Batch G~~ | ~~§8e-StackTrie — FORGE: StackTrie `:120`+`:462` DEFER re-assessment (2 `scalafix:ok` sites)~~ | DONE 2026-06-24 — `09307c5a7` (both CLEAR: `:120` node expr, `:462` var-result; see modernization-log/core/mpt.md) |
