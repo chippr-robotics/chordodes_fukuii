@@ -35,7 +35,16 @@
 
 ---
 
+## §8e-BEACON: `return` → expression BEACON pass
+
+#### `d78177bda` — §8e-BEACON: EngineApiController `return` conversions (BEACON-reviewed, 2026-06-24)
+- **`:96` (`handleNewPayload` error guard)** — CLEAR. `return IO.pure(errResp)` → `decode match { case Left(e) => IO.pure(errResp); case Right(params) => <body> }`. Byte-identical error response: `PayloadStatusV1(Invalid, None, "malformed payload: $msg")`.
+- **`:226` (`handleForkchoiceUpdated` error guard)** — CLEAR. Same pattern; tuple destructured in `Right((fcs, payloadAttrs))` pattern, eliminating `.toOption.get`. Byte-identical error response: JSON-RPC `-38003` code.
+- **`:447` (priority-fee helper)** — CLEAR. `if receipts.isEmpty then return "0x0"` → `if/else` expression. Pure hex-string builder; zero consensus-logic change.
+- **Verify:** 16/16 EngineApiSpec ✅. `grep -n "\breturn\b" EngineApiController.scala` → 0 code-level hits. **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8e-BEACON`
+
+---
+
 ## Open
 
-- `EngineApiController.scala:96,226` — `return IO.pure(...)` inside IO (S3-D, §8e BEACON gate)
 - `Ordering.Iterable` deprecation warning — BEACON gate
