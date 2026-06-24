@@ -971,32 +971,37 @@ object GraphQLSchema {
           val hash = c.arg(TxHashArg)
           val fut = c.ctx.ethTxService
             .getTransactionByHash(com.chipprbots.ethereum.jsonrpc.EthTxService.GetTransactionByHashRequest(hash))
-            .map {
+            .flatMap {
               case Right(resp) =>
-                resp.txResponse.flatMap { tr =>
-                  (tr.blockHash, tr.transactionIndex) match {
-                    case (Some(bh), Some(idx)) =>
-                      c.ctx.blockchainReader.getBlockByHash(bh).flatMap { b =>
-                        b.body.transactionList.lift(idx.toInt).map { stx =>
-                          GTransaction(stx, Some(GTxBlockInfo(b, idx.toInt)))
-                        }
-                      }
-                    case _ =>
-                      // Pending tx — fetch raw stx
-                      c.ctx.blockchainReader.getBestBlock
-                        .flatMap { _ =>
-                          c.ctx.ethTxService
-                            .getRawTransactionByHash(
-                              com.chipprbots.ethereum.jsonrpc.EthTxService.GetTransactionByHashRequest(hash)
-                            )
-                            .unsafeRunSync() match {
-                            case Right(r) => r.transactionResponse.map(stx => GTransaction(stx, None))
-                            case Left(_)  => None
+                resp.txResponse match {
+                  case None => cats.effect.IO.pure(None)
+                  case Some(tr) =>
+                    (tr.blockHash, tr.transactionIndex) match {
+                      case (Some(bh), Some(idx)) =>
+                        cats.effect.IO.pure(
+                          c.ctx.blockchainReader.getBlockByHash(bh).flatMap { b =>
+                            b.body.transactionList.lift(idx.toInt).map { stx =>
+                              GTransaction(stx, Some(GTxBlockInfo(b, idx.toInt)))
+                            }
                           }
+                        )
+                      case _ =>
+                        // Pending tx — compose getRawTransactionByHash in IO before the edge
+                        c.ctx.blockchainReader.getBestBlock match {
+                          case None => cats.effect.IO.pure(None)
+                          case Some(_) =>
+                            c.ctx.ethTxService
+                              .getRawTransactionByHash(
+                                com.chipprbots.ethereum.jsonrpc.EthTxService.GetTransactionByHashRequest(hash)
+                              )
+                              .map {
+                                case Right(r) => r.transactionResponse.map(stx => GTransaction(stx, None))
+                                case Left(_)  => None
+                              }
                         }
-                  }
+                    }
                 }
-              case Left(_) => None
+              case Left(_) => cats.effect.IO.pure(None)
             }
             .unsafeToFuture()
           fut
