@@ -218,6 +218,17 @@ object NetworkPeerManagerActor {
     // blocks behind `lastKnownClHead`. Used for hysteresis.
     private val laggingPeerSince = scala.collection.mutable.Map.empty[PeerId, Long]
 
+    // Per-ETH69-peer count of consecutive RefreshPeerBestBlocksTick probes where
+    // maxBlockNumber did not advance. Incremented at each tick where the current
+    // maxBlockNumber matches lastProbeMaxBlock; reset when maxBlockNumber advances.
+    // Peers whose count reaches StaticPeerProbeThreshold are exempt from the
+    // monotonic chain-weight guard in updateMaxBlock.
+    private val consecutiveUnchangedProbes = scala.collection.mutable.Map.empty[PeerId, Int]
+
+    // MaxBlockNumber recorded at the last RefreshPeerBestBlocksTick probe, per ETH69 peer.
+    // Used by the next tick to detect whether the peer advanced.
+    private val lastProbeMaxBlock = scala.collection.mutable.Map.empty[PeerId, BigInt]
+
     // PeerIds for which PMA just performed inbound-wins: the outbound PeerActor was closed and will
     // shortly publish PeerDisconnected. That event must NOT evict the peer from peersWithInfo.
     private val pendingInboundWinsDisconnects: scala.collection.mutable.Set[PeerId] =
@@ -351,6 +362,17 @@ object NetworkPeerManagerActor {
               val recentlySignaled = peerInfo.remoteStatus.capability == Capability.ETH69 &&
                 lastBlockSignalMs.get(peerId).exists(t => now - t < refreshStaleAfterMs)
               if !recentlySignaled then {
+                // Archive-node detection: track consecutive probes with no maxBlockNumber advancement.
+                if peerInfo.remoteStatus.capability == Capability.ETH69 then {
+                  lastProbeMaxBlock.get(peerId) match {
+                    case Some(prev) if peerInfo.maxBlockNumber <= prev =>
+                      consecutiveUnchangedProbes(peerId) = consecutiveUnchangedProbes.getOrElse(peerId, 0) + 1
+                    case Some(_) =>
+                      consecutiveUnchangedProbes.remove(peerId)
+                    case None => ()
+                  }
+                  lastProbeMaxBlock(peerId) = peerInfo.maxBlockNumber
+                }
                 val bestHash = peerInfo.remoteStatus.bestHash
                 val probe: MessageSerializable =
                   ETHPackets.GetBlockHeaders(ETHPackets.nextRequestId, Right(bestHash), 1, 0, reverse = false)
@@ -572,6 +594,8 @@ object NetworkPeerManagerActor {
             PeerTelemetry.deregisterPeer(peerId)
             lastBlockSignalMs.remove(peerId)
             laggingPeerSince.remove(peerId)
+            consecutiveUnchangedProbes.remove(peerId)
+            lastProbeMaxBlock.remove(peerId)
             handleMessages(peersWithInfo - peerId)
           }
 
@@ -792,7 +816,7 @@ object NetworkPeerManagerActor {
 
       updateChainWeight(message)
         .andThen(updateForkAccepted(message, initialPeerWithInfo.peer))
-        .andThen(updateMaxBlock(message))(initialPeerWithInfo.peerInfo)
+        .andThen(updateMaxBlock(message, initialPeerWithInfo.peer.id))(initialPeerWithInfo.peerInfo)
     }
 
     private def updateChainWeight(message: Message)(initialPeerInfo: PeerInfo): PeerInfo =
@@ -836,7 +860,7 @@ object NetworkPeerManagerActor {
         case _ => initialPeerInfo
       }
 
-    private def updateMaxBlock(message: Message)(initialPeerInfo: PeerInfo): PeerInfo = {
+    private def updateMaxBlock(message: Message, peerId: PeerId)(initialPeerInfo: PeerInfo): PeerInfo = {
       def update(ns: Seq[(BigInt, ByteString)]): PeerInfo =
         if ns.isEmpty then {
           initialPeerInfo
@@ -851,17 +875,23 @@ object NetworkPeerManagerActor {
             else initialPeerInfo
 
           // For ETH/69 peers: re-resolve chainWeight via 3-tier.
+          // Archive/static peers (maxBlockNumber unchanged across N probes) are exempt from
+          // the monotonic guard so a Tier3 overestimate at handshake can be corrected down.
           blockchainReader match {
             case Some(reader) if updated.remoteStatus.capability == Capability.ETH69 =>
               val (cw, source) = reader.resolveETH69ChainWeight(maxBlockHash, maxBlockNumber, isPoWChain)
               val isImprovement = cw.totalDifficulty > updated.chainWeight.totalDifficulty
-              if isImprovement && source != "COLD_START" then {
+              val isPeerStatic =
+                consecutiveUnchangedProbes.getOrElse(peerId, 0) >= StaticPeerProbeThreshold
+              val shouldUpdate = (isImprovement || isPeerStatic) && source != "COLD_START"
+              if shouldUpdate then {
                 log.info(
-                  "ETH69_CHAINWEIGHT_REFRESH: blockNum={} newTD={} prevTD={} source={}",
+                  "ETH69_CHAINWEIGHT_REFRESH: blockNum={} newTD={} prevTD={} source={} static={}",
                   maxBlockNumber,
                   cw.totalDifficulty,
                   updated.chainWeight.totalDifficulty,
-                  source
+                  source,
+                  isPeerStatic
                 )
                 updated.withChainWeight(cw)
               } else updated
@@ -1308,6 +1338,12 @@ object NetworkPeerManagerActor {
 
   /** Delay before applying the override blacklist. */
   private[network] val LaggingPeerBlacklistOverrideDelay: FiniteDuration = 5.seconds
+
+  /** Consecutive `RefreshPeerBestBlocksTick` probes with no `maxBlockNumber` advancement needed to classify an ETH69
+    * peer as static (archive/non-mining). Static peers are exempt from the monotonic chain-weight guard so a Tier3
+    * overestimate at handshake can be corrected downward.
+    */
+  private[network] val StaticPeerProbeThreshold: Int = 3
 
   case class HandshakedPeers(peers: Map[Peer, PeerInfo])
 

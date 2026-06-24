@@ -653,4 +653,172 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     val snapSyncController: TestProbe = TestProbe()
   }
 
+  // Data helpers for archive-node detection tests.
+  // Does NOT override peersInfoHolder — call newReaderHolder() in each test after
+  // consuming the main actor's initial subscriptions to avoid double-actor confusion.
+  trait TestSetupWithReader extends TestSetup {
+    // A block header with a distinct hash (modified extraData) at the same block number.
+    // Its hash → actualTD is stored in the test DB so DB_LOOKUP returns a low TD.
+    val archiveProbeBlock: BlockHeader = baseBlockHeader.copy(
+      extraData = org.apache.pekko.util.ByteString(0xde.toByte)
+    )
+    val actualTD: BigInt = BigInt(500)
+    val inflatedTD: BigInt = BigInt(9999)
+    val eth69Status: RemoteStatus = peerStatus.copy(capability = Capability.ETH69)
+    val eth69PeerInfo: PeerInfo = initialPeerInfo.copy(
+      remoteStatus = eth69Status,
+      chainWeight = ChainWeight.totalDifficultyOnly(inflatedTD)
+    )
+
+    // Store the low TD for archiveProbeBlock.hash in the test DB.
+    def storeArchiveWeight(): Unit =
+      blockchainWriter
+        .storeChainWeight(archiveProbeBlock.hash, ChainWeight.totalDifficultyOnly(actualTD))
+        .commit()
+
+    // Create a fresh actor wired with the real BlockchainReader.
+    // Call this AFTER expectInitialSubscriptions() to avoid interleaving subscriptions.
+    def newReaderHolder(): org.apache.pekko.actor.ActorRef = classicSystem
+      .spawn(
+        NetworkPeerManagerActor.behavior(
+          peerManager.ref.toTyped[PeerManagerActor.Command],
+          peerEventBus.ref.toTyped[PeerEventBusActor.Command],
+          storagesInstance.storages.appStateStorage,
+          Some(forkResolver),
+          blockchainReader = Some(blockchainReader),
+          isPoWChain = true
+        ),
+        s"npma-reader-${java.util.UUID.randomUUID()}"
+      )
+      .toClassic
+
+    // Handshake a peer onto a specific holder actor, consuming the expected subscribe
+    // messages and any post-handshake SendMessageCmd from peerManager.
+    def setupPeerOnHolder(
+        holder: org.apache.pekko.actor.ActorRef,
+        peer: Peer,
+        peerProbe: TestProbe,
+        peerInfo: PeerInfo
+    ): Unit = {
+      holder ! PeerEventCmd(PeerHandshakeSuccessful(peer, peerInfo))
+      peerEventBus.expectMsgType[SubscribeCmd].to shouldBe PeerDisconnectedClassifier(
+        PeerSelector.WithId(peer.id)
+      )
+      peerEventBus.expectMsgType[SubscribeCmd].to shouldBe MessageClassifier(
+        Set(
+          Codes.BlockHeadersCode,
+          Codes.NewBlockCode,
+          Codes.NewBlockHashesCode,
+          Codes.BlockRangeUpdateCode,
+          com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.AccountRangeCode,
+          com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.StorageRangesCode,
+          com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.TrieNodesCode,
+          com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.ByteCodesCode,
+          com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetAccountRangeCode,
+          com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetStorageRangesCode,
+          com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetTrieNodesCode,
+          com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.GetByteCodesCode
+        ),
+        PeerSelector.WithId(peer.id)
+      )
+      peerProbe.expectNoMessage(100.millis)
+      // For ETH/69 peers, the actor sends a BlockRangeUpdate to peerManager immediately
+      // after handshake (announces our own chain range). Consume it so it doesn't
+      // bleed into subsequent peerManager expectations.
+      if peerInfo.remoteStatus.capability == Capability.ETH69 then
+        peerManager.expectMsgClass(classOf[PeerManagerActor.SendMessageCmd])
+    }
+  }
+
+  it should "ETH69 archive peer: correct inflated Tier3 chainWeight after 3 consecutive unchanged probes" taggedAs (
+    UnitTest,
+    NetworkTest
+  ) in new TestSetupWithReader {
+    // Drain peersInfoHolder (no blockchainReader) initial subscriptions.
+    expectInitialSubscriptions()
+    // Create the actor WITH blockchainReader and drain its initial subscriptions.
+    val readerHolder = newReaderHolder()
+    expectInitialSubscriptions()
+
+    // Seed the DB with the low actualTD before any tick so DB_LOOKUP can resolve it.
+    storeArchiveWeight()
+
+    // Handshake an ETH69 peer with inflated Tier3 estimate onto the reader-backed actor.
+    setupPeerOnHolder(readerHolder, peer1, peer1Probe, eth69PeerInfo)
+
+    // No BlockHeaders response is sent during accumulation: sending a response would set
+    // lastBlockSignalMs = now, causing the immediately-following tick to see recentlySignaled
+    // = true and skip counter tracking (BlockSignalStaleAfter = 150s production value).
+    // Consuming the probe from peerManager is sufficient — the counter is tracked at TICK time,
+    // not at response time.
+    def tick(): Unit = {
+      readerHolder ! RefreshPeerBestBlocksTick
+      peerManager.expectMsgClass(classOf[PeerManagerActor.SendMessageCmd])
+    }
+
+    // Tick 1: seeds lastProbeMaxBlock; counter stays 0 (first tick → case None → no increment).
+    tick()
+    // Tick 2: counter = 1.
+    tick()
+    // Tick 3: counter = 2.
+    tick()
+    // Tick 4: counter = 3 = StaticPeerProbeThreshold → isPeerStatic = true on next response.
+    tick()
+
+    // No response received yet — correction has not fired; chainWeight is still inflated.
+    readerHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
+    requestSender.expectMsgType[PeerInfoResponse].peerInfo.get.chainWeight.totalDifficulty shouldBe inflatedTD
+
+    // Trigger correction: send probe response. isPeerStatic = true → DB_LOOKUP → actualTD.
+    val probeResponse = BlockHeaders(BigInt(0), Seq(archiveProbeBlock))
+    readerHolder ! PeerEventCmd(MessageFromPeer(probeResponse, peer1.id))
+
+    readerHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
+    requestSender.expectMsgType[PeerInfoResponse].peerInfo.get.chainWeight.totalDifficulty shouldBe actualTD
+  }
+
+  it should "ETH69 mining peer: active block signal suppresses tick probes — monotonic guard stays active" taggedAs (
+    UnitTest,
+    NetworkTest
+  ) in new TestSetupWithReader {
+    // Drain peersInfoHolder initial subscriptions, then create and drain the reader actor.
+    expectInitialSubscriptions()
+    val readerHolder = newReaderHolder()
+    expectInitialSubscriptions()
+
+    storeArchiveWeight()
+    setupPeerOnHolder(readerHolder, peer1, peer1Probe, eth69PeerInfo)
+
+    // Tick 1: no recent signal → probe fires; seeds lastProbeMaxBlock, counter = 0 (case None).
+    readerHolder ! RefreshPeerBestBlocksTick
+    peerManager.expectMsgClass(classOf[PeerManagerActor.SendMessageCmd])
+
+    // Mining peer sends a live block signal via BlockRangeUpdate — refreshes lastBlockSignalMs.
+    // This simulates an active mining node that keeps its signal fresh across tick intervals.
+    // The advancing block number is not in the DB so resolveETH69ChainWeight returns COLD_START
+    // (shouldUpdate = false), leaving chainWeight at inflatedTD.
+    val advancingBlock = archiveProbeBlock.copy(number = archiveProbeBlock.number + 1)
+    readerHolder ! PeerEventCmd(
+      MessageFromPeer(
+        BlockRangeUpdate(
+          earliestBlock = BigInt(0),
+          latestBlock = advancingBlock.number,
+          latestBlockHash = advancingBlock.hash
+        ),
+        peer1.id
+      )
+    )
+
+    // Ticks 2 and 3: recentlySignaled = true (BlockRangeUpdate set lastBlockSignalMs < 150s ago)
+    // → probes are suppressed → counter is never incremented past 0.
+    readerHolder ! RefreshPeerBestBlocksTick
+    peerManager.expectNoMessage(100.millis)
+    readerHolder ! RefreshPeerBestBlocksTick
+    peerManager.expectNoMessage(100.millis)
+
+    // counter = 0 < StaticPeerProbeThreshold (3); monotonic guard remains active — no correction.
+    readerHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
+    requestSender.expectMsgType[PeerInfoResponse].peerInfo.get.chainWeight.totalDifficulty shouldBe inflatedTD
+  }
+
 }
