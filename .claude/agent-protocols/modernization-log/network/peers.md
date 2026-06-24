@@ -124,3 +124,20 @@ Note: `ServerActor` and `RLPxConnectionHandler` intentionally remain Classic TCP
 - **What:** `GetHandshakedPeersCmd.replyTo` field changed from `TypedActorRef[Any]` → `TypedActorRef[NetworkPeerManagerActor.HandshakedPeers]`. Classic-shell variant updated to match.
 - **Files:** `NetworkPeerManagerActor.scala`
 - **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8k-G4`, `modernization-log/sync/controller.md`
+
+---
+
+## ETH69 Archive-Node Static Detection (MITHRIL §ETH69-E)
+
+#### `60c9fd4e5` — fix(sync): ETH69 archive-node monotonic-guard exemption (G3/G4)
+- **What:** Two `mutable.Map` tracking fields (`consecutiveUnchangedProbes`, `lastProbeMaxBlock`)
+  added to NPMA. `RefreshPeerBestBlocksTick` increments the counter per ETH69 peer when
+  `maxBlockNumber` is unchanged. `updateMaxBlock` exempts static peers (counter ≥ 3) from the
+  monotonic TD guard, allowing Tier3 overestimates to correct downward via DB_LOOKUP.
+- **Key subtlety:** Mining peers never accumulate the counter — active block signals
+  (`BlockRangeUpdate`, `NewBlock`) refresh `lastBlockSignalMs`, causing subsequent ticks to see
+  `recentlySignaled = true` and skip the probe/counter entirely.
+- **Tests:** 2 new tests in `NetworkPeerManagerSpec` (`TestSetupWithReader` trait pattern with
+  lazy `newReaderHolder()` factory to avoid double-actor subscription interleaving).
+- **Files:** `NetworkPeerManagerActor.scala`, `NetworkPeerManagerSpec.scala`
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH69-E`, `sync/snap.md` (ETH69 chain-weight chain)

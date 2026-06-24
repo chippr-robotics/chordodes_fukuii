@@ -1645,3 +1645,68 @@ Replaced the `rollingWindowDiff` 10K-block DB-lookup rolling average in `Blockch
 **Effect:** Tier3 estimate variance under ETC flex-load oscillation (symmetric ±50% swing) collapses
 from ±50% (point-in-time head difficulty) to near-zero (true mean of the oscillation window).
 Cold-start window (buffer < 1,000 entries) falls back to head.difficulty (prior behaviour).
+
+---
+
+### §ETH69-D — MITHRIL: Tier3 accuracy telemetry ✅ DONE
+
+**Commits:** feature + clearout in same session (prior to §ETH69-E session)
+
+**What was done:**
+Added `ETH69_TIER3_ACCURACY` debug log in `NetworkPeerManagerActor.updateChainWeight` — fires on
+every `ETHPackets.NewBlock` from an ETH69 peer, logging `prevTD`, `actualTD`, `delta`,
+`deltaPercent` for post-hoc audit of Tier3 POW_SCALING accuracy.
+
+**Files changed:** `NetworkPeerManagerActor.scala` (3 lines in `updateChainWeight` case branch).
+
+**Test result:** `sbt compile-all` clean. No new tests (observability-only change).
+
+---
+
+### §ETH69-E — MITHRIL: Archive-node monotonic-guard exemption ✅ DONE (`60c9fd4e5`)
+
+**Commits:** `60c9fd4e5` (code — 2 files) · `b3f91c6a2` (clearout)
+
+**What was done:**
+Static peers (archive nodes, non-miners) produce an inflated Tier3 POW_SCALING estimate at
+handshake because `maxBlockNumber` never advances. The monotonic guard in `updateMaxBlock`
+blocked the downward correction once the DB resolved the real TD.
+
+**Mechanism:**
+- Two new `mutable.Map` fields: `consecutiveUnchangedProbes: Map[PeerId, Int]` and
+  `lastProbeMaxBlock: Map[PeerId, BigInt]`.
+- In `RefreshPeerBestBlocksTick` handler: when `!recentlySignaled` and peer is ETH69, compare
+  `peerInfo.maxBlockNumber` vs `lastProbeMaxBlock.get(peerId)`. If unchanged, increment counter;
+  if advanced, `remove` (reset). `lastProbeMaxBlock` updated unconditionally.
+- `updateMaxBlock` reads `isPeerStatic = consecutiveUnchangedProbes.getOrElse(peerId, 0) >= 3`.
+  `shouldUpdate = (isImprovement || isPeerStatic) && source != "COLD_START"`.
+- Cleanup on `PeerDisconnected`: both maps `remove(peerId)`.
+- Constant: `private[network] val StaticPeerProbeThreshold: Int = 3`.
+
+**Key design subtlety:**
+Mining peers keep `lastBlockSignalMs` fresh via `BlockRangeUpdate`/`NewBlock` signals, which
+causes each `RefreshPeerBestBlocksTick` to see `recentlySignaled = true` and skip the probe
+entirely. The counter therefore never increments for active mining peers — suppression is the
+primary guard, not counter-reset via advancing `maxBlockNumber`.
+
+Archive peers send no signals → `recentlySignaled = false` → probes fire → no responses
+between ticks → counter accumulates → after 3 unchanged probes → static → correction allowed.
+
+**Files changed:**
+- `NetworkPeerManagerActor.scala`: 2 new mutable.Map fields, counter logic in tick handler,
+  `isPeerStatic` + `shouldUpdate` in `updateMaxBlock`, disconnect cleanup, constant.
+- `NetworkPeerManagerSpec.scala`: `TestSetupWithReader` trait (data + factory methods),
+  `setupPeerOnHolder` helper, 2 new tests (archive peer + mining peer).
+
+**Tests added (NetworkPeerManagerSpec):**
+1. `"ETH69 archive peer: correct inflated Tier3 chainWeight after 3 consecutive unchanged probes"`:
+   4 ticks without responses accumulate counter to 3; single `BlockHeaders(archiveProbeBlock)`
+   triggers DB_LOOKUP → `actualTD` (500) replaces `inflatedTD` (9999).
+2. `"ETH69 mining peer: active block signal suppresses tick probes — monotonic guard stays active"`:
+   Tick 1 seeds; `BlockRangeUpdate` sets `lastBlockSignalMs`; ticks 2-3 suppressed
+   (`expectNoMessage`); chainWeight stays at `inflatedTD`.
+
+**Test result:** 20/20 `NetworkPeerManagerSpec` pass. `sbt compile-all` clean. `sbt scalafmtAll` clean.
+
+**Effect:** Inflated Tier3 POW_SCALING handshake estimates for archive nodes self-correct after
+N=3 `RefreshPeerBestBlocksTick` cycles (production default: ~150s × 3 = 7.5 min).
