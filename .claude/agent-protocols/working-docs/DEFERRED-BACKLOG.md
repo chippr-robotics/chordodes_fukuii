@@ -861,28 +861,7 @@ Step 6 — git commit -m "chore(8k-B): remove adapter imports — TCP floor veri
 
 ---
 
-## Part 8l: VM Tracer Model Modernization (research-first)
-
-**Background:** `VM.scala:140` carries a `// scalafix:ok DisableSyntax.return` suppression from §8e-FORGE. The `return` exits `create()` before `tracer.foreach(_.onCallExit(...))` fires. Converting it to an expression would cause `onCallExit` to fire during an initcode-too-large abort — a behaviour change whose correctness is spec-dependent. Two open questions must be resolved before touching this site:
-
-1. **Spec question:** Should `onCallExit` fire when `create()` aborts? ETC spec and core-geth `CaptureExit` are the reference. If yes → the `return` is a latent bug and the suppression is wrong. If no → the suppression is permanent and needs an explanatory comment.
-2. **Design question:** Is the current `Option[VMTracer]` callback model the right Scala 3 / Pekko Typed shape? Alternatives: ADT event stream (`sealed trait VMEvent`), `given VMTracer` typeclass, or a Typed actor receiving trace messages.
-
----
-
-#### §8l-R1 — FORGE: VM tracer model research + spec verdict ✅ DONE 2026-06-24 — see `completed/DEFERRED-BACKLOG.md §8l-R1`
-
-**Verdict: SHOULD_FIRE** — `VM.create()` emits `onCallEnter` before the EIP-3860 initcode-too-large check, then early-`return`s without a matching `onCallExit`, leaving a dangling frame in `CallTracer`/`VmTracer`. The `scalafix:ok` suppression at `:143` is incorrect. §8l-I required. Full analysis: `.local/docs/vm-tracer-model.md`.
-
----
-
-#### §8l-I — TBD: implement tracer fix per vm-tracer-model.md
-
-**Agent:** FORGE (consensus-adjacent; tracer output only, no consensus-result change)
-**Risk:** LOW — `onCallExit` is an observability hook; no gas/state-root/RLP impact
-**Gate:** §8l-R1 RESOLVED-RESEARCH-COMPLETE (done)
-**Verdict:** SHOULD_FIRE — see `.local/docs/vm-tracer-model.md`
-**Scope:** In `VM.create()` (VM.scala:138-147), convert the EIP-3860 initcode-too-large abort from an early `return` to an expression arm so the abort tuple flows through the trailing `onCallExit` block (VM.scala:206-209), restoring balanced enter/exit for `CallTracer`/`VmTracer`. Remove the `scalafix:ok DisableSyntax.return` suppression and DEFER comment at VM.scala:140-143. Add a `CallTracerSpec`/`VmTracer` regression asserting a balanced frame (one push, one pop; failed CREATE appears in parent `calls` with `InitCodeSizeLimit`, no orphaned frame). Validate: `sbt "testOnly *CallTracer*" "testOnly *VmTracer*" "testOnly *DebugTracingService*"`.
+## Part 8l: VM Tracer Model Modernization ✅ DONE 2026-06-24 — see `completed/DEFERRED-BACKLOG.md §8l-R1` + `§8l-I`
 
 ---
 
@@ -926,7 +905,7 @@ No actor migration gate. Commit individually; do not bundle with primary-track m
 | Task | Work | Agents | Effort |
 |------|------|--------|--------|
 | **8e — ScalaFix expansion** | C2+TNHC DONE — see completed; **§8e-FORGE DONE 2026-06-24** (all 6 consensus files: 6 CLEAR + 9 DEFER w/ scalafix:ok) + **§8e-StackTrie DONE 2026-06-24** (`09307c5a7` — both DEFER sites CLEAR: `:120` node expr, `:462` var-result) + **§8e-BEACON DONE 2026-06-24** (`d78177bda` — 3 sites CLEAR: handleNewPayload, handleForkchoiceUpdated, priority-fee helper); 36 SSC gated (SNAP1) | BEACON / FORGE | **DONE** |
-| **8l — VM tracer research** | §8l-R1 DONE `37c9d081b`/`5c2adeaaf` — SHOULD_FIRE verdict; **§8l-I implementation open** (see Part 8l below) | FORGE | **R1 ✅ · I open** |
+| **8l — VM tracer model** | §8l-R1 DONE `37c9d081b`/`5c2adeaaf` · §8l-I DONE — tracer fix in `VM.create()`; `scalafix:ok` suppression removed — see completed | FORGE | **✅ ALL DONE** |
 | **8j — Thread.sleep** | 2 live call sites (EthMiningServiceSpec:302, SubscriptionManagerSpec:249) — both NECESSARY; defer to §8a-retro | EYE | deferred to §8a |
 | **8a-retro** | Batches 1–4 DONE — see completed. **Batch 5:** BlockFetcherSpec + PendingTxMgrSpec DONE `5ff14017b`; RegularSyncSpec → §9c. PeerActorSpec + RLPxConnectionHandlerSpec wait for Wave 3. | LOOM, EYE | ~2h |
 
@@ -986,7 +965,7 @@ Each prompt can run independently. Commit individually.
 | ~~G5~~ | ~~Batch G~~ | ~~§8d-CONDUIT — CONDUIT: jsonrpc/ remaining IO boundary scan (Await/EC.global/blocking)~~ | DONE 2026-06-24 — zero findings; all 55 `jsonrpc/` files clean (see `completed/DEFERRED-BACKLOG.md §8d`) |
 | G6 | Batch G | §8c-M4 — VAULT: DataSource close cache invalidation verify-or-by-design | LOW priority; VAULT gate; prompt in §8c above |
 | ~~G7~~ | ~~Batch G~~ | ~~§8e-StackTrie — FORGE: StackTrie `:120`+`:462` DEFER re-assessment (2 `scalafix:ok` sites)~~ | DONE 2026-06-24 — `09307c5a7` (both CLEAR: `:120` node expr, `:462` var-result; see modernization-log/core/mpt.md) |
-| ~~G8~~ | ~~Batch G~~ | ~~§8l-R1 — FORGE: VM tracer model research + spec verdict (read-only)~~ | DONE 2026-06-24 — `37c9d081b`/`5c2adeaaf`; SHOULD_FIRE verdict; §8l-I open |
+| ~~G8~~ | ~~Batch G~~ | ~~§8l-R1/I — FORGE: VM tracer research + implementation~~ | DONE 2026-06-24 — R1 `37c9d081b`/`5c2adeaaf`; I impl complete; `VM.create()` tracer balanced; suppression removed |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
 

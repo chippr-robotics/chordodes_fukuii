@@ -23,6 +23,17 @@
 
 ---
 
+## §8l-I: VM Tracer Balance Fix (2026-06-24)
+
+#### (impl commit) — §8l-I: `VM.create()` tracer enter/exit balance restored
+- **File:** `vm/VM.scala` — EIP-3860 initcode-too-large abort arm
+- **What:** Early `return` before `tracer.foreach(_.onCallExit(...))` converted to expression arm; abort tuple now flows through the trailing `onCallExit` block. Removed `// scalafix:ok DisableSyntax.return` suppression (and DEFER comment) at former line 143. `DisableSyntax.noReturns` ratchet now covers this site without suppression.
+- **Tests:** 2 regression tests added to `CallTracerSpec` — balanced push/pop assertion + abort-appears-in-parent with `InitCodeSizeLimit` error, no orphaned frame.
+- **Beacon sign-off:** SAFE — tracer callback only; no gas/state-root/RLP impact.
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8l-R1` (research) + `§8l-I` (this fix)
+
+---
+
 ## Open
 
 - `vm/OpCode.scala` — infix/wildcard warnings (9 hits, FORGE gate)

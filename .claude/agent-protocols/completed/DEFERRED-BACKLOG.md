@@ -1284,3 +1284,31 @@ param on `VM[W,S]`. Synchronous, not an actor. Four concrete impls: `StructLogTr
 at the emission site in §8l-I.
 
 **Next step:** §8l-I — implement balanced enter/exit in `VM.create()` (open in working-docs).
+
+---
+
+## §8l-I — FORGE: VM.create() tracer balance fix ✅ DONE 2026-06-24
+
+**Gate:** §8l-R1 (done)
+**Agent:** FORGE + BEACON sign-off (consensus-adjacent; tracer output only)
+**Risk:** LOW — `onCallExit` is an observability hook; no gas/state-root/RLP/hash impact
+
+**What was fixed:** `VM.create()` (VM.scala) emitted `onCallEnter` unconditionally before the
+EIP-3860 initcode-too-large check, then early-`return`ed before the trailing `onCallExit` block,
+leaving a dangling frame in `CallTracer`/`VmTracer` push/pop stacks. The `// scalafix:ok
+DisableSyntax.return` suppression added in §8e-FORGE (`4544b8025`) masked the bug.
+
+**Fix:** Converted the EIP-3860 abort arm from an early `return` to an expression arm so the
+abort tuple flows through the trailing `tracer.foreach(_.onCallExit(...))` block. The
+`scalafix:ok` suppression and associated DEFER comment at VM.scala:140-143 were removed.
+
+**Tests added:** 2 regression tests in `CallTracerSpec`:
+- Balanced frame assertion: one `onCallEnter` push / one `onCallExit` pop per failed CREATE
+- Abort appears in parent `calls` with `InitCodeSizeLimit` error; no orphaned frame on the stack
+
+**Verification:**
+- `sbt "testOnly *CallTracer*"` — 10/10 PASS
+- `sbt "testOnly *DebugTracingService*"` — 9/9 PASS
+- BEACON sign-off: SAFE for ETH/Sepolia (tracer callback only; no consensus-result change)
+- `grep -n "scalafix:ok" VM.scala` — suppression at former `:143` absent; remaining suppressions
+  in `PrecompiledContracts.scala` (KZG/BLS/MODEXP crypto, unchanged) are unaffected
