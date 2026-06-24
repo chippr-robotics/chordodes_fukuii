@@ -545,7 +545,7 @@ object SyncController {
                   peersClient,
                   blockchainWriter,
                   targetBlock,
-                  replyTo = externalAdapter.toClassic,
+                  replyTo = externalAdapter,
                   syncConfig,
                   preferSnapPeers = true
                 ),
@@ -579,7 +579,7 @@ object SyncController {
                   peersClient,
                   blockchainWriter,
                   headHash,
-                  replyTo = externalAdapter.toClassic,
+                  replyTo = externalAdapter,
                   syncConfig,
                   preferSnapPeers = false
                 ),
@@ -743,7 +743,7 @@ object SyncController {
                 peersClient,
                 blockchainWriter,
                 recentBlock,
-                replyTo = externalAdapter.toClassic,
+                replyTo = externalAdapter,
                 syncConfig,
                 preferSnapPeers = true
               ),
@@ -1092,7 +1092,7 @@ object SyncController {
                   newPeersClient,
                   blockchainWriter,
                   newTargetBlock,
-                  replyTo = externalAdapter.toClassic,
+                  replyTo = externalAdapter,
                   syncConfig,
                   preferSnapPeers = true
                 ),
@@ -1527,7 +1527,7 @@ object SyncController {
             blacklist,
             syncConfig,
             configBuilder,
-            externalAdapter.toClassic
+            externalAdapter
           ),
           s"fast-sync-$syncGeneration",
           DispatcherSelector.fromConfig("sync-dispatcher")
@@ -1561,7 +1561,7 @@ object SyncController {
             snapSyncConfig,
             scheduler,
             blacklist,
-            syncController = externalAdapter.toClassic
+            syncController = externalAdapter
           ),
           s"snap-sync-$syncGeneration",
           DispatcherSelector.fromConfig("sync-dispatcher")
@@ -1722,7 +1722,7 @@ object SyncController {
               networkPeerManager = networkPeerManager,
               peerEventBus = peerEventBus,
               syncConfig = syncConfig,
-              replyTo = externalAdapter.toClassic,
+              replyTo = externalAdapter,
               maxConcurrentRequests = snapSyncConfig.chainBackfillConcurrentRequests,
               requestTimeout = snapSyncConfig.chainDownloadTimeout
             ),
@@ -1807,7 +1807,7 @@ object SyncController {
                 stateStorage,
                 evmCodeStorage,
                 appStateStorage,
-                externalAdapter.toClassic,
+                externalAdapter,
                 pivotBlock,
                 snapSyncConfig
               ),
@@ -1828,7 +1828,7 @@ object SyncController {
                         evmCodeStorage,
                         appStateStorage,
                         networkPeerManager,
-                        externalAdapter.toClassic,
+                        externalAdapter,
                         pivotBlock,
                         snapSyncConfig
                       ),
@@ -1849,7 +1849,7 @@ object SyncController {
                         appStateStorage,
                         flatSlotStorage,
                         networkPeerManager,
-                        externalAdapter.toClassic,
+                        externalAdapter,
                         pivotBlock,
                         snapSyncConfig
                       ),
@@ -1906,7 +1906,7 @@ object SyncController {
                       evmCodeStorage,
                       appStateStorage,
                       networkPeerManager,
-                      externalAdapter.toClassic,
+                      externalAdapter,
                       pivotBlock,
                       snapSyncConfig,
                       effByte
@@ -1928,7 +1928,7 @@ object SyncController {
                       appStateStorage,
                       flatSlotStorage,
                       networkPeerManager,
-                      externalAdapter.toClassic,
+                      externalAdapter,
                       pivotBlock,
                       snapSyncConfig,
                       effStor
@@ -2134,7 +2134,7 @@ object SyncController {
                 peersClient,
                 blockchainWriter,
                 recentBlock,
-                replyTo = externalAdapter.toClassic,
+                replyTo = externalAdapter,
                 syncConfig,
                 preferSnapPeers = true
               ),

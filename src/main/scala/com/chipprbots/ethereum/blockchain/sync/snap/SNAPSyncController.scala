@@ -2,6 +2,7 @@ package com.chipprbots.ethereum.blockchain.sync.snap
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.Scheduler
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.PostStop
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
@@ -59,7 +60,7 @@ private class SNAPSyncControllerImpl(
     snapSyncConfig: SNAPSyncConfig,
     scheduler: Scheduler,
     blacklist: Blacklist,
-    syncController: ActorRef,
+    syncController: TypedActorRef[Any],
     // Factory for `StateValidator` so unit tests can inject a fake. Production
     // default is a thin `new StateValidator(_)` wrapper; tests can supply a
     // `FakeStateValidator` that returns canned results, delays, or throws.
@@ -5124,7 +5125,7 @@ object SNAPSyncController {
       snapSyncConfig: SNAPSyncConfig,
       scheduler: Scheduler,
       blacklist: Blacklist,
-      syncController: ActorRef,
+      syncController: TypedActorRef[Any],
       validatorFactory: MptStorage => StateValidator = new StateValidator(_)
   )(implicit ec: ExecutionContext): Behavior[Command] =
     Behaviors.setup[Command] { ctx =>

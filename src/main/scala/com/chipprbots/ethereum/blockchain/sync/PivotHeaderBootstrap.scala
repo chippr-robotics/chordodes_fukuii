@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import org.apache.pekko.actor.ActorRef as ClassicActorRef
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.Scheduler
@@ -69,7 +68,7 @@ object PivotHeaderBootstrap {
       peersClient: ActorRef[PeersClient.Command],
       blockchainWriter: BlockchainWriter,
       targetBlock: BigInt,
-      replyTo: ClassicActorRef,
+      replyTo: ActorRef[Any],
       syncConfig: SyncConfig,
       maxAttempts: Int = 10,
       initialRetryDelay: FiniteDuration = 1.second,
@@ -98,7 +97,7 @@ object PivotHeaderBootstrap {
       peersClient: ActorRef[PeersClient.Command],
       blockchainWriter: BlockchainWriter,
       headHash: ByteString,
-      replyTo: ClassicActorRef,
+      replyTo: ActorRef[Any],
       syncConfig: SyncConfig,
       maxAttempts: Int = 10,
       initialRetryDelay: FiniteDuration = 1.second,
@@ -125,7 +124,7 @@ object PivotHeaderBootstrap {
       blockchainWriter: BlockchainWriter,
       targetBlock: BigInt,
       targetHash: Option[ByteString],
-      replyTo: ClassicActorRef,
+      replyTo: ActorRef[Any],
       @annotation.unused syncConfig: SyncConfig,
       maxAttempts: Int,
       initialRetryDelay: FiniteDuration,
@@ -160,7 +159,7 @@ object PivotHeaderBootstrap {
       blockchainWriter: BlockchainWriter,
       targetBlock: BigInt,
       targetHash: Option[ByteString],
-      replyTo: ClassicActorRef,
+      replyTo: ActorRef[Any],
       maxAttempts: Int,
       initialRetryDelay: FiniteDuration,
       maxRetryDelay: FiniteDuration,

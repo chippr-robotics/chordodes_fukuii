@@ -86,7 +86,7 @@ object FastSync {
       blacklist: Blacklist,
       syncConfig: SyncConfig,
       configBuilder: BlockchainConfigBuilder,
-      syncController: ActorRef
+      syncController: TypedActorRef[Any]
   ): Behavior[Command] =
     Behaviors.setup[Command] { ctx =>
       Behaviors.withTimers[Command] { timers =>
@@ -144,7 +144,7 @@ object FastSync {
       blacklist: Blacklist,
       val syncConfig: SyncConfig,
       configBuilder: BlockchainConfigBuilder,
-      syncController: ActorRef,
+      syncController: TypedActorRef[Any],
       peerDisconnectedAdapter: TypedActorRef[PeerEvent],
       handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers]
   ) extends ReceiptsValidator

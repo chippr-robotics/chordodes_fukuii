@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.util.ByteString
@@ -43,7 +43,7 @@ object CombinedRecoveryScanActor {
       stateStorage: StateStorage,
       evmCodeStorage: EvmCodeStorage,
       appStateStorage: AppStateStorage,
-      syncController: ActorRef,
+      syncController: ActorRef[Any],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig
   ): Behavior[Command] =
@@ -76,10 +76,7 @@ object CombinedRecoveryScanActor {
           s"Combined recovery scan complete: ${result.missingBytecodes.size} missing bytecodes, " +
             s"${result.missingStorageTries.size} missing storage tries"
         )
-        syncController.tell(
-          CombinedScanComplete(result.missingBytecodes, result.missingStorageTries),
-          org.apache.pekko.actor.ActorRef.noSender
-        )
+        syncController ! CombinedScanComplete(result.missingBytecodes, result.missingStorageTries)
         Behaviors.stopped
       }
     }

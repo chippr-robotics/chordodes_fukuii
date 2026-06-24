@@ -78,7 +78,7 @@ class ChainDownloader private (
     initialMaxConcurrentRequests: Int,
     requestTimeout: FiniteDuration,
     snapServerPeerNodeIds: Set[ByteString],
-    replyTo: ClassicActorRef
+    replyTo: TypedActorRef[Any]
 ) {
 
   import ChainDownloader.*
@@ -942,7 +942,7 @@ object ChainDownloader {
       networkPeerManager: ClassicActorRef,
       peerEventBus: ClassicActorRef,
       syncConfig: SyncConfig,
-      replyTo: ClassicActorRef,
+      replyTo: TypedActorRef[Any],
       maxConcurrentRequests: Int = 4,
       requestTimeout: FiniteDuration = 10.seconds,
       snapServerPeerNodeIds: Set[ByteString] = Set.empty,

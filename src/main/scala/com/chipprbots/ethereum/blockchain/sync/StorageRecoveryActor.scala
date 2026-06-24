@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.blockchain.sync
 
 import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -82,7 +83,7 @@ object StorageRecoveryActor {
       appStateStorage: AppStateStorage,
       flatSlotStorage: FlatSlotStorage,
       networkPeerManager: ActorRef,
-      syncController: ActorRef,
+      syncController: TypedActorRef[Any],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig
   ): Behavior[Command] = scanning(
@@ -107,7 +108,7 @@ object StorageRecoveryActor {
       appStateStorage: AppStateStorage,
       flatSlotStorage: FlatSlotStorage,
       networkPeerManager: ActorRef,
-      syncController: ActorRef,
+      syncController: TypedActorRef[Any],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig,
       missing: Seq[(ByteString, ByteString)]
@@ -131,7 +132,7 @@ object StorageRecoveryActor {
       appStateStorage: AppStateStorage,
       flatSlotStorage: FlatSlotStorage,
       networkPeerManager: ActorRef,
-      syncController: ActorRef,
+      syncController: TypedActorRef[Any],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig,
       preloaded: Option[Seq[(ByteString, ByteString)]] = None,
@@ -155,7 +156,7 @@ object StorageRecoveryActor {
       appStateStorage: AppStateStorage,
       flatSlotStorage: FlatSlotStorage,
       networkPeerManager: ActorRef,
-      syncController: ActorRef,
+      syncController: TypedActorRef[Any],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig,
       preloaded: Option[Seq[(ByteString, ByteString)]],
@@ -185,7 +186,7 @@ object StorageRecoveryActor {
             ctx.log.info("Storage recovery: all contract storage tries present. Marking recovery complete.")
             RecoveryMetrics.setStoragePhase(RecoveryMetrics.PhaseComplete)
             appStateStorage.storageRecoveryDone().commit()
-            syncController.tell(RecoveryComplete, org.apache.pekko.actor.ActorRef.noSender)
+            syncController ! RecoveryComplete
             Behaviors.stopped
           } else {
             ctx.log.warn(
@@ -264,7 +265,7 @@ object StorageRecoveryActor {
       stateRoot: ByteString,
       stateStorage: StateStorage,
       pivotBlockNumber: BigInt,
-      syncController: ActorRef,
+      syncController: TypedActorRef[Any],
       appStateStorage: AppStateStorage,
       snapSyncConfig: SNAPSyncConfig
   ): Behavior[Command] = {
@@ -361,7 +362,7 @@ object StorageRecoveryActor {
               rollsAttempted + 1,
               maxRolls
             )
-            syncController.tell(RequestRecentRoot(ctx.self.toClassic), org.apache.pekko.actor.ActorRef.noSender)
+            syncController ! RequestRecentRoot(ctx.self.toClassic)
           } else if rollsAttempted >= maxRolls then {
             ctx.log.info(
               "Storage recovery: exhausted {} recent-root rolls; letting the abandon timer run for the residue.",

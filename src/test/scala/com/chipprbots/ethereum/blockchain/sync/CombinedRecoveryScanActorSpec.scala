@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.blockchain.sync
 
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -84,7 +85,7 @@ class CombinedRecoveryScanActorSpec extends ScalaTestWithActorTestKit() with Any
         stateStorage = stateStorage,
         evmCodeStorage = evm,
         appStateStorage = appState,
-        syncController = parent.ref,
+        syncController = parent.ref.toTyped[Any],
         pivotBlockNumber = BigInt(0),
         snapSyncConfig = SNAPSyncConfig(recoveryScanConcurrency = 2, recoveryScanShardDepth = 1)
       ),

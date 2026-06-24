@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.blockchain.sync
 
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -84,7 +85,7 @@ class StorageRecoveryActorSpec extends ScalaTestWithActorTestKit() with AnyFlatS
           appStateStorage = appStateStorage,
           flatSlotStorage = flatSlots,
           networkPeerManager = networkPeerManager.ref,
-          syncController = syncController.ref,
+          syncController = syncController.ref.toTyped[Any],
           pivotBlockNumber = BigInt(100),
           snapSyncConfig = newConfig(abandonAfter, maxRolls),
           preloaded = Some(missingOne),

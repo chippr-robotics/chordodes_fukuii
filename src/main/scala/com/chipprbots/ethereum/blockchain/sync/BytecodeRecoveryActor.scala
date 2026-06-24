@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.blockchain.sync
 
 import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -62,7 +63,7 @@ object BytecodeRecoveryActor {
       evmCodeStorage: EvmCodeStorage,
       appStateStorage: AppStateStorage,
       networkPeerManager: ActorRef,
-      syncController: ActorRef,
+      syncController: TypedActorRef[Any],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig
   ): Behavior[Command] = scanning(
@@ -87,7 +88,7 @@ object BytecodeRecoveryActor {
       evmCodeStorage: EvmCodeStorage,
       appStateStorage: AppStateStorage,
       networkPeerManager: ActorRef,
-      syncController: ActorRef,
+      syncController: TypedActorRef[Any],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig,
       missing: Seq[ByteString]
@@ -111,7 +112,7 @@ object BytecodeRecoveryActor {
       evmCodeStorage: EvmCodeStorage,
       appStateStorage: AppStateStorage,
       networkPeerManager: ActorRef,
-      syncController: ActorRef,
+      syncController: TypedActorRef[Any],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig,
       preloaded: Option[Seq[ByteString]] = None,
@@ -135,7 +136,7 @@ object BytecodeRecoveryActor {
       evmCodeStorage: EvmCodeStorage,
       appStateStorage: AppStateStorage,
       networkPeerManager: ActorRef,
-      syncController: ActorRef,
+      syncController: TypedActorRef[Any],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig,
       preloaded: Option[Seq[ByteString]],
@@ -167,7 +168,7 @@ object BytecodeRecoveryActor {
             ctx.log.info("Bytecode recovery: all contract bytecodes present. Marking recovery complete.")
             RecoveryMetrics.setBytecodePhase(RecoveryMetrics.PhaseComplete)
             appStateStorage.bytecodeRecoveryDone().commit()
-            syncController.tell(RecoveryComplete, org.apache.pekko.actor.ActorRef.noSender)
+            syncController ! RecoveryComplete
             Behaviors.stopped
           } else {
             ctx.log.warn(
@@ -210,7 +211,7 @@ object BytecodeRecoveryActor {
       ctx: ActorContext[Command],
       coordinator: org.apache.pekko.actor.typed.ActorRef[snap.actors.ByteCodeCoordinator.Command],
       expectedCount: Int,
-      syncController: ActorRef,
+      syncController: TypedActorRef[Any],
       appStateStorage: AppStateStorage,
       snapSyncConfig: SNAPSyncConfig
   ): Behavior[Command] = {
