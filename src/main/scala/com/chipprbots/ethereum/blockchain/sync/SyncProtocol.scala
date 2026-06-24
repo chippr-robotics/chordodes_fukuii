@@ -3,6 +3,12 @@ import com.chipprbots.ethereum.domain.Block
 
 object SyncProtocol {
 
+  /** Marker trait for messages that SNAPSyncController sends up to SyncController. Not sealed because the companion
+    * message types live in SNAPSyncController.scala (a separate file). SyncController receives them via a
+    * `messageAdapter[SyncControllerReply]`, narrowing the `ActorRef[Any]` that SSC previously held.
+    */
+  trait SyncControllerReply
+
   /** All direct subtypes are defined in this file — sealed is now valid (W17 fix). Direct subtypes: Start, GetStatus,
     * MinedBlock, RegularSyncStuck (below), FetcherStatusTick, PrintStatusTick, ProgressProtocol (all in this file).
     */
@@ -58,7 +64,7 @@ object SyncProtocol {
     * SyncController responds by clearing SnapSyncDone and restarting SNAP with a fresh pivot. Mirrors Besu BUG-008
     * class recovery: abort finalization rather than commit a broken state.
     */
-  case object HealingImpossible extends SyncProtocolMsg
+  case object HealingImpossible extends SyncProtocolMsg with SyncControllerReply
 
   /** Sent by NetworkPeerManagerActor to SyncController when a TD-PROXY-GAP is detected at peer handshake.
     * SyncController uses the peer's STATUS-message TD and block number to interpolate and write the correct cumulative

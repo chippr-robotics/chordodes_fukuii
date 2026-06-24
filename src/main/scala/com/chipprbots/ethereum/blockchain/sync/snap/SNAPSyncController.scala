@@ -60,7 +60,7 @@ private class SNAPSyncControllerImpl(
     snapSyncConfig: SNAPSyncConfig,
     scheduler: Scheduler,
     blacklist: Blacklist,
-    syncController: TypedActorRef[Any],
+    syncController: TypedActorRef[SyncProtocol.SyncControllerReply],
     // Factory for `StateValidator` so unit tests can inject a fake. Production
     // default is a thin `new StateValidator(_)` wrapper; tests can supply a
     // `FakeStateValidator` that returns canned results, delays, or throws.
@@ -4907,7 +4907,7 @@ object SNAPSyncController {
   }
 
   case object Start extends Command
-  case object Done
+  case object Done extends SyncProtocol.SyncControllerReply
 
   /** Hint from `SyncController` that the consensus layer has pushed a fork-choice update. Carries the head's hash
     * (always) and the locally-stored header (when present — usually true if a `newPayload` arrived first; can be `None`
@@ -4924,15 +4924,17 @@ object SNAPSyncController {
   /** Bootstrap-by-hash variant of `StartRegularSyncBootstrap`. Used when the CL drives sync and we know the head hash
     * but not its block number — `PivotHeaderBootstrap` then fetches by `GetBlockHeaders(Right(hash))`. Closes #1207.
     */
-  final case class StartRegularSyncBootstrapByHash(headHash: ByteString)
+  final case class StartRegularSyncBootstrapByHash(headHash: ByteString) extends SyncProtocol.SyncControllerReply
   // Two-phase handshake with SyncController:
   //   1. SnapSyncFinalized(pivot) — pivot/state anchored, regular sync can start.
   //      SyncController starts RegularSync but does NOT poison-pill SNAPSyncController.
   //   2. Done — backfill complete (or absent/disabled). SyncController poison-pills SNAPSyncController.
   // Sender always emits the same shape: Finalized first, then Done either immediately or after backfill.
-  final case class SnapSyncFinalized(pivot: BigInt)
-  case object FallbackToFastSync // Signal to fallback to fast sync due to repeated failures
-  case class StartRegularSyncBootstrap(targetBlock: BigInt) // Request bootstrap from SyncController
+  final case class SnapSyncFinalized(pivot: BigInt) extends SyncProtocol.SyncControllerReply
+  case object FallbackToFastSync
+      extends SyncProtocol.SyncControllerReply // Signal to fallback to fast sync due to repeated failures
+  case class StartRegularSyncBootstrap(targetBlock: BigInt)
+      extends SyncProtocol.SyncControllerReply // Request bootstrap from SyncController
   final case class BootstrapComplete(
       pivotHeader: Option[BlockHeader] = None
   ) extends Command // Signal from SyncController that bootstrap is done
@@ -5016,7 +5018,7 @@ object SNAPSyncController {
     * that mutates the walk root) and from `StorageRecoveryActor`'s recent-root requester. The parent replies with
     * `HealingServeRoot`.
     */
-  case object RequestHealingServeRoot
+  case object RequestHealingServeRoot extends SyncProtocol.SyncControllerReply
 
   /** spec 004 T012: SyncController → SNAPSyncController reply with a newest-servable `(blockNumber, stateRoot)`, or
     * `stateRoot = None` if none could be fetched (no peers / bootstrap failed / timeout). On `None`, the controller
@@ -5125,7 +5127,7 @@ object SNAPSyncController {
       snapSyncConfig: SNAPSyncConfig,
       scheduler: Scheduler,
       blacklist: Blacklist,
-      syncController: TypedActorRef[Any],
+      syncController: TypedActorRef[SyncProtocol.SyncControllerReply],
       validatorFactory: MptStorage => StateValidator = new StateValidator(_)
   )(implicit ec: ExecutionContext): Behavior[Command] =
     Behaviors.setup[Command] { ctx =>

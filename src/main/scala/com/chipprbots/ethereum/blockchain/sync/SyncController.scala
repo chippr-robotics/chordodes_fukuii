@@ -458,6 +458,10 @@ object SyncController {
       ctx.messageAdapter[fast.FastSync.SyncControllerMsg](WrappedExternal.apply)
     val chainDownloaderAdapter: TypedActorRef[snap.ChainDownloader.Done.type] =
       ctx.messageAdapter[snap.ChainDownloader.Done.type](WrappedExternal.apply)
+    // §8k-G3-SSC: narrow typed adapter for SNAPSyncController's 7 reply types (6 in SSC companion +
+    // SyncProtocol.HealingImpossible), all sharing the SyncControllerReply marker trait.
+    val snapAdapter: TypedActorRef[SyncProtocol.SyncControllerReply] =
+      ctx.messageAdapter[SyncProtocol.SyncControllerReply](WrappedExternal.apply)
 
     /** Load SNAP sync configuration with fallback to defaults */
     private def loadSnapSyncConfig(): SNAPSyncConfig =
@@ -1578,7 +1582,7 @@ object SyncController {
             snapSyncConfig,
             scheduler,
             blacklist,
-            syncController = externalAdapter
+            syncController = snapAdapter
           ),
           s"snap-sync-$syncGeneration",
           DispatcherSelector.fromConfig("sync-dispatcher")
