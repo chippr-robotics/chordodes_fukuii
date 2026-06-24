@@ -12,26 +12,7 @@ Active sprint plan: `/home/dev/.claude/plans/we-are-working-on-noble-whisper.md`
 
 **Status: W2-P1 sweep COMPLETE (7 commits, 2026-06-21). ~507 non-E165 → 87 non-E165 remaining.**
 
-### W2-P1 Commits
-
-| Commit | What |
-|--------|------|
-| `94879ba59` | `NodeBuilder.scala`: `with`→`&` in self-type continuations |
-| `82cd757ea` | `MiningBuilder` + `FaucetBuilder`: multi-line self-types |
-| `8bfa0552a` | 8 files: `private[this]`/`protected[this]` → `private`/`protected` |
-| `a211638f1` | Test deprecations: `expectNoMsg`, `left.get`, `json4s extract` |
-| `a211638f1` | 5 files: inline `with` as type operator |
-| `00e4ce34b` | 14 files: `= _`, infix operators, wildcards, `Ordering.Iterable`, E029 |
-| `823732397` | `BootstrapDownload`: `new URL(String)` → `URI.create().toURL()` |
-
-**Fixed in earlier phases (not part of W2-P1 sweep):**
-- #1 `BlockHeaderValidatorSkeleton.scala:218` unused implicit `_blockchainConfig` — cleared
-- #2 `PeersClient.scala:326` unused param `_peer` — cleared
-- #3 `extvm/VMClient.scala:22` unused constructor param — cleared (C4 deleted extvm entirely)
-- #4/#5 `PathNodeStorage.scala` unused `hash` params — cleared
-- #6 `ETHPackets.scala:106` E092 `@unchecked` — cleared
-- E003 `with` in self-types (337 occurrences) — cleared in W2-P3a + W2-P1
-- E198 unused test symbols — addressed
+**Commits and earlier-phase fixes:** see `completed/DEFERRED-BACKLOG.md` W2-P1 History section.
 
 ### Remaining 87 Non-E165 Warnings (all externally gated)
 
@@ -66,12 +47,7 @@ at once keeps callers and callees coherent in a single commit.
 
 ### Subsystem Order (lowest risk → highest)
 
-| # | Subsystem | Actors | Files | Risk | Status |
-|---|-----------|--------|-------|------|--------|
-| 1 | `faucet/` | FaucetHandler + FaucetSupervisor | 7 | LOW | ✅ DONE — `551bccfaf` (post-rebase). Sealed Command ADT, two state behaviors, Classic→Typed adapter, Typed TestProbes. FaucetHandlerSelector deleted. |
-| 2 | `jsonrpc/` | FilterManager + SubscriptionManager | ~8 | LOW-MED | ✅ DONE — `2ac71a58e` + `1309bb968` (post-rebase). ctx.messageAdapter bridges Classic eventStream. eventStream msgs confirmed local-only. 22/22 tests. |
-| 3 | `transactions/` | PendingTransactionsManager + SignedTransactionsFilterActor | 10+18 | HIGH | ✅ DONE — `0be6dd776`. WrappedPeerEvent adapter, MailboxSelector.bounded(50000), toClassic.eventStream bridge, field-type updates in RegularSync/SyncController/BlockchainHostActor. |
-| 4 | `consensus/pow/miners/` + `ommers/` | MockedMiner + OmmersPool | 19 | MED | ✅ DONE — `0aa837d5e`. OmmersPool: sealed Command ADT, immutable state via recursive `running()`, replyTo. MockedMiner: 4-state context.become → per-state Behaviors, pipeToSelf, context.scheduleOnce. FORGE-approved. Ommer ordering invariants preserved. |
+**All 4 subsystems DONE** — see `completed/DEFERRED-BACKLOG.md` (faucet `551bccfaf`, jsonrpc `2ac71a58e`+`1309bb968`, transactions `0be6dd776`, OmmersPool+MockedMiner `0aa837d5e`).
 
 ### Remaining Classic→Typed Bridges (require network/P2P sprint to remove)
 
@@ -95,10 +71,7 @@ sprint below.
 
 ### NET Group — Deferred Items
 
-| Item | Location | Issue | Fix | Gate |
-|------|----------|-------|-----|------|
-| `@annotation.unused timers` | `PeerManagerActor.Impl:272` | Impl receives `TimerScheduler[Command]` from `Behaviors.withTimers` but uses `classicSystem.scheduler` exclusively. Suppressed with `@annotation.unused` during C3b. | ✅ DONE `4b101b612` — `Behaviors.withTimers` wrapper dropped entirely; `@annotation.unused timers: TimerScheduler[Command]` removed from Impl constructor; import dropped. `classicSystem.scheduler` private def stays — still used for `scheduleWithFixedDelay` (node-update, status-refresh) and `scheduleOnce` (connect retries). 61/61 PeerManager tests green. Full typed-timer migration deferred to network/P2P sprint. | — |
-| NET-01 | `NetworkPeerManagerActor.scala:165,451,663` | `classicSystem.scheduler` for two fire-and-forget blacklist-delay `scheduleOnce` calls. HERALD verified by-design (2026-06-21). | ✅ DONE `6b506a63f` (partial) — `@annotation.unused timers: TimerScheduler[Any]` removed from NPMA Impl constructor; `timers,` removed from `new Impl(ctx, timers, ...)` call; TimerScheduler import dropped. `private def scheduler = ctx.system.classicSystem.scheduler` stays — correct for the two fire-and-forget `AddToBlacklistCmd` delays. Full treatment (path b: typed timers) deferred to network/P2P sprint. | — |
+**Both NET Group items DONE** — see `completed/DEFERRED-BACKLOG.md` (`4b101b612`, `6b506a63f`).
 
 ### Network/P2P Sprint — Pekko Migration Completion Gate
 
@@ -164,28 +137,7 @@ Hotspot files (highest density — start here):
 **Prerequisite**: Add `GivenUsing` to `.scalafix.conf` BEFORE running. Must run AFTER
 Pekko migration sprint (actor files will also be touched by GivenUsing).
 
-### 3b — implicit class → extension methods — COMPLETE (2026-06-20)
-
-**Commit**: `c0a3612b4` on `scala3-cleanup-june`
-
-**Scope completed**: Non-consensus `src/main/` (excludes `consensus/`, `vm/`, `crypto/`, `domain/`).
-29 files changed, all `AnyVal` implicit classes and Dec/RLP-codec implicit classes converted.
-
-**Kept as `implicit class` (with reasons):**
-
-| Class | File | Reason |
-|-------|------|--------|
-| All `*Enc extends MessageSerializableImplicit` | ETHPackets, SNAP, ETH69, WireProtocol | Subtype polymorphism — `new FooEnc(msg): MessageSerializable` in MessageDecoders |
-| `SignedTransactionEnc extends RLPSerializable` | ETHPackets | `toBytes` used via trait inheritance in `domain/BlockBody` (excluded path) |
-| `MptNodeEnc extends RLPSerializable` | MptNodeCodecs | `toBytes` used via trait inheritance in SNAP sync codec layer |
-| `TxLogEntryRLPEnc` | ETHPackets | Name collision: `ReceiptCodecs` also has `extension (TxLogEntry) { def toRLPEncodable }` — ambiguous under wildcard import |
-| `ReceiptBloomEnc` | ETHPackets | Same name-collision reason; also scoped-import disambiguation in `BlockchainHostActor` |
-| `ReceiptBloomFreeEnc` | ETHPackets | Same as above |
-
-**Remaining scope** (consensus/vm/crypto/domain/ — requires forge/beacon review gate):
-- `OmmersSeq`, `Receipt`, `ForkId` codec classes in `consensus/`
-- Additional domain codecs in `domain/`
-- These are deferred to a consensus-reviewed sprint.
+### 3b — implicit class → extension methods — DONE `c0a3612b4` — see `completed/DEFERRED-BACKLOG.md`
 
 ### 3c — isInstanceOf / asInstanceOf audit
 
@@ -200,8 +152,7 @@ Audit hot paths; replace with pattern matching / algebraic data types.
 **Risk**: LOW
 **Constraint**: NEVER migrate hierarchies with `case class` subtypes.
 **Priority**: LOW-MEDIUM — elevated from "optional" because high-value candidates exist:
-- `SyncPhase` ✅ DONE `adf4e69ea` — 8-member single-line enum; `SyncPhase.*` imported at 5 call sites
-- `ForkId` message codes ✅ DONE `adf4e69ea` — `ForkIdValidationResult` 3-member enum; 4 external callers updated
+- `SyncPhase`, `ForkIdValidationResult` — DONE `adf4e69ea` (see completed)
 - `Blacklist.BlacklistReason` ❌ REJECTED — has 7 `final case class` subtypes (`EmptyBlockBodies`, `EmptyReceipts`, `InvalidReceipts`, `FastSyncRequestFailed`, `InvalidStateResponse`, `RegularSyncRequestFailed`, `BlockImportError`). Not a pure discriminant; cannot be an enum.
 - `Blacklist.BlacklistReasonType` ❌ REJECTED — non-trivial behavior fields (`code: Int`, `name: String`) and mixin group traits (`FastSyncBlacklistGroup` etc.). Not a pure discriminant enum.
 - `SyncProtocol.SyncStatus` equivalents — still candidate; verify subtypes are pure `case object` before migrating
@@ -218,55 +169,7 @@ grep -rn "SyncProtocol\.SyncStatus\|sealed.*SyncStatus\|case object.*SyncStatus"
 ```
 If all subtypes are pure `case object` (no fields, no methods, no constructor params): migrate to `enum` in the same commit pattern as `SyncPhase` (`adf4e69ea`). If any subtype has fields → reject (add ❌ REJECTED note here). This is a 5-minute check + 15-minute migration if confirmed. Handle opportunistically when already in `sync/` files.
 
-### 3g — StateValidator.scala Exception Swallowing (FORGE — RESOLVED)
-
-**Source:** R0 audit Cat 5 (exception swallowing)
-**File:** `src/main/scala/.../blockchain/sync/snap/StateValidator.scala` (note: actual path is
-`snap/`, not `state/` as originally recorded)
-**Status:** RESOLVED 2026-06-20 — disposition **log + swallow** (non-behavioral observability),
-plus one safe conservative-flag improvement. Tests: `*StateValidator* *SNAP* *Trie*` 245/0.
-
-**FORGE assessment (answers to the three questions):**
-
-**Q1 — Intentional fault tolerance?** Partly. The validator's contract with its caller
-(`SNAPSyncController`) is: `Right(missing)` = "walk completed, here are nodes to heal";
-`Left(error)` = "walk could not complete." When `Right(Seq.empty)` is returned the caller
-declares state **"COMPLETE — all tries intact"** (`SNAPSyncController.scala:1508`) and finishes
-sync. The HashNode resolve handlers (`traverseForMissingNodes`) deliberately treat an unreadable
-node as missing → conservatively correct. But the `collectAccounts` / leaf-decode / storage-walk
-silent `case _: Exception => ()` sites could omit a subtree from the missing set and produce a
-**false "intact" signal on corrupt state** — that part was an over-broad accidental catch-all,
-not deliberate policy.
-
-**Q2 — Correct behavior?** **Log + swallow** (not propagate). The walks run fire-and-forget
-inside a `Future`; the `Left` path triggers a full validation-retry / restart / dormant cycle
-(`SNAPSyncController.scala:1462-1500`). Propagating a transient decode/I-O fault there would be
-*more* destructive than the current behavior (needless pivot restart). Logging at WARN preserves
-control flow while making masked faults visible. Two sites additionally now **conservatively add
-the affected root to the missing set** (storage-walk line ~73; idempotent — healing re-fetch of an
-already-present root is a no-op) to close the false-"intact" hole without changing the Left/Right
-contract.
-
-**Q3 — MissingNodeException vs other exceptions distinction?** The distinction was real but the
-non-missing branch lacked observability. A `StorageException` (corrupt DB) or decode failure could
-arrive and be indistinguishable from an ordinary missing node, or silently dropped. Now every
-catch site logs (WARN for non-missing/unexpected, DEBUG for ordinary missing) so the two are
-separable in operations. `StackOverflowError` is not catchable by `case _: Exception` and is not a
-concern here — the heal walks (`walkAccountTrieDFS`/`walkStorageTrieDFS`) are already iterative
-(explicit stack) specifically to avoid it.
-
-**Sites changed (all in `snap/StateValidator.scala`):**
-- `traverseForMissingNodes` HashNode (was 127): log WARN, still mark-as-missing (intentional).
-- `validateAllStorageTries` account-traversal (was 58): log WARN before existing `Left`.
-- `validateAllStorageTries` storage-walk (was 73): log WARN + **flag storageRoot for healing**
-  (was silent drop).
-- `collectAccounts` leaf decode (was 148): log WARN.
-- `collectAccounts` branch terminator decode (was 170): log WARN.
-- `collectAccounts` HashNode resolve (was 182-183): split — DEBUG (missing) / WARN (unexpected).
-- `walkAccountTrieDFS` leaf decode (was 305): log WARN.
-
-No consensus/byte-level behavior change: validator output set is unchanged except the storage-walk
-site, which can only *add* an already-idempotent heal target. Compile: `sbt compile-all` clean.
+### 3g — StateValidator.scala Exception Swallowing — DONE 2026-06-20 — see `completed/DEFERRED-BACKLOG.md`
 
 ---
 
@@ -281,52 +184,11 @@ site, which can only *add* an already-idempotent heal target. Compile: `sbt comp
 **Count**: 20 `.synchronized`/`.wait()`/`.notify()` outside actor boundaries
 **Priority**: Address where overlapping with Pekko migration; audit remainder separately.
 
-**Audit COMPLETE** (`cf33cfa87`) — 5 sites in `src/main/`, all accounted for:
-
-| # | File | Line | Bucket | Disposition |
-|---|------|------|--------|-------------|
-| 1 | `db/cache/MapCache.scala` | 19 | D | ✅ Fixed — `mutable.HashMap` → `TrieMap`; `this.synchronized` on update removed |
-| 2 | `db/cache/MapCache.scala` | 30 | D | ✅ Fixed — same backing change; `this.synchronized` on get removed |
-| 3 | `blockchain/sync/CombinedRecoveryScanner.scala` | 106 | D | Left as-is — `lock.synchronized` serializes compound multi-structure transaction (dedup sets + mutable accumulators + fsync) across parallel `Future` workers; `ConcurrentHashMap` cannot substitute. Comment at line 104 documents this. |
-| 4 | `consensus/pow/PoWMining.scala` | 106 | A | No-touch — **FORGE gate required**. Compound check-then-act on two `@volatile` fields; could become `AtomicBoolean` but FORGE must sign off. Logged in CHASE-QUEUE. |
-| 5 | `blockchain/sync/snap/actors/TrieNodeHealingCoordinator.scala` | 1617 | D | Left as-is — `visitedLru.synchronized` on `LinkedHashMap`-backed bounded FIFO-eviction set; `ConcurrentHashMap` was the prior implementation and produced a silent correctness hole (comment at lines 1607–1614 documents why). |
-
-No Bucket C violations (no actor-internal state accessed outside actor thread).
+**Audit DONE** `cf33cfa87` — see `completed/DEFERRED-BACKLOG.md`. One FORGE-gated site (`PoWMining.scala:106`) logged in CHASE-QUEUE.
 
 ---
 
-### 3h — `Any` in Type Signatures (type erasure cleanup)
-
-**Added:** 2026-06-22 (birdseye-review G8 scope)
-**Agent:** MITHRIL (non-consensus sites); FORGE-gated (vm/, consensus/, domain/)
-**Risk:** LOW–MEDIUM (no consensus logic in most sites; vm/ sites need forge sign-off)
-
-**Counts (pre-scan 2026-06-22):**
-| Pattern | Count | Primary subsystems |
-|---------|-------|-------------------|
-| `: Any` in type signatures | ~~20~~ → 1 ungated remaining | 15 documented `// Any:`, 4 FORGE-gated (domain×2, vm×2), 1 per-scan GraphQLSchema (has `// cast:` comment) |
-| `[Any]` generic parameter | ~~22~~ → 0 ungated remaining | all documented `// Any:` or FORGE-gated |
-| `=> Any` return type | ~~2~~ → 0 ungated remaining | both documented `// Any:` |
-| `Behavior[Any]` (Pekko) | ~~12~~ **0** | ✅ DONE 2026-06-22 — all 12 actors narrowed to Behavior[Command] |
-
-**Note:** `Behavior[Any]` sites are Wave 3 scope (LOOM). Wave 3 is complete as of 2026-06-22 — all
-12 actors narrowed to `Behavior[Command]`, stale Scaladoc comments updated. The remaining ~44
-non-Pekko sites (`: Any` in type signatures, `[Any]` generics, `=> Any` returns) are the target of this item.
-
-**Remediation pattern:**
-- `def process(msg: Any)` → `def process(msg: Command)` (sealed ADT)
-- `Map[String, Any]` → case class or `io.circe.Json` (circe already in codebase)
-- `List[Any]` (mixed types) → sealed ADT with `List[A | B]`
-- `def result: Any` → sealed trait / enum / generic `[T]`
-- EXCEPTION: Intentional reflection sites → `// Any: reflection — no typed alternative` comment
-
-**Gate:** G8-findings must categorize all sites. Wave 3 (Behavior[Any] removal) is DONE.
-Remaining sites ~44. Add `DisableSyntax.noAny` to scalafix.conf after cleanup
-(check R6-findings for rule availability).
-
-**Scope prompt:** `birdseye-review/01-gap-analysis/G8-any-type-scope.md`
-
-**✅ DONE 2026-06-22** — MITHRIL pass complete. 15 sites documented `// Any:`, 7 FORGE-gated (markers added, logged in CHASE-QUEUE). 0 type changes (all remaining uses are intentional: Pekko messageAdapter, Micrometer gauge, Java interop, or FORGE-gated). See G8 scope doc for post-fix baseline.
+### 3h — `Any` in Type Signatures — DONE 2026-06-22 — see `completed/DEFERRED-BACKLOG.md`
 
 
 ## Part 4: Dependency Upgrades (blocked or deferred)
@@ -404,19 +266,7 @@ Post-Typed migration: evaluate replacing Actor mailboxes with Ox `supervised` sc
 
 ## Part 6: Tech Debt Deletion
 
-### 6a — extvm/ Dead Code Deletion ✅ DONE (`a948fda1d`)
-
-18 files deleted, 1,423 deletions. All 3 pre-checks passed.
-
-- `src/main/scala/.../extvm/` — 11 Scala source files
-- `src/test/scala/.../extvm/` — MessageHandlerSpec, VMClientSpec
-- `src/main/protobuf/extvm/msg.proto` + `src/main/resources/extvm/VERSION`
-- `project/scalapb.sbt` — entire file (sbt-protoc plugin was extvm-exclusive)
-- `build.sbt` / `Dependencies.scala` — PB.targets block, `scalapb-runtime` dep, extvm coverage/scapegoat exclusions removed
-
-`sbt clean compile-all` → 0 errors. Side effect: Part 1 Warning #3 (`extvm/VMClient.scala:22`) now resolved.
-
----
+### 6a — extvm/ Dead Code Deletion — DONE `a948fda1d` — see `completed/DEFERRED-BACKLOG.md`
 
 ---
 
@@ -444,50 +294,7 @@ is a correctness/resilience improvement, not a bug fix.
 
 ---
 
-### 7d — Post-CAPSTONE Classic Artifact Audit
-
-**What**: A systematic sweep of the entire codebase for Classic-era patterns that survived the
-mechanical migration. Even with every actor Typed, logic originally written for Classic may leave
-behind structural artifacts.
-
-**Sweep categories**:
-
-```bash
-# 1. Any remaining extends Actor / ActorLogging
-grep -rn "extends Actor\b\|ActorLogging\|import org.apache.pekko.actor.Actor\b" \
-  src/main/ --include="*.scala"
-
-# 2. Any remaining sender() calls
-grep -rn "sender()" src/main/ --include="*.scala"
-
-# 3. adapter.* imports (should be zero after root flip)
-grep -rn "typed.scaladsl.adapter\|toClassic\|toTyped" src/main/ --include="*.scala"
-
-# 4. Remaining PropsAdapter usage
-grep -rn "PropsAdapter" src/main/ --include="*.scala"
-
-# 5. Behavior[Any] remaining (should be zero post-CAPSTONE)
-grep -rn "Behavior\[Any\]" src/main/ --include="*.scala"
-
-# 6. Raw context.system.scheduler.scheduleOnce without stored Cancellable
-grep -rn "scheduler\.scheduleOnce\|scheduler\.schedule\b" src/main/ --include="*.scala"
-
-# 7. Classic ActorRef types on Typed actor fields
-grep -rn "ActorRef\b" src/main/ --include="*.scala" | grep -v "typed\.ActorRef\|// "
-
-# 8. Dead-letter / unhandled message review — identify Behaviors.unhandled call sites
-grep -rn "Behaviors\.unhandled\|case other =>" src/main/ --include="*.scala"
-```
-
-**Output**: `post-capstone-artifact-audit.md` — catalog of every hit, categorized as:
-- `resolved` (expected zero — confirm)
-- `intentional` (document why it remains)
-- `fix-now` (feeds directly into 7e queue)
-
-**Gate**: CAPSTONE commit merged.
-**Priority**: High — run this before declaring the Typed migration "complete". Artifacts missed here
-become permanent technical debt.
-**Agent**: PRISM (8-lens review of findings) + HERALD (any wire-protocol artifacts).
+### 7d — Post-CAPSTONE Classic Artifact Audit — DONE 2026-06-21 — see `completed/DEFERRED-BACKLOG.md`
 
 ---
 
@@ -565,38 +372,10 @@ Each LOOM session: after migrating the actor, migrate its test file(s) from `Tes
 **For already-migrated actors** (faucet, jsonrpc, transactions, consensus/mining) whose tests
 were not converted: address in a dedicated test-cleanup sprint (8a-retro).
 
-**8a-retro batch 1 — consensus/mining ✅ DONE** (`0d65a85c4`). 27/27 tests green.
-
-| File | Key change |
-|------|-----------|
-| `LegacyTransactionHistoryServiceSpec` | Drop `TestKit` + `WithActorSystemShutDown` → `ScalaTestWithActorTestKit`; `system.toClassic` for Classic TestProbe (service still takes Classic ActorRef) |
-| `ForkChoiceManagerSpec` | Same swap; fixes latent bug — original had no `afterAll` shutdown, leaking the actor system after every test run |
-| `PoWMiningSpec` | Pure swap — TestKit was vestigial (no probes, no messaging) |
-| `WorkNotifierSpec` | Swap + `system.toClassic` for Pekko HTTP's `Http()` (requires Classic system); drop explicit `BeforeAndAfterAll` (comes free from `ScalaTestWithActorTestKit`) |
-| `MockedMinerSpec` | Swap + `system.toClassic` for Classic probes in `MinerSpecSetup`; `classicSystem.spawnAnonymous` → `testKit.spawn` (Typed test kit's custom user guardian disallows top-level spawning via Classic adapter — same fix `PoWMiningCoordinatorSpec` uses) |
-
-**Non-obvious finding:** `ForkChoiceManagerSpec` had no `afterAll` — actor system leaked after every test run. Silent pre-existing resource leak, not a test logic error. Fixed as a side-effect of the migration.
-
-**8a-retro batch 2 — jsonrpc/ + graphql/ ✅ DONE** (`b5e11c0a4` + `722f316f2`). 275/275 tests green (143 + 132).
-
-| Commit | Files | Tests |
-|--------|-------|-------|
-| `b5e11c0a4` | DebugServiceSpec, DebugTracingServiceSpec, EthBlocksServiceSpec, EthInfoServiceSpec, EthMiningServiceSpec, EthProofServiceSpec, EthTxServiceSpec, EthUserServiceSpec, FukuiiServiceSpec, GasPriceOracleSpec | 143/143 |
-| `722f316f2` | graphql/GraphQLServiceSpec, JsonRpcController{EthLegacyTransaction,Eth,Personal,}Spec, McpServiceSpec, PersonalServiceSpec, QAServiceSpec, TraceServiceSpec, TxPoolServiceSpec; modified: JsonRpcControllerFixture (ActorTestKit implicit param; `system.spawnAnonymous` → `actorTestKit.spawn`) | 132/132 |
-
-**Recurring patterns (apply to remaining batches):**
-
-| Issue | Root cause | Fix |
-|-------|-----------|-----|
-| `PatienceConfig` ambiguity | `NormalPatience`/`LongPatience` abstract override conflicts with `ScalaTestWithActorTestKit.patience` | Drop patience trait from mixin; test kit default (10s) sufficient |
-| `cannot create top-level actor from the outside` | Classic adapter `system.spawnAnonymous(...)` blocked by Typed test kit's custom user guardian | Thread `ActorTestKit` as implicit param into fixture; use `actorTestKit.spawn(...)` |
-| `override` error on `def timeout` | `ActorTestKitBase` already declares `def timeout: Timeout` | Add `override` modifier |
-| `system.toTyped.scheduler` invalid | After migration, `system` is already `ActorSystem[Nothing]` | Change to `system.scheduler` |
-| No `afterAll` → resource leak | `WithActorSystemShutDown` was providing cleanup | `ScalaTestWithActorTestKit` handles shutdown automatically |
-| `QAServiceSpec` — no Classic usage | Only `WithActorSystemShutDown` held the system | Clean removal; no `classicActorSystem` needed |
+**Batches 1–3 DONE** — see `completed/DEFERRED-BACKLOG.md` (`0d65a85c4` batch 1, `b5e11c0a4`+`722f316f2` batch 2, `12c23cf8a`+`a719520db` batch 3). §8a-infra-c DONE — see completed.
 
 **Gate**: Per-actor gate = that actor's LOOM migration is complete.
-**Parallel-safe**: No — test file migration must follow actor migration. Not a housekeeping task.
+**Parallel-safe**: No — test file migration must follow actor migration.
 **Priority**: HIGH — should be embedded in each LOOM thread, not deferred.
 **Agent**: LOOM (test migration paired with production migration per actor).
 
@@ -625,74 +404,6 @@ were not converted: address in a dedicated test-cleanup sprint (8a-retro).
 > `fishForMessage` calls to replace with `expectMessageType`, (c) any `system.toClassic` needs
 > (Pekko HTTP, Classic eventStream). Produce a migration plan per file before touching any code.
 
----
-
-**8a-retro batch 3 — network/sync (G1-narrowed) ✅ DONE** (`12c23cf8a` + `a719520db`). 25 specs migrated.
-
-| Commit | Files | Notes |
-|--------|-------|-------|
-| `12c23cf8a` | ByteCode/AccountRange/StorageRange/TrieNodeHealingWorkerSpec, StorageRecoveryActorSpec, BlockBroadcastSpec, SyncStateDownloaderStateSpec, CombinedRecoveryScanActorSpec, BlockFetcherStateSpec, SyncProgressMonitorSpec, ServerActorSpec, PeerEventBusActorSpec, NetworkPeerManagerActorHandshakeSpec, IORuntimeInitializationSpec | 14 specs, part 1 |
-| `a719520db` | StateSyncSpec, StateNodeFetcherSpec, PivotHeaderBootstrapSpec, PivotBlockSelectorSpec, BytecodeRecoveryActorSpec, FastSyncSpec, FastSyncBranchResolverActorSpec, ChainDownloaderSpec, SNAPRequestTrackerSpec, SNAPFakePeerSpec, PeerManagerSpec; also NetworkPeerManagerFake | 11 specs + NPMAFake `GetHandshakedPeers`→`GetHandshakedPeersCmd(replyTo)` fix |
-
-**New pitfalls discovered in batch 3 (added to established patterns table above):**
-
-| Issue | Root cause | Fix |
-|-------|-----------|-----|
-| `system.stop(ref)` on kit-spawned actor | classic `StopChild` sent to Typed guardian → `ClassCastException` → system shutdown | `testKit.stop(typedRef)` |
-| Missing named dispatchers | default kit config lacks `sync-dispatcher`, `account-trie-dispatcher`, etc. | `ScalaTestWithActorTestKit(ConfigFactory.load())` |
-| `must.Matchers` conflicts with kit's `should.Matchers` | E164 on override | Drop `must.Matchers` mixin; use `should.*` throughout |
-| `awaitCond(cond, max, interval, msg)` gone | Classic TestKit method, absent from Typed kit | `eventually(timeout(X), interval(Y)) { assert(cond, msg) }` with `Eventually` + `SpanSugar.*` |
-| `adapter.*` needed for probe-as-typed-param | `TestProbe().ref` passed as typed param; adapter provides implicit conversion | Retain `import org.apache.pekko.actor.typed.scaladsl.adapter.*` in affected files |
-
-**Side-find:** `GetHandshakedPeers` → `GetHandshakedPeersCmd(replyTo)` — pre-existing failures in `PivotBlockSelectorSpec` and `FastSyncBranchResolverActorSpec` uncovered during migration (production side already updated; test AutoPilots lagged behind).
-
-**Remaining (blocked — see batches 4 and 5 below):**
-- 14 coordinator/heal specs: `PropsAdapter` child-stop incompatible with Typed `ActorTestKitGuardian` (§8a-retro batch 4)
-- 5 multi-system/`TestActorRef` specs: non-standard lifecycle or Classic-only testing APIs (§8a-retro batch 5)
-- `WithActorSystemShutDown.scala`: still referenced by `PeerActorSpec` + `RLPxConnectionHandlerSpec`; delete after batch 5
-
----
-
-#### §8a-infra-c — MITHRIL: replace classic `actorSelection` worker-ref pattern with Typed TestProbe injection in ByteCodeCoordinatorSpec + AccountRangeCoordinatorSpec
-
-**Agent:** MITHRIL (Scala 3 / Typed modernization)
-**Risk:** LOW — test files only; no production code changed
-**Prerequisite:** §8a-retro batch 4 complete (`5eae34c21`)
-**Gate:** Run any time after E5d.
-
-**Background (E5c audit finding, 2026-06-23):**
-Two coordinator specs obtain worker refs via `classicSystem.actorSelection(coordinator.path / "*").resolveOne(3.seconds)`, returning classic `org.apache.pekko.actor.ActorRef`. These refs are then used to:
-- Send typed worker commands via classic `!` (e.g. `workerRef ! AccountRangeCoordinator.WorkerPeerDisconnected(...)`)
-- Simulate worker death via `classicSystem.stop(workerRef)` (test scenario — intentional, not teardown)
-
-The pattern works (the Typed workers are visible in the classic hierarchy), but it ties the test to `classicSystem.actorSelection` and an untyped ref. A cleaner approach:
-- Replace `resolveWorkerChild` with a `TestProbe[W]` injected as the worker factory (if the coordinator accepts a worker-factory override), OR
-- Convert to `toClassic`/`toTyped` ref bridging after spawn where both specs can hold a `ActorRef[Worker.Command]` directly
-
-This is cosmetic test-quality work; the existing pattern is correct and not a source of leaks or flakiness.
-
-**Files:**
-- `ByteCodeCoordinatorSpec.scala` — `resolveWorkerChild` at line 71; `classicSystem.stop(workerRef)` at lines 743, 779
-- `AccountRangeCoordinatorSpec.scala` — `resolveWorkerChild` at line 70; classic `!` sends at lines 365, 544, 591
-
-**Step 1 — Read each coordinator's worker spawn API:**
-Check `ByteCodeCoordinator` and `AccountRangeCoordinator` for whether a worker-factory override (`workerFactory: (context, ...) => ActorRef[Worker.Command]`) can be injected without modifying production behavior. If the factory is `private`, the injection approach requires a minimal production change (adding a `protected` hook); assess whether that's acceptable.
-
-**Step 2 — If injection is viable:** Replace `resolveWorkerChild` with an injected `TestProbe[Worker.Command]` factory. The test controls the ref from spawn time, eliminating `actorSelection` entirely.
-
-**Step 3 — If injection is not viable:** Document why and convert the `actorSelection` result to a Typed ref via `.toTyped[Worker.Command]` (after confirming the worker's `Command` supertype) so at least the send-side is typed.
-
-**Verification:**
-```bash
-sbt compile-all
-sbt "testOnly *ByteCodeCoordinatorSpec* *AccountRangeCoordinatorSpec*"
-./local/scripts/fukuii-test
-```
-
-**Rejection criteria:**
-- Changing production actor behavior or `private` visibility
-- Introducing a worker-factory parameter that changes the non-test code path
-- Any change to `src/main/` beyond a minimal `protected` hook if injection is chosen
 
 ---
 
@@ -741,9 +452,7 @@ housekeeping task during test waits for specific domain files.
 
 **Context:** VAULT-gate audit of resource lifecycle in `db/`, `node/`, and `core/utils/`. H-series = heap/iterator leaks; M-series = DataSource cache invalidation.
 
-**Work done:**
-- ~~**H2/H3** — `StdNode` teardown missing `.waitForShutdown()`; `FileUtils` unclosed streams~~ ✅ DONE `4907406fe`
-- ~~**H4+M1** — RocksDB iterator `close()` in `finally`; bloom filter option leak plugged~~ ✅ DONE `ef75a5608`
+**H2/H3 DONE** `4907406fe`, **H4+M1 DONE** `ef75a5608` — see `completed/DEFERRED-BACKLOG.md`.
 
 **Remaining open:**
 
@@ -764,9 +473,9 @@ housekeeping task during test waits for specific domain files.
 
 **Context:** R9 research (`threading-model-audit.md`, DONE 2026-06-18) found 3 IO/threading issues. Two are cleared; A1 remains open.
 
-**Status summary:**
-- ~~**B2** — `PoWMiningCoordinator.scala:133` EC.global escape~~ ✅ CLEARED 2026-06-23 (FORGE F1 Item C) — confirmed SAFE AS-IS; `context.executionContext` already supplied; `MineNext` sequenced through actor mailbox. No change.
-- ~~**B1** — `EC.global` in `SyncController.scala:15`~~ ✅ CLEARED 2026-06-22 `a5132aa80` (C2) — `import scala.concurrent.ExecutionContext.Implicits.global` removed; `given ec` wired from `ctx.executionContext`.
+**B1+B2 DONE** — see `completed/DEFERRED-BACKLOG.md`.
+
+**Remaining open:**
 - **A1** — `EngineApiService.scala`: `Await.result` on CE3 compute thread — **OPEN, BEACON gate**
 - **Additional jsonrpc sites** — `api/jsonrpc.md` notes remaining IO boundary sites beyond A1 — **OPEN, CONDUIT review**
 
@@ -794,11 +503,7 @@ housekeeping task during test waits for specific domain files.
 
 ### 8e — ScalaFix Ruleset Expansion + `noReturns` Ratchet Lock
 
-**Work done (2026-06-18):**
-- `DisableSyntax.noReturns = true` — **already in `.scalafix.conf`** (pre-done).
-- `NoAutoTupling` — **already in `.scalafix.conf`** (pre-done).
-- C2 chore removes `return` from ~52 non-actor non-consensus sites — **✅ DONE `9eb1f4e06`** (guard clauses, while-loop early exits, try-block returns, match-arm returns, complex multi-return methods; 19 files; 0 compile errors).
-- TNHC 4 (actual 11) returns — **✅ DONE `7a48c5988`** (LOOM Phase 0, S3 TNHC thread).
+**C2 DONE `9eb1f4e06`, TNHC DONE `7a48c5988`** — see `completed/DEFERRED-BACKLOG.md`.
 
 **Remaining to lock the ratchet** (`sbt scalafixAll` not yet green): 40 deferred sites.
 
@@ -809,8 +514,8 @@ housekeeping task during test waits for specific domain files.
 | Consensus-path (ETH Engine API) — BEACON review | `consensus/engine/EngineApiController.scala:96` (`handleNewPayload`, malformed-payload decode `Left` branch), `consensus/engine/EngineApiController.scala:226` (`handleForkchoiceUpdated`, malformed-params decode `Left` branch) | 2 | BEACON sign-off (S3-D) |
 
 **Full ratchet lock checklist:**
-1. C2 chore clears ~52 sites ✅ DONE `9eb1f4e06`
-2. LOOM Phase 0 for TNHC clears 11 sites ✅ DONE `7a48c5988`
+1. ~~C2 chore~~ ✅ DONE `9eb1f4e06`
+2. ~~LOOM Phase 0 TNHC~~ ✅ DONE `7a48c5988`
 3. FORGE reviews and clears 6 consensus sites (1 cleared: consensus/engine/JwtAuthenticator.scala — S3-C) ← add to relevant FORGE sessions
 4. BEACON reviews and clears 2 ETH Engine API sites — `EngineApiController.scala:96` + `:226` (S3-D). Both are early-`return IO.pure(...)` decode-error guards inside large consensus-path method bodies; removing the `return` requires wrapping ~90 lines of post-decode body into the `Right`/`else` branch. Deferred from S3-A/S3-D/S3-F commit (2026-06-22): the byte-for-byte response behavior must be preserved across the re-indent; gated on a focused BEACON pass, not bundled with the low-risk Option/val changes.
 5. Wave 3 SNAP1 migration sprint clears SNAPSyncController 36 sites ← gated on NET2
@@ -916,31 +621,11 @@ sbt "testOnly *EngineApi*"
 
 ---
 
-### 8f — Dead Code Audit (Broader than extvm) ✅ RESEARCH DONE (2026-06-22)
+### 8f — Dead Code Audit (Broader than extvm) ✅ RESEARCH DONE (2026-06-22) — see `completed/DEFERRED-BACKLOG.md`
 
-**PRISM sweep complete.** 4 high-confidence candidates identified (see CHASE-QUEUE.md DEAD entries 2026-06-22). No `FIXME`/`HACK`/`TODO` markers found. Deletion sprint pending.
+**FastSyncBranchResolverActor** ✅ WIRED `ea60c4f29` — see completed.
 
-**Part 6a** covers `extvm/` (10 files). Additional dead code likely exists beyond it.
-
-**Sweep**:
-```bash
-# Private methods never referenced outside their file
-# (approximate — look for `private def` that doesn't appear in the rest of the file)
-grep -rn "private def \w\+" src/main/ --include="*.scala" | \
-  awk -F: '{print $1, $3}' | sort | head -40
-
-# @Ignored tests (56 occurrences — how many are permanently dead?)
-grep -rn "@Ignore\b\|ignore\b\|pending\b" src/test/ --include="*.scala" -l
-
-# Imports never used (compile warns, but sweep for any suppressed)
-grep -rn "@nowarn.*unused\|@SuppressWarnings.*unused" src/main/ --include="*.scala"
-
-# TODO/FIXME markers (how many reference removed functionality?)
-grep -rn "TODO\|FIXME\|HACK\|XXX\b" src/ --include="*.scala" | wc -l
-```
-
-**Known candidates beyond extvm**:
-- `FastSyncBranchResolverActor` ✅ WIRED `ea60c4f29` — `FastSync.scala` `handleBlockHeaders` `ParentChainWeightNotFound` case now spawns the actor (binary search for true common ancestor) and transitions to `waitingForBranchResolution()`; `BranchResolvedSuccessful` resets cursors/queues; `BranchResolutionFailed` falls back to N-block rewind. 15/15 tests pass. testEssential 3,600/0 ✅.
+**Deletion sprint open** (4 high-confidence candidates in CHASE-QUEUE.md DEAD entries 2026-06-22):
 - Test helpers with `@Ignore` annotations (56 occurrences in tests) — audit which are permanently dead
 
 **Output**: `dead-code-audit.md` — file list, confidence level (definitely dead / possibly dead / uncertain).
@@ -1079,132 +764,21 @@ slower than dev machine → timeouts). `@Ignore` annotations silently hide untes
 
 ~130 production bridge sites + 2 test `actorSelection` sites. Permanent floor: 4 TCP bridges. Eliminatable: ~126 production + 2 test.
 
+**Clusters A,B,C,D,F,G,H,K,L,M,N DONE** — see `completed/DEFERRED-BACKLOG.md`.
+
 | Cluster | Sites | Root cause | Pre/Post-CAPSTONE | Sprint |
 |---------|-------|-----------|-------------------|--------|
-| A — `messageAdapter.toClassic` (PeerEventBus subscriptions) | ~26 | `PeerEventBusActor.SubscribeCmd(subscriber: ActorRef)` | Pre-CAPSTONE | §8k-D ✅ DONE 93bcedb12 |
-| B — `handshakedPeersAdapter.toClassic` | ~15 | `NPMA.GetHandshakedPeersCmd(replyTo: ActorRef)` | Pre-CAPSTONE | §8k-E ✅ DONE c42316b39 |
-| C — `ctx.toClassic.sender()` in SyncController/FastSync | ~27 | OQ-5 Classic ask path from jsonrpc callers | Pre-CAPSTONE | §8k-G ✅ DONE 2ef2b6637 |
-| D — `ctx.toClassic.actorOf(RegularSync)` | 2 | RegularSync has no `Behavior[Command]` | Pre-CAPSTONE | §8k-F ✅ DONE b24515637 |
-| E — `externalAdapter.toClassic` in SyncController | 21 remaining | Per-child adapter pattern: eliminated one spawn-site at a time when the receiving child updates its constructor param from `ActorRef` → `ActorRef[T]`. NOT the same as OQ-5 (original table description was wrong). | Pre-CAPSTONE | §8k-G2 (immediate: FastSync + NPMA cmd) + per-child LOOM migration |
-| F — `ctx.self.toClassic` coordinator→worker + SSC→coordinator | ~15 | Worker `coordinator: ActorRef` params untyped | **NOW** (MITHRIL) | §8k-A + §8k-C |
-| G — `context.toClassic.parent` in PeerActor | 7 | PeerActor notifies PeerManager via Classic parent | Pre-CAPSTONE | §8k-H ✅ DONE 222623960 |
-| H — `ctx.spawn(...).toClassic` for PeerActor ref | 1 | PeerManagerActor stores spawned child as Classic | Pre-CAPSTONE | §8k-H ✅ DONE 222623960 |
+| E — `externalAdapter.toClassic` in SyncController | 21 remaining | Per-child adapter pattern: eliminated one spawn-site at a time when the receiving child updates its constructor param from `ActorRef` → `ActorRef[T]`. NOT the same as OQ-5. | Pre-CAPSTONE | §8k-G2 (immediate: FastSync + NPMA cmd) + per-child LOOM migration |
 | I — TCP I/O bridge (RLPxConnectionHandler, ServerActor) | 4 | Akka TCP requires Classic `sender()` — **permanent** | N/A | — |
-| J — `classicSystem.actorOf` bridge actors in NodeBuilder | 3 | KNM/PDM/PTM have Classic callers via legacy case objects | Pre-CAPSTONE | §8k-I |
-| K — `peerEventBus.toClassic` + spawn `.toClassic` in NodeBuilder | 3 | SyncController/NPMA returned as Classic refs to callers | Pre-CAPSTONE | §8k-G ✅ DONE 2ef2b6637 |
-| L — `AkkaTaskOps.askFor` (jsonrpc, ~18 call sites) | ~18 | Commands carry `replyTo: ActorRef` not `ActorRef[T]` | Pre-CAPSTONE | §8k-G ✅ DONE 2ef2b6637 |
-| M — `peerEventBus.toClassic` watchWith in PEBA itself | 1 | PEBA internal Classic watch | Pre-CAPSTONE | §8k-D ✅ DONE 93bcedb12 |
-| N — `ctx.self.toClassic` / `fetcherReplyTo.toClassic` in BlockImporter | 4 | RegularSync spawned Classic → BlockImporter props take Classic refs | Pre-CAPSTONE | §8k-F ✅ DONE b24515637 |
+| J — `classicSystem.actorOf` bridge actors in NodeBuilder | 0 | **DONE 4613e398f** — KNM/PDM/PTM bridges deleted; callers use Typed ask | COMPLETE | §8k-I ✓ |
 
 **Principle**: Each `.toClassic` call is a symptom, not the disease. The disease is an unconverted classic actor upstream. The fix strategy is: **migrate the upstream actor first (LOOM), then delete the bridge**. Bridges must never be removed before the upstream is converted — that produces a type error at the call site that blocks compilation.
 
 ---
 
-#### §8k-R1 — PRISM: Comprehensive classic-interop audit ✅ DONE 2026-06-23
+#### §8k-R1 — DONE 2026-06-23 — see `completed/DEFERRED-BACKLOG.md`
 
-**Agent:** PRISM (read-only review, 8-lens analysis)
-**Risk:** ZERO — research only, no code changed
-**Gate:** Any time. Run before starting §8k-A.
-**Output:** `.local/docs/classic-interop-audit.md` (535 lines, 14 clusters, bridge census ~130 prod + 2 test).
-
-**Research prompt:**
-```
-You are auditing the fukuii codebase for all sites where Pekko Typed actors
-bridge to the Classic system. The goal is to inventory every bridge pattern,
-identify the root-cause classic actor, and produce a prioritized elimination
-roadmap so the type lattice can be fully closed.
-
-Step 0 — Read the migration progress context FIRST (do not skip):
-
-  # Understand the current migration state before searching
-  # a. What has been completed (actors already Typed):
-  ls .claude/agent-protocols/completed/
-
-  # Read these if present (they define what is DONE):
-  cat .claude/agent-protocols/completed/SPRINT-QUEUE.md          # committed waves
-  cat .claude/agent-protocols/completed/DEFERRED-BACKLOG.md      # completed deferred items
-  cat .claude/agent-protocols/completed/CODEBASE-AUDIT.md        # completed audit sweeps
-
-  # b. What modernization work has been done per subsystem:
-  ls .claude/agent-protocols/modernization-log/
-
-  # Read the INDEX file and any sync/, network/, node/ subdirectory files
-  # relevant to actor migration (these list what was changed and when)
-  cat .claude/agent-protocols/modernization-log/INDEX.md
-  # Then: cat .claude/agent-protocols/modernization-log/network/*.md
-  #       cat .claude/agent-protocols/modernization-log/sync/*.md
-
-  # c. What is still in flight (current working queue):
-  cat .claude/agent-protocols/working-docs/SPRINT-QUEUE.md       # active sprint tasks
-  cat .claude/agent-protocols/working-docs/DEFERRED-BACKLOG.md   # §8k section (this prompt)
-  grep "Wave 3\|CAPSTONE\|S3\|S4\|NET2\|SNAP1\|SNAP2\|ROOT" \
-    .claude/agent-protocols/working-docs/SPRINT-QUEUE.md         # migration sequence
-
-  Synthesise: which actors are Typed NOW, which are still Classic, and
-  in what order do the remaining Classic actors migrate? This is the
-  framework for the elimination roadmap.
-
-Step 1 — Inventory every bridge site:
-
-cd /media/dev/2tb/dev/fukuii
-
-# A. Classic subscriptions / message-adapter bridges
-grep -rn "\.toClassic\b" src/main/ --include="*.scala" | grep -v "//.*toClassic"
-
-# B. Classic sender/parent access
-grep -rn "ctx\.toClassic\|context\.toClassic" src/main/ --include="*.scala" | grep -v "//.*toClassic"
-
-# C. Classic actor spawns from Typed contexts
-grep -rn "classicSystem\.actorOf\|ctx\.toClassic\.actorOf\|context\.toClassic\.actorOf" src/main/ --include="*.scala"
-
-# D. actorSelection (test code — separate catalog)
-grep -rn "actorSelection" src/test/ --include="*.scala" | grep -v "//.*actorSelection"
-
-# E. Worker coordinator param types
-grep -rn "coordinator.*ActorRef\b\|ActorRef.*coordinator" src/main/ --include="*.scala" | grep -v "typed"
-
-Step 2 — For each site in A/B/C/E, identify:
-  - Which classic actor is the terminal sink (the one receiving the classic ref)?
-  - Is that classic actor already in the Wave 3 LOOM queue (SPRINT-QUEUE.md)?
-  - If so: which LOOM sprint removes the bridge?
-  - If not: it's a new gap — record it.
-
-Step 3 — Produce the elimination table:
-
-| File:line | Pattern | Root-cause classic actor | Elimination sprint | Blocker? |
-|-----------|---------|--------------------------|-------------------|----------|
-| ...       | toClassic | PeerEventBusActor | NET2 LOOM | YES |
-
-Step 4 — Identify any sites that can be fixed NOW (pre-CAPSTONE):
-  Criteria: the bridge exists only because a Typed actor passes its own ref
-  to a child/worker that accepts a classic param. If we update the child's
-  param type to `ActorRef[T]`, both the bridge AND the actorSelection
-  workaround disappear. Check AccountRangeWorker and ByteCodeWorker
-  `coordinator` parameter types specifically.
-
-Step 5 — Output the full audit to `.local/docs/classic-interop-audit.md`.
-  Sections: (1) inventory table, (2) root-cause mapping, (3) elimination order,
-  (4) "fix now" candidates, (5) estimated bridge count at each LOOM sprint boundary.
-```
-
-**Expected output:** `.local/docs/classic-interop-audit.md` — ~100-200 rows.
-
----
-
-
-#### §8k-G — CONDUIT + MITHRIL: OQ-5 kill — migrate jsonrpc callers to Typed ask ✅ DONE 2ef2b6637
-
-**Completed:** 2026-06-23 · 25 files (17 main + 8 test)
-**What was done:** SyncProtocol `GetStatus`/`ResetFastSync`/`RestartFastSync` gained typed `replyTo` fields.
-All `ctx.toClassic.sender()` sites in SyncController/FastSync/RegularSync replaced with `cmd.replyTo`.
-jsonrpc callers (EthInfoService, NodeJsonRpcHealthChecker, McpResources, McpTools, FukuiiService) switched
-from Classic `?` ask to Typed ask pattern. NodeBuilder `syncController` field changed from Classic `ActorRef`
-to `TypedActorRef[SyncController.Command]`. Clusters C, K, L ✅ eliminated.
-
-**What was NOT done (Cluster E — 21 sites remain):** `externalAdapter.toClassic` spawn sites in
-SyncController were preserved because they are per-child adapter patterns, not OQ-5 ask paths.
-The original §8k-G prompt description was incorrect (said "same root as C" — it is not).
-Immediate cohort tracked in §8k-G2 below. Gated cohort tracked in CHASE-QUEUE.
+#### §8k-G — DONE 2ef2b6637 — see `completed/DEFERRED-BACKLOG.md`
 
 ---
 
@@ -1364,69 +938,6 @@ Output a short report: gaps found, gaps already tracked, new gaps to add.
 
 ---
 
-#### §8k-I — MITHRIL: NodeBuilder Classic bridge actor elimination
-
-**Agent:** MITHRIL
-**Risk:** MEDIUM — touches node bootstrap wiring in NodeBuilder; verify all callers still reach their target
-**Gate:** §8k-G complete (PTM `AkkaTaskOps` migration done) + §8k-H complete (PeerManagerActor clean)
-**Bridge sites eliminated:** 3 anonymous Classic bridge actors in NodeBuilder (Cluster J) + ~18 call sites
-         in FilterManager/PersonalService/GraphQLSchema/TestService using `pendingTransactionsManager: ActorRef`
-
-**Pekko 2.x context:** The 3 anonymous Classic bridge actors in NodeBuilder use `classicSystem.actorOf`
-to create Typed adapters inline. `classicSystem` (the Classic `ActorSystem`) does not exist in Pekko 2.x
-— `ActorSystem[T]` is Typed-only. These bridges are dead weight in a post-Classic codebase and become
-compile errors in 2.x. Deleting them and wiring callers directly to `AskPattern.ask` on existing Typed
-actors is the correct migration path.
-
-**Background:**
-`NodeBuilder.scala` wires 3 anonymous Classic bridge actors (Cluster J) to service callers that still
-use legacy Classic ask/tell patterns:
-1. `knownNodesManager` bridge (line 210): PeerManagerActor sends `GetKnownNodes` to a Classic bridge
-   which forwards as a Typed ask to `knownNodesManagerTyped`.
-2. `peerDiscoveryManager` bridge (line 269): PeerManagerActor/StdNode send `GetDiscoveredNodesInfo`
-   via Classic bridge.
-3. `pendingTransactionsManager` bridge (line 547): FilterManager/PersonalService/GraphQLSchema/TestService
-   use Classic `?` ask for `GetPendingTransactions`.
-
-For each bridge, the callers need to switch to the existing Typed `*Req(replyTo: ActorRef[T])` variant
-that is already present in the respective Typed actor's Command ADT.
-
-**Steps:**
-1. **KnownNodesManager bridge**: Find every `knownNodesManager.tell(GetKnownNodes, sender)` call site.
-   Replace with `AskPattern.ask(knownNodesManagerTyped, KnownNodesManagerActor.GetKnownNodesReq(_))`.
-   Delete the bridge actor at NodeBuilder:210.
-
-2. **PeerDiscoveryManager bridge**: Find every `peerDiscoveryManager.tell(GetDiscoveredNodesInfo, sender)`
-   / `GetRandomNodeInfo`. Replace with Typed ask to `peerDiscoveryManagerTyped`.
-   Delete the bridge actor at NodeBuilder:269.
-
-3. **PTM bridge**: FilterManager, PersonalService, GraphQLSchema, TestService — replace Classic
-   `?` ask for `GetPendingTransactions` with `AskPattern.ask(pendingTransactionsManagerTyped, ...)`.
-   Delete the bridge actor at NodeBuilder:547.
-
-4. `sbt compile-all` after each bridge deletion.
-
-**Verify:**
-```bash
-grep -rn "classicSystem\.actorOf" src/main/ --include="*.scala"
-# Expected: 0 in NodeBuilder (only TCP bridges in ServerActor remain)
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. Stage NodeBuilder + caller files (PeerManagerActor, FilterManager, PersonalService, etc.)
-3. `git commit -m "refactor(8k-I): delete 3 NodeBuilder Classic bridge actors — callers use Typed ask (Cluster J)"`
-4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(8k-I): clearout — $SHA"`
-5. **DELETE §8k-I**
-6. After this commit, verify total `.toClassic` count = 4 (TCP permanent floor only):
-   ```bash
-   grep -rn "\.toClassic" src/main/ --include="*.scala" | grep -v "//.*toClassic"
-   # Expected: 4 lines (ServerActor.TcpEventBridge + RLPxConnectionHandler ×2 + sa.toClassic in BlockFetcher)
-   ```
-
----
-
 #### §8k-B — Post-CAPSTONE: Final classic bridge verification sweep
 
 **Agent:** PRISM (verification only)
@@ -1523,15 +1034,13 @@ dependencies on each other and can be picked up in any order when the primary tr
 | **→ CAPSTONE** | Root flip: ActorSystem[Nothing], bridge/adapter removal, Behavior[Any] narrowing | LOOM | All actors Typed |
 | **7d — Artifact audit** | Post-CAPSTONE sweep: surviving Classic patterns, adapter imports, raw schedulers | PRISM, HERALD | CAPSTONE merged |
 | **8k-B — Bridge elimination** | Post-CAPSTONE: remove all ~170 remaining `.toClassic`/`.toTyped` bridge calls now that every upstream actor is Typed | LOOM, PRISM | CAPSTONE + 7d done |
-| **7a — ADT consolidation** ✅ | Seal Command traits: move Messages.scala cases into companion objects DONE — `04615ad43` `4e8b42263`; 173/173; 3,600/0 | MITHRIL, WRAITH | ✅ |
-| **7b — EventStream** ✅ | R5 research → Topic[T] migration for eventStream pub/sub sites DONE — `849c0dcf0` (NewPendingTransaction) + `b35b35cf6` (NewBlockImported); `EventTopicsBuilder` trait; 13 files; grep eventStream → 0 | HERALD, LOOM | ✅ |
-| **7e — Design review** ✅ | Typed API optimization DONE — 3 accepted redesigns (P4 SSC idle catch-all, P2 HealingState extraction, P3 CD stagnation push); 5 no-change verdicts | PRISM, HERALD, LOOM | ✅ |
+| **7a — ADT consolidation** | DONE `04615ad43` `4e8b42263` — see completed | — | ✅ |
+| **7b — EventStream** | DONE `849c0dcf0`+`b35b35cf6` — see completed | — | ✅ |
+| **7e — Design review** | DONE — see completed | — | ✅ |
 | **7c — Supervision** | Explicit Behaviors.supervise per actor with typed failure strategies | PRISM, LOOM | 7a done |
 | **8b — Opaque types** | Domain value type safety: BlockNumber, Hash, Address, Balance | MITHRIL, FORGE | Part 3a done |
 | **8i — RLP derivation** | Replace handwritten product-type RLP codecs with derivation | MITHRIL, FORGE, EYE | Part 3a + R7 done |
 | **Scala 3 idioms** | Part 3a implicit→given (198 files) | MITHRIL + scalafix | After Pekko migration |
-| **Scala 3 idioms** | Part 3b COMPLETE `c0a3612b4` — non-consensus; consensus deferred (forge gate) | MITHRIL | ✅ |
-| **Scala 3 idioms** | ~~Part 3c isInstanceOf audit~~ ✅ DONE `7cc9eda3a` — 1 site in mpt/Node.scala; 0 in consensus/vm/crypto/domain | MITHRIL | ✅ |
 | **Dep upgrades** | Part 4a JLine 4.x | — | Dedicated sprint |
 | **Dep upgrades** | Part 4e Jackson 3 → then 4b logstash | — | Ecosystem gate |
 | **Scala 3.9** | Part 5a | — | 3.9 release gate |
@@ -1545,18 +1054,11 @@ No actor migration gate. Commit individually; do not bundle with primary-track m
 
 | Task | Work | Agents | Effort |
 |------|------|--------|--------|
-| ~~**Part 1**~~ | ~~Remaining 5 compiler warnings~~ | ~~WRAITH~~ | ✅ DONE `bd2d691c3` — 5 warnings cleared |
-| ~~**6a — extvm deletion**~~ | ~~Delete `extvm/` (10 files) after grep-verify~~ | ~~WRAITH~~ | ✅ DONE `a948fda1d` — 18 files deleted (extvm/ + proto + sbt-protoc) |
-| ~~**8f — Dead code audit**~~ | ~~research + deletion sprint~~ | ~~WRAITH~~ | ✅ DONE — `fa57df9b9` (MetricsAlreadyConfiguredError + LocalVM + AdaptiveSyncStrategy), `c6b3da4cb` (DeltaSpikeGauge), `ff2fc219c` (StaticNodesLoader); branch-wide audit 2026-06-22 confirmed no further candidates |
-| ~~**3d — enum polish**~~ | ~~Migrate `SyncPhase`, `BlacklistReason`, `ForkId` codes to enum~~ | ~~MITHRIL~~ | ✅ DONE — `adf4e69ea` (SyncPhase + ForkIdValidationResult), `b305ef41b` (NetworkType/VmMode/FaucetStatus/SealEngineType), `c1ecd9706` (ServerStatus), `7f9c987cc` (PruningMode), `75a3d8c5d` (MiningMode). BlacklistReason/BlacklistReasonType ❌ REJECTED (case class subtypes). **`SyncProtocol.SyncStatus` still candidate** — see §3d residual note |
-| ~~**3e — console→logging**~~ | ~~Replace 24 `println`/`System.out` calls with SLF4J~~ | ~~MITHRIL~~ | ✅ DONE `c3fec6390` 2026-06-22 — 12 sites fixed (3 files); 8 intentional CLI/TUI calls preserved |
-| **8e — ScalaFix expansion** | C2 ✅ `9eb1f4e06`; TNHC ✅ `7a48c5988`; **§8e-FORGE** (6 consensus files, unblocked) + **§8e-BEACON** (EngineApiController S3-D, unblocked) → clearing prompts written above; 36 SSC gated (SNAP1) | FORGE / BEACON / LOOM | partial |
-| **8g — braceless config** ✅ `34a55a025` | Deferred settings documented in .scalafmt.conf; indent.defnSite + topLevelStatementBlankLines each trigger ~400-file reformats → gated for per-subsystem pass post-CAPSTONE | MITHRIL | done |
-| **8j — Thread.sleep** | 2 live call sites (EthMiningServiceSpec:302, SubscriptionManagerSpec:249) — both NECESSARY; defer to §8a-retro (Typed TestKit enables proper replacement) | EYE | deferred to §8a |
-| **8k-R1 — Classic interop audit** | PRISM: run §8k-R1 prompt — map every `.toClassic`/`actorSelection` to root-cause classic actor; confirm §8k-A scope; output `classic-interop-audit.md` | PRISM | any time |
-| ~~**8k-A — Typed coordinator ref**~~ | ~~MITHRIL: update AccountRangeWorker + ByteCodeWorker `coordinator:` param from classic → typed `ActorRef[T]`; remove `.toClassic` at spawn sites~~ | ~~MITHRIL~~ | ✅ DONE — workers already use typed coordinator refs (`ActorRef[T.Command]`) |
-| ~~**3f — manual sync**~~ | ~~Audit 5 `.synchronized` outside actors~~ | ~~PRISM~~ | ✅ DONE `cf33cfa87` — MapCache:19+30 fixed (TrieMap); CombinedRecoveryScanner + TNHC left as-is (documented); PoWMining FORGE-gated (CHASE-QUEUE) |
-| **8a-retro** | Batches 1–4 ✅ DONE (all 14 coordinator/heal specs migrated). **Batch 5 (assessable subset):** BlockFetcherSpec + PendingTxMgrSpec → **§8a-retro-5b** prompt above; RegularSyncSpec → §9c. PeerActorSpec + RLPxConnectionHandlerSpec wait for Wave 3. | LOOM, EYE | ~2h |
+| **8e — ScalaFix expansion** | C2+TNHC DONE — see completed; **§8e-FORGE** (6 consensus files, unblocked) + **§8e-BEACON** (EngineApiController S3-D, unblocked); 36 SSC gated (SNAP1) | FORGE / BEACON / LOOM | partial |
+| **8g — braceless config** ✅ `34a55a025` | Deferred settings documented in .scalafmt.conf; gated for per-subsystem pass post-CAPSTONE | MITHRIL | done |
+| **8j — Thread.sleep** | 2 live call sites (EthMiningServiceSpec:302, SubscriptionManagerSpec:249) — both NECESSARY; defer to §8a-retro | EYE | deferred to §8a |
+| **8k-R1 — Classic interop audit** | DONE 2026-06-23 — see completed | — | ✅ |
+| **8a-retro** | Batches 1–4 DONE — see completed. **Batch 5:** BlockFetcherSpec + PendingTxMgrSpec → §8a-retro-5b; RegularSyncSpec → §9c. PeerActorSpec + RLPxConnectionHandlerSpec wait for Wave 3. | LOOM, EYE | ~2h |
 
 ### Research Threads (run before implementation; can overlap with primary track)
 
@@ -1566,33 +1068,31 @@ No actor migration gate. Commit individually; do not bundle with primary-track m
 | **R0** | Full codebase completeness audit (mandatory gate before Wave 2) | `codebase-completeness-audit.md` | PRISM, MITHRIL |
 | **R1** | Network/sync Pekko migration plan (22 actors) | `network-sync-pekko-migration-plan.md` | HERALD, LOOM |
 | **R2** | Test quality audit (Thread.sleep, coverage gaps, ignored tests) | `test-quality-audit.md` | PRISM, EYE |
-| **R3** ✅ | Jackson ecosystem gate (json4s 4.2.0 status) | Part 4e updated — gate nearly open (json4s M5-SNAPSHOT has Jackson 3; watch for M5 stable tag) | general-purpose |
+| **R3** ✅ | Jackson ecosystem gate — DONE, see completed | — | — |
 | **R4** | Scala 3.9 readiness (periodic — when 3.9 LTS appears) | Update `scala-39-upgrade.md` | MITHRIL, WRAITH |
-| **R5** ✅ | EventStream pub/sub topology map | ✅ DONE — `eventstream-topology.md`; 8 sites / 2 event types / 1 consumer; all Typed already; 2 × `Topic[T]` migration ready; 7b UNBLOCKED | HERALD, LOOM |
+| **R5** ✅ | EventStream pub/sub topology map — DONE, see completed | — | — |
 | **R6** | Opaque type domain analysis (map BigInt/ByteString semantic roles) | Feeds 8b implementation | MITHRIL, FORGE |
 | **R7** | RLP codec derivation safety analysis (safe-to-derive vs must-stay-manual) | Feeds 8i implementation | MITHRIL, FORGE |
-| **R8** ✅ | Memory / resource retention audit | ✅ DONE — `memory-leak-audit.md`; 4H/4M/3L; H2+H3 fix-now (StdNode.shutdown), H4 DAG stream leak, H1 BEACON-gated; L1/L2 SNAP sprint, L3 NET sprint | PRISM, VAULT |
-| **R9** ✅ | IO threading model audit (blocking calls on actor dispatchers) | ✅ DONE — `threading-model-audit.md`; overall MEDIUM risk; A1 (EngineApiService Await on CE3 compute — fix-now, BEACON gate) + B1 (EC.global in JsonRpcBaseController — defer) + B2 (PoWMiningCoordinator — FORGE gate, CHASE-QUEUE) | PRISM, HERALD, VAULT |
+| **R8** ✅ | Memory / resource retention audit — DONE, see completed | — | — |
+| **R9** ✅ | IO threading model audit — DONE, see completed | — | — |
 
 | Sprint | Work | Agents | Gate |
 |--------|------|--------|------|
-| **Pekko migration** | Part 2: faucet → jsonrpc → transactions → consensus/mining | LOOM, FORGE | scala3-cleanup-june merged |
-| **Warning cleanup** | Part 1 remaining 5 warnings | WRAITH | Any sprint |
+| **Pekko migration** | Part 2: all 4 subsystems DONE — see completed | — | ✅ |
+| **Warning cleanup** | Part 1 remaining 87 non-E165 warnings | WRAITH | Externally gated |
 | **Scala 3 idioms** | Part 3a implicit→given (198 files) | MITHRIL + scalafix | After Pekko migration |
-| **Scala 3 idioms** | Part 3b COMPLETE `c0a3612b4` — non-consensus done; consensus deferred (forge gate) | MITHRIL | ✅ |
-| **Scala 3 idioms** | ~~Part 3c isInstanceOf audit~~ ✅ DONE `7cc9eda3a` — 1 site in mpt/Node.scala; 0 in consensus/vm/crypto/domain | MITHRIL | ✅ |
 | **Dep upgrades** | Part 4a JLine 4.x | — | Dedicated sprint |
 | **Dep upgrades** | Part 4e Jackson 3 → then 4b logstash | — | Ecosystem gate |
 | **Network/sync Pekko** | S3→S4/S7→NET2→SNAP1→SNAP2→ROOT→CAPSTONE (see SPRINT-QUEUE.md) | LOOM, FORGE, HERALD | Active sprint |
 | **→ CAPSTONE** | Root flip: ActorSystem[Nothing], bridge/adapter removal, Behavior[Any] narrowing | LOOM | All actors Typed |
-| **7d — Artifact audit** | Post-CAPSTONE sweep: any surviving Classic patterns, adapter imports, raw schedulers | PRISM, HERALD | CAPSTONE merged |
-| **7a — ADT consolidation** ✅ | Seal Command traits: move Messages.scala cases into companion objects DONE — `04615ad43` `4e8b42263`; 173/173; 3,600/0 | MITHRIL, WRAITH | ✅ |
-| **7b — EventStream** ✅ | R5 research → Topic[T] migration for eventStream pub/sub sites DONE — `849c0dcf0` (NewPendingTransaction) + `b35b35cf6` (NewBlockImported); `EventTopicsBuilder` trait; 13 files; grep eventStream → 0 | HERALD, LOOM | ✅ |
-| **7e — Design review** ✅ | Typed API optimization DONE — 3 accepted redesigns (P4 SSC idle catch-all, P2 HealingState extraction, P3 CD stagnation push); 5 no-change verdicts | PRISM, HERALD, LOOM | ✅ |
+| **7d — Artifact audit** | DONE 2026-06-21 — see completed | — | ✅ |
+| **7a — ADT consolidation** | DONE `04615ad43` `4e8b42263` — see completed | — | ✅ |
+| **7b — EventStream** | DONE `849c0dcf0` + `b35b35cf6` — see completed | — | ✅ |
+| **7e — Design review** | DONE — see completed | — | ✅ |
 | **7c — Supervision** | Explicit Behaviors.supervise per actor with typed failure strategies | PRISM, LOOM | 7a done |
 | **Scala 3.9** | Part 5a | — | 3.9 release gate |
 | **Constitution** | Part 5c | — | After 5a |
-| **extvm deletion** | Part 6a | WRAITH | Standalone sprint (grep verify first) |
+| **extvm deletion** | Part 6a DONE `a948fda1d` — see completed | — | ✅ |
 
 ---
 
