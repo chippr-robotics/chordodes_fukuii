@@ -5,6 +5,7 @@ import java.io.File
 import java.io.InputStreamReader
 import java.net.ServerSocket
 import java.net.Socket
+import java.util.concurrent.TimeoutException
 
 import cats.effect.unsafe.IORuntime
 
@@ -99,11 +100,12 @@ class JsonRpcIpcServer(jsonRpcController: JsonRpcController, config: JsonRpcIpcS
         case Some(nextMsgJson) =>
           val request = nextMsgJson.extract[JsonRpcRequest]
           val responseF = jsonRpcController.handleRequest(request)
-          responseF.unsafeRunTimed(awaitTimeout) match {
-            case Some(response) =>
-              out.write((Serialization.write(response) + '\n').getBytes())
-              out.flush()
-            case None =>
+          try {
+            val response = responseF.timeout(awaitTimeout).unsafeRunSync()
+            out.write((Serialization.write(response) + '\n').getBytes())
+            out.flush()
+          } catch {
+            case _: TimeoutException =>
               // Send JSON-RPC error response for timeout
               val errorResponse = JsonRpcResponse(
                 "2.0",
