@@ -30,13 +30,28 @@
 
 ---
 
-## IO/Threading Audit (DEFERRED-BACKLOG 8d)
+## IO/Threading Audit (DEFERRED-BACKLOG 8d + 8d-J) — ALL ITEMS DONE
 
-#### `0a8ed3038` — A1: IO.defer fix in EngineApiService
+#### `0a8ed3038` — IO.defer fix in EngineApiService
 - **What:** `IO.pure(unsafeComputation())` replaced with `IO.defer { IO.pure(unsafeComputation()) }` — computation deferred until IO evaluation
 
 #### `276c77735` — B1: actorSystem.dispatcher as EC in RPC handler
 - **What:** `Future` in JSON-RPC handler switched from global EC to `actorSystem.dispatcher`
+
+#### (no commit) — A1: Await.result → IO.fromFuture in forkchoiceUpdated pending-tx fetch
+- **What:** Verified 2026-06-24. `Await.result` on CE3 compute thread (threading-model-audit.md A1) was already fixed before the backlog entry was written. `IO.fromFuture` at lines 629–640 with source comment confirming intent. No code change needed.
+
+#### §8d-J1 — AdminService.scala: IO { } → IO.blocking { } for file ops (2026-06-24)
+- **Files:** `AdminService.scala` lines 335–361 (exportChain + importChain)
+- **What:** Bare `IO { }` wrapping `FileOutputStream`/`FileInputStream` blocking loops replaced with `IO.blocking { }` — shifts to CE3 blocking pool, releases compute thread during long chain export/import operations
+
+#### §8d-J2 — GraphQLSchema.scala: eliminate unsafeRunSync inside Sangria resolver (2026-06-24)
+- **File:** `GraphQLSchema.scala` line 992
+- **What:** `.unsafeRunSync()` on inner `IO` inside a Sangria resolver `flatMap` body (executing on Pekko-HTTP dispatcher thread) replaced by composing both IO calls in IO context before the single `.unsafeToFuture()` at the resolver boundary — no synchronous materialisation inside the Future chain
+
+#### §8d-J3 — JsonRpcIpcServer.scala: model IPC timeout in IO (2026-06-24)
+- **File:** `JsonRpcIpcServer.scala` line 102
+- **What:** `responseF.unsafeRunTimed(awaitTimeout)` (using `IORuntime.global`, shared across HTTP/GraphQL/IPC) replaced with `IO.timeout(awaitTimeout)` + `unsafeRunSync()` — timeout modelled in IO; eliminates `IORuntime.global` contention on the IPC transport path
 
 ---
 
@@ -70,8 +85,19 @@
 
 ---
 
+## Classic Interop — §8k-G (COMMITTED `2ef2b6637`, testEssential pending)
+
+#### `2ef2b6637` — refactor(8k-G): OQ-5 kill — Typed ask for jsonrpc callers (Clusters C+E+L)
+- **What:** Cluster L — `AkkaTaskOps.askFor[T]` Classic ask pattern eliminated in jsonrpc service callers. `SyncProtocol` commands (`GetStatus`, `ResetFastSync`, `RestartFastSync`) became `final case class` with `replyTo: ActorRef[T]`. Jsonrpc services (`SyncService.scala`, `PersonalService.scala`, etc.) updated to use Typed ask (`?`) with typed `replyTo`. NodeBuilder: `syncController` type lifted from `TypedActorRef[Any]` → `TypedActorRef[SyncController.Command]`; spawn-site `.toClassic` in NodeBuilder removed (Cluster K).
+- **Deferred — Cluster E:** `externalAdapter.toClassic` at spawn sites (21 sites in FastSync, RegularSync, SyncController) — NOT the same as OQ-5. Per-child constructor param lift deferred to §8k-G2 (immediate: FastSync + NPMA) and per-child LOOM migrations. See DEFERRED-BACKLOG §8k-G2.
+- **Mining cascade:** `MinedBlock` signature updated across `PoWMiningCoordinator`, `EthashMiner`, `Miner`, `MockedMiner` — replyTo lifted.
+- **Scope:** 25 files changed (5 jsonrpc services, `SyncProtocol.scala`, `SyncController.scala`, `FastSync.scala`, `RegularSync.scala`, `NodeBuilder.scala`, 4 mining actors, 8 test files)
+- **Docs:** Clearout commit pending (after testEssential passes)
+
+---
+
 ## Open / Deferred
 
 - json4s Manifest synthesis warnings (68 hits) — externally gated on json4s 4.2.0-M5 release
-- B2 (IO/threading audit): additional IO boundary sites — DEFERRED-BACKLOG §8d
+- Additional jsonrpc IO boundary sites (CONDUIT scan) — DEFERRED-BACKLOG §8d (A1/B1/B2 all done; this is the remaining LOW-priority CONDUIT sweep)
 - W3-P3a: `implicit val`/`implicit def` → `given`/`using` in jsonrpc/ (15 candidates) — DEFERRED-BACKLOG §3a

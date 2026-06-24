@@ -260,6 +260,24 @@ VERIFY: `compile-all` — 0 errors. `testOnly *EngineApi*` — 16/16 ✅.
 
 ---
 
+### 8d-CONDUIT — jsonrpc/ IO boundary scan ✅ DONE (2026-06-24)
+
+CONDUIT audit of all 55 `jsonrpc/` files (including `graphql/`, `server/`, `mcp/`, `client/`, `serialization/` subdirs).
+
+| Pattern | Hits |
+|---------|------|
+| `scala.concurrent.blocking` | 0 |
+| `Await.result` / `Await.ready` | 0 |
+| `ExecutionContext.global` / `Implicits.global` | 0 |
+| `Thread.sleep` | 0 |
+| `java.util.concurrent.Future.get()` | 0 |
+
+`.get()` calls in `AdminService`, `EthMiningService`, `NetService` are `AtomicReference.get()` — wait-free lock-free reads. `McpPrompts.get()` is static prompt object method dispatch. All by-design.
+
+**No code changes.** §8d fully closed — all sub-items (A1, B1, CONDUIT scan) resolved.
+
+---
+
 ## Part 9 — ETH Test Coverage ✅ DONE (BEACON sprint)
 
 Source: `eth-coverage-audit.md` (2026-06-20). Pre-existing gaps, not sprint-introduced. All 5 items complete.
@@ -1187,3 +1205,82 @@ DEFERRED-BACKLOG references updated, MEMORY.md + memory file renamed.
 | `:462` | `byteCompare` | **CLEAR** | Rewrote `return`-in-`while` as `var result` accumulator with loop guard `while result == 0 && i < n`. Final expression `if result != 0 then result else Integer.compare(...)`. Pure comparator; ordering semantics identical (first differing byte wins, else length). |
 
 **Verify:** `grep -n "return\|scalafix" StackTrie.scala` → 0 code-level hits. `sbt compile-all` → 0 errors. See `modernization-log/core/mpt.md §8e-FORGE` for updated site-by-site log.
+
+---
+
+## §8d-A1 — EngineApiService `Await.result` on CE3 compute thread ✅ DONE 2026-06-24
+
+**Resolution:** Verified as already fixed — no code change needed.
+
+`EngineApiService.scala` contains zero `Await.result` calls. The pending-transaction fetch in
+`forkchoiceUpdated` uses `IO.fromFuture` (lines 629–640), with a source comment confirming
+the intent:
+```
+// Fetch pending transactions from the tx pool using IO.fromFuture so the
+// CE3 compute thread is not blocked waiting for the actor response.
+```
+
+The fix predates the backlog entry (threading-model-audit.md, 2026-06-21). No BEACON review
+required; the only threading change is in the IO bridge, not in consensus logic.
+
+**B1+B2 context:** B1 (`actorSystem.dispatcher` EC) and B2 (additional IO boundary scan) were
+cleared in earlier sessions. A1 completes the §8d trilogy.
+
+---
+
+## §8d-J — CONDUIT: jsonrpc IO boundary fixes ✅ DONE 2026-06-24
+
+**Source:** §8d CONDUIT scan (2026-06-24). Three sites found uncovered after B1/B2/A1 closure.
+
+### §8d-J1 — AdminService IO.blocking ✅ DONE 2026-06-24
+
+**File:** `src/main/scala/com/chipprbots/ethereum/jsonrpc/AdminService.scala` lines 335–361
+**Severity:** MEDIUM — long chain export/import parked a CE3 compute thread
+**Fix:** `IO { ... }` → `IO.blocking { ... }` at both `FileOutputStream` write loop and `FileInputStream` read loop call sites. Shifts execution to the CE3 blocking pool, releasing the compute thread for the duration of file operations.
+**Effort:** TRIVIAL (2-site keyword replacement, 1 file)
+
+### §8d-J2 — GraphQLSchema unsafeRunSync in Sangria resolver ✅ DONE 2026-06-24
+
+**File:** `src/main/scala/com/chipprbots/ethereum/jsonrpc/graphql/GraphQLSchema.scala` line 992
+**Severity:** HIGH — `.unsafeRunSync()` parked a Pekko-HTTP/Sangria dispatcher thread
+**Fix:** Composed both IO operations in IO context before the single `.unsafeToFuture()` at the resolver boundary. Eliminated synchronous materialisation inside the `Future`/`flatMap` body.
+**Effort:** SMALL (1 file, resolver re-composition)
+
+### §8d-J3 — JsonRpcIpcServer IORuntime scoping ✅ DONE 2026-06-24
+
+**File:** `src/main/scala/com/chipprbots/ethereum/jsonrpc/server/ipc/JsonRpcIpcServer.scala` line 102
+**Severity:** MEDIUM — `responseF.unsafeRunTimed(awaitTimeout)` used `IORuntime.global` on per-connection `ClientThread`; runtime shared across HTTP/GraphQL/IPC paths
+**Fix:** Replaced `unsafeRunTimed` with `IO.timeout(awaitTimeout)` + `unsafeRunSync()` — timeout modelled in IO, materialisation explicit. IORuntime contention eliminated on the IPC path.
+**Effort:** SMALL (1 file, IO composition change)
+
+---
+
+## §8l-R1 — FORGE: VM tracer model research + spec verdict ✅ DONE 2026-06-24
+
+**Commits:** `37c9d081b` (`.local/docs/vm-tracer-model.md`) · `5c2adeaaf` (DEFERRED-BACKLOG update)
+
+**Spec verdict: SHOULD_FIRE**
+
+`VM.create()` fires `onCallEnter` unconditionally for sub-creates (VM.scala:126-129) before the
+EIP-3860 initcode-too-large check, then early-`return`s at line 143 without a matching
+`onCallExit` (VM.scala:206-209). `CallTracer` and `VmTracer` treat enter/exit as a balanced
+push/pop — the missing exit leaves a dangling frame that corrupts the trace tree.
+
+The `scalafix:ok DisableSyntax.return` suppression at VM.scala:143 is **incorrect**. The early
+`return` preserves the unbalanced emission; the suppression marks the symptom, not the fix.
+
+**Reference client note:** core-geth fires *neither* `CaptureEnter` nor `CaptureExit` for
+initcode-too-large because EIP-3860 is enforced in the parent opcode's dynamic-gas stage
+(`gasCreateEip3860`, `gas_table.go:324`) before `evm.create()`'s deferred `captureBegin`/
+`captureEnd` are reached. Fukuii already emits the enter — balancing it with an exit is the
+minimal correct fix, not skipping both.
+
+**VMTracer type:** `trait ExecutionTracer` — plain Scala 3 callback interface with default no-op
+methods (modelled on Besu's `OperationTracer`). Threaded as `Option[ExecutionTracer]` constructor
+param on `VM[W,S]`. Synchronous, not an actor. Four concrete impls: `StructLogTracer`,
+`CallTracer`, `VmTracer`, `PrestateTracer`.
+
+**Modernisation:** No structural change needed — not a LOOM/Pekko Typed candidate. Fix is purely
+at the emission site in §8l-I.
+
+**Next step:** §8l-I — implement balanced enter/exit in `VM.create()` (open in working-docs).

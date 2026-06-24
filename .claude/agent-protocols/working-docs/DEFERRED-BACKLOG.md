@@ -474,175 +474,7 @@ housekeeping task during test waits for specific domain files.
 
 ### 8d — IO Threading Model Follow-Up ✅ DONE 2026-06-24 — see `completed/DEFERRED-BACKLOG.md §8d`
 
-### 8d-J — CONDUIT: jsonrpc IO boundary fixes (3 sites, 2026-06-24 scan)
-
-**Context:** The §8d CONDUIT scan (2026-06-24) found 3 uncovered IO boundary violations in `jsonrpc/`. B1/B2/A1 from the R9 audit are already cleared. These 3 are net-new.
-
-**Priority order:** J1 (TRIVIAL, same session) → J2 (HIGH severity) → J3 (MEDIUM, most complex).
-**Agent:** CONDUIT for all three. Parallel-safe — no gates.
-
----
-
-#### §8d-J1 — CONDUIT: AdminService IO.blocking for file ops (TRIVIAL)
-
-**Agent:** CONDUIT
-**Risk:** LOW — CE3 thread-pool semantics only, no behavioral change
-**Gate:** None — parallel-safe
-**Severity:** MEDIUM — long chain export parks a CE3 compute thread for the full duration
-
-**Background:**
-`AdminService.exportChain` (lines 335-361) wraps `FileOutputStream` / `FileInputStream` blocking
-read loops inside bare `IO { }` (`IO.delay`), which runs on the CE3 compute thread pool. A large
-export (millions of blocks) parks a compute thread for the entire operation.
-Fix: `IO { }` → `IO.blocking { }` at both call sites. `IO.blocking` shifts to the CE3 blocking
-pool and releases the compute thread for the duration.
-
-**Steps:**
-1. **Read** `src/main/scala/com/chipprbots/ethereum/jsonrpc/AdminService.scala` lines 320-380 —
-   locate both `IO { ... }` wrapping `FileOutputStream` write loops and `FileInputStream` read
-   loops. Confirm no other `IO.delay`/`IO { }` wrapping blocking Java IO in the same file.
-2. **Fix both sites:**
-   ```scala
-   // Before:
-   IO {
-     val fos = new BufferedOutputStream(new FileInputStream(req.file))
-     // ... blocking read loop ...
-   }
-   // After:
-   IO.blocking {
-     val fos = new BufferedOutputStream(new FileInputStream(req.file))
-     // ... blocking read loop ...
-   }
-   ```
-3. `sbt compile-all`
-4. `sbt "testOnly *AdminService*"` — confirm no regressions
-
-**Verify:**
-```bash
-grep -n "IO {" src/main/scala/com/chipprbots/ethereum/jsonrpc/AdminService.scala
-# Expected: 0 remaining bare IO { } wrapping file ops
-grep -n "IO.blocking {" src/main/scala/com/chipprbots/ethereum/jsonrpc/AdminService.scala
-# Expected: 2 hits (export + import)
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add src/main/scala/com/chipprbots/ethereum/jsonrpc/AdminService.scala`
-3. `git commit -m "fix(jsonrpc): AdminService file ops IO.blocking — release compute thread during chain export/import (8d-J1)"`
-4. **DELETE §8d-J1**
-
----
-
-#### §8d-J2 — CONDUIT: GraphQLSchema unsafeRunSync inside Sangria resolver (HIGH)
-
-**Agent:** CONDUIT
-**Risk:** LOW — resolver composition only, no schema or API surface change
-**Gate:** None — can run immediately after J1 or in parallel
-**Severity:** HIGH — `.unsafeRunSync()` parks a Pekko-HTTP/Sangria dispatcher thread
-
-**Background:**
-`GraphQLSchema.scala:992` calls `.unsafeRunSync()` on an inner `IO` inside a Sangria resolver
-`flatMap` body that is already executing on a Pekko-HTTP dispatcher thread (materialised via the
-outer `.unsafeToFuture()`). The inner sync materialisation parks the dispatcher thread for the
-duration of the IO — bypassing CE3's thread pool management.
-
-The fix: compose both IO calls before the single `.unsafeToFuture()` at the resolver boundary,
-so only one materialisation occurs at the edge and no sync blocking happens inside the `Future`.
-
-**Steps:**
-1. **Read** `src/main/scala/com/chipprbots/ethereum/jsonrpc/graphql/GraphQLSchema.scala`
-   lines 980-1010 — locate the resolver that calls `.unsafeRunSync()`. Understand what two IO
-   operations are being composed (e.g., `getTransactionByHash` + `getRawTransactionByHash`).
-2. **Identify the fix pattern** — two cases:
-   - **Case A** (inner IO is derived from outer result): use `flatMap` to compose in IO context:
-     ```scala
-     // Before:
-     ethTxService.getTransactionByHash(hash).flatMap { tx =>
-       ethTxService.getRawTransactionByHash(hash).unsafeRunSync() // WRONG
-     }.unsafeToFuture()
-     // After:
-     ethTxService.getTransactionByHash(hash).flatMap { tx =>
-       ethTxService.getRawTransactionByHash(hash).map { raw => ... }
-     }.unsafeToFuture()
-     ```
-   - **Case B** (two independent IOs): use `parTupled` or `flatMap` to sequence before the edge:
-     ```scala
-     (getTransactionByHash(hash), getRawTransactionByHash(hash)).parTupled
-       .map { (tx, raw) => ... }
-       .unsafeToFuture()
-     ```
-3. Apply the appropriate pattern for the actual code shape.
-4. `sbt compile-all`
-5. `sbt "testOnly *GraphQL*"` — confirm resolver still returns correct data
-
-**Verify:**
-```bash
-grep -n "unsafeRunSync\|unsafeRunTimed" \
-  src/main/scala/com/chipprbots/ethereum/jsonrpc/graphql/GraphQLSchema.scala
-# Expected: 0 hits
-grep -n "unsafeToFuture" \
-  src/main/scala/com/chipprbots/ethereum/jsonrpc/graphql/GraphQLSchema.scala
-# Expected: hits only at resolver boundaries (not inside flatMap bodies)
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add src/main/scala/com/chipprbots/ethereum/jsonrpc/graphql/GraphQLSchema.scala`
-3. `git commit -m "fix(graphql): compose IO before unsafeToFuture — eliminate unsafeRunSync on dispatcher thread (8d-J2)"`
-4. **DELETE §8d-J2**
-
----
-
-#### §8d-J3 — CONDUIT: JsonRpcIpcServer IORuntime scoping (MEDIUM)
-
-**Agent:** CONDUIT
-**Risk:** LOW-MEDIUM — changes IORuntime lifecycle for per-connection threads; no protocol change
-**Gate:** None — parallel-safe with J1/J2
-**Severity:** MEDIUM — `IORuntime.global` shared across HTTP server + GraphQL + IPC paths
-
-**Background:**
-`JsonRpcIpcServer.scala:102` calls `responseF.unsafeRunTimed(awaitTimeout)` on a dedicated
-`ClientThread` (raw `java.lang.Thread`, one per IPC connection). The thread itself is not a Pekko
-dispatcher thread so there is no dispatcher starvation. However, `IORuntime.global` is used — the
-same shared runtime as HTTP server and GraphQL paths — so CE3 compute threads are not isolated
-per transport.
-
-The minimal correct fix: replace `unsafeRunTimed` with `IO.timeout` (model the timeout in IO) and
-scope a purpose-built `IORuntime` with one compute thread per connection so the IPC path cannot
-interfere with the HTTP/GraphQL compute pool.
-
-**Steps:**
-1. **Read** `src/main/scala/com/chipprbots/ethereum/jsonrpc/server/ipc/JsonRpcIpcServer.scala`
-   in full — understand:
-   - Where `ClientThread` is created and how `responseF` (an `IO`) is materialised
-   - What `awaitTimeout` is set to and where it comes from
-   - Whether the per-connection thread is pooled or spawned fresh per accept
-2. **Determine the right fix level:**
-   - **Minimal (preferred):** Add `IO.timeout(awaitTimeout)` before materialisation; replace
-     `unsafeRunTimed` with `unsafeRunSync()`. This keeps the global runtime but removes the
-     `Option`-returning timed variant (less error-prone).
-   - **Full isolation:** Build a one-compute-thread `IORuntime` per connection, pass it to
-     `unsafeRunSync()` explicit arg, shut it down after response. Only use if global runtime
-     contention is observed under load.
-3. Apply the minimal fix unless the full file review reveals a reason for full isolation.
-4. `sbt compile-all`
-5. `sbt "testOnly *IpcServer*"` — confirm IPC request/response cycle intact
-
-**Verify:**
-```bash
-grep -n "unsafeRunTimed\|IORuntime.global" \
-  src/main/scala/com/chipprbots/ethereum/jsonrpc/server/ipc/JsonRpcIpcServer.scala
-# Expected: 0 hits for unsafeRunTimed; 0 hits for IORuntime.global (if full fix applied)
-grep -n "IO.timeout\|unsafeRunSync" \
-  src/main/scala/com/chipprbots/ethereum/jsonrpc/server/ipc/JsonRpcIpcServer.scala
-# Expected: IO.timeout present; unsafeRunSync at the materialisation site
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add src/main/scala/com/chipprbots/ethereum/jsonrpc/server/ipc/JsonRpcIpcServer.scala`
-3. `git commit -m "fix(ipc): model IPC response timeout in IO — replace unsafeRunTimed (8d-J3)"`
-4. **DELETE §8d-J3**
+### 8d-J — CONDUIT: jsonrpc IO boundary fixes ✅ DONE 2026-06-24 — see `completed/DEFERRED-BACKLOG.md §8d-J`
 
 ---
 
@@ -1038,37 +870,9 @@ Step 6 — git commit -m "chore(8k-B): remove adapter imports — TCP floor veri
 
 ---
 
-#### §8l-R1 — FORGE: VM tracer model research + spec verdict — RESOLVED-RESEARCH-COMPLETE
+#### §8l-R1 — FORGE: VM tracer model research + spec verdict ✅ DONE 2026-06-24 — see `completed/DEFERRED-BACKLOG.md §8l-R1`
 
-**Agent:** FORGE
-**Risk:** ZERO — read-only research, no code changes
-**Gate:** None — parallel-safe any time
-**Purpose:** Answer the spec question at `VM.scala:140`, map the current tracer model, and produce a design recommendation before any code changes are made
-**Spec verdict: SHOULD_FIRE** — onCallExit must fire; early return at :143 leaves an unbalanced onCallEnter (no matching exit), corrupting CallTracer/VmTracer frame stacks. The `scalafix:ok` suppression masks a latent tracer bug. §8l-I implementation required. Full analysis: `.local/docs/vm-tracer-model.md`. (Note: core-geth fires *neither* enter nor exit for initcode-too-large because the EIP-3860 check short-circuits in the parent opcode's dynamic-gas stage before `create()` is entered; Fukuii already emits the enter, so balancing it with an exit is the minimal correct fix.)
-
-**Steps:**
-1. **Read** `VM.scala` in full — map every `tracer.foreach(...)` call site. For each: method name, event type (`onCallEntry`/`onCallExit`/`onCreate`/etc.), and whether it fires before or after any `return` in the same method.
-2. **Read** core-geth at `reference-clients-evm/go-ethereum/core/vm/evm.go` and `interpreter.go` — specifically: does `CaptureExit` fire for a failed `create()` (e.g., initcode-too-large)? What arguments does it receive?
-3. **Spec verdict** — record one of:
-   - **SHOULD_FIRE** → the `return` is a latent tracer bug; the `scalafix:ok` suppression is incorrect. Implementation prompt §8l-I required.
-   - **SHOULD_NOT_FIRE** → the `return` is correct; suppression is permanent. Update the annotation: `// scalafix:ok DisableSyntax.return — onCallExit must NOT fire on initcode-too-large abort (spec: create abort ≠ normal call exit)`.
-4. **Tracer type inventory:** What is `VMTracer`? Interface, abstract class, or actor ref? Is it Classic or Typed? How is it threaded (constructor param, context, `given`)?
-5. **Scala 3 / Pekko Typed assessment** — given the tracer type, propose the appropriate modernisation shape:
-   - Interface/callback → `given VMTracer` typeclass, or ADT event stream
-   - Classic actor → LOOM candidate; identify which subsystem sprint gates it
-   - Already Typed → no structural change needed; spec fix at `:140` is sufficient
-6. **Write** `.local/docs/vm-tracer-model.md`:
-   ```markdown
-   # VM Tracer Model — Research (§8l-R1)
-   ## Spec verdict (SHOULD_FIRE / SHOULD_NOT_FIRE)
-   ## core-geth CaptureExit reference behaviour
-   ## Call site map (table: method | event | fires before/after return?)
-   ## Current tracer type and threading
-   ## Modernisation recommendation and proposed next step
-   ```
-7. `git add .local/docs/vm-tracer-model.md` → `git commit -m "docs(8l-r1): VM tracer model — spec verdict and design assessment"`
-8. **Update this section** — add the spec verdict as a one-line note after the background block; add `§8l-I` implementation prompt below if SHOULD_FIRE or a redesign is warranted; mark as RESOLVED-PERMANENT-DEFER and delete this prompt if SHOULD_NOT_FIRE.
-9. **DELETE §8l-R1**
+**Verdict: SHOULD_FIRE** — `VM.create()` emits `onCallEnter` before the EIP-3860 initcode-too-large check, then early-`return`s without a matching `onCallExit`, leaving a dangling frame in `CallTracer`/`VmTracer`. The `scalafix:ok` suppression at `:143` is incorrect. §8l-I required. Full analysis: `.local/docs/vm-tracer-model.md`.
 
 ---
 
@@ -1122,7 +926,7 @@ No actor migration gate. Commit individually; do not bundle with primary-track m
 | Task | Work | Agents | Effort |
 |------|------|--------|--------|
 | **8e — ScalaFix expansion** | C2+TNHC DONE — see completed; **§8e-FORGE DONE 2026-06-24** (all 6 consensus files: 6 CLEAR + 9 DEFER w/ scalafix:ok) + **§8e-StackTrie DONE 2026-06-24** (`09307c5a7` — both DEFER sites CLEAR: `:120` node expr, `:462` var-result) + **§8e-BEACON DONE 2026-06-24** (`d78177bda` — 3 sites CLEAR: handleNewPayload, handleForkchoiceUpdated, priority-fee helper); 36 SSC gated (SNAP1) | BEACON / FORGE | **DONE** |
-| **8l — VM tracer research** | §8l-R1 FORGE research: spec verdict on `VM.scala:140` tracer call + tracer model Scala 3 / Typed design assessment | FORGE | unblocked |
+| **8l — VM tracer research** | §8l-R1 DONE `37c9d081b`/`5c2adeaaf` — SHOULD_FIRE verdict; **§8l-I implementation open** (see Part 8l below) | FORGE | **R1 ✅ · I open** |
 | **8j — Thread.sleep** | 2 live call sites (EthMiningServiceSpec:302, SubscriptionManagerSpec:249) — both NECESSARY; defer to §8a-retro | EYE | deferred to §8a |
 | **8a-retro** | Batches 1–4 DONE — see completed. **Batch 5:** BlockFetcherSpec + PendingTxMgrSpec DONE `5ff14017b`; RegularSyncSpec → §9c. PeerActorSpec + RLPxConnectionHandlerSpec wait for Wave 3. | LOOM, EYE | ~2h |
 
@@ -1182,7 +986,7 @@ Each prompt can run independently. Commit individually.
 | ~~G5~~ | ~~Batch G~~ | ~~§8d-CONDUIT — CONDUIT: jsonrpc/ remaining IO boundary scan (Await/EC.global/blocking)~~ | DONE 2026-06-24 — zero findings; all 55 `jsonrpc/` files clean (see `completed/DEFERRED-BACKLOG.md §8d`) |
 | G6 | Batch G | §8c-M4 — VAULT: DataSource close cache invalidation verify-or-by-design | LOW priority; VAULT gate; prompt in §8c above |
 | ~~G7~~ | ~~Batch G~~ | ~~§8e-StackTrie — FORGE: StackTrie `:120`+`:462` DEFER re-assessment (2 `scalafix:ok` sites)~~ | DONE 2026-06-24 — `09307c5a7` (both CLEAR: `:120` node expr, `:462` var-result; see modernization-log/core/mpt.md) |
-| G8 | Batch G | §8l-R1 — FORGE: VM tracer model research + spec verdict (read-only) | Parallel-safe; FORGE-only; unblocked |
+| ~~G8~~ | ~~Batch G~~ | ~~§8l-R1 — FORGE: VM tracer model research + spec verdict (read-only)~~ | DONE 2026-06-24 — `37c9d081b`/`5c2adeaaf`; SHOULD_FIRE verdict; §8l-I open |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
 

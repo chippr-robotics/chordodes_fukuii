@@ -60,8 +60,8 @@ When the clearout prompts above are done, the branch is ready for:
    after all clearout commits land
 2. **PR open** — `white-b0x:scala3-cleanup-june` → `chippr-robotics:staging`
 3. **DEFERRED-BACKLOG unblocked items** — see `working-docs/DEFERRED-BACKLOG.md` Clearout Prompts
-   (3c isInstanceOf, 3d enum candidates, 3e console→logging, 8f dead code audit, 8g braceless scalafmt,
-   **8d-J1/J2/J3** jsonrpc IO boundary fixes — CONDUIT, no gates, run in order J1→J2→J3)
+   (3c isInstanceOf, 3d enum candidates, 3e console→logging, 8f dead code audit, 8g braceless scalafmt)
+   — 8d-J1/J2/J3 jsonrpc IO boundary fixes ✅ DONE 2026-06-24; §8l-R1 VM tracer research ✅ DONE 2026-06-24 (§8l-I implementation open)
 
 ### Classic Bridge Elimination Track (pre-CAPSTONE, sequential)
 
