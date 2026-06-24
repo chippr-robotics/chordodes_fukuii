@@ -243,6 +243,16 @@ object FastSync {
         .map(_.totalDifficulty)
         .getOrElse(BigInt(0))
 
+    // ETH69 G5 — closures for the pivot-selector's parent-chain backlink probe. `getCanonicalHeaderByNumber`
+    // reads our local canonical chain; `validateHeaderPoW` runs the isolated PoW/difficulty header check
+    // (validateHeaderOnly needs no parent). Defined here so the implicit blockchainConfig (from configBuilder)
+    // resolves at this call site rather than leaking consensus types into PivotBlockSelector.
+    private def getCanonicalHeaderByNumber(number: BigInt): Option[BlockHeader] =
+      blockchainReader.getBlockHeaderByNumber(number)
+
+    private def validateHeaderPoW(header: BlockHeader): Boolean =
+      validators.blockHeaderValidator.validateHeaderOnly(header).isRight
+
     def startWithState(syncState: SyncState): Behavior[Command] = {
       // Check if headers in RocksDB go beyond the persisted bestBlockHeaderNumber.
       // This happens when SyncState was persisted mid-download but the node restarted —
@@ -277,7 +287,9 @@ object FastSync {
             syncConfig,
             fastSyncClassicSelf,
             blacklist,
-            () => ourBestTotalDifficulty()
+            () => ourBestTotalDifficulty(),
+            getCanonicalHeaderByNumber,
+            validateHeaderPoW
           ),
           "pivot-block-selector"
         )
@@ -301,7 +313,9 @@ object FastSync {
                   syncConfig,
                   fastSyncClassicSelf,
                   blacklist,
-                  () => ourBestTotalDifficulty()
+                  () => ourBestTotalDifficulty(),
+                  getCanonicalHeaderByNumber,
+                  validateHeaderPoW
                 ),
                 s"pivot-block-selector-retry-${java.util.UUID.randomUUID()}"
               )
@@ -687,7 +701,9 @@ object FastSync {
               syncConfig,
               fastSyncClassicSelf,
               blacklist,
-              () => ourBestTotalDifficulty()
+              () => ourBestTotalDifficulty(),
+              getCanonicalHeaderByNumber,
+              validateHeaderPoW
             ),
             s"$countActor-pivot-block-selector-update"
           )

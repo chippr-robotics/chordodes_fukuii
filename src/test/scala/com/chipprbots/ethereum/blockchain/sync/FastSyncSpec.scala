@@ -75,7 +75,10 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
       new NetworkPeerManagerFake(
         syncConfig,
         testPeers,
-        testBlocks
+        // ETH69 G5 — include genesis so the pivot's parent-chain backlink probe (reverse from the pivot) can
+        // walk back to genesis, which is the only block in the local canonical chain at sync start. Without it
+        // the backlink finds no canonical ancestor and the pivot is (correctly) rejected.
+        BlockHelpers.genesis :: testBlocks
       )
     lazy val peerEventBus: TestProbe = TestProbe("peer_event-bus")
     lazy val syncControllerProbe: TestProbe = TestProbe("sync-controller")

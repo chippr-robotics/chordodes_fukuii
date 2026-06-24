@@ -54,6 +54,8 @@ class PivotBlockSelectorSpec
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
   "FastSyncPivotBlockSelector" should "download pivot block from peers" taggedAs (UnitTest, SyncTest) in new TestSetup {
+    // ETH69 G5 — the elected pivot's backlink probe must find a canonical match; resolve the pivot at its height.
+    canonicalByNumber = canonicalReturningPivot
     updateHandshakedPeers(HandshakedPeers(threeAcceptedPeers))
 
     pivotBlockSelector ! SelectPivotBlock
@@ -82,6 +84,9 @@ class PivotBlockSelectorSpec
       MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
       MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
     )
+
+    // ETH69 G5 — backlink probe + confirmation before the pivot is handed to FastSync.
+    confirmBacklink(pivotBlockHeader, Seq(peer1, peer2, peer3), peer1)
 
     fastSync.expectMsg(Result(pivotBlockHeader))
     peerMessageBus.expectMsgType[UnsubscribeAllCmd]
@@ -279,6 +284,7 @@ class PivotBlockSelectorSpec
     override val minPeersToChoosePivotBlock = 2
     override val peersToChoosePivotBlockMargin = 1
 
+    canonicalByNumber = canonicalReturningPivot
     updateHandshakedPeers(HandshakedPeers(allPeers))
 
     pivotBlockSelector ! SelectPivotBlock
@@ -304,12 +310,15 @@ class PivotBlockSelectorSpec
       MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer3.id)
     )
 
-    expectUnsubscribeCmdsWithAll(
+    expectUnsubscribeCmds(
       MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
       MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
       MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
     )
-    peerMessageBus.expectNoMessage()
+
+    // ETH69 G5 — backlink probe + confirmation.
+    confirmBacklink(pivotBlockHeader, Seq(peer1, peer2, peer3), peer1)
+    peerMessageBus.expectMsgType[UnsubscribeAllCmd]
 
     fastSync.expectMsg(Result(pivotBlockHeader))
   }
@@ -318,6 +327,7 @@ class PivotBlockSelectorSpec
     override val minPeersToChoosePivotBlock = 2
     override val peersToChoosePivotBlockMargin = 1
 
+    canonicalByNumber = canonicalReturningPivot
     updateHandshakedPeers(HandshakedPeers(allPeers))
 
     pivotBlockSelector ! SelectPivotBlock
@@ -357,10 +367,14 @@ class PivotBlockSelectorSpec
       MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer4.id)
     )
 
-    expectUnsubscribeCmdsWithAll(
+    // peer4's vote completes the election (peer1 + peer4 backed the pivot); unsubscribe peer4's voting stream.
+    expectUnsubscribeCmds(
       MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer4.id))
     )
-    peerMessageBus.expectNoMessage()
+
+    // ETH69 G5 — the two peers that voted for the pivot (peer1, peer4) are probed for its backlink.
+    confirmBacklink(pivotBlockHeader, Seq(peer1, peer4), peer1)
+    peerMessageBus.expectMsgType[UnsubscribeAllCmd]
 
     fastSync.expectMsg(Result(pivotBlockHeader))
   }
@@ -446,6 +460,7 @@ class PivotBlockSelectorSpec
     UnitTest,
     SyncTest
   ) in new TestSetup() {
+    canonicalByNumber = canonicalReturningPivot
     updateHandshakedPeers(HandshakedPeers(peersFromDifferentNetworks))
 
     pivotBlockSelector ! SelectPivotBlock
@@ -477,6 +492,9 @@ class PivotBlockSelectorSpec
       MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer4.id))
     )
 
+    // ETH69 G5 — backlink probe across the three voting peers + confirmation.
+    confirmBacklink(pivotBlockHeader, Seq(peer1, peer3, peer4), peer1)
+
     fastSync.expectMsg(Result(pivotBlockHeader))
     peerMessageBus.expectMsgType[UnsubscribeAllCmd]
   }
@@ -488,6 +506,10 @@ class PivotBlockSelectorSpec
 
     override val minPeersToChoosePivotBlock = 2
     override val peersToChoosePivotBlockMargin = 1
+
+    // ETH69 G5 — elected pivot is block 900; resolve it canonically for the backlink match.
+    val pivot900: BlockHeader = baseBlockHeader.copy(number = 900)
+    canonicalByNumber = n => if n == BigInt(900) then Some(pivot900) else None
 
     updateHandshakedPeers(
       HandshakedPeers(
@@ -521,14 +543,17 @@ class PivotBlockSelectorSpec
       MessageFromPeer(BlockHeaders(BigInt(0), Seq(baseBlockHeader.copy(number = 900))), peer4.id)
     )
 
-    expectUnsubscribeCmdsWithAll(
+    expectUnsubscribeCmds(
       MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
       MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id)),
       MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer4.id))
     )
-    peerMessageBus.expectNoMessage()
 
-    fastSync.expectMsg(Result(baseBlockHeader.copy(number = 900)))
+    // ETH69 G5 — backlink probe across the three voting peers + confirmation.
+    confirmBacklink(pivot900, Seq(peer1, peer3, peer4), peer1)
+    peerMessageBus.expectMsgType[UnsubscribeAllCmd]
+
+    fastSync.expectMsg(Result(pivot900))
   }
 
   // ETH69 G1 — pivot TD consensus gate. The selector must exclude peers whose advertised chainWeight
@@ -603,6 +628,7 @@ class PivotBlockSelectorSpec
     override def peersToChoosePivotBlockMargin = 0
 
     ourBestTD = BigInt(100) // minPeerTD = 80; sybils at TD = 1 are gated out, honest peer1 at TD = 100 passes.
+    canonicalByNumber = canonicalReturningPivot
 
     updateHandshakedPeers(
       HandshakedPeers(
@@ -629,9 +655,12 @@ class PivotBlockSelectorSpec
       MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivotBlockHeader)), peer1.id)
     )
 
-    expectUnsubscribeCmdsWithAll(
+    expectUnsubscribeCmds(
       MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id))
     )
+
+    // ETH69 G5 — the honest peer is probed for the pivot backlink and confirms it.
+    confirmBacklink(pivotBlockHeader, Seq(peer1), peer1)
     fastSync.expectMsg(Result(pivotBlockHeader))
   }
 
@@ -663,6 +692,143 @@ class PivotBlockSelectorSpec
     )
 
     expectGetBlockHeadersRequests(Seq(peer1, peer2, peer3), expectedPivotBlock)
+  }
+
+  // ── ETH69 G5 — pivot parent-chain backlink validation ───────────────────────────────────────────────────
+
+  /** Drive a three-peer election to a unanimous vote for `pivot` and return after the per-vote unsubscribes, leaving
+    * the selector in the backlink-probe state. Shared setup for the G5 scenario tests below. The voted header must sit
+    * at `expectedPivotBlock` so the election accepts it.
+    */
+  private def electUnanimousPivot(setup: TestSetup, pivot: BlockHeader): Unit = {
+    import setup.*
+    updateHandshakedPeers(HandshakedPeers(threeAcceptedPeers))
+    pivotBlockSelector ! SelectPivotBlock
+    expectSubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
+    )
+    expectGetBlockHeadersRequests(Seq(peer1, peer2, peer3), expectedPivotBlock)
+    Seq(peer1, peer2, peer3).foreach { p =>
+      pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+        MessageFromPeer(BlockHeaders(BigInt(0), Seq(pivot)), p.id)
+      )
+    }
+    expectUnsubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
+    )
+  }
+
+  it should "proceed when the pivot's canonical parent is within 5 hops" taggedAs (UnitTest, SyncTest) in
+    new TestSetup {
+      // Backlink chain [pivot, pivot-1, ..., pivot-4]; only pivot-4 matches our canonical chain.
+      val chain: Seq[BlockHeader] = reverseChain(expectedPivotBlock, depth = 5)
+      val pivot: BlockHeader = chain.head
+      val anchor: BlockHeader = chain.last // pivot-4
+      canonicalByNumber = n => if n == anchor.number then Some(anchor) else None
+
+      electUnanimousPivot(this, pivot)
+      expectBacklinkProbe(pivot, Seq(peer1, peer2, peer3))
+      feedBacklink(chain, peer1)
+
+      fastSync.expectMsg(Result(pivot))
+      peerMessageBus.expectMsgType[UnsubscribeAllCmd]
+    }
+
+  it should "proceed when the canonical parent is at exactly hop N (BacklinkDepth)" taggedAs (
+    UnitTest,
+    SyncTest
+  ) in new TestSetup {
+    val depth: Int = PivotBlockSelector.BacklinkDepth
+    val chain: Seq[BlockHeader] = reverseChain(expectedPivotBlock, depth = depth)
+    val pivot: BlockHeader = chain.head
+    val anchor: BlockHeader = chain.last // pivot - (N-1), the deepest returned header
+    canonicalByNumber = n => if n == anchor.number then Some(anchor) else None
+
+    electUnanimousPivot(this, pivot)
+    expectBacklinkProbe(pivot, Seq(peer1, peer2, peer3))
+    feedBacklink(chain, peer1)
+
+    fastSync.expectMsg(Result(pivot))
+    peerMessageBus.expectMsgType[UnsubscribeAllCmd]
+  }
+
+  it should "reject the pivot and retry when no canonical parent is found within N hops" taggedAs (
+    UnitTest,
+    SyncTest
+  ) in new TestSetup {
+    // Full-depth chain, but NONE of the returned headers is canonical → backlink fails → retry.
+    val chain: Seq[BlockHeader] = reverseChain(expectedPivotBlock, depth = PivotBlockSelector.BacklinkDepth)
+    val pivot: BlockHeader = chain.head
+    canonicalByNumber = _ => None
+
+    electUnanimousPivot(this, pivot)
+    expectBacklinkProbe(pivot, Seq(peer1, peer2, peer3))
+    feedBacklink(chain, peer1)
+
+    // No pivot handed to FastSync; the selector schedules a retry instead.
+    fastSync.expectNoMessage()
+    peerMessageBus.expectMsgType[UnsubscribeAllCmd]
+
+    testScheduler.timePasses(syncConfig.startRetryInterval)
+
+    // Retry re-runs the election from scratch (fresh subscribe round).
+    expectSubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
+    )
+  }
+
+  it should "reject the pivot immediately and blacklist the peer when a backlink header fails PoW" taggedAs (
+    UnitTest,
+    SyncTest
+  ) in new TestSetup {
+    val chain: Seq[BlockHeader] = reverseChain(expectedPivotBlock, depth = 5)
+    val pivot: BlockHeader = chain.head
+    val anchor: BlockHeader = chain.last
+    // Even though a canonical match exists, forged PoW must reject the chain before the canonical check.
+    canonicalByNumber = n => if n == anchor.number then Some(anchor) else None
+    // The third returned header (pivot-2) has invalid PoW.
+    val forged: BlockHeader = chain(2)
+    validateHeaderPoWFn = h => h.hash != forged.hash
+
+    electUnanimousPivot(this, pivot)
+    expectBacklinkProbe(pivot, Seq(peer1, peer2, peer3))
+    feedBacklink(chain, peer1)
+
+    // The forged-PoW chain is rejected immediately: no pivot reaches FastSync.
+    fastSync.expectNoMessage()
+    peerMessageBus.expectMsgType[UnsubscribeAllCmd]
+
+    // peer1 served a forged-PoW backlink and must be blacklisted (distinguishing malicious from honest-divergent).
+    blacklist.isBlacklisted(peer1.id) shouldBe true
+  }
+
+  it should "retry when the backlink probe times out with no voter response" taggedAs (
+    UnitTest,
+    SyncTest
+  ) in new TestSetup {
+    canonicalByNumber = canonicalReturningPivot
+
+    electUnanimousPivot(this, pivotBlockHeader)
+    expectBacklinkProbe(pivotBlockHeader, Seq(peer1, peer2, peer3))
+
+    // No backlink response arrives; the probe timeout fires (peerResponseTimeout).
+    testScheduler.timePasses(syncConfig.peerResponseTimeout)
+
+    fastSync.expectNoMessage()
+    peerMessageBus.expectMsgType[UnsubscribeAllCmd]
+
+    testScheduler.timePasses(syncConfig.startRetryInterval)
+    expectSubscribeCmds(
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer1.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id)),
+      MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
+    )
   }
 
   class TestSetup extends TestSyncConfig {
@@ -702,6 +868,47 @@ class PivotBlockSelectorSpec
         reverse shouldBe false
       case other =>
         fail(s"Expected GetBlockHeaders for block $expectedBlockNumber but received $other")
+    }
+
+    // ── ETH69 G5 — backlink probe helpers ─────────────────────────────────────────────────────────────────
+
+    /** After a pivot wins the vote, the selector re-subscribes to the winning voters and sends each a reverse
+      * `GetBlockHeaders(Right(pivotHash), count=BacklinkDepth, reverse=true)`. Consume those subscriptions and
+      * requests, asserting the reverse-by-hash shape, and return the peer ids that were probed.
+      */
+    def expectBacklinkProbe(pivot: BlockHeader, expectedPeers: Seq[Peer]): Unit = {
+      expectSubscribeCmds(
+        expectedPeers.map(p => MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(p.id)))*
+      )
+      val sends =
+        (1 to expectedPeers.size).map(_ => networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage])
+      sends.foreach { s =>
+        s.message.underlyingMsg match {
+          case GetBlockHeaders(_, Right(hash), maxHeaders, skip, reverse) =>
+            hash shouldBe pivot.hash
+            maxHeaders shouldBe PivotBlockSelector.BacklinkDepth
+            skip shouldBe 0
+            reverse shouldBe true
+          case other => fail(s"Expected reverse GetBlockHeaders(Right(pivotHash)) but received $other")
+        }
+      }
+      val unexpected = sends.map(_.peerId).filterNot(expectedPeers.map(_.id).contains)
+      withClue(s"Unexpected backlink probe peers: $unexpected")(unexpected shouldBe empty)
+    }
+
+    /** Deliver a backlink header chain from one of the probed peers. */
+    def feedBacklink(chain: Seq[BlockHeader], from: Peer): Unit =
+      pivotBlockSelector ! PivotBlockSelector.WrappedMessageFromPeer(
+        MessageFromPeer(BlockHeaders(BigInt(0), chain), from.id)
+      )
+
+    /** The common happy-path backlink: canonical lookup resolves the pivot at its own height, the probed peer returns
+      * the single-header chain rooted at the pivot, and the selector confirms + emits Result. Call BEFORE spawning is
+      * forced (sets `canonicalByNumber`), then drives the probe handshake after votes.
+      */
+    def confirmBacklink(pivot: BlockHeader, probedPeers: Seq[Peer], responder: Peer): Unit = {
+      expectBacklinkProbe(pivot, probedPeers)
+      feedBacklink(Seq(pivot), responder)
     }
 
     // Assertion helpers: subscriber ref is an internal adapter ref — matched with wildcard.
@@ -787,6 +994,12 @@ class PivotBlockSelectorSpec
     // inert for existing tests (minPeerTD = 0); TD-gate tests override this before spawning the selector.
     @volatile var ourBestTD: BigInt = BigInt(0)
 
+    // ETH69 G5 — pivot parent-chain backlink closures. Defaults make the backlink probe pass: every header
+    // validates PoW, and the canonical lookup returns the elected pivot itself at its own height (so the
+    // first probed header is an immediate canonical match). Backlink tests override these before spawning.
+    @volatile var validateHeaderPoWFn: BlockHeader => Boolean = _ => true
+    @volatile var canonicalByNumber: BigInt => Option[BlockHeader] = _ => None
+
     lazy val pivotBlockSelector: ActorRef = testKit
       .spawn(
         PivotBlockSelector(
@@ -795,7 +1008,9 @@ class PivotBlockSelectorSpec
           defaultSyncConfig,
           fastSync.ref,
           blacklist,
-          () => ourBestTD
+          () => ourBestTD,
+          n => canonicalByNumber(n),
+          h => validateHeaderPoWFn(h)
         ),
         s"pivot-block-selector-${java.util.UUID.randomUUID()}"
       )
@@ -945,5 +1160,27 @@ class PivotBlockSelectorSpec
         maxBlockNumber = bestBlock,
         bestBlockHash = status.bestHash
       )
+
+    /** ETH69 G5 — a canonical lookup that resolves the elected pivot at its own height (immediate backlink match). Used
+      * by the happy-path electing tests so the backlink probe confirms on the pivot header itself.
+      */
+    def canonicalReturningPivot: BigInt => Option[BlockHeader] =
+      n => if n == pivotBlockHeader.number then Some(pivotBlockHeader) else None
+
+    /** ETH69 G5 — build a reverse-ordered, parentHash-linked header chain with its tip at `tipNum`, walking back
+      * `depth` blocks (so the returned Seq is [tip, tip-1, ..., tip-depth+1]). Each header's parentHash points at the
+      * next (older) header's hash, satisfying the selector's continuity check. extraData disambiguates the per-height
+      * hashes so they differ from any canonical header unless explicitly matched. The tip header (Seq.head) is the
+      * elected pivot to vote in `electUnanimousPivot`.
+      */
+    def reverseChain(tipNum: BigInt, depth: Int): Seq[BlockHeader] = {
+      // Oldest → newest, linking parentHash forward, then reverse to newest → oldest.
+      val oldestNum = tipNum - depth + 1
+      val ascending = (oldestNum to tipNum).foldLeft(Vector.empty[BlockHeader]) { (acc, n) =>
+        val parentHash = acc.lastOption.map(_.hash).getOrElse(ByteString("genesis-parent"))
+        acc :+ baseBlockHeader.copy(number = n, parentHash = parentHash, extraData = ByteString(s"backlink-$n"))
+      }
+      ascending.reverse
+    }
   }
 }
