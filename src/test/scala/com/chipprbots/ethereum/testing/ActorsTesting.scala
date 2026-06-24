@@ -2,6 +2,9 @@ package com.chipprbots.ethereum.testing
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.testkit.TestActor.AutoPilot
 
+import com.chipprbots.ethereum.blockchain.sync.SyncController
+import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
+
 object ActorsTesting {
   def simpleAutoPilot(makeResponse: PartialFunction[Any, Any]): AutoPilot =
     new AutoPilot {
@@ -14,4 +17,17 @@ object ActorsTesting {
         this
       }
     }
+
+  /** AutoPilot for SyncController stubs that replies via the typed replyTo embedded in GetStatus. Classic TestProbe
+    * sender() is not the reply target for typed asks — the replyTo field is.
+    */
+  def syncStatusAutoPilot(status: SyncProtocol.Status): AutoPilot = new AutoPilot {
+    def run(sender: ActorRef, msg: Any): AutoPilot = {
+      msg match {
+        case SyncController.WrappedSyncProtocol(gs: SyncProtocol.GetStatus) => gs.replyTo ! status
+        case _                                                              => ()
+      }
+      this
+    }
+  }
 }

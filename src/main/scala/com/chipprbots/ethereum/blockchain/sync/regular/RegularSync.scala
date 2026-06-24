@@ -151,8 +151,8 @@ object RegularSync {
         importer ! BlockImporter.MinedBlock(block)
         Behaviors.same
 
-      case SyncProtocol.GetStatus =>
-        ctx.toClassic.sender() ! progressState.toStatus
+      case msg: SyncProtocol.GetStatus =>
+        msg.replyTo ! progressState.toStatus
         Behaviors.same
 
       case ProgressProtocol.StartedFetching =>

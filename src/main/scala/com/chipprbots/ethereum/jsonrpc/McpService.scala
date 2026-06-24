@@ -2,8 +2,8 @@ package com.chipprbots.ethereum.jsonrpc
 
 import java.util.concurrent.atomic.AtomicReference
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
@@ -14,6 +14,7 @@ import scala.concurrent.duration.*
 
 import org.json4s.JsonAST.JValue
 
+import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.network.PeerManagerActor
@@ -110,7 +111,7 @@ object McpService {
 
 class McpService(
     peerManager: typed.ActorRef[PeerManagerActor.Command],
-    syncController: ActorRef,
+    syncController: TypedActorRef[SyncController.Command],
     blockchainReader: BlockchainReader,
     blockchainConfig: BlockchainConfig,
     nodeStatusHolder: AtomicReference[NodeStatus],
@@ -244,7 +245,7 @@ class McpService(
 /** Bundle of dependencies available to MCP tools and resources */
 case class McpDependencies(
     peerManager: typed.ActorRef[PeerManagerActor.Command],
-    syncController: ActorRef,
+    syncController: TypedActorRef[SyncController.Command],
     blockchainReader: BlockchainReader,
     blockchainConfig: BlockchainConfig,
     nodeStatusHolder: AtomicReference[NodeStatus],

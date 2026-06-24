@@ -4,7 +4,6 @@ import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.pattern.ask
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.Timeout
 
@@ -130,8 +129,11 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
 
     val startSync: IO[Unit] = IO(fastSync ! FastSync.WrappedSyncProtocol(SyncProtocol.Start))
 
-    val getSyncStatus: IO[Status] =
-      IO.fromFuture(IO((fastSync ? FastSync.WrappedSyncProtocol(SyncProtocol.GetStatus)).mapTo[Status]))
+    val getSyncStatus: IO[Status] = IO.async_[Status] { cb =>
+      val replyProbe = TestProbe("get-status-reply")
+      fastSync ! FastSync.WrappedSyncProtocol(SyncProtocol.GetStatus(replyProbe.ref.toTyped[Status]))
+      cb(Right(replyProbe.expectMsgClass(timeout.duration, classOf[Status])))
+    }
   }
 
   override def createFixture(): Fixture = new Fixture

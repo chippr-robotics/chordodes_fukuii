@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.consensus.pow.miners
 
-import org.apache.pekko.actor.ActorRef as ClassicActorRef
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
@@ -30,7 +30,7 @@ import com.chipprbots.ethereum.utils.Logger
 class EthashMiner(
     dagManager: EthashDAGManager,
     blockCreator: PoWBlockCreator,
-    syncController: ClassicActorRef,
+    syncController: TypedActorRef[com.chipprbots.ethereum.blockchain.sync.SyncController.Command],
     ethMiningService: EthMiningService
 )(implicit scheduler: IORuntime)
     extends Miner

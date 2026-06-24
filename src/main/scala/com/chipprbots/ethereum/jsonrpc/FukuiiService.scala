@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
@@ -38,11 +39,13 @@ object FukuiiService {
 class FukuiiService(
     transactionHistoryService: TransactionHistoryService,
     jsonRpcConfig: JsonRpcConfig,
-    syncController: ActorRef
+    syncController: TypedActorRef[SyncController.Command],
+    scheduler: Scheduler
 ) {
 
   import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
   given timeout: Timeout = Timeout(10.seconds)
+  private given typedScheduler: Scheduler = scheduler
 
   given blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
 
@@ -66,11 +69,15 @@ class FukuiiService(
 
   def resetFastSync(@unused request: ResetFastSyncRequest): ServiceResponse[ResetFastSyncResponse] =
     syncController
-      .askFor[SyncProtocol.ResetFastSyncResponse](SyncController.WrappedSyncProtocol(SyncProtocol.ResetFastSync))
+      .askForTyped[SyncProtocol.ResetFastSyncResponse](replyTo =>
+        SyncController.WrappedSyncProtocol(SyncProtocol.ResetFastSync(replyTo))
+      )
       .map(resp => Right(ResetFastSyncResponse(resp.reset)))
 
   def restartFastSync(@unused request: RestartFastSyncRequest): ServiceResponse[RestartFastSyncResponse] =
     syncController
-      .askFor[SyncProtocol.RestartFastSyncResponse](SyncController.WrappedSyncProtocol(SyncProtocol.RestartFastSync))
+      .askForTyped[SyncProtocol.RestartFastSyncResponse](replyTo =>
+        SyncController.WrappedSyncProtocol(SyncProtocol.RestartFastSync(replyTo))
+      )
       .map(resp => Right(RestartFastSyncResponse(resp.started, resp.cooldownUntilMillis)))
 }

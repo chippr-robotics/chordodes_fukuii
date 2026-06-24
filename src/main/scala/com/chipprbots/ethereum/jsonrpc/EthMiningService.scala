@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.AtomicReference
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.typed
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
@@ -80,7 +81,7 @@ class EthMiningService(
     mining: Mining,
     jsonRpcConfig: JsonRpcConfig,
     ommersPool: typed.ActorRef[OmmersPool.Command],
-    syncingController: ActorRef,
+    syncingController: TypedActorRef[SyncController.Command],
     val pendingTransactionsManager: ActorRef,
     val getTransactionFromPoolTimeout: FiniteDuration,
     configBuilder: BlockchainConfigBuilder,

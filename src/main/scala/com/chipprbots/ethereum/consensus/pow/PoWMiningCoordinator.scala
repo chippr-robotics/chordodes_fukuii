@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.consensus.pow
 
-import org.apache.pekko.actor.ActorRef as ClassicActorRef
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.AbstractBehavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
@@ -41,7 +41,7 @@ object PoWMiningCoordinator {
   case object MiningComplete extends MiningResponse
 
   def apply(
-      syncController: ClassicActorRef,
+      syncController: TypedActorRef[com.chipprbots.ethereum.blockchain.sync.SyncController.Command],
       ethMiningService: EthMiningService,
       blockCreator: PoWBlockCreator,
       blockchainReader: BlockchainReader,
@@ -64,7 +64,7 @@ object PoWMiningCoordinator {
 
 class PoWMiningCoordinator private (
     context: ActorContext[CoordinatorProtocol],
-    syncController: ClassicActorRef,
+    syncController: TypedActorRef[com.chipprbots.ethereum.blockchain.sync.SyncController.Command],
     ethMiningService: EthMiningService,
     blockCreator: PoWBlockCreator,
     blockchainReader: BlockchainReader,

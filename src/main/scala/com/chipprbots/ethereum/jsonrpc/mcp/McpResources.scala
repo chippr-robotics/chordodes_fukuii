@@ -31,8 +31,9 @@ object NodeStatusResource {
 
   def read(deps: McpDependencies)(implicit timeout: Timeout, @unused ec: ExecutionContext): IO[String] = {
     given scheduler: typed.Scheduler = deps.scheduler
-    val syncStatusIO =
-      deps.syncController.askFor[SyncProtocol.Status](SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus))
+    val syncStatusIO = deps.syncController.askForTyped[SyncProtocol.Status](replyTo =>
+      SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus(replyTo))
+    )
     val peersIO = deps.peerManager.askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
 
     for {
@@ -100,9 +101,10 @@ object SyncStatusResource {
   val description: Some[String] = Some("Current blockchain synchronization status and progress")
   val mimeType: Some[String] = Some("application/json")
 
-  def read(deps: McpDependencies)(implicit timeout: Timeout, @unused ec: ExecutionContext): IO[String] =
+  def read(deps: McpDependencies)(implicit timeout: Timeout, @unused ec: ExecutionContext): IO[String] = {
+    given scheduler: typed.Scheduler = deps.scheduler
     deps.syncController
-      .askFor[SyncProtocol.Status](SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus))
+      .askForTyped[SyncProtocol.Status](replyTo => SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus(replyTo)))
       .recover { case _ =>
         SyncProtocol.Status.NotSyncing
       }
@@ -141,6 +143,7 @@ object SyncStatusResource {
             |}""".stripMargin
         }
       }
+  }
 }
 
 object ConnectedPeersResource {

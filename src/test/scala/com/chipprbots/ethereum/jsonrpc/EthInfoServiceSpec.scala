@@ -32,7 +32,7 @@ import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ledger.StxLedger
 import com.chipprbots.ethereum.ledger.TxResult
 import com.chipprbots.ethereum.network.p2p.messages.Capability
-import com.chipprbots.ethereum.testing.ActorsTesting.simpleAutoPilot
+import com.chipprbots.ethereum.testing.ActorsTesting.syncStatusAutoPilot
 import com.chipprbots.ethereum.testing.Tags.*
 
 class EthServiceSpec
@@ -63,9 +63,9 @@ class EthServiceSpec
   }
 
   it should "return syncing info if the peer is syncing" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    syncingController.setAutoPilot(simpleAutoPilot { case SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus) =>
-      SyncProtocol.Status.Syncing(999, Progress(200, 10000), Some(Progress(100, 144)))
-    })
+    syncingController.setAutoPilot(
+      syncStatusAutoPilot(SyncProtocol.Status.Syncing(999, Progress(200, 10000), Some(Progress(100, 144))))
+    )
 
     val response: SyncingResponse = ethService.syncing(SyncingRequest()).unsafeRunSync().toOption.get
 
@@ -84,9 +84,7 @@ class EthServiceSpec
 
   // scalastyle:off magic.number
   it should "return no syncing info if the peer is not syncing" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    syncingController.setAutoPilot(simpleAutoPilot { case SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus) =>
-      SyncProtocol.Status.NotSyncing
-    })
+    syncingController.setAutoPilot(syncStatusAutoPilot(SyncProtocol.Status.NotSyncing))
 
     val response: Either[JsonRpcError, SyncingResponse] = ethService.syncing(SyncingRequest()).unsafeRunSync()
 
@@ -94,9 +92,7 @@ class EthServiceSpec
   }
 
   it should "return no syncing info if sync is done" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    syncingController.setAutoPilot(simpleAutoPilot { case SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus) =>
-      SyncProtocol.Status.SyncDone
-    })
+    syncingController.setAutoPilot(syncStatusAutoPilot(SyncProtocol.Status.SyncDone))
 
     val response: Either[JsonRpcError, SyncingResponse] = ethService.syncing(SyncingRequest()).unsafeRunSync()
 
@@ -188,9 +184,10 @@ class EthServiceSpec
       mining,
       stxLedger,
       keyStore,
-      syncingController.ref,
+      syncingController.ref.toTyped[SyncController.Command],
       Capability.ETH63,
-      Timeouts.shortTimeout
+      Timeouts.shortTimeout,
+      system.toTyped.scheduler
     )
 
     val blockToRequest: Block = Block(Fixtures.Blocks.Block3125369.header, Fixtures.Blocks.Block3125369.body)

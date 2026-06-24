@@ -22,7 +22,6 @@ import org.scalatest.prop.TableFor1
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.Fixtures
-import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol.Status.Progress
 import com.chipprbots.ethereum.consensus.blocks.PendingBlock
@@ -47,6 +46,7 @@ import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers.Unformatted
 import com.chipprbots.ethereum.ommers.OmmersPool
 import com.chipprbots.ethereum.ommers.OmmersPool.Ommers
 import com.chipprbots.ethereum.testing.ActorsTesting.simpleAutoPilot
+import com.chipprbots.ethereum.testing.ActorsTesting.syncStatusAutoPilot
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 
@@ -93,9 +93,9 @@ class JsonRpcControllerEthSpec
   }
 
   it should "eth_syncing" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
-    syncingController.setAutoPilot(simpleAutoPilot { case SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus) =>
-      SyncProtocol.Status.Syncing(999, Progress(200, 10000), Some(Progress(100, 144)))
-    })
+    syncingController.setAutoPilot(
+      syncStatusAutoPilot(SyncProtocol.Status.Syncing(999, Progress(200, 10000), Some(Progress(100, 144))))
+    )
 
     val rpcRequest: JsonRpcRequest = JsonRpcRequest("2.0", "eth_syncing", None, Some(1))
 

@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.consensus.pow.miners
 
-import org.apache.pekko.actor.ActorRef as ClassicActorRef
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.Future
@@ -25,7 +25,7 @@ trait Miner extends Logger {
 
   def handleMiningResult(
       miningResult: MiningResult,
-      syncController: ClassicActorRef,
+      syncController: TypedActorRef[SyncController.Command],
       block: Block
   ): CoordinatorProtocol =
     miningResult match {

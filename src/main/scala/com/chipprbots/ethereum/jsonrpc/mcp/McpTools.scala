@@ -67,8 +67,9 @@ object NodeStatusTool {
 
   def execute(deps: McpDependencies)(implicit timeout: Timeout, @unused ec: ExecutionContext): IO[String] = {
     given scheduler: typed.Scheduler = deps.scheduler
-    val syncStatusIO =
-      deps.syncController.askFor[SyncProtocol.Status](SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus))
+    val syncStatusIO = deps.syncController.askForTyped[SyncProtocol.Status](replyTo =>
+      SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus(replyTo))
+    )
     val peersIO = deps.peerManager.askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
 
     for {
@@ -136,9 +137,10 @@ object SyncStatusTool {
     "Get detailed synchronization status including mode, progress, and remaining blocks"
   )
 
-  def execute(deps: McpDependencies)(implicit timeout: Timeout, @unused ec: ExecutionContext): IO[String] =
+  def execute(deps: McpDependencies)(implicit timeout: Timeout, @unused ec: ExecutionContext): IO[String] = {
+    given scheduler: typed.Scheduler = deps.scheduler
     deps.syncController
-      .askFor[SyncProtocol.Status](SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus))
+      .askForTyped[SyncProtocol.Status](replyTo => SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus(replyTo)))
       .recover { case _ =>
         SyncProtocol.Status.NotSyncing
       }
@@ -173,6 +175,7 @@ object SyncStatusTool {
             |  Status: Idle""".stripMargin
         }
       }
+  }
 }
 
 object PeerListTool {

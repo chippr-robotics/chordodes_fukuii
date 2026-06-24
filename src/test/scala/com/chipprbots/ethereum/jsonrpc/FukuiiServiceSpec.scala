@@ -3,6 +3,7 @@ package com.chipprbots.ethereum.jsonrpc
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
@@ -15,6 +16,7 @@ import com.chipprbots.ethereum.BlockHelpers
 import com.chipprbots.ethereum.FreeSpecBase
 import com.chipprbots.ethereum.SpecFixtures
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
+import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.Block
@@ -56,7 +58,16 @@ class FukuiiServiceSpec extends ScalaTestWithActorTestKit with FreeSpecBase with
       com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
     ]
 
-    override lazy val syncController: ActorRef = TestProbe().ref
+    override lazy val syncController: TypedActorRef[SyncController.Command] =
+      TestProbe().ref.toTyped[SyncController.Command]
+
+    // FukuiiServiceBuilder requires ActorSystemBuilder for the scheduler; override directly instead.
+    override lazy val fukuiiService: FukuiiService = new FukuiiService(
+      transactionHistoryService,
+      jsonRpcConfig,
+      syncController,
+      classicActorSystem.toTyped.scheduler
+    )
   }
   def createFixture() = new Fixture
 

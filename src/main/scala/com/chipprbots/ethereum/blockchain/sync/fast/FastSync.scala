@@ -219,12 +219,8 @@ object FastSync {
         msg match {
           case WrappedSyncProtocol(SyncProtocol.Start) => start()
           case GetStatusCmd(replyTo)                   => replyTo ! SyncProtocol.Status.NotSyncing; Behaviors.same
-          // By-design Classic bridge: sender() is always a Classic ask-temp actor here.
-          // GetStatusCmd is constructed internally from WrappedSyncProtocol(GetStatus);
-          // all external callers reach it via a Classic bridge ref. Safe as long as
-          // SyncController is never exposed as a Typed ActorRef[Command] to callers.
-          case WrappedSyncProtocol(SyncProtocol.GetStatus) =>
-            ctx.self ! GetStatusCmd(ctx.toClassic.sender()); Behaviors.same
+          case WrappedSyncProtocol(msg: SyncProtocol.GetStatus) =>
+            ctx.self ! GetStatusCmd(msg.replyTo); Behaviors.same
           case _ => Behaviors.same
         }
     }
@@ -295,8 +291,8 @@ object FastSync {
             )
             timers.startSingleTimer(RetryPivotBlockSelection, startRetryInterval)
             Behaviors.same
-          case WrappedSyncProtocol(SyncProtocol.GetStatus) =>
-            ctx.self ! GetStatusCmd(ctx.toClassic.sender()); Behaviors.same
+          case WrappedSyncProtocol(msg: SyncProtocol.GetStatus) =>
+            ctx.self ! GetStatusCmd(msg.replyTo); Behaviors.same
           case WrappedPivotResult(PivotBlockSelector.Result(pivotBlockHeader)) =>
             if pivotBlockHeader.number < 1 then {
               log.info("Unable to start block synchronization in fast mode: pivot block is less than 1")
@@ -440,8 +436,8 @@ object FastSync {
     }
 
     def handleStatus(msg: Command): Boolean = msg match {
-      case WrappedSyncProtocol(SyncProtocol.GetStatus) =>
-        ctx.self ! GetStatusCmd(ctx.toClassic.sender())
+      case WrappedSyncProtocol(msg: SyncProtocol.GetStatus) =>
+        ctx.self ! GetStatusCmd(msg.replyTo)
         true
       case GetStatusCmd(replyTo) =>
         replyTo ! currentSyncingStatus
@@ -1795,8 +1791,8 @@ object FastSync {
     */
   private case class FatalError(reason: String) extends Command
 
-  /** Carries the Classic reply-to for an ask-based `SyncProtocol.GetStatus`. */
-  final private[fast] case class GetStatusCmd(replyTo: ActorRef) extends Command
+  /** Carries the Typed reply-to for a `SyncProtocol.GetStatus` ask. */
+  final private[fast] case class GetStatusCmd(replyTo: TypedActorRef[SyncProtocol.Status]) extends Command
 
   /** Core-internal: a watched Classic `PeerRequestHandler` child stopped (it replies to `context.parent` then stops
     * itself). Delivered via `ctx.watchWith`, this is the single place that removes the handler from the active set —

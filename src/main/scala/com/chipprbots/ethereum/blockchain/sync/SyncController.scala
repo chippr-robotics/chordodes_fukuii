@@ -45,40 +45,37 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 /** Top-level sync orchestrator.
   *
-  * Pekko Typed migration (Group ROOT, Phase 2 complete): converted to a Typed actor with behavior type
+  * Pekko Typed migration (Group ROOT, Phase 2 + OQ-5 complete): converted to a Typed actor with behavior type
   * `Behavior[Command]`. Heterogeneous external case classes from still-Classic senders arrive via two wrappers:
   * `WrappedExternal` (child fire-and-forget replies via a `messageAdapter`) and `WrappedSyncProtocol` (JSON-RPC asks
-  * that preserve `sender()` for the OQ-5 reply path). Callers include `NetworkPeerManagerActor` (`HandshakedPeers`,
-  * `CalibrateChainWeightFromPeer`), `ForkChoiceManager` (`BeaconHead` via its Classic `setListener(ActorRef)`
-  * callback), the JSON-RPC layer (`SyncProtocol.GetStatus`), and its children (`SNAPSyncController`, the recovery
-  * actors, `ChainDownloader`, the Classic `FastSync` / `RegularSync` / `PeersClient` / `PivotHeaderBootstrap`). Replies
-  * to a Classic ask go out via `ctx.toClassic.sender()` (same idiom as `RegularSync`); forwarding becomes
-  * `child.tell(msg, ctx.toClassic.sender())`.
+  * now using Typed ask with embedded `replyTo` in each `SyncProtocol.*` message). Callers include
+  * `NetworkPeerManagerActor` (`HandshakedPeers`, `CalibrateChainWeightFromPeer`), `ForkChoiceManager` (`BeaconHead` via
+  * its Classic `setListener(ActorRef)` callback), the JSON-RPC layer (`SyncProtocol.GetStatus`, `ResetFastSync`,
+  * `RestartFastSync`), and its children (`SNAPSyncController`, the recovery actors, `ChainDownloader`, the Classic
+  * `FastSync` / `RegularSync` / `PeersClient` / `PivotHeaderBootstrap`).
   *
   * Each former `context.become(stateX)` becomes a named `Behavior[Command]` factory method on `Impl`. Stored-sender
-  * slots (`healingServeRootRequester`, `recentRootRequester`) capture the Classic `ctx.toClassic.sender()` and reply
-  * later. Timers (`RestartFastSyncNow`, `PollRecoveryPeers`, recent-root / healing-serve-root timeouts, TD calibration)
-  * use a `TimerScheduler`. `PivotHeaderBootstrap` (now Typed) is spawned via `ctx.spawn`; the remaining Classic
-  * children are spawned via `ctx.toClassic.actorOf`. The Classic `OQ-5` ask path (`SyncProtocol.GetStatus`) is
-  * preserved as-is: `syncController` stays a Classic `ActorRef` to all callers via the `.toClassic` bridge until
-  * CAPSTONE flips the root.
+  * slots (`healingServeRootRequester`, `recentRootRequester`) carry explicit `ActorRef[ReplyType]` fields. Timers
+  * (`RestartFastSyncNow`, `PollRecoveryPeers`, recent-root / healing-serve-root timeouts, TD calibration) use a
+  * `TimerScheduler`. `PivotHeaderBootstrap` (now Typed) is spawned via `ctx.spawn`; the remaining Classic children are
+  * spawned via `ctx.toClassic.actorOf`. `syncController` is now a Typed `ActorRef[Command]` in `NodeBuilder` and all
+  * JSON-RPC callers; the OQ-5 Classic ask path (`ctx.toClassic.sender()`) has been eliminated.
   */
 object SyncController {
 
-  /** Sealed protocol for the top-level sync orchestrator (ROOT-a narrowing, Phase 1).
+  /** Sealed protocol for the top-level sync orchestrator (ROOT-a narrowing, Phase 1; OQ-5 complete).
     *
-    * This ADT covers the messages SyncController OWNS: self/timer ticks, death-watch termination markers, and the OQ-5
-    * status queries. Heterogeneous external case classes still arrive from many Classic senders (SyncProtocol,
-    * FastSync, SNAPSyncController, PivotHeaderBootstrap, RegularSync.ProgressProtocol, ForkChoiceManager.BeaconHead,
-    * NetworkPeerManagerActor, the recovery actors, CombinedRecoveryScanActor) — those are NOT yet members of this
-    * Command ADT. Phases 2+ will introduce wrapper Commands and rewrite the match arms; Phase 1 only defines the ADT
-    * and changes the behavior return-type annotations, so those external references are expected compile errors.
+    * This ADT covers the messages SyncController OWNS: self/timer ticks, death-watch termination markers, and the
+    * sync-protocol queries now routed via `WrappedSyncProtocol`. Heterogeneous external case classes still arrive from
+    * many Classic senders (FastSync, SNAPSyncController, PivotHeaderBootstrap, RegularSync.ProgressProtocol,
+    * ForkChoiceManager.BeaconHead, NetworkPeerManagerActor, the recovery actors, CombinedRecoveryScanActor) — those are
+    * NOT yet members of this Command ADT; they arrive via `WrappedExternal`. `SyncProtocol.*` messages carry typed
+    * `replyTo` fields and arrive via `WrappedSyncProtocol`; Classic sender() is no longer used.
     */
   sealed trait Command
 
-  // OQ-5: status/progress queries replied to via `ctx.toClassic.sender()` (RegularSync idiom). No `replyTo` field —
-  // the Classic ask bridge supplies the reply target. Reply paths are intentionally NOT changed in this phase.
-  case object GetStatus extends Command
+  // `GetProgress` is an internal/unused remnant kept for symmetry; the canonical status query is SyncProtocol.GetStatus
+  // wrapped in WrappedSyncProtocol with a typed replyTo field.
   case object GetProgress extends Command
 
   private case object RestartFastSyncNow extends Command
@@ -115,11 +112,10 @@ object SyncController {
   //      `case WrappedExternal(msg) => msg match { ... }`. Forwarding catch-alls inside that block still work because
   //      the parent is the message's destination, not a relay needing the original sender.
   //
-  //   2. `WrappedSyncProtocol(msg)` — EXTERNAL-SENDER ask / reply-dependent traffic (`sender()` needed). The JSON-RPC
-  //      layer asks `syncController.askFor[SyncProtocol.Status](SyncProtocol.GetStatus)` and expects a reply to the
-  //      ask's temp actor, reachable only via `ctx.toClassic.sender()` (which a `messageAdapter` would lose). These
-  //      travel as `WrappedSyncProtocol` constructed BY THE CALLER; Phase 3 edits the JSON-RPC / NodeBuilder callers to
-  //      wrap. The handler keeps the OQ-5 sender-reply idiom (`ctx.toClassic.sender()`), so no `replyTo` field is added.
+  //   2. `WrappedSyncProtocol(msg)` — EXTERNAL-SENDER ask / reply-dependent traffic. The JSON-RPC layer sends
+  //      `SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus(replyTo))` via Typed ask; each `SyncProtocol.*`
+  //      message carries a typed `replyTo: ActorRef[ReplyType]` field. The handler replies directly to `msg.replyTo`
+  //      — no `ctx.toClassic.sender()` required. The OQ-5 Classic ask path has been fully eliminated.
   // INFO-4/INFO-11: concrete message types currently routed through WrappedExternal (child fire-and-forget only).
   // All arrive via the shared `externalAdapter` messageAdapter registered in `apply()`. Update this list when new
   // child reply types are added or removed.
@@ -144,9 +140,9 @@ object SyncController {
   //     FastSync.Done, FastSync.FallbackToSnapSync, RegularSync.ProgressProtocol.*, recovery scanner events
   final private[sync] case class WrappedExternal(msg: Any)
       extends Command // Any: Pekko messageAdapter boundary — Classic msgs arrive untyped
-  // Public: external Classic callers (JSON-RPC asks, miner, NodeBuilder startup) construct this to wrap their raw
-  // SyncProtocol.* sends so the messages survive the Behavior[Command] boundary. The handler unwraps and replies via
-  // ctx.toClassic.sender() (preserved because callers `.tell`/`?` with the original sender), so no replyTo is added.
+  // Public: external callers (JSON-RPC layer, miner, NodeBuilder startup) construct this to wrap their raw
+  // SyncProtocol.* messages so they survive the Behavior[Command] boundary. Each SyncProtocol.* message carries a
+  // typed `replyTo` field; the handler unwraps and replies directly to `msg.replyTo`.
   final case class WrappedSyncProtocol(msg: SyncProtocol.SyncProtocolMsg) extends Command
 
   // scalastyle:off parameter.number
@@ -375,14 +371,18 @@ object SyncController {
       )
     }
 
-    private def handleResetFastSync(replyTo: ActorRef): Unit = {
+    private def handleResetFastSync(
+        replyTo: TypedActorRef[SyncProtocol.ResetFastSyncResponse]
+    ): Unit = {
       log.warn("ResetFastSync requested: clearing persisted fast-sync markers")
       appStateStorage.clearFastSyncDone().commit()
       fastSyncStateStorage.purge()
       replyTo ! SyncProtocol.ResetFastSyncResponse(reset = true)
     }
 
-    private def handleRestartFastSync(replyTo: ActorRef): Unit = {
+    private def handleRestartFastSync(
+        replyTo: TypedActorRef[SyncProtocol.RestartFastSyncResponse]
+    ): Unit = {
       val nowMillis = System.currentTimeMillis()
       val cooldownUntil = appStateStorage.getFastSyncCooldownUntilMillis()
 
@@ -457,11 +457,11 @@ object SyncController {
       msg match {
         case SyncProtocol.Start =>
           start()
-        case SyncProtocol.ResetFastSync =>
-          handleResetFastSync(ctx.toClassic.sender())
+        case msg: SyncProtocol.ResetFastSync =>
+          handleResetFastSync(msg.replyTo)
           Behaviors.same
-        case SyncProtocol.RestartFastSync =>
-          handleRestartFastSync(ctx.toClassic.sender())
+        case msg: SyncProtocol.RestartFastSync =>
+          handleRestartFastSync(msg.replyTo)
           Behaviors.same
         case RestartFastSyncNow =>
           doRestartFastSyncNow()
@@ -476,11 +476,11 @@ object SyncController {
     def runningFastSync(fastSync: ActorRef): Behavior[Command] = Behaviors.receive { (_, cmd) =>
       val msg = unwrap(cmd)
       msg match {
-        case SyncProtocol.ResetFastSync =>
-          handleResetFastSync(ctx.toClassic.sender())
+        case msg: SyncProtocol.ResetFastSync =>
+          handleResetFastSync(msg.replyTo)
           Behaviors.same
-        case SyncProtocol.RestartFastSync =>
-          handleRestartFastSync(ctx.toClassic.sender())
+        case msg: SyncProtocol.RestartFastSync =>
+          handleRestartFastSync(msg.replyTo)
           Behaviors.same
         case RestartFastSyncNow =>
           doRestartFastSyncNow()
@@ -507,10 +507,11 @@ object SyncController {
           Behaviors.same
         case spMsg: SyncProtocol.SyncProtocolMsg =>
           // FastSync is Typed (Behavior[Command]); wrap external SyncProtocol messages so they arrive as Commands.
-          fastSync.tell(FastSync.WrappedSyncProtocol(spMsg), ctx.toClassic.sender())
+          // GetStatus/ResetFastSync/RestartFastSync carry replyTo — forward the message as-is.
+          fastSync.tell(FastSync.WrappedSyncProtocol(spMsg), org.apache.pekko.actor.ActorRef.noSender)
           Behaviors.same
         case other =>
-          fastSync.tell(other, ctx.toClassic.sender())
+          fastSync.tell(other, org.apache.pekko.actor.ActorRef.noSender)
           Behaviors.same
       }
     }
@@ -518,11 +519,11 @@ object SyncController {
     def runningSnapSync(snapSync: ActorRef): Behavior[Command] = Behaviors.receive { (_, cmd) =>
       val msg = unwrap(cmd)
       msg match {
-        case SyncProtocol.ResetFastSync =>
-          handleResetFastSync(ctx.toClassic.sender())
+        case msg: SyncProtocol.ResetFastSync =>
+          handleResetFastSync(msg.replyTo)
           Behaviors.same
-        case SyncProtocol.RestartFastSync =>
-          handleRestartFastSync(ctx.toClassic.sender())
+        case msg: SyncProtocol.RestartFastSync =>
+          handleRestartFastSync(msg.replyTo)
           Behaviors.same
         case RestartFastSyncNow =>
           doRestartFastSyncNow()
@@ -711,7 +712,7 @@ object SyncController {
           // Late self/death-watch marker for a child stopped before this transition — drop silently.
           Behaviors.same
         case msg =>
-          snapSync.tell(msg, ctx.toClassic.sender())
+          snapSync.tell(msg, org.apache.pekko.actor.ActorRef.noSender)
           Behaviors.same
       }
     }
@@ -807,11 +808,11 @@ object SyncController {
         case RegularSyncTerminated(actor) if actor == regularSync =>
           log.error("RegularSync actor terminated unexpectedly — restarting regular sync.")
           startRegularSync(resumeBackfill = false)._2
-        case SyncProtocol.ResetFastSync =>
-          handleResetFastSync(ctx.toClassic.sender())
+        case msg: SyncProtocol.ResetFastSync =>
+          handleResetFastSync(msg.replyTo)
           Behaviors.same
-        case SyncProtocol.RestartFastSync =>
-          handleRestartFastSync(ctx.toClassic.sender())
+        case msg: SyncProtocol.RestartFastSync =>
+          handleRestartFastSync(msg.replyTo)
           Behaviors.same
         case RestartFastSyncNow =>
           doRestartFastSyncNow()
@@ -897,7 +898,7 @@ object SyncController {
           // to RegularSync, which would crash with ClassCastException.
           Behaviors.same
         case msg =>
-          regularSync.tell(msg, ctx.toClassic.sender())
+          regularSync.tell(msg, org.apache.pekko.actor.ActorRef.noSender)
           Behaviors.same
       }
 
@@ -945,8 +946,8 @@ object SyncController {
       * delegating.
       */
     private def isRestartTrigger(msg: Any): Boolean = msg match { // Any: Classic msg from adapter
-      case SyncProtocol.ResetFastSync       => true
-      case SyncProtocol.RestartFastSync     => true
+      case _: SyncProtocol.ResetFastSync    => true
+      case _: SyncProtocol.RestartFastSync  => true
       case RestartFastSyncNow               => true
       case _: SyncProtocol.RegularSyncStuck => true
       case _                                => false
@@ -979,11 +980,11 @@ object SyncController {
     ): Behavior[Command] = Behaviors.receive { (_, cmd) =>
       val msg = unwrap(cmd)
       msg match {
-        case SyncProtocol.ResetFastSync =>
-          handleResetFastSync(ctx.toClassic.sender())
+        case msg: SyncProtocol.ResetFastSync =>
+          handleResetFastSync(msg.replyTo)
           Behaviors.same
-        case SyncProtocol.RestartFastSync =>
-          handleRestartFastSync(ctx.toClassic.sender())
+        case msg: SyncProtocol.RestartFastSync =>
+          handleRestartFastSync(msg.replyTo)
           Behaviors.same
         case RestartFastSyncNow =>
           doRestartFastSyncNow()
@@ -1011,16 +1012,16 @@ object SyncController {
             runningSnapSync(originalSnapSyncRef)
           } else Behaviors.same
 
-        case SyncProtocol.GetStatus =>
-          // Forward status requests to regular sync
-          regularSync.tell(SyncProtocol.GetStatus, ctx.toClassic.sender())
+        case msg: SyncProtocol.GetStatus =>
+          // Forward status requests to regular sync; replyTo is embedded in the message.
+          regularSync.tell(msg, org.apache.pekko.actor.ActorRef.noSender)
           Behaviors.same
 
         case other if isInternalMarker(other) =>
           // Late self/death-watch marker for a child stopped before this transition — drop silently.
           Behaviors.same
         case other =>
-          regularSync.tell(other, ctx.toClassic.sender())
+          regularSync.tell(other, org.apache.pekko.actor.ActorRef.noSender)
           Behaviors.same
       }
     }
@@ -1033,11 +1034,11 @@ object SyncController {
     ): Behavior[Command] = Behaviors.receive { (_, cmd) =>
       val msg = unwrap(cmd)
       msg match {
-        case SyncProtocol.ResetFastSync =>
-          handleResetFastSync(ctx.toClassic.sender())
+        case msg: SyncProtocol.ResetFastSync =>
+          handleResetFastSync(msg.replyTo)
           Behaviors.same
-        case SyncProtocol.RestartFastSync =>
-          handleRestartFastSync(ctx.toClassic.sender())
+        case msg: SyncProtocol.RestartFastSync =>
+          handleRestartFastSync(msg.replyTo)
           Behaviors.same
         case RestartFastSyncNow =>
           doRestartFastSyncNow()
@@ -1060,9 +1061,9 @@ object SyncController {
           originalSnapSyncRef ! PivotBootstrapFailed(reason)
           runningSnapSync(originalSnapSyncRef)
 
-        case SyncProtocol.GetStatus =>
+        case msg: SyncProtocol.GetStatus =>
           // Expose progress as a generic syncing state.
-          ctx.toClassic.sender() ! SyncProtocol.Status.Syncing(
+          msg.replyTo ! SyncProtocol.Status.Syncing(
             startingBlockNumber = appStateStorage.getSyncStartingBlock(),
             blocksProgress = SyncProtocol.Status.Progress(appStateStorage.getBestBlockNumber(), targetBlock),
             stateNodesProgress = None
@@ -1152,7 +1153,7 @@ object SyncController {
         case msg =>
           // Forward coordinator and protocol messages to SNAP sync during the brief bootstrap.
           // This keeps coordinators functional while we fetch the pivot header (~1-5 seconds).
-          originalSnapSyncRef.tell(msg, ctx.toClassic.sender())
+          originalSnapSyncRef.tell(msg, org.apache.pekko.actor.ActorRef.noSender)
           Behaviors.same
       }
     }
@@ -2100,9 +2101,10 @@ object SyncController {
           // Late self/death-watch marker for a child stopped before this transition — drop silently.
           Behaviors.same
         case msg =>
-          // Forward SNAP protocol responses to both active recovery actors
-          bytecodeActor.foreach(_.tell(msg, ctx.toClassic.sender()))
-          storageActor.foreach(_.tell(msg, ctx.toClassic.sender()))
+          // Forward SNAP protocol responses to both active recovery actors.
+          // Responses arrive via externalAdapter (fire-and-forget); no reply target to preserve.
+          bytecodeActor.foreach(_.tell(msg, org.apache.pekko.actor.ActorRef.noSender))
+          storageActor.foreach(_.tell(msg, org.apache.pekko.actor.ActorRef.noSender))
           Behaviors.same
       }
     }

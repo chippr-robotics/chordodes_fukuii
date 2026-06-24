@@ -153,9 +153,10 @@ class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRoute
       mining,
       stxLedger,
       keyStore,
-      syncProbe.ref,
+      syncProbe.ref.toTyped[com.chipprbots.ethereum.blockchain.sync.SyncController.Command],
       Capability.ETH66,
-      org.apache.pekko.util.Timeout(2.seconds)
+      org.apache.pekko.util.Timeout(2.seconds),
+      system.toTyped.scheduler
     )
     lazy val ethUserService = new EthUserService(
       blockchain,

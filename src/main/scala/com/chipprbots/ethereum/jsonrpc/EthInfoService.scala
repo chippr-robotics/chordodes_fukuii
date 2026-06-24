@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
@@ -8,7 +9,6 @@ import cats.effect.IO
 import cats.syntax.either.*
 
 import scala.annotation.unused
-import scala.reflect.ClassTag
 
 import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
@@ -87,12 +87,15 @@ class EthInfoService(
     val mining: Mining,
     stxLedger: StxLedger,
     keyStore: KeyStore,
-    syncingController: ActorRef,
+    syncingController: TypedActorRef[SyncController.Command],
     capability: Capability,
-    askTimeout: Timeout
+    askTimeout: Timeout,
+    scheduler: Scheduler
 ) extends ResolveBlock {
 
   import EthInfoService.*
+
+  private given typedScheduler: Scheduler = scheduler
 
   def protocolVersion(@unused req: ProtocolVersionRequest): ServiceResponse[ProtocolVersionResponse] =
     IO.pure(Right(ProtocolVersionResponse(f"0x${capability.version}%x")))
@@ -107,9 +110,9 @@ class EthInfoService(
     */
   def syncing(@unused req: SyncingRequest): ServiceResponse[SyncingResponse] =
     syncingController
-      .askFor(SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus))(
+      .askForTyped[SyncProtocol.Status](replyTo => SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus(replyTo)))(
         timeout = askTimeout,
-        implicitly[ClassTag[SyncProtocol.Status]]
+        scheduler = typedScheduler
       )
       .map {
         case Status.Syncing(startingBlockNumber, blocksProgress, maybeStateNodesProgress) =>

@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.consensus.pow.miners
 
-import org.apache.pekko.actor.ActorRef as ClassicActorRef
 import org.apache.pekko.actor.typed
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.DispatcherSelector
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
@@ -66,7 +66,7 @@ object MockedMiner {
   def apply(
       blockchainReader: BlockchainReader,
       blockCreator: PoWBlockCreator,
-      syncEventListener: ClassicActorRef,
+      syncEventListener: TypedActorRef[SyncController.Command],
       configBuilder: BlockchainConfigBuilder
   ): Behavior[Command] =
     Behaviors.setup { context =>
@@ -117,7 +117,7 @@ private class MockedMiner(
     context: ActorContext[Command],
     blockchainReader: BlockchainReader,
     blockCreator: PoWBlockCreator,
-    syncEventListener: ClassicActorRef,
+    syncEventListener: TypedActorRef[SyncController.Command],
     configBuilder: BlockchainConfigBuilder
 ) {
   import configBuilder.*

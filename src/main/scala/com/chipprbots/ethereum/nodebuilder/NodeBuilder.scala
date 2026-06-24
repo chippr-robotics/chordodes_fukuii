@@ -619,7 +619,7 @@ trait EthProofServiceBuilder {
 
 trait EthInfoServiceBuilder {
   self: StorageBuilder & BlockchainBuilder & BlockchainConfigBuilder & MiningBuilder & StxLedgerBuilder &
-    KeyStoreBuilder & SyncControllerBuilder & AsyncConfigBuilder & InstanceConfigProvider =>
+    KeyStoreBuilder & SyncControllerBuilder & AsyncConfigBuilder & InstanceConfigProvider & ActorSystemBuilder =>
 
   lazy val ethInfoService = new EthInfoService(
     blockchain,
@@ -630,7 +630,8 @@ trait EthInfoServiceBuilder {
     keyStore,
     syncController,
     Capability.best(instanceConfig.supportedCapabilities),
-    asyncConfig.askTimeout
+    asyncConfig.askTimeout,
+    classicSystem.toTyped.scheduler
   )
 }
 
@@ -734,13 +735,18 @@ trait QaServiceBuilder {
 }
 
 trait SyncControllerRefBuilder {
-  def syncController: ActorRef
+  def syncController: org.apache.pekko.actor.typed.ActorRef[SyncController.Command]
 }
 
 trait FukuiiServiceBuilder {
-  self: TransactionHistoryServiceBuilder & JSONRpcConfigBuilder & SyncControllerRefBuilder =>
+  self: TransactionHistoryServiceBuilder & JSONRpcConfigBuilder & SyncControllerRefBuilder & ActorSystemBuilder =>
 
-  lazy val fukuiiService = new FukuiiService(transactionHistoryService, jsonRpcConfig, syncController)
+  lazy val fukuiiService = new FukuiiService(
+    transactionHistoryService,
+    jsonRpcConfig,
+    syncController,
+    classicSystem.toTyped.scheduler
+  )
 }
 
 trait McpServiceBuilder {
@@ -883,14 +889,15 @@ trait JSONRpcControllerBuilder {
 
 trait JSONRpcHealthcheckerBuilder {
   this: NetServiceBuilder & EthBlocksServiceBuilder & JSONRpcConfigBuilder & AsyncConfigBuilder &
-    SyncControllerBuilder =>
+    SyncControllerBuilder & ActorSystemBuilder =>
   lazy val jsonRpcHealthChecker: JsonRpcHealthChecker =
     new NodeJsonRpcHealthChecker(
       netService,
       ethBlocksService,
       syncController,
       jsonRpcConfig.healthConfig,
-      asyncConfig
+      asyncConfig,
+      classicSystem.toTyped.scheduler
     )
 }
 
@@ -1053,10 +1060,10 @@ trait SyncControllerBuilder extends SyncControllerRefBuilder {
     */
   def forkChoiceManagerForSync: Option[com.chipprbots.ethereum.consensus.engine.ForkChoiceManager] = None
 
-  // SyncController is Pekko Typed (Group ROOT, narrowed) — a `Behavior[Command]`. Spawned via the Classic→Typed
-  // adapter; the resulting Typed ref is converted back to Classic so all callers (`syncController: ActorRef`, the
-  // JSON-RPC `askFor` path, `ForkChoiceManager.setListener`) keep compiling. Root flip to a fully-Typed ref is CAPSTONE.
-  lazy val syncController: ActorRef = classicSystem
+  // SyncController is Pekko Typed (Group ROOT, narrowed) — a `Behavior[Command]`. Spawned via
+  // classicSystem.spawn so it lives in the Classic system's guardian tree while exposing a fully-Typed
+  // ActorRef[Command]. All callers now hold a TypedActorRef[SyncController.Command] (OQ-5 kill, 8k-G).
+  lazy val syncController: org.apache.pekko.actor.typed.ActorRef[SyncController.Command] = classicSystem
     .spawn(
       SyncController(
         blockchain,
@@ -1084,7 +1091,6 @@ trait SyncControllerBuilder extends SyncControllerRefBuilder {
       ),
       "sync-controller"
     )
-    .toClassic
 
 }
 

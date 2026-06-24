@@ -186,9 +186,10 @@ class JsonRpcControllerFixture(implicit
     mining,
     stxLedger,
     keyStore,
-    syncingController.ref,
+    syncingController.ref.toTyped[com.chipprbots.ethereum.blockchain.sync.SyncController.Command],
     Capability.ETH63,
-    Timeouts.shortTimeout
+    Timeouts.shortTimeout,
+    system.toTyped.scheduler
   )
 
   override lazy val coinbaseProvider = new CoinbaseProvider(mining.config.generic.coinbase)
@@ -198,7 +199,7 @@ class JsonRpcControllerFixture(implicit
     mining,
     config,
     ommersPool.ref.toTyped[OmmersPool.Command],
-    syncingController.ref,
+    syncingController.ref.toTyped[com.chipprbots.ethereum.blockchain.sync.SyncController.Command],
     pendingTransactionsManager.ref,
     getTransactionFromPoolTimeout,
     this,

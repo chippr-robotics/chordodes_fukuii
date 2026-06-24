@@ -3,7 +3,8 @@ package com.chipprbots.ethereum.jsonrpc
 import java.time.Duration
 import java.time.Instant
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
@@ -24,12 +25,14 @@ import com.chipprbots.ethereum.utils.AsyncConfig
 class NodeJsonRpcHealthChecker(
     netService: NetService,
     ethBlocksService: EthBlocksService,
-    syncingController: ActorRef,
+    syncingController: TypedActorRef[SyncController.Command],
     config: JsonRpcHealthConfig,
-    asyncConfig: AsyncConfig
+    asyncConfig: AsyncConfig,
+    scheduler: Scheduler
 ) extends JsonRpcHealthChecker {
 
   given askTimeout: Timeout = asyncConfig.askTimeout
+  private given typedScheduler: Scheduler = scheduler
 
   protected def mainService: String = "node health"
 
@@ -76,7 +79,9 @@ class NodeJsonRpcHealthChecker(
     JsonRpcHealthcheck
       .fromTask(
         "syncStatus",
-        syncingController.askFor[SyncProtocol.Status](SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus))
+        syncingController.askForTyped[SyncProtocol.Status](replyTo =>
+          SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus(replyTo))
+        )
       )
       .map(_.withInfo {
         case NotSyncing                                          => "STARTING"
@@ -124,7 +129,7 @@ class NodeJsonRpcHealthChecker(
   /** Try to fetch best block number from the sync controller or fallback to ethBlocksService */
   private def getBestKnownBlockTask =
     syncingController
-      .askFor[SyncProtocol.Status](SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus))
+      .askForTyped[SyncProtocol.Status](replyTo => SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus(replyTo)))
       .flatMap {
         case NotSyncing | SyncDone =>
           ethBlocksService
@@ -136,7 +141,7 @@ class NodeJsonRpcHealthChecker(
   /** Try to fetch best fetching number from the sync controller or fallback to ethBlocksService */
   private def getBestFetchingBlockTask =
     syncingController
-      .askFor[SyncProtocol.Status](SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus))
+      .askForTyped[SyncProtocol.Status](replyTo => SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus(replyTo)))
       .flatMap {
         case NotSyncing | SyncDone =>
           ethBlocksService
