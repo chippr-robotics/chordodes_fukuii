@@ -213,3 +213,19 @@ construction:
 
 ---
 
+
+---
+
+## ETH/Sepolia Test Coverage Gaps (Thread 7 audit, 2026-06-24)
+
+Systematic under-coverage of the ETH/Sepolia path discovered during coverage-ratio audit. 5 gaps, ordered by risk.
+
+| # | Gap | File(s) | Risk | Recommended test |
+|---|-----|---------|------|-----------------|
+| 1 | `EvmConfig.forBlock(blockNumber, timestamp, config)` — the 3-arg timestamp dispatch path has zero unit tests asserting opcode set / fee schedule at each ETH fork timestamp | `vm/EvmConfig.scala:32-72` | **Critical** | `EvmConfigTimestampForkSpec` — for Shanghai/Cancun/Prague/Osaka timestamps, assert opcode list membership and fee schedule identity (direct analog of `OlympiaEipEnablementSpec`) |
+| 2 | `BlockExecution.applyEip4788` ring-buffer write (timestamp slot + root slot layout, contract deployment at Cancun activation, wrap-around at 8192) is entirely untested | `ledger/BlockExecution.scala:202-233` | **High** | `Eip4788BeaconRootStorageSpec` — mirror `BlockHashHistorySpec` for EIP-4788; execute post-Cancun block with non-zero `parentBeaconBlockRoot`, read-back storage slots, verify wrap-around |
+| 3 | Engine API version-mismatch guards (`getPayloadV2` for Cancun block → `-38005`, `newPayloadV3` pre-Cancun → `InvalidParams`, etc.) exercised only by hive (which does not run against fukuii in CI) | `engine/EngineApiController.scala:138-143,255-262,363-368` | **High** | `EngineApiGetPayloadVersionSpec` — unit-test all 5 cross-version rejection guards without requiring a live node |
+| 4 | `PeerActor:551` and `BlockFetcher:486` match `ETH69.BlockRangeUpdate` but decoder emits `ETHPackets.BlockRangeUpdate`; existing `BlockFetcherSpec` masks gap by constructing wrong type (also in CHASE-QUEUE above) | `network/PeerActor.scala:551`, `sync/regular/BlockFetcher.scala:486` | **High** | `BlockRangeUpdateDecodePathSpec` — feed decoder output type into both handlers, assert correct head-follow and protocol-breach disconnect behavior |
+| 5 | Sepolia `ForkId` checksum chain (6 timestamps + `merge-netsplit-block-number`) has no unit test; regression in CRC32 sequence would cause all Sepolia peers to be rejected at handshake | `network/ForkIdValidator`, `sepolia-chain.conf` | **Medium** | `ForkIdSepoliaSpec` — assert known Sepolia fork-id checksums at each fork timestamp boundary |
+
+Occurrence count: 5 distinct gaps across 3 subsystems (vm, ledger, network/engine).

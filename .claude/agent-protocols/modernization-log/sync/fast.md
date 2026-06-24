@@ -113,3 +113,14 @@
 - **Wiring:** `ourBestTotalDifficulty: () => BigInt` threaded as constructor param; all 3 `PivotBlockSelector` spawn sites in `FastSync` updated.
 - **Tests:** 4 new cases in `PivotBlockSelectorSpec` (17 total): low-TD excluded, high-TD included, K-sybil honest-wins, liveness fallback. 17/17 passed.
 - **Spec:** `.local/Wire-Protocol-Modernization/G1-pivot-td-gate.md`
+
+## §ETH69-B — Pivot Parent-Chain Backlink Validation (2026-06-24)
+
+#### `0092e5f03` — fix(sync): ETH69 pivot parent-chain backlink validation before SNAP bootstrap (G5)
+- **Security fix (P0 HIGH):** After G1 TD gate, a peer whose Tier3 TD estimate passes 80% threshold could still elect a pivot on a fork and anchor SNAP sync to a fabricated state root. `sendResponseAndCleanup` emitted `Result(pivotBlockHeader)` to FastSync with no PoW check and no parent-chain link to a known canonical ancestor.
+- **New `verifyingBacklink` state:** after vote win, `PivotBlockSelector` sends `GetBlockHeaders(Right(pivot.hash), count=20, reverse=true)` to pivot-voting peers before emitting `Result`. N=20 chosen: deep enough to cover any plausible fork window within `pivotBlockOffset`, uses existing `obtainBlockHeaderFromPeer` request path.
+- **`checkBacklink` validation:** chain rooted at pivot, per-header PoW via `validateHeaderOnly`, `parentHash` continuity, canonical match via `getCanonicalHeaderByNumber` within N hops. Match → `sendResponseAndCleanup` → `Result`; no match → log `ETH69_PIVOT_BACKLINK_FAIL` + deepen-retry; forged-PoW peers blacklisted immediately.
+- **Failure mode:** reject pivot + deepen-retry (not disconnect-all). Reuses existing `scheduleRetry → idle → collectVoters` path; honest-but-divergent voters stay connected for liveness fallback.
+- **Wiring:** `getCanonicalHeaderByNumber` and `validateHeaderPoW` closures added to `PivotBlockSelector` constructor from `FastSync` (where `blockchainConfig` is in scope); all 3 spawn sites updated. SNAPSyncController not modified — validation belongs upstream of `Result` emission.
+- **Tests:** 5 new G5 scenarios in `PivotBlockSelectorSpec` (22 total): canonical within 5 hops → proceeds; canonical at hop N → proceeds; no canonical match → rejected + retry; invalid PoW → immediate reject + blacklist; probe timeout → retry. 22/22 passed.
+- **Spec:** `.local/Wire-Protocol-Modernization/G5-pivot-backlink.md`

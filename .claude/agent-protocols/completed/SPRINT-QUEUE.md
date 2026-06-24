@@ -323,3 +323,38 @@ wait times. No gate dependency on the primary sprint groups above.
 - In `collectVoters`: computes `minPeerTD = ourBestTD * 8 / 10` (80% floor); filters peer pool by `chainWeight.totalDifficulty >= minPeerTD`; if no peer passes the gate, logs `ETH69_PIVOT_TD_GATE_EMPTY` and falls back to block-number-only ranking for liveness
 - Added 4 new tests to `PivotBlockSelectorSpec` (17 total, all pass): low-TD excluded, high-TD included, K-sybil scenario honest peer wins, liveness fallback triggers
 - `sbt scalafmtAll` clean; `sbt "testOnly *PivotBlock*"` 17/17 passed
+
+### §ETH69-B — FORGE: PivotBlockSelector parent-chain backlink validation (G5)
+
+**Commit:** `0092e5f03` — `fix(sync): ETH69 pivot parent-chain backlink validation before SNAP bootstrap (G5)`
+**Completed:** 2026-06-24
+**Files:** `PivotBlockSelector.scala`, `FastSync.scala`, `PivotBlockSelectorSpec.scala`, `FastSyncSpec.scala`
+
+**Pre-flight decisions:**
+- **N=20** — existing `obtainBlockHeaderFromPeer` already sends `GetBlockHeaders` with `maxHeaders`; no new request mechanism needed. 20 hops deep enough to cover any plausible fork window within `pivotBlockOffset`, shallow enough to avoid sync delay.
+- **Failure mode: reject pivot + deepen-retry** — reuses existing `scheduleRetry → idle → collectVoters` path; honest-but-divergent voters stay connected so liveness fallback (extend `pivotBlockOffset`) can retry with a deeper pivot.
+- **Request path:** existing `peerEventBus` subscription + `networkPeerManager.tell` already used for voting; no new actor wiring.
+
+**What was done:**
+- Added `verifyingBacklink` state to `PivotBlockSelector`: after pivot election, sends `GetBlockHeaders(Right(pivot.hash), count=20, reverse=true)` to pivot-voting peers before emitting `Result`
+- `checkBacklink` validates: chain rooted at pivot, per-header PoW (`validateHeaderOnly`), `parentHash` continuity, canonical match via `getCanonicalHeaderByNumber` within 20 hops
+- Canonical match found → `sendResponseAndCleanup` → `Result` to FastSync; no match → log `ETH69_PIVOT_BACKLINK_FAIL` + deepen-retry; forged-PoW peers blacklisted
+- Two closures wired into `PivotBlockSelector` from `FastSync` (`getCanonicalHeaderByNumber`, `validateHeaderPoW`) — selector stays decoupled from consensus types; all 3 spawn sites updated
+- 22 tests in `PivotBlockSelectorSpec` (5 new G5 scenarios): canonical within 5 hops → proceeds; canonical at exactly hop N → proceeds; no canonical match → rejected + retry; invalid PoW → immediate reject + blacklist; probe timeout → retry
+- **SNAPSyncController not modified** — validation correctly belongs in `PivotBlockSelector` upstream of `Result` emission; SNAP receives an already-validated pivot
+- `sbt compile-all` clean; `sbt "testOnly *PivotBlock*"` 22/22 passed
+- `testEssential` 3517/3547 — 30 failures pre-existing and unrelated to pivot/sync path (JSON-RPC/network/miner timing flakes); FastSyncSpec 5 failures pre-existing at baseline `12d2ede7e`
+- **Spec:** `.local/Wire-Protocol-Modernization/G5-pivot-backlink.md`
+
+### §ETH69-F — BEACON: BlockRangeUpdate type mismatch — restore BreachOfProtocol disconnect and chain-tip follow (G6)
+
+**Commit:** `931c615dd` — `fix(network,sync): ETH/69 BlockRangeUpdate inbound type — ETH69→ETHPackets in PeerActor+BlockFetcher (Part 14 §ETH-BRU)`
+**Completed:** 2026-06-23 (shipped as Part 14 §ETH-BRU before §ETH69-A/B)
+**Files:** `PeerActor.scala`, `BlockFetcher.scala`, `BlockFetcherSpec.scala`
+
+**What was done:**
+- `PeerActor.scala:551`: match arm for inbound `BlockRangeUpdate` matched `ETH69.BlockRangeUpdate` (outbound-only type); decoder emits `ETHPackets.BlockRangeUpdate`. BreachOfProtocol disconnect guard for malformed BRU from ETH/69 peers was dead code — abusive peers were not disconnected. Fixed by changing matched type to `ETHPackets.BlockRangeUpdate`.
+- `BlockFetcher.scala:486`: `AdaptedMessageFromEventBus(msg: ETH69.BlockRangeUpdate, _)` → same wrong type. Peer-pushed chain-tip advances via `withPossibleNewTopAt` were silently dropped on ETH/Sepolia sync; head-following degraded to periodic re-probe only. Fixed.
+- `BlockFetcherSpec.scala:298-305`: test was constructing `ETH69.BlockRangeUpdate` directly (false-positive — masked the production gap). Rebuilt to use `ETHPackets.BlockRangeUpdate`.
+- Root cause: sprint commit `13aa7585e` (W5/W11) swept NPMA to `ETHPackets.BlockRangeUpdate` but missed the two sibling inbound handlers in `PeerActor` and `BlockFetcher`.
+- **Modernization log:** `network/peers.md` (PeerActor fix), `sync/regular.md` (BlockFetcher fix)

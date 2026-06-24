@@ -1568,3 +1568,46 @@ times before the reactive fallback triggers. This task extracted the decision lo
 
 **New test file:** `SyncStartupStrategySpec.scala` — 6 tests via `AnyFunSuite + TestSyncConfig`:
 0 peers → Snap (optimistic), 1 snap peer → Fast (downgrade), 3 snap peers → Snap, majority → Snap, fast-only config → Fast, regular fallback → Regular. All pass.
+
+---
+
+## R10 — ETH/Sepolia Assumption Audit ✅ ALL THREADS COMPLETE 2026-06-24
+
+**Research thread:** DEFERRED-BACKLOG.md `| **R10** ✅ ALL DONE |`
+**Audit doc:** `.local/docs/eth-sepolia-assumption-audit.md` — status markers added to all 10 threads
+
+10-thread systematic hunt for ETC-first design assumptions leaking into ETH/Sepolia code paths.
+
+### Thread outcomes
+
+| Thread | Result | Backlog items |
+|--------|--------|---------------|
+| T1 — Fork dispatch (`forBlock` vs `forTimestamp`) | 3 gaps | §ETH-T1-A/B/C |
+| T2 — PoW/PoS divergence guards | All correct; 1 rename | §ETH-T2-A |
+| T3 — EIP-1559 fee routing | Bug fixed `f868b75a8` | (none — fixed inline) |
+| T4 — CL integration (withdrawals, blobs, KZG) | 4 gaps | §ETH-T4-A/B/C/D |
+| T5 — Chain ID / networkId leakage | Zero leakage | (none) |
+| T6 — VM tracer abort-path completeness | 0 unbalanced paths; 2 hardening | §ETH-T6-A/B |
+| T7 — Test coverage ratio ETC vs ETH | 5 missing test specs | §ETH-T7-A/B/C/D/E |
+| T8 — Sepolia config completeness | All correct; 1 doc fix | (none) |
+| T9 — SNAP sync ETH path | 4 gaps (pivot validation, RLP, StorageScheme, startup gate) | §ETH-T9-A/B/C/D |
+| T10 — Engine API Osaka edge cases | 4 gaps (V5/V4 methods, requests) | §ETH-T10-A/B/C/D |
+
+### Total backlog items generated
+21 items across T1–T10: §ETH-T1-A/B/C · T2-A · T4-A/B/C/D · T6-A/B · T7-A/B/C/D/E · T9-A/B/C/D · T10-A/B/C/D
+
+### Severity summary
+| Severity | Count | Items |
+|----------|-------|-------|
+| HIGH | 6 | T1-A, T1-B, T4-A, T4-B, T9-A, T9-B |
+| MEDIUM | 4 | T1-C, T4-C, T4-D, T9-C |
+| LOW | 7 | T2-A, T6-A, T6-B, T9-D, T10-C, T10-D + §ETH-T7 test specs |
+| MISSING tests | 5 | T7-A/B/C/D/E |
+
+### Key finding
+No ETC chain-ID hardcoding leaks into ETH code paths (T5 clean). The highest-risk gap is
+T4-A (KZG trusted setup never loaded — point-evaluation precompile silently accepts invalid
+proofs on all Sepolia blocks containing blob transactions).
+
+### Commit
+`1a65e6f13` — docs(r10): Thread 9 SNAP ETH path audit — add §ETH-T9-A/B/C/D; mark T9+T10 complete in R10 row
