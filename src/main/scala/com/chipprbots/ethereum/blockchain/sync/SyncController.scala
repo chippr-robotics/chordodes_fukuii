@@ -117,10 +117,10 @@ object SyncController {
   //      message carries a typed `replyTo: ActorRef[ReplyType]` field. The handler replies directly to `msg.replyTo`
   //      — no `ctx.toClassic.sender()` required. The OQ-5 Classic ask path has been fully eliminated.
   // INFO-4/INFO-11: concrete message types currently routed through WrappedExternal (child fire-and-forget only).
-  // All arrive via the shared `externalAdapter` messageAdapter registered in `apply()`. Update this list when new
+  // Each child uses a narrow per-type adapter declared in apply(). Update this list when new
   // child reply types are added or removed.
   //
-  //   From SNAPSyncController (child reply-target = externalAdapter.toClassic):
+  //   From SNAPSyncController (child reply-target = snapAdapter via Typed spawn):
   //     SNAPSyncController.SnapSyncFinalized, SNAPSyncController.Done, SNAPSyncController.FallbackToFastSync,
   //     SNAPSyncController.RequestHealingServeRoot, SNAPSyncController.StartRegularSyncBootstrap,
   //     SNAPSyncController.StartRegularSyncBootstrapByHash, SNAPSyncController.BootstrapComplete,
@@ -442,15 +442,9 @@ object SyncController {
       case m                      => m
     }
 
-    // Shared message adapter: children we spawn get `externalAdapter.toClassic` as their reply target, so every
-    // fire-and-forget child message lands here as `WrappedExternal(msg)`. Registered once per actor instance.
-    val externalAdapter: TypedActorRef[Any] =
-      ctx.messageAdapter[Any](WrappedExternal.apply) // Any: messageAdapter ref — Classic side is untyped
-
-    // §8k-G3: per-child narrow typed adapters. Each wraps into WrappedExternal exactly as externalAdapter does.
-    // All produce the same underlying Classic ref as externalAdapter (Pekko's adapter routing table is keyed by
-    // Class[T] per actor, and multiple registrations on the same ActorContext share the same mailbox).
-    // SyncController's unwrap() / WrappedExternal dispatch is UNCHANGED.
+    // §8k-G3: per-child narrow typed adapters. Each wraps into WrappedExternal. Pekko's adapter
+    // routing table is keyed by Class[T] per actor; multiple adapters on the same ActorContext
+    // share the same mailbox. SyncController's unwrap() / WrappedExternal dispatch is UNCHANGED.
     val bytecodeRecoveryAdapter: TypedActorRef[BytecodeRecoveryActor.RecoveryComplete.type] =
       ctx.messageAdapter[BytecodeRecoveryActor.RecoveryComplete.type](WrappedExternal.apply)
     val storageRecoveryAdapter: TypedActorRef[StorageRecoveryActor.SyncControllerMsg] =
@@ -476,14 +470,21 @@ object SyncController {
     val cwCalibrationAdapter: TypedActorRef[SyncProtocol.CalibrateChainWeightFromPeer] =
       ctx.messageAdapter[SyncProtocol.CalibrateChainWeightFromPeer](WrappedExternal.apply)
     // §8k-G4d: narrow typed adapter for NetworkPeerManagerActor's HandshakedPeers reply.
-    // Replaces the bare externalAdapter at all 3 GetHandshakedPeersCmd call sites so the
-    // replyTo field carries TypedActorRef[HandshakedPeers] rather than TypedActorRef[Any].
+    // All 3 GetHandshakedPeersCmd call sites use this so the replyTo field is
+    // TypedActorRef[HandshakedPeers] rather than TypedActorRef[Any].
     val handshakedPeersAdapter: TypedActorRef[
       com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers
     ] =
       ctx.messageAdapter[com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers](
         WrappedExternal.apply
       )
+    // §8k-G4e-final: narrow typed adapter for NPMA SNAP response routing during post-SNAP recovery.
+    // No SNAPSyncController exists during recovery; SyncController registers itself as the SNAP target
+    // so NPMA routes ByteCodesResponse / StorageRangesResponse here via WrappedExternal dispatch.
+    // NPMA calls .toTyped[SNAPSyncController.Command] on the Classic bridge, so the adapter must cover
+    // SNAPSyncController.Command (common supertype of all SNAP protocol messages).
+    val recoverySnapAdapter: TypedActorRef[SNAPSyncController.Command] =
+      ctx.messageAdapter[SNAPSyncController.Command](WrappedExternal.apply)
 
     /** Load SNAP sync configuration with fallback to defaults */
     private def loadSnapSyncConfig(): SNAPSyncConfig =
@@ -701,7 +702,7 @@ object SyncController {
         case SNAPSyncController.RequestHealingServeRoot =>
           if healingServeRootRequester.isEmpty && healingServeRootBootstrap.isEmpty then {
             // Phase 2 (ROOT-b): reply to the known SNAP child ref directly rather than `ctx.toClassic.sender()`, which
-            // would resolve to the shared message adapter now that SNAP routes to `externalAdapter.toClassic`.
+            // would resolve to the message adapter now that SNAP routes through a typed adapter.
             healingServeRootRequester = Some(snapSync)
             log.info("[HEAL-SERVE-ROOT] Healing requested a newest-servable root. Polling peers for the network head.")
             networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeersCmd(
@@ -2022,11 +2023,11 @@ object SyncController {
       } else {
         bytecodeActor.foreach(a => ctx.watchWith(a.toTyped[Nothing], BytecodeRecoveryTerminated(a)))
         storageActor.foreach(a => ctx.watchWith(a.toTyped[Nothing], StorageRecoveryTerminated(a)))
-        // §8k-G4c: register SyncController's externalAdapter as the SNAP routing target.
+        // §8k-G4c/G4e-final: register recoverySnapAdapter as the SNAP routing target during recovery.
         // No SNAPSyncController exists during recovery — SyncController relays ByteCodesResponse →
         // BytecodeRecoveryActor and StorageRangesResponse → StorageRecoveryActor (see runningRecovery handlers).
         networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterSnapSyncController(
-          externalAdapter.toClassic
+          recoverySnapAdapter.toClassic
         )
         timers.startTimerWithFixedDelay(RecoveryPollerKey, PollRecoveryPeers, 2.seconds, 5.seconds)
         runningRecovery(bytecodeActor, storageActor, bytecodeComplete, storageComplete)
@@ -2092,7 +2093,7 @@ object SyncController {
           Behaviors.same
 
         // §8k-G4c: SNAP protocol responses arrive here because beginRecoveryDownloads registers
-        // externalAdapter.toClassic with NPMA (no SNAPSyncController exists during recovery).
+        // recoverySnapAdapter.toClassic with NPMA (no SNAPSyncController exists during recovery).
         // SyncController acts as the routing relay: forward ByteCodesResponse to BytecodeRecoveryActor
         // → ByteCodeCoordinator, and StorageRangesResponse to StorageRecoveryActor → StorageRangeCoordinator.
         // AccountRangeResponse and TrieNodesResponse are not used in the recovery path — drop them.
@@ -2169,7 +2170,7 @@ object SyncController {
           Behaviors.same
         case msg =>
           // Forward SNAP protocol responses to both active recovery actors.
-          // Responses arrive via externalAdapter (fire-and-forget); no reply target to preserve.
+          // Responses arrive via recoverySnapAdapter (fire-and-forget); no reply target to preserve.
           bytecodeActor.foreach(_.tell(msg, org.apache.pekko.actor.ActorRef.noSender))
           storageActor.foreach(_.tell(msg, org.apache.pekko.actor.ActorRef.noSender))
           Behaviors.same
