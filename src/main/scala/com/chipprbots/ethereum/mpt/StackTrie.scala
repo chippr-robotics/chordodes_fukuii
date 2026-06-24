@@ -141,18 +141,16 @@ final class StackTrie(onTrieNode: (Array[Byte], ByteString, Array[Byte]) => Unit
             // Exact key match: update value in-place. Mirrors go-ethereum's Trie.insert which replaces the valueNode
             // rather than throwing. Required for SNAP proof verification where Phase 1 resolves a boundary leaf into
             // the tree and Phase 3 re-inserts the same key with the peer's claimed value.
-            // DEFER: early return mixed with in-place node mutation inside MPT trie construction
-            // (state-root calculation). Keep the short-circuit rather than restructure mutable trie state.
             node.value = value
-            return node // scalafix:ok DisableSyntax.return
+            node
+          } else {
+            // Either duplicate key or our key extends past the existing leaf's terminator.
+            // SNAP sync keys are all 64 hex nibbles (32-byte hashes), so both imply a duplicate insert.
+            throw new IllegalStateException(
+              s"StackTrie: duplicate or extending key at path ${hexStr(path)} (existing key=${hexStr(origKey)}, new key=${hexStr(key)})"
+            )
           }
-          // Either duplicate key or our key extends past the existing leaf's terminator.
-          // SNAP sync keys are all 64 hex nibbles (32-byte hashes), so both imply a duplicate insert.
-          throw new IllegalStateException(
-            s"StackTrie: duplicate or extending key at path ${hexStr(path)} (existing key=${hexStr(origKey)}, new key=${hexStr(key)})"
-          )
-        }
-        if diff == 0 then {
+        } else if diff == 0 then {
           // No shared prefix: convert leaf into a branch with two leaves.
           val branch = StNode.newBranch()
           val origIdx = origKey(0) & 0xff
@@ -486,15 +484,14 @@ object StackTrie {
   private[mpt] def byteCompare(a: Array[Byte], b: Array[Byte]): Int = {
     val n = math.min(a.length, b.length)
     var i = 0
-    while i < n do {
+    var result = 0
+    while result == 0 && i < n do {
       val ai = a(i) & 0xff
       val bi = b(i) & 0xff
-      // DEFER: early return inside a while loop; converting changes loop iteration semantics for a
-      // comparator that orders MPT keys (state-root sort order). Keep the short-circuit.
-      if ai != bi then return (if ai < bi then -1 else 1) // scalafix:ok DisableSyntax.return
+      if ai != bi then result = if ai < bi then -1 else 1
       i += 1
     }
-    Integer.compare(a.length, b.length)
+    if result != 0 then result else Integer.compare(a.length, b.length)
   }
 
   /** Allocate a slice `arr(from .. arr.length)`. */
