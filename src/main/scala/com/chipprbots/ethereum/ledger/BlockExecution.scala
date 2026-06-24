@@ -336,6 +336,7 @@ class BlockExecution(
               saveAsBestBlock = false
             )
             blockchain.saveBlockState(blockToExecute.header.number)
+            blockchainReader.recordBlockDifficulty(blockToExecute.header.difficulty)
             go(newBlockData :: executedBlocksDecOrder, remainingBlocksIncOrder.tail, newWeight)
           case Left(executionError) =>
             (executedBlocksDecOrder.reverse, Some(executionError))

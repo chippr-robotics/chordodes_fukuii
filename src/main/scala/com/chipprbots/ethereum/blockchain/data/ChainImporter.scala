@@ -99,6 +99,7 @@ class ChainImporter(
                 // consensus / consume-engine fixtures expect head to advance over blob blocks;
                 // mainnet ingestion uses Engine API + sidecar verification, not chain.rlp.
                 blockchainWriter.save(block, receipts, newWeight, saveAsBestBlock = true)
+                blockchainReader.recordBlockDifficulty(block.header.difficulty)
                 imported += 1
 
                 if imported % 10 == 0 || blockNum == blocks.last.header.number then {
