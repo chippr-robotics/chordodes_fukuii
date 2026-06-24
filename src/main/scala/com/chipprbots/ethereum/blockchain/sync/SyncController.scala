@@ -126,10 +126,10 @@ object SyncController {
   //     SNAPSyncController.StartRegularSyncBootstrapByHash, SNAPSyncController.BootstrapComplete,
   //     SNAPSyncController.PivotBootstrapFailed, SyncProtocol.HealingImpossible, SyncProtocol.Status.Progress
   //
-  //   From PivotHeaderBootstrap (replyTo = externalAdapter.toClassic):
+  //   From PivotHeaderBootstrap (replyTo = pivotBootstrapAdapter — §8k-G4e narrow typed adapter):
   //     PivotHeaderBootstrap.Completed, PivotHeaderBootstrap.Failed
   //
-  //   From NetworkPeerManagerActor (reply-target = externalAdapter, via GetHandshakedPeersCmd):
+  //   From NetworkPeerManagerActor (reply-target = handshakedPeersAdapter, via GetHandshakedPeersCmd):
   //     NetworkPeerManagerActor.HandshakedPeers
   //     NetworkPeerManagerActor.CalibrateChainWeightFromPeer (RegisterChainWeightCalibrationTarget)
   //
@@ -475,6 +475,15 @@ object SyncController {
     // it arrives as WrappedExternal and is dispatched by the existing CalibrateChainWeightFromPeer arm.
     val cwCalibrationAdapter: TypedActorRef[SyncProtocol.CalibrateChainWeightFromPeer] =
       ctx.messageAdapter[SyncProtocol.CalibrateChainWeightFromPeer](WrappedExternal.apply)
+    // §8k-G4d: narrow typed adapter for NetworkPeerManagerActor's HandshakedPeers reply.
+    // Replaces the bare externalAdapter at all 3 GetHandshakedPeersCmd call sites so the
+    // replyTo field carries TypedActorRef[HandshakedPeers] rather than TypedActorRef[Any].
+    val handshakedPeersAdapter: TypedActorRef[
+      com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers
+    ] =
+      ctx.messageAdapter[com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers](
+        WrappedExternal.apply
+      )
 
     /** Load SNAP sync configuration with fallback to defaults */
     private def loadSnapSyncConfig(): SNAPSyncConfig =
@@ -696,7 +705,7 @@ object SyncController {
             healingServeRootRequester = Some(snapSync)
             log.info("[HEAL-SERVE-ROOT] Healing requested a newest-servable root. Polling peers for the network head.")
             networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeersCmd(
-              externalAdapter
+              handshakedPeersAdapter
             )
           } else {
             log.debug("[HEAL-SERVE-ROOT] Healing serve-root request already in flight; ignoring duplicate.")
@@ -777,7 +786,7 @@ object SyncController {
                 peersClient,
                 blockchainWriter,
                 recentBlock,
-                replyTo = externalAdapter,
+                replyTo = pivotBootstrapAdapter,
                 syncConfig,
                 preferSnapPeers = true
               ),
@@ -2062,7 +2071,7 @@ object SyncController {
 
         case PollRecoveryPeers =>
           networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeersCmd(
-            externalAdapter
+            handshakedPeersAdapter
           )
           Behaviors.same
 
@@ -2110,7 +2119,7 @@ object SyncController {
             recentRootRequester = Some(replyTo)
             log.info("Recovery requested a recent root to roll off the aged pivot. Polling peers for the network head.")
             networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.GetHandshakedPeersCmd(
-              externalAdapter
+              handshakedPeersAdapter
             )
           } else {
             log.debug("Recovery recent-root request already in flight; ignoring duplicate.")
@@ -2192,7 +2201,7 @@ object SyncController {
                 peersClient,
                 blockchainWriter,
                 recentBlock,
-                replyTo = externalAdapter,
+                replyTo = pivotBootstrapAdapter,
                 syncConfig,
                 preferSnapPeers = true
               ),
