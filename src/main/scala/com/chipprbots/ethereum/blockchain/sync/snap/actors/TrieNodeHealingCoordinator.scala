@@ -431,6 +431,15 @@ class TrieNodeHealingCoordinator(
 
   // Stateless peer tracking (geth-aligned: peers that return empty TrieNodes for current root)
   private val statelessPeers = mutable.Set[String]()
+  // Soft-exile strike counter (mirrors AccountRangeCoordinator.emptyResponseStrikes). A SINGLE empty
+  // TrieNodes response used to permanently exile a peer for the whole root, which on a 2-peer-eligible
+  // residual drains the pool to zero and stalls the heal one node short (observed live: only 2 of ~10
+  // connected peers ever tried). Instead we strike on each consecutive empty response and only exile at
+  // the threshold; any successful heal from a peer wipes its strikes. Peers rotate — one that returns
+  // empty now may serve after a refresh — so the set is also auto-cleared periodically (see
+  // HealingStagnationCheck). 5 strikes mirrors Account/Storage's EmptyResponseStrikeThreshold.
+  private val emptyResponseStrikes = mutable.Map.empty[String, Int]
+  private val EmptyResponseStrikeThreshold: Int = 5
   private var pivotRefreshRequested: Boolean = false
   private var pivotRefreshRequestedAt: Long = 0L
   private val PivotRefreshWatchdogMs: Long = 15.minutes.toMillis
@@ -827,9 +836,18 @@ class TrieNodeHealingCoordinator(
       tryRedispatchPendingTasks()
 
     case UpdateMaxInFlightPerPeer(newLimit) =>
-      log.info(s"Healing per-peer budget: $maxInFlightPerPeer -> $newLimit")
-      maxInFlightPerPeer = newLimit
-      if (newLimit > 0) tryRedispatchPendingTasks()
+      // Floor the per-peer budget at MinInFlightPerPeer so a single slow peer can never throttle the
+      // whole residual dispatch to one outstanding request. The controller pushes 1 by default
+      // (healing-max-inflight-per-peer), which serialised the residual onto whichever peer happened to
+      // hold the lone slot; with a 2-peer-eligible residual that is enough to stall. Flooring keeps at
+      // least MinInFlightPerPeer requests pipelined per peer so the residual fans out across the pool.
+      val floored = newLimit.max(TrieNodeHealingCoordinator.MinInFlightPerPeer)
+      if (floored != newLimit)
+        log.info(s"Healing per-peer budget: $maxInFlightPerPeer -> $floored (floored from requested $newLimit)")
+      else
+        log.info(s"Healing per-peer budget: $maxInFlightPerPeer -> $floored")
+      maxInFlightPerPeer = floored
+      if (floored > 0) tryRedispatchPendingTasks()
 
     case HealingForceComplete =>
       // spec 004 T016/C5/SC-002: under decoupling, HealingForceComplete must NEVER declare completion while any
@@ -883,6 +901,7 @@ class TrieNodeHealingCoordinator(
         pendingTasks.clear() // Will be re-populated by root reseed + inline discovery / trie walk from controller
         pendingHashSet.clear()
         statelessPeers.clear()
+        emptyResponseStrikes.clear() // fresh slate on the new root (mirrors statelessPeers clear)
         peerCooldownUntilMs.clear()
         peerResponseBytesTarget.clear()
         // Cancel active requests (they're for the old root)
@@ -1141,6 +1160,23 @@ class TrieNodeHealingCoordinator(
 
     case HealingStagnationCheck =>
       emitHealingFrontierGauges() // refresh backlog/in-flight gauges even when idle
+      // Periodic soft-exile auto-clear (mirrors the Account/Storage "fresh slate on the next round" intent,
+      // but on every 2-min tick rather than only on pivot refresh): peers rotate and a peer that returned
+      // empty for the current root earlier may now be in its serve window. While there is residual work and
+      // peers exist but the stateless set has eaten into the eligible pool, wipe the stateless set + strikes
+      // so every connected SNAP peer is retried. Pure peer-pool management — does not touch any task/store
+      // state. The strike threshold keeps a genuinely useless peer out within the 2-min window; this re-arms
+      // it for the next. Without this the residual heal was stuck retrying only the 2 not-yet-exiled peers.
+      if (pendingTasks.nonEmpty && statelessPeers.nonEmpty && knownAvailablePeers.nonEmpty && !pivotRefreshRequested) {
+        log.info(
+          s"[HEAL] Auto-clearing ${statelessPeers.size} stateless peer(s) + ${emptyResponseStrikes.size} strike(s) " +
+            s"on periodic tick — retrying all ${knownAvailablePeers.size} known peers for the residual frontier " +
+            s"(pending=${pendingTasks.size})."
+        )
+        statelessPeers.clear()
+        emptyResponseStrikes.clear()
+        tryRedispatchPendingTasks(allowCooldownFloor = true) // periodic tick: anti-starvation floor permitted
+      }
       val recentHealed = totalNodesHealed - lastPulseHealedCount
       val healTotal = completedTaskCount.toLong + pendingTasks.size.toLong + activeRequests.size.toLong
       val healPct = if (healTotal > 0) ((completedTaskCount.toDouble / healTotal) * 100).toInt else 0
@@ -1207,7 +1243,7 @@ class TrieNodeHealingCoordinator(
               s"SNAPSyncController refresh stalled (no-peer retry loop). Resetting and resuming dispatch."
           )
           pivotRefreshRequested = false
-          tryRedispatchPendingTasks()
+          tryRedispatchPendingTasks(allowCooldownFloor = true) // periodic tick: anti-starvation floor permitted
         }
       }
 
@@ -1252,14 +1288,15 @@ class TrieNodeHealingCoordinator(
           // Without this clear, eligiblePeers stays empty forever — HealingAllPeersStateless can't
           // fire because fresh peers keep arriving, keeping knownAvailablePeers.size > statelessPeers.size.
           statelessPeers.clear()
+          emptyResponseStrikes.clear()
           peerCooldownUntilMs.clear()
           consecutiveIdleChecks = 0 // Reset so we don't immediately force-complete on the next tick
           log.info(
             s"[HEAL] Stateless/cooldown peer state cleared. Attempting dispatch to ${knownAvailablePeers.size} peers."
           )
-          tryRedispatchPendingTasks()
+          tryRedispatchPendingTasks(allowCooldownFloor = true) // periodic tick: anti-starvation floor permitted
         } else {
-          tryRedispatchPendingTasks()
+          tryRedispatchPendingTasks(allowCooldownFloor = true) // periodic tick: anti-starvation floor permitted
         }
       } else {
         consecutiveIdleChecks = 0
@@ -1527,35 +1564,49 @@ class TrieNodeHealingCoordinator(
     // Adaptive byte budget + stateless tracking
     if (healedCount > 0) {
       adjustResponseBytesOnSuccess(peer, requestedBytes, BigInt(receivedBytes))
-      // Successful response — clear stateless marking and reset stagnation timer
+      // Successful response — clear stateless marking + strikes and reset stagnation timer.
+      // Any forward progress from this peer wipes its prior strikes (mirrors recordPeerSuccess).
       statelessPeers -= peer.id.value
+      emptyResponseStrikes.remove(peer.id.value)
       lastHealedAtMs = System.currentTimeMillis()
     } else {
       adjustResponseBytesOnFailure(peer, "empty healing response")
       recordPeerCooldown(peer, "empty healing response")
-      // Mark peer stateless only on first empty response (geth-aligned: guard prevents duplicate logs
-      // and redundant threshold checks when multiple in-flight responses from the same peer all return empty)
+      // Soft-exile (mirrors AccountRangeCoordinator.markPeerStateless): a SINGLE empty response no
+      // longer permanently exiles the peer. Strike it; only at EmptyResponseStrikeThreshold consecutive
+      // empties (no intervening heal) is it confirmed stateless. A peer that returns empty now may serve
+      // after the pivot rolls into its serve window — keeping it eligible across a transient empty cycle
+      // is the difference between draining a 2-peer pool to zero and finishing the residual.
       if (!statelessPeers.contains(peer.id.value)) {
-        statelessPeers += peer.id.value
-        // NB-7: Evict from knownAvailablePeers immediately so the 1s HealingPeerAvailable scheduler
-        // tick doesn't re-add and re-dispatch to this peer until the next pivot refresh.
-        knownAvailablePeers.filterInPlace(_.id != peer.id)
-        log.info(
-          s"Peer ${peer.id.value} marked stateless for healing root " +
-            s"${Hex.toHexString(stateRoot.take(4).toArray)} (${statelessPeers.size}/${knownAvailablePeers.size} stateless)"
-        )
-        // Check if all known peers are stateless — request pivot refresh.
-        // Use statelessPeers.nonEmpty (not knownAvailablePeers.nonEmpty): filterInPlace above
-        // removes this peer from knownAvailablePeers BEFORE the check, so a single-peer set
-        // leaves knownAvailablePeers empty and the old guard silently swallowed the trigger.
-        if (statelessPeers.size >= knownAvailablePeers.size && statelessPeers.nonEmpty && !pivotRefreshRequested) {
-          pivotRefreshRequested = true
-          pivotRefreshRequestedAt = System.currentTimeMillis()
-          log.warning(
-            s"All ${statelessPeers.size} peers stateless for healing root " +
-              s"${Hex.toHexString(stateRoot.take(4).toArray)}. Requesting pivot refresh."
+        val strikes = emptyResponseStrikes.getOrElse(peer.id.value, 0) + 1
+        emptyResponseStrikes(peer.id.value) = strikes
+        if (strikes < EmptyResponseStrikeThreshold) {
+          log.info(
+            s"Peer ${peer.id.value} empty-response strike $strikes/$EmptyResponseStrikeThreshold for healing root " +
+              s"${Hex.toHexString(stateRoot.take(4).toArray)} — still eligible for dispatch."
           )
-          snapSyncController ! SNAPSyncController.HealingAllPeersStateless
+        } else {
+          statelessPeers += peer.id.value
+          // NB-7: Evict from knownAvailablePeers immediately so the 1s HealingPeerAvailable scheduler
+          // tick doesn't re-add and re-dispatch to this peer until the next pivot refresh / auto-clear.
+          knownAvailablePeers.filterInPlace(_.id != peer.id)
+          log.info(
+            s"Peer ${peer.id.value} marked stateless after $strikes consecutive empty responses for healing root " +
+              s"${Hex.toHexString(stateRoot.take(4).toArray)} (${statelessPeers.size}/${knownAvailablePeers.size} stateless)"
+          )
+          // Check if all known peers are stateless — request pivot refresh.
+          // Use statelessPeers.nonEmpty (not knownAvailablePeers.nonEmpty): filterInPlace above
+          // removes this peer from knownAvailablePeers BEFORE the check, so a single-peer set
+          // leaves knownAvailablePeers empty and the old guard silently swallowed the trigger.
+          if (statelessPeers.size >= knownAvailablePeers.size && statelessPeers.nonEmpty && !pivotRefreshRequested) {
+            pivotRefreshRequested = true
+            pivotRefreshRequestedAt = System.currentTimeMillis()
+            log.warning(
+              s"All ${statelessPeers.size} peers stateless for healing root " +
+                s"${Hex.toHexString(stateRoot.take(4).toArray)}. Requesting pivot refresh."
+            )
+            snapSyncController ! SNAPSyncController.HealingAllPeersStateless
+          }
         }
       }
     }
@@ -1627,12 +1678,47 @@ class TrieNodeHealingCoordinator(
     self ! HealingCheckCompletion
   }
 
-  private def tryRedispatchPendingTasks(): Unit = {
+  /** Redispatch the pending heal frontier to eligible (non-cooling, non-stateless) peers.
+    *
+    * `allowCooldownFloor` gates the peer-scarce eligible-set floor (see `[HEAL-FLOOR]` below). It is `false` on every
+    * SYNCHRONOUS / event-driven caller (timeout re-queue, peer-(un)available, queue, serve-root refresh, max-inflight
+    * change) so that the per-peer cooldown is always respected on the immediate path — a peer that JUST timed out (and
+    * was cooled one line earlier in `handleTimeout`) must NOT be revived and re-hit in the same turn (spec-004 cooldown
+    * safety; DecoupledHealSafetySpec T-4 asserts the timed-out task stays pending). It is `true` ONLY on the periodic
+    * `HealingStagnationCheck` tick, whose job is anti-starvation: if a genuine residual is down to peers that are all
+    * cooling, the tick revives the soonest-to-expire one so the residual heal keeps moving. The 30s cooldowns have
+    * normally expired by the next 2-min tick anyway; the floor only bites when back-to-back timeouts keep re-cooling
+    * the last peers, which is exactly the stall the floor exists to break.
+    */
+  private def tryRedispatchPendingTasks(allowCooldownFloor: Boolean = false): Unit = {
     if (pendingTasks.isEmpty) return
     if (pivotRefreshRequested) return
-    val eligiblePeers = knownAvailablePeers.toList
+    var eligiblePeers = knownAvailablePeers.toList
       .filterNot(isPeerCoolingDown)
       .filterNot(p => statelessPeers.contains(p.id.value))
+    // Eligible-set floor (peer-retention): if the only thing excluding every non-stateless peer is a cooldown, revive
+    // the soonest-to-expire one rather than stalling at zero dispatchable peers. Mirrors AccountRangeCoordinator's
+    // [ACCOUNT-FLOOR] / StorageRangeCoordinator's [STORAGE-FLOOR]. On an abundant pool this never fires; on a residual
+    // heal down to 1-2 servable SNAP peers it is the difference between forward progress and a dead stall. We only
+    // override cooldown — confirmed-stateless peers stay excluded, so we never re-dispatch to a peer that genuinely
+    // returned empty for the current root (the soft-exile threshold + periodic auto-clear handle re-admission).
+    // GATED on `allowCooldownFloor` (periodic tick only): on the synchronous timeout/redispatch path the cooldown is
+    // load-bearing — a just-timed-out peer must serve its 30s penalty before retry, so the floor must NOT fire there.
+    if (allowCooldownFloor && eligiblePeers.isEmpty) {
+      knownAvailablePeers.toList
+        .filterNot(p => statelessPeers.contains(p.id.value))
+        .filter(isPeerCoolingDown)
+        .sortBy(p => peerCooldownUntilMs.getOrElse(p.id.value, 0L))
+        .headOption
+        .foreach { peer =>
+          peerCooldownUntilMs.remove(peer.id.value)
+          log.info(
+            s"[HEAL-FLOOR] All servable peers were cooling and none eligible — " +
+              s"reviving ${peer.id.value.take(8)} to keep the residual heal fed (peer-scarce floor)"
+          )
+          eligiblePeers = List(peer)
+        }
+    }
     if (eligiblePeers.isEmpty) return
 
     for (peer <- eligiblePeers if pendingTasks.nonEmpty)
@@ -2297,6 +2383,14 @@ class TrieNodeHealingCoordinator(
 }
 
 object TrieNodeHealingCoordinator {
+
+  /** Floor for the per-peer in-flight request budget. The controller pushes `healing-max-inflight-per-peer` (default 1)
+    * via UpdateMaxInFlightPerPeer; a value of 1 serialises the residual heal onto a single outstanding request per
+    * peer, so one slow peer holding the lone slot can stall a 1-2-peer residual. The handler floors the pushed value at
+    * this, keeping at least this many requests pipelined per peer so the residual frontier fans out across the
+    * connected SNAP peers. Peer-pool management only — no effect on which nodes are stored or the content-hash gate.
+    */
+  val MinInFlightPerPeer: Int = 2
 
   /** Default cap on the frontier-rebuild walk's FIFO `visited` set: 4M entries ≈ 480-640 MB (a 32-byte ByteString key +
     * wrapper + LinkedHashMap entry is ~120-150 B, not the 80 B an "≈320 MB" estimate assumed). Insertion-order
