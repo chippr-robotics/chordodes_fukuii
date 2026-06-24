@@ -541,52 +541,6 @@ Partial progress (C2) is safe to run any time.
 
 ---
 
-#### §8e-FORGE — FORGE: consensus `return` → expression conversions (6 sites)
-
-**Agent:** FORGE
-**Risk:** MEDIUM-per-file — each site is a `return` → Scala expression conversion in consensus-path code
-**Gate:** None — FORGE-only; parallel-safe with active migration tracks
-**Purpose:** Lock the `DisableSyntax.noReturns = true` scalafix ratchet for consensus files; prerequisite to `sbt scalafixAll` going green
-
-**Files to review (6 remaining; `JwtAuthenticator.scala` already cleared S3-C):**
-- `vm/VM.scala`
-- `vm/OpCode.scala`
-- `vm/PrecompiledContracts.scala`
-- `ledger/BlockPreparator.scala`
-- `mpt/StackTrie.scala`
-- `consensus/validators/std/StdSignedTransactionValidator.scala`
-
-**For each file:**
-1. `grep -n "\breturn\b"` the file — locate every `return` statement
-2. Assess consensus impact: is converting `return` to an expression (guard clause → if/else, early exit → match arm) byte-identical in output?
-3. Decision: **CLEAR** (convert now) or **DEFER** (byte-level risk — document specific concern)
-4. For CLEAR sites: convert inline; `sbt compile-all` after each file
-5. For DEFER sites: add `// @nowarn("msg=return")` with a comment explaining why
-
-**Verify:**
-```bash
-cd /media/dev/2tb/dev/fukuii
-grep -rn "\breturn\b" \
-  src/main/scala/com/chipprbots/ethereum/vm/VM.scala \
-  src/main/scala/com/chipprbots/ethereum/vm/OpCode.scala \
-  src/main/scala/com/chipprbots/ethereum/vm/PrecompiledContracts.scala \
-  src/main/scala/com/chipprbots/ethereum/blockchain/ledger/BlockPreparator.scala \
-  src/main/scala/com/chipprbots/ethereum/blockchain/mpt/StackTrie.scala \
-  src/main/scala/com/chipprbots/ethereum/consensus/validators/std/StdSignedTransactionValidator.scala
-# Expected: 0 on all CLEAR files
-
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. Stage only the consensus files (no test files)
-3. `git commit -m "refactor(8e-forge): FORGE-cleared consensus return → expression (§8e ratchet)"`
-4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(8e-forge): clearout — $SHA"`
-5. **DELETE §8e-FORGE**
-
----
-
 #### §8e-BEACON — BEACON: EngineApiController `return` → expression (S3-D, 2 sites)
 
 **Agent:** BEACON
@@ -1015,7 +969,7 @@ No actor migration gate. Commit individually; do not bundle with primary-track m
 
 | Task | Work | Agents | Effort |
 |------|------|--------|--------|
-| **8e — ScalaFix expansion** | C2+TNHC DONE — see completed; **§8e-FORGE** (6 consensus files, unblocked) + **§8e-BEACON** (EngineApiController S3-D, unblocked); 36 SSC gated (SNAP1) | FORGE / BEACON / LOOM | partial |
+| **8e — ScalaFix expansion** | C2+TNHC DONE — see completed; **§8e-FORGE DONE 2026-06-24** (all 6 consensus files: 6 CLEAR + 9 DEFER w/ scalafix:ok) + **§8e-BEACON** (EngineApiController S3-D, unblocked); 36 SSC gated (SNAP1) | BEACON / LOOM | partial |
 | **8j — Thread.sleep** | 2 live call sites (EthMiningServiceSpec:302, SubscriptionManagerSpec:249) — both NECESSARY; defer to §8a-retro | EYE | deferred to §8a |
 | **8a-retro** | Batches 1–4 DONE — see completed. **Batch 5:** BlockFetcherSpec + PendingTxMgrSpec DONE `5ff14017b`; RegularSyncSpec → §9c. PeerActorSpec + RLPxConnectionHandlerSpec wait for Wave 3. | LOOM, EYE | ~2h |
 
@@ -1069,7 +1023,7 @@ Each prompt can run independently. Commit individually.
 |---|-------|--------|---------------|
 | E6 | Batch E | §8a-retro batch 5 — multi-system + TestActorRef specs (3 assessable, 2 Wave 3 gate) | Partial — RegularSyncSpec → §9c; BlockFetcherSpec + PendingTxMgr DONE `5ff14017b`; PeerActor + RLPx wait for Wave 3 |
 | G1 | Batch G | §8a-retro-5b — DONE `5ff14017b` (specs migrated in 8a-retro multi-system commit; clearout follows) | — |
-| G2 | Batch G | §8e-FORGE — 6 consensus `return` → expression conversions | Parallel-safe; FORGE-only; unblocked |
+| ~~G2~~ | ~~Batch G~~ | ~~§8e-FORGE — 6 consensus `return` → expression conversions~~ | DONE 2026-06-24 — FORGE executed across all 6 files: 6 sites CLEAR (converted to if/else), 9 sites DEFER (`scalafix:ok DisableSyntax.return`: VM.scala tracer short-circuit, PrecompiledContracts KZG/BLS crypto + MODEXP guard, StackTrie MPT-mutation + loop comparator). Prior archive's "2/6 clear" assessment was inaccurate — BlockPreparator/StackTrie had real returns that were converted. |
 | G3 | Batch G | §8e-BEACON — EngineApiController S3-D `return` → expression (2 sites) | Parallel-safe; BEACON-only; unblocked |
 | G4 | Batch G | §8d-A1 — BEACON: EngineApiService `Await.result` on CE3 compute thread | MEDIUM priority; BEACON gate; prompt in §8d above |
 | G5 | Batch G | §8d-CONDUIT — CONDUIT: jsonrpc/ remaining IO boundary scan (Await/EC.global/blocking) | LOW priority; unblocked; 15-min scan; prompt in §8d above |
