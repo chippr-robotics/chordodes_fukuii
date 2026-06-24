@@ -1137,8 +1137,51 @@ class SNAPSyncController(
       }
 
     case HealingAllPeersStateless if currentPhase == StateHealing =>
-      log.warning("All healing peers stateless — refreshing pivot in-place for healing")
-      refreshPivotInPlace("all healing peers stateless")
+      // HEAL WALK-ROOT FREEZE FIX (fix/heal-freeze-walk-root):
+      // Do NOT roll the WALK root on all-peers-stateless during healing. Rolling re-pins the coordinator's
+      // completion target (`stateRoot`) to the live-head root on every all-peers-stateless event (~1.7 min
+      // cadence under a short serve window), so heal completion chases a moving target and can NEVER close —
+      // the residual is always "the walk root". core-geth heals against a root chosen at sync START and the
+      // healer never moves it; it terminates when the frontier drains to zero, then block-import advances to
+      // head. We mirror that: HOLD the walk root fixed for the whole heal and advance only the SERVE root.
+      //
+      // GATING (must-fix, adversarial review): the HOLD behaviour is valid ONLY when the spec-004 serve-root
+      // channel exists (`decoupledHealServeRoot == true`). Spec-004 decoupled the serve root from the walk
+      // root: peers source delta nodes BY HASH against an advancing newest-servable SERVE root
+      // (HealingServeRootRefresh channel), while completeness stays anchored to the held WALK root
+      // (content-hash / keccak-verify-before-store gate UNCHANGED). So rolling the walk root is no longer
+      // needed for servability — it only destroys the finite, strictly-shrinking completion frontier.
+      //
+      // When `decoupledHealServeRoot == false` there is NO serve-root channel (serve root == walk root, the
+      // pre-spec-004 coupling). Holding the walk root WITHOUT a way to advance the serve root would leave the
+      // heal with no forward path the moment the current root ages out of every peer's serve window — an
+      // all-peers-stateless stall (violates spec-004 FR-008 / SC-006). In that mode a roll
+      // (refreshPivotInPlace) is the ONLY way to regain servability, so we fall back to the legacy roll. This
+      // mirrors the HealingStagnated handler below, which likewise gates its hold on a config flag.
+      SNAPSyncController.healAllPeersStatelessAction(currentPhase, snapSyncConfig.decoupledHealServeRoot) match {
+        case SNAPSyncController.HoldWalkRoot =>
+          // Action (mirrors the HealingStagnated hold-pivot branch below): tell the coordinator to resume
+          // dispatch on the held root (clears its pivotRefreshRequested latch, fresh stagnation window, NO root
+          // mutation), and force a fresh serve-root fetch so peers can serve the residual against a current
+          // serve window.
+          log.warning(
+            "All healing peers stateless — HOLDING walk root (not rolling); advancing serve root + resuming dispatch"
+          )
+          trieNodeHealingCoordinator.foreach(_ ! actors.Messages.HealingResumeDispatch)
+          // Force the serve-root staleness gate to engage on the NEXT healing tick regardless of drift: an
+          // all-peers-stateless event means the current serve root has aged out of every peer's serve window,
+          // so we must fetch the newest-servable root now rather than wait for the > 2×margin drift threshold.
+          lastHealingServeRootBlock = None
+          maybeRequestHealingServeRoot()
+        case SNAPSyncController.RollWalkRoot =>
+          // No serve-root channel: holding has no forward path. Roll the walk root (legacy behaviour) — the only
+          // way to regain servability when serve root == walk root. refreshPivotInPlace sends
+          // HealingPivotRefreshed to the coordinator directly.
+          log.warning(
+            "All healing peers stateless — decoupled serve-root disabled; rolling walk root (legacy roll)"
+          )
+          refreshPivotInPlace("all healing peers stateless")
+      }
 
     // Coordinator detected no healing progress (MaxConsecutiveStagnations 2-min cycles, or the
     // healingStagnationTimeoutMs path). Stagnation means "healing is SLOW", NOT "the root is unservable".
@@ -1156,8 +1199,11 @@ class SNAPSyncController(
     // executes blocks forward and fetches any residual missing node on-demand by hash. No state-root / EVM /
     // gas / reward / RLP output changes — this only changes WHEN the pivot rolls during the healing phase.
     //
-    // The GENUINE-unservable path (HealingAllPeersStateless, above) is UNCHANGED: if the held root truly
-    // becomes unservable by ALL peers, we still MUST roll or healing stalls.
+    // The all-peers-stateless path (HealingAllPeersStateless, above) now ALSO holds the walk root: spec-004
+    // decoupled the serve root, so the held root's missing nodes stay servable (BY HASH, content-addressed)
+    // against an advancing SERVE root — the walk root must stay FIXED for the whole heal so the completion
+    // frontier is finite and strictly shrinking, exactly as core-geth does. Rolling the walk root only moves
+    // the completion target and is no longer needed for servability.
     //
     // Set heal-hold-pivot-on-stagnation = false to restore the legacy roll-on-stagnation behaviour.
     case actors.Messages.HealingStagnated(healed, pending) if currentPhase == StateHealing =>
@@ -4127,10 +4173,32 @@ class SNAPSyncController(
     // Bytecodes are content-addressed (hash-keyed) so pivot changes don't invalidate them,
     // but the coordinator should clear stale peer tracking.
     bytecodeCoordinator.foreach(_ ! actors.Messages.ByteCodePivotRefreshed)
-    // Healing coordinator: update root, clear pending tasks and stateless peers.
-    // Then re-walk the trie with the new root to discover missing nodes.
+    // Healing coordinator: during the DOWNLOAD phases this updates the root, clears pending tasks + stateless
+    // peers, and re-walks the trie with the new root to discover missing nodes (correct — those phases SHOULD
+    // chase the pivot, so they ALWAYS send HealingPivotRefreshed). The gating below is SCOPED to StateHealing.
+    //
+    // During StateHealing the WALK root must stay FIXED (heal walk-root freeze fix): a HealingPivotRefreshed
+    // mutates the coordinator's `stateRoot`, resets verificationPassComplete=false, and re-seeds the frontier
+    // — re-pinning the completion target to the live head so heal can never close. Belt-and-suspenders: even
+    // if a refresh resolves while healing (e.g. a stray BootstrapComplete), do NOT mutate the walk root. Push
+    // the fresh root to the SERVE root only (spec-004), so peers can source delta nodes against a current
+    // serve window while completeness stays anchored to the held walk root. The content-hash /
+    // keccak-verify-before-store completion gate is UNTOUCHED — freezing the root can never declare a false
+    // completion against an incomplete trie.
+    //
+    // GATING (must-fix, adversarial review): the SERVE-root-only push is valid ONLY when the spec-004
+    // serve-root channel exists (`decoupledHealServeRoot == true`). When it is false there is no serve root to
+    // advance (serve root == walk root), so a HealingServeRootRefresh would be a no-op at the coordinator and
+    // the heal would have no forward path; in that mode we send HealingPivotRefreshed (the old behaviour, a
+    // roll) even during StateHealing, matching the legacy-roll fallback in the HealingAllPeersStateless
+    // handler above. Mirrors the maybeRequestHealingServeRoot guard, which is also a no-op when decoupling is
+    // off.
     trieNodeHealingCoordinator.foreach { coordinator =>
-      coordinator ! actors.Messages.HealingPivotRefreshed(newStateRoot)
+      if (SNAPSyncController.useHealingServeRootRefresh(currentPhase, snapSyncConfig.decoupledHealServeRoot)) {
+        coordinator ! actors.Messages.HealingServeRootRefresh(newStateRoot)
+      } else {
+        coordinator ! actors.Messages.HealingPivotRefreshed(newStateRoot)
+      }
     }
     // Chain download target extends to the new pivot (chain data is canonical, never invalidated)
     if (chainDownloader.isDefined) {
@@ -4663,6 +4731,36 @@ object SNAPSyncController {
   case object ChainDownloadCompletion extends SyncPhase
   case object Completed extends SyncPhase
   case object Dormant extends SyncPhase
+
+  /** Decision for an all-peers-stateless event raised during StateHealing (heal walk-root freeze fix). Pure function of
+    * `(phase, decoupledHealServeRoot)` so the gating is deterministically testable without an actor harness. The two
+    * outcomes:
+    *   - [[HoldWalkRoot]]: hold the WALK root fixed, resume dispatch on the held root, and advance only the SERVE root
+    *     (HealingServeRootRefresh channel). Valid ONLY when the spec-004 serve-root channel exists.
+    *   - [[RollWalkRoot]]: legacy roll via refreshPivotInPlace. The only forward path when there is no serve-root
+    *     channel (serve root == walk root), so holding would stall (spec-004 FR-008 / SC-006).
+    */
+  sealed trait HealAllPeersStatelessAction
+  case object HoldWalkRoot extends HealAllPeersStatelessAction
+  case object RollWalkRoot extends HealAllPeersStatelessAction
+
+  /** Gate (must-fix, adversarial review): hold the walk root on all-peers-stateless ONLY when both we are in
+    * StateHealing AND the spec-004 serve-root channel is enabled. Without the serve-root channel, holding leaves the
+    * heal with no forward path once the root ages out of every peer's serve window, so we must roll. The `phase ==
+    * StateHealing` guard is belt-and-suspenders — the call site already matches StateHealing — but keeping it here
+    * makes the helper total and self-documenting.
+    */
+  def healAllPeersStatelessAction(phase: SyncPhase, decoupledHealServeRoot: Boolean): HealAllPeersStatelessAction =
+    if (phase == StateHealing && decoupledHealServeRoot) HoldWalkRoot else RollWalkRoot
+
+  /** Gate for the healing coordinator notification in `completePivotRefreshWithStateRoot`. Returns true iff the
+    * coordinator should be sent `HealingServeRootRefresh` (push the fresh root to the SERVE root only, holding the walk
+    * root). True ONLY during StateHealing AND when the spec-004 serve-root channel is enabled. Otherwise the caller
+    * sends `HealingPivotRefreshed` (the legacy roll): download phases must chase the pivot, and during StateHealing
+    * with decoupling off there is no serve root to advance, so a roll is the only forward path.
+    */
+  def useHealingServeRootRefresh(phase: SyncPhase, decoupledHealServeRoot: Boolean): Boolean =
+    phase == StateHealing && decoupledHealServeRoot
 
   /** Source of pivot block selection */
   sealed trait PivotSelectionSource {
