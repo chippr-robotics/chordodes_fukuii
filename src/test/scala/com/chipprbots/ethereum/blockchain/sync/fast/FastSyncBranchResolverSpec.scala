@@ -3,6 +3,7 @@ package com.chipprbots.ethereum.blockchain.sync.fast
 import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import org.scalamock.scalatest.MockFactory
@@ -12,6 +13,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import com.chipprbots.ethereum.BlockHelpers
 import com.chipprbots.ethereum.Fixtures
+import com.chipprbots.ethereum.network.PeerActor
 import com.chipprbots.ethereum.blockchain.sync.fast.BinarySearchSupport.*
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSyncBranchResolver.SearchState
 import com.chipprbots.ethereum.domain.Block
@@ -184,7 +186,13 @@ class FastSyncBranchResolverSpec extends AnyWordSpec with Matchers with MockFact
         commonBlocks :++ BlockHelpers.generateChain(ourBestBlock + 1 - highestCommonBlock, commonBlocks.last)
 
       val dummyPeer =
-        Peer(PeerId("dummyPeer"), new InetSocketAddress("foo", 1), ActorRef.noSender, false, createTimeMillis = 0)
+        Peer(
+          PeerId("dummyPeer"),
+          new InetSocketAddress("foo", 1),
+          ActorRef.noSender.toTyped[PeerActor.Command],
+          false,
+          createTimeMillis = 0
+        )
 
       val initialSearchState = SearchState(1, 10, dummyPeer)
       val ours = blocksSaved.map(b => (b.number, b)).toMap
@@ -260,7 +268,13 @@ class FastSyncBranchResolverSpec extends AnyWordSpec with Matchers with MockFact
       val blocksSavedInPeer: List[Block] = BlockHelpers.generateChain(8, BlockHelpers.genesis)
 
       val dummyPeer =
-        Peer(PeerId("dummyPeer"), new InetSocketAddress("foo", 1), ActorRef.noSender, false, createTimeMillis = 0)
+        Peer(
+          PeerId("dummyPeer"),
+          new InetSocketAddress("foo", 1),
+          ActorRef.noSender.toTyped[PeerActor.Command],
+          false,
+          createTimeMillis = 0
+        )
 
       val initialSearchState = SearchState(1, 8, dummyPeer)
       val ours = blocksSaved.map(b => (b.number, b)).toMap

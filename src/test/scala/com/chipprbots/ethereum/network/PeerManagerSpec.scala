@@ -88,7 +88,8 @@ class PeerManagerSpec
     peerManager ! PeerManagerActor.HandlePeerConnectionCmd(incomingConnection1.ref, incomingPeerAddress1)
 
     val probe2: TestProbe = createdPeers(2).probe
-    val peer: Peer = Peer(PeerId("peerid"), incomingPeerAddress1, probe2.ref, incomingConnection = true)
+    val peer: Peer =
+      Peer(PeerId("peerid"), incomingPeerAddress1, probe2.ref.toTyped[PeerActor.Command], incomingConnection = true)
 
     peerManager ! PeerManagerActor.PeerClosedConnectionCmd(
       peer.remoteAddress.getHostString,
@@ -112,7 +113,8 @@ class PeerManagerSpec
     peerManager ! PeerManagerActor.HandlePeerConnectionCmd(incomingConnection1.ref, incomingPeerAddress1)
 
     val probe2: TestProbe = createdPeers(2).probe
-    val peer: Peer = Peer(PeerId("peer"), incomingPeerAddress1, probe2.ref, incomingConnection = true)
+    val peer: Peer =
+      Peer(PeerId("peer"), incomingPeerAddress1, probe2.ref.toTyped[PeerActor.Command], incomingConnection = true)
 
     peerManager ! PeerManagerActor.PeerClosedConnectionCmd(peer.remoteAddress.getHostString, Disconnect.Reasons.Other)
 
@@ -212,7 +214,13 @@ class PeerManagerSpec
     // It should have created the next peer for the first incoming connection (probably using a synchronous test scheduler).
     val probe2: TestProbe = createdPeers(2).probe
     val peer: Peer =
-      Peer(PeerId("peer"), incomingPeerAddress1, probe2.ref, incomingConnection = true, nodeId = Some(incomingNodeId1))
+      Peer(
+        PeerId("peer"),
+        incomingPeerAddress1,
+        probe2.ref.toTyped[PeerActor.Command],
+        incomingConnection = true,
+        nodeId = Some(incomingNodeId1)
+      )
     probe2.expectMsg(PeerActor.HandleConnection(incomingConnection1.ref, incomingPeerAddress1))
     probe2.reply(PeerEvent.PeerHandshakeSuccessful(peer, initialPeerInfo))
 
@@ -233,7 +241,7 @@ class PeerManagerSpec
       Peer(
         PeerId("secondPeer"),
         incomingPeerAddress2,
-        probe3.ref,
+        probe3.ref.toTyped[PeerActor.Command],
         incomingConnection = true,
         nodeId = Some(incomingNodeId2)
       )
@@ -313,7 +321,7 @@ class PeerManagerSpec
     val peerAsIncoming: Peer = Peer(
       PeerId("peerAsIncoming"),
       peerAsIncomingAddress,
-      peerAsIncomingProbe.ref,
+      peerAsIncomingProbe.ref.toTyped[PeerActor.Command],
       incomingConnection = true,
       nodeId = Some(nodeId)
     )
@@ -351,7 +359,7 @@ class PeerManagerSpec
     val peerAsIncoming: Peer = Peer(
       PeerId("peerAsIncoming"),
       peerAsIncomingAddress,
-      peerAsIncomingProbe.ref,
+      peerAsIncomingProbe.ref.toTyped[PeerActor.Command],
       incomingConnection = true,
       nodeId = Some(nodeId)
     )
@@ -392,7 +400,7 @@ class PeerManagerSpec
         Peer(
           PeerId(hexNodeId),
           new InetSocketAddress("127.0.0.5", 30303),
-          createdPeers(0).probe.ref,
+          createdPeers(0).probe.ref.toTyped[PeerActor.Command],
           incomingConnection = false,
           nodeId = Some(nodeIdBytes)
         ),
@@ -435,7 +443,7 @@ class PeerManagerSpec
         Peer(
           PeerId(hexNodeId),
           new InetSocketAddress("127.0.0.5", 30303),
-          createdPeers(0).probe.ref,
+          createdPeers(0).probe.ref.toTyped[PeerActor.Command],
           incomingConnection = false,
           nodeId = Some(nodeIdBytes)
         ),
@@ -458,7 +466,7 @@ class PeerManagerSpec
         Peer(
           PeerId(hexNodeId),
           incomingPeerAddress1,
-          createdPeers(1).probe.ref,
+          createdPeers(1).probe.ref.toTyped[PeerActor.Command],
           incomingConnection = true,
           nodeId = Some(nodeIdBytes)
         ),
@@ -521,7 +529,7 @@ class PeerManagerSpec
         Peer(
           PeerId(hexNodeId),
           incomingPeerAddress1,
-          createdPeers(1).probe.ref,
+          createdPeers(1).probe.ref.toTyped[PeerActor.Command],
           incomingConnection = true,
           nodeId = Some(nodeIdBytes)
         ),
@@ -600,7 +608,7 @@ class PeerManagerSpec
         Peer(
           PeerId(hexNodeId),
           new InetSocketAddress("127.0.0.9", 30303),
-          createdPeers(0).probe.ref,
+          createdPeers(0).probe.ref.toTyped[PeerActor.Command],
           incomingConnection = false,
           nodeId = Some(nodeIdBytes)
         ),
@@ -620,7 +628,7 @@ class PeerManagerSpec
         Peer(
           PeerId(hexNodeId),
           inboundAddress,
-          createdPeers(1).probe.ref,
+          createdPeers(1).probe.ref.toTyped[PeerActor.Command],
           incomingConnection = true,
           nodeId = Some(nodeIdBytes)
         ),
@@ -670,7 +678,7 @@ class PeerManagerSpec
         Peer(
           PeerId(hexNodeId),
           new InetSocketAddress("127.0.0.9", 30303),
-          createdPeers(0).probe.ref,
+          createdPeers(0).probe.ref.toTyped[PeerActor.Command],
           incomingConnection = false,
           nodeId = Some(nodeIdBytes)
         ),
@@ -690,7 +698,7 @@ class PeerManagerSpec
         Peer(
           PeerId(hexNodeId),
           inboundAddress,
-          createdPeers(1).probe.ref,
+          createdPeers(1).probe.ref.toTyped[PeerActor.Command],
           incomingConnection = true,
           nodeId = Some(nodeIdBytes)
         ),
@@ -1006,12 +1014,12 @@ class PeerManagerSpec
         org.apache.pekko.actor.typed.scaladsl.ActorContext[PeerManagerActor.Command],
         InetSocketAddress,
         Boolean
-    ) => ActorRef = { (_, address, isIncoming) =>
+    ) => typed.ActorRef[PeerActor.Command] = { (_, address, isIncoming) =>
       val peerProbe = TestProbe()
-      val tp = TestPeer(Peer(PeerId(""), address, peerProbe.ref, isIncoming), peerProbe)
+      val tp = TestPeer(Peer(PeerId(""), address, peerProbe.ref.toTyped[PeerActor.Command], isIncoming), peerProbe)
       createdPeers :+= tp
       createdPeerQueue.offer(tp)
-      peerProbe.ref
+      peerProbe.ref.toTyped[PeerActor.Command]
     }
 
     val port = 30340
@@ -1151,9 +1159,9 @@ class PeerManagerSpec
       incoming <- arbitrary[Boolean]
       ageMillis <- Gen.choose(0, 24 * 60 * 60 * 1000)
     } yield Peer(
-      PeerId.fromRef(TestProbe().ref),
+      PeerId.fromRef(TestProbe().ref.toTyped[PeerActor.Command]),
       remoteAddress = new InetSocketAddress(ip, port),
-      ref = TestProbe().ref,
+      ref = TestProbe().ref.toTyped[PeerActor.Command],
       incomingConnection = incoming,
       nodeId = None,
       createTimeMillis = System.currentTimeMillis - ageMillis

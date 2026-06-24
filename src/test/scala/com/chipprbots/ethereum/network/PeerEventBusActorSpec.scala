@@ -152,7 +152,7 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
       new Peer(
         PeerId("peer1"),
         new InetSocketAddress("127.0.0.1", 0),
-        TestProbe().ref,
+        TestProbe().ref.toTyped[PeerActor.Command],
         false,
         nodeId = Some(ByteString())
       )

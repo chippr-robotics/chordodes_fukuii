@@ -102,10 +102,8 @@ object PeerManagerActor {
   final private case class PruneStatsFailed(ex: Throwable) extends Command
   final private case class StatusRefreshFailed(ex: Throwable) extends Command
 
-  /** Death-watch notification for a spawned PeerActor (replaces Classic Terminated). The ref is the Classic-adapted
-    * PeerActor ref stored in [[ConnectedPeers]].
-    */
-  final private case class PeerTerminated(ref: ActorRef) extends Command
+  /** Death-watch notification for a spawned PeerActor (replaces Classic Terminated). */
+  final private case class PeerTerminated(ref: typed.ActorRef[PeerActor.Command]) extends Command
 
   // =========================================================================
   // Behaviour factory + implementation
@@ -118,7 +116,7 @@ object PeerManagerActor {
       peerConfiguration: PeerConfiguration,
       knownNodesManager: ActorRef,
       peerStatistics: typed.ActorRef[PeerStatisticsActor.Command],
-      peerFactory: (TypedActorContext[Command], InetSocketAddress, Boolean) => ActorRef,
+      peerFactory: (TypedActorContext[Command], InetSocketAddress, Boolean) => typed.ActorRef[PeerActor.Command],
       discoveryConfig: DiscoveryConfig,
       blacklist: Blacklist,
       externalSchedulerOpt: Option[Scheduler] = None
@@ -146,7 +144,7 @@ object PeerManagerActor {
       peerConfiguration: PeerConfiguration,
       knownNodesManager: ActorRef,
       peerStatistics: typed.ActorRef[PeerStatisticsActor.Command],
-      peerFactory: (TypedActorContext[Command], InetSocketAddress, Boolean) => ActorRef,
+      peerFactory: (TypedActorContext[Command], InetSocketAddress, Boolean) => typed.ActorRef[PeerActor.Command],
       discoveryConfig: DiscoveryConfig,
       val blacklist: Blacklist,
       externalSchedulerOpt: Option[Scheduler],
@@ -232,7 +230,7 @@ object PeerManagerActor {
       * When a Terminated fires with no matching PeerId in connectedPeers (pre-handshake death), this map identifies the
       * URI so the reconnect timer can be scheduled. Cleared on successful handshake or actor termination.
       */
-    private val pendingMaintainedConnections: mutable.Map[ActorRef, URI] = mutable.Map.empty
+    private val pendingMaintainedConnections: mutable.Map[typed.ActorRef[PeerActor.Command], URI] = mutable.Map.empty
 
     /** Consecutive pre-handshake TCP failures per remote IP. After 5 failures the IP is blacklisted with exponential
       * backoff (5→10→20→30 min). Cleared on successful handshake to avoid blacklisting peers that recovered.
@@ -567,8 +565,8 @@ object PeerManagerActor {
           val (peer, newConnectedPeers) = createPeer(address, incomingConnection = true, connectedPeers)
           // Send with peerEventAdapter as the Classic sender so a reply (in tests, probe.reply(PeerHandshakeSuccessful))
           // routes back to the core as PeerEventReceived. In production the real PeerActor publishes to the event bus.
-          // `.toClassic` here is a Classic tell constraint (sender: ActorRef), not a subscription bridge.
-          peer.ref.tell(PeerActor.HandleConnection(connection, remoteAddress), peerEventAdapter.toClassic)
+          // `.toClassic` on the typed ref allows the 2-arg Classic tell (sets sender for test probes).
+          peer.ref.toClassic.tell(PeerActor.HandleConnection(connection, remoteAddress), peerEventAdapter.toClassic)
           listening(newConnectedPeers)
 
         case Left(error) =>
@@ -606,7 +604,7 @@ object PeerManagerActor {
       validConnection match {
         case Right(address) =>
           val (peer, newConnectedPeers) = createPeer(address, incomingConnection = false, connectedPeers)
-          peer.ref.tell(PeerActor.ConnectTo(uri), peerEventAdapter.toClassic)
+          peer.ref.toClassic.tell(PeerActor.ConnectTo(uri), peerEventAdapter.toClassic)
           if maintainedPeersByNodeId.values.exists(_ == uri) then {
             pendingMaintainedConnections(peer.ref) = uri
           }
@@ -688,7 +686,10 @@ object PeerManagerActor {
         case _ => None
       }
 
-    private def handleTerminated(ref: ActorRef, connectedPeers: ConnectedPeers): Behavior[Command] = {
+    private def handleTerminated(
+        ref: typed.ActorRef[PeerActor.Command],
+        connectedPeers: ConnectedPeers
+    ): Behavior[Command] = {
       // Pre-handshake path: if a maintained peer's TCP actor dies before the ETH handshake
       // completes, no PeerId was assigned — the post-handshake reconnect path won't fire.
       pendingMaintainedConnections.remove(ref).foreach { uri =>
@@ -827,10 +828,9 @@ object PeerManagerActor {
         connectedPeers: ConnectedPeers
     ): (Peer, ConnectedPeers) = {
       val ref = peerFactory(context, address, incomingConnection)
-      // HERALD-2 #1: death-watch the spawned PeerActor. The ref is the Classic-adapted PeerActor ref (or, in tests,
-      // a probe ref). watchWith maps its termination to PeerTerminated; `.toTyped[Nothing]` adapts the Classic ref
-      // for the Typed death-watch — PeerId.fromRef still reads the Classic path name, unchanged.
-      context.watchWith(ref.toTyped[Nothing], PeerTerminated(ref))
+      // Death-watch the spawned PeerActor. watchWith maps its termination to PeerTerminated so the Typed
+      // handleTerminated handler can remove the peer from ConnectedPeers and schedule reconnects.
+      context.watchWith(ref, PeerTerminated(ref))
 
       // The peerId is unknown for a pending peer, hence it is created from the PeerActor's path.
       // Upon successful handshake, the pending peer is updated with the actual peerId derived from
@@ -943,9 +943,8 @@ object PeerManagerActor {
       given typedScheduler: org.apache.pekko.actor.typed.Scheduler = context.system.scheduler
       // Extract a plain SLF4J logger before the IO lambda — ctx.log is thread-confined.
       val slf4jLog = org.slf4j.LoggerFactory.getLogger("com.chipprbots.ethereum.network.PeerManagerActor")
-      val typedRef = peer.ref.toTyped[PeerActor.Command]
       IO.fromFuture(
-        IO(typedRef.ask[PeerActor.StatusResponse](replyTo => PeerActor.GetStatus(replyTo)))
+        IO(peer.ref.ask[PeerActor.StatusResponse](replyTo => PeerActor.GetStatus(replyTo)))
       ).map(sr => Some((peer, sr.status)))
         .handleErrorWith {
           case _: java.util.concurrent.TimeoutException =>
@@ -1002,22 +1001,22 @@ object PeerManagerActor {
       handshaker: Handshaker[R],
       authHandshaker: AuthHandshaker,
       capabilities: List[Capability]
-  ): (TypedActorContext[Command], InetSocketAddress, Boolean) => ActorRef = { (ctx, address, incomingConnection) =>
-    val id: String = sanitizeActorPathElement(address.toString)
-    // PeerActor is already Typed. Build its Behavior directly and spawn it as a Typed child of this Typed core, then
-    // `.toClassic` so the ref slots into Peer / ConnectedPeers / PeerId.fromRef unchanged. The child's path name is the
-    // sanitized address — identical to the prior `ctx.actorOf(PeerActor.props, id)`, so PeerId.fromRef is preserved.
-    val behavior: Behavior[PeerActor.Command] =
-      PeerActor.apply(
-        address,
-        PeerActor.rlpxConnectionFactory(authHandshaker, config.rlpxConfiguration, capabilities),
-        config,
-        eventBus,
-        knownNodesManager,
-        incomingConnection,
-        initHandshaker = handshaker
-      )
-    ctx.spawn(behavior, id).toClassic
+  ): (TypedActorContext[Command], InetSocketAddress, Boolean) => typed.ActorRef[PeerActor.Command] = {
+    (ctx, address, incomingConnection) =>
+      val id: String = sanitizeActorPathElement(address.toString)
+      // Spawn PeerActor as a Typed child. The child's path name is the sanitized address — identical to the prior
+      // `ctx.actorOf(PeerActor.props, id)`, so PeerId.fromRef is preserved.
+      val behavior: Behavior[PeerActor.Command] =
+        PeerActor.apply(
+          address,
+          PeerActor.rlpxConnectionFactory(authHandshaker, config.rlpxConfiguration, capabilities),
+          config,
+          eventBus,
+          knownNodesManager,
+          incomingConnection,
+          initHandshaker = handshaker
+        )
+      ctx.spawn(behavior, id)
   }
 
   trait PeerConfiguration extends PeerConfiguration.ConnectionLimits {

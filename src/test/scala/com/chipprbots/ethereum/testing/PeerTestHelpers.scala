@@ -3,8 +3,10 @@ package com.chipprbots.ethereum.testing
 import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 
 import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.PeerActor
 import com.chipprbots.ethereum.network.PeerId
 
 /** Test utilities for creating mock Peer instances in unit tests */
@@ -15,7 +17,7 @@ object PeerTestHelpers {
     * @param id
     *   Peer identifier string
     * @param ref
-    *   ActorRef for the peer
+    *   Classic ActorRef for the peer (converted to Typed internally)
     * @return
     *   A properly constructed Peer instance for testing
     */
@@ -23,7 +25,7 @@ object PeerTestHelpers {
     Peer(
       id = PeerId(id),
       remoteAddress = new InetSocketAddress("127.0.0.1", 30303),
-      ref = ref,
+      ref = ref.toTyped[PeerActor.Command],
       incomingConnection = false
     )
 }

@@ -7,6 +7,7 @@ import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestActor.AutoPilot
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
@@ -36,6 +37,7 @@ import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.*
 import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.PeerActor
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.Capability
@@ -155,7 +157,7 @@ class StateSyncSpec
         Peer(
           PeerId(s"peer$i"),
           new InetSocketAddress("127.0.0.1", i),
-          TestProbe(i.toString).ref,
+          TestProbe(i.toString).ref.toTyped[PeerActor.Command],
           incomingConnection = false
         ),
         initialPeerInfo

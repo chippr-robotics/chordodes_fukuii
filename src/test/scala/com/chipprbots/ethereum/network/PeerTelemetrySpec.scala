@@ -3,6 +3,7 @@ package com.chipprbots.ethereum.network
 import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import scala.jdk.CollectionConverters.*
@@ -38,7 +39,7 @@ class PeerTelemetrySpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll
   private def registry = Metrics.get().registry
 
   private def peer(id: String, ip: String, port: Int, inbound: Boolean): Peer =
-    Peer(PeerId(id), new InetSocketAddress(ip, port), aRef, incomingConnection = inbound)
+    Peer(PeerId(id), new InetSocketAddress(ip, port), aRef.toTyped[PeerActor.Command], incomingConnection = inbound)
 
   private def peerInfo(
       clientId: String,

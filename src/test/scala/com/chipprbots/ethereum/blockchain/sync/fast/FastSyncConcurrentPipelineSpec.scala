@@ -3,6 +3,7 @@ package com.chipprbots.ethereum.blockchain.sync.fast
 import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -15,6 +16,7 @@ import com.chipprbots.ethereum.blockchain.sync.BodiesFetcherQueue
 import com.chipprbots.ethereum.blockchain.sync.ConcurrentFetch
 import com.chipprbots.ethereum.blockchain.sync.DeliveryResult
 import com.chipprbots.ethereum.blockchain.sync.HeadersFetcherQueue
+import com.chipprbots.ethereum.network.PeerActor
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
 import com.chipprbots.ethereum.blockchain.sync.PeerRateTracker
 import com.chipprbots.ethereum.blockchain.sync.ReceiptsFetcherQueue
@@ -163,7 +165,8 @@ class FastSyncConcurrentPipelineSpec extends AnyFlatSpec with Matchers {
     )
 
     def mkPeer(id: String): PeerWithInfo = {
-      val peer = Peer(PeerId(id), new InetSocketAddress("127.0.0.1", 30303), TestProbe().ref, false)
+      val peer =
+        Peer(PeerId(id), new InetSocketAddress("127.0.0.1", 30303), TestProbe().ref.toTyped[PeerActor.Command], false)
       val peerInfo = PeerInfo(
         remoteStatus,
         ChainWeight(BigInt(1000)),

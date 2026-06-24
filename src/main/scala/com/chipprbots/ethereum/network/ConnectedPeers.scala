@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.network
 
 import java.net.InetSocketAddress
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.duration.FiniteDuration
@@ -68,7 +68,7 @@ case class ConnectedPeers(
         handshakedPeers = handshakedPeers + (peerAfterHandshake.id -> peerAfterHandshake)
       )
 
-  def removeTerminatedPeer(peerRef: ActorRef): (Iterable[PeerId], ConnectedPeers) = {
+  def removeTerminatedPeer(peerRef: typed.ActorRef[PeerActor.Command]): (Iterable[PeerId], ConnectedPeers) = {
     val peersId = allPeers.collect { case (id, peer) if peer.ref == peerRef => id }
 
     (

@@ -4,6 +4,7 @@ import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 
 import org.scalatest.flatspec.AnyFlatSpecLike
@@ -21,6 +22,7 @@ import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
 import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.PeerActor
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.ETH69
@@ -160,11 +162,14 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     val firstBlockMsg: NewBlock = ETHPackets.NewBlock(firstBlock, firstChainWeight.totalDifficulty)
 
     val peer2Probe: TestProbe = TestProbe()
-    val peer2: Peer = Peer(PeerId("peer2"), new InetSocketAddress("127.0.0.1", 0), peer2Probe.ref, false)
+    val peer2: Peer =
+      Peer(PeerId("peer2"), new InetSocketAddress("127.0.0.1", 0), peer2Probe.ref.toTyped[PeerActor.Command], false)
     val peer3Probe: TestProbe = TestProbe()
-    val peer3: Peer = Peer(PeerId("peer3"), new InetSocketAddress("127.0.0.1", 0), peer3Probe.ref, false)
+    val peer3: Peer =
+      Peer(PeerId("peer3"), new InetSocketAddress("127.0.0.1", 0), peer3Probe.ref.toTyped[PeerActor.Command], false)
     val peer4Probe: TestProbe = TestProbe()
-    val peer4: Peer = Peer(PeerId("peer4"), new InetSocketAddress("127.0.0.1", 0), peer4Probe.ref, false)
+    val peer4: Peer =
+      Peer(PeerId("peer4"), new InetSocketAddress("127.0.0.1", 0), peer4Probe.ref.toTyped[PeerActor.Command], false)
 
     // when
     val peers: Seq[Peer] = Seq(peer, peer2, peer3, peer4)
@@ -347,7 +352,12 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     )
 
     val peer2Probe: TestProbe = TestProbe()
-    val peer2: Peer = Peer(PeerId("peer2"), new java.net.InetSocketAddress("127.0.0.1", 0), peer2Probe.ref, false)
+    val peer2: Peer = Peer(
+      PeerId("peer2"),
+      new java.net.InetSocketAddress("127.0.0.1", 0),
+      peer2Probe.ref.toTyped[PeerActor.Command],
+      false
+    )
 
     // Our block is at sharedBlockNr (behind both peers by 1) but with heavier TD
     val ourBlockHdr: BlockHeader = baseBlockHeader.copy(number = sharedBlockNr)
@@ -411,7 +421,12 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     )
 
     val peer2Probe: TestProbe = TestProbe()
-    val peer2: Peer = Peer(PeerId("peer2"), new java.net.InetSocketAddress("127.0.0.1", 0), peer2Probe.ref, false)
+    val peer2: Peer = Peer(
+      PeerId("peer2"),
+      new java.net.InetSocketAddress("127.0.0.1", 0),
+      peer2Probe.ref.toTyped[PeerActor.Command],
+      false
+    )
 
     // Our block is ahead of both peers
     val ourBlockHdr: BlockHeader = baseBlockHeader.copy(number = peerBlockNr + 1)
@@ -617,7 +632,7 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
         Peer(
           PeerId(s"eth68peer-$isPoW"),
           new java.net.InetSocketAddress("127.0.0.1", 0),
-          TestProbe()(testKit.system.classicSystem).ref,
+          TestProbe()(testKit.system.classicSystem).ref.toTyped[PeerActor.Command],
           false
         )
 
@@ -683,7 +698,8 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     )
 
     val peerProbe: TestProbe = TestProbe()
-    val peer: Peer = Peer(PeerId("peer"), new InetSocketAddress("127.0.0.1", 0), peerProbe.ref, false)
+    val peer: Peer =
+      Peer(PeerId("peer"), new InetSocketAddress("127.0.0.1", 0), peerProbe.ref.toTyped[PeerActor.Command], false)
 
     /** Build an ETH69 PeerInfo whose maxBlockNumber is `latestBlock`. */
     def eth69PeerInfoAt(latestBlock: BigInt): PeerInfo = {

@@ -164,9 +164,21 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
     val fakeNodeId: ByteString = ByteString()
 
     val peer1: Peer =
-      Peer(PeerId("peer1"), new InetSocketAddress("127.0.0.1", 1), TestProbe().ref, false, nodeId = Some(fakeNodeId))
+      Peer(
+        PeerId("peer1"),
+        new InetSocketAddress("127.0.0.1", 1),
+        TestProbe().ref.toTyped[PeerActor.Command],
+        false,
+        nodeId = Some(fakeNodeId)
+      )
     val peer2: Peer =
-      Peer(PeerId("peer2"), new InetSocketAddress("127.0.0.1", 2), TestProbe().ref, false, nodeId = Some(fakeNodeId))
+      Peer(
+        PeerId("peer2"),
+        new InetSocketAddress("127.0.0.1", 2),
+        TestProbe().ref.toTyped[PeerActor.Command],
+        false,
+        nodeId = Some(fakeNodeId)
+      )
 
     def mkInfo(cap: Capability, td: BigInt, blockNum: BigInt): PeerInfo = {
       val status = RemoteStatus(

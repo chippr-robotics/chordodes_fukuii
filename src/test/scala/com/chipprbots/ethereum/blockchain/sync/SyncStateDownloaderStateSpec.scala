@@ -4,6 +4,7 @@ import java.net.InetSocketAddress
 
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -19,6 +20,7 @@ import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateSchedulerActor.Unre
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateSchedulerActor.UsefulData
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.PeerActor
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NodeData
 import com.chipprbots.ethereum.testing.Tags.*
@@ -246,10 +248,30 @@ class SyncStateDownloaderStateSpec extends ScalaTestWithActorTestKit with AnyFla
     val ref4: ActorRef = TestProbe().ref
 
     val initialState: DownloaderState = DownloaderState(Map.empty, Map.empty)
-    val peer1: Peer = Peer(PeerId("peer1"), new InetSocketAddress("127.0.0.1", 1), ref1, incomingConnection = false)
-    val peer2: Peer = Peer(PeerId("peer2"), new InetSocketAddress("127.0.0.1", 2), ref2, incomingConnection = false)
-    val peer3: Peer = Peer(PeerId("peer3"), new InetSocketAddress("127.0.0.1", 3), ref3, incomingConnection = false)
-    val notKnownPeer: Peer = Peer(PeerId(""), new InetSocketAddress("127.0.0.1", 4), ref4, incomingConnection = false)
+    val peer1: Peer = Peer(
+      PeerId("peer1"),
+      new InetSocketAddress("127.0.0.1", 1),
+      ref1.toTyped[PeerActor.Command],
+      incomingConnection = false
+    )
+    val peer2: Peer = Peer(
+      PeerId("peer2"),
+      new InetSocketAddress("127.0.0.1", 2),
+      ref2.toTyped[PeerActor.Command],
+      incomingConnection = false
+    )
+    val peer3: Peer = Peer(
+      PeerId("peer3"),
+      new InetSocketAddress("127.0.0.1", 3),
+      ref3.toTyped[PeerActor.Command],
+      incomingConnection = false
+    )
+    val notKnownPeer: Peer = Peer(
+      PeerId(""),
+      new InetSocketAddress("127.0.0.1", 4),
+      ref4.toTyped[PeerActor.Command],
+      incomingConnection = false
+    )
     val peers: NonEmptyList[Peer] = NonEmptyList.fromListUnsafe(List(peer1, peer2, peer3))
     val potentialNodes: List[ByteString] = (1 to 100).map(i => ByteString(i)).toList
     val potentialNodesHashes: List[ByteString] = potentialNodes.map(node => kec256(node))

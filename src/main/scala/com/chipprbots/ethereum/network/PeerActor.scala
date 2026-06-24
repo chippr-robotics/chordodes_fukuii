@@ -11,7 +11,6 @@ import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.StashBuffer
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.util.ByteString
 
@@ -281,7 +280,6 @@ object PeerActor {
             case Some(uri) if numRetries < peerConfiguration.connectMaxRetries =>
               scheduleConnectRetry(uri, numRetries)
             case Some(uri) =>
-              context.toClassic.parent ! PeerClosedConnection(peerAddress.getHostString, Disconnect.Reasons.Other)
               knownNodesManager ! KnownNodesManager.RemoveKnownNode(uri)
               Behaviors.stopped
             case None =>
@@ -386,13 +384,12 @@ object PeerActor {
 
         case Left(HandshakeFailure(reason)) =>
           log.info(
-            "HANDSHAKE_FAILURE: Handshake failed with peer {}:{} - reason code: 0x{} ({}). Will disconnect and notify parent.",
+            "HANDSHAKE_FAILURE: Handshake failed with peer {}:{} - reason code: 0x{} ({}). Disconnecting.",
             peerAddress.getHostString,
             peerAddress.getPort,
             reason.toHexString,
             Disconnect.reasonToString(reason)
           )
-          context.toClassic.parent ! PeerClosedConnection(peerAddress.getHostString, reason)
           rlpxConnection.uriOpt.foreach(uri => knownNodesManager ! KnownNodesManager.RemoveKnownNode(uri))
           disconnectFromPeer(rlpxConnection, reason)
       }
@@ -456,7 +453,6 @@ object PeerActor {
         case Some(uri) if numRetries < peerConfiguration.connectMaxRetries =>
           scheduleConnectRetry(uri, numRetries + 1)
         case Some(uri) =>
-          context.toClassic.parent ! PeerClosedConnection(peerAddress.getHostString, Disconnect.Reasons.Other)
           knownNodesManager ! KnownNodesManager.RemoveKnownNode(uri)
           // TCP already closed remotely — no need for the disconnect PoisonPill delay
           // (normally used to let a Disconnect wire message flush). Stop immediately so
@@ -489,14 +485,7 @@ object PeerActor {
       d.reason match {
         case IncompatibleP2pProtocolVersion | UselessPeer | NullNodeIdentityReceived | UnexpectedIdentity |
             IdentityTheSame | Other =>
-          context.toClassic.parent ! PeerClosedConnection(peerAddress.getHostString, d.reason)
           rlpxConnection.uriOpt.foreach(uri => knownNodesManager ! KnownNodesManager.RemoveKnownNode(uri))
-        case TooManyPeers | TcpSubsystemError | DisconnectRequested | ClientQuitting | TimeoutOnReceivingAMessage =>
-          context.toClassic.parent ! PeerClosedConnection(peerAddress.getHostString, d.reason)
-        case AlreadyConnected =>
-          // NB-8: Propagate AlreadyConnected so PeerManagerActor can detect the inbound connection
-          // is already covering this maintained peer and skip the 30s reconnect timer.
-          context.toClassic.parent ! PeerClosedConnection(peerAddress.getHostString, d.reason)
         case _ => // nothing
       }
       log.debug(s"Received {}. Closing connection with peer ${peerAddress.getHostString}:${peerAddress.getPort}", d)
@@ -532,7 +521,7 @@ object PeerActor {
         )
         .map(_.message)
       val peer: Peer =
-        Peer(peerId, peerAddress, context.self.toClassic, incomingConnection, source, Some(remoteNodeId))
+        Peer(peerId, peerAddress, context.self, incomingConnection, source, Some(remoteNodeId))
       peerEventBus ! PublishCmd(PeerHandshakeSuccessful(peer, handshakeResult))
 
       Behaviors.receiveMessage {
