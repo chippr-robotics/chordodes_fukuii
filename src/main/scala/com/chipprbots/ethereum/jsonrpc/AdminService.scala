@@ -332,7 +332,7 @@ class AdminService(
   def getDatadir(@unused req: AdminDatadirRequest): ServiceResponse[AdminDatadirResponse] =
     IO.pure(Right(AdminDatadirResponse(datadir)))
 
-  def exportChain(req: AdminExportChainRequest): ServiceResponse[AdminExportChainResponse] = IO {
+  def exportChain(req: AdminExportChainRequest): ServiceResponse[AdminExportChainResponse] = IO.blocking {
     try {
       val first = req.first.getOrElse(BigInt(0))
       val last = req.last.getOrElse(blockchainReader.getBestBlockNumber)
@@ -361,7 +361,7 @@ class AdminService(
     }
   }
 
-  def importChain(req: AdminImportChainRequest): ServiceResponse[AdminImportChainResponse] = IO {
+  def importChain(req: AdminImportChainRequest): ServiceResponse[AdminImportChainResponse] = IO.blocking {
     try {
       val in = new FileInputStream(req.file)
       try {
