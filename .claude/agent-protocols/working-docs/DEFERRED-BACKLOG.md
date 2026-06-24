@@ -830,6 +830,92 @@ Partial progress (C2) is safe to run any time.
 
 ---
 
+#### §8e-FORGE — FORGE: consensus `return` → expression conversions (6 sites)
+
+**Agent:** FORGE
+**Risk:** MEDIUM-per-file — each site is a `return` → Scala expression conversion in consensus-path code
+**Gate:** None — FORGE-only; parallel-safe with active migration tracks
+**Purpose:** Lock the `DisableSyntax.noReturns = true` scalafix ratchet for consensus files; prerequisite to `sbt scalafixAll` going green
+
+**Files to review (6 remaining; `JwtAuthenticator.scala` already cleared S3-C):**
+- `vm/VM.scala`
+- `vm/OpCode.scala`
+- `vm/PrecompiledContracts.scala`
+- `ledger/BlockPreparator.scala`
+- `mpt/StackTrie.scala`
+- `consensus/validators/std/StdSignedTransactionValidator.scala`
+
+**For each file:**
+1. `grep -n "\breturn\b"` the file — locate every `return` statement
+2. Assess consensus impact: is converting `return` to an expression (guard clause → if/else, early exit → match arm) byte-identical in output?
+3. Decision: **CLEAR** (convert now) or **DEFER** (byte-level risk — document specific concern)
+4. For CLEAR sites: convert inline; `sbt compile-all` after each file
+5. For DEFER sites: add `// @nowarn("msg=return")` with a comment explaining why
+
+**Verify:**
+```bash
+cd /media/dev/2tb/dev/fukuii
+grep -rn "\breturn\b" \
+  src/main/scala/com/chipprbots/ethereum/vm/VM.scala \
+  src/main/scala/com/chipprbots/ethereum/vm/OpCode.scala \
+  src/main/scala/com/chipprbots/ethereum/vm/PrecompiledContracts.scala \
+  src/main/scala/com/chipprbots/ethereum/blockchain/ledger/BlockPreparator.scala \
+  src/main/scala/com/chipprbots/ethereum/blockchain/mpt/StackTrie.scala \
+  src/main/scala/com/chipprbots/ethereum/consensus/validators/std/StdSignedTransactionValidator.scala
+# Expected: 0 on all CLEAR files
+
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. Stage only the consensus files (no test files)
+3. `git commit -m "refactor(8e-forge): FORGE-cleared consensus return → expression (§8e ratchet)"`
+4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(8e-forge): clearout — $SHA"`
+5. **DELETE §8e-FORGE**
+
+---
+
+#### §8e-BEACON — BEACON: EngineApiController `return` → expression (S3-D, 2 sites)
+
+**Agent:** BEACON
+**Risk:** MEDIUM — early-exit return guards in Engine API method bodies; removing `return` requires wrapping ~90 LOC into an else branch
+**Gate:** None — BEACON-only; parallel-safe with active migration tracks
+**Purpose:** Clear the 2 BEACON-gated sites for `DisableSyntax.noReturns = true` ratchet lock
+
+**Files:**
+- `consensus/engine/EngineApiController.scala:96` — `handleNewPayload` malformed-payload decode `Left` branch
+- `consensus/engine/EngineApiController.scala:226` — `handleForkchoiceUpdated` malformed-params decode `Left` branch
+
+Both are `return IO.pure(...)` decode-error guards inside large method bodies. Deferred from S3-A because removing the `return` requires wrapping the `Right`-path body (≥90 lines) into an `else { }` block. The byte-for-byte response behavior must be preserved.
+
+**Steps:**
+1. **Read** `EngineApiController.scala:80-130` (handleNewPayload) and `:210-270` (handleForkchoiceUpdated)
+2. **Verify** the exact error response shape (status code, error body) that must be preserved for both `Left` branches
+3. **Convert** site 1 (line :96): `if decode fails { return IO.pure(errResp) }` → `decode match { case Left(e) => IO.pure(errResp); case Right(params) => ... (existing body) }`
+4. **Convert** site 2 (line :226): same pattern
+5. `sbt compile-all` after each conversion — must be 0 errors
+
+**Verify:**
+```bash
+cd /media/dev/2tb/dev/fukuii
+grep -n "\breturn\b" \
+  src/main/scala/com/chipprbots/ethereum/consensus/engine/EngineApiController.scala
+# Expected: 0
+
+sbt "testOnly *EngineApi*"
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. Stage `EngineApiController.scala` only
+3. `git commit -m "refactor(8e-beacon): EngineApiController return → expression — S3-D BEACON cleared"`
+4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(8e-beacon): clearout — $SHA"`
+5. **DELETE §8e-BEACON**
+
+---
+
 ### 8f — Dead Code Audit (Broader than extvm) ✅ RESEARCH DONE (2026-06-22)
 
 **PRISM sweep complete.** 4 high-confidence candidates identified (see CHASE-QUEUE.md DEAD entries 2026-06-22). No `FIXME`/`HACK`/`TODO` markers found. Deletion sprint pending.
@@ -997,16 +1083,16 @@ slower than dev machine → timeouts). `@Ignore` annotations silently hide untes
 |---------|-------|-----------|-------------------|--------|
 | A — `messageAdapter.toClassic` (PeerEventBus subscriptions) | ~26 | `PeerEventBusActor.SubscribeCmd(subscriber: ActorRef)` | Pre-CAPSTONE | §8k-D ✅ DONE 93bcedb12 |
 | B — `handshakedPeersAdapter.toClassic` | ~15 | `NPMA.GetHandshakedPeersCmd(replyTo: ActorRef)` | Pre-CAPSTONE | §8k-E ✅ DONE c42316b39 |
-| C — `ctx.toClassic.sender()` in SyncController/FastSync | ~27 | OQ-5 Classic ask path from jsonrpc callers | Pre-CAPSTONE | §8k-G |
+| C — `ctx.toClassic.sender()` in SyncController/FastSync | ~27 | OQ-5 Classic ask path from jsonrpc callers | Pre-CAPSTONE | §8k-G ✅ DONE 2ef2b6637 |
 | D — `ctx.toClassic.actorOf(RegularSync)` | 2 | RegularSync has no `Behavior[Command]` | Pre-CAPSTONE | §8k-F ✅ DONE b24515637 |
-| E — `externalAdapter.toClassic` in SyncController | ~29 | OQ-5 Classic ask path (same root as C) | Pre-CAPSTONE | §8k-G |
+| E — `externalAdapter.toClassic` in SyncController | 21 remaining | Per-child adapter pattern: eliminated one spawn-site at a time when the receiving child updates its constructor param from `ActorRef` → `ActorRef[T]`. NOT the same as OQ-5 (original table description was wrong). | Pre-CAPSTONE | §8k-G2 (immediate: FastSync + NPMA cmd) + per-child LOOM migration |
 | F — `ctx.self.toClassic` coordinator→worker + SSC→coordinator | ~15 | Worker `coordinator: ActorRef` params untyped | **NOW** (MITHRIL) | §8k-A + §8k-C |
-| G — `context.toClassic.parent` in PeerActor | 7 | PeerActor notifies PeerManager via Classic parent | Pre-CAPSTONE | §8k-H |
-| H — `ctx.spawn(...).toClassic` for PeerActor ref | 1 | PeerManagerActor stores spawned child as Classic | Pre-CAPSTONE | §8k-H |
+| G — `context.toClassic.parent` in PeerActor | 7 | PeerActor notifies PeerManager via Classic parent | Pre-CAPSTONE | §8k-H ✅ DONE 222623960 |
+| H — `ctx.spawn(...).toClassic` for PeerActor ref | 1 | PeerManagerActor stores spawned child as Classic | Pre-CAPSTONE | §8k-H ✅ DONE 222623960 |
 | I — TCP I/O bridge (RLPxConnectionHandler, ServerActor) | 4 | Akka TCP requires Classic `sender()` — **permanent** | N/A | — |
 | J — `classicSystem.actorOf` bridge actors in NodeBuilder | 3 | KNM/PDM/PTM have Classic callers via legacy case objects | Pre-CAPSTONE | §8k-I |
-| K — `peerEventBus.toClassic` + spawn `.toClassic` in NodeBuilder | 3 | SyncController/NPMA returned as Classic refs to callers | Pre-CAPSTONE | §8k-G/§8k-I |
-| L — `AkkaTaskOps.askFor` (jsonrpc, ~18 call sites) | ~18 | Commands carry `replyTo: ActorRef` not `ActorRef[T]` | Pre-CAPSTONE | §8k-G |
+| K — `peerEventBus.toClassic` + spawn `.toClassic` in NodeBuilder | 3 | SyncController/NPMA returned as Classic refs to callers | Pre-CAPSTONE | §8k-G ✅ DONE 2ef2b6637 |
+| L — `AkkaTaskOps.askFor` (jsonrpc, ~18 call sites) | ~18 | Commands carry `replyTo: ActorRef` not `ActorRef[T]` | Pre-CAPSTONE | §8k-G ✅ DONE 2ef2b6637 |
 | M — `peerEventBus.toClassic` watchWith in PEBA itself | 1 | PEBA internal Classic watch | Pre-CAPSTONE | §8k-D ✅ DONE 93bcedb12 |
 | N — `ctx.self.toClassic` / `fetcherReplyTo.toClassic` in BlockImporter | 4 | RegularSync spawned Classic → BlockImporter props take Classic refs | Pre-CAPSTONE | §8k-F ✅ DONE b24515637 |
 
@@ -1106,99 +1192,175 @@ Step 5 — Output the full audit to `.local/docs/classic-interop-audit.md`.
 ---
 
 
-#### §8k-G — CONDUIT + MITHRIL: OQ-5 kill — migrate jsonrpc callers to Typed ask
+#### §8k-G — CONDUIT + MITHRIL: OQ-5 kill — migrate jsonrpc callers to Typed ask ✅ DONE 2ef2b6637
 
-**Agent:** CONDUIT (jsonrpc layer audit), then MITHRIL (implementation)
-**Risk:** MEDIUM — ~74 bridge sites across SyncController + jsonrpc layer; touches live RPC path
-**Gate:** §8k-F complete (RegularSync Typed — SyncController OQ-5 reply path must be clean first)
-**Bridge sites eliminated:** ~56 (Clusters C + E: `ctx.toClassic.sender()` + `externalAdapter.toClassic` in SyncController/FastSync)
-         + ~18 (Cluster L: `AkkaTaskOps.askFor` call sites in jsonrpc) = **~74 total**
+**Completed:** 2026-06-23 · 25 files (17 main + 8 test)
+**What was done:** SyncProtocol `GetStatus`/`ResetFastSync`/`RestartFastSync` gained typed `replyTo` fields.
+All `ctx.toClassic.sender()` sites in SyncController/FastSync/RegularSync replaced with `cmd.replyTo`.
+jsonrpc callers (EthInfoService, NodeJsonRpcHealthChecker, McpResources, McpTools, FukuiiService) switched
+from Classic `?` ask to Typed ask pattern. NodeBuilder `syncController` field changed from Classic `ActorRef`
+to `TypedActorRef[SyncController.Command]`. Clusters C, K, L ✅ eliminated.
 
-**Background:**
-`EthInfoService`, `NodeJsonRpcHealthChecker`, `McpResources`, `McpTools`, `FukuiiService` and others
-use Classic `?` ask against `SyncController`'s Classic ref (OQ-5). This forces SyncController to
-capture `ctx.toClassic.sender()` (~27 sites) and maintain `externalAdapter.toClassic` (~29 sites).
-`AkkaTaskOps.askFor` is the shared adapter that carries an untyped `replyTo: ActorRef` at ~18 call sites.
-
-**Steps:**
-1. Add `replyTo: ActorRef[T]` to `SyncProtocol.GetStatus`, `ResetFastSync`, `RestartFastSync`
-   (and any other commands in Clusters C/E that currently use `sender()`).
-2. In SyncController: replace every `ctx.toClassic.sender()` with `cmd.replyTo ! response`.
-   Replace every `externalAdapter.toClassic` with `cmd.replyTo` (Typed).
-3. In jsonrpc callers: replace `Classic ?` ask on the SyncController classic ref with
-   `AskPattern.ask[SyncProtocol.StatusResponse](syncControllerTyped, replyTo => GetStatus(replyTo))`.
-4. Delete `AkkaTaskOps.askFor` (now unused) and its import sites.
-5. In NodeBuilder: `classicSystem.spawn(SyncController(...)).toClassic` (Cluster K) → callers now
-   hold the Typed ref directly; remove the `.toClassic` conversion.
-6. `sbt compile-all` after each file group (jsonrpc callers can be done in parallel — independent files).
-
-**Verify:**
-```bash
-grep -rn "ctx\.toClassic\.sender()\|externalAdapter\.toClassic\|AkkaTaskOps" \
-  src/main/ --include="*.scala"
-# Expected: 0
-grep -rn "toClassic" src/main/scala/com/chipprbots/ethereum/jsonrpc/ --include="*.scala"
-# Expected: 0
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. Stage SyncController + FastSync + all jsonrpc caller files + AkkaTaskOps deletion
-3. `git commit -m "refactor(8k-G): OQ-5 kill — typed ask in jsonrpc, remove ~74 .toClassic sites (Clusters C+E+L)"`
-4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(8k-G): clearout — $SHA"`
-5. **DELETE §8k-G**
+**What was NOT done (Cluster E — 21 sites remain):** `externalAdapter.toClassic` spawn sites in
+SyncController were preserved because they are per-child adapter patterns, not OQ-5 ask paths.
+The original §8k-G prompt description was incorrect (said "same root as C" — it is not).
+Immediate cohort tracked in §8k-G2 below. Gated cohort tracked in CHASE-QUEUE.
 
 ---
 
-#### §8k-H — MITHRIL: PeerActor parent notification → `watchWith` + typed Command
+#### §8k-G2 — PRISM + MITHRIL: Cluster E immediate cohort — spawn-site `.toClassic` elimination
 
-**Agent:** MITHRIL
-**Risk:** LOW — PeerManagerActor is already Typed; change is localized to PeerActor and its PMA spawn site
-**Gate:** §8k-G complete (PeerManagerActor changes coincide with other jsonrpc callers)
-**Bridge sites eliminated:** 7 (Cluster G: `context.toClassic.parent ! PeerClosedConnection`) + 1 (Cluster H: `ctx.spawn(...).toClassic`)
+**Agent:** PRISM (audit which children are already Typed), then MITHRIL (update constructor params + spawn sites)
+**Risk:** LOW-MEDIUM — touches child constructor signatures and SyncController spawn sites; compile-verified
+**Gate:** §8k-G ✅ DONE
+**Bridge sites targeted:** subset of the 21 remaining `externalAdapter.toClassic` sites where the receiving
+child has already been migrated to Typed but its constructor param type was not updated to accept `ActorRef[T]`
+
+**Pekko 2.x context:** This sprint implements **pekko-typed-api.md P16** — the protocol standard
+that constructor params must declare `ActorRef[T]` (Typed), not Classic `ActorRef`, whenever the
+receiving actor is a Typed Behavior. Pekko 2.x removes `org.apache.pekko.actor.typed.scaladsl.adapter`
+entirely: every `.toClassic` call on a Typed ref becomes a compile error. Each site eliminated here
+is one less blocker for `pekko-version := "2.x"` in `build.sbt`. The spawn-site `.toClassic` pattern
+is also the systematic gap that **pre-migration-checklist.md Step 13** is designed to catch: after
+any LOOM migration, verify the child's constructor param type matches the Typed caller's ActorRef.
 
 **Background:**
-`PeerActor` sends `PeerClosedConnection(id)` to its parent (`PeerManagerActor`) via
-`context.toClassic.parent ! PeerClosedConnection(...)` (6 sites). PeerManagerActor spawns PeerActor
-via `ctx.spawn(...)` so the parent IS Typed, but PeerActor uses the Classic parent path. There are
-two clean fixes; (B) is preferred:
+When §8k-G ran, CONDUIT correctly identified that `externalAdapter.toClassic` sites are per-child adapter
+patterns: each site disappears only when the receiving child's constructor param changes from Classic
+`ActorRef` to `ActorRef[T]`. Two known immediate candidates (child already Typed, param not yet updated):
 
-**(A)** Add `PeerClosedConnection` to `PeerManagerActor.Command` ADT; PeerActor sends via
-       `context.toTyped[PeerManagerActor.Command] ! PeerClosedConnection(id)`.
+1. **FastSync `syncController: ActorRef` param** — FastSync was cleaned up in §8k-F/§8k-G but its
+   constructor still declares `syncController: ActorRef` (Classic). SyncController passes `externalAdapter.toClassic`
+   at line ~1530. Since FastSync is already Typed, update the param to `ActorRef[Any]` (the adapter type)
+   and remove the `.toClassic` at the spawn site.
 
-**(B)** Use `watchWith` at the spawn site: `ctx.watchWith(peerRef, PeerClosed(id))`.
-       PeerActor needs to stop (or throw) rather than send the notification; PMA receives `PeerClosed`
-       on child termination. Eliminates all 6 active `context.toClassic.parent !` sends.
-       Already used elsewhere in the codebase — preferred pattern.
+2. **NPMA `RegisterChainWeightCalibrationTarget(replyTo: ActorRef)`** — NPMA was migrated in §8k-E but
+   this command still carries a Classic `ActorRef`. SyncController sends `RegisterChainWeightCalibrationTarget(externalAdapter.toClassic)`
+   at line ~1635. Update the command field to `ActorRef[Any]` (or the specific type NPMA sends back)
+   and remove the `.toClassic`.
 
-Also: `PeerManagerActor.scala:1022` stores the spawned PeerActor as `ctx.spawn(...).toClassic`
-(Cluster H). After (B), PMA no longer needs the Classic ref stored for `sender()` reply purposes.
+There may be additional candidates (ForkChoiceManager, PivotHeaderBootstrap). PRISM audit identifies them.
 
-**Steps:**
-1. At PeerActor spawn site in PMActor: replace `ctx.spawn(behavior, id).toClassic` with `ctx.spawn(behavior, id)`.
-   Use `ctx.watchWith(typedRef, PeerClosed(id))` to receive termination.
-2. In PeerActor: remove all 6 `context.toClassic.parent ! PeerClosedConnection(...)` sends.
-   PeerActor should simply stop (throw / return `Behaviors.stopped`) when it detects disconnection —
-   the PMA watchWith will fire.
-3. Remove `context.self.toClassic` at PeerActor:535 (stored in `Peer` case class as Classic ref).
-   Update `Peer` to hold `ActorRef[PeerActor.Command]` instead.
-4. `sbt compile-all` + `sbt "testOnly *PeerActor* *PeerManager*"`.
+**PRISM audit step (run first):**
+```bash
+cd /media/dev/2tb/dev/fukuii
+
+# Find all 21 remaining externalAdapter.toClassic sites with their receiving actor
+grep -n "externalAdapter\.toClassic" \
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala
+
+# For each receiving actor/command found, check if it's already a Typed Behavior:
+grep -rn "class FastSync\|object FastSync\|extends Behavior\|Behaviors\." \
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/fast/FastSync.scala | head -5
+
+grep -rn "RegisterChainWeightCalibrationTarget" \
+  src/main/scala/com/chipprbots/ethereum/network/ --include="*.scala"
+
+grep -rn "class ForkChoiceManager\|extends Behavior" \
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/ --include="*.scala"
+
+grep -rn "class PivotHeaderBootstrap\|extends Behavior" \
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/ --include="*.scala"
+```
+
+For each site, PRISM should classify as:
+- **IMMEDIATE** — receiving actor is Typed; only constructor param type update needed
+- **GATED** — receiving actor is still Classic; blocked on that actor's LOOM migration
+
+**MITHRIL implementation (immediate sites only):**
+
+For each IMMEDIATE site:
+1. Update the receiving actor's constructor param from `ActorRef` (Classic) to `ActorRef[Any]`
+   (or a more specific `ActorRef[T]` if the sent message type is known and narrow).
+2. Update internal usages of that param inside the child (Classic `!` → Typed `!` — same syntax, type changes).
+3. In SyncController: remove `.toClassic` at the spawn site — pass `externalAdapter` directly.
+4. `sbt compile-all` after each actor.
 
 **Verify:**
 ```bash
-grep -rn "context\.toClassic\.parent\|context\.self\.toClassic" \
-  src/main/scala/com/chipprbots/ethereum/network/PeerActor.scala
-# Expected: 0
-./local/scripts/fukuii-test
+# Count should decrease from 21 toward the gated-only floor
+grep -rn "externalAdapter\.toClassic" src/main/ --include="*.scala" | wc -l
+
+# No new compilation errors
+sbt compile-all
+./media/dev/2tb/dev/fukuii/.local/scripts/fukuii-test
 ```
 
 **MANDATORY final steps:**
 1. `sbt scalafmtAll`
-2. Stage PeerActor + PeerManagerActor + Peer case class
-3. `git commit -m "refactor(8k-H): PeerActor watchWith — remove context.toClassic.parent sends (Clusters G+H)"`
-4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(8k-H): clearout — $SHA"`
-5. **DELETE §8k-H**
+2. Stage SyncController + each updated child constructor file
+3. `git commit -m "refactor(8k-G2): Cluster E immediate cohort — drop externalAdapter.toClassic at Typed child spawn sites"`
+4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(8k-G2): clearout — $SHA"`
+5. Update CHASE-QUEUE: mark cleared sites as CLEARED with SHA
+6. **DELETE §8k-G2**
+
+---
+
+#### §8k-R2 — PRISM: Post-migration gap audit — spawn-site `.toClassic` slippage
+
+**Agent:** PRISM (read-only, 8-lens analysis)
+**Risk:** ZERO — research only, no code changes
+**Gate:** Any time. Run after any LOOM migration sprint completes.
+**Purpose:** Catch the systematic gap where a child actor is fully migrated to Typed but its spawn-site
+caller still passes `.toClassic` because the child's constructor param type was not updated in the same commit.
+
+**Why this keeps happening:**
+LOOM migration tasks focus on the actor's *internals* (removing `sender()`, `context.become`, timers,
+`Props`). They do not require updating the actor's *constructor signature* to accept `ActorRef[T]` instead
+of `ActorRef`. The spawn-site caller (often SyncController or NodeBuilder) then continues to pass
+`.toClassic` because the param type demands it. These slipped sites are invisible to `sbt compile-all`
+(they compile fine) and to the existing bridge-count grep (they ARE bridge sites, just wrongly categorised).
+
+**Audit prompt:**
+```
+You are auditing the fukuii codebase for spawn-site `.toClassic` slippage:
+cases where a Typed actor's constructor param still declares a Classic `ActorRef`
+parameter, forcing the Typed caller to write `typedRef.toClassic` at the spawn site
+even though both sides are Typed.
+
+Step 1 — Find all Typed actors that have Classic ActorRef constructor params:
+
+cd /media/dev/2tb/dev/fukuii
+
+# Find case classes / classes that extend Behavior but have ActorRef (Classic) params
+grep -rn "ActorRef\b" src/main/ --include="*.scala" \
+  | grep -v "typed\.ActorRef\|ActorRef\[" \
+  | grep -v "//.*ActorRef"
+
+# Cross-reference: which of those files also have Behaviors / extends AbstractBehavior?
+# The overlap is a Typed actor with Classic params.
+
+Step 2 — For each hit, determine:
+  a. Is this actor a Typed Behavior (Behaviors.receive, AbstractBehavior, ctx.spawn)?
+  b. Does it have a Classic ActorRef param in its constructor or Props?
+  c. Is there a caller that passes `.toClassic` to fill that param?
+  d. Is the `.toClassic` truly necessary (child is still Classic) or is it slippage?
+
+Step 3 — Produce a table:
+
+| Actor | File:line | Param name | Type | Root cause | Removable now? | Tracked in? |
+|-------|-----------|------------|------|-----------|----------------|-------------|
+| FastSync | FastSync.scala:42 | syncController | ActorRef | externalAdapter passed as Classic | YES | §8k-G2 |
+| SNAPSyncController | SNAPSyncController.scala:88 | syncController | ActorRef | Still Classic actor | NO (SNAP1) | CHASE-QUEUE |
+
+Step 4 — Flag any sites NOT already tracked in §8k-G2 or CHASE-QUEUE.
+  These are new gaps. Add them to CHASE-QUEUE with type CLASSIC.
+
+Step 5 — Also run the general bridge census to see if the count has improved:
+
+  grep -rn "\.toClassic\b" src/main/ --include="*.scala" | grep -v "//.*toClassic" | wc -l
+  # Compare against §8k-R1 baseline of ~130 production sites.
+  # Document delta and which sprints caused which reductions.
+
+Output a short report: gaps found, gaps already tracked, new gaps to add.
+```
+
+**Expected output:** Short gap report + any new CHASE-QUEUE entries.
+
+**MANDATORY final steps:**
+1. Add any new untracked gaps to CHASE-QUEUE with type CLASSIC
+2. `git commit -m "docs(8k-R2): post-migration gap audit — <N> new gaps found"` (docs-only commit)
+3. **DELETE §8k-R2**
 
 ---
 
@@ -1209,6 +1371,12 @@ grep -rn "context\.toClassic\.parent\|context\.self\.toClassic" \
 **Gate:** §8k-G complete (PTM `AkkaTaskOps` migration done) + §8k-H complete (PeerManagerActor clean)
 **Bridge sites eliminated:** 3 anonymous Classic bridge actors in NodeBuilder (Cluster J) + ~18 call sites
          in FilterManager/PersonalService/GraphQLSchema/TestService using `pendingTransactionsManager: ActorRef`
+
+**Pekko 2.x context:** The 3 anonymous Classic bridge actors in NodeBuilder use `classicSystem.actorOf`
+to create Typed adapters inline. `classicSystem` (the Classic `ActorSystem`) does not exist in Pekko 2.x
+— `ActorSystem[T]` is Typed-only. These bridges are dead weight in a post-Classic codebase and become
+compile errors in 2.x. Deleting them and wiring callers directly to `AskPattern.ask` on existing Typed
+actors is the correct migration path.
 
 **Background:**
 `NodeBuilder.scala` wires 3 anonymous Classic bridge actors (Cluster J) to service callers that still
@@ -1292,6 +1460,54 @@ Step 6 — git commit -m "chore(8k-B): remove adapter imports — TCP floor veri
 
 ---
 
+#### §8a-retro-5b — LOOM+EYE: BlockFetcherSpec + PendingTransactionsManagerSpec ActorTestKit migration
+
+**Agent:** LOOM + EYE
+**Risk:** LOW — test files only; both production actors already Typed
+**Gate:** None — PTM migrated in `0be6dd776` (W2-P2c); BlockFetcher Typed migration sprint
+**Purpose:** Close batch 5 assessable specs; PeerActorSpec + RLPxConnectionHandlerSpec remain Wave-3-gated
+
+**Note:** RegularSyncSpec (third assessable batch-5 spec) is covered by §9c.
+
+**For BlockFetcherSpec:**
+1. Verify spec compiles and tests pass before migrating (BlockFetcher ETHPackets rebuild — `931c615dd`)
+2. Migrate from `TestKit(ActorSystem())` + `ImplicitSender` → `ScalaTestWithActorTestKit(ConfigFactory.load())`
+3. Apply established batch patterns: PatienceConfig conflict → drop; guardian spawn → `actorTestKit.spawn`; `TestProbe()` → `testKit.createTestProbe[M]()`
+4. Reference `node/testing-infra.md` for pitfall table (batches 1–4)
+5. `sbt "testOnly *BlockFetcher*"` — verify pass count stable
+
+**For PendingTransactionsManagerSpec:**
+1. PTM uses `toClassic.eventStream` bridge (preserved in `0be6dd776`) — test subscriptions may still need `system.classicSystem` for eventStream; document if so and add a CHASE-QUEUE note
+2. Migrate from `TestKit(ActorSystem())` → `ScalaTestWithActorTestKit(ConfigFactory.load())`
+3. Apply established batch patterns
+4. `sbt "testOnly *PendingTransactions*"` — verify pass count stable
+
+**Pre-flight — Step 13 of pre-migration-checklist.md:**
+After migrating spawn sites in these specs, verify no actor constructor param accepts Classic `ActorRef`:
+```bash
+grep -n "ActorRef\b" \
+  src/test/scala/.../BlockFetcherSpec.scala \
+  src/test/scala/.../PendingTransactionsManagerSpec.scala \
+  | grep -v "typed\.ActorRef\|ActorRef\["
+# Expected: 0 (all refs should be ActorRef[T] or fully qualified Typed)
+```
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *BlockFetcher* *PendingTransactions*"
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. Stage only test files — no production source changes expected
+3. `git commit -m "test(8a-retro-5b): BlockFetcherSpec + PendingTxMgrSpec → ActorTestKit migration"`
+4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(8a-retro-5b): clearout — $SHA"`
+5. **DELETE §8a-retro-5b**
+
+---
+
 ## Recommended Sprint Sequence (post scala3-cleanup-june)
 
 Two tracks run in parallel: **Primary** (blocking, sequential) and **Housekeeping** (parallel-safe,
@@ -1334,13 +1550,13 @@ No actor migration gate. Commit individually; do not bundle with primary-track m
 | ~~**8f — Dead code audit**~~ | ~~research + deletion sprint~~ | ~~WRAITH~~ | ✅ DONE — `fa57df9b9` (MetricsAlreadyConfiguredError + LocalVM + AdaptiveSyncStrategy), `c6b3da4cb` (DeltaSpikeGauge), `ff2fc219c` (StaticNodesLoader); branch-wide audit 2026-06-22 confirmed no further candidates |
 | ~~**3d — enum polish**~~ | ~~Migrate `SyncPhase`, `BlacklistReason`, `ForkId` codes to enum~~ | ~~MITHRIL~~ | ✅ DONE — `adf4e69ea` (SyncPhase + ForkIdValidationResult), `b305ef41b` (NetworkType/VmMode/FaucetStatus/SealEngineType), `c1ecd9706` (ServerStatus), `7f9c987cc` (PruningMode), `75a3d8c5d` (MiningMode). BlacklistReason/BlacklistReasonType ❌ REJECTED (case class subtypes). **`SyncProtocol.SyncStatus` still candidate** — see §3d residual note |
 | ~~**3e — console→logging**~~ | ~~Replace 24 `println`/`System.out` calls with SLF4J~~ | ~~MITHRIL~~ | ✅ DONE `c3fec6390` 2026-06-22 — 12 sites fixed (3 files); 8 intentional CLI/TUI calls preserved |
-| **8e — ScalaFix expansion** | Rules in .scalafix.conf ✅; C2 ✅ `9eb1f4e06`; TNHC ✅ `7a48c5988`; remaining: 7 consensus (FORGE) + 36 SSC (SNAP1) | FORGE / LOOM | gated |
+| **8e — ScalaFix expansion** | C2 ✅ `9eb1f4e06`; TNHC ✅ `7a48c5988`; **§8e-FORGE** (6 consensus files, unblocked) + **§8e-BEACON** (EngineApiController S3-D, unblocked) → clearing prompts written above; 36 SSC gated (SNAP1) | FORGE / BEACON / LOOM | partial |
 | **8g — braceless config** ✅ `34a55a025` | Deferred settings documented in .scalafmt.conf; indent.defnSite + topLevelStatementBlankLines each trigger ~400-file reformats → gated for per-subsystem pass post-CAPSTONE | MITHRIL | done |
 | **8j — Thread.sleep** | 2 live call sites (EthMiningServiceSpec:302, SubscriptionManagerSpec:249) — both NECESSARY; defer to §8a-retro (Typed TestKit enables proper replacement) | EYE | deferred to §8a |
 | **8k-R1 — Classic interop audit** | PRISM: run §8k-R1 prompt — map every `.toClassic`/`actorSelection` to root-cause classic actor; confirm §8k-A scope; output `classic-interop-audit.md` | PRISM | any time |
 | ~~**8k-A — Typed coordinator ref**~~ | ~~MITHRIL: update AccountRangeWorker + ByteCodeWorker `coordinator:` param from classic → typed `ActorRef[T]`; remove `.toClassic` at spawn sites~~ | ~~MITHRIL~~ | ✅ DONE — workers already use typed coordinator refs (`ActorRef[T.Command]`) |
 | ~~**3f — manual sync**~~ | ~~Audit 5 `.synchronized` outside actors~~ | ~~PRISM~~ | ✅ DONE `cf33cfa87` — MapCache:19+30 fixed (TrieMap); CombinedRecoveryScanner + TNHC left as-is (documented); PoWMining FORGE-gated (CHASE-QUEUE) |
-| **8a-retro** | Batches 1+2 DONE — **batch 3 (G1 network/sync actors)** needs TestKit→ActorTestKit migration; clearout prompt in §8a below | LOOM, EYE | ~3h |
+| **8a-retro** | Batches 1–4 ✅ DONE (all 14 coordinator/heal specs migrated). **Batch 5 (assessable subset):** BlockFetcherSpec + PendingTxMgrSpec → **§8a-retro-5b** prompt above; RegularSyncSpec → §9c. PeerActorSpec + RLPxConnectionHandlerSpec wait for Wave 3. | LOOM, EYE | ~2h |
 
 ### Research Threads (run before implementation; can overlap with primary track)
 
@@ -1403,8 +1619,14 @@ Each prompt can run independently. Commit individually.
 | ~~E5c~~ | ~~Batch E~~ | ~~§8a-infra-b — audit + fix worker teardown leaks in coordinator/heal specs~~ | ✅ DONE 2026-06-23 — `781c8e985` — no leaks; workers are Typed `spawnAnonymous` children, stopped by hierarchy; 150/150 ×2 |
 | ~~E5d~~ | ~~Batch E~~ | ~~§8a-retro batch 4b — E165 TestProbe narrowing in coordinator/heal specs (~209 sites)~~ | ✅ DONE 2026-06-23 — `a193bc794` (14 specs, 141 tests, floor 92→65) |
 | ~~E5e~~ | ~~Batch E~~ | ~~§8a-infra-c — MITHRIL: replace classic `actorSelection` worker-ref pattern with Typed injection in ByteCodeCoordinatorSpec + AccountRangeCoordinatorSpec~~ | ✅ DONE 2026-06-23 — `5f28e8ae6` — 40/40 (21 ByteCodeCoordinatorSpec + 19 AccountRangeCoordinatorSpec); see node/testing-infra.md |
-| E6 | Batch E | §8a-retro batch 5 — multi-system + TestActorRef specs (3 assessable, 2 Wave 3 gate) | Partial — BlockFetcherSpec + PendingTxMgr + RegularSyncSpec assessable now; PeerActor + RLPx wait for Wave 3 |
+| E6 | Batch E | §8a-retro batch 5 — multi-system + TestActorRef specs (3 assessable, 2 Wave 3 gate) | Partial — RegularSyncSpec → §9c; remaining: BlockFetcherSpec + PendingTxMgr (→ §8a-retro-5b below); PeerActor + RLPx wait for Wave 3 |
 | ~~F1~~ | ~~Batch F~~ | ~~§3i MITHRIL+FORGE — BlockExecutionError hierarchy redesign: union type + `describe`~~ | ✅ DONE 2026-06-23 — `64ab4786e` |
+| G1 | Batch G | §8a-retro-5b — BlockFetcherSpec + PendingTxMgrSpec ActorTestKit migration | No gate — both production actors already Typed |
+| G2 | Batch G | §8e-FORGE — 6 consensus `return` → expression conversions | Parallel-safe; FORGE-only; unblocked |
+| G3 | Batch G | §8e-BEACON — EngineApiController S3-D `return` → expression (2 sites) | Parallel-safe; BEACON-only; unblocked |
+| G4 | Batch G | §8d-A1 — BEACON: EngineApiService `Await.result` on CE3 compute thread | MEDIUM priority; BEACON gate; prompt in §8d above |
+| G5 | Batch G | §8d-CONDUIT — CONDUIT: jsonrpc/ remaining IO boundary scan (Await/EC.global/blocking) | LOW priority; unblocked; 15-min scan; prompt in §8d above |
+| G6 | Batch G | §8c-M4 — VAULT: DataSource close cache invalidation verify-or-by-design | LOW priority; VAULT gate; prompt in §8c above |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
 
@@ -1451,6 +1673,40 @@ the right mode immediately."
 after the current sprint queue clears.
 
 **Agent:** Sonnet (pure function + SyncController wiring, not consensus-critical)
+
+---
+
+### 9b — RegularSync Divergence-Path Spec Fix (gate OPEN — §8k-F done)
+
+**Context:** CHASE-QUEUE "RegularSync divergence path EXCEPT" (cleared 2026-06-21) — HERALD audit confirmed the three-path fork recovery in `BlockImporter.scala` (`handleForkRecovery`) uses a blind 128-block rewind with no LCA knowledge. MESS makes >128-block forks near-impossible on ETC mainnet so this is latent-correctness, not active-risk. Gate was §8k-F (RegularSync Typed) — **now done** (`b24515637`).
+
+**Fix spec:**
+1. Confirm whether FSBA `replyTo: ActorRef[BranchResolverResponse]` was already wired (SNAP2 note in CHASE-QUEUE ~line 94)
+2. Add `ResolvingFork` behavior to `BlockImporterLogic` — spawn `FastSyncBranchResolverActor` + handle `FinishedBranchResolution` response
+3. Replace 4-line blind rewind in `handleForkRecovery` with actor spawn + response path
+4. Re-enable/rewrite the divergence-path EXCEPT test in `RegularSyncSpec`
+
+**Prompt (LOOM + EYE):**
+> `RegularSync.scala` is now fully Typed (`b24515637`). The divergence path EXCEPT in `RegularSyncSpec` is now actionable (DEFERRED-BACKLOG §9b). Read `sync/regular.md`, `sync/fast.md` (FSBA), and CHASE-QUEUE cleared entry "RegularSync divergence path EXCEPT". Implement the `ResolvingFork` behavior in `BlockImporterLogic` and re-enable the test. Gate: none.
+>
+> **Pre-flight — pekko-typed-api.md P16 + pre-migration-checklist.md Step 13:** After wiring the FSBA spawn, confirm `FastSyncBranchResolverActor`'s constructor param declares `ActorRef[BranchResolverResponse]` (Typed), not Classic `ActorRef`. The spawn site must not write `.toClassic`. Run: `grep -n "ActorRef\b" BlockImporterLogic.scala | grep -v "typed\.\|ActorRef\["` — expected 0 hits.
+
+**Size:** S. **Agent:** LOOM + EYE. **Priority:** LOW.
+
+---
+
+### 9c — RegularSyncSpec Full Migration (gate OPEN — §8k-F done)
+
+**Context:** `RegularSyncSpec` was deferred because it required `RegularSync` to be Typed first. **§8k-F (`b24515637`) opens the gate.**
+
+**Fix:** Migrate `RegularSyncSpec` from `Resource[IO, ActorSystem]` lifecycle to `ScalaTestWithActorTestKit`. Restructure teardown to use `testKit.system` + `testKit.shutdown()`.
+
+**Prompt (LOOM + EYE):**
+> `RegularSync.scala` is now fully Typed (`b24515637`). Migrate `RegularSyncSpec` from its `Resource[IO, ActorSystem]` lifecycle to `ScalaTestWithActorTestKit`. Read `node/testing-infra.md` §8a-retro batches for migration patterns. Verify 33/33 tests pass.
+>
+> **Pre-flight — pre-migration-checklist.md Step 13:** After migrating, verify no spawn-site slippage was introduced: `grep -n "ActorRef\b" RegularSyncSpec.scala | grep -v "typed\.\|ActorRef\["` — expected 0 hits. Also opportunistically check `SyncProtocol.SyncStatus` for enum candidacy (§3d residual — 5-min check while in sync/ territory).
+
+**Size:** M. **Agent:** LOOM + EYE. **Priority:** MED — unblocks E165 TestProbe narrowing in this spec.
 
 ---
 
