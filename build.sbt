@@ -82,10 +82,6 @@ def commonSettings(projectName: String): Seq[sbt.Def.Setting[_]] = Seq(
   (Test / testOptions) += Tests
     .Argument(TestFrameworks.ScalaTest, "-l", "EthashMinerSpec"), // miner tests disabled by default
   (Test / testOptions) += Tests
-    .Argument(TestFrameworks.ScalaTest, "-l", "FlakyTest"), // timing-sensitive tests excluded by default
-  (Test / testOptions) += Tests
-    .Argument(TestFrameworks.ScalaTest, "-l", "DisabledTest"), // known-broken tests excluded by default
-  (Test / testOptions) += Tests
     .Argument(TestFrameworks.ScalaTest, "-l", "IntegrationTest"), // network-dependent tests excluded by default
   // Configure scalacOptions for Scala 3
   scalacOptions := {
@@ -516,13 +512,13 @@ addCommandAlias(
 // These commands enable selective test execution based on ScalaTest tags
 
 // testEssential - Tier 1: Essential tests (< 5 minutes)
-// Runs fast unit tests, excludes integration, slow, sync, and disabled tests
-// Sync tests are excluded because they involve complex actor choreography (ADR-017)
-// DisabledTest is excluded because these tests are known to be broken or flaky
+// Runs fast unit tests, excludes integration and slow tests.
+// SlowTest: legitimately too slow for the daily commit gate (runs in testStandard).
+// IntegrationTest: network-dependent or actor-choreography tests that belong in Tier 2+.
 addCommandAlias(
   "testEssential",
   """; compile-all
-    |; testOnly -- -l SlowTest -l IntegrationTest -l SyncTest -l DisabledTest -l FlakyTest
+    |; testOnly -- -l SlowTest -l IntegrationTest
     |; rlp / test
     |; bytes / test
     |; crypto / test
@@ -530,32 +526,25 @@ addCommandAlias(
 )
 
 // testStandard - Tier 2: Standard tests (< 30 minutes)
-// Runs unit and integration tests, excludes benchmarks, comprehensive ethereum tests, and disabled tests
-// DisabledTest is excluded because these tests are known to be broken or flaky
-// SyncTest is excluded because these tests involve complex actor choreography (ADR-017)
-//   that times out under load — same reason testEssential excludes them
+// Runs unit and integration tests. Excludes only Tier 3 tests:
+// BenchmarkTest/EthereumTest: the 3-hour compliance suite — belongs in testComprehensive only.
 addCommandAlias(
   "testStandard",
   """; compile-all
-    |; testOnly -- -l BenchmarkTest -l EthereumTest -l SyncTest -l DisabledTest -l FlakyTest
+    |; testOnly -- -l BenchmarkTest -l EthereumTest
     |""".stripMargin
 )
 
 // testComprehensive - Tier 3: Comprehensive tests (< 3 hours)
-// Runs all tests including ethereum/tests compliance suite
-// Excludes FlakyTest and DisabledTest to ensure reliable nightly builds
-// SyncTest is excluded for the same reason testEssential and testStandard exclude it:
-//   complex actor choreography (ADR-017) times out under CI load
-//   (RegularSyncSpec, SyncControllerSpec, BlockchainHostActorSpec, FastSyncSpec,
-//   SyncStateDownloaderStateSpec — all "timeout during fishForSpecificMessage").
+// Runs all tests including the ethereum/tests compliance suite. No exclusions.
 addCommandAlias(
   "testComprehensive",
   """; compile-all
     |; rlp / test
     |; bytes / test
     |; crypto / test
-    |; testOnly -- -l SyncTest -l FlakyTest -l DisabledTest
-    |; IntegrationTest / testOnly -- -l SyncTest -l FlakyTest -l DisabledTest
+    |; testOnly
+    |; IntegrationTest / testOnly
     |""".stripMargin
 )
 
@@ -579,6 +568,13 @@ addCommandAlias("testDatabase", "testOnly -- -n DatabaseTest")
 addCommandAlias("testRLP", "testOnly -- -n RLPTest")
 addCommandAlias("testMPT", "testOnly -- -n MPTTest")
 addCommandAlias("testEthereum", "testOnly -- -n EthereumTest")
+// Domain test commands — added in P12 (tag taxonomy audit)
+// ConsensusTest (284), RPCTest (219), OlympiaTest (201), StateTest (63), SyncTest (84)
+addCommandAlias("testConsensus", "testOnly -- -n ConsensusTest")
+addCommandAlias("testRPC", "testOnly -- -n RPCTest")
+addCommandAlias("testState", "testOnly -- -n StateTest")
+addCommandAlias("testOlympia", "testOnly -- -n OlympiaTest")
+addCommandAlias("testSync", "testOnly -- -n SyncTest")
 
 // Scapegoat configuration for Scala 3
 (ThisBuild / scapegoatVersion) := "3.3.6" // first cross-build for Scala 3.3.8
