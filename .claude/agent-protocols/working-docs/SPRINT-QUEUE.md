@@ -91,65 +91,11 @@ Source: `§8k-R1` audit complete 2026-06-23 — `.local/docs/classic-interop-aud
 | Sprint | Work | Agent | Severity | Gate |
 |--------|------|-------|----------|------|
 | ~~**§ETH69-A**~~ | ~~`collectVoters`: add TD consensus gate — filter peer pool by `chainWeight.totalDifficulty >= ourBestTD × 0.8`~~ | ~~FORGE~~ | ~~**P0 CRITICAL**~~ | ✅ DONE `12d2ede7e` |
-| **§ETH69-B** | `SNAPSyncController`: parent-chain backlink validation (N=20 headers) before SNAP bootstrap | FORGE | **P0 HIGH** | §ETH69-A |
+| ~~**§ETH69-B**~~ | ~~`PivotBlockSelector`: parent-chain backlink validation (N=20 headers) before SNAP bootstrap~~ | ~~FORGE~~ | ~~**P0 HIGH**~~ | ✅ DONE `0092e5f03` |
 | ~~**§ETH69-F**~~ | ~~`PeerActor:551` + `BlockFetcher:486`: `ETH69.BlockRangeUpdate` → `ETHPackets.BlockRangeUpdate`; fix `BlockFetcherSpec:298-305`~~ | ~~BEACON~~ | ~~**P1 HIGH**~~ | ✅ DONE `931c615dd` (Part 14 §ETH-BRU) — PeerActor:551 + BlockFetcher:486 fixed; see network/peers.md |
 
 P1/P2 hardening items → `DEFERRED-BACKLOG.md Part 16` (§ETH69-C/D/E)
 
----
-
-#### §ETH69-B — FORGE: SNAPSyncController pivot parent-chain backlink validation (G5)
-
-**Agent:** FORGE
-**Risk:** HIGH — adds mandatory header probe between pivot election and SNAP bootstrap
-**Gate:** §ETH69-A complete
-**Spec:** `.local/Wire-Protocol-Modernization/G5-pivot-backlink.md`
-
-**Background:**
-Even with the G1 TD gate in place, a peer whose Tier3 estimate passes the 80% threshold can
-still present a pivot on a low-TD fork. After pivot election, `PivotBlockSelector.sendResponseAndCleanup`
-(lines 340-351) sends the pivot header to FastSync with no parent-chain validation. No PoW
-nonce check, no back-link to a known canonical ancestor. SNAP sync bootstraps from the pivot's
-state root immediately.
-
-**Steps:**
-1. **Read** `.local/Wire-Protocol-Modernization/G5-pivot-backlink.md` for full context.
-2. **Read** `SNAPSyncController.scala` — locate the bootstrap entry point and how pivot header
-   is consumed. Grep: `bootstrap|pivotBlock|pivotStateRoot|FastSyncState|PivotBlock`.
-3. **Read** `PivotBlockSelector.scala` — locate `sendResponseAndCleanup` (lines 340-351).
-4. **FORGE pre-flight decision required:**
-   - What is the right backlink depth N? (Initial recommendation: 20 headers)
-   - Failure mode: pivot rejection + retry, or disconnect-all-voters + retry?
-   - Is there an existing `GetBlockHeaders` request path usable from `PivotBlockSelector`?
-5. **Implement** post-election backlink probe:
-   - Send `GetBlockHeaders(pivot.hash, count=N, skip=0, reverse=true)` to pivot-voting peers
-   - Walk N parent headers verifying PoW validity (nonce, difficulty, parentHash chain)
-   - Check if ANY parent header matches `blockchainReader.getBlockHeaderByNumber(h.number)` + hash
-   - If canonical match found within N hops → proceed with pivot
-   - If no match → reject pivot, log `ETH69_PIVOT_BACKLINK_FAIL`, retry
-6. **Write tests** in SNAPSyncController spec:
-   - Canonical parent within 5 hops → proceeds
-   - Canonical parent at exactly hop N → proceeds
-   - No canonical parent in N hops → rejected + retry
-   - Invalid PoW in parent headers → immediate rejection
-
-**Verify:**
-```bash
-grep -n "sendResponseAndCleanup\|Result\|pivotBlock" \
-  src/main/scala/com/chipprbots/ethereum/blockchain/sync/fast/PivotBlockSelector.scala
-# Must see backlink probe call before Result(...) emission
-
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. Stage `PivotBlockSelector.scala`, `SNAPSyncController.scala`, and test files
-3. `git commit -m "fix(sync): ETH69 pivot parent-chain backlink validation before SNAP bootstrap (G5)"`
-4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(eth69-b): clearout — $SHA"`
-5. **DELETE §ETH69-B**
-
----
 
 #### §ETH69-F — BEACON: BlockRangeUpdate type mismatch — dead protocol-breach disconnect (G6)
 

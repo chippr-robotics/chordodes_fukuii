@@ -1,6 +1,6 @@
 # Fukuii Modernization — Deferred Backlog
 
-**Last updated**: 2026-06-24 (§8k-G4 fully DONE — all sub-tasks committed, externalAdapter deleted, §8k-G cluster closed; see completed/DEFERRED-BACKLOG.md §8k-G4)
+**Last updated**: 2026-06-24 (§8k-G4 fully DONE; Thread 4 ETH/Sepolia audit complete — 4 items added as §ETH-T4-A/B/C/D; Thread 6 VM tracer audit complete — §ETH-T6-A + §ETH-T6-B added; Thread 7 test coverage ratio audit — §ETH-T7-A/B/C/D/E added; Thread 8 config audit complete — NO CODE FIXES; Thread 9 SNAP sync ETH path audit — §ETH-T9-A/B/C/D added; Thread 10 Engine API Osaka audit — §ETH-T10-A/B/C/D confirmed by BEACON; Thread 5 chain ID hardcoding audit CLEAN — zero leakage, no action items; **R10 ALL 10 THREADS COMPLETE**)
 **Purpose**: Single reference for all deferred cleanup work — completed items,
 active deferred items, and follow-up sprint plans.
 
@@ -23,7 +23,7 @@ Active sprint plan: `/home/dev/.claude/plans/we-are-working-on-noble-whisper.md`
 | 2 | RocksDB `ClockCache` deprecated | Library upgrade |
 | 2 | diffx `DiffMatcher` | Library upgrade |
 | 1 | Guava `CacheBuilder` | Library upgrade |
-| 1 | `EngineApiService.scala:581` `Ordering.Iterable` | BEACON gate |
+| 1 | `EngineApiService.scala:661` `Ordering.Iterable` (tx sort key — `(Seq[Byte], BigInt)`) | BEACON gate — **not a correctness concern** (T10 verdict 2026-06-24); fix: supply explicit `Ordering` to silence warning without changing semantics |
 | 1 | web3j `Admin` deprecated | Library upgrade |
 | 1 | `TrieNodeHealingCoordinator` inside Pekko library boundary | Unfixable |
 | 1 | `PeerRequestHandler` `ClassTag` unsound type-test | Needs `TypeTest[A,B]` (non-trivial) |
@@ -828,7 +828,7 @@ No actor migration gate. Commit individually; do not bundle with primary-track m
 | **R7** | RLP codec derivation safety analysis (safe-to-derive vs must-stay-manual) | Feeds 8i implementation | MITHRIL, FORGE |
 | **R8** ✅ | Memory / resource retention audit — DONE, see completed | — | — |
 | **R9** ✅ | IO threading model audit — DONE, see completed | — | — |
-| **R10** | **ETH/Sepolia assumption audit** — systematic hunt for ETC-first design leaking into ETH code paths. 10 threads: (1) fork dispatch `forBlock` vs `forTimestamp`, (2) PoW/PoS divergence guards, (3) EIP-1559 fee routing (burn vs treasury), (4) CL integration completeness (withdrawals/4788/4844), (5) chain ID hardcoding, (6) VM tracer abort-path completeness, (7) test coverage ratio ETC vs ETH, (8) Sepolia config completeness, (9) SNAP sync ETH path, (10) Engine API Osaka edge cases. Findings feed an ETH sprint. **Prompt:** `.local/docs/eth-sepolia-assumption-audit.md`. Gate: none. | BEACON (T1,3,4,6,8,10), FORGE (T2,5,7), EYE (T9) |
+| **R10** ✅ **ALL DONE** | **ETH/Sepolia assumption audit** — systematic hunt for ETC-first design leaking into ETH code paths. 10 threads: (1) fork dispatch `forBlock` vs `forTimestamp` ✅ → §ETH-T1-A/B/C, (2) PoW/PoS divergence guards ✅ → §ETH-T2-A, (3) EIP-1559 fee routing ✅ FIXED `f868b75a8`, (4) CL integration completeness ✅ → §ETH-T4-A/B/C/D, (5) chain ID hardcoding ✅ NO CODE FIXES — zero leakage; chainId/networkId config-driven throughout; EIP-155 signing config-bound; `TestService.scala:239 networkId=1` is retesteth-only (harmless), (6) VM tracer abort-path completeness ✅ 0 unbalanced paths — §ETH-T6-A (try/finally hardening) + §ETH-T6-B (EIP-2681 nonce-max) added, (7) test coverage ratio ETC vs ETH ✅ → §ETH-T7-A/B/C/D/E, (8) Sepolia config completeness ✅ NO CODE FIXES — all values correct; blob gas hardcoded correctly in BlobGasUtils; `network-type="eth"` present; treasury=0x0; audit doc had wrong Prague ts (1740434112→1741159776, fixed 2026-06-24), (9) SNAP sync ETH path ✅ → §ETH-T9-A/B/C/D, (10) Engine API Osaka edge cases ✅ → §ETH-T10-A/B/C/D. Findings feed an ETH sprint. **Prompt:** `.local/docs/eth-sepolia-assumption-audit.md`. Gate: none. | BEACON (T1,3,4,6,8,10), FORGE (T2,5,7), EYE (T9) |
 
 | Sprint | Work | Agents | Gate |
 |--------|------|--------|------|
@@ -1596,3 +1596,1096 @@ sbt testVM
 3. `git commit -m "refactor: rename BlockHeader.isPostMerge → isPoS, add isPoW companion — align PoW/PoS vocabulary with chain-level isPoWChain pattern"`
 4. `SHA=$(git rev-parse --short HEAD)` → update `.local/docs/eth-sepolia-assumption-audit.md` Thread 2 entry with SHA
 5. **DELETE §ETH-T2-A**
+
+---
+
+### §ETH-T4-A — BEACON: Load KZG trusted setup — point-evaluation precompile silently accepts invalid proofs
+
+**Agent:** BEACON
+**Risk:** HIGH — consensus divergence: every Sepolia block using precompile 0x0A produces wrong output
+**Gate:** None — standalone fix; prerequisite for any correct ETH/Sepolia execution
+**Files:**
+- `src/main/scala/com/chipprbots/ethereum/vm/PrecompiledContracts.scala:784-799`
+- `project/Dependencies.scala:141` (`jc-kzg-4844`)
+- Node startup path (find with: `grep -rn "KZGUtils\|CKZG4844JNI\|loadTrustedSetup\|loadNativeLibrary" src/main/ --include="*.scala"`)
+
+**Background:**
+`CKZG4844JNI.verifyKzgProof` (jc-kzg-4844) throws `IllegalStateException` if the trusted
+setup is not loaded before the call. The trusted setup is **never loaded** anywhere in the
+codebase — zero `loadTrustedSetup` or `loadNativeLibrary` calls exist. The catch block at
+`:797-799` swallows the exception and falls through to return the success output
+(`FIELD_ELEMENTS_PER_BLOB ++ BLS_MODULUS`) whenever the SHA-256/field checks pass. This
+means the point-evaluation precompile **accepts any KZG proof that is well-formed but
+cryptographically invalid** — it never actually verifies the proof.
+
+go-ethereum (`core/vm/contracts.go`) returns `errBlobVerifyKZGProof` on verification
+failure, which causes the precompile to revert. Fukuii returns success. Any Sepolia block
+containing a `POINT_EVALUATION` call against an invalid proof would be accepted by Fukuii
+but rejected by all other clients — consensus divergence.
+
+**Steps:**
+1. **Read** `PrecompiledContracts.scala:743-808` in full to understand the current
+   point-evaluation implementation and the exception handling.
+2. **Read** `project/Dependencies.scala` around line 141 for the `jc-kzg-4844` version.
+3. **Find** the node startup path — check `NodeBuilder.scala` (or equivalent) for where
+   precompiled contracts / EVM setup is initialized.
+4. **Load the trusted setup at startup** — call `CKZG4844JNI.loadNativeLibrary()` and then
+   `CKZG4844JNI.loadTrustedSetup(...)` once at node startup before any EVM execution. The
+   canonical `trusted_setup.txt` ships with the `jc-kzg-4844` JAR as a resource; load it with:
+   ```scala
+   CKZG4844JNI.loadNativeLibrary()
+   val setupStream = classOf[CKZG4844JNI].getResourceAsStream("/trusted_setup.txt")
+   CKZG4844JNI.loadTrustedSetup(setupStream)
+   ```
+   Gate this on `networkType == NetworkType.ETH` (or on `cancunTimestamp.isDefined`) — ETC
+   nodes do not need the trusted setup.
+5. **Fix the catch block** at `PrecompiledContracts.scala:797-799`: replace the silent
+   fallthrough with an explicit `None` (revert):
+   ```scala
+   // BEFORE: exception swallowed, returns success
+   } catch { case _: Exception => /* fall through */ }
+   if (/* sha256 / field checks passed */) Some(...)
+   
+   // AFTER: exception = proof failed = revert
+   } catch { case _: Exception => return None }
+   ```
+6. **Write a test** in `PrecompiledContractSpec` (or similar):
+   - Valid KZG proof → returns `(FIELD_ELEMENTS_PER_BLOB, BLS_MODULUS)` encoded as expected
+   - Invalid KZG proof (well-formed but wrong) → returns `None` (revert)
+   - Use a real test vector from the EIP-4844 JSON tests in:
+     `reference-clients-evm/go-ethereum/core/vm/testdata/precompiles/pointEvaluation.json`
+     (or equivalent)
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *PrecompiledContract* *PointEvaluation* *Blob*"
+sbt testVM
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/main/scala/.../vm/PrecompiledContracts.scala` + startup file + any test files
+3. `git commit -m "fix(eth): load KZG trusted setup at startup — point-evaluation precompile now rejects invalid proofs (EIP-4844)"`
+4. `SHA=$(git rev-parse --short HEAD)` → update `.local/docs/eth-sepolia-assumption-audit.md` Thread 4c entry with SHA
+5. **DELETE §ETH-T4-A**
+
+---
+
+### §ETH-T4-B — BEACON: Add `maxFeePerBlobGas >= blobBaseFee` validation for Type-3 transactions
+
+**Agent:** BEACON
+**Risk:** HIGH — under-priced blob transactions accepted into blocks; consensus divergence vs go-ethereum
+**Gate:** §ETH-T4-A complete (same file — apply in the same BEACON session)
+**Files:**
+- `src/main/scala/com/chipprbots/ethereum/consensus/validators/std/StdSignedTransactionValidator.scala:85-128`
+- `src/main/scala/com/chipprbots/ethereum/ledger/BlockPreparator.scala` (access to computed `blobBaseFee`)
+
+**Background:**
+EIP-4844 requires that a blob transaction is valid only when
+`tx.maxFeePerBlobGas >= blobBaseFee(block.excessBlobGas)`. go-ethereum rejects with
+`ErrMaxFeePerBlobGas`. Fukuii's `StdSignedTransactionValidator` checks Cancun activation
+(`:85-97`) and the generic EIP-1559 `maxFeePerGas >= baseFee` (`:103-128`) but has no
+comparison of `maxFeePerBlobGas` against the block's blob base fee. A blob tx with
+`maxFeePerBlobGas = 0` in a block where `blobBaseFee = 1` would be accepted by Fukuii.
+
+**Steps:**
+1. **Read** `StdSignedTransactionValidator.scala:70-130` in full to understand the validation
+   signature — specifically how `baseFee` and `blockHeader` are passed in.
+2. **Read** `BlobGasUtils` (in `EngineApiService.scala` or a dedicated object) to find the
+   `getBlobGasPrice(excessBlobGas, timestamp, config)` method.
+3. **Compute `blobBaseFee`** from `blockHeader.excessBlobGas` using `BlobGasUtils`. Confirm
+   `blockHeader.excessBlobGas` is available at the validator call site.
+4. **Add validation** for `BlobTransaction` subtype:
+   ```scala
+   case tx: BlobTransaction =>
+     val blobBaseFee = BlobGasUtils.getBlobGasPrice(
+       blockHeader.excessBlobGas.getOrElse(BigInt(0)),
+       blockHeader.unixTimestamp,
+       blockchainConfig
+     )
+     if tx.maxFeePerBlobGas < blobBaseFee then
+       Left(TransactionError.MaxFeePerBlobGasTooLow(tx.maxFeePerBlobGas, blobBaseFee))
+     else Right(())
+   ```
+   Add `MaxFeePerBlobGasTooLow` to the `TransactionError` sealed hierarchy if it does not exist.
+5. **Gate on Cancun timestamp** — only apply when `blockchainConfig.isCancunTimestamp(blockHeader.unixTimestamp)`.
+   Pre-Cancun blocks have no `excessBlobGas`; blob txs are already rejected before this check.
+6. **Write tests** in `StdSignedTransactionValidatorSpec`:
+   - Blob tx with `maxFeePerBlobGas` equal to `blobBaseFee` → accepted
+   - Blob tx with `maxFeePerBlobGas` below `blobBaseFee` → rejected with `MaxFeePerBlobGasTooLow`
+   - Non-blob tx → check unchanged (no regression)
+   - ETC chain → no blob txs; check does not fire
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *StdSignedTransactionValidator* *BlobTransaction*"
+sbt testVM
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/main/scala/.../consensus/validators/std/StdSignedTransactionValidator.scala` + any error ADT file + test files
+3. `git commit -m "fix(eth): validate maxFeePerBlobGas >= blobBaseFee for Type-3 transactions (EIP-4844)"`
+4. `SHA=$(git rev-parse --short HEAD)` → update `.local/docs/eth-sepolia-assumption-audit.md` Thread 4c entry
+5. **DELETE §ETH-T4-B**
+
+---
+
+### §ETH-T4-C — BEACON: Deploy EIP-4788 beacon roots contract bytecode (code + nonce=1 missing)
+
+**Agent:** BEACON
+**Risk:** MEDIUM — EIP-4788 storage values correct; account code hash diverges from canonical Sepolia state root
+**Gate:** None — standalone fix; safe to run before §ETH-T4-A/B
+**Files:**
+- `src/main/scala/com/chipprbots/ethereum/ledger/BlockExecution.scala:209-237` (`applyEip4788`)
+- Compare with EIP-2935 implementation at `BlockExecution.scala:260-267` (uses `saveCode` + nonce=1)
+
+**Background:**
+`applyEip4788` (`BlockExecution.scala:209-237`) writes the two ring-buffer storage slots
+correctly but does not deploy the contract bytecode on the beacon roots account
+(`0x000F3df6D732807Ef1319fB7B8bB8522d0Beac02`). go-ethereum makes a real EVM
+`call(SystemAddress → BeaconRootsAddress)` which executes the deployed bytecode; the account
+therefore has `code != empty` and `nonce = 1` in canonical Sepolia state.
+
+Fukuii only calls `saveAccount` + `saveStorage` — the account has `codeHash = EMPTY_HASH`
+and `nonce = 0`. When the Sepolia state root is computed, the account leaf differs from the
+canonical leaf → state root mismatch on any post-Cancun Sepolia block.
+
+The Sepolia genesis does NOT pre-allocate the beacon roots account — it must be seeded during
+block processing at the Cancun activation block. EIP-2935 (at `:260-267`) already handles
+this correctly with `saveCode` + nonce=1. The fix is to mirror that pattern.
+
+The canonical beacon roots contract bytecode is the standard EIP-4788 bytecode deployed on
+all mainnet/testnet chains. Retrieve from go-ethereum:
+`reference-clients-evm/go-ethereum/core/vm/contracts.go` or from the EIP-4788 spec.
+
+**Steps:**
+1. **Read** `BlockExecution.scala:209-237` to understand the current `applyEip4788` implementation.
+2. **Read** `BlockExecution.scala:260-267` (`applyEip2935`) to see the `saveCode` + nonce=1 pattern.
+3. **Find the canonical EIP-4788 contract bytecode**:
+   ```bash
+   grep -rn "BeaconRoots\|4788\|0x000F3df6" \
+     reference-clients-evm/go-ethereum/core/ --include="*.go" | head -20
+   ```
+   The bytecode is a small (~100 byte) assembly program. It is public and deterministic.
+4. **Extend `applyEip4788`** to deploy the contract at activation time (only on the first
+   call, when the account does not yet have code). Mirror the EIP-2935 pattern:
+   ```scala
+   // After saveStorage calls — deploy bytecode if account has no code yet
+   val beaconRootsAccount = worldState.getAccount(beaconRootsAddress)
+     .getOrElse(Account.empty())
+   if beaconRootsAccount.codeHash == Account.EMPTY_CODE_HASH then
+     val withCode = beaconRootsAccount.copy(nonce = 1)
+     val updatedWorld = worldState
+       .saveAccount(beaconRootsAddress, withCode)
+       .saveCode(beaconRootsAddress, ByteString(BEACON_ROOTS_CODE))
+   ```
+   Where `BEACON_ROOTS_CODE` is the canonical EIP-4788 bytecode bytes.
+5. **Write a test** that verifies the beacon roots account has `code != empty` and `nonce == 1`
+   after the first post-Cancun block is processed on ETH/Sepolia.
+6. **Confirm ETC safety** — `applyEip4788` is already gated on
+   `isCancunTimestamp(block.header.unixTimestamp)` which returns `false` for ETC; no change needed.
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *BlockExecution* *Eip4788* *BeaconRoot*"
+sbt testVM
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/main/scala/.../ledger/BlockExecution.scala` + any test files
+3. `git commit -m "fix(eth): deploy EIP-4788 beacon roots contract bytecode (code+nonce=1) — state root now matches canonical Sepolia"`
+4. `SHA=$(git rev-parse --short HEAD)` → update `.local/docs/eth-sepolia-assumption-audit.md` Thread 4b entry
+5. **DELETE §ETH-T4-C**
+
+---
+
+### §ETH-T4-D — MITHRIL + BEACON: Unify blob base fee formula — `deductBlobGas` diverges post-Osaka
+
+**Agent:** MITHRIL (mechanical change) with BEACON pre-flight (consensus safety check)
+**Risk:** MEDIUM — burned blob gas cost diverges from header-validator/Engine-API view on post-BPO Sepolia blocks
+**Gate:** None — standalone fix; safe to run independently
+**Files:**
+- `src/main/scala/com/chipprbots/ethereum/ledger/BlockPreparator.scala:205-240` (`deductBlobGas`, `computeBlobBaseFee`)
+- `src/main/scala/com/chipprbots/ethereum/consensus/engine/EngineApiService.scala` (`BlobGasUtils.getBlobGasPrice`)
+
+**Background:**
+There are two independent blob base fee calculations in Fukuii:
+
+1. **`BlobGasUtils.getBlobGasPrice`** (in `EngineApiService.scala`) — handles Cancun
+   (`TARGET_BLOB_GAS_PER_BLOCK = 3338477`), Prague (`5007716`), and post-Osaka EIP-7892
+   BPO1/BPO2 update fractions. Used by the header validator and Engine API.
+
+2. **`BlockPreparator.computeBlobBaseFee`** (`:223-240`) — a second implementation that
+   only handles Cancun and Prague fractions. It does NOT include the EIP-7892 BPO fractions
+   that activate post-Osaka.
+
+`deductBlobGas` (`:205-221`) calls `computeBlobBaseFee` to compute how much blob gas to burn
+from the sender. On a post-BPO Osaka Sepolia block, `deductBlobGas` uses the wrong update
+fraction → the burned amount differs from what `BlobGasUtils` (used by the validator)
+computes → inconsistency between the amount burned and the amount validated.
+
+The fix is to delete `computeBlobBaseFee` and route `deductBlobGas` through
+`BlobGasUtils.getBlobGasPrice`, which is already the single source of truth.
+
+**Steps:**
+1. **BEACON pre-flight:** Read `BlockPreparator.scala:205-240` and `BlobGasUtils.getBlobGasPrice`
+   side by side. Confirm:
+   - `getBlobGasPrice(excessBlobGas, timestamp, config)` signature matches what `deductBlobGas` needs
+   - The `blockHeader.unixTimestamp` and `blockHeader.excessBlobGas` are in scope in `deductBlobGas`
+   - The return type is compatible (both return `BigInt` blob gas price)
+2. **MITHRIL implementation:**
+   a. In `deductBlobGas`, replace the `computeBlobBaseFee(...)` call with
+      `BlobGasUtils.getBlobGasPrice(blockHeader.excessBlobGas.getOrElse(0), blockHeader.unixTimestamp, blockchainConfig)`
+   b. Delete the `computeBlobBaseFee` private method (`:223-240`) — it is now unreachable.
+3. **Confirm ETC safety** — `deductBlobGas` is gated on Cancun activation; ETC has no Cancun
+   timestamp; the path is unreachable for ETC blocks. No ETC behaviour change.
+4. **Write / extend a test** to verify `deductBlobGas` burns the correct amount for a
+   post-Prague block using a known `excessBlobGas` value, matching `BlobGasUtils.getBlobGasPrice`.
+
+**Verify:**
+```bash
+# No remaining computeBlobBaseFee references
+grep -rn "computeBlobBaseFee" src/ --include="*.scala"
+# Expected: 0 results
+
+sbt compile-all
+sbt "testOnly *BlockPreparator* *BlobGas*"
+sbt testVM
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/main/scala/.../ledger/BlockPreparator.scala` + any test files
+3. `git commit -m "fix(eth): unify blob base fee formula — deductBlobGas now uses BlobGasUtils.getBlobGasPrice (EIP-7892 post-Osaka correct)"`
+4. `SHA=$(git rev-parse --short HEAD)` → update `.local/docs/eth-sepolia-assumption-audit.md` Thread 4c entry
+5. **DELETE §ETH-T4-D**
+
+---
+
+### §ETH-T6-A — BEACON: VM.scala tracer try/finally hardening
+
+**Agent:** BEACON
+**Risk:** LOW — no behaviour change on the happy path; only affects exceptional/unreachable abort
+paths that currently skip `onCallExit`. ETC execution is identical (ETC uses the same `VM.scala`).
+**Gate:** None — standalone fix, no sprint prerequisite
+**Files:** `src/main/scala/com/chipprbots/ethereum/vm/VM.scala` — `call()` (lines 55-104) and
+`create()` (lines 120-208)
+
+**Background (Thread 6 of the ETH/Sepolia assumption audit, 2026-06-24):**
+
+The Thread 6 audit found that `call()` and `create()` use a `val result = if/else` expression
+pattern where `onCallEnter` fires at the top and `onCallExit` fires unconditionally after the
+if/else. This is correct and balanced for every currently-reachable path. However, three defensive
+guards (`require`/`throw`) are placed inside the if/else and can throw past the trailing `onCallExit`:
+
+| # | Location | Guard | Reachable from opcode dispatch? |
+|---|----------|-------|---------------------------------|
+| C2 | `VM.create()` line 133 | `require(recipientAddr.isEmpty)` | NO — `CreateOp.exec` always passes `None` |
+| C3 | `VM.create()` line 134 | `require(doTransfer)` | NO — `CreateOp.exec` always passes `true` |
+| L2 | `VM.call()` line 71-73 | `throw IllegalArgumentException` | NO — `CallOp.exec` always passes `Some(toAddr)` |
+
+These are the **same class of structural hole** as the §8l-I bug (EIP-3860 unbalanced path) but
+are currently unreachable through normal sub-call opcode dispatch. The structural fix is to move
+`onCallExit` into a `finally` block, making "every enter has an exit" true **by construction**.
+This matches Besu's `traceContextExit` guarantee and also closes C9/L6 (unexpected `exec()` throw).
+
+**Steps:**
+
+1. **Read** `VM.scala` lines 55-104 (`call()`) and 120-208 (`create()`) in full — confirm exact
+   line numbers of `tracer.foreach(_.onCallEnter(...))`, the result `val`, and the trailing
+   `tracer.foreach(_.onCallExit(...))` in each method.
+
+2. **In `call()` — wrap result computation in try/finally:**
+   ```scala
+   // BEFORE (simplified):
+   if isSubCall then tracer.foreach(_.onCallEnter(...))
+   val result = if !isValidCall then invalidCallResult else { ... }
+   if isSubCall then tracer.foreach(_.onCallExit(...))
+   result
+
+   // AFTER:
+   if isSubCall then tracer.foreach(_.onCallEnter(...))
+   val result =
+     try
+       if !isValidCall then invalidCallResult else { ... }
+     finally
+       if isSubCall then tracer.foreach(_.onCallExit(...))
+   result
+   ```
+   Remove the standalone trailing `if isSubCall then tracer.foreach(_.onCallExit(...))` line.
+
+3. **In `create()` — same pattern** for the `val (result, newAddress) = ...` binding.
+   Remove the standalone trailing `onCallExit` line.
+
+4. **Confirm §8l-I fix is preserved** — the EIP-3860 check (lines 136-142) returns a value
+   inside the `try` block; it does NOT throw. The `finally` block fires after it. §8l-I is
+   structurally preserved; the wrapper additionally closes C2/C3/L2.
+
+5. **Write a targeted regression test** in the existing VM tracer test suite covering the latent
+   paths:
+   - `create()` called with `recipientAddr = Some(addr)` at sub-call depth → `require` fires
+     → verify `onCallExit` IS emitted (previously it was not)
+   - `call()` called with `recipientAddr = None` at sub-call depth → `throw` fires
+     → verify `onCallExit` IS emitted
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *VMTracer*" "testOnly *CallTracer*" "testOnly *VM*"
+sbt testVM
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/main/scala/.../vm/VM.scala` + test file(s)
+3. `git commit -m "fix(vm): wrap call()/create() result in try/finally — onCallExit always fires even on require/throw abort (closes C2/C3/L2 latent tracer paths)"`
+4. `SHA=$(git rev-parse --short HEAD)` → update `.local/docs/eth-sepolia-assumption-audit.md` Thread 6 entry with SHA
+5. **DELETE §ETH-T6-A**
+
+---
+
+### §ETH-T6-B — BEACON: EIP-2681 nonce overflow enforcement at transaction layer
+
+**Agent:** BEACON
+**Risk:** LOW — nonce overflow is an extreme edge case (account nonce must reach 2^64 - 1);
+however, the absence of this check is a spec deviation vs go-ethereum (`ErrNonceMax`).
+Affects both ETC and ETH (same nonce semantics).
+**Gate:** None — standalone investigation; no sprint prerequisite
+**Files:**
+- `src/main/scala/com/chipprbots/ethereum/consensus/validators/std/StdSignedTransactionValidator.scala`
+- `src/main/scala/com/chipprbots/ethereum/domain/SignedTransaction.scala` (stateless mempool path)
+
+**Background (Thread 6 of the ETH/Sepolia assumption audit, 2026-06-24):**
+The VM tracer abort-path audit (Thread 6) confirmed that nonce overflow (EIP-2681, post-Berlin)
+is **not** enforced in the VM — it is a transaction-layer concern. EIP-2681 specifies that
+transactions from an account with nonce `>= 2^64 - 1` must be rejected at the validator boundary.
+go-ethereum enforces this with `ErrNonceMax` in `state_transition.go`. Fukuii's transaction
+validator was not checked for this guard during Thread 6 (VM-only scope). This entry tracks
+the transaction-layer investigation.
+
+**Steps:**
+
+1. **Search for nonce-max enforcement in Fukuii:**
+   ```bash
+   grep -rn "nonce\|Nonce" \
+     src/main/scala/com/chipprbots/ethereum/consensus/validators/std/StdSignedTransactionValidator.scala
+   grep -rn "NonceTooHigh\|ErrNonceMax\|nonce.*max\|nonce.*overflow\|nonce.*64" \
+     src/main/scala/ --include="*.scala"
+   ```
+
+2. **Compare against go-ethereum reference:**
+   ```bash
+   grep -n "NonceTooHigh\|ErrNonceMax\|nonce.*2\^64\|nonce.*overflow" \
+     /media/dev/2tb/dev/reference-clients-evm/go-ethereum/core/state_transition.go
+   ```
+
+3. **If the check is missing** — add nonce-max validation to `StdSignedTransactionValidator`
+   AND to the stateless mempool path (`SignedTransaction.getStatelessValidTransactions`):
+   ```scala
+   if tx.tx.nonce >= BigInt(2).pow(64) - 1 then
+     Left(TransactionError.NonceTooHigh(tx.tx.nonce))
+   else Right(())
+   ```
+   Add `NonceTooHigh` to the `TransactionError` sealed hierarchy if absent.
+
+4. **Confirm ETC safety** — ETC uses the same nonce semantics (uint64). The fix applies
+   to both chains equally; no chain-specific gating needed.
+
+5. **Write tests** covering:
+   - Nonce `== 2^64 - 2` → accepted
+   - Nonce `== 2^64 - 1` → rejected with `NonceTooHigh`
+   - Nonce `== 2^64` → rejected
+   - Normal nonce (< `2^64 - 1`) → unaffected
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *StdSignedTransactionValidator*"
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/main/scala/.../consensus/validators/std/StdSignedTransactionValidator.scala` + any error ADT files + test files
+3. `git commit -m "fix(tx): enforce EIP-2681 nonce-max (>= 2^64-1) at transaction validator layer"`
+4. `SHA=$(git rev-parse --short HEAD)` → add SHA to `.local/docs/eth-sepolia-assumption-audit.md` Thread 6 entry
+5. **DELETE §ETH-T6-B**
+
+---
+
+### §ETH-T7-A — BEACON: Add `EvmConfigTimestampForkSpec` — ETH fork transition tests MISSING
+
+**Agent:** BEACON
+**Risk:** LOW — new test file only; no production code changes
+**Gate:** None — standalone
+**Files:**
+- `src/test/scala/com/chipprbots/ethereum/vm/EvmConfigTimestampForkSpec.scala` (new file)
+- Reference: `src/test/scala/com/chipprbots/ethereum/consensus/OlympiaEipEnablementSpec.scala` (ETC analog)
+
+**Background (Thread 7, 2026-06-24):**
+Zero test files call `EvmConfig.forBlock(blockNumber, timestamp, config)` with ETH/Sepolia configs. `OlympiaEipEnablementSpec` provides the exact ETC analog — calls `forBlock` with ETC configs and asserts opcode presence/absence at fork boundaries. No ETH equivalent exists. A regression in `forTimestamp()` dispatch would be invisible to `testEssential`. CLZ opcode (Osaka, `0x1e`) has no unit test.
+
+**Steps:**
+1. **Read** `OlympiaEipEnablementSpec.scala` in full — understand the pattern: synthetic `BlockchainConfigForEvm` with specific fork timestamps, call `EvmConfig.forBlock(0L, timestamp, config)`, assert flags and opcode presence.
+2. **Read** `EvmConfig.scala:27-80` — confirm the 3-arg overload and what fork-specific flags/opcode sets are returned per timestamp.
+3. **Create** `EvmConfigTimestampForkSpec.scala` with `taggedAs(UnitTest, ConsensusTest)`. One `it` block per fork boundary:
+   - **Pre-Shanghai** (ts = 0): `eip3860Enabled = false`; PUSH0 (`0x5F`) absent
+   - **At Shanghai**: `eip3860Enabled = true`; PUSH0 present
+   - **At Cancun**: BLOBHASH (`0x49`) present; BLOBBASEFEE (`0x4A`) present; `isCancunTimestamp = true`
+   - **At Prague**: `isPragueTimestamp = true`; EIP-7623 calldata floor in fee schedule
+   - **At Osaka**: CLZ (`0x1e`) present; `isOsakaTimestamp = true`
+   - **ETC chain** (use ETC config, olympiaBlockNumber, no timestamps): `forTimestamp`-path returns Olympia config; no Shanghai/Cancun/Prague opcodes
+4. `sbt "testOnly *EvmConfigTimestampFork*"`
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *EvmConfigTimestampFork*"
+sbt testVM
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/test/scala/.../vm/EvmConfigTimestampForkSpec.scala`
+3. `git commit -m "test(eth): EvmConfigTimestampForkSpec — opcode presence at each ETH timestamp fork (T7-A)"`
+4. `SHA=$(git rev-parse --short HEAD)` → update `.local/docs/eth-sepolia-assumption-audit.md` Thread 7 entry
+5. **DELETE §ETH-T7-A**
+
+---
+
+### §ETH-T7-B — BEACON: Add `Eip4788BeaconRootStorageSpec` — ring-buffer write untested (THIN)
+
+**Agent:** BEACON
+**Risk:** LOW — new test file only
+**Gate:** §ETH-T4-C complete (deploys EIP-4788 contract bytecode + nonce=1; tests should see the updated account)
+**Files:**
+- `src/test/scala/com/chipprbots/ethereum/ledger/Eip4788BeaconRootStorageSpec.scala` (new file)
+- Reference: `src/test/scala/com/chipprbots/ethereum/ledger/BlockHashHistorySpec.scala` (EphemBlockchainTestSetup pattern)
+
+**Background (Thread 7, 2026-06-24):**
+`applyEip4788` (`BlockExecution.scala:209-237`) writes two ring-buffer slots per block. The slot formula (`timestamp % 8192` and `timestamp % 8192 + 8192`), wrap-around at entry 8192, and the pre-Cancun guard are entirely untested. `BlockHashHistorySpec` uses `EphemBlockchainTestSetup`, executes real in-memory blocks, and reads storage directly — the identical infrastructure is needed here.
+
+**Steps:**
+1. **Read** `BlockHashHistorySpec.scala` in full — understand `EphemBlockchainTestSetup`, block construction with Cancun config, `world.getStorage(address, slot)` post-execution.
+2. **Read** `BlockExecution.scala:200-240` — confirm slot formula: timestamp-slot and timestamp-slot+8192 root slot.
+3. **Create** `Eip4788BeaconRootStorageSpec.scala` with `taggedAs(UnitTest, ConsensusTest)`:
+
+   **Case 1 — First post-Cancun block:**
+   - Execute a block at Cancun-activated timestamp with a specific `parentBeaconBlockRoot`.
+   - `slot = timestamp % 8192`
+   - Assert `world.getStorage(BEACON_ROOTS_ADDRESS, slot)` = `timestamp`
+   - Assert `world.getStorage(BEACON_ROOTS_ADDRESS, slot + 8192)` = `parentBeaconBlockRoot`
+
+   **Case 2 — Pre-Cancun block:**
+   - Execute pre-Cancun. Both storage slots → zero (empty).
+
+   **Case 3 — Wrap-around:**
+   - Execute block at `timestamp % 8192 = 8191`. Execute next block at `timestamp % 8192 = 0`.
+   - Verify slot 0 overwritten with new values; slot 8191 retains previous block's values.
+
+   **Case 4 — §ETH-T4-C contract deployment:**
+   - After first post-Cancun block: `world.getAccount(BEACON_ROOTS_ADDRESS).codeHash != EMPTY_CODE_HASH`
+   - `world.getAccount(BEACON_ROOTS_ADDRESS).nonce == 1`
+
+4. `sbt "testOnly *Eip4788BeaconRoot*"`
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *Eip4788BeaconRoot*"
+sbt testVM
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/test/scala/.../ledger/Eip4788BeaconRootStorageSpec.scala`
+3. `git commit -m "test(eth): Eip4788BeaconRootStorageSpec — slot formula, wrap-around, pre-Cancun guard, bytecode deploy check (T7-B)"`
+4. `SHA=$(git rev-parse --short HEAD)` → update audit doc Thread 7 entry
+5. **DELETE §ETH-T7-B**
+
+---
+
+### §ETH-T7-C — BEACON: Add `EngineApiVersionRejectionSpec` — version-mismatch guards untested (THIN)
+
+**Agent:** BEACON
+**Risk:** LOW — new test file only
+**Gate:** None — standalone
+**Files:**
+- `src/test/scala/com/chipprbots/ethereum/consensus/engine/EngineApiVersionRejectionSpec.scala` (new file)
+- Reference: `src/test/scala/com/chipprbots/ethereum/consensus/engine/EngineApiSpec.scala` (existing harness)
+
+**Background (Thread 7, 2026-06-24):**
+`EngineApiController.scala` has 5 version-mismatch rejection guards (version/fork envelope enforcement). They only fire under hive integration tests; no unit test exercises them. If a guard is broken a misconfigured CL can push wrong-version payloads silently.
+
+Guards to test:
+- `getPayloadV2` for a Cancun-era block → error `-38005`
+- `getPayloadV3` for a Shanghai-era block → error `-38005`
+- `getPayloadV1` for a Shanghai-era block → error `-38005`
+- `newPayloadV3` pre-Cancun → `InvalidParams`
+- `forkchoiceUpdatedV3` with non-zero `parentBeaconBlockRoot` before Cancun → `UnsupportedFork`
+
+**Steps:**
+1. **Read** `EngineApiController.scala:36-58` (dispatch table) and each `handleGetPayload`/`handleNewPayload`/`handleForkchoiceUpdated` version gate.
+2. **Read** `EngineApiSpec.scala` — understand how the controller is instantiated, how requests are built and dispatched in tests.
+3. **Create** `EngineApiVersionRejectionSpec.scala` with `taggedAs(UnitTest, ConsensusTest)`. One `it` block per guard (5 total):
+   - Build the appropriate payload/request type for each case.
+   - Call the controller method.
+   - Assert error code matches the expected value (`-38005` / `InvalidParams` / `UnsupportedFork`).
+4. `sbt "testOnly *EngineApiVersionRejection*"`
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *EngineApiVersionRejection* *EngineApi*"
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/test/scala/.../consensus/engine/EngineApiVersionRejectionSpec.scala`
+3. `git commit -m "test(eth): EngineApiVersionRejectionSpec — 5 version-mismatch guards now have unit coverage (T7-C)"`
+4. `SHA=$(git rev-parse --short HEAD)` → update audit doc Thread 7 entry
+5. **DELETE §ETH-T7-C**
+
+---
+
+### §ETH-T7-D — HERALD: Add `BlockRangeUpdateDecodePathSpec` — ETH69 decode path untested (MISSING)
+
+**Agent:** HERALD
+**Risk:** LOW — new test file only; also clears a CHASE-QUEUE false-positive coverage item
+**Gate:** None — standalone
+**Files:**
+- `src/test/scala/com/chipprbots/ethereum/network/p2p/messages/BlockRangeUpdateDecodePathSpec.scala` (new file)
+- `src/main/scala/com/chipprbots/ethereum/network/PeerActor.scala` (malformed message path)
+- `src/main/scala/com/chipprbots/ethereum/sync/BlockFetcher.scala` (`withPossibleNewTopAt`)
+
+**Background (Thread 7, 2026-06-24):**
+`BlockFetcherSpec:298-305` appears to cover the `BlockRangeUpdate` inbound path but uses a stub that never feeds a decoded `ETHPackets.BlockRangeUpdate` into `BlockFetcher`. The real decode path — `PeerActor` feeds `BlockFetcher` — has no unit test. Two behaviors need coverage:
+1. Malformed bytes → `PeerActor` protocol-breach disconnect
+2. Valid `BlockRangeUpdate` → `BlockFetcher` calls `withPossibleNewTopAt`
+
+**Steps:**
+1. **Read** `PeerActor.scala` — find where `ETHPackets.BlockRangeUpdate` is decoded and handled; identify the protocol-breach disconnect path.
+2. **Read** `BlockFetcher.scala` — find `withPossibleNewTopAt` and what triggers it.
+3. **Read** `BlockFetcherSpec.scala:298-305` — confirm the stub and why the real path is missed.
+4. **Create** `BlockRangeUpdateDecodePathSpec.scala` with `taggedAs(UnitTest, NetworkTest)`:
+
+   **Case 1 — Malformed bytes → PeerActor disconnect:**
+   - Feed truncated/invalid bytes as `BlockRangeUpdate` wire payload into `PeerActor`'s inbound handler.
+   - Assert disconnect with `ProtocolBreachError` (or equivalent).
+
+   **Case 2 — Valid message → `withPossibleNewTopAt`:**
+   - Construct `ETHPackets.BlockRangeUpdate(lowestBlock=N, highestBlock=M)`.
+   - Feed into `BlockFetcher`'s inbound handler.
+   - Assert `withPossibleNewTopAt(M)` is called.
+
+5. Add a comment in `BlockFetcherSpec:298-305` pointing to this spec as the real coverage.
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *BlockRangeUpdate* *BlockFetcher*"
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/test/scala/.../network/p2p/messages/BlockRangeUpdateDecodePathSpec.scala`
+3. `git commit -m "test(net): BlockRangeUpdateDecodePathSpec — malformed disconnect + valid withPossibleNewTopAt (T7-D, clears CHASE-QUEUE false-positive)"`
+4. `SHA=$(git rev-parse --short HEAD)` → update audit doc Thread 7 entry; update CHASE-QUEUE `BlockRangeUpdate` entry
+5. **DELETE §ETH-T7-D**
+
+---
+
+### §ETH-T7-E — HERALD: Add `ForkIdSepoliaSpec` — Sepolia CRC32 accumulation untested (MISSING)
+
+**Agent:** HERALD
+**Risk:** LOW — new test file only; regression here silently causes ALL Sepolia peers to disconnect at handshake
+**Gate:** None — standalone
+**Files:**
+- `src/test/scala/com/chipprbots/ethereum/network/ForkIdSepoliaSpec.scala` (new file)
+- Reference: existing `ForkIdSpec.scala` (ETC/Mordor ForkId tests — use same pattern)
+- Reference: `reference-clients-evm/go-ethereum/params/config.go` (`SepoliaChainConfig`, known checksums)
+
+**Background (Thread 7, 2026-06-24):**
+ForkId CRC32 accumulation is tested for ETC/Mordor but not for Sepolia. A regression in `forTimestamp`-based ForkId computation (wrong order, wrong timestamp used) would cause fukuii to compute an incorrect `ForkId`. Every incoming Sepolia peer would disconnect at ETH handshake with `ErrLocalIncompatibleOrStale`. This is silent — `testEssential` does not catch it.
+
+**Steps:**
+1. **Read** `ForkIdSpec.scala` — understand how `ForkId` is constructed and how CRC32 is accumulated for ETC.
+2. **Read** `reference-clients-evm/go-ethereum/params/config.go` — extract Sepolia's `SepoliaChainConfig` fork hashes at each checkpoint. Run:
+   ```bash
+   grep -n "Sepolia\|sepolia\|1735371\|1677557\|1706655" \
+     /media/dev/2tb/dev/reference-clients-evm/go-ethereum/params/config.go | head -30
+   ```
+3. **Read** Fukuii's Sepolia `BlockchainConfig` — confirm timestamp values match go-ethereum.
+4. **Create** `ForkIdSepoliaSpec.scala` with `taggedAs(UnitTest, NetworkTest)`. For each checkpoint, compute `ForkId(sepoliaConfig, block=N, timestamp=T)` and assert `checksum` equals the known go-ethereum value:
+   - Genesis (block 0, ts 0)
+   - At merge netsplit block (1,735,371)
+   - At Shanghai timestamp
+   - At Cancun timestamp
+   - At Prague timestamp
+   - At Osaka timestamp (if known in go-ethereum `upstream`)
+5. `sbt "testOnly *ForkIdSepolia*"`
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *ForkIdSepolia* *ForkId*"
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/test/scala/.../network/ForkIdSepoliaSpec.scala`
+3. `git commit -m "test(net): ForkIdSepoliaSpec — CRC32 at genesis, merge-netsplit, and 6 timestamp forks vs go-ethereum ground truth (T7-E)"`
+4. `SHA=$(git rev-parse --short HEAD)` → update audit doc Thread 7 entry
+5. **DELETE §ETH-T7-E**
+
+---
+
+### §ETH-T9-A — BEACON: Validate pivot header before commit in SNAP sync (HIGH)
+
+**Agent:** BEACON
+**Risk:** HIGH — consensus path: a malicious peer can serve a malformed post-merge header; SNAP sync commits it with no validation
+**Gate:** None — standalone fix; prerequisite for any correct ETH/Sepolia SNAP sync
+**Files:**
+- `src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/SNAPSyncController.scala` — `BootstrapComplete` handler and `completePivotRefreshWithStateRoot`
+
+**Background:**
+Thread 9 of the ETH/Sepolia assumption audit (`eth-sepolia-assumption-audit.md`) found that
+`SNAPSyncController` stores the pivot header directly in both the `BootstrapComplete` handler
+and `completePivotRefreshWithStateRoot` without invoking `PostMergeBlockHeaderValidator`.
+
+`PostMergeBlockHeaderValidator` checks (for ETH/Sepolia blocks):
+- `difficulty == 0` and `nonce == 0` (no PoW fields)
+- `ommersHash == BlockHeader.EmptyOmmers` (no uncles on PoS)
+- `withdrawalsRoot.isDefined` for Shanghai+ timestamp blocks
+- `blobGasUsed`, `excessBlobGas`, `parentBeaconBlockRoot` present for Cancun+ blocks
+
+Without this call, a malicious peer can serve a pivot header with `withdrawalsRoot = None` on
+a Shanghai-era Sepolia block, or fake `difficulty > 0`, and SNAP sync will accept and commit it.
+The resulting stateRoot mismatch is not discovered until regular sync attempts block execution —
+at which point the node has committed invalid chain state.
+
+ETC is unaffected: SNAP sync on ETC uses `StdBlockHeaderValidator`, not `PostMergeBlockHeaderValidator`,
+and ETC blocks never pass `isPoS` checks. The fix must gate on `networkType == NetworkType.ETH`.
+
+**Steps:**
+1. **Read** `SNAPSyncController.scala` — find `BootstrapComplete` handler (pivot header storage)
+   and `completePivotRefreshWithStateRoot`. Confirm neither calls a header validator.
+2. **Read** `PostMergeBlockHeaderValidator.scala` — understand `validateHeaderOnly(header)` signature
+   and what it checks. Confirm it does not require a parent header.
+3. **Find** where `networkType` or `BlockchainConfig.isPoSChain` is available in `SNAPSyncController`.
+4. **Add validation** in both storage paths:
+   ```scala
+   // Gate on ETH/Sepolia only — ETC pivot headers validated by StdBlockHeaderValidator
+   if networkType == NetworkType.ETH then
+     postMergeValidator.validateHeaderOnly(pivotHeader) match
+       case Left(err) =>
+         log.error("SNAP pivot header failed consensus validation — blacklisting peer: {}", err)
+         blacklistPeer(sourcePeer)
+         return  // abort pivot commit
+       case Right(_) => ()
+   ```
+5. **Write tests** (or update existing SNAP sync spec) to cover:
+   - ETH/Sepolia: pivot header with `withdrawalsRoot = None` on a Shanghai+ block → rejected
+   - ETH/Sepolia: pivot header with `difficulty > 0` → rejected (not a PoS block)
+   - ETH/Sepolia: valid post-merge pivot header → accepted
+   - ETC: pivot header with `difficulty > 0` (PoW block) → accepted (no ETH validator called)
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *SNAPSync*"
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/main/scala/.../sync/snap/SNAPSyncController.scala` + test files
+3. `git commit -m "fix(eth): validate pivot header against PostMergeBlockHeaderValidator before SNAP commit — prevents malformed pivot on ETH/Sepolia"`
+4. `SHA=$(git rev-parse --short HEAD)` → update `.local/docs/eth-sepolia-assumption-audit.md` Thread 9 entry
+5. **DELETE §ETH-T9-A**
+
+---
+
+### §ETH-T9-B — BEACON: Gate BlockHeader RLP field-count on fork timestamp (HIGH)
+
+**Agent:** BEACON
+**Risk:** HIGH — protocol correctness: a Cancun-era ETH block with only 17 RLP fields (Shanghai shape) is accepted and stored with `blobGasUsed = None`; downstream validators may reject the block, wasting SNAP progress
+**Gate:** §ETH-T9-A complete (both fixes apply in the same SNAP sync session)
+**Files:**
+- `src/main/scala/com/chipprbots/ethereum/domain/BlockHeader.scala` — RLP decoder, field-count branch
+
+**Background:**
+The `BlockHeader` RLP decoder branches on the number of list items to decode optional fields:
+- 15 items → pre-EIP-1559 (no baseFee)
+- 16 items → post-London/Olympia (baseFee)
+- 17 items → Shanghai (withdrawalsRoot)
+- 20 items → Cancun (blobGasUsed, excessBlobGas, parentBeaconBlockRoot)
+- 21+ items → Prague+ (requestsHash)
+
+When decoding a Cancun-era ETH/Sepolia block, a peer could send a 17-item (Shanghai-shape) RLP.
+The decoder accepts it, setting the three Cancun fields to `None`. This is not a decode error.
+
+The result: Fukuii stores a Cancun-era pivot header with `blobGasUsed = None`. When
+`PostMergeBlockHeaderValidator` is called (after §ETH-T9-A), it rejects the header — good.
+But the problem is structural: the decoder should itself reject field-count mismatches when the
+header's timestamp places it in a fork that requires more fields. Currently it does not.
+
+The fix: after decoding, cross-check field count against `blockchainConfig` fork timestamps.
+If `timestamp >= cancunTimestamp` and only 17 fields were decoded, return a decode error.
+
+ETC is unaffected: ETC has no `cancunTimestamp` (timestamp forks are ETH-only), so the
+timestamp-gated check is a no-op on ETC blocks.
+
+**Steps:**
+1. **Read** `BlockHeader.scala` RLP decoder in full — find the item-count branching logic
+   and where `unixTimestamp` is available during decode.
+2. **Read** `BlockchainConfig` — confirm `cancunTimestamp`, `shanghaiTimestamp`, `pragueTimestamp`
+   are accessible at decode time (may require passing config to the decoder).
+3. **Determine approach:** Either
+   a. Pass `BlockchainConfig` to the RLP decoder and add a post-decode validation step, or
+   b. Add a standalone `validateFieldCount(header, config)` method called after decode.
+   Option (b) is lower-risk (does not change the decoder signature).
+4. **Implement `validateFieldCount`:**
+   ```scala
+   def validateFieldCount(header: BlockHeader, config: BlockchainConfig): Either[String, Unit] =
+     if config.isCancunTimestamp(header.unixTimestamp) && header.blobGasUsed.isEmpty then
+       Left(s"Cancun-era header missing blobGasUsed at timestamp ${header.unixTimestamp}")
+     else if config.isShanghaiTimestamp(header.unixTimestamp) && header.withdrawalsRoot.isEmpty then
+       Left(s"Shanghai-era header missing withdrawalsRoot at timestamp ${header.unixTimestamp}")
+     else Right(())
+   ```
+5. **Call `validateFieldCount`** at SNAP sync pivot acceptance (same path as §ETH-T9-A guard),
+   and at regular sync block import.
+6. **Gate on `networkType == NetworkType.ETH`** — ETC has no timestamp forks.
+7. **Write tests:**
+   - Cancun-era timestamp + 17-item RLP (no blobGasUsed) → `Left` (validation error)
+   - Cancun-era timestamp + 20-item RLP (all fields) → `Right(())`
+   - ETC block (any field count) → `Right(())` (no timestamp gate fires)
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *BlockHeader*"
+sbt "testOnly *SNAPSync*"
+sbt testVM
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/main/scala/.../domain/BlockHeader.scala` + test files
+3. `git commit -m "fix(eth): reject ETH headers with field-count below fork requirement — Cancun header with <20 fields is a decode error"`
+4. `SHA=$(git rev-parse --short HEAD)` → update Thread 9 entry in audit doc
+5. **DELETE §ETH-T9-B**
+
+---
+
+### §ETH-T9-C — BEACON: Verify StorageScheme routing in SNAP coordinators (HIGH — verify first)
+
+**Agent:** BEACON
+**Risk:** HIGH if gap confirmed — trie writes silently use wrong scheme; MEDIUM if already wired (false positive from Explore audit)
+**Gate:** §ETH-T9-A complete; requires BEACON read-only verification before implementing any fix
+**Files:**
+- `src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/actors/AccountRangeCoordinator.scala`
+- `src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/actors/StorageRangeCoordinator.scala`
+- `src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/actors/TrieNodeHealingCoordinator.scala`
+
+**Background:**
+Thread 9 audit (Explore agent) flagged that all three SNAP coordinators accept
+`storageScheme: StorageScheme` as a constructor parameter but the Explore agent could not
+confirm that this parameter actually drives trie read/write routing internally.
+
+On ETH/Sepolia (path-scheme storage), the trie nodes must be stored and queried using the
+path-keyed layout. On ETC (hash-scheme storage), the hash-keyed layout is used. If the
+parameter is wired up to a helper or base class that the Explore agent did not find (e.g.,
+a `TrieStorage` abstraction), this may be a false positive.
+
+**Verification first — do NOT implement a fix before reading the code.**
+
+**Steps:**
+1. **Read** each coordinator file in full — search for every use of `storageScheme` or
+   `pathNodeStorage` inside the actor body, including calls to helper methods or base classes.
+2. **Read** any `SnapStorage`, `TrieNodeStorage`, or `NodeStorage` helper classes referenced
+   by the coordinators.
+3. **Determine verdict:**
+   - **WIRED:** `storageScheme` drives a dispatch (e.g., `storageScheme match { case Hash => ...; case Path => ... }`
+     or passed to a storage abstraction that does the dispatch) → **NO FIX NEEDED**; add a ✅ WIRED note here and DELETE §ETH-T9-C.
+   - **NOT WIRED:** `storageScheme` is stored but never read inside the trie write/read path →
+     proceed to Step 4 (implement the routing).
+4. **If NOT WIRED — implement routing:**
+   - Identify the trie node write/read call in each coordinator.
+   - Add a dispatch on `storageScheme`:
+     ```scala
+     storageScheme match
+       case StorageScheme.Hash => hashNodeStorage.put(nodeHash, nodeBytes)
+       case StorageScheme.Path => pathNodeStorage.getOrElse(sys.error("path storage not configured")).put(path, nodeBytes)
+     ```
+   - Gate path-scheme usage on `pathNodeStorage.isDefined` — throw at construction time if
+     `storageScheme == Path && pathNodeStorage.isEmpty`.
+5. **Write tests:**
+   - If NOT WIRED: coordinator with `storageScheme = Path` writes to `pathNodeStorage`, not `hashNodeStorage`.
+   - If WIRED: just document the finding and DELETE this entry.
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *AccountRange* *StorageRange* *TrieNodeHealing*"
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps (if fix was needed):**
+1. `sbt scalafmtAll`
+2. `git add` coordinator files + test files
+3. `git commit -m "fix(eth): wire StorageScheme routing in SNAP coordinators — path-scheme storage now used for ETH/Sepolia trie nodes"`
+4. `SHA=$(git rev-parse --short HEAD)` → update Thread 9 entry in audit doc
+5. **DELETE §ETH-T9-C**
+
+**MANDATORY final steps (if WIRED — false positive):**
+1. Add note here: `✅ WIRED — storageScheme correctly routed via <helper class>. No fix needed.`
+2. `git commit -m "docs(eth-t9-c): verify StorageScheme routing — WIRED, no code change needed"` (docs-only)
+3. **DELETE §ETH-T9-C**
+
+---
+
+### §ETH-T9-D — BEACON: Startup assertion — storageScheme must match chain type (MEDIUM)
+
+**Agent:** BEACON
+**Risk:** LOW — defensive assertion only; misconfiguration is caught at startup before any sync
+**Gate:** §ETH-T9-C complete (confirm correct scheme per chain before adding the assertion)
+**Files:**
+- `SNAPSyncController.scala` or `NodeBuilder.scala` — node startup / actor construction path
+
+**Background:**
+`SNAPSyncController` is instantiated without a runtime check that the configured `storageScheme`
+matches the chain's expected scheme:
+- ETH/Sepolia → `StorageScheme.Path` (default)
+- ETC/Mordor → `StorageScheme.Hash` (default)
+
+A misconfigured node (e.g., ETC with `storageScheme = path` in `reference.conf`) would start
+successfully, sync some state into the wrong storage layout, and fail later with a corrupt trie.
+The failure would be silent until state verification.
+
+**Steps:**
+1. **Read** `NodeBuilder.scala` (or wherever `SNAPSyncController` is constructed) —
+   find where `storageScheme` and `networkType` are both in scope.
+2. **Add a startup assertion:**
+   ```scala
+   val expectedScheme = networkType match
+     case NetworkType.ETH => StorageScheme.Path
+     case NetworkType.ETC => StorageScheme.Hash
+   require(
+     storageScheme == expectedScheme,
+     s"storageScheme=$storageScheme does not match expected $expectedScheme for networkType=$networkType — check reference.conf"
+   )
+   ```
+3. **Confirm ETC path:** `StorageScheme.Hash` is the ETC default and is enforced.
+4. **Confirm ETH path:** `StorageScheme.Path` is the ETH default and is enforced.
+5. **No test needed** — `require` throws `IllegalArgumentException` at startup; the existing
+   integration tests will catch any regression if the assertion fires incorrectly.
+
+**Verify:**
+```bash
+sbt compile-all
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add` the startup file
+3. `git commit -m "fix(config): assert storageScheme matches chain type at SNAPSyncController startup — misconfiguration now fails fast"`
+4. `SHA=$(git rev-parse --short HEAD)` → update Thread 9 entry in audit doc
+5. **DELETE §ETH-T9-D**
+
+---
+
+### §ETH-T10-A — BEACON: Implement `engine_getPayloadV5` — Osaka block proposal blocked (HIGH)
+
+**Agent:** BEACON
+**Risk:** HIGH — without V5, fukuii cannot propose any Osaka block; the CL calls `getPayloadV5` on post-Osaka forkchoiceUpdated, fukuii falls through to `InvalidParams`
+**Gate:** None — standalone; but requires KZG cell-proof generation support as a prerequisite (see step 1)
+**Files:**
+- `src/main/scala/com/chipprbots/ethereum/consensus/engine/EngineApiController.scala:47-50` (dispatch)
+- `src/main/scala/com/chipprbots/ethereum/consensus/engine/EngineApiService.scala:1004-1023` (`exchangeCapabilities`)
+- `src/main/scala/com/chipprbots/ethereum/consensus/engine/EngineApiDomain.scala` (payload types)
+
+**Background (Thread 10, 2026-06-24):**
+`engine_getPayloadV5` is the only hard Osaka Engine API requirement. An Osaka-active CL (Lighthouse, Prysm, Teku post-Fusaka) calls `getPayloadV5` when building a block proposal payload. Fukuii's dispatcher at `EngineApiController.scala:47-50` has no V5 case — it falls through to the `case _ =>` branch at L204-207 returning `InvalidParams`. **Fukuii cannot propose Osaka blocks.**
+
+The V4→V5 difference is the blobs bundle envelope: V5 returns `BlobsBundleV2` (cell proofs — `CELLS_PER_EXT_BLOB × len(blobs)`) per EIP-7594/PeerDAS instead of V4's `BlobsBundleV1` (one KZG proof per blob).
+
+go-ethereum reference: `eth/catalyst/api.go:482-500` (GetPayloadV5), `beacon/engine/types.go:148-156, 167-170` (BlobsBundleV1 vs V2).
+
+`forkchoiceUpdatedV4` and `newPayloadV5` are **Amsterdam** (the fork after Osaka) — not needed for Osaka. `forkchoiceUpdatedV3` and `newPayloadV4` remain the correct Osaka cap.
+
+**Steps:**
+1. **Prerequisite check — KZG cell proofs:**
+   ```bash
+   grep -rn "CELLS_PER_EXT_BLOB\|cellProof\|computeCells\|splitBlob\|PeerDAS\|EIP.*7594" \
+     src/main/scala/ --include="*.scala" | head -20
+   ```
+   If cell-proof generation is absent: this is a hard prerequisite before plumbing the V5 response. Surface to user and add a sub-entry §ETH-T10-A1 for KZG cell-proof implementation. Do not proceed with the API wiring until cell proofs are available.
+
+2. **Read** `EngineApiController.scala:36-58` (dispatch) and `EngineApiService.scala:700-900` (payload build path) to understand how V4 constructs the response envelope.
+
+3. **Read** `EngineApiDomain.scala` — find `ExecutionPayload`, `BlobsBundleV1`. Determine if `BlobsBundleV2` already exists or needs to be added.
+
+4. **Add `engine_getPayloadV5` dispatch** at `EngineApiController.scala:50`:
+   ```scala
+   case "engine_getPayloadV5" => handleGetPayload(request, version = 5)
+   ```
+
+5. **Add V5 envelope in `handleGetPayload`** — mirror V4's `case 4` but wrap blobs bundle as `BlobsBundleV2` (cell proofs). Add fork-version gating: `getPayloadV5` valid only for Osaka-or-later payloads; `getPayloadV4` must reject Osaka payloads (matching geth api.go:471-480 Prague-only gate).
+
+6. **Add `"engine_getPayloadV5"` to `exchangeCapabilities`** (`EngineApiService.scala:1017` area).
+
+7. **Write tests** in `EngineApiSpec` or a new `EngineApiGetPayloadV5Spec`:
+   - V5 called for Osaka block → correct `BlobsBundleV2` envelope returned
+   - V4 called for Osaka block → error `-38005` (wrong version)
+   - V5 called for Prague block (pre-Osaka) → error `-38005`
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *EngineApi*"
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/main/scala/.../consensus/engine/EngineApiController.scala src/main/scala/.../consensus/engine/EngineApiService.scala` + domain/test files
+3. `git commit -m "fix(eth): implement engine_getPayloadV5 — BlobsBundleV2 cell proofs for Osaka block proposal (T10-A)"`
+4. `SHA=$(git rev-parse --short HEAD)` → update `.local/docs/eth-sepolia-assumption-audit.md` Thread 10 entry
+5. **DELETE §ETH-T10-A**
+
+---
+
+### §ETH-T10-B — BEACON: Implement `engine_getBlobsV2` — Osaka/PeerDAS blob serving (MEDIUM)
+
+**Agent:** BEACON
+**Risk:** MEDIUM — missing V2 degrades blob availability serving on Osaka but does not block block import/proposal
+**Gate:** §ETH-T10-A prerequisite check complete (cell-proof KZG support verified); §ETH-T10-A itself need not be complete
+**Files:**
+- `src/main/scala/com/chipprbots/ethereum/consensus/engine/EngineApiController.scala:53` (dispatch)
+- `src/main/scala/com/chipprbots/ethereum/consensus/engine/EngineApiService.scala:1004-1023` (`exchangeCapabilities`)
+
+**Background (Thread 10, 2026-06-24):**
+Only `getBlobsV1` is dispatched (controller L53). Osaka/PeerDAS CLs use `getBlobsV2` to fetch blobs-with-cell-proofs from the EL mempool for gossip reconstruction (EIP-7594). Missing V2 means Osaka CLs cannot retrieve cell proofs from fukuii → degraded blob availability.
+
+`BlobAndProofV2` = `{blob: Blob, cellProofs: CELLS_PER_EXT_BLOB×48-byte-proofs}` per go-ethereum `beacon/engine/types.go:167-170`.
+
+**Steps:**
+1. **Read** `EngineApiController.scala:50-55` — find `getBlobsV1` dispatch; read `EngineApiService` blob-serving method it calls.
+2. **Read** go-ethereum `beacon/engine/types.go:148-170` — understand `BlobAndProofV1` vs `BlobAndProofV2`.
+3. **Add `BlobAndProofV2`** to `EngineApiDomain.scala` (blob + cell proofs array).
+4. **Add `engine_getBlobsV2` dispatch** at `EngineApiController.scala:54` — calls the blob fetch path and returns `BlobAndProofV2` list.
+5. **Add `"engine_getBlobsV2"` to `exchangeCapabilities`**.
+6. **Write a test** asserting `getBlobsV2` returns the cell-proof format for a mempool blob.
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *EngineApi*"
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add` relevant files
+3. `git commit -m "fix(eth): implement engine_getBlobsV2 — BlobAndProofV2 cell proofs for PeerDAS blob serving (T10-B)"`
+4. `SHA=$(git rev-parse --short HEAD)` → update audit doc Thread 10 entry
+5. **DELETE §ETH-T10-B**
+
+---
+
+### §ETH-T10-C — BEACON: Explicit Osaka fork gate on `newPayloadV4` acceptance (LOW)
+
+**Agent:** BEACON
+**Risk:** LOW — correctness-neutral today (Prague gate fires correctly at Osaka timestamps); latent gap for Amsterdam V5 split
+**Gate:** §ETH-T10-A complete (Osaka V5 context established)
+**Files:**
+- `src/main/scala/com/chipprbots/ethereum/consensus/engine/EngineApiController.scala:192`
+- `src/main/scala/com/chipprbots/ethereum/consensus/engine/EngineApiService.scala:316`
+
+**Background (Thread 10, 2026-06-24):**
+`EngineApiService.scala:316` gates `executionRequests` verification on `isPragueTimestamp`. Since Osaka > Prague, `isPragueTimestamp` is `true` at Osaka timestamps — verification still fires, so the behaviour is currently correct. However, the controller's V4 dispatch at L192 accepts `executionRequests` for `version >= 4` without an explicit Osaka-aware fork window. go-ethereum explicitly lists `forks.Prague, forks.Osaka, BPO1-5` in NewPayloadV4 (`api.go:782`). Without an explicit Osaka gate, when Amsterdam introduces V5 a clean version split becomes harder (V4 remains valid for Prague+Osaka only, not Amsterdam+).
+
+**Steps:**
+1. **Read** `EngineApiController.scala:185-210` and `EngineApiService.scala:310-330` — understand the current fork gating logic.
+2. **Read** go-ethereum `api.go:767-795` — see how `checkFork(Prague, Osaka, BPO1-5)` is expressed for NewPayloadV4; compare against NewPayloadV5 (Amsterdam only).
+3. **Add** an explicit `isOsakaTimestamp`-aware acceptance window to `handleNewPayload` for V4: accept for `isPragueTimestamp || isOsakaTimestamp`, reject with `UnsupportedFork` for `isAmsterdamTimestamp` (when Amsterdam is defined). This is a no-op today (no Amsterdam timestamps defined) but documents the boundary.
+4. Update the `exchangeCapabilities` docstring/comment if one exists.
+5. **Write a test**: `newPayloadV4` at a Prague timestamp → accepted; `newPayloadV4` at a pre-Prague timestamp → rejected. (The Osaka case is the same as Prague — covered implicitly.)
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *EngineApi*"
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add` relevant files
+3. `git commit -m "fix(eth): explicit Osaka fork gate on newPayloadV4 — documents Prague+Osaka window, safe for future Amsterdam V5 split (T10-C)"`
+4. `SHA=$(git rev-parse --short HEAD)` → update audit doc Thread 10 entry
+5. **DELETE §ETH-T10-C**
+
+---
+
+### §ETH-T10-D — BEACON: `validateRequests` ordering/empty-check at Engine API boundary (LOW)
+
+**Agent:** BEACON
+**Risk:** LOW — current check catches honest mismatches; this adds rejection of deliberately malformed CL input at the boundary, matching go-ethereum's `validateRequests`
+**Gate:** §ETH-T10-A complete (V5 + requests context established)
+**Files:**
+- `src/main/scala/com/chipprbots/ethereum/consensus/engine/EngineApiService.scala` (near L311-329 `executionRequests` handling)
+
+**Background (Thread 10, 2026-06-24):**
+go-ethereum's `validateRequests` (`api.go:1257`) rejects `executionRequests` entries that are:
+- Empty (`len(entry) < 2` — no type byte prefix)
+- Out-of-type-order or duplicate-type (type bytes must be strictly ascending)
+
+Fukuii's current check (`suppliedRequests != derivedRequests` at L317) catches honest CL/EL mismatches but won't produce go-ethereum's specific `InvalidParams` error for deliberately malformed-but-self-consistent request lists. This matters for hive `engine-prague` request-validation variants.
+
+**Steps:**
+1. **Read** go-ethereum `api.go:1257-1290` (`validateRequests`) — understand the length and strict-ascending-type-byte checks.
+2. **Read** `EngineApiService.scala:305-335` — find where `executionRequests` is received and validated.
+3. **Add pre-validation** before the existing mismatch check:
+   ```scala
+   // Reject empty request entries and non-strictly-ascending type bytes
+   val requestTypeBytes = executionRequests.map(_.headOption.getOrElse(0.toByte))
+   if executionRequests.exists(_.length < 2) then
+     return Left(InvalidParams("executionRequests entry too short — missing type prefix"))
+   if requestTypeBytes != requestTypeBytes.sorted.distinct then
+     return Left(InvalidParams("executionRequests type bytes must be strictly ascending"))
+   ```
+4. **Gate on post-Prague** — only apply when `isPragueTimestamp` (requests field only present Prague+).
+5. **Write tests**: malformed empty entry → `InvalidParams`; duplicate type byte → `InvalidParams`; correct ascending types → proceeds to mismatch check.
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *EngineApi*"
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/main/scala/.../consensus/engine/EngineApiService.scala` + test files
+3. `git commit -m "fix(eth): validateRequests — reject empty entries and non-ascending type bytes at Engine API boundary (T10-D)"`
+4. `SHA=$(git rev-parse --short HEAD)` → update audit doc Thread 10 entry; **update Part 1 warning table**: mark `EngineApiService.scala:661 Ordering.Iterable` DONE with SHA (the `@nowarn` or explicit-Ordering fix for line 661 should be committed in this same session — see Part 1 table)
+5. **DELETE §ETH-T10-D**
