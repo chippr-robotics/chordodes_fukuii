@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.util.ByteString
 
 import cats.effect.IO
@@ -46,9 +47,10 @@ class EthTxService(
     val blockchain: Blockchain,
     val blockchainReader: BlockchainReader,
     val mining: Mining,
-    val pendingTransactionsManager: ActorRef,
+    val pendingTransactionsManager: ActorRef[PendingTransactionsManager.Command],
     val getTransactionFromPoolTimeout: FiniteDuration,
-    transactionMappingStorage: TransactionMappingStorage
+    transactionMappingStorage: TransactionMappingStorage,
+    val scheduler: Scheduler
 )(implicit val blockchainConfig: BlockchainConfig)
     extends TransactionPicker
     with ResolveBlock {

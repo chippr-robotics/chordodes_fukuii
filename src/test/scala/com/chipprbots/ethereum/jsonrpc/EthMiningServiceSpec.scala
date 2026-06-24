@@ -90,8 +90,7 @@ class EthMiningServiceSpec
       ethMiningService.getWork(GetWorkRequest()).unsafeToFuture()
 
     // Handle the actor messages
-    pendingTransactionsManager.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    pendingTransactionsManager.reply(PendingTransactionsManager.PendingTransactionsResponse(Nil))
+    replyPTM(PendingTransactionsManager.PendingTransactionsResponse(Nil))
     ommersPool.expectMsgPF() {
       case OmmersPool.GetOmmers(hash, replyTo) if hash == parentBlock.hash =>
         replyTo ! OmmersPool.Ommers(Nil)
@@ -151,8 +150,7 @@ class EthMiningServiceSpec
       ethMiningService.getWork(GetWorkRequest()).unsafeToFuture()
 
     // Handle the actor messages
-    pendingTransactionsManager.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    pendingTransactionsManager.reply(PendingTransactionsManager.PendingTransactionsResponse(Nil))
+    replyPTM(PendingTransactionsManager.PendingTransactionsResponse(Nil))
     ommersPool.expectMsgPF() {
       case OmmersPool.GetOmmers(hash, replyTo) if hash == parentBlock.hash =>
         replyTo ! OmmersPool.Ommers(Nil)
@@ -188,8 +186,7 @@ class EthMiningServiceSpec
       ethMiningService.getWork(GetWorkRequest()).unsafeToFuture()
 
     // Handle the actor messages
-    pendingTransactionsManager.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    pendingTransactionsManager.reply(PendingTransactionsManager.PendingTransactionsResponse(Nil))
+    replyPTM(PendingTransactionsManager.PendingTransactionsResponse(Nil))
 
     ommersPool.expectMsgPF() {
       case OmmersPool.GetOmmers(hash, replyTo) if hash == parentBlock.hash =>
@@ -222,8 +219,7 @@ class EthMiningServiceSpec
     blockchainWriter.save(parentBlock, Nil, ChainWeight.totalDifficultyOnly(parentBlock.header.difficulty), true)
 
     val response: Either[JsonRpcError, GetWorkResponse] = ethMiningService.getWork(GetWorkRequest()).unsafeRunSync()
-    pendingTransactionsManager.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    pendingTransactionsManager.reply(PendingTransactionsManager.PendingTransactionsResponse(Nil))
+    replyPTM(PendingTransactionsManager.PendingTransactionsResponse(Nil))
 
     ommersPool.expectMsgPF() {
       case OmmersPool.GetOmmers(hash, replyTo) if hash == parentBlock.hash =>
@@ -362,8 +358,7 @@ class EthMiningServiceSpec
     val workFuture: Future[Either[JsonRpcError, GetWorkResponse]] =
       ethMiningService.getWork(GetWorkRequest()).unsafeToFuture()
 
-    pendingTransactionsManager.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    pendingTransactionsManager.reply(PendingTransactionsManager.PendingTransactionsResponse(Nil))
+    replyPTM(PendingTransactionsManager.PendingTransactionsResponse(Nil))
     ommersPool.expectMsgPF() {
       case OmmersPool.GetOmmers(hash, replyTo) if hash == parentBlock.hash =>
         replyTo ! OmmersPool.Ommers(Nil)
@@ -469,8 +464,7 @@ class EthMiningServiceSpec
       ethMiningService.getWork(GetWorkRequest()).unsafeToFuture()
 
     // Handle the actor messages
-    pendingTransactionsManager.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    pendingTransactionsManager.reply(PendingTransactionsManager.PendingTransactionsResponse(Nil))
+    replyPTM(PendingTransactionsManager.PendingTransactionsResponse(Nil))
 
     ommersPool.expectMsgPF() {
       case OmmersPool.GetOmmers(hash, replyTo) if hash == parentBlock.hash =>
@@ -534,12 +528,17 @@ class EthMiningServiceSpec
       jsonRpcConfig,
       ommersPool.ref.toTyped[OmmersPool.Command],
       syncingController.ref,
-      pendingTransactionsManager.ref,
+      pendingTransactionsManager.ref.toTyped[PendingTransactionsManager.Command],
       getTransactionFromPoolTimeout,
       this,
       coinbaseProvider,
       system
     )
+
+    def replyPTM(response: PendingTransactionsManager.PendingTransactionsResponse): Unit =
+      pendingTransactionsManager.expectMsgPF() { case req: PendingTransactionsManager.GetPendingTransactionsReq =>
+        req.replyTo ! response
+      }
 
     val difficulty = 131072
     val parentBlock: Block = Block(

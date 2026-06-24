@@ -1164,6 +1164,8 @@ object GraphQLSchema {
               import com.chipprbots.ethereum.transactions.PendingTransactionsManager
               given askTimeout: org.apache.pekko.util.Timeout =
                 org.apache.pekko.util.Timeout(scala.concurrent.duration.DurationInt(5).seconds)
+              given askScheduler: org.apache.pekko.actor.typed.Scheduler =
+                c.ctx.ethTxService.scheduler
 
               val req = com.chipprbots.ethereum.jsonrpc.EthTxService.SendRawTransactionRequest(raw)
               val io = c.ctx.ethTxService
@@ -1171,8 +1173,8 @@ object GraphQLSchema {
                 .flatMap {
                   case Right(resp) =>
                     c.ctx.ethTxService.pendingTransactionsManager
-                      .askFor[PendingTransactionsManager.PendingTransactionsResponse](
-                        PendingTransactionsManager.GetPendingTransactions
+                      .askForTyped[PendingTransactionsManager.PendingTransactionsResponse](
+                        PendingTransactionsManager.GetPendingTransactionsReq(_)
                       )
                       .map(_ => resp.transactionHash)
                       .handleError(_ => resp.transactionHash)

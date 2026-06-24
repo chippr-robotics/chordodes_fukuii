@@ -125,7 +125,7 @@ object PeerActor {
       rlpxConnectionFactory: ActorContext[Command] => ActorRef[RLPxConnectionHandler.Command],
       peerConfiguration: PeerConfiguration,
       peerEventBus: ActorRef[PeerEventBusCommand],
-      knownNodesManager: ClassicActorRef,
+      knownNodesManager: ActorRef[KnownNodesManager.Command],
       incomingConnection: Boolean,
       initHandshaker: Handshaker[R]
   ): Behavior[Command] =
@@ -154,7 +154,7 @@ object PeerActor {
       peerAddress: InetSocketAddress,
       peerConfiguration: PeerConfiguration,
       peerEventBus: ActorRef[PeerEventBusCommand],
-      knownNodesManager: ClassicActorRef,
+      knownNodesManager: ActorRef[KnownNodesManager.Command],
       incomingConnection: Boolean,
       handshaker: Handshaker[R],
       authHandshaker: AuthHandshaker,
@@ -201,7 +201,7 @@ object PeerActor {
       rlpxConnectionFactory: ActorContext[Command] => ActorRef[RLPxConnectionHandler.Command],
       peerConfiguration: PeerConfiguration,
       peerEventBus: ActorRef[PeerEventBusCommand],
-      knownNodesManager: ClassicActorRef,
+      knownNodesManager: ActorRef[KnownNodesManager.Command],
       incomingConnection: Boolean,
       initHandshaker: Handshaker[R],
       stash: StashBuffer[Command],

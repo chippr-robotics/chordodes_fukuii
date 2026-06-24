@@ -152,8 +152,7 @@ class EthTxServiceSpec
       ethTxService.getRawTransactionByHash(request).unsafeRunSync()
 
     // then
-    pendingTransactionsManager.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    pendingTransactionsManager.reply(PendingTransactionsResponse(Nil))
+    replyPTM(PendingTransactionsResponse(Nil))
 
     response shouldEqual Right(RawTransactionResponse(None))
   }
@@ -170,10 +169,7 @@ class EthTxServiceSpec
       ethTxService.getRawTransactionByHash(request).unsafeToFuture()
 
     // then
-    pendingTransactionsManager.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    pendingTransactionsManager.reply(
-      PendingTransactionsResponse(Seq(PendingTransaction(txToRequestWithSender, System.currentTimeMillis)))
-    )
+    replyPTM(PendingTransactionsResponse(Seq(PendingTransaction(txToRequestWithSender, System.currentTimeMillis))))
 
     response.futureValue shouldEqual Right(RawTransactionResponse(Some(txToRequest)))
   }
@@ -193,8 +189,7 @@ class EthTxServiceSpec
       ethTxService.getRawTransactionByHash(request).unsafeRunSync()
 
     // then
-    pendingTransactionsManager.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    pendingTransactionsManager.reply(PendingTransactionsResponse(Nil))
+    replyPTM(PendingTransactionsResponse(Nil))
 
     response shouldEqual Right(RawTransactionResponse(Some(txToRequest)))
   }
@@ -322,8 +317,7 @@ class EthTxServiceSpec
     val response: Either[JsonRpcError, GetTransactionByHashResponse] =
       ethTxService.getTransactionByHash(request).unsafeRunSync()
 
-    pendingTransactionsManager.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    pendingTransactionsManager.reply(PendingTransactionsResponse(Nil))
+    replyPTM(PendingTransactionsResponse(Nil))
 
     response shouldEqual Right(GetTransactionByHashResponse(None))
   }
@@ -334,10 +328,7 @@ class EthTxServiceSpec
     val response: Future[Either[JsonRpcError, GetTransactionByHashResponse]] =
       ethTxService.getTransactionByHash(request).unsafeToFuture()
 
-    pendingTransactionsManager.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    pendingTransactionsManager.reply(
-      PendingTransactionsResponse(Seq(PendingTransaction(txToRequestWithSender, System.currentTimeMillis)))
-    )
+    replyPTM(PendingTransactionsResponse(Seq(PendingTransaction(txToRequestWithSender, System.currentTimeMillis))))
 
     response.futureValue shouldEqual Right(GetTransactionByHashResponse(Some(TransactionResponse(txToRequest))))
   }
@@ -354,8 +345,7 @@ class EthTxServiceSpec
     val response: Either[JsonRpcError, GetTransactionByHashResponse] =
       ethTxService.getTransactionByHash(request).unsafeRunSync()
 
-    pendingTransactionsManager.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    pendingTransactionsManager.reply(PendingTransactionsResponse(Nil))
+    replyPTM(PendingTransactionsResponse(Nil))
 
     response shouldEqual Right(
       GetTransactionByHashResponse(Some(TransactionResponse(txToRequest, Some(blockWithTx.header), Some(0))))
@@ -410,8 +400,7 @@ class EthTxServiceSpec
   ) in new TestSetup {
     val res: PendingTransactionsResponse = ethTxService.getTransactionsFromPool.unsafeRunSync()
 
-    pendingTransactionsManager.expectMsg(GetPendingTransactions)
-    pendingTransactionsManager.reply(PendingTransactionsResponse(Nil))
+    replyPTM(PendingTransactionsResponse(Nil))
 
     res shouldBe PendingTransactionsResponse(Nil)
   }
@@ -438,17 +427,15 @@ class EthTxServiceSpec
 
     val res: Future[PendingTransactionsResponse] = ethTxService.getTransactionsFromPool.unsafeToFuture()
 
-    pendingTransactionsManager.expectMsg(GetPendingTransactions)
-    pendingTransactionsManager.reply(PendingTransactionsResponse(transactions))
+    replyPTM(PendingTransactionsResponse(transactions))
 
     res.futureValue shouldBe PendingTransactionsResponse(transactions)
   }
 
   it should "send message to pendingTransactionsManager and return an empty GetPendingTransactionsResponse taggedAs (UnitTest, RPCTest) in case of error" in new TestSetup {
+    // With Typed ask, error injection is done by not responding (timeout) rather than sending an exception.
+    // The handleError in TransactionPicker catches the AskTimeoutException and returns PendingTransactionsResponse(Nil).
     val res: PendingTransactionsResponse = ethTxService.getTransactionsFromPool.unsafeRunSync()
-
-    pendingTransactionsManager.expectMsg(GetPendingTransactions)
-    pendingTransactionsManager.reply(new ClassCastException("error"))
 
     res shouldBe PendingTransactionsResponse(Nil)
   }
@@ -463,10 +450,17 @@ class EthTxServiceSpec
       blockchain,
       blockchainReader,
       mining,
-      pendingTransactionsManager.ref,
+      pendingTransactionsManager.ref.toTyped[PendingTransactionsManager.Command],
       getTransactionFromPoolTimeout,
-      storagesInstance.storages.transactionMappingStorage
+      storagesInstance.storages.transactionMappingStorage,
+      system.toTyped.scheduler
     )
+
+    /** Reply to a Typed PTM ask (GetPendingTransactionsReq) from the probe's mailbox. */
+    def replyPTM(response: PendingTransactionsResponse): Unit =
+      pendingTransactionsManager.expectMsgPF() { case req: GetPendingTransactionsReq =>
+        req.replyTo ! response
+      }
 
     val blockToRequest: Block = Block(Fixtures.Blocks.Block3125369.header, Fixtures.Blocks.Block3125369.body)
 

@@ -196,37 +196,15 @@ trait KnownNodesManagerBuilder {
   lazy val knownNodesManagerConfig: KnownNodesManager.KnownNodesManagerConfig =
     KnownNodesManager.KnownNodesManagerConfig(instanceConfig.config)
 
-  // Typed ref — for in-scope callers and direct Typed wiring.
-  lazy val knownNodesManagerTyped: org.apache.pekko.actor.typed.ActorRef[KnownNodesManager.Command] =
+  lazy val knownNodesManager: org.apache.pekko.actor.typed.ActorRef[KnownNodesManager.Command] =
     classicSystem.spawn(
       KnownNodesManager(knownNodesManagerConfig, storagesInstance.storages.knownNodesStorage),
-      "known-nodes-manager-typed"
-    )
-
-  // Classic bridge actor for out-of-scope Classic callers (PeerManagerActor, PeerActor).
-  // Translates the legacy GetKnownNodes case object to the Typed ask pattern (replying to the
-  // original sender), and forwards all other KnownNodesManager Commands directly.
-  lazy val knownNodesManager: ActorRef =
-    classicSystem.actorOf(
-      org.apache.pekko.actor.Props(new org.apache.pekko.actor.Actor {
-        implicit private val scheduler: org.apache.pekko.actor.typed.Scheduler =
-          context.system.toTyped.scheduler
-        implicit private val bridgeTimeout: org.apache.pekko.util.Timeout =
-          org.apache.pekko.util.Timeout(10.seconds)
-
-        def receive: Receive = {
-          case KnownNodesManager.GetKnownNodes =>
-            val s = sender()
-            import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
-            knownNodesManagerTyped
-              .ask(ref => KnownNodesManager.GetKnownNodesReq(ref))
-              .foreach(s ! _)(context.dispatcher)
-          case cmd: KnownNodesManager.Command =>
-            knownNodesManagerTyped ! cmd
-        }
-      }),
       "known-nodes-manager"
     )
+
+  // Alias kept for any caller that previously used the Typed-specific name during the bridge era.
+  def knownNodesManagerTyped: org.apache.pekko.actor.typed.ActorRef[KnownNodesManager.Command] =
+    knownNodesManager
 }
 
 trait PeerDiscoveryManagerBuilder {
@@ -260,31 +238,6 @@ trait PeerDiscoveryManagerBuilder {
       "peer-discovery-manager-typed"
     )
 
-  // Classic bridge actor for out-of-scope Classic callers (PeerManagerActor, StdNode).
-  // Translates legacy GetDiscoveredNodesInfo / GetRandomNodeInfo case objects into typed
-  // GetDiscoveredNodesInfoReq / GetRandomNodeInfoReq with the Classic sender wrapped as
-  // a typed replyTo. Forwards PeerDiscoveryManager.Command messages (Start, Stop) directly.
-  // Remove once PeerManagerActor and StdNode are migrated to Typed.
-  lazy val peerDiscoveryManager: ActorRef =
-    classicSystem.actorOf(
-      org.apache.pekko.actor.Props(new org.apache.pekko.actor.Actor {
-        def receive: Receive = {
-          case PeerDiscoveryManager.GetDiscoveredNodesInfo =>
-            peerDiscoveryManagerTyped ! PeerDiscoveryManager.GetDiscoveredNodesInfoReq(
-              sender().toTyped[PeerDiscoveryManager.DiscoveredNodesInfo]
-            )
-
-          case PeerDiscoveryManager.GetRandomNodeInfo =>
-            peerDiscoveryManagerTyped ! PeerDiscoveryManager.GetRandomNodeInfoReq(
-              sender().toTyped[PeerDiscoveryManager.RandomNodeInfo]
-            )
-
-          case cmd: PeerDiscoveryManager.Command =>
-            peerDiscoveryManagerTyped ! cmd
-        }
-      }),
-      "peer-discovery-manager"
-    )
 }
 
 trait BlacklistBuilder {
@@ -512,21 +465,17 @@ trait NetServiceBuilder {
 }
 
 trait PendingTransactionsManagerBuilder {
-  // Classic bridge ref — for out-of-scope callers (FilterManager, EthMiningService,
-  // EthTxService, TxPoolService, PersonalService, TransactionHistoryService, TestService,
-  // PoWBlockCreator, TransactionPicker).
-  def pendingTransactionsManager: ActorRef
-  // Typed ref — for in-scope callers (EngineApiService, BlockImporter, BlockchainHostActor,
-  // RegularSync, SyncController).
-  def pendingTransactionsManagerTyped: org.apache.pekko.actor.typed.ActorRef[PendingTransactionsManager.Command]
+  def pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[PendingTransactionsManager.Command]
+  // Alias kept for callers that reference the Typed ref by the old name.
+  def pendingTransactionsManagerTyped: org.apache.pekko.actor.typed.ActorRef[PendingTransactionsManager.Command] =
+    pendingTransactionsManager
 }
 object PendingTransactionsManagerBuilder {
   trait Default extends PendingTransactionsManagerBuilder {
     self: ActorSystemBuilder & PeerManagerActorBuilder & NetworkPeerManagerActorBuilder & PeerEventBusBuilder &
       TxPoolConfigBuilder & BlockchainBuilder & StorageBuilder & EventTopicsBuilder =>
 
-    lazy val pendingTransactionsManagerTyped
-        : org.apache.pekko.actor.typed.ActorRef[PendingTransactionsManager.Command] =
+    lazy val pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[PendingTransactionsManager.Command] =
       classicSystem.spawn(
         PendingTransactionsManager(
           txPoolConfig,
@@ -539,31 +488,6 @@ object PendingTransactionsManagerBuilder {
         ),
         "pending-transactions-manager"
       )
-
-    // Classic bridge actor for out-of-scope callers.
-    // Translates the legacy GetPendingTransactions case object to the Typed ask pattern,
-    // and forwards all other PTM Commands directly.
-    lazy val pendingTransactionsManager: ActorRef =
-      classicSystem.actorOf(
-        org.apache.pekko.actor.Props(new org.apache.pekko.actor.Actor {
-          implicit private val scheduler: org.apache.pekko.actor.typed.Scheduler =
-            context.system.toTyped.scheduler
-          implicit private val bridgeTimeout: org.apache.pekko.util.Timeout =
-            org.apache.pekko.util.Timeout(txPoolConfig.pendingTxManagerQueryTimeout)
-
-          def receive: Receive = {
-            case PendingTransactionsManager.GetPendingTransactions =>
-              val s = sender()
-              import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
-              pendingTransactionsManagerTyped
-                .ask(ref => PendingTransactionsManager.GetPendingTransactionsReq(ref))
-                .foreach(s ! _)(context.dispatcher)
-            case cmd: PendingTransactionsManager.Command =>
-              pendingTransactionsManagerTyped ! cmd
-          }
-        }),
-        "ptm-classic-bridge"
-      )
   }
 }
 
@@ -572,12 +496,13 @@ trait TransactionHistoryServiceBuilder {
 }
 object TransactionHistoryServiceBuilder {
   trait Default extends TransactionHistoryServiceBuilder {
-    self: BlockchainBuilder & PendingTransactionsManagerBuilder & TxPoolConfigBuilder =>
+    self: BlockchainBuilder & PendingTransactionsManagerBuilder & TxPoolConfigBuilder & ActorSystemBuilder =>
     lazy val transactionHistoryService =
       new TransactionHistoryService(
         blockchainReader,
         pendingTransactionsManager,
-        txPoolConfig.getTransactionFromPoolTimeout
+        txPoolConfig.getTransactionFromPoolTimeout,
+        classicSystem.toTyped.scheduler
       )
   }
 }
@@ -667,7 +592,7 @@ trait EthMiningServiceBuilder {
 }
 trait EthTxServiceBuilder {
   self: BlockchainBuilder & BlockchainConfigBuilder & PendingTransactionsManagerBuilder & MiningBuilder &
-    TxPoolConfigBuilder & StorageBuilder =>
+    TxPoolConfigBuilder & StorageBuilder & ActorSystemBuilder =>
 
   lazy val ethTxService = new EthTxService(
     blockchain,
@@ -675,7 +600,8 @@ trait EthTxServiceBuilder {
     mining,
     pendingTransactionsManager,
     txPoolConfig.getTransactionFromPoolTimeout,
-    storagesInstance.storages.transactionMappingStorage
+    storagesInstance.storages.transactionMappingStorage,
+    classicSystem.toTyped.scheduler
   )
 }
 
@@ -713,7 +639,7 @@ trait EthFilterServiceBuilder {
 
 trait PersonalServiceBuilder {
   self: KeyStoreBuilder & BlockchainBuilder & BlockchainConfigBuilder & PendingTransactionsManagerBuilder &
-    StorageBuilder & TxPoolConfigBuilder & EthTxServiceBuilder =>
+    StorageBuilder & TxPoolConfigBuilder & EthTxServiceBuilder & ActorSystemBuilder =>
 
   lazy val personalService: PersonalServiceAPI = new PersonalService(
     keyStore,
@@ -721,7 +647,8 @@ trait PersonalServiceBuilder {
     pendingTransactionsManager,
     txPoolConfig,
     this,
-    ethTxService
+    ethTxService,
+    classicSystem.toTyped.scheduler
   )
 }
 
@@ -809,12 +736,13 @@ trait AdminServiceBuilder {
 }
 
 trait TxPoolServiceBuilder {
-  this: PendingTransactionsManagerBuilder & TxPoolConfigBuilder =>
+  this: PendingTransactionsManagerBuilder & TxPoolConfigBuilder & ActorSystemBuilder =>
 
   lazy val txPoolService: TxPoolService = new TxPoolService(
     pendingTransactionsManager,
     txPoolConfig.getTransactionFromPoolTimeout,
-    txPoolConfig
+    txPoolConfig,
+    classicSystem.toTyped.scheduler
   )
 }
 

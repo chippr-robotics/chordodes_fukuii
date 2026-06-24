@@ -254,8 +254,12 @@ trait MinerSpecSetup
       TestActor.KeepRunning
     }
 
-    pendingTransactionsManager.setAutoPilot { (sender: ActorRef, _: Any) =>
-      sender ! PendingTransactionsManager.PendingTransactionsResponse(Nil)
+    pendingTransactionsManager.setAutoPilot { (_: ActorRef, msg: Any) =>
+      msg match {
+        case PendingTransactionsManager.GetPendingTransactionsReq(replyTo) =>
+          replyTo ! PendingTransactionsManager.PendingTransactionsResponse(Nil)
+        case _ => ()
+      }
       TestActor.KeepRunning
     }
   }

@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
@@ -44,6 +45,7 @@ import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.testmode.SealEngineType
 import com.chipprbots.ethereum.testmode.TestModeComponentsProvider
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
+import com.chipprbots.ethereum.transactions.PendingTransactionsManager.GetPendingTransactionsReq
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransactionsResponse
 import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
@@ -141,11 +143,12 @@ class TestService(
     blockchainWriter: BlockchainWriter,
     stateStorage: StateStorage,
     evmCodeStorage: EvmCodeStorage,
-    pendingTransactionsManager: ActorRef,
+    pendingTransactionsManager: ActorRef[PendingTransactionsManager.Command],
     miningConfig: MiningConfig,
     testModeComponentsProvider: TestModeComponentsProvider,
     transactionMappingStorage: TransactionMappingStorage,
-    node: TestNode
+    node: TestNode,
+    scheduler: Scheduler
 )(implicit ioRuntime: IORuntime)
     extends Logger {
   import node.*
@@ -344,8 +347,9 @@ class TestService(
 
   private def getBlockForMining(parentBlock: Block): IO[PendingBlock] = {
     given timeout: Timeout = Timeout(20.seconds)
+    given sc: Scheduler = scheduler
     pendingTransactionsManager
-      .askFor[PendingTransactionsResponse](PendingTransactionsManager.GetPendingTransactions)
+      .askForTyped[PendingTransactionsResponse](GetPendingTransactionsReq(_))
       .timeout(timeout.duration)
       .recover { case ex =>
         log.error("Error getting transactions", ex)

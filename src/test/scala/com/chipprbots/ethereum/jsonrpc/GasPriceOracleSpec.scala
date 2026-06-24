@@ -157,9 +157,10 @@ class GasPriceOracleSpec
       stub[Blockchain],
       reader,
       stub[Mining],
-      probe.ref,
+      probe.ref.toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
       5.seconds,
-      stub[TransactionMappingStorage]
+      stub[TransactionMappingStorage],
+      system.scheduler
     )
   }
 

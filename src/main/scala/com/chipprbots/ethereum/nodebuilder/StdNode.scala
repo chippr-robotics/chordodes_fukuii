@@ -182,7 +182,7 @@ abstract class BaseNode extends Node {
 
   private def startMining(): Unit = mining.startProtocol(this)
 
-  private def startDiscoveryManager(): Unit = peerDiscoveryManager ! PeerDiscoveryManager.Start
+  private def startDiscoveryManager(): Unit = peerDiscoveryManagerTyped ! PeerDiscoveryManager.Start
 
   private def startJsonRpcHttpServer(): Unit =
     maybeJsonRpcHttpServer match {
@@ -251,7 +251,7 @@ abstract class BaseNode extends Node {
 
     tryAndLogFailure(() => tuiUpdater.foreach(_.stop()))
     tryAndLogFailure(() => Tui.getInstance().shutdown())
-    tryAndLogFailure(() => peerDiscoveryManager ! PeerDiscoveryManager.Stop)
+    tryAndLogFailure(() => peerDiscoveryManagerTyped ! PeerDiscoveryManager.Stop)
     tryAndLogFailure(() => mining.stopProtocol())
     // Stop the Engine API server first: it owns its own Http() binding (port 8551) on a dedicated
     // ActorSystem + IORuntime. Terminate them before the main ActorSystem so the port is released

@@ -59,7 +59,17 @@ class TxPoolServiceSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike w
 
   trait TestSetup {
     val probe: TestProbe = TestProbe()
-    val service = new TxPoolService(probe.ref, 5.seconds, txPoolConfig)
+    val service = new TxPoolService(
+      probe.ref.toTyped[PendingTransactionsManager.Command],
+      5.seconds,
+      txPoolConfig,
+      testKit.system.scheduler
+    )
+
+    def replyPTM(response: PendingTransactionsResponse): Unit =
+      probe.expectMsgPF() { case req: PendingTransactionsManager.GetPendingTransactionsReq =>
+        req.replyTo ! response
+      }
   }
 
   // ── besuTransactions ────────────────────────────────────────────────────────
@@ -70,8 +80,7 @@ class TxPoolServiceSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike w
     val future: Future[Either[JsonRpcError, TxPoolBesuTransactionsResponse]] =
       service.besuTransactions(TxPoolBesuTransactionsRequest()).unsafeToFuture()
 
-    probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    probe.reply(PendingTransactionsResponse(pts))
+    replyPTM(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
     result shouldBe a[Right[?, ?]]
@@ -82,8 +91,7 @@ class TxPoolServiceSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike w
     val future: Future[Either[JsonRpcError, TxPoolBesuTransactionsResponse]] =
       service.besuTransactions(TxPoolBesuTransactionsRequest()).unsafeToFuture()
 
-    probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    probe.reply(PendingTransactionsResponse(Seq.empty))
+    replyPTM(PendingTransactionsResponse(Seq.empty))
 
     future.futureValue shouldBe Right(TxPoolBesuTransactionsResponse(Seq.empty))
   }
@@ -96,8 +104,7 @@ class TxPoolServiceSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike w
     val future: Future[Either[JsonRpcError, TxPoolBesuStatisticsResponse]] =
       service.besuStatistics(TxPoolBesuStatisticsRequest()).unsafeToFuture()
 
-    probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    probe.reply(PendingTransactionsResponse(pts))
+    replyPTM(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
     result shouldBe a[Right[?, ?]]
@@ -115,8 +122,7 @@ class TxPoolServiceSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike w
     val future: Future[Either[JsonRpcError, TxPoolBesuStatisticsResponse]] =
       service.besuStatistics(TxPoolBesuStatisticsRequest()).unsafeToFuture()
 
-    probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    probe.reply(PendingTransactionsResponse(localPt +: remotePts))
+    replyPTM(PendingTransactionsResponse(localPt +: remotePts))
 
     val result = future.futureValue
     result shouldBe a[Right[?, ?]]
@@ -130,8 +136,7 @@ class TxPoolServiceSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike w
     val future: Future[Either[JsonRpcError, TxPoolBesuStatisticsResponse]] =
       service.besuStatistics(TxPoolBesuStatisticsRequest()).unsafeToFuture()
 
-    probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    probe.reply(PendingTransactionsResponse(Seq.empty))
+    replyPTM(PendingTransactionsResponse(Seq.empty))
 
     future.futureValue shouldBe Right(
       TxPoolBesuStatisticsResponse(maxSize = 4096L, localCount = 0L, remoteCount = 0L)
@@ -146,8 +151,7 @@ class TxPoolServiceSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike w
     val future: Future[Either[JsonRpcError, TxPoolBesuPendingTransactionsResponse]] =
       service.besuPendingTransactions(TxPoolBesuPendingTransactionsRequest(None)).unsafeToFuture()
 
-    probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    probe.reply(PendingTransactionsResponse(pts))
+    replyPTM(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
     result shouldBe a[Right[?, ?]]
@@ -160,8 +164,7 @@ class TxPoolServiceSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike w
     val future: Future[Either[JsonRpcError, TxPoolBesuPendingTransactionsResponse]] =
       service.besuPendingTransactions(TxPoolBesuPendingTransactionsRequest(Some(1))).unsafeToFuture()
 
-    probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    probe.reply(PendingTransactionsResponse(pts))
+    replyPTM(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
     result shouldBe a[Right[?, ?]]
@@ -180,8 +183,7 @@ class TxPoolServiceSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike w
         .besuPendingTransactions(TxPoolBesuPendingTransactionsRequest(None, Some(params)))
         .unsafeToFuture()
 
-    probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    probe.reply(PendingTransactionsResponse(pts))
+    replyPTM(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
     result shouldBe a[Right[?, ?]]
@@ -200,8 +202,7 @@ class TxPoolServiceSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike w
         .besuPendingTransactions(TxPoolBesuPendingTransactionsRequest(None, Some(params)))
         .unsafeToFuture()
 
-    probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    probe.reply(PendingTransactionsResponse(pts))
+    replyPTM(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
     result shouldBe a[Right[?, ?]]
@@ -220,8 +221,7 @@ class TxPoolServiceSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike w
         .besuPendingTransactions(TxPoolBesuPendingTransactionsRequest(None, Some(params)))
         .unsafeToFuture()
 
-    probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    probe.reply(PendingTransactionsResponse(pts))
+    replyPTM(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
     result shouldBe a[Right[?, ?]]
@@ -240,8 +240,7 @@ class TxPoolServiceSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike w
         .besuPendingTransactions(TxPoolBesuPendingTransactionsRequest(None, Some(params)))
         .unsafeToFuture()
 
-    probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    probe.reply(PendingTransactionsResponse(pts))
+    replyPTM(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
     result shouldBe a[Right[?, ?]]
@@ -260,8 +259,7 @@ class TxPoolServiceSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike w
         .besuPendingTransactions(TxPoolBesuPendingTransactionsRequest(Some(2), Some(params)))
         .unsafeToFuture()
 
-    probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    probe.reply(PendingTransactionsResponse(pts))
+    replyPTM(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
     result shouldBe a[Right[?, ?]]
@@ -276,8 +274,7 @@ class TxPoolServiceSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike w
     val future: Future[Either[JsonRpcError, TxPoolContentResponse]] =
       service.content(TxPoolContentRequest()).unsafeToFuture()
 
-    probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    probe.reply(PendingTransactionsResponse(pts))
+    replyPTM(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
     result shouldBe a[Right[?, ?]]
@@ -295,8 +292,7 @@ class TxPoolServiceSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike w
     val future: Future[Either[JsonRpcError, TxPoolContentResponse]] =
       service.content(TxPoolContentRequest()).unsafeToFuture()
 
-    probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    probe.reply(PendingTransactionsResponse(Seq.empty))
+    replyPTM(PendingTransactionsResponse(Seq.empty))
 
     future.futureValue shouldBe Right(TxPoolContentResponse(Map.empty, Map.empty))
   }
@@ -310,8 +306,7 @@ class TxPoolServiceSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike w
     val future: Future[Either[JsonRpcError, TxPoolContentFromResponse]] =
       service.contentFrom(TxPoolContentFromRequest(target)).unsafeToFuture()
 
-    probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    probe.reply(PendingTransactionsResponse(pts))
+    replyPTM(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
     result shouldBe a[Right[?, ?]]
@@ -332,8 +327,7 @@ class TxPoolServiceSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike w
     val future: Future[Either[JsonRpcError, TxPoolContentFromResponse]] =
       service.contentFrom(TxPoolContentFromRequest(absent)).unsafeToFuture()
 
-    probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    probe.reply(PendingTransactionsResponse(pts))
+    replyPTM(PendingTransactionsResponse(pts))
 
     future.futureValue shouldBe Right(TxPoolContentFromResponse(Map.empty, Map.empty))
   }
@@ -346,8 +340,7 @@ class TxPoolServiceSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike w
     val future: Future[Either[JsonRpcError, TxPoolStatusResponse]] =
       service.status(TxPoolStatusRequest()).unsafeToFuture()
 
-    probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    probe.reply(PendingTransactionsResponse(pts))
+    replyPTM(PendingTransactionsResponse(pts))
 
     future.futureValue shouldBe Right(TxPoolStatusResponse(pending = 4L, queued = 0L))
   }
@@ -356,8 +349,7 @@ class TxPoolServiceSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike w
     val future: Future[Either[JsonRpcError, TxPoolStatusResponse]] =
       service.status(TxPoolStatusRequest()).unsafeToFuture()
 
-    probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    probe.reply(PendingTransactionsResponse(Seq.empty))
+    replyPTM(PendingTransactionsResponse(Seq.empty))
 
     future.futureValue shouldBe Right(TxPoolStatusResponse(pending = 0L, queued = 0L))
   }
@@ -370,8 +362,7 @@ class TxPoolServiceSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike w
     val future: Future[Either[JsonRpcError, TxPoolInspectResponse]] =
       service.inspect(TxPoolInspectRequest()).unsafeToFuture()
 
-    probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    probe.reply(PendingTransactionsResponse(pts))
+    replyPTM(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
     result shouldBe a[Right[?, ?]]
@@ -395,8 +386,7 @@ class TxPoolServiceSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike w
     val future: Future[Either[JsonRpcError, TxPoolInspectResponse]] =
       service.inspect(TxPoolInspectRequest()).unsafeToFuture()
 
-    probe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    probe.reply(PendingTransactionsResponse(pts))
+    replyPTM(PendingTransactionsResponse(pts))
 
     val result = future.futureValue
     result shouldBe a[Right[?, ?]]

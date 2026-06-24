@@ -75,9 +75,13 @@ object PeerManagerActor {
   /** A [[PeerEventBusActor.PeerEvent]] delivered to the shell (the subscriber) and forwarded to the core. */
   final case class PeerEventReceived(ev: PeerEvent) extends Command
 
-  // Reply from the (still-Classic) KnownNodesManager, wrapped via messageAdapter so the Classic `sender()`-based reply
-  // lands as a typed Command. PMA keeps sending the legacy Classic GetKnownNodes with the adapter as the sender.
+  // Reply from KnownNodesManager (Typed ask), mapped back to the actor thread as a Command.
   final private case class KnownNodesReceived(nodes: Set[URI]) extends Command
+
+  /** A Typed ask to KnownNodesManager timed out or failed. Known-node bootstrap is best-effort; the actor starts
+    * connecting to discovery nodes, so a missed known-nodes response is non-fatal.
+    */
+  private case object KnownNodesFailed extends Command
 
   // Replies from the (now-Typed) PeerDiscoveryManager, delivered by the `context.ask` mapping.
   // private[ethereum] so integration tests outside the `network` package can inject discovery results directly.
@@ -114,7 +118,7 @@ object PeerManagerActor {
       peerEventBus: typed.ActorRef[PeerEventBusActor.Command],
       peerDiscoveryManager: typed.ActorRef[PeerDiscoveryManager.Command],
       peerConfiguration: PeerConfiguration,
-      knownNodesManager: ActorRef,
+      knownNodesManager: typed.ActorRef[KnownNodesManager.Command],
       peerStatistics: typed.ActorRef[PeerStatisticsActor.Command],
       peerFactory: (TypedActorContext[Command], InetSocketAddress, Boolean) => typed.ActorRef[PeerActor.Command],
       discoveryConfig: DiscoveryConfig,
@@ -142,7 +146,7 @@ object PeerManagerActor {
       peerEventBus: typed.ActorRef[PeerEventBusActor.Command],
       peerDiscoveryManager: typed.ActorRef[PeerDiscoveryManager.Command],
       peerConfiguration: PeerConfiguration,
-      knownNodesManager: ActorRef,
+      knownNodesManager: typed.ActorRef[KnownNodesManager.Command],
       peerStatistics: typed.ActorRef[PeerStatisticsActor.Command],
       peerFactory: (TypedActorContext[Command], InetSocketAddress, Boolean) => typed.ActorRef[PeerActor.Command],
       discoveryConfig: DiscoveryConfig,
@@ -158,14 +162,21 @@ object PeerManagerActor {
 
     private def scheduler: Scheduler = externalSchedulerOpt.getOrElse(context.system.classicSystem.scheduler)
 
-    // Adapter that turns the Classic `sender()`-based reply from the (still-Classic) KnownNodesManager into a typed
-    // Command. The request is sent with `.tell(msg, adapter.toClassic)` so the reply routes back through the adapter.
-    private val knownNodesAdapter: ActorRef =
-      context.messageAdapter[KnownNodesManager.KnownNodes](kn => KnownNodesReceived(kn.nodes)).toClassic
-
-    // Timeout for the typed asks to the (now-Typed) PeerDiscoveryManager. Discovery is best-effort, so a lapsed ask is
+    // Timeout for the typed asks to KnownNodesManager and PeerDiscoveryManager. Both are best-effort, so a lapsed ask is
     // simply logged (DiscoveryFailed) and retried by the next scan / connection-demand trigger.
     implicit private val discoveryAskTimeout: Timeout = Timeout(peerConfiguration.updateNodesInterval)
+
+    /** Typed ask to KnownNodesManager for the persisted known-node set. The mapped result lands back on the actor
+      * thread as [[KnownNodesReceived]] (success) or [[KnownNodesFailed]] (timeout/failure).
+      */
+    private def requestKnownNodes(): Unit =
+      context.ask[KnownNodesManager.Command, KnownNodesManager.KnownNodes](
+        knownNodesManager,
+        KnownNodesManager.GetKnownNodesReq(_)
+      ) {
+        case scala.util.Success(kn) => KnownNodesReceived(kn.nodes)
+        case scala.util.Failure(_)  => KnownNodesFailed
+      }
 
     /** Typed ask to the Typed PeerDiscoveryManager for the current discovered-nodes set. The mapped result lands back
       * on the actor thread as [[DiscoveredNodesReceived]] (success) or [[DiscoveryFailed]] (timeout/failure).
@@ -291,7 +302,7 @@ object PeerManagerActor {
           case StartConnectingCmd =>
             scheduleNodesUpdate()
             schedulePeerStatusRefresh()
-            knownNodesManager.tell(KnownNodesManager.GetKnownNodes, knownNodesAdapter)
+            requestKnownNodes()
             // Also request discovered/bootstrap nodes immediately. On a fresh node, KnownNodes is empty
             // but bootstrap/static nodes are available as alreadyDiscoveredNodes in PeerDiscoveryManager.
             // Without this, the first connection attempt waits for updateNodesInitialDelay.
@@ -352,6 +363,10 @@ object PeerManagerActor {
 
         case RequestDiscoveredNodes =>
           requestDiscoveredNodes()
+          Some(Behaviors.same)
+
+        case KnownNodesFailed =>
+          log.debug("KnownNodesManager ask timed out or failed; starting with empty known-nodes list")
           Some(Behaviors.same)
 
         case DiscoveryFailed =>
@@ -997,7 +1012,7 @@ object PeerManagerActor {
   def peerFactory[R <: HandshakeResult](
       config: PeerConfiguration,
       eventBus: typed.ActorRef[PeerEventBusActor.Command],
-      knownNodesManager: ActorRef,
+      knownNodesManager: typed.ActorRef[KnownNodesManager.Command],
       handshaker: Handshaker[R],
       authHandshaker: AuthHandshaker,
       capabilities: List[Capability]

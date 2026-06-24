@@ -45,7 +45,6 @@ import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers.QuantitiesS
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers.UnformattedDataJsonSerializer
 import com.chipprbots.ethereum.ommers.OmmersPool
 import com.chipprbots.ethereum.ommers.OmmersPool.Ommers
-import com.chipprbots.ethereum.testing.ActorsTesting.simpleAutoPilot
 import com.chipprbots.ethereum.testing.ActorsTesting.syncStatusAutoPilot
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
@@ -271,9 +270,10 @@ class JsonRpcControllerEthSpec
     )
 
     // Set up AutoPilot to respond immediately when messages are received
-    pendingTransactionsManager.setAutoPilot(simpleAutoPilot { case PendingTransactionsManager.GetPendingTransactions =>
-      PendingTransactionsManager.PendingTransactionsResponse(Nil)
-    })
+    pendingTransactionsManager.setAutoPilot(
+      com.chipprbots.ethereum.testing.ActorsTesting
+        .ptmAutoPilot(PendingTransactionsManager.PendingTransactionsResponse(Nil))
+    )
 
     ommersPool.setAutoPilot(new org.apache.pekko.testkit.TestActor.AutoPilot {
       def run(sender: org.apache.pekko.actor.ActorRef, msg: Any): org.apache.pekko.testkit.TestActor.AutoPilot = {

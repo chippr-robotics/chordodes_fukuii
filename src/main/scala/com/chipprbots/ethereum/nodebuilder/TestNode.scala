@@ -2,6 +2,8 @@ package com.chipprbots.ethereum.nodebuilder
 
 import java.util.concurrent.atomic.AtomicReference
 
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
+
 import cats.effect.unsafe.IORuntime
 
 import com.chipprbots.ethereum.consensus.mining.CoinbaseProvider
@@ -54,11 +56,12 @@ class TestNode(
         blockchainWriter,
         storagesInstance.storages.stateStorage,
         storagesInstance.storages.evmCodeStorage,
-        pendingTransactionsManager,
+        pendingTransactionsManagerTyped,
         miningConfig,
         testModeComponentsProvider,
         storagesInstance.storages.transactionMappingStorage,
-        this
+        this,
+        classicSystem.toTyped.scheduler
       )(ioRuntime)
     )
 

@@ -152,9 +152,10 @@ class GraphQLServiceSpec
       blockchain,
       blockchainReader,
       mining,
-      pendingTxProbe.ref,
+      pendingTxProbe.ref.toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
       1.second,
-      transactionMappingStorage
+      transactionMappingStorage,
+      system.scheduler
     )
     lazy val ethInfoService = new EthInfoService(
       blockchain,

@@ -200,7 +200,7 @@ class JsonRpcControllerFixture(implicit
     config,
     ommersPool.ref.toTyped[OmmersPool.Command],
     syncingController.ref.toTyped[com.chipprbots.ethereum.blockchain.sync.SyncController.Command],
-    pendingTransactionsManager.ref,
+    pendingTransactionsManager.ref.toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
     getTransactionFromPoolTimeout,
     this,
     coinbaseProvider,
@@ -213,9 +213,10 @@ class JsonRpcControllerFixture(implicit
     blockchain,
     blockchainReader,
     mining,
-    pendingTransactionsManager.ref,
+    pendingTransactionsManager.ref.toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
     getTransactionFromPoolTimeout,
-    storagesInstance.storages.transactionMappingStorage
+    storagesInstance.storages.transactionMappingStorage,
+    system.toTyped.scheduler
   )
 
   val ethUserService = new EthUserService(

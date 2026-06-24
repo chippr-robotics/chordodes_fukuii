@@ -1,8 +1,10 @@
 package com.chipprbots.ethereum.consensus.pow
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.typed
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Scheduler
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import cats.effect.IO
@@ -16,18 +18,20 @@ import com.chipprbots.ethereum.consensus.pow.blocks.PoWBlockGenerator
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ommers.OmmersPool
+import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransactionsResponse
 import com.chipprbots.ethereum.transactions.TransactionPicker
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 class PoWBlockCreator(
-    val pendingTransactionsManager: ActorRef,
+    val pendingTransactionsManager: ActorRef[PendingTransactionsManager.Command],
     val getTransactionFromPoolTimeout: FiniteDuration,
     mining: PoWMining,
     ommersPool: typed.ActorRef[OmmersPool.Command],
     coinbaseProvider: CoinbaseProvider,
     system: ActorSystem
 ) extends TransactionPicker {
+  override val scheduler: Scheduler = system.toTyped.scheduler
 
   lazy val fullConsensusConfig = mining.config
   lazy val miningConfig = fullConsensusConfig.specific
@@ -52,8 +56,7 @@ class PoWBlockCreator(
 
   private def getOmmersFromPool(parentBlockHash: ByteString): IO[OmmersPool.Ommers] = {
     import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
-    import org.apache.pekko.actor.typed.scaladsl.adapter.*
-    implicit val scheduler: org.apache.pekko.actor.typed.Scheduler = system.toTyped.scheduler
+    implicit val sc: Scheduler = scheduler
     IO.fromFuture(IO(ommersPool.ask[OmmersPool.Ommers](OmmersPool.GetOmmers(parentBlockHash, _))))
       .handleError { ex =>
         log.error("Failed to get ommers, mining block with empty ommers list", ex)

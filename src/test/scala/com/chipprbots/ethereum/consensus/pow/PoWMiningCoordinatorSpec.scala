@@ -256,7 +256,7 @@ class PoWMiningCoordinatorSpec
     val coinbaseProvider = new CoinbaseProvider(miningConfig.coinbase)
 
     override lazy val blockCreator = new PoWBlockCreator(
-      pendingTransactionsManager = pendingTransactionsManager.ref,
+      pendingTransactionsManager = pendingTransactionsManager.ref.toTyped[PendingTransactionsManager.Command],
       getTransactionFromPoolTimeout = getTransactionFromPoolTimeout,
       mining = mining,
       ommersPool = ommersPool.ref.toTyped[com.chipprbots.ethereum.ommers.OmmersPool.Command],

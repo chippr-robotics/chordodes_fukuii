@@ -142,9 +142,10 @@ class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRoute
       blockchain,
       blockchainReader,
       mining,
-      pendingTxProbe.ref,
+      pendingTxProbe.ref.toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
       1.second,
-      storagesInstance.storages.transactionMappingStorage
+      storagesInstance.storages.transactionMappingStorage,
+      system.toTyped.scheduler
     )
     lazy val ethInfoService = new EthInfoService(
       blockchain,

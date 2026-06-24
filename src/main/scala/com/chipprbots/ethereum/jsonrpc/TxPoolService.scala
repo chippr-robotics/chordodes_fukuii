@@ -1,11 +1,13 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Scheduler
 
 import scala.annotation.unused
 import scala.concurrent.duration.FiniteDuration
 
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransaction
 import com.chipprbots.ethereum.transactions.TransactionPicker
 import com.chipprbots.ethereum.utils.TxPoolConfig
@@ -90,9 +92,10 @@ object TxPoolService {
 }
 
 class TxPoolService(
-    override val pendingTransactionsManager: ActorRef,
+    override val pendingTransactionsManager: ActorRef[PendingTransactionsManager.Command],
     override val getTransactionFromPoolTimeout: FiniteDuration,
-    txPoolConfig: TxPoolConfig
+    txPoolConfig: TxPoolConfig,
+    override val scheduler: Scheduler
 ) extends TransactionPicker {
   import TxPoolService.*
 

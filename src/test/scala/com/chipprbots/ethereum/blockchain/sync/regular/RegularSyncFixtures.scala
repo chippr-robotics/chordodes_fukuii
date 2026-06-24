@@ -516,11 +516,13 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
       }
     })
 
-    // Set up AutoPilot for pendingTransactionsManager to respond to GetPendingTransactions messages
+    // Set up AutoPilot for pendingTransactionsManager to respond to pending transaction asks.
+    // RegularSync/BlockImporter only send fire-and-forget commands (AddUncheckedTransactions,
+    // RemoveTransactions); this autopilot handles both Classic and Typed ask variants defensively.
     pendingTransactionsManager.setAutoPilot(new AutoPilot {
       def run(sender: ActorRef, msg: Any): AutoPilot = msg match {
-        case PendingTransactionsManager.GetPendingTransactions =>
-          sender ! PendingTransactionsManager.PendingTransactionsResponse(Seq.empty)
+        case PendingTransactionsManager.GetPendingTransactionsReq(replyTo) =>
+          replyTo ! PendingTransactionsManager.PendingTransactionsResponse(Seq.empty)
           this
         case _ => this
       }

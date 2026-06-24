@@ -3,6 +3,7 @@ package com.chipprbots.ethereum.jsonrpc
 import org.apache.pekko.actor.testkit.typed.scaladsl.ManualTime
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -419,10 +420,9 @@ class FilterManagerSpec
       testKit.createTestProbe[FilterLogs]()
     filterManager ! FilterManager.GetFilterLogs(createResp.id, logsProbe.ref)
 
-    ptmProbe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    ptmProbe.reply(
-      PendingTransactionsManager.PendingTransactionsResponse(pendingTxs.map(PendingTransaction(_, 0)))
-    )
+    ptmProbe.expectMsgPF() { case PendingTransactionsManager.GetPendingTransactionsReq(replyTo) =>
+      replyTo ! PendingTransactionsManager.PendingTransactionsResponse(pendingTxs.map(PendingTransaction(_, 0)))
+    }
 
     val getLogsRes: PendingTransactionFilterLogs = logsProbe.expectMessageType[PendingTransactionFilterLogs]
     getLogsRes.txHashes shouldBe pendingTxs.map(_.tx.hash)
@@ -456,10 +456,9 @@ class FilterManagerSpec
       testKit.createTestProbe[FilterLogs]()
     filterManager ! FilterManager.GetFilterLogs(createResp.id, logsProbe.ref)
 
-    ptmProbe.expectMsg(PendingTransactionsManager.GetPendingTransactions)
-    ptmProbe.reply(
-      PendingTransactionsManager.PendingTransactionsResponse(pendingTxs.map(PendingTransaction(_, 0)))
-    )
+    ptmProbe.expectMsgPF() { case PendingTransactionsManager.GetPendingTransactionsReq(replyTo) =>
+      replyTo ! PendingTransactionsManager.PendingTransactionsResponse(pendingTxs.map(PendingTransaction(_, 0)))
+    }
 
     // the filter should work
     val getLogsRes: PendingTransactionFilterLogs = logsProbe.expectMessageType[PendingTransactionFilterLogs]
@@ -500,7 +499,14 @@ class FilterManagerSpec
     val ptmProbe: TestProbe = TestProbe()(testKit.system.classicSystem)
 
     val filterManager: ActorRef[FilterManager.Command] = testKit.spawn(
-      FilterManager(blockchainReader, blockGenerator, keyStore, ptmProbe.ref, filterConfig, txPoolConfig)
+      FilterManager(
+        blockchainReader,
+        blockGenerator,
+        keyStore,
+        ptmProbe.ref.toTyped[PendingTransactionsManager.Command],
+        filterConfig,
+        txPoolConfig
+      )
     )
 
     val blockHeader: BlockHeader = BlockHeader(

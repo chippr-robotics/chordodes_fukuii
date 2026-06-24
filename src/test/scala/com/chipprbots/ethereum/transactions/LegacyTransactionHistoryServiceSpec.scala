@@ -14,6 +14,7 @@ import com.chipprbots.ethereum.*
 import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.crypto.generateKeyPair
 import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import com.chipprbots.ethereum.transactions.TransactionHistoryService.ExtendedTransactionData
 import com.chipprbots.ethereum.transactions.TransactionHistoryService.MinedTransactionData
 import com.chipprbots.ethereum.transactions.testing.PendingTransactionsManagerAutoPilot
@@ -30,7 +31,12 @@ class LegacyTransactionHistoryServiceSpec
     val pendingTransactionManager: TestProbe = TestProbe()
     pendingTransactionManager.setAutoPilot(PendingTransactionsManagerAutoPilot())
     val transactionHistoryService =
-      new TransactionHistoryService(blockchainReader, pendingTransactionManager.ref, Timeouts.normalTimeout)
+      new TransactionHistoryService(
+        blockchainReader,
+        pendingTransactionManager.ref.toTyped[PendingTransactionsManager.Command],
+        Timeouts.normalTimeout,
+        system.scheduler
+      )
   }
 
   def createFixture() = new Fixture

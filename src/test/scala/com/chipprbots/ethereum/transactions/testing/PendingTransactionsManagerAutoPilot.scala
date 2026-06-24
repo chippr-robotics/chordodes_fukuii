@@ -36,6 +36,10 @@ case class PendingTransactionsManagerAutoPilot(pendingTransactions: Set[PendingT
         sender ! PendingTransactionsResponse(pendingTransactions.toSeq)
         this
 
+      case GetPendingTransactionsReq(replyTo) =>
+        replyTo ! PendingTransactionsResponse(pendingTransactions.toSeq)
+        this
+
       case RemoveTransactions(signedTransactions) =>
         this.removeTransactions(signedTransactions.map(_.hash).toSet)
 

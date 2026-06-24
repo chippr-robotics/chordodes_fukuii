@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.transactions
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.util.Timeout
 
 import cats.effect.IO
@@ -22,8 +23,9 @@ import com.chipprbots.ethereum.utils.Logger
 
 class TransactionHistoryService(
     blockchainReader: BlockchainReader,
-    pendingTransactionsManager: ActorRef,
-    getTransactionFromPoolTimeout: FiniteDuration
+    pendingTransactionsManager: ActorRef[PendingTransactionsManager.Command],
+    getTransactionFromPoolTimeout: FiniteDuration,
+    scheduler: Scheduler
 ) extends Logger {
   def getAccountTransactions(
       account: Address,
@@ -64,8 +66,11 @@ class TransactionHistoryService(
 
   private val getTransactionsFromPool: IO[List[PendingTransaction]] = {
     given timeout: Timeout = getTransactionFromPoolTimeout
+    given sc: Scheduler = scheduler
     pendingTransactionsManager
-      .askFor[PendingTransactionsManager.PendingTransactionsResponse](PendingTransactionsManager.GetPendingTransactions)
+      .askForTyped[PendingTransactionsManager.PendingTransactionsResponse](
+        PendingTransactionsManager.GetPendingTransactionsReq(_)
+      )
       .map(_.pendingTransactions.toList)
       .handleErrorWith { case ex: Throwable =>
         log.error("Failed to get pending transactions, passing empty transactions list", ex)

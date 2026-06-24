@@ -2,7 +2,8 @@ package com.chipprbots.ethereum.jsonrpc
 
 import java.time.Duration
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.Scheduler
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
@@ -88,10 +89,11 @@ trait PersonalServiceAPI {
 class PersonalService(
     keyStore: KeyStore,
     blockchainReader: BlockchainReader,
-    txPool: ActorRef,
+    txPool: ActorRef[PendingTransactionsManager.Command],
     txPoolConfig: TxPoolConfig,
     configBuilder: BlockchainConfigBuilder,
-    ethTxService: EthTxService
+    ethTxService: EthTxService,
+    scheduler: Scheduler
 ) extends PersonalServiceAPI
     with Logger {
   import configBuilder.*
@@ -194,9 +196,10 @@ class PersonalService(
 
   private def sendTransaction(request: TransactionRequest, wallet: Wallet): IO[ByteString] = {
     given timeout: Timeout = Timeout(txPoolConfig.pendingTxManagerQueryTimeout)
+    given sc: Scheduler = scheduler
 
     val pendingTxsFuture =
-      txPool.askFor[PendingTransactionsResponse](PendingTransactionsManager.GetPendingTransactions)
+      txPool.askForTyped[PendingTransactionsResponse](PendingTransactionsManager.GetPendingTransactionsReq(_))
     val latestPendingTxNonceFuture: IO[Option[BigInt]] = pendingTxsFuture.map { pendingTxs =>
       val senderTxsNonces = pendingTxs.pendingTransactions
         .collect { case ptx if ptx.stx.senderAddress == wallet.address => ptx.stx.tx.tx.nonce }

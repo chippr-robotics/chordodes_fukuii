@@ -4,10 +4,11 @@ import java.time.Duration
 import java.util.Date
 import java.util.concurrent.atomic.AtomicReference
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.typed
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
+import org.apache.pekko.actor.typed.Scheduler
+import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 import org.apache.pekko.util.Timeout
 
@@ -82,12 +83,15 @@ class EthMiningService(
     jsonRpcConfig: JsonRpcConfig,
     ommersPool: typed.ActorRef[OmmersPool.Command],
     syncingController: TypedActorRef[SyncController.Command],
-    val pendingTransactionsManager: ActorRef,
+    val pendingTransactionsManager: TypedActorRef[
+      com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
+    ],
     val getTransactionFromPoolTimeout: FiniteDuration,
     configBuilder: BlockchainConfigBuilder,
     coinbaseProvider: CoinbaseProvider,
     system: ActorSystem
 ) extends TransactionPicker {
+  override val scheduler: Scheduler = system.toTyped.scheduler
   import configBuilder.*
   import EthMiningService.*
 

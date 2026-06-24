@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.apache.pekko.actor.ActorRef as ClassicActorRef
 import org.apache.pekko.actor.Cancellable
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
@@ -99,13 +98,14 @@ object FilterManager {
       blockchainReader: BlockchainReader,
       blockGenerator: BlockGenerator,
       keyStore: KeyStore,
-      pendingTransactionsManager: ClassicActorRef,
+      pendingTransactionsManager: ActorRef[PendingTransactionsManager.Command],
       filterConfig: FilterConfig,
       txPoolConfig: TxPoolConfig
   ): Behavior[Command] = Behaviors.setup { ctx =>
     given ec: ExecutionContext = ctx.executionContext
     given ioRuntime: IORuntime = IORuntime.global
     given timeout: Timeout = Timeout(txPoolConfig.pendingTxManagerQueryTimeout)
+    given scheduler: org.apache.pekko.actor.typed.Scheduler = ctx.system.scheduler
 
     val maxBlockHashesChanges = 256
 
@@ -248,8 +248,8 @@ object FilterManager {
 
     def getPendingTransactions(): IO[Seq[PendingTransaction]] =
       pendingTransactionsManager
-        .askFor[PendingTransactionsManager.PendingTransactionsResponse](
-          PendingTransactionsManager.GetPendingTransactions
+        .askForTyped[PendingTransactionsManager.PendingTransactionsResponse](
+          PendingTransactionsManager.GetPendingTransactionsReq(_)
         )
         .flatMap { response =>
           keyStore.listAccounts match {

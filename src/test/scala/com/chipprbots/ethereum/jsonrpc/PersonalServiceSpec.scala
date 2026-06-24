@@ -139,8 +139,7 @@ class PersonalServiceSpec
     val res: Future[Either[JsonRpcError, SendTransactionWithPassphraseResponse]] =
       personal.sendTransaction(req).unsafeToFuture()
 
-    txPool.expectMsg(GetPendingTransactions)
-    txPool.reply(PendingTransactionsResponse(Nil))
+    replyPTM(PendingTransactionsResponse(Nil))
 
     res.futureValue shouldEqual Right(SendTransactionWithPassphraseResponse(stx.hash))
     txPool.expectMsg(AddOrOverrideTransaction(stx))
@@ -164,8 +163,7 @@ class PersonalServiceSpec
     val res: Future[Either[JsonRpcError, SendTransactionWithPassphraseResponse]] =
       personal.sendTransaction(req).unsafeToFuture()
 
-    txPool.expectMsg(GetPendingTransactions)
-    txPool.reply(PendingTransactionsResponse(Seq(PendingTransaction(stxWithSender, 0))))
+    replyPTM(PendingTransactionsResponse(Seq(PendingTransaction(stxWithSender, 0))))
 
     res.futureValue shouldEqual Right(SendTransactionWithPassphraseResponse(newTx.hash))
     txPool.expectMsg(AddOrOverrideTransaction(newTx))
@@ -200,8 +198,7 @@ class PersonalServiceSpec
     val req: SendTransactionRequest = SendTransactionRequest(tx)
     val res: Future[Either[JsonRpcError, SendTransactionResponse]] = personal.sendTransaction(req).unsafeToFuture()
 
-    txPool.expectMsg(GetPendingTransactions)
-    txPool.reply(PendingTransactionsResponse(Nil))
+    replyPTM(PendingTransactionsResponse(Nil))
 
     res.futureValue shouldEqual Right(SendTransactionResponse(stx.hash))
     txPool.expectMsg(AddOrOverrideTransaction(stx))
@@ -368,8 +365,7 @@ class PersonalServiceSpec
     val res: Future[Either[JsonRpcError, SendTransactionWithPassphraseResponse]] =
       personal.sendTransaction(req).unsafeToFuture()
 
-    txPool.expectMsg(GetPendingTransactions)
-    txPool.reply(PendingTransactionsResponse(Nil))
+    replyPTM(PendingTransactionsResponse(Nil))
 
     res.futureValue shouldEqual Right(SendTransactionWithPassphraseResponse(stx.hash))
     txPool.expectMsg(AddOrOverrideTransaction(stx))
@@ -389,8 +385,7 @@ class PersonalServiceSpec
     val res: Future[Either[JsonRpcError, SendTransactionWithPassphraseResponse]] =
       personal.sendTransaction(req).unsafeToFuture()
 
-    txPool.expectMsg(GetPendingTransactions)
-    txPool.reply(PendingTransactionsResponse(Nil))
+    replyPTM(PendingTransactionsResponse(Nil))
 
     res.futureValue shouldEqual Right(SendTransactionWithPassphraseResponse(chainSpecificStx.hash))
     txPool.expectMsg(AddOrOverrideTransaction(chainSpecificStx))
@@ -413,8 +408,7 @@ class PersonalServiceSpec
     val res: Future[Either[JsonRpcError, SendTransactionWithPassphraseResponse]] =
       personal.sendTransaction(req).unsafeToFuture()
 
-    txPool.expectMsg(GetPendingTransactions)
-    txPool.reply(PendingTransactionsResponse(Nil))
+    replyPTM(PendingTransactionsResponse(Nil))
 
     res.futureValue shouldEqual Left(JsonRpcError.NodeNotFound)
   }
@@ -438,8 +432,7 @@ class PersonalServiceSpec
     val res: Future[Either[JsonRpcError, SendTransactionResponse]] =
       personal.sendTransaction(req).unsafeToFuture()
 
-    txPool.expectMsg(GetPendingTransactions)
-    txPool.reply(PendingTransactionsResponse(Nil))
+    replyPTM(PendingTransactionsResponse(Nil))
 
     res.futureValue shouldEqual Left(JsonRpcError.NodeNotFound)
   }
@@ -534,9 +527,10 @@ class PersonalServiceSpec
       blockchain,
       stub[BlockchainReader],
       stub[Mining],
-      probe2.ref,
+      probe2.ref.toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
       Timeouts.normalTimeout,
-      stub[TransactionMappingStorage]
+      stub[TransactionMappingStorage],
+      system.scheduler
     ) {
       // Return defaultGasPrice (20 gwei) so stx/chainSpecificStx fixture hashes match.
       // tx.toTransaction(nonce) uses 2 * 10^10 as the gas-price fallback.
@@ -547,7 +541,7 @@ class PersonalServiceSpec
       new PersonalService(
         keyStore,
         blockchainReader,
-        txPool.ref,
+        txPool.ref.toTyped[com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command],
         txPoolConfig,
         new BlockchainConfigBuilder with com.chipprbots.ethereum.TestInstanceConfigProvider {
           override def blockchainConfig: BlockchainConfig = BlockchainConfig(
@@ -566,8 +560,17 @@ class PersonalServiceSpec
             ethCompatibleStorage = true
           )
         },
-        ethTxService
+        ethTxService,
+        system.scheduler
       )
+
+    def replyPTM(
+        response: com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransactionsResponse
+    ): Unit =
+      txPool.expectMsgPF() {
+        case req: com.chipprbots.ethereum.transactions.PendingTransactionsManager.GetPendingTransactionsReq =>
+          req.replyTo ! response
+      }
 
     def array[T](arr: Array[T])(implicit ev: ClassTag[Array[T]]): MatcherBase =
       argThat((_: Array[T]).sameElements(arr))
