@@ -1675,7 +1675,7 @@ object SyncController {
       // and tier-3 local chain computation fires instead.
       ctx.system.scheduler.scheduleOnce(
         java.time.Duration.ofSeconds(30),
-        () => networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.CalibrateChainWeightNow,
+        () => networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.CalibrateChainWeightNowCmd,
         ctx.executionContext
       )
 
@@ -2344,7 +2344,7 @@ object SyncController {
     private def scheduleTDCalibrationRetry(): Unit = {
       ctx.system.scheduler.scheduleOnce(
         java.time.Duration.ofMinutes(30),
-        () => networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.CalibrateChainWeightNow,
+        () => networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.CalibrateChainWeightNowCmd,
         ctx.executionContext
       )
       val bestBlockNum = blockchainReader.getBestBlockHeader.map(_.number).getOrElse(BigInt(0))
