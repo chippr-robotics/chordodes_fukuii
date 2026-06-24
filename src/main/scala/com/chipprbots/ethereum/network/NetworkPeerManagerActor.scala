@@ -798,6 +798,18 @@ object NetworkPeerManagerActor {
     private def updateChainWeight(message: Message)(initialPeerInfo: PeerInfo): PeerInfo =
       message match {
         case newBlock: ETHPackets.NewBlock =>
+          val prevTD = initialPeerInfo.chainWeight.totalDifficulty
+          val actualTD = newBlock.totalDifficulty
+          val delta = actualTD - prevTD
+          val deltaPercent = if prevTD > 0 then (delta * 100) / prevTD else BigInt(0)
+          log.debug(
+            "ETH69_TIER3_ACCURACY: peer={} prevTD={} actualTD={} delta={} deltaPercent={}%",
+            initialPeerInfo.remoteStatus.bestHash,
+            prevTD,
+            actualTD,
+            delta,
+            deltaPercent
+          )
           initialPeerInfo.copy(chainWeight = ChainWeight.totalDifficultyOnly(newBlock.totalDifficulty))
         case _ => initialPeerInfo
       }
