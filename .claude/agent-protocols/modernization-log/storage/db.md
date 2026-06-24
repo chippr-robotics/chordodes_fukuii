@@ -22,7 +22,7 @@
 #### `ef75a5608` — H4 + M1: RocksDB iterator auto-close + bloom filter leak (8c batch)
 - **What:** RocksDB iterator `close()` in `finally` blocks; bloom filter option leak plugged
 
-#### M4 (by-design, 2026-06-24) — DataSource close protocol documented
+#### `07db4e902` — M4 (by-design, 2026-06-24) — DataSource close protocol documented
 - **What:** VAULT audit confirmed `RocksDbDataSource.close()` correctly omits `cache.invalidateAll()` — caches live one tier above in `DefaultStorages`; invalidating from `close()` would invert layering. Scaladoc comment added to `close()`; protocol note in `storage-rocksdb.md`.
 
 ---

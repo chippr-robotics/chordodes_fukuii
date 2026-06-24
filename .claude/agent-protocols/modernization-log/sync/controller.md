@@ -79,10 +79,19 @@
 
 ---
 
+## Per-Child Typed Adapters — §8k-G3 (2026-06-24)
+
+#### `a8cea433c` — refactor(8k-G3): per-child typed messageAdapters — eliminate ActorRef[Any] from child constructor params
+- **What:** SyncController's single `externalAdapter: TypedActorRef[Any]` replaced with 6 narrow per-child adapters. Each child constructor param narrowed to the specific type it sends. `StorageRecoveryActor` and `PivotHeaderBootstrap` gained `sealed trait SyncControllerMsg` / `sealed trait Reply` to unify their 2-message send sets. `FastSync` gained `sealed trait SyncControllerMsg`. `ChainDownloader` param narrowed to `Done.type`. `SNAPSyncController` deferred → §8k-G3-SSC (sends 7 types across 2 files; needs unsealed marker trait).
+- **Files:** `SyncController.scala`, `BytecodeRecoveryActor.scala`, `StorageRecoveryActor.scala`, `CombinedRecoveryScanActor.scala`, `PivotHeaderBootstrap.scala`, `FastSync.scala`, `ChainDownloader.scala`
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8k-G3`
+
+---
+
 ## Open / Deferred
 
 - W4: `ctx.self ! cmd` re-delivers wrapped Command (document invariant) — deferred; add by-design comment at call site during Network/P2P sprint
-- W15: `unwrap returns Any` — Wave 3 LOOM gate (`WrappedExternal` elimination; partially reduced by §8k-G but not fully eliminated)
+- W15: `unwrap returns Any` — Wave 3 LOOM gate (`WrappedExternal` elimination; partially reduced by §8k-G + §8k-G3 but not fully eliminated; `externalAdapter: TypedActorRef[Any]` retained for SNAPSyncController pending §8k-G3-SSC)
 - ~~INFO-9: `GetHandshakedPeersCmd.replyTo: ActorRef` untyped~~ — ✅ DONE `c42316b39` §8k-E
 - ~~§P9-NOTCHANGE: SyncControllerSpec:243~~ — ✅ DONE 2026-06-23 (`37037a89b` + `5a12c7f09`) — see `sync/fast.md`
 - ~~`handleRegularSyncMsg:895-897` catch-all `FastSync.Done` bug~~ — ✅ DONE 2026-06-23 (`ab98f1370`)

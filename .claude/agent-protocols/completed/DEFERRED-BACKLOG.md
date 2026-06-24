@@ -1289,6 +1289,8 @@ at the emission site in §8l-I.
 
 ## §8c-M4 — VAULT: DataSource close cache invalidation ✅ DONE 2026-06-24 (by-design)
 
+**Commit:** `07db4e902`
+
 **Verdict: by-design — no code logic change.**
 
 `RocksDbDataSource.close()` does not call `cache.invalidateAll()` and should not. The overlay
@@ -1310,6 +1312,7 @@ The fix belongs at the test fixture level: `afterEach { cache.clear(); dataSourc
 
 ## §8l-I — FORGE: VM.create() tracer balance fix ✅ DONE 2026-06-24
 
+**Commit:** `bda0228a4`
 **Gate:** §8l-R1 (done)
 **Agent:** FORGE + BEACON sign-off (consensus-adjacent; tracer output only)
 **Risk:** LOW — `onCallExit` is an observability hook; no gas/state-root/RLP/hash impact
@@ -1413,3 +1416,29 @@ wrapping is `IO[Status]` directly, not `IO[Future[Status]]`.
 
 **Verification:** `sbt compile-all` — 0 errors. `testOnly *RegularSyncSpec*` — **34/34 pass**
 (was 30/34). `sbt scalafmtAll` — no reformats needed.
+
+---
+
+## §8k-G3 — Per-child typed messageAdapters ✅ DONE 2026-06-24
+
+**Commit:** `a8cea433c`
+**Agent:** MITHRIL
+**Risk:** LOW — mechanical type substitution; behavior unchanged (WrappedExternal dispatch in SyncController.unwrap() unmodified)
+
+**What was done:** SyncController's single universal `externalAdapter: TypedActorRef[Any]` replaced with per-child narrow adapters. Each child's constructor param narrowed from `ActorRef[Any]` to the specific type it actually sends.
+
+**Child → adapter type mapping:**
+
+| Child | Adapter type | Notes |
+|-------|-------------|-------|
+| `BytecodeRecoveryActor` | `TypedActorRef[RecoveryComplete.type]` | — |
+| `StorageRecoveryActor` | `TypedActorRef[StorageRecoveryActor.SyncControllerMsg]` | Added `sealed trait SyncControllerMsg`; `RecoveryComplete` + `RequestRecentRoot` extend it |
+| `CombinedRecoveryScanActor` | `TypedActorRef[CombinedScanComplete]` | — |
+| `PivotHeaderBootstrap` | `TypedActorRef[PivotHeaderBootstrap.Reply]` | Added `sealed trait Reply`; `Completed` + `Failed` extend it |
+| `FastSync` | `TypedActorRef[fast.FastSync.SyncControllerMsg]` | Added `sealed trait SyncControllerMsg`; `FallbackToSnapSync` + `Done` extend it |
+| `ChainDownloader` | `TypedActorRef[snap.ChainDownloader.Done.type]` | — |
+| `SNAPSyncController` | **deferred → §8k-G3-SSC** | Sends 7 types across 2 files; needs unsealed marker trait in SyncProtocol.scala |
+
+**Files modified:** `SyncController.scala`, `BytecodeRecoveryActor.scala`, `StorageRecoveryActor.scala`, `CombinedRecoveryScanActor.scala`, `PivotHeaderBootstrap.scala`, `FastSync.scala`, `ChainDownloader.scala`
+
+**Remaining:** `§8k-G3-SSC` — SNAPSyncController still has `TypedActorRef[Any]` constructor param; `externalAdapter` in SyncController retained as its sole remaining consumer until §8k-G3-SSC completes. See working-docs `§8k-G3-SSC` section.

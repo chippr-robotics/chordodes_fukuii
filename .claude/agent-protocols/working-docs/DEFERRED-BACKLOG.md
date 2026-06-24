@@ -656,101 +656,114 @@ slower than dev machine → timeouts). `@Ignore` annotations silently hide untes
 
 ---
 
-#### §8k-G3 — Per-child typed messageAdapters: eliminate `ActorRef[Any]` from child constructor params
+#### §8k-G3 — Per-child typed messageAdapters ✅ DONE 2026-06-24
 
-**Agent:** MITHRIL (SyncController + child actors)
-**Risk:** LOW — mechanical type substitution; behavior is unchanged (still wraps into WrappedExternal internally)
+**Commit:** `a8cea433c` — see `completed/DEFERRED-BACKLOG.md §8k-G3`
+
+---
+
+#### §8k-G3-SSC — Type SNAPSyncController's syncController param via shared `SyncControllerReply` marker trait
+
+**Agent:** MITHRIL (SNAPSyncController + SyncProtocol)
+**Risk:** LOW — adds a marker trait and `extends` clauses; no logic changes; all existing dispatch in SyncController.unwrap() is unchanged
 **Gate:** None — can run any time. Does NOT require CAPSTONE.
-**Completes:** P16 properly. §8k-G2 replaced Classic `ActorRef` with `ActorRef[Any]` (correct, per P16 line 486 for the bridge adapter). This sprint replaces `ActorRef[Any]` with the most-specific type each child actually sends.
+**Completes:** The one child deferred from §8k-G3. After this, `externalAdapter: TypedActorRef[Any]` in SyncController can be removed entirely.
 
-**Why `ActorRef[Any]` is a stepping stone, not the destination:**
-SyncController currently registers ONE universal messageAdapter: `ctx.messageAdapter[Any](WrappedExternal.apply)`.
-Every child gets this same `externalAdapter: TypedActorRef[Any]`. The type `Any` is honest — the adapter
-truly accepts any message — but it discards type information at the child's constructor boundary.
-The fix is per-child typed adapters. Since `messageAdapter[T]` wraps into whatever Command type you supply,
-we can create per-child adapters that still wrap into `WrappedExternal(msg)` internally — SyncController's
-existing `unwrap` dispatch doesn't change. Only the CHILD's constructor param becomes typed.
+**Why §8k-G3 deferred SSC:**
+`SNAPSyncController` sends 7 distinct types to `syncController`. Six are defined in the SSC companion object; one — `SyncProtocol.HealingImpossible` — is defined in `SyncProtocol.scala` in a different package. A `sealed trait` in SSC.scala cannot be extended from SyncProtocol.scala (sealed = same file in Scala 3), so a cross-file hierarchy requires an unsealed marker trait.
 
-**Phase A — Per-child adapters, `WrappedExternal` preserved (this sprint):**
+**Full send-site inventory (grep result):**
 
-For each child in the IMMEDIATE cohort, instead of passing `externalAdapter` directly, SyncController
-creates a narrow adapter:
+| Type | Defined in |
+|------|-----------|
+| `StartRegularSyncBootstrap` | SSC companion |
+| `StartRegularSyncBootstrapByHash` | SSC companion |
+| `FallbackToFastSync` | SSC companion |
+| `Done` | SSC companion |
+| `RequestHealingServeRoot` | SSC companion (inner) |
+| `SnapSyncFinalized` | SSC companion |
+| `SyncProtocol.HealingImpossible` | `SyncProtocol.scala` |
+
+**Solution — shared marker trait in SyncProtocol.scala:**
+
 ```scala
-// Current:
-val externalAdapter: TypedActorRef[Any] = ctx.messageAdapter[Any](WrappedExternal.apply)
-ctx.spawn(BytecodeRecoveryActor(... syncController = externalAdapter ...), ...)
+// SyncProtocol.scala — add a marker trait (not sealed; must extend cross-file):
+trait SyncControllerReply
 
-// Target:
-val bytecodeAdapter: TypedActorRef[BytecodeRecoveryActor.RecoveryComplete.type] =
-  ctx.messageAdapter[BytecodeRecoveryActor.RecoveryComplete.type](WrappedExternal.apply)
-ctx.spawn(BytecodeRecoveryActor(... syncController = bytecodeAdapter ...), ...)
-// BCA constructor param: syncController: ActorRef[RecoveryComplete.type]
+// Have HealingImpossible also extend SyncControllerReply (was: extends SyncProtocolMsg only):
+case object HealingImpossible extends SyncProtocolMsg with SyncControllerReply
+
+// SNAPSyncController companion — add extends SyncProtocol.SyncControllerReply to each type:
+case object Done                                    extends SyncProtocol.SyncControllerReply
+final case class StartRegularSyncBootstrap(...)     extends SyncProtocol.SyncControllerReply
+final case class StartRegularSyncBootstrapByHash(...) extends SyncProtocol.SyncControllerReply
+case object FallbackToFastSync                      extends SyncProtocol.SyncControllerReply
+final case class SnapSyncFinalized(pivot: BigInt)   extends SyncProtocol.SyncControllerReply
+case object RequestHealingServeRoot                 extends SyncProtocol.SyncControllerReply
+
+// SNAPSyncController constructor params — change both apply and Impl:
+// Before: syncController: TypedActorRef[Any]
+// After:  syncController: TypedActorRef[SyncProtocol.SyncControllerReply]
+
+// SyncController.scala — replace the generic externalAdapter passed to SSC:
+// Before: ctx.spawn(SNAPSyncController(... syncController = externalAdapter ...), ...)
+// After:
+val snapAdapter: TypedActorRef[SyncProtocol.SyncControllerReply] =
+  ctx.messageAdapter[SyncProtocol.SyncControllerReply](WrappedExternal.apply)
+ctx.spawn(SNAPSyncController(... syncController = snapAdapter ...), ...)
+// Then remove externalAdapter entirely if SSC was its only remaining consumer.
 ```
-
-**Child → message type mapping** (what each child actually sends to syncController):
-
-| Child actor | Messages sent to syncController | Target param type |
-|-------------|--------------------------------|-------------------|
-| `BytecodeRecoveryActor` | `RecoveryComplete` | `ActorRef[BytecodeRecoveryActor.RecoveryComplete.type]` |
-| `StorageRecoveryActor` | `RecoveryComplete`, `RequestRecentRoot` | `ActorRef[StorageRecoveryActor.RecoveryComplete.type \| StorageRecoveryActor.RequestRecentRoot]` or sealed parent |
-| `CombinedRecoveryScanActor` | `CombinedScanComplete` | `ActorRef[CombinedRecoveryScanActor.CombinedScanComplete]` |
-| `PivotHeaderBootstrap` | `Completed`, `Failed` (sealed `Result`) | `ActorRef[PivotHeaderBootstrap.Result]` |
-| `FastSync` | `FallbackToSnapSync`, `Done` | sealed parent or union type |
-| `SNAPSyncController` | multiple — see SNAP reply types | `ActorRef[SNAPSyncController.SyncControllerReply]` (create sealed) |
-| `ChainDownloader` | `Done` | `ActorRef[ChainDownloader.Done.type]` |
-
-**StorageRecoveryActor note:** sends two different types. Options:
-- Define `sealed trait SyncControllerMsg` in SRA object, have both extend it
-- Use Scala 3 union type: `ActorRef[RecoveryComplete.type | RequestRecentRoot]`
-- Keep `ActorRef[Any]` only for SRA (defer until sealed parent defined)
-
-**Phase B — Replace `WrappedExternal(Any)` with typed Command wrappers (CAPSTONE sprint):**
-After Phase A, SyncController's internal `WrappedExternal(msg: Any)` can be replaced with specific wrappers:
-`case class BytecodeRecoveryDone() extends Command`, etc. This requires the full Command ADT redesign and
-is gated on CAPSTONE. Do NOT do Phase B in this sprint.
 
 **Resolution prompt:**
 ```
-You are implementing §8k-G3: per-child typed messageAdapters in SyncController.
+You are implementing §8k-G3-SSC: type SNAPSyncController's syncController param via a shared marker trait.
 
 Context:
-- SyncController.scala currently has one universal adapter:
-    val externalAdapter: TypedActorRef[Any] = ctx.messageAdapter[Any](WrappedExternal.apply)
-  All children receive this as their `syncController` / `replyTo` param (type: ActorRef[Any]).
-- Goal: each child gets a narrow typed adapter. SyncController's internal WrappedExternal dispatch
-  is UNCHANGED — only the per-child adapter's declared type changes.
-- pekko-typed-api.md P16 is the governing standard. Phase A only (no WrappedExternal changes).
+- §8k-G3 converted 6 of 7 SyncController children to typed per-child adapters.
+- The one remaining child is SNAPSyncController (SSC), which sends 7 types to syncController.
+- Six are defined in the SSC companion; one (SyncProtocol.HealingImpossible) is in SyncProtocol.scala.
+- A sealed trait cannot span files in Scala 3 — use an unsealed marker trait instead.
+- pekko-typed-api.md P16 is the governing standard. SyncController.unwrap() dispatch is UNCHANGED.
+- Do NOT commit — the user will review and commit manually.
 
 Step 1 — Read these files before making any changes:
-  src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala (lines 108-145, 440-445)
-  src/main/scala/com/chipprbots/ethereum/blockchain/sync/BytecodeRecoveryActor.scala
-  src/main/scala/com/chipprbots/ethereum/blockchain/sync/StorageRecoveryActor.scala
-  src/main/scala/com/chipprbots/ethereum/blockchain/sync/CombinedRecoveryScanActor.scala
-  src/main/scala/com/chipprbots/ethereum/blockchain/sync/PivotHeaderBootstrap.scala
-  src/main/scala/com/chipprbots/ethereum/blockchain/sync/fast/FastSync.scala
-  src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/SNAPSyncController.scala
-  src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/ChainDownloader.scala
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncProtocol.scala (lines 55-70 around HealingImpossible)
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/SNAPSyncController.scala (lines 55-70, 4905-4940, 5015-5025, 5120-5135)
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala (lines 440-450 around externalAdapter, and the SSC spawn site)
 
-Step 2 — For each child, identify the exact message type(s) sent to syncController/replyTo.
-  Grep: grep -n "syncController !\|replyTo !" src/main/scala/com/chipprbots/ethereum/blockchain/sync/**/*.scala
+Step 2 — In SyncProtocol.scala, add the marker trait and extend HealingImpossible:
+  Add after the existing imports / before the object body:
+    trait SyncControllerReply
+  Change the HealingImpossible definition from:
+    case object HealingImpossible extends SyncProtocolMsg
+  to:
+    case object HealingImpossible extends SyncProtocolMsg with SyncControllerReply
 
-Step 3 — For each child, create a per-child adapter in SyncController (at the spawn site or in a
-  shared adapter val section). The adapter wraps into WrappedExternal(msg) — do NOT change unwrap().
-  Example for BytecodeRecoveryActor:
-    val bytecodeAdapter = ctx.messageAdapter[BytecodeRecoveryActor.RecoveryComplete.type](WrappedExternal.apply)
-    // pass bytecodeAdapter at the BCA spawn site instead of externalAdapter
+Step 3 — In SNAPSyncController.scala companion object, extend SyncProtocol.SyncControllerReply on
+  each of these types (add `extends SyncProtocol.SyncControllerReply` or `with SyncProtocol.SyncControllerReply`):
+    Done, StartRegularSyncBootstrap, StartRegularSyncBootstrapByHash, FallbackToFastSync,
+    SnapSyncFinalized, RequestHealingServeRoot
 
-Step 4 — Update each child's constructor param from ActorRef[Any] to the specific ActorRef[T].
-  For StorageRecoveryActor (two message types), define a sealed trait in the SRA object if not already
-  present, or use Scala 3 union type. Do NOT use ActorRef[Any] as the solution.
+Step 4 — Update both SSC constructor sites:
+  Line ~63  (apply factory): syncController: TypedActorRef[Any] → TypedActorRef[SyncProtocol.SyncControllerReply]
+  Line ~5128 (Impl class): same change
 
-Step 5 — sbt compile-all after each child. scalafmtAll before committing.
+Step 5 — In SyncController.scala, replace the externalAdapter passed to SSC at its spawn site:
+  Add:
+    val snapAdapter: org.apache.pekko.actor.typed.ActorRef[SyncProtocol.SyncControllerReply] =
+      ctx.messageAdapter[SyncProtocol.SyncControllerReply](WrappedExternal.apply)
+  Pass snapAdapter to SSC instead of externalAdapter.
+  If externalAdapter has no other consumers after this change, remove it.
 
-Step 6 — Verify: grep -rn "ActorRef\[Any\]" src/main/scala/com/chipprbots/ethereum/blockchain/sync/
-  Target: 0 hits in child actor constructor params (SyncController's externalAdapter decl may remain
-  temporarily if not all children are converted in this sprint).
+Step 6 — sbt compile-all. Fix any errors before continuing.
 
-Step 7 — git commit -m "refactor(8k-G3): per-child typed messageAdapters — eliminate ActorRef[Any] from child constructor params"
+Step 7 — sbt scalafmtAll.
+
+Step 8 — Verify:
+  grep -rn "ActorRef\[Any\]" src/main/scala/com/chipprbots/ethereum/blockchain/sync/
+  Target: 0 hits anywhere in the sync package (both constructor params and SyncController internals).
+
+Report: which files changed, whether externalAdapter was removed, compile result, grep result.
 ```
 
 ---
