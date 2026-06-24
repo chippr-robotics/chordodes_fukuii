@@ -467,6 +467,9 @@ housekeeping task during test waits for specific domain files.
 **Agent:** VAULT
 **Priority:** LOW — only visible in test isolation or restart scenarios; runtime nodes do not re-open DBs.
 
+**Prompt (VAULT):**
+> Read `RocksDbDataSource.close()` and any overlay cache layers in `db/`. Determine whether `close()` invalidates in-memory LRU cache entries or leaves stale references. Two outcomes: (a) if invalidation is missing — add `cache.invalidateAll()` before `rocksDb.close()`, run `sbt compile-all`, then `sbt "testOnly *DataSource*"`; (b) if the close protocol is already correct — add a short inline comment explaining why no explicit invalidation is needed and mark M4 as by-design. Either way, record the verdict in `storage-rocksdb.md` under a "DataSource close protocol" note.
+
 ---
 
 ### 8d — IO Threading Model Follow-Up (R9 audit items)
@@ -489,6 +492,9 @@ housekeeping task during test waits for specific domain files.
 
 **Agent:** BEACON
 **Priority:** MEDIUM — latency/liveness issue under concurrent engine API load; not data-correctness.
+
+**Prompt (BEACON):**
+> Read `threading-model-audit.md` A1 entry and locate `Await.result` in `EngineApiService.scala`. Determine: (a) does this call execute on the CE3 compute pool or on a dedicated blocking dispatcher? (b) if on CE3, is the correct fix `IO.fromFuture` + returning `IO`, switching to a `blocking {}` wrapper, or moving to a dedicated EC? Implement the safer approach. Byte-for-byte response semantics must be preserved — only the threading model changes. Run `sbt compile-all` then `sbt "testOnly *EngineApi*"` to verify.
 
 #### Additional jsonrpc IO boundary sites
 
@@ -764,13 +770,12 @@ slower than dev machine → timeouts). `@Ignore` annotations silently hide untes
 
 ~130 production bridge sites + 2 test `actorSelection` sites. Permanent floor: 4 TCP bridges. Eliminatable: ~126 production + 2 test.
 
-**Clusters A,B,C,D,F,G,H,K,L,M,N DONE** — see `completed/DEFERRED-BACKLOG.md`.
+**Clusters A,B,C,D,F,G,H,J,K,L,M,N DONE** — see `completed/DEFERRED-BACKLOG.md`.
 
 | Cluster | Sites | Root cause | Pre/Post-CAPSTONE | Sprint |
 |---------|-------|-----------|-------------------|--------|
 | E — `externalAdapter.toClassic` in SyncController | 21 remaining | Per-child adapter pattern: eliminated one spawn-site at a time when the receiving child updates its constructor param from `ActorRef` → `ActorRef[T]`. NOT the same as OQ-5. | Pre-CAPSTONE | §8k-G2 (immediate: FastSync + NPMA cmd) + per-child LOOM migration |
 | I — TCP I/O bridge (RLPxConnectionHandler, ServerActor) | 4 | Akka TCP requires Classic `sender()` — **permanent** | N/A | — |
-| J — `classicSystem.actorOf` bridge actors in NodeBuilder | 0 | **DONE 4613e398f** — KNM/PDM/PTM bridges deleted; callers use Typed ask | COMPLETE | §8k-I ✓ |
 
 **Principle**: Each `.toClassic` call is a symptom, not the disease. The disease is an unconverted classic actor upstream. The fix strategy is: **migrate the upstream actor first (LOOM), then delete the bridge**. Bridges must never be removed before the upstream is converted — that produces a type error at the call site that blocks compilation.
 
@@ -942,7 +947,7 @@ Output a short report: gaps found, gaps already tracked, new gaps to add.
 
 **Agent:** PRISM (verification only)
 **Risk:** LOW — read-only final check
-**Gate:** §8k-I complete AND CAPSTONE merged. Run §7d artifact audit first (they overlap).
+**Gate:** ~~§8k-I complete~~ ✅ `4613e398f` AND CAPSTONE merged. Run §7d artifact audit first (they overlap).
 
 **Background:**
 After §8k-A through §8k-I, only 4 intentional TCP permanent bridges should remain.
@@ -968,54 +973,6 @@ Step 4 — Run §7d artifact audit sweep (grep commands in §7d).
 Step 5 — Run testEssential — confirm baseline holds.
 Step 6 — git commit -m "chore(8k-B): remove adapter imports — TCP floor verified (4 bridges)"
 ```
-
----
-
-#### §8a-retro-5b — LOOM+EYE: BlockFetcherSpec + PendingTransactionsManagerSpec ActorTestKit migration
-
-**Agent:** LOOM + EYE
-**Risk:** LOW — test files only; both production actors already Typed
-**Gate:** None — PTM migrated in `0be6dd776` (W2-P2c); BlockFetcher Typed migration sprint
-**Purpose:** Close batch 5 assessable specs; PeerActorSpec + RLPxConnectionHandlerSpec remain Wave-3-gated
-
-**Note:** RegularSyncSpec (third assessable batch-5 spec) is covered by §9c.
-
-**For BlockFetcherSpec:**
-1. Verify spec compiles and tests pass before migrating (BlockFetcher ETHPackets rebuild — `931c615dd`)
-2. Migrate from `TestKit(ActorSystem())` + `ImplicitSender` → `ScalaTestWithActorTestKit(ConfigFactory.load())`
-3. Apply established batch patterns: PatienceConfig conflict → drop; guardian spawn → `actorTestKit.spawn`; `TestProbe()` → `testKit.createTestProbe[M]()`
-4. Reference `node/testing-infra.md` for pitfall table (batches 1–4)
-5. `sbt "testOnly *BlockFetcher*"` — verify pass count stable
-
-**For PendingTransactionsManagerSpec:**
-1. PTM uses `toClassic.eventStream` bridge (preserved in `0be6dd776`) — test subscriptions may still need `system.classicSystem` for eventStream; document if so and add a CHASE-QUEUE note
-2. Migrate from `TestKit(ActorSystem())` → `ScalaTestWithActorTestKit(ConfigFactory.load())`
-3. Apply established batch patterns
-4. `sbt "testOnly *PendingTransactions*"` — verify pass count stable
-
-**Pre-flight — Step 13 of pre-migration-checklist.md:**
-After migrating spawn sites in these specs, verify no actor constructor param accepts Classic `ActorRef`:
-```bash
-grep -n "ActorRef\b" \
-  src/test/scala/.../BlockFetcherSpec.scala \
-  src/test/scala/.../PendingTransactionsManagerSpec.scala \
-  | grep -v "typed\.ActorRef\|ActorRef\["
-# Expected: 0 (all refs should be ActorRef[T] or fully qualified Typed)
-```
-
-**Verify:**
-```bash
-sbt compile-all
-sbt "testOnly *BlockFetcher* *PendingTransactions*"
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. Stage only test files — no production source changes expected
-3. `git commit -m "test(8a-retro-5b): BlockFetcherSpec + PendingTxMgrSpec → ActorTestKit migration"`
-4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(8a-retro-5b): clearout — $SHA"`
-5. **DELETE §8a-retro-5b**
 
 ---
 
@@ -1054,11 +1011,13 @@ No actor migration gate. Commit individually; do not bundle with primary-track m
 
 | Task | Work | Agents | Effort |
 |------|------|--------|--------|
+**8g, 8k-R1 DONE** — see `completed/DEFERRED-BACKLOG.md`.
+
+| Task | Work | Agents | Effort |
+|------|------|--------|--------|
 | **8e — ScalaFix expansion** | C2+TNHC DONE — see completed; **§8e-FORGE** (6 consensus files, unblocked) + **§8e-BEACON** (EngineApiController S3-D, unblocked); 36 SSC gated (SNAP1) | FORGE / BEACON / LOOM | partial |
-| **8g — braceless config** ✅ `34a55a025` | Deferred settings documented in .scalafmt.conf; gated for per-subsystem pass post-CAPSTONE | MITHRIL | done |
 | **8j — Thread.sleep** | 2 live call sites (EthMiningServiceSpec:302, SubscriptionManagerSpec:249) — both NECESSARY; defer to §8a-retro | EYE | deferred to §8a |
-| **8k-R1 — Classic interop audit** | DONE 2026-06-23 — see completed | — | ✅ |
-| **8a-retro** | Batches 1–4 DONE — see completed. **Batch 5:** BlockFetcherSpec + PendingTxMgrSpec → §8a-retro-5b; RegularSyncSpec → §9c. PeerActorSpec + RLPxConnectionHandlerSpec wait for Wave 3. | LOOM, EYE | ~2h |
+| **8a-retro** | Batches 1–4 DONE — see completed. **Batch 5:** BlockFetcherSpec + PendingTxMgrSpec DONE `5ff14017b`; RegularSyncSpec → §9c. PeerActorSpec + RLPxConnectionHandlerSpec wait for Wave 3. | LOOM, EYE | ~2h |
 
 ### Research Threads (run before implementation; can overlap with primary track)
 
@@ -1104,24 +1063,12 @@ Each prompt can run independently. Commit individually.
 **Run order — this file:**
 | # | Batch | Prompt | Parallel-safe? |
 |---|-------|--------|---------------|
-| ~~A3~~ | ~~Batch A~~ | ~~P4 PRISM dead code audit~~ | ✅ DONE 2026-06-22 — 4 items in CHASE-QUEUE |
-| ~~A4~~ | ~~Batch A~~ | ~~P6 EYE Thread.sleep audit~~ | ✅ DONE 2026-06-22 — 2 pre-existing (both NECESSARY) |
-| ~~B4~~ | ~~Batch B step 4~~ | ~~P5 MITHRIL scalafmt config~~ | ✅ DONE 2026-06-22 — `34a55a025` — deferred settings documented; indent.defnSite + topLevelStatementBlankLines both trigger mass reformats, gated for per-subsystem pass |
-| ~~C1~~ | ~~Batch C step 1~~ | ~~P1 MITHRIL isInstanceOf (83 instances)~~ | ✅ DONE 2026-06-22 — 1 site fixed (`7cc9eda3a`); consensus/vm/crypto/domain had 0 hits |
-| ~~C2~~ | ~~Batch C step 2~~ | ~~P2 MITHRIL enum candidates~~ | ✅ DONE 2026-06-22 — 4 types converted (`b305ef41b`) |
-| ~~C3~~ | ~~Batch C step 3~~ | ~~P3 MITHRIL console→logging (28 sites)~~ | ✅ DONE 2026-06-22 — 12 sites fixed |
-| ~~C4~~ | ~~Batch C step 4~~ | ~~P4 MITHRIL/EYE E165 sprint — expectMsgType[Any]~~ | ✅ DONE 2026-06-22 — `8cdf1290d` — 20 sites → 0; 777 TestProbe metric + 20 fishForMessage sites §8a-gated (see §8a research prompt) |
-| ~~D3~~ | ~~Batch D~~ | ~~P7 EYE test timing audit~~ | ✅ DONE 2026-06-22 — 680s (11m 20s) baseline, 3,595 tests, 0 code changes; both Thread.sleep sites defer to §8a; all wall-clock bounds safe. Note: captured pre-Batch-D; rerun after G1/G2 if test count grows. |
-| ~~E3~~ | ~~Batch E~~ | ~~§3h — Any type signature cleanup~~ | ✅ DONE 2026-06-22 — 0 types changed; 15 sites documented `// Any:`; 7 FORGE-gated (vm/domain/ledger); compile clean |
-| ~~E4~~ | ~~Batch E~~ | ~~§8a-retro batch 3 — 25 network/sync specs~~ | ✅ DONE 2026-06-23 — `12c23cf8a` (14 specs) + `a719520db` (11 specs + NPMAFake fix) |
-| ~~E5~~ | ~~Batch E~~ | ~~§8a-retro batch 4 — 14 coordinator/heal specs (PropsAdapter fixture fix)~~ | ✅ DONE 2026-06-23 — `5eae34c21` (14 specs + HealingTrieFixtures to ActorTestKit, 135 tests) |
-| ~~E5b~~ | ~~Batch E~~ | ~~§8a-infra — create `application-test.conf` (bare ctor fix + `throughput=1`)~~ | ✅ DONE 2026-06-23 — `8b9bef67d` |
-| ~~E5c~~ | ~~Batch E~~ | ~~§8a-infra-b — audit + fix worker teardown leaks in coordinator/heal specs~~ | ✅ DONE 2026-06-23 — `781c8e985` — no leaks; workers are Typed `spawnAnonymous` children, stopped by hierarchy; 150/150 ×2 |
-| ~~E5d~~ | ~~Batch E~~ | ~~§8a-retro batch 4b — E165 TestProbe narrowing in coordinator/heal specs (~209 sites)~~ | ✅ DONE 2026-06-23 — `a193bc794` (14 specs, 141 tests, floor 92→65) |
-| ~~E5e~~ | ~~Batch E~~ | ~~§8a-infra-c — MITHRIL: replace classic `actorSelection` worker-ref pattern with Typed injection in ByteCodeCoordinatorSpec + AccountRangeCoordinatorSpec~~ | ✅ DONE 2026-06-23 — `5f28e8ae6` — 40/40 (21 ByteCodeCoordinatorSpec + 19 AccountRangeCoordinatorSpec); see node/testing-infra.md |
-| E6 | Batch E | §8a-retro batch 5 — multi-system + TestActorRef specs (3 assessable, 2 Wave 3 gate) | Partial — RegularSyncSpec → §9c; remaining: BlockFetcherSpec + PendingTxMgr (→ §8a-retro-5b below); PeerActor + RLPx wait for Wave 3 |
-| ~~F1~~ | ~~Batch F~~ | ~~§3i MITHRIL+FORGE — BlockExecutionError hierarchy redesign: union type + `describe`~~ | ✅ DONE 2026-06-23 — `64ab4786e` |
-| G1 | Batch G | §8a-retro-5b — BlockFetcherSpec + PendingTxMgrSpec ActorTestKit migration | No gate — both production actors already Typed |
+**A3,A4,B4,C1–C4,D3,E3–E5e,F1 DONE** — see `completed/DEFERRED-BACKLOG.md`.
+
+| # | Batch | Prompt | Parallel-safe? |
+|---|-------|--------|---------------|
+| E6 | Batch E | §8a-retro batch 5 — multi-system + TestActorRef specs (3 assessable, 2 Wave 3 gate) | Partial — RegularSyncSpec → §9c; BlockFetcherSpec + PendingTxMgr DONE `5ff14017b`; PeerActor + RLPx wait for Wave 3 |
+| G1 | Batch G | §8a-retro-5b — DONE `5ff14017b` (specs migrated in 8a-retro multi-system commit; clearout follows) | — |
 | G2 | Batch G | §8e-FORGE — 6 consensus `return` → expression conversions | Parallel-safe; FORGE-only; unblocked |
 | G3 | Batch G | §8e-BEACON — EngineApiController S3-D `return` → expression (2 sites) | Parallel-safe; BEACON-only; unblocked |
 | G4 | Batch G | §8d-A1 — BEACON: EngineApiService `Await.result` on CE3 compute thread | MEDIUM priority; BEACON gate; prompt in §8d above |
@@ -1174,6 +1121,14 @@ after the current sprint queue clears.
 
 **Agent:** Sonnet (pure function + SyncController wiring, not consensus-critical)
 
+**Prompt:**
+> `SyncController.start()` selects sync mode via a 5-branch pattern-match on config booleans with no peer pre-flight. The deleted `AdaptiveSyncStrategy.scala` (removed in Part 8f) contained the right decision logic. Extract it as a pure function in `SyncController.scala` (or a companion object):
+> ```scala
+> def selectSyncMode(peerCount: Int, snapCapablePeers: Int, latencyMs: Long,
+>                    config: SyncConfig): SyncMode
+> ```
+> Wire it into `SyncController.start()` at the 5-branch match (~line 1387): if `doSnapSync && snapCapablePeers < 3`, downgrade to `doFastSync`. Do not add mutable state or strategy objects — pure function only. Write a unit test covering all 5 branches (0 peers, 1 peer, 3 peers, snap-capable majority, fast-only config). Run `sbt compile-all` then `sbt "testOnly *SyncController*"` to verify.
+
 ---
 
 ### 9b — RegularSync Divergence-Path Spec Fix (gate OPEN — §8k-F done)
@@ -1210,12 +1165,6 @@ after the current sprint queue clears.
 
 ---
 
-~~### P6 — EYE: Thread.sleep audit~~ ✅ DONE 2026-06-22
-
-**Result:** 2 pre-existing sites found — `EthMiningServiceSpec.scala:302` (timeout window advance,
-NECESSARY) and `SubscriptionManagerSpec.scala:249` (topic propagation wait, NECESSARY). Neither
-is flaky. No CHASE-QUEUE entries needed. Part 8j baseline: 2 sites, both intentional.
-
 ---
 
 ## Part 11: Full Test Suite Coverage Audit
@@ -1237,10 +1186,10 @@ written reason. P7 covered only `testEssential`; this part closes the gap.
 **Run order — this section:**
 | # | Batch | Prompt | Parallel-safe? |
 |---|-------|--------|----------------|
-| ~~E1~~ | ~~Batch E~~ | ~~P8 EYE SyncTest tag audit~~ | ✅ DONE 2026-06-23 — 40 rescued (15 RetryStrategy + 7 PeersClient + 6 Blacklist + 12 BlockchainHostActor), 36 kept SyncTest, `3aef474a9` |
-| ~~E2~~ | ~~Batch E~~ | ~~P9 EYE/MITHRIL DisabledTest audit~~ | ✅ DONE 2026-06-23 — `86c76fd4e` — 2 fixed, 7 deferred (F6 CODEBASE-AUDIT) |
-| ~~E3~~ | ~~Batch E~~ | ~~P10 EYE/MITHRIL FlakyTest root cause~~ | ✅ DONE 2026-06-23 — `ab98f1370` — 11 de-tagged, 2 deleted (F7 CODEBASE-AUDIT) |
-| ~~E4~~ | ~~Batch E~~ | ~~P11 testStandard baseline + SlowTest audit~~ | ✅ DONE 2026-06-23 — 961s/3,579 tests; 6 SlowTest→UnitTest `edfb69f35`; 2 failures: DNS flaky (Mordor DNS) + BHA pre-existing (fixed `07e5d505f`) |
+**E1–E4 DONE** — see `completed/DEFERRED-BACKLOG.md`.
+
+| # | Batch | Prompt | Parallel-safe? |
+|---|-------|--------|----------------|
 | E5 | Batch E | P12 Tag taxonomy + build target architecture review | Yes (read-only) |
 
 ---
@@ -1261,153 +1210,7 @@ written reason. P7 covered only `testEssential`; this part closes the gap.
 
 ---
 
-### P11b — Docs: migrate `fukuii-test-timing.md` → `test-quality-log.md`
-
-**COMPLETE 2026-06-23** — `test-quality-log.md` created at `.local/docs/`, all content migrated,
-old file deleted, DEFERRED-BACKLOG references updated, MEMORY.md + memory file renamed.
-
-**Agent:** Any (pure documentation — no compilation or test runs required)
-**Parallel-safe:** YES — touches only `.local/docs/` and working docs
-**Priority:** LOW — do before P12, since P12's final steps reference the old filename
-
-**Context (2026-06-23):** After P11 we have two sources of test-suite knowledge:
-`fukuii-test-timing.md` (tier baselines, slowest tests, wall-clock assertions, Thread.sleep
-inventory) and ad-hoc findings scattered across CHASE-QUEUE, DEFERRED-BACKLOG, and sprint
-notes. Consolidating them into a single curated `test-quality-log.md` gives future agents
-one canonical place to check before making tag or tier decisions. The file stays in
-`.local/docs/` (gitignored — machine-specific observations, not portable).
-
-**What the new file must contain (in this order):**
-
-```
-# fukuii test-quality-log
-
-## Tier baselines
-
-### testEssential (Tier 1)
-Table: Date | Wall time | Tests | Failures | Notes
-(migrate from current fukuii-test-timing.md Current baseline table)
-
-### testStandard (Tier 2)
-Table: Date | Wall time | Tests | Failures | Notes
-(migrate from current fukuii-test-timing.md testStandard baseline table)
-
-### testComprehensive (Tier 3)
-Table: Date | Wall time | Tests | Failures | Notes
-(no entries yet — placeholder)
-
-## Top slowest tests
-
-### testEssential top 10 (2026-06-22 run)
-(migrate from fukuii-test-timing.md "Slow tests >2s" table — add Spec class column)
-
-### testStandard additions (2026-06-23 run, P11)
-Any tests that appear in testStandard but not testEssential that take >5s
-(derive from P11 log or leave as TODO if not available)
-
-## Known flakes
-
-Table: Spec | Test | Failure mode | Root cause | Status
-- DnsDiscoverySpec | "should resolve enodes from Mordor DNS tree" | `9 >= 10` assertion | Live Mordor DNS peer count near threshold — network-dependent | OPEN: raise threshold or widen retry
-- EthMiningServiceSpec | multiple | AskTimeoutException (20s/60s timeouts) | TestProbe never receives ask reply under JVM load | OPEN: tracked in §8j
-
-## SlowTest audit history
-
-Table: Date | Prompt | Spec | Test | Observed time | Decision | SHA
-(populate from P11 2026-06-23 audit findings)
-
-Rows to add:
-- 2026-06-23 | P11 | MiningSpec | "have unique names" | 17ms | SlowTest→UnitTest | edfb69f35
-- 2026-06-23 | P11 | MiningSpec | "contain ethash" | 0ms | SlowTest→UnitTest | edfb69f35
-- 2026-06-23 | P11 | PoWMiningSpec | "use RestrictedPoWBlockGeneratorImpl..." | 56ms | SlowTest→UnitTest | edfb69f35
-- 2026-06-23 | P11 | PoWMiningSpec | "start only one mocked miner...MockedPow" | 56ms | SlowTest→UnitTest | edfb69f35
-- 2026-06-23 | P11 | PoWMiningSpec | "start only the normal miner...PoW" | 50ms | SlowTest→UnitTest | edfb69f35
-- 2026-06-23 | P11 | PoWMiningSpec | "start only the normal miner...RestrictedPoW" | 40ms | SlowTest→UnitTest | edfb69f35
-- 2026-06-23 | P11 | PoWMiningSpec | "use NoAdditionalPoWData..." | 202ms | kept SlowTest | — (actor system init on first test)
-- 2026-06-23 | P11 | PoWMiningSpec | "not start a miner when miningEnabled=false" | 425ms | kept SlowTest | — (TestMiningNode init)
-
-## Infrastructure traps
-
-Patterns that inflate per-test timing and can cause mislabelling:
-
-- **ScalaTestWithActorTestKit first-test overhead**: The first test in a class that extends
-  `ScalaTestWithActorTestKit` pays Pekko actor system initialization (~150-250ms under warm JVM).
-  Subsequent tests in the same class are much faster (40-60ms). Use `-oD` timing across the
-  full class, not just the first test, when deciding whether to remove SlowTest.
-- **TestMiningNode initialization**: Tests that call `startProtocol(new TestMiningNode())` pay
-  heavy setup cost (~400ms) because `TestMiningNode extends StdNode with EphemBlockchainTestSetup`.
-  This is not mining computation — it is node bootstrap overhead. Tests with this pattern are
-  legitimately SlowTest even though no PoW occurs.
-- **ScalaMock stub teardown noise**: Tests that spawn coordinator actors with mocked dependencies
-  produce ERROR log lines after teardown when the coordinator calls a mock that has already been
-  verified. These are NOT test failures — they are expected cleanup noise.
-
-## How to measure: SlowTest calibration
-
-To measure per-test timings before making tag decisions:
-```bash
-sbt "testOnly <fully.qualified.SpecClass> -- -oD"
-```
-The `-oD` flag makes ScalaTest print each test's duration in milliseconds.
-Only remove SlowTest if the observed time is <100ms. Do not guess from suite-level totals.
-DAGGenerationSpec and EthashNonceSearchSpec must always remain SlowTest (CPU-bound PoW).
-
-## Wall-clock assertion inventory
-
-(migrate from fukuii-test-timing.md — keep as-is)
-
-## Thread.sleep inventory
-
-(migrate from fukuii-test-timing.md — keep as-is)
-```
-
-**Steps:**
-
-1. Read `.local/docs/fukuii-test-timing.md` in full.
-2. Create `.local/docs/test-quality-log.md` using the structure above. Migrate all content
-   from `fukuii-test-timing.md` into the appropriate sections. Do not truncate or summarise
-   existing data — move it verbatim then add the new sections around it.
-3. Delete `.local/docs/fukuii-test-timing.md`.
-4. Update every reference to `fukuii-test-timing.md` in DEFERRED-BACKLOG.md — replace with
-   `test-quality-log.md`. Do NOT rename `/tmp/fukuii-test-timing.log` references (lines that
-   reference a temp log path, not the persistent doc). Affected lines: 1610, 1743, 1877, 1930,
-   1940, 2102, 2103, 2104 (verify by grep — line numbers may shift after this prompt is
-   inserted).
-   ```bash
-   grep -n "fukuii-test-timing\.md" .claude/agent-protocols/working-docs/DEFERRED-BACKLOG.md
-   ```
-5. Update `~/.claude/projects/-media-dev-2tb-dev/memory/MEMORY.md`: change the
-   `fukuii-test-timing.md` entry to point at `test-quality-log.md` and update the description.
-6. Update `~/.claude/projects/-media-dev-2tb-dev/memory/fukuii-test-timing.md`: rename to
-   `fukuii-test-quality-log.md`, update `name:`, `description:`, and body to reflect the new
-   file and its expanded scope.
-7. Update `~/.claude/projects/-media-dev-2tb-dev/memory/feedback_test_visibility.md`: change
-   the `[[fukuii-test-timing]]` link to `[[fukuii-test-quality-log]]`.
-8. Verify no remaining references to the old filename:
-   ```bash
-   grep -rn "fukuii-test-timing\.md" \
-     .claude/agent-protocols/working-docs/ \
-     ~/.claude/projects/-media-dev-2tb-dev/memory/
-   ```
-   Expected output: zero results.
-9. Commit:
-   ```bash
-   git add .claude/agent-protocols/working-docs/DEFERRED-BACKLOG.md
-   git commit -m "docs(p11b): migrate fukuii-test-timing.md → test-quality-log.md"
-   SHA=$(git rev-parse --short HEAD)
-   ```
-10. Update CODEBASE-AUDIT.md run-order table — add and immediately strike through:
-    `| ~~P11b~~ | ~~Batch G~~ | ~~Docs: migrate fukuii-test-timing.md → test-quality-log.md~~ | ✅ DONE [date] — $SHA |`
-11. Stage and commit docs:
-    ```bash
-    git add .claude/agent-protocols/working-docs/CODEBASE-AUDIT.md
-    git commit -m "docs(p11b): clearout — $SHA"
-    ```
-
-**Rejection criteria:** Symlinking the old name to the new file — clean delete only. Truncating
-or summarising existing data from `fukuii-test-timing.md` instead of migrating it verbatim.
-Renaming `/tmp/fukuii-test-timing.log` references (temp paths, not the persistent doc).
-Missing any of the 8 `fukuii-test-timing.md` references in DEFERRED-BACKLOG.md.
+### P11b — Docs: migrate `fukuii-test-timing.md` → `test-quality-log.md` — COMPLETE 2026-06-23 — see `completed/DEFERRED-BACKLOG.md`
 
 ---
 
@@ -1577,8 +1380,6 @@ do not exclude it. Tiers must reflect reality.
 ---
 
 ## Part 12: Pre-Olympia Consensus Correctness Gate
-
-### §G5 — BlockExecution.applyEip2935 account-existence gap — DONE (`bbc5f1df8`) — see completed/DEFERRED-BACKLOG.md
 
 ---
 
