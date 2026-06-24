@@ -133,75 +133,72 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
         require(context.recipientAddr.isEmpty, "recipient address must be empty for contract creation")
         require(context.doTransfer, "contract creation will always transfer funds")
 
-        // EIP-3860: Check initcode size limit
+        // EIP-3860: Check initcode size limit — abort arm flows through onCallExit below.
         val maxInitCodeSize = context.evmConfig.maxInitCodeSize
-        if context.evmConfig.eip3860Enabled && maxInitCodeSize.exists(max => context.inputData.size > max) then {
-          // Exceptional abort: initcode too large (consumes all gas).
-          // DEFER: this early `return` exits create() before the trailing onCallExit tracer
-          // block (lines ~203). Converting to an expression arm would make onCallExit fire for
-          // the abort case, changing observable tracer emission. Keep the short-circuit.
-          return ( // scalafix:ok DisableSyntax.return
+        if context.evmConfig.eip3860Enabled && maxInitCodeSize.exists(max => context.inputData.size > max) then
+          (
             invalidCallResult(context, Set.empty, Set.empty).copy(error = Some(InitCodeSizeLimit), gasRemaining = 0),
             Address(0)
           )
-        }
+        else {
 
-        if DebugTrace.enabledForBlock(context.blockHeader.number) then {
-          val callerAccountNonce = context.world.getAccount(context.callerAddr).map(_.nonce)
-          callerAccountNonce.foreach { n =>
-            val nonceForCreate = n - 1
-            // Address must be encoded as a single RLP string (20 bytes), not as a Seq[Byte].
-            val rlpPreimage =
-              rlp.encode(RLPList(RLPValue(context.callerAddr.bytes.toArray), nonceForCreate.toRLPEncodable))
-            val hash = kec256(rlpPreimage)
-            val derived = Address(hash)
-            log.info(
-              s"TRACE_CREATE_ADDR block=${context.blockHeader.number} caller=${context.callerAddr} " +
-                s"callerNonce=$n nonceForCreate=$nonceForCreate rlp=${Hex.toHexString(rlpPreimage.toArray)} " +
-                s"hash=${Hex.toHexString(hash.toArray)} derived=$derived"
-            )
+          if DebugTrace.enabledForBlock(context.blockHeader.number) then {
+            val callerAccountNonce = context.world.getAccount(context.callerAddr).map(_.nonce)
+            callerAccountNonce.foreach { n =>
+              val nonceForCreate = n - 1
+              // Address must be encoded as a single RLP string (20 bytes), not as a Seq[Byte].
+              val rlpPreimage =
+                rlp.encode(RLPList(RLPValue(context.callerAddr.bytes.toArray), nonceForCreate.toRLPEncodable))
+              val hash = kec256(rlpPreimage)
+              val derived = Address(hash)
+              log.info(
+                s"TRACE_CREATE_ADDR block=${context.blockHeader.number} caller=${context.callerAddr} " +
+                  s"callerNonce=$n nonceForCreate=$nonceForCreate rlp=${Hex.toHexString(rlpPreimage.toArray)} " +
+                  s"hash=${Hex.toHexString(hash.toArray)} derived=$derived"
+              )
+            }
           }
+
+          val contractAddr = salt
+            .map(s => context.world.create2Address(context.callerAddr, s, context.inputData))
+            .getOrElse(context.world.createAddress(context.callerAddr))
+
+          // EIP-684: revert a CREATE if the target address already has non-empty code/nonce.
+          // EIP-7610 (Paris+): additionally revert if the address has non-empty storage.
+          // Activation matches the EELS test marker `valid_from("Paris")` — we use
+          // BlockHeader.isPostMerge (difficulty==0 && baseFee set) as the Paris signal.
+          val conflict =
+            if context.blockHeader.isPostMerge then context.world.nonEmptyCodeOrNonceOrStorageAccount(contractAddr)
+            else context.world.nonEmptyCodeOrNonceAccount(contractAddr)
+
+          /** Specification of https://eips.ethereum.org/EIPS/eip-1283 states, that `originalValue` should be taken from
+            * world which is left after `a reversion happens on the current transaction`, so in current scope
+            * `context.originalWorld`.
+            *
+            * But ets test expects that it should be taken from world after the new account initialisation, which clears
+            * account storage. As it seems other implementations encountered similar problems with this ambiguity:
+            * ambiguity: https://gist.github.com/holiman/0154f00d5fcec5f89e85894cbb46fcb2 - explanation of geth and
+            * parity treating this situation differently. https://github.com/mana-ethereum/mana/pull/579 - elixir eth
+            * client dealing with same problem.
+            */
+          val originInitialisedAccount = context.originalWorld.initialiseAccount(contractAddr)
+
+          val world1: W =
+            context.world.initialiseAccount(contractAddr).transfer(context.callerAddr, contractAddr, context.endowment)
+
+          val code = if conflict then ByteString(INVALID.code) else context.inputData
+
+          val env = ExecEnv(context, code, contractAddr).copy(inputData = ByteString.empty)
+
+          val initialState: PS =
+            ProgramState(this, context.copy(world = world1, originalWorld = originInitialisedAccount): PC, env)
+              .addAccessedAddress(contractAddr)
+
+          val execResult = exec(initialState).toResult
+
+          val newContractResult = saveNewContract(context, contractAddr, execResult, env.evmConfig)
+          (newContractResult, contractAddr)
         }
-
-        val contractAddr = salt
-          .map(s => context.world.create2Address(context.callerAddr, s, context.inputData))
-          .getOrElse(context.world.createAddress(context.callerAddr))
-
-        // EIP-684: revert a CREATE if the target address already has non-empty code/nonce.
-        // EIP-7610 (Paris+): additionally revert if the address has non-empty storage.
-        // Activation matches the EELS test marker `valid_from("Paris")` — we use
-        // BlockHeader.isPostMerge (difficulty==0 && baseFee set) as the Paris signal.
-        val conflict =
-          if context.blockHeader.isPostMerge then context.world.nonEmptyCodeOrNonceOrStorageAccount(contractAddr)
-          else context.world.nonEmptyCodeOrNonceAccount(contractAddr)
-
-        /** Specification of https://eips.ethereum.org/EIPS/eip-1283 states, that `originalValue` should be taken from
-          * world which is left after `a reversion happens on the current transaction`, so in current scope
-          * `context.originalWorld`.
-          *
-          * But ets test expects that it should be taken from world after the new account initialisation, which clears
-          * account storage. As it seems other implementations encountered similar problems with this ambiguity:
-          * ambiguity: https://gist.github.com/holiman/0154f00d5fcec5f89e85894cbb46fcb2 - explanation of geth and parity
-          * treating this situation differently. https://github.com/mana-ethereum/mana/pull/579 - elixir eth client
-          * dealing with same problem.
-          */
-        val originInitialisedAccount = context.originalWorld.initialiseAccount(contractAddr)
-
-        val world1: W =
-          context.world.initialiseAccount(contractAddr).transfer(context.callerAddr, contractAddr, context.endowment)
-
-        val code = if conflict then ByteString(INVALID.code) else context.inputData
-
-        val env = ExecEnv(context, code, contractAddr).copy(inputData = ByteString.empty)
-
-        val initialState: PS =
-          ProgramState(this, context.copy(world = world1, originalWorld = originInitialisedAccount): PC, env)
-            .addAccessedAddress(contractAddr)
-
-        val execResult = exec(initialState).toResult
-
-        val newContractResult = saveNewContract(context, contractAddr, execResult, env.evmConfig)
-        (newContractResult, contractAddr)
       }
     if isSubCall then
       tracer.foreach(
