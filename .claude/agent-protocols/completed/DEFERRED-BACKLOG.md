@@ -1611,3 +1611,37 @@ proofs on all Sepolia blocks containing blob transactions).
 
 ### Commit
 `1a65e6f13` — docs(r10): Thread 9 SNAP ETH path audit — add §ETH-T9-A/B/C/D; mark T9+T10 complete in R10 row
+
+---
+
+### §ETH69-C — MITHRIL: BlockchainReader Tier3 rolling-median difficulty ✅ DONE (`2af49dcb1`)
+
+**Commits:** `2af49dcb1` (code — 4 files) · clearout in same session
+
+**What was done:**
+Replaced the `rollingWindowDiff` 10K-block DB-lookup rolling average in `BlockchainReader.resolveETH69ChainWeight`
+(Tier3 POW_SCALING) with a 1,000-block in-memory ring buffer + rolling-median.
+
+- **`BlockchainReader.scala`**: Added `difficultyRingBuffer: ArrayDeque[BigInt]` (capacity 1,000),
+  `recordBlockDifficulty(difficulty): Unit` (synchronized ring-buffer writer), and
+  `rollingMedianDifficulty: Option[BigInt]` (synchronized; returns None until buffer is full;
+  averages two middle elements for even-length arrays — exact mean under symmetric bimodal oscillation).
+  Tier3 rate line changed from `rollingWindowDiff(head, ourBestTD)` to
+  `rollingMedianDifficulty.orElse(bestHeaderOpt.map(_.difficulty)).getOrElse(BigInt(1))`.
+  Dead code removed: `Tier3RollingWindow` constant + `rollingWindowDiff` private method.
+- **`BlockExecution.scala`**: Hook added after `blockchain.saveBlockState(...)` — calls
+  `blockchainReader.recordBlockDifficulty(blockToExecute.header.difficulty)` for live import.
+- **`ChainImporter.scala`**: Hook added after `blockchainWriter.save(block, ...)` — calls
+  `blockchainReader.recordBlockDifficulty(block.header.difficulty)` for offline/hive import.
+- **`ETH69OscillationChainWeightSpec.scala`**: 2 new tests added (tag: UnitTest, NetworkTest):
+  1. "reduce Tier3 estimate variance to < ±20% under ±50% oscillation" — anchorNum=100 so
+     10K-block gap dominates; alternating 1500/4500 TH (1000 entries); asserts oldErr > 0.20
+     and newErr < 0.20.
+  2. "average out alternating high/low difficulty to the true midpoint" — asserts median of
+     {500×2000 TH, 500×4000 TH} = 3000 TH exactly.
+
+**Test result:** 15/15 pass (`testOnly *ETH69Oscillation*`). `sbt compile-all` clean. `sbt scalafmtAll` clean.
+
+**Effect:** Tier3 estimate variance under ETC flex-load oscillation (symmetric ±50% swing) collapses
+from ±50% (point-in-time head difficulty) to near-zero (true mean of the oscillation window).
+Cold-start window (buffer < 1,000 entries) falls back to head.difficulty (prior behaviour).

@@ -1152,59 +1152,6 @@ The `handleRegularSyncMsg` production bug (SyncController:895-897) is tracked un
 
 ---
 
-### §ETH69-C — MITHRIL: BlockchainReader Tier3 rolling-window median (G2, P1)
-
-**Agent:** MITHRIL
-**Risk:** MEDIUM — changes Tier3 TD estimation formula; affects peer ranking and chainWeight accuracy
-**Gate:** §ETH69-A complete (TD gate in place) + §ETH69-B complete
-**File:** `src/main/scala/com/chipprbots/ethereum/domain/BlockchainReader.scala:217-221`
-
-**Background:**
-Tier3 `POW_SCALING` uses current head difficulty as the marginal rate in:
-```scala
-val rate = rollingWindowDiff(head, ourBestTD)  // 10K-block rolling avg, fallback to head.difficulty
-val gap  = (latestBlock - ourBestNum).max(BigInt(0))
-val estimatedTD = ourBestTD + rate * gap
-```
-Under flex-load difficulty oscillation (±50% swing observed in `ETH69OscillationChainWeightSpec.scala:142-156`),
-this causes Tier3 to systematically overestimate or underestimate TD by 10-50%. Archive nodes
-receiving an inflated Tier3 estimate are never corrected (monotonic guard + no NewBlock sent).
-Peers arriving mid-oscillation trough are deprioritised unfairly.
-
-**Steps:**
-1. **Read** `BlockchainReader.scala:199-248` in full — understand `rollingWindowDiff`,
-   `resolveETH69ChainWeight`, and what `head` / `ourBestTD` are.
-2. **Read** `ETH69OscillationChainWeightSpec.scala` — understand existing oscillation test cases
-   and what accuracy targets they assert.
-3. **Implement** a 1,000-block rolling-median difficulty store:
-   - On each new block import (hook into the existing block-update path), record
-     `header.difficulty` in a ring buffer of size 1,000.
-   - Expose `rollingMedianDifficulty: BigInt` as a new `BlockchainReader` method.
-   - Replace `rollingWindowDiff(head, ourBestTD)` call in Tier3 with `rollingMedianDifficulty`
-     (fallback to `head.difficulty` if buffer is not yet full).
-4. **Add test cases** to `ETH69OscillationChainWeightSpec`:
-   - Verify Tier3 estimate variance is < ±20% under 50% oscillation (rolling median dampens swings)
-   - Verify rolling median correctly averages out high/low difficulty alternation
-5. `sbt "testOnly *BlockchainReader* *ETH69*"` after changes.
-
-**Verify:**
-```bash
-grep -n "rollingWindowDiff\|rollingMedian\|rate = " \
-  src/main/scala/com/chipprbots/ethereum/domain/BlockchainReader.scala
-
-sbt "testOnly *ETH69Oscillation*"
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add src/main/scala/.../domain/BlockchainReader.scala src/test/.../ETH69OscillationChainWeightSpec.scala`
-3. `git commit -m "fix(sync): ETH69 Tier3 POW_SCALING — rolling-median difficulty reduces estimate variance (G2)"`
-4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(eth69-c): clearout — $SHA"`
-5. **DELETE §ETH69-C**
-
----
-
 ### §ETH69-D — MITHRIL: Tier3 accuracy telemetry (P1)
 
 **Agent:** MITHRIL

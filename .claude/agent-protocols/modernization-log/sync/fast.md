@@ -124,3 +124,13 @@
 - **Wiring:** `getCanonicalHeaderByNumber` and `validateHeaderPoW` closures added to `PivotBlockSelector` constructor from `FastSync` (where `blockchainConfig` is in scope); all 3 spawn sites updated. SNAPSyncController not modified — validation belongs upstream of `Result` emission.
 - **Tests:** 5 new G5 scenarios in `PivotBlockSelectorSpec` (22 total): canonical within 5 hops → proceeds; canonical at hop N → proceeds; no canonical match → rejected + retry; invalid PoW → immediate reject + blacklist; probe timeout → retry. 22/22 passed.
 - **Spec:** `.local/Wire-Protocol-Modernization/G5-pivot-backlink.md`
+
+## §ETH69-C — BlockchainReader Tier3 Rolling-Median Difficulty (2026-06-24)
+
+#### `2af49dcb1` — fix(sync): ETH69 Tier3 POW_SCALING — rolling-median difficulty reduces estimate variance (G2)
+- **Problem:** Tier3 `POW_SCALING` used `rollingWindowDiff` (10K-block DB-lookup rolling average, fallback to head.difficulty) as the marginal TD rate. Under ETC flex-load oscillation (symmetric ±50% swing), a point-in-time sample could sit at the crest or trough, producing Tier3 estimates ±50% off the true TD. Archive nodes with inflated estimates are never corrected (monotonic guard + no NewBlock); peers mid-trough are deprioritized unfairly.
+- **Fix:** Replaced `rollingWindowDiff` with a 1,000-block in-memory ring buffer (`difficultyRingBuffer: ArrayDeque[BigInt]`) and `rollingMedianDifficulty: Option[BigInt]` in `BlockchainReader`. For even-length sorted arrays, averaging the two middle elements equals the true mean of any symmetric bimodal oscillation — collapses Tier3 variance from ±50% to near-zero under sustained flex-on/flex-off cycling. Returns `None` until the buffer holds 1,000 entries (cold-start falls back to `head.difficulty`).
+- **Hook points:** `BlockExecution.executeAndValidateBlocks()` (live import — after `saveBlockState`) and `ChainImporter.importChainFile()` (offline/hive — after `blockchainWriter.save`) both call `blockchainReader.recordBlockDifficulty(header.difficulty)`. Thread-safe via `synchronized` on the `BlockchainReader` intrinsic lock (safe for Pekko single-actor access).
+- **Dead code removed:** `Tier3RollingWindow: BigInt` constant and `rollingWindowDiff` private method both deleted.
+- **Tests:** 2 new cases in `ETH69OscillationChainWeightSpec` (15 total): (1) oldErr > 20%, newErr < 20% with anchorNum=100 (gap dominates); (2) median of {500×2 TH, 500×4 TH} = 3 TH exactly. 15/15 passed.
+- **Files:** `BlockchainReader.scala`, `BlockExecution.scala`, `ChainImporter.scala`, `ETH69OscillationChainWeightSpec.scala`
