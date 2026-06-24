@@ -1,3 +1,10 @@
+# loop-metadata:
+#   loop_role: checker
+#   never_self_check: false
+#   model_tier: sonnet
+#   provides_gate: [compile, tests]
+#   invoked_by: [verify]
+#   applicable_recipes: [warning-ratchet, test-greening, actor-migration, spec-conformance]
 ---
 name: eye
 description: >-

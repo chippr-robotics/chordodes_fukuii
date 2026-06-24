@@ -1,5 +1,6 @@
 target/
 dist/*
+
 project/boot/
 project/plugins/project/
 .ensime
@@ -71,6 +72,9 @@ ops/*/captured-logs/
 !.claude/agents/
 !.claude/skills/
 !.claude/agent-protocols/
+!.claude/looping/
+.claude/looping/state/*/
+!.claude/looping/bin/
 
 # Planning & internal docs
 SESSION_NOTES.md
@@ -107,4 +111,5 @@ etc-node.key
 # Local run configs
 run-*.conf
 run-*.sh
+!.claude/looping/bin/run-loop.sh
 

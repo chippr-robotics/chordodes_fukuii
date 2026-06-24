@@ -1,3 +1,12 @@
+# loop-metadata:
+#   loop_role: checker
+#   never_self_check: false
+#   model_tier: opus
+#   provides_gate: [conformance-etc]
+#   invoked_by: [discover, verify]
+#   proactive: true
+#   applicable_recipes: [spec-conformance, ref-parity-audit]
+#   NOTE: proactive=true means consult in DISCOVER phase BEFORE maker executes
 ---
 name: forge
 description: >-

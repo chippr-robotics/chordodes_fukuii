@@ -1,3 +1,4 @@
+# loop: invoked_by=[discover] applicable_recipes=[warning-ratchet]
 ---
 name: fukuii-dependency-audit
 description: >-

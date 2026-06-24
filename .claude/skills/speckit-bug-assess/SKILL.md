@@ -1,3 +1,4 @@
+# loop: invoked_by=[discover] applicable_recipes=[spec-conformance]
 ---
 name: speckit-bug-assess
 description: >-

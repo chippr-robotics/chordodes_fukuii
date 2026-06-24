@@ -1,3 +1,10 @@
+# loop-metadata:
+#   loop_role: checker
+#   never_self_check: false
+#   model_tier: sonnet
+#   provides_gate: [quality]
+#   invoked_by: [verify]
+#   applicable_recipes: [warning-ratchet, test-greening, actor-migration]
 ---
 name: prism
 description: >-

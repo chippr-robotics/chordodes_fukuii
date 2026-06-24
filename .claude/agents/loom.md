@@ -1,3 +1,10 @@
+# loop-metadata:
+#   loop_role: maker
+#   never_self_check: true
+#   model_tier: opus
+#   provides_gate: []
+#   invoked_by: [execute]
+#   applicable_recipes: [actor-migration]
 ---
 name: loom
 description: >-

@@ -1,3 +1,4 @@
+# loop: invoked_by=[verify] applicable_recipes=[spec-conformance, test-greening]
 ---
 name: speckit-bug-test
 description: >-

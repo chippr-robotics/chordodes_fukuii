@@ -1,3 +1,4 @@
+# loop: invoked_by=[discover] applicable_recipes=[ref-parity-audit]
 ---
 name: fukuii-node-health-check
 description: >-

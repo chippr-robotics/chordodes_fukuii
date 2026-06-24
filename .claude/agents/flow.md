@@ -1,3 +1,10 @@
+# loop-metadata:
+#   loop_role: checker
+#   never_self_check: false
+#   model_tier: sonnet
+#   provides_gate: [conformance-streams]
+#   invoked_by: [verify]
+#   applicable_recipes: [spec-conformance]
 ---
 name: flow
 description: >-

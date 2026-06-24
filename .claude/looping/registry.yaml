@@ -1,0 +1,169 @@
+# Loop Registry
+# Single source of truth for role resolution. bin/run-loop.sh reads this file
+# to determine which agent fills which role for a given recipe.
+
+agents:
+  wraith:
+    loop_role: maker
+    never_self_check: true
+    model_tier: sonnet
+    provides_gate: []
+    invoked_by: [execute]
+    description: >
+      Scala 3 compile-error fixer. Given failing compilation output, categorizes
+      errors and applies known Scala 2->3 fix patterns. Use as maker for
+      warning-ratchet, spec-conformance, test-greening.
+
+  mithril:
+    loop_role: maker
+    never_self_check: true
+    model_tier: sonnet
+    provides_gate: []
+    invoked_by: [execute]
+    description: >
+      Scala 3 modernization specialist. Refactors working code toward idiomatic
+      Scala 3 idioms without changing behavior. Use as maker for modernization
+      recipes.
+
+  loom:
+    loop_role: maker
+    never_self_check: true
+    model_tier: opus
+    provides_gate: []
+    invoked_by: [execute]
+    description: >
+      Pekko Classic->Typed migration specialist. Migrates one actor per session
+      following pre-migration-checklist. Use as maker for actor-migration recipe.
+
+  eye:
+    loop_role: checker
+    never_self_check: false
+    model_tier: sonnet
+    provides_gate: [compile, tests]
+    invoked_by: [verify]
+    description: >
+      Test and validation reviewer. Runs compile and test tiers, verifies chain
+      compatibility, reports pass/fail with evidence. Read-only. Primary checker
+      for warning-ratchet, test-greening, actor-migration.
+
+  prism:
+    loop_role: checker
+    never_self_check: false
+    model_tier: sonnet
+    provides_gate: [quality]
+    invoked_by: [verify]
+    description: >
+      Code quality reviewer (non-consensus code only). Reviews across 8 lenses.
+      Never reviews consensus/, vm/, crypto/, domain/ code. Use as secondary
+      checker on any recipe touching non-consensus source.
+
+  forge:
+    loop_role: checker
+    never_self_check: false
+    model_tier: opus
+    provides_gate: [conformance-etc]
+    invoked_by: [discover, verify]
+    proactive: true
+    description: >
+      ETC/Mordor consensus-critical specialist. MUST be consulted in DISCOVER
+      phase BEFORE maker executes on any ETC consensus-affecting change.
+      Primary checker for spec-conformance (ETC surface) and ref-parity-audit.
+
+  beacon:
+    loop_role: checker
+    never_self_check: false
+    model_tier: opus
+    provides_gate: [conformance-eth]
+    invoked_by: [discover, verify]
+    proactive: true
+    description: >
+      ETH/Sepolia consensus-critical specialist. MUST be consulted in DISCOVER
+      phase BEFORE maker executes on any ETH consensus-affecting change.
+      Primary checker for spec-conformance (ETH surface) and ref-parity-audit.
+
+  herald:
+    loop_role: checker
+    never_self_check: false
+    model_tier: sonnet
+    provides_gate: [conformance-wire]
+    invoked_by: [verify]
+    description: >
+      P2P / wire-protocol specialist (devp2p, RLPx, ETH68/69/70, SNAP).
+      Checker for spec-conformance (wire surface) and ref-parity-audit.
+
+  vault:
+    loop_role: checker
+    never_self_check: false
+    model_tier: sonnet
+    provides_gate: [conformance-storage]
+    invoked_by: [verify]
+    description: >
+      RocksDB and storage layer specialist. Checker for any recipe touching
+      db/ (DataSource contract, column families, iterator lifecycle).
+
+  conduit:
+    loop_role: checker
+    never_self_check: false
+    model_tier: sonnet
+    provides_gate: [conformance-rpc]
+    invoked_by: [verify]
+    description: >
+      JSON-RPC / API transport specialist. Checker for spec-conformance (RPC
+      surface) and ref-parity-audit.
+
+  flow:
+    loop_role: checker
+    never_self_check: false
+    model_tier: sonnet
+    provides_gate: [conformance-streams]
+    invoked_by: [verify]
+    description: >
+      Pekko Streams specialist. Checker for any recipe touching stream graphs,
+      materialization, or backpressure.
+
+orchestrator: main-session
+
+# Reference repositories pulled by refresh-refs.sh.
+# Branch discipline: refresh-refs.sh updates ONLY the branch listed here.
+# For clients with ETC overlays (besu, core-geth, nethermind), the `main`
+# branch is our overlay and must NEVER be touched by the loop subsystem.
+# Conformance checks always diff against the `upstream` branch.
+ref_repos:
+  spec:
+    - path: .claude/repo-references/ECIPs
+      remote: upstream
+      branch: master
+    - path: .claude/repo-references/EIPs
+      remote: origin
+      branch: master
+    - path: .claude/repo-references/hive
+      remote: upstream
+      branch: upstream
+    - path: .claude/repo-references/pekko
+      remote: upstream
+      branch: upstream
+    - path: .claude/repo-references/scala3
+      remote: upstream
+      branch: upstream
+
+  clients:
+    # ETC overlay exists on main: besu, core-geth, nethermind
+    # No ETC overlay yet: go-ethereum, reth, erigon (planned post-fukuii stabilization)
+    - path: /media/dev/2tb/dev/reference-clients-evm/besu
+      remote: upstream
+      branch: upstream
+    - path: /media/dev/2tb/dev/reference-clients-evm/core-geth
+      remote: upstream
+      branch: upstream
+    - path: /media/dev/2tb/dev/reference-clients-evm/nethermind
+      remote: upstream
+      branch: upstream
+    - path: /media/dev/2tb/dev/reference-clients-evm/go-ethereum
+      remote: upstream
+      branch: upstream
+    - path: /media/dev/2tb/dev/reference-clients-evm/reth
+      remote: upstream
+      branch: upstream
+    - path: /media/dev/2tb/dev/reference-clients-evm/erigon
+      remote: upstream
+      branch: upstream
