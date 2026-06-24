@@ -62,12 +62,19 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 // Fixture classes are wrapped in a trait due to problems with making mocks available inside of them
 trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
-  class RegularSyncFixture(_system: ActorSystem)
+  class RegularSyncFixture
       extends TestKitBase
       with EphemBlockchainTestSetup
       with TestSyncConfig
       with SecureRandomBuilder {
-    implicit override lazy val system: ActorSystem = _system
+    // Each fixture owns a per-test ActorTestKit (typed). Its system has a custom user guardian that
+    // forbids top-level spawning "from the outside" (system.spawn / system.actorOf), so all actor
+    // creation routes through testKit.spawn. The Classic system below is the testKit's underlying
+    // adapter — used by Classic TestProbe / AutoPilot in this fixture. The testKit owns the
+    // lifecycle (shut down per test via `shutdownFixture()`).
+    val testKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit =
+      org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit()
+    implicit override lazy val system: ActorSystem = testKit.system.classicSystem
     implicit override lazy val ioRuntime: IORuntime = IORuntime.global
     override lazy val syncConfig: SyncConfig =
       defaultSyncConfig.copy(
@@ -92,19 +99,25 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
     val stateStorage: StateStorage = stub[StateStorage]
     val evmCodeStorage: EvmCodeStorage = stub[EvmCodeStorage]
 
+    // testKit.spawn (anonymous): RegularSyncSpec shares one testKit-owned ActorSystem across all
+    // fixtures, so a fixed actor name would collide with InvalidActorNameException on the second
+    // fixture. testKit.spawn also satisfies the custom-user-guardian constraint (system.spawn would
+    // throw "cannot create top-level actor from the outside"). The Topic's pubsub identifier
+    // ("block-imported-topic") is internal, not the actor name.
     lazy val blockTopic: org.apache.pekko.actor.typed.ActorRef[
       org.apache.pekko.actor.typed.pubsub.Topic.Command[com.chipprbots.ethereum.jsonrpc.NewBlockImported]
-    ] = system.spawn(
+    ] = testKit.spawn(
       org.apache.pekko.actor.typed.pubsub.Topic[com.chipprbots.ethereum.jsonrpc.NewBlockImported](
         "block-imported-topic"
-      ),
-      "block-imported-topic"
+      )
     )
 
-    // spawnAnonymous (not a named spawn): RegularSyncSpec reuses one ActorSystem across many fixtures,
-    // so a fixed actor name would collide with InvalidActorNameException on the second test case.
-    lazy val regularSync: ActorRef = system
-      .spawnAnonymous(
+    // testKit.spawn (anonymous): RegularSyncSpec reuses one testKit-owned ActorSystem across many
+    // fixtures, so a fixed actor name would collide with InvalidActorNameException on the second test
+    // case. testKit.spawn also satisfies the custom-user-guardian constraint. .toClassic because
+    // RegularSync's callers in this fixture hold it as a Classic ref.
+    lazy val regularSync: ActorRef = testKit
+      .spawn(
         RegularSync.apply(
           peersClient.ref.toTyped[PeersClient.Command],
           networkPeerManager.ref,
@@ -182,6 +195,12 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
 
     def done(): Unit =
       regularSync ! PoisonPill
+
+    // Per-test teardown: shut down this fixture's testKit (and its underlying Classic system).
+    // Replaces the former TestKit.shutdownActorSystem(testSystem) call in the spec.
+    // Named shutdownFixture (not shutdown) to avoid clashing with ShutdownHookBuilder.shutdown.
+    def shutdownFixture(): Unit =
+      testKit.shutdownTestKit()
 
     def peerId(number: Int): PeerId = PeerId(s"peer_$number")
 
@@ -456,7 +475,7 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
     }
   }
 
-  class OnTopFixture(system: ActorSystem) extends RegularSyncFixture(system) {
+  class OnTopFixture extends RegularSyncFixture {
 
     // Override blockHeadersPerRequest = 3 so that the last batch of testBlocks (blocks 19-20)
     // has 2 headers < 3 = no cherry-pick. Without this, the cherry-pick in BlockFetcher bumps

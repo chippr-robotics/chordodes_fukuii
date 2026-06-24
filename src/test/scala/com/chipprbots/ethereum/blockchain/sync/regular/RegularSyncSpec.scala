@@ -1,11 +1,8 @@
-// §8a-retro batch 5: DEFERRED — Resource[IO, ActorSystem] lifecycle is load-bearing; migrate when RegularSync is Typed (Wave 3)
 package com.chipprbots.ethereum.blockchain.sync.regular
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
-import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestActor.AutoPilot
-import org.apache.pekko.testkit.TestKit
 import org.apache.pekko.testkit.TestProbe
 import org.apache.pekko.util.ByteString
 
@@ -24,7 +21,6 @@ import scala.math.BigInt
 
 import org.scalamock.scalatest.AsyncMockFactory
 import org.scalatest.Assertion
-import org.scalatest.BeforeAndAfterEach
 import org.scalatest.diagrams.Diagrams
 import org.scalatest.matchers.should.Matchers
 
@@ -74,31 +70,32 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
 class RegularSyncSpec
     extends WordSpecBase
     with ResourceFixtures
-    with BeforeAndAfterEach
     with Matchers
     with AsyncMockFactory
     with Diagrams
     with RegularSyncFixtures {
   type Fixture = RegularSyncFixture
 
-  val actorSystemResource: Resource[IO, ActorSystem] =
-    Resource.make(IO(ActorSystem()))(system => IO(TestKit.shutdownActorSystem(system)))
-  val fixtureResource: Resource[IO, Fixture] = actorSystemResource.map(new Fixture(_))
+  // This spec is an AsyncWordSpec built on the cats-effect Resource[IO, ...] machinery, which is
+  // incompatible with the synchronous ScalaTestWithActorTestKit base trait (it breaks async test
+  // discovery). Each fixture now owns a per-test ActorTestKit (RegularSyncFixture.testKit) instead of
+  // the former hand-rolled ActorSystem() + TestKit.shutdownActorSystem lifecycle. Per-test isolation
+  // is preserved: each test gets a fresh testKit-owned Classic system, shut down via fixture.shutdownFixture().
 
-  // Used only in sync tests
-  var testSystem: ActorSystem = uninitialized
-  override def beforeEach(): Unit =
-    testSystem = ActorSystem()
-  override def afterEach(): Unit =
-    TestKit.shutdownActorSystem(testSystem)
+  // fixtureResource builds a fresh fixture and shuts down its testKit on release.
+  val fixtureResource: Resource[IO, Fixture] =
+    Resource.make(IO(new Fixture))(fixture => IO(fixture.shutdownFixture()))
+
+  // OnTop variant resource with the same teardown (used by the "return SyncDone when on top" test).
+  val onTopFixtureResource: Resource[IO, OnTopFixture] =
+    Resource.make(IO(new OnTopFixture))(fixture => IO(fixture.shutdownFixture()))
 
   def sync[T <: Fixture](test: => T): Future[Assertion] = {
     import scala.concurrent.ExecutionContext.Implicits.global
     Future {
-      test
-      // this makes sure that actors are all done after the test (believe me, afterEach does not work with mocks)
-      TestKit.shutdownActorSystem(testSystem)
-      succeed
+      val fixture = test
+      try succeed
+      finally fixture.shutdownFixture()
     }
   }
 
@@ -108,7 +105,7 @@ class RegularSyncSpec
         UnitTest,
         SyncTest
       ) in sync(
-        new Fixture(testSystem) {
+        new Fixture {
           regularSync ! SyncProtocol.Start
 
           peerEventBus.expectMsgType[SubscribeCmd].to shouldBe MessageClassifier(
@@ -123,14 +120,14 @@ class RegularSyncSpec
         }
       )
 
-      "subscribe to handshaked peers list" taggedAs (UnitTest, SyncTest) in sync(new Fixture(testSystem) {
+      "subscribe to handshaked peers list" taggedAs (UnitTest, SyncTest) in sync(new Fixture {
         regularSync // unlazy
         networkPeerManager.expectMsgType[NetworkPeerManagerActor.GetHandshakedPeersCmd]
       })
     }
 
     "fetching blocks" should {
-      "fetch headers and bodies concurrently" taggedAs (UnitTest, SyncTest) in sync(new Fixture(testSystem) {
+      "fetch headers and bodies concurrently" taggedAs (UnitTest, SyncTest) in sync(new Fixture {
         regularSync ! SyncProtocol.Start
 
         val sub136 = peerEventBus.expectMsgType[SubscribeCmd]
@@ -149,7 +146,7 @@ class RegularSyncSpec
         )
       })
 
-      "blacklist peer which caused failed request" taggedAs (UnitTest, SyncTest) in sync(new Fixture(testSystem) {
+      "blacklist peer which caused failed request" taggedAs (UnitTest, SyncTest) in sync(new Fixture {
         regularSync ! SyncProtocol.Start
 
         peersClient.expectMsgType[PeersClient.Request[ETHGetBlockHeaders]].replyTo ! PeersClient.RequestFailed(
@@ -165,7 +162,7 @@ class RegularSyncSpec
         UnitTest,
         SyncTest
       ) in sync(
-        new Fixture(testSystem) {
+        new Fixture {
           var blockFetcher: TypedActorRef[PeerEvent] = uninitialized
 
           regularSync ! SyncProtocol.Start
@@ -210,7 +207,7 @@ class RegularSyncSpec
         }
       )
 
-      "not blacklist peer which returns headers not forming a chain" in sync(new Fixture(testSystem) {
+      "not blacklist peer which returns headers not forming a chain" in sync(new Fixture {
         // HeadersNotFormingSeq: headers don't internally chain (e.g. skipped blocks).
         // During a reorg an honest peer may send a valid fork segment that doesn't chain
         // to our expected sequence. No blacklist — just drop and retry.
@@ -230,9 +227,7 @@ class RegularSyncSpec
       // unsolicited data silently instead of blacklisting — behavior was never implemented.
 
       "wait for time defined in config until issuing a retry request due to no suitable peer" in sync(
-        new Fixture(
-          testSystem
-        ) {
+        new Fixture {
           regularSync ! SyncProtocol.Start
 
           peersClient.expectMsgEq(blockHeadersChunkRequest(0)).replyTo ! PeersClient.NoSuitablePeer
@@ -241,7 +236,7 @@ class RegularSyncSpec
         }
       )
 
-      "not fetch new blocks if fetcher's queue reached size defined in configuration" in sync(new Fixture(testSystem) {
+      "not fetch new blocks if fetcher's queue reached size defined in configuration" in sync(new Fixture {
         override lazy val syncConfig: SyncConfig = defaultSyncConfig.copy(
           syncRetryInterval = testKitSettings.DefaultTimeout.duration,
           maxFetcherQueueSize = 1,
@@ -285,7 +280,7 @@ class RegularSyncSpec
         UnitTest,
         SyncTest
       ) in sync(
-        new Fixture(testSystem) {
+        new Fixture {
           override lazy val blockchainReader: BlockchainReader = stub[BlockchainReader]
           (() => blockchainReader.getBestBlockNumber).when().returns(BigInt(1000))
           (() => blockchainReader.getSnapSyncPivotBlock).when().returns(None)
@@ -298,14 +293,17 @@ class RegularSyncSpec
             val lca = BigInt(depth)
             val blockTopic: org.apache.pekko.actor.typed.ActorRef[
               org.apache.pekko.actor.typed.pubsub.Topic.Command[com.chipprbots.ethereum.jsonrpc.NewBlockImported]
-            ] = system.spawn(
+            ] = testKit.spawn(
               org.apache.pekko.actor.typed.pubsub.Topic[com.chipprbots.ethereum.jsonrpc.NewBlockImported](
                 "block-imported-topic"
               ),
               s"block-imported-topic-depth-$depth"
             )
-            val importer = system.actorOf(
-              org.apache.pekko.actor.typed.scaladsl.adapter.PropsAdapter(
+            // testKit.spawn keeps the Typed ref so testKit.stop can terminate it safely. Using the
+            // Classic system.stop on a testKit-guardian child sends StopChild to the guardian, which
+            // only accepts TestKitCommand → ClassCastException → whole-system shutdown (8a-retro batch 4).
+            val importer = testKit
+              .spawn(
                 BlockImporter.apply(
                   importerFetcher.ref.toTyped[BlockFetcher.FetchCommand],
                   consensusAdapter,
@@ -326,10 +324,9 @@ class RegularSyncSpec
                   blockchain,
                   blacklist,
                   this
-                )
-              ),
-              s"test-importer-depth-$depth"
-            )
+                ),
+                s"test-importer-depth-$depth"
+              )
 
             importer ! BlockImporter.Start
             importerFetcher.expectMsgClass(3.seconds, classOf[BlockFetcher.Start])
@@ -342,7 +339,7 @@ class RegularSyncSpec
             }
             assert(msg.from == lca, s"StrictPickBlocks.from mismatch for depth=$depth")
 
-            system.stop(importer)
+            testKit.stop(importer)
             importerFetcher.expectNoMessage(200.millis)
           }
         }
@@ -359,7 +356,7 @@ class RegularSyncSpec
         UnitTest,
         SyncTest
       ) in sync(
-        new Fixture(testSystem) {
+        new Fixture {
           val capturedBest: BigInt = testBlocks.last.number // 20
           val lca: BigInt = BigInt(10)
           val lcaHeader: BlockHeader = testBlocks.find(_.number == lca).get.header
@@ -378,15 +375,17 @@ class RegularSyncSpec
 
           val forkBlockTopic: org.apache.pekko.actor.typed.ActorRef[
             org.apache.pekko.actor.typed.pubsub.Topic.Command[com.chipprbots.ethereum.jsonrpc.NewBlockImported]
-          ] = system.spawn(
+          ] = testKit.spawn(
             org.apache.pekko.actor.typed.pubsub.Topic[com.chipprbots.ethereum.jsonrpc.NewBlockImported](
               "fork-block-imported-topic"
             ),
             "fork-block-imported-topic"
           )
 
-          val importer: ActorRef = system.actorOf(
-            org.apache.pekko.actor.typed.scaladsl.adapter.PropsAdapter(
+          // testKit.spawn keeps the Typed ref so testKit.stop can terminate it safely (Classic
+          // system.stop on a testKit-guardian child crashes the guardian — 8a-retro batch 4).
+          val importer: TypedActorRef[BlockImporter.Command] = testKit
+            .spawn(
               BlockImporter.apply(
                 importerFetcher.ref.toTyped[BlockFetcher.FetchCommand],
                 consensusAdapter,
@@ -407,10 +406,9 @@ class RegularSyncSpec
                 blockchain,
                 blacklist,
                 this
-              )
-            ),
-            "test-fork-recovery-importer"
-          )
+              ),
+              "test-fork-recovery-importer"
+            )
 
           importer ! BlockImporter.Start
           importerFetcher.expectMsgClass(3.seconds, classOf[BlockFetcher.Start])
@@ -439,12 +437,12 @@ class RegularSyncSpec
             .verify(lca, lcaHeader.hash, capturedBest)
             .once()
 
-          system.stop(importer)
+          testKit.stop(importer)
         }
       )
 
       "go back to earlier block in order to find a common parent with new branch" in sync(
-        new Fixture(testSystem) {
+        new Fixture {
           override lazy val blockchain: BlockchainImpl = stub[BlockchainImpl]
           override lazy val blockchainReader: BlockchainReader = stub[BlockchainReader]
           (() => blockchainReader.getBestBlockNumber).when().onCall(() => bestBlock.number)
@@ -510,7 +508,7 @@ class RegularSyncSpec
     }
 
     "go back to earlier positive block in order to resolve a fork when branch smaller than branch resolution size" in sync(
-      new Fixture(testSystem) {
+      new Fixture {
         override lazy val blockchainReader: BlockchainReader = stub[BlockchainReader]
         override lazy val blockchain: BlockchainImpl = stub[BlockchainImpl]
         (() => blockchainReader.getBestBlockNumber).when().onCall(() => bestBlock.number)
@@ -579,7 +577,7 @@ class RegularSyncSpec
     )
 
     "fetching state node" should {
-      abstract class MissingStateNodeFixture(system: ActorSystem) extends Fixture(system) {
+      abstract class MissingStateNodeFixture extends Fixture {
         val failingBlock: Block = testBlocksChunked.head.head
         setImportResult(
           failingBlock,
@@ -587,7 +585,7 @@ class RegularSyncSpec
         )
       }
 
-      "blacklist peer which returns empty response" in sync(new MissingStateNodeFixture(testSystem) {
+      "blacklist peer which returns empty response" in sync(new MissingStateNodeFixture {
         val failingPeer: Peer = peerByNumber(1)
 
         peersClient.setAutoPilot(new PeersClientAutoPilot {
@@ -603,7 +601,7 @@ class RegularSyncSpec
         fishForBlacklistPeer(failingPeer)
       })
 
-      "blacklist peer which returns invalid node" in sync(new MissingStateNodeFixture(testSystem) {
+      "blacklist peer which returns invalid node" in sync(new MissingStateNodeFixture {
         val failingPeer: Peer = peerByNumber(1)
         peersClient.setAutoPilot(new PeersClientAutoPilot {
           override def overrides(sender: ActorRef): PartialFunction[Any, Option[AutoPilot]] = {
@@ -619,7 +617,7 @@ class RegularSyncSpec
       })
 
       "retry fetching node if validation failed" taggedAs (UnitTest, SyncTest) in sync(
-        new MissingStateNodeFixture(testSystem) {
+        new MissingStateNodeFixture {
           def fishForFailingBlockNodeRequest(): Boolean = peersClient.fishForSpecificMessage(max = 10.seconds) {
             case PeersClient.Request(GetNodeData(hash :: Nil), _, _, _) if hash == failingBlock.hash => true
           }
@@ -648,7 +646,7 @@ class RegularSyncSpec
         }
       )
 
-      "save fetched node" in sync(new Fixture(testSystem) {
+      "save fetched node" in sync(new Fixture {
         val failingBlock: Block = testBlocksChunked.head.head
 
         override lazy val blockchainReader: BlockchainReader = new BlockchainReader(
@@ -716,7 +714,7 @@ class RegularSyncSpec
     }
 
     "catching the top" should {
-      "ignore new blocks if they are too new" in sync(new Fixture(testSystem) {
+      "ignore new blocks if they are too new" in sync(new Fixture {
         override lazy val consensusAdapter: ConsensusAdapter = stub[ConsensusAdapter]
 
         val newBlock: Block = testBlocks.last
@@ -734,7 +732,7 @@ class RegularSyncSpec
         )
       })
 
-      "retry fetch of block that failed to import" in sync(new Fixture(testSystem) {
+      "retry fetch of block that failed to import" in sync(new Fixture {
         val failingBlock: Block = testBlocksChunked(1).head
 
         testBlocksChunked.head.foreach(setImportResult(_, IO.pure(BlockImportedToTop(Nil))))
@@ -757,7 +755,7 @@ class RegularSyncSpec
     }
 
     "on top" should {
-      "import received new block" in sync(new OnTopFixture(testSystem) {
+      "import received new block" in sync(new OnTopFixture {
         goToTop()
 
         sendNewBlock()
@@ -765,7 +763,7 @@ class RegularSyncSpec
         awaitCond(importedNewBlock)
       })
 
-      "broadcast imported block" in sync(new OnTopFixture(testSystem) {
+      "broadcast imported block" in sync(new OnTopFixture {
         networkPeerManager.setAutoPilot(new AutoPilot {
           def run(sender: ActorRef, msg: Any): AutoPilot = msg match {
             case cmd: GetHandshakedPeersCmd =>
@@ -790,7 +788,7 @@ class RegularSyncSpec
         }
       })
 
-      "fetch hashes if received NewHashes message" in sync(new OnTopFixture(testSystem) {
+      "fetch hashes if received NewHashes message" in sync(new OnTopFixture {
         goToTop()
 
         blockFetcher !
@@ -803,7 +801,7 @@ class RegularSyncSpec
     }
 
     "handling mined blocks" should {
-      "not import when importing other blocks" in sync(new Fixture(testSystem) {
+      "not import when importing other blocks" in sync(new Fixture {
         val headPromise: Promise[BlockImportResult] = Promise()
         setImportResult(testBlocks.head, IO.fromFuture(IO.pure(headPromise.future)))
         val minedBlock: Block = BlockHelpers.generateBlock(BlockHelpers.genesis)
@@ -829,7 +827,7 @@ class RegularSyncSpec
         headPromise.success(BlockImportedToTop(Nil))
       })
 
-      "import when on top" in sync(new OnTopFixture(testSystem) {
+      "import when on top" in sync(new OnTopFixture {
         goToTop()
 
         regularSync ! SyncProtocol.MinedBlock(newBlock)
@@ -837,7 +835,7 @@ class RegularSyncSpec
         awaitCond(importedNewBlock)
       })
 
-      "import when not on top and not importing other blocks" in sync(new Fixture(testSystem) {
+      "import when not on top and not importing other blocks" in sync(new Fixture {
         val minedBlock: Block = BlockHelpers.generateBlock(BlockHelpers.genesis)
         setImportResult(minedBlock, IO.pure(BlockImportedToTop(Nil)))
 
@@ -848,7 +846,7 @@ class RegularSyncSpec
         awaitCond(didTryToImportBlock(minedBlock))
       })
 
-      "broadcast after successful import" in sync(new OnTopFixture(testSystem) {
+      "broadcast after successful import" in sync(new OnTopFixture {
         goToTop()
 
         val peersCmd724 = networkPeerManager.expectMsgType[GetHandshakedPeersCmd]
@@ -869,7 +867,7 @@ class RegularSyncSpec
 
     "broadcasting blocks" should {
       "send an ETH NewBlock message to broadcast newly imported blocks" in sync(
-        new OnTopFixture(testSystem) {
+        new OnTopFixture {
           val peerWithETH63: (Peer, PeerInfo) = {
             val id = peerId(handshakedPeers.size)
             val peer = getPeer(id)
@@ -1015,14 +1013,13 @@ class RegularSyncSpec
         } yield succeed
       }
 
-      "return SyncDone when on top" in customTestCaseResourceM(actorSystemResource.map(new OnTopFixture(_))) {
-        fixture =>
-          import fixture.*
+      "return SyncDone when on top" in customTestCaseResourceM(onTopFixtureResource) { fixture =>
+        import fixture.*
 
-          for {
-            _ <- IO(goToTop())
-            status <- getSyncStatus
-          } yield assert(status === Status.SyncDone)
+        for {
+          _ <- IO(goToTop())
+          status <- getSyncStatus
+        } yield assert(status === Status.SyncDone)
       }
     }
 
