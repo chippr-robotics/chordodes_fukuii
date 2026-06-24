@@ -114,3 +114,13 @@ Note: `ServerActor` and `RLPxConnectionHandler` intentionally remain Classic TCP
 - `PeerRequestHandler` `ClassTag` unsound → `TypeTest[A,B]` — deferred
 - 35 remaining Classic actors in devp2p/rlpx (Wave 3 network migration plan complete, implementation not started)
 - §8a-retro batch 5: `PeerActorSpec` deferred — `TestActorRef` is Classic-only; migrate when PeerActor is Typed (Wave 3 network sprint)
+
+#### `8c23a294e` — §8k-G4b: RegisterChainWeightCalibrationTarget narrowed to TypedActorRef
+- **What:** `RegisterChainWeightCalibrationTarget.target` + `RegisterChainWeightCalibrationTargetCmd.target` + `chainWeightCalibrationTarget` var changed from `ActorRef` → `TypedActorRef[SyncProtocol.CalibrateChainWeightFromPeer]`. Classic-shell forwarding path preserved the typed ref through translation.
+- **Files:** `NetworkPeerManagerActor.scala`
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8k-G4`, `modernization-log/sync/controller.md`
+
+#### `8227b84dd` — §8k-G4d: GetHandshakedPeersCmd.replyTo narrowed to TypedActorRef[HandshakedPeers]
+- **What:** `GetHandshakedPeersCmd.replyTo` field changed from `TypedActorRef[Any]` → `TypedActorRef[NetworkPeerManagerActor.HandshakedPeers]`. Classic-shell variant updated to match.
+- **Files:** `NetworkPeerManagerActor.scala`
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8k-G4`, `modernization-log/sync/controller.md`

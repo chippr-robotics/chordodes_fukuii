@@ -1480,3 +1480,69 @@ wrapping is `IO[Status]` directly, not `IO[Future[Status]]`.
 **Opportunistic — SyncProtocol.Status enum candidacy:** `sealed trait Status` with `case object NotSyncing`, `case object SyncDone`, and `case class Syncing(...)`. Mixed payload/singleton ADT — not a clean enum candidate (parameterised case). Weak candidate only; deferred.
 
 **Verification:** `sbt "testOnly *RegularSyncSpec"` — **34/34 pass** (two consecutive runs, no guardian crash). `sbt compile-all` — 0 errors. `sbt scalafmtAll` — clean.
+
+---
+
+## §8k-G4 — Typed adapter narrowing + externalAdapter removal ✅ DONE 2026-06-24
+
+Six sub-tasks narrowed every remaining `externalAdapter` consumer in `SyncController` to a typed per-child
+adapter; the final task deleted `externalAdapter` itself. Together with §8k-G3 + §8k-G3-SSC, this closes
+Cluster E entirely — zero `TypedActorRef[Any]` in production sync-package code, every child on a narrow
+typed interface. Full Scala 3.3.8 + Pekko 1.6 Typed discipline in the sync layer.
+
+### §8k-G4a + §8k-G4b — FCM.setListener + NPMA RegisterChainWeightCalibrationTarget
+
+**Commit:** `8c23a294e` — "refactor(8k-G4a,4b): type FCM and NPMA calibration listeners via narrow TypedActorRef adapters"
+
+**G4a — ForkChoiceManager.setListener:**
+- `ForkChoiceManager.scala` — `listenerRef` type changed from `AtomicReference[Option[ActorRef]]` → `AtomicReference[Option[TypedActorRef[ForkChoiceManager.BeaconHead]]]`; `setListener` param changed accordingly.
+- `SyncController.scala` — `fcm.setListener(externalAdapter.toClassic)` replaced with `fcmAdapter` via `ctx.messageAdapter[ForkChoiceManager.BeaconHead](WrappedExternal.apply)`.
+
+**G4b — NPMA RegisterChainWeightCalibrationTarget:**
+- `NetworkPeerManagerActor.scala` — `RegisterChainWeightCalibrationTarget.target` + `RegisterChainWeightCalibrationTargetCmd.target` + `chainWeightCalibrationTarget` var all changed from `ActorRef` → `TypedActorRef[SyncProtocol.CalibrateChainWeightFromPeer]`. Classic-shell forwarding path updated to preserve the typed ref.
+- `SyncController.scala` — `cwAdapter` via `ctx.messageAdapter[SyncProtocol.CalibrateChainWeightFromPeer]` replaces `externalAdapter.toClassic` at the `RegisterChainWeightCalibrationTarget` call site.
+
+---
+
+### §8k-G4c — NPMA RegisterSnapSyncController relay
+
+**Commit:** `0cd0a48a9` — "fix(8k-G4c): wire SNAP response relay through SyncController during recovery"
+
+**What was found:** Investigation revealed that in the recovery state-machine, `SyncController` passes its own adapter as the `snapSyncController` to NPMA intentionally — NPMA routes incoming SNAP protocol responses (`AccountRangeResponse`, `ByteCodesResponse`, etc.) back through `SyncController`'s `WrappedExternal` dispatch during the window before a `SNAPSyncController` is spawned.
+
+**Fix:** Replaced `externalAdapter.toClassic` with a typed `snapRelayAdapter: TypedActorRef[SNAPSyncController.Command]` via `ctx.messageAdapter`. Updated NPMA's `RegisterSnapSyncController` field to accept `TypedActorRef[SNAPSyncController.Command]` directly.
+
+---
+
+### §8k-G4c-extended — CalibrateChainWeightNow vs CalibrateChainWeightNowCmd
+
+**Commit:** `b38c3197d` — "fix(8k-G4c-ext): SyncController sends CalibrateChainWeightNowCmd not Classic-shell variant"
+
+**What was found:** Surfaced by the G4b loom run. `SyncController` sent `CalibrateChainWeightNow` (Classic-shell non-Cmd variant) at two sites; NPMA's `handleMessages` only matches `CalibrateChainWeightNowCmd` (Typed Command). Both sends were silently dropped — the calibration round-trip never completed.
+
+**Fix:** Two `CalibrateChainWeightNow(...)` send sites in `SyncController.scala` replaced with `CalibrateChainWeightNowCmd(...)`.
+
+---
+
+### §8k-G4d — GetHandshakedPeersCmd replyTo narrowed
+
+**Commit:** `8227b84dd` — "refactor(sync): §8k-G4d narrow GetHandshakedPeersCmd replyTo to TypedActorRef[HandshakedPeers]"
+
+**What was done:**
+- `NetworkPeerManagerActor.scala` — `GetHandshakedPeersCmd.replyTo` changed from `TypedActorRef[Any]` → `TypedActorRef[NetworkPeerManagerActor.HandshakedPeers]`. Classic-shell variant updated to match.
+- `SyncController.scala` — `handshakedPeersAdapter` via `ctx.messageAdapter[NetworkPeerManagerActor.HandshakedPeers]` replaces `externalAdapter` at all 3 `GetHandshakedPeersCmd` call sites (healing-serve-root path line ~687; recovery `runningRecovery` line ~2049; recovery `recentRootRequester` line ~2076).
+
+---
+
+### §8k-G4e + §8k-G4-FINAL — PivotHeaderBootstrap.replyTo narrowed + externalAdapter deleted
+
+**Commit:** `c948937e5` — "refactor(8k-G4e-final+G4-FINAL): remove externalAdapter — replace recovery SNAP path + delete val"
+
+**G4e — PivotHeaderBootstrap.replyTo:**
+- `PivotHeaderBootstrap.scala` — `replyTo` parameter narrowed from `TypedActorRef[Any]` → `TypedActorRef[PivotHeaderBootstrap.PivotBootstrapReply]` (sealed trait `PivotBootstrapReply` confirmed/added covering `Completed` + `Failed`). Both constructor sites updated.
+- `SyncController.scala` — `pivotBootstrapAdapter` via `ctx.messageAdapter[PivotHeaderBootstrap.PivotBootstrapReply]` replaces `replyTo = externalAdapter` at both spawn sites (healing-serve-root line ~767; recovery-recent-root line ~2158). The `.toClassic` on the spawned ref is retained — PHB is still a Classic actor; only the reply-target is now typed.
+
+**G4-FINAL — externalAdapter deleted:**
+- `SyncController.scala` — `externalAdapter: TypedActorRef[Any]` val declaration and its associated INFO comment block deleted. `WrappedExternal` case class retained (used by all per-child adapters). All per-child adapter vals retained.
+
+**End state:** 0 `ActorRef[Any]` hits in production code under the sync package. 0 `externalAdapter` references in SyncController. Cluster E fully closed.

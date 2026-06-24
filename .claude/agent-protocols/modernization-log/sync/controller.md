@@ -97,9 +97,35 @@
 ## Open / Deferred
 
 - W4: `ctx.self ! cmd` re-delivers wrapped Command (document invariant) — deferred; add by-design comment at call site during Network/P2P sprint
-- ~~W15: `unwrap returns Any`~~ — ✅ DONE `79068ad11` §8k-G3-SSC. `externalAdapter: TypedActorRef[Any]` retained only for FCM + NPMA consumers (§8k-G4); 0 `ActorRef[Any]` hits remain in sync package production code. Full `WrappedExternal` elimination gated on Wave 3 LOOM / CAPSTONE.
+- ~~W15: `unwrap returns Any`~~ — ✅ FULLY DONE `c948937e5` §8k-G4-FINAL. `externalAdapter: TypedActorRef[Any]` deleted from `SyncController`. All consumers (FCM, NPMA, PHB, SSC) use narrow typed adapters. 0 `ActorRef[Any]` in production sync-package code. `WrappedExternal` elimination gated on Wave 3 LOOM / CAPSTONE.
 - ~~INFO-9: `GetHandshakedPeersCmd.replyTo: ActorRef` untyped~~ — ✅ DONE `c42316b39` §8k-E
 - ~~§P9-NOTCHANGE: SyncControllerSpec:243~~ — ✅ DONE 2026-06-23 (`37037a89b` + `5a12c7f09`) — see `sync/fast.md`
 - ~~`handleRegularSyncMsg:895-897` catch-all `FastSync.Done` bug~~ — ✅ DONE 2026-06-23 (`ab98f1370`)
 - §8a-retro batch 5: `SyncControllerSpec`, `CalibratePivotTDSpec`, `ChainWeightCalibrationSpec` — deferred comments added; gate on SyncController actor migration (Wave 3)
 - ~~§P9-FRESHPIVOT: SyncControllerSpec:393~~ — ✅ DONE 2026-06-23 (`083f08836`) — two concurrent races: (1) `CombinedRecoveryScanActor` completes early on ForkJoinPool → `clearFastSyncState()` → `getSyncState()=None`; (2) recovery path sets `stateDownloadStarted=true` pre-storage-update → wrong pivot in a synchronous check outside `eventually`. Fix: kept `eventually` unified; replaced `.get` with `.map(_.pivotBlock).getOrElse(defaultPivotBlockHeader)` — safe for all three terminal states. 88/88 × 3 consecutive full-suite runs.
+
+#### `8c23a294e` — §8k-G4a+G4b: FCM.setListener + NPMA CalibrateChainWeight narrowed to TypedActorRef
+- **What:** G4a — `ForkChoiceManager.setListener` now accepts `TypedActorRef[ForkChoiceManager.BeaconHead]`; `SyncController` replaces `fcm.setListener(externalAdapter.toClassic)` with a typed `fcmAdapter`. G4b — `SyncController` replaces `externalAdapter.toClassic` at the `RegisterChainWeightCalibrationTarget` call site with a typed `cwAdapter: TypedActorRef[SyncProtocol.CalibrateChainWeightFromPeer]`.
+- **Files:** `ForkChoiceManager.scala`, `NetworkPeerManagerActor.scala`, `SyncController.scala`
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8k-G4`
+
+#### `0cd0a48a9` — §8k-G4c: SNAP response relay through SyncController during recovery typed
+- **What:** `SyncController` passes a typed `snapRelayAdapter: TypedActorRef[SNAPSyncController.Command]` to `NPMA.RegisterSnapSyncController` (recovery path). NPMA field narrowed accordingly. `externalAdapter.toClassic` removed at that site.
+- **Files:** `NetworkPeerManagerActor.scala`, `SyncController.scala`
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8k-G4`
+
+#### `b38c3197d` — §8k-G4c-ext: SyncController sends CalibrateChainWeightNowCmd (not Classic-shell)
+- **What:** Two `CalibrateChainWeightNow(...)` sends in `SyncController` replaced with `CalibrateChainWeightNowCmd(...)`. Previous sends were silently dropped by NPMA's Typed dispatcher.
+- **Files:** `SyncController.scala`
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8k-G4`
+
+#### `8227b84dd` — §8k-G4d: GetHandshakedPeersCmd.replyTo narrowed to TypedActorRef[HandshakedPeers]
+- **What:** `SyncController` replaces `externalAdapter` with `handshakedPeersAdapter: TypedActorRef[HandshakedPeers]` at all 3 `GetHandshakedPeersCmd` call sites (healing-serve-root, recovery runningRecovery, recovery recentRootRequester).
+- **Files:** `NetworkPeerManagerActor.scala`, `SyncController.scala`
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8k-G4`
+
+#### `c948937e5` — §8k-G4e+FINAL: PivotHeaderBootstrap.replyTo narrowed + externalAdapter deleted
+- **What:** G4e — `PivotHeaderBootstrap.replyTo` narrowed from `TypedActorRef[Any]` → `TypedActorRef[PivotBootstrapReply]`; `pivotBootstrapAdapter` replaces `externalAdapter` at both PHB spawn sites in `SyncController`. G4-FINAL — `externalAdapter: TypedActorRef[Any]` val and its INFO comment deleted from `SyncController`. `WrappedExternal` and all per-child adapters retained.
+- **Files:** `PivotHeaderBootstrap.scala`, `SyncController.scala`
+- **End state:** 0 `ActorRef[Any]` in production sync-package code. Cluster E fully closed. §8k-G cluster done.
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8k-G4`
