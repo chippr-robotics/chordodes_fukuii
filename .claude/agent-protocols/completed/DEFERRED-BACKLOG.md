@@ -1437,11 +1437,26 @@ wrapping is `IO[Status]` directly, not `IO[Future[Status]]`.
 | `PivotHeaderBootstrap` | `TypedActorRef[PivotHeaderBootstrap.Reply]` | Added `sealed trait Reply`; `Completed` + `Failed` extend it |
 | `FastSync` | `TypedActorRef[fast.FastSync.SyncControllerMsg]` | Added `sealed trait SyncControllerMsg`; `FallbackToSnapSync` + `Done` extend it |
 | `ChainDownloader` | `TypedActorRef[snap.ChainDownloader.Done.type]` | — |
-| `SNAPSyncController` | **deferred → §8k-G3-SSC** | Sends 7 types across 2 files; needs unsealed marker trait in SyncProtocol.scala |
+| `SNAPSyncController` | `TypedActorRef[SyncProtocol.SyncControllerReply]` | Unsealed marker trait (cross-file hierarchy); `SyncProtocol.HealingImpossible` and 6 SSC companion types all extend it. Completed in §8k-G3-SSC. |
 
 **Files modified:** `SyncController.scala`, `BytecodeRecoveryActor.scala`, `StorageRecoveryActor.scala`, `CombinedRecoveryScanActor.scala`, `PivotHeaderBootstrap.scala`, `FastSync.scala`, `ChainDownloader.scala`
 
-**Remaining:** `§8k-G3-SSC` — SNAPSyncController still has `TypedActorRef[Any]` constructor param; `externalAdapter` in SyncController retained as its sole remaining consumer until §8k-G3-SSC completes. See working-docs `§8k-G3-SSC` section.
+---
+
+## §8k-G3-SSC — SNAPSyncController syncController param typed via SyncControllerReply ✅ DONE 2026-06-24
+
+**Commit:** `79068ad11`
+**Agent:** MITHRIL
+**Risk:** LOW — marker trait + `extends` clauses only; SyncController.unwrap() dispatch unchanged
+
+**Why deferred from §8k-G3:** SSC sends 7 types to syncController; one (`SyncProtocol.HealingImpossible`) is defined in a different package's companion. A `sealed trait` in SSC.scala cannot be extended from SyncProtocol.scala (sealed = same file in Scala 3), requiring an unsealed marker trait instead.
+
+**What was done:**
+- `SyncProtocol.scala` — added `trait SyncControllerReply` (unsealed); `HealingImpossible` now `extends SyncProtocolMsg with SyncControllerReply`
+- `SNAPSyncController.scala` — 6 companion types (`Done`, `StartRegularSyncBootstrap`, `StartRegularSyncBootstrapByHash`, `FallbackToFastSync`, `SnapSyncFinalized`, `RequestHealingServeRoot`) all extend `SyncProtocol.SyncControllerReply`; both constructor sites (`apply` factory + `Impl` class) changed from `TypedActorRef[Any]` → `TypedActorRef[SyncProtocol.SyncControllerReply]`
+- `SyncController.scala` — added `snapAdapter: TypedActorRef[SyncProtocol.SyncControllerReply]` via `ctx.messageAdapter`; SSC spawn site uses it instead of `externalAdapter`. `externalAdapter` retained — 8 other consumers remain (FCM, NPMA paths, healing replyTo paths); removal gated on §8k-G4.
+
+**End state:** 0 `ActorRef[Any]` hits in production code under the sync package. All remaining hits are in comments.
 
 ---
 

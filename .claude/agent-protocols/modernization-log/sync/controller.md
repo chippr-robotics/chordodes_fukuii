@@ -86,12 +86,18 @@
 - **Files:** `SyncController.scala`, `BytecodeRecoveryActor.scala`, `StorageRecoveryActor.scala`, `CombinedRecoveryScanActor.scala`, `PivotHeaderBootstrap.scala`, `FastSync.scala`, `ChainDownloader.scala`
 - **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8k-G3`
 
+#### `79068ad11` — §8k-G3-SSC: type SNAPSyncController.syncController via SyncControllerReply marker trait
+- **What:** The one SSC child deferred from §8k-G3. Added `trait SyncControllerReply` (unsealed) to `SyncProtocol.scala`; `HealingImpossible` now extends both `SyncProtocolMsg` and `SyncControllerReply`. Six SSC companion types (`Done`, `StartRegularSyncBootstrap`, `StartRegularSyncBootstrapByHash`, `FallbackToFastSync`, `SnapSyncFinalized`, `RequestHealingServeRoot`) all extend `SyncProtocol.SyncControllerReply`. Both SSC constructor sites changed from `TypedActorRef[Any]` → `TypedActorRef[SyncProtocol.SyncControllerReply]`. `SyncController` adds `snapAdapter` via `ctx.messageAdapter[SyncProtocol.SyncControllerReply]`. `externalAdapter` retained — 8 remaining consumers (FCM, NPMA paths) gated on §8k-G4.
+- **Files:** `SyncProtocol.scala`, `SNAPSyncController.scala`, `SyncController.scala`
+- **End state:** 0 `ActorRef[Any]` hits in production code under the sync package.
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8k-G3-SSC`, `modernization-log/sync/snap.md`
+
 ---
 
 ## Open / Deferred
 
 - W4: `ctx.self ! cmd` re-delivers wrapped Command (document invariant) — deferred; add by-design comment at call site during Network/P2P sprint
-- W15: `unwrap returns Any` — Wave 3 LOOM gate (`WrappedExternal` elimination; partially reduced by §8k-G + §8k-G3 but not fully eliminated; `externalAdapter: TypedActorRef[Any]` retained for SNAPSyncController pending §8k-G3-SSC)
+- ~~W15: `unwrap returns Any`~~ — ✅ DONE `79068ad11` §8k-G3-SSC. `externalAdapter: TypedActorRef[Any]` retained only for FCM + NPMA consumers (§8k-G4); 0 `ActorRef[Any]` hits remain in sync package production code. Full `WrappedExternal` elimination gated on Wave 3 LOOM / CAPSTONE.
 - ~~INFO-9: `GetHandshakedPeersCmd.replyTo: ActorRef` untyped~~ — ✅ DONE `c42316b39` §8k-E
 - ~~§P9-NOTCHANGE: SyncControllerSpec:243~~ — ✅ DONE 2026-06-23 (`37037a89b` + `5a12c7f09`) — see `sync/fast.md`
 - ~~`handleRegularSyncMsg:895-897` catch-all `FastSync.Done` bug~~ — ✅ DONE 2026-06-23 (`ab98f1370`)

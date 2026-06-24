@@ -80,6 +80,15 @@
 
 ---
 
+## Per-Child Typed Adapter — §8k-G3-SSC (2026-06-24)
+
+#### `79068ad11` — §8k-G3-SSC: type SNAPSyncController.syncController via SyncControllerReply marker trait
+- **What:** SSC's `syncController` constructor param typed from `TypedActorRef[Any]` → `TypedActorRef[SyncProtocol.SyncControllerReply]`. Added `trait SyncControllerReply` (unsealed — needed cross-file) to `SyncProtocol.scala`; `HealingImpossible` now extends it. Six SSC companion types extend `SyncProtocol.SyncControllerReply`. Both constructor sites (apply factory + Impl class) updated.
+- **Files:** `SNAPSyncController.scala`, `SyncProtocol.scala`, `SyncController.scala`
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8k-G3-SSC`, `modernization-log/sync/controller.md §8k-G3-SSC`
+
+---
+
 ## Open / Deferred
 
 - INFO-8: `refreshFreshRootCache` function no longer exists in SNAPSyncController (searched 2026-06-22, 0 results). `getBlockHeaderByNumber` has 7 scattered call sites, none in a tight loop. No run-logs available. Marking MONITORED — no action needed.
