@@ -737,6 +737,61 @@ housekeeping task during test waits for specific domain files.
 
 ---
 
+### 8c — Memory/Resource Leak Audit
+
+**Context:** VAULT-gate audit of resource lifecycle in `db/`, `node/`, and `core/utils/`. H-series = heap/iterator leaks; M-series = DataSource cache invalidation.
+
+**Work done:**
+- ~~**H2/H3** — `StdNode` teardown missing `.waitForShutdown()`; `FileUtils` unclosed streams~~ ✅ DONE `4907406fe`
+- ~~**H4+M1** — RocksDB iterator `close()` in `finally`; bloom filter option leak plugged~~ ✅ DONE `ef75a5608`
+
+**Remaining open:**
+
+#### M4 — DataSource close cache invalidation (VAULT gate)
+
+**Problem:** When a `RocksDbDataSource` is closed (e.g., test teardown, node shutdown), any in-memory `LRU` caches layered over it retain stale references. A subsequent re-open (or test DataSource reconstruction) may read from an invalidated cache entry, producing incorrect data without error.
+
+**Gate:** VAULT review — confirm whether `DataSource.close()` flushes or invalidates overlay caches. If the close protocol is correct, mark M4 as by-design.
+
+**Scope:** `db/` — `RocksDbDataSource.scala`, `EphemDataSource.scala`, any `caching/` layer.
+
+**Agent:** VAULT
+**Priority:** LOW — only visible in test isolation or restart scenarios; runtime nodes do not re-open DBs.
+
+---
+
+### 8d — IO Threading Model Follow-Up (R9 audit items)
+
+**Context:** R9 research (`threading-model-audit.md`, DONE 2026-06-18) found 3 IO/threading issues. Two are cleared; A1 remains open.
+
+**Status summary:**
+- ~~**B2** — `PoWMiningCoordinator.scala:133` EC.global escape~~ ✅ CLEARED 2026-06-23 (FORGE F1 Item C) — confirmed SAFE AS-IS; `context.executionContext` already supplied; `MineNext` sequenced through actor mailbox. No change.
+- ~~**B1** — `EC.global` in `SyncController.scala:15`~~ ✅ CLEARED 2026-06-22 `a5132aa80` (C2) — `import scala.concurrent.ExecutionContext.Implicits.global` removed; `given ec` wired from `ctx.executionContext`.
+- **A1** — `EngineApiService.scala`: `Await.result` on CE3 compute thread — **OPEN, BEACON gate**
+- **Additional jsonrpc sites** — `api/jsonrpc.md` notes remaining IO boundary sites beyond A1 — **OPEN, CONDUIT review**
+
+#### A1 — EngineApiService `Await.result` on CE3 compute thread (BEACON gate)
+
+**Problem:** `EngineApiService` uses `Await.result(future, timeout)` on the Cats Effect 3 compute thread pool. Blocking a CE3 fiber thread starves the entire compute pool — any concurrent EC3 fiber that needs that thread will hang until `Await` returns.
+
+**Gate:** BEACON — confirm the call site and safe fix approach (defer to IO boundary, use `IO.fromFuture`, or confirm the call never executes on the CE3 pool).
+
+**Spec:** `.local/docs/threading-model-audit.md` — A1 entry.
+
+**Agent:** BEACON
+**Priority:** MEDIUM — latency/liveness issue under concurrent engine API load; not data-correctness.
+
+#### Additional jsonrpc IO boundary sites
+
+**Problem:** `api/jsonrpc.md` open section notes "additional IO boundary sites" beyond A1 that were observed during the R9 research pass but not catalogued in `threading-model-audit.md`.
+
+**Clearing prompt:** CONDUIT audit of `jsonrpc/` for any remaining `scala.concurrent.blocking`, `Await`, or `EC.global` usage not covered by B1/B2/A1. Output a short table of sites + severity.
+
+**Agent:** CONDUIT
+**Priority:** LOW — likely few/none after B1/B2 cleared; run as a 15-minute scan before closing §8d.
+
+---
+
 ### 8e — ScalaFix Ruleset Expansion + `noReturns` Ratchet Lock
 
 **Work done (2026-06-18):**
@@ -943,7 +998,7 @@ slower than dev machine → timeouts). `@Ignore` annotations silently hide untes
 | A — `messageAdapter.toClassic` (PeerEventBus subscriptions) | ~26 | `PeerEventBusActor.SubscribeCmd(subscriber: ActorRef)` | Pre-CAPSTONE | §8k-D ✅ DONE 93bcedb12 |
 | B — `handshakedPeersAdapter.toClassic` | ~15 | `NPMA.GetHandshakedPeersCmd(replyTo: ActorRef)` | Pre-CAPSTONE | §8k-E ✅ DONE c42316b39 |
 | C — `ctx.toClassic.sender()` in SyncController/FastSync | ~27 | OQ-5 Classic ask path from jsonrpc callers | Pre-CAPSTONE | §8k-G |
-| D — `ctx.toClassic.actorOf(RegularSync)` | 2 | RegularSync has no `Behavior[Command]` | Pre-CAPSTONE | §8k-F |
+| D — `ctx.toClassic.actorOf(RegularSync)` | 2 | RegularSync has no `Behavior[Command]` | Pre-CAPSTONE | §8k-F ✅ DONE b24515637 |
 | E — `externalAdapter.toClassic` in SyncController | ~29 | OQ-5 Classic ask path (same root as C) | Pre-CAPSTONE | §8k-G |
 | F — `ctx.self.toClassic` coordinator→worker + SSC→coordinator | ~15 | Worker `coordinator: ActorRef` params untyped | **NOW** (MITHRIL) | §8k-A + §8k-C |
 | G — `context.toClassic.parent` in PeerActor | 7 | PeerActor notifies PeerManager via Classic parent | Pre-CAPSTONE | §8k-H |
@@ -953,7 +1008,7 @@ slower than dev machine → timeouts). `@Ignore` annotations silently hide untes
 | K — `peerEventBus.toClassic` + spawn `.toClassic` in NodeBuilder | 3 | SyncController/NPMA returned as Classic refs to callers | Pre-CAPSTONE | §8k-G/§8k-I |
 | L — `AkkaTaskOps.askFor` (jsonrpc, ~18 call sites) | ~18 | Commands carry `replyTo: ActorRef` not `ActorRef[T]` | Pre-CAPSTONE | §8k-G |
 | M — `peerEventBus.toClassic` watchWith in PEBA itself | 1 | PEBA internal Classic watch | Pre-CAPSTONE | §8k-D ✅ DONE 93bcedb12 |
-| N — `ctx.self.toClassic` / `fetcherReplyTo.toClassic` in BlockImporter | 4 | RegularSync spawned Classic → BlockImporter props take Classic refs | Pre-CAPSTONE | §8k-F |
+| N — `ctx.self.toClassic` / `fetcherReplyTo.toClassic` in BlockImporter | 4 | RegularSync spawned Classic → BlockImporter props take Classic refs | Pre-CAPSTONE | §8k-F ✅ DONE b24515637 |
 
 **Principle**: Each `.toClassic` call is a symptom, not the disease. The disease is an unconverted classic actor upstream. The fix strategy is: **migrate the upstream actor first (LOOM), then delete the bridge**. Bridges must never be removed before the upstream is converted — that produces a type error at the call site that blocks compilation.
 
@@ -1050,68 +1105,6 @@ Step 5 — Output the full audit to `.local/docs/classic-interop-audit.md`.
 
 ---
 
-
-#### §8k-F — LOOM: RegularSync full Typed migration
-
-**Agent:** LOOM (one actor per session, follow pre-migration-checklist.md)
-**Risk:** HIGH — RegularSync is a Classic actor with `Props`, `sender()`, `context.parent`, and timers.
-         Full LOOM migration protocol mandatory.
-**Gate:** §8k-E complete. HERALD pre-flight on BlockImporter props callers.
-**Bridge sites eliminated:** ~15 (Cluster D: 2 × `ctx.toClassic.actorOf(RegularSync)` in SyncController;
-         Cluster C: `ctx.toClassic.parent` at RegularSync:236; Clusters N: BlockImporter `.toClassic` sites)
-
-**Background:**
-`RegularSync` is the last major Classic actor in the sync subsystem. It is spawned via
-`ctx.toClassic.actorOf(RegularSync.props(...))` by SyncController (2 sites), sends to its Classic
-parent (`ctx.toClassic.parent ! WrappedSyncProtocol(...)` at RegularSync:236), and passes its own
-`ctx.self.toClassic` / `broadcaster.toClassic` into `BlockImporter.Props` (Clusters N).
-
-**LOOM pre-flight (mandatory — run before any edit):**
-```bash
-cd /media/dev/2tb/dev/fukuii/src/main/scala/com/chipprbots/ethereum/blockchain/sync/regular/
-
-# sender() usages
-grep -n "sender()\|context\.sender()" RegularSync.scala
-
-# context.parent
-grep -n "context\.parent\|context\.toClassic\.parent" RegularSync.scala
-
-# timers
-grep -n "context\.system\.scheduler\|timers\." RegularSync.scala
-
-# worker/child spawns
-grep -n "context\.actorOf\|context\.toClassic\.actorOf\|ctx\.spawn" RegularSync.scala
-```
-
-**Migration outline (LOOM fills in details):**
-1. Create `RegularSync.Command` sealed trait (reuse existing `RegularSyncCommand` if already defined).
-2. Convert `class RegularSync extends Actor { def receive = ... }` → `Behaviors.receive[RegularSyncCommand]`.
-3. Replace `context.parent ! WrappedSyncProtocol(msg)` with typed parent ref injected at spawn via
-   `SyncController` passing `ctx.self.narrow[WrappedSyncProtocol]`.
-4. Replace `sender()` capture in ask handlers with `replyTo: ActorRef[T]` in commands.
-5. In `SyncController`: change `ctx.toClassic.actorOf(RegularSync.props(...))` → `ctx.spawn(RegularSync.behavior(...))`.
-6. In `BlockImporter.Props`: remove `supervisor: ActorRef` (Classic) → `supervisor: ActorRef[RegularSync.ProgressProtocol]`.
-   Remove `broadcaster.toClassic` (Cluster N).
-7. `sbt compile-all` after each phase.
-
-**Verify:**
-```bash
-grep -rn "RegularSync\.props\|ctx\.toClassic\.actorOf.*RegularSync\|context\.toClassic\.parent" \
-  src/main/ --include="*.scala"
-# Expected: 0
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. Stage RegularSync + BlockImporter + SyncController (2 spawn sites)
-3. `git commit -m "refactor(8k-F): RegularSync Classic→Typed migration — remove ctx.toClassic.actorOf + parent bridge (Clusters C/D/N)"`
-4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(8k-F): clearout — $SHA"`
-5. **DELETE §8k-F**
-
-**Rejection criteria:** Any change to consensus, mining, or domain code. Block validation logic must not move.
-
----
 
 #### §8k-G — CONDUIT + MITHRIL: OQ-5 kill — migrate jsonrpc callers to Typed ask
 
@@ -1409,7 +1402,7 @@ Each prompt can run independently. Commit individually.
 | ~~E5b~~ | ~~Batch E~~ | ~~§8a-infra — create `application-test.conf` (bare ctor fix + `throughput=1`)~~ | ✅ DONE 2026-06-23 — `8b9bef67d` |
 | ~~E5c~~ | ~~Batch E~~ | ~~§8a-infra-b — audit + fix worker teardown leaks in coordinator/heal specs~~ | ✅ DONE 2026-06-23 — `781c8e985` — no leaks; workers are Typed `spawnAnonymous` children, stopped by hierarchy; 150/150 ×2 |
 | ~~E5d~~ | ~~Batch E~~ | ~~§8a-retro batch 4b — E165 TestProbe narrowing in coordinator/heal specs (~209 sites)~~ | ✅ DONE 2026-06-23 — `a193bc794` (14 specs, 141 tests, floor 92→65) |
-| E5e | Batch E | §8a-infra-c — MITHRIL: replace classic `actorSelection` worker-ref pattern with Typed injection in ByteCodeCoordinatorSpec + AccountRangeCoordinatorSpec | No — cosmetic; run after E5d |
+| ~~E5e~~ | ~~Batch E~~ | ~~§8a-infra-c — MITHRIL: replace classic `actorSelection` worker-ref pattern with Typed injection in ByteCodeCoordinatorSpec + AccountRangeCoordinatorSpec~~ | ✅ DONE 2026-06-23 — `5f28e8ae6` — 40/40 (21 ByteCodeCoordinatorSpec + 19 AccountRangeCoordinatorSpec); see node/testing-infra.md |
 | E6 | Batch E | §8a-retro batch 5 — multi-system + TestActorRef specs (3 assessable, 2 Wave 3 gate) | Partial — BlockFetcherSpec + PendingTxMgr + RegularSyncSpec assessable now; PeerActor + RLPx wait for Wave 3 |
 | ~~F1~~ | ~~Batch F~~ | ~~§3i MITHRIL+FORGE — BlockExecutionError hierarchy redesign: union type + `describe`~~ | ✅ DONE 2026-06-23 — `64ab4786e` |
 
@@ -1419,65 +1412,7 @@ Each prompt can run independently. Commit individually.
 
 ## Part 10: Test Suite Performance
 
-### P7 — EYE/MITHRIL: Test timing audit + slow-test reduction
-
-**Agent:** EYE (timing profiler), MITHRIL (Thread.sleep replacement)
-**Prerequisite:** testEssential gate passed. Run AFTER Batch D (G1/G2) so that any new test files
-from the Behavior[Any] narrowing sprint are included in the timing baseline.
-
-**Context:** testEssential baseline was ~24:22 (3,601 tests). Batch C cleanup (dead code deletion,
-E165 expectMsgType narrowing, enum conversions) may have affected this. After Batch D the suite will
-grow slightly (narrowing adds typed actor specs). This prompt captures the new baseline and identifies
-actionable slow tests.
-
-**Steps:**
-
-1. **Capture new baseline:**
-   ```bash
-   cd /media/dev/2tb/dev/fukuii
-   time .local/scripts/fukuii-test 2>&1 | tee /tmp/fukuii-test-timing.log
-   ```
-   Record total wall time from `time` output.
-
-2. **Identify slow tests (>2s per test):**
-   ```bash
-   grep -E "\([0-9]+ seconds" /tmp/fukuii-test-timing.log | sort -t'(' -k2 -rn | head -20
-   ```
-   List the top 20 slowest individual tests.
-
-3. **Assess Thread.sleep sites (2 known):**
-   - `EthMiningServiceSpec.scala:302` — timeout window advance; check if `TestScheduler` can replace
-   - `SubscriptionManagerSpec.scala:249` — topic propagation wait 200ms; check if `awaitAssert` with short poll replaces it
-   For each: if replaceable with `TestScheduler` or `eventually(timeout(500.ms), interval(10.ms))`,
-   fix inline. If requires Typed TestKit migration → defer to §8a.
-
-4. **Assess wall-clock assertions (3 known + 1 borderline):**
-   - `WorkNotifierSpec` L103–108 (`elapsed should be < 500L`) — can the upper bound be raised to reduce flakiness?
-   - `MerkleProofVerifierPhase3Spec` L584–603 — already has generous bounds; record observed times
-   - `TrieNodeHealingCoordinatorSpec` L316–327 (`elapsedMs should be < 5000L`) — record observed time
-   - `SnapServerLimitsSpec` L89–90 — borderline; record whether it flaps
-   If any bound is routinely met with <50% margin, either raise the bound or replace with a
-   non-time-based assertion.
-
-5. **Check for accidentally slow test infrastructure:**
-   ```bash
-   grep -rn "Thread\.sleep\|Await\.result\|blocking {" src/test/ --include="*.scala"
-   ```
-   Any new sites not in the known list → log to CHASE-QUEUE.
-
-**Verification:** New baseline ≤ prior baseline (23 min target). All 3,601+ tests pass.
-
-**MANDATORY final step — complete IN THIS ORDER:**
-1. `sbt scalafmtAll` — if any test files were modified
-2. `git add <specific test files changed>` — stage only modified files; skip if no source changes
-3. `git commit -m "test(timing): P7 — replace wall-clock assertions, N fixes"` — omit if no source changes
-4. `SHA=$(git rev-parse --short HEAD)` — capture SHA (or note "no source commit" if step 3 skipped)
-5. Update run-order table: strikethrough D3 → `| ~~D3~~ | ~~Batch D~~ | ~~P7 EYE test timing audit~~ | ✅ DONE [date] — Xs baseline, N improvements, $SHA |`
-6. Update `test-quality-log.md` with new baseline
-7. Any Thread.sleep fixes → `completed/SPRINT-QUEUE.md` row with `$SHA`
-8. `git add .claude/` → `git commit -m "docs(p7): clearout — $SHA"`
-
-**Rejection criteria:** Weakening test assertions beyond 2× measured time; skipping tests to reduce count; modifying test logic (only timing assertions and sleep replacement are in scope)
+### P7 — EYE/MITHRIL: Test timing audit + slow-test reduction — DONE — see completed/DEFERRED-BACKLOG.md
 
 ---
 
@@ -1554,260 +1489,19 @@ written reason. P7 covered only `testEssential`; this part closes the gap.
 
 ---
 
-### P8 — EYE: SyncTest tag audit — rescue mis-tagged unit tests
-
-**Agent:** EYE (read, grep, verdict per test)
-**Prerequisite:** None. Read-only — no code changes, only assessment and a verdict file.
-
-**Context:** `SyncTest` is excluded from ALL tiers in `build.sbt:85`. The tag description says
-"Tests for blockchain synchronisation." However, grep reveals ~50 tests across 8 files using this
-tag, many of which look like pure unit tests (exponential backoff math, cache data structures, peer
-selection logic) that don't require live sync or any actor timing. They were probably tagged
-`SyncTest` because they live in sync-related packages, not because they actually need the exclusion.
-
-Rescuing mis-labelled tests to `UnitTest` would immediately add them to `testEssential`.
-
-**Files to audit:**
-- `RetryStrategySpec.scala` — 12 tests: exponential backoff, delay caps, jitter, fluent config. Likely all pure unit.
-- `PeersClientSpec.scala` — 5 tests: peer selection data structures (BestPeer, filter by block number).
-- `CacheBasedBlacklistSpec.scala` — 5 tests: blacklist cache add/expire/remove/keys.
-- `BlockchainHostActorSpec.scala` — 8 tests: actor serves block data using TestProbe. Actor-based but hermetic.
-- `StateStorageActorSpec.scala` — 1 test: actor persists fast sync state.
-- `StateSyncSpec.scala` — 2 tests: state sync to tries.
-- `FastSyncSpec.scala` — 3 tests tagged `(UnitTest, SyncTest, FlakyTest)` + 1 tagged same. (FlakyTest root cause is P10.)
-- `SyncControllerSpec.scala` — `FlakyTest` ones are P10. Remaining SyncTest-only tests assessed here.
-
-**Steps:**
-1. For each file above, read the test bodies. For each test, answer:
-   - Does it require a live network connection or real peer handshake? → Keep `SyncTest`
-   - Does it use real clock / wall-time sensitivity? → Keep `SyncTest` or add `FlakyTest`
-   - Is it a pure function / data-structure test with TestProbe? → Candidate for `UnitTest` rescue
-   - Is it tagged `SyncTest` AND `FlakyTest`? → Skip (P10 handles FlakyTest cases)
-
-2. Produce a verdict table:
-   ```
-   | File | Test description | Current tags | Verdict | Reason |
-   ```
-   With verdicts: `RESCUE→UnitTest` / `KEEP SyncTest` / `REASSIGN→IntegrationTest` / `DEFER (P10)`.
-
-3. For each `RESCUE` verdict: remove `SyncTest`, add `UnitTest` if not already present.
-   - `SyncTest` appears in two patterns: `taggedAs (UnitTest, SyncTest)` and `taggedAs (UnitTest, SyncTest, FlakyTest)`
-   - Only edit the `UnitTest, SyncTest` (no FlakyTest) ones in this prompt
-   - Compile after each file: `sbt compile-all`
-
-4. Run `testEssential` after all rescues to confirm the rescued tests pass in Tier 1.
-
-**Verification:** `sbt compile-all` clean. Rescued tests appear in `testEssential` output and pass.
-`testEssential` count increases by the number of rescued tests.
-
-**MANDATORY final step — complete IN THIS ORDER:**
-1. `sbt scalafmtAll`
-2. `git add <specific test files modified>` — stage only the rescued/fixed test files
-3. `git commit -m "test(p8): SyncTest audit — rescue N tests, delete M"`
-4. `SHA=$(git rev-parse --short HEAD)` — capture exact SHA
-5. Update run-order table in `CODEBASE-AUDIT.md`: strikethrough E1 → `| ~~E1~~ | ... | ✅ DONE [date] — N rescued, $SHA |`
-6. Update `test-quality-log.md` with new testEssential count
-7. Add CHASE-QUEUE entry: remaining SyncTest count and path to `-l SyncTest` removal (P8+P10 prerequisite)
-8. `git add .claude/` → `git commit -m "docs(p8): clearout — $SHA"`
-
-**Rejection criteria:** Rescuing any test that uses `Thread.sleep`, real wall-clock assertions, or
-live network/peer connections. Rescue only hermetic tests.
+### P8 — EYE: SyncTest tag audit — rescue mis-tagged unit tests — DONE — see completed/DEFERRED-BACKLOG.md
 
 ---
 
-### P9 — EYE/MITHRIL: DisabledTest audit — fix, wire, or delete
-
-**Agent:** EYE (assess each test), MITHRIL (implement fixes where needed)
-**Prerequisite:** None. Can run parallel to P8.
-
-**Context:** 9 tests across 5 files are tagged `DisabledTest`, which ADR-017 defines as
-"temporarily disabled due to known issues — should be re-enabled." These are not dead code —
-they are tests with a stated intent. But "temporarily" may have become permanent. Each needs
-a verdict: Fix & enable / Delete (the test is wrong or the feature is gone) / Defer with
-written reason and a GitHub issue link.
-
-**Inventory (9 tests, 5 files):**
-
-| File | Line | Test description |
-|------|------|-----------------|
-| `RegularSyncSpec.scala` | 522 | "retry fetching node if validation failed" |
-| `RegularSyncSpec.scala` | 550 | "save fetched node" |
-| `SyncControllerSpec.scala` | 243 | "not change best block after receiving faraway block" |
-| `SyncControllerSpec.scala` | 434 | "re-enqueue block bodies when empty response is received" |
-| `JsonRpcControllerSpec.scala` | 76 | (read to determine description) |
-| `JsonRpcControllerSpec.scala` | 127 | (read to determine description) |
-| `JsonRpcControllerEthSpec.scala` | 559 | (read to determine description) |
-| `JsonRpcControllerEthSpec.scala` | 852 | (read to determine description) |
-| `EthTxServiceSpec.scala` | 372 | (read to determine description) |
-
-**Steps for each test:**
-1. Read the test body (±20 lines around the listed line).
-2. Run `git log -p --follow -S "DisabledTest" -- <file>` to find when/why it was disabled.
-3. Attempt to compile and run the test alone: `sbt "testOnly *SpecName* -- -n DisabledTest"` — does it pass?
-4. Verdict:
-   - **FIX**: If the test fails with a specific error → fix the underlying issue, remove `DisabledTest`, add appropriate tier tag.
-   - **DELETE**: If the feature under test was removed, renamed, or the test was clearly wrong → delete the test and note why.
-   - **DEFER**: If fixing requires significant new implementation or blocked on an external gate → document the block, create a CHASE-QUEUE entry, leave `DisabledTest` tag but add a comment with the reason.
-
-5. Commit fixed tests individually. Format: "test: re-enable <TestName> — <one-line fix>"
-
-**Verification:** After each fix, `sbt compile-all` + `sbt "testOnly *SpecName*"` passes.
-
-**MANDATORY final step — complete IN THIS ORDER:**
-1. `sbt scalafmtAll`
-2. `git add <specific test files modified>` — stage only the fixed/deleted test files
-3. `git commit -m "test(p9): DisabledTest audit — fix N, delete M, defer K"` — one commit per test or per file is also fine (see step 5 in the prompt above)
-4. `SHA=$(git rev-parse --short HEAD)` — capture the final commit SHA (or comma-separate multiple SHAs if committed individually)
-5. Update run-order table in `CODEBASE-AUDIT.md`: strikethrough E2 → `| ~~E2~~ | ... | ✅ DONE [date] — N fixed, M deleted, $SHA |`
-6. Add any DEFERred items to CHASE-QUEUE with `[DisabledTest]` prefix
-7. `git add .claude/` → `git commit -m "docs(p9): clearout — $SHA"`
-
-**Rejection criteria:** Re-enabling a test without understanding why it was disabled. Never remove
-`DisabledTest` without verifying the test actually passes.
+### P9 — EYE/MITHRIL: DisabledTest audit — fix, wire, or delete — DONE — see completed/DEFERRED-BACKLOG.md
 
 ---
 
-### P10 — EYE/MITHRIL: FlakyTest root cause audit — fix or delete
-
-**Agent:** EYE (diagnose root cause), MITHRIL (fix with deterministic patterns)
-**Prerequisite:** P8 complete (so SyncTest+FlakyTest overlap is clear).
-
-**Context:** 8 tests across 3 files are tagged `FlakyTest`. ADR-017 says "investigate and fix but
-temporarily marked to avoid blocking CI." These are the tests most likely to contain real bugs —
-race conditions, wall-clock sensitivity, or non-deterministic actor interactions. None of them run
-in any tier. Fixing them is high-value: these cover sync state, PoW mining, and peer management.
-
-**Inventory (8 tests, 3 files):**
-
-| File | Line | Test description | Also tagged |
-|------|------|-----------------|-------------|
-| `FastSyncSpec.scala` | ~244 | (read to determine) | UnitTest, SyncTest |
-| `FastSyncSpec.scala` | ~287 | (read to determine) | UnitTest, SyncTest |
-| `FastSyncSpec.scala` | ~311 | (read to determine) | UnitTest, SyncTest |
-| `FastSyncSpec.scala` | ~336 | "returns Syncing with state nodes progress" | UnitTest, SyncTest |
-| `SyncControllerSpec.scala` | ~385 | (read to determine) | (check) |
-| `SyncControllerSpec.scala` | ~470 | (read to determine) | (check) |
-| `PoWMiningCoordinatorSpec.scala` | ~123 | "Miners mine recurrently" | UnitTest, ConsensusTest, SlowTest |
-| `PoWMiningCoordinatorSpec.scala` | ~188 | "StopMining stops PoWMinerCoordinator" | UnitTest, ConsensusTest, SlowTest |
-
-**Known root cause — SyncControllerSpec FlakyTests (identified in P9 thread, 2026-06-23):**
-
-`SyncController.scala:895-897` — `handleRegularSyncMsg` forwards all unhandled messages to
-`RegularSync` via `regularSync.tell(msg, ctx.toClassic.sender())`. When `FastSync.Done` arrives
-late (after `syncSwitchDelay = 0.5s`, i.e. after SyncController has already transitioned to
-`runningRegularSync`), it lands in this catch-all and is `tell`-forwarded to the RegularSync
-classic child, which crashes with `ClassCastException: FastSync$Done$ cannot be cast to
-RegularSyncCommand`.
-
-**Fix (apply before diagnosing the tests):** Add a guard arm before the catch-all in
-`handleRegularSyncMsg`:
-```scala
-case FastSync.Done => Behaviors.same  // late arrival after sync switch — ignore
-```
-Confirm the arm is placed BEFORE the `regularSync.tell` catch-all. Compile:
-```bash
-sbt compile-all
-```
-Then run the two SyncControllerSpec FlakyTests 5× to confirm the race is resolved before
-proceeding with the remaining inventory.
-
-**Steps for each test (one at a time, no parallel):**
-1. Read the full test body.
-2. `git log -p --follow -S "FlakyTest" -- <file>` to find when it was marked flaky and what comment was left.
-3. Identify the root cause category:
-   - **`Thread.sleep` / wall-clock assertion** → Replace with `TestScheduler` / `eventually` / `awaitAssert`
-   - **Non-deterministic actor message ordering** → Add `TestProbe.expectMsgAllOf` or reorder assertions
-   - **Race between actor startup and first message** → Add `awaitAssert` or `expectMsgType` with explicit timeout
-   - **Real PoW computation timing** (PoWMiningCoordinatorSpec) → Inject a fake miner that succeeds immediately
-   - **Test depends on external state** → Isolate with mocks or hermetic fixtures
-4. Attempt the fix. Compile: `sbt compile-all`.
-5. Run 10× to confirm not flaky: `for i in $(seq 10); do sbt "testOnly *SpecName*" && echo "PASS $i" || echo "FAIL $i"; done`
-6. If not fixable without major refactor → verdict DELETE, with rationale written in test comment before removal.
-   Never leave a flaky test enabled — either fix it or delete it.
-7. Remove `FlakyTest` tag once confirmed stable (10/10 passes). Add correct tier tag.
-
-**Special case — PoWMiningCoordinatorSpec:** These two tests involve real Ethash PoW computation,
-which is inherently variable. The fix is almost certainly a fake/mock miner that completes
-instantly, not a timing adjustment. Check if `EthashMiner` is injectable; if not, MITHRIL adds
-a `MinerFactory` seam.
-
-**Verification:** Fixed tests pass 10/10 in `testOnly`. No `FlakyTest` tags remain in the fixed files.
-
-**MANDATORY final step — complete IN THIS ORDER:**
-1. `sbt scalafmtAll`
-2. `git add <specific test files modified>` — stage only fixed/deleted test files
-3. `git commit -m "test(p10): FlakyTest audit — fix N, delete M"` — or per-test commits (format in step 5 above)
-4. `SHA=$(git rev-parse --short HEAD)` — capture final commit SHA (comma-separate if multiple)
-5. Update run-order table in `CODEBASE-AUDIT.md`: strikethrough E3 → `| ~~E3~~ | ... | ✅ DONE [date] — N fixed, M deleted, $SHA |`
-6. If any tests also rescued from SyncTest → update P8 verdict table with those SHAs
-7. Update `test-quality-log.md` test count after fixes land in testEssential
-8. `git add .claude/` → `git commit -m "docs(p10): clearout — $SHA"`
-
-**Rejection criteria:** Re-tagging a flaky test as `SlowTest` or `DisabledTest` to avoid fixing it.
-A test must be either reliably passing or deleted — no half-measures.
+### P10 — EYE/MITHRIL: FlakyTest root cause audit — fix or delete — DONE — see completed/DEFERRED-BACKLOG.md
 
 ---
 
-### P11 — EYE: testStandard baseline + SlowTest tag audit
-
-**Agent:** EYE (run testStandard, assess SlowTest tag accuracy)
-**Prerequisite:** P8, P9, P10 complete (so the test count is stable before capturing the baseline).
-
-**Context:** `testStandard` (~30 min) adds `SlowTest` and `IntegrationTest` to the essential tier.
-No baseline has ever been recorded for this tier. Additionally, some `SlowTest` tagged tests
-appear mislabelled (e.g., `MiningSpec:10` — "KnownProtocols have unique names" — should not be
-slow). This prompt captures the Standard baseline and audits SlowTest label accuracy.
-
-**SlowTest inventory for label-accuracy check:**
-
-| File | Tests | Why tagged SlowTest? | Likely correct? |
-|------|-------|---------------------|-----------------|
-| `DAGGenerationSpec.scala` | 7 | Ethash cache+DAG CPU computation | ✅ Yes — legitimately slow |
-| `EthashNonceSearchSpec.scala` | 6 | PoW nonce search (CPU-bound) | ✅ Yes |
-| `EthashMinerSpec.scala` | 2 | Mining valid blocks (actual PoW) | ✅ Yes |
-| `PoWBlockHeaderValidatorSpec.scala` | 1 | Ethash header validation | Possibly — assess observed time |
-| `PoWMiningCoordinatorSpec.scala` | ~7 | Mining coordinator w/ actor timing | Possibly — assess |
-| `PoWMiningSpec.scala:71` | 1 | "not start miner when miningEnabled=false" | ❓ Likely mislabelled |
-| `MiningSpec.scala:10,17` | 2 | "unique names" / "contain ethash" | ❌ Almost certainly mislabelled |
-| `MerkleProofVerifierPhase3Spec.scala:573` | 1 | Quadratic growth regression check | ✅ Yes — 100-1000 acct comparison |
-
-**Steps:**
-1. Check system resources: `free -h && uptime` (load < 4.0 before starting).
-2. Run testStandard and capture timing:
-   ```bash
-   cd /media/dev/2tb/dev/fukuii
-   start_time=$(date +%s)
-   .local/scripts/fukuii-test standard 2>&1 | tee /tmp/fukuii-teststandard-timing.log
-   end_time=$(date +%s)
-   echo "TOTAL_ELAPSED: $((end_time - start_time)) seconds" | tee -a /tmp/fukuii-teststandard-timing.log
-   ```
-
-3. After completion, identify the top 20 slowest tests:
-   ```bash
-   grep -E "\([0-9]+ seconds" /tmp/fukuii-teststandard-timing.log | sort -t'(' -k2 -rn | head -20
-   ```
-
-4. For each test tagged `SlowTest`: compare its actual observed time against the `SlowTest` definition
-   (">100ms, <5 seconds"). If actual time is <100ms → `MISLABELLED` → remove `SlowTest`, add `UnitTest`.
-
-5. For `MiningSpec:10,17` and `PoWMiningSpec:71` specifically: if observed time is <100ms →
-   remove `SlowTest` tag and add `UnitTest`, which promotes them to `testEssential`.
-
-6. Record the testStandard baseline in `fukuii/.local/docs/test-quality-log.md`.
-
-**Verification:** All testStandard tests pass (0 failures). Baseline recorded.
-
-**MANDATORY final step — complete IN THIS ORDER:**
-1. `sbt scalafmtAll` — only if test files were modified
-2. `git add <specific test files modified>` — stage only files with tag changes; skip if no source changes
-3. `git commit -m "test(p11): promote N mislabelled SlowTest → UnitTest"` — omit if no source changes
-4. `SHA=$(git rev-parse --short HEAD)` — capture SHA (note "no source commit" if step 3 skipped)
-5. Update run-order table in `CODEBASE-AUDIT.md`: strikethrough E4 → `| ~~E4~~ | ... | ✅ DONE [date] — Xs wall time, N tests, M mislabelled fixed, $SHA |`
-6. Update `test-quality-log.md` with testStandard baseline and timing
-7. `git add .claude/` → `git commit -m "docs(p11): clearout — $SHA"`
-
-**Rejection criteria:** Removing `SlowTest` from a test that actually takes >100ms. Observe the
-time, don't guess. `DAGGenerationSpec` and `EthashNonceSearchSpec` must remain `SlowTest`.
+### P11 — EYE: testStandard baseline + SlowTest tag audit — DONE — see completed/DEFERRED-BACKLOG.md
 
 ---
 
@@ -2128,63 +1822,7 @@ do not exclude it. Tiers must reflect reality.
 
 ## Part 12: Pre-Olympia Consensus Correctness Gate
 
-### §G5 — BlockExecution.applyEip2935 account-existence gap (BEACON + FORGE)
-
-**Source:** CHASE-QUEUE `BlockExecution.applyEip2935` entry (cleared 2026-06-21, routed here)
-**Branch:** Any post-Olympia-gated branch
-**Risk:** MEDIUM — consensus-adjacent storage write; pre-Olympia correctness gap; Hive compliance blocker
-
-**Background:**
-
-`BlockExecution.applyEip2935` writes to `HistoryStorageAddress` storage without first
-guaranteeing the account exists. The parallel method `applyEip4788` does create the account
-if absent before writing. Currently masked on real ETC mainnet by deployment order (the
-`HistoryStorageAddress` account pre-exists at activation block), but:
-
-1. **Hive compliance:** EIP-2935 Hive tests construct `emptyWorld` + post-activation block;
-   the absent-account path hits `getGuaranteedAccount` → `IllegalStateException` → test failure.
-2. **Test construction trap:** Any `BlockHashHistorySpec` scenario starting from an empty world
-   after the activation block will silently fail to write or throw.
-3. **Olympia activation risk:** If activation block ordering or genesis conditions ever shift,
-   the storage write silently fails or corrupts state (storage on a non-existent account).
-
-**Current code pattern** (analogous to applyEip4788 — read both before touching either):
-```bash
-grep -n "applyEip2935\|applyEip4788\|HistoryStorageAddress\|BlockHashHistory" \
-  src/main/scala/io/iohk/ethereum/blockchain/ledger/BlockExecution.scala
-```
-
-**Fix (FORGE + BEACON reviewed verdict — do not implement without confirmation):**
-- Drop `isActivationBlock &&` from the `w1` branch condition so the account-existence guard
-  runs on every post-activation block (not just the activation block itself)
-- OR adopt the same "create if absent" guard pattern used in `applyEip4788`
-- Exact approach must be confirmed with FORGE (ETC/Olympia) + BEACON (EIP-2935 spec)
-
-**New test required:** `BlockHashHistorySpec` absent-account scenario:
-```scala
-// Test pattern: emptyWorld + post-activation block → storage write succeeds + account exists
-// Verify: no IllegalStateException, HistoryStorageAddress account exists after call
-// Mirrors: existing applyEip4788 test coverage pattern
-```
-
-**Gate condition:** BEACON review (EIP-2935 spec compliance) + FORGE review (ETC/Olympia
-activation block semantics) BOTH required before any code change. This touches consensus
-ledger logic and both chains are affected.
-
-**Owner:** BEACON + FORGE — do not delegate to MITHRIL or WRAITH alone.
-
-**Priority:** HIGH — Hive EIP-2935 compliance blocker for Olympia acceptance testing.
-Handle before any Hive ETC Olympia test suite run.
-
-**MANDATORY final step — complete IN THIS ORDER:**
-1. `sbt scalafmtAll`
-2. `git add src/main/scala/.../ledger/BlockExecution.scala src/test/scala/.../ledger/BlockHashHistorySpec.scala` — stage only the two files changed
-3. `git commit -m "fix(ledger): applyEip2935 account-existence guard — match applyEip4788 pattern (Part 12 §G5)"`
-4. `SHA=$(git rev-parse --short HEAD)` — capture exact SHA
-5. `./local/scripts/fukuii-test` → confirm 3,595+ tests, 0 failures; record timing
-6. Add to `CHASE-QUEUE.md` cleared entries log: `| BlockExecution.applyEip2935 Part 12 §G5 | Cleared [date]: $SHA — account-existence guard added; BlockHashHistorySpec absent-account test added |`
-7. `git add .claude/agent-protocols/working-docs/DEFERRED-BACKLOG.md .claude/agent-protocols/working-docs/CHASE-QUEUE.md` → `git commit -m "docs(part12-g5): clearout — $SHA"`
-8. DELETE this section
+### §G5 — BlockExecution.applyEip2935 account-existence gap — DONE (`bbc5f1df8`) — see completed/DEFERRED-BACKLOG.md
 
 ---
 
