@@ -21,6 +21,14 @@
 
 ---
 
+## §8e-FORGE: `return` → expression FORGE pass
+
+#### `4544b8025` — §8e-FORGE: StdSignedTransactionValidator `return` conversions (FORGE-reviewed, 2026-06-24)
+- **`:65` + `:67` (`validateOlympiaTxTypes` ETH and Olympia guards)** — both CLEAR. Two sequential `Either`-returning guards → `if … else if … else { stx.tx match }`. No mutable state, no loop, no crypto; identical result.
+- **Gate:** FORGE sign-off. **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8e-FORGE`
+
+---
+
 ## Open
 
 - EIP-2935 account-existence gap tracked in CHASE-QUEUE (FORGE + BEACON before Olympia)

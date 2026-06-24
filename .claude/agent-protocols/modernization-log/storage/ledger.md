@@ -23,6 +23,16 @@
 
 ---
 
+## §8e-FORGE: `return` → expression FORGE pass
+
+#### `4544b8025` — §8e-FORGE: BlockPreparator `return` conversions (FORGE-reviewed, 2026-06-24)
+- **`:56` (`payBlockReward` post-merge guard)** — CLEAR. `if isPostMerge then ws else { ECIP-1017 rewards }`. Reward logic untouched; byte-identical.
+- **`:89` (`creditBaseFeeToTreasury` Olympia guard)** — CLEAR. Same guard→if/else pattern; ECIP-1111 treasury credit path unchanged.
+- **`:733` (`recoverAuthority` chain-id guard)** — CLEAR. Converted to match `applyAuthorization:771` (identical check, already idiomatic) — proven byte-identical precedent.
+- **Gate:** FORGE sign-off. **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8e-FORGE`
+
+---
+
 ## Open
 
-- `ledger/BlockPreparator.scala:56` — `return` statement (§8e FORGE gate)
+_(no open items)_

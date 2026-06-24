@@ -13,7 +13,16 @@
 
 ---
 
+## §8e-FORGE: `return` → expression / `scalafix:ok` FORGE pass
+
+#### `4544b8025` — §8e-FORGE: consensus `return` conversion (FORGE-reviewed, 2026-06-24)
+- **`vm/OpCode.scala:989`** — CLEAR. Pure guard clause → `if cond then abort else { ...rest... }`. Byte-identical.
+- **`vm/VM.scala:140`** — DEFER (`// scalafix:ok DisableSyntax.return`). Early exit before `onCallExit` tracer block; converting fires the tracer callback in the abort case — observable behaviour change. Ratchet satisfied via suppression.
+- **`vm/PrecompiledContracts.scala:271, 649, 753, 762, 767, 772, 782`** — all DEFER (`// scalafix:ok`). EIP-2537 BLS and EIP-4844 KZG crypto primitives; `try`-nested return has catch-sensitive control flow. Conversion requires restructuring that is byte-level risky for precompile results. `:573` already carried `scalafix:ok` (untouched).
+- **Gate:** FORGE sign-off. **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8e-FORGE`
+
+---
+
 ## Open
 
-- `vm/VM.scala:140`, `vm/OpCode.scala:989`, `vm/PrecompiledContracts.scala:271` — `return` statements (§8e FORGE gate)
 - `vm/OpCode.scala` — infix/wildcard warnings (9 hits, FORGE gate)

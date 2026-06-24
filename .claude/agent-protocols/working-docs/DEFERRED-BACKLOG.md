@@ -511,18 +511,18 @@ housekeeping task during test waits for specific domain files.
 
 **C2 DONE `9eb1f4e06`, TNHC DONE `7a48c5988`** — see `completed/DEFERRED-BACKLOG.md`.
 
-**Remaining to lock the ratchet** (`sbt scalafixAll` not yet green): 40 deferred sites.
+**Remaining to lock the ratchet** (`sbt scalafixAll` not yet green): 38 deferred sites.
 
 | Deferred category | File(s) | Count | Gate |
 |-------------------|---------|-------|------|
 | Classic actor — Wave 3 LOOM sprint | `sync/snap/SNAPSyncController.scala` | 36 | Wave 3 network/sync migration (SNAP1) |
-| Consensus-critical — FORGE review | `vm/VM.scala`, `vm/OpCode.scala`, `vm/PrecompiledContracts.scala`, `ledger/BlockPreparator.scala`, `mpt/StackTrie.scala`, `consensus/validators/std/StdSignedTransactionValidator.scala` | 6 | FORGE sign-off per file |
+| ~~Consensus-critical — FORGE review~~ | ~~6 files~~ | ~~0~~ | ✅ DONE `4544b8025` — 6 CLEAR + 9 `scalafix:ok` DEFER; see `completed/DEFERRED-BACKLOG.md §8e-FORGE` |
 | Consensus-path (ETH Engine API) — BEACON review | `consensus/engine/EngineApiController.scala:96` (`handleNewPayload`, malformed-payload decode `Left` branch), `consensus/engine/EngineApiController.scala:226` (`handleForkchoiceUpdated`, malformed-params decode `Left` branch) | 2 | BEACON sign-off (S3-D) |
 
 **Full ratchet lock checklist:**
 1. ~~C2 chore~~ ✅ DONE `9eb1f4e06`
 2. ~~LOOM Phase 0 TNHC~~ ✅ DONE `7a48c5988`
-3. FORGE reviews and clears 6 consensus sites (1 cleared: consensus/engine/JwtAuthenticator.scala — S3-C) ← add to relevant FORGE sessions
+3. ~~FORGE reviews and clears 6 consensus sites~~ ✅ DONE `4544b8025` — 6 CLEAR + 9 DEFER (`scalafix:ok DisableSyntax.return`); ratchet sees 0 violations across all 6 files
 4. BEACON reviews and clears 2 ETH Engine API sites — `EngineApiController.scala:96` + `:226` (S3-D). Both are early-`return IO.pure(...)` decode-error guards inside large consensus-path method bodies; removing the `return` requires wrapping ~90 lines of post-decode body into the `Right`/`else` branch. Deferred from S3-A/S3-D/S3-F commit (2026-06-22): the byte-for-byte response behavior must be preserved across the re-indent; gated on a focused BEACON pass, not bundled with the low-risk Option/val changes.
 5. Wave 3 SNAP1 migration sprint clears SNAPSyncController 36 sites ← gated on NET2
 6. After all above: run `sbt scalafixAll` to confirm 0 violations → ratchet locked
