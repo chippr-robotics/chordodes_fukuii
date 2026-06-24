@@ -887,44 +887,9 @@ Each prompt can run independently. Commit individually.
 Items identified during dead-code sweeps where the verdict was DEFER rather than DELETE.
 See `agent-protocols/dead-code-review.md` for the full assessment protocol.
 
-### 9a — SyncStartupStrategy extraction (from deleted AdaptiveSyncStrategy)
+### 9a — SyncStartupStrategy extraction ✅ DONE 2026-06-24
 
-**Context:** `AdaptiveSyncStrategy.scala` (193 lines) was deleted in Part 8f as
-unintegrated dead code. However, the design logic it contained addresses a real
-gap: `SyncController.start()` selects sync mode from static config booleans with
-no peer-count or latency pre-flight. If `doSnapSync=true` but fewer than 3 peers
-are available, SNAP attempts and fails N times before reactive fallback triggers.
-
-**What should be built:** A lightweight pure function:
-```scala
-def selectSyncMode(peerCount: Int, snapCapablePeers: Int, latencyMs: Long,
-                   config: SyncConfig): SyncMode
-```
-This is NOT the full `AdaptiveSyncController` class (mutable state, strategy objects).
-It is the decision logic only — extracted, tested as a pure function, wired into
-`SyncController.start()` at the sync mode selection branch (~line 1387).
-
-**Wiring point:** `SyncController.start()` — the 5-branch pattern-match on
-`(isSnapSyncDone, isFastSyncDone, doSnapSync, doFastSync)` config booleans.
-Add a pre-flight check: if `doSnapSync && snapCapablePeers < 3`, downgrade to
-`doFastSync` mode rather than attempting SNAP and waiting for reactive failure.
-
-**Benefit:** Reduces day-1 sync latency on low-peer-count or high-latency networks.
-Turns "wait for N failures then fallback" into "check conditions upfront, start on
-the right mode immediately."
-
-**Prerequisite:** None. Not consensus-critical. Candidate for a standalone task
-after the current sprint queue clears.
-
-**Agent:** Sonnet (pure function + SyncController wiring, not consensus-critical)
-
-**Prompt:**
-> `SyncController.start()` selects sync mode via a 5-branch pattern-match on config booleans with no peer pre-flight. The deleted `AdaptiveSyncStrategy.scala` (removed in Part 8f) contained the right decision logic. Extract it as a pure function in `SyncController.scala` (or a companion object):
-> ```scala
-> def selectSyncMode(peerCount: Int, snapCapablePeers: Int, latencyMs: Long,
->                    config: SyncConfig): SyncMode
-> ```
-> Wire it into `SyncController.start()` at the 5-branch match (~line 1387): if `doSnapSync && snapCapablePeers < 3`, downgrade to `doFastSync`. Do not add mutable state or strategy objects — pure function only. Write a unit test covering all 5 branches (0 peers, 1 peer, 3 peers, snap-capable majority, fast-only config). Run `sbt compile-all` then `sbt "testOnly *SyncController*"` to verify.
+**Commit:** `3140db465` — see `completed/DEFERRED-BACKLOG.md §9a` for full context.
 
 ---
 

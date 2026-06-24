@@ -129,3 +129,8 @@
 - **Files:** `PivotHeaderBootstrap.scala`, `SyncController.scala`
 - **End state:** 0 `ActorRef[Any]` in production sync-package code. Cluster E fully closed. §8k-G cluster done.
 - **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8k-G4`
+
+#### `3140db465` — §9a: SyncStartupStrategy — selectSyncMode pure function + wiring
+- **What:** Added `SyncMode` enum and `selectSyncMode(peerCount, snapCapablePeers, latencyMs, config)` pure function to `SyncController` companion object (`private[sync]`). Wired into `start()` replacing `doSnapSync`/`doFastSync` in the 5-branch match with `snapEnabled`/`fastEnabled`. Downgrade fires only when `peerCount > 0 && snapCapablePeers < 3`; startup (peerCount=0) stays optimistic. New `SyncStartupStrategySpec` (6 tests).
+- **Files:** `SyncController.scala`, `SyncStartupStrategySpec.scala` (new)
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §9a`

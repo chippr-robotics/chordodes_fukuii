@@ -1546,3 +1546,25 @@ typed interface. Full Scala 3.3.8 + Pekko 1.6 Typed discipline in the sync layer
 - `SyncController.scala` — `externalAdapter: TypedActorRef[Any]` val declaration and its associated INFO comment block deleted. `WrappedExternal` case class retained (used by all per-child adapters). All per-child adapter vals retained.
 
 **End state:** 0 `ActorRef[Any]` hits in production code under the sync package. 0 `externalAdapter` references in SyncController. Cluster E fully closed.
+
+---
+
+## §9a — SyncStartupStrategy extraction ✅ DONE 2026-06-24
+
+**Commit:** `3140db465` — "feat(sync): §9a SyncStartupStrategy — selectSyncMode pure function + wiring"
+
+**Context:** `AdaptiveSyncStrategy.scala` (193 lines) was deleted in Part 8f as unintegrated dead
+code. The design intent was sound: `SyncController.start()` selects sync mode from static config
+booleans with no peer pre-flight. With `doSnapSync=true` but < 3 SNAP-capable peers, SNAP fails N
+times before the reactive fallback triggers. This task extracted the decision logic as a pure function.
+
+**What was done:**
+- Added `SyncMode` enum (`Snap`, `Fast`, `Regular`) to `SyncController` companion object — `private[sync]` for testability
+- Added `selectSyncMode(peerCount, snapCapablePeers, latencyMs, config)` pure function — downgrades SNAP→Fast only when `peerCount > 0 && snapCapablePeers < 3`; with 0 peers (initial startup) stays optimistic
+- Wired into `start()`: computes `snapEnabled`/`fastEnabled` from the function (called with `(0, 0, 0L)` at startup — no behavioral change today, structure in place for future live-peer call sites)
+- 5-branch match updated to use `snapEnabled`/`fastEnabled` instead of raw config booleans
+- Early checks (`clearDoneOnStart`, `isFastSyncCoolingOff`) still use original `doSnapSync`/`doFastSync` — correct, those are operator config flags
+- `latencyMs` suppressed with `@annotation.nowarn` — reserved for future latency-based heuristics
+
+**New test file:** `SyncStartupStrategySpec.scala` — 6 tests via `AnyFunSuite + TestSyncConfig`:
+0 peers → Snap (optimistic), 1 snap peer → Fast (downgrade), 3 snap peers → Snap, majority → Snap, fast-only config → Fast, regular fallback → Regular. All pass.
