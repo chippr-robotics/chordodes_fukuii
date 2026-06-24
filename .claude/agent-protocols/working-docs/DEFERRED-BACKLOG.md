@@ -1152,57 +1152,6 @@ The `handleRegularSyncMsg` production bug (SyncController:895-897) is tracked un
 
 ---
 
-### §ETH69-D — MITHRIL: Tier3 accuracy telemetry (P1)
-
-**Agent:** MITHRIL
-**Risk:** LOW — instrumentation only, no logic change
-**Gate:** §ETH69-A complete
-**File:** `src/main/scala/com/chipprbots/ethereum/network/NetworkPeerManagerActor.scala:794-799`
-
-**Background:**
-When an ETH69 peer sends a `NewBlock`, `updateChainWeight` directly replaces the peer's
-chainWeight with the NewBlock TD — no monotonic guard. This is the only moment where the
-**actual** TD is revealed after a Tier3 estimate. Capturing the estimate-vs-actual delta
-at this point provides the data needed to tune the Tier3 formula and detect systematic bias.
-
-**Steps:**
-1. **Read** `NetworkPeerManagerActor.scala:789-810` — understand `updateChainWeight` and how
-   `NewBlock.totalDifficulty` and `initialPeerInfo.chainWeight` are accessible together.
-2. **Add logging** at the point of NewBlock TD replacement (inside `updateChainWeight`):
-   ```scala
-   case newBlock: ETHPackets.NewBlock =>
-     val prevTD      = initialPeerInfo.chainWeight.totalDifficulty
-     val actualTD    = newBlock.totalDifficulty
-     val delta       = actualTD - prevTD
-     val deltaPercent = if (prevTD > 0) (delta * 100) / prevTD else BigInt(0)
-     log.debug(
-       "ETH69_TIER3_ACCURACY: peer={} prevTD={} actualTD={} delta={} deltaPercent={}%",
-       initialPeerInfo.remoteStatus.bestHash,
-       prevTD, actualTD, delta, deltaPercent
-     )
-     initialPeerInfo.copy(chainWeight = ChainWeight.totalDifficultyOnly(newBlock.totalDifficulty))
-   ```
-3. **No test change required** — this is debug logging only. Confirm it compiles.
-4. `sbt compile-all` to confirm no errors.
-
-**Verify:**
-```bash
-grep -n "ETH69_TIER3_ACCURACY\|deltaPercent" \
-  src/main/scala/com/chipprbots/ethereum/network/NetworkPeerManagerActor.scala
-# Must see the log line
-
-sbt compile-all
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add src/main/scala/.../network/NetworkPeerManagerActor.scala`
-3. `git commit -m "feat(telemetry): ETH69 Tier3 estimate-vs-actual TD logging on NewBlock (G2 instrumentation)"`
-4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(eth69-d): clearout — $SHA"`
-5. **DELETE §ETH69-D**
-
----
-
 ### §ETH69-E — MITHRIL: Archive node monotonic guard exemption (G3/G4, P2)
 
 **Agent:** MITHRIL
