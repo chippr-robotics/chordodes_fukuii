@@ -472,21 +472,177 @@ housekeeping task during test waits for specific domain files.
 
 ---
 
-### 8d — IO Threading Model Follow-Up (R9 audit items)
+### 8d — IO Threading Model Follow-Up ✅ DONE 2026-06-24 — see `completed/DEFERRED-BACKLOG.md §8d`
 
-**Context:** R9 research (`threading-model-audit.md`, DONE 2026-06-18) found 3 IO/threading issues. B1, B2, and A1 are all cleared — see `completed/DEFERRED-BACKLOG.md §8d`.
+### 8d-J — CONDUIT: jsonrpc IO boundary fixes (3 sites, 2026-06-24 scan)
 
-**Remaining open:**
-- **Additional jsonrpc sites** — `api/jsonrpc.md` open section notes IO boundary sites not catalogued in `threading-model-audit.md` — **OPEN, CONDUIT review**
+**Context:** The §8d CONDUIT scan (2026-06-24) found 3 uncovered IO boundary violations in `jsonrpc/`. B1/B2/A1 from the R9 audit are already cleared. These 3 are net-new.
 
-#### Additional jsonrpc IO boundary sites
+**Priority order:** J1 (TRIVIAL, same session) → J2 (HIGH severity) → J3 (MEDIUM, most complex).
+**Agent:** CONDUIT for all three. Parallel-safe — no gates.
 
-**Problem:** Additional IO boundary sites in `jsonrpc/` observed during the R9 research pass but not catalogued in `threading-model-audit.md`.
+---
 
-**Clearing prompt:** CONDUIT audit of `jsonrpc/` for any remaining `scala.concurrent.blocking`, `Await`, or `EC.global` usage not covered by B1/B2/A1. Output a short table of sites + severity.
+#### §8d-J1 — CONDUIT: AdminService IO.blocking for file ops (TRIVIAL)
 
 **Agent:** CONDUIT
-**Priority:** LOW — likely few/none after B1/B2 cleared; run as a 15-minute scan before closing §8d.
+**Risk:** LOW — CE3 thread-pool semantics only, no behavioral change
+**Gate:** None — parallel-safe
+**Severity:** MEDIUM — long chain export parks a CE3 compute thread for the full duration
+
+**Background:**
+`AdminService.exportChain` (lines 335-361) wraps `FileOutputStream` / `FileInputStream` blocking
+read loops inside bare `IO { }` (`IO.delay`), which runs on the CE3 compute thread pool. A large
+export (millions of blocks) parks a compute thread for the entire operation.
+Fix: `IO { }` → `IO.blocking { }` at both call sites. `IO.blocking` shifts to the CE3 blocking
+pool and releases the compute thread for the duration.
+
+**Steps:**
+1. **Read** `src/main/scala/com/chipprbots/ethereum/jsonrpc/AdminService.scala` lines 320-380 —
+   locate both `IO { ... }` wrapping `FileOutputStream` write loops and `FileInputStream` read
+   loops. Confirm no other `IO.delay`/`IO { }` wrapping blocking Java IO in the same file.
+2. **Fix both sites:**
+   ```scala
+   // Before:
+   IO {
+     val fos = new BufferedOutputStream(new FileInputStream(req.file))
+     // ... blocking read loop ...
+   }
+   // After:
+   IO.blocking {
+     val fos = new BufferedOutputStream(new FileInputStream(req.file))
+     // ... blocking read loop ...
+   }
+   ```
+3. `sbt compile-all`
+4. `sbt "testOnly *AdminService*"` — confirm no regressions
+
+**Verify:**
+```bash
+grep -n "IO {" src/main/scala/com/chipprbots/ethereum/jsonrpc/AdminService.scala
+# Expected: 0 remaining bare IO { } wrapping file ops
+grep -n "IO.blocking {" src/main/scala/com/chipprbots/ethereum/jsonrpc/AdminService.scala
+# Expected: 2 hits (export + import)
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/main/scala/com/chipprbots/ethereum/jsonrpc/AdminService.scala`
+3. `git commit -m "fix(jsonrpc): AdminService file ops IO.blocking — release compute thread during chain export/import (8d-J1)"`
+4. **DELETE §8d-J1**
+
+---
+
+#### §8d-J2 — CONDUIT: GraphQLSchema unsafeRunSync inside Sangria resolver (HIGH)
+
+**Agent:** CONDUIT
+**Risk:** LOW — resolver composition only, no schema or API surface change
+**Gate:** None — can run immediately after J1 or in parallel
+**Severity:** HIGH — `.unsafeRunSync()` parks a Pekko-HTTP/Sangria dispatcher thread
+
+**Background:**
+`GraphQLSchema.scala:992` calls `.unsafeRunSync()` on an inner `IO` inside a Sangria resolver
+`flatMap` body that is already executing on a Pekko-HTTP dispatcher thread (materialised via the
+outer `.unsafeToFuture()`). The inner sync materialisation parks the dispatcher thread for the
+duration of the IO — bypassing CE3's thread pool management.
+
+The fix: compose both IO calls before the single `.unsafeToFuture()` at the resolver boundary,
+so only one materialisation occurs at the edge and no sync blocking happens inside the `Future`.
+
+**Steps:**
+1. **Read** `src/main/scala/com/chipprbots/ethereum/jsonrpc/graphql/GraphQLSchema.scala`
+   lines 980-1010 — locate the resolver that calls `.unsafeRunSync()`. Understand what two IO
+   operations are being composed (e.g., `getTransactionByHash` + `getRawTransactionByHash`).
+2. **Identify the fix pattern** — two cases:
+   - **Case A** (inner IO is derived from outer result): use `flatMap` to compose in IO context:
+     ```scala
+     // Before:
+     ethTxService.getTransactionByHash(hash).flatMap { tx =>
+       ethTxService.getRawTransactionByHash(hash).unsafeRunSync() // WRONG
+     }.unsafeToFuture()
+     // After:
+     ethTxService.getTransactionByHash(hash).flatMap { tx =>
+       ethTxService.getRawTransactionByHash(hash).map { raw => ... }
+     }.unsafeToFuture()
+     ```
+   - **Case B** (two independent IOs): use `parTupled` or `flatMap` to sequence before the edge:
+     ```scala
+     (getTransactionByHash(hash), getRawTransactionByHash(hash)).parTupled
+       .map { (tx, raw) => ... }
+       .unsafeToFuture()
+     ```
+3. Apply the appropriate pattern for the actual code shape.
+4. `sbt compile-all`
+5. `sbt "testOnly *GraphQL*"` — confirm resolver still returns correct data
+
+**Verify:**
+```bash
+grep -n "unsafeRunSync\|unsafeRunTimed" \
+  src/main/scala/com/chipprbots/ethereum/jsonrpc/graphql/GraphQLSchema.scala
+# Expected: 0 hits
+grep -n "unsafeToFuture" \
+  src/main/scala/com/chipprbots/ethereum/jsonrpc/graphql/GraphQLSchema.scala
+# Expected: hits only at resolver boundaries (not inside flatMap bodies)
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/main/scala/com/chipprbots/ethereum/jsonrpc/graphql/GraphQLSchema.scala`
+3. `git commit -m "fix(graphql): compose IO before unsafeToFuture — eliminate unsafeRunSync on dispatcher thread (8d-J2)"`
+4. **DELETE §8d-J2**
+
+---
+
+#### §8d-J3 — CONDUIT: JsonRpcIpcServer IORuntime scoping (MEDIUM)
+
+**Agent:** CONDUIT
+**Risk:** LOW-MEDIUM — changes IORuntime lifecycle for per-connection threads; no protocol change
+**Gate:** None — parallel-safe with J1/J2
+**Severity:** MEDIUM — `IORuntime.global` shared across HTTP server + GraphQL + IPC paths
+
+**Background:**
+`JsonRpcIpcServer.scala:102` calls `responseF.unsafeRunTimed(awaitTimeout)` on a dedicated
+`ClientThread` (raw `java.lang.Thread`, one per IPC connection). The thread itself is not a Pekko
+dispatcher thread so there is no dispatcher starvation. However, `IORuntime.global` is used — the
+same shared runtime as HTTP server and GraphQL paths — so CE3 compute threads are not isolated
+per transport.
+
+The minimal correct fix: replace `unsafeRunTimed` with `IO.timeout` (model the timeout in IO) and
+scope a purpose-built `IORuntime` with one compute thread per connection so the IPC path cannot
+interfere with the HTTP/GraphQL compute pool.
+
+**Steps:**
+1. **Read** `src/main/scala/com/chipprbots/ethereum/jsonrpc/server/ipc/JsonRpcIpcServer.scala`
+   in full — understand:
+   - Where `ClientThread` is created and how `responseF` (an `IO`) is materialised
+   - What `awaitTimeout` is set to and where it comes from
+   - Whether the per-connection thread is pooled or spawned fresh per accept
+2. **Determine the right fix level:**
+   - **Minimal (preferred):** Add `IO.timeout(awaitTimeout)` before materialisation; replace
+     `unsafeRunTimed` with `unsafeRunSync()`. This keeps the global runtime but removes the
+     `Option`-returning timed variant (less error-prone).
+   - **Full isolation:** Build a one-compute-thread `IORuntime` per connection, pass it to
+     `unsafeRunSync()` explicit arg, shut it down after response. Only use if global runtime
+     contention is observed under load.
+3. Apply the minimal fix unless the full file review reveals a reason for full isolation.
+4. `sbt compile-all`
+5. `sbt "testOnly *IpcServer*"` — confirm IPC request/response cycle intact
+
+**Verify:**
+```bash
+grep -n "unsafeRunTimed\|IORuntime.global" \
+  src/main/scala/com/chipprbots/ethereum/jsonrpc/server/ipc/JsonRpcIpcServer.scala
+# Expected: 0 hits for unsafeRunTimed; 0 hits for IORuntime.global (if full fix applied)
+grep -n "IO.timeout\|unsafeRunSync" \
+  src/main/scala/com/chipprbots/ethereum/jsonrpc/server/ipc/JsonRpcIpcServer.scala
+# Expected: IO.timeout present; unsafeRunSync at the materialisation site
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/main/scala/com/chipprbots/ethereum/jsonrpc/server/ipc/JsonRpcIpcServer.scala`
+3. `git commit -m "fix(ipc): model IPC response timeout in IO — replace unsafeRunTimed (8d-J3)"`
+4. **DELETE §8d-J3**
 
 ---
 
@@ -1023,7 +1179,7 @@ Each prompt can run independently. Commit individually.
 | ~~G2~~ | ~~Batch G~~ | ~~§8e-FORGE — 6 consensus `return` → expression conversions~~ | DONE 2026-06-24 — FORGE executed across all 6 files: 6 sites CLEAR (converted to if/else), 9 sites DEFER (`scalafix:ok DisableSyntax.return`: VM.scala tracer short-circuit, PrecompiledContracts KZG/BLS crypto + MODEXP guard, StackTrie MPT-mutation + loop comparator). Prior archive's "2/6 clear" assessment was inaccurate — BlockPreparator/StackTrie had real returns that were converted. |
 | ~~G3~~ | ~~Batch G~~ | ~~§8e-BEACON — EngineApiController S3-D `return` → expression (2 sites)~~ | DONE 2026-06-24 — `d78177bda` (3 sites: handleNewPayload, handleForkchoiceUpdated, priority-fee helper; 16/16 EngineApiSpec ✅) |
 | ~~G4~~ | ~~Batch G~~ | ~~§8d-A1 — BEACON: EngineApiService `Await.result` on CE3 compute thread~~ | DONE 2026-06-24 — verified already fixed: `IO.fromFuture` in place at lines 629–640 with explanatory comment; no code change needed |
-| G5 | Batch G | §8d-CONDUIT — CONDUIT: jsonrpc/ remaining IO boundary scan (Await/EC.global/blocking) | LOW priority; unblocked; 15-min scan; prompt in §8d above |
+| ~~G5~~ | ~~Batch G~~ | ~~§8d-CONDUIT — CONDUIT: jsonrpc/ remaining IO boundary scan (Await/EC.global/blocking)~~ | DONE 2026-06-24 — zero findings; all 55 `jsonrpc/` files clean (see `completed/DEFERRED-BACKLOG.md §8d`) |
 | G6 | Batch G | §8c-M4 — VAULT: DataSource close cache invalidation verify-or-by-design | LOW priority; VAULT gate; prompt in §8c above |
 | ~~G7~~ | ~~Batch G~~ | ~~§8e-StackTrie — FORGE: StackTrie `:120`+`:462` DEFER re-assessment (2 `scalafix:ok` sites)~~ | DONE 2026-06-24 — `09307c5a7` (both CLEAR: `:120` node expr, `:462` var-result; see modernization-log/core/mpt.md) |
 | G8 | Batch G | §8l-R1 — FORGE: VM tracer model research + spec verdict (read-only) | Parallel-safe; FORGE-only; unblocked |

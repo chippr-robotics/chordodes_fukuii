@@ -60,7 +60,8 @@ When the clearout prompts above are done, the branch is ready for:
    after all clearout commits land
 2. **PR open** — `white-b0x:scala3-cleanup-june` → `chippr-robotics:staging`
 3. **DEFERRED-BACKLOG unblocked items** — see `working-docs/DEFERRED-BACKLOG.md` Clearout Prompts
-   (3c isInstanceOf, 3d enum candidates, 3e console→logging, 8f dead code audit, 8g braceless scalafmt)
+   (3c isInstanceOf, 3d enum candidates, 3e console→logging, 8f dead code audit, 8g braceless scalafmt,
+   **8d-J1/J2/J3** jsonrpc IO boundary fixes — CONDUIT, no gates, run in order J1→J2→J3)
 
 ### Classic Bridge Elimination Track (pre-CAPSTONE, sequential)
 
@@ -68,14 +69,15 @@ Source: `§8k-R1` audit complete 2026-06-23 — `.local/docs/classic-interop-aud
 
 | Sprint | Work | Agent | Sites eliminated | Gate |
 |--------|------|-------|-----------------|------|
-| **§8k-A** | All 4 SNAP worker `coordinator: ActorRef` → Typed (AccountRange/ByteCode/StorageRange/TrieNodeHealing) | MITHRIL | ~12 prod + 2 test | §8k-R1 ✅ |
-| **§8k-C** | SNAP coordinator `snapSyncController: ActorRef` → Typed (4 coordinators + SSC spawn sites) | MITHRIL | ~7 | §8k-A |
-| **§8k-D** | `PeerEventBusActor.SubscribeCmd(subscriber: ActorRef)` → Typed (Clusters A+M, 9 files) | HERALD+MITHRIL | ~27 | §8k-C |
-| **§8k-E** | `NPMA.GetHandshakedPeersCmd(replyTo: ActorRef)` → Typed (Cluster B, 7 files) | MITHRIL | ~15 | §8k-D |
-| **§8k-F** | RegularSync Classic→Typed migration (full LOOM; Clusters C/D/N) | LOOM | ~15 | §8k-E |
-| **§8k-G** | OQ-5 kill: jsonrpc callers → Typed ask; delete AkkaTaskOps (Clusters C+E+L) | CONDUIT+MITHRIL | ~74 | §8k-F |
-| **§8k-H** | PeerActor `watchWith` — remove `context.toClassic.parent` sends (Clusters G+H) | MITHRIL | ~8 | §8k-G |
-| **§8k-I** | NodeBuilder 3 Classic bridge actors → callers use Typed ask (Cluster J) | MITHRIL | ~21 | §8k-G+H |
+| ~~**§8k-A**~~ | ~~All 4 SNAP worker `coordinator: ActorRef` → Typed (AccountRange/ByteCode/StorageRange/TrieNodeHealing)~~ | ~~MITHRIL~~ | ~~12 prod + 2 test~~ | ✅ DONE `791c0211f` — docs `4c333b178` |
+| ~~**§8k-C**~~ | ~~SNAP coordinator `snapSyncController: ActorRef` → Typed (4 coordinators + SSC spawn sites)~~ | ~~MITHRIL~~ | ~~7~~ | ✅ DONE `b4453d117` — docs `9b34401d5` |
+| ~~**§8k-D**~~ | ~~`PeerEventBusActor.SubscribeCmd(subscriber: ActorRef)` → Typed (Clusters A+M, 9 files)~~ | ~~HERALD+MITHRIL~~ | ~~27~~ | ✅ DONE `93bcedb12` — docs `8748d6e35` |
+| ~~**§8k-E**~~ | ~~`NPMA.GetHandshakedPeersCmd(replyTo: ActorRef)` → Typed (Cluster B, 7 files)~~ | ~~MITHRIL~~ | ~~15~~ | ✅ DONE `c42316b39` — docs `7bd607a87` |
+| ~~**§8k-F**~~ | ~~RegularSync Classic→Typed migration (full LOOM; Clusters C/D/N)~~ | ~~LOOM~~ | ~~15~~ | ✅ DONE `b24515637` — docs `806202cb9` |
+| ~~**§8k-G**~~ | ~~OQ-5 kill: jsonrpc callers → Typed ask; delete AkkaTaskOps (Clusters C+E+L)~~ | ~~CONDUIT+MITHRIL~~ | ~~74~~ | ✅ COMMITTED `2ef2b6637` — testEssential PENDING — docs clearout PENDING |
+| **§8k-G2** | Cluster E immediate cohort: FastSync + NPMA spawn-site `.toClassic` (constructor param lift) | PRISM+MITHRIL | ~4 | §8k-G committed |
+| ~~**§8k-H**~~ | ~~PeerActor `watchWith` — remove `context.toClassic.parent` sends (Clusters G+H)~~ | ~~MITHRIL~~ | ~~8~~ | ✅ DONE `222623960` — docs `53edef1b9` |
+| ~~**§8k-I**~~ | ~~NodeBuilder 3 Classic bridge actors → callers use Typed ask (Cluster J)~~ | ~~MITHRIL~~ | ~~21~~ | ✅ DONE `4613e398f` — docs `b5f47116c` |
 | **§8k-B** | Post-CAPSTONE: verify TCP floor (4 bridges), delete adapter imports | PRISM | — | §8k-I + CAPSTONE |
 
 ---
@@ -90,7 +92,7 @@ Source: `§8k-R1` audit complete 2026-06-23 — `.local/docs/classic-interop-aud
 |--------|------|-------|----------|------|
 | **§ETH69-A** | `collectVoters`: add TD consensus gate — filter peer pool by `chainWeight.totalDifficulty >= ourBestTD × 0.8` | FORGE | **P0 CRITICAL** | None |
 | **§ETH69-B** | `SNAPSyncController`: parent-chain backlink validation (N=20 headers) before SNAP bootstrap | FORGE | **P0 HIGH** | §ETH69-A |
-| **§ETH69-F** | `PeerActor:551` + `BlockFetcher:486`: `ETH69.BlockRangeUpdate` → `ETHPackets.BlockRangeUpdate`; fix `BlockFetcherSpec:298-305` | BEACON | **P1 HIGH** | None (parallel with §ETH69-B) |
+| ~~**§ETH69-F**~~ | ~~`PeerActor:551` + `BlockFetcher:486`: `ETH69.BlockRangeUpdate` → `ETHPackets.BlockRangeUpdate`; fix `BlockFetcherSpec:298-305`~~ | ~~BEACON~~ | ~~**P1 HIGH**~~ | ✅ DONE `931c615dd` (Part 14 §ETH-BRU) — PeerActor:551 + BlockFetcher:486 fixed; see network/peers.md |
 
 P1/P2 hardening items → `DEFERRED-BACKLOG.md Part 16` (§ETH69-C/D/E)
 
