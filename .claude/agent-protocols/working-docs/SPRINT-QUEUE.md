@@ -90,63 +90,11 @@ Source: `§8k-R1` audit complete 2026-06-23 — `.local/docs/classic-interop-aud
 
 | Sprint | Work | Agent | Severity | Gate |
 |--------|------|-------|----------|------|
-| **§ETH69-A** | `collectVoters`: add TD consensus gate — filter peer pool by `chainWeight.totalDifficulty >= ourBestTD × 0.8` | FORGE | **P0 CRITICAL** | None |
+| ~~**§ETH69-A**~~ | ~~`collectVoters`: add TD consensus gate — filter peer pool by `chainWeight.totalDifficulty >= ourBestTD × 0.8`~~ | ~~FORGE~~ | ~~**P0 CRITICAL**~~ | ✅ DONE `12d2ede7e` |
 | **§ETH69-B** | `SNAPSyncController`: parent-chain backlink validation (N=20 headers) before SNAP bootstrap | FORGE | **P0 HIGH** | §ETH69-A |
 | ~~**§ETH69-F**~~ | ~~`PeerActor:551` + `BlockFetcher:486`: `ETH69.BlockRangeUpdate` → `ETHPackets.BlockRangeUpdate`; fix `BlockFetcherSpec:298-305`~~ | ~~BEACON~~ | ~~**P1 HIGH**~~ | ✅ DONE `931c615dd` (Part 14 §ETH-BRU) — PeerActor:551 + BlockFetcher:486 fixed; see network/peers.md |
 
 P1/P2 hardening items → `DEFERRED-BACKLOG.md Part 16` (§ETH69-C/D/E)
-
----
-
-#### §ETH69-A — FORGE: PivotBlockSelector TD consensus gate (G1)
-
-**Agent:** FORGE
-**Risk:** HIGH — changes pivot election criteria for ETC snap sync
-**Gate:** None — P0 security fix, implement immediately post-PR-#1333
-**Spec:** `.local/Wire-Protocol-Modernization/G1-pivot-td-gate.md`
-
-**Background:**
-`PivotBlockSelector.collectVoters` (`PivotBlockSelector.scala:373-395`) builds the snap sync
-voter pool sorting peers by `maxBlockNumber` only. Zero `chainWeight` references. An attacker
-with modest hashrate on a long-low-difficulty fork receives a plausible Tier3 TD estimate at
-handshake (computed from the honest network's difficulty), enters the voter pool by block-number
-ranking, and can win pivot election with K sybil peers. The elected pivot's state root is then
-used as the SNAP sync anchor without further validation.
-
-**Steps:**
-1. **Read** `PivotBlockSelector.scala` in full to locate `collectVoters`, understand `PeerInfo`
-   structure (identify `chainWeight` accessor), and find where local best TD is accessible.
-2. **Read** `NetworkPeerManagerActor.scala` — grep for `case class PeerInfo` and `chainWeight`
-   to confirm field names and types.
-3. **Read** `.local/Wire-Protocol-Modernization/G1-pivot-td-gate.md` for the full spec.
-4. **Implement** the TD gate in `collectVoters`:
-   - Compute `ourBestTD` from the local blockchain state
-   - Set `minPeerTD = ourBestTD * 8 / 10` (80% threshold — covers Tier3 ±20% typical variance)
-   - Add `peerInfo.chainWeight.totalDifficulty >= minPeerTD` to the peer collector filter
-   - **Liveness fallback:** if no peers pass the TD gate, log `ETH69_PIVOT_TD_GATE_EMPTY` and
-     fall back to block-number-only ranking rather than blocking sync indefinitely
-5. **Write tests** in `PivotBlockSelectorSpec`:
-   - Low-TD peer excluded (chainWeight < 80% local best)
-   - High-TD peer included (chainWeight ≥ 80%)
-   - Sybil scenario: K low-TD peers + 1 honest peer → honest peer wins
-   - All-peers-below-threshold fallback path triggers liveness mode
-
-**Verify:**
-```bash
-grep -n "chainWeight\|totalDifficulty" \
-  src/main/scala/com/chipprbots/ethereum/blockchain/sync/fast/PivotBlockSelector.scala
-# Must see chainWeight in collectVoters
-
-sbt "testOnly *PivotBlock*"
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add src/main/scala/.../sync/fast/PivotBlockSelector.scala src/test/.../PivotBlockSelectorSpec.scala`
-3. `git commit -m "fix(sync): ETH69 pivot TD consensus gate in collectVoters — exclude low-TD peers (G1)"`
-4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(eth69-a): clearout — $SHA"`
-5. **DELETE §ETH69-A**
 
 ---
 

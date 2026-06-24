@@ -101,3 +101,15 @@
 - E165 TestProbe in `FastSyncBranchResolverSpec` — 5 pre-existing warnings, deferred (PENDING.md)
 - ~~INFO-10: fragile adapter-pinning tuple `FastSync.scala:180–183`~~ — ✅ DONE 2026-06-22 (D4)
 - ~~§P9-NOTCHANGE: SyncControllerSpec:243~~ — ✅ DONE 2026-06-23 (`37037a89b` + `5a12c7f09`)
+
+---
+
+## §ETH69-A — TD Consensus Gate in PivotBlockSelector (2026-06-24)
+
+#### `12d2ede7e` — fix(sync): ETH69 pivot TD consensus gate in collectVoters — exclude low-TD peers (G1)
+- **Security fix (P0):** `collectVoters` previously sorted the snap-sync voter pool by `maxBlockNumber` only — zero `chainWeight` references. An attacker on a long low-difficulty fork could enter the pool via Tier3 TD estimation and win pivot election with K sybil peers, anchoring SNAP sync to an attacker-chosen state root.
+- **Gate implementation:** `ourBestTotalDifficulty()` helper reads `blockchainReader.getBestBlock → getChainWeightByHash → totalDifficulty` (returns `BigInt(0)` when unavailable — gate inert on early sync). `minPeerTD = ourBestTD * 8 / 10` (80% floor covers Tier3 ±20% variance). Peer pool filtered by `chainWeight.totalDifficulty >= minPeerTD`.
+- **Liveness fallback:** if no peers pass the gate, logs `ETH69_PIVOT_TD_GATE_EMPTY` and falls back to block-number-only ranking — sync never blocks indefinitely.
+- **Wiring:** `ourBestTotalDifficulty: () => BigInt` threaded as constructor param; all 3 `PivotBlockSelector` spawn sites in `FastSync` updated.
+- **Tests:** 4 new cases in `PivotBlockSelectorSpec` (17 total): low-TD excluded, high-TD included, K-sybil honest-wins, liveness fallback. 17/17 passed.
+- **Spec:** `.local/Wire-Protocol-Modernization/G1-pivot-td-gate.md`

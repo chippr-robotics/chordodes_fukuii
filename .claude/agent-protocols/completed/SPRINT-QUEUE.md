@@ -306,3 +306,20 @@ wait times. No gate dependency on the primary sprint groups above.
 | pre-fixed | CHASE-QUEUE P8 — G1-sweep PRISM 4 items: FastSync null→Option (`0c7d6781b` W13+W14), expandTypedReceipts Try.fold (`0c7d6781b` W13), NPMA dead if/else (`504b4ca16` W1/W2/W12/W16), SyncController EC.global→ctx.executionContext (`a5132aa80` C2) — all 4 items pre-fixed before P8 session |
 | pre-fixed // | CHASE-QUEUE P8 — G1-sweep PRISM 4 items (FastSync null→Option , expandTypedReceipts Try.fold , NPMA dead if/else , SyncController EC.global→ctx.executionContext ) — all 4 pre-fixed before P8 session |
 | uncommitted — §3h | E3 (Batch E): Any type signature cleanup — 15 sites documented `// Any:` (Pekko messageAdapter×8, Micrometer gauge×3, Java equals×3, GraphQL dynamic, any-thunk); 7 FORGE-gated with `// §3h: FORGE-gate` markers (domain×2, vm×2, ledger×3); 0 type changes (all remaining Any uses are intentional); sbt compile-all clean. Scope doc: `.local/docs/birdseye-review/01-gap-analysis/G8-any-type-scope.md`. CHASE-QUEUE updated (FORGE). |
+
+---
+
+## ETH69/ETH70 PoW Safety Track — Completed Items
+
+### §ETH69-A — FORGE: PivotBlockSelector TD consensus gate (G1)
+
+**Commit:** `12d2ede7e` — `fix(sync): ETH69 pivot TD consensus gate in collectVoters — exclude low-TD peers (G1)`
+**Completed:** 2026-06-24
+**Files:** `PivotBlockSelector.scala`, `FastSync.scala`, `PivotBlockSelectorSpec.scala`
+
+**What was done:**
+- Added `ourBestTotalDifficulty()` helper to `FastSync` (reads `blockchainReader.getBestBlock` → `getChainWeightByHash` → `.totalDifficulty`; returns `BigInt(0)` when unavailable so gate is inert on early sync)
+- Threaded `ourBestTotalDifficulty: () => BigInt` as a constructor parameter into `PivotBlockSelector` (all 3 spawn sites in `FastSync` updated)
+- In `collectVoters`: computes `minPeerTD = ourBestTD * 8 / 10` (80% floor); filters peer pool by `chainWeight.totalDifficulty >= minPeerTD`; if no peer passes the gate, logs `ETH69_PIVOT_TD_GATE_EMPTY` and falls back to block-number-only ranking for liveness
+- Added 4 new tests to `PivotBlockSelectorSpec` (17 total, all pass): low-TD excluded, high-TD included, K-sybil scenario honest peer wins, liveness fallback triggers
+- `sbt scalafmtAll` clean; `sbt "testOnly *PivotBlock*"` 17/17 passed
