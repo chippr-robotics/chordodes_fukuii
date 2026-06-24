@@ -1156,3 +1156,34 @@ DEFERRED-BACKLOG references updated, MEMORY.md + memory file renamed.
 **Suppression mechanism note:** `// scalafix:ok DisableSyntax.return` is used — NOT `@nowarn`. `@nowarn` silences the Scala compiler, not scalafix. The correct per-site scalafix suppression is `// scalafix:ok <RuleName>`, matching the existing pattern at `PrecompiledContracts.scala:573`.
 
 **Summary:** 2/6 files already clear (BlockPreparator, StackTrie). 4/6 files have 11 remaining real `return` sites. `JwtAuthenticator.scala` cleared in S3-C (pre-existing). Full FORGE instruction prompt preserved in git history via the §8e-FORGE section prior to this archive commit.
+
+---
+
+## §8e-BEACON — EngineApiController `return` → expression ✅ DONE 2026-06-24
+
+**Commits:** `d78177bda` (code) · `de4f489b5` (docs clearout)
+
+**Outcome:** 3 `return` sites cleared in `consensus/engine/EngineApiController.scala`. Task scoped 2 sites; a third pre-existing `return` in the priority-fee helper was also cleared as required to satisfy the `DisableSyntax.noReturns = true` ratchet lock.
+
+| Site | Method | Conversion | Notes |
+|------|--------|-----------|-------|
+| `:96` | `handleNewPayload` | `return IO.pure(errResp)` → `decode match { case Left(e) => IO.pure(errResp); case Right(params) => <body> }` | Byte-identical error response: `PayloadStatusV1(Invalid, None, "malformed payload: $msg")` |
+| `:226` | `handleForkchoiceUpdated` | Same pattern; tuple destructured in `Right((fcs, payloadAttrs))` pattern, eliminating `.toOption.get` | Byte-identical error response: JSON-RPC `-38003` code |
+| `:447` | Priority-fee helper | `if receipts.isEmpty then return "0x0"` → `if/else` expression | Pure hex-string builder; zero consensus-logic change |
+
+**Verify:** `grep -n "\breturn\b" EngineApiController.scala` → 0 code-level hits (7 English-word matches in comments/strings only). `sbt "testOnly *EngineApi*"` → 16/16 ✅. `sbt compile-all` → 0 errors.
+
+---
+
+## §8e-StackTrie — StackTrie DEFER re-assessment ✅ DONE 2026-06-24
+
+**Commits:** `09307c5a7` (code) · docs clearout in this commit
+
+**Outcome:** Both `// scalafix:ok DisableSyntax.return` DEFER sites from §8e-FORGE (`4544b8025`) re-assessed and cleared. `StackTrie.scala` is now fully return-free with no suppressions.
+
+| Site | Method | Decision | Conversion |
+|------|--------|----------|-----------|
+| `:120` | `insert` Leaf exact-match | **CLEAR** | The `return node` short-circuited past a `throw` in the same scope — never fell through. Restructured inner `if/throw` into `if (exact) node else throw`, merged outer `if diff >= origKey.length` block into the existing `if/else-if/else` chain. Whole Leaf case is now a single expression. `node.value = value` mutation unchanged; byte-identical. |
+| `:462` | `byteCompare` | **CLEAR** | Rewrote `return`-in-`while` as `var result` accumulator with loop guard `while result == 0 && i < n`. Final expression `if result != 0 then result else Integer.compare(...)`. Pure comparator; ordering semantics identical (first differing byte wins, else length). |
+
+**Verify:** `grep -n "return\|scalafix" StackTrie.scala` → 0 code-level hits. `sbt compile-all` → 0 errors. See `modernization-log/core/mpt.md §8e-FORGE` for updated site-by-site log.
