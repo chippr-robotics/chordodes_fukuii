@@ -1,6 +1,6 @@
 # Fukuii Modernization — Deferred Backlog
 
-**Last updated**: 2026-06-18 (Part 8 added — Classic TestKit, opaque types, memory audit, IO threading, ScalaFix expansion, dead code, braceless syntax, property-based testing, RLP modernization, test quality; sprint sequence updated with parallel housekeeping tracks)
+**Last updated**: 2026-06-24 (Part 10 added — ETH/Sepolia assumption audit Thread 1 findings: §ETH-T1-A/B WRONG sites in StdSignedTransactionValidator, §ETH-T1-C SUSPICIOUS mempool dispatch; Thread 3 fee routing functionally CORRECT but log.error false-alarm FIXED `f868b75a8`; §ETH-T2-A added — Thread 2 naming finding: rename `BlockHeader.isPostMerge` → `isPoS`/`isPoW` for chain-agnostic consistency)
 **Purpose**: Single reference for all deferred cleanup work — completed items,
 active deferred items, and follow-up sprint plans.
 
@@ -452,23 +452,7 @@ housekeeping task during test waits for specific domain files.
 
 **Context:** VAULT-gate audit of resource lifecycle in `db/`, `node/`, and `core/utils/`. H-series = heap/iterator leaks; M-series = DataSource cache invalidation.
 
-**H2/H3 DONE** `4907406fe`, **H4+M1 DONE** `ef75a5608` — see `completed/DEFERRED-BACKLOG.md`.
-
-**Remaining open:**
-
-#### M4 — DataSource close cache invalidation (VAULT gate)
-
-**Problem:** When a `RocksDbDataSource` is closed (e.g., test teardown, node shutdown), any in-memory `LRU` caches layered over it retain stale references. A subsequent re-open (or test DataSource reconstruction) may read from an invalidated cache entry, producing incorrect data without error.
-
-**Gate:** VAULT review — confirm whether `DataSource.close()` flushes or invalidates overlay caches. If the close protocol is correct, mark M4 as by-design.
-
-**Scope:** `db/` — `RocksDbDataSource.scala`, `EphemDataSource.scala`, any `caching/` layer.
-
-**Agent:** VAULT
-**Priority:** LOW — only visible in test isolation or restart scenarios; runtime nodes do not re-open DBs.
-
-**Prompt (VAULT):**
-> Read `RocksDbDataSource.close()` and any overlay cache layers in `db/`. Determine whether `close()` invalidates in-memory LRU cache entries or leaves stale references. Two outcomes: (a) if invalidation is missing — add `cache.invalidateAll()` before `rocksDb.close()`, run `sbt compile-all`, then `sbt "testOnly *DataSource*"`; (b) if the close protocol is already correct — add a short inline comment explaining why no explicit invalidation is needed and mark M4 as by-design. Either way, record the verdict in `storage-rocksdb.md` under a "DataSource close protocol" note.
+**H2/H3 DONE** `4907406fe`, **H4+M1 DONE** `ef75a5608`, **M4 DONE (by-design) 2026-06-24** — see `completed/DEFERRED-BACKLOG.md`.
 
 ---
 
@@ -924,6 +908,7 @@ No actor migration gate. Commit individually; do not bundle with primary-track m
 | **R7** | RLP codec derivation safety analysis (safe-to-derive vs must-stay-manual) | Feeds 8i implementation | MITHRIL, FORGE |
 | **R8** ✅ | Memory / resource retention audit — DONE, see completed | — | — |
 | **R9** ✅ | IO threading model audit — DONE, see completed | — | — |
+| **R10** | **ETH/Sepolia assumption audit** — systematic hunt for ETC-first design leaking into ETH code paths. 10 threads: (1) fork dispatch `forBlock` vs `forTimestamp`, (2) PoW/PoS divergence guards, (3) EIP-1559 fee routing (burn vs treasury), (4) CL integration completeness (withdrawals/4788/4844), (5) chain ID hardcoding, (6) VM tracer abort-path completeness, (7) test coverage ratio ETC vs ETH, (8) Sepolia config completeness, (9) SNAP sync ETH path, (10) Engine API Osaka edge cases. Findings feed an ETH sprint. **Prompt:** `.local/docs/eth-sepolia-assumption-audit.md`. Gate: none. | BEACON (T1,3,4,6,8,10), FORGE (T2,5,7), EYE (T9) |
 
 | Sprint | Work | Agents | Gate |
 |--------|------|--------|------|
@@ -963,7 +948,7 @@ Each prompt can run independently. Commit individually.
 | ~~G3~~ | ~~Batch G~~ | ~~§8e-BEACON — EngineApiController S3-D `return` → expression (2 sites)~~ | DONE 2026-06-24 — `d78177bda` (3 sites: handleNewPayload, handleForkchoiceUpdated, priority-fee helper; 16/16 EngineApiSpec ✅) |
 | ~~G4~~ | ~~Batch G~~ | ~~§8d-A1 — BEACON: EngineApiService `Await.result` on CE3 compute thread~~ | DONE 2026-06-24 — verified already fixed: `IO.fromFuture` in place at lines 629–640 with explanatory comment; no code change needed |
 | ~~G5~~ | ~~Batch G~~ | ~~§8d-CONDUIT — CONDUIT: jsonrpc/ remaining IO boundary scan (Await/EC.global/blocking)~~ | DONE 2026-06-24 — zero findings; all 55 `jsonrpc/` files clean (see `completed/DEFERRED-BACKLOG.md §8d`) |
-| G6 | Batch G | §8c-M4 — VAULT: DataSource close cache invalidation verify-or-by-design | LOW priority; VAULT gate; prompt in §8c above |
+| ~~G6~~ | ~~Batch G~~ | ~~§8c-M4 — VAULT: DataSource close cache invalidation verify-or-by-design~~ | DONE 2026-06-24 — by-design; Scaladoc comment on `RocksDbDataSource.close()`; verdict in `storage-rocksdb.md` |
 | ~~G7~~ | ~~Batch G~~ | ~~§8e-StackTrie — FORGE: StackTrie `:120`+`:462` DEFER re-assessment (2 `scalafix:ok` sites)~~ | DONE 2026-06-24 — `09307c5a7` (both CLEAR: `:120` node expr, `:462` var-result; see modernization-log/core/mpt.md) |
 | ~~G8~~ | ~~Batch G~~ | ~~§8l-R1/I — FORGE: VM tracer research + implementation~~ | DONE 2026-06-24 — R1 `37c9d081b`/`5c2adeaaf`; I impl complete; `VM.create()` tracer balanced; suppression removed |
 
@@ -1449,3 +1434,289 @@ sbt "testOnly *NetworkPeerManager*"
 3. `git commit -m "fix(sync): ETH69 archive node Tier3 chainWeight — exempt static peers from monotonic guard (G3/G4)"`
 4. `SHA=$(git rev-parse --short HEAD)` → `git commit -m "docs(eth69-e): clearout — $SHA"`
 5. **DELETE §ETH69-E**
+
+---
+
+## Part 10: ETH/Sepolia Assumption Audit Findings (2026-06-24)
+
+Source: `.local/docs/eth-sepolia-assumption-audit.md` — Thread 1 (fork dispatch completeness).
+Thread 3 (EIP-1559 fee routing) audited: functionally CORRECT — ETH base fee is burned, ETC base fee credited to treasury. Found one logging bug: `log.error` in `BlockPreparator.creditBaseFeeToTreasury` fired for every ETH/Sepolia block (treasury-address=0 is correct config, not an error). **FIXED `f868b75a8`** — guard added `&& networkType == NetworkType.ETC`. See `completed/DEFERRED-BACKLOG.md §ETH-T3-LOG`.
+
+---
+
+### §ETH-T1-A — BEACON: Fix `validateInitCodeSize` fork dispatch on ETH/Sepolia
+
+**Agent:** BEACON
+**Risk:** MEDIUM — consensus-touching transaction validator; ETH-only behaviour change
+**Gate:** None — standalone fix, no sprint prerequisite
+**Files:** `src/main/scala/com/chipprbots/ethereum/consensus/validators/std/StdSignedTransactionValidator.scala:245`
+
+**Background:**
+`validateInitCodeSize` calls the 2-arg (block-only) `EvmConfig.forBlock(blockHeader.number, blockchainConfig)`.
+On Sepolia (`olympiaBlockNumber=0`, `spiral=1e18`) the block-only dispatch always returns a
+London-era config, so `eip3860Enabled = false` regardless of block timestamp. EIP-3860
+(max initcode size: `2 * MAX_CODE_SIZE = 49152` bytes, plus initcode word cost) was activated
+at Shanghai (2023-04-12 on mainnet, block 2,778,137 on Sepolia). Any CREATE transaction on
+ETH/Sepolia with initcode > 49152 bytes is incorrectly accepted by Fukuii post-Shanghai.
+
+The same file already does this correctly for gas-cap and blob validation:
+- `validateTxGasLimitCap` (line 47) → `blockHeader.unixTimestamp`
+- `validateBlobTransactionSupport` (line 90) → `isCancunTimestamp`
+
+**Steps:**
+1. **Read** `StdSignedTransactionValidator.scala` lines 230-260 in full to confirm
+   the call site and available variables.
+2. **Read** `EvmConfig.scala` lines 27-70 to confirm the 3-arg overload signature:
+   `forBlock(blockNumber: BigInt, timestamp: Long, blockchainConfig: BlockchainConfigForEvm)`.
+3. **Verify** that `blockHeader` (with `unixTimestamp`) is in scope at line 245.
+4. **Change** line 245 from 2-arg to 3-arg:
+   ```scala
+   // BEFORE
+   val evmConfig = EvmConfig.forBlock(blockHeader.number, blockchainConfig)
+   // AFTER
+   val evmConfig = EvmConfig.forBlock(blockHeader.number, blockHeader.unixTimestamp, blockchainConfig)
+   ```
+5. **Confirm ETC safety:** `isShanghaiTimestamp` et al. return `false` for ETC configs
+   (no timestamp fields set), so the 3-arg overload collapses to the existing block-only
+   result on ETC — behaviour unchanged.
+6. **Write / update a test** in `StdSignedTransactionValidatorSpec` covering:
+   - ETH/Sepolia post-Shanghai: initcode > 49152 bytes → rejected
+   - ETH/Sepolia pre-Shanghai: large initcode → accepted (timestamp before Shanghai)
+   - ETC: large initcode → accepted (EIP-3860 not active on ETC)
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *StdSignedTransactionValidator*"
+sbt "testOnly *Osaka*" "testOnly *Sepolia*"
+sbt testVM
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/main/scala/.../consensus/validators/std/StdSignedTransactionValidator.scala`
+3. `git commit -m "fix(eth): use timestamp-aware EvmConfig in validateInitCodeSize — EIP-3860 now enforced post-Shanghai on ETH/Sepolia"`
+4. `SHA=$(git rev-parse --short HEAD)` → update audit doc `.local/docs/eth-sepolia-assumption-audit.md` Thread 1 entry
+5. **DELETE §ETH-T1-A**
+
+---
+
+### §ETH-T1-B — BEACON: Fix `validateGasLimitEnoughForIntrinsicGas` fork dispatch on ETH/Sepolia
+
+**Agent:** BEACON
+**Risk:** MEDIUM — consensus-touching transaction validator; ETH-only behaviour change
+**Gate:** §ETH-T1-A complete (same file; apply in the same session or back-to-back)
+**Files:** `src/main/scala/com/chipprbots/ethereum/consensus/validators/std/StdSignedTransactionValidator.scala:271`
+
+**Background:**
+`validateGasLimitEnoughForIntrinsicGas` calls the 2-arg (block-only) `EvmConfig.forBlock`.
+On ETH/Sepolia the block-only overload returns London-era config, so intrinsic-gas validation
+uses `MystiqueFeeSchedule` (London/Paris calldata costs: zero bytes = 4 gas, non-zero = 16 gas).
+Post-Prague (EIP-7623), calldata floor pricing changes. A transaction valid under
+London calldata costs may be invalid under the Prague floor — or vice versa — meaning
+Fukuii can admit ETH transactions it should reject (or reject ones it should admit) at the
+validator boundary post-Prague.
+
+**Steps:**
+1. **Read** `StdSignedTransactionValidator.scala` lines 255-290 to confirm call site
+   and available variables.
+2. **Read** `EvmConfig.scala` lines 27-70 to confirm the 3-arg overload signature.
+3. **Verify** `blockHeader.unixTimestamp` is in scope at line 271.
+4. **Change** line 271 from 2-arg to 3-arg:
+   ```scala
+   // BEFORE
+   val evmConfig = EvmConfig.forBlock(blockHeader.number, blockchainConfig)
+   // AFTER
+   val evmConfig = EvmConfig.forBlock(blockHeader.number, blockHeader.unixTimestamp, blockchainConfig)
+   ```
+5. **Confirm ETC safety** — same reasoning as §ETH-T1-A (timestamp fields absent on ETC,
+   3-arg collapses to block-only result; ETC unaffected).
+6. **Write / update a test** in `StdSignedTransactionValidatorSpec`:
+   - ETH/Sepolia post-Prague: transaction with calldata that passes London floor
+     but fails EIP-7623 floor → rejected
+   - ETC: same calldata → accepted (no EIP-7623 on ETC)
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *StdSignedTransactionValidator*"
+sbt "testOnly *Prague*" "testOnly *Sepolia*"
+sbt testVM
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/main/scala/.../consensus/validators/std/StdSignedTransactionValidator.scala`
+3. `git commit -m "fix(eth): use timestamp-aware EvmConfig in validateGasLimitEnoughForIntrinsicGas — correct intrinsic-gas floor post-Prague on ETH/Sepolia"`
+4. `SHA=$(git rev-parse --short HEAD)` → update audit doc Thread 1 entry
+5. **DELETE §ETH-T1-B**
+
+---
+
+### §ETH-T1-C — Design decision: stateless mempool fee schedule on ETH (SUSPICIOUS, low severity)
+
+**Agent:** BEACON (design review, not a direct fix)
+**Risk:** LOW — not consensus-final; block-execution re-validates
+**Gate:** §ETH-T1-A and §ETH-T1-B complete
+**Files:** `src/main/scala/com/chipprbots/ethereum/domain/SignedTransaction.scala:610`
+
+**Background:**
+`getStatelessValidTransactions` (line 610) calls `EvmConfig.forBlock(olympiaBlockNumber, ...)`
+as a fixed block-number proxy. On ETH, `olympiaBlockNumber = 0`, so this always returns
+London config — correct for pre-Shanghai blocks, stale for post-Shanghai. The method is a
+stateless mempool pre-filter (runs on incoming p2p txs via `SignedTransactionsFilterActor`
+and `PendingTransactionsManager`) and has no access to a block timestamp.
+
+This is classified SUSPICIOUS rather than WRONG because:
+- It is not consensus-final (block-execution validates again with the correct `evmConfig`)
+- It cannot silently corrupt state — it can only cause false rejection of valid ETH txs
+  from the mempool, or false admission of txs that will fail at execution
+
+**Decision required:** Choose one of:
+1. **Use `latestForkTimestamp` proxy** — derive the latest activated ETH timestamp from
+   `blockchainConfig` (e.g., `pragueTimestamp` if present) and call the 3-arg overload.
+   Gives a "current fork" approximation. Safe and inexpensive.
+2. **Skip intrinsic-gas floor for ETH** — gate the intrinsic check on `networkType != ETH`,
+   rely entirely on block-execution for ETH. Simpler, less precise mempool filtering.
+3. **Accept as-is** — document the known approximation; mempool pre-filters can be lenient.
+
+**Steps for BEACON:**
+1. Read `SignedTransaction.scala:595-630` to understand what pre-checks are done stateless.
+2. Read how `latestActivatedTimestamp` (or equivalent) could be derived from `BlockchainConfig`.
+3. Recommend one of the three options above with rationale. Do not implement — surface the
+   decision to the user first.
+
+**DELETE §ETH-T1-C** after the design decision is recorded and (if applicable) implemented.
+
+---
+
+### §ETH-T2-A — MITHRIL + BEACON + FORGE: Rename `isPostMerge` → `isPoS` / add `isPoW` companion
+
+**Agent:** MITHRIL (mechanical rename) — pre-flight read by BEACON (ETH call sites) and FORGE (ETC call sites)
+**Risk:** LOW — pure rename; predicate logic unchanged; all call sites are small and compile-verified
+**Gate:** None — standalone housekeeping, no sprint prerequisite
+**Files:**
+- `src/main/scala/com/chipprbots/ethereum/domain/BlockHeader.scala` (definition)
+- `src/main/scala/com/chipprbots/ethereum/ledger/BlockPreparator.scala` (PoW reward skip)
+- `src/main/scala/com/chipprbots/ethereum/vm/OpCode.scala` (PREVRANDAO dispatch)
+- `src/main/scala/com/chipprbots/ethereum/vm/VM.scala` (EIP-7610 CREATE conflict)
+- `src/main/scala/com/chipprbots/ethereum/consensus/engine/PostMergeBlockHeaderValidator.scala` (difficulty guard)
+- `src/main/scala/com/chipprbots/ethereum/consensus/engine/TransitionBlockHeaderValidator.scala` (routing split)
+- All test files referencing `isPostMerge` (find with grep below)
+
+**Background:**
+
+Thread 2 of the ETH/Sepolia assumption audit (`eth-sepolia-assumption-audit.md`) confirmed all
+PoW/PoS divergence guards are correct. The naming inconsistency was identified separately:
+
+The codebase uses two guard patterns:
+- **Chain-level (static):** `isPoWChain` = `terminalTotalDifficulty.isEmpty` — set at node startup,
+  consistent across the whole chain. Used in `BlockBroadcast`, `EthNodeStatus69ExchangeState`,
+  `RegularSync`, `NodeBuilder`, `BlockchainReader`, `NetworkPeerManagerActor`.
+- **Block-level (dynamic):** `BlockHeader.isPostMerge` = `difficulty == 0 && baseFee.isDefined` —
+  per-block runtime check. Used in `BlockPreparator`, `OpCode`, `VM`, validators.
+
+`isPostMerge` is ETH-specific terminology ("The Merge" was an ETH event). The chain-level
+pattern already uses the chain-agnostic `isPoW`/`isPoS` vocabulary. For consistency and
+future-proofing (other PoS EVM chains), the block-level predicate should use the same vocabulary:
+
+- `isPostMerge` → `isPoS` (positive: this block runs under PoS consensus)
+- Add `isPoW = !isPoS` companion (positive: this block runs under PoW consensus)
+
+Design rationale: most EVM networks are PoS. PoW is the exception (ETC/Mordor only in
+production use). The default assumption should be PoS; PoW behaviour is explicitly opted into.
+`if block.header.isPoW then <pow behaviour>` reads more naturally in a multi-chain client
+than `if !block.header.isPostMerge then <pow behaviour>`.
+
+The predicate logic does not change. `difficulty == 0 && baseFee.isDefined` is still correct:
+- ETC: `difficulty > 0` → `isPoS = false`, `isPoW = true` always
+- ETH post-merge: `difficulty == 0 && baseFee.isDefined` → `isPoS = true`, `isPoW = false`
+- ETH pre-merge (historical): `difficulty > 0` → `isPoS = false`, `isPoW = true` (correct)
+
+`isPostMergeChain` / `isPoWChain` at the chain-config level are already correct and do not
+need renaming — they serve a different purpose (static chain-type flag vs. per-block predicate).
+
+**Steps:**
+
+1. **Pre-flight grep — find all call sites:**
+   ```bash
+   cd /media/dev/2tb/dev/fukuii
+   grep -rn "isPostMerge\b" src/ --include="*.scala"
+   ```
+   Expected production hits:
+   - `BlockHeader.scala` (definition — 2 lines: `def isPostMerge` + `def prevRandao`)
+   - `BlockPreparator.scala` (1 site)
+   - `OpCode.scala` (1 site)
+   - `VM.scala` (2 sites — log comment + guard)
+   - `PostMergeBlockHeaderValidator.scala` (1 site — class name contains "PostMerge", body uses `difficulty == 0` directly, not the predicate — verify)
+   - `TransitionBlockHeaderValidator.scala` (uses `difficulty == 0` directly — verify no `isPostMerge` call)
+   Also check test files:
+   ```bash
+   grep -rn "isPostMerge\b" src/test/ --include="*.scala"
+   ```
+
+2. **In `BlockHeader.scala`** — rename + add companion:
+   ```scala
+   // BEFORE
+   def isPostMerge: Boolean = difficulty == 0 && baseFee.isDefined
+   def prevRandao: Option[ByteString] = if isPostMerge then Some(mixHash) else None
+
+   // AFTER
+   def isPoS: Boolean = difficulty == 0 && baseFee.isDefined
+   def isPoW: Boolean = !isPoS
+   def prevRandao: Option[ByteString] = if isPoS then Some(mixHash) else None
+   ```
+
+3. **In `BlockPreparator.scala`** — update guard:
+   ```scala
+   // BEFORE
+   if block.header.isPostMerge then worldStateProxy
+   // AFTER
+   if block.header.isPoS then worldStateProxy
+   ```
+
+4. **In `OpCode.scala`** — update PREVRANDAO dispatch:
+   ```scala
+   // BEFORE
+   if s.env.blockHeader.isPostMerge then UInt256(s.env.blockHeader.mixHash)
+   // AFTER
+   if s.env.blockHeader.isPoS then UInt256(s.env.blockHeader.mixHash)
+   ```
+
+5. **In `VM.scala`** — update EIP-7610 CREATE conflict guard (2 sites — comment + code):
+   ```scala
+   // BEFORE
+   // BlockHeader.isPostMerge (difficulty==0 && baseFee set) as the Paris signal.
+   if context.blockHeader.isPostMerge then context.world.nonEmptyCodeOrNonceOrStorageAccount(contractAddr)
+   // AFTER
+   // BlockHeader.isPoS (difficulty==0 && baseFee set) as the Paris / PoS signal.
+   if context.blockHeader.isPoS then context.world.nonEmptyCodeOrNonceOrStorageAccount(contractAddr)
+   ```
+
+6. **Update any test files** found in step 1.
+
+7. **Confirm `PostMergeBlockHeaderValidator` and `TransitionBlockHeaderValidator`** do NOT
+   call `isPostMerge` — they use `difficulty == 0` directly. If they do call `isPostMerge`,
+   update those sites too.
+
+**Verify:**
+```bash
+# No remaining isPostMerge references (other than comments that explain the history)
+grep -rn "\.isPostMerge\b" src/ --include="*.scala"
+# Expected: 0 results
+
+# New predicate is present
+grep -rn "\.isPoS\b\|\.isPoW\b" src/ --include="*.scala" | grep "BlockHeader\|blockHeader\|header\."
+
+sbt compile-all
+sbt "testOnly *BlockPreparator*" "testOnly *VM*" "testOnly *OpCode*"
+sbt testVM
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. `git add src/main/scala/.../domain/BlockHeader.scala src/main/scala/.../ledger/BlockPreparator.scala src/main/scala/.../vm/OpCode.scala src/main/scala/.../vm/VM.scala` (+ any test files changed)
+3. `git commit -m "refactor: rename BlockHeader.isPostMerge → isPoS, add isPoW companion — align PoW/PoS vocabulary with chain-level isPoWChain pattern"`
+4. `SHA=$(git rev-parse --short HEAD)` → update `.local/docs/eth-sepolia-assumption-audit.md` Thread 2 entry with SHA
+5. **DELETE §ETH-T2-A**

@@ -33,6 +33,16 @@
 
 ---
 
+## §ETH-T3-LOG: Thread 3 treasury-zero log.error gate (BEACON, 2026-06-24)
+
+#### `f868b75a8` — gate treasury-zero log.error to ETC chains only
+- **What:** `creditBaseFeeToTreasury` logged `log.error` on every ETH/Sepolia block because `treasury-address=0` is the correct ETH configuration (base fee burns), not a misconfiguration. Added `networkType == NetworkType.ETC` guard so the error only fires for ETC chains where a non-zero treasury is expected.
+- **Why:** ETH/Sepolia assumption audit Thread 3 — log.error false-alarm, no consensus impact.
+- **Verification:** `sbt compile-all` — clean
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T3-LOG`
+
+---
+
 ## Open
 
 _(no open items)_

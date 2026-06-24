@@ -1287,6 +1287,27 @@ at the emission site in §8l-I.
 
 ---
 
+## §8c-M4 — VAULT: DataSource close cache invalidation ✅ DONE 2026-06-24 (by-design)
+
+**Verdict: by-design — no code logic change.**
+
+`RocksDbDataSource.close()` does not call `cache.invalidateAll()` and should not. The overlay
+caches (`LruCache` in `CachedReferenceCountedStateStorage`, `MapCache` in `CachedNodeStorage`)
+are owned by `DefaultStorages` — one abstraction tier above `DataSource`. Inserting cache
+invalidation into `close()` would require `RocksDbDataSource` to depend upward on the storage
+layer, inverting the layering. The `Cache` trait is not part of the `DataSource` contract.
+
+The stale-cache scenario is real but narrowly scoped: only when a test calls
+`dataSource.clear()` while a `CachedNodeStorage`/`CachedReferenceCountedStateStorage` backed
+by that source is still alive. Production nodes never re-open a closed DB in the same JVM.
+The fix belongs at the test fixture level: `afterEach { cache.clear(); dataSource.clear() }`.
+
+**Changes:**
+- `RocksDbDataSource.scala` — Scaladoc comment on `close()` explaining the layering rationale.
+- `storage-rocksdb.md` — "DataSource close protocol" note added under Quality Findings.
+
+---
+
 ## §8l-I — FORGE: VM.create() tracer balance fix ✅ DONE 2026-06-24
 
 **Gate:** §8l-R1 (done)
@@ -1312,3 +1333,26 @@ abort tuple flows through the trailing `tracer.foreach(_.onCallExit(...))` block
 - BEACON sign-off: SAFE for ETH/Sepolia (tracer callback only; no consensus-result change)
 - `grep -n "scalafix:ok" VM.scala` — suppression at former `:143` absent; remaining suppressions
   in `PrecompiledContracts.scala` (KZG/BLS/MODEXP crypto, unchanged) are unaffected
+
+---
+
+## §ETH-T3-LOG — Thread 3 treasury-zero log.error gate fix ✅ DONE 2026-06-24
+
+**Commit:** `f868b75a8`
+**File:** `ledger/BlockPreparator.scala`
+**Source:** ETH/Sepolia assumption audit Thread 3 (EIP-1559 fee routing)
+
+**Finding:** `BlockPreparator.creditBaseFeeToTreasury` correctly skips the treasury credit for
+ETH/Sepolia (treasury-address = 0 in both chain configs = "burn" path). However the surrounding
+`log.error` checking `treasuryAddress == Address(0)` fired unconditionally for every ETH/Sepolia
+block since zero-treasury is the intended configuration, not a misconfiguration:
+- Sepolia: `olympia-block-number=0` → active from genesis → error on every block
+- ETH mainnet: `olympia-block-number=12965000` → active for all Engine API blocks (post-Merge)
+
+**State transition was correct; only the log alarm was wrong.**
+
+**Fix:** Added `&& blockchainConfig.networkType == com.chipprbots.ethereum.utils.NetworkType.ETC`
+guard to the error branch. ETC chains with Olympia active but treasury-address=0 still get the
+error (genuine misconfiguration). ETH/Sepolia chains are silent.
+
+**Cross-refs:** `storage/ledger.md §ETH-T3-LOG`, `working-docs/DEFERRED-BACKLOG.md Part 10`
