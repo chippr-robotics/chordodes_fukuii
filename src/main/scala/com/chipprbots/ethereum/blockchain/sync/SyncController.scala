@@ -1261,6 +1261,13 @@ object SyncController {
     def start(): Behavior[Command] = {
       import syncConfig.{doFastSync, doSnapSync}
 
+      // Pre-flight: choose the startup sync mode from peer metrics. At initial startup
+      // peerCount=0 so no downgrade fires (peer capabilities unknown). The pure function
+      // is wired here for consistency; real downgrade decisions require a live peer count.
+      val startMode   = SyncController.selectSyncMode(0, 0, 0L, syncConfig)
+      val snapEnabled = doSnapSync && startMode == SyncMode.Snap
+      val fastEnabled = doFastSync || (doSnapSync && startMode == SyncMode.Fast)
+
       val nowMillis = System.currentTimeMillis()
 
       // One-shot operator override. Setting -Dfukuii.reset-fast-sync-done=true on the JVM
@@ -1439,7 +1446,7 @@ object SyncController {
           }
         }
 
-        (appStateStorage.isSnapSyncDone(), appStateStorage.isFastSyncDone(), doSnapSync, doFastSync) match {
+        (appStateStorage.isSnapSyncDone(), appStateStorage.isFastSyncDone(), snapEnabled, fastEnabled) match {
           case (false, _, true, _) =>
             // SNAP sync requested - just start it
             // It will fall back to fast sync if needed
@@ -2415,4 +2422,29 @@ object SyncController {
     */
   private[sync] def recentRootTarget(snapPeerHeights: Iterable[BigInt], margin: BigInt): Option[BigInt] =
     snapPeerHeights.filter(_ > 0).maxOption.map(best => (best - margin).max(1))
+
+  /** Startup sync mode resolved by [[selectSyncMode]]. */
+  private[sync] enum SyncMode:
+    case Snap, Fast, Regular
+
+  /** Pure pre-flight function: pick the startup sync mode from peer metrics and config.
+    *
+    * At initial startup `peerCount` and `snapCapablePeers` are both 0 (no peers observed yet); the function returns
+    * the config-specified mode unchanged. A SNAP→Fast downgrade fires only when at least one peer has been observed
+    * and fewer than 3 of them advertise SNAP support — e.g. on a quick restart with live peers still in the peer
+    * manager's table. The `latencyMs` parameter is reserved for future latency-based heuristics; unused now.
+    */
+  private[sync] def selectSyncMode(
+      peerCount: Int,
+      snapCapablePeers: Int,
+      @annotation.nowarn("msg=unused explicit parameter") latencyMs: Long,
+      config: SyncConfig
+  ): SyncMode =
+    if config.doSnapSync then
+      // Only downgrade when we have direct evidence that SNAP peers are insufficient.
+      // peerCount == 0 means we haven't observed any peers yet — stay optimistic.
+      if peerCount > 0 && snapCapablePeers < 3 then SyncMode.Fast
+      else SyncMode.Snap
+    else if config.doFastSync then SyncMode.Fast
+    else SyncMode.Regular
 }
