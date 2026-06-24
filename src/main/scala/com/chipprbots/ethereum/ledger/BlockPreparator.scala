@@ -91,7 +91,8 @@ class BlockPreparator(
     val isOlympiaActivated = blockHeader.number >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber
     if !isOlympiaActivated then world
     else {
-      if treasuryAddress == Address(0) && blockchainConfig.networkType == com.chipprbots.ethereum.utils.NetworkType.ETC then {
+      if treasuryAddress == Address(0) && blockchainConfig.networkType == com.chipprbots.ethereum.utils.NetworkType.ETC
+      then {
         log.error(
           "Olympia is active at block {} but treasury address is zero — baseFee revenue will not be credited",
           blockHeader.number

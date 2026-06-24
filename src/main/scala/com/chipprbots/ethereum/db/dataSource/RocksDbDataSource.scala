@@ -385,6 +385,14 @@ class RocksDbDataSource(
       .getOrElse(0L)
 
   /** This function closes the DataSource, without deleting the files used by it.
+    *
+    * No in-memory LRU cache invalidation is performed here — by design. The overlay caches (`LruCache`, `MapCache`)
+    * live in `db/storage/` (e.g. `CachedNodeStorage`, `CachedReferenceCountedStateStorage`) and are owned by
+    * `DefaultStorages`, one abstraction tier above `RocksDbDataSource`. This class has no reference to those caches:
+    * adding `cache.invalidateAll()` here would invert the layering (DataSource knowing about the storage layer above
+    * it). Cache invalidation on teardown is the responsibility of the component that owns both the cache and the
+    * DataSource — specifically `DefaultStorages` or any test fixture that calls `dataSource.clear()` while holding a
+    * `CachedNodeStorage` over the same source. See M4 note in `storage-rocksdb.md` for the full rationale.
     */
   override def close(): Unit = {
     log.info(s"About to close DataSource in path: ${rocksDbConfig.path}")
