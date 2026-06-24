@@ -984,80 +984,88 @@ abstract class CreateOp(code: Int, delta: Int) extends OpCode(code, delta, 1, _.
 
     // EIP-3860: Check initcode size limit
     val maxInitCodeSize = state.config.maxInitCodeSize
-    if state.config.eip3860Enabled && maxInitCodeSize.exists(max => inSize.toBigInt > max) then {
+    if state.config.eip3860Enabled && maxInitCodeSize.exists(max => inSize.toBigInt > max) then
       // Exceptional abort: initcode too large
-      return state.withStack(stack1.push(UInt256.Zero)).withError(InitCodeSizeLimit).step()
-    }
+      state.withStack(stack1.push(UInt256.Zero)).withError(InitCodeSizeLimit).step()
+    else {
 
-    // Gas cost already computed by OpCode.execute() and stored in state.opcodeGasCost
-    val availableGas = state.gas - state.opcodeGasCost
-    val startGas = state.config.gasCap(availableGas)
-    val (initCode, memory1) = state.memory.load(inOffset, inSize)
-    val world1 = state.world.increaseNonce(state.ownAddress)
+      // Gas cost already computed by OpCode.execute() and stored in state.opcodeGasCost
+      val availableGas = state.gas - state.opcodeGasCost
+      val startGas = state.config.gasCap(availableGas)
+      val (initCode, memory1) = state.memory.load(inOffset, inSize)
+      val world1 = state.world.increaseNonce(state.ownAddress)
 
-    val context: ProgramContext[W, S] = ProgramContext(
-      callerAddr = state.env.ownerAddr,
-      originAddr = state.env.originAddr,
-      recipientAddr = None,
-      gasPrice = state.env.gasPrice,
-      startGas = startGas,
-      inputData = initCode,
-      value = endowment,
-      endowment = endowment,
-      doTransfer = true,
-      blockHeader = state.env.blockHeader,
-      callDepth = state.env.callDepth + 1,
-      world = world1,
-      initialAddressesToDelete = state.addressesToDelete,
-      evmConfig = state.config,
-      originalWorld = state.originalWorld,
-      warmAddresses = state.accessedAddresses,
-      warmStorage = state.accessedStorageKeys,
-      transientStorage = state.transientStorage,
-      precompileRelocations = state.env.precompileRelocations,
-      blobVersionedHashes = state.env.blobVersionedHashes,
-      traceTransfers = state.env.traceTransfers
-    )
+      val context: ProgramContext[W, S] = ProgramContext(
+        callerAddr = state.env.ownerAddr,
+        originAddr = state.env.originAddr,
+        recipientAddr = None,
+        gasPrice = state.env.gasPrice,
+        startGas = startGas,
+        inputData = initCode,
+        value = endowment,
+        endowment = endowment,
+        doTransfer = true,
+        blockHeader = state.env.blockHeader,
+        callDepth = state.env.callDepth + 1,
+        world = world1,
+        initialAddressesToDelete = state.addressesToDelete,
+        evmConfig = state.config,
+        originalWorld = state.originalWorld,
+        warmAddresses = state.accessedAddresses,
+        warmStorage = state.accessedStorageKeys,
+        transientStorage = state.transientStorage,
+        precompileRelocations = state.env.precompileRelocations,
+        blobVersionedHashes = state.env.blobVersionedHashes,
+        traceTransfers = state.env.traceTransfers
+      )
 
-    val ((result, newAddress), stack2) = this match {
-      case CREATE => (state.vm.create(context), stack1)
-      case CREATE2 =>
-        val (Seq(salt), stack2) = stack1.pop(1)
-        (state.vm.create(context, Some(salt)), stack2)
-    }
+      val ((result, newAddress), stack2) = this match {
+        case CREATE => (state.vm.create(context), stack1)
+        case CREATE2 =>
+          val (Seq(salt), stack2) = stack1.pop(1)
+          (state.vm.create(context, Some(salt)), stack2)
+      }
 
-    result.error match {
-      case Some(error) =>
-        val world2 = if error == InvalidCall then state.world else world1
-        val resultStack = stack2.push(UInt256.Zero)
-        val returnData = if error == RevertOccurs then result.returnData else ByteString.empty
-        state
-          .spendGas(startGas - result.gasRemaining)
-          .withWorld(world2)
-          .withStack(resultStack)
-          .withReturnData(returnData)
-          .addAccessedAddresses(if error == InvalidCall then Set.empty else Set(newAddress))
-          .step()
+      result.error match {
+        case Some(error) =>
+          val world2 = if error == InvalidCall then state.world else world1
+          val resultStack = stack2.push(UInt256.Zero)
+          val returnData = if error == RevertOccurs then result.returnData else ByteString.empty
+          state
+            .spendGas(startGas - result.gasRemaining)
+            .withWorld(world2)
+            .withStack(resultStack)
+            .withReturnData(returnData)
+            .addAccessedAddresses(if error == InvalidCall then Set.empty else Set(newAddress))
+            .step()
 
-      case None =>
-        val resultStack = stack2.push(newAddress.toUInt256)
-        val internalTx =
-          InternalTransaction(CREATE, context.callerAddr, None, context.startGas, context.inputData, context.endowment)
+        case None =>
+          val resultStack = stack2.push(newAddress.toUInt256)
+          val internalTx =
+            InternalTransaction(
+              CREATE,
+              context.callerAddr,
+              None,
+              context.startGas,
+              context.inputData,
+              context.endowment
+            )
 
-        state
-          .spendGas(startGas - result.gasRemaining)
-          .withWorld(result.world)
-          .refundGas(result.gasRefund)
-          .withStack(resultStack)
-          .withAddressesToDelete(result.addressesToDelete)
-          .withLogs(result.logs)
-          .withMemory(memory1)
-          .withInternalTxs(internalTx +: result.internalTxs)
-          .withReturnData(ByteString.empty)
-          .addAccessedStorageKeys(result.accessedStorageKeys)
-          .addAccessedAddresses(result.accessedAddresses + newAddress)
-          .copy(transientStorage = result.transientStorage)
-          .step()
+          state
+            .spendGas(startGas - result.gasRemaining)
+            .withWorld(result.world)
+            .refundGas(result.gasRefund)
+            .withStack(resultStack)
+            .withAddressesToDelete(result.addressesToDelete)
+            .withLogs(result.logs)
+            .withMemory(memory1)
+            .withInternalTxs(internalTx +: result.internalTxs)
+            .withReturnData(ByteString.empty)
+            .addAccessedStorageKeys(result.accessedStorageKeys)
+            .addAccessedAddresses(result.accessedAddresses + newAddress)
+            .copy(transientStorage = result.transientStorage)
+            .step()
+      }
     }
   }
 

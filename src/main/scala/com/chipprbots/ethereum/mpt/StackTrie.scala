@@ -141,8 +141,10 @@ final class StackTrie(onTrieNode: (Array[Byte], ByteString, Array[Byte]) => Unit
             // Exact key match: update value in-place. Mirrors go-ethereum's Trie.insert which replaces the valueNode
             // rather than throwing. Required for SNAP proof verification where Phase 1 resolves a boundary leaf into
             // the tree and Phase 3 re-inserts the same key with the peer's claimed value.
+            // DEFER: early return mixed with in-place node mutation inside MPT trie construction
+            // (state-root calculation). Keep the short-circuit rather than restructure mutable trie state.
             node.value = value
-            return node
+            return node // scalafix:ok DisableSyntax.return
           }
           // Either duplicate key or our key extends past the existing leaf's terminator.
           // SNAP sync keys are all 64 hex nibbles (32-byte hashes), so both imply a duplicate insert.
@@ -244,35 +246,35 @@ final class StackTrie(onTrieNode: (Array[Byte], ByteString, Array[Byte]) => Unit
     *
     * No-op if `node` is already `Hashed` or `Empty`.
     */
-  private def hashNode(node: StNode, path: Array[Byte]): Unit = {
-    if node == null || node.typ == Hashed || node.typ == Empty then return
+  private def hashNode(node: StNode, path: Array[Byte]): Unit =
+    // No-op guard: already-finalised or empty nodes need no hashing.
+    if node == null || node.typ == Hashed || node.typ == Empty then ()
+    else
+      node.typ match {
+        case Leaf =>
+          val blob = encodeLeaf(node)
+          finalise(node, blob, path)
 
-    node.typ match {
-      case Leaf =>
-        val blob = encodeLeaf(node)
-        finalise(node, blob, path)
+        case Ext =>
+          // Hash the single child first.
+          val childPath = appendNibbles(path, node.key, 0, node.key.length)
+          hashNode(node.children(0), childPath)
+          val blob = encodeExt(node)
+          finalise(node, blob, path)
 
-      case Ext =>
-        // Hash the single child first.
-        val childPath = appendNibbles(path, node.key, 0, node.key.length)
-        hashNode(node.children(0), childPath)
-        val blob = encodeExt(node)
-        finalise(node, blob, path)
+        case Branch =>
+          // Hash all non-hashed children in slot order.
+          var i = 0
+          while i < 16 do {
+            val c = node.children(i)
+            if c != null && c.typ != Empty && c.typ != Hashed then hashNode(c, appendNibble(path, i.toByte))
+            i += 1
+          }
+          val blob = encodeBranch(node)
+          finalise(node, blob, path)
 
-      case Branch =>
-        // Hash all non-hashed children in slot order.
-        var i = 0
-        while i < 16 do {
-          val c = node.children(i)
-          if c != null && c.typ != Empty && c.typ != Hashed then hashNode(c, appendNibble(path, i.toByte))
-          i += 1
-        }
-        val blob = encodeBranch(node)
-        finalise(node, blob, path)
-
-      case _ => // unreachable
-    }
-  }
+        case _ => // unreachable
+      }
 
   /** Apply the inline-or-hash rule to a finalised node's encoded blob.
     *
@@ -404,19 +406,20 @@ final class StackTrie(onTrieNode: (Array[Byte], ByteString, Array[Byte]) => Unit
     }
 
   /** Big-endian, minimum-length encoding of a non-negative length. */
-  private def lengthAsBytes(n: Int): Array[Byte] = {
-    if n == 0 then return Array.emptyByteArray
-    val byteCount = (32 - Integer.numberOfLeadingZeros(n) + 7) / 8
-    val out = new Array[Byte](byteCount)
-    var i = byteCount - 1
-    var v = n
-    while i >= 0 do {
-      out(i) = (v & 0xff).toByte
-      v >>>= 8
-      i -= 1
+  private def lengthAsBytes(n: Int): Array[Byte] =
+    if n == 0 then Array.emptyByteArray
+    else {
+      val byteCount = (32 - Integer.numberOfLeadingZeros(n) + 7) / 8
+      val out = new Array[Byte](byteCount)
+      var i = byteCount - 1
+      var v = n
+      while i >= 0 do {
+        out(i) = (v & 0xff).toByte
+        v >>>= 8
+        i -= 1
+      }
+      out
     }
-    out
-  }
 }
 
 object StackTrie {
@@ -486,7 +489,9 @@ object StackTrie {
     while i < n do {
       val ai = a(i) & 0xff
       val bi = b(i) & 0xff
-      if ai != bi then return if ai < bi then -1 else 1
+      // DEFER: early return inside a while loop; converting changes loop iteration semantics for a
+      // comparator that orders MPT keys (state-root sort order). Keep the short-circuit.
+      if ai != bi then return (if ai < bi then -1 else 1) // scalafix:ok DisableSyntax.return
       i += 1
     }
     Integer.compare(a.length, b.length)

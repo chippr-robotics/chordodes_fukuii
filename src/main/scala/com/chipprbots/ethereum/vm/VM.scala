@@ -136,8 +136,11 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
         // EIP-3860: Check initcode size limit
         val maxInitCodeSize = context.evmConfig.maxInitCodeSize
         if context.evmConfig.eip3860Enabled && maxInitCodeSize.exists(max => context.inputData.size > max) then {
-          // Exceptional abort: initcode too large (consumes all gas)
-          return (
+          // Exceptional abort: initcode too large (consumes all gas).
+          // DEFER: this early `return` exits create() before the trailing onCallExit tracer
+          // block (lines ~203). Converting to an expression arm would make onCallExit fire for
+          // the abort case, changing observable tracer emission. Keep the short-circuit.
+          return ( // scalafix:ok DisableSyntax.return
             invalidCallResult(context, Set.empty, Set.empty).copy(error = Some(InitCodeSizeLimit), gasRemaining = 0),
             Address(0)
           )

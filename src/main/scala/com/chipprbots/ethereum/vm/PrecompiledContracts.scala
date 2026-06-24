@@ -268,7 +268,11 @@ object PrecompiledContracts {
         val expLength = getLength(context.inputData, 1)
         val modLength = getLength(context.inputData, 2)
         if baseLength > maxOperandLength || expLength > maxOperandLength || modLength > maxOperandLength then {
-          return ProgramResult(
+          // DEFER: nested guard inside the EIP-7823 (Unit-typed) validation block; the method
+          // value (ProgramResult / MODEXP output) is produced below. An expression rewrite would
+          // require restructuring the validation into a separate boolean and is byte-level risky
+          // for a precompile result that feeds state. Keep the short-circuit.
+          return ProgramResult( // scalafix:ok DisableSyntax.return
             ByteString.empty,
             BigInt(0),
             context.world,
@@ -646,7 +650,9 @@ object PrecompiledContracts {
     */
   private def blsNativeOp(opByte: Byte, inputData: ByteString): Option[ByteString] = {
     import org.hyperledger.besu.nativelib.bls12_381.LibEthPairings
-    if !LibEthPairings.ENABLED then return None
+    // DEFER: guard in the BLS12-381 native precompile path (crypto primitive). Keep the
+    // short-circuit; an expression rewrite is byte-level risky for consensus crypto.
+    if !LibEthPairings.ENABLED then return None // scalafix:ok DisableSyntax.return
     try {
       val resultBuf = new Array[Byte](LibEthPairings.EIP2537_PREALLOCATE_FOR_RESULT_BYTES)
       val errorBuf = new Array[Byte](LibEthPairings.EIP2537_PREALLOCATE_FOR_ERROR_BYTES)
@@ -750,7 +756,11 @@ object PrecompiledContracts {
     def gas(inputData: ByteString, etcFork: EtcFork, ethFork: EthFork): BigInt = KZG_GAS
 
     def exec(inputData: ByteString): Option[ByteString] = {
-      if inputData.length != 192 then return None
+      // DEFER (all returns in this method): EIP-4844 KZG point-evaluation crypto primitive.
+      // These are sequential validation guards feeding a precompile result; the return inside
+      // the try block below (line ~786) also has try/catch-sensitive control flow. Keep the
+      // short-circuits — expression rewrites are byte-level risky for consensus crypto.
+      if inputData.length != 192 then return None // scalafix:ok DisableSyntax.return
 
       val versionedHash = inputData.slice(0, 32)
       val z = inputData.slice(32, 64)
@@ -759,17 +769,17 @@ object PrecompiledContracts {
       val proof = inputData.slice(144, 192)
 
       // Verify the versioned hash matches commitment via SHA256
-      if versionedHash(0) != VERSIONED_HASH_VERSION_KZG then return None
+      if versionedHash(0) != VERSIONED_HASH_VERSION_KZG then return None // scalafix:ok DisableSyntax.return
 
       // Verify z < BLS_MODULUS and y < BLS_MODULUS
       val zBigInt = BigInt(1, z.toArray)
       val yBigInt = BigInt(1, y.toArray)
-      if zBigInt >= BLS_MODULUS || yBigInt >= BLS_MODULUS then return None
+      if zBigInt >= BLS_MODULUS || yBigInt >= BLS_MODULUS then return None // scalafix:ok DisableSyntax.return
 
       // Verify the versioned hash matches SHA256(commitment)[1:] with version prefix
       val commitmentHash = java.security.MessageDigest.getInstance("SHA-256").digest(commitment.toArray)
       commitmentHash(0) = VERSIONED_HASH_VERSION_KZG
-      if ByteString(commitmentHash) != versionedHash then return None
+      if ByteString(commitmentHash) != versionedHash then return None // scalafix:ok DisableSyntax.return
 
       // Verify the KZG proof using c-kzg-4844
       try {
@@ -779,7 +789,7 @@ object PrecompiledContracts {
           y.toArray,
           proof.toArray
         )
-        if !isValid then return None
+        if !isValid then return None // scalafix:ok DisableSyntax.return
       } catch {
         case _: Exception =>
         // If KZG library not loaded or verification fails, try without native library

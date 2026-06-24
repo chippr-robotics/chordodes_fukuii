@@ -48,36 +48,39 @@ class BlockPreparator(
   protected[ledger] def payBlockReward(
       block: Block,
       worldStateProxy: InMemoryWorldStateProxy
-  )(implicit blockchainConfig: BlockchainConfig): InMemoryWorldStateProxy = {
+  )(implicit blockchainConfig: BlockchainConfig): InMemoryWorldStateProxy =
     // Post-merge: no PoW rewards, no ommer rewards. EIP-4895 withdrawals are applied by
     // BlockExecution.processWithdrawals after payBlockReward returns; applying them here
     // too would double-credit every withdrawal and break state-root validation.
-    if block.header.isPostMerge then {
-      return worldStateProxy
+    if block.header.isPostMerge then worldStateProxy
+    else {
+      val blockNumber = block.header.number
+      val minerRewardForBlock = blockRewardCalculator.calculateMiningRewardForBlock(blockNumber)
+      val minerRewardForOmmers =
+        blockRewardCalculator.calculateMiningRewardForOmmers(blockNumber, block.body.uncleNodesList.size)
+      val minerAddress = Address(block.header.beneficiary)
+
+      val minerReward = minerRewardForOmmers + minerRewardForBlock
+
+      // ECIP-1111: Treasury credit BEFORE miner/ommer rewards (spec order per ECIP-1111)
+      val worldAfterTreasury = creditBaseFeeToTreasury(block.header, blockchainConfig.treasuryAddress, worldStateProxy)
+
+      val worldAfterPayingBlockReward = increaseAccountBalance(minerAddress, UInt256(minerReward))(worldAfterTreasury)
+      log.debug("Paying block {} reward of {} to miner with address {}", blockNumber, minerReward, minerAddress)
+
+      block.body.uncleNodesList.foldLeft(worldAfterPayingBlockReward) { (ws, ommer) =>
+        val ommerAddress = Address(ommer.beneficiary)
+        val ommerReward = blockRewardCalculator.calculateOmmerRewardForInclusion(blockNumber, ommer.number)
+
+        log.debug(
+          "Paying block {} reward of {} to ommer with account address {}",
+          blockNumber,
+          ommerReward,
+          ommerAddress
+        )
+        increaseAccountBalance(ommerAddress, UInt256(ommerReward))(ws)
+      }
     }
-
-    val blockNumber = block.header.number
-    val minerRewardForBlock = blockRewardCalculator.calculateMiningRewardForBlock(blockNumber)
-    val minerRewardForOmmers =
-      blockRewardCalculator.calculateMiningRewardForOmmers(blockNumber, block.body.uncleNodesList.size)
-    val minerAddress = Address(block.header.beneficiary)
-
-    val minerReward = minerRewardForOmmers + minerRewardForBlock
-
-    // ECIP-1111: Treasury credit BEFORE miner/ommer rewards (spec order per ECIP-1111)
-    val worldAfterTreasury = creditBaseFeeToTreasury(block.header, blockchainConfig.treasuryAddress, worldStateProxy)
-
-    val worldAfterPayingBlockReward = increaseAccountBalance(minerAddress, UInt256(minerReward))(worldAfterTreasury)
-    log.debug("Paying block {} reward of {} to miner with address {}", blockNumber, minerReward, minerAddress)
-
-    block.body.uncleNodesList.foldLeft(worldAfterPayingBlockReward) { (ws, ommer) =>
-      val ommerAddress = Address(ommer.beneficiary)
-      val ommerReward = blockRewardCalculator.calculateOmmerRewardForInclusion(blockNumber, ommer.number)
-
-      log.debug("Paying block {} reward of {} to ommer with account address {}", blockNumber, ommerReward, ommerAddress)
-      increaseAccountBalance(ommerAddress, UInt256(ommerReward))(ws)
-    }
-  }
 
   /** ECIP-1111: Credit baseFee * gasUsed to treasury. Applied BEFORE miner and ommer rewards per ECIP-1111 spec. */
   private def creditBaseFeeToTreasury(
@@ -86,27 +89,28 @@ class BlockPreparator(
       world: InMemoryWorldStateProxy
   )(implicit blockchainConfig: BlockchainConfig): InMemoryWorldStateProxy = {
     val isOlympiaActivated = blockHeader.number >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber
-    if !isOlympiaActivated then return world
-
-    if treasuryAddress == Address(0) then {
-      log.error(
-        "Olympia is active at block {} but treasury address is zero — baseFee revenue will not be credited",
-        blockHeader.number
-      )
-    }
-
-    blockHeader.baseFee match {
-      case Some(baseFee) if baseFee > 0 && blockHeader.gasUsed > 0 && treasuryAddress != Address(0) =>
-        val treasuryCredit = baseFee * blockHeader.gasUsed
-        log.debug(
-          "Crediting baseFee revenue {} (baseFee={} * gasUsed={}) to treasury {}",
-          treasuryCredit,
-          baseFee,
-          blockHeader.gasUsed,
-          treasuryAddress
+    if !isOlympiaActivated then world
+    else {
+      if treasuryAddress == Address(0) then {
+        log.error(
+          "Olympia is active at block {} but treasury address is zero — baseFee revenue will not be credited",
+          blockHeader.number
         )
-        increaseAccountBalance(treasuryAddress, UInt256(treasuryCredit))(world)
-      case _ => world
+      }
+
+      blockHeader.baseFee match {
+        case Some(baseFee) if baseFee > 0 && blockHeader.gasUsed > 0 && treasuryAddress != Address(0) =>
+          val treasuryCredit = baseFee * blockHeader.gasUsed
+          log.debug(
+            "Crediting baseFee revenue {} (baseFee={} * gasUsed={}) to treasury {}",
+            treasuryCredit,
+            baseFee,
+            blockHeader.gasUsed,
+            treasuryAddress
+          )
+          increaseAccountBalance(treasuryAddress, UInt256(treasuryCredit))(world)
+        case _ => world
+      }
     }
   }
 
@@ -730,25 +734,26 @@ class BlockPreparator(
     import com.chipprbots.ethereum.rlp.RLPImplicitConversions.toEncodeable
     import com.chipprbots.ethereum.rlp.RLPImplicits.given
 
-    if auth.chainId != 0 && auth.chainId != blockchainConfig.chainId then return None
-
-    val sigHash = com.chipprbots.ethereum.crypto.kec256(
-      encode(
-        PrefixedRLPEncodable(
-          0x05,
-          RLPList(
-            toEncodeable(auth.chainId),
-            toEncodeable(auth.address.toArray),
-            toEncodeable(auth.nonce)
+    if auth.chainId != 0 && auth.chainId != blockchainConfig.chainId then None
+    else {
+      val sigHash = com.chipprbots.ethereum.crypto.kec256(
+        encode(
+          PrefixedRLPEncodable(
+            0x05,
+            RLPList(
+              toEncodeable(auth.chainId),
+              toEncodeable(auth.address.toArray),
+              toEncodeable(auth.nonce)
+            )
           )
         )
       )
-    )
-    val rawV = if auth.v == 0 then ECDSASignature.negativePointSign else ECDSASignature.positivePointSign
-    val ecdsaSig = ECDSASignature(auth.r, auth.s, BigInt(rawV))
-    ecdsaSig.publicKey(sigHash).flatMap { key =>
-      val addrBytes = com.chipprbots.ethereum.crypto.kec256(key).slice(12, 32)
-      if addrBytes.length == Address.Length then Some(Address(addrBytes)) else None
+      val rawV = if auth.v == 0 then ECDSASignature.negativePointSign else ECDSASignature.positivePointSign
+      val ecdsaSig = ECDSASignature(auth.r, auth.s, BigInt(rawV))
+      ecdsaSig.publicKey(sigHash).flatMap { key =>
+        val addrBytes = com.chipprbots.ethereum.crypto.kec256(key).slice(12, 32)
+        if addrBytes.length == Address.Length then Some(Address(addrBytes)) else None
+      }
     }
   }
 

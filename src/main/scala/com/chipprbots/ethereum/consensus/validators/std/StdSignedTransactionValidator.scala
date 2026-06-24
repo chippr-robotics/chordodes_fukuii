@@ -60,27 +60,27 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
   private def validateOlympiaTxTypes(
       stx: SignedTransaction,
       blockHeader: BlockHeader
-  )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] = {
-    if blockchainConfig.networkType == com.chipprbots.ethereum.utils.NetworkType.ETH then
-      return Right(SignedTransactionValid)
-    if blockHeader.number >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber then
-      return Right(SignedTransactionValid)
-    stx.tx match {
-      case _: TransactionWithDynamicFee =>
-        Left(
-          SignedTransactionError.TransactionSyntaxError(
-            "TYPE_2_TX_NOT_SUPPORTED: EIP-1559 dynamic-fee transactions require Olympia activation"
+  )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] =
+    // ETH gates these tx types via London/Prague, not Olympia; from Olympia onwards ETC accepts them.
+    if blockchainConfig.networkType == com.chipprbots.ethereum.utils.NetworkType.ETH then Right(SignedTransactionValid)
+    else if blockHeader.number >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber then
+      Right(SignedTransactionValid)
+    else
+      stx.tx match {
+        case _: TransactionWithDynamicFee =>
+          Left(
+            SignedTransactionError.TransactionSyntaxError(
+              "TYPE_2_TX_NOT_SUPPORTED: EIP-1559 dynamic-fee transactions require Olympia activation"
+            )
           )
-        )
-      case _: SetCodeTransaction =>
-        Left(
-          SignedTransactionError.TransactionSyntaxError(
-            "TYPE_4_TX_NOT_SUPPORTED: EIP-7702 set-code transactions require Olympia activation"
+        case _: SetCodeTransaction =>
+          Left(
+            SignedTransactionError.TransactionSyntaxError(
+              "TYPE_4_TX_NOT_SUPPORTED: EIP-7702 set-code transactions require Olympia activation"
+            )
           )
-        )
-      case _ => Right(SignedTransactionValid)
-    }
-  }
+        case _ => Right(SignedTransactionValid)
+      }
 
   private def validateBlobTransactionSupport(
       stx: SignedTransaction,
