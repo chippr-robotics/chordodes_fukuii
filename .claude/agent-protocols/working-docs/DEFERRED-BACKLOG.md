@@ -669,6 +669,123 @@ Use `sbt compile-all` to confirm import removal is safe before deleting any adap
 
 ---
 
+#### §8k-K — LOOM: SyncController child refs Classic→Typed (unblocks §7d Lens 4 + Lens 6)
+
+**Agent:** LOOM
+**Risk:** MEDIUM — SyncController is the central sync state machine; touches all sync modes
+**Gate:** Any time — targeted ref-type change, not a full actor migration
+
+**Background:**
+SyncController is already a `Behavior[Command]` (Typed). The issue is it holds its children
+as Classic `ActorRef` and stops them with `PoisonPill`. Fixing this does NOT require rewriting
+the whole actor — only the child ref types and stop calls.
+
+**Unblocks:**
+- §7d Lens 6: 15 `PoisonPill` send-sites in SyncController (`fastSync`, `snapSync`,
+  `regularSync`, `headerBootstrap`, `originalSnapSyncRef`)
+- §7d Lens 4: once SyncController accepts `TypedActorRef[StorageRecoveryActor.Command]`
+  instead of Classic `ActorRef`, StorageRecoveryActor can drop `.toClassic` and narrow
+  from `Behavior[Any]` to `Behavior[Command]` (same for BytecodeRecoveryActor)
+
+**Scope (read-only survey first):**
+```bash
+# Child ref types currently held as Classic ActorRef
+grep -n "runningFastSync\|runningSnapSync\|runningRegularSync\|startRegularSync\|startSnapSync" \
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala | head -20
+
+# All PoisonPill targets
+grep -n "PoisonPill" \
+  src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala
+```
+
+**Prompt:**
+```
+Use LOOM to narrow SyncController's child refs from Classic ActorRef to Typed ActorRef[T].
+File: src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala
+
+Context:
+- SyncController IS already Behavior[Command] (Typed). This is NOT a full actor migration.
+- The 4 child state machine params are Classic ActorRef:
+    runningFastSync(fastSync: ActorRef)
+    runningSnapSync(snapSync: ActorRef)
+    runningRegularSync(regularSync: ActorRef)
+    runningRegularSyncWithBackfill(regularSync: ActorRef, snapSync: ActorRef)
+- SyncController sends PoisonPill to stop children (15 send-sites). In Typed, use
+  ctx.stop(child) or a typed Stop command.
+- The private termination ADT members carry Classic refs:
+    SnapSyncTerminated(ref: ActorRef), RegularSyncTerminated(ref: ActorRef), etc.
+
+Run pre-migration-checklist for SyncController first. Then:
+
+Phase 1 — Survey (read-only):
+  1. For each child type (FastSync, SNAPSyncController, RegularSync, PivotHeaderBootstrap),
+     identify the Typed Command ADT entry point (the top-level Command sealed trait).
+  2. List all spawn/obtain sites where SyncController gets a Classic ActorRef to a child.
+  3. Confirm each child IS a Typed actor (Behavior[T]) already.
+
+Phase 2 — Narrow child ref types:
+  4. Change the state machine params: ActorRef → ActorRef[ChildActor.Command]
+  5. Update private termination ADT: SnapSyncTerminated(ref: ActorRef[FastSync.Command]) etc.
+  6. Replace every `child ! PoisonPill` with ctx.stop(child) or a typed Stop message.
+  7. Replace `.toTyped[Nothing]` in ctx.watchWith/ctx.unwatch calls with the narrowed ref.
+
+Phase 3 — Downstream: StorageRecoveryActor + BytecodeRecoveryActor
+  8. SyncController currently receives these actors' Classic refs. Once it accepts Typed refs,
+     StorageRecoveryActor can change:
+       syncController ! RequestRecentRoot(ctx.self.toClassic)
+     to:
+       syncController ! RequestRecentRoot(ctx.self)
+  9. With .toClassic removed, Behavior[Any] can be narrowed to Behavior[Command] in both actors.
+
+sbt compile-all after each phase. testEssential at end.
+Commit per phase:
+  "refactor(capstone-sc-p1): SyncController child refs Classic→Typed survey"
+  "refactor(capstone-sc-p2): SyncController child refs narrowed; PoisonPill → ctx.stop (15 sites)"
+  "refactor(capstone-sc-p3): StorageRecoveryActor + BytecodeRecoveryActor Behavior[Any] → Behavior[Command]"
+```
+
+---
+
+#### §8k-L — HERALD: PeerManagerActor TCP PoisonPill — permanent floor or migrateable?
+
+**Agent:** HERALD
+**Risk:** LOW — read-only assessment
+**Gate:** Any time — standalone assessment
+
+**Background:**
+PeerManagerActor IS already Typed (migrated in `05e0c003b`). It still imports and uses
+`PoisonPill` to stop TCP connection actors (`connection ! PoisonPill` at lines 982, 986, 990).
+These connection actors are managed by the TCP/RLPx layer. Assessment needed to determine
+whether these 3 PoisonPill sites are permanent TCP floor (like ServerActor/RLPxConnectionHandler)
+or whether they can be replaced with Typed stop once the TCP layer is cleaned up.
+
+**Prompt:**
+```
+Assess the 3 PoisonPill send-sites in PeerManagerActor to determine if they are
+permanent TCP floor or migratable.
+
+File: src/main/scala/com/chipprbots/ethereum/network/PeerManagerActor.scala
+Lines: 982, 986, 990 — all send `connection ! PoisonPill`
+
+Questions to answer:
+1. What type is `connection` at each call site? (Classic ActorRef, TypedActorRef, or
+   a field in a case class?)
+2. Where is `connection` created/obtained — is it spawned by PeerManagerActor (child)
+   or received from an external Classic actor (non-child)?
+3. If it's a non-child Classic actor (e.g., obtained from Tcp.Connected or RLPx),
+   PoisonPill may be the correct stop mechanism and counts as permanent TCP floor.
+4. If it's a child spawned by PeerManagerActor, it can be stopped via ctx.stop(child)
+   once its type is narrowed.
+
+Output: for each of the 3 sites, state:
+  - PERMANENT FLOOR: count toward §8k-J TCP floor census (update from 4 to 4+N)
+  - MIGRATEABLE: describe the ref type and the replacement stop pattern
+
+No code changes — read-only assessment only.
+```
+
+---
+
 #### §8k-CQ1 — MITHRIL: Remove `KnownNodesManager.GetKnownNodes` dead compat shim
 
 **Agent:** MITHRIL
