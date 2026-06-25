@@ -13,3 +13,4 @@ Classic TCP bridge actors (ServerActor, RLPxConnectionHandler) intentionally rem
 | [rlpx.md](rlpx.md) | `network/rlpx/` + `handshaker/` | W3-W1/W2 Classic TCP bridges retained; RLPx connection handler |
 | [discovery.md](discovery.md) | `network/discovery/` | W3-PLN/NET DNS/peer discovery Typed migration |
 | [snap-server.md](snap-server.md) | `network/snapserver/` | SNAP server (NPMA-embedded); INFO-8/INFO-9 deferred |
+| [messages.md](messages.md) | `network/p2p/messages/` | ETH68/69/70 + SNAP/1 codec property-based round-trip tests (8h, 2026-06-25) |

@@ -2497,3 +2497,34 @@ site from §8k-O and is the natural successor to this work.
 pass; code changes deferred to LOOM migration commits).
 
 **Cross-refs:** `network/peers.md §8k-P`, `working-docs/DEFERRED-BACKLOG.md J3 (strikethrough)`
+
+---
+
+### 8h — Property-Based Testing Expansion ✅ DONE (2026-06-25)
+
+**Agent:** HERALD (wire protocol) + EYE (validation)
+**Commits:** `9932d3b86` (ETH packets), `f2659102a` (SNAP)
+**Branch:** `scala3-cleanup-june`
+
+**What was done:**
+
+Added `forAll { msg => decode(encode(msg)) == msg }` property-based round-trip tests for all ETH68/69/70 and SNAP/1 wire protocol message types.
+
+**`ETHPacketsRoundTripSpec.scala`** — 18 `forAll` tests:
+- `Status68/69/70`, `NewBlockHashes`, `BlockRangeUpdate`
+- `GetBlockHeaders` by-number (Left) and by-hash (Right) — disambiguation via `block.bytes.length < 32`
+- `BlockHeaders`, `BlockBodies` (empty Seq — RLPList reference-equality constraint)
+- `GetBlockBodies`, `GetPooledTransactions`, `GetReceipts/69/70`, `NewPooledTransactionHashes`
+- `Receipts68/69/70` — assert on scalar fields only (`requestId`, `lastBlockIncomplete`); `RLPList` uses Array reference equality so full-body assertion is unsound
+
+**`SNAPRoundTripSpec.scala`** — 8 `forAll` tests (all SNAP/1 message types):
+- `GetAccountRange`, `AccountRange` (slim-format round-trip through `SnapServer.toSlimAccountRlp` + normalize-on-decode; full `shouldBe` works because `Account` defaults survive the encoding losslessly)
+- `GetStorageRanges`, `StorageRanges` (nested `Seq[Seq[(ByteString, ByteString)]]` slots)
+- `GetByteCodes`, `ByteCodes`, `GetTrieNodes` (nested path lists), `TrieNodes`
+- `boundaryHashGen` exercises `0x00…00` and `0xff…ff` range endpoints with 2/5 frequency
+
+**Verification:** `sbt "testOnly *ETHPacketsRoundTripSpec*"` — 18/18 PASS. `sbt "testOnly *SNAPRoundTripSpec*"` — 8/8 PASS. `sbt scalafmtAll` — 2 sources reformatted.
+
+**Gaps remaining (explicit non-scope):**
+- Domain type invariants (`Block`, `BlockHeader`, `Transaction`) — deferred (8h original scope item 2)
+- Cryptographic operations (`keccak256`, `recoverPublicKey`) — deferred (8h original scope item 4)

@@ -77,6 +77,7 @@ When 5+ entries share a Type or package, open a dedicated sprint:
 | SyncController IMPLICIT EC.global (P8-Item4) | `blockchain/sync/SyncController.scala:15` | Cleared 2026-06-22: `a5132aa80` (C2) — `import scala.concurrent.ExecutionContext.Implicits.global` removed; `given ec: ExecutionContext = ctx.executionContext` added. Pre-fixed before P8 session. |
 | §8k-R1 Classic bridge audit | `.local/docs/classic-interop-audit.md` | Cleared 2026-06-23: PRISM audit complete (535 lines). ~130 prod bridge sites + 2 test actorSelection. 14 clusters mapped to 8 root causes. 8 pre-CAPSTONE elimination sprints (§8k-A through §8k-I) drafted in DEFERRED-BACKLOG.md + SPRINT-QUEUE.md sprint sequence table. Permanent floor: 4 TCP bridges. |
 | §8k-CQ1 dead shim removal | `network/KnownNodesManager.scala:113–117` + `src/it/.../CommonFakePeer.scala:150–167` | Cleared 2026-06-24: `d4cc7a7fa` — `case object GetKnownNodes` + Scaladoc + Classic bridge handler (`case GetKnownNodes => ...`) + stale `// Classic compat` comments + unused `implicit private val scheduler` + `implicit private val bridgeTimeout` vals removed. `GetKnownNodesReq(replyTo: ActorRef[KnownNodes])` Typed replacement (line 105) retained. 2 files changed, 22 lines deleted. `compile-all` green, 52/52 `KnownNodesManagerSpec` tests pass. |
+| ETH/Sepolia Test Coverage Gaps (Thread 7, 2026-06-24) — 5 gaps | `vm/EvmConfig.scala`, `ledger/BlockExecution.scala`, `engine/EngineApiController.scala`, `network/PeerActor.scala` + `BlockFetcher.scala`, `network/ForkIdValidator` | Cleared 2026-06-25: Gap 1 → `ac0e25b62` (T7-A `EvmConfigTimestampForkSpec`); Gap 2 → `cb2e2aec1` (T7-B `Eip4788BeaconRootStorageSpec`); Gap 3 → `6e72ad2a0` (T7-C `EngineApiVersionRejectionSpec`); Gap 4 → `c7cc5d131` (T7-D `BlockRangeUpdateDecodePathSpec`); Gap 5 → `3d362be30` (T7-E `ForkIdSepoliaSpec`). All 5 resolved. |
 
 ---
 
@@ -195,19 +196,9 @@ construction:
 
 ---
 
-## ETH/Sepolia Test Coverage Gaps (Thread 7 audit, 2026-06-24)
+## ETH/Sepolia Test Coverage Gaps (Thread 7 audit) ✅ ALL DONE 2026-06-25
 
-Systematic under-coverage of the ETH/Sepolia path discovered during coverage-ratio audit. 5 gaps, ordered by risk.
-
-| # | Gap | File(s) | Risk | Recommended test |
-|---|-----|---------|------|-----------------|
-| 1 | `EvmConfig.forBlock(blockNumber, timestamp, config)` — the 3-arg timestamp dispatch path has zero unit tests asserting opcode set / fee schedule at each ETH fork timestamp | `vm/EvmConfig.scala:32-72` | **Critical** | `EvmConfigTimestampForkSpec` — for Shanghai/Cancun/Prague/Osaka timestamps, assert opcode list membership and fee schedule identity (direct analog of `OlympiaEipEnablementSpec`) |
-| 2 | `BlockExecution.applyEip4788` ring-buffer write (timestamp slot + root slot layout, contract deployment at Cancun activation, wrap-around at 8192) is entirely untested | `ledger/BlockExecution.scala:202-233` | **High** | `Eip4788BeaconRootStorageSpec` — mirror `BlockHashHistorySpec` for EIP-4788; execute post-Cancun block with non-zero `parentBeaconBlockRoot`, read-back storage slots, verify wrap-around |
-| 3 | Engine API version-mismatch guards (`getPayloadV2` for Cancun block → `-38005`, `newPayloadV3` pre-Cancun → `InvalidParams`, etc.) exercised only by hive (which does not run against fukuii in CI) | `engine/EngineApiController.scala:138-143,255-262,363-368` | **High** | `EngineApiGetPayloadVersionSpec` — unit-test all 5 cross-version rejection guards without requiring a live node |
-| 4 | `PeerActor:551` and `BlockFetcher:486` match `ETH69.BlockRangeUpdate` but decoder emits `ETHPackets.BlockRangeUpdate`; existing `BlockFetcherSpec` masks gap by constructing wrong type (also in CHASE-QUEUE above) | `network/PeerActor.scala:551`, `sync/regular/BlockFetcher.scala:486` | **High** | `BlockRangeUpdateDecodePathSpec` — feed decoder output type into both handlers, assert correct head-follow and protocol-breach disconnect behavior |
-| 5 | Sepolia `ForkId` checksum chain (6 timestamps + `merge-netsplit-block-number`) has no unit test; regression in CRC32 sequence would cause all Sepolia peers to be rejected at handshake | `network/ForkIdValidator`, `sepolia-chain.conf` | **Medium** | `ForkIdSepoliaSpec` — assert known Sepolia fork-id checksums at each fork timestamp boundary |
-
-Occurrence count: 5 distinct gaps across 3 subsystems (vm, ledger, network/engine).
+All 5 gaps resolved — see Cleared entries log above for commit SHAs. Full spec preserved in `completed/` via DEFERRED-BACKLOG §I1/I2.
 
 ---
 
@@ -220,3 +211,14 @@ Discovered during §8k-B §7d Lens 6 sweep.
 | 1 | `import org.apache.pekko.actor.*` wildcard — only specific types (likely `Cancellable`, `Scheduler`) are needed; wildcard pulls in all Classic types | `blockchain/sync/snap/SNAPRequestTracker.scala:3` | **Low** | Replace wildcard with specific imports (read file to determine exact set); `sbt compile-all` to verify |
 
 Occurrence count: 1 file.
+
+**Clearout prompt:**
+
+> Use the MITHRIL agent. Replace the Pekko Classic wildcard import in `SNAPRequestTracker.scala`:
+> 1. Read `blockchain/sync/snap/SNAPRequestTracker.scala:1-20` — identify which specific Classic types are actually referenced in the file.
+> 2. Replace line 3 `import org.apache.pekko.actor.*` with the specific imports only (e.g., `import org.apache.pekko.actor.{Cancellable, Scheduler}` or whatever the file actually uses).
+> 3. `sbt compile-all` — 0 errors.
+> 4. `sbt scalafmtAll`.
+> 5. `git add src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/SNAPRequestTracker.scala`
+> 6. `git commit -m "chore(snap): replace Pekko Classic wildcard import with specific types in SNAPRequestTracker (§7d)"`
+> After committing, add SHA to Cleared entries log and remove this section.

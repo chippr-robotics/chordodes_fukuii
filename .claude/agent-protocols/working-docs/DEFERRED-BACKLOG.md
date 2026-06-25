@@ -572,48 +572,6 @@ rewrite.scala3.removeOptionalBraces = true
 
 ---
 
-### 8h — Property-Based Testing Expansion
-
-**Current state**: 589 ScalaCheck usages already exist in the test suite — the codebase has
-`forAll` / `Gen.*` / `Arbitrary` in use. However coverage is uneven.
-
-**Gaps to fill**:
-1. **RLP codec round-trip properties**: Every RLP-encodeable domain type should have a
-   `forAll { value => decode(encode(value)) == value }` property test. Missing for several
-   new message types added in ETH68/69/70 work.
-2. **Domain type invariant properties**: `Block`, `BlockHeader`, `Transaction` have
-   invariants (e.g., `gasUsed <= gasLimit`) that should be property-tested, not just
-   unit-tested with fixed examples.
-3. **SNAP protocol message codecs**: `AccountRangePacket`, `StorageRangesPacket`, `ByteCodesPacket`
-   — check if fuzz-tested with boundary values (empty ranges, maximum-size ranges, malformed keys).
-4. **Cryptographic operations**: `keccak256`, `recoverPublicKey` — check property coverage.
-
-**Approach**: R2 (test quality audit) should enumerate existing ScalaCheck coverage. Add missing
-properties during the sprint that migrates the relevant actor (natural pairing — you're already
-touching the code and understand the invariants).
-
-**Gate**: R2 (test quality audit) ✅ COMPLETE — `test-quality-audit.md` documents existing ScalaCheck coverage; unblocked.
-**Parallel-safe**: YES — individual property test additions are file-scoped.
-**Priority**: MEDIUM — catches codec correctness bugs that unit tests miss.
-**Agent**: EYE (test validation) + HERALD (for wire-protocol message codecs).
-
-**Prompt:**
-> Use the HERALD agent (EYE for non-wire tests). Add missing property-based round-trip tests:
-> 1. ETH68/69/70 message types added in recent wire protocol work — check each for
->    `forAll { msg => decode(encode(msg)) == msg }` coverage:
->    ```bash
->    grep -rn "Eth6[89]\|Eth70\|ReceiptsMessage\|BlockBodiesMessage\|BlockHeadersMessage" \
->      src/test/ --include="*.scala"
->    ```
-> 2. SNAP protocol messages: confirm `AccountRangePacket`, `StorageRangesPacket`,
->    `ByteCodesPacket` are fuzz-tested with empty ranges, max-size inputs, malformed keys
-> 3. Cryptographic operations: verify `keccak256`, `recoverPublicKey` have property coverage
-> For each gap: add a `forAll` property test in the nearest existing spec file.
-> `sbt testOnly *<SpecName>*` after each addition. One commit per codec group:
-> `test(8h): property-based round-trip tests for <codec>`
-
----
-
 ### 8i — RLP Typeclass Derivation Modernization
 
 **Current state**: 183 `implicit val`/`def` RLP encoder/decoder instances across the codebase.
@@ -1142,7 +1100,7 @@ No actor migration gate. Commit individually; do not bundle with primary-track m
 | **R3** ✅ | Jackson ecosystem gate — DONE, see completed | — | — |
 | **R4** | Scala 3.9 readiness (periodic — when 3.9 LTS appears) | Update `scala-39-upgrade.md` | MITHRIL, WRAITH |
 | **R5** ✅ | EventStream pub/sub topology map — DONE, see completed | — | — |
-| **R6** | Opaque type domain analysis (map BigInt/ByteString semantic roles) | `.local/docs/opaque-type-domain-analysis.md` → feeds 8b | MITHRIL, FORGE |
+| **R6** ✅ | Opaque type domain analysis (map BigInt/ByteString semantic roles) — DONE, see `.local/docs/opaque-type-domain-analysis.md` | — | — |
 | **R7** | RLP codec derivation safety analysis (safe-to-derive vs must-stay-manual) | Feeds 8i implementation | MITHRIL, FORGE |
 | **R8** ✅ | Memory / resource retention audit — DONE, see completed | — | — |
 | **R9** ✅ | IO threading model audit — DONE, see completed | — | — |
@@ -1195,7 +1153,7 @@ Each prompt can run independently. Commit individually.
 | ~~J2~~ | ~~Batch J~~ | ~~**§8k-O** — MITHRIL: FastSync `fastSyncClassicSelf` + PivotBlockSelector/StateStorageActor bridge elimination (5 sites)~~ | ✅ DONE `fc5a3f8e7` (2026-06-25) — 4/5 sites; `fastSyncClassicSelf` remains pending SyncStateSchedulerActor migration |
 | ~~J3~~ | ~~Batch J~~ | ~~**§8k-P** — MITHRIL: PeerEventBusActor caller narrowing — update `peerEventBus: ActorRef` → `TypedActorRef[PEB.Command]` across ~15 constructors; enables adapter import removal in 22+ files~~ | ✅ DONE (2026-06-25) |
 | ~~J4~~ | ~~Batch J~~ | ~~**§8k-Q** — LOOM: SyncStateSchedulerActor Typed migration — fixes `FastSyncSpec "returns Syncing"` ClassCastException + deletes `fastSyncClassicSelf` (§8k-O 5th site)~~ | ✅ DONE `c4392fe87`/`f3b9fb04c` (2026-06-25) — 17/17 tests pass |
-| K1 | Batch K | **R6** — MITHRIL: opaque type domain analysis (`BigInt`/`ByteString` semantic roles → `.local/docs/opaque-type-domain-analysis.md`) | YES — read-only research; no source edits |
+| ~~K1~~ | ~~Batch K~~ | ~~**R6** — MITHRIL: opaque type domain analysis (`BigInt`/`ByteString` semantic roles → `.local/docs/opaque-type-domain-analysis.md`)~~ | ✅ DONE 2026-06-25 |
 | I1 | ETH Sprint (unblocked) | ~~**§ETH-T1-A**~~ ✅ ed4db9df9 · ~~**§ETH-T1-B**~~ ✅ 6f8f74708 · ~~**§ETH-T2-A**~~ ✅ c470b3dac + 35db7dc61 (§NAMING-A) · ~~**§ETH-T4-A**~~ ✅ 02aaa05fc KZG trusted setup · ~~**§ETH-T4-C**~~ ✅ b934caffe EIP-4788 beacon roots bytecode · ~~**§ETH-T4-D**~~ ✅ f6cf7fb9c blob base fee unification · ~~**§ETH-T6-A**~~ ✅ b696ve6b6 · ~~**§ETH-T6-B**~~ ✅ 525a1a911 · ~~**§ETH-T7-A**~~ ✅ ac0e25b62 · ~~**§ETH-T7-C**~~ ✅ 6e72ad2a0 · ~~**§ETH-T7-D**~~ ✅ c7cc5d131 | ✅ ALL DONE 2026-06-25 |
 | I2 | ETH Sprint (gated) | ~~**§ETH-T4-B**~~ ✅ maxFeePerBlobGas validation · ~~**§ETH-T7-B**~~ ✅ cb2e2aec1 · ~~**§ETH-T1-C**~~ ✅ `89863ac80` · ~~**§ETH-T9-A**~~ ✅ · ~~**§ETH-T9-B**~~ ✅ `4ac7e2842` · ~~**§ETH-T9-C**~~ ✅ false positive · ~~**§ETH-T9-D**~~ ✅ SNAP sync ETH paths · ~~**§ETH-T10-A**~~ ✅ `b131a5ec7` · ~~**§ETH-T10-B**~~ ✅ a40750ce6 · ~~**§ETH-T10-C**~~ ✅ 3bc71fe51 · ~~**§ETH-T10-D**~~ ✅ 364e395dc | ✅ ALL DONE 2026-06-25 |
 
