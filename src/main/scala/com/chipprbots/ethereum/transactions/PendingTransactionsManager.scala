@@ -435,7 +435,7 @@ object PendingTransactionsManager {
             "PooledTransactions from peer {} has type/size mismatch with announcement — disconnecting",
             peerId
           )
-          peerManager ! PeerManagerActor.DisconnectPeerByIdCmd(peerId, ClassicActorRef.noSender)
+          peerManager ! PeerManagerActor.DisconnectPeerFireAndForgetCmd(peerId)
         } else {
           // Store blob tx sidecar bytes for PooledTransactions responses
           msg.blobTxRawBytes.foreach { case (hash, rawBytes) =>

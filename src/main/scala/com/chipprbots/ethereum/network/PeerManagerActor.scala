@@ -54,21 +54,22 @@ object PeerManagerActor {
 
   trait Command
 
-  // 8 ask-paths (carry the Classic replier captured by the shell's sender()):
-  final case class GetPeersCmd(replyTo: ActorRef) extends Command
-  final case class DisconnectPeerByIdCmd(peerId: PeerId, replyTo: ActorRef) extends Command
-  final case class AddToBlacklistCmd(req: AddToBlacklistRequest, replyTo: ActorRef) extends Command
-  final case class RemoveFromBlacklistCmd(req: RemoveFromBlacklistRequest, replyTo: ActorRef) extends Command
-  final case class AddMaintainedPeerCmd(uri: URI, replyTo: ActorRef) extends Command
-  final case class AddTrustedPeerCmd(uri: URI, replyTo: ActorRef) extends Command
-  final case class RemoveTrustedPeerCmd(nodeId: String, replyTo: ActorRef) extends Command
-  final case class SetMaxPeersCmd(n: Int, replyTo: ActorRef) extends Command
+  // 8 ask-paths (typed reply channels):
+  final case class GetPeersCmd(replyTo: typed.ActorRef[Peers]) extends Command
+  final case class DisconnectPeerByIdCmd(peerId: PeerId, replyTo: typed.ActorRef[DisconnectPeerResponse]) extends Command
+  final case class AddToBlacklistCmd(req: AddToBlacklistRequest, replyTo: typed.ActorRef[AddToBlacklistResponse]) extends Command
+  final case class RemoveFromBlacklistCmd(req: RemoveFromBlacklistRequest, replyTo: typed.ActorRef[RemoveFromBlacklistResponse]) extends Command
+  final case class AddMaintainedPeerCmd(uri: URI, replyTo: typed.ActorRef[AddMaintainedPeerResponse]) extends Command
+  final case class AddTrustedPeerCmd(uri: URI, replyTo: typed.ActorRef[AddTrustedPeerResponse]) extends Command
+  final case class RemoveTrustedPeerCmd(nodeId: String, replyTo: typed.ActorRef[RemoveTrustedPeerResponse]) extends Command
+  final case class SetMaxPeersCmd(n: Int, replyTo: typed.ActorRef[SetMaxPeersResponse]) extends Command
 
   // Fire-and-forget wire messages forwarded by the shell:
   case object StartConnectingCmd extends Command
   final case class HandlePeerConnectionCmd(connection: ActorRef, remoteAddress: InetSocketAddress) extends Command
   final case class ConnectToPeerCmd(uri: URI) extends Command
   final case class RemoveMaintainedPeerCmd(nodeId: String) extends Command
+  final case class DisconnectPeerFireAndForgetCmd(peerId: PeerId) extends Command
   final case class SendMessageCmd(message: MessageSerializable, peerId: PeerId) extends Command
   final case class PeerClosedConnectionCmd(peerHostAddress: String, reason: Long) extends Command
 
@@ -476,7 +477,7 @@ object PeerManagerActor {
           val nodeId = uri.getUserInfo
           val wasAdded = !maintainedPeersByNodeId.contains(nodeId)
           maintainedPeersByNodeId = maintainedPeersByNodeId + (nodeId -> uri)
-          if replyTo != null then replyTo ! AddMaintainedPeerResponse(wasAdded)
+          replyTo ! AddMaintainedPeerResponse(wasAdded)
           peerEventBus ! PublishCmd(PeerEvent.MaintainedPeersChanged(maintainedPeersByNodeId.keySet))
           Some(connectWith(uri, connectedPeers))
 
@@ -662,6 +663,12 @@ object PeerManagerActor {
               replyTo ! DisconnectPeerResponse(disconnected = true)
             case None =>
               replyTo ! DisconnectPeerResponse(disconnected = false)
+          }
+          Some(Behaviors.same)
+
+        case DisconnectPeerFireAndForgetCmd(peerId) =>
+          connectedPeers.getPeer(peerId).foreach { peer =>
+            peer.ref ! PeerActor.DisconnectPeer(Disconnect.Reasons.DisconnectRequested)
           }
           Some(Behaviors.same)
 

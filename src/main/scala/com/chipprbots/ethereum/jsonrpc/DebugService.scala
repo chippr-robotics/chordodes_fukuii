@@ -45,7 +45,7 @@ class DebugService(
     given timeout: Timeout = Timeout(20.seconds)
 
     peerManager
-      .askFor[Peers](PeerManagerActor.GetPeersCmd(_))
+      .askForTyped[Peers](PeerManagerActor.GetPeersCmd(_))
       .handleError(_ => Peers(Map.empty[Peer, PeerActor.Status]))
       .map(_.peers.keySet.map(_.id).toList)
   }

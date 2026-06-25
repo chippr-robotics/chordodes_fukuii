@@ -131,7 +131,7 @@ class NetService(
   def peerCount(req: PeerCountRequest): ServiceResponse[PeerCountResponse] = {
     given timeout: Timeout = Timeout(config.peerManagerTimeout)
     peerManager
-      .askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
+      .askForTyped[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
       .map(peers => Right(PeerCountResponse(peers.handshaked.size)))
   }
 
@@ -155,7 +155,7 @@ class NetService(
   def listPeers(req: ListPeersRequest): ServiceResponse[ListPeersResponse] = {
     given timeout: Timeout = Timeout(config.peerManagerTimeout)
     peerManager
-      .askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
+      .askForTyped[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
       .map { peersData =>
         val peerInfoList = peersData.peers.map { case (peer, status) =>
           PeerInfo(
@@ -173,7 +173,7 @@ class NetService(
   def disconnectPeer(req: DisconnectPeerRequest): ServiceResponse[DisconnectPeerResponse] = {
     given timeout: Timeout = Timeout(config.peerManagerTimeout)
     peerManager
-      .askFor[PeerManagerActor.DisconnectPeerResponse](ref =>
+      .askForTyped[PeerManagerActor.DisconnectPeerResponse](ref =>
         PeerManagerActor.DisconnectPeerByIdCmd(PeerId(req.peerId), ref)
       )
       .map(response => Right(DisconnectPeerResponse(response.disconnected)))
@@ -209,7 +209,7 @@ class NetService(
   def addToBlacklist(req: AddToBlacklistRequest): ServiceResponse[AddToBlacklistResponse] = {
     given timeout: Timeout = Timeout(config.peerManagerTimeout)
     peerManager
-      .askFor[PeerManagerActor.AddToBlacklistResponse](ref =>
+      .askForTyped[PeerManagerActor.AddToBlacklistResponse](ref =>
         PeerManagerActor.AddToBlacklistCmd(
           PeerManagerActor.AddToBlacklistRequest(
             address = req.address,
@@ -225,7 +225,7 @@ class NetService(
   def removeFromBlacklist(req: RemoveFromBlacklistRequest): ServiceResponse[RemoveFromBlacklistResponse] = {
     given timeout: Timeout = Timeout(config.peerManagerTimeout)
     peerManager
-      .askFor[PeerManagerActor.RemoveFromBlacklistResponse](ref =>
+      .askForTyped[PeerManagerActor.RemoveFromBlacklistResponse](ref =>
         PeerManagerActor.RemoveFromBlacklistCmd(PeerManagerActor.RemoveFromBlacklistRequest(req.address), ref)
       )
       .map(response => Right(RemoveFromBlacklistResponse(response.removed)))

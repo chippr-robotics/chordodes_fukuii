@@ -320,7 +320,7 @@ object NetworkPeerManagerActor {
 
         case DeferredBlacklistCmd(request) =>
           // Delivered on the actor mailbox by a single-shot timer; forward to PeerManagerActor.
-          peerManagerActor ! PeerManagerActor.AddToBlacklistCmd(request, ActorRef.noSender)
+          peerManagerActor ! PeerManagerActor.AddToBlacklistCmd(request, ctx.system.deadLetters)
           Behaviors.same
 
         // ── Timer ticks ───────────────────────────────────────────────────────

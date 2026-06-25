@@ -34,7 +34,7 @@ object NodeStatusResource {
     val syncStatusIO = deps.syncController.askForTyped[SyncProtocol.Status](replyTo =>
       SyncController.WrappedSyncProtocol(SyncProtocol.GetStatus(replyTo))
     )
-    val peersIO = deps.peerManager.askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
+    val peersIO = deps.peerManager.askForTyped[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
 
     for {
       syncStatus <- syncStatusIO.recover { case _ => SyncProtocol.Status.NotSyncing }
@@ -155,7 +155,7 @@ object ConnectedPeersResource {
   def read(deps: McpDependencies)(implicit timeout: Timeout, @unused ec: ExecutionContext): IO[String] = {
     given scheduler: typed.Scheduler = deps.scheduler
     deps.peerManager
-      .askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
+      .askForTyped[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
       .recover { case _ =>
         PeerManagerActor.Peers(Map.empty)
       }

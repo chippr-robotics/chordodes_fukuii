@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum.nodebuilder
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed.ActorSystem
 import org.apache.pekko.util.ByteString
 
@@ -166,7 +165,7 @@ abstract class BaseNode extends Node {
     if nodes.nonEmpty then {
       log.info("Loading {} static peer(s) from {}/{}", nodes.size, datadir, StaticNodesLoader.FileName)
       nodes.foreach { uri =>
-        peerManager ! PeerManagerActor.AddMaintainedPeerCmd(uri, ActorRef.noSender)
+        peerManager ! PeerManagerActor.AddMaintainedPeerCmd(uri, system.deadLetters)
         log.debug("Static peer added: {}", uri)
       }
     }

@@ -7,7 +7,6 @@ import java.net.URI
 import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicReference
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed
 import org.apache.pekko.util.Timeout
 
@@ -224,7 +223,7 @@ class AdminService(
     */
   def peers(@unused req: AdminPeersRequest): ServiceResponse[AdminPeersResponse] =
     peerManager
-      .askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
+      .askForTyped[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
       .map { peersResult =>
         val peerInfos = peersResult.peers.map { case (peer, _) =>
           AdminPeerInfo(
@@ -249,7 +248,7 @@ class AdminService(
     try {
       val uri = new URI(req.enodeUrl)
       peerManager
-        .askFor[PeerManagerActor.AddMaintainedPeerResponse](ref => PeerManagerActor.AddMaintainedPeerCmd(uri, ref))
+        .askForTyped[PeerManagerActor.AddMaintainedPeerResponse](ref => PeerManagerActor.AddMaintainedPeerCmd(uri, ref))
         .map(r => Right(AdminAddPeerResponse(r.wasAdded)))
         .handleError { ex =>
           log.error(s"Failed to add peer: ${req.enodeUrl}", ex)
@@ -267,7 +266,7 @@ class AdminService(
     */
   def removePeer(req: AdminRemovePeerRequest): ServiceResponse[AdminRemovePeerResponse] =
     peerManager
-      .askFor[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
+      .askForTyped[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
       .map { peersResult =>
         try {
           val uri = new URI(req.enodeUrl)
@@ -282,7 +281,7 @@ class AdminService(
               }
               matchingPeer match {
                 case Some(peer) =>
-                  peerManager ! PeerManagerActor.DisconnectPeerByIdCmd(peer.id, ActorRef.noSender)
+                  peerManager ! PeerManagerActor.DisconnectPeerFireAndForgetCmd(peer.id)
                   Right(AdminRemovePeerResponse(true))
                 case None =>
                   Right(AdminRemovePeerResponse(false))
@@ -413,7 +412,7 @@ class AdminService(
     try {
       val uri = new URI(req.enodeUrl)
       peerManager
-        .askFor[PeerManagerActor.AddTrustedPeerResponse](ref => PeerManagerActor.AddTrustedPeerCmd(uri, ref))
+        .askForTyped[PeerManagerActor.AddTrustedPeerResponse](ref => PeerManagerActor.AddTrustedPeerCmd(uri, ref))
         .map(r => Right(AdminAddTrustedPeerResponse(r.success)))
         .handleError { ex =>
           log.error(s"Failed to add trusted peer: ${req.enodeUrl}", ex)
@@ -433,7 +432,7 @@ class AdminService(
       val uri = new URI(req.enodeUrl)
       val targetNodeId = Option(uri.getUserInfo).map(_.toLowerCase).getOrElse("")
       peerManager
-        .askFor[PeerManagerActor.RemoveTrustedPeerResponse](ref =>
+        .askForTyped[PeerManagerActor.RemoveTrustedPeerResponse](ref =>
           PeerManagerActor.RemoveTrustedPeerCmd(targetNodeId, ref)
         )
         .map(r => Right(AdminRemoveTrustedPeerResponse(r.success)))
@@ -452,7 +451,7 @@ class AdminService(
     */
   def maxPeers(req: AdminMaxPeersRequest): ServiceResponse[AdminMaxPeersResponse] =
     peerManager
-      .askFor[PeerManagerActor.SetMaxPeersResponse](ref => PeerManagerActor.SetMaxPeersCmd(req.maxPeers, ref))
+      .askForTyped[PeerManagerActor.SetMaxPeersResponse](ref => PeerManagerActor.SetMaxPeersCmd(req.maxPeers, ref))
       .map(r => Right(AdminMaxPeersResponse(r.success)))
       .handleError { ex =>
         log.error(s"Failed to set max peers to ${req.maxPeers}", ex)

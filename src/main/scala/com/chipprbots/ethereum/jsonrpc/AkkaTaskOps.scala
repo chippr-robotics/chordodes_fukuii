@@ -3,7 +3,6 @@ package com.chipprbots.ethereum.jsonrpc
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed
 import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.pattern.ask
 import org.apache.pekko.util.Timeout
 
@@ -28,16 +27,7 @@ object AkkaTaskOps {
       IO.fromFuture(IO(org.apache.pekko.pattern.extended.ask(to, makeCmd).mapTo[A]))
   }
 
-  // Typed ask (Classic replyTo): converts the temp typed replyTo to a Classic ActorRef so existing
-  // Cmd variants (replyTo: ActorRef) stay unchanged. The lambda receives the Classic ref directly.
   extension [C](to: typed.ActorRef[C]) {
-    def askFor[A](
-        makeCmd: ActorRef => C
-    )(implicit timeout: Timeout, scheduler: typed.Scheduler): IO[A] =
-      IO.fromFuture(IO(to.ask[A](typedRef => makeCmd(typedRef.toClassic))))
-
-    // Typed ask (Typed replyTo): for Cmd variants where replyTo is already a TypedActorRef[A].
-    // The lambda receives the typed temp actor ref directly — no Classic conversion needed.
     def askForTyped[A](
         makeCmd: typed.ActorRef[A] => C
     )(implicit timeout: Timeout, scheduler: typed.Scheduler): IO[A] =
