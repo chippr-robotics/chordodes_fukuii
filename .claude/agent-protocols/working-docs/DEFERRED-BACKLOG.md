@@ -779,6 +779,62 @@ sbt "testOnly *PeerEventBus* *RegularSync* *FastSyncBranchResolver* *NodeBuilder
 
 ---
 
+#### §8k-Q — LOOM: SyncStateSchedulerActor Typed migration (fixes FastSyncSpec "returns Syncing" + completes §8k-O 5th site)
+
+**Agent:** LOOM
+**Risk:** MEDIUM — SyncStateSchedulerActor is a child of FastSync; migrating its constructor and command ADT touches FastSync's spawn site, SyncSession setup, and the reply-to chain back to FastSync.
+**Gate:** None — standalone. §8k-O left `fastSyncClassicSelf` in place specifically for this actor; §8k-Q is the planned continuation.
+
+**Background:**
+`SyncStateSchedulerActor` is the last Classic-signature actor spawned by FastSync. Its constructor accepts
+`parentRef: ClassicActorRef` and its commands carry `replyTo: ClassicActorRef`:
+```
+StartSyncingToCmd(replyTo: ClassicActorRef)
+RestartRequestedCmd(replyTo: ClassicActorRef)
+```
+Because SSA sends messages back to `fastSyncClassicSelf` (the Classic projection of FastSync's `pivotResultAdapter`),
+a `ClassCastException` occurs at runtime: `SyncStateSchedulerActor$NetworkIncompatible$ cannot be cast to FastSync$Command`.
+This causes the `FastSyncSpec` "returns Syncing when pivot block is selected and started fetching data" test to time out at 60s — the pivot is selected, but the `Syncing` status is never published because SSA's reply goes missing.
+
+Two outcomes on completion:
+1. `fastSyncClassicSelf` (§8k-O's 5th deferred site) can be deleted — `SyncStateSchedulerActor` will hold a `TypedActorRef[FastSync.Command]` directly.
+2. The pre-existing `FastSyncSpec` timeout resolves.
+
+**Steps:**
+
+1. **Run LOOM pre-migration checklist on SyncStateSchedulerActor:**
+   ```bash
+   grep -n "sender()\|context\.become\|timers\|ActorRef\b" \
+     src/main/scala/com/chipprbots/ethereum/blockchain/sync/fast/SyncStateSchedulerActor.scala
+   grep -n "SyncStateSchedulerActor" \
+     src/main/scala/com/chipprbots/ethereum/blockchain/sync/fast/FastSync.scala
+   ```
+
+2. **Audit the Command ADT** — map every `parentRef ! Msg(...)` send site in SSA to the FastSync command it should become (`TypedActorRef[FastSync.Command]` or a narrower reply type). Candidates: `NetworkIncompatible`, `StatsSyncUpdate`, and any others.
+
+3. **Migrate SSA to `Behavior[Command]`** — replace `parentRef: ClassicActorRef` with `replyTo: TypedActorRef[FastSync.Command]` (or a sealed trait if only a subset of commands flow back). Follow `pekko-typed-api.md` P1–P16.
+
+4. **Update FastSync's spawn site** (`initSyncSession`): drop `.toClassic` (already eliminated in §8k-O for the storageActor; SSA spawn is the remaining one). Pass `ctx.self` (Typed) instead of `fastSyncClassicSelf`.
+
+5. **Delete `fastSyncClassicSelf`** — once SSA no longer needs it, the definition on line ~186 of `FastSync.scala` has no remaining callers. Delete it and remove the `import org.apache.pekko.actor.ActorRef` if it was the last Classic `ActorRef` usage.
+
+6. **Update `SyncStateSchedulerActorSpec`** (if it exists) — replace `TestProbe` with Pekko Typed probes.
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *FastSyncSpec* *SyncStateScheduler*"
+```
+`FastSyncSpec "returns Syncing when pivot block is selected and started fetching data"` **must pass** — this is the acceptance gate for this task.
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. One commit for SSA migration + FastSync spawn site update
+3. One commit for `fastSyncClassicSelf` deletion (Bucket A — mechanical removal)
+4. **DELETE §8k-Q when FastSyncSpec test passes and `fastSyncClassicSelf` is gone**
+
+---
+
 ## Part 8l: VM Tracer Model Modernization ✅ DONE 2026-06-24 — see `completed/DEFERRED-BACKLOG.md §8l-R1` + `§8l-I`
 
 ---
@@ -890,6 +946,7 @@ Each prompt can run independently. Commit individually.
 | ~~J1~~ | ~~Batch J~~ | ~~**§8k-N** — MITHRIL: SyncController catch-all bridge elimination (10 sites) — all target actors already Typed; audit each catch-all arm, extend ADTs or handle explicitly, replace `.toClassic.tell`~~ | ✅ DONE `35db7dc61` (2026-06-25) |
 | ~~J2~~ | ~~Batch J~~ | ~~**§8k-O** — MITHRIL: FastSync `fastSyncClassicSelf` + PivotBlockSelector/StateStorageActor bridge elimination (5 sites)~~ | ✅ DONE `fc5a3f8e7` (2026-06-25) — 4/5 sites; `fastSyncClassicSelf` remains pending SyncStateSchedulerActor migration |
 | J3 | Batch J | **§8k-P** — MITHRIL: PeerEventBusActor caller narrowing — update `peerEventBus: ActorRef` → `TypedActorRef[PEB.Command]` across ~15 constructors; enables adapter import removal in 22+ files | NO — broad refactor; run after J1/J2 compile-all passes |
+| J4 | Batch J | **§8k-Q** — LOOM: SyncStateSchedulerActor Typed migration — fixes `FastSyncSpec "returns Syncing"` ClassCastException + deletes `fastSyncClassicSelf` (§8k-O 5th site) | YES — standalone; unblocks after §8k-O |
 | I1 | ETH Sprint (unblocked) | ~~**§ETH-T1-A**~~ ✅ ed4db9df9 · ~~**§ETH-T1-B**~~ ✅ 6f8f74708 · ~~**§ETH-T2-A**~~ ✅ c470b3dac + 35db7dc61 (§NAMING-A) · ~~**§ETH-T4-A**~~ ✅ 02aaa05fc KZG trusted setup · ~~**§ETH-T4-C**~~ ✅ b934caffe EIP-4788 beacon roots bytecode · ~~**§ETH-T4-D**~~ ✅ f6cf7fb9c blob base fee unification · **§ETH-T6-A** VM tracer try/finally · **§ETH-T6-B** EIP-2681 nonce-max · **§ETH-T7-A** `EvmConfigTimestampForkSpec` · **§ETH-T7-C** `EngineApiVersionRejectionSpec` · **§ETH-T7-D** `BlockRangeUpdateDecodePathSpec` | Partial — each standalone |
 | I2 | ETH Sprint (gated) | ~~**§ETH-T4-B**~~ ✅ maxFeePerBlobGas validation · **§ETH-T7-B** `Eip4788BeaconRootStorageSpec` · ~~**§ETH-T1-C**~~ ✅ `89863ac80` · ~~**§ETH-T9-A**~~ ✅ · ~~**§ETH-T9-B**~~ ✅ `4ac7e2842` · ~~**§ETH-T9-C**~~ ✅ false positive · ~~**§ETH-T9-D**~~ ✅ SNAP sync ETH paths · **§ETH-T10-A/B/C/D** Engine API Osaka edge cases | NO — run after I1 items; gate conditions above |
 
