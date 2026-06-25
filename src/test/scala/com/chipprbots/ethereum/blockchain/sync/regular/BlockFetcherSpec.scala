@@ -282,6 +282,9 @@ class BlockFetcherSpec
       testKit.stop(blockFetcher)
     }
 
+    // BF-1A: GetBlockHeaders(block=Left(1)) originates from the initial Start dispatch (nextDispatchBlock=1),
+    // not from the BRU handler. Real BRU decode-path coverage (malformed disconnect + withPossibleNewTopAt
+    // via GotNewBlock) is in BlockRangeUpdateDecodePathSpec.
     "should request headers when BlockRangeUpdate announces a new chain tip" taggedAs (
       UnitTest,
       SyncTest
