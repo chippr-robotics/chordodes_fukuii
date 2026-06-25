@@ -110,12 +110,6 @@ object KnownNodesManager {
   /** Response message — not part of the Command ADT. */
   final case class KnownNodes(nodes: Set[URI])
 
-  /** Legacy Classic-only message — NOT a Command. Used solely by the Classic bridge actor in NodeBuilder, which
-    * translates it into [[GetKnownNodesReq]] for out-of-scope Classic callers (PeerManagerActor). Remove once
-    * PeerManagerActor is migrated to Typed.
-    */
-  case object GetKnownNodes
-
   case class KnownNodesManagerConfig(persistInterval: FiniteDuration, maxPersistedNodes: Int)
 
   object KnownNodesManagerConfig {

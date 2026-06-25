@@ -147,26 +147,12 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
       "known-nodes-manager-typed"
     )
 
-  // Classic bridge for PeerManagerActor (still Classic) that sends the legacy GetKnownNodes case object.
   lazy val knownNodesManager: ActorRef =
     system.actorOf(
       org.apache.pekko.actor.Props(new org.apache.pekko.actor.Actor {
-        implicit private val scheduler: org.apache.pekko.actor.typed.Scheduler =
-          context.system.toTyped.scheduler
-        implicit private val bridgeTimeout: org.apache.pekko.util.Timeout =
-          org.apache.pekko.util.Timeout(10.seconds)
-
-        // Classic bridge: only GetKnownNodes and Command subtypes are ever sent here — sealed-trait match on Any is safe.
         @annotation.nowarn("msg=Matchable")
-        def receive: Receive = {
-          case KnownNodesManager.GetKnownNodes =>
-            val s = sender()
-            import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
-            knownNodesManagerTyped
-              .ask(ref => KnownNodesManager.GetKnownNodesReq(ref))
-              .foreach(s ! _)(context.dispatcher)
-          case cmd: KnownNodesManager.Command =>
-            knownNodesManagerTyped ! cmd
+        def receive: Receive = { case cmd: KnownNodesManager.Command =>
+          knownNodesManagerTyped ! cmd
         }
       }),
       "known-nodes-manager"
