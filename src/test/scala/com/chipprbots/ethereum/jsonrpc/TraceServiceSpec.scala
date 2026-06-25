@@ -59,7 +59,7 @@ class TraceServiceSpec
     }
 
   it should "return flat trace array for a valid transaction" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    val txHash: ByteString = block.body.transactionList.head.hash
+    val txHash: ByteString = block.body.transactionList.head.hash.value
     val txIndex = 0
 
     blockchainWriter.storeBlock(block).commit()
@@ -118,7 +118,7 @@ class TraceServiceSpec
     }
 
   it should "return a replay result with trace option enabled" taggedAs (UnitTest, RPCTest) in new TestSetup {
-    val txHash: ByteString = block.body.transactionList.head.hash
+    val txHash: ByteString = block.body.transactionList.head.hash.value
     val txIndex = 0
 
     blockchainWriter.storeBlock(block).commit()

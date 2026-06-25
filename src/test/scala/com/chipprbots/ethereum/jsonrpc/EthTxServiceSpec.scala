@@ -374,7 +374,7 @@ class EthTxServiceSpec
     // receipt surfaces — mirrors what ChainImporter/BlockImporter do on real imports.
     blockchainWriter.saveBestKnownBlocks(blockWithTx.header.hash, blockWithTx.header.number)
 
-    val request: GetTransactionReceiptRequest = GetTransactionReceiptRequest(contractCreatingTransaction.hash)
+    val request: GetTransactionReceiptRequest = GetTransactionReceiptRequest(contractCreatingTransaction.hash.value)
     val response: ServiceResponse[GetTransactionReceiptResponse] = ethTxService.getTransactionReceipt(request)
 
     response.unsafeRunSync() shouldBe Right(
@@ -516,7 +516,7 @@ class EthTxServiceSpec
     val txSender: Address = SignedTransaction.getSender(txToRequest).get
     val txToRequestWithSender: SignedTransactionWithSender = SignedTransactionWithSender(txToRequest, txSender)
 
-    val txToRequestHash = txToRequest.hash
+    val txToRequestHash = txToRequest.hash.value
   }
 
 }

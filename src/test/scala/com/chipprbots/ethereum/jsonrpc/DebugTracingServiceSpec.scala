@@ -60,7 +60,7 @@ class DebugTracingServiceSpec
 
   it should "return InvalidParams when block hash is not in storage" taggedAs (UnitTest, RPCTest) in
     new TestSetup {
-      val txHash: ByteString = block.body.transactionList.head.hash
+      val txHash: ByteString = block.body.transactionList.head.hash.value
       val missingBlockHash: ByteString = ByteString(Array.fill(32)(0xee.toByte))
       txMappingStorage.get.expects(txHash).returning(Some(TransactionLocation(missingBlockHash, 0)))
 
@@ -73,7 +73,7 @@ class DebugTracingServiceSpec
 
   it should "return a trace result for a valid transaction" taggedAs (UnitTest, RPCTest) in
     new TestSetup {
-      val txHash: ByteString = block.body.transactionList.head.hash
+      val txHash: ByteString = block.body.transactionList.head.hash.value
       val txIndex = 0
 
       blockchainWriter.storeBlock(block).commit()

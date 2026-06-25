@@ -9,7 +9,6 @@ import com.chipprbots.ethereum.rlp.RLPSerializable
 import com.chipprbots.ethereum.rlp.RLPValue
 import com.chipprbots.ethereum.rlp.encode
 import com.chipprbots.ethereum.rlp.rawDecode
-import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 
 case class BlockBody(
     transactionList: Seq[SignedTransaction],

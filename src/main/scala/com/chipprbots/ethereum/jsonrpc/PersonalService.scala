@@ -26,7 +26,6 @@ import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.AddOrOverrideTransaction
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransactionsResponse
-import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 import com.chipprbots.ethereum.utils.Logger
 import com.chipprbots.ethereum.utils.TxPoolConfig
 
@@ -222,7 +221,7 @@ class PersonalService(
 
       txPool ! AddOrOverrideTransaction(stx.tx)
 
-      stx.tx.hash
+      stx.tx.hash.value
     }
   }
 

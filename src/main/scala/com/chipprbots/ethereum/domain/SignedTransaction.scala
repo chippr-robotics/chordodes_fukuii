@@ -37,7 +37,7 @@ object SignedTransaction {
   // Cache available processors count for parallel execution (constant at runtime)
   private val availableProcessors: Int = Runtime.getRuntime.availableProcessors
 
-  private val txSenders: Cache[ByteString, Address] = CacheBuilder
+  private val txSenders: Cache[TxHash, Address] = CacheBuilder
     .newBuilder()
     .maximumSize(maximumSenderCacheSize)
     .recordStats()
@@ -569,7 +569,7 @@ case class SignedTransaction(tx: Transaction, signature: ECDSASignature) {
   def isChainSpecific: Boolean =
     signature.v != ECDSASignature.negativePointSign && signature.v != ECDSASignature.positivePointSign
 
-  lazy val hash: ByteString = ByteString(kec256(this.toBytes: Array[Byte]))
+  lazy val hash: TxHash = TxHash(ByteString(kec256(this.toBytes: Array[Byte])))
 }
 
 case class SignedTransactionWithSender(tx: SignedTransaction, senderAddress: Address)

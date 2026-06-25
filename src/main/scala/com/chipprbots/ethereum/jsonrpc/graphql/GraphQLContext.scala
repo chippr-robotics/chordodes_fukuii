@@ -56,7 +56,7 @@ object GraphQLTypes {
       stx: SignedTransaction,
       blockInfo: Option[GTxBlockInfo]
   ) {
-    def hash: ByteString = stx.hash
+    def hash: ByteString = stx.hash.value
   }
 
   /** Position of a mined transaction within its block, plus the block itself. */

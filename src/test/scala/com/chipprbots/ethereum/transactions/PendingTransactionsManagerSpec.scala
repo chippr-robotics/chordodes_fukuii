@@ -317,12 +317,12 @@ class PendingTransactionsManagerSpec
     val announcedHashes: Set[ByteString] = announces
       .flatMap(_.message.underlyingMsg match {
         case ETHPackets.NewPooledTransactionHashes(_, _, hashes) => hashes
-        case SignedTransactions(txs)                             => txs.map(_.hash)
+        case SignedTransactions(txs)                             => txs.map(_.hash.value)
         case _                                                   => Nil
       })
       .toSet
-    (announcedHashes should contain).allOf(otherTx.tx.hash, overrideTx.tx.hash)
-    announcedHashes shouldNot contain(firstTx.tx.hash)
+    (announcedHashes should contain).allOf(otherTx.tx.hash.value, overrideTx.tx.hash.value)
+    announcedHashes shouldNot contain(firstTx.tx.hash.value)
   }
 
   it should "broadcast pending transactions to newly connected peers" taggedAs (UnitTest) in new TestSetup {

@@ -626,7 +626,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
 
     val result: JArray = JArray(
       transactions.map { tx =>
-        encodeAsHex(tx.stx.tx.hash)
+        encodeAsHex(tx.stx.tx.hash.value)
       }.toList
     )
 

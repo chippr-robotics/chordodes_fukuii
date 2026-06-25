@@ -230,7 +230,7 @@ class TraceService(
         stxs = SignedTransactionWithSender.getSignedTransactions(block.body.transactionList)
         results = stxs.zipWithIndex.map { case (stx, txIndex) =>
           val world = stxLedger.advanceWorldToTx(block.header, stxs, txIndex, parentHeader.stateRoot)
-          buildReplayResult(stx, block, Some(world), stx.tx.hash, txIndex, req.options)
+          buildReplayResult(stx, block, Some(world), stx.tx.hash.value, txIndex, req.options)
         }
       } yield TraceReplayBlockTransactionsResponse(results)
     }.recover { case _: MissingNodeException =>
@@ -296,7 +296,7 @@ class TraceService(
       val world = stxLedger.advanceWorldToTx(block.header, stxs, txIndex, parentStateRoot)
       val tracer = new CallTracer(onlyTopCall = false)
       stxLedger.simulateTransactionWithTracer(stx, block.header, Some(world), tracer)
-      flattenCallTree(tracer.getResult, stx.tx.hash, txIndex, block.header.hash, block.header.number)
+      flattenCallTree(tracer.getResult, stx.tx.hash.value, txIndex, block.header.hash, block.header.number)
     }
   }
 

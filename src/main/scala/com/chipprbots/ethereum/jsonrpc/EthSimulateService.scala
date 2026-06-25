@@ -949,7 +949,7 @@ class EthSimulateService(
         val l = TxLog(
           logIndex = globalLogIndex,
           transactionIndex = callIdx,
-          transactionHash = stx.hash,
+          transactionHash = stx.hash.value,
           blockHash = ByteString(new Array[Byte](32)), // Placeholder — updated after header finalized
           blockNumber = blockHeader.number,
           address = txLog.loggerAddress,

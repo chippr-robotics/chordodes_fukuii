@@ -1105,7 +1105,7 @@ object ETHPackets {
       override def code: Int = Codes.PooledTransactionsCode
       override def toRLPEncodable: RLPEncodeable = {
         val txItems: Seq[RLPEncodeable] = msg.txs.map { stx =>
-          msg.blobTxRawBytes.get(stx.hash) match {
+          msg.blobTxRawBytes.get(stx.hash.value) match {
             case Some(rawBytes) => PrefixedRLPEncodable(rawBytes(0), rawDecode(rawBytes.toArray.drop(1)))
             case None           => stx.toRLPEncodable
           }
@@ -1140,7 +1140,7 @@ object ETHPackets {
               val rawBytes = com.chipprbots.ethereum.rlp.encode(prefixed)
               val unwrapped = PrefixedRLPEncodable(Transaction.Type03, inner.items.head)
               val stx = unwrapped.toSignedTransaction
-              blobTxRawBytesBuilder += (stx.hash -> ByteString(rawBytes))
+              blobTxRawBytesBuilder += (stx.hash.value -> ByteString(rawBytes))
               unwrapped
             case other => other
           }

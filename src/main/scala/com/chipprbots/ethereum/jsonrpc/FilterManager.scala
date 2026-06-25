@@ -163,7 +163,7 @@ object FilterManager {
                 TxLog(
                   logIndex = logIndex,
                   transactionIndex = txIndex,
-                  transactionHash = tx.hash,
+                  transactionHash = tx.hash.value,
                   blockHash = block.header.hash,
                   blockNumber = block.header.number,
                   address = log.loggerAddress,
@@ -276,7 +276,7 @@ object FilterManager {
 
         case Some(_: PendingTransactionFilter) =>
           getPendingTransactions()
-            .map(ptxs => PendingTransactionFilterLogs(ptxs.map(_.stx.tx.hash)))
+            .map(ptxs => PendingTransactionFilterLogs(ptxs.map(_.stx.tx.hash.value)))
             .unsafeToFuture()
             .foreach(replyTo ! _)
 
@@ -308,7 +308,7 @@ object FilterManager {
           getPendingTransactions()
             .map { pendingTransactions =>
               val filtered = pendingTransactions.filter(_.addTimestamp > lastCheckTimestamp)
-              PendingTransactionFilterChanges(filtered.map(_.stx.tx.hash))
+              PendingTransactionFilterChanges(filtered.map(_.stx.tx.hash.value))
             }
             .unsafeToFuture()
             .foreach(replyTo ! _)

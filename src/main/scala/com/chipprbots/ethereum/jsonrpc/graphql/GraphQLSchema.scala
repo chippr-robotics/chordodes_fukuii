@@ -481,7 +481,7 @@ object GraphQLSchema {
     "Transaction",
     () =>
       fields[GraphQLContext, GTransaction](
-        Field("hash", Bytes32Type, resolve = _.value.stx.hash),
+        Field("hash", Bytes32Type, resolve = _.value.stx.hash.value),
         Field("nonce", LongType, resolve = _.value.stx.tx.nonce.toLong),
         Field("index", OptionType(LongType), resolve = _.value.blockInfo.map(_.txIndex.toLong)),
         Field(

@@ -111,7 +111,7 @@ object TransactionResponse {
     val effectiveGasPrice = Transaction.effectiveGasPrice(stx.tx, blockHeader.flatMap(_.baseFee))
 
     TransactionResponse(
-      hash = stx.hash,
+      hash = stx.hash.value,
       nonce = stx.tx.nonce,
       blockHash = blockHeader.map(_.hash),
       blockNumber = blockHeader.map(_.number),

@@ -178,7 +178,7 @@ object PendingTransactionsManager {
       peers.foreach { peer =>
         val txsToNotify = txSeq.filterNot(stx => isTxKnown(stx, peer.id))
         if txsToNotify.nonEmpty then {
-          val hashes = txsToNotify.map(_.hash)
+          val hashes = txsToNotify.map(_.hash.value)
           val types = txsToNotify.map { stx =>
             stx.tx match {
               case _: LegacyTransaction         => 0.toByte
@@ -285,12 +285,12 @@ object PendingTransactionsManager {
     }
 
     def isTxKnown(signedTransaction: SignedTransaction, peerId: PeerId): Boolean =
-      knownTransactions.getOrElse(signedTransaction.hash, Set.empty).contains(peerId)
+      knownTransactions.getOrElse(signedTransaction.hash.value, Set.empty).contains(peerId)
 
     def setTxKnown(signedTransaction: SignedTransaction, peerId: PeerId): Unit = {
-      val currentPeers = knownTransactions.getOrElse(signedTransaction.hash, Set.empty)
+      val currentPeers = knownTransactions.getOrElse(signedTransaction.hash.value, Set.empty)
       val newPeers = currentPeers + peerId
-      knownTransactions += (signedTransaction.hash -> newPeers)
+      knownTransactions += (signedTransaction.hash.value -> newPeers)
     }
 
     // scalastyle:off method.length
@@ -330,7 +330,7 @@ object PendingTransactionsManager {
         val transactionsToAdd = validateAgainstState(newTxs)
         if transactionsToAdd.nonEmpty then {
           val timestamp = System.currentTimeMillis()
-          transactionsToAdd.foreach(t => pendingTransactions.put(t.tx.hash, PendingTransaction(t, timestamp)))
+          transactionsToAdd.foreach(t => pendingTransactions.put(t.tx.hash.value, PendingTransaction(t, timestamp)))
           updatePendingNonces(transactionsToAdd)
           transactionsToAdd.foreach(t => pendingTxTopic ! Topic.Publish(NewPendingTransaction(t)))
           val peers = connectedPeers.values.toSeq
@@ -343,7 +343,7 @@ object PendingTransactionsManager {
       case AddOrOverrideTransaction(newStx, blobRawBytesOpt) =>
         pendingTransactions.cleanUp()
         context.log.debug("Overriding transaction: {}", newStx.hash.toHex)
-        blobRawBytesOpt.foreach(raw => blobTxNetworkBytes += (newStx.hash -> raw))
+        blobRawBytesOpt.foreach(raw => blobTxNetworkBytes += (newStx.hash.value -> raw))
         // Only validated transactions are added this way, it is safe to call get
         val newStxSender = SignedTransaction
           .getSender(newStx)
@@ -359,7 +359,7 @@ object PendingTransactionsManager {
         val timestamp = System.currentTimeMillis()
         val newPendingTx = SignedTransactionWithSender(newStx, newStxSender)
         pendingTransactions.put(
-          newStx.hash,
+          newStx.hash.value,
           PendingTransaction(newPendingTx, timestamp, receivedFromLocalSource = true)
         )
         updatePendingNonces(Seq(newPendingTx))
@@ -412,7 +412,7 @@ object PendingTransactionsManager {
         // Validate received txs against their announcements (type/size mismatch = blob violation)
         import com.chipprbots.ethereum.domain.*
         val announcementViolation = msg.txs.zipWithIndex.exists { case (stx, idx) =>
-          pendingAnnouncements.get(stx.hash).exists { case (announcedType, announcedSize, _) =>
+          pendingAnnouncements.get(stx.hash.value).exists { case (announcedType, announcedSize, _) =>
             val actualType: Byte = stx.tx match {
               case _: LegacyTransaction         => 0.toByte
               case _: TransactionWithAccessList => Transaction.Type01
@@ -429,7 +429,7 @@ object PendingTransactionsManager {
           }
         }
         // Clean up announcements for received txs
-        msg.txs.foreach(stx => pendingAnnouncements -= stx.hash)
+        msg.txs.foreach(stx => pendingAnnouncements -= stx.hash.value)
         if announcementViolation then {
           context.log.debug(
             "PooledTransactions from peer {} has type/size mismatch with announcement — disconnecting",
@@ -458,10 +458,10 @@ object PendingTransactionsManager {
         Behaviors.same
 
       case RemoveTransactions(signedTransactions) =>
-        pendingTransactions.invalidateAll(signedTransactions.map(_.hash).asJava)
+        pendingTransactions.invalidateAll(signedTransactions.map(_.hash.value).asJava)
         context.log.debug("Removing transactions: {}", signedTransactions.map(_.hash.toHex))
-        knownTransactions = knownTransactions -- signedTransactions.map(_.hash)
-        blobTxNetworkBytes = blobTxNetworkBytes -- signedTransactions.map(_.hash)
+        knownTransactions = knownTransactions -- signedTransactions.map(_.hash.value)
+        blobTxNetworkBytes = blobTxNetworkBytes -- signedTransactions.map(_.hash.value)
         Behaviors.same
 
       case ProperSignedTransactions(transactions, peerId) =>

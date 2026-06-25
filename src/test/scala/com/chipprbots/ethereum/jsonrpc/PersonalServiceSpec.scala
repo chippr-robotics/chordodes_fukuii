@@ -141,7 +141,7 @@ class PersonalServiceSpec
 
     replyPTM(PendingTransactionsResponse(Nil))
 
-    res.futureValue shouldEqual Right(SendTransactionWithPassphraseResponse(stx.hash))
+    res.futureValue shouldEqual Right(SendTransactionWithPassphraseResponse(stx.hash.value))
     txPool.expectMsg(AddOrOverrideTransaction(stx))
   }
 
@@ -165,7 +165,7 @@ class PersonalServiceSpec
 
     replyPTM(PendingTransactionsResponse(Seq(PendingTransaction(stxWithSender, 0))))
 
-    res.futureValue shouldEqual Right(SendTransactionWithPassphraseResponse(newTx.hash))
+    res.futureValue shouldEqual Right(SendTransactionWithPassphraseResponse(newTx.hash.value))
     txPool.expectMsg(AddOrOverrideTransaction(newTx))
   }
 
@@ -200,7 +200,7 @@ class PersonalServiceSpec
 
     replyPTM(PendingTransactionsResponse(Nil))
 
-    res.futureValue shouldEqual Right(SendTransactionResponse(stx.hash))
+    res.futureValue shouldEqual Right(SendTransactionResponse(stx.hash.value))
     txPool.expectMsg(AddOrOverrideTransaction(stx))
   }
 
@@ -367,7 +367,7 @@ class PersonalServiceSpec
 
     replyPTM(PendingTransactionsResponse(Nil))
 
-    res.futureValue shouldEqual Right(SendTransactionWithPassphraseResponse(stx.hash))
+    res.futureValue shouldEqual Right(SendTransactionWithPassphraseResponse(stx.hash.value))
     txPool.expectMsg(AddOrOverrideTransaction(stx))
   }
 
@@ -387,7 +387,7 @@ class PersonalServiceSpec
 
     replyPTM(PendingTransactionsResponse(Nil))
 
-    res.futureValue shouldEqual Right(SendTransactionWithPassphraseResponse(chainSpecificStx.hash))
+    res.futureValue shouldEqual Right(SendTransactionWithPassphraseResponse(chainSpecificStx.hash.value))
     txPool.expectMsg(AddOrOverrideTransaction(chainSpecificStx))
   }
 

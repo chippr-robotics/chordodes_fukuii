@@ -148,7 +148,7 @@ class BlockchainWriter(
         reader.getBlockBodyByHash(hash) match {
           case Some(body) =>
             body.transactionList.zipWithIndex.foldLeft(withNumberMapping) { case (a, (tx, idx)) =>
-              a.and(transactionMappingStorage.put(tx.hash, TransactionLocation(hash, idx)))
+              a.and(transactionMappingStorage.put(tx.hash.value, TransactionLocation(hash, idx)))
             }
           case None => withNumberMapping
         }
@@ -163,7 +163,7 @@ class BlockchainWriter(
   private def saveTxsLocations(blockHash: ByteString, blockBody: BlockBody): DataSourceBatchUpdate =
     blockBody.transactionList.zipWithIndex.foldLeft(transactionMappingStorage.emptyBatchUpdate) {
       case (updates, (tx, index)) =>
-        updates.and(transactionMappingStorage.put(tx.hash, TransactionLocation(blockHash, index)))
+        updates.and(transactionMappingStorage.put(tx.hash.value, TransactionLocation(blockHash, index)))
     }
 }
 

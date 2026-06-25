@@ -85,7 +85,7 @@ object BlockResponse {
         Right(block.body.transactionList.zipWithIndex.map { case (stx, transactionIndex) =>
           TransactionResponse(stx = stx, blockHeader = Some(block.header), transactionIndex = Some(transactionIndex))
         })
-      else Left(block.body.transactionList.map(_.hash))
+      else Left(block.body.transactionList.map(_.hash.value))
 
     val td = weight.map(_.totalDifficulty)
 

@@ -173,7 +173,7 @@ object EthTxJsonMethodsImplicits extends JsonMethodsImplicits {
 
       override def encodeJson(t: EthPendingTransactionsResponse): JValue =
         JArray(t.pendingTransactions.toList.map { pendingTx =>
-          encodeAsHex(pendingTx.stx.tx.hash)
+          encodeAsHex(pendingTx.stx.tx.hash.value)
         })
     }
 

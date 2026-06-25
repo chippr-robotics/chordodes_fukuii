@@ -175,7 +175,7 @@ class BlockchainImpl(
   }
 
   private def removeTxsLocations(stxs: Seq[SignedTransaction]): DataSourceBatchUpdate =
-    stxs.map(_.hash).foldLeft(transactionMappingStorage.emptyBatchUpdate) { case (updates, hash) =>
+    stxs.map(_.hash.value).foldLeft(transactionMappingStorage.emptyBatchUpdate) { case (updates, hash) =>
       updates.and(transactionMappingStorage.remove(hash))
     }
 

@@ -86,7 +86,7 @@ object BlockchainHostActor {
         .foreach { response =>
           val matchingTxs = response.pendingTransactions
             .map(_.stx.tx)
-            .filter(tx => hashSet.contains(tx.hash))
+            .filter(tx => hashSet.contains(tx.hash.value))
           // Include blob tx sidecar bytes for EIP-4844 network wrapping in PooledTransactions
           val matchingBlobBytes = response.blobTxNetworkBytes.filter { case (hash, _) => hashSet.contains(hash) }
           val responseMsg: MessageSerializable = requestIdOpt match {

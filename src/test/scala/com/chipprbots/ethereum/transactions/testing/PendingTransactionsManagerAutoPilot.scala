@@ -28,7 +28,7 @@ case class PendingTransactionsManagerAutoPilot(pendingTransactions: Set[PendingT
         val newStxSender = SignedTransaction.getSender(newStx).get
         val obsoleteTxs = pendingTransactions
           .filter(ptx => ptx.stx.senderAddress == newStxSender && ptx.stx.tx.tx.nonce == newStx.tx.nonce)
-          .map(_.stx.tx.hash)
+          .map(_.stx.tx.hash.value)
 
         removeTransactions(obsoleteTxs).addTransactions(Set(SignedTransactionWithSender(newStx, newStxSender)))
 
@@ -41,7 +41,7 @@ case class PendingTransactionsManagerAutoPilot(pendingTransactions: Set[PendingT
         this
 
       case RemoveTransactions(signedTransactions) =>
-        this.removeTransactions(signedTransactions.map(_.hash).toSet)
+        this.removeTransactions(signedTransactions.map(_.hash.value).toSet)
 
       case ProperSignedTransactions(transactions, _) =>
         this.addTransactions(transactions)
@@ -59,5 +59,5 @@ case class PendingTransactionsManagerAutoPilot(pendingTransactions: Set[PendingT
   }
 
   def removeTransactions(hashes: Set[ByteString]): PendingTransactionsManagerAutoPilot =
-    copy(pendingTransactions.filterNot(ptx => hashes.contains(ptx.stx.tx.hash)))
+    copy(pendingTransactions.filterNot(ptx => hashes.contains(ptx.stx.tx.hash.value)))
 }

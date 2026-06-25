@@ -38,7 +38,6 @@ import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.nodebuilder.Node
 import com.chipprbots.ethereum.utils.ByteStringUtils
-import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 
 object MockedMiner {
   final val BlockForgerDispatcherId = "fukuii.async.dispatchers.block-forger"

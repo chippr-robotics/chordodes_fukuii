@@ -217,7 +217,7 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
             encodeSimulatedTxFull(tx, idx, h, sender)
           }.toList)
         } else {
-          "transactions" -> JArray(block.transactions.map(tx => encodeAsHex(tx.hash)).toList)
+          "transactions" -> JArray(block.transactions.map(tx => encodeAsHex(tx.hash.value)).toList)
         }
 
         // Per-call results
@@ -257,7 +257,7 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
           "from" -> encodeAsHex(sender),
           "gas" -> encodeAsHex(tx.gasLimit),
           "gasPrice" -> encodeAsHex(effectiveGasPrice),
-          "hash" -> encodeAsHex(stx.hash),
+          "hash" -> encodeAsHex(stx.hash.value),
           "input" -> encodeAsHex(tx.payload),
           "nonce" -> encodeAsHex(tx.nonce),
           "to" -> tx.receivingAddress.map(a => encodeAsHex(a.bytes)).getOrElse(JNull),

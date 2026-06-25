@@ -982,7 +982,7 @@ class EngineApiService(
     val allProofs = Seq.newBuilder[ByteString]
     val allCellProofsPerBlob = Seq.newBuilder[Seq[ByteString]]
     blobTxHashes.foreach { h =>
-      blobTxRawBytes.get(h) match {
+      blobTxRawBytes.get(h.value) match {
         case Some(raw) if raw.length > 1 && raw(0) == 0x03 =>
           try
             rawDecode(raw.toArray.drop(1)) match {
@@ -998,7 +998,7 @@ class EngineApiService(
                         case e: Exception =>
                           log.warn(
                             "EIP-7594 cell-proof computation failed for blob in tx {}: {}",
-                            h.toArray.map("%02x".format(_)).mkString,
+                            h.value.toArray.map("%02x".format(_)).mkString,
                             e.getMessage
                           )
                           Seq.empty
@@ -1009,13 +1009,13 @@ class EngineApiService(
                 commitments.items.foreach { case RLPValue(c) => allCommitments += ByteString(c); case _ => }
                 proofs.items.foreach { case RLPValue(p) => allProofs += ByteString(p); case _ => }
               case _ =>
-                log.warn("Blob tx {} sidecar RLP shape unexpected; skipping", h.toArray.map("%02x".format(_)).mkString)
+                log.warn("Blob tx {} sidecar RLP shape unexpected; skipping", h.value.toArray.map("%02x".format(_)).mkString)
             }
           catch {
             case e: Exception =>
               log.warn(
                 "Failed to decode blob tx {} sidecar: {}",
-                h.toArray.map("%02x".format(_)).mkString,
+                h.value.toArray.map("%02x".format(_)).mkString,
                 e.getMessage
               )
           }

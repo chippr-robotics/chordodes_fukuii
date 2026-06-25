@@ -105,7 +105,7 @@ class EthTxService(
 
   private def getTransactionDataByHash(txHash: ByteString): IO[Option[TransactionData]] = {
     val maybeTxPendingResponse: IO[Option[TransactionData]] = getTransactionsFromPool.map {
-      _.pendingTransactions.map(_.stx.tx).find(_.hash == txHash).map(TransactionData(_))
+      _.pendingTransactions.map(_.stx.tx).find(_.hash.value == txHash).map(TransactionData(_))
     }
 
     maybeTxPendingResponse.map { txPending =>
@@ -279,7 +279,7 @@ class EthTxService(
               signedTransaction,
               rawBytesOpt.map(org.apache.pekko.util.ByteString(_))
             )
-            IO.pure(Right(SendRawTransactionResponse(signedTransaction.hash)))
+            IO.pure(Right(SendRawTransactionResponse(signedTransaction.hash.value)))
           }
         }
       case Failure(_) =>
