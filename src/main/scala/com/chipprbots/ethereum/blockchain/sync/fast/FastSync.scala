@@ -175,10 +175,6 @@ object FastSync {
     private val stateSyncStatsAdapter: TypedActorRef[SyncStateSchedulerActor.StateSyncStats] =
       ctx.messageAdapter[SyncStateSchedulerActor.StateSyncStats](WrappedStateSyncStats(_))
 
-    // Retained for Commit 2 deletion — no remaining callers after SSA Typed migration.
-    @annotation.unused
-    private val fastSyncClassicSelf: ActorRef = pivotResultAdapter.toClassic
-
     private val peerHelper =
       new PeerListHelper(peerEventBus, blacklist, peerDisconnectedAdapter, log, Some(ethRateTracker))
 
