@@ -713,6 +713,216 @@ No regressions vs §8k-B sweep.
 
 **Step 5 — testEssential:** Not run — net zero code change; `sbt compile-all` confirmed clean.
 
+#### §8k-N — MITHRIL: SyncController catch-all bridge elimination (10 sites)
+
+**Agent:** MITHRIL
+**Risk:** LOW-MEDIUM — no behaviour change on happy paths; catch-all arms only fire for messages outside the typed ADT
+**Gate:** None — all target actors are already `Behavior[Command]`; SyncController already holds typed refs
+
+**Background:**
+All Classic children SyncController forwards to are already Typed. The 10 remaining `.toClassic.tell`
+bridges in SyncController exist because each state has a catch-all arm:
+```scala
+case other => fastSync.toClassic.tell(other, noSender)       // runningFastSync — 1 site
+case msg   => snapSync.toClassic.tell(msg, noSender)          // runningSnapSync — 3 sites + line 1628
+case msg   => regularSync.toClassic.tell(msg, noSender)       // runningRegularSync/Backfill — 3 sites
+bytecodeActor.foreach(_.toClassic.tell(msg, noSender))        // recovery state — 2 sites
+storageActor.foreach(_.toClassic.tell(msg, noSender))
+```
+Refs are already narrowed (`TypedActorRef[FastSync.Command]`, `TypedActorRef[SNAPSyncController.Command]`,
+`TypedActorRef[RegularSync.Command]`, `TypedActorRef[BytecodeRecoveryActor.Command]`,
+`TypedActorRef[StorageRecoveryActor.Command]`). The bridges are needed only because the catch-all arm
+forwards types that are NOT yet in the child's Command ADT.
+
+**Steps:**
+
+1. **Audit each catch-all arm** — for each of the 5 arms above, run:
+   ```bash
+   # example for FastSync catch-all (line 560)
+   grep -rn "SyncController.*!" src/main/scala --include="*.scala" | grep -v "\/\/"
+   # then check: what types flow into SyncController from Classic callers that would reach runningFastSync
+   # and not be matched by the explicit cases before the catch-all?
+   ```
+   Identify the actual message types that flow through each catch-all. Check `unwrap(cmd)` and the
+   `messageAdapter[Any]` registration in `apply()` to understand what can arrive.
+
+2. **For `runningFastSync` catch-all (line 560):**
+   Determine what `other` types arrive. Candidates: `FastSync.Done` (handled explicitly above),
+   `SyncProtocol.*` (handled via `WrappedSyncProtocol`). If no types remain, the catch-all is dead —
+   replace with `case other => log.warning("Unexpected msg in runningFastSync: {}", other); Behaviors.same`.
+
+3. **For `runningSnapSync` catch-all (line 763) + `RegisterSnapSyncController` (line 1628):**
+   Line 1628: `snapSync.toClassic` passed to NPMA. Check if NPMA accepts `TypedActorRef[SSC.Command]` —
+   if so, drop `.toClassic`. Lines 763/1206: identify what `msg` types arrive; add to `SNAPSyncController.Command`
+   as `WrappedExternal` variants or handle explicitly in SyncController.
+
+4. **For `runningRegularSync` / `runningRegularSyncWithBackfill` catch-alls (lines 949, 1068, 1075):**
+   Line 1068: explicitly forwards `GetStatus` — check if `RegularSync.Command` includes it
+   (`type Command = SyncProtocol.RegularSyncCommand`; check whether `GetStatus` is a `RegularSyncCommand`).
+   If not, add it. Lines 949/1075: general catch-all — identify types.
+
+5. **For recovery catch-all (lines 2183-2184):**
+   The comment says "Forward SNAP protocol responses to both active recovery actors." Check what SNAP
+   protocol response types flow through `recoverySnapAdapter` and arrive here. Add them explicitly to
+   `BytecodeRecoveryActor.Command` and `StorageRecoveryActor.Command` (or a shared `RecoveryCommand` trait),
+   then replace the catch-alls with typed sends.
+
+6. After each arm is resolved (dead catch-all → logged warning, or live → typed sends), run:
+   ```bash
+   sbt compile-all
+   sbt "testOnly *SyncController*"
+   sbt testEssential   # at end only
+   ```
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *SyncController* *FastSync* *SNAPSync* *RegularSync* *BytecodeRecovery* *StorageRecovery*"
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. Stage and commit per actor (risk-stratified: one commit per catch-all arm resolved)
+3. Update §8k-J cluster table in working-docs to reflect resolved sites
+4. **DELETE §8k-N when all 10 sites resolved**
+
+---
+
+#### §8k-O — MITHRIL: FastSync internal bridge elimination (`fastSyncClassicSelf` + PivotBlockSelector/StateStorageActor)
+
+**Agent:** MITHRIL
+**Risk:** MEDIUM — PivotBlockSelector is spawned as a child of FastSync; changing its constructor signature
+touches FastSync (3 spawn sites), FastSync's spec, and PivotBlockSelector's own type
+**Gate:** None — standalone; does not depend on §8k-N
+
+**Background:**
+FastSync (`Behavior[Command]`) has 5 internal `.toClassic` bridges:
+- Line 186: `private val fastSyncClassicSelf: ActorRef = pivotResultAdapter.toClassic`
+  — passed as `self` to Classic-signature collaborators
+- Lines 296, 322, 710: `ctx.spawn(PivotBlockSelector(...)).toClassic`
+  — PivotBlockSelector is spawned Typed but held as Classic `ActorRef`
+- Line 415: `ctx.spawn(StateStorageActor()).toClassic`
+  — StateStorageActor is spawned Typed but held as Classic `ActorRef`
+
+`PivotBlockSelector` and `StateStorageActor` are the root cause: their constructors or the code holding
+their refs uses Classic `ActorRef`. Eliminate by:
+1. Narrowing `PivotBlockSelector`'s ref to `TypedActorRef[PivotBlockSelector.Command]`
+2. Narrowing `StateStorageActor`'s ref similarly
+3. Replacing `fastSyncClassicSelf` with typed self-ref where possible
+
+**Steps:**
+
+1. **Audit PivotBlockSelector:**
+   ```bash
+   head -30 src/main/scala/com/chipprbots/ethereum/blockchain/sync/fast/PivotBlockSelector.scala
+   grep -n "extends Actor\|Behavior\[" \
+     src/main/scala/com/chipprbots/ethereum/blockchain/sync/fast/PivotBlockSelector.scala
+   ```
+   If already `Behavior[Command]`: why does FastSync hold it as Classic? Check the `pivotBlockSelector ! ...`
+   send sites — if they use Classic `!`, update to typed `pivotBlockSelector ! PivotBlockSelector.SelectPivotBlock`.
+   Drop `.toClassic` from the spawn.
+
+2. **Audit StateStorageActor:**
+   ```bash
+   head -30 src/main/scala/com/chipprbots/ethereum/blockchain/sync/fast/StateStorageActor.scala
+   ```
+   Same check — if Typed, drop `.toClassic` from spawn site (line 415).
+
+3. **If PivotBlockSelector is Classic** — run LOOM pre-migration-checklist, then migrate:
+   - Convert to `Behavior[Command]`
+   - Update all 3 FastSync spawn sites to drop `.toClassic`
+   - Update `PivotBlockSelectorSpec` if it uses `TestActorRef`
+
+4. **Audit `fastSyncClassicSelf` usage** — lines 288, 314, 436, 702. These pass `fastSyncClassicSelf` to
+   collaborator constructors as the reply-to address. Check each collaborator's constructor signature:
+   ```bash
+   grep -n "fastSyncClassicSelf" \
+     src/main/scala/com/chipprbots/ethereum/blockchain/sync/fast/FastSync.scala
+   ```
+   For each collaborator that accepts it: check if it can accept `TypedActorRef[FastSync.Command]` instead
+   (or a narrower reply type). If yes, update the constructor param type and drop `fastSyncClassicSelf`.
+
+5. Once `fastSyncClassicSelf` has no remaining uses: delete its definition (line 186).
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *FastSync* *PivotBlockSelector*"
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. Commit PivotBlockSelector migration separately from FastSync narrowing
+3. **DELETE §8k-O when all 5 sites resolved**
+
+---
+
+#### §8k-P — MITHRIL: PeerEventBusActor caller narrowing (unblocks adapter import removal in 22+ files)
+
+**Agent:** MITHRIL
+**Risk:** MEDIUM — PEB is used throughout sync, network, and node-builder; changing its constructor
+signature is a broad refactor touching ~15 call sites
+**Gate:** None — PEB is already `Behavior[Command]` (line 277); callers just pass Classic `ActorRef`
+
+**Background:**
+`PeerEventBusActor.behavior(): Behavior[Command]` is fully Typed. However, every actor that accepts
+a `peerEventBus` parameter declares it as `peerEventBus: ActorRef` (Classic), not
+`peerEventBus: TypedActorRef[PeerEventBusActor.Command]`. The adapter import's implicit conversion
+(`ClassicActorRef → TypedActorRef[T]`) bridges the gap silently.
+
+This is the primary reason adapter import removal fails across 22+ files: the implicit is load-bearing
+at every constructor call that passes a Classic `peerEventBus` ref.
+
+Sites confirmed requiring it (from §8k-J Step 3):
+- `RegularSync.apply(... peerEventBus: ActorRef ...)` → `BlockFetcher` and `BlockBroadcasterActor`
+- `FastSyncBranchResolverActor(... peerEventBus: ActorRef ...)` → `PeerListHelper`
+- `NodeBuilder` — wires PEB at startup (lines 2 bridge sites)
+- `PeerEventBusActor.scala` itself — 1 self-watch site
+
+**Steps:**
+
+1. **Survey all `peerEventBus: ActorRef` constructor params:**
+   ```bash
+   grep -rn "peerEventBus.*: ActorRef\b" src/main/scala --include="*.scala"
+   grep -rn "peerEventBus.*: ActorRef\b" src/test/scala --include="*.scala"
+   ```
+   List all files. This is the full change surface.
+
+2. **Update each constructor param** from `ActorRef` to `TypedActorRef[PeerEventBusActor.Command]`
+   (add import alias: `import org.apache.pekko.actor.typed.ActorRef as TypedActorRef` is likely already
+   present; add `import com.chipprbots.ethereum.network.PeerEventBusActor` where needed).
+
+3. **Update all call sites** — wherever `peerEventBus` is passed, it must now be a
+   `TypedActorRef[PeerEventBusActor.Command]`. Trace from `NodeBuilder` (the spawn site) down through
+   each layer. NodeBuilder already spawns PEB — check if it holds the ref as Classic or Typed:
+   ```bash
+   grep -n "PeerEventBusActor\|peerEventBus" \
+     src/main/scala/com/chipprbots/ethereum/nodebuilder/NodeBuilder.scala
+   ```
+
+4. **Attempt adapter import removal** after all params are narrowed:
+   - For each file where the ONLY adapter import usage was the implicit `ClassicActorRef → TypedActorRef[PEB.Command]`:
+     remove the import, run `sbt compile-all`, confirm clean.
+
+5. **PeerEventBusActor self-watch site** (1 bridge): inside PEB itself. Check if it uses `.toClassic` for
+   a death-watch; if so, convert to Typed `ctx.watch(peerRef)` directly.
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *PeerEventBus* *RegularSync* *FastSyncBranchResolver* *NodeBuilder*"
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. Commit param narrowing + call site updates together (one commit per actor if large)
+3. Commit adapter import removals as a separate pass (mechanical, Bucket A)
+4. Update §8k-J cluster table: mark PEB+NodeBuilder sites resolved; note how many adapter imports removed
+5. **DELETE §8k-P when all sites resolved and adapter imports cleaned**
+
 ---
 
 ## Part 8l: VM Tracer Model Modernization ✅ DONE 2026-06-24 — see `completed/DEFERRED-BACKLOG.md §8l-R1` + `§8l-I`
@@ -822,7 +1032,10 @@ Each prompt can run independently. Commit individually.
 | ~~G7~~ | ~~Batch G~~ | ~~§8e-StackTrie — FORGE: StackTrie `:120`+`:462` DEFER re-assessment (2 `scalafix:ok` sites)~~ | DONE 2026-06-24 — `09307c5a7` (both CLEAR: `:120` node expr, `:462` var-result; see modernization-log/core/mpt.md) |
 | ~~G8~~ | ~~Batch G~~ | ~~§8l-R1/I — FORGE: VM tracer research + implementation~~ | DONE 2026-06-24 — R1 `37c9d081b`/`5c2adeaaf`; I impl complete; `VM.create()` tracer balanced; suppression removed |
 | ~~H1~~ | ~~Batch H~~ | ~~**§8k-CQ1** — MITHRIL: Remove `GetKnownNodes` dead shim (KnownNodesManager.scala:117 + CommonFakePeer.scala:162)~~ | ✅ DONE `d4cc7a7fa` (2026-06-24) |
-| H2 | Batch H | **§8k-CQ2** — MITHRIL: Fix `PeerActorSpec:429` PeerClosedConnection regression (8k-H) — research PeerActor notification path first | NO — 1 outstanding `testEssential` failure until done |
+| ~~H2~~ | ~~Batch H~~ | ~~**§8k-CQ2** — MITHRIL: Fix `PeerActorSpec:429` PeerClosedConnection regression~~ | ✅ DONE `359692a3b` (2026-06-24) |
+| J1 | Batch J | **§8k-N** — MITHRIL: SyncController catch-all bridge elimination (10 sites) — all target actors already Typed; audit each catch-all arm, extend ADTs or handle explicitly, replace `.toClassic.tell` | YES — standalone per catch-all arm |
+| J2 | Batch J | **§8k-O** — MITHRIL: FastSync `fastSyncClassicSelf` + PivotBlockSelector/StateStorageActor bridge elimination (5 sites) — check if PBS/SSA already Typed; if so drop `.toClassic` from spawn | YES — standalone |
+| J3 | Batch J | **§8k-P** — MITHRIL: PeerEventBusActor caller narrowing — update `peerEventBus: ActorRef` → `TypedActorRef[PEB.Command]` across ~15 constructors; enables adapter import removal in 22+ files | NO — broad refactor; run after J1/J2 compile-all passes |
 | I1 | ETH Sprint (unblocked) | ~~**§ETH-T1-A**~~ ✅ ed4db9df9 · ~~**§ETH-T1-B**~~ ✅ 6f8f74708 · **§ETH-T2-A** `isPostMerge`→`isPoS` rename · **§ETH-T4-A** KZG trusted setup · **§ETH-T4-C** EIP-4788 beacon roots bytecode · ~~**§ETH-T4-D**~~ ✅ f6cf7fb9c blob base fee unification · **§ETH-T6-A** VM tracer try/finally · **§ETH-T6-B** EIP-2681 nonce-max · **§ETH-T7-A** `EvmConfigTimestampForkSpec` · **§ETH-T7-C** `EngineApiVersionRejectionSpec` · **§ETH-T7-D** `BlockRangeUpdateDecodePathSpec` | Partial — each standalone; T4-B gates on T4-A; T7-B gates on T4-C |
 | I2 | ETH Sprint (gated) | ~~**§ETH-T4-B**~~ ✅ maxFeePerBlobGas validation · **§ETH-T7-B** `Eip4788BeaconRootStorageSpec` (gate: T4-C) · ~~**§ETH-T1-C**~~ ✅ `89863ac80` · **§ETH-T9-A/B/C/D** SNAP sync ETH paths · **§ETH-T10-A/B/C/D** Engine API Osaka edge cases | NO — run after I1 items; gate conditions above |
 
