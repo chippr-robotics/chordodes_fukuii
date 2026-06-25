@@ -112,6 +112,11 @@
 - **Files:** `SNAPSyncController.scala`, `SNAPSyncControllerSpec.scala` (4 new tests)
 - **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T9-A`, `.local/docs/eth-sepolia-assumption-audit.md` Thread 9
 
+#### `4ac7e2842` — fix(eth): validateFieldCount — gate BlockHeader RLP field-count on fork timestamp
+- **What:** Added `BlockHeader.validateFieldCount(header, config)` to `BlockHeader` companion object. Chained at both SNAP pivot acceptance sites before `PostMergeBlockHeaderValidator` (bootstrap + pivot refresh). Also called in `SyncBlocksValidator.validateHeaderOnly` for the fast sync header path. ETC short-circuits immediately (`networkType != ETH`).
+- **Files:** `domain/BlockHeader.scala`, `sync/snap/SNAPSyncController.scala` (2 sites), `sync/fast/SyncBlocksValidator.scala`, new `domain/BlockHeaderFieldCountSpec.scala` (6 tests)
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T9-B`, `.local/docs/eth-sepolia-assumption-audit.md` Thread 9
+
 ---
 
 ## Open / Deferred

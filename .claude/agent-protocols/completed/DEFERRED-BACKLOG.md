@@ -2205,3 +2205,40 @@ Added `if isPostMergeChain then { given bc: BlockchainConfig = ...; PostMergeBlo
 - `"confirm the ETH validator rejects PoW headers (ETC gate avoids calling it)"` — difficulty=10^16 → isLeft
 
 **Cross-refs:** `sync/snap.md §ETH-T9-A`, `working-docs/DEFERRED-BACKLOG.md Part 10`, `.local/docs/eth-sepolia-assumption-audit.md` Thread 9
+
+---
+
+## §ETH-T9-B — BEACON: Gate BlockHeader RLP field-count on fork timestamp ✅ FIXED 2026-06-25
+
+**Commit:** `4ac7e2842`
+**Branch:** `scala3-cleanup-june`
+**Agent:** BEACON
+**Risk (pre-fix):** HIGH — a peer sending a Cancun-era block header encoded as a 17-item (Shanghai-shape) RLP was silently accepted with `blobGasUsed = None`; the decoder dispatched it to `HefPostShanghai` with no validation against the fork timestamp, producing a structurally inconsistent header that evaded `PostMergeBlockHeaderValidator` (which requires `difficulty == 0`, so PoW ETC headers were never checked)
+
+**Files changed:**
+- `src/main/scala/com/chipprbots/ethereum/domain/BlockHeader.scala` — added `validateFieldCount(header, config)` to companion object
+- `src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/SNAPSyncController.scala` — `validateFieldCount` chained before `PostMergeBlockHeaderValidator` at both pivot acceptance sites (bootstrap `BootstrapComplete` handler and `completePivotRefreshWithStateRoot`)
+- `src/main/scala/com/chipprbots/ethereum/blockchain/sync/fast/SyncBlocksValidator.scala` — `validateFieldCount` pre-screens in `validateHeaderOnly` (fast sync header path)
+- `src/test/scala/com/chipprbots/ethereum/domain/BlockHeaderFieldCountSpec.scala` — new (6 tests)
+
+**Root cause:**
+`BlockHeaderDec.toBlockHeader` dispatches on RLP item count alone — 15→`HefEmpty`, 16→`HefPostOlympia`, 17→`HefPostShanghai`, 20→`HefPostCancun`, 21+→`HefPostPrague`. Item count 18 or 19 throws; count 17 with a Cancun-active timestamp is silently decoded as `HefPostShanghai` with `blobGasUsed = None`. `PostMergeBlockHeaderValidator` only runs on PoS headers (`difficulty == 0`), leaving the PoW-era ETC code path and any PoW-forged ETH pivot header without the check.
+
+**Fix:**
+`BlockHeader.validateFieldCount(header, config)` — a pure, cheap gate:
+- No-op for `NetworkType.ETC` (no timestamp forks on ETC).
+- Returns `Left(msg)` if Cancun is active at `header.unixTimestamp` and `blobGasUsed.isEmpty`.
+- Returns `Left(msg)` if Shanghai is active at `header.unixTimestamp` and `withdrawalsRoot.isEmpty`.
+- Called at: both SNAP pivot acceptance sites (pre-screens before `PostMergeBlockHeaderValidator`), and `SyncBlocksValidator.validateHeaderOnly` (fast sync header validation, returns `HeaderUnexpectedError`).
+
+**Tests (6, all pass):**
+- ETC config → `Right(())` (no-op for any field shape regardless of timestamp)
+- Pre-Shanghai ETH + `HefEmpty` → `Right(())`
+- Shanghai-active ETH + `HefEmpty` (no `withdrawalsRoot`) → `Left` containing "withdrawalsRoot"
+- Cancun-active ETH + `HefPostShanghai` (17-item, no `blobGasUsed`) → `Left` containing "blobGasUsed" (§ETH-T9-B motivating case)
+- Cancun-active ETH + `HefPostCancun` (20-item, all fields) → `Right(())`
+- Timestamp exactly at `CancunTs` boundary + Shanghai-shape → `Left` (boundary inclusive)
+
+**ETC safety:** `config.networkType != NetworkType.ETH` short-circuits to `Right(())` immediately — zero behaviour change for ETC/Mordor nodes.
+
+**Cross-refs:** `sync/snap.md §ETH-T9-B`, `working-docs/DEFERRED-BACKLOG.md I2`, `.local/docs/eth-sepolia-assumption-audit.md` Thread 9
