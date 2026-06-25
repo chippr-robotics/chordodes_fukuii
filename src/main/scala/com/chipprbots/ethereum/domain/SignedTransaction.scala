@@ -607,7 +607,24 @@ object SignedTransactionWithSender {
       stxs: Seq[SignedTransaction]
   )(implicit blockchainConfig: BlockchainConfig): Seq[SignedTransaction] = {
     import com.chipprbots.ethereum.vm.EvmConfig
-    val config = EvmConfig.forBlock(blockchainConfig.forkBlockNumbers.olympiaBlockNumber, blockchainConfig)
+    import com.chipprbots.ethereum.utils.NetworkType
+    // For ETH chains, apply timestamp-based fork overrides so that EIP-3860 initcode metering
+    // is included in the intrinsic gas check (omitting it under-estimates cost for contract-creation
+    // txs post-Shanghai). Use the latest configured fork timestamp as a stateless proxy for "now".
+    // ETC uses the 2-arg path: timestamp forks do not exist on ETC.
+    val config =
+      if blockchainConfig.networkType == NetworkType.ETH then
+        val ft = blockchainConfig.forkTimestamps
+        val latestTimestamp: Long =
+          ft.osakaTimestamp
+            .orElse(ft.bpo2Timestamp)
+            .orElse(ft.bpo1Timestamp)
+            .orElse(ft.pragueTimestamp)
+            .orElse(ft.cancunTimestamp)
+            .orElse(ft.shanghaiTimestamp)
+            .getOrElse(0L)
+        EvmConfig.forBlock(blockchainConfig.forkBlockNumbers.olympiaBlockNumber, latestTimestamp, blockchainConfig)
+      else EvmConfig.forBlock(blockchainConfig.forkBlockNumbers.olympiaBlockNumber, blockchainConfig)
 
     stxs.filter { stx =>
       val tx = stx.tx
