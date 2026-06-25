@@ -791,11 +791,7 @@ object PrecompiledContracts {
         )
         if !isValid then return None // scalafix:ok DisableSyntax.return
       } catch {
-        case _: Exception =>
-        // If KZG library not loaded or verification fails, try without native library
-        // For now, if the hash and field checks pass, accept the proof
-        // Full KZG verification requires the trusted setup to be loaded
-        // KZG native library not loaded or verification failed — accept if hash checks passed
+        case _: Exception => return None // scalafix:ok DisableSyntax.return
       }
 
       // Return FIELD_ELEMENTS_PER_BLOB ++ BLS_MODULUS as 32-byte big-endian

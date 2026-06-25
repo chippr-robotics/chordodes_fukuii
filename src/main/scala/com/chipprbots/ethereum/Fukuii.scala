@@ -64,6 +64,24 @@ object Fukuii extends Logger {
       System.exit(1)
     }
 
+    if Config.blockchains.blockchainConfig.forkTimestamps.cancunTimestamp.isDefined then {
+      log.info("Cancun fork detected — loading KZG trusted setup for EIP-4844 point-evaluation precompile")
+      try {
+        ethereum.ckzg4844.CKZG4844JNI.loadNativeLibrary()
+        ethereum.ckzg4844.CKZG4844JNI.loadTrustedSetupFromResource(
+          "/trusted_setup.txt",
+          classOf[ethereum.ckzg4844.CKZG4844JNI]
+        )
+        log.info("KZG trusted setup loaded successfully")
+      } catch {
+        case e: Exception =>
+          log.error(
+            "Failed to load KZG trusted setup — point-evaluation precompile (0x0A) will revert all calls: {}",
+            e.getMessage
+          )
+      }
+    }
+
     val node =
       if Config.testmode then {
         log.info("Starting Fukuii in test mode")
