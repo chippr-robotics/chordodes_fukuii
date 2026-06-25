@@ -118,6 +118,7 @@ class EngineApiController(
             val blockchainConfig = com.chipprbots.ethereum.utils.Config.blockchains.blockchainConfig
             val isShanghaiPayload = blockchainConfig.isShanghaiTimestamp(payload.timestamp)
             val isCancunPayload = blockchainConfig.isCancunTimestamp(payload.timestamp)
+            val isPraguePayload = blockchainConfig.isPragueTimestamp(payload.timestamp)
 
             // Version enforcement on payload shape (not on method-of-fork — that's -38005).
             // Hive withdrawals suite expects -32602 (InvalidParamsError) for shape mismatches:
@@ -139,6 +140,12 @@ class EngineApiController(
             val hasAllCancunFields =
               payload.blobGasUsed.isDefined && payload.excessBlobGas.isDefined
             val versionError: Option[(Int, String)] = version match {
+              // V4 is valid only for Prague and Osaka payloads (go-ethereum: checkFork(Prague,
+              // Osaka, BPO1-5)).  When Amsterdam is later defined, add a prior guard:
+              //   case 4 if isAmsterdamTimestamp =>
+              //     Some(UnsupportedFork -> "newPayloadV4 cannot be used post-Amsterdam, use V5")
+              case 4 if !isPraguePayload =>
+                Some(UnsupportedFork -> "newPayloadV4 must only be called for Prague/Osaka payloads")
               case 3 if !isCancunPayload && hasAllCancunFields =>
                 Some(UnsupportedFork -> "newPayloadV3 cannot be used pre-Cancun")
               case 3 if !isCancunPayload =>
