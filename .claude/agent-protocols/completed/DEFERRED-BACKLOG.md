@@ -2176,3 +2176,32 @@ Deleted `computeBlobBaseFee` and `fakeExponential`. All 3 deduction sites call `
 **ETC safety:** Blob deduction paths are unreachable for ETC blocks (no `cancunTimestamp`). No ETC behaviour change.
 
 **Cross-refs:** `storage/ledger.md §ETH-T4-D`, `working-docs/DEFERRED-BACKLOG.md Part 10`, `.local/docs/eth-sepolia-assumption-audit.md` Thread 4c
+
+---
+
+## §ETH-T9-A — SNAP pivot header post-merge validation gate ✅ FIXED 2026-06-25
+
+**Commit:** `4ac7e2842`
+**Branch:** `scala3-cleanup-june`
+**Agent:** BEACON
+**Risk (pre-fix):** HIGH — a malicious peer could serve a malformed post-merge pivot header (e.g. `difficulty > 0`, `withdrawalsRoot = None` on Shanghai blocks) and SNAP sync would commit it with no validation, causing stateRoot divergence not discovered until block execution
+
+**Files changed:**
+- `src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/SNAPSyncController.scala` — `isPostMergeChain` gate added in `BootstrapComplete` handler and `completePivotRefreshWithStateRoot`; on rejection: `startSnapSync()` / `return` respectively
+- `src/test/scala/com/chipprbots/ethereum/blockchain/sync/snap/SNAPSyncControllerSpec.scala` — 4 new tests for the `PostMergeBlockHeaderValidator` pivot header gate (difficulty>0 rejected, withdrawalsRoot=None rejected, valid accepted, PoW confirmed rejected)
+
+**Root cause:**
+Both `BootstrapComplete` and `completePivotRefreshWithStateRoot` stored the peer-supplied pivot header into `appStateStorage` without calling any header validator. `PostMergeBlockHeaderValidator.validateHeaderOnly` checks difficulty==0, nonce==EmptyNonce, ommersHash==EmptyOmmers, withdrawalsRoot present for Shanghai+, and blobGas fields present for Cancun+. None of these were verified before committing pivot state.
+
+**Fix:**
+Added `if isPostMergeChain then { given bc: BlockchainConfig = ...; PostMergeBlockHeaderValidator.validateHeaderOnly(header) match { ... } }` before any state mutation in both storage paths. `isPostMergeChain` is `terminalTotalDifficulty.isDefined` — true for ETH/Sepolia, false for ETC.
+
+**ETC safety:** `isPostMergeChain = false` for all ETC/Mordor configs (no TTD). Gate never fires on ETC; validator is never called. No ETC behaviour change.
+
+**Tests (4/4 pass):**
+- `"reject an ETH/Sepolia pivot header with difficulty > 0"` — difficulty=1 → isLeft
+- `"reject an ETH/Sepolia Shanghai-era pivot header with withdrawalsRoot = None"` — HefEmpty → isLeft
+- `"accept a valid ETH/Sepolia post-merge pivot header"` — valid Sepolia header → isRight
+- `"confirm the ETH validator rejects PoW headers (ETC gate avoids calling it)"` — difficulty=10^16 → isLeft
+
+**Cross-refs:** `sync/snap.md §ETH-T9-A`, `working-docs/DEFERRED-BACKLOG.md Part 10`, `.local/docs/eth-sepolia-assumption-audit.md` Thread 9

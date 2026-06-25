@@ -1037,7 +1037,7 @@ Each prompt can run independently. Commit individually.
 | J2 | Batch J | **§8k-O** — MITHRIL: FastSync `fastSyncClassicSelf` + PivotBlockSelector/StateStorageActor bridge elimination (5 sites) — check if PBS/SSA already Typed; if so drop `.toClassic` from spawn | YES — standalone |
 | J3 | Batch J | **§8k-P** — MITHRIL: PeerEventBusActor caller narrowing — update `peerEventBus: ActorRef` → `TypedActorRef[PEB.Command]` across ~15 constructors; enables adapter import removal in 22+ files | NO — broad refactor; run after J1/J2 compile-all passes |
 | I1 | ETH Sprint (unblocked) | ~~**§ETH-T1-A**~~ ✅ ed4db9df9 · ~~**§ETH-T1-B**~~ ✅ 6f8f74708 · **§ETH-T2-A** `isPostMerge`→`isPoS` rename · ~~**§ETH-T4-A**~~ ✅ 02aaa05fc KZG trusted setup · ~~**§ETH-T4-C**~~ ✅ b934caffe EIP-4788 beacon roots bytecode · ~~**§ETH-T4-D**~~ ✅ f6cf7fb9c blob base fee unification · **§ETH-T6-A** VM tracer try/finally · **§ETH-T6-B** EIP-2681 nonce-max · **§ETH-T7-A** `EvmConfigTimestampForkSpec` · **§ETH-T7-C** `EngineApiVersionRejectionSpec` · **§ETH-T7-D** `BlockRangeUpdateDecodePathSpec` | Partial — each standalone |
-| I2 | ETH Sprint (gated) | ~~**§ETH-T4-B**~~ ✅ maxFeePerBlobGas validation · **§ETH-T7-B** `Eip4788BeaconRootStorageSpec` · ~~**§ETH-T1-C**~~ ✅ `89863ac80` · **§ETH-T9-A/B/C/D** SNAP sync ETH paths · **§ETH-T10-A/B/C/D** Engine API Osaka edge cases | NO — run after I1 items; gate conditions above |
+| I2 | ETH Sprint (gated) | ~~**§ETH-T4-B**~~ ✅ maxFeePerBlobGas validation · **§ETH-T7-B** `Eip4788BeaconRootStorageSpec` · ~~**§ETH-T1-C**~~ ✅ `89863ac80` · ~~**§ETH-T9-A**~~ ✅ · **§ETH-T9-B/C/D** SNAP sync ETH paths · **§ETH-T10-A/B/C/D** Engine API Osaka edge cases | NO — run after I1 items; gate conditions above |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
 
@@ -1535,146 +1535,6 @@ sbt "testOnly *ForkIdSepolia* *ForkId*"
 
 ---
 
-### §ETH-T9-A — BEACON: Validate pivot header before commit in SNAP sync (HIGH)
-
-**Agent:** BEACON
-**Risk:** HIGH — consensus path: a malicious peer can serve a malformed post-merge header; SNAP sync commits it with no validation
-**Gate:** None — standalone fix; prerequisite for any correct ETH/Sepolia SNAP sync
-**Files:**
-- `src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/SNAPSyncController.scala` — `BootstrapComplete` handler and `completePivotRefreshWithStateRoot`
-
-**Background:**
-Thread 9 of the ETH/Sepolia assumption audit (`eth-sepolia-assumption-audit.md`) found that
-`SNAPSyncController` stores the pivot header directly in both the `BootstrapComplete` handler
-and `completePivotRefreshWithStateRoot` without invoking `PostMergeBlockHeaderValidator`.
-
-`PostMergeBlockHeaderValidator` checks (for ETH/Sepolia blocks):
-- `difficulty == 0` and `nonce == 0` (no PoW fields)
-- `ommersHash == BlockHeader.EmptyOmmers` (no uncles on PoS)
-- `withdrawalsRoot.isDefined` for Shanghai+ timestamp blocks
-- `blobGasUsed`, `excessBlobGas`, `parentBeaconBlockRoot` present for Cancun+ blocks
-
-Without this call, a malicious peer can serve a pivot header with `withdrawalsRoot = None` on
-a Shanghai-era Sepolia block, or fake `difficulty > 0`, and SNAP sync will accept and commit it.
-The resulting stateRoot mismatch is not discovered until regular sync attempts block execution —
-at which point the node has committed invalid chain state.
-
-ETC is unaffected: SNAP sync on ETC uses `StdBlockHeaderValidator`, not `PostMergeBlockHeaderValidator`,
-and ETC blocks never pass `isPoS` checks. The fix must gate on `networkType == NetworkType.ETH`.
-
-**Steps:**
-1. **Read** `SNAPSyncController.scala` — find `BootstrapComplete` handler (pivot header storage)
-   and `completePivotRefreshWithStateRoot`. Confirm neither calls a header validator.
-2. **Read** `PostMergeBlockHeaderValidator.scala` — understand `validateHeaderOnly(header)` signature
-   and what it checks. Confirm it does not require a parent header.
-3. **Find** where `networkType` or `BlockchainConfig.isPoSChain` is available in `SNAPSyncController`.
-4. **Add validation** in both storage paths:
-   ```scala
-   // Gate on ETH/Sepolia only — ETC pivot headers validated by StdBlockHeaderValidator
-   if networkType == NetworkType.ETH then
-     postMergeValidator.validateHeaderOnly(pivotHeader) match
-       case Left(err) =>
-         log.error("SNAP pivot header failed consensus validation — blacklisting peer: {}", err)
-         blacklistPeer(sourcePeer)
-         return  // abort pivot commit
-       case Right(_) => ()
-   ```
-5. **Write tests** (or update existing SNAP sync spec) to cover:
-   - ETH/Sepolia: pivot header with `withdrawalsRoot = None` on a Shanghai+ block → rejected
-   - ETH/Sepolia: pivot header with `difficulty > 0` → rejected (not a PoS block)
-   - ETH/Sepolia: valid post-merge pivot header → accepted
-   - ETC: pivot header with `difficulty > 0` (PoW block) → accepted (no ETH validator called)
-
-**Verify:**
-```bash
-sbt compile-all
-sbt "testOnly *SNAPSync*"
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add src/main/scala/.../sync/snap/SNAPSyncController.scala` + test files
-3. `git commit -m "fix(eth): validate pivot header against PostMergeBlockHeaderValidator before SNAP commit — prevents malformed pivot on ETH/Sepolia"`
-4. `SHA=$(git rev-parse --short HEAD)` → update `.local/docs/eth-sepolia-assumption-audit.md` Thread 9 entry
-5. **DELETE §ETH-T9-A**
-
----
-
-### §ETH-T9-B — BEACON: Gate BlockHeader RLP field-count on fork timestamp (HIGH)
-
-**Agent:** BEACON
-**Risk:** HIGH — protocol correctness: a Cancun-era ETH block with only 17 RLP fields (Shanghai shape) is accepted and stored with `blobGasUsed = None`; downstream validators may reject the block, wasting SNAP progress
-**Gate:** §ETH-T9-A complete (both fixes apply in the same SNAP sync session)
-**Files:**
-- `src/main/scala/com/chipprbots/ethereum/domain/BlockHeader.scala` — RLP decoder, field-count branch
-
-**Background:**
-The `BlockHeader` RLP decoder branches on the number of list items to decode optional fields:
-- 15 items → pre-EIP-1559 (no baseFee)
-- 16 items → post-London/Olympia (baseFee)
-- 17 items → Shanghai (withdrawalsRoot)
-- 20 items → Cancun (blobGasUsed, excessBlobGas, parentBeaconBlockRoot)
-- 21+ items → Prague+ (requestsHash)
-
-When decoding a Cancun-era ETH/Sepolia block, a peer could send a 17-item (Shanghai-shape) RLP.
-The decoder accepts it, setting the three Cancun fields to `None`. This is not a decode error.
-
-The result: Fukuii stores a Cancun-era pivot header with `blobGasUsed = None`. When
-`PostMergeBlockHeaderValidator` is called (after §ETH-T9-A), it rejects the header — good.
-But the problem is structural: the decoder should itself reject field-count mismatches when the
-header's timestamp places it in a fork that requires more fields. Currently it does not.
-
-The fix: after decoding, cross-check field count against `blockchainConfig` fork timestamps.
-If `timestamp >= cancunTimestamp` and only 17 fields were decoded, return a decode error.
-
-ETC is unaffected: ETC has no `cancunTimestamp` (timestamp forks are ETH-only), so the
-timestamp-gated check is a no-op on ETC blocks.
-
-**Steps:**
-1. **Read** `BlockHeader.scala` RLP decoder in full — find the item-count branching logic
-   and where `unixTimestamp` is available during decode.
-2. **Read** `BlockchainConfig` — confirm `cancunTimestamp`, `shanghaiTimestamp`, `pragueTimestamp`
-   are accessible at decode time (may require passing config to the decoder).
-3. **Determine approach:** Either
-   a. Pass `BlockchainConfig` to the RLP decoder and add a post-decode validation step, or
-   b. Add a standalone `validateFieldCount(header, config)` method called after decode.
-   Option (b) is lower-risk (does not change the decoder signature).
-4. **Implement `validateFieldCount`:**
-   ```scala
-   def validateFieldCount(header: BlockHeader, config: BlockchainConfig): Either[String, Unit] =
-     if config.isCancunTimestamp(header.unixTimestamp) && header.blobGasUsed.isEmpty then
-       Left(s"Cancun-era header missing blobGasUsed at timestamp ${header.unixTimestamp}")
-     else if config.isShanghaiTimestamp(header.unixTimestamp) && header.withdrawalsRoot.isEmpty then
-       Left(s"Shanghai-era header missing withdrawalsRoot at timestamp ${header.unixTimestamp}")
-     else Right(())
-   ```
-5. **Call `validateFieldCount`** at SNAP sync pivot acceptance (same path as §ETH-T9-A guard),
-   and at regular sync block import.
-6. **Gate on `networkType == NetworkType.ETH`** — ETC has no timestamp forks.
-7. **Write tests:**
-   - Cancun-era timestamp + 17-item RLP (no blobGasUsed) → `Left` (validation error)
-   - Cancun-era timestamp + 20-item RLP (all fields) → `Right(())`
-   - ETC block (any field count) → `Right(())` (no timestamp gate fires)
-
-**Verify:**
-```bash
-sbt compile-all
-sbt "testOnly *BlockHeader*"
-sbt "testOnly *SNAPSync*"
-sbt testVM
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add src/main/scala/.../domain/BlockHeader.scala` + test files
-3. `git commit -m "fix(eth): reject ETH headers with field-count below fork requirement — Cancun header with <20 fields is a decode error"`
-4. `SHA=$(git rev-parse --short HEAD)` → update Thread 9 entry in audit doc
-5. **DELETE §ETH-T9-B**
-
----
-
 ### §ETH-T9-C — BEACON: Verify StorageScheme routing in SNAP coordinators (HIGH — verify first)
 
 **Agent:** BEACON
@@ -1970,3 +1830,123 @@ sbt "testOnly *EngineApi*"
 3. `git commit -m "fix(eth): validateRequests — reject empty entries and non-ascending type bytes at Engine API boundary (T10-D)"`
 4. `SHA=$(git rev-parse --short HEAD)` → update audit doc Thread 10 entry; **update Part 1 warning table**: mark `EngineApiService.scala:661 Ordering.Iterable` DONE with SHA (the `@nowarn` or explicit-Ordering fix for line 661 should be committed in this same session — see Part 1 table)
 5. **DELETE §ETH-T10-D**
+
+---
+
+### §NAMING-A — MITHRIL: Rename `PostMerge` → `PoS` throughout (terminology alignment)
+
+**Agent:** MITHRIL
+**Risk:** LOW — pure rename, no logic change; `BlockHeader.scala:83-84` already defines the canonical pattern
+**Gate:** none — standalone, can run any time
+
+**Files (~60 occurrences across 8 files):**
+
+*Main source (29 occurrences):*
+- `consensus/engine/PostMergeBlockHeaderValidator.scala` — rename file + object + 4 private methods
+- `consensus/validators/BlockHeaderValidator.scala` — `PostMergeNonceError`, `PostMergeOmmersError`
+- `consensus/engine/TransitionBlockHeaderValidator.scala` — 2 references to `PostMergeBlockHeaderValidator`
+- `blockchain/sync/snap/SNAPSyncController.scala` — `isPostMergeChain` val + 8 usages + import + 1 log string
+- `blockchain/sync/SyncController.scala` — `isPostMergeChain` val + 1 usage
+- `utils/BlockchainConfig.scala` — `isPostMerge(totalDifficulty): Boolean`
+
+*Test source (31+ occurrences):*
+- `test/.../validators/PostMergeBlockHeaderValidatorSpec.scala` — rename file + class + ~18 internal references
+- `test/.../sync/snap/SNAPSyncControllerSpec.scala` — import + 5 call sites + 1 comment
+
+*Lower-priority (local variable names only — context is ETH Merge event, not consensus type):*
+- `test/.../ETH69OscillationChainWeightSpec.scala:100-101` — `preMerge`, `postMerge` local vals
+- `test/.../ledger/BlockExecutionSpec.scala:688,698` — `postMergeHeader` local val
+
+**Background:**
+"PostMerge" refers to Ethereum's specific historical event — The Merge (Sept 2022), when ETH transitioned from PoW to PoS. Fukuii is a multi-chain client: ETC is a permanent PoW chain that never had a "merge". Using `PostMerge` in shared infrastructure conflates ETH's migration event with the chain's consensus type, making ETC code harder to reason about.
+
+`BlockHeader.scala:83-84` already defines the canonical pattern:
+```scala
+def isPoS: Boolean = difficulty == 0 && baseFee.isDefined
+def isPoW: Boolean = !isPoS
+```
+
+All `PostMerge` identifiers should align with this existing `isPoS`/`isPoW` vocabulary.
+
+**Investigation audit (run first — confirm scope before renaming):**
+```bash
+# Full occurrence list in main source
+grep -rn "PostMerge\|postMerge\|isPostMerge" \
+  /media/dev/2tb/dev/fukuii/src/main/scala/ --include="*.scala"
+
+# Full occurrence list in test source
+grep -rn "PostMerge\|postMerge\|isPostMerge" \
+  /media/dev/2tb/dev/fukuii/src/test/scala/ --include="*.scala"
+
+# Confirm canonical pattern already exists
+grep -n "isPoS\|isPoW" \
+  /media/dev/2tb/dev/fukuii/src/main/scala/com/chipprbots/ethereum/domain/BlockHeader.scala
+```
+
+**Rename map:**
+
+| From | To | Where |
+|------|----|-------|
+| `PostMergeBlockHeaderValidator` (object) | `PoSBlockHeaderValidator` | file rename + all refs |
+| `PostMergeBlockHeaderValidatorSpec` (class) | `PoSBlockHeaderValidatorSpec` | file rename + all refs |
+| `validatePostMergeDifficulty` | `validatePoSDifficulty` | `PoSBlockHeaderValidator.scala` |
+| `validatePostMergeNonce` | `validatePoSNonce` | `PoSBlockHeaderValidator.scala` |
+| `validatePostMergeOmmers` | `validatePoSOmmers` | `PoSBlockHeaderValidator.scala` |
+| `PostMergeNonceError` | `PoSNonceError` | `BlockHeaderValidator.scala` + spec |
+| `PostMergeOmmersError` | `PoSOmmersError` | `BlockHeaderValidator.scala` + spec |
+| `isPostMergeChain` (val) | `isPoSChain` | `SyncController.scala`, `SNAPSyncController.scala` |
+| `isPostMerge(totalDifficulty)` | `isPoS(totalDifficulty)` | `BlockchainConfig.scala` |
+| log string `"postMergeChain={}"` | `"isPoSChain={}"` | `SNAPSyncController.scala` |
+
+**Steps:**
+1. Run the investigation greps above — confirm the counts before proceeding.
+2. `git mv` the two files with structural renames:
+   ```bash
+   git mv src/main/scala/.../consensus/engine/PostMergeBlockHeaderValidator.scala \
+          src/main/scala/.../consensus/engine/PoSBlockHeaderValidator.scala
+   git mv src/test/scala/.../validators/PostMergeBlockHeaderValidatorSpec.scala \
+          src/test/scala/.../validators/PoSBlockHeaderValidatorSpec.scala
+   ```
+3. Apply all symbol renames in the map above. Prefer `sed -i` on each file for precision over IDE batch rename:
+   ```bash
+   # Example (adjust paths to full package paths):
+   sed -i 's/PostMergeBlockHeaderValidator/PoSBlockHeaderValidator/g' \
+     src/main/scala/.../consensus/engine/PoSBlockHeaderValidator.scala \
+     src/main/scala/.../consensus/engine/TransitionBlockHeaderValidator.scala \
+     src/main/scala/.../blockchain/sync/snap/SNAPSyncController.scala \
+     src/test/scala/.../validators/PoSBlockHeaderValidatorSpec.scala \
+     src/test/scala/.../sync/snap/SNAPSyncControllerSpec.scala
+   sed -i 's/PostMergeNonceError/PoSNonceError/g; s/PostMergeOmmersError/PoSOmmersError/g' \
+     src/main/scala/.../consensus/validators/BlockHeaderValidator.scala \
+     src/main/scala/.../consensus/engine/PoSBlockHeaderValidator.scala \
+     src/test/scala/.../validators/PoSBlockHeaderValidatorSpec.scala
+   sed -i 's/isPostMergeChain/isPoSChain/g' \
+     src/main/scala/.../blockchain/sync/SyncController.scala \
+     src/main/scala/.../blockchain/sync/snap/SNAPSyncController.scala \
+     src/test/scala/.../sync/snap/SNAPSyncControllerSpec.scala
+   sed -i 's/isPostMerge(/isPoS(/g' \
+     src/main/scala/.../utils/BlockchainConfig.scala
+   sed -i 's/validatePostMergeDifficulty/validatePoSDifficulty/g; s/validatePostMergeNonce/validatePoSNonce/g; s/validatePostMergeOmmers/validatePoSOmmers/g' \
+     src/main/scala/.../consensus/engine/PoSBlockHeaderValidator.scala
+   sed -i 's/postMergeChain=/isPoSChain=/g' \
+     src/main/scala/.../blockchain/sync/snap/SNAPSyncController.scala
+   ```
+4. `sbt compile-all` — fix any missed references. Expected: 0 errors.
+5. Grep to confirm no `PostMerge`/`postMerge`/`isPostMerge` remain in main source (lower-priority local vars in test files are acceptable to leave):
+   ```bash
+   grep -rn "PostMerge\|isPostMerge" src/main/scala/ --include="*.scala"
+   ```
+6. `sbt scalafmtAll`
+
+**Verify:**
+```bash
+sbt compile-all
+sbt "testOnly *PoSBlockHeader* *BlockHeaderValidator* *SNAPSync*"
+./local/scripts/fukuii-test
+```
+
+**MANDATORY final steps:**
+1. `sbt scalafmtAll`
+2. Stage with `git add` — list all 8 touched files individually
+3. `git commit -m "refactor: rename PostMerge → PoS — align with BlockHeader.isPoS/isPoW canonical pattern"`
+4. **DELETE §NAMING-A**

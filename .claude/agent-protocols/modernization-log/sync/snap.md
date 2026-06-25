@@ -105,6 +105,15 @@
 
 ---
 
+## ETH/Sepolia Pivot Header Validation — §ETH-T9-A (2026-06-25)
+
+#### `4ac7e2842` — fix(eth): validate pivot header against PostMergeBlockHeaderValidator before SNAP commit
+- **What:** `isPostMergeChain` gate added at both SNAP pivot storage paths in `SNAPSyncController`: the `BootstrapComplete` handler and `completePivotRefreshWithStateRoot`. On ETH/Sepolia, calls `PostMergeBlockHeaderValidator.validateHeaderOnly(header)` before any `appStateStorage` write. Rejection in bootstrap calls `startSnapSync()`; rejection in pivot refresh returns early. ETC (`isPostMergeChain = false`) skips the gate entirely.
+- **Files:** `SNAPSyncController.scala`, `SNAPSyncControllerSpec.scala` (4 new tests)
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T9-A`, `.local/docs/eth-sepolia-assumption-audit.md` Thread 9
+
+---
+
 ## Open / Deferred
 
 - INFO-8: `refreshFreshRootCache` function no longer exists in SNAPSyncController (searched 2026-06-22, 0 results). `getBlockHeaderByNumber` has 7 scattered call sites, none in a tight loop. No run-logs available. Marking MONITORED — no action needed.
