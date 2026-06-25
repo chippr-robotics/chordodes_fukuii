@@ -58,7 +58,9 @@ object NetworkPeerManagerActor {
   private[network] case object CheckLaggingPeersTick extends Command
 
   // Fire-and-forget registrations forwarded by the Classic shell:
-  final case class RegisterSnapSyncControllerCmd(ref: ActorRef) extends Command
+  final case class RegisterSnapSyncControllerCmd(
+      ref: typed.ActorRef[com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.Command]
+  ) extends Command
   final case class RegisterChainWeightCalibrationTargetCmd(
       target: typed.ActorRef[com.chipprbots.ethereum.blockchain.sync.SyncProtocol.CalibrateChainWeightFromPeer]
   ) extends Command
@@ -263,8 +265,7 @@ object NetworkPeerManagerActor {
 
         case RegisterSnapSyncControllerCmd(ref) =>
           log.info("Registering SNAPSyncController for message routing")
-          snapSyncControllerOpt =
-            Some(ref.toTyped[com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.Command])
+          snapSyncControllerOpt = Some(ref)
           Behaviors.same
 
         case RegisterChainWeightCalibrationTargetCmd(target) =>
@@ -1354,7 +1355,9 @@ object NetworkPeerManagerActor {
   case class SendMessage(message: MessageSerializable, peerId: PeerId)
 
   /** Register the SNAPSyncController actor for message routing */
-  case class RegisterSnapSyncController(snapSyncController: ActorRef)
+  case class RegisterSnapSyncController(
+      snapSyncController: typed.ActorRef[com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.Command]
+  )
 
   /** Register SyncController as the recipient for TD-PROXY-GAP calibration data. */
   case class RegisterChainWeightCalibrationTarget(

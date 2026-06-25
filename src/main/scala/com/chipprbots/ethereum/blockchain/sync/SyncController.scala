@@ -376,7 +376,7 @@ object SyncController {
 
       // Ensure snap-sync routing is not left pointing at a dead actor.
       networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterSnapSyncController(
-        ctx.system.classicSystem.deadLetters
+        ctx.system.deadLetters[SNAPSyncController.Command]
       )
     }
 
@@ -1665,7 +1665,7 @@ object SyncController {
 
       // Register SNAPSyncController with NetworkPeerManagerActor for message routing
       networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor
-        .RegisterSnapSyncController(snapSync.toClassic)
+        .RegisterSnapSyncController(snapSync)
 
       // If a CL-driven head arrived before SNAP started (post-merge chains), prime the new
       // SNAP actor with it so pivot selection skips the TD-based path entirely.
@@ -2076,7 +2076,7 @@ object SyncController {
         // No SNAPSyncController exists during recovery — SyncController relays ByteCodesResponse →
         // BytecodeRecoveryActor and StorageRangesResponse → StorageRecoveryActor (see runningRecovery handlers).
         networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterSnapSyncController(
-          recoverySnapAdapter.toClassic
+          recoverySnapAdapter
         )
         timers.startTimerWithFixedDelay(RecoveryPollerKey, PollRecoveryPeers, 2.seconds, 5.seconds)
         runningRecovery(bytecodeActor, storageActor, bytecodeComplete, storageComplete)
@@ -2088,7 +2088,7 @@ object SyncController {
     private def completeRecovery(): Behavior[Command] = {
       timers.cancel(RecoveryPollerKey)
       networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterSnapSyncController(
-        ctx.system.classicSystem.deadLetters
+        ctx.system.deadLetters[SNAPSyncController.Command]
       )
       appStateStorage.clearRecoveryProgress().commit()
       log.info("All recovery complete. Transitioning to regular sync.")

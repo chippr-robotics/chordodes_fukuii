@@ -436,7 +436,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     expectInitialSubscriptions()
 
     // Register SNAP sync controller
-    peersInfoHolder ! RegisterSnapSyncControllerCmd(snapSyncController.ref)
+    peersInfoHolder ! RegisterSnapSyncControllerCmd(snapSyncController.ref.toTyped[SNAPSyncController.Command])
 
     // Setup a peer
     setupNewPeer(peer1, peer1Probe, peer1Info)
