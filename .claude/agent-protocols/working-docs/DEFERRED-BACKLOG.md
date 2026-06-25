@@ -1,6 +1,6 @@
 # Fukuii Modernization — Deferred Backlog
 
-**Last updated**: 2026-06-25 (§ETH-T4-B FIXED — `validateMaxFeePerBlobGas` added to `StdSignedTransactionValidator`; `TransactionMaxFeePerBlobGasTooLow` error; 4 tests)
+**Last updated**: 2026-06-25 (§ETH-T4-D FIXED — `deductBlobGas` routes through `BlobGasUtils.getBlobGasPrice`; local `computeBlobBaseFee` deleted; `BlockPreparatorSpec` test added)
 **Purpose**: Single reference for all deferred cleanup work — completed items,
 active deferred items, and follow-up sprint plans.
 
@@ -823,7 +823,7 @@ Each prompt can run independently. Commit individually.
 | ~~G8~~ | ~~Batch G~~ | ~~§8l-R1/I — FORGE: VM tracer research + implementation~~ | DONE 2026-06-24 — R1 `37c9d081b`/`5c2adeaaf`; I impl complete; `VM.create()` tracer balanced; suppression removed |
 | ~~H1~~ | ~~Batch H~~ | ~~**§8k-CQ1** — MITHRIL: Remove `GetKnownNodes` dead shim (KnownNodesManager.scala:117 + CommonFakePeer.scala:162)~~ | ✅ DONE `d4cc7a7fa` (2026-06-24) |
 | H2 | Batch H | **§8k-CQ2** — MITHRIL: Fix `PeerActorSpec:429` PeerClosedConnection regression (8k-H) — research PeerActor notification path first | NO — 1 outstanding `testEssential` failure until done |
-| I1 | ETH Sprint (unblocked) | ~~**§ETH-T1-A**~~ ✅ ed4db9df9 · ~~**§ETH-T1-B**~~ ✅ 6f8f74708 · **§ETH-T2-A** `isPostMerge`→`isPoS` rename · **§ETH-T4-A** KZG trusted setup · **§ETH-T4-C** EIP-4788 beacon roots bytecode · **§ETH-T4-D** blob base fee unification · **§ETH-T6-A** VM tracer try/finally · **§ETH-T6-B** EIP-2681 nonce-max · **§ETH-T7-A** `EvmConfigTimestampForkSpec` · **§ETH-T7-C** `EngineApiVersionRejectionSpec` · **§ETH-T7-D** `BlockRangeUpdateDecodePathSpec` | Partial — each standalone; T4-B gates on T4-A; T7-B gates on T4-C |
+| I1 | ETH Sprint (unblocked) | ~~**§ETH-T1-A**~~ ✅ ed4db9df9 · ~~**§ETH-T1-B**~~ ✅ 6f8f74708 · **§ETH-T2-A** `isPostMerge`→`isPoS` rename · **§ETH-T4-A** KZG trusted setup · **§ETH-T4-C** EIP-4788 beacon roots bytecode · ~~**§ETH-T4-D**~~ ✅ f6cf7fb9c blob base fee unification · **§ETH-T6-A** VM tracer try/finally · **§ETH-T6-B** EIP-2681 nonce-max · **§ETH-T7-A** `EvmConfigTimestampForkSpec` · **§ETH-T7-C** `EngineApiVersionRejectionSpec` · **§ETH-T7-D** `BlockRangeUpdateDecodePathSpec` | Partial — each standalone; T4-B gates on T4-A; T7-B gates on T4-C |
 | I2 | ETH Sprint (gated) | ~~**§ETH-T4-B**~~ ✅ maxFeePerBlobGas validation · **§ETH-T7-B** `Eip4788BeaconRootStorageSpec` (gate: T4-C) · ~~**§ETH-T1-C**~~ ✅ `89863ac80` · **§ETH-T9-A/B/C/D** SNAP sync ETH paths · **§ETH-T10-A/B/C/D** Engine API Osaka edge cases | NO — run after I1 items; gate conditions above |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.

@@ -1864,12 +1864,15 @@ Permanent floor confirmed (6 sites):
 - `PeerManagerActor.scala:982,986,990` — `connection ! PoisonPill` on TCP-extension-owned actors (§8k-L)
 
 Root cause for remaining 24 bridges:
-1. **PivotHeaderBootstrap still Classic** → FastSync (5) + SyncController (10) forward via `.toClassic.tell`
+1. ✅ **§8k-M RESOLVED** — PHB already Typed (Group ROOT/CAPSTONE; see §8k-M entry above). SyncController×10
+   bridge to FastSync(1)/SnapSync-SSC(4)/RegularSync(3)/recovery actors(2); FastSync×5 are
+   `fastSyncClassicSelf = pivotResultAdapter.toClassic` (self-ref for Classic-signature collaborators).
+   Neither cluster is PHB-related.
 2. **PeerEventBusActor callers pass Classic refs via implicit adapter** → adapter import removal blocked in 22+ files
 
-Bridge clusters: SyncController×10, FastSync×5, PeerManagerActor×4, PivotBlockSelector×2,
-BlockImporter×2, BytecodeRecovery+StorageRecovery×2, PeerRequestHandler×1, SNAPSyncController×1,
-AkkaTaskOps×1, PeerEventBusActor×1, NodeBuilder×2.
+Bridge clusters: SyncController(FastSync×1, SnapSync×4, RegularSync×3, recovery×2)=10, FastSync×5,
+PeerManagerActor×4, PivotBlockSelector×2, BlockImporter×2, BytecodeRecovery+StorageRecovery×2,
+PeerRequestHandler×1, SNAPSyncController×1, AkkaTaskOps×1, PeerEventBusActor×1, NodeBuilder×2.
 
 **Step 3 — 0 adapter imports removable:** FastSyncBranchResolverActor and RegularSync both fail
 compile without adapter — implicit `ClassicActorRef → ActorRef[PEBActor.Command]` conversion.
@@ -1882,7 +1885,7 @@ wildcard — pre-existing CHASE-QUEUE item from §8k-B.
 
 **Step 5 — testEssential:** Skipped — net zero code change; `sbt compile-all` confirmed clean.
 
-**Primary unblock:** PivotHeaderBootstrap LOOM migration (eliminates 15/24 remaining bridges).
+**Primary unblocks:** FastSync, SNAPSyncController, RegularSync migrations (eliminate SyncController×10 + FastSync×5); PEB Typed migration (unblocks adapter import removal in 22+ files).
 
 ---
 
