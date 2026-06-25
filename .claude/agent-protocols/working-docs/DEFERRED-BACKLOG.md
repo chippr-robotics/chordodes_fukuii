@@ -650,36 +650,22 @@ slower than dev machine → timeouts). `@Ignore` annotations silently hide untes
 
 ---
 
-#### §8k-B — Post-CAPSTONE: Final classic bridge verification sweep
+#### §8k-J — PRISM: Re-run TCP floor verification after CAPSTONE
 
-**Agent:** PRISM (verification only)
-**Risk:** LOW — read-only final check
-**Gate:** ~~§8k-I complete~~ ✅ `4613e398f` AND CAPSTONE merged. Run §7d artifact audit first (they overlap).
+**Agent:** PRISM
+**Risk:** LOW — same as §8k-B
+**Gate:** CAPSTONE merged
 
-**Background:**
-After §8k-A through §8k-I, only 4 intentional TCP permanent bridges should remain.
-This sprint verifies that claim and deletes the `pekko.actor.typed.scaladsl.adapter` imports
-that are no longer needed anywhere outside the TCP path.
+§8k-B was executed 2026-06-24 **before** CAPSTONE merged. Found **91** `.toClassic`/`.toTyped`
+bridge occurrences (expected ≤4). All 91 are CAPSTONE-scope. TCP floor cannot be
+declared until CAPSTONE migrates the remaining actors to pure Typed.
 
-**Expected state after §8k-A–I:**
-- `grep -rn "\.toClassic" src/main/ --include="*.scala" | grep -v "//"` → 4 lines only (TCP)
-- `grep -rn "toClassic\|toTyped" src/main/ --include="*.scala" | wc -l` → ≤ 4
-- `import org.apache.pekko.actor.typed.scaladsl.adapter` → only in TCP-path files
+After CAPSTONE merges, re-run §8k-B verbatim (see `completed/DEFERRED-BACKLOG.md`).
+Expected post-CAPSTONE state: ≤4 occurrences (ServerActor + RLPxConnectionHandler TCP only).
 
-**Prompt (run AFTER §8k-I + CAPSTONE):**
-```
-§8k-A through §8k-I are complete. Verify the TCP floor:
-
-Step 1 — grep for any remaining .toClassic / .toTyped outside of:
-  ServerActor.scala, RLPxConnectionHandler.scala (TCP I/O — permanent)
-Step 2 — If found: identify which sprint was supposed to clear it and create
-  a §8k-J follow-up entry in DEFERRED-BACKLOG.md.
-Step 3 — Delete all `import org.apache.pekko.actor.typed.scaladsl.adapter`
-  lines from files that no longer use the adapter.
-Step 4 — Run §7d artifact audit sweep (grep commands in §7d).
-Step 5 — Run testEssential — confirm baseline holds.
-Step 6 — git commit -m "chore(8k-B): remove adapter imports — TCP floor verified (4 bridges)"
-```
+**Adapter import note (from §8k-B Step 3):** The grep heuristic `grep "toClassic|toTyped"` is
+insufficient — the adapter also provides `classicSystem.spawn()` and implicit `ActorRef` conversions.
+Use `sbt compile-all` to confirm import removal is safe before deleting any adapter line.
 
 ---
 
@@ -915,6 +901,10 @@ Each prompt can run independently. Commit individually.
 | ~~G6~~ | ~~Batch G~~ | ~~§8c-M4 — VAULT: DataSource close cache invalidation verify-or-by-design~~ | DONE 2026-06-24 — by-design; Scaladoc comment on `RocksDbDataSource.close()`; verdict in `storage-rocksdb.md` |
 | ~~G7~~ | ~~Batch G~~ | ~~§8e-StackTrie — FORGE: StackTrie `:120`+`:462` DEFER re-assessment (2 `scalafix:ok` sites)~~ | DONE 2026-06-24 — `09307c5a7` (both CLEAR: `:120` node expr, `:462` var-result; see modernization-log/core/mpt.md) |
 | ~~G8~~ | ~~Batch G~~ | ~~§8l-R1/I — FORGE: VM tracer research + implementation~~ | DONE 2026-06-24 — R1 `37c9d081b`/`5c2adeaaf`; I impl complete; `VM.create()` tracer balanced; suppression removed |
+| H1 | Batch H | **§8k-CQ1** — MITHRIL: Remove `GetKnownNodes` dead shim (KnownNodesManager.scala:117 + CommonFakePeer.scala:162) | YES — pure dead-code removal, safe at any time |
+| H2 | Batch H | **§8k-CQ2** — MITHRIL: Fix `PeerActorSpec:429` PeerClosedConnection regression (8k-H) — research PeerActor notification path first | NO — 1 outstanding `testEssential` failure until done |
+| I1 | ETH Sprint (unblocked) | **§ETH-T1-A** `validateInitCodeSize` timestamp dispatch · **§ETH-T2-A** `isPostMerge`→`isPoS` rename · **§ETH-T4-A** KZG trusted setup · **§ETH-T4-C** EIP-4788 beacon roots bytecode · **§ETH-T4-D** blob base fee unification · **§ETH-T6-A** VM tracer try/finally · **§ETH-T6-B** EIP-2681 nonce-max · **§ETH-T7-A** `EvmConfigTimestampForkSpec` · **§ETH-T7-C** `EngineApiVersionRejectionSpec` · **§ETH-T7-D** `BlockRangeUpdateDecodePathSpec` | Partial — each standalone; T4-B gates on T4-A; T7-B gates on T4-C |
+| I2 | ETH Sprint (gated) | **§ETH-T4-B** blob maxFeePerBlobGas validation (gate: T4-A) · **§ETH-T7-B** `Eip4788BeaconRootStorageSpec` (gate: T4-C) · **§ETH-T1-B/C** stateless-mempool decisions needed · **§ETH-T9-A/B/C/D** SNAP sync ETH paths · **§ETH-T10-A/B/C/D** Engine API Osaka edge cases | NO — run after I1 items; gate conditions above |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
 

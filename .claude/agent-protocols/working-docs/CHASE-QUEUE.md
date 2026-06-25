@@ -231,3 +231,15 @@ Systematic under-coverage of the ETH/Sepolia path discovered during coverage-rat
 | 5 | Sepolia `ForkId` checksum chain (6 timestamps + `merge-netsplit-block-number`) has no unit test; regression in CRC32 sequence would cause all Sepolia peers to be rejected at handshake | `network/ForkIdValidator`, `sepolia-chain.conf` | **Medium** | `ForkIdSepoliaSpec` — assert known Sepolia fork-id checksums at each fork timestamp boundary |
 
 Occurrence count: 5 distinct gaps across 3 subsystems (vm, ledger, network/engine).
+
+---
+
+## §7d Audit Finding: SNAPRequestTracker Classic Wildcard Import (2026-06-24)
+
+Discovered during §8k-B §7d Lens 6 sweep.
+
+| # | Finding | File | Risk | Action |
+|---|---------|------|------|--------|
+| 1 | `import org.apache.pekko.actor.*` wildcard — only specific types (likely `Cancellable`, `Scheduler`) are needed; wildcard pulls in all Classic types | `blockchain/sync/snap/SNAPRequestTracker.scala:3` | **Low** | Replace wildcard with specific imports (read file to determine exact set); `sbt compile-all` to verify |
+
+Occurrence count: 1 file.

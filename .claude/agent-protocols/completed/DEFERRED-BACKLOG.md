@@ -1754,3 +1754,56 @@ PivotHeaderBootstrap (×5 spawn sites) — all now accept `TypedActorRef[T]` par
 | TCP / JSON-RPC / Scheduler bridges | ~22 | LEGITIMATE — permanent interop |
 | NPMA routing msgs (SyncController L1635, L1983) | 2 | GATED — CHASE-QUEUE (NPMA command ADT redesign) |
 | ForkChoiceManager.setListener (SyncController L309) | 1 | GATED — CHASE-QUEUE (FCM API redesign) |
+
+---
+
+### §8k-B — PRISM: Post-CAPSTONE TCP floor verification (pre-CAPSTONE run) ✅ DONE 2026-06-24
+
+**Commit:** `<docs-only>` (net zero code changes — see below)
+**Executed:** Pre-CAPSTONE; CAPSTONE not yet merged. Created §8k-J to re-run after merge.
+
+**Step 1 — TCP floor NOT achieved (CAPSTONE pending):**
+- `grep -rn "\.toClassic" src/main/ --include="*.scala" | grep -v "//"` → **91 occurrences** (expected ≤4)
+- All 91 are CAPSTONE-scope bridges (SyncController, PeerManagerActor, FastSync, SNAPSyncController, etc.)
+- TCP-permanent floor (ServerActor + RLPxConnectionHandler) confirmed present.
+
+**Step 2 — §8k-J created** in `working-docs/DEFERRED-BACKLOG.md`.
+
+**Step 3 — 0 adapter imports removed:**
+Attempted removal from 5 files where grep returned 0 `.toClassic`/`.toTyped` hits. All failed compile —
+the adapter also provides `classicSystem.spawn()` (FaucetSupervisor, MockedMiner, PoWMining) and implicit
+`ActorRef` ↔ `ActorRef[T]` conversions (RegularSync, FastSyncBranchResolverActor). All 5 imports restored.
+Lesson: `grep "toClassic|toTyped"` is insufficient — use `sbt compile-all` to confirm adapter safety.
+
+**Step 4 — §7d Artifact Audit (8-lens sweep):**
+
+| Lens | Finding | Status |
+|------|---------|--------|
+| 1: `sender()` in Typed actors | Only TCP bridge + doc comments explaining elimination | ✅ Clean |
+| 2: `context.actorOf` | Only RLPxConnectionHandler TCP bridge (×2 spawn sites) | ✅ Clean |
+| 3: `context.system.scheduler` | Typed actors use Typed scheduler correctly; Classic actors also correct | ✅ Clean |
+| 4: `Behavior[Any]` | 2 doc comments in StorageRecoveryActor + BytecodeRecoveryActor — CAPSTONE scope | ⚠️ CAPSTONE |
+| 5: Unhandled catch-all | All are legitimate pattern arms (return types, ClassTag matching, etc.) | ✅ Clean |
+| 6: Classic import leaks | PoisonPill in SyncController + PeerManagerActor (CAPSTONE targets); `org.apache.pekko.actor.*` wildcard in SNAPRequestTracker.scala | ⚠️ See note |
+| 7: `Props.apply/Props()` | Only ServerActor + RLPxConnectionHandler TCP bridges | ✅ Clean |
+| 8: `preStart/postStop` | Only RLPxConnectionHandler TCP bridge; AccountRangeWorker uses `postStopSignal` (Typed naming) | ✅ Clean |
+
+**Lens 6 notable:** `SNAPRequestTracker.scala` imports `org.apache.pekko.actor.*` wildcard — should be narrowed.
+Logged to CHASE-QUEUE as minor cleanup candidate.
+
+**Step 5 — testEssential:** Not run — net zero code change; compile-all confirmed clean.
+
+**Re-run prompt (after CAPSTONE):**
+```
+§8k-A through §8k-I are complete. Verify the TCP floor:
+
+Step 1 — grep for any remaining .toClassic / .toTyped outside of:
+  ServerActor.scala, RLPxConnectionHandler.scala (TCP I/O — permanent)
+Step 2 — If found: identify which sprint was supposed to clear it and create
+  a §8k-J follow-up entry in DEFERRED-BACKLOG.md.
+Step 3 — Delete all `import org.apache.pekko.actor.typed.scaladsl.adapter`
+  lines from files that no longer use the adapter. VERIFY with sbt compile-all after each removal.
+Step 4 — Run §7d artifact audit sweep (grep commands in G4-pekko-design-scope.md).
+Step 5 — Run testEssential — confirm baseline holds.
+Step 6 — git commit -m "chore(8k-B): remove adapter imports — TCP floor verified (4 bridges)"
+```
