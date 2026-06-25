@@ -6,7 +6,6 @@ import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.duration.*
@@ -413,10 +412,7 @@ object PivotBlockSelector {
             skip = 0,
             reverse = true
           )
-          networkPeerManager.tell(
-            NetworkPeerManagerActor.SendMessage(msg, peer),
-            blockHeadersAdapter.toClassic
-          )
+          networkPeerManager ! NetworkPeerManagerActor.SendMessage(msg, peer)
         }
         timers.startSingleTimer(BacklinkTimeoutKey, BacklinkTimeout, peerResponseTimeout)
         ctx.log.debug(
@@ -571,13 +567,7 @@ object PivotBlockSelector {
         case _ =>
           ETHPackets.GetBlockHeaders(ETHPackets.nextRequestId, Left(blockNumber), 1, 0, reverse = false)
       }
-      // In production the response arrives via the peerEventBus subscription above. Pass blockHeadersAdapter
-      // explicitly so a directly-replying peer manager (notably the test AutoPilot) routes its MessageFromPeer
-      // response back here rather than to dead letters.
-      networkPeerManager.tell(
-        NetworkPeerManagerActor.SendMessage(getBlockHeadersMsg, peer),
-        blockHeadersAdapter.toClassic
-      )
+      networkPeerManager ! NetworkPeerManagerActor.SendMessage(getBlockHeadersMsg, peer)
     }
 
     private def collectVoters(

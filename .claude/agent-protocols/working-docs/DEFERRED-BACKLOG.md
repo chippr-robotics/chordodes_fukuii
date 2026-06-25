@@ -1532,7 +1532,7 @@ Next opportunity: after SNAP1 frees 4 bridges.
 | ~~§8k-B2~~ ✅ | 2 — SyncController:1668, :2079 (NPMA type fix) | **15** |
 | ~~§8k-B3~~ ✅ | 1 — SSC:555 (chainDownloaderReplyAdapter) | **14** |
 | ~~§8k-B4~~ ✅ | 2 — BlockImporter:207, :214 | **12** |
-| §8k-B5 | 2 — PivotBlockSelector:418, :579 | 10 |
+| ~~§8k-B5~~ ✅ | 2 — PivotBlockSelector:418, :579 | **10** |
 | §8k-B6 | 4 — PeerEventBusActor:42, NodeBuilder:419/:1009, PeerRequestHandler:78 | 6 |
 | §8k-B7 | 1 — AkkaTaskOps:37 | **5 → TCP floor = 7 calls** |
 
