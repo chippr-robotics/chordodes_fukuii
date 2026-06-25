@@ -6,6 +6,15 @@
 
 ---
 
+## §8k-M: PivotHeaderBootstrap Classic→Typed — task already complete (2026-06-25)
+
+#### (no commit) — §8k-M audit finding
+- **Files:** `sync/PivotHeaderBootstrap.scala` (already `Behavior[Command]`), `sync/SyncController.scala` (already using `ctx.spawn` + `pivotBootstrapAdapter`), `sync/FastSync.scala` (no PHB references)
+- **What:** §8k-M was created at §8k-J time based on the belief that PHB was still Classic. Inspection confirmed PHB was migrated to `Behavior[Command]` in Group ROOT/CAPSTONE: sealed Command ADT (`Fetch`, `WaitForPeer`, `ScheduleWaitForPeer`, `Retry`, `Fetched`); sealed `Reply` trait (`Completed`, `Failed`); `Behaviors.withTimers`; Typed `AskPattern` for `peersClient`; SLF4J `asyncLog` for off-thread safety. SyncController uses `ctx.spawn(PivotHeaderBootstrap(...))`, `TypedActorRef[PivotHeaderBootstrap.Command]`, and `pivotBootstrapAdapter = ctx.messageAdapter[PivotHeaderBootstrap.Reply]`. FastSync has no PHB references at all. The 10+5 bridges attributed to PHB at §8k-J were bridges to other Classic actors (FastSync, SnapSync, RegularSync, recovery actors).
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8k-M`, `completed/DEFERRED-BACKLOG.md §8k-G4e`
+
+---
+
 ## §8k-K: Child ref narrowing + PeerRequestHandler dual-adapter fix (2026-06-25)
 
 #### `a6b0304e7` — SyncController child refs Classic→Typed; PeerRequestHandler dual-adapter bug

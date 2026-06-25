@@ -665,9 +665,8 @@ Permanent TCP floor confirmed (3 `.toClassic` + 3 PoisonPill = 6 sites):
 - `RLPxConnectionHandler.scala:323` — `context.self.toClassic` (TCP write ack sender)
 - `PeerManagerActor.scala:982,986,990` — `connection ! PoisonPill` (TCP-extension-owned actors; confirmed §8k-L 2026-06-24)
 
-Root cause for remaining 24 bridges: two systemic dependencies not eliminated by CAPSTONE:
-1. **PivotHeaderBootstrap is still a Classic actor** — FastSync (5 bridges) and SyncController (10 bridges)
-   use `.toClassic.tell(msg, noSender)` to forward messages it doesn't yet accept typed.
+Root cause for remaining 24 bridges: two systemic dependencies noted at §8k-J time:
+1. ✅ **§8k-M RESOLVED** — `PivotHeaderBootstrap` is now a `Behavior[Command]` (migrated in Group ROOT/CAPSTONE). The 10 SyncController bridges attributed to PHB at §8k-J time were bridges to FastSync (1), SnapSync (4), RegularSync (3), and recovery actors (2) — correctly attributed below. The 5 FastSync bridges attributed to PHB no longer exist (FastSync has no PHB references).
 2. **PeerEventBusActor callers pass Classic refs via implicit adapter conversion** — not visible to grep;
    blocks adapter import removal in RegularSync, FastSyncBranchResolverActor, and others.
 
@@ -675,8 +674,10 @@ Remaining bridge clusters (24 code sites, excluding 6 permanent floor):
 
 | Cluster | File | Sites | Unblock |
 |---------|------|-------|---------|
-| SyncController protocol forward | SyncController.scala | 10 | PivotHeaderBootstrap LOOM migration |
-| FastSync → PivotHeaderBootstrap | FastSync.scala | 5 | PivotHeaderBootstrap LOOM migration |
+| SyncController → FastSync forward | SyncController.scala | 1 | FastSync migration |
+| SyncController → SnapSync/SSC forward | SyncController.scala | 4 | SNAPSyncController migration |
+| SyncController → RegularSync forward | SyncController.scala | 3 | RegularSync migration |
+| SyncController → recovery actors | SyncController.scala | 2 | BytecodeRecoveryActor/StorageRecoveryActor |
 | PeerManager → PeerActor | PeerManagerActor.scala | 4 | PeerActor migration (TCP-adjacent) |
 | PivotBlockSelector adapter | PivotBlockSelector.scala | 2 | PeerRequestHandler cleanup |
 | BlockImporter self+adapter | BlockImporter.scala | 2 | Needs LOOM survey |
@@ -711,59 +712,6 @@ conversion via adapter (PEB interface still expects Classic callers).
 No regressions vs §8k-B sweep.
 
 **Step 5 — testEssential:** Not run — net zero code change; `sbt compile-all` confirmed clean.
-
----
-
-#### §8k-M — LOOM: PivotHeaderBootstrap Classic→Typed migration (unblocks 15 bridges)
-
-**Agent:** LOOM
-**Risk:** MEDIUM — PivotHeaderBootstrap is a fast-sync state machine; touches FastSync and SyncController
-**Gate:** Any time — standalone migration
-
-**Background:**
-`PivotHeaderBootstrap` is still a Classic actor. It is the primary reason 15 `.toClassic` bridges
-remain post-CAPSTONE:
-- SyncController spawns it via `ctx.toClassic.actorOf()` and holds its ref as Classic `ActorRef`
-  (10 `.toClassic.tell(msg, noSender)` forwarding sites)
-- FastSync holds `fastSyncClassicSelf: ActorRef = pivotResultAdapter.toClassic` and forwards to
-  it via Classic (5 sites)
-
-Migrating PivotHeaderBootstrap to Typed would:
-1. Allow SyncController to replace 10 `.toClassic.tell` forwarding sites with typed sends
-2. Allow FastSync to drop `fastSyncClassicSelf` and its 5 adapter sites
-3. Remove `ctx.toClassic.actorOf()` in SyncController (replace with `ctx.spawn()`)
-
-**Prompt:**
-```
-Use LOOM to migrate PivotHeaderBootstrap from Classic to Typed.
-File: src/main/scala/com/chipprbots/ethereum/blockchain/sync/PivotHeaderBootstrap.scala
-
-Context:
-- PivotHeaderBootstrap is a Classic actor (`extends Actor`).
-- SyncController spawns it via `ctx.toClassic.actorOf(Props(new PivotHeaderBootstrap(...)))`.
-- FastSync holds `fastSyncClassicSelf: ActorRef = pivotResultAdapter.toClassic` and sends
-  to PivotHeaderBootstrap via Classic.
-- Doc comment at PivotHeaderBootstrap.scala:44 says: "`ctx.self.toClassic` CAPSTONE bridge"
-
-Run pre-migration-checklist for PivotHeaderBootstrap first. Then:
-
-Phase 1 — Survey:
-  1. Identify the full Command ADT (all message types PHB handles)
-  2. List all spawn sites (SyncController, FastSync) and how they hold the ref
-  3. List all callers that send to PHB — Typed or Classic?
-
-Phase 2 — Migrate PivotHeaderBootstrap:
-  4. Convert from `extends Actor` to `Behavior[Command]` (Behaviors.setup)
-  5. Replace `sender()` with explicit `replyTo` fields in Commands
-  6. Replace Classic scheduler with Typed timers
-
-Phase 3 — Update callers:
-  7. SyncController: replace `ctx.toClassic.actorOf(Props(...))` with `ctx.spawn(PivotHeaderBootstrap(...))`
-  8. SyncController: replace 10 `.toClassic.tell(msg, noSender)` with typed sends
-  9. FastSync: drop `fastSyncClassicSelf` and its 5 adapter sites
-
-sbt compile-all after each phase. testEssential at end.
-```
 
 ---
 
@@ -991,67 +939,11 @@ Thread 3 (EIP-1559 fee routing) audited: functionally CORRECT — ETH base fee i
 
 ---
 
-### §ETH-T4-D — MITHRIL + BEACON: Unify blob base fee formula — `deductBlobGas` diverges post-Osaka
+~~### §ETH-T4-D — FIXED f6cf7fb9c (2026-06-25)~~
 
-**Agent:** MITHRIL (mechanical change) with BEACON pre-flight (consensus safety check)
-**Risk:** MEDIUM — burned blob gas cost diverges from header-validator/Engine-API view on post-BPO Sepolia blocks
-**Gate:** None — standalone fix; safe to run independently
-**Files:**
-- `src/main/scala/com/chipprbots/ethereum/ledger/BlockPreparator.scala:205-240` (`deductBlobGas`, `computeBlobBaseFee`)
-- `src/main/scala/com/chipprbots/ethereum/consensus/engine/EngineApiService.scala` (`BlobGasUtils.getBlobGasPrice`)
-
-**Background:**
-There are two independent blob base fee calculations in Fukuii:
-
-1. **`BlobGasUtils.getBlobGasPrice`** (in `EngineApiService.scala`) — handles Cancun
-   (`TARGET_BLOB_GAS_PER_BLOCK = 3338477`), Prague (`5007716`), and post-Osaka EIP-7892
-   BPO1/BPO2 update fractions. Used by the header validator and Engine API.
-
-2. **`BlockPreparator.computeBlobBaseFee`** (`:223-240`) — a second implementation that
-   only handles Cancun and Prague fractions. It does NOT include the EIP-7892 BPO fractions
-   that activate post-Osaka.
-
-`deductBlobGas` (`:205-221`) calls `computeBlobBaseFee` to compute how much blob gas to burn
-from the sender. On a post-BPO Osaka Sepolia block, `deductBlobGas` uses the wrong update
-fraction → the burned amount differs from what `BlobGasUtils` (used by the validator)
-computes → inconsistency between the amount burned and the amount validated.
-
-The fix is to delete `computeBlobBaseFee` and route `deductBlobGas` through
-`BlobGasUtils.getBlobGasPrice`, which is already the single source of truth.
-
-**Steps:**
-1. **BEACON pre-flight:** Read `BlockPreparator.scala:205-240` and `BlobGasUtils.getBlobGasPrice`
-   side by side. Confirm:
-   - `getBlobGasPrice(excessBlobGas, timestamp, config)` signature matches what `deductBlobGas` needs
-   - The `blockHeader.unixTimestamp` and `blockHeader.excessBlobGas` are in scope in `deductBlobGas`
-   - The return type is compatible (both return `BigInt` blob gas price)
-2. **MITHRIL implementation:**
-   a. In `deductBlobGas`, replace the `computeBlobBaseFee(...)` call with
-      `BlobGasUtils.getBlobGasPrice(blockHeader.excessBlobGas.getOrElse(0), blockHeader.unixTimestamp, blockchainConfig)`
-   b. Delete the `computeBlobBaseFee` private method (`:223-240`) — it is now unreachable.
-3. **Confirm ETC safety** — `deductBlobGas` is gated on Cancun activation; ETC has no Cancun
-   timestamp; the path is unreachable for ETC blocks. No ETC behaviour change.
-4. **Write / extend a test** to verify `deductBlobGas` burns the correct amount for a
-   post-Prague block using a known `excessBlobGas` value, matching `BlobGasUtils.getBlobGasPrice`.
-
-**Verify:**
-```bash
-# No remaining computeBlobBaseFee references
-grep -rn "computeBlobBaseFee" src/ --include="*.scala"
-# Expected: 0 results
-
-sbt compile-all
-sbt "testOnly *BlockPreparator* *BlobGas*"
-sbt testVM
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add src/main/scala/.../ledger/BlockPreparator.scala` + any test files
-3. `git commit -m "fix(eth): unify blob base fee formula — deductBlobGas now uses BlobGasUtils.getBlobGasPrice (EIP-7892 post-Osaka correct)"`
-4. `SHA=$(git rev-parse --short HEAD)` → update `.local/docs/eth-sepolia-assumption-audit.md` Thread 4c entry
-5. **DELETE §ETH-T4-D**
+`deductBlobGas` + `updateSenderAccountBeforeExecution` + balance pre-check all routed through
+`BlobGasUtils.getBlobGasPrice`. Local `computeBlobBaseFee` / `fakeExponential` deleted.
+`BlockPreparatorSpec` "deductBlobGas" test added. 25/25 tests passed.
 
 ---
 

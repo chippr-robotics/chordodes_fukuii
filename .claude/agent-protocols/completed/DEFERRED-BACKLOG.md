@@ -1568,6 +1568,22 @@ typed interface. Full Scala 3.3.8 + Pekko 1.6 Typed discipline in the sync layer
 
 ---
 
+### §8k-M — PivotHeaderBootstrap Classic→Typed migration ✅ DONE (Group ROOT/CAPSTONE)
+
+**Status:** Already complete at time of §8k-J audit — task created in error.
+
+**What was found (2026-06-25):** `PivotHeaderBootstrap.scala` is a `Behavior[Command]` with sealed Command ADT, `Behaviors.withTimers`, explicit `replyTo: ActorRef[Reply]` (sealed `Reply` trait covering `Completed` + `Failed`), Typed AskPattern for `peersClient`, and SLF4J `asyncLog` for off-thread safety. The migration was done as part of Group ROOT/CAPSTONE, predating the §8k-J audit.
+
+**§8k-J attribution correction:** The 10 SyncController `.toClassic.tell` bridges attributed to PHB at §8k-J were bridges to FastSync (1), SnapSync/SSC (4), RegularSync (3), and recovery actors (2). The 5 FastSync bridges attributed to PHB do not exist — FastSync has no PHB references. The `ctx.self.toClassic` reference in the original PHB doc comment described SyncController's own classic-bridge adapter, not PHB's Classic status.
+
+**Caller state (verified):**
+- `SyncController.scala` — spawns PHB via `ctx.spawn(PivotHeaderBootstrap(...))` (not `ctx.toClassic.actorOf`); holds `TypedActorRef[PivotHeaderBootstrap.Command]`; `pivotBootstrapAdapter = ctx.messageAdapter[PivotHeaderBootstrap.Reply]` at all spawn sites.
+- `FastSync.scala` — no PHB references at all (`fastSyncClassicSelf` removed).
+
+**Cross-refs:** `modernization-log/sync/controller.md §8k-M`, `working-docs/DEFERRED-BACKLOG.md §8k-J` (attribution corrected)
+
+---
+
 ## §9a — SyncStartupStrategy extraction ✅ DONE 2026-06-24
 
 **Commit:** `3140db465` — "feat(sync): §9a SyncStartupStrategy — selectSyncMode pure function + wiring"
