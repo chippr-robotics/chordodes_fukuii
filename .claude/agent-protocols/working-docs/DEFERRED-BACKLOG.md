@@ -856,7 +856,7 @@ Each prompt can run independently. Commit individually.
 | ~~H1~~ | ~~Batch H~~ | ~~**§8k-CQ1** — MITHRIL: Remove `GetKnownNodes` dead shim (KnownNodesManager.scala:117 + CommonFakePeer.scala:162)~~ | ✅ DONE `d4cc7a7fa` (2026-06-24) |
 | H2 | Batch H | **§8k-CQ2** — MITHRIL: Fix `PeerActorSpec:429` PeerClosedConnection regression (8k-H) — research PeerActor notification path first | NO — 1 outstanding `testEssential` failure until done |
 | I1 | ETH Sprint (unblocked) | ~~**§ETH-T1-A**~~ ✅ ed4db9df9 · ~~**§ETH-T1-B**~~ ✅ 6f8f74708 · **§ETH-T2-A** `isPostMerge`→`isPoS` rename · **§ETH-T4-A** KZG trusted setup · **§ETH-T4-C** EIP-4788 beacon roots bytecode · **§ETH-T4-D** blob base fee unification · **§ETH-T6-A** VM tracer try/finally · **§ETH-T6-B** EIP-2681 nonce-max · **§ETH-T7-A** `EvmConfigTimestampForkSpec` · **§ETH-T7-C** `EngineApiVersionRejectionSpec` · **§ETH-T7-D** `BlockRangeUpdateDecodePathSpec` | Partial — each standalone; T4-B gates on T4-A; T7-B gates on T4-C |
-| I2 | ETH Sprint (gated) | **§ETH-T4-B** blob maxFeePerBlobGas validation (gate: T4-A) · **§ETH-T7-B** `Eip4788BeaconRootStorageSpec` (gate: T4-C) · **§ETH-T1-C** stateless-mempool decision needed · **§ETH-T9-A/B/C/D** SNAP sync ETH paths · **§ETH-T10-A/B/C/D** Engine API Osaka edge cases | NO — run after I1 items; gate conditions above |
+| I2 | ETH Sprint (gated) | **§ETH-T4-B** blob maxFeePerBlobGas validation (gate: T4-A) · **§ETH-T7-B** `Eip4788BeaconRootStorageSpec` (gate: T4-C) · ~~**§ETH-T1-C**~~ ✅ `89863ac80` · **§ETH-T9-A/B/C/D** SNAP sync ETH paths · **§ETH-T10-A/B/C/D** Engine API Osaka edge cases | NO — run after I1 items; gate conditions above |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
 
@@ -968,43 +968,6 @@ The `handleRegularSyncMsg` production bug (SyncController:895-897) is tracked un
 
 Source: `.local/docs/eth-sepolia-assumption-audit.md` — Thread 1 (fork dispatch completeness).
 Thread 3 (EIP-1559 fee routing) audited: functionally CORRECT — ETH base fee is burned, ETC base fee credited to treasury. Found one logging bug: `log.error` in `BlockPreparator.creditBaseFeeToTreasury` fired for every ETH/Sepolia block (treasury-address=0 is correct config, not an error). **FIXED `f868b75a8`** — guard added `&& networkType == NetworkType.ETC`. See `completed/DEFERRED-BACKLOG.md §ETH-T3-LOG`.
-
----
-
-### §ETH-T1-C — Design decision: stateless mempool fee schedule on ETH (SUSPICIOUS, low severity)
-
-**Agent:** BEACON (design review, not a direct fix)
-**Risk:** LOW — not consensus-final; block-execution re-validates
-**Gate:** §ETH-T1-A and §ETH-T1-B complete
-**Files:** `src/main/scala/com/chipprbots/ethereum/domain/SignedTransaction.scala:610`
-
-**Background:**
-`getStatelessValidTransactions` (line 610) calls `EvmConfig.forBlock(olympiaBlockNumber, ...)`
-as a fixed block-number proxy. On ETH, `olympiaBlockNumber = 0`, so this always returns
-London config — correct for pre-Shanghai blocks, stale for post-Shanghai. The method is a
-stateless mempool pre-filter (runs on incoming p2p txs via `SignedTransactionsFilterActor`
-and `PendingTransactionsManager`) and has no access to a block timestamp.
-
-This is classified SUSPICIOUS rather than WRONG because:
-- It is not consensus-final (block-execution validates again with the correct `evmConfig`)
-- It cannot silently corrupt state — it can only cause false rejection of valid ETH txs
-  from the mempool, or false admission of txs that will fail at execution
-
-**Decision required:** Choose one of:
-1. **Use `latestForkTimestamp` proxy** — derive the latest activated ETH timestamp from
-   `blockchainConfig` (e.g., `pragueTimestamp` if present) and call the 3-arg overload.
-   Gives a "current fork" approximation. Safe and inexpensive.
-2. **Skip intrinsic-gas floor for ETH** — gate the intrinsic check on `networkType != ETH`,
-   rely entirely on block-execution for ETH. Simpler, less precise mempool filtering.
-3. **Accept as-is** — document the known approximation; mempool pre-filters can be lenient.
-
-**Steps for BEACON:**
-1. Read `SignedTransaction.scala:595-630` to understand what pre-checks are done stateless.
-2. Read how `latestActivatedTimestamp` (or equivalent) could be derived from `BlockchainConfig`.
-3. Recommend one of the three options above with rationale. Do not implement — surface the
-   decision to the user first.
-
-**DELETE §ETH-T1-C** after the design decision is recorded and (if applicable) implemented.
 
 ---
 

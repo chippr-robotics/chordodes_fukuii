@@ -1919,3 +1919,47 @@ always won. Fix: place `mystiqueBlockNumber = 5_000_000` (above Byzantium's 4370
 - ETC with Mystique base, no Shanghai timestamp: gasLimit = 56213 ≥ intrinsic 56200 → accepted ✅
 
 **Verification:** 5/5 `StdSignedTransactionValidatorSpec` pass; 227/227 `testVM` pass; `scalafmtAll` clean.
+
+---
+
+### §ETH-T1-C — BEACON: `getStatelessValidTransactions` timestamp dispatch ✅ FIXED 2026-06-24
+
+**Commit:** `89863ac80`
+**Branch:** `scala3-cleanup-june`
+**Files changed:**
+- `src/main/scala/com/chipprbots/ethereum/domain/SignedTransaction.scala`
+- `src/test/scala/com/chipprbots/ethereum/domain/SignedTransactionStatelessFilterSpec.scala` (new)
+
+**Background:** `getStatelessValidTransactions` (the stateless mempool pre-filter running on incoming
+p2p txs via `SignedTransactionsFilterActor` and `PendingTransactionsManager`) called the 2-arg
+`EvmConfig.forBlock(olympiaBlockNumber, blockchainConfig)`. On ETH chains where
+`spiralBlockNumber > olympiaBlockNumber` (`etcForksDisabled = true`), this resolves to
+`LondonConfigBuilder` with `eip3860Enabled = false`. Contract-creation txs with gasLimit between
+the London intrinsic gas (no EIP-3860 initcode word cost) and the Shanghai intrinsic gas
+(`delta = ceil(initcode.length/32) * 2`) were false-admitted to the mempool and would fail at
+block-execution.
+
+**Key finding during analysis:** EIP-7623 calldata floor (Prague) is enforced in
+`BlockPreparator.calcFloorDataGas`, not in `calcTransactionIntrinsicGas`, so the stateless path
+cannot enforce it regardless of config version. The sole actionable discrepancy was EIP-3860.
+
+**Decision:** Option 1 (latestForkTimestamp proxy). Derive the highest configured fork timestamp
+from `blockchainConfig.forkTimestamps` (osaka → bpo2 → bpo1 → prague → cancun → shanghai,
+first defined wins) and call the 3-arg `forBlock`. ETC keeps the existing 2-arg path unchanged.
+
+**Fix:** Dispatches on `networkType == NetworkType.ETH` inside `getStatelessValidTransactions`.
+ETH: derives `latestTimestamp` from `forkTimestamps` chain; calls 3-arg overload. ETC: unchanged.
+
+**ETC safety:** ETC configs have no `forkTimestamps` defined (`shanghaiTimestamp = None` etc.),
+so the ETH branch is dead code on ETC. The 2-arg path for ETC is structurally unchanged.
+
+**Tests added:** 3 tests in `SignedTransactionStatelessFilterSpec` (new file):
+- CREATE tx, gasLimit = 69384 (London intrinsic, no EIP-3860) → rejected post-fix ✅
+- CREATE tx, gasLimit = 69448 (Shanghai intrinsic, EIP-3860 included) → admitted ✅
+- CALL tx (non-creation), gasLimit = 37384 → admitted (EIP-3860 irrelevant) ✅
+
+**Config used in tests:** `etcMystiqueConfig` base with `olympiaBlockNumber = 6_000_000`,
+`spiralBlockNumber = 1e18` → `etcForksDisabled = true` → LondonConfigBuilder (reproduces the
+ETH-style fork schedule that triggered the false-admission path).
+
+**Verification:** 3/3 `SignedTransactionStatelessFilterSpec` pass.
