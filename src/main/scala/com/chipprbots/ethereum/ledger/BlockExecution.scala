@@ -218,13 +218,17 @@ class BlockExecution(
         val timestampIdx = timestamp.mod(UInt256(BeaconRootHistoryBufferLength))
         val rootIdx = timestampIdx + UInt256(BeaconRootHistoryBufferLength)
 
-        // Ensure the contract account exists
-        val account = world
-          .getAccount(BeaconRootContractAddress)
-          .getOrElse(Account.empty(blockchainConfig.accountStartNonce))
-
-        val w1 = if !world.getAccount(BeaconRootContractAddress).isDefined then {
-          world.saveAccount(BeaconRootContractAddress, account)
+        // Deploy contract bytecode and set nonce=1 on the first Cancun block (mirror EIP-2935 pattern).
+        // The Sepolia genesis does NOT pre-allocate this account; it is seeded here during block processing.
+        // go-ethereum achieves this by executing a real EVM call; Fukuii sets code + nonce directly.
+        val w1 = if world.getCode(BeaconRootContractAddress).isEmpty then {
+          val account = world
+            .getAccount(BeaconRootContractAddress)
+            .getOrElse(Account.empty(blockchainConfig.accountStartNonce))
+            .copy(nonce = UInt256(1))
+          world
+            .saveAccount(BeaconRootContractAddress, account)
+            .saveCode(BeaconRootContractAddress, BeaconRootsCode)
         } else world
 
         val storage = w1.getStorage(BeaconRootContractAddress)
@@ -517,6 +521,11 @@ object BlockExecution {
 
   /** EIP-4788: History buffer length for beacon root storage (8191 slots) */
   val BeaconRootHistoryBufferLength: BigInt = BigInt(8191)
+
+  /** EIP-4788: Deployed bytecode for the beacon roots system contract */
+  val BeaconRootsCode: ByteString = ByteStringUtils.string2hash(
+    "3373fffffffffffffffffffffffffffffffffffffffe14604d57602036146024575f5ffd5b5f35801560495762001fff810690815414603c575f5ffd5b62001fff01545f5260205ff35b5f5ffd5b62001fff42064281555f359062001fff015500"
+  )
 
   /** EIP-2935: Address of the history storage contract */
   val HistoryStorageAddress: Address = Address("0x0000F90827F1C53a10cb7A02335B175320002935")
