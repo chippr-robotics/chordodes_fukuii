@@ -713,13 +713,34 @@ class TrieNodeHealingCoordinator(
           }
         }(ec)
       } else {
-        // ARCH-ROOT-SEED: Fresh start — seed root and let inline discovery populate the queue.
-        log.info(
-          s"[HEAL] Root ${Hex.toHexString(root.take(8).toArray)} not yet in storage " +
-            s"— seeding root for inline child discovery (Besu-aligned top-down)"
+        // COMPLEMENTARY GUARD (root-cause w98gfx4wn): the walk-root node's OWN bytes are absent from local storage.
+        //
+        // Seeding the root here is FUTILE and the source of every observed "exactly 1 node, healed=0" heal stall:
+        //   - A root node is content-retrievable ONLY at the empty path of ITS OWN trie. Under deferred merkleization
+        //     (or after a force-completed download / aged pivot) the account/storage trie was never built locally, so
+        //     the pivot's state root is absent from the hash-keyed CF.
+        //   - The fetch targets an ADVANCING serve root (decoupled heal) or an aged walk root outside peers' ~128-block
+        //     serve window, so every reply is some OTHER root's node → the content-hash gate (keccak == task hash)
+        //     correctly drops it → healed stays 0.
+        //   - discoverMissingChildren never re-enqueues a root, so pendingTasks stays at exactly 1 forever.
+        //
+        // A root cannot be reconstructed from nothing (it has no parent to walk down from), so there is no in-place
+        // heal that can make progress. Instead, SIGNAL the controller that this root is unservable so it takes the
+        // lazy-heal handoff (completeSnapSync()) — the SAME path SNAPSyncController.shouldSkipHealingAfterDownloads
+        // uses. The missing state is then filled on-demand via GetTrieNodes during block execution (BlockImporter /
+        // StateNodeFetcher, which walk the LOCAL trie from the real parent state root and so have the root context the
+        // heal lacks). We do NOT seed and do NOT touch the content-hash gate.
+        //
+        // CRITICAL: firing the guard HERE (at the seed) — not at the SNAPSyncController routing decision — is what
+        // makes it cover EVERY entry into healing, including the BootstrapComplete RESTART handlers that call
+        // startStateHealing() directly and bypass shouldSkipHealingAfterDownloads. The root-PRESENT branch above is
+        // unchanged: a servable root still heals normally (rebuild/seed the frontier and heal missing descendants).
+        log.warning(
+          s"[HEAL] Root ${Hex.toHexString(root.take(8).toArray)} not in storage and unservable — a heal cannot " +
+            s"reconstruct a walk root from nothing. Signalling SNAPSyncController to hand off to lazy on-demand " +
+            s"healing (completeSnapSync); missing nodes fetched via GetTrieNodes during block execution."
         )
-        queueNodes(Seq((Seq(emptyPath), root)))
-        lastHealedAtMs = System.currentTimeMillis()
+        snapSyncController ! SNAPSyncController.HealingRootUnservable(root)
       }
 
     case FrontierRebuilt(entries) =>
@@ -1469,6 +1490,13 @@ class TrieNodeHealingCoordinator(
 
     var healedCount = 0
     var receivedBytes: Long = 0
+    // Observability (root-cause w98gfx4wn): count nodes the server actually returned whose keccak did
+    // NOT match any requested task hash. This is the wrong-node-dropped signature — e.g. an empty-path
+    // task fetched against an advanced serve root resolves to the SERVE root's own root node, which the
+    // content-hash gate (below) correctly drops. It is NOT an empty response and must NOT be
+    // misattributed as a stateless peer. We only distinguish it in the log; the gate and the
+    // re-queue/strike flow are unchanged.
+    var droppedWrongNodeCount = 0
 
     // Hash-based matching — NOT positional. Servers (core-geth handler.go:546-547)
     // omit entries for storage pathsets whose account is missing, returning sparse
@@ -1533,6 +1561,7 @@ class TrieNodeHealingCoordinator(
           // without waiting for a full 3h trie walk. Walk becomes validation-only.
           taskByHash.get(nodeHash).foreach(task => discoverMissingChildren(nodeData, task.pathset))
         } else {
+          droppedWrongNodeCount += 1
           log.debug(
             s"Healing response node not in request set (unexpected): ${Hex.toHexString(nodeHash.take(4).toArray)}"
           )
@@ -1570,8 +1599,31 @@ class TrieNodeHealingCoordinator(
       emptyResponseStrikes.remove(peer.id.value)
       lastHealedAtMs = System.currentTimeMillis()
     } else {
-      adjustResponseBytesOnFailure(peer, "empty healing response")
-      recordPeerCooldown(peer, "empty healing response")
+      // Observability (root-cause w98gfx4wn): a zero-heal response has TWO distinct shapes that must
+      // never be conflated. (1) GENUINELY EMPTY: the server returned no nodes (nodes.size == 0) — the
+      // peer truly couldn't serve the requested paths against the (serve) root → a legitimate
+      // stateless signal. (2) WRONG-NODE-DROPPED: the server returned node(s) (nodes.size > 0) but
+      // NONE matched a requested task hash (droppedWrongNodeCount > 0), so the content-hash gate
+      // dropped them all. This is the serve-root/walk-root divergence (an empty-path task resolved to
+      // the serve root's own root node), NOT a stateless peer — striking the peer here would falsely
+      // drain the pool and trigger a spurious pivot refresh. We log the two cases distinctly so this
+      // can never again be misdiagnosed; the strike/re-queue/cooldown flow below is unchanged
+      // (both cases still re-queue the unsatisfied tasks and apply the soft-exile strike policy).
+      val zeroHealReason =
+        if (nodes.nonEmpty && droppedWrongNodeCount > 0)
+          s"wrong-node-dropped healing response (nodes=${nodes.size}, all $droppedWrongNodeCount content-hash-mismatched)"
+        else
+          "empty healing response"
+      if (nodes.nonEmpty && droppedWrongNodeCount > 0) {
+        log.warning(
+          s"Peer ${peer.id.value} returned ${nodes.size} trie node(s) but ALL were content-hash-mismatched " +
+            s"(walk root ${Hex.toHexString(stateRoot.take(4).toArray)}) — this is a serve-root/walk-root divergence, " +
+            s"NOT a stateless peer. The walk root is unservable (likely aged out of the peer serve window); a heal " +
+            s"cannot reconstruct it and should hand off to lazy on-demand fetch (see SNAPSyncController routing)."
+        )
+      }
+      adjustResponseBytesOnFailure(peer, zeroHealReason)
+      recordPeerCooldown(peer, zeroHealReason)
       // Soft-exile (mirrors AccountRangeCoordinator.markPeerStateless): a SINGLE empty response no
       // longer permanently exiles the peer. Strike it; only at EmptyResponseStrikeThreshold consecutive
       // empties (no intervening heal) is it confirmed stateless. A peer that returns empty now may serve
