@@ -34,8 +34,8 @@ import com.chipprbots.ethereum.network.Peer
   *
   * Pekko Typed actor (`Behavior[Command]`, narrowed S5): SyncController sends both `ByteCodePeerAvailable` and
   * `ByteCodeSyncComplete` / `ProgressBytecodesDownloaded` to this actor. SyncController holds a Classic-visible ref via
-  * the CAPSTONE co-existence bridge; all inbound messages are members of the sealed `Command` ADT, so `Behavior[Any]` is
-  * no longer needed — all Typed machinery (named behavior functions, `Behaviors.withTimers`, `watchWith`) is active.
+  * the CAPSTONE co-existence bridge; all inbound messages are members of the sealed `Command` ADT, so `Behavior[Any]`
+  * is no longer needed — all Typed machinery (named behavior functions, `Behaviors.withTimers`, `watchWith`) is active.
   *
   * Lifecycle:
   *   1. Walk state trie, collect missing codeHashes (deduplicated) 2. If none missing → mark recovery done, report to
@@ -196,7 +196,7 @@ object BytecodeRecoveryActor {
                       networkPeerManager = networkPeerManager,
                       requestTracker = requestTracker,
                       batchSize = snap.ByteCodeTask.DEFAULT_BATCH_SIZE,
-                      snapSyncController = bccAdapter.toClassic
+                      snapSyncController = bccAdapter
                     ),
                     "bytecode-recovery-coordinator",
                     org.apache.pekko.actor.typed.DispatcherSelector.fromConfig("sync-dispatcher")

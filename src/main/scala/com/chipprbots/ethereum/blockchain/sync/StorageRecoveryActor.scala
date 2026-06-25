@@ -226,7 +226,7 @@ object StorageRecoveryActor {
                       maxAccountsPerBatch = snapSyncConfig.storageBatchSize,
                       maxInFlightRequests = snapSyncConfig.storageConcurrency,
                       requestTimeout = snapSyncConfig.timeout,
-                      snapSyncController = srcAdapter.toClassic,
+                      snapSyncController = srcAdapter,
                       initialResponseBytes = snapSyncConfig.storageInitialResponseBytes,
                       minResponseBytes = snapSyncConfig.storageMinResponseBytes
                     ),
