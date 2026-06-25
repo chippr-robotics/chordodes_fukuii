@@ -91,7 +91,7 @@ class EthMiningService(
     coinbaseProvider: CoinbaseProvider,
     system: ActorSystem
 ) extends TransactionPicker {
-  override val scheduler: Scheduler = system.toTyped.scheduler
+  override lazy val scheduler: Scheduler = system.toTyped.scheduler
   import configBuilder.*
   import EthMiningService.*
 

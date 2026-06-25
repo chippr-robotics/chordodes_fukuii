@@ -31,7 +31,7 @@ class PoWBlockCreator(
     coinbaseProvider: CoinbaseProvider,
     system: ActorSystem
 ) extends TransactionPicker {
-  override val scheduler: Scheduler = system.toTyped.scheduler
+  override lazy val scheduler: Scheduler = system.toTyped.scheduler
 
   lazy val fullConsensusConfig = mining.config
   lazy val miningConfig = fullConsensusConfig.specific

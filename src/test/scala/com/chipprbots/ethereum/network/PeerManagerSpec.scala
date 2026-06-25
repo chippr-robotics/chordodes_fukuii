@@ -1089,8 +1089,8 @@ class PeerManagerSpec
 
       val req = peerDiscoveryManager.expectMsgClass(classOf[PeerDiscoveryManager.GetDiscoveredNodesInfoReq])
       req.replyTo ! PeerDiscoveryManager.DiscoveredNodesInfo(bootstrapNodes)
-      knownNodesManager.expectMsg(KnownNodesManager.GetKnownNodes)
-      knownNodesManager.reply(KnownNodesManager.KnownNodes(knownNodes))
+      val knownReq = knownNodesManager.expectMsgType[KnownNodesManager.GetKnownNodesReq]
+      knownReq.replyTo ! KnownNodesManager.KnownNodes(knownNodes)
     }
   }
 

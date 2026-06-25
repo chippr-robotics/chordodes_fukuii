@@ -7,17 +7,17 @@ import com.chipprbots.ethereum.testing.Tags.*
 
 /** Tests the pure [[SyncController.selectSyncMode]] pre-flight function.
   *
-  * The function picks the startup sync mode from peer counts and config without any actor or storage
-  * involvement. All branches are exercised: optimistic SNAP (no peers yet), SNAP downgrade (too few
-  * snap-capable peers), confirmed SNAP (≥ 3 snap peers), fast-only, and regular.
+  * The function picks the startup sync mode from peer counts and config without any actor or storage involvement. All
+  * branches are exercised: optimistic SNAP (no peers yet), SNAP downgrade (too few snap-capable peers), confirmed SNAP
+  * (≥ 3 snap peers), fast-only, and regular.
   */
 class SyncStartupStrategySpec extends AnyFunSuite with ParallelTestExecution with TestSyncConfig {
 
   import SyncController.SyncMode
   import SyncController.selectSyncMode
 
-  private val snapCfg    = defaultSyncConfig.copy(doSnapSync = true, doFastSync = false)
-  private val fastCfg    = defaultSyncConfig.copy(doSnapSync = false, doFastSync = true)
+  private val snapCfg = defaultSyncConfig.copy(doSnapSync = true, doFastSync = false)
+  private val fastCfg = defaultSyncConfig.copy(doSnapSync = false, doFastSync = true)
   private val regularCfg = defaultSyncConfig.copy(doSnapSync = false, doFastSync = false)
 
   test("returns Snap with 0 peers — optimistic startup, no capability data yet", UnitTest, SyncTest) {

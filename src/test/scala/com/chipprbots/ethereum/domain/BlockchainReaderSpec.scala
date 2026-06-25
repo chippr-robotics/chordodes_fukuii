@@ -101,11 +101,11 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     val (cw, source) = blockchainReader.resolveETH69ChainWeight(unknownHash, peerBlockNum, isPoWChain = true)
     source shouldBe "POW_SCALING"
     cw.totalDifficulty should be > BigInt(0)
-    // head.number=1 < 10000 → insufficient-history fallback: rate = headTd / headNumber
+    // ring buffer has < 1000 entries → rollingMedianDifficulty = None → rate = head.difficulty (not totalTD/headNumber)
     val ourBestTD = block1Weight.totalDifficulty
     val ourBestNum = block1.header.number
     val gap: BigInt = (peerBlockNum - ourBestNum).max(BigInt(0))
-    val rate: BigInt = ourBestTD / ourBestNum
+    val rate: BigInt = block1.header.difficulty
     cw.totalDifficulty shouldBe ourBestTD + rate * gap
   }
 
