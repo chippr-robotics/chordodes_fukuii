@@ -897,8 +897,8 @@ class ChainDownloader private (
 
 object ChainDownloader {
 
-  /** Sealed inbound protocol. Classic parents (SyncController / SNAPSyncController) send the public cases via
-    * `.toClassic` ref and co-existence mode delivers them to the typed mailbox; all arrive as `Command`.
+  /** Sealed inbound protocol. Classic parents (SyncController / SNAPSyncController) send the public cases via the
+    * Classic co-existence bridge; co-existence mode delivers them to the typed mailbox and all arrive as `Command`.
     */
   sealed trait Command
 

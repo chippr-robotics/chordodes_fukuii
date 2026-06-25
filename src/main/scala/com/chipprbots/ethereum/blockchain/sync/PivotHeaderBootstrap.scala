@@ -40,8 +40,8 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
   *     mode.
   *
   * Pekko Typed migration (Group ROOT): converted to a `Behavior[Command]` with a sealed inbound ADT. The two outgoing
-  * messages [[Completed]] / [[Failed]] are delivered to a Classic `replyTo` ref — `SyncController`'s
-  * `ctx.self.toClassic` CAPSTONE bridge — which matches them as raw case classes in its bootstrap / recovery / healing
+  * messages [[Completed]] / [[Failed]] are delivered to a Classic `replyTo` ref — the CAPSTONE co-existence bridge
+  * on `SyncController`'s `ctx.self` — which matches them as raw case classes in its bootstrap / recovery / healing
   * states. SyncController is itself now `Behavior[Command]`; the Classic ref is the co-existence bridge, not a sign of
   * an un-narrowed actor. `peersClient` is Typed (CAPSTONE Phase 2d); requests use the Typed `AskPattern`
   * (`peersClient.ask`), which supplies the `replyTo` directly. The ask callbacks run off the actor thread, so they send

@@ -60,8 +60,8 @@ import com.chipprbots.ethereum.utils.NetworkType
   * slots (`healingServeRootRequester`, `recentRootRequester`) carry explicit `ActorRef[ReplyType]` fields. Timers
   * (`RestartFastSyncNow`, `PollRecoveryPeers`, recent-root / healing-serve-root timeouts, TD calibration) use a
   * `TimerScheduler`. `PivotHeaderBootstrap` (now Typed) is spawned via `ctx.spawn`; the remaining Classic children are
-  * spawned via `ctx.toClassic.actorOf`. `syncController` is now a Typed `ActorRef[Command]` in `NodeBuilder` and all
-  * JSON-RPC callers; the OQ-5 Classic ask path (`ctx.toClassic.sender()`) has been eliminated.
+  * spawned via the Classic context's `actorOf`. `syncController` is now a Typed `ActorRef[Command]` in `NodeBuilder`
+  * and all JSON-RPC callers; the OQ-5 Classic ask path (sender retrieval via the Classic context) has been eliminated.
   */
 object SyncController {
 

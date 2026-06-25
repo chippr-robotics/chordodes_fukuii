@@ -34,7 +34,7 @@ import com.chipprbots.ethereum.network.Peer
   *
   * Pekko Typed actor (`Behavior[Command]`, narrowed S5): SyncController sends both `ByteCodePeerAvailable` and
   * `ByteCodeSyncComplete` / `ProgressBytecodesDownloaded` to this actor. SyncController holds a Classic-visible ref via
-  * `.toClassic` (CAPSTONE bridge); all inbound messages are members of the sealed `Command` ADT, so `Behavior[Any]` is
+  * the CAPSTONE co-existence bridge; all inbound messages are members of the sealed `Command` ADT, so `Behavior[Any]` is
   * no longer needed — all Typed machinery (named behavior functions, `Behaviors.withTimers`, `watchWith`) is active.
   *
   * Lifecycle:

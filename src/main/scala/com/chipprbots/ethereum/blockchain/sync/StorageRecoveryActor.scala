@@ -40,7 +40,7 @@ import com.chipprbots.ethereum.network.Peer
   *
   * Pekko Typed actor (`Behavior[Command]`, narrowed S5): SyncController sends `StoragePeerAvailable`, `RecentRoot`, and
   * coordinator messages; all are members of the sealed `Command` ADT. SyncController holds a Classic-visible ref via
-  * `.toClassic` (CAPSTONE bridge); `Behavior[Any]` is no longer needed — all Typed machinery active.
+  * the CAPSTONE co-existence bridge; `Behavior[Any]` is no longer needed — all Typed machinery active.
   *
   * Lifecycle:
   *   1. Walk state trie, find contracts with missing storage tries 2. If none missing → mark recovery done, report to
