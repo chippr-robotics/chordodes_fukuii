@@ -159,24 +159,11 @@ Enum promotes exhaustiveness checking and derives `ordinal`, `values`, `fromOrdi
 
 #### §3d residual — SyncProtocol.SyncStatus candidate
 
-One remaining candidate not yet assessed:
-```bash
-grep -rn "SyncProtocol\.SyncStatus\|sealed.*SyncStatus\|case object.*SyncStatus" \
-  src/main/ --include="*.scala"
-```
-If all subtypes are pure `case object` (no fields, no methods, no constructor params): migrate to `enum` in the same commit pattern as `SyncPhase` (`adf4e69ea`). If any subtype has fields → reject (add ❌ REJECTED note here). This is a 5-minute check + 15-minute migration if confirmed. Handle opportunistically when already in `sync/` files.
+❌ REJECTED (2026-06-25) — `SyncProtocol.Status.Syncing` is a `case class` with three constructor
+params (`startingBlockNumber: BigInt`, `blocksProgress: Progress`, `stateNodesProgress: Option[Progress]`).
+Enum migration requires all subtypes to be pure `case object`. Hierarchy stays as sealed trait.
 
-**Prompt:**
-> Use the MITHRIL agent. Check if `SyncProtocol.SyncStatus` qualifies for enum migration:
-> ```bash
-> grep -rn "SyncProtocol\.SyncStatus\|sealed.*SyncStatus\|case object.*SyncStatus\|case class.*SyncStatus" \
->   src/main/ --include="*.scala"
-> ```
-> If ALL subtypes are pure `case object` (no fields, no constructor params, no non-trivial methods):
-> migrate the sealed trait hierarchy to `enum`, following the commit pattern from `adf4e69ea`
-> (SyncPhase / ForkIdValidationResult).
-> If any subtype has fields or constructor params: add `❌ REJECTED` note to §3d residual and stop.
-> `sbt compile-all` to verify. One commit: `style(3d): SyncProtocol.SyncStatus → enum`
+Note: the actual type name is `SyncProtocol.Status` (not `SyncStatus` — no such type exists in main sources).
 
 ### 3g — StateValidator.scala Exception Swallowing — DONE 2026-06-20 — see `completed/DEFERRED-BACKLOG.md`
 
@@ -452,6 +439,44 @@ at boundaries.
 housekeeping task during test waits for specific domain files.
 **Priority**: MEDIUM — correctness improvement. Prevents entire class of type confusion bugs.
 **Agent**: MITHRIL (Scala 3 type design) + FORGE (for domain/ and consensus/ intersections).
+
+**R6 Clearout Prompt (research only — no code changes):**
+
+> Use the MITHRIL agent. Produce `.local/docs/opaque-type-domain-analysis.md` — a mapping of
+> all `BigInt` and `ByteString` usages in `src/main/` by semantic role.
+>
+> **Steps:**
+> 1. Run each grep to get occurrence counts:
+>    ```bash
+>    grep -rn "BigInt" src/main/ --include="*.scala" | grep -v "//\|import\|test" | head -200
+>    grep -rn "ByteString" src/main/ --include="*.scala" | grep -v "//\|import" | head -200
+>    grep -rn "opaque type" src/main/ --include="*.scala"  # should be 0
+>    ```
+> 2. For each `BigInt` field/parameter found, classify by semantic role:
+>    - BlockNumber / BlockHash hint (in sync, chain types)
+>    - Balance (in `Account`, wallet)
+>    - Nonce (in `Account`, tx)
+>    - GasAmount / GasPrice (in `Block`, `Transaction`)
+>    - StorageKey / StorageValue (in `MptNode`, storage)
+>    - Timestamp (ETH fork dispatch)
+>    - Other / ambiguous
+> 3. For each `ByteString` field/parameter found, classify:
+>    - Hash (BlockHash, TransactionHash, UncleHash, StateRoot, TxRoot, ReceiptsRoot)
+>    - Address (sender, recipient, contract)
+>    - ContractCode / CodeHash
+>    - RLP-encoded payload (arbitrary bytes)
+>    - Other / ambiguous
+> 4. For each candidate opaque type, record:
+>    - Current raw type and field name
+>    - Files affected (count)
+>    - Whether it crosses consensus code paths (→ FORGE gate)
+>    - RLP codec interaction (custom `rlpEncode`/`rlpDecode` needed?)
+>    - Migration complexity: LOW (domain-only) / MEDIUM (domain+sync) / HIGH (domain+consensus)
+> 5. Rank candidates by value/cost ratio. Recommend a sequenced introduction order.
+> 6. Write the document — no source file edits.
+>
+> **Output:** `.local/docs/opaque-type-domain-analysis.md`
+> **After running:** update R6 row in Research Threads table with output doc path and ✅.
 
 ---
 
@@ -729,14 +754,20 @@ No regressions vs §8k-B sweep.
 #### §8k-B — PRISM: TCP floor cleanup + adapter import removal (recurring checkpoint)
 
 **Agent:** PRISM
-**Status:** READY — §8k-Q ✅ DONE (`c4392fe87`, `f3b9fb04c` 2026-06-25)
+**Status:** CHECKED 2026-06-25 (post-§8k-Q) — 0 imports removable this pass; next check after SNAP1.
 **Gate:** None — `fastSyncClassicSelf` deleted; bridges now 19.
 
 **This sprint is a recurring checkpoint — re-run after each Primary Track migration completes
 (SNAP1 → BlockImporter LOOM → PEB migration), not just once.**
 
+**Post-§8k-Q check (2026-06-25):** Attempted import removal from 5 candidates with no explicit
+`.toClassic` calls (FastSyncBranchResolverActor, FastSync, SyncStateSchedulerActor, RegularSync,
+FaucetSupervisor). All 5 failed compile — the adapter import enables implicit classic↔typed
+conversions that do not appear in the `.toClassic` grep. No imports are removable at this gate.
+Next opportunity: after SNAP1 frees 4 bridges.
+
 **Current state (live count 2026-06-25):**
-- Real code bridges: **20 grep lines** (26 raw − 6 scaladoc comment noise)
+- Real code bridges: **19 grep lines** (25 raw − 6 scaladoc comment noise)
 - **Permanent TCP floor: 5 grep lines = 7 actual `.toClassic` calls**
   - `ServerActor.scala:70,77` — 2 calls (TCP bind)
   - `RLPxConnectionHandler.scala:323` — 1 call (TCP write ack)
@@ -746,15 +777,16 @@ No regressions vs §8k-B sweep.
 
 **Bridge reduction path:**
 
-| Gate | Bridges freed | After |
-|------|--------------|-------|
-| ~~§8k-Q~~ ✅ | 1 — FastSync:180 `fastSyncClassicSelf` | **19 remaining** |
-| SNAP1 | 4 — BytecodeRecovery:199, SSC:555, StorageRecovery:229, SyncController:2079 | 10 |
-| BlockImporter LOOM survey | 2 — BlockImporter:207, :214 | 8 |
-| PEB migration | 4 — PeerEventBusActor:42, NodeBuilder:419/:1009, PeerRequestHandler:78 | 4 |
-| PivotBlockSelector cleanup | 2 — PivotBlockSelector:418, :579 | 2 |
-| CHASE-QUEUE (NPMA redesign) | 1 — SyncController:1668 | 1 |
-| AkkaTaskOps redesign | 1 — AkkaTaskOps:37 | 0 → **TCP floor = 7 calls** |
+| Sprint | Bridges freed | After (grep lines) |
+|--------|--------------|---------------------|
+| ~~§8k-Q~~ ✅ | 1 — FastSync:180 `fastSyncClassicSelf` | **19** |
+| ~~§8k-B1~~ ✅ | 2 — BytecodeRecovery:199, StorageRecovery:229 | **17** |
+| §8k-B2 | 2 — SyncController:1668, :2079 (NPMA type fix) | 15 |
+| §8k-B3 | 1 — SSC:555 (chainDownloaderReplyAdapter) | 14 |
+| §8k-B4 | 2 — BlockImporter:207, :214 | 12 |
+| §8k-B5 | 2 — PivotBlockSelector:418, :579 | 10 |
+| §8k-B6 | 4 — PeerEventBusActor:42, NodeBuilder:419/:1009, PeerRequestHandler:78 | 6 |
+| §8k-B7 | 1 — AkkaTaskOps:37 | **5 → TCP floor = 7 calls** |
 
 **Run after each Primary Track sprint above:**
 
@@ -765,9 +797,13 @@ grep -rn "\.toClassic\b" src/main/ --include="*.scala" | grep -v "//" | grep -v 
 
 # Step 2 — For each file whose ONLY .toClassic usage was just eliminated,
 # attempt adapter import removal:
-#   Remove: import org.apache.pekko.actor.typed.scaladsl.adapter._
+#   Remove: import org.apache.pekko.actor.typed.scaladsl.adapter.*
 #   Then: sbt compile-all
 #   Keep if compile fails; delete if clean.
+# IMPORTANT: The grep census undercounts live adapter usage. The adapter import
+# also enables implicit classic↔typed conversions (ActorRef[T] where classic
+# ActorRef expected, system.spawn on classic ActorSystem, etc.) that don't
+# appear in the .toClassic grep. Always verify with compile, not grep alone.
 
 # Step 3 — Commit any removals:
 git commit -m "chore(8k-B): remove adapter imports post-<sprint> — <N> files cleaned, bridges: <before>→<after>"
@@ -778,6 +814,274 @@ git commit -m "chore(8k-B): remove adapter imports post-<sprint> — <N> files c
 **TCP floor target: 7 calls (5 grep lines)** — not 4. PeerManagerActor:584 and :622 each contain two `.toClassic` calls on one line.
 
 ---
+
+### §8k-B Sprint Prompts: Bridge Elimination to TCP Floor
+
+Execute in order. Each prompt is self-contained. Run `sbt compile-all` after every change; run the §8k-B census grep after each commit. Target: 19 bridges → 5 grep lines (TCP floor).
+
+---
+
+#### §8k-B1 — BytecodeRecovery + StorageRecovery: pass typed adapter directly (2 bridges, immediate)
+
+**Files:** `BytecodeRecoveryActor.scala:199`, `StorageRecoveryActor.scala:229`
+**Agent:** PRISM or MITHRIL
+**Gate:** None — §8k-C already migrated `ByteCodeCoordinator.snapSyncController` and `StorageRangeCoordinator.snapSyncController` to `TypedActorRef[SNAPSyncController.Command]`.
+
+**Prompt:**
+```
+In BytecodeRecoveryActor.scala, around line 199, the code passes `bccAdapter.toClassic` as the
+`snapSyncController` argument to `ByteCodeCoordinator(...)`. The `bccAdapter` is already typed as
+`TypedActorRef[SNAPSyncController.Command]` (see its declaration ~10 lines above), and
+`ByteCodeCoordinator.snapSyncController` already expects `TypedActorRef[SNAPSyncController.Command]`
+(§8k-C migrated this in 2026). The `.toClassic` is a pointless round-trip that re-adds a bridge.
+
+Fix: remove `.toClassic` at line 199. Pass `bccAdapter` directly.
+
+Apply the same fix in StorageRecoveryActor.scala ~line 229: `srcAdapter.toClassic` → `srcAdapter`.
+The `StorageRangeCoordinator.snapSyncController` parameter is also already Typed.
+
+After both edits:
+1. `sbt compile-all` — must be clean
+2. Run bridge census: `grep -rn "\.toClassic\b" src/main/ --include="*.scala" | grep -v "//" | grep -v "^\s*\*" | wc -l`
+   Expected: 17 (down from 19)
+3. Commit: `git commit -m "fix(8k-B1): remove toClassic round-trip in BytecodeRecovery+StorageRecovery — bridges: 19→17"`
+4. Update §8k-B gate table row for BytecodeRecovery:199 and StorageRecovery:229 as ✅ DONE.
+```
+
+---
+
+#### §8k-B2 — NPMA RegisterSnapSyncController: Classic → Typed ref (2 bridges)
+
+**Files:** `NetworkPeerManagerActor.scala:61,:1357`, `SyncController.scala:1668,:2079`
+**Agent:** PRISM or MITHRIL
+**Gate:** None — `SNAPSyncController` is already `Behavior[Command]`.
+
+**Prompt:**
+```
+`NetworkPeerManagerActor` has two message variants that carry a Classic `ActorRef` for the
+SNAPSyncController routing slot:
+  - Line 61:   `final case class RegisterSnapSyncControllerCmd(ref: ActorRef) extends Command`
+  - Line 1357: `case class RegisterSnapSyncController(snapSyncController: ActorRef)`
+
+SNAPSyncController is already `Behavior[Command]`. Both variants should use
+`TypedActorRef[SNAPSyncController.Command]` instead.
+
+Step 1 — Change the message types:
+  - `NetworkPeerManagerActor.scala:61`: `ref: ActorRef` → `ref: TypedActorRef[SNAPSyncController.Command]`
+  - `NetworkPeerManagerActor.scala:1357`: `snapSyncController: ActorRef` → `snapSyncController: TypedActorRef[SNAPSyncController.Command]`
+  Add import for SNAPSyncController if not present.
+
+Step 2 — Update NPMA internals that store/use the slot (line 264 handler and the stored field):
+  Change the stored field type to `TypedActorRef[SNAPSyncController.Command]`.
+  Messages to snapSyncController are via typed `!` — no adapter needed.
+
+Step 3 — Fix callers (both use `.toClassic` which becomes redundant):
+  - `SyncController.scala:1668`: `RegisterSnapSyncController(snapSync.toClassic)` → `RegisterSnapSyncController(snapSync)`
+  - `SyncController.scala:2079`: `RegisterSnapSyncController(recoverySnapAdapter.toClassic)` → `RegisterSnapSyncController(recoverySnapAdapter)`
+  Note: `recoverySnapAdapter` is `TypedActorRef[SNAPSyncController.Command]` — types already match.
+
+Step 4 — Check for any other callers: `grep -rn "RegisterSnapSyncController" src/main/ --include="*.scala"`
+
+After all edits:
+1. `sbt compile-all` — must be clean
+2. Bridge census — expected: 15 (down from 17)
+3. Commit: `git commit -m "fix(8k-B2): NPMA RegisterSnapSyncController Classic→Typed — bridges: 17→15"`
+4. Update §8k-B gate table.
+```
+
+---
+
+#### §8k-B3 — SNAPSyncController chainDownloaderReplyAdapter: Any → typed Done adapter (1 bridge)
+
+**File:** `SNAPSyncController.scala:548-555`
+**Agent:** LOOM
+**Gate:** ChainDownloader already uses `replyTo: TypedActorRef[Done.type]` (Behavior[Command], S6 narrowed).
+
+**Prompt:**
+```
+In SNAPSyncController.scala, the field `chainDownloaderReplyAdapter` (around line 548) is declared as
+`org.apache.pekko.actor.ActorRef` via `.toClassic`. It handles two message types via `messageAdapter[Any]`:
+`ChainDownloader.Done` and `ChainDownloader.Progress`.
+
+ChainDownloader.start() already accepts `replyTo: TypedActorRef[Done.type]` — progress is polled
+separately via `GetProgress(replyTo: TypedActorRef[Progress])`.
+
+The bridge is unnecessary. Fix:
+
+Step 1 — Replace the `Any` adapter with a typed Done adapter:
+  ```scala
+  private val chainDownloaderReplyAdapter: TypedActorRef[ChainDownloader.Done.type] =
+    ctx.messageAdapter[ChainDownloader.Done.type](_ => ChainDownloaderDone)
+  ```
+  Remove the `Progress` case — SSC already polls progress via `GetProgress` separately.
+  Verify that no code in SSC relies on Progress arriving via this adapter (search for uses of
+  `chainDownloaderReplyAdapter`).
+
+Step 2 — Find all sites where `chainDownloaderReplyAdapter` is passed to `ChainDownloader.start()` or similar.
+  Confirm the type matches `TypedActorRef[Done.type]` — no `.toClassic` needed.
+
+Step 3 — Remove the Classic type annotation and the `.toClassic` call.
+
+Step 4:
+1. `sbt compile-all` — must be clean
+2. Bridge census — expected: 14 (down from 15)
+3. Commit: `git commit -m "fix(8k-B3): SSC chainDownloaderReplyAdapter Any→Typed Done — bridges: 15→14"`
+4. Update §8k-B gate table.
+```
+
+---
+
+#### §8k-B4 — BlockImporter: selfClassic + fetcherReplyTo elimination (2 bridges)
+
+**File:** `BlockImporter.scala:207,:214`
+**Agent:** LOOM
+**Gate:** Requires survey of `selfClassic` and `fetcherReplyTo` usages within BlockImporter.
+
+**Prompt:**
+```
+BlockImporter.scala has two Classic bridge fields (lines 207-214):
+  - `private val selfClassic = ctx.self.toClassic`  (line 207)
+  - `private val fetcherReplyTo: ActorRef = fetcherResponseAdapter.toClassic`  (line 214)
+
+Survey how each is used:
+  `grep -n "selfClassic\|fetcherReplyTo" src/main/scala/com/chipprbots/ethereum/blockchain/sync/regular/BlockImporter.scala`
+
+For `selfClassic`: If used as a sender in Classic `tell()` calls, replace each site with a typed
+adapter (`ctx.messageAdapter`) or change the callee to accept Typed replyTo.
+
+For `fetcherReplyTo`: `fetcherResponseAdapter` is `TypedActorRef[BlockFetcher.FetchResponse]`.
+If `BlockFetcher.start()` accepts `replyTo: TypedActorRef[FetchResponse]`, pass `fetcherResponseAdapter`
+directly (no `.toClassic`). Verify `BlockFetcher` interface.
+
+Fix whichever is addressable without a full LOOM migration of BlockImporter. If `selfClassic` requires
+replacing Classic `!` sends with typed patterns, do the minimum: either convert the specific send site
+or add a typed message wrapper.
+
+After fixes:
+1. `sbt compile-all` — must be clean
+2. Bridge census — expected: 12 or 13 depending on how many sites are fixable
+3. Commit: `git commit -m "fix(8k-B4): BlockImporter selfClassic+fetcherReplyTo bridge reduction — bridges: 14→<N>"`
+4. Update §8k-B gate table.
+```
+
+---
+
+#### §8k-B5 — PivotBlockSelector: blockHeadersAdapter sender bridges (2 bridges)
+
+**File:** `PivotBlockSelector.scala:418,:579`
+**Agent:** LOOM or MITHRIL
+**Gate:** None — this is a standalone refactor of the Classic `tell(msg, sender)` pattern.
+
+**Prompt:**
+```
+PivotBlockSelector.scala has two `.toClassic` bridges at lines 418 and 579:
+  `networkPeerManager.tell(NetworkPeerManagerActor.SendMessage(msg, peer), blockHeadersAdapter.toClassic)`
+
+Both convert `blockHeadersAdapter: TypedActorRef[...]` to a Classic sender for a Classic `tell(msg, sender)`.
+The Classic sender pattern means: "deliver my response to this ref as the sender."
+
+Fix: Replace the Classic tell-with-sender with the typed adapter pattern already in use elsewhere in this file.
+
+Step 1 — Check how other message sends in PivotBlockSelector route responses back (look for messageAdapter usages):
+  `grep -n "messageAdapter\|peerEventBus\|SubscribeCmd" src/main/scala/com/chipprbots/ethereum/blockchain/sync/fast/PivotBlockSelector.scala | head -20`
+
+Step 2 — Replace `networkPeerManager.tell(msg, blockHeadersAdapter.toClassic)` with the typed adapter pattern:
+  Subscribe to the response via peerEventBus (using `SubscribeCmd` + typed messageAdapter), then tell NPMA
+  to SendMessage without a sender. This matches how other request/response flows work in this file.
+
+Step 3 — Verify there are no other callers that depend on Classic sender routing for these messages.
+
+After fixes:
+1. `sbt compile-all` — must be clean
+2. Bridge census — expected: 10 (down from 12)
+3. Commit: `git commit -m "fix(8k-B5): PivotBlockSelector blockHeadersAdapter typed subscription pattern — bridges: 12→10"`
+4. Update §8k-B gate table.
+```
+
+---
+
+#### §8k-B6 — PeerEventBusActor: Typed migration + NodeBuilder + PeerRequestHandler (4 bridges)
+
+**Files:** `PeerEventBusActor.scala:42`, `NodeBuilder.scala:419,:1009`, `PeerRequestHandler.scala:78`
+**Agent:** LOOM (full Typed migration sprint)
+**Gate:** None blocking — PEB migration unlocks adapter import removal for RegularSync, FastSyncBranchResolverActor, and 10+ other files.
+
+**Prompt:**
+```
+PeerEventBusActor currently passes `.toClassic` in its Pekko Streams `messageSource` at line 42:
+  `.watch(peerEventBus.toClassic)`
+
+And is wired as Classic in NodeBuilder:
+  - Line 419: `networkPeerManager spawn site` passes `.toClassic`
+  - Line 1009: `peerEventBus.toClassic` passed into SyncController wiring
+
+PeerRequestHandler:78 also converts the event adapter:
+  `networkPeerManager.tell(SendMessage(...), peerEventAdapter.toClassic)`
+
+This is a LOOM migration sprint for PeerEventBusActor. Run the standard LOOM pre-flight first:
+  `grep -n "sender()\|context\.actorOf\|context\.parent\|preStart\|postStop" src/main/scala/com/chipprbots/ethereum/network/PeerEventBusActor.scala`
+
+Migration plan:
+1. PEB is already `Behavior[Command]` — audit that all Command variants use typed replyTo
+2. Fix `messageSource` in PEB: `.watch(peerEventBus.toClassic)` → `.watch(peerEventBus)` requires
+   Pekko Streams typed actor integration. Check if `.watch` on a typed ref is supported in the Pekko
+   Streams version in use, or use `.watchTermination()` + a typed adapter.
+3. Update `NodeBuilder:419` and `:1009` to pass typed PEB ref directly
+4. Update `PeerRequestHandler:78`: replace Classic `tell(msg, sender)` with typed pattern
+   (message adapter subscription via PEB, not Classic sender)
+
+After migration:
+1. `sbt compile-all` — must be clean
+2. Bridge census — expected: 6 (down from 10)
+3. Test: `./local/scripts/fukuii-test PeerEventBusActorSpec` (or equivalent)
+4. Run §8k-B adapter import removal pass — PEB migration unlocks removal of adapter imports
+   in: RegularSync, FastSyncBranchResolverActor, SyncStateSchedulerActor, and potentially others.
+5. Commit: `git commit -m "fix(8k-B6): PEB Typed migration + NodeBuilder/PeerRequestHandler bridges — bridges: 10→6"`
+6. Update §8k-B gate table.
+```
+
+---
+
+#### §8k-B7 — AkkaTaskOps: typed ask refactor (1 bridge)
+
+**File:** `AkkaTaskOps.scala:37`
+**Agent:** MITHRIL or CONDUIT
+**Gate:** None — standalone refactor.
+
+**Prompt:**
+```
+AkkaTaskOps.scala:37 contains:
+  `IO.fromFuture(IO(to.ask[A](typedRef => makeCmd(typedRef.toClassic))))`
+
+The `makeCmd: ActorRef => C` lambda converts the typed temp replyTo to Classic because command
+variants use `replyTo: ActorRef` (Classic). The `askForTyped` sibling below it already handles
+the Typed case correctly (no `.toClassic`).
+
+This bridge exists because some callers still have `replyTo: ActorRef` in their command ADTs.
+
+Audit which command variants are passed via `askFor` (search all call sites):
+  `grep -rn "\.askFor[^T]" src/main/ --include="*.scala"`
+
+For each command variant found: change `replyTo: ActorRef` → `replyTo: TypedActorRef[A]` in the
+Command ADT, update the handler to use typed `!`, and update the caller to use `askForTyped` instead.
+
+Once all callers use typed replyTo, delete the `askFor` method entirely and remove the `.toClassic` bridge.
+
+After all command variants are migrated:
+1. `sbt compile-all` — must be clean
+2. Bridge census — expected: 5 (TCP floor — down from 6)
+3. Commit: `git commit -m "fix(8k-B7): AkkaTaskOps askFor Classic replyTo → typed — bridges: 6→5 (TCP floor)"`
+4. Run final §8k-B adapter import removal pass — verify no additional imports are removable.
+5. Update §8k-B status to COMPLETE. TCP floor achieved.
+```
+
+---
+
+**Execution order:** §8k-B1 → §8k-B2 → §8k-B3 → §8k-B4 → §8k-B5 → §8k-B6 → §8k-B7
+
+§8k-B1 and §8k-B2 are immediate (no gate). §8k-B3 through §8k-B7 can proceed in parallel
+if separate agents are available, but §8k-B6 (PEB migration) unlocks the most adapter import
+removals and should be prioritized.
 
 ## Part 8l: VM Tracer Model Modernization ✅ DONE 2026-06-24 — see `completed/DEFERRED-BACKLOG.md §8l-R1` + `§8l-I`
 
@@ -838,7 +1142,7 @@ No actor migration gate. Commit individually; do not bundle with primary-track m
 | **R3** ✅ | Jackson ecosystem gate — DONE, see completed | — | — |
 | **R4** | Scala 3.9 readiness (periodic — when 3.9 LTS appears) | Update `scala-39-upgrade.md` | MITHRIL, WRAITH |
 | **R5** ✅ | EventStream pub/sub topology map — DONE, see completed | — | — |
-| **R6** | Opaque type domain analysis (map BigInt/ByteString semantic roles) | Feeds 8b implementation | MITHRIL, FORGE |
+| **R6** | Opaque type domain analysis (map BigInt/ByteString semantic roles) | `.local/docs/opaque-type-domain-analysis.md` → feeds 8b | MITHRIL, FORGE |
 | **R7** | RLP codec derivation safety analysis (safe-to-derive vs must-stay-manual) | Feeds 8i implementation | MITHRIL, FORGE |
 | **R8** ✅ | Memory / resource retention audit — DONE, see completed | — | — |
 | **R9** ✅ | IO threading model audit — DONE, see completed | — | — |
@@ -891,6 +1195,7 @@ Each prompt can run independently. Commit individually.
 | ~~J2~~ | ~~Batch J~~ | ~~**§8k-O** — MITHRIL: FastSync `fastSyncClassicSelf` + PivotBlockSelector/StateStorageActor bridge elimination (5 sites)~~ | ✅ DONE `fc5a3f8e7` (2026-06-25) — 4/5 sites; `fastSyncClassicSelf` remains pending SyncStateSchedulerActor migration |
 | ~~J3~~ | ~~Batch J~~ | ~~**§8k-P** — MITHRIL: PeerEventBusActor caller narrowing — update `peerEventBus: ActorRef` → `TypedActorRef[PEB.Command]` across ~15 constructors; enables adapter import removal in 22+ files~~ | ✅ DONE (2026-06-25) |
 | ~~J4~~ | ~~Batch J~~ | ~~**§8k-Q** — LOOM: SyncStateSchedulerActor Typed migration — fixes `FastSyncSpec "returns Syncing"` ClassCastException + deletes `fastSyncClassicSelf` (§8k-O 5th site)~~ | ✅ DONE `c4392fe87`/`f3b9fb04c` (2026-06-25) — 17/17 tests pass |
+| K1 | Batch K | **R6** — MITHRIL: opaque type domain analysis (`BigInt`/`ByteString` semantic roles → `.local/docs/opaque-type-domain-analysis.md`) | YES — read-only research; no source edits |
 | I1 | ETH Sprint (unblocked) | ~~**§ETH-T1-A**~~ ✅ ed4db9df9 · ~~**§ETH-T1-B**~~ ✅ 6f8f74708 · ~~**§ETH-T2-A**~~ ✅ c470b3dac + 35db7dc61 (§NAMING-A) · ~~**§ETH-T4-A**~~ ✅ 02aaa05fc KZG trusted setup · ~~**§ETH-T4-C**~~ ✅ b934caffe EIP-4788 beacon roots bytecode · ~~**§ETH-T4-D**~~ ✅ f6cf7fb9c blob base fee unification · ~~**§ETH-T6-A**~~ ✅ b696ve6b6 · ~~**§ETH-T6-B**~~ ✅ 525a1a911 · ~~**§ETH-T7-A**~~ ✅ ac0e25b62 · ~~**§ETH-T7-C**~~ ✅ 6e72ad2a0 · ~~**§ETH-T7-D**~~ ✅ c7cc5d131 | ✅ ALL DONE 2026-06-25 |
 | I2 | ETH Sprint (gated) | ~~**§ETH-T4-B**~~ ✅ maxFeePerBlobGas validation · ~~**§ETH-T7-B**~~ ✅ cb2e2aec1 · ~~**§ETH-T1-C**~~ ✅ `89863ac80` · ~~**§ETH-T9-A**~~ ✅ · ~~**§ETH-T9-B**~~ ✅ `4ac7e2842` · ~~**§ETH-T9-C**~~ ✅ false positive · ~~**§ETH-T9-D**~~ ✅ SNAP sync ETH paths · ~~**§ETH-T10-A**~~ ✅ `b131a5ec7` · ~~**§ETH-T10-B**~~ ✅ a40750ce6 · ~~**§ETH-T10-C**~~ ✅ 3bc71fe51 · ~~**§ETH-T10-D**~~ ✅ 364e395dc | ✅ ALL DONE 2026-06-25 |
 
