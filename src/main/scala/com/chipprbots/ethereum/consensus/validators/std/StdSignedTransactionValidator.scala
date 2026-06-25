@@ -43,7 +43,7 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
       _ <- validateInitCodeSize(stx, blockHeader.number, blockHeader.unixTimestamp)
       _ <- validateSignature(stx, blockHeader.number)
       _ <- validateNonce(stx, senderAccount.nonce)
-      _ <- validateGasLimitEnoughForIntrinsicGas(stx, blockHeader.number)
+      _ <- validateGasLimitEnoughForIntrinsicGas(stx, blockHeader.number, blockHeader.unixTimestamp)
       _ <- validateTxGasLimitCap(stx, blockHeader.number, blockHeader.unixTimestamp)
       _ <- validateMaxFeeAgainstBaseFee(stx, blockHeader)
       _ <- validateAccountHasEnoughGasToPayUpfrontCost(senderAccount.balance, upfrontGasCost)
@@ -266,10 +266,11 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
     */
   private def validateGasLimitEnoughForIntrinsicGas(
       stx: SignedTransaction,
-      blockHeaderNumber: BigInt
+      blockHeaderNumber: BigInt,
+      blockHeaderTimestamp: Long
   )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] = {
     import stx.tx
-    val config = EvmConfig.forBlock(blockHeaderNumber, blockchainConfig)
+    val config = EvmConfig.forBlock(blockHeaderNumber, blockHeaderTimestamp, blockchainConfig)
     val authListSize = tx match {
       case sct: SetCodeTransaction => sct.authorizationList.size
       case _                       => 0
