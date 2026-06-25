@@ -661,7 +661,8 @@ bridge occurrences (expected ≤4). All 91 are CAPSTONE-scope. TCP floor cannot 
 declared until CAPSTONE migrates the remaining actors to pure Typed.
 
 After CAPSTONE merges, re-run §8k-B verbatim (see `completed/DEFERRED-BACKLOG.md`).
-Expected post-CAPSTONE state: ≤4 occurrences (ServerActor + RLPxConnectionHandler TCP only).
+Expected post-CAPSTONE state: ≤7 occurrences (ServerActor + RLPxConnectionHandler TCP only, plus
+3 PoisonPill sites in PeerManagerActor — all confirmed permanent TCP floor by §8k-L, 2026-06-24).
 
 **Adapter import note (from §8k-B Step 3):** The grep heuristic `grep "toClassic|toTyped"` is
 insufficient — the adapter also provides `classicSystem.spawn()` and implicit `ActorRef` conversions.
@@ -742,46 +743,6 @@ Commit per phase:
   "refactor(capstone-sc-p1): SyncController child refs Classic→Typed survey"
   "refactor(capstone-sc-p2): SyncController child refs narrowed; PoisonPill → ctx.stop (15 sites)"
   "refactor(capstone-sc-p3): StorageRecoveryActor + BytecodeRecoveryActor Behavior[Any] → Behavior[Command]"
-```
-
----
-
-#### §8k-L — HERALD: PeerManagerActor TCP PoisonPill — permanent floor or migrateable?
-
-**Agent:** HERALD
-**Risk:** LOW — read-only assessment
-**Gate:** Any time — standalone assessment
-
-**Background:**
-PeerManagerActor IS already Typed (migrated in `05e0c003b`). It still imports and uses
-`PoisonPill` to stop TCP connection actors (`connection ! PoisonPill` at lines 982, 986, 990).
-These connection actors are managed by the TCP/RLPx layer. Assessment needed to determine
-whether these 3 PoisonPill sites are permanent TCP floor (like ServerActor/RLPxConnectionHandler)
-or whether they can be replaced with Typed stop once the TCP layer is cleaned up.
-
-**Prompt:**
-```
-Assess the 3 PoisonPill send-sites in PeerManagerActor to determine if they are
-permanent TCP floor or migratable.
-
-File: src/main/scala/com/chipprbots/ethereum/network/PeerManagerActor.scala
-Lines: 982, 986, 990 — all send `connection ! PoisonPill`
-
-Questions to answer:
-1. What type is `connection` at each call site? (Classic ActorRef, TypedActorRef, or
-   a field in a case class?)
-2. Where is `connection` created/obtained — is it spawned by PeerManagerActor (child)
-   or received from an external Classic actor (non-child)?
-3. If it's a non-child Classic actor (e.g., obtained from Tcp.Connected or RLPx),
-   PoisonPill may be the correct stop mechanism and counts as permanent TCP floor.
-4. If it's a child spawned by PeerManagerActor, it can be stopped via ctx.stop(child)
-   once its type is narrowed.
-
-Output: for each of the 3 sites, state:
-  - PERMANENT FLOOR: count toward §8k-J TCP floor census (update from 4 to 4+N)
-  - MIGRATEABLE: describe the ref type and the replacement stop pattern
-
-No code changes — read-only assessment only.
 ```
 
 ---

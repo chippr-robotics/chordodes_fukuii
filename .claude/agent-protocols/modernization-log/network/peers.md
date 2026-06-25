@@ -157,3 +157,19 @@ Note: `ServerActor` and `RLPxConnectionHandler` intentionally remain Classic TCP
   lazy `newReaderHolder()` factory to avoid double-actor subscription interleaving).
 - **Files:** `NetworkPeerManagerActor.scala`, `NetworkPeerManagerSpec.scala`
 - **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH69-E`, `sync/snap.md` (ETH69 chain-weight chain)
+
+
+---
+
+## PeerManagerActor TCP PoisonPill — Floor Assessment (§8k-L)
+
+#### Assessment only — no commit (2026-06-24)
+- **What:** HERALD assessed the 3 `connection ! PoisonPill` sites in `PeerManagerActor.handleConnectionErrors`
+  (lines 982, 986, 990) to determine if they are permanent TCP floor or migratable.
+- **Verdict:** All 3 are **PERMANENT TCP FLOOR**. `connection: ActorRef` originates from the Pekko
+  TCP extension (spawned by `akka.io.TcpManager`), received via `ServerActor.TcpEventBridge`
+  as `sender()` on a Classic `Tcp.Connected` event. PeerManagerActor does not own this actor and
+  has no Typed ref — `PoisonPill` is the correct stop mechanism.
+- **TCP floor census:** Updated §8k-J expected count from 4 → **7** (+3 PoisonPill sites).
+- **Files assessed:** `PeerManagerActor.scala:982,986,990`, `ServerActor.scala:186,198`
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8k-L`

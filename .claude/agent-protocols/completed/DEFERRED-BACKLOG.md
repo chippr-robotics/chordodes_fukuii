@@ -1807,3 +1807,28 @@ Step 4 — Run §7d artifact audit sweep (grep commands in G4-pekko-design-scope
 Step 5 — Run testEssential — confirm baseline holds.
 Step 6 — git commit -m "chore(8k-B): remove adapter imports — TCP floor verified (4 bridges)"
 ```
+
+---
+
+### §8k-L — HERALD: PeerManagerActor TCP PoisonPill ✅ DONE 2026-06-24
+
+**Result:** All 3 sites are **PERMANENT TCP FLOOR**. No code change required or expected.
+
+**File:** `src/main/scala/com/chipprbots/ethereum/network/PeerManagerActor.scala`
+**Lines:** 982, 986, 990 — all `connection ! PoisonPill` inside `handleConnectionErrors`
+
+| Line | Case | Verdict |
+|------|------|---------|
+| 982 | `MaxIncomingPendingConnections` | PERMANENT FLOOR |
+| 986 | `IncomingConnectionAlreadyHandled` | PERMANENT FLOOR |
+| 990 | `IncomingConnectionBlacklisted` | PERMANENT FLOOR |
+
+**Why permanent:** `connection: ActorRef` in all three `ConnectionError` case classes originates from
+the Pekko TCP extension's internal connection actor, received via `ServerActor`'s `TcpEventBridge`
+(`sender()` on a Classic `Tcp.Connected` event → lifted into `TcpConnected(sender(), remote)` →
+forwarded to PeerManagerActor as `HandlePeerConnectionCmd(connection, remoteAddress)`).
+PeerManagerActor never spawns this actor; it has no ownership and no Typed ref. `PoisonPill` is the
+correct stop mechanism and cannot be replaced with `ctx.stop()`.
+
+**TCP floor census update:** §8k-J expected floor count updated from 4 → **7**
+(+3 from PeerManagerActor `handleConnectionErrors` sites).
