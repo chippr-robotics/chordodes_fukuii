@@ -48,6 +48,7 @@ class EngineApiController(
       case "engine_getPayloadV2" => handleGetPayload(request, version = 2)
       case "engine_getPayloadV3" => handleGetPayload(request, version = 3)
       case "engine_getPayloadV4" => handleGetPayload(request, version = 4)
+      case "engine_getPayloadV5" => handleGetPayload(request, version = 5)
       case "engine_getClientVersionV1" =>
         handleGetClientVersion(request)
       case "engine_getBlobsV1" =>
@@ -360,10 +361,13 @@ class EngineApiController(
         val ts = block.header.unixTimestamp
         val isCancunPayload = cfg.isCancunTimestamp(ts)
         val isShanghaiPayload = cfg.isShanghaiTimestamp(ts)
+        val isOsakaPayload = cfg.isOsakaTimestamp(ts)
         val forkError: Option[String] = version match {
           case 2 if isCancunPayload   => Some("getPayloadV2 cannot return a Cancun payload; use V3")
           case 3 if !isCancunPayload  => Some("getPayloadV3 can only return Cancun-or-later payloads")
           case 1 if isShanghaiPayload => Some("getPayloadV1 cannot return a Shanghai-or-later payload; use V2")
+          case 4 if isOsakaPayload    => Some("getPayloadV4 cannot return an Osaka-or-later payload; use V5")
+          case 5 if !isOsakaPayload   => Some("getPayloadV5 can only return Osaka-or-later payloads")
           case _                      => None
         }
         forkError match {
@@ -398,12 +402,31 @@ class EngineApiController(
                   "blobsBundle" -> blobsBundleJson,
                   "shouldOverrideBuilder" -> JBool(false)
                 )
-              case _ => // V4+: add executionRequests (EIP-7685)
+              case 4 => // Prague: BlobsBundleV1 + executionRequests (EIP-7685)
                 val executionRequests = engineApiService.getPayloadExecutionRequests(payloadId)
                 JObject(
                   "executionPayload" -> payload,
                   "blockValue" -> JString(blockValueHex),
                   "blobsBundle" -> blobsBundleJson,
+                  "shouldOverrideBuilder" -> JBool(false),
+                  "executionRequests" -> JArray(
+                    executionRequests.toList.map(r => JString(byteStringToHex(r)))
+                  )
+                )
+              case _ => // V5+: BlobsBundleV2 (EIP-7594 cell proofs) + executionRequests
+                val executionRequests = engineApiService.getPayloadExecutionRequests(payloadId)
+                val blobsBundleV2Json: JObject = {
+                  val bundle = engineApiService.getPayloadBlobsBundle(payloadId)
+                  JObject(
+                    "commitments" -> JArray(bundle.commitments.toList.map(c => JString(byteStringToHex(c)))),
+                    "proofs" -> JArray(bundle.cellProofsPerBlob.flatten.toList.map(p => JString(byteStringToHex(p)))),
+                    "blobs" -> JArray(bundle.blobs.toList.map(b => JString(byteStringToHex(b))))
+                  )
+                }
+                JObject(
+                  "executionPayload" -> payload,
+                  "blockValue" -> JString(blockValueHex),
+                  "blobsBundle" -> blobsBundleV2Json,
                   "shouldOverrideBuilder" -> JBool(false),
                   "executionRequests" -> JArray(
                     executionRequests.toList.map(r => JString(byteStringToHex(r)))

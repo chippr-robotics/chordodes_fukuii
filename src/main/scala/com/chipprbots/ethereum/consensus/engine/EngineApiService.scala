@@ -1038,6 +1038,7 @@ class EngineApiService(
       "engine_getPayloadV2",
       "engine_getPayloadV3",
       "engine_getPayloadV4",
+      "engine_getPayloadV5",
       "engine_getBlobsV1",
       "engine_getPayloadBodiesByHashV1",
       "engine_getPayloadBodiesByRangeV1",
