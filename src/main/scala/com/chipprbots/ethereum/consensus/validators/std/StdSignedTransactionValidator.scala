@@ -40,7 +40,7 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
       _ <- validateOlympiaTxTypes(stx, blockHeader)
       _ <- validateBlobTransactionSupport(stx, blockHeader)
       _ <- checkSyntacticValidity(stx)
-      _ <- validateInitCodeSize(stx, blockHeader.number)
+      _ <- validateInitCodeSize(stx, blockHeader.number, blockHeader.unixTimestamp)
       _ <- validateSignature(stx, blockHeader.number)
       _ <- validateNonce(stx, senderAccount.nonce)
       _ <- validateGasLimitEnoughForIntrinsicGas(stx, blockHeader.number)
@@ -238,11 +238,12 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
     */
   private def validateInitCodeSize(
       stx: SignedTransaction,
-      blockHeaderNumber: BigInt
+      blockHeaderNumber: BigInt,
+      blockHeaderTimestamp: Long
   )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] = {
     import stx.tx
     if tx.isContractInit then {
-      val config = EvmConfig.forBlock(blockHeaderNumber, blockchainConfig)
+      val config = EvmConfig.forBlock(blockHeaderNumber, blockHeaderTimestamp, blockchainConfig)
       config.maxInitCodeSize match {
         case Some(maxSize) if config.eip3860Enabled && tx.payload.size > maxSize =>
           Left(TransactionInitCodeSizeError(tx.payload.size, maxSize))
