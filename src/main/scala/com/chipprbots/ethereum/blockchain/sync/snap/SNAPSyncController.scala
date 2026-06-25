@@ -1190,6 +1190,29 @@ class SNAPSyncController(
         startStateHealingWithInterleave()
       }
 
+    // Complementary guard (root-cause w98gfx4wn): the heal walk root's own bytes are absent from local node storage,
+    // so the coordinator REFUSED to seed it (seeding an unservable root stalls at "exactly 1 node, healed=0" forever —
+    // a root cannot be reconstructed from nothing and cannot be fetched against an advancing serve root). This fires at
+    // the SEED, so it covers every entry into healing — crucially the BootstrapComplete RESTART handlers that call
+    // startStateHealing() directly and bypass shouldSkipHealingAfterDownloads (the whole point of the seed-site guard).
+    //
+    // Hand off to lazy on-demand healing exactly as shouldSkipHealingAfterDownloads's deferred path does: stop the
+    // (idle) coordinator and call completeSnapSync(). The missing trie nodes are then fetched on-demand via GetTrieNodes
+    // during block execution (BlockImporter/StateNodeFetcher, with real parent-root context) — the established
+    // post-SNAP regular-sync fallback. This converges to a REAL Completed/regular-sync state; it is NOT a silent
+    // skip-and-mark-done (finalizeSnapSync still enforces the snapStateRoot == pivotHeader.stateRoot anchor guard).
+    case HealingRootUnservable(root) if currentPhase == StateHealing =>
+      log.warning(
+        s"[HEAL-ROOT-UNSERVABLE] Heal walk root ${root.toHex.take(16)} is absent from local storage and cannot be " +
+          s"seeded (a heal cannot reconstruct an unservable root). Handing off to lazy on-demand healing via " +
+          s"completeSnapSync() — missing trie nodes will be fetched on-demand via GetTrieNodes during block execution."
+      )
+      // completeSnapSync() → finalizeSnapSync() performs ALL cleanup: stopSnapOnlySchedules() cancels the
+      // healingRequestTask scheduler, and stopStateSyncChildren() stops the idle healing coordinator and nulls its
+      // reference. No manual coordinator/scheduler teardown needed here (it would double-cancel). finalizeSnapSync
+      // still enforces the snapStateRoot == pivotHeader.stateRoot anchor guard, so this is NOT a false completion.
+      completeSnapSync()
+
     // Streaming batch from ongoing trie walk — forward immediately to coordinator for early healing
     case TrieWalkBatch(missingNodes) if currentPhase == StateHealing =>
       if (missingNodes.nonEmpty) {
@@ -1523,7 +1546,6 @@ class SNAPSyncController(
       if (
         SNAPSyncController.shouldSkipHealingAfterDownloads(
           snapSyncConfig,
-          storagePhaseForceCompleted,
           resumedStaleCursors
         )
       ) {
@@ -1534,17 +1556,45 @@ class SNAPSyncController(
         // Skip healing/validation entirely. Regular sync's BlockImporter will fetch missing trie
         // nodes on-demand via GetTrieNodes (SNAP protocol) when block execution encounters them.
         // This is the "lazy healing" pattern used by geth's path-based storage.
-        log.info(
-          "All state downloads complete (accounts + bytecodes + storage). " +
-            "Deferred merkleization enabled — skipping healing/validation phase. " +
-            "Missing trie nodes will be fetched on-demand during block execution."
-        )
+        //
+        // This handoff now also covers the force-completed case under deferred merkleization
+        // (storagePhaseForceCompleted). Previously that routed into healing "to fill the known
+        // holes", but the walk root's bytes are absent from local storage AND unservable by peers
+        // (aged pivot, outside the ~128-block serve window), so the heal seeded the walk root as its
+        // sole frontier task and stalled at "exactly 1 node, healed=0" forever. The same lazy
+        // on-demand BlockImporter fetch — which has real parent-root context during execution —
+        // fills those holes correctly. (root-cause w98gfx4wn.)
+        if (snapSyncConfig.deferredMerkleization && storagePhaseForceCompleted) {
+          log.info(
+            "All state downloads reached terminal state (storage force-completed) with deferred " +
+              "merkleization enabled — handing off via completeSnapSync(). Missing trie nodes will be " +
+              "fetched on-demand during block execution (a heal cannot reconstruct the unservable pivot root)."
+          )
+        } else {
+          log.info(
+            "All state downloads complete (accounts + bytecodes + storage). " +
+              "Deferred merkleization enabled — skipping healing/validation phase. " +
+              "Missing trie nodes will be fetched on-demand during block execution."
+          )
+        }
         completeSnapSync()
       } else {
-        if (snapSyncConfig.deferredMerkleization && storagePhaseForceCompleted) {
-          log.warning(
-            "All state downloads reached terminal state, but storage was force-completed with deferred " +
-              "merkleization enabled. Starting healing instead of handing off a state with known holes."
+        // Healing is entered ONLY when the walk root is servable: either the non-deferred path (the
+        // account trie was built locally this session, so SnapHashTrie emit/flush wrote the root),
+        // or the resumedStaleCursors anti-corruption guard (a delta downloaded against a possibly
+        // drifted root must be reconciled before completion).
+        //
+        // COMPLEMENTARY-GUARD NOTE (out of scope for this fix, intentionally NOT changed here):
+        // under deferred merkleization, resumedStaleCursors == true reaches this branch with the
+        // walk root's bytes ALSO absent — so it can hit the identical unservable-root heal stall.
+        // The principled fix is for TrieNodeHealingCoordinator to NOT seed the walk-root node into
+        // the frontier when its bytes are absent AND it is unservable (instead deferring those holes
+        // to lazy on-demand fetch / a serve-root-relative heal), rather than expanding this routing
+        // decision. Tracked separately; the primary handoff above resolves every observed stall.
+        if (resumedStaleCursors) {
+          log.info(
+            "All state downloads complete (accounts + bytecodes + storage); account cursors were " +
+              "resumed from a prior session — running healing to reconcile the delta against the pivot root."
           )
         } else {
           log.info("All state downloads complete (accounts + bytecodes + storage). Starting healing...")
@@ -4734,6 +4784,21 @@ object SNAPSyncController {
   case object StateValidationComplete
   case object GetProgress
 
+  /** Coordinator → controller signal (root-cause w98gfx4wn complementary guard): the heal walk root's own bytes are
+    * ABSENT from local node storage, so the heal cannot be seeded. A root node is content-retrievable ONLY at the empty
+    * path of ITS OWN trie; seeding it as a frontier task and fetching it against an advancing serve root can never
+    * succeed (every reply is the serve root's own node, keccak-dropped by the content-hash gate), and
+    * `discoverMissingChildren` never re-enqueues a root — so pending stays at exactly 1, healed=0, forever.
+    *
+    * This is emitted FROM the seed branch (TrieNodeHealingCoordinator.StartTrieNodeHealing, root-absent case) so it
+    * fires for EVERY entry into healing, including the BootstrapComplete RESTART handlers that call
+    * `startStateHealing()` directly and bypass `shouldSkipHealingAfterDownloads`. On receipt the controller takes the
+    * lazy-heal handoff (`completeSnapSync()`) — the SAME path `shouldSkipHealingAfterDownloads` uses — so the missing
+    * state is filled on-demand via GetTrieNodes during block execution (the established post-SNAP regular-sync path,
+    * which has real parent-root context). Root-PRESENT heals proceed normally; this never fires in that case.
+    */
+  final case class HealingRootUnservable(root: ByteString)
+
   /** spec 004 (Decoupled Heal Serve-Root) T011/T012: SNAPSyncController → SyncController (parent). During healing, ask
     * the parent to fetch a newest-servable canonical header (networkBest − RecentRootMarginBlocks) via its own
     * dedicated PivotHeaderBootstrap slot — distinct from `StartRegularSyncBootstrap` (which is the pivot-refresh path
@@ -4784,15 +4849,33 @@ object SNAPSyncController {
 
   private[snap] def shouldSkipHealingAfterDownloads(
       snapSyncConfig: SNAPSyncConfig,
-      storagePhaseForceCompleted: Boolean,
       resumedStaleCursors: Boolean
   ): Boolean =
-    // The deferred-merkleization fast path (skip healing, lazy-heal during block execution) is
-    // ONLY safe when the trie was built fresh this session. If any account-range cursor was
-    // resumed from a prior session (against a possibly drifted root), the delta MUST be walked
-    // and re-fetched from the current pivot root before completion — otherwise the state is
-    // handed off with silent holes. So a resume forces the full healing walk.
-    snapSyncConfig.deferredMerkleization && !storagePhaseForceCompleted && !resumedStaleCursors
+    // Under deferred merkleization the account/storage trie nodes are NEVER built locally during
+    // download — only flat storage is written. The walk root (the pivot's state root) is therefore
+    // absent from the hash-keyed CF. A heal in that state cannot make progress: the coordinator
+    // seeds the walk-root node itself as the sole frontier task (isNodeInStorage(root) == false),
+    // but no peer can serve that root — it is the pivot, ~200 blocks back, outside peers' ~128-block
+    // serve window. The heal stalls at "exactly 1 node, healed=0" forever (root-cause w98gfx4wn:
+    // the common defect behind every observed heal stall). The holes are instead filled lazily by
+    // BlockImporter's on-demand GetTrieNodes fetch during block execution (walking the local trie
+    // from the parent state root, with real root context) — the same post-SNAP regular-sync
+    // fallback that StateNodeFetcher already uses. So for deferred merkleization we skip healing and
+    // take the completeSnapSync() handoff in BOTH the clean case AND the force-completed case
+    // (force-completed previously routed into healing "to fill the known holes", but healing
+    // provably cannot reconstruct an unservable root — only lazy on-demand fetch can). The
+    // force-completed flag is therefore no longer a routing input here; the caller still inspects
+    // it for logging.
+    //
+    // resumedStaleCursors STILL forces the healing walk: a delta downloaded against a possibly
+    // drifted root must be reconciled before completion (correctness boundary, not a perf choice).
+    // That path can hit the same unservable-root stall under deferred merkleization — see the
+    // complementary-guard note in checkAllDownloadsComplete — but it is left unchanged here because
+    // it is a distinct anti-corruption guard outside this fix's scope.
+    //
+    // The NON-deferred path always returns false (run healing): there the account trie IS built
+    // locally (SnapHashTrie emit/flush writes the root), so the heal has a servable root and works.
+    snapSyncConfig.deferredMerkleization && !resumedStaleCursors
 
   /** Freshness gate for `refreshPivotInPlace`: reject candidate pivots whose source peer is more than `maxStaleness`
     * blocks behind the CL-driven head.

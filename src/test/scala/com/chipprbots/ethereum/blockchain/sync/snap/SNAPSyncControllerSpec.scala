@@ -165,17 +165,32 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
 
     SNAPSyncController.shouldSkipHealingAfterDownloads(
       snapSyncConfig = config,
-      storagePhaseForceCompleted = false,
       resumedStaleCursors = false
     ) shouldBe true
   }
 
-  it should "run healing when storage was force-completed even with deferred merkleization" taggedAs UnitTest in {
+  it should "skip healing (lazy on-demand fetch) under deferred merkleization regardless of force-complete" taggedAs UnitTest in {
     val config = SNAPSyncConfig(deferredMerkleization = true)
+
+    // root-cause w98gfx4wn: force-completed previously forced the healing walk "to fill the known
+    // holes", but under deferred merkleization the walk root's bytes are absent locally AND
+    // unservable by peers (aged pivot). The heal seeds the walk root as its sole frontier task and
+    // stalls at "exactly 1 node, healed=0" forever. The holes are filled by BlockImporter's
+    // on-demand GetTrieNodes fetch during block execution — so skip healing and hand off. The
+    // force-completed flag is therefore no longer a routing input (the caller keeps it for logging).
+    SNAPSyncController.shouldSkipHealingAfterDownloads(
+      snapSyncConfig = config,
+      resumedStaleCursors = false
+    ) shouldBe true
+  }
+
+  it should "run healing when deferred merkleization is OFF" taggedAs UnitTest in {
+    // The non-deferred path is unchanged: the account trie IS built locally (SnapHashTrie writes the
+    // root), so the walk root is servable and healing works. Healing must run.
+    val config = SNAPSyncConfig(deferredMerkleization = false)
 
     SNAPSyncController.shouldSkipHealingAfterDownloads(
       snapSyncConfig = config,
-      storagePhaseForceCompleted = true,
       resumedStaleCursors = false
     ) shouldBe false
   }
@@ -188,7 +203,6 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
     // silent state corruption. The healing walk from the new root re-fetches the delta.
     SNAPSyncController.shouldSkipHealingAfterDownloads(
       snapSyncConfig = config,
-      storagePhaseForceCompleted = false,
       resumedStaleCursors = true
     ) shouldBe false
   }
