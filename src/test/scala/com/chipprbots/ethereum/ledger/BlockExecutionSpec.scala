@@ -684,7 +684,7 @@ class BlockExecutionSpec
           amount = BigInt(1) // 1 Gwei
         )
 
-        // Build a post-merge header (difficulty=0, baseFee set → isPostMerge = true)
+        // Build a post-merge header (difficulty=0, baseFee set → isPoS = true)
         val postMergeHeader: BlockHeader = validBlockParentHeader.copy(
           parentHash = validBlockParentHeader.hash,
           number = validBlockParentHeader.number + 1,

@@ -166,9 +166,9 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
           // EIP-684: revert a CREATE if the target address already has non-empty code/nonce.
           // EIP-7610 (Paris+): additionally revert if the address has non-empty storage.
           // Activation matches the EELS test marker `valid_from("Paris")` — we use
-          // BlockHeader.isPostMerge (difficulty==0 && baseFee set) as the Paris signal.
+          // BlockHeader.isPoS (difficulty==0 && baseFee set) as the Paris / PoS signal.
           val conflict =
-            if context.blockHeader.isPostMerge then context.world.nonEmptyCodeOrNonceOrStorageAccount(contractAddr)
+            if context.blockHeader.isPoS then context.world.nonEmptyCodeOrNonceOrStorageAccount(contractAddr)
             else context.world.nonEmptyCodeOrNonceAccount(contractAddr)
 
           /** Specification of https://eips.ethereum.org/EIPS/eip-1283 states, that `originalValue` should be taken from

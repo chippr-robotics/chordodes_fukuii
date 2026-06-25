@@ -634,7 +634,7 @@ case object NUMBER extends ConstOp(0x43)(s => UInt256(s.env.blockHeader.number))
 case object DIFFICULTY
     extends ConstOp(0x44)(s =>
       // EIP-4399: post-merge, opcode 0x44 returns prevRandao (stored in mixHash) instead of difficulty
-      if s.env.blockHeader.isPostMerge then UInt256(s.env.blockHeader.mixHash)
+      if s.env.blockHeader.isPoS then UInt256(s.env.blockHeader.mixHash)
       else UInt256(s.env.blockHeader.difficulty)
     )
 

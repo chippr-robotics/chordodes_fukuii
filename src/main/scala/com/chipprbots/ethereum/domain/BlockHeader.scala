@@ -80,11 +80,11 @@ case class BlockHeader(
     case _                                => None
   }
 
-  /** True if this is a post-merge block (difficulty == 0, used as prevRandao). */
-  def isPostMerge: Boolean = difficulty == 0 && baseFee.isDefined
+  def isPoS: Boolean = difficulty == 0 && baseFee.isDefined
+  def isPoW: Boolean = !isPoS
 
   /** Post-merge, mixHash carries the prevRandao value from the beacon chain. */
-  def prevRandao: Option[ByteString] = if isPostMerge then Some(mixHash) else None
+  def prevRandao: Option[ByteString] = if isPoS then Some(mixHash) else None
 
   def isParentOf(child: BlockHeader): Boolean = number + 1 == child.number && child.parentHash == hash
 

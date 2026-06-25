@@ -52,7 +52,7 @@ class BlockPreparator(
     // Post-merge: no PoW rewards, no ommer rewards. EIP-4895 withdrawals are applied by
     // BlockExecution.processWithdrawals after payBlockReward returns; applying them here
     // too would double-credit every withdrawal and break state-root validation.
-    if block.header.isPostMerge then worldStateProxy
+    if block.header.isPoS then worldStateProxy
     else {
       val blockNumber = block.header.number
       val minerRewardForBlock = blockRewardCalculator.calculateMiningRewardForBlock(blockNumber)
