@@ -2387,3 +2387,34 @@ No Category B (historical ETC mining event) or Category D (canonical ethereum-te
 **Verification:** `sbt compile-all` — 0 errors. `testOnly *BlockExecution*` — 15/15 pass. No dedicated specs exist for `TransitionBlockHeaderValidator` or `EthSimulateService`; covered by integration paths. `sbt scalafmtAll` — clean.
 
 **Cross-ref:** `§NAMING-INV` (2026-06-25) sourced the 7-identifier list.
+
+---
+
+## §8k-O — COMPLETE (4/5 sites) (2026-06-25)
+
+**Agent:** MITHRIL
+**Commit:** `fc5a3f8e7` on `scala3-cleanup-june`
+**Status:** DONE — 4 of 5 `.toClassic` bridges eliminated. `fastSyncClassicSelf` remains (1 site) pending SyncStateSchedulerActor migration.
+
+**What was done:**
+
+`PivotBlockSelector` was already `Behavior[Command]` — FastSync was simply holding it via `.toClassic`. Resolution: replace `fastSync: ClassicActorRef` constructor param with two typed reply refs (`replyTo: TypedActorRef[Result]`, `selectionFailedTo: TypedActorRef[SelectionFailed.type]`). Send sites updated to use typed `!`. All 3 FastSync spawn sites pass adapters directly — `.toClassic` dropped from each spawn.
+
+`StateStorageActor` was already `Behavior[Command]`. `SyncSession.syncStateStorageActor` field narrowed from `ActorRef` (Classic) to `TypedActorRef[StateStorageActor.Command]`. `.toClassic` on spawn and `toTyped[Nothing]` on `ctx.stop` both eliminated.
+
+`fastSyncClassicSelf` (`pivotResultAdapter.toClassic`) **not deleted** — `SyncStateSchedulerActor` still has Classic constructor params (`parentRef: ClassicActorRef`). This is the 5th site; it will be eliminated when `SyncStateSchedulerActor` is migrated to Typed.
+
+**PivotBlockSelectorSpec:** Classic `TestProbe fastSync` replaced with two Pekko Typed probes:
+- `testKit.createTestProbe[PivotBlockSelector.Result]()` → `fastSyncResult`
+- `testKit.createTestProbe[PivotBlockSelector.SelectionFailed.type]()` → `fastSyncFailed`
+- `expectMsg` → `expectMessage` throughout (8 call sites).
+
+**Key finding:** `networkPeerManager.tell(msg, blockHeadersAdapter.toClassic)` in `PivotBlockSelector` remains — NPM is still Classic and the explicit-sender pattern is required for auto-pilot test routing.
+
+**Verification:** `sbt compile-all` — 0 errors, 5 pre-existing Matchable warnings. `testOnly *PivotBlockSelectorSpec` — 22/22 pass. `FastSyncSpec "returns Syncing"` — pre-existing timeout failure (confirmed against HEAD before this commit; not introduced here).
+
+**Pre-existing failure noted:** `FastSyncSpec "returns Syncing when pivot block is selected and started fetching data"` — 60s timeout. Confirmed pre-existing by stash-revert baseline. `SyncStateSchedulerActor` migration is the likely fix path.
+
+**Next:** §8k-P (J3) — PeerEventBusActor caller narrowing (~15 constructors). `fastSyncClassicSelf` deletion follows SyncStateSchedulerActor migration.
+
+**Cross-refs:** `sync/fast.md §8k-O`, `working-docs/DEFERRED-BACKLOG.md J2 (strikethrough)`

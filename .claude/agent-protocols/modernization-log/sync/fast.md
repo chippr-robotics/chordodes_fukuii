@@ -134,3 +134,12 @@
 - **Dead code removed:** `Tier3RollingWindow: BigInt` constant and `rollingWindowDiff` private method both deleted.
 - **Tests:** 2 new cases in `ETH69OscillationChainWeightSpec` (15 total): (1) oldErr > 20%, newErr < 20% with anchorNum=100 (gap dominates); (2) median of {500×2 TH, 500×4 TH} = 3 TH exactly. 15/15 passed.
 - **Files:** `BlockchainReader.scala`, `BlockExecution.scala`, `ChainImporter.scala`, `ETH69OscillationChainWeightSpec.scala`
+
+## §8k-O — FastSync .toClassic Bridge Elimination (4/5 sites) (2026-06-25)
+
+#### `fc5a3f8e7` — refactor(sync): §8k-O — FastSync .toClassic bridge elimination (4/5 sites)
+- **PivotBlockSelector constructor narrowed:** `fastSync: ClassicActorRef` replaced with `replyTo: TypedActorRef[Result]` + `selectionFailedTo: TypedActorRef[SelectionFailed.type]`. Both send sites updated (`selectionFailedTo ! SelectionFailed`, `replyTo ! Result(pivot)`). All 3 FastSync spawn sites pass adapters directly — no `.toClassic` on spawn.
+- **StateStorageActor ref narrowed:** `SyncSession.syncStateStorageActor` field type changed from `ActorRef` (Classic) to `TypedActorRef[StateStorageActor.Command]`. `.toClassic` on spawn and `toTyped[Nothing]` on `ctx.stop` both removed — `ctx.stop(s.syncStateStorageActor)` is now direct Typed.
+- **`fastSyncClassicSelf` retained:** `SyncStateSchedulerActor` still has Classic constructor params; `fastSyncClassicSelf = pivotResultAdapter.toClassic` remains as the Classic reply target for it. Comment updated to explain the remaining dependency. Will be deleted when SyncStateSchedulerActor is migrated.
+- **PivotBlockSelectorSpec migrated:** Classic `TestProbe fastSync` → two Pekko Typed probes (`fastSyncResult`, `fastSyncFailed`). `expectMsg` → `expectMessage`. `ScalaTestWithActorTestKit.createTestProbe[T]()` used. 22/22 pass.
+- **Files:** `FastSync.scala`, `PivotBlockSelector.scala`, `PivotBlockSelectorSpec.scala`
