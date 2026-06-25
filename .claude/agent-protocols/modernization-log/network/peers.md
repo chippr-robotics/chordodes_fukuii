@@ -127,6 +127,22 @@ Note: `ServerActor` and `RLPxConnectionHandler` intentionally remain Classic TCP
 
 ---
 
+## ETH69 Tier3 Accuracy — §ETH69-C + §ETH69-D (MITHRIL)
+
+#### `2af49dcb1` — fix(sync): ETH69 Tier3 POW_SCALING rolling-median difficulty (G2)
+- **What:** `BlockchainReader.resolveETH69ChainWeight` Tier3 rate changed from a 10K-block DB-lookup rolling average to a 1,000-entry in-memory ring buffer + rolling-median. Added `difficultyRingBuffer: ArrayDeque[BigInt]` (capacity 1,000), `recordBlockDifficulty(difficulty): Unit` (synchronized ring-buffer writer), `rollingMedianDifficulty: Option[BigInt]` (synchronized; None until full; averages two midpoints for even-length arrays). Dead code removed: `Tier3RollingWindow` constant + `rollingWindowDiff` method. Hooks added in `BlockExecution.scala` (live import) and `ChainImporter.scala` (offline/hive import). Cold-start window (< 1,000 entries) falls back to `head.difficulty`.
+- **Effect:** Tier3 estimate variance under ETC flex-load oscillation (symmetric ±50% swing) collapses from ±50% to near-zero.
+- **Tests:** 2 new tests in `ETH69OscillationChainWeightSpec`: variance < ±20% under oscillation; median of {500×2000 TH, 500×4000 TH} = 3000 TH exactly. 15/15 pass.
+- **Files:** `BlockchainReader.scala`, `BlockExecution.scala`, `ChainImporter.scala`, `ETH69OscillationChainWeightSpec.scala`
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH69-C`
+
+#### (feature commit) — feat(telemetry): ETH69 Tier3 estimate-vs-actual TD logging on NewBlock (G2 instrumentation)
+- **What:** Added `ETH69_TIER3_ACCURACY` debug log in `NetworkPeerManagerActor.updateChainWeight` — fires on every `ETHPackets.NewBlock` from an ETH69 peer, logging `prevTD`, `actualTD`, `delta`, `deltaPercent` for post-hoc audit of Tier3 POW_SCALING accuracy.
+- **Files:** `NetworkPeerManagerActor.scala` (3 lines in `updateChainWeight` case branch).
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH69-D`
+
+---
+
 ## ETH69 Archive-Node Static Detection (MITHRIL §ETH69-E)
 
 #### `60c9fd4e5` — fix(sync): ETH69 archive-node monotonic-guard exemption (G3/G4)

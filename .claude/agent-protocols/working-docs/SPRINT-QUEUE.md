@@ -75,7 +75,7 @@ Source: `§8k-R1` audit complete 2026-06-23 — `.local/docs/classic-interop-aud
 | ~~**§8k-E**~~ | ~~`NPMA.GetHandshakedPeersCmd(replyTo: ActorRef)` → Typed (Cluster B, 7 files)~~ | ~~MITHRIL~~ | ~~15~~ | ✅ DONE `c42316b39` — docs `7bd607a87` |
 | ~~**§8k-F**~~ | ~~RegularSync Classic→Typed migration (full LOOM; Clusters C/D/N)~~ | ~~LOOM~~ | ~~15~~ | ✅ DONE `b24515637` — docs `806202cb9` |
 | ~~**§8k-G**~~ | ~~OQ-5 kill: jsonrpc callers → Typed ask; delete AkkaTaskOps (Clusters C+E+L)~~ | ~~CONDUIT+MITHRIL~~ | ~~74~~ | ✅ COMMITTED `2ef2b6637` — testEssential PENDING — docs clearout PENDING |
-| **§8k-G2** | Cluster E immediate cohort: FastSync + NPMA spawn-site `.toClassic` (constructor param lift) | PRISM+MITHRIL | ~4 | §8k-G committed |
+| ~~**§8k-G2**~~ | ~~Cluster E immediate cohort: FastSync + NPMA spawn-site `.toClassic` (constructor param lift)~~ | ~~PRISM+MITHRIL~~ | ~~4~~ | ✅ ABSORBED by §8k-G3/G4 — Cluster E fully done |
 | ~~**§8k-H**~~ | ~~PeerActor `watchWith` — remove `context.toClassic.parent` sends (Clusters G+H)~~ | ~~MITHRIL~~ | ~~8~~ | ✅ DONE `222623960` — docs `53edef1b9` |
 | ~~**§8k-I**~~ | ~~NodeBuilder 3 Classic bridge actors → callers use Typed ask (Cluster J)~~ | ~~MITHRIL~~ | ~~21~~ | ✅ DONE `4613e398f` — docs `b5f47116c` |
 | **§8k-B** | Post-CAPSTONE: verify TCP floor (4 bridges), delete adapter imports | PRISM | — | §8k-I + CAPSTONE |

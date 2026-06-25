@@ -650,20 +650,6 @@ slower than dev machine → timeouts). `@Ignore` annotations silently hide untes
 
 ---
 
-#### §8k-R1 — DONE 2026-06-23 — see `completed/DEFERRED-BACKLOG.md`
-
-#### §8k-G — DONE 2ef2b6637 — see `completed/DEFERRED-BACKLOG.md`
-
----
-
-#### §8k-G3 + §8k-G3-SSC ✅ DONE 2026-06-24 — see `completed/DEFERRED-BACKLOG.md`
-
----
-
-#### §8k-G4 ✅ DONE 2026-06-24 — see `completed/DEFERRED-BACKLOG.md §8k-G4`
-
----
-
 #### §8k-B — Post-CAPSTONE: Final classic bridge verification sweep
 
 **Agent:** PRISM (verification only)
@@ -694,6 +680,132 @@ Step 4 — Run §7d artifact audit sweep (grep commands in §7d).
 Step 5 — Run testEssential — confirm baseline holds.
 Step 6 — git commit -m "chore(8k-B): remove adapter imports — TCP floor verified (4 bridges)"
 ```
+
+---
+
+#### §8k-CQ1 — MITHRIL: Remove `KnownNodesManager.GetKnownNodes` dead compat shim
+
+**Agent:** MITHRIL
+**Risk:** SAFE — dead code removal; `sbt compile-all` will catch any missed callers
+**Gate:** Any time — standalone, no sprint prerequisite
+**Purpose:** `PeerManagerActor` was migrated to Pekko Typed in commit `05e0c003b`.
+`KnownNodesManager.scala:117` still holds `case object GetKnownNodes` with the comment
+"Remove once PeerManagerActor is migrated to Typed." That migration happened. The companion
+handler in `CommonFakePeer.scala:162` is equally dead. Zero production callers remain — confirmed
+by P12 triage (2026-06-24). This is pure dead code removal with no behaviour change.
+
+**Prompt:**
+```
+You are removing a dead Classic-only compat bridge in fukuii on branch `scala3-cleanup-june`.
+
+Context: `PeerManagerActor` was migrated to Pekko Typed in commit `05e0c003b`. Before that
+migration, `KnownNodesManager` had a Classic bridge: `case object GetKnownNodes` with a comment
+"Remove once PeerManagerActor is migrated to Typed." The live replacement is
+`GetKnownNodesReq(replyTo: ActorRef[KnownNodes])` at line 105. PeerManagerSpec was already
+updated in P12 triage to use `GetKnownNodesReq`. CHASE-QUEUE entry (2026-06-24, type DEAD)
+confirmed 0 production callers of `GetKnownNodes` remain.
+
+Step 1 — Verify no remaining callers outside the two files to be edited:
+  cd /media/dev/2tb/dev/fukuii
+  grep -rn "GetKnownNodes\b" src/ --include="*.scala"
+
+  Expected hits ONLY in:
+  - `network/KnownNodesManager.scala` (the definition, line ~117)
+  - `src/it/.../CommonFakePeer.scala` (the dead handler, line ~162)
+  If any other file appears: STOP and log to CHASE-QUEUE instead of deleting.
+
+Step 2 — In `src/main/scala/com/chipprbots/ethereum/network/KnownNodesManager.scala`:
+  Delete `case object GetKnownNodes extends Command` and its Scaladoc comment block
+  (lines ~113-117). The `GetKnownNodesReq(replyTo: ActorRef[KnownNodes])` at line 105
+  must REMAIN — that is the live Typed message.
+
+Step 3 — In `src/it/scala/com/chipprbots/ethereum/sync/util/CommonFakePeer.scala`:
+  Delete the `case KnownNodesManager.GetKnownNodes =>` handler at line ~162.
+  Delete the stale comment at line ~150 ("Classic bridge for PeerManagerActor (still Classic)").
+  Verify the live `GetKnownNodesReq` handler remains untouched.
+
+Step 4:
+  sbt compile-all
+  sbt "testOnly *KnownNodesManager* *PeerManagerSpec*"
+  sbt scalafmtAll
+
+Step 5 — If all green:
+  git add src/main/scala/com/chipprbots/ethereum/network/KnownNodesManager.scala
+  git add src/it/scala/com/chipprbots/ethereum/sync/util/CommonFakePeer.scala
+  git commit -m "chore(network): remove GetKnownNodes Classic compat shim — PMA Typed since 05e0c003b"
+```
+
+**MANDATORY final steps:**
+1. `grep -rn "GetKnownNodes\b" src/` must return ONLY the 2 files above before deleting
+2. `sbt compile-all` must be green
+3. `git commit` as above
+4. Strike-through the CHASE-QUEUE entry for `network/KnownNodesManager.scala:117`
+5. **DELETE §8k-CQ1**
+
+---
+
+#### §8k-CQ2 — MITHRIL: Fix `PeerActorSpec:429` "forward PeerClosedConnection" regression (8k-H)
+
+**Agent:** MITHRIL (research + fix)
+**Risk:** MEDIUM — test file change; must understand the new parent-notification mechanism
+before touching any code
+**Gate:** Standalone — no sprint prerequisite; safe to run now
+**Purpose:** 8k-H commit `222623960` removed `context.toClassic.parent` sends from `PeerActor`.
+`PeerActorSpec.scala:429-454` "should forward PeerClosedConnection with AlreadyConnected to parent"
+expects the message to arrive at a Classic `parentProbe` via the removed send path. The test times
+out after 3 seconds. `testEssential` has 1 failure until this is fixed. The correct fix depends on
+how PeerActor now surfaces disconnection events — this must be researched before any edit.
+
+**Prompt:**
+```
+You are fixing a test regression in fukuii on branch `scala3-cleanup-june`.
+
+Context: `PeerActorSpec.scala:429-454` tests "should forward PeerClosedConnection with
+AlreadyConnected to parent". The test uses `PropsAdapter(PeerActor.apply(...))` wrapping PeerActor
+as a Classic child with a Classic `parentProbe.ref` as its parent. It expects
+`PeerActor.PeerClosedConnection("127.0.0.1", AlreadyConnected)` to arrive at `parentProbe`.
+8k-H commit `222623960` removed `context.toClassic.parent` sends from PeerActor, so the message
+never arrives — 3s timeout. The test has been the sole `testEssential` failure since P12 triage.
+
+Step 1 — Research PeerActor's current disconnection notification mechanism:
+  cd /media/dev/2tb/dev/fukuii
+  grep -n "PeerClosedConnection\|AlreadyConnected\|PeerEventBus\|toClassic.parent" \
+    src/main/scala/com/chipprbots/ethereum/network/p2p/PeerActor.scala | head -40
+  grep -rn "PeerClosedConnection" src/main/scala/ --include="*.scala"
+
+Step 2 — Read `PeerActor.scala` around the `AlreadyConnected` branch to determine what now
+  happens on connection-refused: does PeerActor publish via `PeerEventBusActor`? send to a
+  typed `replyTo`? notify `PeerManagerActor` via a typed message? This determines the fix.
+
+Step 3 — Read `PeerActorSpec.scala:400-460` in full to understand the current test setup:
+  how is PeerActor spawned, where does `parentProbe` appear, what message type is expected.
+
+Step 4 — Based on the findings, implement the minimal fix. Options (choose per findings):
+  a. If PeerActor publishes via PeerEventBusActor: subscribe a typed probe to the bus;
+     assert the event arrives there instead of at parentProbe.
+  b. If PeerActor sends a typed message to a spawn-time replyTo: pass a typed probe ref
+     as replyTo when spawning; assert the message at the typed probe.
+  c. If PeerManagerActor now handles it: assert the message at the PeerManager probe.
+  DO NOT remove the test — the behaviour must still be verifiable, just via the new path.
+
+Step 5:
+  sbt compile-all
+  sbt "testOnly *PeerActorSpec*"     // ALL tests in the class must pass
+
+Step 6 — If all PeerActorSpec tests pass:
+  sbt scalafmtAll
+  git add src/test/scala/com/chipprbots/ethereum/network/p2p/PeerActorSpec.scala
+  git commit -m "fix(test): update PeerActorSpec AlreadyConnected assertion for 8k-H toClassic.parent removal"
+```
+
+**MANDATORY final steps:**
+1. Research step (Step 1-3) MUST precede any code edit — do not guess the mechanism
+2. `sbt compile-all` must be green
+3. `sbt "testOnly *PeerActorSpec*"` — ALL tests in the class must pass
+4. `git commit` as above
+5. Update `testEssential` baseline in `test-quality-log.md` (3,550 → 3,551 if 1 test re-enabled)
+6. Strike-through the CHASE-QUEUE entry for `network/p2p/PeerActor.scala + PeerActorSpec.scala:429`
+7. **DELETE §8k-CQ2**
 
 ---
 

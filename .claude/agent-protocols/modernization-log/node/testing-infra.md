@@ -184,6 +184,25 @@ All 5 ETH coverage gaps closed:
 
 ---
 
+## P12 — Tag taxonomy + build target architecture review (COMPLETE 2026-06-24)
+
+#### `55361ea6f` — build(p12): add domain test targets + remove workaround exclusions
+- **New `addCommandAlias` targets (build.sbt):** `testConsensus` (284 tests), `testRPC` (219), `testOlympia` (201), `testState` (63), `testSync` (84) — all ≥3 threshold.
+- **`Tags.scala` cleanup:** 15 dead definitions removed — 12 fork-specific tags (Homestead through Spiral), 3 environment tags (MainNet/PrivNet/PrivNetNoMining), FastTest. StressTest + ManualTest marked "reserved for future use."
+- **Workaround exclusions removed from all tiers:**
+  - Global `(Test/testOptions)`: `-l FlakyTest` + `-l DisabledTest` removed (0 remaining tests carry these tags post-P9/P10)
+  - `testEssential`: `-l SlowTest -l IntegrationTest` only (SyncTest/Disabled/Flaky exclusions gone)
+  - `testStandard`: `-l BenchmarkTest -l EthereumTest` only
+  - `testComprehensive`: no exclusions
+- **`-l SyncTest` removed everywhere** — all 84 SyncTest tests carry `(UnitTest, SyncTest)`; included in `testEssential` via `UnitTest`. Core sync logic now has CI coverage.
+- **Files:** `build.sbt`, `src/test/.../testing/Tags.scala`
+
+#### `deb421392` — docs(p12): CODEBASE-AUDIT E5 clearout
+- `CODEBASE-AUDIT.md` E5 row struck through with `55361ea6f` SHA.
+- `test-tag-taxonomy.md` written at `.local/docs/`.
+
+---
+
 ## Open / Deferred
 
 - **E165 `expectMsgType[Any]` — COMPLETE** (`8cdf1290d`) — 0 remaining. §8a-gated remainder:

@@ -89,6 +89,22 @@
 
 ---
 
+## ETH69 Pivot Safety — §ETH69-A + §ETH69-B (FORGE)
+
+#### `12d2ede7e` — fix(sync): ETH69 pivot TD consensus gate in collectVoters (G1)
+- **What:** `PivotBlockSelector.collectVoters` now filters the peer pool by a TD floor of `ourBestTD × 0.8`. Added `ourBestTotalDifficulty: () => BigInt` closure to `FastSync` (reads `blockchainReader → getChainWeightByHash → totalDifficulty`; returns 0 when unavailable so gate is inert on cold start). Gate threaded into all 3 `PivotBlockSelector` spawn sites in `FastSync`. If no peer passes the gate, logs `ETH69_PIVOT_TD_GATE_EMPTY` and falls back to block-number-only ranking for liveness.
+- **Tests:** 4 new tests in `PivotBlockSelectorSpec` (17 total): low-TD excluded, high-TD included, K-sybil honest peer wins, liveness fallback triggers.
+- **Files:** `PivotBlockSelector.scala`, `FastSync.scala`, `PivotBlockSelectorSpec.scala`
+- **Cross-refs:** `completed/SPRINT-QUEUE.md §ETH69-A`
+
+#### `0092e5f03` — fix(sync): ETH69 pivot parent-chain backlink validation before SNAP bootstrap (G5)
+- **What:** Added `verifyingBacklink` state to `PivotBlockSelector`. After pivot election, sends `GetBlockHeaders(Right(pivot.hash), count=20, reverse=true)` to pivot-voting peers. `checkBacklink` validates: chain rooted at pivot, per-header PoW via `validateHeaderPoW` closure, `parentHash` continuity, canonical match via `getCanonicalHeaderByNumber` within 20 hops. Canonical match found → `Result` to FastSync. No match → log `ETH69_PIVOT_BACKLINK_FAIL` + deepen-retry. Forged-PoW peers blacklisted. `SNAPSyncController` not modified — validation belongs upstream of `Result` emission.
+- **Tests:** 22 tests in `PivotBlockSelectorSpec` (5 new G5 scenarios): canonical within 5 hops, canonical at exactly hop N, no match → retry, invalid PoW → blacklist, probe timeout → retry.
+- **Files:** `PivotBlockSelector.scala`, `FastSync.scala`, `PivotBlockSelectorSpec.scala`, `FastSyncSpec.scala`
+- **Cross-refs:** `completed/SPRINT-QUEUE.md §ETH69-B`, `.local/Wire-Protocol-Modernization/G5-pivot-backlink.md`
+
+---
+
 ## Open / Deferred
 
 - INFO-8: `refreshFreshRootCache` function no longer exists in SNAPSyncController (searched 2026-06-22, 0 results). `getBlockHeaderByNumber` has 7 scattered call sites, none in a tight loop. No run-logs available. Marking MONITORED — no action needed.

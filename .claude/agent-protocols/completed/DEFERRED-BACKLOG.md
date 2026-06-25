@@ -1144,6 +1144,7 @@ P10 — EYE/MITHRIL: FlakyTest root cause audit — DONE — see completed/DEFER
 | ~~E2~~ | ~~Batch E~~ | ~~P9 EYE/MITHRIL DisabledTest audit~~ | ✅ DONE 2026-06-23 — `86c76fd4e` — 2 fixed, 7 deferred (F6 CODEBASE-AUDIT) |
 | ~~E3~~ | ~~Batch E~~ | ~~P10 EYE/MITHRIL FlakyTest root cause~~ | ✅ DONE 2026-06-23 — `ab98f1370` — 11 de-tagged, 2 deleted (F7 CODEBASE-AUDIT) |
 | ~~E4~~ | ~~Batch E~~ | ~~P11 testStandard baseline + SlowTest audit~~ | ✅ DONE 2026-06-23 — 961s/3,579 tests; 6 SlowTest→UnitTest `edfb69f35`; 2 failures: DNS flaky (Mordor DNS) + BHA pre-existing (fixed `07e5d505f`) |
+| ~~E5~~ | ~~Batch E~~ | ~~P12 Tag taxonomy + build target architecture review~~ | ✅ DONE 2026-06-24 — `55361ea6f` (build.sbt + Tags.scala) · `deb421392` (docs clearout) |
 
 ---
 
@@ -1151,6 +1152,24 @@ P10 — EYE/MITHRIL: FlakyTest root cause audit — DONE — see completed/DEFER
 
 `test-quality-log.md` created at `.local/docs/`, all content migrated, old file deleted,
 DEFERRED-BACKLOG references updated, MEMORY.md + memory file renamed.
+
+---
+
+## Part 12 — P12: Tag taxonomy + build target architecture review ✅ DONE 2026-06-24
+
+**Commits:** `55361ea6f` (build.sbt + Tags.scala) · `deb421392` (CODEBASE-AUDIT clearout + docs)
+
+**Outcome:**
+- **5 new `addCommandAlias` targets added to `build.sbt`:** `testConsensus` (284), `testRPC` (219), `testOlympia` (201), `testState` (63), `testSync` (84) — all met the ≥3 test threshold.
+- **15 dead tag definitions removed from `Tags.scala`:** all 12 fork-specific tags (Homestead→Spiral), all 3 environment tags (MainNet/PrivNet/PrivNetNoMining), FastTest. `StressTest` and `ManualTest` marked "reserved for future use."
+- **Workaround exclusions removed** (P8+P10 confirmed complete, FlakyTest=0, DisabledTest=0):
+  - Global `(Test/testOptions)`: removed `-l FlakyTest` and `-l DisabledTest`
+  - `testEssential`: now `-l SlowTest -l IntegrationTest` only
+  - `testStandard`: now `-l BenchmarkTest -l EthereumTest` only
+  - `testComprehensive`: bare `testOnly` + `IntegrationTest/testOnly` (no exclusions)
+- **`-l SyncTest` removed** from all tiers — all 84 SyncTest tests carry `(UnitTest, SyncTest)` so they are correctly included via `UnitTest` in `testEssential`.
+- **`test-tag-taxonomy.md`** written at `.local/docs/` — authoritative per-tag reference.
+- **Verification:** `sbt compile-all` clean; `sbt testConsensus` 284 tests; `sbt testEssential` count increased as expected.
 
 ---
 
@@ -1710,3 +1729,28 @@ between ticks → counter accumulates → after 3 unchanged probes → static �
 
 **Effect:** Inflated Tier3 POW_SCALING handshake estimates for archive nodes self-correct after
 N=3 `RefreshPeerBestBlocksTick` cycles (production default: ~150s × 3 = 7.5 min).
+
+---
+
+### §8k-R2 — PRISM: Post-migration spawn-site `.toClassic` slippage audit ✅ DONE 2026-06-24
+
+**Commit:** `8e46a3f68` (docs-only)
+
+**Result:** 0 new gaps found.
+
+**Bridge census:** 44 `.toClassic` production sites remaining (down from ~130 baseline — 66% reduction).
+All 44 remaining sites are legitimate bridges, gated architectural work (already in CHASE-QUEUE), or
+by-design return conversions for downstream Classic ref storage.
+
+**All 7 major spawn-site slippage entries confirmed CLEARED by §8k-G2 (`0435ac419`):**
+FastSync, SNAPSyncController, ChainDownloader, CombinedRecoveryScanActor,
+BytecodeRecoveryActor (×2 spawn paths), StorageRecoveryActor (×2 spawn paths),
+PivotHeaderBootstrap (×5 spawn sites) — all now accept `TypedActorRef[T]` params at spawn.
+
+**Remaining 44 sites classified:**
+| Category | Count | Status |
+|----------|-------|--------|
+| Classic NPMA interop (`networkPeerManager: ActorRef`) | ~20 | LEGITIMATE — NPMA not yet Typed |
+| TCP / JSON-RPC / Scheduler bridges | ~22 | LEGITIMATE — permanent interop |
+| NPMA routing msgs (SyncController L1635, L1983) | 2 | GATED — CHASE-QUEUE (NPMA command ADT redesign) |
+| ForkChoiceManager.setListener (SyncController L309) | 1 | GATED — CHASE-QUEUE (FCM API redesign) |
