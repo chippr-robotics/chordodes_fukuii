@@ -25,9 +25,11 @@ import com.chipprbots.ethereum.blockchain.sync.PeersClient
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.BlacklistPeer
 import com.chipprbots.ethereum.blockchain.sync.TestSyncConfig
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcher.AdaptedMessageFromEventBus
+import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcher.FetchResponse
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcher.InternalLastBlockImport
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcher.InvalidateBlocksFrom
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcher.PickBlocks
+import com.chipprbots.ethereum.blockchain.sync.regular.BlockImporter
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.HeadersSeq
 import com.chipprbots.ethereum.network.Peer
@@ -136,7 +138,7 @@ class BlockFetcherSpec
       }
 
       // Fetcher should not enqueue any new block
-      importer.send(blockFetcher.toClassic, PickBlocks(syncConfig.blocksBatchSize, importer.ref))
+      importer.send(blockFetcher.toClassic, PickBlocks(syncConfig.blocksBatchSize, importer.ref.toTyped[FetchResponse]))
       importer.expectNoMessage(100.millis)
       testKit.stop(blockFetcher)
     }
@@ -172,7 +174,7 @@ class BlockFetcherSpec
       // We need to wait a while in order to allow fetcher to process all the blocks
       testKit.system.classicSystem.scheduler.scheduleOnce(Timeouts.shortTimeout) {
         // Fetcher should enqueue all the received blocks
-        importer.send(blockFetcher.toClassic, PickBlocks(firstBlocksBatch.size, importer.ref))
+        importer.send(blockFetcher.toClassic, PickBlocks(firstBlocksBatch.size, importer.ref.toTyped[FetchResponse]))
       }
 
       importer.expectMsgPF() { case BlockFetcher.PickedBlocks(blocks) =>
@@ -208,7 +210,7 @@ class BlockFetcherSpec
       secondBodiesReplyTo ! PeersClient.Response(fakePeer, getBlockBodiesResponse2)
 
       // If we try to pick the whole chain we should only receive the first part
-      importer.send(blockFetcher.toClassic, PickBlocks(firstBlocksBatch.size, importer.ref))
+      importer.send(blockFetcher.toClassic, PickBlocks(firstBlocksBatch.size, importer.ref.toTyped[FetchResponse]))
       importer.expectMsgPF() { case BlockFetcher.PickedBlocks(blocks) =>
         blocks.map(_.hash).toList shouldEqual subChain1.map(_.hash)
       }
@@ -262,7 +264,7 @@ class BlockFetcherSpec
         ETHPackets.BlockBodies(BigInt(0), alternativeSecondBlocksBatch.drop(6).map(_.body))
       )
 
-      importer.send(blockFetcher.toClassic, PickBlocks(syncConfig.blocksBatchSize, importer.ref))
+      importer.send(blockFetcher.toClassic, PickBlocks(syncConfig.blocksBatchSize, importer.ref.toTyped[FetchResponse]))
       importer.expectMsgPF(Timeouts.normalTimeout) { case BlockFetcher.PickedBlocks(blocks) =>
         val headers = blocks.map(_.header).toList
         assert(HeadersSeq.areChain(headers))
@@ -272,7 +274,7 @@ class BlockFetcherSpec
 
     // BF-1A: ETH/69 head-following via BlockRangeUpdate
     "should include BlockRangeUpdateCode in peer event subscription" taggedAs (UnitTest, SyncTest) in new TestSetup {
-      blockFetcher ! BlockFetcher.Start(importer.ref, 0)
+      blockFetcher ! BlockFetcher.Start(importer.ref.toTyped[BlockImporter.Command], 0)
       val sub = peerEventBus.expectMsgType[SubscribeCmd]
       sub.to match {
         case MessageClassifier(codes, _) =>
@@ -324,7 +326,7 @@ class BlockFetcherSpec
       // Importer picks the block; this advances lastBlock to 6 so isOnTop becomes true.
       // expectNoMessage gives BlockFetcher time to process the bodies and update state.
       peersClient.expectNoMessage(300.millis)
-      importer.send(blockFetcher.toClassic, PickBlocks(1, importer.ref))
+      importer.send(blockFetcher.toClassic, PickBlocks(1, importer.ref.toTyped[FetchResponse]))
       importer.expectMsgPF() { case BlockFetcher.PickedBlocks(_) => () }
       // isOnTop=true now (set during PickBlocks processing above); PrintStatus should probe for block 7
       blockFetcher ! BlockFetcher.PrintStatus
@@ -412,7 +414,7 @@ class BlockFetcherSpec
     )
 
     def startFetcher(fromBlock: BigInt = 0): Unit = {
-      blockFetcher ! BlockFetcher.Start(importer.ref, fromBlock)
+      blockFetcher ! BlockFetcher.Start(importer.ref.toTyped[BlockImporter.Command], fromBlock)
 
       peerEventBus.expectMsgType[SubscribeCmd].to shouldBe MessageClassifier(
         Set(Codes.NewBlockCode, Codes.NewBlockHashesCode, Codes.BlockHeadersCode, Codes.BlockRangeUpdateCode),

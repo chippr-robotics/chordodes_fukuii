@@ -5,7 +5,6 @@ import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.pubsub.Topic
 import org.apache.pekko.event.Logging
@@ -204,14 +203,12 @@ final private class BlockImporterLogic(
 
   private val log: LoggingAdapter = Logging(ctx.system.classicSystem, classOf[BlockImporterImpl])
   private val selfRef = ctx.self
-  private val selfClassic = ctx.self.toClassic
 
   private val branchResolverAdapter: TypedActorRef[FastSyncBranchResolverActor.BranchResolverResponse] =
     ctx.messageAdapter[FastSyncBranchResolverActor.BranchResolverResponse](BranchResolverMsg(_))
 
   private val fetcherResponseAdapter: TypedActorRef[BlockFetcher.FetchResponse] =
     ctx.messageAdapter[BlockFetcher.FetchResponse](FetcherResponse(_))
-  private val fetcherReplyTo: ActorRef = fetcherResponseAdapter.toClassic
 
   private var pendingStateNodeHash: Option[ByteString] = None
   private var unknownParentStrikes: Map[ByteString, Int] = Map.empty
@@ -378,7 +375,7 @@ final private class BlockImporterLogic(
 
   private def start(): Behavior[Command] = {
     log.info("Starting Regular Sync, current best block is {}", bestKnownBlockNumber)
-    fetcher ! BlockFetcher.Start(selfClassic, bestKnownBlockNumber)
+    fetcher ! BlockFetcher.Start(selfRef, bestKnownBlockNumber)
     supervisor ! ProgressProtocol.StartingFrom(bestKnownBlockNumber)
     running(ImporterState.initial)
   }
@@ -402,8 +399,8 @@ final private class BlockImporterLogic(
 
   private def pickBlocks(state: ImporterState): Unit = {
     val msg = state.resolvingBranchFrom.fold[BlockFetcher.FetchCommand](
-      BlockFetcher.PickBlocks(syncConfig.blocksBatchSize, fetcherReplyTo)
-    )(from => BlockFetcher.StrictPickBlocks(from, bestKnownBlockNumber, fetcherReplyTo))
+      BlockFetcher.PickBlocks(syncConfig.blocksBatchSize, fetcherResponseAdapter)
+    )(from => BlockFetcher.StrictPickBlocks(from, bestKnownBlockNumber, fetcherResponseAdapter))
 
     fetcher ! msg
   }
@@ -481,7 +478,7 @@ final private class BlockImporterLogic(
                   e.location.isDefined
                 )
                 pendingStateNodeHash = Some(e.hash)
-                fetcher ! BlockFetcher.FetchStateNode(e.hash, fetcherReplyTo, parentStateRoot, paths)
+                fetcher ! BlockFetcher.FetchStateNode(e.hash, fetcherResponseAdapter, parentStateRoot, paths)
                 ResolvingMissingNode(NonEmptyList(notImportedBlocks.head, notImportedBlocks.tail))
               case e: MissingStorageNodeException =>
                 val failedBlock = notImportedBlocks.head
@@ -510,7 +507,7 @@ final private class BlockImporterLogic(
                   e.location.isDefined
                 )
                 pendingStateNodeHash = Some(e.hash)
-                fetcher ! BlockFetcher.FetchStateNode(e.hash, fetcherReplyTo, parentStateRoot, paths)
+                fetcher ! BlockFetcher.FetchStateNode(e.hash, fetcherResponseAdapter, parentStateRoot, paths)
                 ResolvingMissingNode(NonEmptyList(notImportedBlocks.head, notImportedBlocks.tail))
               case e: MissingNodeException =>
                 val failedBlock = notImportedBlocks.head
@@ -530,7 +527,7 @@ final private class BlockImporterLogic(
                   e.location.isDefined
                 )
                 pendingStateNodeHash = Some(e.hash)
-                fetcher ! BlockFetcher.FetchStateNode(e.hash, fetcherReplyTo, parentStateRoot, paths)
+                fetcher ! BlockFetcher.FetchStateNode(e.hash, fetcherResponseAdapter, parentStateRoot, paths)
                 ResolvingMissingNode(NonEmptyList(notImportedBlocks.head, notImportedBlocks.tail))
               case _ if err.toString.contains("Block has invalid gas used") =>
                 // Gas mismatch after execution — likely missing contract code from
@@ -554,7 +551,7 @@ final private class BlockImporterLogic(
                     // instead of the legacy GetNodeData path (which has no peers on modern networks).
                     fetcher ! BlockFetcher.FetchStateNode(
                       codeHash,
-                      fetcherReplyTo,
+                      fetcherResponseAdapter,
                       parentStateRoot,
                       paths = None,
                       isByteCode = true

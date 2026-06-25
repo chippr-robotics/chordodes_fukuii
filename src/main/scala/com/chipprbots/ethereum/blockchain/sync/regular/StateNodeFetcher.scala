@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 
-import org.apache.pekko.actor.ActorRef as ClassicActorRef
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.Scheduler
@@ -20,6 +19,7 @@ import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
 import com.chipprbots.ethereum.blockchain.sync.PeersClient
 import com.chipprbots.ethereum.blockchain.sync.PeersClient.*
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcher.FetchCommand
+import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcher.FetchResponse
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcher.FetchedStateNode
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.network.Peer
@@ -409,7 +409,7 @@ object StateNodeFetcher {
   sealed trait StateNodeFetcherCommand
   final case class FetchStateNode(
       hash: ByteString,
-      originalSender: ClassicActorRef,
+      originalSender: ActorRef[FetchResponse],
       stateRoot: Option[ByteString] = None,
       paths: Option[Seq[Seq[ByteString]]] = None,
       networkHead: BigInt = BigInt(0),
@@ -424,7 +424,7 @@ object StateNodeFetcher {
 
   final case class StateNodeRequester(
       hash: ByteString,
-      replyTo: ClassicActorRef,
+      replyTo: ActorRef[FetchResponse],
       stateRoot: Option[ByteString] = None,
       paths: Option[Seq[Seq[ByteString]]] = None,
       attempts: Int = 0,

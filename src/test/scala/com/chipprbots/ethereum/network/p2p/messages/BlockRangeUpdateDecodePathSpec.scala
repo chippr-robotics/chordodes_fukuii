@@ -22,6 +22,7 @@ import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.blockchain.sync.TestSyncConfig
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcher
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcher.AdaptedMessageFromEventBus
+import com.chipprbots.ethereum.blockchain.sync.regular.BlockImporter
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.network.KnownNodesManager
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
@@ -189,7 +190,7 @@ class BlockRangeUpdateDecodePathSpec
     )
 
     def startFetcher(fromBlock: BigInt = 0): Unit = {
-      fetcher ! BlockFetcher.Start(importer.ref, fromBlock)
+      fetcher ! BlockFetcher.Start(importer.ref.toTyped[BlockImporter.Command], fromBlock)
       peerEventBus.expectMsgType[SubscribeCmd]
     }
   }

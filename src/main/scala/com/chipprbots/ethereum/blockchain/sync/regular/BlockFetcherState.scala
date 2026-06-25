@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.util.ByteString
 
 import cats.data.NonEmptyList
@@ -11,7 +11,9 @@ import scala.collection.immutable.Queue
 import scala.collection.immutable.SortedMap
 
 import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
+import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcher.FetchResponse
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcherState.*
+import com.chipprbots.ethereum.blockchain.sync.regular.BlockImporter
 import com.chipprbots.ethereum.consensus.validators.BlockValidator
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
@@ -45,7 +47,7 @@ import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.Bl
   * @param blockProviders
   */
 case class BlockFetcherState(
-    importer: ActorRef,
+    importer: ActorRef[BlockImporter.Command],
     blockValidator: BlockValidator,
     readyBlocks: Queue[Block],
     waitingHeaders: Queue[BlockHeader],
@@ -386,7 +388,7 @@ case class BlockFetcherState(
 }
 
 object BlockFetcherState {
-  case class StateNodeFetcher(hash: ByteString, replyTo: ActorRef)
+  case class StateNodeFetcher(hash: ByteString, replyTo: ActorRef[FetchResponse])
 
   // Maximum number of concurrent in-flight header requests per sync session.
   // Each slot dispatches to the best available peer for a disjoint block range.
@@ -396,7 +398,7 @@ object BlockFetcherState {
   // are updated for the multi-slot model in TEST-001c ([15]).
   val MaxConcurrentHeaderSlots: Int = 1
 
-  def initial(importer: ActorRef, blockValidator: BlockValidator, lastBlock: BigInt): BlockFetcherState =
+  def initial(importer: ActorRef[BlockImporter.Command], blockValidator: BlockValidator, lastBlock: BigInt): BlockFetcherState =
     BlockFetcherState(
       importer = importer,
       blockValidator = blockValidator,

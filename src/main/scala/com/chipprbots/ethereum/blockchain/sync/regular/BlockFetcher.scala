@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 
-import org.apache.pekko.actor.ActorRef as ClassicActorRef
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.AbstractBehavior
@@ -26,6 +25,7 @@ import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcherState.Headers
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcherState.HeadersNotMatchingReadyBlocks
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcherState.HeadersNotMatchingWaitingHeaders
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockFetcherState.MaxConcurrentHeaderSlots
+import com.chipprbots.ethereum.blockchain.sync.regular.BlockImporter
 import com.chipprbots.ethereum.blockchain.sync.regular.BlockImporter.ImportNewBlock
 import com.chipprbots.ethereum.blockchain.sync.regular.RegularSync.ProgressProtocol
 import com.chipprbots.ethereum.consensus.validators.BlockValidator
@@ -564,7 +564,7 @@ class BlockFetcher(
 
   private def handlePickedBlocks(
       state: BlockFetcherState,
-      replyTo: ClassicActorRef
+      replyTo: ActorRef[FetchResponse]
   )(pickResult: Option[(NonEmptyList[Block], BlockFetcherState)]): BlockFetcherState =
     pickResult
       .tap { case (blocks, _) =>
@@ -725,10 +725,10 @@ object BlockFetcher {
     )
 
   sealed trait FetchCommand
-  final case class Start(importer: ClassicActorRef, fromBlock: BigInt) extends FetchCommand
+  final case class Start(importer: ActorRef[BlockImporter.Command], fromBlock: BigInt) extends FetchCommand
   final case class FetchStateNode(
       hash: ByteString,
-      replyTo: ClassicActorRef,
+      replyTo: ActorRef[FetchResponse],
       stateRoot: Option[ByteString] = None,
       paths: Option[Seq[Seq[ByteString]]] = None,
       networkHead: BigInt = BigInt(0),
@@ -739,8 +739,8 @@ object BlockFetcher {
       isByteCode: Boolean = false
   ) extends FetchCommand
   case object RetryFetchStateNode extends FetchCommand
-  final case class PickBlocks(amount: Int, replyTo: ClassicActorRef) extends FetchCommand
-  final case class StrictPickBlocks(from: BigInt, atLEastWith: BigInt, replyTo: ClassicActorRef) extends FetchCommand
+  final case class PickBlocks(amount: Int, replyTo: ActorRef[FetchResponse]) extends FetchCommand
+  final case class StrictPickBlocks(from: BigInt, atLEastWith: BigInt, replyTo: ActorRef[FetchResponse]) extends FetchCommand
   case object PrintStatus extends FetchCommand
   final case class InvalidateBlocksFrom(fromBlock: BigInt, reason: String, toBlacklist: Option[BigInt])
       extends FetchCommand
