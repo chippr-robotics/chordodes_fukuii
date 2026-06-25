@@ -206,9 +206,38 @@ class EngineApiController(
                 payload = payload.copy(executionRequests = executionRequests)
               }
 
-              engineApiService.newPayload(payload).map { status =>
-                JsonRpcResponse("2.0", Some(encodePayloadStatus(status)), None, reqId(request))
-              }
+              // validateRequests: reject entries with no type prefix or non-strictly-ascending
+              // type bytes. Matches go-ethereum catalyst/api.go:1257. Only applicable Prague+.
+              val requestsError: Option[String] =
+                if !isPraguePayload then None
+                else
+                  payload.executionRequests.flatMap { reqs =>
+                    reqs.zipWithIndex
+                      .collectFirst {
+                        case (req, i) if req.length < 2 =>
+                          s"empty request at index $i: entry too short, missing type prefix (len=${req.length})"
+                      }
+                      .orElse {
+                        reqs.sliding(2).collectFirst {
+                          case Seq(prev, curr) if curr.head <= prev.head =>
+                            s"invalid request order: type 0x${"%02x".format(curr.head)} not strictly after 0x${"%02x".format(prev.head)}"
+                        }
+                      }
+                  }
+
+              if requestsError.isDefined then
+                IO.pure(
+                  JsonRpcResponse(
+                    "2.0",
+                    None,
+                    Some(JsonRpcError(InvalidParams, requestsError.get, None)),
+                    reqId(request)
+                  )
+                )
+              else
+                engineApiService.newPayload(payload).map { status =>
+                  JsonRpcResponse("2.0", Some(encodePayloadStatus(status)), None, reqId(request))
+                }
             }
         }
       case _ =>

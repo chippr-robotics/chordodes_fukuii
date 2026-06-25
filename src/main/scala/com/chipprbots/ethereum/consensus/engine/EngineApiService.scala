@@ -661,6 +661,7 @@ class EngineApiService(
                             // producer like hive's NewPayloadV3 tests sends nonces N, N+1, ...,
                             // and without this sort execution hits NONCE_MISMATCH_TOO_HIGH when
                             // tx with nonce N+2 runs before nonce N.
+                            @annotation.nowarn("cat=deprecation") // Seq[Byte] key uses Ordering.Iterable
                             val txs = filtered.sortBy { stx =>
                               val sender =
                                 SignedTransaction.getSender(stx).map(_.bytes.toArray.toSeq).getOrElse(Seq.empty)
