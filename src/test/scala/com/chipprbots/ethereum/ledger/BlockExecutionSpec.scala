@@ -685,7 +685,7 @@ class BlockExecutionSpec
         )
 
         // Build a post-merge header (difficulty=0, baseFee set → isPoS = true)
-        val postMergeHeader: BlockHeader = validBlockParentHeader.copy(
+        val poSHeader: BlockHeader = validBlockParentHeader.copy(
           parentHash = validBlockParentHeader.hash,
           number = validBlockParentHeader.number + 1,
           difficulty = 0,
@@ -695,7 +695,7 @@ class BlockExecutionSpec
           )
         )
         val block: Block = Block(
-          postMergeHeader,
+          poSHeader,
           BlockBody(transactionList = Nil, uncleNodesList = Nil, withdrawals = Some(Seq(withdrawal)))
         )
 

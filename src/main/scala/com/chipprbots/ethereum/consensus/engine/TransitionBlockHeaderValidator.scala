@@ -23,7 +23,7 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
   */
 object TransitionBlockHeaderValidator extends BlockHeaderValidator {
 
-  private def preMergeValidator: BlockHeaderValidator =
+  private def poWValidator: BlockHeaderValidator =
     if java.lang.Boolean.getBoolean("fukuii.mining.skip-pow-validation") then MockedPowBlockHeaderValidator
     else PoWBlockHeaderValidator
 
@@ -32,11 +32,11 @@ object TransitionBlockHeaderValidator extends BlockHeaderValidator {
       getBlockHeaderByHash: GetBlockHeaderByHash
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
     if blockHeader.difficulty == 0 then PoSBlockHeaderValidator.validate(blockHeader, getBlockHeaderByHash)
-    else preMergeValidator.validate(blockHeader, getBlockHeaderByHash)
+    else poWValidator.validate(blockHeader, getBlockHeaderByHash)
 
   override def validateHeaderOnly(blockHeader: BlockHeader)(implicit
       blockchainConfig: BlockchainConfig
   ): Either[BlockHeaderError, BlockHeaderValid] =
     if blockHeader.difficulty == 0 then PoSBlockHeaderValidator.validateHeaderOnly(blockHeader)
-    else preMergeValidator.validateHeaderOnly(blockHeader)
+    else poWValidator.validateHeaderOnly(blockHeader)
 }

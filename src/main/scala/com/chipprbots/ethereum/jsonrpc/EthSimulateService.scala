@@ -348,11 +348,11 @@ class EthSimulateService(
     // to the miner. Geth's eth_simulateV1 reflects the reward in the simulated
     // stateRoot, so simulated pre-merge blocks must too. Post-merge blocks have no
     // reward — execution layer pays nothing, withdrawals come from the CL.
-    val isPreMerge = simHeader.extraFields match {
+    val isPoW = simHeader.extraFields match {
       case HefEmpty                                                                     => true
       case _: HefPostOlympia | _: HefPostShanghai | _: HefPostCancun | _: HefPostPrague => false
     }
-    if isPreMerge then {
+    if isPoW then {
       val reward = blockchainConfig.monetaryPolicyConfig.firstEraBlockReward
       val byzantiumReward = blockchainConfig.monetaryPolicyConfig.firstEraReducedBlockReward
       val constantinopleReward = blockchainConfig.monetaryPolicyConfig.firstEraConstantinopleReducedBlockReward
