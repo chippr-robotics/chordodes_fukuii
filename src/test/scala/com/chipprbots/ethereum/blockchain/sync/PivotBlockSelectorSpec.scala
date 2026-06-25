@@ -2,7 +2,6 @@ package com.chipprbots.ethereum.blockchain.sync
 
 import java.net.InetSocketAddress
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.ExplicitlyTriggeredScheduler
@@ -88,7 +87,7 @@ class PivotBlockSelectorSpec
     // ETH69 G5 — backlink probe + confirmation before the pivot is handed to FastSync.
     confirmBacklink(pivotBlockHeader, Seq(peer1, peer2, peer3), peer1)
 
-    fastSync.expectMsg(Result(pivotBlockHeader))
+    fastSyncResult.expectMessage(Result(pivotBlockHeader))
     peerMessageBus.expectMsgType[UnsubscribeAllCmd]
   }
 
@@ -141,7 +140,7 @@ class PivotBlockSelectorSpec
     // No subscriptions, no GetBlockHeaders, no fastSync ! Result — selector parks.
     peerMessageBus.expectNoMessage()
     networkPeerManager.expectNoMessage()
-    fastSync.expectNoMessage()
+    fastSyncResult.expectNoMessage()
   }
 
   it should "retry if there are no enough peers" taggedAs (UnitTest, SyncTest) in new TestSetup {
@@ -194,7 +193,7 @@ class PivotBlockSelectorSpec
       MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer3.id))
     )
 
-    fastSync.expectNoMessage() // consensus not reached - process have to be repeated
+    fastSyncResult.expectNoMessage() // consensus not reached - process have to be repeated
 
     testScheduler.timePasses(syncConfig.startRetryInterval)
 
@@ -236,7 +235,7 @@ class PivotBlockSelectorSpec
       MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer2.id))
     )
 
-    fastSync.expectNoMessage() // consensus not reached - process have to be repeated
+    fastSyncResult.expectNoMessage() // consensus not reached - process have to be repeated
 
     testScheduler.timePasses(syncConfig.startRetryInterval)
 
@@ -276,7 +275,7 @@ class PivotBlockSelectorSpec
     )
     testScheduler.timePasses(syncConfig.syncRetryInterval)
 
-    fastSync.expectNoMessage() // consensus not reached - process have to be repeated
+    fastSyncResult.expectNoMessage() // consensus not reached - process have to be repeated
     peerMessageBus.expectNoMessage()
   }
 
@@ -320,7 +319,7 @@ class PivotBlockSelectorSpec
     confirmBacklink(pivotBlockHeader, Seq(peer1, peer2, peer3), peer1)
     peerMessageBus.expectMsgType[UnsubscribeAllCmd]
 
-    fastSync.expectMsg(Result(pivotBlockHeader))
+    fastSyncResult.expectMessage(Result(pivotBlockHeader))
   }
 
   it should "ask additional peers if needed" taggedAs (UnitTest, SyncTest) in new TestSetup {
@@ -376,7 +375,7 @@ class PivotBlockSelectorSpec
     confirmBacklink(pivotBlockHeader, Seq(peer1, peer4), peer1)
     peerMessageBus.expectMsgType[UnsubscribeAllCmd]
 
-    fastSync.expectMsg(Result(pivotBlockHeader))
+    fastSyncResult.expectMessage(Result(pivotBlockHeader))
   }
 
   it should "restart whole process after checking additional nodes" taggedAs (UnitTest, SyncTest) in new TestSetup {
@@ -426,7 +425,7 @@ class PivotBlockSelectorSpec
       MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer4.id))
     )
 
-    fastSync.expectNoMessage() // consensus not reached - process have to be repeated
+    fastSyncResult.expectNoMessage() // consensus not reached - process have to be repeated
 
     testScheduler.timePasses(syncConfig.startRetryInterval)
 
@@ -495,7 +494,7 @@ class PivotBlockSelectorSpec
     // ETH69 G5 — backlink probe across the three voting peers + confirmation.
     confirmBacklink(pivotBlockHeader, Seq(peer1, peer3, peer4), peer1)
 
-    fastSync.expectMsg(Result(pivotBlockHeader))
+    fastSyncResult.expectMessage(Result(pivotBlockHeader))
     peerMessageBus.expectMsgType[UnsubscribeAllCmd]
   }
 
@@ -553,7 +552,7 @@ class PivotBlockSelectorSpec
     confirmBacklink(pivot900, Seq(peer1, peer3, peer4), peer1)
     peerMessageBus.expectMsgType[UnsubscribeAllCmd]
 
-    fastSync.expectMsg(Result(pivot900))
+    fastSyncResult.expectMessage(Result(pivot900))
   }
 
   // ETH69 G1 — pivot TD consensus gate. The selector must exclude peers whose advertised chainWeight
@@ -661,7 +660,7 @@ class PivotBlockSelectorSpec
 
     // ETH69 G5 — the honest peer is probed for the pivot backlink and confirms it.
     confirmBacklink(pivotBlockHeader, Seq(peer1), peer1)
-    fastSync.expectMsg(Result(pivotBlockHeader))
+    fastSyncResult.expectMessage(Result(pivotBlockHeader))
   }
 
   it should "fall back to block-number ranking when no peer passes the TD gate (liveness)" taggedAs (
@@ -734,7 +733,7 @@ class PivotBlockSelectorSpec
       expectBacklinkProbe(pivot, Seq(peer1, peer2, peer3))
       feedBacklink(chain, peer1)
 
-      fastSync.expectMsg(Result(pivot))
+      fastSyncResult.expectMessage(Result(pivot))
       peerMessageBus.expectMsgType[UnsubscribeAllCmd]
     }
 
@@ -752,7 +751,7 @@ class PivotBlockSelectorSpec
     expectBacklinkProbe(pivot, Seq(peer1, peer2, peer3))
     feedBacklink(chain, peer1)
 
-    fastSync.expectMsg(Result(pivot))
+    fastSyncResult.expectMessage(Result(pivot))
     peerMessageBus.expectMsgType[UnsubscribeAllCmd]
   }
 
@@ -770,7 +769,7 @@ class PivotBlockSelectorSpec
     feedBacklink(chain, peer1)
 
     // No pivot handed to FastSync; the selector schedules a retry instead.
-    fastSync.expectNoMessage()
+    fastSyncResult.expectNoMessage()
     peerMessageBus.expectMsgType[UnsubscribeAllCmd]
 
     testScheduler.timePasses(syncConfig.startRetryInterval)
@@ -801,7 +800,7 @@ class PivotBlockSelectorSpec
     feedBacklink(chain, peer1)
 
     // The forged-PoW chain is rejected immediately: no pivot reaches FastSync.
-    fastSync.expectNoMessage()
+    fastSyncResult.expectNoMessage()
     peerMessageBus.expectMsgType[UnsubscribeAllCmd]
 
     // peer1 served a forged-PoW backlink and must be blacklisted (distinguishing malicious from honest-divergent).
@@ -820,7 +819,7 @@ class PivotBlockSelectorSpec
     // No backlink response arrives; the probe timeout fires (peerResponseTimeout).
     testScheduler.timePasses(syncConfig.peerResponseTimeout)
 
-    fastSync.expectNoMessage()
+    fastSyncResult.expectNoMessage()
     peerMessageBus.expectMsgType[UnsubscribeAllCmd]
 
     testScheduler.timePasses(syncConfig.startRetryInterval)
@@ -985,7 +984,8 @@ class PivotBlockSelectorSpec
       blacklistDuration = 1.second
     )
 
-    val fastSync: TestProbe = TestProbe()
+    val fastSyncResult = testKit.createTestProbe[PivotBlockSelector.Result]()
+    val fastSyncFailed = testKit.createTestProbe[PivotBlockSelector.SelectionFailed.type]()
 
     def testScheduler: ExplicitlyTriggeredScheduler =
       classicSystem.scheduler.asInstanceOf[ExplicitlyTriggeredScheduler]
@@ -1000,13 +1000,14 @@ class PivotBlockSelectorSpec
     @volatile var validateHeaderPoWFn: BlockHeader => Boolean = _ => true
     @volatile var canonicalByNumber: BigInt => Option[BlockHeader] = _ => None
 
-    lazy val pivotBlockSelector: ActorRef = testKit
+    lazy val pivotBlockSelector = testKit
       .spawn(
         PivotBlockSelector(
           networkPeerManager.ref,
           peerMessageBus.ref,
           defaultSyncConfig,
-          fastSync.ref,
+          fastSyncResult.ref,
+          fastSyncFailed.ref,
           blacklist,
           () => ourBestTD,
           n => canonicalByNumber(n),
@@ -1014,7 +1015,6 @@ class PivotBlockSelectorSpec
         ),
         s"pivot-block-selector-${java.util.UUID.randomUUID()}"
       )
-      .toClassic
 
     val baseBlockHeader = Fixtures.Blocks.Genesis.header
 

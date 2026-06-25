@@ -162,16 +162,12 @@ object FastSync {
     private val prhResultAdapter: TypedActorRef[PeerRequestHandler.Result] =
       ctx.messageAdapter[PeerRequestHandler.Result](WrappedPrhResult(_))
 
-    // Typed adapters that replace the `ctx.self.toClassic` reply targets previously passed to the Classic-signature
-    // collaborators (PivotBlockSelector, SyncStateSchedulerActor). All `messageAdapter` calls share one underlying
-    // ref keyed by message class, so passing any single adapter's `.toClassic` routes every registered foreign
-    // message class to the correct `Wrapped*` constructor. Each is registered once here and reused at every spawn site.
-    // The three @annotation.unused adapters below are registration-only: their `messageAdapter` calls are the
-    // load-bearing side effect (they populate the shared class→wrapper routing table). The returned TypedActorRef
-    // values are not referenced directly; `fastSyncClassicSelf` (derived from `pivotResultAdapter`) carries all routes.
+    // Typed adapters for inbound foreign messages. Each `messageAdapter` call registers a type→wrapper mapping in
+    // the shared underlying adapter ref. `pivotResultAdapter` and `pivotFailedAdapter` are passed directly to
+    // PivotBlockSelector as its typed reply targets. `schedulerResponseAdapter` and `stateSyncStatsAdapter` are
+    // registration-only: SyncStateSchedulerActor still uses Classic and sends to `fastSyncClassicSelf`.
     private val pivotResultAdapter: TypedActorRef[PivotBlockSelector.Result] =
       ctx.messageAdapter[PivotBlockSelector.Result](WrappedPivotResult(_))
-    @annotation.unused
     private val pivotFailedAdapter: TypedActorRef[PivotBlockSelector.SelectionFailed.type] =
       ctx.messageAdapter[PivotBlockSelector.SelectionFailed.type](_ => PivotSelectionFailed)
     @annotation.unused
@@ -181,8 +177,8 @@ object FastSync {
     private val stateSyncStatsAdapter: TypedActorRef[SyncStateSchedulerActor.StateSyncStats] =
       ctx.messageAdapter[SyncStateSchedulerActor.StateSyncStats](WrappedStateSyncStats(_))
 
-    // Single Classic reply target handed to Classic-signature collaborators. Any adapter's `.toClassic` yields the
-    // same shared underlying ref; `pivotResultAdapter` is chosen arbitrarily as the source.
+    // Classic reply target for SyncStateSchedulerActor (still Classic-signature). Once SyncStateSchedulerActor is
+    // migrated to Typed this can be replaced with direct typed refs and removed.
     private val fastSyncClassicSelf: ActorRef = pivotResultAdapter.toClassic
 
     private val peerHelper =
@@ -285,7 +281,8 @@ object FastSync {
             networkPeerManager,
             peerEventBus,
             syncConfig,
-            fastSyncClassicSelf,
+            pivotResultAdapter,
+            pivotFailedAdapter,
             blacklist,
             () => ourBestTotalDifficulty(),
             getCanonicalHeaderByNumber,
@@ -293,7 +290,6 @@ object FastSync {
           ),
           "pivot-block-selector"
         )
-        .toClassic
       pivotBlockSelector ! PivotBlockSelector.SelectPivotBlock
       waitingForPivotBlock()
     }
@@ -311,7 +307,8 @@ object FastSync {
                   networkPeerManager,
                   peerEventBus,
                   syncConfig,
-                  fastSyncClassicSelf,
+                  pivotResultAdapter,
+                  pivotFailedAdapter,
                   blacklist,
                   () => ourBestTotalDifficulty(),
                   getCanonicalHeaderByNumber,
@@ -319,7 +316,6 @@ object FastSync {
                 ),
                 s"pivot-block-selector-retry-${java.util.UUID.randomUUID()}"
               )
-              .toClassic
             pivotBlockSelector ! PivotBlockSelector.SelectPivotBlock
             Behaviors.same
           case PivotSelectionFailed =>
@@ -404,15 +400,12 @@ object FastSync {
       * persist/print/heartbeat timers. Replaces the work the Classic `SyncingHandler` constructor did.
       */
     private def initSyncSession(initial: SyncState): Unit = {
-      // Pekko Typed migration (Group S2): StateStorageActor is a Typed Behavior; FastSync's core is Typed too, so
-      // spawn it directly and adapt the ref to Classic for the StateStorageActor.Init/Persist command sends.
-      val storageActor = ctx
+      val storageActor: TypedActorRef[StateStorageActor.Command] = ctx
         .spawn(
           StateStorageActor(),
           s"$countActor-state-storage",
           DispatcherSelector.fromConfig("sync-dispatcher")
         )
-        .toClassic
       storageActor ! StateStorageActor.Init(fastSyncStateStorage)
 
       // SyncStateSchedulerActor (Group S4, narrowed S4) is a Typed Behavior (Behavior[Command]); spawn via ctx.spawn.
@@ -699,7 +692,8 @@ object FastSync {
               networkPeerManager,
               peerEventBus,
               syncConfig,
-              fastSyncClassicSelf,
+              pivotResultAdapter,
+              pivotFailedAdapter,
               blacklist,
               () => ourBestTotalDifficulty(),
               getCanonicalHeaderByNumber,
@@ -707,7 +701,6 @@ object FastSync {
             ),
             s"$countActor-pivot-block-selector-update"
           )
-          .toClassic
       pivotBlockSelector ! PivotBlockSelector.SelectPivotBlock
       waitingForPivotBlockUpdate(updateReason)
     }
@@ -1604,7 +1597,7 @@ object FastSync {
       timers.cancel(PersistTimerKey)
       timers.cancel(PrintStatusTimerKey)
       // StateStorageActor is now Typed; stop the classic-adapted ref directly so the child terminates.
-      session.foreach(s => ctx.stop(s.syncStateStorageActor.toTyped[Nothing]))
+      session.foreach(s => ctx.stop(s.syncStateStorageActor))
       fastSyncStateStorage.purge()
     }
 
@@ -1819,7 +1812,7 @@ object FastSync {
       receiptsFetcherQueue: ReceiptsFetcherQueue,
       headersFetcherQueue: HeadersFetcherQueue,
       headerQueueHighWatermark: BigInt,
-      syncStateStorageActor: ActorRef,
+      syncStateStorageActor: TypedActorRef[StateStorageActor.Command],
       syncStateScheduler: TypedActorRef[SyncStateSchedulerActor.Command],
       stateSyncRestartRequested: Boolean,
       stateSyncStarted: Boolean

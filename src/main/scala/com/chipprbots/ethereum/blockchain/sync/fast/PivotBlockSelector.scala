@@ -83,7 +83,8 @@ object PivotBlockSelector {
       networkPeerManager: ClassicActorRef,
       peerEventBus: TypedActorRef[PeerEventBusCommand],
       syncConfig: SyncConfig,
-      fastSync: ClassicActorRef,
+      replyTo: TypedActorRef[Result],
+      selectionFailedTo: TypedActorRef[SelectionFailed.type],
       blacklist: Blacklist,
       ourBestTotalDifficulty: () => BigInt,
       // ETH69 G5 — pivot parent-chain backlink validation. `getCanonicalHeaderByNumber` reads our local
@@ -129,7 +130,8 @@ object PivotBlockSelector {
           networkPeerManager,
           peerEventBus,
           syncConfig,
-          fastSync,
+          replyTo,
+          selectionFailedTo,
           blacklist,
           peerListHelper,
           blockHeadersAdapter,
@@ -177,7 +179,8 @@ object PivotBlockSelector {
       networkPeerManager: ClassicActorRef,
       peerEventBus: TypedActorRef[PeerEventBusCommand],
       syncConfig: SyncConfig,
-      fastSync: ClassicActorRef,
+      replyTo: TypedActorRef[Result],
+      selectionFailedTo: TypedActorRef[SelectionFailed.type],
       blacklist: Blacklist,
       peerListHelper: PeerListHelper,
       blockHeadersAdapter: TypedActorRef[PeerEvent],
@@ -212,7 +215,7 @@ object PivotBlockSelector {
                 "Pivot block selection failed after {} total attempts. Stopping pivot block selector.",
                 maxTotalSelectionAttempts
               )
-              fastSync ! SelectionFailed
+              selectionFailedTo ! SelectionFailed
               peerEventBus ! UnsubscribeAllCmd(blockHeadersAdapter)
               Behaviors.stopped
             } else {
@@ -553,7 +556,7 @@ object PivotBlockSelector {
         pivotBlockHeader.hashAsHexString,
         attempts
       )
-      fastSync ! Result(pivotBlockHeader)
+      replyTo ! Result(pivotBlockHeader)
       peerEventBus ! UnsubscribeAllCmd(blockHeadersAdapter)
     }
 
