@@ -6,13 +6,13 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 import com.chipprbots.ethereum.Fixtures
-import com.chipprbots.ethereum.consensus.engine.PostMergeBlockHeaderValidator
+import com.chipprbots.ethereum.consensus.engine.PoSBlockHeaderValidator
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderDifficultyError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderParentNotFoundError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.MissingBlobGasFieldsError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.MissingWithdrawalsRootError
-import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.PostMergeNonceError
-import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.PostMergeOmmersError
+import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.PoSNonceError
+import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.PoSOmmersError
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostCancun
@@ -22,7 +22,7 @@ import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ForkTimestamps
 
-/** Unit coverage for [[PostMergeBlockHeaderValidator]] (EIP-3675 post-merge header rules).
+/** Unit coverage for [[PoSBlockHeaderValidator]] (EIP-3675 post-merge header rules).
   *
   * The validator skips PoW/difficulty-algorithm checks and instead enforces the post-merge invariants: difficulty == 0,
   * nonce == 8 zero bytes, empty ommers hash, withdrawalsRoot present once Shanghai (EIP-4895) is active, and blob-gas
@@ -33,7 +33,7 @@ import com.chipprbots.ethereum.utils.ForkTimestamps
   * case uses the `getBlockHeaderByHash` overload, which is the only path that resolves (and can reject) the parent.
   */
 // scalastyle:off magic.number
-class PostMergeBlockHeaderValidatorSpec
+class PoSBlockHeaderValidatorSpec
     extends AnyWordSpec
     with Matchers
     with BlockchainConfigBuilder
@@ -75,11 +75,11 @@ class PostMergeBlockHeaderValidatorSpec
       )
     )
 
-  "PostMergeBlockHeaderValidator" when {
+  "PoSBlockHeaderValidator" when {
 
     "header satisfies all post-merge invariants" should {
       "accept a valid Cancun-active header" taggedAs (UnitTest, ConsensusTest) in {
-        PostMergeBlockHeaderValidator.validateHeaderOnly(validCancunHeader) shouldBe Right(BlockHeaderValid)
+        PoSBlockHeaderValidator.validateHeaderOnly(validCancunHeader) shouldBe Right(BlockHeaderValid)
       }
     }
 
@@ -87,7 +87,7 @@ class PostMergeBlockHeaderValidatorSpec
       "fail with HeaderParentNotFoundError" taggedAs (UnitTest, ConsensusTest) in {
         // The getBlockHeaderByHash overload is the only path that resolves the parent;
         // returning None models a parentHash that matches no known header.
-        val result = PostMergeBlockHeaderValidator.validate(validCancunHeader, _ => None)
+        val result = PoSBlockHeaderValidator.validate(validCancunHeader, _ => None)
         result shouldBe Left(HeaderParentNotFoundError)
       }
     }
@@ -97,30 +97,30 @@ class PostMergeBlockHeaderValidatorSpec
       // This documents that the validator intentionally does not reject a non-zero mixHash.
       "accept the header (mixHash is not validated post-merge)" taggedAs (UnitTest, ConsensusTest) in {
         val withMixHash = validCancunHeader.copy(mixHash = ByteString(Array.fill[Byte](32)(1)))
-        PostMergeBlockHeaderValidator.validateHeaderOnly(withMixHash) shouldBe Right(BlockHeaderValid)
+        PoSBlockHeaderValidator.validateHeaderOnly(withMixHash) shouldBe Right(BlockHeaderValid)
       }
     }
 
     "nonce is non-zero" should {
-      "fail with PostMergeNonceError" taggedAs (UnitTest, ConsensusTest) in {
+      "fail with PoSNonceError" taggedAs (UnitTest, ConsensusTest) in {
         val badNonce = validCancunHeader.copy(nonce = ByteString(Array.fill[Byte](8)(7)))
-        val result = PostMergeBlockHeaderValidator.validateHeaderOnly(badNonce)
+        val result = PoSBlockHeaderValidator.validateHeaderOnly(badNonce)
         result shouldBe a[Left[?, ?]]
-        result.left.toOption.get shouldBe a[PostMergeNonceError]
+        result.left.toOption.get shouldBe a[PoSNonceError]
       }
     }
 
     "difficulty is non-zero" should {
       "fail with HeaderDifficultyError" taggedAs (UnitTest, ConsensusTest) in {
         val badDifficulty = validCancunHeader.copy(difficulty = BigInt(1))
-        PostMergeBlockHeaderValidator.validateHeaderOnly(badDifficulty) shouldBe Left(HeaderDifficultyError)
+        PoSBlockHeaderValidator.validateHeaderOnly(badDifficulty) shouldBe Left(HeaderDifficultyError)
       }
     }
 
     "ommers hash is not the empty-list hash" should {
-      "fail with PostMergeOmmersError" taggedAs (UnitTest, ConsensusTest) in {
+      "fail with PoSOmmersError" taggedAs (UnitTest, ConsensusTest) in {
         val badOmmers = validCancunHeader.copy(ommersHash = ByteString(Array.fill[Byte](32)(9)))
-        PostMergeBlockHeaderValidator.validateHeaderOnly(badOmmers) shouldBe Left(PostMergeOmmersError)
+        PoSBlockHeaderValidator.validateHeaderOnly(badOmmers) shouldBe Left(PoSOmmersError)
       }
     }
 
@@ -131,7 +131,7 @@ class PostMergeBlockHeaderValidatorSpec
           unixTimestamp = ShanghaiTs, // Shanghai active, Cancun not yet
           extraFields = HefEmpty
         )
-        PostMergeBlockHeaderValidator.validateHeaderOnly(noWithdrawals) shouldBe Left(MissingWithdrawalsRootError)
+        PoSBlockHeaderValidator.validateHeaderOnly(noWithdrawals) shouldBe Left(MissingWithdrawalsRootError)
       }
     }
 
@@ -142,7 +142,7 @@ class PostMergeBlockHeaderValidatorSpec
         val noBlobFields = validCancunHeader.copy(
           extraFields = HefPostShanghai(baseFee = BigInt(1), withdrawalsRoot = withdrawalsRoot)
         )
-        PostMergeBlockHeaderValidator.validateHeaderOnly(noBlobFields) shouldBe Left(MissingBlobGasFieldsError)
+        PoSBlockHeaderValidator.validateHeaderOnly(noBlobFields) shouldBe Left(MissingBlobGasFieldsError)
       }
     }
   }

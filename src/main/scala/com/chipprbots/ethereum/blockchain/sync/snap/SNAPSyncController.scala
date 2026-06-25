@@ -41,7 +41,7 @@ import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.SNAP
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
-import com.chipprbots.ethereum.consensus.engine.PostMergeBlockHeaderValidator
+import com.chipprbots.ethereum.consensus.engine.PoSBlockHeaderValidator
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 import com.chipprbots.ethereum.utils.Config.SyncConfig
@@ -188,7 +188,7 @@ private class SNAPSyncControllerImpl(
 
   // Buffered CL-driven pivot hint. Populated whenever a `CLPivotHint` message arrives
   // from `SyncController`. Consumed by `startSnapSync()` to skip TD-based pivot selection
-  // on post-merge chains. Only meaningful when `isPostMergeChain == true`. Closes #1207.
+  // on post-merge chains. Only meaningful when `isPoSChain == true`. Closes #1207.
   private var clPivotHint: Option[CLPivotHint] = None
 
   // Minimum pivot block enforced when re-entering SNAP from a RegularSyncStuck escape.
@@ -198,7 +198,7 @@ private class SNAPSyncControllerImpl(
 
   // Captured once at construction. ETC mainnet has TTD=None and never goes down the
   // CL-driven path; Sepolia/mainnet have TTD set and switch off TD-based pivot entirely.
-  private val isPostMergeChain: Boolean =
+  private val isPoSChain: Boolean =
     com.chipprbots.ethereum.utils.Config.blockchains.blockchainConfig.terminalTotalDifficulty.isDefined
 
   private val requestTracker = new SNAPRequestTracker()(scheduler)
@@ -2024,7 +2024,7 @@ private class SNAPSyncControllerImpl(
               } else {
                 // Gate on ETH/Sepolia only — ETC pivot headers use StdBlockHeaderValidator (PoW).
                 val pivotHeaderValid =
-                  if isPostMergeChain then {
+                  if isPoSChain then {
                     given bc: BlockchainConfig =
                       com.chipprbots.ethereum.utils.Config.blockchains.blockchainConfig
                     BlockHeader.validateFieldCount(header, bc) match {
@@ -2035,7 +2035,7 @@ private class SNAPSyncControllerImpl(
                         )
                         false
                       case Right(_) =>
-                        PostMergeBlockHeaderValidator.validateHeaderOnly(header) match {
+                        PoSBlockHeaderValidator.validateHeaderOnly(header) match {
                           case Left(err) =>
                             ctx.log.error(
                               "SNAP bootstrap pivot header failed post-merge validation — aborting commit, restarting sync: {}",
@@ -2236,7 +2236,7 @@ private class SNAPSyncControllerImpl(
     * `StartRegularSyncBootstrapByHash` to fetch the header from a peer.
     *
     * On pre-merge chains (TTD = None): we still buffer for diagnostics but don't act — `startSnapSync()` ignores
-    * `clPivotHint` when `!isPostMergeChain`.
+    * `clPivotHint` when `!isPoSChain`.
     */
   private def handleCLPivotHint(hint: CLPivotHint, isStarting: Boolean): Unit = {
     val isNew = !clPivotHint.exists(_.headHash == hint.headHash)
@@ -2244,10 +2244,10 @@ private class SNAPSyncControllerImpl(
     if isNew then clHintArrivedAtMs = Some(System.currentTimeMillis())
     if isNew then {
       ctx.log.info(
-        "[CL-PIVOT] Received CL-driven head {} (knownHeader={}, postMergeChain={})",
+        "[CL-PIVOT] Received CL-driven head {} (knownHeader={}, isPoSChain={})",
         com.chipprbots.ethereum.utils.ByteStringUtils.hash2string(hint.headHash),
         hint.knownHeader.map(_.number).getOrElse("unknown"),
-        isPostMergeChain
+        isPoSChain
       )
     }
     // Forward the CL head number to the network peer manager so it can run lagging-peer
@@ -2556,7 +2556,7 @@ private class SNAPSyncControllerImpl(
     // first start attempt. Either way, we must NOT walk into TD-based selection here —
     // TD is frozen at TTD on post-merge chains and pivot selection produces useless
     // targets. Closes #1207.
-    if isPostMergeChain && clPivotHint.isEmpty then {
+    if isPoSChain && clPivotHint.isEmpty then {
       val firstAttemptMs =
         clHintArrivedAtMs.getOrElse {
           // Reuse the same timestamp pattern as the hint to keep the wait window stable
@@ -2593,7 +2593,7 @@ private class SNAPSyncControllerImpl(
     // chains is frozen at TerminalTotalDifficulty so peer-best-by-TD is unreliable. This
     // is geth's "BeaconSync" pattern, plumbed via SyncController's BeaconHead listener.
     // Closes #1207.
-    if isPostMergeChain && clPivotHint.isDefined then {
+    if isPoSChain && clPivotHint.isDefined then {
       val hint = clPivotHint.get
       hint.knownHeader match {
         case Some(header) =>
@@ -3999,7 +3999,7 @@ private class SNAPSyncControllerImpl(
     //
     // Pre-merge chains keep peer-reported best because there's no authoritative tip.
     val clHeadNumber: Option[BigInt] =
-      if isPostMergeChain then clPivotHint.flatMap(_.knownHeader).map(_.number) else None
+      if isPoSChain then clPivotHint.flatMap(_.knownHeader).map(_.number) else None
 
     val newPivotOpt: Option[BigInt] = clHeadNumber match {
       case Some(clHead) =>
@@ -4282,7 +4282,7 @@ private class SNAPSyncControllerImpl(
     if deferForProbe then return
 
     // Gate on ETH/Sepolia only — ETC pivot headers use StdBlockHeaderValidator (PoW).
-    if isPostMergeChain then {
+    if isPoSChain then {
       given bc: BlockchainConfig = com.chipprbots.ethereum.utils.Config.blockchains.blockchainConfig
       BlockHeader.validateFieldCount(newPivotHeader, bc) match {
         case Left(msg) =>
@@ -4293,7 +4293,7 @@ private class SNAPSyncControllerImpl(
           return
         case Right(_) => ()
       }
-      PostMergeBlockHeaderValidator.validateHeaderOnly(newPivotHeader) match {
+      PoSBlockHeaderValidator.validateHeaderOnly(newPivotHeader) match {
         case Left(err) =>
           ctx.log.error(
             "SNAP pivot header failed post-merge validation — aborting pivot commit: {}",

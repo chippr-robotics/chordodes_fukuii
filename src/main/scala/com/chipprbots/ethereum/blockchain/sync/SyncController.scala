@@ -296,8 +296,8 @@ object SyncController {
 
     // Whether SNAP should consume CL-driven pivot selection. Captured once at construction
     // because both `syncConfig` and the chain config are stable for the actor's lifetime.
-    private val isPostMergeChain: Boolean = configBuilder.blockchainConfig.terminalTotalDifficulty.isDefined
-    private val clPivotEnabled: Boolean = isPostMergeChain && forkChoiceManagerOpt.isDefined
+    private val isPoSChain: Boolean = configBuilder.blockchainConfig.terminalTotalDifficulty.isDefined
+    private val clPivotEnabled: Boolean = isPoSChain && forkChoiceManagerOpt.isDefined
 
     // TD calibration stats — updated by CalibrateChainWeightFromPeer handler.
     // calibrationSucceeded and networkBestTD are read by the TD_CALIBRATION_STATS periodic log
@@ -556,8 +556,12 @@ object SyncController {
           // GetStatus/ResetFastSync/RestartFastSync carry replyTo — forward the message as-is.
           fastSync ! FastSync.WrappedSyncProtocol(spMsg)
           Behaviors.same
+        case bh: ForkChoiceManager.BeaconHead =>
+          // ETH post-merge only: buffer CL head so pivot selection can use it when SNAP starts later.
+          handleBeaconHead(bh, snapSyncOpt = None)
+          Behaviors.same
         case other =>
-          fastSync.toClassic.tell(other, org.apache.pekko.actor.ActorRef.noSender)
+          log.warn("Unexpected message in runningFastSync: {}", other.getClass.getSimpleName)
           Behaviors.same
       }
     }
@@ -756,11 +760,34 @@ object SyncController {
           case com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers(_) =>
             Behaviors.same
 
+          // Stale PivotHeaderBootstrap replies that arrive in runningSnapSync without a healing request in flight
+          // (the bootstrap was stopped by abortHealingServeRootRequest before leaving runningPivotHeaderBootstrap,
+          // but Pekko stopping is async so a final Completed/Failed can still be in the mailbox). Drop silently.
+          case _: PivotHeaderBootstrap.Completed =>
+            log.debug(
+              "[HEAL-SERVE-ROOT] Stale PivotHeaderBootstrap.Completed in runningSnapSync (no healing in flight)"
+            )
+            Behaviors.same
+
+          case _: PivotHeaderBootstrap.Failed =>
+            log.debug("[HEAL-SERVE-ROOT] Stale PivotHeaderBootstrap.Failed in runningSnapSync (no healing in flight)")
+            Behaviors.same
+
+          case msg: SyncProtocol.GetStatus =>
+            // JSON-RPC eth_syncing while SNAP is running. SSC doesn't have GetStatus in its Command ADT;
+            // reply inline with a generic Syncing status so callers don't time out.
+            msg.replyTo ! SyncProtocol.Status.Syncing(
+              startingBlockNumber = appStateStorage.getSyncStartingBlock(),
+              blocksProgress = SyncProtocol.Status.Progress(appStateStorage.getBestBlockNumber(), BigInt(0)),
+              stateNodesProgress = None
+            )
+            Behaviors.same
+
           case msg if isInternalMarker(msg) =>
             // Late self/death-watch marker for a child stopped before this transition — drop silently.
             Behaviors.same
-          case msg =>
-            snapSync.toClassic.tell(msg, org.apache.pekko.actor.ActorRef.noSender)
+          case other =>
+            log.warn("Unexpected message in runningSnapSync: {}", other.getClass.getSimpleName)
             Behaviors.same
         }
     }
@@ -945,8 +972,13 @@ object SyncController {
           // Late arrival after sync switch (syncSwitchDelay races) — ignore rather than forwarding
           // to RegularSync, which would crash with ClassCastException.
           Behaviors.same
-        case msg =>
-          regularSync.toClassic.tell(msg, org.apache.pekko.actor.ActorRef.noSender)
+        case msg: SyncProtocol.RegularSyncCommand =>
+          // GetStatus (JSON-RPC eth_syncing), MinedBlock (miner), and other RegularSyncCommand subtypes
+          // arrive here. RegularSync.Command = SyncProtocol.RegularSyncCommand so this is a typed send.
+          regularSync ! msg
+          Behaviors.same
+        case other =>
+          log.warn("Unexpected message in handleRegularSyncMsg: {}", other.getClass.getSimpleName)
           Behaviors.same
       }
 
@@ -1022,59 +1054,6 @@ object SyncController {
       case _: RecentRootTimeout          => true
       case _: HealingServeRootTimeout    => true
       case _                             => false
-    }
-
-    def runningRegularSyncBootstrap(
-        regularSync: TypedActorRef[RegularSync.Command],
-        targetBlock: BigInt,
-        originalSnapSyncRef: TypedActorRef[SNAPSyncController.Command]
-    ): Behavior[Command] = Behaviors.receive { (_, cmd) =>
-      val msg = unwrap(cmd)
-      msg match {
-        case msg: SyncProtocol.ResetFastSync =>
-          handleResetFastSync(msg.replyTo)
-          Behaviors.same
-        case msg: SyncProtocol.RestartFastSync =>
-          handleRestartFastSync(msg.replyTo)
-          Behaviors.same
-        case RestartFastSyncNow =>
-          doRestartFastSyncNow()
-        case RegularSync.ProgressProtocol.ImportedBlock(blockNumber, _) =>
-          log.debug(s"Bootstrap progress: block $blockNumber / $targetBlock")
-
-          if blockNumber >= targetBlock then {
-            log.info(s"Bootstrap target ${targetBlock} reached - transitioning to SNAP sync")
-
-            // Stop regular sync
-            ctx.stop(regularSync)
-
-            // Notify SNAP sync controller that bootstrap is complete, including the pivot header if available.
-            blockchainReader.getBlockHeaderByNumber(targetBlock) match {
-              case Some(header) =>
-                originalSnapSyncRef ! BootstrapComplete(Some(header))
-              case None =>
-                log.warn(
-                  s"Bootstrap reached target $targetBlock but pivot header not found locally; notifying SNAP without header"
-                )
-                originalSnapSyncRef ! BootstrapComplete()
-            }
-
-            // Switch back to runningSnapSync state
-            runningSnapSync(originalSnapSyncRef)
-          } else Behaviors.same
-
-        case msg: SyncProtocol.GetStatus =>
-          // Forward status requests to regular sync; replyTo is embedded in the message.
-          regularSync.toClassic.tell(msg, org.apache.pekko.actor.ActorRef.noSender)
-          Behaviors.same
-
-        case other if isInternalMarker(other) =>
-          // Late self/death-watch marker for a child stopped before this transition — drop silently.
-          Behaviors.same
-        case other =>
-          regularSync.toClassic.tell(other, org.apache.pekko.actor.ActorRef.noSender)
-          Behaviors.same
-      }
     }
 
     def runningPivotHeaderBootstrap(
@@ -1197,13 +1176,63 @@ object SyncController {
           originalSnapSyncRef ! SNAPSyncController.HealingServeRoot(0, None)
           Behaviors.same
 
+        // SSC requested a hash-based bootstrap while one is already running — restart with new CL hash.
+        case StartRegularSyncBootstrapByHash(headHash) =>
+          log.info(
+            "SNAP requested by-hash pivot header bootstrap during active bootstrap ({}), restarting.",
+            com.chipprbots.ethereum.utils.ByteStringUtils.hash2string(headHash)
+          )
+          ctx.stop(headerBootstrap)
+          ctx.stop(peersClient)
+          bootstrapGeneration += 1
+          val gen = bootstrapGeneration
+          val newPeersClient =
+            ctx.spawn(
+              PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig),
+              s"peers-client-bootstrap-$gen"
+            )
+          val newHeaderBootstrap =
+            ctx.spawn(
+              PivotHeaderBootstrap.applyByHash(
+                newPeersClient,
+                blockchainWriter,
+                headHash,
+                replyTo = pivotBootstrapAdapter,
+                syncConfig,
+                preferSnapPeers = false
+              ),
+              s"pivot-header-bootstrap-$gen"
+            )
+          runningPivotHeaderBootstrap(newPeersClient, newHeaderBootstrap, targetBlock = BigInt(0), originalSnapSyncRef)
+
+        // Stale completion from a previous bootstrap generation (block doesn't match current targetBlock).
+        case PivotHeaderBootstrap.Completed(block, _) =>
+          log.debug(
+            "Stale PivotHeaderBootstrap.Completed for block {} in runningPivotHeaderBootstrap (expected {}), dropping.",
+            block,
+            targetBlock
+          )
+          Behaviors.same
+
+        // SSC declared healing impossible during the pivot header bootstrap window — stale, drop.
+        case SyncProtocol.HealingImpossible =>
+          log.debug("HealingImpossible in runningPivotHeaderBootstrap — stale, dropping (bootstrap in progress).")
+          Behaviors.same
+
+        // Stale HandshakedPeers reply from a GetHandshakedPeersCmd sent before this state transition.
+        // SSC polls NPMA directly (OQ-3) so these are not forwarded.
+        case _: com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers =>
+          Behaviors.same
+
+        // Stale chain-weight calibration push — no calibration during pivot header bootstrap.
+        case _: SyncProtocol.CalibrateChainWeightFromPeer =>
+          Behaviors.same
+
         case msg if isInternalMarker(msg) =>
           // Late self/death-watch marker for a child stopped before this transition — drop silently.
           Behaviors.same
-        case msg =>
-          // Forward coordinator and protocol messages to SNAP sync during the brief bootstrap.
-          // This keeps coordinators functional while we fetch the pivot header (~1-5 seconds).
-          originalSnapSyncRef.toClassic.tell(msg, org.apache.pekko.actor.ActorRef.noSender)
+        case other =>
+          log.warn("Unexpected message in runningPivotHeaderBootstrap: {}", other.getClass.getSimpleName)
           Behaviors.same
       }
     }
@@ -2177,11 +2206,11 @@ object SyncController {
         case msg if isInternalMarker(msg) =>
           // Late self/death-watch marker for a child stopped before this transition — drop silently.
           Behaviors.same
-        case msg =>
-          // Forward SNAP protocol responses to both active recovery actors.
-          // Responses arrive via recoverySnapAdapter (fire-and-forget); no reply target to preserve.
-          bytecodeActor.foreach(_.toClassic.tell(msg, org.apache.pekko.actor.ActorRef.noSender))
-          storageActor.foreach(_.toClassic.tell(msg, org.apache.pekko.actor.ActorRef.noSender))
+        case other =>
+          // All SNAP response types (ByteCodesResponse, StorageRangesResponse, AccountRangeResponse,
+          // TrieNodesResponse) are handled by explicit arms above. This arm fires only for truly
+          // unexpected message types.
+          log.warn("Unexpected message in runningRecovery: {}", other.getClass.getSimpleName)
           Behaviors.same
       }
     }

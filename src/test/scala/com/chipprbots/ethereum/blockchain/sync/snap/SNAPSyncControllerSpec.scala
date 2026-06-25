@@ -9,7 +9,7 @@ import scala.concurrent.duration.*
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import com.chipprbots.ethereum.consensus.engine.PostMergeBlockHeaderValidator
+import com.chipprbots.ethereum.consensus.engine.PoSBlockHeaderValidator
 import com.chipprbots.ethereum.db.storage.MptStorage
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestMptStorage
@@ -1212,13 +1212,13 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
   // ── §ETH-T9-A: Pivot header post-merge validation ─────────────────────────────────────────────
   // Tests for the gate added to BootstrapComplete and completePivotRefreshWithStateRoot that
   // rejects malformed post-merge pivot headers on ETH/Sepolia before any state is committed.
-  // The gate delegates to PostMergeBlockHeaderValidator.validateHeaderOnly so we test that
+  // The gate delegates to PoSBlockHeaderValidator.validateHeaderOnly so we test that
   // validator directly with headers representative of what SNAP sync may receive from peers.
-  "PostMergeBlockHeaderValidator (pivot header gate)" should
+  "PoSBlockHeaderValidator (pivot header gate)" should
     "reject an ETH/Sepolia pivot header with difficulty > 0 (not a PoS block)" taggedAs UnitTest in {
       given bc: BlockchainConfig = sepoliaTestConfig
       val badHeader = validSepoliaHeader.copy(difficulty = BigInt(1))
-      PostMergeBlockHeaderValidator.validateHeaderOnly(badHeader).isLeft shouldBe true
+      PoSBlockHeaderValidator.validateHeaderOnly(badHeader).isLeft shouldBe true
     }
 
   it should "reject an ETH/Sepolia Shanghai-era pivot header with withdrawalsRoot = None" taggedAs UnitTest in {
@@ -1226,20 +1226,20 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
     given bc: BlockchainConfig = sepoliaTestConfig
     // A header with HefEmpty on a Shanghai-timestamp block has withdrawalsRoot = None — rejected.
     val badHeader = validSepoliaHeader.copy(extraFields = BlockHeader.HeaderExtraFields.HefEmpty)
-    PostMergeBlockHeaderValidator.validateHeaderOnly(badHeader).isLeft shouldBe true
+    PoSBlockHeaderValidator.validateHeaderOnly(badHeader).isLeft shouldBe true
   }
 
   it should "accept a valid ETH/Sepolia post-merge pivot header" taggedAs UnitTest in {
     given bc: BlockchainConfig = sepoliaTestConfig
-    PostMergeBlockHeaderValidator.validateHeaderOnly(validSepoliaHeader).isRight shouldBe true
+    PoSBlockHeaderValidator.validateHeaderOnly(validSepoliaHeader).isRight shouldBe true
   }
 
   it should "confirm the ETH validator rejects PoW headers (ETC gate avoids calling it)" taggedAs UnitTest in {
-    // On ETC the gate is skipped (isPostMergeChain = false). We verify the validator itself
+    // On ETC the gate is skipped (isPoSChain = false). We verify the validator itself
     // would reject this header, confirming that the ETC gate correctly avoids calling it.
     given bc: BlockchainConfig = sepoliaTestConfig
     val etcStyleHeader = validSepoliaHeader.copy(difficulty = BigInt("10000000000000000"))
-    PostMergeBlockHeaderValidator.validateHeaderOnly(etcStyleHeader).isLeft shouldBe true
+    PoSBlockHeaderValidator.validateHeaderOnly(etcStyleHeader).isLeft shouldBe true
   }
 
   private val sepoliaTestConfig: BlockchainConfig = BlockchainConfig(

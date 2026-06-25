@@ -58,7 +58,7 @@ case class BlockchainConfig(
     terminalTotalDifficulty: Option[BigInt] = None,
     forkTimestamps: ForkTimestamps = ForkTimestamps()
 ) {
-  def isPostMerge(totalDifficulty: BigInt): Boolean =
+  def isPoS(totalDifficulty: BigInt): Boolean =
     terminalTotalDifficulty.exists(ttd => totalDifficulty >= ttd)
 
   def isShanghaiTimestamp(timestamp: Long): Boolean =

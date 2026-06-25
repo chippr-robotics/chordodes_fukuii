@@ -63,8 +63,8 @@ object BlockHeaderError {
   }
   case class HeaderUnexpectedError(msg: String) extends BlockHeaderError
   // Post-merge validation errors
-  case class PostMergeNonceError(nonce: org.apache.pekko.util.ByteString) extends BlockHeaderError
-  case object PostMergeOmmersError extends BlockHeaderError
+  case class PoSNonceError(nonce: org.apache.pekko.util.ByteString) extends BlockHeaderError
+  case object PoSOmmersError extends BlockHeaderError
   case object MissingWithdrawalsRootError extends BlockHeaderError
   case object MissingBlobGasFieldsError extends BlockHeaderError
 }

@@ -31,12 +31,12 @@ object TransitionBlockHeaderValidator extends BlockHeaderValidator {
       blockHeader: BlockHeader,
       getBlockHeaderByHash: GetBlockHeaderByHash
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
-    if blockHeader.difficulty == 0 then PostMergeBlockHeaderValidator.validate(blockHeader, getBlockHeaderByHash)
+    if blockHeader.difficulty == 0 then PoSBlockHeaderValidator.validate(blockHeader, getBlockHeaderByHash)
     else preMergeValidator.validate(blockHeader, getBlockHeaderByHash)
 
   override def validateHeaderOnly(blockHeader: BlockHeader)(implicit
       blockchainConfig: BlockchainConfig
   ): Either[BlockHeaderError, BlockHeaderValid] =
-    if blockHeader.difficulty == 0 then PostMergeBlockHeaderValidator.validateHeaderOnly(blockHeader)
+    if blockHeader.difficulty == 0 then PoSBlockHeaderValidator.validateHeaderOnly(blockHeader)
     else preMergeValidator.validateHeaderOnly(blockHeader)
 }

@@ -12,7 +12,7 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
 /** Post-merge block header validator. Skips PoW (Ethash) validation entirely. Enforces: difficulty=0, nonce=0, empty
   * ommers. Validates withdrawalsRoot (Shanghai+) and blob gas fields (Cancun+).
   */
-object PostMergeBlockHeaderValidator extends BlockHeaderValidatorSkeleton {
+object PoSBlockHeaderValidator extends BlockHeaderValidatorSkeleton {
 
   private val EmptyNonce: ByteString = ByteString(Array.fill[Byte](8)(0))
 
@@ -20,30 +20,30 @@ object PostMergeBlockHeaderValidator extends BlockHeaderValidatorSkeleton {
       blockHeader: BlockHeader
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
     for {
-      _ <- validatePostMergeDifficulty(blockHeader)
-      _ <- validatePostMergeNonce(blockHeader)
-      _ <- validatePostMergeOmmers(blockHeader)
+      _ <- validatePoSDifficulty(blockHeader)
+      _ <- validatePoSNonce(blockHeader)
+      _ <- validatePoSOmmers(blockHeader)
       _ <- validateWithdrawalsRoot(blockHeader)
       _ <- validateBlobGasFields(blockHeader)
     } yield BlockHeaderValid
 
-  private def validatePostMergeDifficulty(
+  private def validatePoSDifficulty(
       blockHeader: BlockHeader
   ): Either[BlockHeaderError, BlockHeaderValid] =
     if blockHeader.difficulty == 0 then Right(BlockHeaderValid)
     else Left(HeaderDifficultyError)
 
-  private def validatePostMergeNonce(
+  private def validatePoSNonce(
       blockHeader: BlockHeader
   ): Either[BlockHeaderError, BlockHeaderValid] =
     if blockHeader.nonce == EmptyNonce then Right(BlockHeaderValid)
-    else Left(PostMergeNonceError(blockHeader.nonce))
+    else Left(PoSNonceError(blockHeader.nonce))
 
-  private def validatePostMergeOmmers(
+  private def validatePoSOmmers(
       blockHeader: BlockHeader
   ): Either[BlockHeaderError, BlockHeaderValid] =
     if blockHeader.ommersHash == BlockHeader.EmptyOmmers then Right(BlockHeaderValid)
-    else Left(PostMergeOmmersError)
+    else Left(PoSOmmersError)
 
   private def validateWithdrawalsRoot(
       blockHeader: BlockHeader

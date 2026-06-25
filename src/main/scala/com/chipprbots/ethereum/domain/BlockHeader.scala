@@ -162,7 +162,7 @@ object BlockHeader {
 
   /** Structural check: a decoded header's ExtraFields shape must be consistent with the fork timestamps active at its
     * timestamp. ETC has no timestamp forks; this check is a no-op for ETC chains. Intended as an early, cheap gate
-    * before the full [[com.chipprbots.ethereum.consensus.engine.PostMergeBlockHeaderValidator]].
+    * before the full [[com.chipprbots.ethereum.consensus.engine.PoSBlockHeaderValidator]].
     */
   def validateFieldCount(header: BlockHeader, config: BlockchainConfig): Either[String, Unit] =
     if config.networkType != NetworkType.ETH then Right(())
