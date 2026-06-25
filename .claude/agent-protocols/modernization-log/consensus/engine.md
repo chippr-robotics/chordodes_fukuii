@@ -55,6 +55,17 @@
 
 ---
 
+## §NAMING-MICRO: Rename residual preMerge/postMerge identifiers (2026-06-25)
+
+#### `440896c4e` — refactor: rename preMergeValidator→poWValidator, isPreMerge→isPoW, postMergeHeader→poSHeader — align 7 identifiers with BlockHeader.isPoS/isPoW vocabulary
+- **What:** 7 identifier renames across 3 files. `TransitionBlockHeaderValidator`: `preMergeValidator` → `poWValidator` (field + 2 call sites). `EthSimulateService`: `isPreMerge` → `isPoW` (local val + condition). `BlockExecutionSpec`: `postMergeHeader` → `poSHeader` (2 occurrences).
+- **Why:** These local vals/methods described the *consensus type of a block* (PoW vs PoS) using ETH-Merge event language. `§NAMING-A` (`35db7dc61`) established the `isPoS`/`isPoW` vocabulary from `BlockHeader.scala:85-86`; this follow-up aligns the remaining 7 identifiers that were deferred at the time.
+- **Preserved:** `postMerge`/`preMerge` in comments, `ETH69OscillationChainWeightSpec` (historical ETC mining event), and all `ethereum-tests` canonical identifiers — unchanged.
+- **Tests:** `testOnly *BlockExecution*` — 15/15 pass. No dedicated specs for `TransitionBlockHeaderValidator` or `EthSimulateService`.
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §NAMING-MICRO`, `§NAMING-INV` (audit that sourced the list), `api/jsonrpc.md`
+
+---
+
 ## Open
 
 - `Ordering.Iterable` deprecation warning — BEACON gate

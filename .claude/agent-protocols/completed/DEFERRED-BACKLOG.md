@@ -2350,3 +2350,40 @@ require(
 **Pre-existing failure noted:** `FastSyncSpec "returns Syncing when pivot block is selected..."` — `SyncStateSchedulerActor$NetworkIncompatible$ cannot be cast to FastSync$Command` — confirmed pre-existing by git-stash baseline check. Not introduced by §8k-N.
 
 **Cross-refs:** `sync/controller.md §8k-N`, `working-docs/DEFERRED-BACKLOG.md J1 (strikethrough)`
+
+---
+
+## §NAMING-INV — SUPERSEDED (2026-06-25)
+
+**Status:** Investigation complete; full rename not pursued. Replaced by §NAMING-MICRO (7 identifiers only).
+
+**What was audited:** All "merge"-related identifiers across `src/**/*.scala` (~100+ grep hits).
+PRISM classified each into four categories:
+- **Category A** (rename to PoW/PoS): ~100 occurrences — almost entirely **comments**. Renaming comments across 40+ files produces a massive diff with zero behavioral change and maximum merge-conflict risk. Not worth a dedicated sprint item.
+- **Category B** (keep — historical ETH Merge mining event): `mergePeak`, `mergeSpike`, `mergeSpikeParent`, `premergeBaseline` and associated test names in `ETChashDifficultyManipulationSpec.scala`, `OscillationFixtures.scala`, `ETH69OscillationChainWeightSpec.scala`. These describe ETC's Sept 2022 hashrate spike caused by GPU miners exiting ETH post-Merge — accurate historical domain facts; renaming destroys meaning.
+- **Category C** (protocol constant — not renamed): `mergeNetsplitBlockNumber` in `BlockchainConfig.scala`. Renaming the HOCON key `merge-netsplit-block-number` would be a breaking operator config change with no migration path. Deferred indefinitely.
+- **Category D** (do not rename — external identifiers): `"Merge"` ETH test suite directory, `mergeExample.json` canonical test filename, `case "merge" | "paris" | "themerge"` fork name strings in `TestConverter.scala`.
+
+**What was kept:** 7 genuine identifier renames (production local vals and method names, not comments) were extracted and promoted to §NAMING-MICRO in the active backlog for opportunistic inline application.
+
+**§NAMING-B disposition:** Cancelled. A full-codebase comment rename pass was not justified by the value delivered. The approved rename map lives in this archive entry for reference.
+
+---
+
+## §NAMING-MICRO — COMPLETE (2026-06-25)
+
+**Agent:** MITHRIL
+**Commit:** `440896c4e` on `scala3-cleanup-june`
+**Status:** DONE — 7 identifier renames applied, compile clean, 15/15 tests pass.
+
+**What was done:** Applied the 7 genuine PoW/PoS identifier renames across 3 files:
+
+- `TransitionBlockHeaderValidator.scala`: `preMergeValidator` → `poWValidator` (field + 2 call sites)
+- `EthSimulateService.scala`: `isPreMerge` → `isPoW` (local val + condition)
+- `BlockExecutionSpec.scala`: `postMergeHeader` → `poSHeader` (2 occurrences)
+
+No Category B (historical ETC mining event) or Category D (canonical ethereum-tests) identifiers were touched.
+
+**Verification:** `sbt compile-all` — 0 errors. `testOnly *BlockExecution*` — 15/15 pass. No dedicated specs exist for `TransitionBlockHeaderValidator` or `EthSimulateService`; covered by integration paths. `sbt scalafmtAll` — clean.
+
+**Cross-ref:** `§NAMING-INV` (2026-06-25) sourced the 7-identifier list.

@@ -96,6 +96,13 @@
 
 ---
 
+## §NAMING-MICRO (partial) — EthSimulateService.scala (2026-06-25)
+
+#### `440896c4e` — `isPreMerge` → `isPoW` in `EthSimulateService.scala` (local val + condition, ~line 351/355)
+- **Cross-refs:** `consensus/engine.md §NAMING-MICRO` for full entry; `completed/DEFERRED-BACKLOG.md §NAMING-MICRO`
+
+---
+
 ## Open / Deferred
 
 - json4s Manifest synthesis warnings (68 hits) — externally gated on json4s 4.2.0-M5 release
