@@ -78,4 +78,4 @@ Source: `§8k-R1` audit complete 2026-06-23 — `.local/docs/classic-interop-aud
 | ~~**§8k-G2**~~ | ~~Cluster E immediate cohort: FastSync + NPMA spawn-site `.toClassic` (constructor param lift)~~ | ~~PRISM+MITHRIL~~ | ~~4~~ | ✅ ABSORBED by §8k-G3/G4 — Cluster E fully done |
 | ~~**§8k-H**~~ | ~~PeerActor `watchWith` — remove `context.toClassic.parent` sends (Clusters G+H)~~ | ~~MITHRIL~~ | ~~8~~ | ✅ DONE `222623960` — docs `53edef1b9` |
 | ~~**§8k-I**~~ | ~~NodeBuilder 3 Classic bridge actors → callers use Typed ask (Cluster J)~~ | ~~MITHRIL~~ | ~~21~~ | ✅ DONE `4613e398f` — docs `b5f47116c` |
-| **§8k-B** | Post-CAPSTONE: verify TCP floor (4 bridges), delete adapter imports | PRISM | — | §8k-I + CAPSTONE |
+| **§8k-B** | Post-CAPSTONE: verify TCP floor (7 calls / 5 lines), delete adapter imports | PRISM | — | ~~§8k-Q~~ ✅ + CAPSTONE |

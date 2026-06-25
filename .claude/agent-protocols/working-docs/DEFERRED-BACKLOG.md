@@ -139,12 +139,9 @@ Pekko migration sprint (actor files will also be touched by GivenUsing).
 
 ### 3b — implicit class → extension methods — DONE `c0a3612b4` — see `completed/DEFERRED-BACKLOG.md`
 
-### 3c — isInstanceOf / asInstanceOf audit
+### 3c — isInstanceOf / asInstanceOf audit ✅ DONE 2026-06-22 — see `completed/DEFERRED-BACKLOG.md`
 
-**Count**: 83 instances across network decoders and JSON-RPC marshalling
-**Risk**: MODERATE — bypasses type safety
-**Approach**: `grep -rn "isInstanceOf\|asInstanceOf" src/main/ --include="*.scala"`
-Audit hot paths; replace with pattern matching / algebraic data types.
+1 site fixed (`7cc9eda3a`); remaining 82 are intentional (JSON-RPC marshalling, network decoders — pattern matching replacements not safe without full type analysis).
 
 ### 3d — sealed trait → enum (recommended polish — elevated)
 
@@ -169,15 +166,25 @@ grep -rn "SyncProtocol\.SyncStatus\|sealed.*SyncStatus\|case object.*SyncStatus"
 ```
 If all subtypes are pure `case object` (no fields, no methods, no constructor params): migrate to `enum` in the same commit pattern as `SyncPhase` (`adf4e69ea`). If any subtype has fields → reject (add ❌ REJECTED note here). This is a 5-minute check + 15-minute migration if confirmed. Handle opportunistically when already in `sync/` files.
 
+**Prompt:**
+> Use the MITHRIL agent. Check if `SyncProtocol.SyncStatus` qualifies for enum migration:
+> ```bash
+> grep -rn "SyncProtocol\.SyncStatus\|sealed.*SyncStatus\|case object.*SyncStatus\|case class.*SyncStatus" \
+>   src/main/ --include="*.scala"
+> ```
+> If ALL subtypes are pure `case object` (no fields, no constructor params, no non-trivial methods):
+> migrate the sealed trait hierarchy to `enum`, following the commit pattern from `adf4e69ea`
+> (SyncPhase / ForkIdValidationResult).
+> If any subtype has fields or constructor params: add `❌ REJECTED` note to §3d residual and stop.
+> `sbt compile-all` to verify. One commit: `style(3d): SyncProtocol.SyncStatus → enum`
+
 ### 3g — StateValidator.scala Exception Swallowing — DONE 2026-06-20 — see `completed/DEFERRED-BACKLOG.md`
 
 ---
 
-### 3e — Console output → logging
+### 3e — Console output → logging ✅ COMPLETE `c3fec6390` 2026-06-22 — see `completed/DEFERRED-BACKLOG.md`
 
-**Count**: 28 `println`/`System.out`/`System.err` calls
-**Priority**: Opportunistic — fix when already touching a file.
-**Replace with**: `ctx.log.info(...)` (Typed actors) or SLF4J logger.
+12 sites fixed (3 files); 8 intentional CLI/TUI calls preserved.
 
 ### 3f — Manual synchronization outside actors
 
@@ -496,20 +503,9 @@ Partial progress (C2) is safe to run any time.
 
 ---
 
-### 8f — Dead Code Audit (Broader than extvm) ✅ RESEARCH DONE (2026-06-22) — see `completed/DEFERRED-BACKLOG.md`
+### 8f — Dead Code Audit (Broader than extvm) ✅ COMPLETE — see `completed/DEFERRED-BACKLOG.md`
 
-**FastSyncBranchResolverActor** ✅ WIRED `ea60c4f29` — see completed.
-
-**Deletion sprint open** (4 high-confidence candidates in CHASE-QUEUE.md DEAD entries 2026-06-22):
-- Test helpers with `@Ignore` annotations (56 occurrences in tests) — audit which are permanently dead
-
-**Output**: `dead-code-audit.md` — file list, confidence level (definitely dead / possibly dead / uncertain).
-Each "definitely dead" file gets a deletion PR.
-
-**Gate**: None — standalone sweep any sprint.
-**Parallel-safe**: YES — research only. File-by-file deletion commits are lightweight.
-**Priority**: LOW — cleanup only, no functional impact.
-**Agent**: PRISM (8-lens review of findings) + FORGE (for any files in consensus/).
+Research DONE 2026-06-22. Deletion sprint DONE: `fa57df9b9` (MetricsAlreadyConfiguredError + LocalVM + AdaptiveSyncStrategy), `c6b3da4cb` (DeltaSpikeGauge), `ff2fc219c` (StaticNodesLoader). Branch-wide audit confirmed no further candidates.
 
 ---
 
@@ -575,6 +571,21 @@ touching the code and understand the invariants).
 **Parallel-safe**: YES — individual property test additions are file-scoped.
 **Priority**: MEDIUM — catches codec correctness bugs that unit tests miss.
 **Agent**: EYE (test validation) + HERALD (for wire-protocol message codecs).
+
+**Prompt:**
+> Use the HERALD agent (EYE for non-wire tests). Add missing property-based round-trip tests:
+> 1. ETH68/69/70 message types added in recent wire protocol work — check each for
+>    `forAll { msg => decode(encode(msg)) == msg }` coverage:
+>    ```bash
+>    grep -rn "Eth6[89]\|Eth70\|ReceiptsMessage\|BlockBodiesMessage\|BlockHeadersMessage" \
+>      src/test/ --include="*.scala"
+>    ```
+> 2. SNAP protocol messages: confirm `AccountRangePacket`, `StorageRangesPacket`,
+>    `ByteCodesPacket` are fuzz-tested with empty ranges, max-size inputs, malformed keys
+> 3. Cryptographic operations: verify `keccak256`, `recoverPublicKey` have property coverage
+> For each gap: add a `forAll` property test in the nearest existing spec file.
+> `sbt testOnly *<SpecName>*` after each addition. One commit per codec group:
+> `test(8h): property-based round-trip tests for <codec>`
 
 ---
 
@@ -650,7 +661,7 @@ slower than dev machine → timeouts). `@Ignore` annotations silently hide untes
 
 ---
 
-#### §8k-J — PRISM: Re-run TCP floor verification after CAPSTONE ✅ DONE 2026-06-25
+#### §8k-J — PRISM: Re-run TCP floor verification after CAPSTONE — AUDIT COMPLETE; §8k-B READY (§8k-Q ✅ DONE)
 
 **Commit:** `<docs-only>` (net zero code changes — see below)
 **Executed:** Post-CAPSTONE (all phases 2a-2g merged) + post-§8k-K (`a6b0304e7`).
@@ -713,59 +724,58 @@ No regressions vs §8k-B sweep.
 
 **Step 5 — testEssential:** Not run — net zero code change; `sbt compile-all` confirmed clean.
 
-#### §8k-Q — LOOM: SyncStateSchedulerActor Typed migration (fixes FastSyncSpec "returns Syncing" + completes §8k-O 5th site)
+---
 
-**Agent:** LOOM
-**Risk:** MEDIUM — SyncStateSchedulerActor is a child of FastSync; migrating its constructor and command ADT touches FastSync's spawn site, SyncSession setup, and the reply-to chain back to FastSync.
-**Gate:** None — standalone. §8k-O left `fastSyncClassicSelf` in place specifically for this actor; §8k-Q is the planned continuation.
+#### §8k-B — PRISM: TCP floor cleanup + adapter import removal (recurring checkpoint)
 
-**Background:**
-`SyncStateSchedulerActor` is the last Classic-signature actor spawned by FastSync. Its constructor accepts
-`parentRef: ClassicActorRef` and its commands carry `replyTo: ClassicActorRef`:
-```
-StartSyncingToCmd(replyTo: ClassicActorRef)
-RestartRequestedCmd(replyTo: ClassicActorRef)
-```
-Because SSA sends messages back to `fastSyncClassicSelf` (the Classic projection of FastSync's `pivotResultAdapter`),
-a `ClassCastException` occurs at runtime: `SyncStateSchedulerActor$NetworkIncompatible$ cannot be cast to FastSync$Command`.
-This causes the `FastSyncSpec` "returns Syncing when pivot block is selected and started fetching data" test to time out at 60s — the pivot is selected, but the `Syncing` status is never published because SSA's reply goes missing.
+**Agent:** PRISM
+**Status:** READY — §8k-Q ✅ DONE (`c4392fe87`, `f3b9fb04c` 2026-06-25)
+**Gate:** None — `fastSyncClassicSelf` deleted; bridges now 19.
 
-Two outcomes on completion:
-1. `fastSyncClassicSelf` (§8k-O's 5th deferred site) can be deleted — `SyncStateSchedulerActor` will hold a `TypedActorRef[FastSync.Command]` directly.
-2. The pre-existing `FastSyncSpec` timeout resolves.
+**This sprint is a recurring checkpoint — re-run after each Primary Track migration completes
+(SNAP1 → BlockImporter LOOM → PEB migration), not just once.**
 
-**Steps:**
+**Current state (live count 2026-06-25):**
+- Real code bridges: **20 grep lines** (26 raw − 6 scaladoc comment noise)
+- **Permanent TCP floor: 5 grep lines = 7 actual `.toClassic` calls**
+  - `ServerActor.scala:70,77` — 2 calls (TCP bind)
+  - `RLPxConnectionHandler.scala:323` — 1 call (TCP write ack)
+  - `PeerManagerActor.scala:584` — 2 calls on one line (`peer.ref.toClassic` + `peerEventAdapter.toClassic`)
+  - `PeerManagerActor.scala:622` — 2 calls on one line (`peer.ref.toClassic` + `peerEventAdapter.toClassic`)
+- **Eliminatable: 15 code bridges** — see §8k-J cluster table above
 
-1. **Run LOOM pre-migration checklist on SyncStateSchedulerActor:**
-   ```bash
-   grep -n "sender()\|context\.become\|timers\|ActorRef\b" \
-     src/main/scala/com/chipprbots/ethereum/blockchain/sync/fast/SyncStateSchedulerActor.scala
-   grep -n "SyncStateSchedulerActor" \
-     src/main/scala/com/chipprbots/ethereum/blockchain/sync/fast/FastSync.scala
-   ```
+**Bridge reduction path:**
 
-2. **Audit the Command ADT** — map every `parentRef ! Msg(...)` send site in SSA to the FastSync command it should become (`TypedActorRef[FastSync.Command]` or a narrower reply type). Candidates: `NetworkIncompatible`, `StatsSyncUpdate`, and any others.
+| Gate | Bridges freed | After |
+|------|--------------|-------|
+| ~~§8k-Q~~ ✅ | 1 — FastSync:180 `fastSyncClassicSelf` | **19 remaining** |
+| SNAP1 | 4 — BytecodeRecovery:199, SSC:555, StorageRecovery:229, SyncController:2079 | 10 |
+| BlockImporter LOOM survey | 2 — BlockImporter:207, :214 | 8 |
+| PEB migration | 4 — PeerEventBusActor:42, NodeBuilder:419/:1009, PeerRequestHandler:78 | 4 |
+| PivotBlockSelector cleanup | 2 — PivotBlockSelector:418, :579 | 2 |
+| CHASE-QUEUE (NPMA redesign) | 1 — SyncController:1668 | 1 |
+| AkkaTaskOps redesign | 1 — AkkaTaskOps:37 | 0 → **TCP floor = 7 calls** |
 
-3. **Migrate SSA to `Behavior[Command]`** — replace `parentRef: ClassicActorRef` with `replyTo: TypedActorRef[FastSync.Command]` (or a sealed trait if only a subset of commands flow back). Follow `pekko-typed-api.md` P1–P16.
+**Run after each Primary Track sprint above:**
 
-4. **Update FastSync's spawn site** (`initSyncSession`): drop `.toClassic` (already eliminated in §8k-O for the storageActor; SSA spawn is the remaining one). Pass `ctx.self` (Typed) instead of `fastSyncClassicSelf`.
-
-5. **Delete `fastSyncClassicSelf`** — once SSA no longer needs it, the definition on line ~186 of `FastSync.scala` has no remaining callers. Delete it and remove the `import org.apache.pekko.actor.ActorRef` if it was the last Classic `ActorRef` usage.
-
-6. **Update `SyncStateSchedulerActorSpec`** (if it exists) — replace `TestProbe` with Pekko Typed probes.
-
-**Verify:**
 ```bash
-sbt compile-all
-sbt "testOnly *FastSyncSpec* *SyncStateScheduler*"
-```
-`FastSyncSpec "returns Syncing when pivot block is selected and started fetching data"` **must pass** — this is the acceptance gate for this task.
+# Step 1 — Re-run real bridge census (exclude scaladoc noise):
+grep -rn "\.toClassic\b" src/main/ --include="*.scala" | grep -v "//" | grep -v "^\s*\*" | wc -l
+# Current: 19 (dropped from 20 after §8k-Q deleted FastSync:180)
 
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. One commit for SSA migration + FastSync spawn site update
-3. One commit for `fastSyncClassicSelf` deletion (Bucket A — mechanical removal)
-4. **DELETE §8k-Q when FastSyncSpec test passes and `fastSyncClassicSelf` is gone**
+# Step 2 — For each file whose ONLY .toClassic usage was just eliminated,
+# attempt adapter import removal:
+#   Remove: import org.apache.pekko.actor.typed.scaladsl.adapter._
+#   Then: sbt compile-all
+#   Keep if compile fails; delete if clean.
+
+# Step 3 — Commit any removals:
+git commit -m "chore(8k-B): remove adapter imports post-<sprint> — <N> files cleaned, bridges: <before>→<after>"
+
+# Step 4 — Update §8k-J cluster table with new bridge count and gate status.
+```
+
+**TCP floor target: 7 calls (5 grep lines)** — not 4. PeerManagerActor:584 and :622 each contain two `.toClassic` calls on one line.
 
 ---
 
@@ -880,9 +890,9 @@ Each prompt can run independently. Commit individually.
 | ~~J1~~ | ~~Batch J~~ | ~~**§8k-N** — MITHRIL: SyncController catch-all bridge elimination (10 sites) — all target actors already Typed; audit each catch-all arm, extend ADTs or handle explicitly, replace `.toClassic.tell`~~ | ✅ DONE `35db7dc61` (2026-06-25) |
 | ~~J2~~ | ~~Batch J~~ | ~~**§8k-O** — MITHRIL: FastSync `fastSyncClassicSelf` + PivotBlockSelector/StateStorageActor bridge elimination (5 sites)~~ | ✅ DONE `fc5a3f8e7` (2026-06-25) — 4/5 sites; `fastSyncClassicSelf` remains pending SyncStateSchedulerActor migration |
 | ~~J3~~ | ~~Batch J~~ | ~~**§8k-P** — MITHRIL: PeerEventBusActor caller narrowing — update `peerEventBus: ActorRef` → `TypedActorRef[PEB.Command]` across ~15 constructors; enables adapter import removal in 22+ files~~ | ✅ DONE (2026-06-25) |
-| J4 | Batch J | **§8k-Q** — LOOM: SyncStateSchedulerActor Typed migration — fixes `FastSyncSpec "returns Syncing"` ClassCastException + deletes `fastSyncClassicSelf` (§8k-O 5th site) | YES — standalone; unblocks after §8k-O |
-| I1 | ETH Sprint (unblocked) | ~~**§ETH-T1-A**~~ ✅ ed4db9df9 · ~~**§ETH-T1-B**~~ ✅ 6f8f74708 · ~~**§ETH-T2-A**~~ ✅ c470b3dac + 35db7dc61 (§NAMING-A) · ~~**§ETH-T4-A**~~ ✅ 02aaa05fc KZG trusted setup · ~~**§ETH-T4-C**~~ ✅ b934caffe EIP-4788 beacon roots bytecode · ~~**§ETH-T4-D**~~ ✅ f6cf7fb9c blob base fee unification · **§ETH-T6-A** VM tracer try/finally · **§ETH-T6-B** EIP-2681 nonce-max · **§ETH-T7-A** `EvmConfigTimestampForkSpec` · **§ETH-T7-C** `EngineApiVersionRejectionSpec` · **§ETH-T7-D** `BlockRangeUpdateDecodePathSpec` | Partial — each standalone |
-| I2 | ETH Sprint (gated) | ~~**§ETH-T4-B**~~ ✅ maxFeePerBlobGas validation · **§ETH-T7-B** `Eip4788BeaconRootStorageSpec` · ~~**§ETH-T1-C**~~ ✅ `89863ac80` · ~~**§ETH-T9-A**~~ ✅ · ~~**§ETH-T9-B**~~ ✅ `4ac7e2842` · ~~**§ETH-T9-C**~~ ✅ false positive · ~~**§ETH-T9-D**~~ ✅ SNAP sync ETH paths · ~~**§ETH-T10-A**~~ ✅ `b131a5ec7` · **§ETH-T10-B/C/D** Engine API Osaka edge cases | NO — run after I1 items; gate conditions above |
+| ~~J4~~ | ~~Batch J~~ | ~~**§8k-Q** — LOOM: SyncStateSchedulerActor Typed migration — fixes `FastSyncSpec "returns Syncing"` ClassCastException + deletes `fastSyncClassicSelf` (§8k-O 5th site)~~ | ✅ DONE `c4392fe87`/`f3b9fb04c` (2026-06-25) — 17/17 tests pass |
+| I1 | ETH Sprint (unblocked) | ~~**§ETH-T1-A**~~ ✅ ed4db9df9 · ~~**§ETH-T1-B**~~ ✅ 6f8f74708 · ~~**§ETH-T2-A**~~ ✅ c470b3dac + 35db7dc61 (§NAMING-A) · ~~**§ETH-T4-A**~~ ✅ 02aaa05fc KZG trusted setup · ~~**§ETH-T4-C**~~ ✅ b934caffe EIP-4788 beacon roots bytecode · ~~**§ETH-T4-D**~~ ✅ f6cf7fb9c blob base fee unification · ~~**§ETH-T6-A**~~ ✅ b696ve6b6 · ~~**§ETH-T6-B**~~ ✅ 525a1a911 · ~~**§ETH-T7-A**~~ ✅ ac0e25b62 · ~~**§ETH-T7-C**~~ ✅ 6e72ad2a0 · ~~**§ETH-T7-D**~~ ✅ c7cc5d131 | ✅ ALL DONE 2026-06-25 |
+| I2 | ETH Sprint (gated) | ~~**§ETH-T4-B**~~ ✅ maxFeePerBlobGas validation · ~~**§ETH-T7-B**~~ ✅ cb2e2aec1 · ~~**§ETH-T1-C**~~ ✅ `89863ac80` · ~~**§ETH-T9-A**~~ ✅ · ~~**§ETH-T9-B**~~ ✅ `4ac7e2842` · ~~**§ETH-T9-C**~~ ✅ false positive · ~~**§ETH-T9-D**~~ ✅ SNAP sync ETH paths · ~~**§ETH-T10-A**~~ ✅ `b131a5ec7` · ~~**§ETH-T10-B**~~ ✅ a40750ce6 · ~~**§ETH-T10-C**~~ ✅ 3bc71fe51 · ~~**§ETH-T10-D**~~ ✅ 364e395dc | ✅ ALL DONE 2026-06-25 |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
 
@@ -997,464 +1007,36 @@ Thread 3 (EIP-1559 fee routing) audited: functionally CORRECT — ETH base fee i
 
 ---
 
-### §ETH-T6-A — BEACON: VM.scala tracer try/finally hardening
-
-**Agent:** BEACON
-**Risk:** LOW — no behaviour change on the happy path; only affects exceptional/unreachable abort
-paths that currently skip `onCallExit`. ETC execution is identical (ETC uses the same `VM.scala`).
-**Gate:** None — standalone fix, no sprint prerequisite
-**Files:** `src/main/scala/com/chipprbots/ethereum/vm/VM.scala` — `call()` (lines 55-104) and
-`create()` (lines 120-208)
-
-**Background (Thread 6 of the ETH/Sepolia assumption audit, 2026-06-24):**
-
-The Thread 6 audit found that `call()` and `create()` use a `val result = if/else` expression
-pattern where `onCallEnter` fires at the top and `onCallExit` fires unconditionally after the
-if/else. This is correct and balanced for every currently-reachable path. However, three defensive
-guards (`require`/`throw`) are placed inside the if/else and can throw past the trailing `onCallExit`:
-
-| # | Location | Guard | Reachable from opcode dispatch? |
-|---|----------|-------|---------------------------------|
-| C2 | `VM.create()` line 133 | `require(recipientAddr.isEmpty)` | NO — `CreateOp.exec` always passes `None` |
-| C3 | `VM.create()` line 134 | `require(doTransfer)` | NO — `CreateOp.exec` always passes `true` |
-| L2 | `VM.call()` line 71-73 | `throw IllegalArgumentException` | NO — `CallOp.exec` always passes `Some(toAddr)` |
-
-These are the **same class of structural hole** as the §8l-I bug (EIP-3860 unbalanced path) but
-are currently unreachable through normal sub-call opcode dispatch. The structural fix is to move
-`onCallExit` into a `finally` block, making "every enter has an exit" true **by construction**.
-This matches Besu's `traceContextExit` guarantee and also closes C9/L6 (unexpected `exec()` throw).
-
-**Steps:**
-
-1. **Read** `VM.scala` lines 55-104 (`call()`) and 120-208 (`create()`) in full — confirm exact
-   line numbers of `tracer.foreach(_.onCallEnter(...))`, the result `val`, and the trailing
-   `tracer.foreach(_.onCallExit(...))` in each method.
-
-2. **In `call()` — wrap result computation in try/finally:**
-   ```scala
-   // BEFORE (simplified):
-   if isSubCall then tracer.foreach(_.onCallEnter(...))
-   val result = if !isValidCall then invalidCallResult else { ... }
-   if isSubCall then tracer.foreach(_.onCallExit(...))
-   result
-
-   // AFTER:
-   if isSubCall then tracer.foreach(_.onCallEnter(...))
-   val result =
-     try
-       if !isValidCall then invalidCallResult else { ... }
-     finally
-       if isSubCall then tracer.foreach(_.onCallExit(...))
-   result
-   ```
-   Remove the standalone trailing `if isSubCall then tracer.foreach(_.onCallExit(...))` line.
-
-3. **In `create()` — same pattern** for the `val (result, newAddress) = ...` binding.
-   Remove the standalone trailing `onCallExit` line.
-
-4. **Confirm §8l-I fix is preserved** — the EIP-3860 check (lines 136-142) returns a value
-   inside the `try` block; it does NOT throw. The `finally` block fires after it. §8l-I is
-   structurally preserved; the wrapper additionally closes C2/C3/L2.
-
-5. **Write a targeted regression test** in the existing VM tracer test suite covering the latent
-   paths:
-   - `create()` called with `recipientAddr = Some(addr)` at sub-call depth → `require` fires
-     → verify `onCallExit` IS emitted (previously it was not)
-   - `call()` called with `recipientAddr = None` at sub-call depth → `throw` fires
-     → verify `onCallExit` IS emitted
-
-**Verify:**
-```bash
-sbt compile-all
-sbt "testOnly *VMTracer*" "testOnly *CallTracer*" "testOnly *VM*"
-sbt testVM
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add src/main/scala/.../vm/VM.scala` + test file(s)
-3. `git commit -m "fix(vm): wrap call()/create() result in try/finally — onCallExit always fires even on require/throw abort (closes C2/C3/L2 latent tracer paths)"`
-4. `SHA=$(git rev-parse --short HEAD)` → update `.local/docs/eth-sepolia-assumption-audit.md` Thread 6 entry with SHA
-5. **DELETE §ETH-T6-A**
+### §ETH-T6-A ✅ DONE `b696ve6b6` — see `completed/DEFERRED-BACKLOG.md`
 
 ---
 
-### §ETH-T6-B — BEACON: EIP-2681 nonce overflow enforcement at transaction layer
-
-**Agent:** BEACON
-**Risk:** LOW — nonce overflow is an extreme edge case (account nonce must reach 2^64 - 1);
-however, the absence of this check is a spec deviation vs go-ethereum (`ErrNonceMax`).
-Affects both ETC and ETH (same nonce semantics).
-**Gate:** None — standalone investigation; no sprint prerequisite
-**Files:**
-- `src/main/scala/com/chipprbots/ethereum/consensus/validators/std/StdSignedTransactionValidator.scala`
-- `src/main/scala/com/chipprbots/ethereum/domain/SignedTransaction.scala` (stateless mempool path)
-
-**Background (Thread 6 of the ETH/Sepolia assumption audit, 2026-06-24):**
-The VM tracer abort-path audit (Thread 6) confirmed that nonce overflow (EIP-2681, post-Berlin)
-is **not** enforced in the VM — it is a transaction-layer concern. EIP-2681 specifies that
-transactions from an account with nonce `>= 2^64 - 1` must be rejected at the validator boundary.
-go-ethereum enforces this with `ErrNonceMax` in `state_transition.go`. Fukuii's transaction
-validator was not checked for this guard during Thread 6 (VM-only scope). This entry tracks
-the transaction-layer investigation.
-
-**Steps:**
-
-1. **Search for nonce-max enforcement in Fukuii:**
-   ```bash
-   grep -rn "nonce\|Nonce" \
-     src/main/scala/com/chipprbots/ethereum/consensus/validators/std/StdSignedTransactionValidator.scala
-   grep -rn "NonceTooHigh\|ErrNonceMax\|nonce.*max\|nonce.*overflow\|nonce.*64" \
-     src/main/scala/ --include="*.scala"
-   ```
-
-2. **Compare against go-ethereum reference:**
-   ```bash
-   grep -n "NonceTooHigh\|ErrNonceMax\|nonce.*2\^64\|nonce.*overflow" \
-     /media/dev/2tb/dev/reference-clients-evm/go-ethereum/core/state_transition.go
-   ```
-
-3. **If the check is missing** — add nonce-max validation to `StdSignedTransactionValidator`
-   AND to the stateless mempool path (`SignedTransaction.getStatelessValidTransactions`):
-   ```scala
-   if tx.tx.nonce >= BigInt(2).pow(64) - 1 then
-     Left(TransactionError.NonceTooHigh(tx.tx.nonce))
-   else Right(())
-   ```
-   Add `NonceTooHigh` to the `TransactionError` sealed hierarchy if absent.
-
-4. **Confirm ETC safety** — ETC uses the same nonce semantics (uint64). The fix applies
-   to both chains equally; no chain-specific gating needed.
-
-5. **Write tests** covering:
-   - Nonce `== 2^64 - 2` → accepted
-   - Nonce `== 2^64 - 1` → rejected with `NonceTooHigh`
-   - Nonce `== 2^64` → rejected
-   - Normal nonce (< `2^64 - 1`) → unaffected
-
-**Verify:**
-```bash
-sbt compile-all
-sbt "testOnly *StdSignedTransactionValidator*"
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add src/main/scala/.../consensus/validators/std/StdSignedTransactionValidator.scala` + any error ADT files + test files
-3. `git commit -m "fix(tx): enforce EIP-2681 nonce-max (>= 2^64-1) at transaction validator layer"`
-4. `SHA=$(git rev-parse --short HEAD)` → add SHA to `.local/docs/eth-sepolia-assumption-audit.md` Thread 6 entry
-5. **DELETE §ETH-T6-B**
+### §ETH-T6-B ✅ DONE `525a1a911` — see `completed/DEFERRED-BACKLOG.md`
 
 ---
 
-### §ETH-T7-A — BEACON: Add `EvmConfigTimestampForkSpec` — ETH fork transition tests MISSING
-
-**Agent:** BEACON
-**Risk:** LOW — new test file only; no production code changes
-**Gate:** None — standalone
-**Files:**
-- `src/test/scala/com/chipprbots/ethereum/vm/EvmConfigTimestampForkSpec.scala` (new file)
-- Reference: `src/test/scala/com/chipprbots/ethereum/consensus/OlympiaEipEnablementSpec.scala` (ETC analog)
-
-**Background (Thread 7, 2026-06-24):**
-Zero test files call `EvmConfig.forBlock(blockNumber, timestamp, config)` with ETH/Sepolia configs. `OlympiaEipEnablementSpec` provides the exact ETC analog — calls `forBlock` with ETC configs and asserts opcode presence/absence at fork boundaries. No ETH equivalent exists. A regression in `forTimestamp()` dispatch would be invisible to `testEssential`. CLZ opcode (Osaka, `0x1e`) has no unit test.
-
-**Steps:**
-1. **Read** `OlympiaEipEnablementSpec.scala` in full — understand the pattern: synthetic `BlockchainConfigForEvm` with specific fork timestamps, call `EvmConfig.forBlock(0L, timestamp, config)`, assert flags and opcode presence.
-2. **Read** `EvmConfig.scala:27-80` — confirm the 3-arg overload and what fork-specific flags/opcode sets are returned per timestamp.
-3. **Create** `EvmConfigTimestampForkSpec.scala` with `taggedAs(UnitTest, ConsensusTest)`. One `it` block per fork boundary:
-   - **Pre-Shanghai** (ts = 0): `eip3860Enabled = false`; PUSH0 (`0x5F`) absent
-   - **At Shanghai**: `eip3860Enabled = true`; PUSH0 present
-   - **At Cancun**: BLOBHASH (`0x49`) present; BLOBBASEFEE (`0x4A`) present; `isCancunTimestamp = true`
-   - **At Prague**: `isPragueTimestamp = true`; EIP-7623 calldata floor in fee schedule
-   - **At Osaka**: CLZ (`0x1e`) present; `isOsakaTimestamp = true`
-   - **ETC chain** (use ETC config, olympiaBlockNumber, no timestamps): `forTimestamp`-path returns Olympia config; no Shanghai/Cancun/Prague opcodes
-4. `sbt "testOnly *EvmConfigTimestampFork*"`
-
-**Verify:**
-```bash
-sbt compile-all
-sbt "testOnly *EvmConfigTimestampFork*"
-sbt testVM
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add src/test/scala/.../vm/EvmConfigTimestampForkSpec.scala`
-3. `git commit -m "test(eth): EvmConfigTimestampForkSpec — opcode presence at each ETH timestamp fork (T7-A)"`
-4. `SHA=$(git rev-parse --short HEAD)` → update `.local/docs/eth-sepolia-assumption-audit.md` Thread 7 entry
-5. **DELETE §ETH-T7-A**
+### §ETH-T7-A ✅ DONE `ac0e25b62` — see `completed/DEFERRED-BACKLOG.md`
 
 ---
 
-### §ETH-T7-B — BEACON: Add `Eip4788BeaconRootStorageSpec` — ring-buffer write untested (THIN)
-
-**Agent:** BEACON
-**Risk:** LOW — new test file only
-**Gate:** §ETH-T4-C complete (deploys EIP-4788 contract bytecode + nonce=1; tests should see the updated account)
-**Files:**
-- `src/test/scala/com/chipprbots/ethereum/ledger/Eip4788BeaconRootStorageSpec.scala` (new file)
-- Reference: `src/test/scala/com/chipprbots/ethereum/ledger/BlockHashHistorySpec.scala` (EphemBlockchainTestSetup pattern)
-
-**Background (Thread 7, 2026-06-24):**
-`applyEip4788` (`BlockExecution.scala:209-237`) writes two ring-buffer slots per block. The slot formula (`timestamp % 8192` and `timestamp % 8192 + 8192`), wrap-around at entry 8192, and the pre-Cancun guard are entirely untested. `BlockHashHistorySpec` uses `EphemBlockchainTestSetup`, executes real in-memory blocks, and reads storage directly — the identical infrastructure is needed here.
-
-**Steps:**
-1. **Read** `BlockHashHistorySpec.scala` in full — understand `EphemBlockchainTestSetup`, block construction with Cancun config, `world.getStorage(address, slot)` post-execution.
-2. **Read** `BlockExecution.scala:200-240` — confirm slot formula: timestamp-slot and timestamp-slot+8192 root slot.
-3. **Create** `Eip4788BeaconRootStorageSpec.scala` with `taggedAs(UnitTest, ConsensusTest)`:
-
-   **Case 1 — First post-Cancun block:**
-   - Execute a block at Cancun-activated timestamp with a specific `parentBeaconBlockRoot`.
-   - `slot = timestamp % 8192`
-   - Assert `world.getStorage(BEACON_ROOTS_ADDRESS, slot)` = `timestamp`
-   - Assert `world.getStorage(BEACON_ROOTS_ADDRESS, slot + 8192)` = `parentBeaconBlockRoot`
-
-   **Case 2 — Pre-Cancun block:**
-   - Execute pre-Cancun. Both storage slots → zero (empty).
-
-   **Case 3 — Wrap-around:**
-   - Execute block at `timestamp % 8192 = 8191`. Execute next block at `timestamp % 8192 = 0`.
-   - Verify slot 0 overwritten with new values; slot 8191 retains previous block's values.
-
-   **Case 4 — §ETH-T4-C contract deployment:**
-   - After first post-Cancun block: `world.getAccount(BEACON_ROOTS_ADDRESS).codeHash != EMPTY_CODE_HASH`
-   - `world.getAccount(BEACON_ROOTS_ADDRESS).nonce == 1`
-
-4. `sbt "testOnly *Eip4788BeaconRoot*"`
-
-**Verify:**
-```bash
-sbt compile-all
-sbt "testOnly *Eip4788BeaconRoot*"
-sbt testVM
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add src/test/scala/.../ledger/Eip4788BeaconRootStorageSpec.scala`
-3. `git commit -m "test(eth): Eip4788BeaconRootStorageSpec — slot formula, wrap-around, pre-Cancun guard, bytecode deploy check (T7-B)"`
-4. `SHA=$(git rev-parse --short HEAD)` → update audit doc Thread 7 entry
-5. **DELETE §ETH-T7-B**
+### §ETH-T7-B ✅ DONE `cb2e2aec1` — see `completed/DEFERRED-BACKLOG.md`
 
 ---
 
-### §ETH-T7-C — BEACON: Add `EngineApiVersionRejectionSpec` — version-mismatch guards untested (THIN)
-
-**Agent:** BEACON
-**Risk:** LOW — new test file only
-**Gate:** None — standalone
-**Files:**
-- `src/test/scala/com/chipprbots/ethereum/consensus/engine/EngineApiVersionRejectionSpec.scala` (new file)
-- Reference: `src/test/scala/com/chipprbots/ethereum/consensus/engine/EngineApiSpec.scala` (existing harness)
-
-**Background (Thread 7, 2026-06-24):**
-`EngineApiController.scala` has 5 version-mismatch rejection guards (version/fork envelope enforcement). They only fire under hive integration tests; no unit test exercises them. If a guard is broken a misconfigured CL can push wrong-version payloads silently.
-
-Guards to test:
-- `getPayloadV2` for a Cancun-era block → error `-38005`
-- `getPayloadV3` for a Shanghai-era block → error `-38005`
-- `getPayloadV1` for a Shanghai-era block → error `-38005`
-- `newPayloadV3` pre-Cancun → `InvalidParams`
-- `forkchoiceUpdatedV3` with non-zero `parentBeaconBlockRoot` before Cancun → `UnsupportedFork`
-
-**Steps:**
-1. **Read** `EngineApiController.scala:36-58` (dispatch table) and each `handleGetPayload`/`handleNewPayload`/`handleForkchoiceUpdated` version gate.
-2. **Read** `EngineApiSpec.scala` — understand how the controller is instantiated, how requests are built and dispatched in tests.
-3. **Create** `EngineApiVersionRejectionSpec.scala` with `taggedAs(UnitTest, ConsensusTest)`. One `it` block per guard (5 total):
-   - Build the appropriate payload/request type for each case.
-   - Call the controller method.
-   - Assert error code matches the expected value (`-38005` / `InvalidParams` / `UnsupportedFork`).
-4. `sbt "testOnly *EngineApiVersionRejection*"`
-
-**Verify:**
-```bash
-sbt compile-all
-sbt "testOnly *EngineApiVersionRejection* *EngineApi*"
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add src/test/scala/.../consensus/engine/EngineApiVersionRejectionSpec.scala`
-3. `git commit -m "test(eth): EngineApiVersionRejectionSpec — 5 version-mismatch guards now have unit coverage (T7-C)"`
-4. `SHA=$(git rev-parse --short HEAD)` → update audit doc Thread 7 entry
-5. **DELETE §ETH-T7-C**
+### §ETH-T7-C ✅ DONE `6e72ad2a0` — see `completed/DEFERRED-BACKLOG.md`
 
 ---
 
-### §ETH-T7-D — HERALD: Add `BlockRangeUpdateDecodePathSpec` — ETH69 decode path untested (MISSING)
-
-**Agent:** HERALD
-**Risk:** LOW — new test file only; also clears a CHASE-QUEUE false-positive coverage item
-**Gate:** None — standalone
-**Files:**
-- `src/test/scala/com/chipprbots/ethereum/network/p2p/messages/BlockRangeUpdateDecodePathSpec.scala` (new file)
-- `src/main/scala/com/chipprbots/ethereum/network/PeerActor.scala` (malformed message path)
-- `src/main/scala/com/chipprbots/ethereum/sync/BlockFetcher.scala` (`withPossibleNewTopAt`)
-
-**Background (Thread 7, 2026-06-24):**
-`BlockFetcherSpec:298-305` appears to cover the `BlockRangeUpdate` inbound path but uses a stub that never feeds a decoded `ETHPackets.BlockRangeUpdate` into `BlockFetcher`. The real decode path — `PeerActor` feeds `BlockFetcher` — has no unit test. Two behaviors need coverage:
-1. Malformed bytes → `PeerActor` protocol-breach disconnect
-2. Valid `BlockRangeUpdate` → `BlockFetcher` calls `withPossibleNewTopAt`
-
-**Steps:**
-1. **Read** `PeerActor.scala` — find where `ETHPackets.BlockRangeUpdate` is decoded and handled; identify the protocol-breach disconnect path.
-2. **Read** `BlockFetcher.scala` — find `withPossibleNewTopAt` and what triggers it.
-3. **Read** `BlockFetcherSpec.scala:298-305` — confirm the stub and why the real path is missed.
-4. **Create** `BlockRangeUpdateDecodePathSpec.scala` with `taggedAs(UnitTest, NetworkTest)`:
-
-   **Case 1 — Malformed bytes → PeerActor disconnect:**
-   - Feed truncated/invalid bytes as `BlockRangeUpdate` wire payload into `PeerActor`'s inbound handler.
-   - Assert disconnect with `ProtocolBreachError` (or equivalent).
-
-   **Case 2 — Valid message → `withPossibleNewTopAt`:**
-   - Construct `ETHPackets.BlockRangeUpdate(lowestBlock=N, highestBlock=M)`.
-   - Feed into `BlockFetcher`'s inbound handler.
-   - Assert `withPossibleNewTopAt(M)` is called.
-
-5. Add a comment in `BlockFetcherSpec:298-305` pointing to this spec as the real coverage.
-
-**Verify:**
-```bash
-sbt compile-all
-sbt "testOnly *BlockRangeUpdate* *BlockFetcher*"
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add src/test/scala/.../network/p2p/messages/BlockRangeUpdateDecodePathSpec.scala`
-3. `git commit -m "test(net): BlockRangeUpdateDecodePathSpec — malformed disconnect + valid withPossibleNewTopAt (T7-D, clears CHASE-QUEUE false-positive)"`
-4. `SHA=$(git rev-parse --short HEAD)` → update audit doc Thread 7 entry; update CHASE-QUEUE `BlockRangeUpdate` entry
-5. **DELETE §ETH-T7-D**
+### §ETH-T7-D ✅ DONE `c7cc5d131` — see `completed/DEFERRED-BACKLOG.md`
 
 ---
 
-### §ETH-T7-E — HERALD: Add `ForkIdSepoliaSpec` — Sepolia CRC32 accumulation untested (MISSING)
-
-**Agent:** HERALD
-**Risk:** LOW — new test file only; regression here silently causes ALL Sepolia peers to disconnect at handshake
-**Gate:** None — standalone
-**Files:**
-- `src/test/scala/com/chipprbots/ethereum/network/ForkIdSepoliaSpec.scala` (new file)
-- Reference: existing `ForkIdSpec.scala` (ETC/Mordor ForkId tests — use same pattern)
-- Reference: `reference-clients-evm/go-ethereum/params/config.go` (`SepoliaChainConfig`, known checksums)
-
-**Background (Thread 7, 2026-06-24):**
-ForkId CRC32 accumulation is tested for ETC/Mordor but not for Sepolia. A regression in `forTimestamp`-based ForkId computation (wrong order, wrong timestamp used) would cause fukuii to compute an incorrect `ForkId`. Every incoming Sepolia peer would disconnect at ETH handshake with `ErrLocalIncompatibleOrStale`. This is silent — `testEssential` does not catch it.
-
-**Steps:**
-1. **Read** `ForkIdSpec.scala` — understand how `ForkId` is constructed and how CRC32 is accumulated for ETC.
-2. **Read** `reference-clients-evm/go-ethereum/params/config.go` — extract Sepolia's `SepoliaChainConfig` fork hashes at each checkpoint. Run:
-   ```bash
-   grep -n "Sepolia\|sepolia\|1735371\|1677557\|1706655" \
-     /media/dev/2tb/dev/reference-clients-evm/go-ethereum/params/config.go | head -30
-   ```
-3. **Read** Fukuii's Sepolia `BlockchainConfig` — confirm timestamp values match go-ethereum.
-4. **Create** `ForkIdSepoliaSpec.scala` with `taggedAs(UnitTest, NetworkTest)`. For each checkpoint, compute `ForkId(sepoliaConfig, block=N, timestamp=T)` and assert `checksum` equals the known go-ethereum value:
-   - Genesis (block 0, ts 0)
-   - At merge netsplit block (1,735,371)
-   - At Shanghai timestamp
-   - At Cancun timestamp
-   - At Prague timestamp
-   - At Osaka timestamp (if known in go-ethereum `upstream`)
-5. `sbt "testOnly *ForkIdSepolia*"`
-
-**Verify:**
-```bash
-sbt compile-all
-sbt "testOnly *ForkIdSepolia* *ForkId*"
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add src/test/scala/.../network/ForkIdSepoliaSpec.scala`
-3. `git commit -m "test(net): ForkIdSepoliaSpec — CRC32 at genesis, merge-netsplit, and 6 timestamp forks vs go-ethereum ground truth (T7-E)"`
-4. `SHA=$(git rev-parse --short HEAD)` → update audit doc Thread 7 entry
-5. **DELETE §ETH-T7-E**
+### §ETH-T7-E ✅ DONE `3d362be30` — see `completed/DEFERRED-BACKLOG.md`
 
 ---
 
-### §ETH-T10-C — BEACON: Explicit Osaka fork gate on `newPayloadV4` acceptance (LOW)
-
-**Agent:** BEACON
-**Risk:** LOW — correctness-neutral today (Prague gate fires correctly at Osaka timestamps); latent gap for Amsterdam V5 split
-**Gate:** ~~§ETH-T10-A complete (Osaka V5 context established)~~ ✅ `b131a5ec7` 2026-06-25
-**Files:**
-- `src/main/scala/com/chipprbots/ethereum/consensus/engine/EngineApiController.scala:192`
-- `src/main/scala/com/chipprbots/ethereum/consensus/engine/EngineApiService.scala:316`
-
-**Background (Thread 10, 2026-06-24):**
-`EngineApiService.scala:316` gates `executionRequests` verification on `isPragueTimestamp`. Since Osaka > Prague, `isPragueTimestamp` is `true` at Osaka timestamps — verification still fires, so the behaviour is currently correct. However, the controller's V4 dispatch at L192 accepts `executionRequests` for `version >= 4` without an explicit Osaka-aware fork window. go-ethereum explicitly lists `forks.Prague, forks.Osaka, BPO1-5` in NewPayloadV4 (`api.go:782`). Without an explicit Osaka gate, when Amsterdam introduces V5 a clean version split becomes harder (V4 remains valid for Prague+Osaka only, not Amsterdam+).
-
-**Steps:**
-1. **Read** `EngineApiController.scala:185-210` and `EngineApiService.scala:310-330` — understand the current fork gating logic.
-2. **Read** go-ethereum `api.go:767-795` — see how `checkFork(Prague, Osaka, BPO1-5)` is expressed for NewPayloadV4; compare against NewPayloadV5 (Amsterdam only).
-3. **Add** an explicit `isOsakaTimestamp`-aware acceptance window to `handleNewPayload` for V4: accept for `isPragueTimestamp || isOsakaTimestamp`, reject with `UnsupportedFork` for `isAmsterdamTimestamp` (when Amsterdam is defined). This is a no-op today (no Amsterdam timestamps defined) but documents the boundary.
-4. Update the `exchangeCapabilities` docstring/comment if one exists.
-5. **Write a test**: `newPayloadV4` at a Prague timestamp → accepted; `newPayloadV4` at a pre-Prague timestamp → rejected. (The Osaka case is the same as Prague — covered implicitly.)
-
-**Verify:**
-```bash
-sbt compile-all
-sbt "testOnly *EngineApi*"
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add` relevant files
-3. `git commit -m "fix(eth): explicit Osaka fork gate on newPayloadV4 — documents Prague+Osaka window, safe for future Amsterdam V5 split (T10-C)"`
-4. `SHA=$(git rev-parse --short HEAD)` → update audit doc Thread 10 entry
-5. **DELETE §ETH-T10-C**
+### §ETH-T10-C ✅ DONE `3bc71fe51` — see `completed/DEFERRED-BACKLOG.md`
 
 ---
 
-### §ETH-T10-D — BEACON: `validateRequests` ordering/empty-check at Engine API boundary (LOW)
-
-**Agent:** BEACON
-**Risk:** LOW — current check catches honest mismatches; this adds rejection of deliberately malformed CL input at the boundary, matching go-ethereum's `validateRequests`
-**Gate:** ~~§ETH-T10-A complete (V5 + requests context established)~~ ✅ `b131a5ec7` 2026-06-25
-**Files:**
-- `src/main/scala/com/chipprbots/ethereum/consensus/engine/EngineApiService.scala` (near L311-329 `executionRequests` handling)
-
-**Background (Thread 10, 2026-06-24):**
-go-ethereum's `validateRequests` (`api.go:1257`) rejects `executionRequests` entries that are:
-- Empty (`len(entry) < 2` — no type byte prefix)
-- Out-of-type-order or duplicate-type (type bytes must be strictly ascending)
-
-Fukuii's current check (`suppliedRequests != derivedRequests` at L317) catches honest CL/EL mismatches but won't produce go-ethereum's specific `InvalidParams` error for deliberately malformed-but-self-consistent request lists. This matters for hive `engine-prague` request-validation variants.
-
-**Steps:**
-1. **Read** go-ethereum `api.go:1257-1290` (`validateRequests`) — understand the length and strict-ascending-type-byte checks.
-2. **Read** `EngineApiService.scala:305-335` — find where `executionRequests` is received and validated.
-3. **Add pre-validation** before the existing mismatch check:
-   ```scala
-   // Reject empty request entries and non-strictly-ascending type bytes
-   val requestTypeBytes = executionRequests.map(_.headOption.getOrElse(0.toByte))
-   if executionRequests.exists(_.length < 2) then
-     return Left(InvalidParams("executionRequests entry too short — missing type prefix"))
-   if requestTypeBytes != requestTypeBytes.sorted.distinct then
-     return Left(InvalidParams("executionRequests type bytes must be strictly ascending"))
-   ```
-4. **Gate on post-Prague** — only apply when `isPragueTimestamp` (requests field only present Prague+).
-5. **Write tests**: malformed empty entry → `InvalidParams`; duplicate type byte → `InvalidParams`; correct ascending types → proceeds to mismatch check.
-
-**Verify:**
-```bash
-sbt compile-all
-sbt "testOnly *EngineApi*"
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add src/main/scala/.../consensus/engine/EngineApiService.scala` + test files
-3. `git commit -m "fix(eth): validateRequests — reject empty entries and non-ascending type bytes at Engine API boundary (T10-D)"`
-4. `SHA=$(git rev-parse --short HEAD)` → update audit doc Thread 10 entry; **update Part 1 warning table**: mark `EngineApiService.scala:661 Ordering.Iterable` DONE with SHA (the `@nowarn` or explicit-Ordering fix for line 661 should be committed in this same session — see Part 1 table)
-5. **DELETE §ETH-T10-D**
+### §ETH-T10-D ✅ DONE `364e395dc` — see `completed/DEFERRED-BACKLOG.md`
