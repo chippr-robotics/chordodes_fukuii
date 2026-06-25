@@ -152,3 +152,12 @@
 - **What:** Added `SyncMode` enum and `selectSyncMode(peerCount, snapCapablePeers, latencyMs, config)` pure function to `SyncController` companion object (`private[sync]`). Wired into `start()` replacing `doSnapSync`/`doFastSync` in the 5-branch match with `snapEnabled`/`fastEnabled`. Downgrade fires only when `peerCount > 0 && snapCapablePeers < 3`; startup (peerCount=0) stays optimistic. New `SyncStartupStrategySpec` (6 tests).
 - **Files:** `SyncController.scala`, `SyncStartupStrategySpec.scala` (new)
 - **Cross-refs:** `completed/DEFERRED-BACKLOG.md §9a`
+
+---
+
+## §8k-N: SyncController catch-all bridge elimination (2026-06-25)
+
+#### `35db7dc61` — §8k-N: eliminate all `.toClassic.tell` catch-all bridges from SyncController
+- **Files:** `sync/SyncController.scala`
+- **What:** All 10 `.toClassic.tell` bridge calls in catch-all arms eliminated. `runningPivotHeaderBootstrap` catch-all replaced with explicit typed arms for `StartRegularSyncBootstrapByHash` (full restart with incremented `bootstrapGeneration`), stale `PivotHeaderBootstrap.Completed`, `HealingImpossible`, `HandshakedPeers`, `CalibrateChainWeightFromPeer`, `isInternalMarker`, and terminal `log.warn`. `runningRecovery` terminal catch-all replaced with `log.warn` (all four SNAP response types already handled above). Dead `runningRegularSyncBootstrap` function removed (no spawn site; superseded by `runningPivotHeaderBootstrap`). Two remaining `.toClassic` refs (NPMA `RegisterSnapSyncController`) intentionally out of scope.
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8k-N`

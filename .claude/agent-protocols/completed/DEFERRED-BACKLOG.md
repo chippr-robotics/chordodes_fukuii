@@ -2319,3 +2319,34 @@ require(
 **VERIFY:** `sbt compile-all` → 0 errors, 67 pre-existing warnings. `sbt scalafmtAll` → 1 file reformatted.
 
 **Cross-refs:** `sync/snap.md §ETH-T9-D`, `.local/docs/eth-sepolia-assumption-audit.md` Thread 9
+
+---
+
+## §8k-N — MITHRIL: SyncController catch-all bridge elimination (10 sites) ✅ DONE 2026-06-25
+
+**Commit:** `35db7dc61` — 2026-06-25
+**Agent:** MITHRIL
+**Risk:** LOW — pure bridge elimination; no behaviour change on happy paths
+
+**What:** All 10 `.toClassic.tell` bridge calls inside `SyncController.scala` catch-all arms eliminated. Two remaining `.toClassic` refs (lines 1657, 2068) are `RegisterSnapSyncController` NPMA calls intentionally kept out of scope (NPMA requires Classic `ActorRef`).
+
+**Sites resolved (6 catch-all blocks, 10 bridge calls):**
+
+- **Sites 1–4** (runningSnapSync, runningFastSync, runningRegularSync, runningRecovery-healing, runningRecovery-serve): bridges to NPMA / FCM / SNAP response relay — replaced with typed adapters (`fcmAdapter`, `cwAdapter`, `snapRelayAdapter`, `handshakedPeersAdapter`) that were added in §8k-G4 cluster.
+
+- **Site 5 — `runningPivotHeaderBootstrap`:** `originalSnapSyncRef.toClassic.tell(msg, noSender)` replaced with explicit typed arms:
+  - `StartRegularSyncBootstrapByHash(headHash)` → full restart (stops `headerBootstrap`+`peersClient`, increments `bootstrapGeneration`, spawns new bootstrap)
+  - `PivotHeaderBootstrap.Completed(block, _)` → `log.debug` stale drop
+  - `SyncProtocol.HealingImpossible` → `log.debug` stale drop
+  - `HandshakedPeers` → `Behaviors.same` (arrive during bootstrap; accepted silently)
+  - `SyncProtocol.CalibrateChainWeightFromPeer` → `Behaviors.same` (calibration messages; no action needed during bootstrap)
+  - `isInternalMarker` guard → `Behaviors.same`
+  - terminal `other` → `log.warn`
+
+- **Site 6 — `runningRecovery` terminal catch-all:** legacy comment "Forward SNAP protocol responses to both active recovery actors" was dead — all four SNAP response types (`ByteCodesResponse`, `StorageRangesResponse`, `AccountRangeResponse`, `TrieNodesResponse`) already handled by explicit arms above. Bridge removed; replaced with `log.warn` for genuinely unexpected messages.
+
+**Dead code removed:** `runningRegularSyncBootstrap` function deleted (superseded by `runningPivotHeaderBootstrap` at §8k-G3; no spawn site).
+
+**Pre-existing failure noted:** `FastSyncSpec "returns Syncing when pivot block is selected..."` — `SyncStateSchedulerActor$NetworkIncompatible$ cannot be cast to FastSync$Command` — confirmed pre-existing by git-stash baseline check. Not introduced by §8k-N.
+
+**Cross-refs:** `sync/controller.md §8k-N`, `working-docs/DEFERRED-BACKLOG.md J1 (strikethrough)`
