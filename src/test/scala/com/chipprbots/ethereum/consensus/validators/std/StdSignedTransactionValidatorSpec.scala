@@ -304,4 +304,71 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers {
       case other => fail(s"Expected TYPE_3_TX_NOT_SUPPORTED TransactionSyntaxError, got: $other")
     }
   }
+
+  // ── §ETH-T6-B: EIP-2681 nonce overflow enforcement ──────────────────────────
+  //
+  // EIP-2681: nonces >= 2^64-1 must be rejected (incrementing would overflow uint64).
+  // go-ethereum enforces this with ErrNonceMax in state_transition.go.
+  // Applies to both ETC and ETH — nonce semantics are identical on both chains.
+
+  private val Eip2681MaxValidNonce: BigInt = BigInt(2).pow(64) - 2 // max accepted nonce
+  private val Eip2681OverflowNonce: BigInt = BigInt(2).pow(64) - 1 // first rejected nonce
+  private val Eip2681AboveNonce: BigInt = BigInt(2).pow(64) // one above
+
+  private def signedTxWithNonce(n: BigInt): SignedTransaction = SignedTransaction(
+    LegacyTransaction(
+      nonce = n,
+      gasPrice = BigInt("1000000000"),
+      gasLimit = BigInt("100000"),
+      receivingAddress = Some(Address(0xcafe)),
+      value = BigInt(0),
+      payload = ByteString.empty
+    ),
+    pointSign = 0x1b.toByte,
+    signatureRandom = realR,
+    signature = realS
+  )
+
+  it should "accept tx with nonce == 2^64-2 (max valid nonce per EIP-2681)" taggedAs (UnitTest, ConsensusTest) in {
+    implicit val cfg: BlockchainConfig = etcConfig
+    validate(signedTxWithNonce(Eip2681MaxValidNonce), baseHeader) match {
+      case Left(TransactionSyntaxError(msg)) if msg.contains("EIP-2681") =>
+        fail(s"nonce 2^64-2 must not be rejected by EIP-2681: $msg")
+      case _ => succeed
+    }
+  }
+
+  it should "reject tx with nonce == 2^64-1 (overflow boundary) with EIP-2681 TransactionSyntaxError" taggedAs (
+    UnitTest,
+    ConsensusTest
+  ) in {
+    implicit val cfg: BlockchainConfig = etcConfig
+    validate(signedTxWithNonce(Eip2681OverflowNonce), baseHeader) match {
+      case Left(TransactionSyntaxError(msg)) if msg.contains("EIP-2681") => succeed
+      case other => fail(s"Expected EIP-2681 TransactionSyntaxError, got: $other")
+    }
+  }
+
+  it should "reject tx with nonce == 2^64 (above overflow boundary) with EIP-2681 TransactionSyntaxError" taggedAs (
+    UnitTest,
+    ConsensusTest
+  ) in {
+    implicit val cfg: BlockchainConfig = etcConfig
+    validate(signedTxWithNonce(Eip2681AboveNonce), baseHeader) match {
+      case Left(TransactionSyntaxError(msg)) if msg.contains("EIP-2681") => succeed
+      case other => fail(s"Expected EIP-2681 TransactionSyntaxError, got: $other")
+    }
+  }
+
+  it should "enforce EIP-2681 nonce cap on ETH/Sepolia (same nonce semantics as ETC)" taggedAs (
+    UnitTest,
+    ConsensusTest
+  ) in {
+    implicit val cfg: BlockchainConfig = sepoliaConfig
+    val postShanghaiHeader = baseHeader.copy(unixTimestamp = ShanghaiTs + 1)
+    validate(signedTxWithNonce(Eip2681OverflowNonce), postShanghaiHeader) match {
+      case Left(TransactionSyntaxError(msg)) if msg.contains("EIP-2681") => succeed
+      case other => fail(s"Expected EIP-2681 TransactionSyntaxError on ETH, got: $other")
+    }
+  }
 }

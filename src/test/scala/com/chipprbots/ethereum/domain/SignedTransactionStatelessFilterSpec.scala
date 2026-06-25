@@ -120,4 +120,64 @@ class SignedTransactionStatelessFilterSpec extends AnyFlatSpec with Matchers {
     )
     SignedTransactionWithSender.getStatelessValidTransactions(Seq(callTx)) should have size 1
   }
+
+  // ── §ETH-T6-B: EIP-2681 nonce overflow in stateless mempool filter ───────────
+  //
+  // getStatelessValidTransactions must reject nonces >= 2^64-1 before ECDSA recovery.
+  // Applies to both ETC and ETH chains.
+
+  private def makeCallTxWithNonce(n: BigInt): SignedTransaction =
+    SignedTransaction(
+      tx = LegacyTransaction(
+        nonce = n,
+        gasPrice = BigInt("1000000000"),
+        gasLimit = BigInt(21000),
+        receivingAddress = Some(Address(0xcafe)),
+        value = BigInt(0),
+        payload = ByteString.empty
+      ),
+      pointSign = 0x1b.toByte,
+      signatureRandom = dummyR,
+      signature = dummyS
+    )
+
+  it should "admit tx with nonce == 2^64-2 in stateless filter (max valid, EIP-2681)" taggedAs (
+    UnitTest,
+    ConsensusTest
+  ) in {
+    implicit val cfg: BlockchainConfig = ethConfig
+    SignedTransactionWithSender.getStatelessValidTransactions(
+      Seq(makeCallTxWithNonce(BigInt(2).pow(64) - 2))
+    ) should have size 1
+  }
+
+  it should "reject tx with nonce == 2^64-1 in stateless filter (overflow boundary, EIP-2681)" taggedAs (
+    UnitTest,
+    ConsensusTest
+  ) in {
+    implicit val cfg: BlockchainConfig = ethConfig
+    SignedTransactionWithSender.getStatelessValidTransactions(
+      Seq(makeCallTxWithNonce(BigInt(2).pow(64) - 1))
+    ) shouldBe empty
+  }
+
+  it should "reject tx with nonce == 2^64 in stateless filter (above overflow boundary, EIP-2681)" taggedAs (
+    UnitTest,
+    ConsensusTest
+  ) in {
+    implicit val cfg: BlockchainConfig = ethConfig
+    SignedTransactionWithSender.getStatelessValidTransactions(
+      Seq(makeCallTxWithNonce(BigInt(2).pow(64)))
+    ) shouldBe empty
+  }
+
+  it should "reject nonce overflow in stateless filter on ETC (same nonce semantics)" taggedAs (
+    UnitTest,
+    ConsensusTest
+  ) in {
+    implicit val cfg: BlockchainConfig = etcConfig
+    SignedTransactionWithSender.getStatelessValidTransactions(
+      Seq(makeCallTxWithNonce(BigInt(2).pow(64) - 1))
+    ) shouldBe empty
+  }
 }

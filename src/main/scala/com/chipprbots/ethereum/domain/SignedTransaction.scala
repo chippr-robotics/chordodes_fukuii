@@ -626,6 +626,7 @@ object SignedTransactionWithSender {
         EvmConfig.forBlock(blockchainConfig.forkBlockNumbers.olympiaBlockNumber, latestTimestamp, blockchainConfig)
       else EvmConfig.forBlock(blockchainConfig.forkBlockNumbers.olympiaBlockNumber, blockchainConfig)
 
+    val eip2681NonceCap = BigInt(2).pow(64) - 2 // EIP-2681: nonces >= 2^64-1 rejected
     stxs.filter { stx =>
       val tx = stx.tx
       // 1. Chain ID validation for typed transactions (EIP-2930+)
@@ -637,6 +638,7 @@ object SignedTransactionWithSender {
         case _: LegacyTransaction            => true // validated in getSender
       }
       if !chainIdValid then false
+      else if tx.nonce > eip2681NonceCap then false // EIP-2681 nonce overflow
       else {
         // 2. Intrinsic gas validation — reject txs with gas below minimum
         val authListSize = tx match {

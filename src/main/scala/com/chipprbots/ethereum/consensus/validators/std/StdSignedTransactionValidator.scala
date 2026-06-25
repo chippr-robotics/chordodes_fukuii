@@ -165,8 +165,11 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
     val maxValue = BigInt(2).pow(8 * ValueLength) - 1
     val maxR = BigInt(2).pow(8 * ECDSASignature.RLength) - 1
     val maxS = BigInt(2).pow(8 * ECDSASignature.SLength) - 1
+    // EIP-2681: nonces >= 2^64-1 are invalid (incrementing would overflow uint64)
+    val eip2681NonceCap = BigInt(2).pow(64) - 2
 
     if nonce > maxNonceValue then Left(TransactionSyntaxError(s"Invalid nonce: $nonce > $maxNonceValue"))
+    else if nonce > eip2681NonceCap then Left(TransactionSyntaxError(s"EIP-2681: nonce $nonce >= 2^64-1"))
     else if gasLimit > maxGasValue then Left(TransactionSyntaxError(s"Invalid gasLimit: $gasLimit > $maxGasValue"))
     else if gasPrice > maxGasValue then Left(TransactionSyntaxError(s"Invalid gasPrice: $gasPrice > $maxGasValue"))
     else if value > maxValue then Left(TransactionSyntaxError(s"Invalid value: $value > $maxValue"))
