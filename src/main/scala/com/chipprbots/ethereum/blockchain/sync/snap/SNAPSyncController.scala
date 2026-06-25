@@ -41,6 +41,8 @@ import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.network.p2p.messages.SNAP
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
+import com.chipprbots.ethereum.consensus.engine.PostMergeBlockHeaderValidator
+import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 import com.chipprbots.ethereum.utils.Hex
@@ -2020,36 +2022,64 @@ private class SNAPSyncControllerImpl(
                 // Don't commit a pivot that peers are unlikely to serve.
                 startSnapSync()
               } else {
-                pivotBlock = Some(targetPivot)
-                stateRoot = Some(header.stateRoot)
-                appStateStorage
-                  .putSnapSyncPivotBlock(targetPivot)
-                  .and(appStateStorage.putSnapSyncStateRoot(header.stateRoot))
-                  .commit()
-                updateBestBlockForPivot(header, targetPivot)
+                // Gate on ETH/Sepolia only — ETC pivot headers use StdBlockHeaderValidator (PoW).
+                val pivotHeaderValid =
+                  if isPostMergeChain then {
+                    given bc: BlockchainConfig =
+                      com.chipprbots.ethereum.utils.Config.blockchains.blockchainConfig
+                    BlockHeader.validateFieldCount(header, bc) match {
+                      case Left(msg) =>
+                        ctx.log.error(
+                          "SNAP bootstrap pivot header field-count mismatch — aborting commit, restarting sync: {}",
+                          msg
+                        )
+                        false
+                      case Right(_) =>
+                        PostMergeBlockHeaderValidator.validateHeaderOnly(header) match {
+                          case Left(err) =>
+                            ctx.log.error(
+                              "SNAP bootstrap pivot header failed post-merge validation — aborting commit, restarting sync: {}",
+                              err
+                            )
+                            false
+                          case Right(_) => true
+                        }
+                    }
+                  } else true
 
-                SNAPSyncMetrics.setPivotBlockNumber(targetPivot)
+                if !pivotHeaderValid then startSnapSync()
+                else {
+                  pivotBlock = Some(targetPivot)
+                  stateRoot = Some(header.stateRoot)
+                  appStateStorage
+                    .putSnapSyncPivotBlock(targetPivot)
+                    .and(appStateStorage.putSnapSyncStateRoot(header.stateRoot))
+                    .commit()
+                  updateBestBlockForPivot(header, targetPivot)
 
-                ctx.log.info("=" * 80)
-                ctx.log.info("🎯 SNAP Sync Ready (from bootstrap)")
-                ctx.log.info("=" * 80)
-                ctx.log.info(s"Local best block: $localBestBlock")
-                ctx.log.info(s"Using bootstrapped pivot block: $targetPivot")
-                ctx.log.info(s"State root: ${header.stateRoot.toHex.take(16)}...")
-                ctx.log.info("=" * 80)
+                  SNAPSyncMetrics.setPivotBlockNumber(targetPivot)
 
-                if accountsComplete && storagePhaseComplete && bytecodePhaseComplete then {
-                  ctx.log.info("All data phases complete — skipping to state healing with fresh pivot")
-                  currentPhase = StateHealing
-                  startStateHealing()
-                } else {
-                  ctx.log.info(
-                    s"Beginning fast state sync with ${snapSyncConfig.accountConcurrency} concurrent workers"
-                  )
-                  currentPhase = AccountRangeSync
-                  startAccountRangeSync(header.stateRoot)
+                  ctx.log.info("=" * 80)
+                  ctx.log.info("🎯 SNAP Sync Ready (from bootstrap)")
+                  ctx.log.info("=" * 80)
+                  ctx.log.info(s"Local best block: $localBestBlock")
+                  ctx.log.info(s"Using bootstrapped pivot block: $targetPivot")
+                  ctx.log.info(s"State root: ${header.stateRoot.toHex.take(16)}...")
+                  ctx.log.info("=" * 80)
+
+                  if accountsComplete && storagePhaseComplete && bytecodePhaseComplete then {
+                    ctx.log.info("All data phases complete — skipping to state healing with fresh pivot")
+                    currentPhase = StateHealing
+                    startStateHealing()
+                  } else {
+                    ctx.log.info(
+                      s"Beginning fast state sync with ${snapSyncConfig.accountConcurrency} concurrent workers"
+                    )
+                    currentPhase = AccountRangeSync
+                    startAccountRangeSync(header.stateRoot)
+                  }
+                  syncing()
                 }
-                syncing()
               }
 
             case None =>
@@ -4250,6 +4280,29 @@ private class SNAPSyncControllerImpl(
       }
     }
     if deferForProbe then return
+
+    // Gate on ETH/Sepolia only — ETC pivot headers use StdBlockHeaderValidator (PoW).
+    if isPostMergeChain then {
+      given bc: BlockchainConfig = com.chipprbots.ethereum.utils.Config.blockchains.blockchainConfig
+      BlockHeader.validateFieldCount(newPivotHeader, bc) match {
+        case Left(msg) =>
+          ctx.log.error(
+            "SNAP pivot header field-count mismatch — aborting pivot commit: {}",
+            msg
+          )
+          return
+        case Right(_) => ()
+      }
+      PostMergeBlockHeaderValidator.validateHeaderOnly(newPivotHeader) match {
+        case Left(err) =>
+          ctx.log.error(
+            "SNAP pivot header failed post-merge validation — aborting pivot commit: {}",
+            err
+          )
+          return
+        case Right(_) => ()
+      }
+    }
 
     ctx.log.info(s"Pivot refreshed: block $oldPivot -> $newPivotBlock, root $oldRoot -> $newRoot")
 

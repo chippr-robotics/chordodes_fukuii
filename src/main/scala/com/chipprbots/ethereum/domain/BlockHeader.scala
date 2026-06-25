@@ -11,7 +11,9 @@ import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPSerializable
 import com.chipprbots.ethereum.rlp.encode as rlpEncode
 import com.chipprbots.ethereum.rlp.rawDecode
+import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteStringUtils
+import com.chipprbots.ethereum.utils.NetworkType
 
 import BlockHeader.HeaderExtraFields
 import BlockHeader.HeaderExtraFields.*
@@ -157,6 +159,24 @@ object BlockHeader {
     val rlpItemsWithoutNonce = baseFields ++ extraFieldsEncoded
     rlpEncode(RLPList(rlpItemsWithoutNonce*))
   }
+
+  /** Structural check: a decoded header's ExtraFields shape must be consistent with the fork timestamps active at its
+    * timestamp. ETC has no timestamp forks; this check is a no-op for ETC chains. Intended as an early, cheap gate
+    * before the full [[com.chipprbots.ethereum.consensus.engine.PostMergeBlockHeaderValidator]].
+    */
+  def validateFieldCount(header: BlockHeader, config: BlockchainConfig): Either[String, Unit] =
+    if config.networkType != NetworkType.ETH then Right(())
+    else if config.isCancunTimestamp(header.unixTimestamp) && header.blobGasUsed.isEmpty then
+      Left(
+        s"Cancun-era header at timestamp ${header.unixTimestamp} missing blobGasUsed " +
+          s"(RLP field count below 20 — expected HefPostCancun or HefPostPrague)"
+      )
+    else if config.isShanghaiTimestamp(header.unixTimestamp) && header.withdrawalsRoot.isEmpty then
+      Left(
+        s"Shanghai-era header at timestamp ${header.unixTimestamp} missing withdrawalsRoot " +
+          s"(RLP field count below 17 — expected HefPostShanghai+)"
+      )
+    else Right(())
 
   sealed trait HeaderExtraFields
   object HeaderExtraFields {

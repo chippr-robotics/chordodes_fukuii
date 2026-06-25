@@ -5,6 +5,7 @@ import org.apache.pekko.util.ByteString
 import org.slf4j.Logger
 
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError
+import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderUnexpectedError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
 import com.chipprbots.ethereum.consensus.validators.Validators
 import com.chipprbots.ethereum.domain.BlockBody
@@ -45,7 +46,10 @@ trait SyncBlocksValidator {
   def validateHeaderOnly(blockHeader: BlockHeader)(implicit
       blockchainConfig: BlockchainConfig
   ): Either[BlockHeaderError, BlockHeaderValid] =
-    validators.blockHeaderValidator.validateHeaderOnly(blockHeader)
+    BlockHeader.validateFieldCount(blockHeader, blockchainConfig) match {
+      case Left(msg) => Left(HeaderUnexpectedError(msg))
+      case Right(_)  => validators.blockHeaderValidator.validateHeaderOnly(blockHeader)
+    }
 
   def checkHeadersChain(headers: Seq[BlockHeader]): Boolean =
     if headers.length > 1 then
