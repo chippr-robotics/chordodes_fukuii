@@ -165,20 +165,18 @@ object FastSync {
     // Typed adapters for inbound foreign messages. Each `messageAdapter` call registers a type→wrapper mapping in
     // the shared underlying adapter ref. `pivotResultAdapter` and `pivotFailedAdapter` are passed directly to
     // PivotBlockSelector as its typed reply targets. `schedulerResponseAdapter` and `stateSyncStatsAdapter` are
-    // registration-only: SyncStateSchedulerActor still uses Classic and sends to `fastSyncClassicSelf`.
+    // passed directly to SyncStateSchedulerActor as its reply targets (post-migration).
     private val pivotResultAdapter: TypedActorRef[PivotBlockSelector.Result] =
       ctx.messageAdapter[PivotBlockSelector.Result](WrappedPivotResult(_))
     private val pivotFailedAdapter: TypedActorRef[PivotBlockSelector.SelectionFailed.type] =
       ctx.messageAdapter[PivotBlockSelector.SelectionFailed.type](_ => PivotSelectionFailed)
-    @annotation.unused
     private val schedulerResponseAdapter: TypedActorRef[SyncStateSchedulerActor.SyncStateSchedulerActorResponse] =
       ctx.messageAdapter[SyncStateSchedulerActor.SyncStateSchedulerActorResponse](WrappedSchedulerResponse(_))
-    @annotation.unused
     private val stateSyncStatsAdapter: TypedActorRef[SyncStateSchedulerActor.StateSyncStats] =
       ctx.messageAdapter[SyncStateSchedulerActor.StateSyncStats](WrappedStateSyncStats(_))
 
-    // Classic reply target for SyncStateSchedulerActor (still Classic-signature). Once SyncStateSchedulerActor is
-    // migrated to Typed this can be replaced with direct typed refs and removed.
+    // Retained for Commit 2 deletion — no remaining callers after SSA Typed migration.
+    @annotation.unused
     private val fastSyncClassicSelf: ActorRef = pivotResultAdapter.toClassic
 
     private val peerHelper =
@@ -426,7 +424,8 @@ object FastSync {
                 networkPeerManager,
                 peerEventBus,
                 blacklist,
-                fastSyncClassicSelf
+                schedulerResponseAdapter,
+                stateSyncStatsAdapter
               )
             )
             .onFailure[Exception](org.apache.pekko.actor.typed.SupervisorStrategy.restart),

@@ -6,6 +6,7 @@ import java.util.concurrent.ThreadLocalRandom
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe as TypedTestProbe
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.testkit.TestActor.AutoPilot
@@ -58,13 +59,12 @@ class StateSyncSpec
     PropertyCheckConfiguration(minSuccessful = PosInt(3))
 
   "StateSync" should "sync state to different tries" taggedAs (UnitTest, SyncTest) in new TestSetup() {
-    syncInit.ignoreMsg { case SyncStateSchedulerActor.StateSyncStats(_, _) => true }
     forAll(ObjectGenerators.genMultipleNodeData(1000)) { nodeData =>
       val trieProvider = TrieProvider()
       val target = trieProvider.buildWorld(nodeData)
       setAutoPilotWithProvider(trieProvider)
       syncStateSchedulerActor ! StartSyncingTo(target, 1)
-      syncInit.expectMsg(20.seconds, StateSyncFinished)
+      syncInitResponse.expectMessage(20.seconds, StateSyncFinished)
     }
   }
 
@@ -72,13 +72,12 @@ class StateSyncSpec
     UnitTest,
     SyncTest
   ) in new TestSetup() {
-    syncInit.ignoreMsg { case SyncStateSchedulerActor.StateSyncStats(_, _) => true }
     forAll(ObjectGenerators.genMultipleNodeData(1000)) { nodeData =>
       val trieProvider1 = TrieProvider()
       val target = trieProvider1.buildWorld(nodeData)
       setAutoPilotWithProvider(trieProvider1, partialResponseConfig)
       syncStateSchedulerActor ! StartSyncingTo(target, 1)
-      syncInit.expectMsg(20.seconds, StateSyncFinished)
+      syncInitResponse.expectMessage(20.seconds, StateSyncFinished)
     }
   }
 
@@ -86,13 +85,12 @@ class StateSyncSpec
     UnitTest,
     SyncTest
   ) in new TestSetup() {
-    syncInit.ignoreMsg { case SyncStateSchedulerActor.StateSyncStats(_, _) => true }
     forAll(ObjectGenerators.genMultipleNodeData(1000)) { nodeData =>
       val trieProvider1 = TrieProvider()
       val target = trieProvider1.buildWorld(nodeData)
       setAutoPilotWithProvider(trieProvider1, mixedResponseConfig)
       syncStateSchedulerActor ! StartSyncingTo(target, 1)
-      syncInit.expectMsg(20.seconds, StateSyncFinished)
+      syncInitResponse.expectMessage(20.seconds, StateSyncFinished)
     }
   }
 
@@ -103,10 +101,8 @@ class StateSyncSpec
       setAutoPilotWithProvider(trieProvider1)
       syncStateSchedulerActor ! StartSyncingTo(target, 1)
       syncStateSchedulerActor ! RestartRequested
-      syncInit.fishForMessage(20.seconds) {
-        case _: StateSyncStats        => false
-        case WaitingForNewTargetBlock => true
-      }
+      // Stats go to syncInitStats; responses go to syncInitResponse — wait directly for WaitingForNewTargetBlock.
+      syncInitResponse.expectMessage(20.seconds, WaitingForNewTargetBlock)
     }
   }
 
@@ -121,18 +117,21 @@ class StateSyncSpec
     }
 
     val nodeData: IndexedSeq[MptNodeData] = (0 until 1000).map(i => MptNodeData(Address(i), None, Seq(), i))
-    syncInit.ignoreMsg { case SyncStateSchedulerActor.StateSyncStats(_, _) => true }
     val trieProvider1: TrieProvider = TrieProvider()
     val target: ByteString = trieProvider1.buildWorld(nodeData)
     setAutoPilotWithProvider(trieProvider1)
     syncStateSchedulerActor ! StartSyncingTo(target, 1)
-    syncInit.expectMsg(20.seconds, StateSyncFinished)
+    syncInitResponse.expectMessage(20.seconds, StateSyncFinished)
   }
 
   class TestSetup extends EphemBlockchainTestSetup with TestSyncConfig {
     implicit override lazy val classicSystem: ActorSystem = StateSyncSpec.this.system.classicSystem
     type PeerConfig = Map[PeerId, PeerAction]
-    val syncInit: TestProbe = TestProbe()
+    // Two Typed probes — SSA now sends responses and stats to separate typed refs.
+    val syncInitResponse: TypedTestProbe[SyncStateSchedulerActor.SyncStateSchedulerActorResponse] =
+      testKit.createTestProbe[SyncStateSchedulerActor.SyncStateSchedulerActorResponse]()
+    val syncInitStats: TypedTestProbe[SyncStateSchedulerActor.StateSyncStats] =
+      testKit.createTestProbe[SyncStateSchedulerActor.StateSyncStats]()
 
     val peerStatus: RemoteStatus = RemoteStatus(
       capability = Capability.ETH63,
@@ -263,7 +262,8 @@ class StateSyncSpec
           networkPeerManager.ref,
           peerEventBus.ref,
           blacklist,
-          syncInit.ref
+          syncInitResponse.ref,
+          syncInitStats.ref
         )
       )
     }

@@ -57,10 +57,14 @@ object SyncStateSchedulerActor {
   private case object ScanKey
 
   // Internal commands: StartSyncingTo/RestartRequested are received by the Behavior[Command] core and
-  // converted to these Cmd forms using the parentRef passed at construction (no sender() needed).
-  final private[fast] case class StartSyncingToCmd(stateRoot: ByteString, blockNumber: BigInt, replyTo: ClassicActorRef)
+  // converted to these Cmd forms using the replyTo passed at construction (no sender() needed).
+  final private[fast] case class StartSyncingToCmd(
+      stateRoot: ByteString,
+      blockNumber: BigInt,
+      replyTo: TypedActorRef[SyncStateSchedulerActorResponse]
+  ) extends Command
+  final private[fast] case class RestartRequestedCmd(replyTo: TypedActorRef[SyncStateSchedulerActorResponse])
       extends Command
-  final private[fast] case class RestartRequestedCmd(replyTo: ClassicActorRef) extends Command
 
   // === Private wrapper commands — replace identity adapters and .toClassic self-sends ===
   private case class WrappedPRHResult(result: PeerRequestHandler.Result) extends Command
@@ -76,7 +80,8 @@ object SyncStateSchedulerActor {
       networkPeerManager: ClassicActorRef,
       peerEventBus: ClassicActorRef,
       blacklist: Blacklist,
-      parentRef: ClassicActorRef
+      replyTo: TypedActorRef[SyncStateSchedulerActorResponse],
+      statsReplyTo: TypedActorRef[StateSyncStats]
   ): Behavior[Command] =
     Behaviors.setup[Command] { ctx =>
       Behaviors.withTimers[Command] { timers =>
@@ -91,7 +96,18 @@ object SyncStateSchedulerActor {
         // Immediate first poll + periodic rescans (matches PeerListSupportNg's 0-delay scheduleWithFixedDelay).
         networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter)
         timers.startTimerWithFixedDelay(ScanKey, ScanPeers, syncConfig.peersScanInterval)
-        new Impl(ctx, timers, sync, syncConfig, networkPeerManager, peerEventBus, blacklist, parentRef, peerListHelper)
+        new Impl(
+          ctx,
+          timers,
+          sync,
+          syncConfig,
+          networkPeerManager,
+          peerEventBus,
+          blacklist,
+          replyTo,
+          statsReplyTo,
+          peerListHelper
+        )
           .waitingForBloomFilterToLoad(None)
       }
     }
@@ -102,7 +118,7 @@ object SyncStateSchedulerActor {
   private case object Sync extends Command
 
   private def reportStats(
-      to: ClassicActorRef,
+      to: TypedActorRef[StateSyncStats],
       currentStats: ProcessingStatistics,
       currentState: SyncStateScheduler.SchedulerState
   ): Unit =
@@ -178,7 +194,8 @@ object SyncStateSchedulerActor {
       networkPeerManager: ClassicActorRef,
       peerEventBus: ClassicActorRef,
       @annotation.unused blacklist: Blacklist,
-      parentRef: ClassicActorRef,
+      replyTo: TypedActorRef[SyncStateSchedulerActorResponse],
+      statsReplyTo: TypedActorRef[StateSyncStats],
       peerListHelper: PeerListHelper
   ) {
 
@@ -238,14 +255,13 @@ object SyncStateSchedulerActor {
         Some(Behaviors.same)
       // FastSync spawns this core behavior directly (bypassing the Classic `SyncStateSchedulerActor` shell that
       // captures `sender()`), so the bare public messages arrive here instead of the shell-translated `*Cmd` forms.
-      // Re-dispatch them as `*Cmd` with `parentRef` as the replyTo — the Classic actor used `sender()` (= the
-      // FastSync parent) for exactly this. Without this the core drops `StartSyncingTo` and state download never
-      // begins. The shell path is unaffected: it forwards `*Cmd` directly and never sends the bare messages here.
+      // Re-dispatch them as `*Cmd` with `replyTo` as the reply target — callers pass the typed ref at construction.
+      // Without this the core drops `StartSyncingTo` and state download never begins.
       case StartSyncingTo(stateRoot, blockNumber) =>
-        ctx.self ! StartSyncingToCmd(stateRoot, blockNumber, parentRef)
+        ctx.self ! StartSyncingToCmd(stateRoot, blockNumber, replyTo)
         Some(Behaviors.same)
       case RestartRequested =>
-        ctx.self ! RestartRequestedCmd(parentRef)
+        ctx.self ! RestartRequestedCmd(replyTo)
         Some(Behaviors.same)
       case _ => None
     }
@@ -302,7 +318,7 @@ object SyncStateSchedulerActor {
         root: ByteString,
         bn: BigInt,
         initialStats: ProcessingStatistics,
-        initiator: ClassicActorRef
+        initiator: TypedActorRef[SyncStateSchedulerActorResponse]
     ): Behavior[Command] = {
       timers.startTimerAtFixedRate(PrintInfoKey, PrintInfo, 30.seconds)
       currentStateRoot = root
@@ -317,7 +333,9 @@ object SyncStateSchedulerActor {
           initiator ! StateSyncFinished
           idle(initialStats)
         case Some(initState) =>
-          val nextBehavior = syncing(SyncSchedulerActorState.initial(initState, initialStats, bn, initiator))
+          val nextBehavior = syncing(
+            SyncSchedulerActorState.initial(initState, initialStats, bn, initiator, statsReplyTo)
+          )
           ctx.self ! Sync
           nextBehavior
       }
@@ -328,7 +346,7 @@ object SyncStateSchedulerActor {
       if memBatch.nonEmpty then {
         ctx.log.debug("Persisting {} elements to blockchain and finalizing the state sync", memBatch.size)
         val finalState = sync.persistBatch(state.currentSchedulerState, state.targetBlock)
-        reportStats(state.syncInitiator, state.currentStats.addSaved(memBatch.size), finalState)
+        reportStats(state.statsInitiator, state.currentStats.addSaved(memBatch.size), finalState)
       } else {
         ctx.log.info("Finalizing the state sync")
       }
@@ -340,7 +358,7 @@ object SyncStateSchedulerActor {
         currentState: SchedulerState,
         currentStats: ProcessingStatistics,
         targetBlock: BigInt,
-        restartRequester: ClassicActorRef
+        restartRequester: TypedActorRef[SyncStateSchedulerActorResponse]
     ): Behavior[Command] = {
       ctx.log.debug("Starting request sequence")
       sync.persistBatch(currentState, targetBlock)
@@ -633,7 +651,7 @@ object SyncStateSchedulerActor {
               } else {
                 (newState, newStats)
               }
-              reportStats(currentState.syncInitiator, newStats1, newState1)
+              reportStats(currentState.statsInitiator, newStats1, newState1)
               val nextBehavior =
                 syncing(currentState.withNewProcessingResults(newState1, newDownloaderState, newStats1))
               ctx.self ! Sync
@@ -665,7 +683,7 @@ object SyncStateSchedulerActor {
                           currentState.currentSchedulerState,
                           currentState.currentStats,
                           currentState.targetBlock,
-                          parentRef
+                          replyTo
                         )
                       } else {
                         ctx.self ! Sync

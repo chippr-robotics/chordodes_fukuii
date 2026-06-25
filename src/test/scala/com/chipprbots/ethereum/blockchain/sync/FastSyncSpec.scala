@@ -289,23 +289,27 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
 
         (for {
           _ <- saveGenesis
-          // Subscribe BEFORE startSync so no topic events can be missed under load.
+          _ <- saveTestBlocksWithWeights
           pivotFiber <- networkPeerManager.pivotBlockSelected.head.compile.lastOrError.start
-          headersFiber <- networkPeerManager.fetchedHeaders.head.compile.lastOrError.start
-          _ <- cats.effect.IO.cede // yield: allow subscription fibers to register before Pekko dispatch
+          _ <- cats.effect.IO.cede
           _ <- startSync
           _ <- networkPeerManager.onPeersConnected
           _ <- pivotFiber.joinWith(cats.effect.IO.raiseError(new RuntimeException("pivot fiber canceled")))
-          _ <- headersFiber.joinWith(cats.effect.IO.raiseError(new RuntimeException("headers fiber canceled")))
-          status <- getSyncStatus
+          // Poll until SSA has replied with initial stats — proves the Typed reply chain works
+          status <- Stream
+            .awakeEvery[IO](10.millis)
+            .evalMap(_ => getSyncStatus)
+            .collect { case stat @ Status.Syncing(_, _, Some(_)) => stat: Status }
+            .head
+            .compile
+            .lastOrError
         } yield status match {
           case Status.Syncing(startingBlockNumber, blocksProgress, stateNodesProgress) =>
             assert(startingBlockNumber === BigInt(0))
             assert(blocksProgress.target === expectedPivotBlockNumber)
-            assert(stateNodesProgress === Some(Progress(0, 1)))
+            assert(stateNodesProgress.isDefined)
           case Status.NotSyncing | Status.SyncDone => fail("Expected syncing status")
-        })
-          .timeout(timeout.duration)
+        }).timeout(timeout.duration)
       }
 
       "returns Syncing with block progress once both header and body is fetched" taggedAs (

@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync.fast
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.util.ByteString
 
 import cats.data.NonEmptyList
@@ -11,6 +11,8 @@ import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.Processin
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.SchedulerState
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateSchedulerActor.PeerRequest
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateSchedulerActor.RequestResult
+import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateSchedulerActor.StateSyncStats
+import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateSchedulerActor.SyncStateSchedulerActorResponse
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerId
 
@@ -19,10 +21,11 @@ case class SyncSchedulerActorState(
     currentDownloaderState: DownloaderState,
     currentStats: ProcessingStatistics,
     targetBlock: BigInt,
-    syncInitiator: ActorRef,
+    syncInitiator: TypedActorRef[SyncStateSchedulerActorResponse],
+    statsInitiator: TypedActorRef[StateSyncStats],
     nodesToProcess: Queue[RequestResult],
     processing: Boolean,
-    restartRequested: Option[ActorRef]
+    restartRequested: Option[TypedActorRef[SyncStateSchedulerActorResponse]]
 ) {
   def hasRemainingPendingRequests: Boolean = currentSchedulerState.numberOfPendingRequests > 0
   def isProcessing: Boolean = processing
@@ -44,7 +47,7 @@ case class SyncSchedulerActorState(
   def withNewDownloaderState(newDownloaderState: DownloaderState): SyncSchedulerActorState =
     copy(currentDownloaderState = newDownloaderState)
 
-  def withRestartRequested(restartRequester: ActorRef): SyncSchedulerActorState =
+  def withRestartRequested(restartRequester: TypedActorRef[SyncStateSchedulerActorResponse]): SyncSchedulerActorState =
     copy(restartRequested = Some(restartRequester))
 
   def initProcessing: SyncSchedulerActorState =
@@ -107,7 +110,8 @@ object SyncSchedulerActorState {
       initialSchedulerState: SchedulerState,
       initialStats: ProcessingStatistics,
       targetBlock: BigInt,
-      syncInitiator: ActorRef
+      syncInitiator: TypedActorRef[SyncStateSchedulerActorResponse],
+      statsInitiator: TypedActorRef[StateSyncStats]
   ): SyncSchedulerActorState =
     SyncSchedulerActorState(
       initialSchedulerState,
@@ -115,6 +119,7 @@ object SyncSchedulerActorState {
       initialStats,
       targetBlock,
       syncInitiator,
+      statsInitiator,
       Queue(),
       processing = false,
       restartRequested = None
