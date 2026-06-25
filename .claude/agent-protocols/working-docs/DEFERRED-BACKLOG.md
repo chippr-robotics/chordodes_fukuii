@@ -1,6 +1,6 @@
 # Fukuii Modernization — Deferred Backlog
 
-**Last updated**: 2026-06-25 (§ETH-T4-A FIXED `02aaa05fc` — KZG trusted setup now loaded at startup; `PrecompiledContracts` catch block now reverts instead of succeeding; §ETH-T4-B gate cleared)
+**Last updated**: 2026-06-25 (§ETH-T4-B FIXED — `validateMaxFeePerBlobGas` added to `StdSignedTransactionValidator`; `TransactionMaxFeePerBlobGasTooLow` error; 4 tests)
 **Purpose**: Single reference for all deferred cleanup work — completed items,
 active deferred items, and follow-up sprint plans.
 
@@ -670,83 +670,6 @@ Use `sbt compile-all` to confirm import removal is safe before deleting any adap
 
 ---
 
-#### §8k-K — LOOM: SyncController child refs Classic→Typed (unblocks §7d Lens 4 + Lens 6)
-
-**Agent:** LOOM
-**Risk:** MEDIUM — SyncController is the central sync state machine; touches all sync modes
-**Gate:** Any time — targeted ref-type change, not a full actor migration
-
-**Background:**
-SyncController is already a `Behavior[Command]` (Typed). The issue is it holds its children
-as Classic `ActorRef` and stops them with `PoisonPill`. Fixing this does NOT require rewriting
-the whole actor — only the child ref types and stop calls.
-
-**Unblocks:**
-- §7d Lens 6: 15 `PoisonPill` send-sites in SyncController (`fastSync`, `snapSync`,
-  `regularSync`, `headerBootstrap`, `originalSnapSyncRef`)
-- §7d Lens 4: once SyncController accepts `TypedActorRef[StorageRecoveryActor.Command]`
-  instead of Classic `ActorRef`, StorageRecoveryActor can drop `.toClassic` and narrow
-  from `Behavior[Any]` to `Behavior[Command]` (same for BytecodeRecoveryActor)
-
-**Scope (read-only survey first):**
-```bash
-# Child ref types currently held as Classic ActorRef
-grep -n "runningFastSync\|runningSnapSync\|runningRegularSync\|startRegularSync\|startSnapSync" \
-  src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala | head -20
-
-# All PoisonPill targets
-grep -n "PoisonPill" \
-  src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala
-```
-
-**Prompt:**
-```
-Use LOOM to narrow SyncController's child refs from Classic ActorRef to Typed ActorRef[T].
-File: src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala
-
-Context:
-- SyncController IS already Behavior[Command] (Typed). This is NOT a full actor migration.
-- The 4 child state machine params are Classic ActorRef:
-    runningFastSync(fastSync: ActorRef)
-    runningSnapSync(snapSync: ActorRef)
-    runningRegularSync(regularSync: ActorRef)
-    runningRegularSyncWithBackfill(regularSync: ActorRef, snapSync: ActorRef)
-- SyncController sends PoisonPill to stop children (15 send-sites). In Typed, use
-  ctx.stop(child) or a typed Stop command.
-- The private termination ADT members carry Classic refs:
-    SnapSyncTerminated(ref: ActorRef), RegularSyncTerminated(ref: ActorRef), etc.
-
-Run pre-migration-checklist for SyncController first. Then:
-
-Phase 1 — Survey (read-only):
-  1. For each child type (FastSync, SNAPSyncController, RegularSync, PivotHeaderBootstrap),
-     identify the Typed Command ADT entry point (the top-level Command sealed trait).
-  2. List all spawn/obtain sites where SyncController gets a Classic ActorRef to a child.
-  3. Confirm each child IS a Typed actor (Behavior[T]) already.
-
-Phase 2 — Narrow child ref types:
-  4. Change the state machine params: ActorRef → ActorRef[ChildActor.Command]
-  5. Update private termination ADT: SnapSyncTerminated(ref: ActorRef[FastSync.Command]) etc.
-  6. Replace every `child ! PoisonPill` with ctx.stop(child) or a typed Stop message.
-  7. Replace `.toTyped[Nothing]` in ctx.watchWith/ctx.unwatch calls with the narrowed ref.
-
-Phase 3 — Downstream: StorageRecoveryActor + BytecodeRecoveryActor
-  8. SyncController currently receives these actors' Classic refs. Once it accepts Typed refs,
-     StorageRecoveryActor can change:
-       syncController ! RequestRecentRoot(ctx.self.toClassic)
-     to:
-       syncController ! RequestRecentRoot(ctx.self)
-  9. With .toClassic removed, Behavior[Any] can be narrowed to Behavior[Command] in both actors.
-
-sbt compile-all after each phase. testEssential at end.
-Commit per phase:
-  "refactor(capstone-sc-p1): SyncController child refs Classic→Typed survey"
-  "refactor(capstone-sc-p2): SyncController child refs narrowed; PoisonPill → ctx.stop (15 sites)"
-  "refactor(capstone-sc-p3): StorageRecoveryActor + BytecodeRecoveryActor Behavior[Any] → Behavior[Command]"
-```
-
----
-
 ## Part 8l: VM Tracer Model Modernization ✅ DONE 2026-06-24 — see `completed/DEFERRED-BACKLOG.md §8l-R1` + `§8l-I`
 
 ---
@@ -856,7 +779,7 @@ Each prompt can run independently. Commit individually.
 | ~~H1~~ | ~~Batch H~~ | ~~**§8k-CQ1** — MITHRIL: Remove `GetKnownNodes` dead shim (KnownNodesManager.scala:117 + CommonFakePeer.scala:162)~~ | ✅ DONE `d4cc7a7fa` (2026-06-24) |
 | H2 | Batch H | **§8k-CQ2** — MITHRIL: Fix `PeerActorSpec:429` PeerClosedConnection regression (8k-H) — research PeerActor notification path first | NO — 1 outstanding `testEssential` failure until done |
 | I1 | ETH Sprint (unblocked) | ~~**§ETH-T1-A**~~ ✅ ed4db9df9 · ~~**§ETH-T1-B**~~ ✅ 6f8f74708 · **§ETH-T2-A** `isPostMerge`→`isPoS` rename · **§ETH-T4-A** KZG trusted setup · **§ETH-T4-C** EIP-4788 beacon roots bytecode · **§ETH-T4-D** blob base fee unification · **§ETH-T6-A** VM tracer try/finally · **§ETH-T6-B** EIP-2681 nonce-max · **§ETH-T7-A** `EvmConfigTimestampForkSpec` · **§ETH-T7-C** `EngineApiVersionRejectionSpec` · **§ETH-T7-D** `BlockRangeUpdateDecodePathSpec` | Partial — each standalone; T4-B gates on T4-A; T7-B gates on T4-C |
-| I2 | ETH Sprint (gated) | **§ETH-T4-B** blob maxFeePerBlobGas validation (gate: T4-A) · **§ETH-T7-B** `Eip4788BeaconRootStorageSpec` (gate: T4-C) · ~~**§ETH-T1-C**~~ ✅ `89863ac80` · **§ETH-T9-A/B/C/D** SNAP sync ETH paths · **§ETH-T10-A/B/C/D** Engine API Osaka edge cases | NO — run after I1 items; gate conditions above |
+| I2 | ETH Sprint (gated) | ~~**§ETH-T4-B**~~ ✅ maxFeePerBlobGas validation · **§ETH-T7-B** `Eip4788BeaconRootStorageSpec` (gate: T4-C) · ~~**§ETH-T1-C**~~ ✅ `89863ac80` · **§ETH-T9-A/B/C/D** SNAP sync ETH paths · **§ETH-T10-A/B/C/D** Engine API Osaka edge cases | NO — run after I1 items; gate conditions above |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
 
@@ -968,68 +891,6 @@ The `handleRegularSyncMsg` production bug (SyncController:895-897) is tracked un
 
 Source: `.local/docs/eth-sepolia-assumption-audit.md` — Thread 1 (fork dispatch completeness).
 Thread 3 (EIP-1559 fee routing) audited: functionally CORRECT — ETH base fee is burned, ETC base fee credited to treasury. Found one logging bug: `log.error` in `BlockPreparator.creditBaseFeeToTreasury` fired for every ETH/Sepolia block (treasury-address=0 is correct config, not an error). **FIXED `f868b75a8`** — guard added `&& networkType == NetworkType.ETC`. See `completed/DEFERRED-BACKLOG.md §ETH-T3-LOG`.
-
----
-
-### §ETH-T4-B — BEACON: Add `maxFeePerBlobGas >= blobBaseFee` validation for Type-3 transactions
-
-**Agent:** BEACON
-**Risk:** HIGH — under-priced blob transactions accepted into blocks; consensus divergence vs go-ethereum
-**Gate:** ~~§ETH-T4-A complete~~ — **DONE** (`02aaa05fc`, 2026-06-25)
-**Files:**
-- `src/main/scala/com/chipprbots/ethereum/consensus/validators/std/StdSignedTransactionValidator.scala:85-128`
-- `src/main/scala/com/chipprbots/ethereum/ledger/BlockPreparator.scala` (access to computed `blobBaseFee`)
-
-**Background:**
-EIP-4844 requires that a blob transaction is valid only when
-`tx.maxFeePerBlobGas >= blobBaseFee(block.excessBlobGas)`. go-ethereum rejects with
-`ErrMaxFeePerBlobGas`. Fukuii's `StdSignedTransactionValidator` checks Cancun activation
-(`:85-97`) and the generic EIP-1559 `maxFeePerGas >= baseFee` (`:103-128`) but has no
-comparison of `maxFeePerBlobGas` against the block's blob base fee. A blob tx with
-`maxFeePerBlobGas = 0` in a block where `blobBaseFee = 1` would be accepted by Fukuii.
-
-**Steps:**
-1. **Read** `StdSignedTransactionValidator.scala:70-130` in full to understand the validation
-   signature — specifically how `baseFee` and `blockHeader` are passed in.
-2. **Read** `BlobGasUtils` (in `EngineApiService.scala` or a dedicated object) to find the
-   `getBlobGasPrice(excessBlobGas, timestamp, config)` method.
-3. **Compute `blobBaseFee`** from `blockHeader.excessBlobGas` using `BlobGasUtils`. Confirm
-   `blockHeader.excessBlobGas` is available at the validator call site.
-4. **Add validation** for `BlobTransaction` subtype:
-   ```scala
-   case tx: BlobTransaction =>
-     val blobBaseFee = BlobGasUtils.getBlobGasPrice(
-       blockHeader.excessBlobGas.getOrElse(BigInt(0)),
-       blockHeader.unixTimestamp,
-       blockchainConfig
-     )
-     if tx.maxFeePerBlobGas < blobBaseFee then
-       Left(TransactionError.MaxFeePerBlobGasTooLow(tx.maxFeePerBlobGas, blobBaseFee))
-     else Right(())
-   ```
-   Add `MaxFeePerBlobGasTooLow` to the `TransactionError` sealed hierarchy if it does not exist.
-5. **Gate on Cancun timestamp** — only apply when `blockchainConfig.isCancunTimestamp(blockHeader.unixTimestamp)`.
-   Pre-Cancun blocks have no `excessBlobGas`; blob txs are already rejected before this check.
-6. **Write tests** in `StdSignedTransactionValidatorSpec`:
-   - Blob tx with `maxFeePerBlobGas` equal to `blobBaseFee` → accepted
-   - Blob tx with `maxFeePerBlobGas` below `blobBaseFee` → rejected with `MaxFeePerBlobGasTooLow`
-   - Non-blob tx → check unchanged (no regression)
-   - ETC chain → no blob txs; check does not fire
-
-**Verify:**
-```bash
-sbt compile-all
-sbt "testOnly *StdSignedTransactionValidator* *BlobTransaction*"
-sbt testVM
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add src/main/scala/.../consensus/validators/std/StdSignedTransactionValidator.scala` + any error ADT file + test files
-3. `git commit -m "fix(eth): validate maxFeePerBlobGas >= blobBaseFee for Type-3 transactions (EIP-4844)"`
-4. `SHA=$(git rev-parse --short HEAD)` → update `.local/docs/eth-sepolia-assumption-audit.md` Thread 4c entry
-5. **DELETE §ETH-T4-B**
 
 ---
 

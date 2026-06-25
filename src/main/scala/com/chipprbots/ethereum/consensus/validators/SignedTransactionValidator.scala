@@ -49,6 +49,11 @@ object SignedTransactionError {
     override def toString: String =
       s"GAS_LIMIT_EXCEEDS_MAXIMUM_GAS_LIMIT: Tx gas limit ($txGasLimit) exceeds per-tx cap ($cap)"
   }
+  case class TransactionMaxFeePerBlobGasTooLow(maxFeePerBlobGas: BigInt, blobBaseFee: BigInt)
+      extends SignedTransactionError {
+    override def toString: String =
+      s"FEE_CAP_LESS_THAN_BLOB_BASE_FEE: maxFeePerBlobGas ($maxFeePerBlobGas) < blobBaseFee ($blobBaseFee)"
+  }
 }
 
 sealed trait SignedTransactionValid

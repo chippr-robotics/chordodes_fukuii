@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.consensus.validators
 package std
 
+import com.chipprbots.ethereum.consensus.engine.BlobGasUtils
 import com.chipprbots.ethereum.consensus.validators.SignedTransactionError.*
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.*
@@ -46,6 +47,7 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
       _ <- validateGasLimitEnoughForIntrinsicGas(stx, blockHeader.number, blockHeader.unixTimestamp)
       _ <- validateTxGasLimitCap(stx, blockHeader.number, blockHeader.unixTimestamp)
       _ <- validateMaxFeeAgainstBaseFee(stx, blockHeader)
+      _ <- validateMaxFeePerBlobGas(stx, blockHeader)
       _ <- validateAccountHasEnoughGasToPayUpfrontCost(senderAccount.balance, upfrontGasCost)
       _ <- validateBlockHasEnoughGasLimitForTx(stx, accumGasUsed, blockHeader.gasLimit)
     } yield SignedTransactionValid
@@ -127,6 +129,24 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
         else Right(SignedTransactionValid)
     }
   }
+
+  /** EIP-4844: reject blob transactions whose maxFeePerBlobGas < blobBaseFee(block.excessBlobGas). go-ethereum rejects
+    * with ErrMaxFeePerBlobGas. Only runs when Cancun is active (blob txs are already rejected pre-Cancun by
+    * validateBlobTransactionSupport, but the Cancun gate here defends against future call-site reordering).
+    */
+  private def validateMaxFeePerBlobGas(
+      stx: SignedTransaction,
+      blockHeader: BlockHeader
+  )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] =
+    stx.tx match {
+      case bt: BlobTransaction if blockchainConfig.isCancunTimestamp(blockHeader.unixTimestamp) =>
+        val excessBlobGas = blockHeader.excessBlobGas.getOrElse(BigInt(0))
+        val blobBaseFee = BlobGasUtils.getBlobGasPrice(excessBlobGas, blockHeader.unixTimestamp, blockchainConfig)
+        if bt.maxFeePerBlobGas < blobBaseFee then
+          Left(TransactionMaxFeePerBlobGasTooLow(bt.maxFeePerBlobGas, blobBaseFee))
+        else Right(SignedTransactionValid)
+      case _ => Right(SignedTransactionValid)
+    }
 
   /** Validates if the transaction is syntactically valid (lengths of the transaction fields are correct)
     *

@@ -7,9 +7,13 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures
+import com.chipprbots.ethereum.consensus.engine.BlobGasUtils
 import com.chipprbots.ethereum.consensus.validators.SignedTransactionError.TransactionInitCodeSizeError
+import com.chipprbots.ethereum.consensus.validators.SignedTransactionError.TransactionMaxFeePerBlobGasTooLow
 import com.chipprbots.ethereum.consensus.validators.SignedTransactionError.TransactionNotEnoughGasForIntrinsicError
+import com.chipprbots.ethereum.consensus.validators.SignedTransactionError.TransactionSyntaxError
 import com.chipprbots.ethereum.domain.*
+import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostCancun
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
@@ -193,6 +197,111 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers {
       case Left(_: TransactionNotEnoughGasForIntrinsicError) =>
         fail("EIP-3860 word cost must not apply on ETC pre-Olympia")
       case _ => succeed
+    }
+  }
+
+  // ── §ETH-T4-B: EIP-4844 maxFeePerBlobGas >= blobBaseFee validation ─────────
+  //
+  // EIP-4844: a blob tx is only valid when tx.maxFeePerBlobGas >= blobBaseFee(block.excessBlobGas).
+  // go-ethereum rejects with ErrMaxFeePerBlobGas.
+  //
+  // Test setup:
+  //   excessBlobGas = 0 → blobBaseFee = BlobGasUtils.getBlobGasPrice(0) = 1 (MIN_BLOB_BASE_FEE)
+  //   Blob tx with maxFeePerBlobGas = 1  → accepted (equal to blobBaseFee)
+  //   Blob tx with maxFeePerBlobGas = 0  → rejected (below blobBaseFee)
+  //   Non-blob tx                        → accepted (check does not apply)
+  //   ETC chain (no cancunTimestamp)     → blob tx rejected by validateBlobTransactionSupport,
+  //                                        not by the blob-gas check
+
+  private val CancunTs: Long = 2_000L
+
+  private val sepoliaCancunConfig: BlockchainConfig = etcConfig.copy(
+    networkType = NetworkType.ETH,
+    forkTimestamps = ForkTimestamps(shanghaiTimestamp = Some(ShanghaiTs), cancunTimestamp = Some(CancunTs))
+  )
+
+  // Cancun block header: excessBlobGas = 0 → blobBaseFee = 1
+  private val cancunHeader: BlockHeader = baseHeader.copy(
+    unixTimestamp = CancunTs + 1,
+    gasLimit = BigInt("30000000"),
+    extraFields = HefPostCancun(
+      baseFee = BigInt(1_000_000_000L),
+      withdrawalsRoot = ByteString(new Array[Byte](32)),
+      blobGasUsed = BigInt(0),
+      excessBlobGas = BigInt(0),
+      parentBeaconBlockRoot = ByteString(new Array[Byte](32))
+    )
+  )
+
+  private def signedBlobTx(maxFeePerBlobGas: BigInt): SignedTransaction = SignedTransaction(
+    BlobTransaction(
+      chainId = BigInt(1),
+      nonce = 0,
+      maxPriorityFeePerGas = BigInt(0),
+      maxFeePerGas = BigInt(2_000_000_000L),
+      gasLimit = BigInt(1_000_000),
+      receivingAddress = Some(Address(0L)),
+      value = BigInt(0),
+      payload = ByteString.empty,
+      accessList = Nil,
+      maxFeePerBlobGas = maxFeePerBlobGas,
+      blobVersionedHashes = List(ByteString(new Array[Byte](32)))
+    ),
+    pointSign = 0x00.toByte,
+    signatureRandom = realR,
+    signature = realS
+  )
+
+  it should "accept blob tx with maxFeePerBlobGas equal to blobBaseFee (EIP-4844)" taggedAs (
+    UnitTest,
+    ConsensusTest
+  ) in {
+    implicit val cfg: BlockchainConfig = sepoliaCancunConfig
+    // excessBlobGas = 0 → blobBaseFee = 1; maxFeePerBlobGas = 1 → accepted
+    validate(signedBlobTx(BigInt(1)), cancunHeader) match {
+      case Left(_: TransactionMaxFeePerBlobGasTooLow) => fail("maxFeePerBlobGas == blobBaseFee must be accepted")
+      case _                                          => succeed
+    }
+  }
+
+  it should "reject blob tx with maxFeePerBlobGas below blobBaseFee with TransactionMaxFeePerBlobGasTooLow" taggedAs (
+    UnitTest,
+    ConsensusTest
+  ) in {
+    implicit val cfg: BlockchainConfig = sepoliaCancunConfig
+    // excessBlobGas = 0 → blobBaseFee = 1; maxFeePerBlobGas = 0 → rejected
+    validate(signedBlobTx(BigInt(0)), cancunHeader) match {
+      case Left(err: TransactionMaxFeePerBlobGasTooLow) =>
+        err.maxFeePerBlobGas shouldBe BigInt(0)
+        err.blobBaseFee shouldBe BlobGasUtils.getBlobGasPrice(BigInt(0), CancunTs + 1, sepoliaCancunConfig)
+      case other => fail(s"Expected TransactionMaxFeePerBlobGasTooLow, got: $other")
+    }
+  }
+
+  it should "not apply blob-gas check to non-blob transactions (no regression)" taggedAs (
+    UnitTest,
+    ConsensusTest
+  ) in {
+    implicit val cfg: BlockchainConfig = sepoliaCancunConfig
+    // Legacy tx in a Cancun block — validateMaxFeePerBlobGas must be a no-op
+    validate(signedInitcodeTx, cancunHeader) match {
+      case Left(_: TransactionMaxFeePerBlobGasTooLow) => fail("blob-gas check must not fire for non-blob tx")
+      case _                                          => succeed
+    }
+  }
+
+  it should "reject blob tx on ETC via validateBlobTransactionSupport, not blob-gas check" taggedAs (
+    UnitTest,
+    ConsensusTest
+  ) in {
+    implicit val cfg: BlockchainConfig = etcConfig
+    // ETC has no cancunTimestamp → validateBlobTransactionSupport fires first
+    val etcHeader = baseHeader.copy(unixTimestamp = CancunTs + 1)
+    validate(signedBlobTx(BigInt(0)), etcHeader) match {
+      case Left(TransactionSyntaxError(msg)) if msg.contains("TYPE_3_TX_NOT_SUPPORTED") => succeed
+      case Left(_: TransactionMaxFeePerBlobGasTooLow) =>
+        fail("blob-gas check must not fire on ETC (validateBlobTransactionSupport fires first)")
+      case other => fail(s"Expected TYPE_3_TX_NOT_SUPPORTED TransactionSyntaxError, got: $other")
     }
   }
 }
