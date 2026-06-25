@@ -1036,8 +1036,8 @@ Each prompt can run independently. Commit individually.
 | J1 | Batch J | **§8k-N** — MITHRIL: SyncController catch-all bridge elimination (10 sites) — all target actors already Typed; audit each catch-all arm, extend ADTs or handle explicitly, replace `.toClassic.tell` | YES — standalone per catch-all arm |
 | J2 | Batch J | **§8k-O** — MITHRIL: FastSync `fastSyncClassicSelf` + PivotBlockSelector/StateStorageActor bridge elimination (5 sites) — check if PBS/SSA already Typed; if so drop `.toClassic` from spawn | YES — standalone |
 | J3 | Batch J | **§8k-P** — MITHRIL: PeerEventBusActor caller narrowing — update `peerEventBus: ActorRef` → `TypedActorRef[PEB.Command]` across ~15 constructors; enables adapter import removal in 22+ files | NO — broad refactor; run after J1/J2 compile-all passes |
-| I1 | ETH Sprint (unblocked) | ~~**§ETH-T1-A**~~ ✅ ed4db9df9 · ~~**§ETH-T1-B**~~ ✅ 6f8f74708 · **§ETH-T2-A** `isPostMerge`→`isPoS` rename · **§ETH-T4-A** KZG trusted setup · **§ETH-T4-C** EIP-4788 beacon roots bytecode · ~~**§ETH-T4-D**~~ ✅ f6cf7fb9c blob base fee unification · **§ETH-T6-A** VM tracer try/finally · **§ETH-T6-B** EIP-2681 nonce-max · **§ETH-T7-A** `EvmConfigTimestampForkSpec` · **§ETH-T7-C** `EngineApiVersionRejectionSpec` · **§ETH-T7-D** `BlockRangeUpdateDecodePathSpec` | Partial — each standalone; T4-B gates on T4-A; T7-B gates on T4-C |
-| I2 | ETH Sprint (gated) | ~~**§ETH-T4-B**~~ ✅ maxFeePerBlobGas validation · **§ETH-T7-B** `Eip4788BeaconRootStorageSpec` (gate: T4-C) · ~~**§ETH-T1-C**~~ ✅ `89863ac80` · **§ETH-T9-A/B/C/D** SNAP sync ETH paths · **§ETH-T10-A/B/C/D** Engine API Osaka edge cases | NO — run after I1 items; gate conditions above |
+| I1 | ETH Sprint (unblocked) | ~~**§ETH-T1-A**~~ ✅ ed4db9df9 · ~~**§ETH-T1-B**~~ ✅ 6f8f74708 · **§ETH-T2-A** `isPostMerge`→`isPoS` rename · ~~**§ETH-T4-A**~~ ✅ 02aaa05fc KZG trusted setup · ~~**§ETH-T4-C**~~ ✅ b934caffe EIP-4788 beacon roots bytecode · ~~**§ETH-T4-D**~~ ✅ f6cf7fb9c blob base fee unification · **§ETH-T6-A** VM tracer try/finally · **§ETH-T6-B** EIP-2681 nonce-max · **§ETH-T7-A** `EvmConfigTimestampForkSpec` · **§ETH-T7-C** `EngineApiVersionRejectionSpec` · **§ETH-T7-D** `BlockRangeUpdateDecodePathSpec` | Partial — each standalone |
+| I2 | ETH Sprint (gated) | ~~**§ETH-T4-B**~~ ✅ maxFeePerBlobGas validation · **§ETH-T7-B** `Eip4788BeaconRootStorageSpec` · ~~**§ETH-T1-C**~~ ✅ `89863ac80` · **§ETH-T9-A/B/C/D** SNAP sync ETH paths · **§ETH-T10-A/B/C/D** Engine API Osaka edge cases | NO — run after I1 items; gate conditions above |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
 
@@ -1149,14 +1149,6 @@ The `handleRegularSyncMsg` production bug (SyncController:895-897) is tracked un
 
 Source: `.local/docs/eth-sepolia-assumption-audit.md` — Thread 1 (fork dispatch completeness).
 Thread 3 (EIP-1559 fee routing) audited: functionally CORRECT — ETH base fee is burned, ETC base fee credited to treasury. Found one logging bug: `log.error` in `BlockPreparator.creditBaseFeeToTreasury` fired for every ETH/Sepolia block (treasury-address=0 is correct config, not an error). **FIXED `f868b75a8`** — guard added `&& networkType == NetworkType.ETC`. See `completed/DEFERRED-BACKLOG.md §ETH-T3-LOG`.
-
----
-
-~~### §ETH-T4-D — FIXED f6cf7fb9c (2026-06-25)~~
-
-`deductBlobGas` + `updateSenderAccountBeforeExecution` + balance pre-check all routed through
-`BlobGasUtils.getBlobGasPrice`. Local `computeBlobBaseFee` / `fakeExponential` deleted.
-`BlockPreparatorSpec` "deductBlobGas" test added. 25/25 tests passed.
 
 ---
 

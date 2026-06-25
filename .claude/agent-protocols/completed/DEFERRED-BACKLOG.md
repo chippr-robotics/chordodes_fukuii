@@ -2101,3 +2101,78 @@ well-formed but cryptographically invalid was silently accepted. go-ethereum ret
 **ETC safety:** `cancunTimestamp.isDefined` is false on all ETC/Mordor configs. The KZG setup is never loaded for ETC nodes. `PrecompiledContracts.KzgPointEvaluation` address 0x0A is not active in any ETC fork.
 
 **Cross-refs:** `consensus/vm.md §ETH-T4-A`, `node/bootstrap.md §ETH-T4-A`, `working-docs/DEFERRED-BACKLOG.md Part 10`, `.local/docs/eth-sepolia-assumption-audit.md` Thread 4c
+
+---
+
+## §ETH-T4-B — Type-3 maxFeePerBlobGas Validation (EIP-4844) ✅ FIXED 2026-06-25
+
+**Commit:** `bd43ed49b`
+**Branch:** `scala3-cleanup-june`
+**Agent:** BEACON
+**Risk (pre-fix):** MEDIUM — every Type-3 (blob) transaction with `maxFeePerBlobGas < blobBaseFee` was accepted as valid; go-ethereum returns `errTxBlobFeeCapTooLow` for these cases
+
+**Files changed:**
+- `src/main/scala/com/chipprbots/ethereum/consensus/validators/std/SignedTransactionValidator.scala` — added `TransactionMaxFeePerBlobGasTooLow` error variant
+- `src/main/scala/com/chipprbots/ethereum/consensus/validators/std/StdSignedTransactionValidator.scala` — added `validateMaxFeePerBlobGas` call in Type-3 validation chain
+- `src/test/scala/com/chipprbots/ethereum/consensus/validators/std/StdSignedTransactionValidatorSpec.scala` — 4 new tests
+
+**Root cause:**
+`StdSignedTransactionValidator` validated blob count, blob hashes, and access lists for Type-3 transactions but omitted the `maxFeePerBlobGas >= blobBaseFee` check from EIP-4844 §3.2. A sender could post a blob transaction with `maxFeePerBlobGas = 1 wei` regardless of current blob gas pricing; fukuii would accept it into a block while go-ethereum would reject with `errTxBlobFeeCapTooLow`.
+
+**Fix:**
+Added `validateMaxFeePerBlobGas(stx, header)` to the Type-3 validation chain. Returns `TransactionMaxFeePerBlobGasTooLow(txMaxFee, blobBaseFee)` when `tx.maxFeePerBlobGas < BlobGasUtils.getBlobGasPrice(excessBlobGas, ts, config)`.
+
+**Tests (4, all pass):** Accepted when equal, accepted when above, rejected (`TransactionMaxFeePerBlobGasTooLow`) when below, Type-0/1/2 skip blob fee validation.
+
+**ETC safety:** `maxFeePerBlobGas` validation only runs for `BlobTransaction` (Type-3). ETC has no `cancunTimestamp`, so blob transactions are unreachable. No ETC behaviour change.
+
+**Cross-refs:** `consensus/validators.md §ETH-T4-B`, `working-docs/DEFERRED-BACKLOG.md Part 10`, `.local/docs/eth-sepolia-assumption-audit.md` Thread 4c
+
+---
+
+## §ETH-T4-C — EIP-4788 Beacon Roots Contract Deployment ✅ FIXED 2026-06-25
+
+**Commit:** `b934caffe`
+**Branch:** `scala3-cleanup-june`
+**Agent:** BEACON
+**Risk (pre-fix):** HIGH — ETH/Sepolia state roots diverged from canonical: EIP-4788 requires the `0x4242424242424242424242424242424242424242` system contract to have code and nonce=1 at the Cancun transition; fukuii was writing the beacon root to storage but leaving the account code-empty with nonce=0
+
+**Files changed:**
+- `src/main/scala/com/chipprbots/ethereum/ledger/BlockExecution.scala` — `applyEip4788SystemCall` now deploys `HISTORY_STORAGE_CONTRACT_CODE` + nonce=1 if not already present
+- `src/test/scala/com/chipprbots/ethereum/ledger/BeaconRootsSpec.scala` — new (158 lines, covers contract deployment, beacon root storage, and ring-buffer wrap-around)
+
+**Root cause:**
+`applyEip4788SystemCall` wrote the parent beacon block root to the ring-buffer at `0x4242…` but never initialised the account's code or nonce. The EIP specifies `BEACON_ROOTS_ADDRESS` must hold `HISTORY_STORAGE_CONTRACT_CODE` with `nonce=1` at deployment. Without this, the account's codehash was the empty-code hash, causing state root divergence from canonical Sepolia on every post-Cancun block.
+
+**Fix:**
+At block start for the first Cancun block (whenever the account has no code), deploy `HISTORY_STORAGE_CONTRACT_CODE` and set nonce=1 before the beacon root write.
+
+**ETC safety:** `applyEip4788SystemCall` is guarded by `cancunTimestamp.isDefined` — never runs on ETC/Mordor configs.
+
+**Cross-refs:** `storage/ledger.md §ETH-T4-C`, `working-docs/DEFERRED-BACKLOG.md Part 10`, `.local/docs/eth-sepolia-assumption-audit.md` Thread 4c
+
+---
+
+## §ETH-T4-D — Blob Base Fee Formula Unification ✅ FIXED 2026-06-25
+
+**Commit:** `f6cf7fb9c`
+**Branch:** `scala3-cleanup-june`
+**Agent:** BEACON
+**Risk (pre-fix):** HIGH — `deductBlobGas` / `updateSenderAccountBeforeExecution` / balance pre-check computed blob base fee using a local `computeBlobBaseFee` that only knew Cancun (fraction 3338477) and Prague (fraction 5007716) update fractions; EIP-7892 BPO1 (8346193) and BPO2 (11684671) fractions were absent, causing burned-amount to diverge from `BlobGasUtils.getBlobGasPrice` on post-Osaka Sepolia blocks
+
+**Files changed:**
+- `src/main/scala/com/chipprbots/ethereum/ledger/BlockPreparator.scala` — all 3 call sites of `computeBlobBaseFee` replaced with `BlobGasUtils.getBlobGasPrice(excessBlobGas, header.unixTimestamp, blockchainConfig)`; private `computeBlobBaseFee` and `fakeExponential` methods deleted
+- `src/test/scala/com/chipprbots/ethereum/ledger/BlockPreparatorSpec.scala` — `"deductBlobGas"` test suite added (Prague config, 2-blob tx, verifies burned amount matches `BlobGasUtils.getBlobGasPrice * GAS_PER_BLOB * numBlobs`)
+
+**Root cause:**
+`BlockPreparator` had a private `computeBlobBaseFee(excess, ts)` that duplicated `fakeExponential` logic with only Cancun/Prague fractions. `BlobGasUtils.getBlobGasPrice(excess, ts, config)` is the canonical source of truth handling all BPO variants via `blockchainConfig.bpoSchedule`. Any post-Osaka Sepolia block caused the amount burned to diverge from the amount validated at the transaction level.
+
+**Fix:**
+Deleted `computeBlobBaseFee` and `fakeExponential`. All 3 deduction sites call `BlobGasUtils.getBlobGasPrice(excessBlobGas, header.unixTimestamp, blockchainConfig)` directly.
+
+**Tests (25/25 pass including new):**
+- New: `"deductBlobGas" — burns correct blob gas cost matching BlobGasUtils for a Prague block` — verifies sender balance reduction equals `BlobGasUtils.getBlobGasPrice * GAS_PER_BLOB * numBlobs`
+
+**ETC safety:** Blob deduction paths are unreachable for ETC blocks (no `cancunTimestamp`). No ETC behaviour change.
+
+**Cross-refs:** `storage/ledger.md §ETH-T4-D`, `working-docs/DEFERRED-BACKLOG.md Part 10`, `.local/docs/eth-sepolia-assumption-audit.md` Thread 4c

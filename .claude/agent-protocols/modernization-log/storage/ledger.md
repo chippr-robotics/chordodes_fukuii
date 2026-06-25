@@ -52,6 +52,26 @@
 
 ---
 
+## §ETH-T4-C: EIP-4788 beacon roots contract deployment (2026-06-25)
+
+#### `b934caffe` — fix(eth): deploy EIP-4788 beacon roots contract bytecode (code+nonce=1)
+- **What:** `applyEip4788SystemCall` in `BlockExecution.scala` now deploys `HISTORY_STORAGE_CONTRACT_CODE` + `nonce=1` to `0x4242…` at the first Cancun block, eliminating state root divergence from canonical Sepolia caused by missing account code/nonce.
+- **Gate:** BEACON sign-off. Guarded by `cancunTimestamp.isDefined` — never runs on ETC.
+- **Tests:** 158-line `BeaconRootsSpec.scala` (new).
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T4-C`
+
+---
+
+## §ETH-T4-D: Blob base fee formula unification (2026-06-25)
+
+#### `f6cf7fb9c` — fix(eth): unify blob base fee formula — deductBlobGas now uses BlobGasUtils.getBlobGasPrice
+- **What:** Deleted `BlockPreparator.computeBlobBaseFee` / `fakeExponential` (only knew Cancun/Prague fractions). All 3 deduction call sites now use `BlobGasUtils.getBlobGasPrice(excess, ts, config)`, which handles EIP-7892 BPO1/BPO2 post-Osaka fractions. Single source of truth restored.
+- **Gate:** BEACON sign-off. Blob paths unreachable on ETC (no `cancunTimestamp`).
+- **Tests:** New `"deductBlobGas"` section in `BlockPreparatorSpec` (25/25 pass).
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T4-D`
+
+---
+
 ## Open
 
 _(no open items)_

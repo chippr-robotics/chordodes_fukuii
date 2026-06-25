@@ -46,6 +46,16 @@
 
 ---
 
+## §ETH-T4-B: maxFeePerBlobGas validation for Type-3 transactions (2026-06-25)
+
+#### `bd43ed49b` — fix(eth): validate maxFeePerBlobGas >= blobBaseFee for Type-3 transactions (EIP-4844)
+- **What:** Added `validateMaxFeePerBlobGas` to `StdSignedTransactionValidator`; added `TransactionMaxFeePerBlobGasTooLow` error variant to `SignedTransactionValidator`. Type-3 transactions with `maxFeePerBlobGas < blobBaseFee` now rejected (previously silently accepted).
+- **Gate:** BEACON sign-off. ETC unaffected — `BlobTransaction` is unreachable on all ETC/Mordor configs.
+- **Tests:** 4 new in `StdSignedTransactionValidatorSpec`.
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T4-B`
+
+---
+
 ## Open
 
 - EIP-2935 account-existence gap tracked in CHASE-QUEUE (FORGE + BEACON before Olympia)
