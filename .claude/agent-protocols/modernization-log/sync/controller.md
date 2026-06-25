@@ -6,6 +6,15 @@
 
 ---
 
+## §8k-K: Child ref narrowing + PeerRequestHandler dual-adapter fix (2026-06-25)
+
+#### `a6b0304e7` — SyncController child refs Classic→Typed; PeerRequestHandler dual-adapter bug
+- **Files:** `sync/StorageRecoveryActor.scala` (drop `.toClassic`, narrow `RequestRecentRoot.replyTo`), `sync/PeerRequestHandler.scala` (merge dual adapters), `sync/SyncControllerSpec.scala` (G5 backlink + safeDownloadTarget fixes)
+- **What:** `RequestRecentRoot.replyTo: ActorRef` → `TypedActorRef[StorageRecoveryActor.Command]`; `ctx.self.toClassic` → `ctx.self`. PeerRequestHandler: Pekko `internalMessageAdapter` silently overwrites same-type registration — merged `msgAdapter`/`disconnectAdapter` into single `peerEventAdapter`. SyncControllerSpec: `validateHeaderOnly` override fixed to `Right` (G5 backlink); `safeDownloadTarget` set above `bestBlockHeaderNumber` (Typed FastSync `enqueueHeadersIfNeeded` guard); ETH69 by-hash backlink probe handler added.
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8k-K`
+
+---
+
 ## Pekko Classic → Typed Migration (Wave 3, Part 6)
 
 #### W3-ROOT/CAPSTONE commits — SyncController + NodeBuilder root flip

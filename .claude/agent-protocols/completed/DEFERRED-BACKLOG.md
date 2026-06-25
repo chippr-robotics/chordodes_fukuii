@@ -1988,6 +1988,29 @@ ETH-style fork schedule that triggered the false-admission path).
 
 ---
 
+## §8k-K — SyncController child refs Classic→Typed; PeerRequestHandler dual-adapter bug ✅ DONE
+
+**Commit:** `a6b0304e7`
+**Branch:** `scala3-cleanup-june`
+**Date:** 2026-06-25
+**Agent:** LOOM
+
+**What:**
+- `StorageRecoveryActor.RequestRecentRoot.replyTo`: `ActorRef` → `TypedActorRef[StorageRecoveryActor.Command]`
+- `StorageRecoveryActor`: `ctx.self.toClassic` → `ctx.self` (Classic compat shim removed)
+- **PeerRequestHandler dual-adapter bug** (found during sprint): Pekko's `internalMessageAdapter` silently overwrites a prior registration of the same type `T` (filterNot + prepend on `_messageAdapters`). Two separate `msgAdapter`/`disconnectAdapter` registrations both resolved to the same `messageAdapterRef` with only the last registration's function surviving. Merged into a single `peerEventAdapter` covering both `MessageFromPeer` and `PeerDisconnected`.
+
+**SyncControllerSpec fixes (88/88 pass):**
+- `validateHeaderOnly` override returned `Left(HeaderPoWError)`; G5 `PivotBlockSelector` uses this for PoW backlink checks, causing exponential-backoff retries that exhausted the `eventually` window before `SelectionFailed` arrived. Fixed to `Right(BlockHeaderValid)` — only `validate()` (full block) must fail.
+- `safeDownloadTarget` must exceed `bestBlockHeaderNumber`; Typed `FastSync` caps header fetches at `safeDownloadTarget` via `enqueueHeadersIfNeeded` (Classic version had no such guard).
+- ETH69 G5 by-hash backlink probe handler added to peer mock (stores pivot header in canonical chain so `PivotBlockSelector`'s canonical-match check succeeds).
+
+**Verification:** `sbt compile-all` — clean. `SyncControllerSpec` 88/88 pass. `scalafmtAll` — no changes.
+
+**Cross-refs:** `modernization-log/sync/controller.md §8k-K`; continuation file `.local/docs/continuations/LOOM-SyncController.md`.
+
+---
+
 ## §ETH-T4-A — KZG Point Evaluation Precompile (EIP-4844) ✅ FIXED 2026-06-25
 
 **Commit:** `02aaa05fc`
