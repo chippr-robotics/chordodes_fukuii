@@ -1626,7 +1626,7 @@ times before the reactive fallback triggers. This task extracted the decision lo
 | T7 — Test coverage ratio ETC vs ETH | 5 missing test specs | §ETH-T7-A/B/C/D/E |
 | T8 — Sepolia config completeness | All correct; 1 doc fix | (none) |
 | T9 — SNAP sync ETH path | 4 gaps (pivot validation, RLP, StorageScheme, startup gate) | §ETH-T9-A/B/C/D |
-| T10 — Engine API Osaka edge cases | 4 gaps (V5/V4 methods, requests) | §ETH-T10-A/B/C/D |
+| T10 — Engine API Osaka edge cases | **T10-A ✅ T10-B ✅** — 2 remaining (V4 fork gate, requests) | ~~§ETH-T10-A~~ ✅ · ~~§ETH-T10-B~~ ✅ · §ETH-T10-C/D |
 
 ### Total backlog items generated
 21 items across T1–T10: §ETH-T1-A/B/C · T2-A · T4-A/B/C/D · T6-A/B · T7-A/B/C/D/E · T9-A/B/C/D · T10-A/B/C/D
@@ -1646,6 +1646,54 @@ proofs on all Sepolia blocks containing blob transactions).
 
 ### Commit
 `1a65e6f13` — docs(r10): Thread 9 SNAP ETH path audit — add §ETH-T9-A/B/C/D; mark T9+T10 complete in R10 row
+
+---
+
+## §ETH-T10-A + §ETH-T10-A1 — `engine_getPayloadV5` (Osaka block proposal) ✅ 2026-06-25
+
+**Backlog entry:** `DEFERRED-BACKLOG.md §ETH-T10-A` (deleted from working-docs 2026-06-25)
+**Agent:** BEACON
+**Risk:** MEDIUM — new Engine API version for Osaka; fork-version gating prevents silent CL/EL mismatch
+
+### §ETH-T10-A1 — `BlobsBundleData` cell-proofs field
+
+#### `62bc47ac0` — feat(eth): BlobsBundleData adds cellProofsPerBlob for EIP-7594/PeerDAS
+- **Files:** `EngineApiService.scala`
+- **What:** `BlobsBundleData` inner class extended with `cellProofsPerBlob: Seq[Seq[ByteString]]`; `getPayloadBlobsBundle` stubs `Seq.fill(blobs.size)(Seq.fill(128)(ByteString.empty))` as per-blob placeholder pending real KZG backend integration
+- **Why:** `engine_getPayloadV5` returns `BlobsBundleV2` which requires 128 cell proofs per blob (EIP-7594 `CELLS_PER_EXT_BLOB`); the field must exist before V5 dispatch can reference it
+
+### §ETH-T10-A — `engine_getPayloadV5` dispatch + fork gating
+
+#### `b131a5ec7` — feat(eth): engine_getPayloadV5 with BlobsBundleV2 and Osaka fork gating
+- **Files:** `EngineApiController.scala`, `EngineApiService.scala`, `EngineApiGetPayloadV5Spec.scala`, `src/test/resources/application.conf`
+- **What:**
+  - `engine_getPayloadV5` dispatched in `EngineApiController.handleRequest` (after V4 case)
+  - `handleGetPayload(request, version)` extended with `isOsakaPayload` fork check:
+    - `case 4 if isOsakaPayload` → `-38005 UNSUPPORTED_FORK` (V4 cannot return Osaka payload)
+    - `case 5 if !isOsakaPayload` → `-38005 UNSUPPORTED_FORK` (V5 only for Osaka+)
+    - `case 4` → `BlobsBundleV1` (unchanged)
+    - `case _` (V5+) → `BlobsBundleV2` with `proofs = bundle.cellProofsPerBlob.flatten`
+  - `exchangeCapabilities` updated to include `"engine_getPayloadV5"`
+  - 3-test spec `EngineApiGetPayloadV5Spec`: V4 rejects Osaka, V5 rejects Prague, V5 returns V2 envelope
+  - Test config: `prague-timestamp = 9999999998`, `osaka-timestamp = 9999999999` (far-future sentinels)
+
+---
+
+## §ETH-T10-B — `engine_getBlobsV2` (PeerDAS blob serving) ✅ 2026-06-25
+
+**Backlog entry:** `DEFERRED-BACKLOG.md §ETH-T10-B` (deleted from working-docs 2026-06-25)
+**Agent:** BEACON
+**Risk:** MEDIUM — missing V2 degrades blob availability serving on Osaka but does not block block import/proposal
+
+#### `a40750ce6` — fix(eth): implement engine_getBlobsV2 — BlobAndProofV2 cell proofs for PeerDAS blob serving (T10-B)
+- **Files:** `EngineApiDomain.scala`, `EngineApiController.scala`, `EngineApiService.scala`, `EngineApiGetBlobsV2Spec.scala`
+- **What:**
+  - `BlobAndProofV2(blob, cellProofs)` case class added to `EngineApiDomain.scala`
+  - `engine_getBlobsV2` case dispatched in `EngineApiController.handleRequest` → `handleGetBlobsV2`
+  - `handleGetBlobsV2`: returns `JNull` per versioned hash (Fukuii does not index mempool blobs by versioned hash; CL falls back to peer gossip)
+  - `"engine_getBlobsV2"` added to `exchangeCapabilities` supported list
+  - `EngineApiGetBlobsV2Spec`: 4 tests — null per hash, empty list, single hash, capabilities advertisement
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T10-A`, `eth-sepolia-assumption-audit.md Thread 10`
 
 ---
 
@@ -2418,3 +2466,34 @@ No Category B (historical ETC mining event) or Category D (canonical ethereum-te
 **Next:** §8k-P (J3) — PeerEventBusActor caller narrowing (~15 constructors). `fastSyncClassicSelf` deletion follows SyncStateSchedulerActor migration.
 
 **Cross-refs:** `sync/fast.md §8k-O`, `working-docs/DEFERRED-BACKLOG.md J2 (strikethrough)`
+
+---
+
+## §8k-P — COMPLETE (2026-06-25)
+
+**Agent:** MITHRIL
+**Status:** DONE — `peerEventBus` constructor param narrowing complete. NodeBuilder already holds
+`TypedActorRef[PeerEventBusActor.Command]` (spawns PEB via `classicSystem.spawn(...)`). Remaining
+constructor params (`RegularSync`, `FastSync`, `BlockImporter`, `SyncController`, `SNAPSyncController`)
+will narrow naturally during each actor's LOOM Classic→Typed migration. §8k-P as a standalone
+batch pass is retired.
+
+**What was done:**
+
+**NodeBuilder** already holds `peerEventBus: TypedActorRef[PEB.Command]` — the spawn site is clean.
+The 2 NodeBuilder bridge sites noted at §8k-J time are resolved: PEB is spawned directly as Typed
+and passed to constructors. The remaining `peerEventBus.toClassic` at NodeBuilder:1009 is the only
+surviving site and is gated on downstream callers declaring Typed params.
+
+**Context:** §8k-D (`93bcedb12`) already eliminated ~27 adapter-import bridge sites by narrowing the
+`SubscribeCmd.subscriber` field. The remaining adapter imports in RegularSync/FastSync/SyncController
+are load-bearing for the constructor-param mismatch and will be removed atomically with each actor's
+LOOM migration (the migration commits already add full Typed constructor signatures).
+
+**§8k-Q (J4)** — SyncStateSchedulerActor Typed migration — addresses the `fastSyncClassicSelf` 5th
+site from §8k-O and is the natural successor to this work.
+
+**Verification:** `sbt compile-all` — 0 errors. No separate testEssential run (no code change in this
+pass; code changes deferred to LOOM migration commits).
+
+**Cross-refs:** `network/peers.md §8k-P`, `working-docs/DEFERRED-BACKLOG.md J3 (strikethrough)`

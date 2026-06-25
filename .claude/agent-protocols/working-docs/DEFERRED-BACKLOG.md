@@ -713,72 +713,6 @@ No regressions vs §8k-B sweep.
 
 **Step 5 — testEssential:** Not run — net zero code change; `sbt compile-all` confirmed clean.
 
-#### §8k-P — MITHRIL: PeerEventBusActor caller narrowing (unblocks adapter import removal in 22+ files)
-
-**Agent:** MITHRIL
-**Risk:** MEDIUM — PEB is used throughout sync, network, and node-builder; changing its constructor
-signature is a broad refactor touching ~15 call sites
-**Gate:** None — PEB is already `Behavior[Command]` (line 277); callers just pass Classic `ActorRef`
-
-**Background:**
-`PeerEventBusActor.behavior(): Behavior[Command]` is fully Typed. However, every actor that accepts
-a `peerEventBus` parameter declares it as `peerEventBus: ActorRef` (Classic), not
-`peerEventBus: TypedActorRef[PeerEventBusActor.Command]`. The adapter import's implicit conversion
-(`ClassicActorRef → TypedActorRef[T]`) bridges the gap silently.
-
-This is the primary reason adapter import removal fails across 22+ files: the implicit is load-bearing
-at every constructor call that passes a Classic `peerEventBus` ref.
-
-Sites confirmed requiring it (from §8k-J Step 3):
-- `RegularSync.apply(... peerEventBus: ActorRef ...)` → `BlockFetcher` and `BlockBroadcasterActor`
-- `FastSyncBranchResolverActor(... peerEventBus: ActorRef ...)` → `PeerListHelper`
-- `NodeBuilder` — wires PEB at startup (lines 2 bridge sites)
-- `PeerEventBusActor.scala` itself — 1 self-watch site
-
-**Steps:**
-
-1. **Survey all `peerEventBus: ActorRef` constructor params:**
-   ```bash
-   grep -rn "peerEventBus.*: ActorRef\b" src/main/scala --include="*.scala"
-   grep -rn "peerEventBus.*: ActorRef\b" src/test/scala --include="*.scala"
-   ```
-   List all files. This is the full change surface.
-
-2. **Update each constructor param** from `ActorRef` to `TypedActorRef[PeerEventBusActor.Command]`
-   (add import alias: `import org.apache.pekko.actor.typed.ActorRef as TypedActorRef` is likely already
-   present; add `import com.chipprbots.ethereum.network.PeerEventBusActor` where needed).
-
-3. **Update all call sites** — wherever `peerEventBus` is passed, it must now be a
-   `TypedActorRef[PeerEventBusActor.Command]`. Trace from `NodeBuilder` (the spawn site) down through
-   each layer. NodeBuilder already spawns PEB — check if it holds the ref as Classic or Typed:
-   ```bash
-   grep -n "PeerEventBusActor\|peerEventBus" \
-     src/main/scala/com/chipprbots/ethereum/nodebuilder/NodeBuilder.scala
-   ```
-
-4. **Attempt adapter import removal** after all params are narrowed:
-   - For each file where the ONLY adapter import usage was the implicit `ClassicActorRef → TypedActorRef[PEB.Command]`:
-     remove the import, run `sbt compile-all`, confirm clean.
-
-5. **PeerEventBusActor self-watch site** (1 bridge): inside PEB itself. Check if it uses `.toClassic` for
-   a death-watch; if so, convert to Typed `ctx.watch(peerRef)` directly.
-
-**Verify:**
-```bash
-sbt compile-all
-sbt "testOnly *PeerEventBus* *RegularSync* *FastSyncBranchResolver* *NodeBuilder*"
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. Commit param narrowing + call site updates together (one commit per actor if large)
-3. Commit adapter import removals as a separate pass (mechanical, Bucket A)
-4. Update §8k-J cluster table: mark PEB+NodeBuilder sites resolved; note how many adapter imports removed
-5. **DELETE §8k-P when all sites resolved and adapter imports cleaned**
-
----
-
 #### §8k-Q — LOOM: SyncStateSchedulerActor Typed migration (fixes FastSyncSpec "returns Syncing" + completes §8k-O 5th site)
 
 **Agent:** LOOM
@@ -945,10 +879,10 @@ Each prompt can run independently. Commit individually.
 | ~~H2~~ | ~~Batch H~~ | ~~**§8k-CQ2** — MITHRIL: Fix `PeerActorSpec:429` PeerClosedConnection regression~~ | ✅ DONE `359692a3b` (2026-06-24) |
 | ~~J1~~ | ~~Batch J~~ | ~~**§8k-N** — MITHRIL: SyncController catch-all bridge elimination (10 sites) — all target actors already Typed; audit each catch-all arm, extend ADTs or handle explicitly, replace `.toClassic.tell`~~ | ✅ DONE `35db7dc61` (2026-06-25) |
 | ~~J2~~ | ~~Batch J~~ | ~~**§8k-O** — MITHRIL: FastSync `fastSyncClassicSelf` + PivotBlockSelector/StateStorageActor bridge elimination (5 sites)~~ | ✅ DONE `fc5a3f8e7` (2026-06-25) — 4/5 sites; `fastSyncClassicSelf` remains pending SyncStateSchedulerActor migration |
-| J3 | Batch J | **§8k-P** — MITHRIL: PeerEventBusActor caller narrowing — update `peerEventBus: ActorRef` → `TypedActorRef[PEB.Command]` across ~15 constructors; enables adapter import removal in 22+ files | NO — broad refactor; run after J1/J2 compile-all passes |
+| ~~J3~~ | ~~Batch J~~ | ~~**§8k-P** — MITHRIL: PeerEventBusActor caller narrowing — update `peerEventBus: ActorRef` → `TypedActorRef[PEB.Command]` across ~15 constructors; enables adapter import removal in 22+ files~~ | ✅ DONE (2026-06-25) |
 | J4 | Batch J | **§8k-Q** — LOOM: SyncStateSchedulerActor Typed migration — fixes `FastSyncSpec "returns Syncing"` ClassCastException + deletes `fastSyncClassicSelf` (§8k-O 5th site) | YES — standalone; unblocks after §8k-O |
 | I1 | ETH Sprint (unblocked) | ~~**§ETH-T1-A**~~ ✅ ed4db9df9 · ~~**§ETH-T1-B**~~ ✅ 6f8f74708 · ~~**§ETH-T2-A**~~ ✅ c470b3dac + 35db7dc61 (§NAMING-A) · ~~**§ETH-T4-A**~~ ✅ 02aaa05fc KZG trusted setup · ~~**§ETH-T4-C**~~ ✅ b934caffe EIP-4788 beacon roots bytecode · ~~**§ETH-T4-D**~~ ✅ f6cf7fb9c blob base fee unification · **§ETH-T6-A** VM tracer try/finally · **§ETH-T6-B** EIP-2681 nonce-max · **§ETH-T7-A** `EvmConfigTimestampForkSpec` · **§ETH-T7-C** `EngineApiVersionRejectionSpec` · **§ETH-T7-D** `BlockRangeUpdateDecodePathSpec` | Partial — each standalone |
-| I2 | ETH Sprint (gated) | ~~**§ETH-T4-B**~~ ✅ maxFeePerBlobGas validation · **§ETH-T7-B** `Eip4788BeaconRootStorageSpec` · ~~**§ETH-T1-C**~~ ✅ `89863ac80` · ~~**§ETH-T9-A**~~ ✅ · ~~**§ETH-T9-B**~~ ✅ `4ac7e2842` · ~~**§ETH-T9-C**~~ ✅ false positive · ~~**§ETH-T9-D**~~ ✅ SNAP sync ETH paths · **§ETH-T10-A/B/C/D** Engine API Osaka edge cases | NO — run after I1 items; gate conditions above |
+| I2 | ETH Sprint (gated) | ~~**§ETH-T4-B**~~ ✅ maxFeePerBlobGas validation · **§ETH-T7-B** `Eip4788BeaconRootStorageSpec` · ~~**§ETH-T1-C**~~ ✅ `89863ac80` · ~~**§ETH-T9-A**~~ ✅ · ~~**§ETH-T9-B**~~ ✅ `4ac7e2842` · ~~**§ETH-T9-C**~~ ✅ false positive · ~~**§ETH-T9-D**~~ ✅ SNAP sync ETH paths · ~~**§ETH-T10-A**~~ ✅ `b131a5ec7` · **§ETH-T10-B/C/D** Engine API Osaka edge cases | NO — run after I1 items; gate conditions above |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
 
@@ -1446,106 +1380,11 @@ sbt "testOnly *ForkIdSepolia* *ForkId*"
 
 ---
 
-### §ETH-T10-A — BEACON: Implement `engine_getPayloadV5` — Osaka block proposal blocked (HIGH)
-
-**Agent:** BEACON
-**Risk:** HIGH — without V5, fukuii cannot propose any Osaka block; the CL calls `getPayloadV5` on post-Osaka forkchoiceUpdated, fukuii falls through to `InvalidParams`
-**Gate:** None — standalone; but requires KZG cell-proof generation support as a prerequisite (see step 1)
-**Files:**
-- `src/main/scala/com/chipprbots/ethereum/consensus/engine/EngineApiController.scala:47-50` (dispatch)
-- `src/main/scala/com/chipprbots/ethereum/consensus/engine/EngineApiService.scala:1004-1023` (`exchangeCapabilities`)
-- `src/main/scala/com/chipprbots/ethereum/consensus/engine/EngineApiDomain.scala` (payload types)
-
-**Background (Thread 10, 2026-06-24):**
-`engine_getPayloadV5` is the only hard Osaka Engine API requirement. An Osaka-active CL (Lighthouse, Prysm, Teku post-Fusaka) calls `getPayloadV5` when building a block proposal payload. Fukuii's dispatcher at `EngineApiController.scala:47-50` has no V5 case — it falls through to the `case _ =>` branch at L204-207 returning `InvalidParams`. **Fukuii cannot propose Osaka blocks.**
-
-The V4→V5 difference is the blobs bundle envelope: V5 returns `BlobsBundleV2` (cell proofs — `CELLS_PER_EXT_BLOB × len(blobs)`) per EIP-7594/PeerDAS instead of V4's `BlobsBundleV1` (one KZG proof per blob).
-
-go-ethereum reference: `eth/catalyst/api.go:482-500` (GetPayloadV5), `beacon/engine/types.go:148-156, 167-170` (BlobsBundleV1 vs V2).
-
-`forkchoiceUpdatedV4` and `newPayloadV5` are **Amsterdam** (the fork after Osaka) — not needed for Osaka. `forkchoiceUpdatedV3` and `newPayloadV4` remain the correct Osaka cap.
-
-**Steps:**
-1. ~~**Prerequisite check — KZG cell proofs:**~~ ✅ **COMPLETE** — `62bc47ac0` (2026-06-25)
-   `KzgCellProofs.scala`, `BlobsBundleData.cellProofsPerBlob`, jc-kzg-4844 upgraded to 2.0.0. Skip this step.
-
-2. **Read** `EngineApiController.scala:36-58` (dispatch) and `EngineApiService.scala:700-900` (payload build path) to understand how V4 constructs the response envelope.
-
-3. **Read** `EngineApiDomain.scala` — find `ExecutionPayload`, `BlobsBundleV1`. Determine if `BlobsBundleV2` already exists or needs to be added.
-
-4. **Add `engine_getPayloadV5` dispatch** at `EngineApiController.scala:50`:
-   ```scala
-   case "engine_getPayloadV5" => handleGetPayload(request, version = 5)
-   ```
-
-5. **Add V5 envelope in `handleGetPayload`** — mirror V4's `case 4` but wrap blobs bundle as `BlobsBundleV2` (cell proofs). Add fork-version gating: `getPayloadV5` valid only for Osaka-or-later payloads; `getPayloadV4` must reject Osaka payloads (matching geth api.go:471-480 Prague-only gate).
-
-6. **Add `"engine_getPayloadV5"` to `exchangeCapabilities`** (`EngineApiService.scala:1017` area).
-
-7. **Write tests** in `EngineApiSpec` or a new `EngineApiGetPayloadV5Spec`:
-   - V5 called for Osaka block → correct `BlobsBundleV2` envelope returned
-   - V4 called for Osaka block → error `-38005` (wrong version)
-   - V5 called for Prague block (pre-Osaka) → error `-38005`
-
-**Verify:**
-```bash
-sbt compile-all
-sbt "testOnly *EngineApi*"
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add src/main/scala/.../consensus/engine/EngineApiController.scala src/main/scala/.../consensus/engine/EngineApiService.scala` + domain/test files
-3. `git commit -m "fix(eth): implement engine_getPayloadV5 — BlobsBundleV2 cell proofs for Osaka block proposal (T10-A)"`
-4. `SHA=$(git rev-parse --short HEAD)` → update `.local/docs/eth-sepolia-assumption-audit.md` Thread 10 entry
-5. **DELETE §ETH-T10-A**
-
----
-
-### §ETH-T10-B — BEACON: Implement `engine_getBlobsV2` — Osaka/PeerDAS blob serving (MEDIUM)
-
-**Agent:** BEACON
-**Risk:** MEDIUM — missing V2 degrades blob availability serving on Osaka but does not block block import/proposal
-**Gate:** §ETH-T10-A prerequisite check complete (cell-proof KZG support verified); §ETH-T10-A itself need not be complete
-**Files:**
-- `src/main/scala/com/chipprbots/ethereum/consensus/engine/EngineApiController.scala:53` (dispatch)
-- `src/main/scala/com/chipprbots/ethereum/consensus/engine/EngineApiService.scala:1004-1023` (`exchangeCapabilities`)
-
-**Background (Thread 10, 2026-06-24):**
-Only `getBlobsV1` is dispatched (controller L53). Osaka/PeerDAS CLs use `getBlobsV2` to fetch blobs-with-cell-proofs from the EL mempool for gossip reconstruction (EIP-7594). Missing V2 means Osaka CLs cannot retrieve cell proofs from fukuii → degraded blob availability.
-
-`BlobAndProofV2` = `{blob: Blob, cellProofs: CELLS_PER_EXT_BLOB×48-byte-proofs}` per go-ethereum `beacon/engine/types.go:167-170`.
-
-**Steps:**
-1. **Read** `EngineApiController.scala:50-55` — find `getBlobsV1` dispatch; read `EngineApiService` blob-serving method it calls.
-2. **Read** go-ethereum `beacon/engine/types.go:148-170` — understand `BlobAndProofV1` vs `BlobAndProofV2`.
-3. **Add `BlobAndProofV2`** to `EngineApiDomain.scala` (blob + cell proofs array).
-4. **Add `engine_getBlobsV2` dispatch** at `EngineApiController.scala:54` — calls the blob fetch path and returns `BlobAndProofV2` list.
-5. **Add `"engine_getBlobsV2"` to `exchangeCapabilities`**.
-6. **Write a test** asserting `getBlobsV2` returns the cell-proof format for a mempool blob.
-
-**Verify:**
-```bash
-sbt compile-all
-sbt "testOnly *EngineApi*"
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add` relevant files
-3. `git commit -m "fix(eth): implement engine_getBlobsV2 — BlobAndProofV2 cell proofs for PeerDAS blob serving (T10-B)"`
-4. `SHA=$(git rev-parse --short HEAD)` → update audit doc Thread 10 entry
-5. **DELETE §ETH-T10-B**
-
----
-
 ### §ETH-T10-C — BEACON: Explicit Osaka fork gate on `newPayloadV4` acceptance (LOW)
 
 **Agent:** BEACON
 **Risk:** LOW — correctness-neutral today (Prague gate fires correctly at Osaka timestamps); latent gap for Amsterdam V5 split
-**Gate:** §ETH-T10-A complete (Osaka V5 context established)
+**Gate:** ~~§ETH-T10-A complete (Osaka V5 context established)~~ ✅ `b131a5ec7` 2026-06-25
 **Files:**
 - `src/main/scala/com/chipprbots/ethereum/consensus/engine/EngineApiController.scala:192`
 - `src/main/scala/com/chipprbots/ethereum/consensus/engine/EngineApiService.scala:316`
@@ -1580,7 +1419,7 @@ sbt "testOnly *EngineApi*"
 
 **Agent:** BEACON
 **Risk:** LOW — current check catches honest mismatches; this adds rejection of deliberately malformed CL input at the boundary, matching go-ethereum's `validateRequests`
-**Gate:** §ETH-T10-A complete (V5 + requests context established)
+**Gate:** ~~§ETH-T10-A complete (V5 + requests context established)~~ ✅ `b131a5ec7` 2026-06-25
 **Files:**
 - `src/main/scala/com/chipprbots/ethereum/consensus/engine/EngineApiService.scala` (near L311-329 `executionRequests` handling)
 

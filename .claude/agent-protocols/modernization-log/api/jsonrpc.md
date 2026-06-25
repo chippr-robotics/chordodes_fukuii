@@ -103,6 +103,36 @@
 
 ---
 
+## §ETH-T10-A — `engine_getPayloadV5` + BlobsBundleV2 (2026-06-25)
+
+#### `62bc47ac0` — feat(eth): BlobsBundleData adds cellProofsPerBlob for EIP-7594/PeerDAS
+- **Files:** `EngineApiService.scala`
+- **What:** `BlobsBundleData` inner class extended with `cellProofsPerBlob: Seq[Seq[ByteString]]`; `getPayloadBlobsBundle` stubs 128 empty cell-proof ByteStrings per blob pending real KZG backend
+
+#### `b131a5ec7` — feat(eth): engine_getPayloadV5 with BlobsBundleV2 and Osaka fork gating
+- **Files:** `EngineApiController.scala`, `EngineApiService.scala`, `EngineApiGetPayloadV5Spec.scala`, `src/test/resources/application.conf`
+- **What:**
+  - `engine_getPayloadV5` case in `handleRequest`
+  - `handleGetPayload` extended with Osaka fork gating: V4 rejects Osaka payloads (`-38005`); V5 rejects pre-Osaka payloads (`-38005`); V5+ returns `BlobsBundleV2` with `proofs = bundle.cellProofsPerBlob.flatten`
+  - `exchangeCapabilities` updated to include `"engine_getPayloadV5"`
+  - `EngineApiGetPayloadV5Spec`: 3 tests covering V4/V5 fork rejection and V2 envelope shape
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T10-A`, `eth-sepolia-assumption-audit.md Thread 10`
+
+---
+
+## §ETH-T10-B — `engine_getBlobsV2` + `BlobAndProofV2` (2026-06-25)
+
+#### `a40750ce6` — fix(eth): implement engine_getBlobsV2 — BlobAndProofV2 cell proofs for PeerDAS blob serving (T10-B)
+- **Files:** `EngineApiDomain.scala`, `EngineApiController.scala`, `EngineApiService.scala`, `EngineApiGetBlobsV2Spec.scala`
+- **What:**
+  - `BlobAndProofV2(blob, cellProofs)` added to `EngineApiDomain`
+  - `engine_getBlobsV2` dispatched in `handleRequest` → `handleGetBlobsV2` (returns `JNull` per versioned hash — no mempool blob index by hash; CL falls back to peer gossip)
+  - `"engine_getBlobsV2"` added to `exchangeCapabilities`
+  - `EngineApiGetBlobsV2Spec`: 4 tests (null per hash, empty list, single hash, capabilities)
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T10-B`, `eth-sepolia-assumption-audit.md Thread 10`
+
+---
+
 ## Open / Deferred
 
 - json4s Manifest synthesis warnings (68 hits) — externally gated on json4s 4.2.0-M5 release
