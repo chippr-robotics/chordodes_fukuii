@@ -105,17 +105,26 @@
 
 ---
 
-## ETH/Sepolia Pivot Header Validation — §ETH-T9-A (2026-06-25)
+## ETH/Sepolia SNAP Sync ETH Path Audit — §ETH-T9-A/B/C/D (2026-06-25, ALL COMPLETE)
 
-#### `4ac7e2842` — fix(eth): validate pivot header against PostMergeBlockHeaderValidator before SNAP commit
+#### `4ac7e2842` — fix(eth): validate pivot header against PostMergeBlockHeaderValidator before SNAP commit (§ETH-T9-A)
 - **What:** `isPostMergeChain` gate added at both SNAP pivot storage paths in `SNAPSyncController`: the `BootstrapComplete` handler and `completePivotRefreshWithStateRoot`. On ETH/Sepolia, calls `PostMergeBlockHeaderValidator.validateHeaderOnly(header)` before any `appStateStorage` write. Rejection in bootstrap calls `startSnapSync()`; rejection in pivot refresh returns early. ETC (`isPostMergeChain = false`) skips the gate entirely.
 - **Files:** `SNAPSyncController.scala`, `SNAPSyncControllerSpec.scala` (4 new tests)
 - **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T9-A`, `.local/docs/eth-sepolia-assumption-audit.md` Thread 9
 
-#### `4ac7e2842` — fix(eth): validateFieldCount — gate BlockHeader RLP field-count on fork timestamp
+#### `4ac7e2842` — fix(eth): validateFieldCount — gate BlockHeader RLP field-count on fork timestamp (§ETH-T9-B)
 - **What:** Added `BlockHeader.validateFieldCount(header, config)` to `BlockHeader` companion object. Chained at both SNAP pivot acceptance sites before `PostMergeBlockHeaderValidator` (bootstrap + pivot refresh). Also called in `SyncBlocksValidator.validateHeaderOnly` for the fast sync header path. ETC short-circuits immediately (`networkType != ETH`).
 - **Files:** `domain/BlockHeader.scala`, `sync/snap/SNAPSyncController.scala` (2 sites), `sync/fast/SyncBlocksValidator.scala`, new `domain/BlockHeaderFieldCountSpec.scala` (6 tests)
 - **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T9-B`, `.local/docs/eth-sepolia-assumption-audit.md` Thread 9
+
+#### N/A — §ETH-T9-C: StorageScheme routing in SNAP coordinators — FALSE POSITIVE (2026-06-25)
+- **What:** Thread 9 Explore audit flagged three SNAP coordinators as potentially missing `storageScheme` dispatch. Full file reads confirm all three are correctly wired: `AccountRangeCoordinator.getOrCreateTaskStackTrie:1570`, `StorageRangeCoordinator.getOrCreateAccountTrie:490`, `TrieNodeHealingCoordinator.processActiveResponse:1373`. Each has an explicit `storageScheme match { case Hash => ...; case Path => ... }` dispatch. No code change.
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T9-C`, `.local/docs/eth-sepolia-assumption-audit.md` Thread 9
+
+#### `TBD` — fix(config): assert storageScheme matches chain type at SNAPSyncController startup (§ETH-T9-D)
+- **What:** `SyncController.loadSnapSyncConfig()` now validates `storageScheme` against `blockchainConfig.networkType` via `require()`. ETH → `StorageScheme.Path`; ETC → `StorageScheme.Hash`. Assertion fires before any actor is spawned; all three SNAP startup paths in `SyncController` call `loadSnapSyncConfig()`. Two new imports added (`StorageScheme`, `NetworkType`). Complements the existing `SNAPSyncControllerImpl.checkStorageSchemeMismatch()` (DB-state vs config) with an earlier config vs chain-type gate.
+- **Files:** `blockchain/sync/SyncController.scala`
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T9-D`, `.local/docs/eth-sepolia-assumption-audit.md` Thread 9
 
 ---
 

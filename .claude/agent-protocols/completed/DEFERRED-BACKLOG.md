@@ -2270,3 +2270,52 @@ Added `if isPostMergeChain then { given bc: BlockchainConfig = ...; PostMergeBlo
 **Result:** `sbt compile-all` → 0 errors. `sbt scalafmtAll` → 1 file reformatted.
 
 **Cross-refs:** `modernization-log/consensus/engine.md §NAMING-A`
+
+---
+
+## §ETH-T9-C — BEACON: Verify StorageScheme routing in SNAP coordinators ✅ FALSE POSITIVE 2026-06-25
+
+**Commit:** N/A — no code change needed
+**Agent:** BEACON
+**Risk:** N/A — false positive confirmed; Explore agent audit could not see past file-read truncation limits
+
+**Verdict:** WIRED — all three SNAP coordinators correctly dispatch on `storageScheme`. The Thread 9 Explore agent flagged the gap because both remaining dispatch sites were past its read-window truncation.
+
+**Dispatch sites verified (2026-06-25):**
+- `AccountRangeCoordinator.getOrCreateTaskStackTrie` (line 1570): `storageScheme match { case Hash => new SnapHashTrie(batch => mptStorage.storeRawNodes(batch)); case Path => new SnapPathTrie(...pns.writeAccountNode...) }`
+- `StorageRangeCoordinator.getOrCreateAccountTrie` (line 490): `storageScheme match { case Hash => new SnapHashTrie(...); case Path => new SnapPathTrie(...pns.writeStorageNode...) }`
+- `TrieNodeHealingCoordinator.processActiveResponse` (line 1373): `storageScheme match { case Hash => rawNodeBuffer += (nodeHash, nodeData.toArray); case Path => pathNodeStorageOpt.foreach(pns => ... pns.writeStorageNode / writeAccountNode) }`
+
+**Cross-refs:** `sync/snap.md §ETH-T9-C`, `.local/docs/eth-sepolia-assumption-audit.md` Thread 9
+
+---
+
+## §ETH-T9-D — BEACON: Startup assertion — storageScheme must match chain type ✅ FIXED 2026-06-25
+
+**Commit:** `TBD` — 2026-06-25
+**Agent:** BEACON
+**Risk (pre-fix):** MEDIUM — a misconfigured ETC node (`storage-scheme = path`) or ETH node (`storage-scheme = hash`) would start successfully and sync state into the wrong layout, failing silently until state verification
+
+**Files changed:**
+- `src/main/scala/com/chipprbots/ethereum/blockchain/sync/SyncController.scala` — `loadSnapSyncConfig()` now validates `storageScheme` against `blockchainConfig.networkType` via `require()` before returning. All three SNAP startup paths in `SyncController` call `loadSnapSyncConfig()`, so all are covered.
+
+**What was added (in `loadSnapSyncConfig()`):**
+```scala
+val networkType = configBuilder.blockchainConfig.networkType
+val expectedScheme = if networkType == NetworkType.ETH then StorageScheme.Path else StorageScheme.Hash
+require(
+  config.storageScheme == expectedScheme,
+  s"storageScheme=${config.storageScheme} does not match expected $expectedScheme " +
+    s"for networkType=$networkType — check sync.snap-sync.storage-scheme in reference.conf"
+)
+```
+
+**Placement rationale:** `loadSnapSyncConfig()` is a private helper already called at all three SNAP init sites (`startSnapSync()`, and two restart variants). Adding the assertion there covers all paths without repeating it or changing public APIs.
+
+**Complement:** `SNAPSyncControllerImpl.checkStorageSchemeMismatch()` (separate, existing) detects DB-state vs config mismatch (path data + hash config). This assertion is a separate upstream gate: config vs chain type, at `require()` time before any actor is spawned.
+
+**ETC safety:** `expectedScheme = StorageScheme.Hash` for ETC — the assertion trivially passes for any correct ETC node configuration. Zero behaviour change.
+
+**VERIFY:** `sbt compile-all` → 0 errors, 67 pre-existing warnings. `sbt scalafmtAll` → 1 file reformatted.
+
+**Cross-refs:** `sync/snap.md §ETH-T9-D`, `.local/docs/eth-sepolia-assumption-audit.md` Thread 9

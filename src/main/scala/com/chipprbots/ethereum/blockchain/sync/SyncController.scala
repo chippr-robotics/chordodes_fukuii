@@ -42,6 +42,8 @@ import com.chipprbots.ethereum.ledger.BranchResolution
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.Config.SyncConfig
+import com.chipprbots.ethereum.blockchain.sync.snap.StorageScheme
+import com.chipprbots.ethereum.utils.NetworkType
 
 /** Top-level sync orchestrator.
   *
@@ -489,14 +491,23 @@ object SyncController {
       ctx.messageAdapter[SNAPSyncController.Command](WrappedExternal.apply)
 
     /** Load SNAP sync configuration with fallback to defaults */
-    private def loadSnapSyncConfig(): SNAPSyncConfig =
-      try
-        SNAPSyncConfig.fromConfig(Config.config.getConfig("sync"))
-      catch {
-        case e: Exception =>
-          log.warn(s"Failed to load SNAP sync config, using defaults: ${e.getMessage}")
-          SNAPSyncConfig()
-      }
+    private def loadSnapSyncConfig(): SNAPSyncConfig = {
+      val config =
+        try SNAPSyncConfig.fromConfig(Config.config.getConfig("sync"))
+        catch {
+          case e: Exception =>
+            log.warn(s"Failed to load SNAP sync config, using defaults: ${e.getMessage}")
+            SNAPSyncConfig()
+        }
+      val networkType = configBuilder.blockchainConfig.networkType
+      val expectedScheme = if networkType == NetworkType.ETH then StorageScheme.Path else StorageScheme.Hash
+      require(
+        config.storageScheme == expectedScheme,
+        s"storageScheme=${config.storageScheme} does not match expected $expectedScheme " +
+          s"for networkType=$networkType — check sync.snap-sync.storage-scheme in reference.conf"
+      )
+      config
+    }
 
     def idle(): Behavior[Command] = Behaviors.receive { (_, cmd) =>
       val msg = unwrap(cmd)

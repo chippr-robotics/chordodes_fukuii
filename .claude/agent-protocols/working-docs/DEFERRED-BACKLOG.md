@@ -713,82 +713,6 @@ No regressions vs §8k-B sweep.
 
 **Step 5 — testEssential:** Not run — net zero code change; `sbt compile-all` confirmed clean.
 
-#### §8k-N — MITHRIL: SyncController catch-all bridge elimination (10 sites)
-
-**Agent:** MITHRIL
-**Risk:** LOW-MEDIUM — no behaviour change on happy paths; catch-all arms only fire for messages outside the typed ADT
-**Gate:** None — all target actors are already `Behavior[Command]`; SyncController already holds typed refs
-
-**Background:**
-All Classic children SyncController forwards to are already Typed. The 10 remaining `.toClassic.tell`
-bridges in SyncController exist because each state has a catch-all arm:
-```scala
-case other => fastSync.toClassic.tell(other, noSender)       // runningFastSync — 1 site
-case msg   => snapSync.toClassic.tell(msg, noSender)          // runningSnapSync — 3 sites + line 1628
-case msg   => regularSync.toClassic.tell(msg, noSender)       // runningRegularSync/Backfill — 3 sites
-bytecodeActor.foreach(_.toClassic.tell(msg, noSender))        // recovery state — 2 sites
-storageActor.foreach(_.toClassic.tell(msg, noSender))
-```
-Refs are already narrowed (`TypedActorRef[FastSync.Command]`, `TypedActorRef[SNAPSyncController.Command]`,
-`TypedActorRef[RegularSync.Command]`, `TypedActorRef[BytecodeRecoveryActor.Command]`,
-`TypedActorRef[StorageRecoveryActor.Command]`). The bridges are needed only because the catch-all arm
-forwards types that are NOT yet in the child's Command ADT.
-
-**Steps:**
-
-1. **Audit each catch-all arm** — for each of the 5 arms above, run:
-   ```bash
-   # example for FastSync catch-all (line 560)
-   grep -rn "SyncController.*!" src/main/scala --include="*.scala" | grep -v "\/\/"
-   # then check: what types flow into SyncController from Classic callers that would reach runningFastSync
-   # and not be matched by the explicit cases before the catch-all?
-   ```
-   Identify the actual message types that flow through each catch-all. Check `unwrap(cmd)` and the
-   `messageAdapter[Any]` registration in `apply()` to understand what can arrive.
-
-2. **For `runningFastSync` catch-all (line 560):**
-   Determine what `other` types arrive. Candidates: `FastSync.Done` (handled explicitly above),
-   `SyncProtocol.*` (handled via `WrappedSyncProtocol`). If no types remain, the catch-all is dead —
-   replace with `case other => log.warning("Unexpected msg in runningFastSync: {}", other); Behaviors.same`.
-
-3. **For `runningSnapSync` catch-all (line 763) + `RegisterSnapSyncController` (line 1628):**
-   Line 1628: `snapSync.toClassic` passed to NPMA. Check if NPMA accepts `TypedActorRef[SSC.Command]` —
-   if so, drop `.toClassic`. Lines 763/1206: identify what `msg` types arrive; add to `SNAPSyncController.Command`
-   as `WrappedExternal` variants or handle explicitly in SyncController.
-
-4. **For `runningRegularSync` / `runningRegularSyncWithBackfill` catch-alls (lines 949, 1068, 1075):**
-   Line 1068: explicitly forwards `GetStatus` — check if `RegularSync.Command` includes it
-   (`type Command = SyncProtocol.RegularSyncCommand`; check whether `GetStatus` is a `RegularSyncCommand`).
-   If not, add it. Lines 949/1075: general catch-all — identify types.
-
-5. **For recovery catch-all (lines 2183-2184):**
-   The comment says "Forward SNAP protocol responses to both active recovery actors." Check what SNAP
-   protocol response types flow through `recoverySnapAdapter` and arrive here. Add them explicitly to
-   `BytecodeRecoveryActor.Command` and `StorageRecoveryActor.Command` (or a shared `RecoveryCommand` trait),
-   then replace the catch-alls with typed sends.
-
-6. After each arm is resolved (dead catch-all → logged warning, or live → typed sends), run:
-   ```bash
-   sbt compile-all
-   sbt "testOnly *SyncController*"
-   sbt testEssential   # at end only
-   ```
-
-**Verify:**
-```bash
-sbt compile-all
-sbt "testOnly *SyncController* *FastSync* *SNAPSync* *RegularSync* *BytecodeRecovery* *StorageRecovery*"
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. Stage and commit per actor (risk-stratified: one commit per catch-all arm resolved)
-3. Update §8k-J cluster table in working-docs to reflect resolved sites
-4. **DELETE §8k-N when all 10 sites resolved**
-
----
-
 #### §8k-O — MITHRIL: FastSync internal bridge elimination (`fastSyncClassicSelf` + PivotBlockSelector/StateStorageActor)
 
 **Agent:** MITHRIL
@@ -1036,8 +960,8 @@ Each prompt can run independently. Commit individually.
 | J1 | Batch J | **§8k-N** — MITHRIL: SyncController catch-all bridge elimination (10 sites) — all target actors already Typed; audit each catch-all arm, extend ADTs or handle explicitly, replace `.toClassic.tell` | YES — standalone per catch-all arm |
 | J2 | Batch J | **§8k-O** — MITHRIL: FastSync `fastSyncClassicSelf` + PivotBlockSelector/StateStorageActor bridge elimination (5 sites) — check if PBS/SSA already Typed; if so drop `.toClassic` from spawn | YES — standalone |
 | J3 | Batch J | **§8k-P** — MITHRIL: PeerEventBusActor caller narrowing — update `peerEventBus: ActorRef` → `TypedActorRef[PEB.Command]` across ~15 constructors; enables adapter import removal in 22+ files | NO — broad refactor; run after J1/J2 compile-all passes |
-| I1 | ETH Sprint (unblocked) | ~~**§ETH-T1-A**~~ ✅ ed4db9df9 · ~~**§ETH-T1-B**~~ ✅ 6f8f74708 · **§ETH-T2-A** `isPostMerge`→`isPoS` rename · ~~**§ETH-T4-A**~~ ✅ 02aaa05fc KZG trusted setup · ~~**§ETH-T4-C**~~ ✅ b934caffe EIP-4788 beacon roots bytecode · ~~**§ETH-T4-D**~~ ✅ f6cf7fb9c blob base fee unification · **§ETH-T6-A** VM tracer try/finally · **§ETH-T6-B** EIP-2681 nonce-max · **§ETH-T7-A** `EvmConfigTimestampForkSpec` · **§ETH-T7-C** `EngineApiVersionRejectionSpec` · **§ETH-T7-D** `BlockRangeUpdateDecodePathSpec` | Partial — each standalone |
-| I2 | ETH Sprint (gated) | ~~**§ETH-T4-B**~~ ✅ maxFeePerBlobGas validation · **§ETH-T7-B** `Eip4788BeaconRootStorageSpec` · ~~**§ETH-T1-C**~~ ✅ `89863ac80` · ~~**§ETH-T9-A**~~ ✅ · ~~**§ETH-T9-B**~~ ✅ `4ac7e2842` · **§ETH-T9-C/D** SNAP sync ETH paths · **§ETH-T10-A/B/C/D** Engine API Osaka edge cases | NO — run after I1 items; gate conditions above |
+| I1 | ETH Sprint (unblocked) | ~~**§ETH-T1-A**~~ ✅ ed4db9df9 · ~~**§ETH-T1-B**~~ ✅ 6f8f74708 · ~~**§ETH-T2-A**~~ ✅ c470b3dac + 35db7dc61 (§NAMING-A) · ~~**§ETH-T4-A**~~ ✅ 02aaa05fc KZG trusted setup · ~~**§ETH-T4-C**~~ ✅ b934caffe EIP-4788 beacon roots bytecode · ~~**§ETH-T4-D**~~ ✅ f6cf7fb9c blob base fee unification · **§ETH-T6-A** VM tracer try/finally · **§ETH-T6-B** EIP-2681 nonce-max · **§ETH-T7-A** `EvmConfigTimestampForkSpec` · **§ETH-T7-C** `EngineApiVersionRejectionSpec` · **§ETH-T7-D** `BlockRangeUpdateDecodePathSpec` | Partial — each standalone |
+| I2 | ETH Sprint (gated) | ~~**§ETH-T4-B**~~ ✅ maxFeePerBlobGas validation · **§ETH-T7-B** `Eip4788BeaconRootStorageSpec` · ~~**§ETH-T1-C**~~ ✅ `89863ac80` · ~~**§ETH-T9-A**~~ ✅ · ~~**§ETH-T9-B**~~ ✅ `4ac7e2842` · ~~**§ETH-T9-C**~~ ✅ false positive · ~~**§ETH-T9-D**~~ ✅ SNAP sync ETH paths · **§ETH-T10-A/B/C/D** Engine API Osaka edge cases | NO — run after I1 items; gate conditions above |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
 
@@ -1535,124 +1459,6 @@ sbt "testOnly *ForkIdSepolia* *ForkId*"
 
 ---
 
-### §ETH-T9-C — BEACON: Verify StorageScheme routing in SNAP coordinators (HIGH — verify first)
-
-**Agent:** BEACON
-**Risk:** HIGH if gap confirmed — trie writes silently use wrong scheme; MEDIUM if already wired (false positive from Explore audit)
-**Gate:** §ETH-T9-A complete; requires BEACON read-only verification before implementing any fix
-**Files:**
-- `src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/actors/AccountRangeCoordinator.scala`
-- `src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/actors/StorageRangeCoordinator.scala`
-- `src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/actors/TrieNodeHealingCoordinator.scala`
-
-**Background:**
-Thread 9 audit (Explore agent) flagged that all three SNAP coordinators accept
-`storageScheme: StorageScheme` as a constructor parameter but the Explore agent could not
-confirm that this parameter actually drives trie read/write routing internally.
-
-On ETH/Sepolia (path-scheme storage), the trie nodes must be stored and queried using the
-path-keyed layout. On ETC (hash-scheme storage), the hash-keyed layout is used. If the
-parameter is wired up to a helper or base class that the Explore agent did not find (e.g.,
-a `TrieStorage` abstraction), this may be a false positive.
-
-**Verification first — do NOT implement a fix before reading the code.**
-
-**Steps:**
-1. **Read** each coordinator file in full — search for every use of `storageScheme` or
-   `pathNodeStorage` inside the actor body, including calls to helper methods or base classes.
-2. **Read** any `SnapStorage`, `TrieNodeStorage`, or `NodeStorage` helper classes referenced
-   by the coordinators.
-3. **Determine verdict:**
-   - **WIRED:** `storageScheme` drives a dispatch (e.g., `storageScheme match { case Hash => ...; case Path => ... }`
-     or passed to a storage abstraction that does the dispatch) → **NO FIX NEEDED**; add a ✅ WIRED note here and DELETE §ETH-T9-C.
-   - **NOT WIRED:** `storageScheme` is stored but never read inside the trie write/read path →
-     proceed to Step 4 (implement the routing).
-4. **If NOT WIRED — implement routing:**
-   - Identify the trie node write/read call in each coordinator.
-   - Add a dispatch on `storageScheme`:
-     ```scala
-     storageScheme match
-       case StorageScheme.Hash => hashNodeStorage.put(nodeHash, nodeBytes)
-       case StorageScheme.Path => pathNodeStorage.getOrElse(sys.error("path storage not configured")).put(path, nodeBytes)
-     ```
-   - Gate path-scheme usage on `pathNodeStorage.isDefined` — throw at construction time if
-     `storageScheme == Path && pathNodeStorage.isEmpty`.
-5. **Write tests:**
-   - If NOT WIRED: coordinator with `storageScheme = Path` writes to `pathNodeStorage`, not `hashNodeStorage`.
-   - If WIRED: just document the finding and DELETE this entry.
-
-**Verify:**
-```bash
-sbt compile-all
-sbt "testOnly *AccountRange* *StorageRange* *TrieNodeHealing*"
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps (if fix was needed):**
-1. `sbt scalafmtAll`
-2. `git add` coordinator files + test files
-3. `git commit -m "fix(eth): wire StorageScheme routing in SNAP coordinators — path-scheme storage now used for ETH/Sepolia trie nodes"`
-4. `SHA=$(git rev-parse --short HEAD)` → update Thread 9 entry in audit doc
-5. **DELETE §ETH-T9-C**
-
-**MANDATORY final steps (if WIRED — false positive):**
-1. Add note here: `✅ WIRED — storageScheme correctly routed via <helper class>. No fix needed.`
-2. `git commit -m "docs(eth-t9-c): verify StorageScheme routing — WIRED, no code change needed"` (docs-only)
-3. **DELETE §ETH-T9-C**
-
----
-
-### §ETH-T9-D — BEACON: Startup assertion — storageScheme must match chain type (MEDIUM)
-
-**Agent:** BEACON
-**Risk:** LOW — defensive assertion only; misconfiguration is caught at startup before any sync
-**Gate:** §ETH-T9-C complete (confirm correct scheme per chain before adding the assertion)
-**Files:**
-- `SNAPSyncController.scala` or `NodeBuilder.scala` — node startup / actor construction path
-
-**Background:**
-`SNAPSyncController` is instantiated without a runtime check that the configured `storageScheme`
-matches the chain's expected scheme:
-- ETH/Sepolia → `StorageScheme.Path` (default)
-- ETC/Mordor → `StorageScheme.Hash` (default)
-
-A misconfigured node (e.g., ETC with `storageScheme = path` in `reference.conf`) would start
-successfully, sync some state into the wrong storage layout, and fail later with a corrupt trie.
-The failure would be silent until state verification.
-
-**Steps:**
-1. **Read** `NodeBuilder.scala` (or wherever `SNAPSyncController` is constructed) —
-   find where `storageScheme` and `networkType` are both in scope.
-2. **Add a startup assertion:**
-   ```scala
-   val expectedScheme = networkType match
-     case NetworkType.ETH => StorageScheme.Path
-     case NetworkType.ETC => StorageScheme.Hash
-   require(
-     storageScheme == expectedScheme,
-     s"storageScheme=$storageScheme does not match expected $expectedScheme for networkType=$networkType — check reference.conf"
-   )
-   ```
-3. **Confirm ETC path:** `StorageScheme.Hash` is the ETC default and is enforced.
-4. **Confirm ETH path:** `StorageScheme.Path` is the ETH default and is enforced.
-5. **No test needed** — `require` throws `IllegalArgumentException` at startup; the existing
-   integration tests will catch any regression if the assertion fires incorrectly.
-
-**Verify:**
-```bash
-sbt compile-all
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add` the startup file
-3. `git commit -m "fix(config): assert storageScheme matches chain type at SNAPSyncController startup — misconfiguration now fails fast"`
-4. `SHA=$(git rev-parse --short HEAD)` → update Thread 9 entry in audit doc
-5. **DELETE §ETH-T9-D**
-
----
-
 ### §ETH-T10-A — BEACON: Implement `engine_getPayloadV5` — Osaka block proposal blocked (HIGH)
 
 **Agent:** BEACON
@@ -1833,120 +1639,121 @@ sbt "testOnly *EngineApi*"
 
 ---
 
-### §NAMING-A — MITHRIL: Rename `PostMerge` → `PoS` throughout (terminology alignment)
+### §NAMING-INV — INVESTIGATION: Audit all "Merge" language — classify for PoW/PoS rename vs keep
 
-**Agent:** MITHRIL
-**Risk:** LOW — pure rename, no logic change; `BlockHeader.scala:83-84` already defines the canonical pattern
-**Gate:** none — standalone, can run any time
+**Agent:** PRISM (read-only audit; no code changes in this item)
+**Risk:** n/a — investigation only; produces the rename scope for §NAMING-B
+**Gate:** none — run before §NAMING-B
 
-**Files (~60 occurrences across 8 files):**
+**Why this matters:**
+"The Merge" is ETH's one-time historical event (Sept 2022). Before it: PoW. After it: PoS. Fukuii is a multi-chain client where ETC is a *permanent* PoW chain that never had a merge. When "merge" language appears in shared infrastructure it conflates that transition event with the chain's permanent consensus type.
 
-*Main source (29 occurrences):*
-- `consensus/engine/PostMergeBlockHeaderValidator.scala` — rename file + object + 4 private methods
-- `consensus/validators/BlockHeaderValidator.scala` — `PostMergeNonceError`, `PostMergeOmmersError`
-- `consensus/engine/TransitionBlockHeaderValidator.scala` — 2 references to `PostMergeBlockHeaderValidator`
-- `blockchain/sync/snap/SNAPSyncController.scala` — `isPostMergeChain` val + 8 usages + import + 1 log string
-- `blockchain/sync/SyncController.scala` — `isPostMergeChain` val + 1 usage
-- `utils/BlockchainConfig.scala` — `isPostMerge(totalDifficulty): Boolean`
-
-*Test source (31+ occurrences):*
-- `test/.../validators/PostMergeBlockHeaderValidatorSpec.scala` — rename file + class + ~18 internal references
-- `test/.../sync/snap/SNAPSyncControllerSpec.scala` — import + 5 call sites + 1 comment
-
-*Lower-priority (local variable names only — context is ETH Merge event, not consensus type):*
-- `test/.../ETH69OscillationChainWeightSpec.scala:100-101` — `preMerge`, `postMerge` local vals
-- `test/.../ledger/BlockExecutionSpec.scala:688,698` — `postMergeHeader` local val
-
-**Background:**
-"PostMerge" refers to Ethereum's specific historical event — The Merge (Sept 2022), when ETH transitioned from PoW to PoS. Fukuii is a multi-chain client: ETC is a permanent PoW chain that never had a "merge". Using `PostMerge` in shared infrastructure conflates ETH's migration event with the chain's consensus type, making ETC code harder to reason about.
-
-`BlockHeader.scala:83-84` already defines the canonical pattern:
+`BlockHeader.scala:83-84` already defines the canonical vocabulary:
 ```scala
 def isPoS: Boolean = difficulty == 0 && baseFee.isDefined
 def isPoW: Boolean = !isPoS
 ```
 
-All `PostMerge` identifiers should align with this existing `isPoS`/`isPoW` vocabulary.
+The goal is to classify every occurrence so §NAMING-B has a precise, pre-approved rename map with no surprises.
 
-**Investigation audit (run first — confirm scope before renaming):**
+**Audit grep:**
 ```bash
-# Full occurrence list in main source
-grep -rn "PostMerge\|postMerge\|isPostMerge" \
-  /media/dev/2tb/dev/fukuii/src/main/scala/ --include="*.scala"
-
-# Full occurrence list in test source
-grep -rn "PostMerge\|postMerge\|isPostMerge" \
-  /media/dev/2tb/dev/fukuii/src/test/scala/ --include="*.scala"
-
-# Confirm canonical pattern already exists
-grep -n "isPoS\|isPoW" \
-  /media/dev/2tb/dev/fukuii/src/main/scala/com/chipprbots/ethereum/domain/BlockHeader.scala
+# All merge-related identifiers — excluding data-structure merge utilities
+grep -rn --include="*.scala" -i "merge" /media/dev/2tb/dev/fukuii/src/ \
+  | grep -iv "mergeAndPersist\|mergeOpt\|mergeWith\|mergeMap\|mergeSorted\|mergeAll\|mergeIterator\|mergedWith\|MergeHub\|org\.json4s\.Merge\|merge the known\|merge keys\|merge new stats\|mergeCount\|mergedCount\|ommerGeneration" \
+  | grep -v "^Binary"
 ```
 
-**Rename map:**
+**Classification categories — apply to every hit:**
 
-| From | To | Where |
-|------|----|-------|
-| `PostMergeBlockHeaderValidator` (object) | `PoSBlockHeaderValidator` | file rename + all refs |
-| `PostMergeBlockHeaderValidatorSpec` (class) | `PoSBlockHeaderValidatorSpec` | file rename + all refs |
-| `validatePostMergeDifficulty` | `validatePoSDifficulty` | `PoSBlockHeaderValidator.scala` |
-| `validatePostMergeNonce` | `validatePoSNonce` | `PoSBlockHeaderValidator.scala` |
-| `validatePostMergeOmmers` | `validatePoSOmmers` | `PoSBlockHeaderValidator.scala` |
-| `PostMergeNonceError` | `PoSNonceError` | `BlockHeaderValidator.scala` + spec |
-| `PostMergeOmmersError` | `PoSOmmersError` | `BlockHeaderValidator.scala` + spec |
-| `isPostMergeChain` (val) | `isPoSChain` | `SyncController.scala`, `SNAPSyncController.scala` |
-| `isPostMerge(totalDifficulty)` | `isPoS(totalDifficulty)` | `BlockchainConfig.scala` |
-| log string `"postMergeChain={}"` | `"isPoSChain={}"` | `SNAPSyncController.scala` |
+**Category A — Consensus-type language → RENAME to PoW/PoS**
+"Merge" is being used as shorthand for "the PoW→PoS transition". The actual semantic is the chain's consensus type, not the event itself.
+
+Expected hits include (verify each exists and capture the exact file:line):
+
+| Current form | Target form |
+|---|---|
+| `isPreMerge` / `preMerge` val/var | `isPoW` / `poW…` |
+| `isPostMerge(…)` method | `isPoS(…)` |
+| `preMergeValidator` | `poWValidator` |
+| `isPostMergeChain` | `isPoSChain` |
+| comment: "pre-merge blocks (difficulty > 0)" | "PoW blocks (difficulty > 0)" |
+| comment: "post-merge blocks (difficulty == 0)" | "PoS blocks (difficulty == 0)" |
+| comment/log: "post-merge chains" | "PoS chains" |
+| comment: "pre-merge / non-CL path" | "PoW / non-CL path" |
+| comment/log: "CL-driven post-merge path" | "CL-driven PoS path" |
+| comment: "TD frozen at merge" | "TD frozen at PoS transition" |
+| log: "Post-merge chain (TTD configured)…" | "PoS chain (TTD configured)…" |
+| log: "post-merge validation" | "PoS header validation" |
+| test desc: "pre-merge path (no CL head)" | "PoW path (no CL head)" |
+| test desc: "post-merge pivot header" | "PoS pivot header" |
+| test desc: "ETH post-merge sync" | "ETH PoS sync" |
+| test desc: "post-merge peers" | "PoS peers" |
+| `postMergeHeader` local val | `poSHeader` |
+| any remaining `PostMerge…` symbols missed by §NAMING-A | `PoS…` |
+
+**Category B — Historical event: The Merge as the ETC mining event → KEEP**
+These describe the real-world event of ETH's Sept 2022 PoS transition, which caused GPU miners to flood ETC and create a difficulty spike. This is an accurate historical domain fact — renaming would destroy meaning.
+
+Expected keeps:
+- `ETChashDifficultyManipulationSpec.scala` — `mergePeak`, `mergeSpike`, `mergeSpikeParent`, `premergeBaseline`, test names "ETC DAA during Merge spike", "S1 Ethereum Merge spike", "S2 Post-Merge miner exodus" — **keep**
+- `OscillationFixtures.scala` — same fixtures (`mergePeak`, `mergeSpike`, etc.) — **keep**
+- `ETH69OscillationChainWeightSpec.scala:99-101` — `preMerge`, `postMerge` as TD values bracketing the ETC difficulty spike — **keep**: these measure total-difficulty around the event
+
+**Category C — Protocol constants → assess, may rename**
+- `mergeNetsplitBlockNumber` in `BlockchainConfig.scala` — the ETH block at which difficulty went to 0 (the TTD-crossing block), used in ForkID calculation. Investigate: is this name from the Ethereum wire spec / EIP, or is it a Fukuii-internal name? If spec-defined, keep for alignment. If internal, rename to `poSTransitionBlockNumber`.
+
+**Category D — Canonical test vectors and fork name strings → DO NOT RENAME**
+These are externally defined identifiers:
+- `EthSmokeSpec` `mergeExample.json` — canonical ethereum-tests filename
+- `BlockchainTestsSpec` `"Merge"` — ETH test suite directory
+- `TestConverter` `case "merge" | "paris" | "themerge"` — ETH fork name from JSON
+
+**Output format:**
+Produce a table: `file:line | current identifier | category (A/B/C/D) | proposed form | notes`. Flag anything not covered by A–D. For Category C, add a recommendation on whether to rename. This table is the approved rename map for §NAMING-B.
+
+---
+
+### §NAMING-B — MITHRIL: Apply PoW/PoS rename map from §NAMING-INV
+
+**Agent:** MITHRIL
+**Risk:** LOW — pure rename of comments, val names, and log strings; no logic change
+**Gate:** §NAMING-INV complete (provides the approved rename map)
+**Files:** TBD by §NAMING-INV — expected ~10 files across `consensus/`, `blockchain/sync/`, `jsonrpc/`, test specs
 
 **Steps:**
-1. Run the investigation greps above — confirm the counts before proceeding.
-2. `git mv` the two files with structural renames:
+1. Read the output table from §NAMING-INV.
+2. Apply all Category A renames using `sed -i` per-file (do not use IDE batch rename — it tends to catch Category B/D false positives).
+3. For Category C (`mergeNetsplitBlockNumber`): apply the recommendation from §NAMING-INV.
+4. `sbt compile-all` — must be clean before formatting.
+5. Verify no Category A renames leaked into Category B/D files:
    ```bash
-   git mv src/main/scala/.../consensus/engine/PostMergeBlockHeaderValidator.scala \
-          src/main/scala/.../consensus/engine/PoSBlockHeaderValidator.scala
-   git mv src/test/scala/.../validators/PostMergeBlockHeaderValidatorSpec.scala \
-          src/test/scala/.../validators/PoSBlockHeaderValidatorSpec.scala
+   grep -n "isPoW\|isPoS\|poWValidator\|poSHeader" \
+     src/test/scala/.../pow/difficulty/ETChashDifficultyManipulationSpec.scala \
+     src/test/scala/.../pow/difficulty/OscillationFixtures.scala \
+     src/test/scala/.../network/ETH69OscillationChainWeightSpec.scala
+   # Expect: zero hits (those files should still use Merge terminology)
    ```
-3. Apply all symbol renames in the map above. Prefer `sed -i` on each file for precision over IDE batch rename:
+6. Verify no Category D strings changed:
    ```bash
-   # Example (adjust paths to full package paths):
-   sed -i 's/PostMergeBlockHeaderValidator/PoSBlockHeaderValidator/g' \
-     src/main/scala/.../consensus/engine/PoSBlockHeaderValidator.scala \
-     src/main/scala/.../consensus/engine/TransitionBlockHeaderValidator.scala \
-     src/main/scala/.../blockchain/sync/snap/SNAPSyncController.scala \
-     src/test/scala/.../validators/PoSBlockHeaderValidatorSpec.scala \
-     src/test/scala/.../sync/snap/SNAPSyncControllerSpec.scala
-   sed -i 's/PostMergeNonceError/PoSNonceError/g; s/PostMergeOmmersError/PoSOmmersError/g' \
-     src/main/scala/.../consensus/validators/BlockHeaderValidator.scala \
-     src/main/scala/.../consensus/engine/PoSBlockHeaderValidator.scala \
-     src/test/scala/.../validators/PoSBlockHeaderValidatorSpec.scala
-   sed -i 's/isPostMergeChain/isPoSChain/g' \
-     src/main/scala/.../blockchain/sync/SyncController.scala \
-     src/main/scala/.../blockchain/sync/snap/SNAPSyncController.scala \
-     src/test/scala/.../sync/snap/SNAPSyncControllerSpec.scala
-   sed -i 's/isPostMerge(/isPoS(/g' \
-     src/main/scala/.../utils/BlockchainConfig.scala
-   sed -i 's/validatePostMergeDifficulty/validatePoSDifficulty/g; s/validatePostMergeNonce/validatePoSNonce/g; s/validatePostMergeOmmers/validatePoSOmmers/g' \
-     src/main/scala/.../consensus/engine/PoSBlockHeaderValidator.scala
-   sed -i 's/postMergeChain=/isPoSChain=/g' \
-     src/main/scala/.../blockchain/sync/snap/SNAPSyncController.scala
+   grep -n '"merge"\|"paris"\|"themerge"\|mergeExample' \
+     src/it/scala/.../ethtest/TestConverter.scala \
+     src/it/scala/.../ethtest/EthSmokeSpec.scala \
+     src/it/scala/.../ethtest/BlockchainTestsSpec.scala
+   # Expect: original strings intact
    ```
-4. `sbt compile-all` — fix any missed references. Expected: 0 errors.
-5. Grep to confirm no `PostMerge`/`postMerge`/`isPostMerge` remain in main source (lower-priority local vars in test files are acceptable to leave):
-   ```bash
-   grep -rn "PostMerge\|isPostMerge" src/main/scala/ --include="*.scala"
-   ```
-6. `sbt scalafmtAll`
+7. `sbt scalafmtAll`
 
 **Verify:**
 ```bash
 sbt compile-all
-sbt "testOnly *PoSBlockHeader* *BlockHeaderValidator* *SNAPSync*"
+sbt "testOnly *BlockHeader* *Sync* *ForkChoice* *Pivot* *EthSimulate*"
 ./local/scripts/fukuii-test
 ```
 
 **MANDATORY final steps:**
 1. `sbt scalafmtAll`
-2. Stage with `git add` — list all 8 touched files individually
-3. `git commit -m "refactor: rename PostMerge → PoS — align with BlockHeader.isPoS/isPoW canonical pattern"`
-4. **DELETE §NAMING-A**
+2. `git add` — each affected file individually
+3. `git commit -m "refactor: rename Merge→PoW/PoS throughout — align with BlockHeader.isPoS/isPoW; preserve Merge for ETC mining-event context"`
+4. **DELETE §NAMING-INV and §NAMING-B**
+
