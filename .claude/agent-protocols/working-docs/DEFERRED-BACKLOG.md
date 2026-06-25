@@ -1479,12 +1479,8 @@ go-ethereum reference: `eth/catalyst/api.go:482-500` (GetPayloadV5), `beacon/eng
 `forkchoiceUpdatedV4` and `newPayloadV5` are **Amsterdam** (the fork after Osaka) — not needed for Osaka. `forkchoiceUpdatedV3` and `newPayloadV4` remain the correct Osaka cap.
 
 **Steps:**
-1. **Prerequisite check — KZG cell proofs:**
-   ```bash
-   grep -rn "CELLS_PER_EXT_BLOB\|cellProof\|computeCells\|splitBlob\|PeerDAS\|EIP.*7594" \
-     src/main/scala/ --include="*.scala" | head -20
-   ```
-   If cell-proof generation is absent: this is a hard prerequisite before plumbing the V5 response. Surface to user and add a sub-entry §ETH-T10-A1 for KZG cell-proof implementation. Do not proceed with the API wiring until cell proofs are available.
+1. ~~**Prerequisite check — KZG cell proofs:**~~ ✅ **COMPLETE** — `62bc47ac0` (2026-06-25)
+   `KzgCellProofs.scala`, `BlobsBundleData.cellProofsPerBlob`, jc-kzg-4844 upgraded to 2.0.0. Skip this step.
 
 2. **Read** `EngineApiController.scala:36-58` (dispatch) and `EngineApiService.scala:700-900` (payload build path) to understand how V4 constructs the response envelope.
 
