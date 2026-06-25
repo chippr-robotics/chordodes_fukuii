@@ -29,6 +29,23 @@
 
 ---
 
+## §ETH-T1-A/B: Timestamp-aware EvmConfig in StdSignedTransactionValidator
+
+#### `ed4db9df9` — fix(eth): use timestamp-aware EvmConfig in validateInitCodeSize (2026-06-24)
+- **What:** `validateInitCodeSize` upgraded from 2-arg to 3-arg `EvmConfig.forBlock`. The 2-arg overload returns London-era config (eip3860Enabled=false) on ETH/Sepolia regardless of timestamp, silently accepting oversized `CREATE` initcode post-Shanghai.
+- **Gate:** BEACON sign-off. ETC unaffected — `isShanghaiTimestamp` always false on ETC.
+- **Tests:** 3 new in `StdSignedTransactionValidatorSpec` (ETH post/pre-Shanghai, ETC).
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T1-A`
+
+#### `6f8f74708` — fix(eth): use timestamp-aware EvmConfig in validateGasLimitEnoughForIntrinsicGas (2026-06-24)
+- **What:** Same 2-arg → 3-arg upgrade in `validateGasLimitEnoughForIntrinsicGas`. EIP-3860 word cost (2 gas/word) was excluded from intrinsic-gas floor post-Shanghai.
+- **Test note:** The default test config has `byzantium-block-number = 4370000`; `forBlock` uses `maxBy((blockNum, priority))` so Byzantium at 4370000 beats any ETC fork at 0. Test config places `mystiqueBlockNumber = 5_000_000` (above Byzantium) to get `MystiqueFeeSchedule` at block 21M.
+- **Gate:** BEACON sign-off. ETC unaffected.
+- **Tests:** 2 new in `StdSignedTransactionValidatorSpec` (total 5 tests).
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T1-B`
+
+---
+
 ## Open
 
 - EIP-2935 account-existence gap tracked in CHASE-QUEUE (FORGE + BEACON before Olympia)

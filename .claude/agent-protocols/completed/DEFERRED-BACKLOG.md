@@ -1832,3 +1832,90 @@ correct stop mechanism and cannot be replaced with `ctx.stop()`.
 
 **TCP floor census update:** §8k-J expected floor count updated from 4 → **7**
 (+3 from PeerManagerActor `handleConnectionErrors` sites).
+
+---
+
+### §8k-CQ2 — MITHRIL: `PeerActorSpec:429` AlreadyConnected test regression ✅ FIXED 2026-06-24
+
+**Commit:** `359692a3b`
+**Branch:** `scala3-cleanup-june`
+**File changed:** `src/test/scala/com/chipprbots/ethereum/network/p2p/PeerActorSpec.scala`
+
+**Background:** 8k-H removed `context.toClassic.parent` sends from `PeerActor`. The test at line 429
+("should forward PeerClosedConnection with AlreadyConnected to parent") used `PropsAdapter(PeerActor.apply(...))`
+with a Classic `parentProbe.ref` as the parent and expected `PeerActor.PeerClosedConnection("127.0.0.1", AlreadyConnected)`
+to arrive there. With the send path gone it timed out after 3 seconds. This was the sole `testEssential`
+failure after P12 triage.
+
+**Finding (MITHRIL research):** `PeerActor` never re-sends `PeerClosedConnection` via any new path.
+`PeerManagerActor` detects peer death via Pekko death-watch (`watchWith(ref, PeerTerminated(ref))`),
+not a message from the peer. The correct way to observe "PeerActor stopped after AlreadyConnected"
+is therefore `expectTerminated`.
+
+**Fix summary:**
+- Test description: "should forward PeerClosedConnection with AlreadyConnected to parent"
+  → "should stop when Disconnect(AlreadyConnected) is received during handshake"
+- Removed `parentProbe.ref` as explicit parent
+- Added `watcherProbe: TestProbe` calling `watcherProbe.watch(peerUnderTest)`
+- `parentProbe.expectMsg(3.seconds, PeerClosedConnection(...))` → `watcherProbe.expectTerminated(peerUnderTest, 3.seconds)`
+
+**Verification:** `compile-all` 0 errors; 15/15 `PeerActorSpec` pass; `scalafmtAll` clean.
+
+---
+
+### §ETH-T1-A — BEACON: `validateInitCodeSize` timestamp dispatch ✅ FIXED 2026-06-24
+
+**Commit:** `ed4db9df9`
+**Branch:** `scala3-cleanup-june`
+**File changed:** `src/main/scala/com/chipprbots/ethereum/consensus/validators/std/StdSignedTransactionValidator.scala`
+
+**Background:** `validateInitCodeSize` called the 2-arg `EvmConfig.forBlock(blockNumber, config)`.
+On ETH/Sepolia this returns a London-era config with `eip3860Enabled = false` regardless of block
+timestamp — the `spiralBlockNumber` guard in the 2-arg path never fires on ETH. Result: EIP-3860
+initcode size cap (49152 bytes) was never enforced on Sepolia post-Shanghai, meaning oversized
+`CREATE` initcode was silently accepted.
+
+**Fix:** Changed call site and method signature to use the 3-arg overload:
+`EvmConfig.forBlock(blockHeaderNumber, blockHeaderTimestamp, blockchainConfig)`. The 3-arg overload
+applies timestamp-based fork overrides, setting `eip3860Enabled = true` when `isShanghaiTimestamp`
+holds.
+
+**ETC safety:** `isShanghaiTimestamp` returns false on ETC (no `shanghaiTimestamp` in `ForkTimestamps`),
+so the 3-arg overload collapses to the same result as 2-arg for ETC — no behaviour change.
+
+**Tests added:** 3 new tests in `StdSignedTransactionValidatorSpec`:
+- ETH/Sepolia post-Shanghai: initcode > 49152 bytes → `TransactionInitCodeSizeError` ✅
+- ETH/Sepolia pre-Shanghai: same initcode → accepted ✅
+- ETC at any block: same initcode → accepted ✅
+
+**Verification:** 3/3 new tests pass; `scalafmtAll` clean.
+
+---
+
+### §ETH-T1-B — BEACON: `validateGasLimitEnoughForIntrinsicGas` timestamp dispatch ✅ FIXED 2026-06-24
+
+**Commit:** `6f8f74708`
+**Branch:** `scala3-cleanup-june`
+**File changed:** `src/main/scala/com/chipprbots/ethereum/consensus/validators/std/StdSignedTransactionValidator.scala`
+
+**Background:** `validateGasLimitEnoughForIntrinsicGas` called the 2-arg `EvmConfig.forBlock`.
+On ETH/Sepolia this returns a London-era config with `eip3860Enabled = false`, so the EIP-3860
+initcode word cost (`G_initcode_word * ceil(len/32) = 2 * words`) was never included in the
+intrinsic-gas floor check post-Shanghai. Under-gassed `CREATE` transactions could pass validation.
+
+**Fix:** Changed call site and method signature to use the 3-arg overload, identical to §ETH-T1-A.
+
+**Subtlety found during testing:** The test application.conf sets `byzantium-block-number = 4370000`.
+`EvmConfig.forBlock` selects forks via `maxBy((blockNum, priority))` — a higher block number beats
+a higher-priority entry at block 0. Activating ETC forks at block 0 didn't help; Byzantium at 4370000
+always won. Fix: place `mystiqueBlockNumber = 5_000_000` (above Byzantium's 4370000) in the test's
+`etcMystiqueConfig` so `MystiqueFeeSchedule` wins the selector at block 21M and provides the correct
+`G_txdatanonzero = 16` and `G_initcode_word = 2` for the EIP-3860 word cost test.
+
+**ETC safety:** Same as §ETH-T1-A — `isShanghaiTimestamp` false on ETC; no behaviour change.
+
+**Tests added:** 2 new tests in `StdSignedTransactionValidatorSpec` (total 5 tests):
+- ETH/Sepolia post-Shanghai with Mystique base: gasLimit = 56213 < intrinsic 56214 → rejected ✅
+- ETC with Mystique base, no Shanghai timestamp: gasLimit = 56213 ≥ intrinsic 56200 → accepted ✅
+
+**Verification:** 5/5 `StdSignedTransactionValidatorSpec` pass; 227/227 `testVM` pass; `scalafmtAll` clean.

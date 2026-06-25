@@ -747,132 +747,6 @@ Commit per phase:
 
 ---
 
-#### §8k-CQ1 — MITHRIL: Remove `KnownNodesManager.GetKnownNodes` dead compat shim
-
-**Agent:** MITHRIL
-**Risk:** SAFE — dead code removal; `sbt compile-all` will catch any missed callers
-**Gate:** Any time — standalone, no sprint prerequisite
-**Purpose:** `PeerManagerActor` was migrated to Pekko Typed in commit `05e0c003b`.
-`KnownNodesManager.scala:117` still holds `case object GetKnownNodes` with the comment
-"Remove once PeerManagerActor is migrated to Typed." That migration happened. The companion
-handler in `CommonFakePeer.scala:162` is equally dead. Zero production callers remain — confirmed
-by P12 triage (2026-06-24). This is pure dead code removal with no behaviour change.
-
-**Prompt:**
-```
-You are removing a dead Classic-only compat bridge in fukuii on branch `scala3-cleanup-june`.
-
-Context: `PeerManagerActor` was migrated to Pekko Typed in commit `05e0c003b`. Before that
-migration, `KnownNodesManager` had a Classic bridge: `case object GetKnownNodes` with a comment
-"Remove once PeerManagerActor is migrated to Typed." The live replacement is
-`GetKnownNodesReq(replyTo: ActorRef[KnownNodes])` at line 105. PeerManagerSpec was already
-updated in P12 triage to use `GetKnownNodesReq`. CHASE-QUEUE entry (2026-06-24, type DEAD)
-confirmed 0 production callers of `GetKnownNodes` remain.
-
-Step 1 — Verify no remaining callers outside the two files to be edited:
-  cd /media/dev/2tb/dev/fukuii
-  grep -rn "GetKnownNodes\b" src/ --include="*.scala"
-
-  Expected hits ONLY in:
-  - `network/KnownNodesManager.scala` (the definition, line ~117)
-  - `src/it/.../CommonFakePeer.scala` (the dead handler, line ~162)
-  If any other file appears: STOP and log to CHASE-QUEUE instead of deleting.
-
-Step 2 — In `src/main/scala/com/chipprbots/ethereum/network/KnownNodesManager.scala`:
-  Delete `case object GetKnownNodes extends Command` and its Scaladoc comment block
-  (lines ~113-117). The `GetKnownNodesReq(replyTo: ActorRef[KnownNodes])` at line 105
-  must REMAIN — that is the live Typed message.
-
-Step 3 — In `src/it/scala/com/chipprbots/ethereum/sync/util/CommonFakePeer.scala`:
-  Delete the `case KnownNodesManager.GetKnownNodes =>` handler at line ~162.
-  Delete the stale comment at line ~150 ("Classic bridge for PeerManagerActor (still Classic)").
-  Verify the live `GetKnownNodesReq` handler remains untouched.
-
-Step 4:
-  sbt compile-all
-  sbt "testOnly *KnownNodesManager* *PeerManagerSpec*"
-  sbt scalafmtAll
-
-Step 5 — If all green:
-  git add src/main/scala/com/chipprbots/ethereum/network/KnownNodesManager.scala
-  git add src/it/scala/com/chipprbots/ethereum/sync/util/CommonFakePeer.scala
-  git commit -m "chore(network): remove GetKnownNodes Classic compat shim — PMA Typed since 05e0c003b"
-```
-
-**MANDATORY final steps:**
-1. `grep -rn "GetKnownNodes\b" src/` must return ONLY the 2 files above before deleting
-2. `sbt compile-all` must be green
-3. `git commit` as above
-4. Strike-through the CHASE-QUEUE entry for `network/KnownNodesManager.scala:117`
-5. **DELETE §8k-CQ1**
-
----
-
-#### §8k-CQ2 — MITHRIL: Fix `PeerActorSpec:429` "forward PeerClosedConnection" regression (8k-H)
-
-**Agent:** MITHRIL (research + fix)
-**Risk:** MEDIUM — test file change; must understand the new parent-notification mechanism
-before touching any code
-**Gate:** Standalone — no sprint prerequisite; safe to run now
-**Purpose:** 8k-H commit `222623960` removed `context.toClassic.parent` sends from `PeerActor`.
-`PeerActorSpec.scala:429-454` "should forward PeerClosedConnection with AlreadyConnected to parent"
-expects the message to arrive at a Classic `parentProbe` via the removed send path. The test times
-out after 3 seconds. `testEssential` has 1 failure until this is fixed. The correct fix depends on
-how PeerActor now surfaces disconnection events — this must be researched before any edit.
-
-**Prompt:**
-```
-You are fixing a test regression in fukuii on branch `scala3-cleanup-june`.
-
-Context: `PeerActorSpec.scala:429-454` tests "should forward PeerClosedConnection with
-AlreadyConnected to parent". The test uses `PropsAdapter(PeerActor.apply(...))` wrapping PeerActor
-as a Classic child with a Classic `parentProbe.ref` as its parent. It expects
-`PeerActor.PeerClosedConnection("127.0.0.1", AlreadyConnected)` to arrive at `parentProbe`.
-8k-H commit `222623960` removed `context.toClassic.parent` sends from PeerActor, so the message
-never arrives — 3s timeout. The test has been the sole `testEssential` failure since P12 triage.
-
-Step 1 — Research PeerActor's current disconnection notification mechanism:
-  cd /media/dev/2tb/dev/fukuii
-  grep -n "PeerClosedConnection\|AlreadyConnected\|PeerEventBus\|toClassic.parent" \
-    src/main/scala/com/chipprbots/ethereum/network/p2p/PeerActor.scala | head -40
-  grep -rn "PeerClosedConnection" src/main/scala/ --include="*.scala"
-
-Step 2 — Read `PeerActor.scala` around the `AlreadyConnected` branch to determine what now
-  happens on connection-refused: does PeerActor publish via `PeerEventBusActor`? send to a
-  typed `replyTo`? notify `PeerManagerActor` via a typed message? This determines the fix.
-
-Step 3 — Read `PeerActorSpec.scala:400-460` in full to understand the current test setup:
-  how is PeerActor spawned, where does `parentProbe` appear, what message type is expected.
-
-Step 4 — Based on the findings, implement the minimal fix. Options (choose per findings):
-  a. If PeerActor publishes via PeerEventBusActor: subscribe a typed probe to the bus;
-     assert the event arrives there instead of at parentProbe.
-  b. If PeerActor sends a typed message to a spawn-time replyTo: pass a typed probe ref
-     as replyTo when spawning; assert the message at the typed probe.
-  c. If PeerManagerActor now handles it: assert the message at the PeerManager probe.
-  DO NOT remove the test — the behaviour must still be verifiable, just via the new path.
-
-Step 5:
-  sbt compile-all
-  sbt "testOnly *PeerActorSpec*"     // ALL tests in the class must pass
-
-Step 6 — If all PeerActorSpec tests pass:
-  sbt scalafmtAll
-  git add src/test/scala/com/chipprbots/ethereum/network/p2p/PeerActorSpec.scala
-  git commit -m "fix(test): update PeerActorSpec AlreadyConnected assertion for 8k-H toClassic.parent removal"
-```
-
-**MANDATORY final steps:**
-1. Research step (Step 1-3) MUST precede any code edit — do not guess the mechanism
-2. `sbt compile-all` must be green
-3. `sbt "testOnly *PeerActorSpec*"` — ALL tests in the class must pass
-4. `git commit` as above
-5. Update `testEssential` baseline in `test-quality-log.md` (3,550 → 3,551 if 1 test re-enabled)
-6. Strike-through the CHASE-QUEUE entry for `network/p2p/PeerActor.scala + PeerActorSpec.scala:429`
-7. **DELETE §8k-CQ2**
-
----
-
 ## Part 8l: VM Tracer Model Modernization ✅ DONE 2026-06-24 — see `completed/DEFERRED-BACKLOG.md §8l-R1` + `§8l-I`
 
 ---
@@ -971,7 +845,7 @@ Each prompt can run independently. Commit individually.
 | # | Batch | Prompt | Parallel-safe? |
 |---|-------|--------|---------------|
 | E6 | Batch E | §8a-retro batch 5 — multi-system + TestActorRef specs (3 assessable, 2 Wave 3 gate) | Partial — RegularSyncSpec → §9c; BlockFetcherSpec + PendingTxMgr DONE `5ff14017b`; PeerActor + RLPx wait for Wave 3 |
-| G1 | Batch G | §8a-retro-5b — DONE `5ff14017b` (specs migrated in 8a-retro multi-system commit; clearout follows) | — |
+| ~~G1~~ | ~~Batch G~~ | ~~§8a-retro-5b — specs migrated in 8a-retro multi-system commit~~ | ✅ DONE `5ff14017b` |
 | ~~G2~~ | ~~Batch G~~ | ~~§8e-FORGE — 6 consensus `return` → expression conversions~~ | DONE 2026-06-24 — FORGE executed across all 6 files: 6 sites CLEAR (converted to if/else), 9 sites DEFER (`scalafix:ok DisableSyntax.return`: VM.scala tracer short-circuit, PrecompiledContracts KZG/BLS crypto + MODEXP guard, StackTrie MPT-mutation + loop comparator). Prior archive's "2/6 clear" assessment was inaccurate — BlockPreparator/StackTrie had real returns that were converted. |
 | ~~G3~~ | ~~Batch G~~ | ~~§8e-BEACON — EngineApiController S3-D `return` → expression (2 sites)~~ | DONE 2026-06-24 — `d78177bda` (3 sites: handleNewPayload, handleForkchoiceUpdated, priority-fee helper; 16/16 EngineApiSpec ✅) |
 | ~~G4~~ | ~~Batch G~~ | ~~§8d-A1 — BEACON: EngineApiService `Await.result` on CE3 compute thread~~ | DONE 2026-06-24 — verified already fixed: `IO.fromFuture` in place at lines 629–640 with explanatory comment; no code change needed |
@@ -979,10 +853,10 @@ Each prompt can run independently. Commit individually.
 | ~~G6~~ | ~~Batch G~~ | ~~§8c-M4 — VAULT: DataSource close cache invalidation verify-or-by-design~~ | DONE 2026-06-24 — by-design; Scaladoc comment on `RocksDbDataSource.close()`; verdict in `storage-rocksdb.md` |
 | ~~G7~~ | ~~Batch G~~ | ~~§8e-StackTrie — FORGE: StackTrie `:120`+`:462` DEFER re-assessment (2 `scalafix:ok` sites)~~ | DONE 2026-06-24 — `09307c5a7` (both CLEAR: `:120` node expr, `:462` var-result; see modernization-log/core/mpt.md) |
 | ~~G8~~ | ~~Batch G~~ | ~~§8l-R1/I — FORGE: VM tracer research + implementation~~ | DONE 2026-06-24 — R1 `37c9d081b`/`5c2adeaaf`; I impl complete; `VM.create()` tracer balanced; suppression removed |
-| H1 | Batch H | **§8k-CQ1** — MITHRIL: Remove `GetKnownNodes` dead shim (KnownNodesManager.scala:117 + CommonFakePeer.scala:162) | YES — pure dead-code removal, safe at any time |
+| ~~H1~~ | ~~Batch H~~ | ~~**§8k-CQ1** — MITHRIL: Remove `GetKnownNodes` dead shim (KnownNodesManager.scala:117 + CommonFakePeer.scala:162)~~ | ✅ DONE `d4cc7a7fa` (2026-06-24) |
 | H2 | Batch H | **§8k-CQ2** — MITHRIL: Fix `PeerActorSpec:429` PeerClosedConnection regression (8k-H) — research PeerActor notification path first | NO — 1 outstanding `testEssential` failure until done |
-| I1 | ETH Sprint (unblocked) | **§ETH-T1-A** `validateInitCodeSize` timestamp dispatch · **§ETH-T2-A** `isPostMerge`→`isPoS` rename · **§ETH-T4-A** KZG trusted setup · **§ETH-T4-C** EIP-4788 beacon roots bytecode · **§ETH-T4-D** blob base fee unification · **§ETH-T6-A** VM tracer try/finally · **§ETH-T6-B** EIP-2681 nonce-max · **§ETH-T7-A** `EvmConfigTimestampForkSpec` · **§ETH-T7-C** `EngineApiVersionRejectionSpec` · **§ETH-T7-D** `BlockRangeUpdateDecodePathSpec` | Partial — each standalone; T4-B gates on T4-A; T7-B gates on T4-C |
-| I2 | ETH Sprint (gated) | **§ETH-T4-B** blob maxFeePerBlobGas validation (gate: T4-A) · **§ETH-T7-B** `Eip4788BeaconRootStorageSpec` (gate: T4-C) · **§ETH-T1-B/C** stateless-mempool decisions needed · **§ETH-T9-A/B/C/D** SNAP sync ETH paths · **§ETH-T10-A/B/C/D** Engine API Osaka edge cases | NO — run after I1 items; gate conditions above |
+| I1 | ETH Sprint (unblocked) | ~~**§ETH-T1-A**~~ ✅ ed4db9df9 · ~~**§ETH-T1-B**~~ ✅ 6f8f74708 · **§ETH-T2-A** `isPostMerge`→`isPoS` rename · **§ETH-T4-A** KZG trusted setup · **§ETH-T4-C** EIP-4788 beacon roots bytecode · **§ETH-T4-D** blob base fee unification · **§ETH-T6-A** VM tracer try/finally · **§ETH-T6-B** EIP-2681 nonce-max · **§ETH-T7-A** `EvmConfigTimestampForkSpec` · **§ETH-T7-C** `EngineApiVersionRejectionSpec` · **§ETH-T7-D** `BlockRangeUpdateDecodePathSpec` | Partial — each standalone; T4-B gates on T4-A; T7-B gates on T4-C |
+| I2 | ETH Sprint (gated) | **§ETH-T4-B** blob maxFeePerBlobGas validation (gate: T4-A) · **§ETH-T7-B** `Eip4788BeaconRootStorageSpec` (gate: T4-C) · **§ETH-T1-C** stateless-mempool decision needed · **§ETH-T9-A/B/C/D** SNAP sync ETH paths · **§ETH-T10-A/B/C/D** Engine API Osaka edge cases | NO — run after I1 items; gate conditions above |
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
 
@@ -1094,115 +968,6 @@ The `handleRegularSyncMsg` production bug (SyncController:895-897) is tracked un
 
 Source: `.local/docs/eth-sepolia-assumption-audit.md` — Thread 1 (fork dispatch completeness).
 Thread 3 (EIP-1559 fee routing) audited: functionally CORRECT — ETH base fee is burned, ETC base fee credited to treasury. Found one logging bug: `log.error` in `BlockPreparator.creditBaseFeeToTreasury` fired for every ETH/Sepolia block (treasury-address=0 is correct config, not an error). **FIXED `f868b75a8`** — guard added `&& networkType == NetworkType.ETC`. See `completed/DEFERRED-BACKLOG.md §ETH-T3-LOG`.
-
----
-
-### §ETH-T1-A — BEACON: Fix `validateInitCodeSize` fork dispatch on ETH/Sepolia
-
-**Agent:** BEACON
-**Risk:** MEDIUM — consensus-touching transaction validator; ETH-only behaviour change
-**Gate:** None — standalone fix, no sprint prerequisite
-**Files:** `src/main/scala/com/chipprbots/ethereum/consensus/validators/std/StdSignedTransactionValidator.scala:245`
-
-**Background:**
-`validateInitCodeSize` calls the 2-arg (block-only) `EvmConfig.forBlock(blockHeader.number, blockchainConfig)`.
-On Sepolia (`olympiaBlockNumber=0`, `spiral=1e18`) the block-only dispatch always returns a
-London-era config, so `eip3860Enabled = false` regardless of block timestamp. EIP-3860
-(max initcode size: `2 * MAX_CODE_SIZE = 49152` bytes, plus initcode word cost) was activated
-at Shanghai (2023-04-12 on mainnet, block 2,778,137 on Sepolia). Any CREATE transaction on
-ETH/Sepolia with initcode > 49152 bytes is incorrectly accepted by Fukuii post-Shanghai.
-
-The same file already does this correctly for gas-cap and blob validation:
-- `validateTxGasLimitCap` (line 47) → `blockHeader.unixTimestamp`
-- `validateBlobTransactionSupport` (line 90) → `isCancunTimestamp`
-
-**Steps:**
-1. **Read** `StdSignedTransactionValidator.scala` lines 230-260 in full to confirm
-   the call site and available variables.
-2. **Read** `EvmConfig.scala` lines 27-70 to confirm the 3-arg overload signature:
-   `forBlock(blockNumber: BigInt, timestamp: Long, blockchainConfig: BlockchainConfigForEvm)`.
-3. **Verify** that `blockHeader` (with `unixTimestamp`) is in scope at line 245.
-4. **Change** line 245 from 2-arg to 3-arg:
-   ```scala
-   // BEFORE
-   val evmConfig = EvmConfig.forBlock(blockHeader.number, blockchainConfig)
-   // AFTER
-   val evmConfig = EvmConfig.forBlock(blockHeader.number, blockHeader.unixTimestamp, blockchainConfig)
-   ```
-5. **Confirm ETC safety:** `isShanghaiTimestamp` et al. return `false` for ETC configs
-   (no timestamp fields set), so the 3-arg overload collapses to the existing block-only
-   result on ETC — behaviour unchanged.
-6. **Write / update a test** in `StdSignedTransactionValidatorSpec` covering:
-   - ETH/Sepolia post-Shanghai: initcode > 49152 bytes → rejected
-   - ETH/Sepolia pre-Shanghai: large initcode → accepted (timestamp before Shanghai)
-   - ETC: large initcode → accepted (EIP-3860 not active on ETC)
-
-**Verify:**
-```bash
-sbt compile-all
-sbt "testOnly *StdSignedTransactionValidator*"
-sbt "testOnly *Osaka*" "testOnly *Sepolia*"
-sbt testVM
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add src/main/scala/.../consensus/validators/std/StdSignedTransactionValidator.scala`
-3. `git commit -m "fix(eth): use timestamp-aware EvmConfig in validateInitCodeSize — EIP-3860 now enforced post-Shanghai on ETH/Sepolia"`
-4. `SHA=$(git rev-parse --short HEAD)` → update audit doc `.local/docs/eth-sepolia-assumption-audit.md` Thread 1 entry
-5. **DELETE §ETH-T1-A**
-
----
-
-### §ETH-T1-B — BEACON: Fix `validateGasLimitEnoughForIntrinsicGas` fork dispatch on ETH/Sepolia
-
-**Agent:** BEACON
-**Risk:** MEDIUM — consensus-touching transaction validator; ETH-only behaviour change
-**Gate:** §ETH-T1-A complete (same file; apply in the same session or back-to-back)
-**Files:** `src/main/scala/com/chipprbots/ethereum/consensus/validators/std/StdSignedTransactionValidator.scala:271`
-
-**Background:**
-`validateGasLimitEnoughForIntrinsicGas` calls the 2-arg (block-only) `EvmConfig.forBlock`.
-On ETH/Sepolia the block-only overload returns London-era config, so intrinsic-gas validation
-uses `MystiqueFeeSchedule` (London/Paris calldata costs: zero bytes = 4 gas, non-zero = 16 gas).
-Post-Prague (EIP-7623), calldata floor pricing changes. A transaction valid under
-London calldata costs may be invalid under the Prague floor — or vice versa — meaning
-Fukuii can admit ETH transactions it should reject (or reject ones it should admit) at the
-validator boundary post-Prague.
-
-**Steps:**
-1. **Read** `StdSignedTransactionValidator.scala` lines 255-290 to confirm call site
-   and available variables.
-2. **Read** `EvmConfig.scala` lines 27-70 to confirm the 3-arg overload signature.
-3. **Verify** `blockHeader.unixTimestamp` is in scope at line 271.
-4. **Change** line 271 from 2-arg to 3-arg:
-   ```scala
-   // BEFORE
-   val evmConfig = EvmConfig.forBlock(blockHeader.number, blockchainConfig)
-   // AFTER
-   val evmConfig = EvmConfig.forBlock(blockHeader.number, blockHeader.unixTimestamp, blockchainConfig)
-   ```
-5. **Confirm ETC safety** — same reasoning as §ETH-T1-A (timestamp fields absent on ETC,
-   3-arg collapses to block-only result; ETC unaffected).
-6. **Write / update a test** in `StdSignedTransactionValidatorSpec`:
-   - ETH/Sepolia post-Prague: transaction with calldata that passes London floor
-     but fails EIP-7623 floor → rejected
-   - ETC: same calldata → accepted (no EIP-7623 on ETC)
-
-**Verify:**
-```bash
-sbt compile-all
-sbt "testOnly *StdSignedTransactionValidator*"
-sbt "testOnly *Prague*" "testOnly *Sepolia*"
-sbt testVM
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add src/main/scala/.../consensus/validators/std/StdSignedTransactionValidator.scala`
-3. `git commit -m "fix(eth): use timestamp-aware EvmConfig in validateGasLimitEnoughForIntrinsicGas — correct intrinsic-gas floor post-Prague on ETH/Sepolia"`
-4. `SHA=$(git rev-parse --short HEAD)` → update audit doc Thread 1 entry
-5. **DELETE §ETH-T1-B**
 
 ---
 

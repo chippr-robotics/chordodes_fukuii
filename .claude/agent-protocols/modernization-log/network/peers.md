@@ -161,6 +161,16 @@ Note: `ServerActor` and `RLPxConnectionHandler` intentionally remain Classic TCP
 
 ---
 
+## Dead Code Removal — §8k-CQ1
+
+#### `d4cc7a7fa` — refactor(8k-CQ1): remove `GetKnownNodes` Classic compat shim (2026-06-24)
+- **What:** `KnownNodesManager.GetKnownNodes` (case object) + Scaladoc block deleted. This was a Classic-only bridge message used by the old `PeerManagerActor` to request the known-node set before NPMA migrated to Typed. The Typed replacement `GetKnownNodesReq(replyTo: ActorRef[KnownNodes])` has been in place since `05e0c003b` and is the live path.
+- **CommonFakePeer.scala (src/it):** Bridge handler (`case GetKnownNodes => AskPattern.ask(...)`) removed along with its orphaned `implicit private val scheduler` and `implicit private val bridgeTimeout` vals (were only needed for the ask). The wrapping `lazy val knownNodesManager: ActorRef` and its remaining case (`case cmd: KnownNodesManager.Command =>`) are preserved — still passed to `PeerManagerActor.behavior` at lines 251 and 256.
+- **Files:** `network/KnownNodesManager.scala` (5 lines deleted), `src/it/.../CommonFakePeer.scala` (17 lines deleted)
+- **Verification:** `compile-all` 0 errors, 52/52 `KnownNodesManagerSpec` pass, `scalafmtAll` clean
+
+---
+
 ## PeerManagerActor TCP PoisonPill — Floor Assessment (§8k-L)
 
 #### Assessment only — no commit (2026-06-24)
@@ -173,3 +183,13 @@ Note: `ServerActor` and `RLPxConnectionHandler` intentionally remain Classic TCP
 - **TCP floor census:** Updated §8k-J expected count from 4 → **7** (+3 PoisonPill sites).
 - **Files assessed:** `PeerManagerActor.scala:982,986,990`, `ServerActor.scala:186,198`
 - **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8k-L`
+
+---
+
+## Test Fix — §8k-CQ2: PeerActorSpec:429 AlreadyConnected regression
+
+#### `359692a3b` — fix(test): update PeerActorSpec AlreadyConnected assertion for 8k-H toClassic.parent removal (2026-06-24)
+- **What:** `PeerActorSpec.scala:429` "should forward PeerClosedConnection with AlreadyConnected to parent" timed out after 8k-H removed all `context.toClassic.parent` sends from `PeerActor`. Test updated to observe the correct post-Typed behaviour: `PeerActor` stops on `AlreadyConnected`; `PeerManagerActor` detects this via death-watch (`watchWith(PeerTerminated)`), not a peer-sent message. Test now uses `watcherProbe.expectTerminated(peerUnderTest, 3.seconds)` instead of `parentProbe.expectMsg(PeerClosedConnection(...))`.
+- **Finding:** `PeerClosedConnection` remains defined in the companion object but is sent nowhere in the current codebase. No new notification mechanism exists for pre-handshake disconnects — termination is the signal.
+- **Verification:** 15/15 `PeerActorSpec` pass; `testEssential` baseline restored to 0 failures.
+- **Cross-refs:** `completed/CHASE-QUEUE.md §8k-CQ2`, `completed/DEFERRED-BACKLOG.md §8k-CQ2`
