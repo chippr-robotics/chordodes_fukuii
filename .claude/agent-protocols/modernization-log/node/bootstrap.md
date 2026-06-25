@@ -59,3 +59,13 @@
 - `NodeBuilder.scala:236,1094` — `implicit` `ExecutionContext`/`IORuntime` → `given` candidates (§3a scope)
 - `MockedMiner.Send` envelope cleanup — noted in CAPSTONE post-mortem; deferred (see DEFERRED-BACKLOG §9b prompt)
 - `ProgressProtocol.ImportedBlock` in `runningRegularSyncBootstrap` — noted in ROOT Phase 3; **gate NOW OPEN** (§8k-F `b24515637` + §8k-G `2ef2b6637` both committed). Actionable as a LOOM task: check whether `ImportedBlock` handler in `runningRegularSyncBootstrap` can be tightened now that RegularSync is fully Typed.
+
+---
+
+## §ETH-T4-A: KZG trusted setup loaded at node startup (2026-06-25)
+
+#### `02aaa05fc` — fix(eth): load KZG trusted setup at startup (EIP-4844)
+- **File:** `src/main/scala/com/chipprbots/ethereum/Fukuii.scala`
+- **What:** Added KZG initialization block after `ConfigValidator.validate` and before node construction. Calls `CKZG4844JNI.loadNativeLibrary()` then `CKZG4844JNI.loadTrustedSetupFromResource("/trusted_setup.txt", classOf[CKZG4844JNI])`. Startup failure logs an error but does not abort — the precompile will revert all calls if the setup is absent (safe degradation).
+- **Guard:** `if Config.blockchains.blockchainConfig.forkTimestamps.cancunTimestamp.isDefined` — ETC/Mordor nodes skip this block entirely.
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T4-A`, `consensus/vm.md §ETH-T4-A`

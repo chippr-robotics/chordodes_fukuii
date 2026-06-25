@@ -18,6 +18,15 @@
 
 ---
 
+## §ETH-T2-A: `BlockHeader.isPostMerge` → `isPoS`, add `isPoW` (2026-06-24)
+
+#### `c470b3dac` — rename block-level PoS predicate to chain-agnostic vocabulary
+- **File:** `domain/BlockHeader.scala`
+- **What:** `isPostMerge` → `isPoS`; `isPoW = !isPoS` added. `prevRandao` updated to use `isPoS`.
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T2-A`
+
+---
+
 ## W2-P1: Wildcard Import Migration
 
 #### `333aab3fc` — 730-file wildcard `import foo._` → `import foo.*`

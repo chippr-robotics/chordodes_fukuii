@@ -1963,3 +1963,64 @@ so the ETH branch is dead code on ETC. The 2-arg path for ETC is structurally un
 ETH-style fork schedule that triggered the false-admission path).
 
 **Verification:** 3/3 `SignedTransactionStatelessFilterSpec` pass.
+
+---
+
+## §ETH-T2-A — Rename `BlockHeader.isPostMerge` → `isPoS`, add `isPoW` ✅ DONE
+
+**Commit:** `c470b3dac`
+**Branch:** `scala3-cleanup-june`
+**Date:** 2026-06-24
+**Agent:** MITHRIL (mechanical rename)
+**Risk:** LOW — pure rename, predicate logic unchanged
+
+**What:**
+- `BlockHeader.isPostMerge: Boolean = difficulty == 0 && baseFee.isDefined` → `isPoS`
+- `isPoW: Boolean = !isPoS` added as companion
+- All 4 call sites updated: `BlockPreparator.scala`, `OpCode.scala`, `VM.scala` (code + comment), `BlockExecutionSpec.scala` (test comment)
+- `BlockchainConfig.isPostMerge(totalDifficulty: BigInt)` — left untouched (different semantic: chain-level TTD check, zero callers, not in scope)
+
+**Why:** Block-level `isPostMerge` is ETH-specific terminology ("The Merge"). The chain-level pattern already uses chain-agnostic `isPoW`/`isPoS` vocabulary (`isPoWChain`, `isPostMergeChain`). Aligning the block-level predicate makes multi-chain intent clearer: `if header.isPoW then <pow behaviour>` reads more naturally than `if !header.isPostMerge then <pow behaviour>`.
+
+**Verification:** `sbt compile-all` — clean. `testOnly *BlockPreparator* *BlockExecution* *VM* *OpCode*` — 384/384 pass. `scalafmtAll` — 1 reformatted (expected, new `isPoW` line).
+
+**Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T2-A` (this); audit doc `.local/docs/eth-sepolia-assumption-audit.md` Thread 2.
+
+---
+
+## §ETH-T4-A — KZG Point Evaluation Precompile (EIP-4844) ✅ FIXED 2026-06-25
+
+**Commit:** `02aaa05fc`
+**Branch:** `scala3-cleanup-june`
+**Agent:** BEACON
+**Risk (pre-fix):** HIGH — consensus divergence: every ETH/Sepolia block using precompile 0x0A accepted any well-formed KZG proof regardless of cryptographic validity
+
+**Files changed:**
+- `src/main/scala/com/chipprbots/ethereum/vm/PrecompiledContracts.scala` — catch fix
+- `src/main/scala/com/chipprbots/ethereum/Fukuii.scala` — KZG startup init
+- `src/main/resources/trusted_setup.txt` — new (4163-line canonical mainnet KZG setup, c-kzg-4844 v0.4.0 format)
+- `src/test/scala/com/chipprbots/ethereum/vm/KzgPointEvaluationSpec.scala` — new (4 tests)
+
+**Root cause:**
+`CKZG4844JNI.verifyKzgProof` (jc-kzg-4844:1.0.0) throws `IllegalStateException` when the
+trusted setup is not loaded. The trusted setup was **never loaded** anywhere in the codebase.
+The `catch { case _: Exception => }` block at `PrecompiledContracts.scala:793-799` swallowed
+the exception and fell through to return the success output (`FIELD_ELEMENTS_PER_BLOB ++
+BLS_MODULUS`) whenever the SHA-256/field checks passed — meaning any KZG proof that was
+well-formed but cryptographically invalid was silently accepted. go-ethereum returns
+`errBlobVerifyKZGProof` on verification failure, causing the precompile to revert.
+
+**Fix (three parts):**
+1. **Catch → revert**: `catch { case _: Exception => return None // scalafix:ok DisableSyntax.return }` — an unloaded library is never silently treated as a passing proof.
+2. **Load trusted setup at startup**: `Fukuii.main` now calls `CKZG4844JNI.loadNativeLibrary()` and `CKZG4844JNI.loadTrustedSetupFromResource("/trusted_setup.txt", classOf[CKZG4844JNI])` inside a `if cancunTimestamp.isDefined` guard — ETC nodes are unaffected.
+3. **Bundle canonical setup**: `src/main/resources/trusted_setup.txt` — mainnet KZG parameters in c-kzg-4844 v0.4.0 format (4096 G1 points + 65 G2 points). Source: `github.com/ethereum/c-kzg-4844@v0.4.0/src/trusted_setup.txt`. INCOMPATIBLE with jc-kzg-4844:2.x format (8259 lines); correct for jc-kzg-4844:1.0.0.
+
+**Tests (4, all pass):**
+- `KZGPointEvaluation valid proof returns FIELD_ELEMENTS_PER_BLOB ++ BLS_MODULUS` (SlowTest+VMTest) — vector from go-ethereum `core/vm/testdata/precompiles/pointEvaluation.json` `pointEvaluation1`
+- `KZGPointEvaluation invalid proof (corrupted proof bytes) reverts` (SlowTest+VMTest)
+- `KZGPointEvaluation wrong input length reverts` (UnitTest+VMTest)
+- `KZGPointEvaluation wrong versioned hash version byte reverts` (UnitTest+VMTest)
+
+**ETC safety:** `cancunTimestamp.isDefined` is false on all ETC/Mordor configs. The KZG setup is never loaded for ETC nodes. `PrecompiledContracts.KzgPointEvaluation` address 0x0A is not active in any ETC fork.
+
+**Cross-refs:** `consensus/vm.md §ETH-T4-A`, `node/bootstrap.md §ETH-T4-A`, `working-docs/DEFERRED-BACKLOG.md Part 10`, `.local/docs/eth-sepolia-assumption-audit.md` Thread 4c

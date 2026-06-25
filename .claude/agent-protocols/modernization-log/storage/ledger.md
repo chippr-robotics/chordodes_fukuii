@@ -33,6 +33,15 @@
 
 ---
 
+## §ETH-T2-A: `isPostMerge` → `isPoS` call-site update (2026-06-24)
+
+#### `c470b3dac` — rename block-level PoS predicate to chain-agnostic vocabulary
+- **File:** `ledger/BlockPreparator.scala` — PoW reward skip guard
+- **What:** `block.header.isPostMerge` → `block.header.isPoS`. No logic change.
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T2-A`
+
+---
+
 ## §ETH-T3-LOG: Thread 3 treasury-zero log.error gate (BEACON, 2026-06-24)
 
 #### `f868b75a8` — gate treasury-zero log.error to ETC chains only

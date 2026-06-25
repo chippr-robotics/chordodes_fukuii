@@ -13,6 +13,15 @@
 
 ---
 
+## §ETH-T2-A: `isPostMerge` → `isPoS` / add `isPoW` (2026-06-24)
+
+#### `c470b3dac` — rename block-level PoS predicate to chain-agnostic vocabulary
+- **Files:** `vm/OpCode.scala` (PREVRANDAO dispatch), `vm/VM.scala` (EIP-7610 CREATE guard + comment)
+- **What:** `blockHeader.isPostMerge` → `blockHeader.isPoS` at both call sites. No logic change.
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T2-A`
+
+---
+
 ## §8e-FORGE: `return` → expression / `scalafix:ok` FORGE pass
 
 #### `4544b8025` — §8e-FORGE: consensus `return` conversion (FORGE-reviewed, 2026-06-24)
@@ -37,3 +46,13 @@
 ## Open
 
 - `vm/OpCode.scala` — infix/wildcard warnings (9 hits, FORGE gate)
+
+---
+
+## §ETH-T4-A: KZG Point Evaluation Precompile fix (2026-06-25)
+
+#### `02aaa05fc` — fix(eth): load KZG trusted setup at startup — point-evaluation precompile now rejects invalid proofs (EIP-4844)
+- **Files:** `vm/PrecompiledContracts.scala` (catch fix), `src/main/resources/trusted_setup.txt` (new), `src/test/scala/.../vm/KzgPointEvaluationSpec.scala` (new, 4 tests)
+- **What:** Silent exception catch in `KzgPointEvaluation.exec` (`PrecompiledContracts.scala:793-799`) replaced with explicit `return None` (revert). Trusted setup now loaded at startup (`Fukuii.scala`), so `CKZG4844JNI.verifyKzgProof` executes the real cryptographic check. Pre-fix: any well-formed KZG proof was accepted without crypto verification.
+- **Gate:** BEACON sign-off. ETC unaffected — `cancunTimestamp.isDefined` false on all ETC configs.
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T4-A`, `node/bootstrap.md §ETH-T4-A`
