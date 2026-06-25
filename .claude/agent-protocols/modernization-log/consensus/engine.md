@@ -45,6 +45,16 @@
 
 ---
 
+## §NAMING-A: Rename PostMerge → PoS (terminology alignment)
+
+#### `35db7dc61` — refactor: rename PostMerge → PoS — align with BlockHeader.isPoS/isPoW canonical pattern (2026-06-25)
+- **What:** Pure rename across 10 files (2 `git mv`, 8 symbol renames). `PostMergeBlockHeaderValidator` → `PoSBlockHeaderValidator`; `validatePostMerge*` → `validatePoS*`; `PostMergeNonceError`/`PostMergeOmmersError` → `PoSNonceError`/`PoSOmmersError`; `isPostMergeChain` → `isPoSChain`; `isPostMerge(totalDifficulty)` → `isPoS(totalDifficulty)` in `BlockchainConfig.scala`.
+- **Why:** "PostMerge" conflates ETH's historical Merge event with the consensus type. ETC never had a merge. `BlockHeader.scala:85-86` already defines the canonical `isPoS`/`isPoW` vocabulary — all validators now align.
+- **Preserved:** `postMerge`/`preMerge` local vals in `ETH69OscillationChainWeightSpec` and `postMergeHeader` in `BlockExecutionSpec` (those refer to the ETH Merge event specifically, not consensus type).
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §NAMING-A`, `consensus/validators.md`
+
+---
+
 ## Open
 
 - `Ordering.Iterable` deprecation warning — BEACON gate

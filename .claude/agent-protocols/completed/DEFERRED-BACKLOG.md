@@ -2038,7 +2038,7 @@ ETH-style fork schedule that triggered the false-admission path).
 
 **Verification:** `sbt compile-all` — clean. `testOnly *BlockPreparator* *BlockExecution* *VM* *OpCode*` — 384/384 pass. `scalafmtAll` — 1 reformatted (expected, new `isPoW` line).
 
-**Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T2-A` (this); audit doc `.local/docs/eth-sepolia-assumption-audit.md` Thread 2.
+**Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T2-A` (this); audit doc `.local/docs/eth-sepolia-assumption-audit.md` Thread 2. Follow-on: `§NAMING-A` (`35db7dc61`) completed the remaining `PostMerge*` renames that were intentionally left out of scope here — `BlockchainConfig.isPostMerge`, `PostMergeBlockHeaderValidator` → `PoSBlockHeaderValidator`, and `isPostMergeChain` → `isPoSChain`.
 
 ---
 
@@ -2242,3 +2242,31 @@ Added `if isPostMergeChain then { given bc: BlockchainConfig = ...; PostMergeBlo
 **ETC safety:** `config.networkType != NetworkType.ETH` short-circuits to `Right(())` immediately — zero behaviour change for ETC/Mordor nodes.
 
 **Cross-refs:** `sync/snap.md §ETH-T9-B`, `working-docs/DEFERRED-BACKLOG.md I2`, `.local/docs/eth-sepolia-assumption-audit.md` Thread 9
+
+---
+
+### §NAMING-A — MITHRIL: Rename `PostMerge` → `PoS` throughout (terminology alignment)
+
+**Commit:** `35db7dc61` — 2026-06-25
+**Agent:** MITHRIL
+**Risk:** LOW — pure rename, no logic change
+
+**Files changed (10):**
+- `git mv` renames: `consensus/engine/PostMergeBlockHeaderValidator.scala` → `PoSBlockHeaderValidator.scala`, `test/.../validators/PostMergeBlockHeaderValidatorSpec.scala` → `PoSBlockHeaderValidatorSpec.scala`
+- Symbol renames in: `consensus/engine/PoSBlockHeaderValidator.scala`, `consensus/engine/TransitionBlockHeaderValidator.scala`, `consensus/validators/BlockHeaderValidator.scala`, `domain/BlockHeader.scala`, `utils/BlockchainConfig.scala`, `blockchain/sync/SyncController.scala`, `blockchain/sync/snap/SNAPSyncController.scala`, `test/.../validators/PoSBlockHeaderValidatorSpec.scala`, `test/.../sync/snap/SNAPSyncControllerSpec.scala`, `test/.../domain/BlockHeaderFieldCountSpec.scala`
+
+**Rename map applied:**
+- `PostMergeBlockHeaderValidator` → `PoSBlockHeaderValidator` (object + all refs + file)
+- `validatePostMergeDifficulty/Nonce/Ommers` → `validatePoSDifficulty/Nonce/Ommers`
+- `PostMergeNonceError` → `PoSNonceError`, `PostMergeOmmersError` → `PoSOmmersError`
+- `isPostMergeChain` → `isPoSChain` (in `SyncController.scala` + `SNAPSyncController.scala`)
+- `isPostMerge(totalDifficulty)` → `isPoS(totalDifficulty)` in `BlockchainConfig.scala`
+- log string `"postMergeChain={}"` → `"isPoSChain={}"`
+
+**Preserved (lower-priority local vars — ETH Merge event context, not consensus type):**
+- `postMerge`/`preMerge` in `ETH69OscillationChainWeightSpec.scala:100-101`
+- `postMergeHeader` local val in `BlockExecutionSpec.scala:688,698`
+
+**Result:** `sbt compile-all` → 0 errors. `sbt scalafmtAll` → 1 file reformatted.
+
+**Cross-refs:** `modernization-log/consensus/engine.md §NAMING-A`
