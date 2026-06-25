@@ -2292,7 +2292,7 @@ Added `if isPostMergeChain then { given bc: BlockchainConfig = ...; PostMergeBlo
 
 ## §ETH-T9-D — BEACON: Startup assertion — storageScheme must match chain type ✅ FIXED 2026-06-25
 
-**Commit:** `TBD` — 2026-06-25
+**Commit:** `f74158a3c` — 2026-06-25
 **Agent:** BEACON
 **Risk (pre-fix):** MEDIUM — a misconfigured ETC node (`storage-scheme = path`) or ETH node (`storage-scheme = hash`) would start successfully and sync state into the wrong layout, failing silently until state verification
 

@@ -121,7 +121,7 @@
 - **What:** Thread 9 Explore audit flagged three SNAP coordinators as potentially missing `storageScheme` dispatch. Full file reads confirm all three are correctly wired: `AccountRangeCoordinator.getOrCreateTaskStackTrie:1570`, `StorageRangeCoordinator.getOrCreateAccountTrie:490`, `TrieNodeHealingCoordinator.processActiveResponse:1373`. Each has an explicit `storageScheme match { case Hash => ...; case Path => ... }` dispatch. No code change.
 - **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T9-C`, `.local/docs/eth-sepolia-assumption-audit.md` Thread 9
 
-#### `TBD` — fix(config): assert storageScheme matches chain type at SNAPSyncController startup (§ETH-T9-D)
+#### `f74158a3c` — fix(config): assert storageScheme matches chain type at SNAPSyncController startup (§ETH-T9-D)
 - **What:** `SyncController.loadSnapSyncConfig()` now validates `storageScheme` against `blockchainConfig.networkType` via `require()`. ETH → `StorageScheme.Path`; ETC → `StorageScheme.Hash`. Assertion fires before any actor is spawned; all three SNAP startup paths in `SyncController` call `loadSnapSyncConfig()`. Two new imports added (`StorageScheme`, `NetworkType`). Complements the existing `SNAPSyncControllerImpl.checkStorageSchemeMismatch()` (DB-state vs config) with an earlier config vs chain-type gate.
 - **Files:** `blockchain/sync/SyncController.scala`
 - **Cross-refs:** `completed/DEFERRED-BACKLOG.md §ETH-T9-D`, `.local/docs/eth-sepolia-assumption-audit.md` Thread 9
