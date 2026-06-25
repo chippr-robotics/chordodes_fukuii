@@ -423,13 +423,15 @@ class PeerActorSpec
     manager.expectTerminated(peer)
   }
 
-  it should "forward PeerClosedConnection with AlreadyConnected to parent when Disconnect(AlreadyConnected) is received" taggedAs (
+  it should "stop when Disconnect(AlreadyConnected) is received during handshake" taggedAs (
     UnitTest,
     NetworkTest
   ) in new TestSetup {
-    val parentProbe: TestProbe = TestProbe()
+    // 8k-H removed context.toClassic.parent sends; PeerActor now stops immediately
+    // on pre-handshake Disconnect. Verify via death-watch instead of parent message.
+    val watcherProbe: TestProbe = TestProbe()
 
-    val peerWithParent: TestActorRef[Nothing] = TestActorRef(
+    val peerUnderTest: TestActorRef[Nothing] = TestActorRef(
       PropsAdapter(
         PeerActor.apply(
           new InetSocketAddress("127.0.0.1", 0),
@@ -440,18 +442,19 @@ class PeerActorSpec
           false,
           handshaker
         )
-      ),
-      parentProbe.ref
+      )
     )
 
-    peerWithParent ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
+    watcherProbe.watch(peerUnderTest)
+
+    peerUnderTest ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
     rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-    rlpxConnection.send(peerWithParent, RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
+    rlpxConnection.send(peerUnderTest, RLPxConnectionHandler.ConnectionEstablished(remoteNodeId))
     rlpxConnection.expectMsgPF() { case RLPxConnectionHandler.SendMessage(_: HelloEnc) => () }
 
-    rlpxConnection.send(peerWithParent, RLPxConnectionHandler.MessageReceived(Disconnect(Reasons.AlreadyConnected)))
+    rlpxConnection.send(peerUnderTest, RLPxConnectionHandler.MessageReceived(Disconnect(Reasons.AlreadyConnected)))
 
-    parentProbe.expectMsg(3.seconds, PeerActor.PeerClosedConnection("127.0.0.1", Disconnect.Reasons.AlreadyConnected))
+    watcherProbe.expectTerminated(peerUnderTest, 3.seconds)
   }
 
   trait BlockUtils {
