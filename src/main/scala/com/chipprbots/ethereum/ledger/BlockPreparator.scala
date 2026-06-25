@@ -14,6 +14,7 @@ import com.chipprbots.ethereum.ledger.BlockExecutionError.TxsExecutionError
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 import com.chipprbots.ethereum.utils.DebugTrace
+import com.chipprbots.ethereum.consensus.engine.BlobGasUtils
 import com.chipprbots.ethereum.utils.Logger
 import com.chipprbots.ethereum.vm.{PC as _, *}
 
@@ -157,7 +158,7 @@ class BlockPreparator(
         // would derive (e.g. blobBaseFee=0 when excessBlobGas=0 would yield 1).
         val blobBaseFee = _simulateBlobBaseFeeOverride.getOrElse(
           blockHeader.excessBlobGas
-            .map(eg => computeBlobBaseFee(eg, blockHeader.unixTimestamp))
+            .map(eg => BlobGasUtils.getBlobGasPrice(eg, blockHeader.unixTimestamp, blockchainConfig))
             .getOrElse(BigInt(1))
         )
         blobGasUsed * blobBaseFee
@@ -212,42 +213,12 @@ class BlockPreparator(
       val blobGasUsed = BigInt(bt.blobVersionedHashes.size) * BigInt(131072)
       // Compute blob base fee from header's excessBlobGas using fork-correct update fraction.
       val blobBaseFee = blockHeader.excessBlobGas
-        .map(eg => computeBlobBaseFee(eg, blockHeader.unixTimestamp))
+        .map(eg => BlobGasUtils.getBlobGasPrice(eg, blockHeader.unixTimestamp, blockchainConfig))
         .getOrElse(BigInt(1))
       val blobGasCost = blobGasUsed * blobBaseFee
       val account = world.getGuaranteedAccount(senderAddress)
       world.saveAccount(senderAddress, account.increaseBalance(UInt256(-blobGasCost)))
     case _ => world
-  }
-
-  /** Compute the blob base fee from excessBlobGas per EIP-4844, with EIP-7691 Prague bump. */
-  private def computeBlobBaseFee(excessBlobGas: BigInt, blockTimestamp: Long)(implicit
-      blockchainConfig: BlockchainConfig
-  ): BigInt = {
-    val minBlobBaseFee = BigInt(1)
-    // EIP-7691 (Prague): BLOB_BASE_FEE_UPDATE_FRACTION bumped from 3338477 → 5007716.
-    val updateFraction =
-      if blockchainConfig.isPragueTimestamp(blockTimestamp) then BigInt(5007716)
-      else BigInt(3338477)
-    if excessBlobGas == 0 then minBlobBaseFee
-    else {
-      // Simplified: baseFee = minBlobBaseFee * e^(excessBlobGas / updateFraction)
-      // Use the integer approximation from the spec
-      fakeExponential(minBlobBaseFee, excessBlobGas, updateFraction)
-    }
-  }
-
-  /** Integer approximation of factor * e^(numerator / denominator) per EIP-4844 */
-  private def fakeExponential(factor: BigInt, numerator: BigInt, denominator: BigInt): BigInt = {
-    var i = 1
-    var output = BigInt(0)
-    var numeratorAccum = factor * denominator
-    while numeratorAccum > 0 do {
-      output += numeratorAccum
-      numeratorAccum = (numeratorAccum * numerator) / (denominator * i)
-      i += 1
-    }
-    output / denominator
   }
 
   private[ledger] def runVM(
@@ -583,7 +554,7 @@ class BlockPreparator(
           case bt: com.chipprbots.ethereum.domain.BlobTransaction =>
             val blobGasUsed = BigInt(bt.blobVersionedHashes.size) * BigInt(131072)
             val blobBaseFee = blockHeader.excessBlobGas
-              .map(eg => computeBlobBaseFee(eg, blockHeader.unixTimestamp))
+              .map(eg => BlobGasUtils.getBlobGasPrice(eg, blockHeader.unixTimestamp, blockchainConfig))
               .getOrElse(BigInt(1))
             blobGasUsed * blobBaseFee
           case _ => BigInt(0)

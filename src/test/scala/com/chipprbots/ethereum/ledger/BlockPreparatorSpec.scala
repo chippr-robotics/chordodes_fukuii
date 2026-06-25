@@ -14,7 +14,10 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import com.chipprbots.ethereum.Mocks
 import com.chipprbots.ethereum.Mocks.MockVM
 import com.chipprbots.ethereum.Mocks.MockValidatorsAlwaysSucceed
+import com.chipprbots.ethereum.consensus.engine.BlobGasUtils
 import com.chipprbots.ethereum.consensus.mining.Mining
+import com.chipprbots.ethereum.crypto.ECDSASignature
+import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostCancun
 import com.chipprbots.ethereum.consensus.validators.SignedTransactionError
 import com.chipprbots.ethereum.consensus.validators.SignedTransactionError.TransactionSignatureError
 import com.chipprbots.ethereum.consensus.validators.SignedTransactionValid
@@ -434,5 +437,61 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
 
     result shouldBe a[Right[?, BlockResult]]
     result.map(_.receipts.last.postTransactionStateHash shouldBe FailureOutcome)
+  }
+
+  "deductBlobGas" should {
+    // Verifies that deductBlobGas routes through BlobGasUtils.getBlobGasPrice, which covers
+    // EIP-7892 BPO1/BPO2 fractions. The old local computeBlobBaseFee only handled Cancun/Prague
+    // and produced incorrect amounts post-BPO on Sepolia blocks.
+    "burn the correct blob gas cost matching BlobGasUtils for a Prague block" taggedAs (
+      UnitTest,
+      ConsensusTest
+    ) in new TestSetup {
+      implicit val pragueConfig: BlockchainConfig = blockchainConfig.copy(
+        forkTimestamps = blockchainConfig.forkTimestamps.copy(
+          cancunTimestamp = Some(0L),
+          pragueTimestamp = Some(0L)
+        )
+      )
+
+      val excessBlobGas = BigInt(1000000)
+      val blockTs = 100L
+      val numBlobs = 2
+      val blobTx = BlobTransaction(
+        chainId = pragueConfig.chainId,
+        nonce = 1,
+        maxPriorityFeePerGas = 1,
+        maxFeePerGas = 1000,
+        gasLimit = 21000,
+        receivingAddress = Some(receiverAddress),
+        value = 0,
+        payload = ByteString.empty,
+        accessList = Nil,
+        maxFeePerBlobGas = 1000,
+        blobVersionedHashes = List.fill(numBlobs)(ByteString(Array.fill(32)(0.toByte)))
+      )
+      val stx = SignedTransaction(blobTx, ECDSASignature(0, 0, 0))
+      val header = defaultBlockHeader.copy(
+        unixTimestamp = blockTs,
+        extraFields = HefPostCancun(
+          baseFee = BigInt(1_000_000_000L),
+          withdrawalsRoot = ByteString(new Array[Byte](32)),
+          blobGasUsed = BigInt(0),
+          excessBlobGas = excessBlobGas,
+          parentBeaconBlockRoot = ByteString(new Array[Byte](32))
+        )
+      )
+
+      val senderBalance = UInt256(BigInt(1000000000L))
+      val world = emptyWorld.saveAccount(originAddress, Account(balance = senderBalance))
+
+      val resultWorld = prep.deductBlobGas(stx, originAddress, header, world)
+
+      val expectedFee = BlobGasUtils.getBlobGasPrice(excessBlobGas, blockTs, pragueConfig)
+      val expectedBurned = expectedFee * BlobGasUtils.GAS_PER_BLOB * numBlobs
+      val actualBalance = resultWorld.getGuaranteedAccount(originAddress).balance
+
+      actualBalance shouldBe UInt256(senderBalance.toBigInt - expectedBurned)
+    }
   }
 }
