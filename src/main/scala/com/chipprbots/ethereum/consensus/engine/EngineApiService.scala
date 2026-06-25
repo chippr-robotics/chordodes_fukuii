@@ -68,10 +68,13 @@ class EngineApiService(
   // against the sidecars the test submitted via eth_sendRawTransaction. We capture sidecars
   // during the proposer's GetPendingTransactions call and hand them to engine_getPayloadV3's
   // blobsBundle envelope.
+  // cellProofsPerBlob stashes EIP-7594 PeerDAS cell proofs (128 × 48 bytes per blob)
+  // for use by engine_getBlobsV2 (§ETH-T10-B).
   case class BlobsBundleData(
       blobs: Seq[ByteString],
       commitments: Seq[ByteString],
-      proofs: Seq[ByteString]
+      proofs: Seq[ByteString],
+      cellProofsPerBlob: Seq[Seq[ByteString]]
   )
   private val pendingPayloadBlobsBundle =
     new java.util.concurrent.ConcurrentHashMap[ByteString, BlobsBundleData]()
@@ -958,7 +961,7 @@ class EngineApiService(
     * when the payload has no blob txs.
     */
   def getPayloadBlobsBundle(payloadId: ByteString): BlobsBundleData =
-    Option(pendingPayloadBlobsBundle.get(payloadId)).getOrElse(BlobsBundleData(Nil, Nil, Nil))
+    Option(pendingPayloadBlobsBundle.get(payloadId)).getOrElse(BlobsBundleData(Nil, Nil, Nil, Nil))
 
   /** Parse the EIP-4844 network-wrapped raw bytes (`0x03 || rlp([tx_payload, blobs, commitments, proofs])`) the pool
     * captured for each blob tx, and return the concatenated sidecars for every blob tx actually included in the built
@@ -969,19 +972,39 @@ class EngineApiService(
       blobTxRawBytes: Map[ByteString, ByteString]
   ): BlobsBundleData = {
     import com.chipprbots.ethereum.rlp.{rawDecode, RLPList, RLPValue}
+    import com.chipprbots.ethereum.crypto.KzgCellProofs
     val blobTxHashes = txs.collect {
       case stx @ SignedTransaction(_: com.chipprbots.ethereum.domain.BlobTransaction, _) => stx.hash
     }
     val allBlobs = Seq.newBuilder[ByteString]
     val allCommitments = Seq.newBuilder[ByteString]
     val allProofs = Seq.newBuilder[ByteString]
+    val allCellProofsPerBlob = Seq.newBuilder[Seq[ByteString]]
     blobTxHashes.foreach { h =>
       blobTxRawBytes.get(h) match {
         case Some(raw) if raw.length > 1 && raw(0) == 0x03 =>
           try
             rawDecode(raw.toArray.drop(1)) match {
               case RLPList(_, blobs: RLPList, commitments: RLPList, proofs: RLPList) =>
-                blobs.items.foreach { case RLPValue(b) => allBlobs += ByteString(b); case _ => }
+                blobs.items.foreach {
+                  case RLPValue(b) =>
+                    allBlobs += ByteString(b)
+                    val cellProofs: Seq[ByteString] =
+                      try {
+                        val (_, perCellProofs) = KzgCellProofs.computeCellsAndKzgProofs(b)
+                        perCellProofs.toSeq.map(ByteString(_))
+                      } catch {
+                        case e: Exception =>
+                          log.warn(
+                            "EIP-7594 cell-proof computation failed for blob in tx {}: {}",
+                            h.toArray.map("%02x".format(_)).mkString,
+                            e.getMessage
+                          )
+                          Seq.empty
+                      }
+                    allCellProofsPerBlob += cellProofs
+                  case _ =>
+                }
                 commitments.items.foreach { case RLPValue(c) => allCommitments += ByteString(c); case _ => }
                 proofs.items.foreach { case RLPValue(p) => allProofs += ByteString(p); case _ => }
               case _ =>
@@ -998,7 +1021,7 @@ class EngineApiService(
         case _ => // tx from network / historical — we didn't store a sidecar
       }
     }
-    BlobsBundleData(allBlobs.result(), allCommitments.result(), allProofs.result())
+    BlobsBundleData(allBlobs.result(), allCommitments.result(), allProofs.result(), allCellProofsPerBlob.result())
   }
 
   /** engine_exchangeCapabilities — return supported Engine API methods. */

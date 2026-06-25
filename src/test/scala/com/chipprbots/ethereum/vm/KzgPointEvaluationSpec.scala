@@ -23,7 +23,7 @@ class KzgPointEvaluationSpec extends AnyFunSuite with BeforeAndAfterAll with Mat
   override def beforeAll(): Unit =
     try {
       CKZG4844JNI.loadNativeLibrary()
-      CKZG4844JNI.loadTrustedSetupFromResource("/trusted_setup.txt", classOf[CKZG4844JNI])
+      CKZG4844JNI.loadTrustedSetupFromResource("/trusted_setup.txt", classOf[CKZG4844JNI], 0L)
     } catch {
       case _: Exception => () // already loaded by a prior test class in the same JVM
     }

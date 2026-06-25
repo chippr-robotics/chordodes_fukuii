@@ -138,7 +138,7 @@ object Dependencies {
   val crypto = Seq(
     "org.bouncycastle" % "bcprov-jdk18on" % "1.84",
     "org.bouncycastle" % "bcpkix-jdk18on" % "1.84",
-    "tech.pegasys" % "jc-kzg-4844" % "1.0.0", // EIP-4844 KZG point evaluation (c-kzg-4844 JNI bindings)
+    "io.consensys.protocols" % "jc-kzg-4844" % "2.0.0", // EIP-4844/7594 KZG ops (c-kzg-4844 JNI bindings, PeerDAS cell proofs)
     "org.hyperledger.besu" % "bls12-381" % "1.0.0" // EIP-2537 BLS12-381 precompiles (gnark/Constantine backends)
   )
 

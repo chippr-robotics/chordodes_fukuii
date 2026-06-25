@@ -70,7 +70,8 @@ object Fukuii extends Logger {
         ethereum.ckzg4844.CKZG4844JNI.loadNativeLibrary()
         ethereum.ckzg4844.CKZG4844JNI.loadTrustedSetupFromResource(
           "/trusted_setup.txt",
-          classOf[ethereum.ckzg4844.CKZG4844JNI]
+          classOf[ethereum.ckzg4844.CKZG4844JNI],
+          0L
         )
         log.info("KZG trusted setup loaded successfully")
       } catch {
