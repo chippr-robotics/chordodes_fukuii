@@ -25,8 +25,7 @@ object PeerEventBusActor {
     * @param messageClassifier
     *   specify which messages to subscribe to
     * @return
-    *   Source that subscribes to the peer event bus on materialization and unsubscribes on cancellation. It will
-    *   complete when the event bus actor terminates.
+    *   Source that subscribes to the peer event bus on materialization and unsubscribes on cancellation.
     *
     * Note:
     *   - subscription is asynchronous so it may miss messages when starting.
@@ -39,7 +38,6 @@ object PeerEventBusActor {
     Source
       // Buffer 64 + dropHead: absorbs bursty peer messages without dying on a race.
       .actorRef[MessageFromPeer](PartialFunction.empty, PartialFunction.empty, 64, OverflowStrategy.dropHead)
-      .watch(peerEventBus.toClassic)
       .mapMaterializedValue { actorRef =>
         peerEventBus ! SubscribeCmd(messageClassifier, actorRef.toTyped[PeerEvent])
         NotUsed

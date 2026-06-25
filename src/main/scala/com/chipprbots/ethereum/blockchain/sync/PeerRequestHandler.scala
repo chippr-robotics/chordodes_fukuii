@@ -3,7 +3,6 @@ package com.chipprbots.ethereum.blockchain.sync
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed.{ActorRef as TypedActorRef, Behavior}
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 
 import scala.concurrent.duration.FiniteDuration
 import scala.reflect.ClassTag
@@ -72,10 +71,9 @@ object PeerRequestHandler {
             case e                     => throw new MatchError(s"unexpected PeerEvent from bus: $e")
           }
 
-        // Classic tell with sender: peerEventAdapter.toClassic is a TCP bridge constraint.
         networkPeerManager.tell(
-          NetworkPeerManagerActor.SendMessage(toSerializable(requestMsg), peer.id),
-          peerEventAdapter.toClassic
+          NetworkPeerManagerActor.SendMessageCmd(toSerializable(requestMsg), peer.id),
+          ActorRef.noSender
         )
         peerEventBus ! SubscribeCmd(
           PeerDisconnectedClassifier(PeerSelector.WithId(peer.id)),
