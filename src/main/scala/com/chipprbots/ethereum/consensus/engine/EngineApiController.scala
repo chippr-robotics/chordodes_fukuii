@@ -53,6 +53,8 @@ class EngineApiController(
         handleGetClientVersion(request)
       case "engine_getBlobsV1" =>
         handleGetBlobs(request)
+      case "engine_getBlobsV2" =>
+        handleGetBlobsV2(request)
       case "engine_getPayloadBodiesByHashV1" =>
         handleGetPayloadBodiesByHash(request)
       case "engine_getPayloadBodiesByRangeV1" =>
@@ -583,6 +585,22 @@ class EngineApiController(
       .getOrElse(Nil)
     val nullBlobs = hashes.map(_ => JNull)
     IO.pure(JsonRpcResponse("2.0", Some(JArray(nullBlobs)), None, reqId(request)))
+  }
+
+  private def handleGetBlobsV2(request: JsonRpcRequest): IO[JsonRpcResponse] = {
+    // engine_getBlobsV2: returns BlobAndProofV2 | null per versioned hash (EIP-7594 / PeerDAS).
+    // Fukuii does not index mempool blobs by versioned hash, so null is returned for every entry;
+    // the CL (Lighthouse/Prysm) will fall back to fetching cell proofs from CL peers.
+    val hashes = request.params
+      .map(_.arr)
+      .getOrElse(Nil)
+      .headOption
+      .collect { case JArray(items) =>
+        items
+      }
+      .getOrElse(Nil)
+    val nullEntries = hashes.map(_ => JNull)
+    IO.pure(JsonRpcResponse("2.0", Some(JArray(nullEntries)), None, reqId(request)))
   }
 
   private def handleGetPayloadBodiesByHash(request: JsonRpcRequest): IO[JsonRpcResponse] = {

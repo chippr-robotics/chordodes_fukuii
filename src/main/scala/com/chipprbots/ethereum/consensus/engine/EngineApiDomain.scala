@@ -76,3 +76,6 @@ case class ForkchoiceUpdatedResponse(
 
 /** Payload ID for tracking built payloads */
 case class PayloadId(id: ByteString)
+
+/** BlobAndProofV2 per EIP-7594 / engine_getBlobsV2 — blob + CELLS_PER_EXT_BLOB cell proofs (48 bytes each). */
+case class BlobAndProofV2(blob: ByteString, cellProofs: Seq[ByteString])
