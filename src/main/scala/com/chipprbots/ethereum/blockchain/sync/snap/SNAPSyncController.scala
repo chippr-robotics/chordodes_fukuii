@@ -541,18 +541,12 @@ private class SNAPSyncControllerImpl(
       handshakedPeersAdapter
     )
 
-  /** OQ-2: reply target for ChainDownloader's `Done`/`Progress`. ChainDownloader (Behavior[Command], S6 narrowed) sends
-    * to this Classic adapter, which bridges into SSC's sealed mailbox as ChainDownloaderDone / ChainDownloaderProgress.
+  /** OQ-2: reply target for ChainDownloader's `Done`. ChainDownloader (Behavior[Command], S6 narrowed) sends Done to
+    * this typed adapter, which bridges into SSC's sealed mailbox as ChainDownloaderDone. Progress is polled separately
+    * via GetProgress — this adapter handles Done only.
     */
-  private val chainDownloaderReplyAdapter: org.apache.pekko.actor.ActorRef =
-    ctx
-      .messageAdapter[Any] { // Any: Pekko messageAdapter — wraps Classic replies
-        case ChainDownloader.Done => ChainDownloaderDone
-        case p: ChainDownloader.Progress =>
-          ChainDownloaderProgress(p.headersDownloaded, p.bodiesDownloaded, p.receiptsDownloaded, p.targetBlock)
-        case other => throw new IllegalArgumentException(s"Unexpected ChainDownloader reply: $other")
-      }
-      .toClassic
+  private val chainDownloaderReplyAdapter: TypedActorRef[ChainDownloader.Done.type] =
+    ctx.messageAdapter[ChainDownloader.Done.type](_ => ChainDownloaderDone)
 
   private def onStop(): Unit = {
     stopSnapOnlySchedules()
