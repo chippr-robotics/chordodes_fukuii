@@ -61,29 +61,29 @@ object PeerRequestHandler {
           case _                              => None
         }
 
-        val msgAdapter: TypedActorRef[PeerEvent] =
+        // Single adapter for all PeerEvent subtypes. Two registrations for the same type `T`
+        // in Pekko's `internalMessageAdapter` overwrite each other (filterNot + prepend on
+        // `_messageAdapters`), so separate msgAdapter/disconnectAdapter were both resolving to
+        // the shared `messageAdapterRef` with only the last registration's function surviving.
+        val peerEventAdapter: TypedActorRef[PeerEvent] =
           ctx.messageAdapter[PeerEvent] {
             case MessageFromPeer(m, _) => MessageFromPeerCmd(m)
-            case e                     => throw new MatchError(s"unexpected PeerEvent from bus: $e")
-          }
-        val disconnectAdapter: TypedActorRef[PeerEvent] =
-          ctx.messageAdapter[PeerEvent] {
             case PeerDisconnected(pid) => PeerLeftCmd(pid)
             case e                     => throw new MatchError(s"unexpected PeerEvent from bus: $e")
           }
 
-        // Classic tell with sender: msgAdapter.toClassic is a TCP bridge constraint, not a subscription call.
+        // Classic tell with sender: peerEventAdapter.toClassic is a TCP bridge constraint.
         networkPeerManager.tell(
           NetworkPeerManagerActor.SendMessage(toSerializable(requestMsg), peer.id),
-          msgAdapter.toClassic
+          peerEventAdapter.toClassic
         )
         peerEventBus ! SubscribeCmd(
           PeerDisconnectedClassifier(PeerSelector.WithId(peer.id)),
-          disconnectAdapter
+          peerEventAdapter
         )
         peerEventBus ! SubscribeCmd(
           MessageClassifier(Set(responseMsgCode), PeerSelector.WithId(peer.id)),
-          msgAdapter
+          peerEventAdapter
         )
         timers.startSingleTimer("timeout", TimeoutCmd, responseTimeout)
 
@@ -91,8 +91,7 @@ object PeerRequestHandler {
 
         def cleanup(): Unit = {
           timers.cancel("timeout")
-          peerEventBus ! UnsubscribeAllCmd(msgAdapter)
-          peerEventBus ! UnsubscribeAllCmd(disconnectAdapter)
+          peerEventBus ! UnsubscribeAllCmd(peerEventAdapter)
         }
 
         Behaviors.receiveMessage {

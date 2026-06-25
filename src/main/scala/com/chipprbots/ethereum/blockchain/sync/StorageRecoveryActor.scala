@@ -84,7 +84,7 @@ object StorageRecoveryActor {
     * the download can roll onto a root peers can still serve. Carries `replyTo` so SyncController does not need
     * `sender()` to reply.
     */
-  case class RequestRecentRoot(replyTo: ActorRef) extends SyncControllerMsg
+  case class RequestRecentRoot(replyTo: TypedActorRef[StorageRecoveryActor.Command]) extends SyncControllerMsg
 
   def apply(
       stateRoot: ByteString,
@@ -371,7 +371,7 @@ object StorageRecoveryActor {
               rollsAttempted + 1,
               maxRolls
             )
-            syncController ! RequestRecentRoot(ctx.self.toClassic)
+            syncController ! RequestRecentRoot(ctx.self)
           } else if rollsAttempted >= maxRolls then {
             ctx.log.info(
               "Storage recovery: exhausted {} recent-root rolls; letting the abandon timer run for the residue.",

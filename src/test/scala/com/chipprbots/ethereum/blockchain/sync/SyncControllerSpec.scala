@@ -154,17 +154,25 @@ class SyncControllerSpec
         )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
           Left(HeaderPoWError)
 
+        // G5 PivotBlockSelector uses validateHeaderOnly for PoW backlink checks. Returning Left here
+        // causes the backlink to fail on every attempt, driving exponential-backoff retries that exhaust
+        // the 25-second eventually window before SelectionFailed arrives. Only validate() (full block
+        // validation, exercised by FastSync.processHeaders) must fail for this test to work correctly.
         override def validateHeaderOnly(blockHeader: BlockHeader)(implicit
             blockchainConfig: BlockchainConfig
         ): Either[BlockHeaderError, BlockHeaderValid] =
-          Left(HeaderPoWError)
+          Right(BlockHeaderValid)
       }
     }
   ) { testSetup =>
     import testSetup.*
     startWithState(
-      defaultStateBeforeNodeRestart.copy(nextBlockToFullyValidate =
-        defaultStateBeforeNodeRestart.bestBlockHeaderNumber + 1
+      defaultStateBeforeNodeRestart.copy(
+        nextBlockToFullyValidate = defaultStateBeforeNodeRestart.bestBlockHeaderNumber + 1,
+        // safeDownloadTarget must exceed bestBlockHeaderNumber so FastSync enqueues headers
+        // beyond 399500. The Typed FastSync caps header fetches at safeDownloadTarget via
+        // enqueueHeadersIfNeeded; the Classic version did not have this guard.
+        safeDownloadTarget = beforeRestartPivot.number + syncConfig.fastSyncBlockValidationX
       )
     )
 
@@ -902,7 +910,18 @@ class SyncControllerSpec
           case NetworkPeerManagerActor.CalibrateChainWeightNow =>
             this
 
-          // Handle ETH66 GetBlockHeaders (with requestId)
+          // ETH69 G5 by-hash backlink probe: block = Right(hash). Store pivot header in the
+          // canonical chain so PivotBlockSelector's canonical-match check succeeds, then reply
+          // with the pivot header as the single-element backlink chain.
+          case SendMessage(msg: ETHPackets.GetBlockHeaders.GetBlockHeadersEnc, peer)
+              if msg.underlyingMsg.block.isRight =>
+            val requestId = msg.underlyingMsg.requestId
+            blockchainWriter.storeBlockHeader(pivotHeader).commit()
+            storagesInstance.storages.blockNumberMappingStorage.put(pivotHeader.number, pivotHeader.hash).commit()
+            sender ! MessageFromPeer(ETHPackets.BlockHeaders(requestId, Seq(pivotHeader)), peer)
+            this
+
+          // Handle ETH66 GetBlockHeaders by block number (with requestId)
           case SendMessage(msg: ETHPackets.GetBlockHeaders.GetBlockHeadersEnc, peer) =>
             val underlyingMessage = msg.underlyingMsg
             val requestId = underlyingMessage.requestId

@@ -12,7 +12,8 @@ import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.ForkTimestamps
 import com.chipprbots.ethereum.utils.NetworkType
 
-/** Tests for the EIP-3860 initcode-cost correctness fix in [[SignedTransactionWithSender.getStatelessValidTransactions]].
+/** Tests for the EIP-3860 initcode-cost correctness fix in
+  * [[SignedTransactionWithSender.getStatelessValidTransactions]].
   *
   * The stateless pre-filter uses `EvmConfig.forBlock` to compute intrinsic gas. On ETH chains the correct overload is
   * the 3-arg form that applies timestamp-based fork overrides (including EIP-3860 initcode metering, active at
