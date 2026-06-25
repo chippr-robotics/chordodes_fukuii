@@ -1835,6 +1835,41 @@ correct stop mechanism and cannot be replaced with `ctx.stop()`.
 
 ---
 
+### §8k-J — PRISM: TCP floor verification post-CAPSTONE + post-§8k-K ✅ DONE 2026-06-25
+
+**Commit:** `<docs-only>` (net zero code changes)
+**Executed:** Post-CAPSTONE (phases 2a-2g) + post-§8k-K (`a6b0304e7`).
+
+**Step 1 — 30 code `.toClassic` bridges remain** (down from 91 pre-CAPSTONE; ≤4 expectation was wrong).
+
+Permanent floor confirmed (6 sites):
+- `ServerActor.scala:70,77` — TCP bind + bridge spawn
+- `RLPxConnectionHandler.scala:323` — TCP write ack
+- `PeerManagerActor.scala:982,986,990` — `connection ! PoisonPill` on TCP-extension-owned actors (§8k-L)
+
+Root cause for remaining 24 bridges:
+1. **PivotHeaderBootstrap still Classic** → FastSync (5) + SyncController (10) forward via `.toClassic.tell`
+2. **PeerEventBusActor callers pass Classic refs via implicit adapter** → adapter import removal blocked in 22+ files
+
+Bridge clusters: SyncController×10, FastSync×5, PeerManagerActor×4, PivotBlockSelector×2,
+BlockImporter×2, BytecodeRecovery+StorageRecovery×2, PeerRequestHandler×1, SNAPSyncController×1,
+AkkaTaskOps×1, PeerEventBusActor×1, NodeBuilder×2.
+
+**Step 3 — 0 adapter imports removable:** FastSyncBranchResolverActor and RegularSync both fail
+compile without adapter — implicit `ClassicActorRef → ActorRef[PEBActor.Command]` conversion.
+`MockedMiner`/`PoWMining`/`FaucetSupervisor` need adapter for `classicSystem.spawn()`.
+
+**Step 4 — §7d 8-lens audit:**
+Lenses 1, 2, 4, 7, 8: ✅ Clean. Lens 3: minor (5 Typed fetchers import Classic `Scheduler`).
+Lens 5: pre-existing `Behaviors.same` silent drops (SSA/FSBRA) — CHASE-QUEUE. Lens 6: SNAPRequestTracker
+wildcard — pre-existing CHASE-QUEUE item from §8k-B.
+
+**Step 5 — testEssential:** Skipped — net zero code change; `sbt compile-all` confirmed clean.
+
+**Primary unblock:** PivotHeaderBootstrap LOOM migration (eliminates 15/24 remaining bridges).
+
+---
+
 ### §8k-CQ2 — MITHRIL: `PeerActorSpec:429` AlreadyConnected test regression ✅ FIXED 2026-06-24
 
 **Commit:** `359692a3b`

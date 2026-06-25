@@ -650,23 +650,120 @@ slower than dev machine → timeouts). `@Ignore` annotations silently hide untes
 
 ---
 
-#### §8k-J — PRISM: Re-run TCP floor verification after CAPSTONE
+#### §8k-J — PRISM: Re-run TCP floor verification after CAPSTONE ✅ DONE 2026-06-25
 
-**Agent:** PRISM
-**Risk:** LOW — same as §8k-B
-**Gate:** CAPSTONE merged
+**Commit:** `<docs-only>` (net zero code changes — see below)
+**Executed:** Post-CAPSTONE (all phases 2a-2g merged) + post-§8k-K (`a6b0304e7`).
 
-§8k-B was executed 2026-06-24 **before** CAPSTONE merged. Found **91** `.toClassic`/`.toTyped`
-bridge occurrences (expected ≤4). All 91 are CAPSTONE-scope. TCP floor cannot be
-declared until CAPSTONE migrates the remaining actors to pure Typed.
+**Step 1 — TCP floor NOT achieved (30 code bridges remain):**
 
-After CAPSTONE merges, re-run §8k-B verbatim (see `completed/DEFERRED-BACKLOG.md`).
-Expected post-CAPSTONE state: ≤7 occurrences (ServerActor + RLPxConnectionHandler TCP only, plus
-3 PoisonPill sites in PeerManagerActor — all confirmed permanent TCP floor by §8k-L, 2026-06-24).
+`grep -rn "\.toClassic" src/main/ --include="*.scala" | grep -v "//"` → **30 code occurrences**
+(down from 91 pre-CAPSTONE; expected ≤4 was overly optimistic — see root cause below).
 
-**Adapter import note (from §8k-B Step 3):** The grep heuristic `grep "toClassic|toTyped"` is
-insufficient — the adapter also provides `classicSystem.spawn()` and implicit `ActorRef` conversions.
-Use `sbt compile-all` to confirm import removal is safe before deleting any adapter line.
+Permanent TCP floor confirmed (3 `.toClassic` + 3 PoisonPill = 6 sites):
+- `ServerActor.scala:70,77` — `ctx.system.toClassic` + `ctx.toClassic.actorOf` (TCP bind + bridge spawn)
+- `RLPxConnectionHandler.scala:323` — `context.self.toClassic` (TCP write ack sender)
+- `PeerManagerActor.scala:982,986,990` — `connection ! PoisonPill` (TCP-extension-owned actors; confirmed §8k-L 2026-06-24)
+
+Root cause for remaining 24 bridges: two systemic dependencies not eliminated by CAPSTONE:
+1. **PivotHeaderBootstrap is still a Classic actor** — FastSync (5 bridges) and SyncController (10 bridges)
+   use `.toClassic.tell(msg, noSender)` to forward messages it doesn't yet accept typed.
+2. **PeerEventBusActor callers pass Classic refs via implicit adapter conversion** — not visible to grep;
+   blocks adapter import removal in RegularSync, FastSyncBranchResolverActor, and others.
+
+Remaining bridge clusters (24 code sites, excluding 6 permanent floor):
+
+| Cluster | File | Sites | Unblock |
+|---------|------|-------|---------|
+| SyncController protocol forward | SyncController.scala | 10 | PivotHeaderBootstrap LOOM migration |
+| FastSync → PivotHeaderBootstrap | FastSync.scala | 5 | PivotHeaderBootstrap LOOM migration |
+| PeerManager → PeerActor | PeerManagerActor.scala | 4 | PeerActor migration (TCP-adjacent) |
+| PivotBlockSelector adapter | PivotBlockSelector.scala | 2 | PeerRequestHandler cleanup |
+| BlockImporter self+adapter | BlockImporter.scala | 2 | Needs LOOM survey |
+| Recovery → SSC adapters | BytecodeRecoveryActor + StorageRecoveryActor | 2 | SNAPSyncController Typed interface |
+| PeerRequestHandler adapter | PeerRequestHandler.scala | 1 | §8k-K follow-through |
+| SNAPSyncController bridge | SNAPSyncController.scala | 1 | SSC Typed interface widening |
+| AkkaTaskOps Classic ask | AkkaTaskOps.scala | 1 | Typed ask helper (toClassic for ask compat) |
+| PeerEventBusActor self-watch | PeerEventBusActor.scala | 1 | PEB Typed migration |
+| NodeBuilder wiring | NodeBuilder.scala | 2 | PEB Typed migration |
+
+**Step 3 — 0 adapter imports removable:**
+
+Attempted removal from 2 candidates (FastSyncBranchResolverActor, RegularSync). Both failed
+compile — same root cause: implicit `ClassicActorRef → ActorRef[PeerEventBusActor.Command]`
+conversion via adapter (PEB interface still expects Classic callers).
+- `MockedMiner`, `PoWMining`, `FaucetSupervisor` — `classicSystem.spawn()` extension method; must keep.
+- All remaining 22 adapter imports confirmed load-bearing.
+
+**Step 4 — §7d artifact audit (8-lens sweep):**
+
+| Lens | Finding | Status |
+|------|---------|--------|
+| 1: `sender()` | Only doc comments — no code uses | ✅ Clean |
+| 2: `context.actorOf` | Only RLPxConnectionHandler TCP floor | ✅ Clean |
+| 3: `context.system.scheduler` | 5 Typed fetchers import Classic `Scheduler` (compatible via extends); 2 Classic TCP actors (expected) | ⚠️ Minor |
+| 4: `Behavior[Any]` | Both grep hits are doc comments; actual impls are `Behavior[Command]` | ✅ Clean |
+| 5: Unlogged catch-all | Pre-existing: `Behaviors.same` silent drops in SSA/FSBRA; `case _ => None` data patterns | ⚠️ Pre-existing CHASE |
+| 6: Classic import leaks | `SNAPRequestTracker.scala` wildcard `pekko.actor.*` — pre-existing CHASE-QUEUE item | ⚠️ Pre-existing |
+| 7: `Props.apply` | None outside TCP floor | ✅ Clean |
+| 8: `preStart/postStop` | Only RLPxConnectionHandler TCP floor; AccountRangeWorker uses `postStopSignal` (Typed) | ✅ Clean |
+
+No regressions vs §8k-B sweep.
+
+**Step 5 — testEssential:** Not run — net zero code change; `sbt compile-all` confirmed clean.
+
+---
+
+#### §8k-M — LOOM: PivotHeaderBootstrap Classic→Typed migration (unblocks 15 bridges)
+
+**Agent:** LOOM
+**Risk:** MEDIUM — PivotHeaderBootstrap is a fast-sync state machine; touches FastSync and SyncController
+**Gate:** Any time — standalone migration
+
+**Background:**
+`PivotHeaderBootstrap` is still a Classic actor. It is the primary reason 15 `.toClassic` bridges
+remain post-CAPSTONE:
+- SyncController spawns it via `ctx.toClassic.actorOf()` and holds its ref as Classic `ActorRef`
+  (10 `.toClassic.tell(msg, noSender)` forwarding sites)
+- FastSync holds `fastSyncClassicSelf: ActorRef = pivotResultAdapter.toClassic` and forwards to
+  it via Classic (5 sites)
+
+Migrating PivotHeaderBootstrap to Typed would:
+1. Allow SyncController to replace 10 `.toClassic.tell` forwarding sites with typed sends
+2. Allow FastSync to drop `fastSyncClassicSelf` and its 5 adapter sites
+3. Remove `ctx.toClassic.actorOf()` in SyncController (replace with `ctx.spawn()`)
+
+**Prompt:**
+```
+Use LOOM to migrate PivotHeaderBootstrap from Classic to Typed.
+File: src/main/scala/com/chipprbots/ethereum/blockchain/sync/PivotHeaderBootstrap.scala
+
+Context:
+- PivotHeaderBootstrap is a Classic actor (`extends Actor`).
+- SyncController spawns it via `ctx.toClassic.actorOf(Props(new PivotHeaderBootstrap(...)))`.
+- FastSync holds `fastSyncClassicSelf: ActorRef = pivotResultAdapter.toClassic` and sends
+  to PivotHeaderBootstrap via Classic.
+- Doc comment at PivotHeaderBootstrap.scala:44 says: "`ctx.self.toClassic` CAPSTONE bridge"
+
+Run pre-migration-checklist for PivotHeaderBootstrap first. Then:
+
+Phase 1 — Survey:
+  1. Identify the full Command ADT (all message types PHB handles)
+  2. List all spawn sites (SyncController, FastSync) and how they hold the ref
+  3. List all callers that send to PHB — Typed or Classic?
+
+Phase 2 — Migrate PivotHeaderBootstrap:
+  4. Convert from `extends Actor` to `Behavior[Command]` (Behaviors.setup)
+  5. Replace `sender()` with explicit `replyTo` fields in Commands
+  6. Replace Classic scheduler with Typed timers
+
+Phase 3 — Update callers:
+  7. SyncController: replace `ctx.toClassic.actorOf(Props(...))` with `ctx.spawn(PivotHeaderBootstrap(...))`
+  8. SyncController: replace 10 `.toClassic.tell(msg, noSender)` with typed sends
+  9. FastSync: drop `fastSyncClassicSelf` and its 5 adapter sites
+
+sbt compile-all after each phase. testEssential at end.
+```
 
 ---
 
@@ -891,78 +988,6 @@ The `handleRegularSyncMsg` production bug (SyncController:895-897) is tracked un
 
 Source: `.local/docs/eth-sepolia-assumption-audit.md` — Thread 1 (fork dispatch completeness).
 Thread 3 (EIP-1559 fee routing) audited: functionally CORRECT — ETH base fee is burned, ETC base fee credited to treasury. Found one logging bug: `log.error` in `BlockPreparator.creditBaseFeeToTreasury` fired for every ETH/Sepolia block (treasury-address=0 is correct config, not an error). **FIXED `f868b75a8`** — guard added `&& networkType == NetworkType.ETC`. See `completed/DEFERRED-BACKLOG.md §ETH-T3-LOG`.
-
----
-
-### §ETH-T4-C — BEACON: Deploy EIP-4788 beacon roots contract bytecode (code + nonce=1 missing)
-
-**Agent:** BEACON
-**Risk:** MEDIUM — EIP-4788 storage values correct; account code hash diverges from canonical Sepolia state root
-**Gate:** None — standalone fix; safe to run before §ETH-T4-A/B
-**Files:**
-- `src/main/scala/com/chipprbots/ethereum/ledger/BlockExecution.scala:209-237` (`applyEip4788`)
-- Compare with EIP-2935 implementation at `BlockExecution.scala:260-267` (uses `saveCode` + nonce=1)
-
-**Background:**
-`applyEip4788` (`BlockExecution.scala:209-237`) writes the two ring-buffer storage slots
-correctly but does not deploy the contract bytecode on the beacon roots account
-(`0x000F3df6D732807Ef1319fB7B8bB8522d0Beac02`). go-ethereum makes a real EVM
-`call(SystemAddress → BeaconRootsAddress)` which executes the deployed bytecode; the account
-therefore has `code != empty` and `nonce = 1` in canonical Sepolia state.
-
-Fukuii only calls `saveAccount` + `saveStorage` — the account has `codeHash = EMPTY_HASH`
-and `nonce = 0`. When the Sepolia state root is computed, the account leaf differs from the
-canonical leaf → state root mismatch on any post-Cancun Sepolia block.
-
-The Sepolia genesis does NOT pre-allocate the beacon roots account — it must be seeded during
-block processing at the Cancun activation block. EIP-2935 (at `:260-267`) already handles
-this correctly with `saveCode` + nonce=1. The fix is to mirror that pattern.
-
-The canonical beacon roots contract bytecode is the standard EIP-4788 bytecode deployed on
-all mainnet/testnet chains. Retrieve from go-ethereum:
-`reference-clients-evm/go-ethereum/core/vm/contracts.go` or from the EIP-4788 spec.
-
-**Steps:**
-1. **Read** `BlockExecution.scala:209-237` to understand the current `applyEip4788` implementation.
-2. **Read** `BlockExecution.scala:260-267` (`applyEip2935`) to see the `saveCode` + nonce=1 pattern.
-3. **Find the canonical EIP-4788 contract bytecode**:
-   ```bash
-   grep -rn "BeaconRoots\|4788\|0x000F3df6" \
-     reference-clients-evm/go-ethereum/core/ --include="*.go" | head -20
-   ```
-   The bytecode is a small (~100 byte) assembly program. It is public and deterministic.
-4. **Extend `applyEip4788`** to deploy the contract at activation time (only on the first
-   call, when the account does not yet have code). Mirror the EIP-2935 pattern:
-   ```scala
-   // After saveStorage calls — deploy bytecode if account has no code yet
-   val beaconRootsAccount = worldState.getAccount(beaconRootsAddress)
-     .getOrElse(Account.empty())
-   if beaconRootsAccount.codeHash == Account.EMPTY_CODE_HASH then
-     val withCode = beaconRootsAccount.copy(nonce = 1)
-     val updatedWorld = worldState
-       .saveAccount(beaconRootsAddress, withCode)
-       .saveCode(beaconRootsAddress, ByteString(BEACON_ROOTS_CODE))
-   ```
-   Where `BEACON_ROOTS_CODE` is the canonical EIP-4788 bytecode bytes.
-5. **Write a test** that verifies the beacon roots account has `code != empty` and `nonce == 1`
-   after the first post-Cancun block is processed on ETH/Sepolia.
-6. **Confirm ETC safety** — `applyEip4788` is already gated on
-   `isCancunTimestamp(block.header.unixTimestamp)` which returns `false` for ETC; no change needed.
-
-**Verify:**
-```bash
-sbt compile-all
-sbt "testOnly *BlockExecution* *Eip4788* *BeaconRoot*"
-sbt testVM
-./local/scripts/fukuii-test
-```
-
-**MANDATORY final steps:**
-1. `sbt scalafmtAll`
-2. `git add src/main/scala/.../ledger/BlockExecution.scala` + any test files
-3. `git commit -m "fix(eth): deploy EIP-4788 beacon roots contract bytecode (code+nonce=1) — state root now matches canonical Sepolia"`
-4. `SHA=$(git rev-parse --short HEAD)` → update `.local/docs/eth-sepolia-assumption-audit.md` Thread 4b entry
-5. **DELETE §ETH-T4-C**
 
 ---
 
