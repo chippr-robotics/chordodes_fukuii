@@ -35,7 +35,7 @@ fukuii/
 blockchain/sync/
 ├── SyncController.scala              # Top-level sync orchestrator (SNAP → Fast → Regular fallback)
 ├── AdaptiveSyncStrategy.scala        # Strategy selection with fallback chain
-├── PeersClient.scala                 # Peer request routing (ETH63/66/68, SNAP)
+├── PeersClient.scala                 # Peer request routing (ETH68/69/70, SNAP)
 ├── BlockchainHostActor.scala         # Serves blocks/state to remote peers
 ├── StorageRecoveryActor.scala        # Post-SNAP storage recovery (Bug 20)
 │
@@ -104,7 +104,7 @@ network/
 ├── handshaker/                       # ETH protocol handshake (version negotiation)
 ├── p2p/
 │   └── messages/
-│       ├── ETH.scala                 # ETH protocol messages (63/66/68)
+│       ├── ETH.scala                 # ETH protocol messages (68/69/70)
 │       └── SNAP.scala                # SNAP protocol messages (GetAccountRange, GetStorageRanges, etc.)
 └── rlpx/                             # RLPx encrypted transport
 ```
@@ -174,12 +174,15 @@ conf/
 └── mordor.conf                       # Mordor testnet overrides
 ```
 
+> **Note:** `eth.conf` and `sepolia.conf` do not exist yet — ETH/Sepolia network config is work in progress. ETH/Sepolia nodes inherit `fukuii.conf` defaults and are configured via CLI flags or env overrides.
+
 ## Deployment Environments (`ops/`)
 
 ```
 ops/
 ├── barad-dur/                        # Production: dual-node + Kong gateway + monitoring
 │   ├── docker-compose.yml            # Primary (ETC) + Secondary (Mordor) + Kong + Prometheus + Grafana
+│   │                                 # (ETH/Sepolia nodes not yet in barad-dur)
 │   ├── fukuii-conf-1/                # Primary node config (ETC mainnet)
 │   ├── fukuii-conf-2/                # Secondary node config (Mordor testnet)
 │   ├── grafana/dashboards/           # Olympia Sync, Dark Lands Network, SNAP Sync, Main
