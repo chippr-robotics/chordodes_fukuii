@@ -296,6 +296,336 @@ is a correctness/resilience improvement, not a bug fix.
 - **Implementation order:** Phase 1=Group D (alert wrappers) → A → B → C → E (risk-flagged)
 - **Protocol needed:** `alert-wrapper-protocol.md` before Group D LOOM threads begin
 
+#### §7c-P0 — Write alert-wrapper-protocol.md (prerequisite)
+
+**Files:** `.claude/agent-protocols/alert-wrapper-protocol.md` (new)
+**Agent:** Main session
+**Gate:** None — do this first before any Group D LOOM threads.
+
+**Prompt:**
+```
+Write `.claude/agent-protocols/alert-wrapper-protocol.md` to standardise the
+STOP-AND-ALERT supervision pattern used in §7c Group D.
+
+The pattern applies to actors where restart causes state corruption. Rather than
+adding restart supervision, the parent (typically the guardian / NodeBuilder) is
+amended to watchWith the critical child and emit a structured alarm on failure.
+
+## Pattern
+
+At spawn site in the parent behavior:
+
+```scala
+// 1. Spawn the critical actor
+val criticalRef = ctx.spawn(CriticalActor(...), "critical-actor")
+
+// 2. Register death-watch with a typed failure message
+ctx.watchWith(criticalRef, CriticalActorFailed("critical-actor"))
+```
+
+Add `CriticalActorFailed(name: String)` to the parent's Command ADT (or
+use a dedicated sealed trait if the parent has no Command ADT of its own).
+
+Handle it in the parent's Behaviors.receive:
+
+```scala
+case CriticalActorFailed(name) =>
+  log.error("CRITICAL actor stopped unexpectedly — node restart required: {}", name)
+  // Do NOT restart the child. Propagate failure upward.
+  Behaviors.stopped
+```
+
+## When to use
+
+Apply to actors in the STOP-AND-ALERT class (§7c audit):
+PeerEventBusActor, PeerManagerActor, NetworkPeerManagerActor,
+SNAPSyncController, SyncController, SubscriptionManager.
+
+## When NOT to use
+
+Do not use for actors in the SAFE-TO-RESTART class — those get
+`Behaviors.supervise(…).onFailure[Throwable](SupervisorStrategy.restart…)` instead.
+
+## Variant: guardian with no Command ADT
+
+If the guardian is a Behaviors.setup block with no explicit Command ADT,
+add a private sealed trait inside the behavior scope:
+
+```scala
+Behaviors.setup[Any] { ctx =>
+  sealed trait GuardianMsg
+  case class CriticalActorFailed(name: String) extends GuardianMsg
+  val child = ctx.spawn(CriticalActor(...), "critical-actor")
+  ctx.watchWith(child, CriticalActorFailed("critical-actor"))
+  Behaviors.receiveMessage {
+    case CriticalActorFailed(name) =>
+      log.error("CRITICAL: {} stopped — restarting node", name)
+      Behaviors.stopped
+    case other => Behaviors.same
+  }
+}
+```
+
+## Do not use Behaviors.supervise for these actors
+
+The whole point of the STOP-AND-ALERT class is that restart is unsafe.
+Never wrap STOP-AND-ALERT actors with SupervisorStrategy.restart.
+```
+
+Commit: `docs(7c-P0): add alert-wrapper-protocol.md — STOP-AND-ALERT supervision pattern`
+```
+
+---
+
+#### §7c-D — Group D: STOP-AND-ALERT monitoring wrappers (6 actors)
+
+**Files:** Spawn sites for PeerEventBusActor, PeerManagerActor, NetworkPeerManagerActor,
+  SNAPSyncController, SyncController, SubscriptionManager — expected in `NodeBuilder.scala`
+  / `StdNode.scala` / JSON-RPC server setup. Grep to confirm.
+**Agent:** LOOM (or MITHRIL if spawn sites are pure wiring with no behavior logic)
+**Gate:** §7c-P0 done (alert-wrapper-protocol.md written and understood).
+
+**Prompt:**
+```
+Read `.claude/agent-protocols/alert-wrapper-protocol.md` first.
+Read `.local/docs/supervision-design-7c.md` Part 1 (STOP-AND-ALERT section).
+
+Task: apply the alert-wrapper pattern to the 6 STOP-AND-ALERT actors at their spawn sites.
+
+Step 1 — Locate all 6 spawn sites:
+  grep -rn "PeerEventBusActor\|PeerManagerActor\|NetworkPeerManagerActor\|SNAPSyncController\|SyncController\|SubscriptionManager" \
+    src/main/scala --include="*.scala" | grep "ctx\.spawn\|system\.spawn\|actorOf"
+
+Step 2 — For each spawn site, apply the pattern from alert-wrapper-protocol.md:
+  - D1: PeerEventBusActor  spawn site
+  - D2: PeerManagerActor   spawn site
+  - D3: NetworkPeerManagerActor spawn site
+  - D4: SNAPSyncController spawn site (inside SyncController)
+  - D5: SyncController     spawn site (in NodeBuilder/StdNode)
+  - D6: SubscriptionManager spawn site (in JSON-RPC server setup)
+
+  For each: add `ctx.watchWith(ref, CriticalActorFailed("actor-name"))` immediately
+  after the `ctx.spawn(...)` call. Add `CriticalActorFailed` to the parent's
+  Command ADT. Add handler: log.error + Behaviors.stopped.
+
+  If multiple STOP-AND-ALERT actors share the same parent, reuse a single
+  `CriticalActorFailed(name: String)` case class — don't create one per actor.
+
+Step 3 — sbt compile-all — must be clean.
+
+Step 4 — sbt "testOnly *NodeBuilder* *StdNode* *Subscription*" if test coverage exists.
+
+Step 5 — git commit -m "feat(7c-D): STOP-AND-ALERT watchWith alarm on 6 critical actors"
+```
+
+---
+
+#### §7c-A — Group A: Infrastructure + application restart wrappers
+
+**Files:** Spawn sites in NodeBuilder/StdNode for: ServerActor, KnownNodesManager,
+  PeerStatisticsActor, PeerDiscoveryManager, OmmersPool, PendingTransactionsManager,
+  FilterManager, FaucetHandler, PeriodicConsistencyCheck. PeerActor spawn in
+  PeerManagerActor.peerFactory.
+**Agent:** MITHRIL (pure spawn-site wiring changes)
+**Gate:** §7c-D done.
+
+**Prompt:**
+```
+Read `.local/docs/supervision-design-7c.md` Part 2 Group A.
+
+Task: wrap SAFE-TO-RESTART actors at their spawn sites with Behaviors.supervise.
+Import: `import org.apache.pekko.actor.typed.SupervisorStrategy`
+        `import org.apache.pekko.actor.typed.scaladsl.Behaviors`
+        `import scala.concurrent.duration._`
+
+Apply these strategies (locate each ctx.spawn call first — grep for actor name):
+
+  ServerActor:
+    Behaviors.supervise(ServerActor(...)).onFailure[Throwable](
+      SupervisorStrategy.restartWithBackoff(2.seconds, 60.seconds, 0.1))
+
+  KnownNodesManager:
+    Behaviors.supervise(KnownNodesManager(...)).onFailure[Throwable](SupervisorStrategy.restart)
+
+  PeerStatisticsActor:
+    Behaviors.supervise(PeerStatisticsActor(...)).onFailure[Throwable](SupervisorStrategy.restart)
+
+  PeerDiscoveryManager:
+    Behaviors.supervise(PeerDiscoveryManager(...)).onFailure[Throwable](SupervisorStrategy.restart)
+
+  OmmersPool (ETC-only):
+    Behaviors.supervise(OmmersPool(...)).onFailure[Throwable](SupervisorStrategy.restart)
+
+  PendingTransactionsManager:
+    Behaviors.supervise(PendingTransactionsManager(...)).onFailure[Throwable](
+      SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2).withMaxRestarts(3))
+
+  FilterManager:
+    Behaviors.supervise(FilterManager(...)).onFailure[Throwable](
+      SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2).withMaxRestarts(3))
+
+  FaucetHandler:
+    Behaviors.supervise(FaucetHandler(...)).onFailure[Throwable](SupervisorStrategy.restart)
+
+  PeriodicConsistencyCheck:
+    Behaviors.supervise(PeriodicConsistencyCheck(...)).onFailure[Throwable](
+      SupervisorStrategy.restart.withMaxRestarts(3))
+
+  PeerActor (spawn site in PeerManagerActor.peerFactory):
+    Behaviors.supervise(PeerActor(...)).onFailure[Throwable](
+      SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2).withMaxRestarts(3))
+
+  RLPxConnectionHandler — NO CHANGE (keep default stop; leave a comment explaining why).
+
+Step N-1 — sbt compile-all — must be clean.
+Step N   — git commit -m "feat(7c-A): restart supervision for 10 safe-to-restart infrastructure actors"
+```
+
+---
+
+#### §7c-B — Group B: SNAP workers, coordinators, sync support
+
+**Files:** Worker spawn sites in coordinator files; coordinator spawn sites in
+  SNAPSyncController; sync support spawn sites in SyncController/NodeBuilder.
+**Agent:** MITHRIL
+**Gate:** §7c-A done.
+
+**Prompt:**
+```
+Read `.local/docs/supervision-design-7c.md` Part 2 Groups B1/B2/B3.
+
+Task: wrap SNAP workers, coordinators, and sync support actors at their spawn sites.
+
+B1 — SNAP Workers (spawn sites inside each coordinator's worker-spawn call):
+  AccountRangeWorker, ByteCodeWorker, StorageRangeWorker, TrieNodeHealingWorker:
+    Behaviors.supervise(XxxWorker(...)).onFailure[Throwable](
+      SupervisorStrategy.restart.withMaxRestarts(5))
+
+B2 — SNAP Coordinators (spawn sites in SNAPSyncController):
+  AccountRangeCoordinator, ByteCodeCoordinator,
+  StorageRangeCoordinator, TrieNodeHealingCoordinator:
+    Behaviors.supervise(XxxCoordinator(...)).onFailure[Throwable](
+      SupervisorStrategy.restartWithBackoff(1.second, 10.seconds, 0.2).withMaxRestarts(3))
+
+B3 — Sync support actors (locate spawn sites via grep):
+  PeersClient:       restartWithBackoff(500.millis, 10.seconds, 0.2).withMaxRestarts(5)
+  ChainDownloader:   restart
+  PivotBlockSelector: restart
+  PivotHeaderBootstrap: restart
+  BlockchainHostActor: restart
+  BytecodeRecoveryActor: restartWithBackoff(1.second, 30.seconds, 0.2).withMaxRestarts(2)
+  StorageRecoveryActor:  restartWithBackoff(1.second, 30.seconds, 0.2).withMaxRestarts(2)
+  CombinedRecoveryScanActor: restart
+  StateStorageActor: restart
+  FastSyncBranchResolverActor: restart
+  BlockBroadcasterActor: restart
+  PeerRequestHandler — NO CHANGE (self-limiting leaf, effectively irrelevant).
+
+Step N-1 — sbt compile-all — must be clean.
+Step N-2 — sbt "testOnly *SNAP* *Coordinator* *Worker*"
+Step N   — git commit -m "feat(7c-B): restart supervision for SNAP workers, coordinators, sync support"
+```
+
+---
+
+#### §7c-E1 — RF-1: BlockImporter write idempotency (forge consultation)
+
+**Files:** `blockchain/sync/regular/BlockImporter.scala`, `blockchain/BlockchainWriter.scala`
+**Agent:** FORGE (ETC consensus — write idempotency is a chain correctness question)
+**Gate:** None — can run in parallel with §7c-A/B.
+
+**Prompt:**
+```
+Use the FORGE agent.
+
+Question: Is `BlockchainWriter.save(block, ...)` (or equivalent ETC block-write path)
+idempotent? Specifically: if a block is written to RocksDB successfully and then the
+same block is submitted again (same hash, same number), does it:
+  (a) silently succeed (no-op / overwrite with identical data), or
+  (b) throw an exception or corrupt state?
+
+Context: `BlockImporter` has a companion-object `var survivedExhausts` that is
+intentionally preserved across Pekko restarts (comment confirms restart is expected).
+We want to know if adding `Behaviors.supervise(BlockImporter(...)).onFailure[Throwable](
+SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2).withMaxRestarts(3))`
+at the BlockImporter spawn site is safe, or if a mid-import restart could cause a
+duplicate write to corrupt ETC chain state.
+
+Produce: a one-paragraph verdict with the relevant code path cited.
+If idempotent → update §7c-C to include BlockImporter in the restart group.
+If NOT idempotent → BlockImporter stays at default stop (no supervise wrapper).
+```
+
+---
+
+#### §7c-C — Group C: RegularSync fetch children (RF-2 decision + implementation)
+
+**Files:** `blockchain/sync/regular/BlockFetcher.scala`, `BlockImporter.scala`,
+  `HeadersFetcher.scala`, `BodiesFetcher.scala`, `StateNodeFetcher.scala`, `RegularSync.scala`
+**Agent:** MITHRIL (after RF-2 decision is made)
+**Gate:** RF-2 decision confirmed (see risk flag below).
+
+**RF-2 decision (choose before prompting MITHRIL):**
+
+Option A (recommended): `BlockFetcher` → stop (keep default). `RegularSync` death-watches
+  `BlockFetcher` and re-spawns it. `HeadersFetcher`/`BodiesFetcher`/`StateNodeFetcher` are
+  children of BlockFetcher — they stop when BlockFetcher stops; RegularSync's re-spawn of
+  BlockFetcher re-creates them. `BlockBroadcasterActor` → restart (already in Group A).
+
+Option B: Add `PreRestart` signal handler to `BlockFetcher` to `ctx.stop` all children
+  before restart, then wrap with restartWithBackoff. More complex, more fragile.
+
+**Prompt (for Option A):**
+```
+Read `.local/docs/supervision-design-7c.md` Part 3 RF-2.
+
+Decision: Option A — BlockFetcher keeps default stop; RegularSync handles re-spawn.
+
+Step 1 — Confirm RegularSync currently death-watches BlockFetcher:
+  grep -n "watch\|watchWith\|BlockFetcher" src/main/scala/.../RegularSync.scala
+  If death-watch exists and re-spawn logic is present, proceed.
+  If not, add ctx.watchWith(blockFetcherRef, BlockFetcherStopped) + re-spawn handler.
+
+Step 2 — Confirm HeadersFetcher/BodiesFetcher/StateNodeFetcher are children of
+  BlockFetcher (spawned in BlockFetcher constructor). If so, they stop automatically
+  when BlockFetcher stops — no additional supervision needed.
+
+Step 3 — Add a comment at the BlockFetcher spawn site in RegularSync explaining the
+  decision (ghost-children risk with AbstractBehavior restart — see §7c RF-2):
+  // BlockFetcher uses AbstractBehavior and spawns children in its constructor.
+  // Pekko restart would re-run the constructor and ghost the old children.
+  // Default stop-on-failure is intentional; RegularSync re-spawns on BlockFetcherStopped.
+
+Step 4 — sbt compile-all — must be clean.
+Step 5 — git commit -m "docs(7c-C): document BlockFetcher stop-on-failure rationale (RF-2 ghost-child risk)"
+```
+
+---
+
+#### §7c-E3 — RF-3: SyncStateSchedulerActor (FastSync, storm-bounded restart)
+
+**Files:** `blockchain/sync/fast/SyncStateSchedulerActor.scala` spawn site in FastSync
+**Agent:** MITHRIL (after RF-3 confirmation)
+**Gate:** FastSync spec review confirms acceptable re-request behaviour on restart.
+
+**Prompt:**
+```
+Read `.local/docs/supervision-design-7c.md` Part 3 RF-3.
+
+Precondition: confirm that re-requesting all in-flight peer assignments simultaneously
+on SyncStateSchedulerActor restart is tolerable — FastSync will time out pending requests
+regardless, so restart just accelerates the timeout. The PeerRateTracker re-initialises
+from zero (conservative), which means the burst is rate-limited by the conservative
+initial per-peer window, not an unconstrained flood.
+
+If confirmed — apply at the SyncStateSchedulerActor spawn site (in FastSync):
+  Behaviors.supervise(SyncStateSchedulerActor(...)).onFailure[Throwable](
+    SupervisorStrategy.restartWithBackoff(5.seconds, 60.seconds, 0.3).withMaxRestarts(2))
+
+sbt compile-all — must be clean.
+git commit -m "feat(7c-E3): restartWithBackoff for SyncStateSchedulerActor (bounded storm)"
+```
+
 ---
 
 ### 7d — Post-CAPSTONE Classic Artifact Audit — DONE 2026-06-21 — see `completed/DEFERRED-BACKLOG.md`
