@@ -1009,7 +1009,10 @@ class EngineApiService(
                 commitments.items.foreach { case RLPValue(c) => allCommitments += ByteString(c); case _ => }
                 proofs.items.foreach { case RLPValue(p) => allProofs += ByteString(p); case _ => }
               case _ =>
-                log.warn("Blob tx {} sidecar RLP shape unexpected; skipping", h.value.toArray.map("%02x".format(_)).mkString)
+                log.warn(
+                  "Blob tx {} sidecar RLP shape unexpected; skipping",
+                  h.value.toArray.map("%02x".format(_)).mkString
+                )
             }
           catch {
             case e: Exception =>

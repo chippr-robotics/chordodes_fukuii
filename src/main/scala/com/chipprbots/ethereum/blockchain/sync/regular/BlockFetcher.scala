@@ -740,7 +740,8 @@ object BlockFetcher {
   ) extends FetchCommand
   case object RetryFetchStateNode extends FetchCommand
   final case class PickBlocks(amount: Int, replyTo: ActorRef[FetchResponse]) extends FetchCommand
-  final case class StrictPickBlocks(from: BigInt, atLEastWith: BigInt, replyTo: ActorRef[FetchResponse]) extends FetchCommand
+  final case class StrictPickBlocks(from: BigInt, atLEastWith: BigInt, replyTo: ActorRef[FetchResponse])
+      extends FetchCommand
   case object PrintStatus extends FetchCommand
   final case class InvalidateBlocksFrom(fromBlock: BigInt, reason: String, toBlacklist: Option[BigInt])
       extends FetchCommand

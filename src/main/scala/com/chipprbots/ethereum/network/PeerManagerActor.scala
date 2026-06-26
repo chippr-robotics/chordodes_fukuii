@@ -56,12 +56,18 @@ object PeerManagerActor {
 
   // 8 ask-paths (typed reply channels):
   final case class GetPeersCmd(replyTo: typed.ActorRef[Peers]) extends Command
-  final case class DisconnectPeerByIdCmd(peerId: PeerId, replyTo: typed.ActorRef[DisconnectPeerResponse]) extends Command
-  final case class AddToBlacklistCmd(req: AddToBlacklistRequest, replyTo: typed.ActorRef[AddToBlacklistResponse]) extends Command
-  final case class RemoveFromBlacklistCmd(req: RemoveFromBlacklistRequest, replyTo: typed.ActorRef[RemoveFromBlacklistResponse]) extends Command
+  final case class DisconnectPeerByIdCmd(peerId: PeerId, replyTo: typed.ActorRef[DisconnectPeerResponse])
+      extends Command
+  final case class AddToBlacklistCmd(req: AddToBlacklistRequest, replyTo: typed.ActorRef[AddToBlacklistResponse])
+      extends Command
+  final case class RemoveFromBlacklistCmd(
+      req: RemoveFromBlacklistRequest,
+      replyTo: typed.ActorRef[RemoveFromBlacklistResponse]
+  ) extends Command
   final case class AddMaintainedPeerCmd(uri: URI, replyTo: typed.ActorRef[AddMaintainedPeerResponse]) extends Command
   final case class AddTrustedPeerCmd(uri: URI, replyTo: typed.ActorRef[AddTrustedPeerResponse]) extends Command
-  final case class RemoveTrustedPeerCmd(nodeId: String, replyTo: typed.ActorRef[RemoveTrustedPeerResponse]) extends Command
+  final case class RemoveTrustedPeerCmd(nodeId: String, replyTo: typed.ActorRef[RemoveTrustedPeerResponse])
+      extends Command
   final case class SetMaxPeersCmd(n: Int, replyTo: typed.ActorRef[SetMaxPeersResponse]) extends Command
 
   // Fire-and-forget wire messages forwarded by the shell:

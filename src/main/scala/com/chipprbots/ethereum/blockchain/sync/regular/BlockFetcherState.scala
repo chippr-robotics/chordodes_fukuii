@@ -398,7 +398,11 @@ object BlockFetcherState {
   // are updated for the multi-slot model in TEST-001c ([15]).
   val MaxConcurrentHeaderSlots: Int = 1
 
-  def initial(importer: ActorRef[BlockImporter.Command], blockValidator: BlockValidator, lastBlock: BigInt): BlockFetcherState =
+  def initial(
+      importer: ActorRef[BlockImporter.Command],
+      blockValidator: BlockValidator,
+      lastBlock: BigInt
+  ): BlockFetcherState =
     BlockFetcherState(
       importer = importer,
       blockValidator = blockValidator,
