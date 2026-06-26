@@ -115,7 +115,7 @@ Each subsystem = one implementation thread:
 
 - `grep -rn "import .*\._" src/main/ | wc -l` > 0 at migration start
 - PTM eventStream types cross network boundary → full `@SerializabilityTrait` pre-flight required
-- Any file under `consensus/`, `vm/`, `crypto/`, `domain/` touched → invoke FORGE before proceeding
+- Any file under `consensus/`, `vm/`, `crypto/`, `domain/` touched → invoke FORGE (ETC paths) or BEACON (ETH paths) or both before proceeding
 - `sbt testEssential` drops below 3,601 tests
 
 ---
@@ -528,32 +528,41 @@ Step N   — git commit -m "feat(7c-B): restart supervision for SNAP workers, co
 
 ---
 
-#### §7c-E1 — RF-1: BlockImporter write idempotency (forge consultation)
+#### §7c-E1 — RF-1: BlockImporter write idempotency (forge + beacon consultation)
 
 **Files:** `blockchain/sync/regular/BlockImporter.scala`, `blockchain/BlockchainWriter.scala`
-**Agent:** FORGE (ETC consensus — write idempotency is a chain correctness question)
+**Agent:** FORGE (ETC block acceptance: ECIP-1017 rewards, Ethash seal, ETC-specific state writes) + BEACON (ETH block acceptance: withdrawals, beacon root syscall, PoS-specific idempotency) — `BlockchainWriter` is shared infrastructure used by both chains
 **Gate:** None — can run in parallel with §7c-A/B.
 
 **Prompt:**
 ```
-Use the FORGE agent.
+Use the FORGE agent first, then the BEACON agent.
 
-Question: Is `BlockchainWriter.save(block, ...)` (or equivalent ETC block-write path)
-idempotent? Specifically: if a block is written to RocksDB successfully and then the
-same block is submitted again (same hash, same number), does it:
+`BlockchainWriter` is shared infrastructure used by both ETC and ETH block acceptance paths.
+Both write paths must be idempotent for `BlockImporter` restartWithBackoff to be safe.
+
+Question (FORGE — ETC path): Is `BlockchainWriter.save(block, ...)` idempotent on the ETC
+block-acceptance path (ECIP-1017 rewards, Ethash seal, ETC-specific state writes)?
+Specifically: if a block is written to RocksDB successfully and then the same block is
+submitted again (same hash, same number), does it:
   (a) silently succeed (no-op / overwrite with identical data), or
   (b) throw an exception or corrupt state?
 
-Context: `BlockImporter` has a companion-object `var survivedExhausts` that is
-intentionally preserved across Pekko restarts (comment confirms restart is expected).
-We want to know if adding `Behaviors.supervise(BlockImporter(...)).onFailure[Throwable](
-SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2).withMaxRestarts(3))`
-at the BlockImporter spawn site is safe, or if a mid-import restart could cause a
-duplicate write to corrupt ETC chain state.
+Question (BEACON — ETH path): Is the same `BlockchainWriter.save(block, ...)` idempotent on
+the ETH block-acceptance path (validator withdrawals applied, beacon root syscall, PoS-specific
+state writes)? Could a duplicate write on ETH corrupt the withdrawal accumulator or beacon state?
 
-Produce: a one-paragraph verdict with the relevant code path cited.
-If idempotent → update §7c-C to include BlockImporter in the restart group.
-If NOT idempotent → BlockImporter stays at default stop (no supervise wrapper).
+Context: `BlockImporter` has a companion-object `var survivedExhausts` that is intentionally
+preserved across Pekko restarts (comment confirms restart is expected). We want to know if
+adding `Behaviors.supervise(BlockImporter(...)).onFailure[Throwable](
+SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2).withMaxRestarts(3))`
+at the BlockImporter spawn site is safe on BOTH chains, or if a mid-import restart could
+corrupt chain state on either ETC or ETH.
+
+Produce: one verdict per chain (ETC via FORGE, ETH via BEACON) with the relevant code path cited.
+If BOTH chains idempotent → update §7c-C to include BlockImporter in the restart group.
+If EITHER chain NOT idempotent → BlockImporter stays at default stop (no supervise wrapper)
+  and note which chain is the blocker and why.
 ```
 
 ---
@@ -966,21 +975,21 @@ Step 7 — `git commit -m "feat(8b-M1): StorageKey opaque type Phase A — Acces
 
 ---
 
-#### §8b-M2 — `CodeHash`: ByteString → opaque type (FORGE advisory)
+#### §8b-M2 — `CodeHash`: ByteString → opaque type (FORGE + BEACON advisory)
 
 **Files:** `domain/CodeHash.scala` (new), `Account.scala`, `BlockchainReader.scala`, state trie layer (~32 files)
-**Agent:** MITHRIL + FORGE advisory
-**Gate:** FORGE advisory — EIP-161 (empty-account) and EIP-684 (collision) touch consensus semantics. The opaque wrapper itself is safe (preserves `==`), but FORGE should confirm before merging.
+**Agent:** MITHRIL + FORGE advisory + BEACON advisory
+**Gate:** FORGE + BEACON advisory — EIP-161 (empty-account) and EIP-684 (collision) are consensus paths on **both** ETC and ETH. The opaque wrapper itself is safe (preserves `==`), but both specialists should confirm before merging. FORGE confirms ETC EIP-161/684 semantics; BEACON confirms the same semantics hold on the ETH execution layer (post-merge EL still enforces EIP-161).
 
 **Prompt:**
 ```
-Use the MITHRIL agent to implement `opaque type CodeHash = ByteString`, then ask FORGE to review
-before committing.
+Use the MITHRIL agent to implement `opaque type CodeHash = ByteString`, then ask FORGE and
+BEACON to review before committing.
 
 Context: `Account.codeHash` and `Account.EmptyCodeHash` are used in EIP-161 empty-account checks
-and EIP-684 collision detection — consensus semantics, but the opaque wrapper does NOT change
-runtime equality (Scala 3 opaque types preserve the underlying `==`). FORGE review is a gate
-on the commit, not on implementation.
+and EIP-684 collision detection — consensus semantics present on BOTH ETC and ETH. The opaque
+wrapper does NOT change runtime equality (Scala 3 opaque types preserve the underlying `==`).
+FORGE + BEACON review is a gate on the commit, not on implementation.
 Reference: `.local/docs/opaque-type-domain-analysis.md` §5.
 
 Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/CodeHash.scala`:
@@ -1013,32 +1022,37 @@ Step 3 — Update all sites that reference `Account.codeHash` or `Account.EmptyC
 Step 4 — `sbt compile-all` — must be clean.
 
 Step 5 — FORGE review: present the diff to the FORGE agent and confirm:
-  (a) EIP-161 equality check semantics are preserved.
-  (b) EIP-684 check semantics are preserved.
-  (c) No consensus byte encoding is altered.
+  (a) EIP-161 equality check semantics are preserved on ETC.
+  (b) EIP-684 check semantics are preserved on ETC.
+  (c) No consensus byte encoding is altered on ETC.
 
-Step 6 (after FORGE confirms) — `sbt "testOnly *Account* *State*"`.
+Step 5b — BEACON review: present the same diff to the BEACON agent and confirm:
+  (a) EIP-161 empty-account logic is unchanged on the ETH execution layer.
+  (b) EIP-684 contract-creation collision check is unchanged on ETH.
 
-Step 7 — `git commit -m "feat(8b-M2): CodeHash opaque type (ByteString) — Account + EIP-161/684 sites, FORGE-reviewed"`
+Step 6 (after FORGE + BEACON confirm) — `sbt "testOnly *Account* *State*"`.
+
+Step 7 — `git commit -m "feat(8b-M2): CodeHash opaque type (ByteString) — Account + EIP-161/684 sites, FORGE+BEACON reviewed"`
 ```
 
 ---
 
-#### §8b-M3 — `StorageKey` Phase B: ProgramState / EVM (FORGE gate)
+#### §8b-M3 — `StorageKey` Phase B: ProgramState / EVM (FORGE + BEACON gate)
 
 **Files:** `ProgramState.scala`, `EthereumUInt256Mpt.scala`, EVM opcode warm-storage sites
-**Agent:** FORGE (consensus-touching — EVM opcode dispatch, EIP-2929 warm storage check)
-**Gate:** FORGE — `ProgramState.addAccessedStorageKey` flows through EVM opcode dispatcher.
+**Agent:** FORGE (ETC EVM opcode dispatch, EIP-2929 warm storage check) + BEACON (ETH EVM same paths — EIP-2929 is active on ETH too)
+**Gate:** FORGE + BEACON — `ProgramState.addAccessedStorageKey` flows through the EVM opcode dispatcher which runs for **both** ETC and ETH transactions. EIP-2929 warm-storage checking is a shared code path. Both specialists must confirm before merging.
 **Prerequisite:** §8b-M1 must be committed first (establishes `StorageKey` type).
 
 **Prompt:**
 ```
-Use the FORGE agent. Extend `StorageKey` opaque type from §8b-M1 into `ProgramState` and the
-EVM storage layer (Phase B).
+Use the FORGE agent for ETC EVM paths, then BEACON agent for ETH EVM paths. Extend `StorageKey`
+opaque type from §8b-M1 into `ProgramState` and the EVM storage layer (Phase B).
 
 Context: §8b-M1 introduced `StorageKey` and applied it to `AccessListItem`. Phase B extends this
 into the EVM warm-storage check (`ProgramState.addAccessedStorageKey`) and `EthereumUInt256Mpt`.
-This crosses EVM opcode dispatch (EIP-2929), so FORGE review is mandatory.
+This crosses EVM opcode dispatch (EIP-2929), which runs for BOTH ETC and ETH transactions.
+FORGE + BEACON review is mandatory.
 Reference: `.local/docs/opaque-type-domain-analysis.md` §4 Phase B.
 
 Pre-flight:
@@ -1064,7 +1078,7 @@ Step 5 — `sbt testVM` — EVM opcode tests must pass.
 
 Step 6 — `sbt "testOnly *ProgramState* *EthereumUInt256Mpt*"`.
 
-Step 7 — `git commit -m "feat(8b-M3): StorageKey Phase B — ProgramState + EVM warm-storage check, FORGE-reviewed"`
+Step 7 — `git commit -m "feat(8b-M3): StorageKey Phase B — ProgramState + EVM warm-storage check, FORGE+BEACON reviewed"`
 ```
 
 ---
@@ -1201,11 +1215,12 @@ Step 10 — `git commit -m "feat(8b-H2): TrieRoot opaque type (ByteString) — ~
 
 ---
 
-#### §8b-H3 — `Difficulty`: BigInt → opaque type (ETC only)
+#### §8b-H3 — `Difficulty`: BigInt → opaque type (ETC primary, BEACON note required)
 
 **Files:** `domain/Difficulty.scala` (new), `BlockHeader.scala`, `EthashDifficultyCalculator.scala`, `TargetTimeDifficultyCalculator.scala`, `ArtificialFinality.scala`, `EthashBlockHeaderValidator.scala` (~47 files)
-**Agent:** FORGE only — Difficulty is ETC/Ethash specific; no ETH path uses it post-merge.
-**Gate:** FORGE — arithmetic operations on `difficulty` feed directly into Ethash validation.
+**Agent:** FORGE (primary — Ethash validation, ECIP difficulty arithmetic) + BEACON note
+**Gate:** FORGE — arithmetic operations on `difficulty` feed directly into Ethash validation. Difficulty calculation is ETC-specific post-merge (ETH sets `difficulty = 0`). However, BEACON must verify one edge case: the `Difficulty` extension defines `def -(other: Difficulty) = ... .max(Minimum.value)` which clamps to 131072. ETH blocks have `difficulty = 0` in `BlockHeader.difficulty`; if any shared code path reads this field and calls subtraction, the clamp would be wrong. BEACON confirms no ETH code path invokes Difficulty arithmetic on a post-merge header.
+**Note:** If BEACON finds any such path, demote that field to a separate opaque type (e.g., `PrevRandaoHint`) rather than using `Difficulty` for ETH headers.
 
 **Prompt:**
 ```
@@ -1259,9 +1274,20 @@ Step 7 — `sbt compile-all` — must be clean.
 
 Step 8 — FORGE: verify Ethash difficulty calculation output matches go-ethereum byte-for-byte on at least one known block.
 
-Step 9 — `sbt "testOnly *Ethash* *Difficulty* *BlockHeader*"`.
+Step 9 — BEACON: verify no ETH code path invokes `Difficulty` arithmetic on a post-merge header.
+  ETH sets `BlockHeader.difficulty = 0` post-merge. The `-(other: Difficulty)` extension clamps to
+  `Minimum.value` (131072). If any shared code path reads a post-merge ETH header's difficulty and
+  calls subtraction, the clamp would silently produce 131072 instead of 0.
+  BEACON confirms: (a) no shared EVM/consensus path reads `header.difficulty` and calls arithmetic
+  on it for ETH headers, and (b) if a `Difficulty` type is used in ETH headers, it is safe to leave
+  `difficulty = 0` (i.e., `Difficulty.Zero` is a valid value and the `.max(Minimum.value)` clamp in
+  `-(other)` is never reachable from ETH header fields).
+  If BEACON finds a shared path that hits the clamp: demote ETH `header.difficulty` to `BigInt`
+  (leave it untyped) rather than using `Difficulty` for ETH headers.
 
-Step 10 — `git commit -m "feat(8b-H3): Difficulty opaque type (BigInt) — ~47 files, FORGE-reviewed"`
+Step 10 — `sbt "testOnly *Ethash* *Difficulty* *BlockHeader*"`.
+
+Step 11 — `git commit -m "feat(8b-H3): Difficulty opaque type (BigInt) — ~47 files, FORGE+BEACON reviewed"`
 ```
 
 ---
@@ -1936,6 +1962,7 @@ No actor migration gate. Commit individually; do not bundle with primary-track m
 | **R7** | RLP codec derivation safety analysis (safe-to-derive vs must-stay-manual) | Feeds 8i implementation | MITHRIL, FORGE |
 | **R8** ✅ | Memory / resource retention audit — DONE, see completed | — | — |
 | **R9** ✅ | IO threading model audit — DONE, see completed | — | — |
+| **R11** | **ETC-only artifact sweep** — 4-part fix pass: (A) memory + local docs bias (main session); (B) public doc protocol version cleanup — ETH63-67 removed, ETH68/69/70 live (HERALD); (C) agent protocols + constitution + backlog language (main session); (D) PoS skill gap audit + write CL-setup/engine-API/Sepolia-sync/PoS-health skills (BEACON). Run A first, then B+C+D in parallel. See Part 16. | `.local/docs/etc-only-artifact-sweep.md` | A: main; B: HERALD; C: main; D: BEACON |
 | **R10** ✅ **ALL DONE** | **ETH/Sepolia assumption audit** — systematic hunt for ETC-first design leaking into ETH code paths. 10 threads: (1) fork dispatch `forBlock` vs `forTimestamp` ✅ → §ETH-T1-A/B/C, (2) PoW/PoS divergence guards ✅ → §ETH-T2-A, (3) EIP-1559 fee routing ✅ FIXED `f868b75a8`, (4) CL integration completeness ✅ → §ETH-T4-A/B/C/D, (5) chain ID hardcoding ✅ NO CODE FIXES — zero leakage; chainId/networkId config-driven throughout; EIP-155 signing config-bound; `TestService.scala:239 networkId=1` is retesteth-only (harmless), (6) VM tracer abort-path completeness ✅ 0 unbalanced paths — §ETH-T6-A (try/finally hardening) + §ETH-T6-B (EIP-2681 nonce-max) added, (7) test coverage ratio ETC vs ETH ✅ → §ETH-T7-A/B/C/D/E, (8) Sepolia config completeness ✅ NO CODE FIXES — all values correct; blob gas hardcoded correctly in BlobGasUtils; `network-type="eth"` present; treasury=0x0; audit doc had wrong Prague ts (1740434112→1741159776, fixed 2026-06-24), (9) SNAP sync ETH path ✅ → §ETH-T9-A/B/C/D, (10) Engine API Osaka edge cases ✅ → §ETH-T10-A/B/C/D. Findings feed an ETH sprint. **Prompt:** `.local/docs/eth-sepolia-assumption-audit.md`. Gate: none. | BEACON (T1,3,4,6,8,10), FORGE (T2,5,7), EYE (T9) |
 
 | Sprint | Work | Agents | Gate |
@@ -2135,3 +2162,432 @@ Thread 3 (EIP-1559 fee routing) audited: functionally CORRECT — ETH base fee i
 ---
 
 ### §ETH-T10-D ✅ DONE `364e395dc` — see `completed/DEFERRED-BACKLOG.md`
+
+---
+
+## Part 16: ETC-Only Artifact Sweep (R11)
+
+**Status**: OPEN — repo hygiene + alignment task
+**Priority**: HIGH — the root pattern has already caused a missed-BEACON sprint (ETH/Sepolia sprint
+was run separately to catch what the modernization sprint missed because prompts were FORGE-only).
+**Agent**: general-purpose
+**Gate**: None — unblocked, can run any time
+
+### Background
+
+Fukuii is a **dual-chain** EVM client (ETC/Mordor PoW + ETH/Sepolia PoS). The consensus review
+protocol is:
+- **ETC-only code** → FORGE
+- **ETH-only code** → BEACON
+- **Shared code (vm/, domain/, consensus/ shared paths)** → FORGE first, then BEACON
+
+Despite this, the modernization sprint generated prompts with FORGE-only routing for shared-chain
+code, requiring a full ETH/Sepolia remediation sprint (R10 + §ETH-T*) to catch what was missed.
+This pattern keeps recurring because the root cause spans multiple artifact layers and has not been
+fully eliminated.
+
+**Known immediate fixes already applied (2026-06-26):**
+- §8b-M2 (CodeHash): FORGE advisory → FORGE + BEACON advisory ✓
+- §8b-M3 (StorageKey Phase B): FORGE gate → FORGE + BEACON gate ✓
+- §8b-H3 (Difficulty): Added BEACON edge-case note (ETH difficulty=0 / Minimum clamping) ✓
+- Part 2 Rejection Criteria: "invoke FORGE" → "invoke FORGE (ETC) or BEACON (ETH) or both" ✓
+- `pre-migration-checklist.md` Red Flags: "FORGE review" → "FORGE (ETC) or BEACON (ETH)" ✓
+
+**Remaining scope:** memory files, gitignored local docs, public repo docs (README.md,
+ARCHITECTURE.md, docs/), remaining agent protocols, skill descriptions, and the constitution.
+
+---
+
+### §R11-A — Memory + Local Doc Bias Sweep
+
+**Agent:** main session (direct file edits — no specialist needed; these are meta-docs, not code)
+**Context budget:** small (≤10 files, targeted edits)
+**Run before:** §R11-C (C does a backlog spot-check that benefits from knowing what A found)
+
+```
+You are fixing ETC-only bias in the session memory files and gitignored working docs for the
+fukuii dual-chain EVM client. "ETC-only bias" means docs that frame fukuii as ETC-primary
+and fail to mention ETH/Sepolia equally — causing every new Claude session to default to
+FORGE-only routing for code that is shared between ETC and ETH.
+
+Context:
+- ETC/Mordor (PoW, Ethash, forBlock(), OlympiaOpCodes) → FORGE
+- ETH/Sepolia (PoS, timestamp forks, forTimestamp(), OsakaOpCodes) → BEACON
+- Shared code (vm/, domain/, consensus/) → FORGE first, then BEACON
+- These inline fixes are already done — do not redo: §8b-M2/M3/H3, Part 2 criteria,
+  pre-migration-checklist.md (2026-06-26) ✓
+
+## Step 1 — Memory file audit
+
+Read ALL files in `~/.claude/projects/-media-dev-2tb-dev/memory/` that touch fukuii:
+- `MEMORY.md` — the per-session index (HIGHEST LEVERAGE: loaded every session)
+- `fukuii-multi-chain-etc-eth.md`
+- `fukuii-outstanding-work.md`, `fukuii-backlog.md`
+- `fukuii-agent-symlinks.md`
+
+For each file answer: (a) Does it describe fukuii as dual-chain or ETC-primary? (b) Does it
+mention BEACON alongside FORGE for consensus work? (c) Would a new session reading MEMORY.md
+alone default to FORGE-only for shared vm/domain code?
+
+Fix directly. The `MEMORY.md` entry for fukuii must make the dual-chain posture and
+FORGE+BEACON routing visible at a glance. `fukuii-multi-chain-etc-eth.md` should carry the
+sentence: "Shared code (vm/, domain/, consensus/) requires FORGE (ETC review) followed by
+BEACON (ETH review) — neither alone is sufficient."
+
+## Step 2 — Gitignored local doc audit
+
+```bash
+ls /media/dev/2tb/dev/fukuii/.local/docs/
+```
+
+Read these files and fix Gate/Agent column entries that say FORGE for shared-chain code:
+- `.local/docs/opaque-type-domain-analysis.md` — this is the SOURCE TABLE that generated the
+  §8b backlog prompts. Any row with a Gate that says "FORGE" for M-tier (shared EVM paths)
+  must be updated to match the already-applied fixes:
+    M2 → FORGE+BEACON advisory
+    M3 → FORGE+BEACON gate
+    H3 → FORGE primary + BEACON edge-case note
+- `.local/docs/eth-sepolia-assumption-audit.md` — confirm the dual-chain conclusion is captured
+- `.local/docs/supervision-design-7c.md` — any ETC-only framing in actor topology?
+- `.local/docs/classic-interop-audit.md` — any FORGE-only gate language?
+
+## Step 3 — Commit
+
+```bash
+git add ~/.claude/projects/-media-dev-2tb-dev/memory/*.md
+git commit -m "docs(r11-a): memory + local docs — dual-chain posture, FORGE+BEACON parity"
+```
+
+Note in the output doc `.local/docs/etc-only-artifact-sweep.md` (create if absent):
+- Files changed and what was fixed
+- Files checked and confirmed correct
+```
+
+---
+
+### §R11-B — Protocol Version Cleanup in Public Docs
+
+**Agent:** HERALD (primary — owns ETH wire protocol lifecycle: ETH63-67 removed, ETH68/69/70
+live); FORGE assists on any ETC-specific ADR content that needs HISTORICAL framing
+**Context budget:** medium (grep sweep + targeted edits to ~5-8 files)
+**Independent of:** §R11-A, §R11-C, §R11-D — run in any order
+
+```
+You are HERALD. Fix stale ETH protocol version references in the public documentation for
+the fukuii multi-network EVM client. ETH protocols 63, 64, 65, 66, and 67 have been REMOVED
+from fukuii. The live wire protocol versions are ETH68, ETH69, and ETH70. Any documentation
+claiming ETH63/64/65/66/67 is still supported is incorrect and misleads contributors.
+
+## Step 1 — ARCHITECTURE.md
+
+Read `/media/dev/2tb/dev/fukuii/ARCHITECTURE.md` in full.
+
+Known stale lines (fix these):
+- Line ~38: `PeersClient.scala — Peer request routing (ETH63/66/68, SNAP)`
+  → `PeersClient.scala — Peer request routing (ETH68/69/70, SNAP)`
+- Line ~107: `ETH.scala — ETH protocol messages (63/66/68)`
+  → `ETH.scala — ETH protocol messages (68/69/70)`
+
+Also check:
+- Config file listing: only `etc.conf`/`mordor.conf` shown. Verify whether `eth.conf` and
+  `sepolia.conf` exist:
+  ```bash
+  ls /media/dev/2tb/dev/fukuii/src/main/resources/ | grep -iE "eth|sep|main"
+  ```
+  If they exist, add them to the config listing section.
+- Deployment table: `barad-dur` docker-compose — does it list Sepolia nodes? If Sepolia nodes
+  are now deployed, add them. If not, add a note: "(ETH/Sepolia nodes not yet in barad-dur)".
+- Any other ETH63/64/65/66/67 references.
+
+## Step 2 — docs/ sweep
+
+```bash
+grep -rln "ETH63\|ETH64\|ETH65\|ETH66\|ETH67\|eth63\|eth66\|63/66\|63/65\|63/67\|63/68" \
+  /media/dev/2tb/dev/fukuii/docs/ --include="*.md"
+```
+
+For each file returned:
+
+**ADRs** (path contains `/adr/`): These are FROZEN decisions — do not change the decision text.
+Add a callout block at the top of the ADR body (after the frontmatter/title):
+
+> **Historical note:** ETH wire protocols 63–67 have been removed from fukuii as of the
+> ETH69 alignment sprint (2026). This ADR documents the original decision and remains valid
+> as historical record. Current live protocols: ETH68, ETH69, ETH70.
+
+Known ADR to update: `docs/adr/consensus/CON-005-eth66-protocol-aware-message-formatting.md`
+
+**Architecture / specification docs** (not ADRs): Update version numbers directly.
+Likely targets:
+- `docs/architecture/PROTOCOL_VERSION_ALIGNMENT.md`
+- `docs/architecture/PROTOCOL_CAPABILITY_NEGOTIATION.md`
+- `docs/architecture/architecture-overview.md`
+
+For each: grep for ETH6x references, read context, correct to ETH68/69/70 where appropriate.
+
+## Step 3 — README.md quick check
+
+Read `/media/dev/2tb/dev/fukuii/README.md`. Check for ETH63-67 mentions only — do NOT
+change the marketing framing (ETC-primary positioning is intentional). Fix only stale
+technical claims about protocol versions if any appear.
+
+## Step 4 — Commit
+
+```bash
+git add /media/dev/2tb/dev/fukuii/ARCHITECTURE.md
+git add /media/dev/2tb/dev/fukuii/docs/
+git add /media/dev/2tb/dev/fukuii/README.md
+git commit -m "docs(r11-b): remove stale ETH63-67 refs — live protocols are ETH68/69/70"
+```
+
+Append findings to `.local/docs/etc-only-artifact-sweep.md`.
+```
+
+---
+
+### §R11-C — Agent Protocols + Constitution + Backlog Language
+
+**Agent:** main session (these are CLAUDE-facing routing docs — no specialist needed; changes
+are text substitutions, not consensus-critical)
+**Context budget:** small (targeted FORGE-only → dual-chain substitutions)
+**Run after:** §R11-A (so you know what was already fixed)
+
+```
+You are fixing FORGE-only routing language in fukuii agent protocols and the project
+constitution. The goal: any doc that says "route to FORGE" for consensus/ or vm/ code must
+say "FORGE (ETC paths) or BEACON (ETH paths) — both if shared."
+
+Already correct — skip these:
+- `consensus-change-protocol.md` — routing table already dual-chain aware ✓
+- `pre-migration-checklist.md` — Red Flags table already fixed (2026-06-26) ✓
+
+## Step 1 — Agent protocol files
+
+Read each of the following and fix any FORGE-only routing language for shared-chain code:
+- `fukuii/.claude/agent-protocols/warning-ratchet.md`
+- `fukuii/.claude/agent-protocols/risk-stratified-commit.md`
+- `fukuii/.claude/agent-protocols/inline-cleanup.md`
+- `fukuii/.claude/agent-protocols/dead-code-review.md`
+- `fukuii/.claude/agent-protocols/migration-handoff.md`
+- `fukuii/.claude/agent-protocols/loop-handoff.md`
+
+For each: grep for "FORGE" and read the surrounding context. If a FORGE reference is for:
+- vm/, consensus/, domain/ code → change to "FORGE (ETC paths) or BEACON (ETH paths)"
+- Ethash, ECIP, mining, block rewards → these ARE ETC-only; leave FORGE-only ✓
+- Pekko actor migration, Scala 3, build → not consensus; leave as-is ✓
+
+## Step 2 — Constitution
+
+Read `/media/dev/2tb/dev/fukuii/.specify/memory/constitution.md`.
+
+Look for the consensus-critical code section. If BEACON is not mentioned as the mandatory
+reviewer for ETH/Sepolia consensus paths, add after the FORGE reference:
+
+"ETH/Sepolia consensus paths (PoS, timestamp forks, Engine API, EIP-4844, withdrawals)
+require BEACON review on the same mandatory basis as ETC paths require FORGE. Shared EVM
+paths (vm/, domain/ types used by both chains) require FORGE review followed by BEACON review."
+
+## Step 3 — Backlog spot-check (Part 7 onward, active non-DONE prompts only)
+
+Read `fukuii/.claude/agent-protocols/working-docs/DEFERRED-BACKLOG.md` from Part 7 to end.
+Parts 1-6 have no active routing language — skip them.
+Parts 12+ are entirely DONE or gated non-consensus housekeeping — skip those sections too.
+Focus on Parts 7 and 8 which have active, unblocked implementation prompts.
+
+Note: the following gaps were found and fixed in the §R11-A pass (2026-06-26) and should
+already be corrected — skip re-checking these:
+- §7c-E1: FORGE-only → FORGE then BEACON for BlockchainWriter idempotency (shared infra) ✓
+- §8b-H3: Prompt body missing BEACON step — added Step 9 BEACON edge-case check ✓
+
+Find any remaining non-DONE prompt with FORGE-only routing for:
+- vm/ paths (EVM opcodes, gas, opcode dispatch) — these are shared
+- domain/ types (Account, BlockHeader, Transaction) — these are shared
+- consensus/ paths that are not explicitly ETC-only (Ethash/ECIP/mining)
+
+Apply the same fix: change "Use FORGE" to "Use FORGE (ETC) then BEACON (ETH)" and update
+the Gate text. The §8b fixes already applied (M2/M3/H3) are the pattern to follow.
+
+## Step 4 — Commit
+
+```bash
+git add fukuii/.claude/agent-protocols/
+git add fukuii/.specify/memory/constitution.md
+git commit -m "docs(r11-c): agent protocols + constitution — FORGE-only → dual-chain routing"
+```
+
+Append findings to `.local/docs/etc-only-artifact-sweep.md`.
+```
+
+---
+
+### §R11-D — PoS Skill Gap: Audit + Authoring
+
+**Agent:** BEACON (primary — writes operationally correct ETH/Sepolia PoS skill content);
+main session wires up dual-chain notes in existing skills
+**Context budget:** substantial (BEACON writes 3-4 new skill files; keep each under 300 lines)
+**Independent of:** §R11-A/B/C — run in parallel or after
+
+```
+You are BEACON. You are auditing and expanding the operational skill library for the fukuii
+multi-network EVM client to ensure ETH/Sepolia PoS operation has equal coverage to ETC/Mordor.
+
+## Step 1 — Check what exists
+
+```bash
+ls /media/dev/2tb/dev/fukuii/.claude/skills/
+```
+
+Categorize each skill as:
+- ETC-only by design (mining, checkpoint service) — correct, no change
+- Dual-chain but missing ETH/Sepolia notes — add a brief "**ETH/Sepolia:**" annotation
+- Missing PoS-specific skills — write them (Step 2)
+
+Dual-chain skills to annotate if ETH/Sepolia behavior diverges:
+- `fukuii-first-start.md` — ETH requires CL running first + JWT auth before EL starts syncing
+- `fukuii-sync-troubleshooting.md` — ETH sync stall = CL disconnect or forkchoiceUpdated timeout;
+  ETC sync stall = peer count or checkpoint miss (different root causes)
+- `fukuii-node-health-check.md` — ETH health includes CL↔EL Engine API connection check
+- `fukuii-node-configuration.md` — ETH needs `network-type = "eth"` and `engine-api.jwt-secret`
+- `fukuii-peer-management.md` — ETH P2P is port 30310; ETC is 30303
+
+Add ONE or TWO sentences per divergence point. Do not rewrite — annotate.
+
+## Step 2 — Write missing PoS skills
+
+Write the following skills that have no ETC equivalent and do not exist yet.
+Check before writing:
+```bash
+ls /media/dev/2tb/dev/fukuii/.claude/skills/ | grep -iE "cl-setup|engine-api|sepolia-sync|pos-health"
+```
+
+**Required YAML frontmatter for each skill:**
+```yaml
+---
+name: skill-name
+description: >
+  [WHAT it does]. Use when [TRIGGER PHRASES]. Covers [KEY CAPABILITIES].
+  Do NOT use for [EXCLUSIONS].
+disable-model-invocation: true
+user-invokable: true
+model: sonnet
+---
+```
+
+---
+
+**`fukuii-cl-setup.md`** — Pairing fukuii (EL) with a consensus layer client
+
+Content must cover:
+1. Why post-merge ETH requires both EL (fukuii) and CL (Prysm/Lighthouse/Teku)
+2. JWT secret: generate with `openssl rand -hex 32 > /path/to/jwt.hex`; shared between EL and CL
+3. fukuii config: `engine-api { enabled = true, port = 8551, jwt-secret = "/path/to/jwt.hex" }`
+4. CL connection flags (show both Prysm and Lighthouse variants):
+   - Prysm: `--execution-endpoint=http://localhost:8551 --jwt-secret=/path/to/jwt.hex`
+   - Lighthouse: `--execution-endpoint http://localhost:8551 --execution-jwt /path/to/jwt.hex`
+5. Startup order: start fukuii first, wait for Engine API to bind, then start CL
+6. Verification: `curl -s -o /dev/null -w "%{http_code}" http://localhost:8551/` returns 401
+   (proves endpoint live; 401 is correct — JWT auth required)
+7. Common failure: CL logs "execution layer not available" — Engine API not bound yet or wrong port
+
+---
+
+**`fukuii-engine-api-debug.md`** — Diagnosing Engine API problems
+
+Content must cover (each as a self-contained troubleshooting case):
+1. **JWT auth failure (401)**: Wrong JWT file path, clock skew > 5s between EL and CL hosts.
+   Fix: `sudo ntpdate pool.ntp.org` or `timedatectl set-ntp true`; verify shared file path.
+2. **`engine_forkchoiceUpdatedV*` timeout**: EL not responding in time. Check fukuii
+   `BlockImporter` logs — is it stuck importing a block? If load is high, check system resources.
+3. **`engine_newPayloadV*` INVALID**: Payload parent not in EL chain (sync gap). EL must catch up.
+   Not a bug — normal during initial sync.
+4. **EL reports SYNCING to CL**: CL withholds attestation duties until EL is caught up.
+   Check EL peer count (`net_peerCount` RPC) and chain tip (`eth_blockNumber`).
+5. **`engine_exchangeCapabilities` version mismatch**: CL expects V3/V4 for Osaka; EL advertises
+   wrong set. Check fukuii fork config — verify `OsakaOpCodes` is active on ETH chain path.
+6. **Distinguishing EL vs CL bugs**: Same symptom with two different CL clients → EL bug.
+   Symptom only with one CL client → investigate that CL.
+
+---
+
+**`fukuii-sepolia-sync.md`** — Syncing fukuii to Sepolia from scratch
+
+Content must cover:
+1. Prerequisites: CL client (Prysm/Lighthouse) synced to Sepolia via checkpoint sync.
+   Checkpoint URL: `https://sepolia.checkpoint.ethpandaops.io` (or equivalent).
+2. fukuii config for Sepolia: `network-type = "eth"`, `chain-id = 11155111`, Engine API section.
+3. Sync phases:
+   - Phase 1 (pre-merge blocks via EL peers): EL sync behaves like ETC — peer-driven
+   - Phase 2 (post-merge, block 15537393+): CL drives EL via Engine API; EL is passive
+   Check which phase you're in: if `eth_blockNumber` is < 15537393, EL peer issues; if higher, CL issues.
+4. Verify sync: `eth_syncing` returns `false` when caught up; watch `BlockImporter` logs.
+5. Blob transactions (post-Cancun, block ~5187023 on Sepolia): EL must handle
+   `engine_newPayloadV3` with blob hashes. If payload validation fails post-Cancun block,
+   check EIP-4844 blob sidecar handling in fukuii.
+6. Troubleshooting: block import stalls mid-chain → check which phase (EL peers vs CL driver).
+
+---
+
+**`fukuii-pos-node-health.md`** — Health checks specific to ETH/Sepolia PoS
+
+*(Write only if `fukuii-node-health-check.md` does not already cover PoS adequately.)*
+
+Content must cover:
+1. CL↔EL Engine API: `curl -s -o /dev/null -w "%{http_code}" http://localhost:8551/` → 401 = live
+2. EL sync status: `cast rpc eth_syncing --rpc-url http://localhost:8545` → false = synced
+3. CL attestation participation (if running validator): check CL metrics endpoint
+4. Blob gossip peer count (post-Cancun): blobs have a separate gossip network in ETH P2P;
+   low blob peer count means missed blob sidecars → check `net_peerCount` and CL peer count
+5. Engine API latency: target < 2s for `engine_newPayloadV*`; high latency → CL marks EL slow
+
+## Step 3 — Update CLAUDE.md skill table
+
+After writing each new skill, add it to the skill table in
+`~/.claude/CLAUDE.md` (or `fukuii/CLAUDE.md` if that is where the project skill table lives).
+
+## Step 4 — Commit
+
+```bash
+git add /media/dev/2tb/dev/fukuii/.claude/skills/
+git commit -m "feat(r11-d): add PoS operational skills — CL setup, Engine API debug, Sepolia sync, PoS health"
+```
+
+Append to `.local/docs/etc-only-artifact-sweep.md`:
+- Skills audited (list)
+- Annotations added to existing skills (what and where)
+- New skills written (list)
+- Anything deferred
+```
+
+---
+
+### §R11 Run Order
+
+Run A → then B, C, D in parallel (B/C/D are independent of each other):
+
+```
+§R11-A  (main session)     — memory + local docs
+    ↓
+§R11-B  (HERALD)           — public docs protocol versions
+§R11-C  (main session)     — agent protocols + constitution + backlog
+§R11-D  (BEACON)           — PoS skill audit + authoring
+```
+
+All four write to `.local/docs/etc-only-artifact-sweep.md`. Merge sections after all four
+complete. Final commit:
+```bash
+git add .local/docs/etc-only-artifact-sweep.md
+git commit -m "docs(r11): ETC-only artifact sweep complete — etc-only-artifact-sweep.md"
+```
+
+**Pre-flight check before starting §R11-A:**
+```bash
+grep -c "FORGE + BEACON" /media/dev/2tb/dev/fukuii/.claude/agent-protocols/working-docs/DEFERRED-BACKLOG.md
+grep "FORGE (ETC) or BEACON (ETH)" /media/dev/2tb/dev/fukuii/.claude/agent-protocols/pre-migration-checklist.md
+```
+
+**Known stale content (from pre-flight scan 2026-06-26):**
+- `ARCHITECTURE.md:~38` — "ETH63/66/68" → "ETH68/69/70"
+- `ARCHITECTURE.md:~107` — "ETH protocol messages (63/66/68)" → "(68/69/70)"
+- `ARCHITECTURE.md:~173` — only `etc.conf`/`mordor.conf`; verify `eth.conf`/`sepolia.conf`
+- `docs/adr/consensus/CON-005-eth66-*` — historical ADR, add HISTORICAL callout
+- `docs/architecture/PROTOCOL_VERSION_ALIGNMENT.md` — likely has ETH63-67 refs

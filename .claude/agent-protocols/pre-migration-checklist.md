@@ -251,7 +251,7 @@ Record: param names, their proposed typed equivalent, and which spawn sites are 
 |---------|--------|
 | Actor spawns 10+ workers | Map all workers first; may need separate sprint |
 | Actor uses `context.system.eventStream` to publish/subscribe | Route to FORGE/HERALD — PSH serialization pre-flight required before migrating |
-| Worker is in `consensus/` or `vm/` | FORGE review before touching it |
+| Worker is in `consensus/` or `vm/` | FORGE (ETC paths) or BEACON (ETH paths) review before touching it — both if shared |
 | Actor is accessed from Java code | Java interop analysis needed before migration |
 | Actor uses `akka.remote` / `pekko.remote` | Serialization review (PSH) — route to FORGE |
 | `@SerializationProxy` or `readResolve` methods | Serialization review required |
