@@ -32,5 +32,5 @@ case class ProgramResult[W <: WorldStateProxy[W, S], S <: Storage[S]](
     error: Option[ProgramError],
     accessedAddresses: Set[Address],
     accessedStorageKeys: Set[(Address, StorageKey)],
-    transientStorage: Map[(Address, BigInt), BigInt] = Map.empty
+    transientStorage: Map[(Address, StorageKey), BigInt] = Map.empty
 )

@@ -95,7 +95,7 @@ case class ProgramState[W <: WorldStateProxy[W, S], S <: Storage[S]](
     originalWorld: W,
     accessedAddresses: Set[Address],
     accessedStorageKeys: Set[(Address, StorageKey)],
-    transientStorage: Map[(Address, BigInt), BigInt] = Map.empty,
+    transientStorage: Map[(Address, StorageKey), BigInt] = Map.empty,
     opcodeGasCost: BigInt = 0
 ) {
 

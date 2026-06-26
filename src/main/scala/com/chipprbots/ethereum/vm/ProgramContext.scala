@@ -117,7 +117,7 @@ case class ProgramContext[W <: WorldStateProxy[W, S], S <: Storage[S]](
     originalWorld: W,
     warmAddresses: Set[Address],
     warmStorage: Set[(Address, StorageKey)],
-    transientStorage: Map[(Address, BigInt), BigInt] = Map.empty,
+    transientStorage: Map[(Address, StorageKey), BigInt] = Map.empty,
     precompileRelocations: Map[Address, Address] = Map.empty,
     blobVersionedHashes: Seq[ByteString] = Seq.empty,
     traceTransfers: Boolean = false,

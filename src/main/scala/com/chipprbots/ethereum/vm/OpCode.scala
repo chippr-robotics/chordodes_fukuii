@@ -1542,7 +1542,7 @@ case object BLOBBASEFEE extends OpCode(0x4a, 0, 1, _.G_base) with ConstGas {
 case object TLOAD extends OpCode(0x5c, 1, 1, _.G_warm_storage_read) with ConstGas {
   protected def exec[S <: Storage[S], W <: WorldStateProxy[W, S]](state: ProgramState[W, S]): ProgramState[W, S] = {
     val (offset, stack1) = state.stack.pop()
-    val value = state.transientStorage.getOrElse((state.ownAddress, offset.toBigInt), BigInt(0))
+    val value = state.transientStorage.getOrElse((state.ownAddress, StorageKey(offset.toBigInt)), BigInt(0))
     val stack2 = stack1.push(UInt256(value))
     state.withStack(stack2).step()
   }
@@ -1554,7 +1554,7 @@ case object TSTORE extends OpCode(0x5d, 2, 0, _.G_warm_storage_read) with ConstG
   protected def exec[S <: Storage[S], W <: WorldStateProxy[W, S]](state: ProgramState[W, S]): ProgramState[W, S] = {
     val (Seq(offset, value), stack1) = state.stack.pop(2)
     val updatedTransient = state.transientStorage.updated(
-      (state.ownAddress, offset.toBigInt),
+      (state.ownAddress, StorageKey(offset.toBigInt)),
       value.toBigInt
     )
     state.copy(transientStorage = updatedTransient).withStack(stack1).step()
