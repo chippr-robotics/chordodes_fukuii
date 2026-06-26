@@ -281,10 +281,20 @@ matching the system's fault-tolerance requirements.
 where restart-on-failure is safe (coordinator workers, peer workers) vs. stop-and-alert for actors
 where restart could cause state corruption (SSC, NPMA).
 
-**Gate**: CAPSTONE complete + 7a done (sealed ADTs make failure typing cleaner).
+**Gate**: CAPSTONE complete + 7a done (sealed ADTs make failure typing cleaner). ✅ BOTH MET 2026-06-25.
 **Priority**: Low — the current behavior is safe (default stop is conservative); explicit supervision
 is a correctness/resilience improvement, not a bug fix.
 **Agent**: PRISM (review) + LOOM (implementation per subsystem).
+
+**PRISM audit complete 2026-06-25.** Design: `.local/docs/supervision-design-7c.md`
+- 49 actors audited. Zero existing `Behaviors.supervise` wrappers.
+- **6 STOP-AND-ALERT** (keep stop, add monitoring alert wrapper): PeerEventBusActor, PeerManagerActor,
+  NetworkPeerManagerActor, SNAPSyncController, SyncController, SubscriptionManager
+- **39 SAFE-TO-RESTART** across Thread Groups A/B/C (restart/restartWithBackoff per spec)
+- **4 NEEDS-ANALYSIS** blocked on risk flags: RF-1 BlockImporter (→ forge idempotency check),
+  RF-2 BlockFetcher ghost children, RF-3 SyncStateSchedulerActor storm bound
+- **Implementation order:** Phase 1=Group D (alert wrappers) → A → B → C → E (risk-flagged)
+- **Protocol needed:** `alert-wrapper-protocol.md` before Group D LOOM threads begin
 
 ---
 
