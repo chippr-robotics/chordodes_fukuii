@@ -57,7 +57,7 @@ Record in the continuation file if doing LOOM work, or surface to the user.
 | `sender()` in a Classic actor you are NOT migrating | Changes message protocol | LOOM when that actor is scheduled |
 | `extends Actor` in a file you opened but aren't migrating | Full migration needed | LOOM |
 | `implicit val/def` in main sources | Waiting for Part 3a | MITHRIL after Pekko complete |
-| `asInstanceOf[T]` | Bucket C — needs proof | FORGE if consensus, MITHRIL otherwise |
+| `asInstanceOf[T]` | Bucket C — needs proof | FORGE (ETC) or BEACON (ETH) if consensus, MITHRIL otherwise |
 | `isInstanceOf[T]` | Bucket C — sealed ADT needed | MITHRIL |
 | Any pattern in `consensus/`, `vm/`, `crypto/`, `domain/` | Consensus-critical | FORGE / BEACON |
 | Wire message encoding in `network/p2p/messages/` | Protocol-critical | HERALD |
@@ -119,7 +119,7 @@ Never combine a cleanup commit with a failing compile — it makes bisect useles
 ### Rule 4: Consensus files — flag only
 
 If a file in `consensus/`, `vm/`, `crypto/`, or `domain/` has cleanup candidates,
-write a flag comment in your continuation file. Do NOT fix inline. Route to FORGE.
+write a flag comment in your continuation file. Do NOT fix inline. Route to FORGE (ETC) or BEACON (ETH).
 
 ```
 # continuation note:
@@ -142,7 +142,7 @@ not just Scala 3 / Pekko:
 | Domain | Common inline finds | Notes |
 |--------|--------------------|-|
 | Scala 3 / Pekko | log.warning, println, unused imports, self: with | Most common |
-| EVM / opcode logic | Hardcoded numbers without named constants | FORGE review before naming |
+| EVM / opcode logic | Hardcoded numbers without named constants | FORGE (ETC) or BEACON (ETH) review before naming |
 | devp2p / wire protocol | Hardcoded magic bytes without named constants | HERALD review |
 | SNAP protocol | println debugging left in | Safe to remove |
 | RLP codecs | Unused `given` instances, duplicate decoders | HERALD if in wire messages |

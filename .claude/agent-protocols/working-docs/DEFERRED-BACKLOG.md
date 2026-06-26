@@ -768,9 +768,9 @@ Scale: 2,276 `BigInt` usages / 204 files · 2,305 `ByteString` usages / 243 file
 | LOW | `BloomFilter` | `ByteString` | ~30 | None |
 | LOW | `BlobVersionedHash` | `ByteString` | ~15 | None (ETH-only) |
 | MEDIUM | `StorageKey` Phase A (AccessListItem only) | `BigInt` | 7 | None |
-| MEDIUM | `CodeHash` | `ByteString` | 32 | FORGE advisory |
-| MEDIUM | `StorageKey` Phase B (ProgramState/EVM) | `BigInt` | ~12 | FORGE |
-| HIGH | `BlockNumber`, `Difficulty`, `TotalDifficulty`, `GasAmount`, `GasPrice`, `ChainId`, `BlockHash`, `TrieRoot` | `BigInt`/`ByteString` | 25–124 | FORGE (consensus) |
+| MEDIUM | `CodeHash` | `ByteString` | 32 | FORGE + BEACON advisory |
+| MEDIUM | `StorageKey` Phase B (ProgramState/EVM) | `BigInt` | ~12 | FORGE + BEACON |
+| HIGH | `BlockNumber`, `Difficulty`, `TotalDifficulty`, `GasAmount`, `GasPrice`, `ChainId`, `BlockHash`, `TrieRoot` | `BigInt`/`ByteString` | 25–124 | FORGE + BEACON (consensus) |
 
 **Caveats (from R6 doc):**
 - `UInt256` and `Address` are hand-rolled wrappers (not opaque types) — do not introduce competing `Balance`/`Nonce` types that conflict with `Account.balance: UInt256`.
@@ -929,7 +929,7 @@ Step 7 — `git commit -m "feat(8b-L3): introduce BlobVersionedHash opaque type 
 
 **Files:** `domain/StorageKey.scala` (new), `Transaction.scala` (`AccessListItem`), `ETHPackets.scala` EIP-2930 codec (~7 files directly)
 **Agent:** MITHRIL
-**Gate:** None for Phase A — `AccessListItem` does not touch EVM opcode dispatch. Phase B (ProgramState) requires FORGE.
+**Gate:** None for Phase A — `AccessListItem` does not touch EVM opcode dispatch. Phase B (ProgramState) requires FORGE + BEACON.
 
 **Prompt:**
 ```
@@ -964,7 +964,7 @@ Step 3 — Update `ETHPackets.scala` EIP-2930 / EIP-1559 typed transaction codec
 Step 4 — Check for other AccessListItem callers:
   `grep -rn "AccessListItem\|storageKeys" src/main/ --include="*.scala"`
   Update any site that constructs or deconstructs `storageKeys`.
-  STOP if you reach `ProgramState.scala` or `EthereumUInt256Mpt` — those are Phase B (FORGE gate).
+  STOP if you reach `ProgramState.scala` or `EthereumUInt256Mpt` — those are Phase B (FORGE + BEACON gate).
 
 Step 5 — `sbt compile-all` — must be clean.
 
