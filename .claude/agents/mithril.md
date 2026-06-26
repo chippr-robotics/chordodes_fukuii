@@ -73,6 +73,11 @@ sbt compile-all && sbt testEssential   # verify before and after
 sbt scalafmtAll                        # keep formatting clean
 ```
 
+**Core domain type sweeps** (BlockHeader, Account, Block, Transaction — 50+ dependents):
+use `sbt compile` between files during the sweep, then `sbt compile-all` once at the end.
+`sbt compile` is root main only; it still catches all main-source type errors and is fast
+after the first cascade. See `testing-protocol.md` → "Core domain type sweeps".
+
 ## High-value transformations (in priority order)
 
 1. **given / using** — replace `implicit val`/`implicit` params:

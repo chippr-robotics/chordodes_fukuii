@@ -26,7 +26,8 @@ burned, validator withdrawals, blob transactions (EIP-4844), Osaka fork.
 
 | Command | What it runs | When to use |
 |---------|-------------|-------------|
-| `sbt compile-all` | Compiles all modules + test sources | After every file change — non-negotiable |
+| `sbt compile-all` | Compiles all modules + test sources | After every file change (exception: core domain sweeps — use `sbt compile` instead, then `compile-all` once at end; see `testing-protocol.md`) |
+| `sbt compile` | Root main sources only — no test/IT/Benchmark | **Core domain type sweeps only** (BlockHeader, Account, Block, Transaction → 50+ dependents) — avoids cascade on every file; `compile-all` once at end |
 | `sbt scalafmtAll` | scalafmt across ALL modules (formatting only) | After every migration commit; safe at any time |
 | `sbt scalafmt` | scalafmt on ROOT module only | **Do not use** — misses submodules (bytes, crypto, rlp, Evm, etc.) |
 | `sbt formatAll` | scalafixAll + scalafmtAll across all modules | Pre-PR on a clean codebase ONLY — aborts on pre-existing scalafix violations |
@@ -42,7 +43,7 @@ burned, validator withdrawals, blob transactions (EIP-4844), Osaka fork.
 | `sbt "IntegrationTest / test"` | Integration test module | After protocol-level changes |
 
 **Test cadence during a migration thread:**
-1. Every file edit → `sbt compile-all` (mandatory, fast)
+1. Every file edit → `sbt compile-all` (mandatory, fast) — **exception**: if the sweep touches a core domain type (BlockHeader, Account, Block, Transaction), use `sbt compile` between files and `sbt compile-all` once at the end (see `testing-protocol.md` → "Core domain type sweeps")
 2. Phases that only add types (returns removal, Messages.scala additions) → compile only, no tests
 3. After Phase 2 (main migration) and Phase 3 (callers) → `testOnly *<ActorName>*` + any touched caller specs
 4. End of thread, once → full `testEssential` to confirm baseline holds
