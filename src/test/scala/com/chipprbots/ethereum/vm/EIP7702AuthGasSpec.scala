@@ -47,10 +47,10 @@ class EIP7702AuthGasSpec
   }
 
   it should "combine with access list and calldata costs" taggedAs (OlympiaTest, VMTest) in {
-    import com.chipprbots.ethereum.domain.{AccessListItem, Address}
+    import com.chipprbots.ethereum.domain.{AccessListItem, Address, StorageKey}
 
     val payload = ByteString(Array.fill(100)(0x01.toByte)) // 100 nonzero bytes
-    val accessList = List(AccessListItem(Address(1), List(BigInt(0), BigInt(1))))
+    val accessList = List(AccessListItem(Address(1), List(StorageKey(BigInt(0)), StorageKey(BigInt(1)))))
 
     val gasBase = evmConfig.calcTransactionIntrinsicGas(emptyPayload, isContractCreation = false, Nil, 0)
     val gasFull = evmConfig.calcTransactionIntrinsicGas(payload, isContractCreation = false, accessList, 2)

@@ -7,6 +7,7 @@ import boopickle.Pickler
 
 import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.AccessListItem
+import com.chipprbots.ethereum.domain.StorageKey
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlobTransaction
 import com.chipprbots.ethereum.domain.BlockBody
@@ -47,6 +48,8 @@ object Picklers {
 
   given addressPickler: Pickler[Address] =
     transformPickler[Address, ByteString](bytes => Address(bytes))(address => address.bytes)
+  given storageKeyPickler: Pickler[StorageKey] =
+    transformPickler[StorageKey, BigInt](StorageKey(_))(_.value)
   given accessListItemPickler: Pickler[AccessListItem] = generatePickler[AccessListItem]
 
   given legacyTransactionPickler: Pickler[LegacyTransaction] = generatePickler[LegacyTransaction]

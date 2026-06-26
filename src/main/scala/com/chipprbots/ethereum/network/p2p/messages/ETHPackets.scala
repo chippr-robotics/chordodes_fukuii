@@ -59,12 +59,15 @@ object ETHPackets {
   implicit val accessListItemCodec: RLPCodec[AccessListItem] =
     RLPCodec.instance[AccessListItem](
       { case AccessListItem(address, storageKeys) =>
-        RLPList(address, toRlpList(storageKeys.map(UInt256(_).bytes.toArray)))
+        RLPList(address, toRlpList(storageKeys.map(sk => UInt256(sk.value).bytes.toArray)))
       },
       {
         case r: RLPList if r.items.isEmpty => AccessListItem(null, List.empty)
         case RLPList(rlpAddress, rlpStorageKeys: RLPList) =>
-          AccessListItem(rlpAddress.decodeAs[Address]("address"), fromRlpList[BigInt](rlpStorageKeys).toList)
+          AccessListItem(
+            rlpAddress.decodeAs[Address]("address"),
+            fromRlpList[BigInt](rlpStorageKeys).toList.map(StorageKey(_))
+          )
       }
     )
 

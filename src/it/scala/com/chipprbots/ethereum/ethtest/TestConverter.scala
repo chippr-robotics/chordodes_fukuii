@@ -140,7 +140,7 @@ object TestConverter {
       testTx.accessList.getOrElse(List.empty).map { item =>
         AccessListItem(
           address = Address(ByteString(parseHex(item.address))),
-          storageKeys = item.storageKeys.map(key => parseBigInt(key))
+          storageKeys = item.storageKeys.map(key => StorageKey(parseBigInt(key)))
         )
       }
 

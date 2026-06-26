@@ -50,7 +50,7 @@ object ProgramContext {
       evmConfig = evmConfig,
       originalWorld = world,
       warmAddresses = accessList.map(_.address).toSet,
-      warmStorage = accessList.flatMap(i => i.storageKeys.map((i.address, _))).toSet,
+      warmStorage = accessList.flatMap(i => i.storageKeys.map(sk => (i.address, sk.value))).toSet,
       blobVersionedHashes = blobHashes
     )
   }

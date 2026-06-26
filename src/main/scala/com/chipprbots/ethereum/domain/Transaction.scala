@@ -206,7 +206,7 @@ case class TransactionWithDynamicFee(
       s"}"
 }
 
-case class AccessListItem(address: Address, storageKeys: List[BigInt]) // bytes32
+case class AccessListItem(address: Address, storageKeys: List[StorageKey]) // bytes32
 
 /** EIP-4844 Type-3 blob transaction. Introduces maxFeePerBlobGas and blobVersionedHashes for blob-carrying
   * transactions. Must have a To address (no contract creation). gasPrice is defined as maxFeePerGas for upfront cost

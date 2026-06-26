@@ -88,7 +88,7 @@ trait ObjectGenerators {
 
   def accessListItemGen: Gen[AccessListItem] = for {
     address <- addressGen
-    storageKeys <- Gen.listOf(bigIntGen)
+    storageKeys <- Gen.listOf(bigIntGen.map(StorageKey(_)))
   } yield AccessListItem(address, storageKeys)
 
   def setCodeAuthorizationGen: Gen[SetCodeAuthorization] = for {

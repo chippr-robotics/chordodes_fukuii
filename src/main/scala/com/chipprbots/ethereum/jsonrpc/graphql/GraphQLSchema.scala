@@ -342,7 +342,7 @@ object GraphQLSchema {
         ListType(Bytes32Type),
         resolve = _.value.storageKeys.map { n =>
           // Left-pad BigInt key to 32 bytes.
-          val bytes = com.chipprbots.ethereum.utils.ByteUtils.bigIntToUnsignedByteArray(n)
+          val bytes = com.chipprbots.ethereum.utils.ByteUtils.bigIntToUnsignedByteArray(n.value)
           val padded =
             if bytes.length >= 32 then bytes.takeRight(32)
             else Array.fill[Byte](32 - bytes.length)(0) ++ bytes
