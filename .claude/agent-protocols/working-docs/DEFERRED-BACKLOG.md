@@ -2560,9 +2560,100 @@ Append to `.local/docs/etc-only-artifact-sweep.md`:
 
 ---
 
+### §R11-E — ETH Mainnet Deployment Parity (`ops/barad-dur/eth/`)
+
+**Agent:** BEACON (primary — owns ETH/Sepolia deployment patterns and Engine API wiring);
+main session handles ARCHITECTURE.md update and commit
+**Context budget:** medium (new docker-compose + conf dir; model after `barad-dur/sepolia/`)
+**Independent of:** §R11-A/B/C/D — run after §R11-D confirms skill coverage is solid
+**Unblocks:** ETH mainnet EL in production fleet; current gap identified in §R11-B (2026-06-26)
+
+**Background:** The §R11-B pass discovered `eth.conf` and `sepolia.conf` already exist in
+`src/main/resources/conf/`. Sepolia has a full `ops/barad-dur/sepolia/` deployment (Fukuii EL
++ Lighthouse CL via Engine API). ETH mainnet has no equivalent — there is no
+`ops/barad-dur/eth/` and no ETH mainnet service in any barad-dur compose file. This task
+closes that gap.
+
+```
+You are BEACON. Add an ETH mainnet deployment to the barad-dur production environment,
+matching the structure of `ops/barad-dur/sepolia/`.
+
+## Step 1 — Study the Sepolia deployment
+
+Read these files in full:
+- `ops/barad-dur/sepolia/docker-compose.yml`
+- `ops/barad-dur/sepolia/fukuii-conf/sepolia.conf`
+- `ops/barad-dur/sepolia/fukuii-conf/multi-network.conf`
+- `ops/barad-dur/sepolia/fukuii-conf/static-nodes.json`
+
+Understand: port assignments, JWT auth path, volume mounts, CL client choice (Lighthouse),
+JVM envelope (the x-fukuii-jvm-defaults anchor), mem_limit, restart policy, health checks.
+
+## Step 2 — Check existing ETH conf
+
+Read `src/main/resources/conf/eth.conf`. Confirm it sets `network = "eth"` and note any
+ETH-mainnet-specific overrides already present (peering, gas, EIP schedule).
+
+## Step 3 — Port assignment
+
+Check current barad-dur port usage to avoid conflicts:
+```bash
+grep -rh "ports:" -A 10 /media/dev/2tb/dev/fukuii/ops/barad-dur/ --include="*.yml" | grep "\"[0-9]"
+```
+From memory (update if stale): ETC=8553, Mordor=8554 (HTTP); Sepolia=8555/8556/8561 (HTTP/WS/Engine).
+ETH mainnet should use the next available block. Confirm and assign.
+
+## Step 4 — Create `ops/barad-dur/eth/`
+
+Create these files, modelling each on the Sepolia equivalents:
+
+**`ops/barad-dur/eth/docker-compose.yml`**
+- Services: `fukuii-eth` (EL) + `lighthouse-eth` (CL)
+- CL: Lighthouse with `--network mainnet` (vs `--network sepolia` for Sepolia)
+- JWT: shared `/app/jwt/jwt.hex` (same pattern as Sepolia)
+- Ports: use the block assigned in Step 3
+- Volumes: `${ETH_DATA_DIR:-/chipprbots/blockchain/chain-data/eth/fukuii-eth}`
+- JVM envelope: same `x-fukuii-jvm-defaults` anchor as Sepolia (mem_limit: 8g — ETH state
+  is larger than Sepolia; do NOT reduce)
+
+**`ops/barad-dur/eth/fukuii-conf/eth.conf`**
+- `include classpath("eth.conf")` from the packaged resource
+- Add any barad-dur-specific overrides (metrics port, log path, datadir)
+
+**`ops/barad-dur/eth/fukuii-conf/static-nodes.json`**
+- Empty array `[]` for now — ETH mainnet peer discovery is DNS-based; static nodes
+  are not required for initial sync
+
+## Step 5 — Update ARCHITECTURE.md
+
+Add `eth/` to the barad-dur tree alongside `sepolia/`:
+
+```
+│   ├── eth/                          # ETH mainnet EL (Fukuii) + CL (Lighthouse) via Engine API
+│   │   ├── docker-compose.yml        # fukuii-eth + lighthouse-eth services
+│   │   └── fukuii-conf/              # ETH mainnet node config
+│   ├── sepolia/                      # Sepolia EL (Fukuii) + CL (Lighthouse) via Engine API
+│   │   ├── docker-compose.yml        # fukuii-sepolia + lighthouse services
+│   │   └── fukuii-conf/              # Sepolia node config
+```
+
+## Step 6 — Commit
+
+```bash
+git add ops/barad-dur/eth/
+git add ARCHITECTURE.md
+git commit -m "ops(eth-mainnet): add barad-dur ETH mainnet deployment — Fukuii EL + Lighthouse CL"
+```
+
+Append findings (port assignments chosen, any Sepolia divergences) to
+`.local/docs/etc-only-artifact-sweep.md`.
+```
+
+---
+
 ### §R11 Run Order
 
-Run A → then B, C, D in parallel (B/C/D are independent of each other):
+Run A → then B, C, D in parallel (B/C/D are independent of each other); E after D:
 
 ```
 §R11-A  (main session)     — memory + local docs
@@ -2570,6 +2661,8 @@ Run A → then B, C, D in parallel (B/C/D are independent of each other):
 §R11-B  (HERALD)           — public docs protocol versions
 §R11-C  (main session)     — agent protocols + constitution + backlog
 §R11-D  (BEACON)           — PoS skill audit + authoring
+    ↓
+§R11-E  (BEACON)           — ETH mainnet ops/barad-dur/eth/ deployment parity
 ```
 
 All four write to `.local/docs/etc-only-artifact-sweep.md`. Merge sections after all four

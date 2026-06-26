@@ -171,10 +171,10 @@ conf/
 │   ├── db.conf                       # RocksDB tuning
 │   └── logging.conf                  # Logback levels
 ├── etc.conf                          # ETC mainnet overrides
-└── mordor.conf                       # Mordor testnet overrides
+├── mordor.conf                       # Mordor testnet overrides
+├── eth.conf                          # ETH mainnet overrides
+└── sepolia.conf                      # Sepolia testnet overrides
 ```
-
-> **Note:** `eth.conf` and `sepolia.conf` do not exist yet — ETH/Sepolia network config is work in progress. ETH/Sepolia nodes inherit `fukuii.conf` defaults and are configured via CLI flags or env overrides.
 
 ## Deployment Environments (`ops/`)
 
@@ -182,11 +182,13 @@ conf/
 ops/
 ├── barad-dur/                        # Production: dual-node + Kong gateway + monitoring
 │   ├── docker-compose.yml            # Primary (ETC) + Secondary (Mordor) + Kong + Prometheus + Grafana
-│   │                                 # (ETH/Sepolia nodes not yet in barad-dur)
 │   ├── fukuii-conf-1/                # Primary node config (ETC mainnet)
 │   ├── fukuii-conf-2/                # Secondary node config (Mordor testnet)
+│   ├── sepolia/                      # Sepolia EL (Fukuii) + CL (Lighthouse) via Engine API
+│   │   ├── docker-compose.yml        # fukuii-sepolia + lighthouse services
+│   │   └── fukuii-conf/              # Sepolia node config
 │   ├── grafana/dashboards/           # Olympia Sync, Dark Lands Network, SNAP Sync, Main
-│   └── prometheus/                   # Scrape configs for both nodes
+│   └── prometheus/                   # Scrape configs for ETC, Mordor, and Sepolia nodes
 │
 ├── cirith-ungol/                     # Testing: single Fukuii + Core-Geth on real network
 │   ├── docker-compose.yml
