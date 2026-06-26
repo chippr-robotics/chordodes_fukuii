@@ -1994,7 +1994,7 @@ After all command variants are migrated:
 
 ---
 
-#### §8k-B9 — SendMessage non-Cmd sweep: 8 actors × 13 sites (silent-drop investigation + fix)
+#### §8k-B9 — SendMessage non-Cmd sweep: 8 actors × 13 sites (silent-drop investigation + fix) ✅ DONE `81b4e91b4` 2026-06-25
 
 **Files:** `network/BlockchainHostActor.scala` (97, 302), `sync/fast/PivotBlockSelector.scala` (415, 570), `sync/regular/BlockBroadcast.scala` (64, 100, 108), `sync/snap/actors/AccountRangeWorker.scala` (106), `sync/snap/actors/StorageRangeCoordinator.scala` (1108), `sync/snap/actors/ByteCodeWorker.scala` (82), `sync/snap/actors/TrieNodeHealingCoordinator.scala` (1321), `transactions/PendingTransactionsManager.scala` (193, 400)
 **Agent:** LOOM
