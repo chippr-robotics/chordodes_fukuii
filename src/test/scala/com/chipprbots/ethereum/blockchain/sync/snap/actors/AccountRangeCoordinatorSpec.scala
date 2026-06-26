@@ -39,7 +39,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
 
   private def arcProps(
       stateRoot: ByteString,
-      networkPeerManager: org.apache.pekko.actor.ActorRef,
+      networkPeerManager: org.apache.pekko.actor.typed.ActorRef[NetworkPeerManagerActor.Command],
       requestTracker: SNAPRequestTracker,
       mptStorage: TestMptStorage,
       concurrency: Int,
@@ -79,12 +79,12 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = arcProps(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 4,
@@ -100,7 +100,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
     val peerProbe = testKit.createTestProbe[Any]()
 
@@ -108,7 +108,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
 
     val coordinator = arcProps(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 4,
@@ -125,12 +125,12 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = arcProps(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 4,
@@ -150,12 +150,12 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = arcProps(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 1, // Small concurrency for test
@@ -173,12 +173,12 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = arcProps(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 4,
@@ -197,12 +197,12 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = arcProps(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 4,
@@ -222,12 +222,12 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = arcProps(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 4,
@@ -249,7 +249,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val stateRoot = ByteString(MerklePatriciaTrie.EmptyRootHash)
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
     val peerProbe = testKit.createTestProbe[Any]()
 
@@ -257,7 +257,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
 
     val coordinator = arcProps(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 1,
@@ -289,7 +289,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     // worker (still in `working` state) through the "Worker is busy" branch and emit
     // TaskFailed(0, "Worker busy") — the canonical leak-fix-incomplete signature.
     val stateRoot = kec256(ByteString("worker-reuse-test-root"))
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val peerProbeA = testKit.createTestProbe[Any]()
     val peerProbeB = testKit.createTestProbe[Any]()
     val peerA = PeerTestHelpers.createTestPeer("reuse-peerA", peerProbeA.ref.toClassic)
@@ -298,7 +298,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
 
     val coordinator = arcProps(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = new TestMptStorage(),
       concurrency = 1, // exactly one worker so reuse is unambiguous
@@ -337,14 +337,14 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val stateRoot = kec256(ByteString("requeue-test-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
     val peerProbe = testKit.createTestProbe[Any]()
     val peer = PeerTestHelpers.createTestPeer("requeue-peer", peerProbe.ref.toClassic)
 
     val coordinator = arcProps(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 1,
@@ -374,14 +374,14 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val rootR2 = kec256(ByteString("stale-guard-root-r2"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
     val peerProbe = testKit.createTestProbe[Any]()
     val peer = PeerTestHelpers.createTestPeer("stale-guard-peer", peerProbe.ref.toClassic)
 
     val coordinator = arcProps(
       stateRoot = rootR1,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 1,
@@ -417,12 +417,12 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val stateRoot = kec256(ByteString("poststop-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = arcProps(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 1,
@@ -448,14 +448,14 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val rootR2 = kec256(ByteString("pivot-clear-root-r2"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
     val peerProbe = testKit.createTestProbe[Any]()
     val peer = PeerTestHelpers.createTestPeer("pivot-clear-peer", peerProbe.ref.toClassic)
 
     val coordinator = arcProps(
       stateRoot = rootR1,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 1,
@@ -483,7 +483,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val root = kec256(ByteString("disconnect-mid-flight-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
     val peerProbe1 = testKit.createTestProbe[Any]()
     val peerProbe2 = testKit.createTestProbe[Any]()
@@ -492,7 +492,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
 
     val coordinator = arcProps(
       stateRoot = root,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 1,
@@ -518,14 +518,14 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val root = kec256(ByteString("late-response-guard-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
     val peerProbe = testKit.createTestProbe[Any]()
     val peer = PeerTestHelpers.createTestPeer("late-resp-peer", peerProbe.ref.toClassic)
 
     val coordinator = arcProps(
       stateRoot = root,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 1,
@@ -562,7 +562,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     val root = kec256(ByteString("cooldown-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
     val peerProbe1 = testKit.createTestProbe[Any]()
     val peerProbe2 = testKit.createTestProbe[Any]()
@@ -571,7 +571,7 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
 
     val coordinator = arcProps(
       stateRoot = root,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       mptStorage = storage,
       concurrency = 2,
@@ -605,13 +605,13 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     // single-range coord. Observable: with no pending tasks and a peer available, no SendMessage fires.
     val root = kec256(ByteString("stacktrie-resume-complete-root"))
     val rangeLast = AccountTask.MaxHash32
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val peerProbe = testKit.createTestProbe[Any]()
     val peer = PeerTestHelpers.createTestPeer("resume-complete-peer", peerProbe.ref.toClassic)
 
     val coord = arcProps(
       stateRoot = root,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = new TestMptStorage(),
       concurrency = 1,
@@ -631,11 +631,11 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
   // ── Storage / bytecode back-pressure pause/resume (#1232 follow-up) ────────
 
   it should "skip dispatch while storage back-pressure is set, resume on release" taggedAs UnitTest in {
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val root = kec256(ByteString("backpressure-dispatch-root"))
     val coord = arcProps(
       stateRoot = root,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = new TestMptStorage(),
       concurrency = 4,
@@ -660,11 +660,11 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
   }
 
   it should "treat storage and bytecode pressure as ANY-of: only release once every source clears" taggedAs UnitTest in {
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val root = kec256(ByteString("two-source-backpressure-root"))
     val coord = arcProps(
       stateRoot = root,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = new TestMptStorage(),
       concurrency = 4,

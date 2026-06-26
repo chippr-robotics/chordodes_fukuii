@@ -6,7 +6,6 @@ import java.io.RandomAccessFile
 import java.nio.file.Files
 import java.nio.file.Path
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -31,6 +30,7 @@ import com.chipprbots.ethereum.db.storage.MptStorage
 import com.chipprbots.ethereum.db.storage.PathNodeStorage
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.AccountRange
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
@@ -67,7 +67,7 @@ private class AccountRangeCoordinatorImpl(
     ctx: ActorContext[AccountRangeCoordinator.Command],
     timers: TimerScheduler[AccountRangeCoordinator.Command],
     initialStateRoot: ByteString,
-    networkPeerManager: ActorRef,
+    networkPeerManager: org.apache.pekko.actor.typed.ActorRef[NetworkPeerManagerActor.Command],
     requestTracker: SNAPRequestTracker,
     mptStorage: MptStorage,
     concurrency: Int,
@@ -1871,7 +1871,7 @@ object AccountRangeCoordinator {
 
   def apply(
       stateRoot: ByteString,
-      networkPeerManager: ActorRef,
+      networkPeerManager: org.apache.pekko.actor.typed.ActorRef[NetworkPeerManagerActor.Command],
       requestTracker: SNAPRequestTracker,
       mptStorage: MptStorage,
       concurrency: Int,

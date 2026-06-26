@@ -23,8 +23,8 @@ import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
   *   1. Created by coordinator when needed 2. Fetches one task 3. Reports result 4. Can be reused for next task or
   *      stopped
   *
-  * Pekko Typed leaf actor (Group W1). `coordinator` is a typed ref (§8k-A). `networkPeerManager` remains a Classic ref
-  * via the typed→classic adapter.
+  * Pekko Typed leaf actor (Group W1). `coordinator` is a typed ref (§8k-A). `networkPeerManager` is a typed ref
+  * (§8k-B11).
   */
 object AccountRangeWorker {
 
@@ -35,13 +35,13 @@ object AccountRangeWorker {
   /** @param coordinator
     *   Parent coordinator actor (Typed)
     * @param networkPeerManager
-    *   Actor for network communication (Classic)
+    *   Actor for network communication (Typed)
     * @param requestTracker
     *   Tracker for requests
     */
   def apply(
       coordinator: ActorRef[AccountRangeCoordinator.Command],
-      networkPeerManager: org.apache.pekko.actor.ActorRef,
+      networkPeerManager: ActorRef[com.chipprbots.ethereum.network.NetworkPeerManagerActor.Command],
       requestTracker: SNAPRequestTracker
   ): Behavior[Command] =
     Behaviors.setup { context =>
@@ -56,7 +56,7 @@ object AccountRangeWorker {
 
   private def idle(
       coordinator: ActorRef[AccountRangeCoordinator.Command],
-      networkPeerManager: org.apache.pekko.actor.ActorRef,
+      networkPeerManager: ActorRef[com.chipprbots.ethereum.network.NetworkPeerManagerActor.Command],
       requestTracker: SNAPRequestTracker,
       currentTask: Option[(AccountTask, Peer, BigInt, ByteString)]
   ): Behavior[Command] =
@@ -102,10 +102,7 @@ object AccountRangeWorker {
             import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetAccountRange.GetAccountRangeEnc
             import com.chipprbots.ethereum.network.p2p.MessageSerializable
             val messageSerializable: MessageSerializable = new GetAccountRangeEnc(request)
-            networkPeerManager.tell(
-              NetworkPeerManagerActor.SendMessageCmd(messageSerializable, peer.id),
-              org.apache.pekko.actor.ActorRef.noSender
-            )
+            networkPeerManager ! NetworkPeerManagerActor.SendMessageCmd(messageSerializable, peer.id)
 
             working(coordinator, networkPeerManager, requestTracker, Some((task, peer, requestId, expectedRoot)))
         }
@@ -114,7 +111,7 @@ object AccountRangeWorker {
 
   private def working(
       coordinator: ActorRef[AccountRangeCoordinator.Command],
-      networkPeerManager: org.apache.pekko.actor.ActorRef,
+      networkPeerManager: ActorRef[com.chipprbots.ethereum.network.NetworkPeerManagerActor.Command],
       requestTracker: SNAPRequestTracker,
       currentTask: Option[(AccountTask, Peer, BigInt, ByteString)]
   ): Behavior[Command] = {

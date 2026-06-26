@@ -7,7 +7,6 @@ import org.apache.pekko.actor.typed.PostStop
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import scala.collection.mutable
@@ -3373,7 +3372,7 @@ private class SNAPSyncControllerImpl(
       ctx.spawn(
         actors.AccountRangeCoordinator(
           stateRoot = rootHash,
-          networkPeerManager = networkPeerManager.toClassic,
+          networkPeerManager = networkPeerManager,
           requestTracker = requestTracker,
           mptStorage = storage,
           concurrency = effectiveConcurrency,

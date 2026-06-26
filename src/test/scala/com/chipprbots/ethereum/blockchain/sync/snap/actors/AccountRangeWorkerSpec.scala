@@ -42,7 +42,7 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
 
   private def makeWorker(
       coordinator: TestProbe[AccountRangeCoordinator.Command],
-      networkPeerManager: ClassicTestProbe
+      networkPeerManager: TestProbe[NetworkPeerManagerActor.Command]
   ): org.apache.pekko.actor.typed.ActorRef[AccountRangeWorker.Command] = {
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     testKit.spawn(
@@ -52,7 +52,7 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
 
   "AccountRangeWorker" should "send GetAccountRange to peer via NetworkPeerManager on FetchAccountRange" taggedAs UnitTest in {
     val coordinator = makeCoordinatorProbe()
-    val networkPeerManager = ClassicTestProbe()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val peerProbe = ClassicTestProbe()
     val peer = PeerTestHelpers.createTestPeer("ar-peer-1", peerProbe.ref)
     val worker = makeWorker(coordinator, networkPeerManager)
@@ -60,7 +60,7 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
     val reqId = BigInt(1)
     worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
 
-    val sendMsg = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
+    val sendMsg = networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd](1.second)
     sendMsg.peerId shouldBe peer.id
     sendMsg.message shouldBe a[GetAccountRangeEnc]
     val msg = sendMsg.message.asInstanceOf[GetAccountRangeEnc].underlyingMsg
@@ -71,7 +71,7 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
 
   it should "report TaskComplete to coordinator on proof-only empty-range response" taggedAs UnitTest in {
     val coordinator = makeCoordinatorProbe()
-    val networkPeerManager = ClassicTestProbe()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val peerProbe = ClassicTestProbe()
     val peer = PeerTestHelpers.createTestPeer("ar-peer-2", peerProbe.ref)
     val worker = makeWorker(coordinator, networkPeerManager)
@@ -79,7 +79,7 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
 
     val reqId = BigInt(2)
     worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(root), peer, reqId, defaultBytes)
-    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
+    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd](1.second)
 
     val emptyResponse = AccountRange(requestId = reqId, accounts = Seq.empty, proof = rangeProof)
     worker ! AccountRangeCoordinator.AccountRangeResponseMsg(emptyResponse)
@@ -97,14 +97,14 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
     // go-ethereum accepts accounts=0 + proof=0 unconditionally as a valid terminal-empty range.
     // The worker should complete the task rather than failing it.
     val coordinator = makeCoordinatorProbe()
-    val networkPeerManager = ClassicTestProbe()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val peerProbe = ClassicTestProbe()
     val peer = PeerTestHelpers.createTestPeer("ar-peer-2b", peerProbe.ref)
     val worker = makeWorker(coordinator, networkPeerManager)
 
     val reqId = BigInt(20)
     worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
-    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
+    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd](1.second)
 
     worker ! AccountRangeCoordinator.AccountRangeResponseMsg(
       AccountRange(requestId = reqId, accounts = Seq.empty, proof = Seq.empty)
@@ -116,14 +116,14 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
 
   it should "report TaskFailed to coordinator on RequestTimeout" taggedAs UnitTest in {
     val coordinator = makeCoordinatorProbe()
-    val networkPeerManager = ClassicTestProbe()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val peerProbe = ClassicTestProbe()
     val peer = PeerTestHelpers.createTestPeer("ar-peer-3", peerProbe.ref)
     val worker = makeWorker(coordinator, networkPeerManager)
 
     val reqId = BigInt(3)
     worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
-    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
+    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd](1.second)
 
     worker ! AccountRangeCoordinator.RequestTimeout(reqId)
 
@@ -134,14 +134,14 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
 
   it should "report TaskFailed to coordinator on WorkerPeerDisconnected" taggedAs UnitTest in {
     val coordinator = makeCoordinatorProbe()
-    val networkPeerManager = ClassicTestProbe()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val peerProbe = ClassicTestProbe()
     val peer = PeerTestHelpers.createTestPeer("ar-peer-4", peerProbe.ref)
     val worker = makeWorker(coordinator, networkPeerManager)
 
     val reqId = BigInt(4)
     worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
-    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
+    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd](1.second)
 
     worker ! AccountRangeCoordinator.WorkerPeerDisconnected(peer.id.value)
 
@@ -152,14 +152,14 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
 
   it should "report TaskFailed(0, Worker busy) when FetchAccountRange arrives while already working" taggedAs UnitTest in {
     val coordinator = makeCoordinatorProbe()
-    val networkPeerManager = ClassicTestProbe()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val peerProbe = ClassicTestProbe()
     val peer = PeerTestHelpers.createTestPeer("ar-peer-5", peerProbe.ref)
     val worker = makeWorker(coordinator, networkPeerManager)
 
     val reqId1 = BigInt(5)
     worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId1, defaultBytes)
-    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
+    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd](1.second)
 
     // Send a second task while still working
     val reqId2 = BigInt(6)
@@ -172,34 +172,34 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
 
   it should "return to idle after timeout and accept a new task" taggedAs UnitTest in {
     val coordinator = makeCoordinatorProbe()
-    val networkPeerManager = ClassicTestProbe()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val peerProbe = ClassicTestProbe()
     val peer = PeerTestHelpers.createTestPeer("ar-peer-6", peerProbe.ref)
     val worker = makeWorker(coordinator, networkPeerManager)
 
     val reqId1 = BigInt(7)
     worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId1, defaultBytes)
-    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
+    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd](1.second)
     worker ! AccountRangeCoordinator.RequestTimeout(reqId1)
     coordinator.expectMessageType[AccountRangeCoordinator.TaskFailed](1.second)
 
     // Worker should now be in idle — second task accepted
     val reqId2 = BigInt(8)
     worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId2, defaultBytes)
-    val sendMsg2 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
+    val sendMsg2 = networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd](1.second)
     sendMsg2.message.asInstanceOf[GetAccountRangeEnc].underlyingMsg.requestId shouldBe reqId2
   }
 
   it should "ignore response with mismatched request ID" taggedAs UnitTest in {
     val coordinator = makeCoordinatorProbe()
-    val networkPeerManager = ClassicTestProbe()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val peerProbe = ClassicTestProbe()
     val peer = PeerTestHelpers.createTestPeer("ar-peer-7", peerProbe.ref)
     val worker = makeWorker(coordinator, networkPeerManager)
 
     val reqId = BigInt(9)
     worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
-    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
+    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd](1.second)
 
     // Respond with the wrong request ID
     val wrongResponse = AccountRange(requestId = BigInt(999), accounts = Seq.empty, proof = Seq.empty)
@@ -213,14 +213,14 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
   // are silently ignored (dropped atomic flag). AccountRangeWorker achieves the same via idle state.
   it should "silently drop a late response (correct reqId) that arrives after RequestTimeout" taggedAs UnitTest in {
     val coordinator = makeCoordinatorProbe()
-    val networkPeerManager = ClassicTestProbe()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val peerProbe = ClassicTestProbe()
     val peer = PeerTestHelpers.createTestPeer("ar-peer-8", peerProbe.ref)
     val worker = makeWorker(coordinator, networkPeerManager)
 
     val reqId = BigInt(10)
     worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
-    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
+    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd](1.second)
 
     // Timeout fires — worker sends TaskFailed and transitions to idle
     worker ! AccountRangeCoordinator.RequestTimeout(reqId)
