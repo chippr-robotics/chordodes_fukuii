@@ -6,6 +6,7 @@ import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.SetCodeTransaction
+import com.chipprbots.ethereum.domain.StorageKey
 import com.chipprbots.ethereum.domain.TxLogEntry
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.domain.UInt256.*
@@ -194,7 +195,7 @@ object OpCode {
   def storageAccessCost[S <: Storage[S], W <: WorldStateProxy[W, S]](
       state: ProgramState[W, S],
       address: Address,
-      key: BigInt
+      key: StorageKey
   )(
       preGasFn: FeeSchedule => BigInt,
       postColdGasFn: FeeSchedule => BigInt,
@@ -277,13 +278,13 @@ trait StorageAccessGas { self: OpCode =>
   private def warmGasFn: FeeSchedule => BigInt = _.G_warm_storage_read
 
   override protected def baseGas[S <: Storage[S], W <: WorldStateProxy[W, S]](state: ProgramState[W, S]): BigInt = {
-    val (address, value) = addressAndKey(state)
-    OpCode.storageAccessCost(state, address, value)(baseGasFn, coldGasFn, warmGasFn)
+    val (address, key) = addressAndKey(state)
+    OpCode.storageAccessCost(state, address, key)(baseGasFn, coldGasFn, warmGasFn)
   }
 
   protected def addressAndKey[S <: Storage[S], W <: WorldStateProxy[W, S]](
       state: ProgramState[W, S]
-  ): (Address, BigInt)
+  ): (Address, StorageKey)
 }
 
 sealed trait ConstGas { self: OpCode =>
@@ -679,14 +680,14 @@ case object SLOAD extends OpCode(0x54, 1, 1, _.G_sload) with StorageAccessGas wi
     val (offset, stack1) = state.stack.pop()
     val value = state.storage.load(offset)
     val stack2 = stack1.push(UInt256(value))
-    state.withStack(stack2).addAccessedStorageKey(state.ownAddress, offset).step()
+    state.withStack(stack2).addAccessedStorageKey(state.ownAddress, StorageKey(offset.toBigInt)).step()
   }
 
   protected def addressAndKey[S <: Storage[S], W <: WorldStateProxy[W, S]](
       state: ProgramState[W, S]
-  ): (Address, BigInt) = {
+  ): (Address, StorageKey) = {
     val (offset, _) = state.stack.pop()
-    (state.ownAddress, offset)
+    (state.ownAddress, StorageKey(offset.toBigInt))
   }
 }
 
@@ -744,7 +745,7 @@ case object SSTORE extends OpCode(0x55, 2, 0, _.G_zero) {
     }
     val updatedStorage = state.storage.store(offset, newValue)
     state
-      .addAccessedStorageKey(state.ownAddress, offset)
+      .addAccessedStorageKey(state.ownAddress, StorageKey(offset.toBigInt))
       .withStack(stack1)
       .withStorage(updatedStorage)
       .refundGas(refund)
@@ -782,7 +783,11 @@ case object SSTORE extends OpCode(0x55, 2, 0, _.G_zero) {
       else state.config.feeSchedule.G_sreset
     }
 
-    originalCharge + OpCode.storageAccessCost(state, state.ownAddress, offset)(_ => 0, _.G_cold_sload, _ => 0)
+    originalCharge + OpCode.storageAccessCost(state, state.ownAddress, StorageKey(offset.toBigInt))(
+      _ => 0,
+      _.G_cold_sload,
+      _ => 0
+    )
   }
 
   override protected def availableInContext[S <: Storage[S], W <: WorldStateProxy[W, S]]

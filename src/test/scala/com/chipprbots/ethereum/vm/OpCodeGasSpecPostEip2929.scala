@@ -13,6 +13,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import com.chipprbots.ethereum.Fixtures.Blocks
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.StorageKey
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.domain.UInt256.*
 import com.chipprbots.ethereum.vm.Generators.*
@@ -143,16 +144,16 @@ trait OpCodeGasSpecPostEip2929 extends AnyFunSuite with OpCodeTesting with Match
       val stateOut = op.execute(stateIn)
 
       verifyGas(G_cold_sload, stateIn, stateOut)
-      assert(stateOut.accessedStorageKeys.contains((stateIn.ownAddress, offset)))
+      assert(stateOut.accessedStorageKeys.contains((stateIn.ownAddress, StorageKey(offset.toBigInt))))
     }
 
     forAll(stateGen) { stateIn =>
       val (offset, _) = stateIn.stack.pop()
 
-      val stateOut = op.execute(stateIn.addAccessedStorageKey(stateIn.ownAddress, offset))
+      val stateOut = op.execute(stateIn.addAccessedStorageKey(stateIn.ownAddress, StorageKey(offset.toBigInt)))
 
       verifyGas(G_warm_storage_read, stateIn, stateOut)
-      assert(stateOut.accessedStorageKeys.contains((stateIn.ownAddress, offset)))
+      assert(stateOut.accessedStorageKeys.contains((stateIn.ownAddress, StorageKey(offset.toBigInt))))
     }
   }
 
@@ -230,7 +231,7 @@ trait OpCodeGasSpecPostEip2929 extends AnyFunSuite with OpCodeTesting with Match
       ).sample.get.withStack(stackIn).withStorage(storage).copy(gas = startGas)
 
       val stateOut =
-        if alreadyAccessed then op.execute(stateIn.addAccessedStorageKey(stateIn.ownAddress, offset))
+        if alreadyAccessed then op.execute(stateIn.addAccessedStorageKey(stateIn.ownAddress, StorageKey(offset.toBigInt)))
         else op.execute(stateIn)
       verifyGas(expectedGasConsumption, stateIn, stateOut, allowOOG = false)
     }
@@ -249,7 +250,7 @@ trait OpCodeGasSpecPostEip2929 extends AnyFunSuite with OpCodeTesting with Match
       ).sample.get.withStack(stackIn).copy(gas = expectedGasConsumption)
 
       val stateOut =
-        if alreadyAccessed then op.execute(stateIn.addAccessedStorageKey(stateIn.ownAddress, offset))
+        if alreadyAccessed then op.execute(stateIn.addAccessedStorageKey(stateIn.ownAddress, StorageKey(offset)))
         else op.execute(stateIn)
       verifyGas(expectedGasConsumption, stateIn, stateOut, allowOOG = false)
     }

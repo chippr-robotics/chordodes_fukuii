@@ -9,6 +9,7 @@ import org.bouncycastle.util.encoders.Hex
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.SetCodeTransaction
+import com.chipprbots.ethereum.domain.StorageKey
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.rlp
 import com.chipprbots.ethereum.rlp.RLPList
@@ -280,7 +281,7 @@ class VM[W <: WorldStateProxy[W, S], S <: Storage[S]](
   private def invalidCallResult(
       context: PC,
       accessedAddresses: Set[Address],
-      accessedStorageKeys: Set[(Address, BigInt)]
+      accessedStorageKeys: Set[(Address, StorageKey)]
   ): PR =
     ProgramResult(
       ByteString.empty,

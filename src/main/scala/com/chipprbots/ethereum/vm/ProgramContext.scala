@@ -50,7 +50,7 @@ object ProgramContext {
       evmConfig = evmConfig,
       originalWorld = world,
       warmAddresses = accessList.map(_.address).toSet,
-      warmStorage = accessList.flatMap(i => i.storageKeys.map(sk => (i.address, sk.value))).toSet,
+      warmStorage = accessList.flatMap(i => i.storageKeys.map(sk => (i.address, sk))).toSet,
       blobVersionedHashes = blobHashes
     )
   }
@@ -116,7 +116,7 @@ case class ProgramContext[W <: WorldStateProxy[W, S], S <: Storage[S]](
     staticCtx: Boolean = false,
     originalWorld: W,
     warmAddresses: Set[Address],
-    warmStorage: Set[(Address, BigInt)],
+    warmStorage: Set[(Address, StorageKey)],
     transientStorage: Map[(Address, BigInt), BigInt] = Map.empty,
     precompileRelocations: Map[Address, Address] = Map.empty,
     blobVersionedHashes: Seq[ByteString] = Seq.empty,

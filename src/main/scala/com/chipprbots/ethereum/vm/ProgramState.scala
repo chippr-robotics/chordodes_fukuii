@@ -3,6 +3,7 @@ package com.chipprbots.ethereum.vm
 import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.StorageKey
 import com.chipprbots.ethereum.domain.TxLogEntry
 import com.chipprbots.ethereum.domain.UInt256
 
@@ -93,7 +94,7 @@ case class ProgramState[W <: WorldStateProxy[W, S], S <: Storage[S]](
     error: Option[ProgramError] = None,
     originalWorld: W,
     accessedAddresses: Set[Address],
-    accessedStorageKeys: Set[(Address, BigInt)],
+    accessedStorageKeys: Set[(Address, StorageKey)],
     transientStorage: Map[(Address, BigInt), BigInt] = Map.empty,
     opcodeGasCost: BigInt = 0
 ) {
@@ -166,13 +167,13 @@ case class ProgramState[W <: WorldStateProxy[W, S], S <: Storage[S]](
   def addAccessedAddress(addr: Address): ProgramState[W, S] =
     copy(accessedAddresses = accessedAddresses + addr)
 
-  def addAccessedStorageKey(addr: Address, storageKey: BigInt): ProgramState[W, S] =
-    copy(accessedStorageKeys = accessedStorageKeys + ((addr, storageKey)))
+  def addAccessedStorageKey(addr: Address, key: StorageKey): ProgramState[W, S] =
+    copy(accessedStorageKeys = accessedStorageKeys + ((addr, key)))
 
   def addAccessedAddresses(addresses: Set[Address]): ProgramState[W, S] =
     copy(accessedAddresses = accessedAddresses ++ addresses)
 
-  def addAccessedStorageKeys(storageKeys: Set[(Address, BigInt)]): ProgramState[W, S] =
+  def addAccessedStorageKeys(storageKeys: Set[(Address, StorageKey)]): ProgramState[W, S] =
     copy(accessedStorageKeys = accessedStorageKeys ++ storageKeys)
 
   def toResult: ProgramResult[W, S] =

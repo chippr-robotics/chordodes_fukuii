@@ -11,6 +11,7 @@ import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.CodeHash
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.StorageKey
 import com.chipprbots.ethereum.domain.TxLogEntry
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.domain.UInt256.*
@@ -441,7 +442,7 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
         result.toBigInt shouldEqual data
 
         stateOut shouldEqual stateIn
-          .addAccessedStorageKey(stateIn.ownAddress, UInt256(offset))
+          .addAccessedStorageKey(stateIn.ownAddress, StorageKey(offset.toBigInt))
           .withStack(stateOut.stack)
           .step()
       }
@@ -463,7 +464,7 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
         data shouldEqual value.toBigInt
 
         stateOut shouldEqual stateIn
-          .addAccessedStorageKey(stateIn.ownAddress, offset)
+          .addAccessedStorageKey(stateIn.ownAddress, StorageKey(offset.toBigInt))
           .withStack(stateOut.stack)
           .withStorage(stateOut.storage)
           .step()
