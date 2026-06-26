@@ -184,6 +184,9 @@ ops/
 │   ├── docker-compose.yml            # Primary (ETC) + Secondary (Mordor) + Kong + Prometheus + Grafana
 │   ├── fukuii-conf-1/                # Primary node config (ETC mainnet)
 │   ├── fukuii-conf-2/                # Secondary node config (Mordor testnet)
+│   ├── eth/                          # ETH mainnet EL (Fukuii) + CL (Lighthouse) via Engine API
+│   │   ├── docker-compose.yml        # fukuii-eth + lighthouse-eth services
+│   │   └── fukuii-conf/              # ETH mainnet node config
 │   ├── sepolia/                      # Sepolia EL (Fukuii) + CL (Lighthouse) via Engine API
 │   │   ├── docker-compose.yml        # fukuii-sepolia + lighthouse services
 │   │   └── fukuii-conf/              # Sepolia node config

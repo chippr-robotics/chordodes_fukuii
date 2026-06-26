@@ -1,0 +1,123 @@
+# ETH Mainnet: Fukuii EL + Lighthouse CL
+# Validates the Engine API implementation against a real consensus layer on
+# Ethereum mainnet (chain ID 1, post-merge PoS).
+#
+# Architecture:
+#   Lighthouse (CL) --Engine API (JWT)--> Fukuii (EL)
+#   Both share /jwt/jwt.hex for authentication
+#
+# Usage:
+#   docker compose up -d
+#   docker compose logs -f fukuii-eth      # watch EL
+#   docker compose logs -f lighthouse-eth  # watch CL
+
+networks:
+  eth-network:
+    driver: bridge
+
+# Shared JVM defaults reused across services. Anchored once here so every
+# fukuii compose service in this file inherits a consistent envelope.
+# Composes in sibling directories should mirror this value — once the runtime
+# image bakes JAVA_TOOL_OPTIONS into ENV (or `application.ini` lands via the
+# proper sbt-native-packager Dockerfile), this block becomes redundant.
+x-fukuii-jvm-defaults: &fukuii-jvm-defaults
+  JAVA_TOOL_OPTIONS: >-
+    -Xmx3g -Xms1g -Xss1M
+    -XX:MaxDirectMemorySize=512M
+    -XX:+UseG1GC -XX:MaxGCPauseMillis=200
+    -XX:+HeapDumpOnOutOfMemoryError
+    -XX:HeapDumpPath=/app/data/logs/heapdump.hprof
+    -XX:+ExitOnOutOfMemoryError
+
+services:
+  # Fukuii Execution Layer — ETH mainnet
+  fukuii-eth:
+    image: chipprbots/fukuii:latest
+    container_name: fukuii-eth
+    restart: unless-stopped
+    # 3g heap + ~3 GB native (RocksDB 512MB block cache, memtables, G1,
+    # DeferredWriteMpt/StackTrie buffers, JNI). ETH mainnet state is far
+    # larger than Sepolia, so the cgroup ceiling stays at 8g to give the
+    # native side (RocksDB page cache, trie buffers) ample headroom on top
+    # of the 3g heap. Do NOT reduce — a tighter ceiling causes PSI-based
+    # systemd-oomd eviction under mainnet's heavier I/O pattern.
+    mem_limit: 8g
+    memswap_limit: 8g
+    # JVM flags live in JAVA_TOOL_OPTIONS (anchor above) — picked up
+    # automatically by the JVM regardless of how it's invoked.
+    environment:
+      <<: *fukuii-jvm-defaults
+    ports:
+      - "8557:8545"       # JSON-RPC HTTP
+      - "8558:8546"       # JSON-RPC WebSocket
+      - "8562:8551"       # Engine API (authrpc)
+      - "30307:30307/tcp" # P2P TCP
+      - "30307:30307/udp" # P2P Discovery
+      - "9098:9095"       # Metrics
+    volumes:
+      - ${ETH_DATA_DIR:-/chipprbots/blockchain/chain-data/eth/fukuii-eth}:/app/data
+      - ./fukuii-conf:/app/conf:ro
+      - ./jwt.hex:/app/jwt/jwt.hex:ro
+      - ./fukuii-conf/static-nodes.json:/app/data/static-nodes.json:ro
+    # Image ENTRYPOINT is just `java` — overriding here to be explicit so a
+    # future image change (e.g. baking in `-jar`) doesn't silently break the
+    # arg order. JVM tuning itself comes from JAVA_TOOL_OPTIONS, not from
+    # this list.
+    entrypoint: ["java"]
+    command:
+      - "-Dconfig.file=/app/conf/eth.conf"
+      - "-Dfukuii.datadir=/app/data"
+      - "-jar"
+      - "/app/fukuii/lib/fukuii-assembly.jar"
+      - "eth"
+    networks:
+      - eth-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8545/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 180s
+
+  # Lighthouse Consensus Layer — ETH mainnet
+  lighthouse-eth:
+    image: sigp/lighthouse:latest
+    container_name: lighthouse-eth
+    restart: unless-stopped
+    ports:
+      - "5053:5052"       # Beacon API
+      - "9101:9000/tcp"   # P2P TCP
+      - "9101:9000/udp"   # P2P UDP
+    volumes:
+      - ${LIGHTHOUSE_DATA_DIR:-/chipprbots/blockchain/chain-data/eth/lighthouse-eth}:/data
+      - ./jwt.hex:/jwt/jwt.hex:ro
+    command:
+      - "lighthouse"
+      - "bn"
+      - "--network=mainnet"
+      - "--execution-endpoint=http://fukuii-eth:8551"
+      - "--execution-jwt=/jwt/jwt.hex"
+      - "--datadir=/data"
+      - "--http"
+      - "--http-address=0.0.0.0"
+      - "--http-port=5052"
+      - "--http-allow-origin=*"
+      - "--port=9000"
+      # Advertise the externally-reachable port (Docker maps host 9101 → container 9000).
+      # Without these, ENR advertises :9000 which is unreachable from outside the bridge,
+      # so peer-discovery dials never complete and Lighthouse can't sync the head.
+      - "--enr-tcp-port=9101"
+      - "--enr-udp-port=9101"
+      - "--target-peers=50"
+      - "--checkpoint-sync-url=https://mainnet.checkpoint.sigp.io"
+    depends_on:
+      fukuii-eth:
+        condition: service_healthy
+    networks:
+      - eth-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5052/eth/v1/node/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
