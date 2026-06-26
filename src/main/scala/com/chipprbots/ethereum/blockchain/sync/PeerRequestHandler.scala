@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed.{ActorRef as TypedActorRef, Behavior}
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 
@@ -45,7 +44,7 @@ object PeerRequestHandler {
   def behavior[RequestMsg <: Message, ResponseMsg <: Message: ClassTag](
       peer: Peer,
       responseTimeout: FiniteDuration,
-      networkPeerManager: ActorRef,
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
       peerEventBus: TypedActorRef[PeerEventBusCommand],
       requestMsg: RequestMsg,
       responseMsgCode: Int,
@@ -71,10 +70,7 @@ object PeerRequestHandler {
             case e                     => throw new MatchError(s"unexpected PeerEvent from bus: $e")
           }
 
-        networkPeerManager.tell(
-          NetworkPeerManagerActor.SendMessageCmd(toSerializable(requestMsg), peer.id),
-          ActorRef.noSender
-        )
+        networkPeerManager ! NetworkPeerManagerActor.SendMessageCmd(toSerializable(requestMsg), peer.id)
         peerEventBus ! SubscribeCmd(
           PeerDisconnectedClassifier(PeerSelector.WithId(peer.id)),
           peerEventAdapter

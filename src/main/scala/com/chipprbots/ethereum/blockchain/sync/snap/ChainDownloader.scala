@@ -1,12 +1,10 @@
 package com.chipprbots.ethereum.blockchain.sync.snap
 
-import org.apache.pekko.actor.ActorRef as ClassicActorRef
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.duration.*
@@ -29,6 +27,7 @@ import com.chipprbots.ethereum.domain.Receipt
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.PeerEventBusActor
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.PeerId
@@ -70,8 +69,8 @@ class ChainDownloader private (
     blockchainReader: BlockchainReader,
     blockchainWriter: BlockchainWriter,
     appStateStorage: AppStateStorage,
-    networkPeerManager: ClassicActorRef,
-    peerEventBus: ClassicActorRef,
+    networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
+    peerEventBus: TypedActorRef[PeerEventBusActor.Command],
     blacklist: Blacklist,
     syncConfig: SyncConfig,
     peerListHelper: PeerListHelper,
@@ -795,7 +794,6 @@ class ChainDownloader private (
       // Clear backfill cursors so the next startup doesn't try to resume a finished backfill (#1169).
       appStateStorage.clearBackfillCursors().commit()
       timers.cancel(DispatchKey)
-      // The spawning parent (SyncController / SNAPSyncController) is still Classic; reach it via the adapter.
       replyTo ! Done
       idle()
     } else {
@@ -939,8 +937,8 @@ object ChainDownloader {
       blockchainReader: BlockchainReader,
       blockchainWriter: BlockchainWriter,
       appStateStorage: AppStateStorage,
-      networkPeerManager: ClassicActorRef,
-      peerEventBus: ClassicActorRef,
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
+      peerEventBus: TypedActorRef[PeerEventBusActor.Command],
       syncConfig: SyncConfig,
       replyTo: TypedActorRef[Done.type],
       maxConcurrentRequests: Int = 4,

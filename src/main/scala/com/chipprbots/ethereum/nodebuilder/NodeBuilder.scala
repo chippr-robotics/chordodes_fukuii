@@ -3,7 +3,6 @@ package com.chipprbots.ethereum.nodebuilder
 import java.time.Clock
 import java.util.concurrent.atomic.AtomicReference
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.ActorSystem
 
@@ -402,7 +401,7 @@ trait NetworkPeerManagerActorBuilder {
   self: ActorSystemBuilder & PeerManagerActorBuilder & PeerEventBusBuilder & ForkResolverBuilder & StorageBuilder &
     BlockchainBuilder & BlockchainConfigBuilder =>
 
-  lazy val networkPeerManager: ActorRef = classicSystem
+  lazy val networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command] = classicSystem
     .spawn(
       NetworkPeerManagerActor.behavior(
         peerManager,
@@ -416,7 +415,6 @@ trait NetworkPeerManagerActorBuilder {
       ),
       "network-peer-manager"
     )
-    .toClassic
 
 }
 
@@ -430,7 +428,7 @@ trait BlockchainHostBuilder {
       storagesInstance.storages.evmCodeStorage,
       peerConfiguration,
       peerEventBus,
-      networkPeerManager,
+      networkPeerManager.toClassic,
       pendingTransactionsManagerTyped
     ),
     "blockchain-host"
@@ -480,7 +478,7 @@ object PendingTransactionsManagerBuilder {
         PendingTransactionsManager(
           txPoolConfig,
           peerManager,
-          networkPeerManager,
+          networkPeerManager.toClassic,
           peerEventBus,
           pendingTxTopic,
           blockchainReader,
@@ -528,7 +526,7 @@ trait FilterManagerBuilder {
 trait DebugServiceBuilder {
   self: NetworkPeerManagerActorBuilder & PeerManagerActorBuilder & ActorSystemBuilder =>
 
-  lazy val debugService = new DebugService(peerManager, networkPeerManager)(classicSystem.toTyped.scheduler)
+  lazy val debugService = new DebugService(peerManager, networkPeerManager.toClassic)(classicSystem.toTyped.scheduler)
 }
 
 trait EthProofServiceBuilder {
@@ -1006,7 +1004,7 @@ trait SyncControllerBuilder extends SyncControllerRefBuilder {
         storagesInstance.storages.fastSyncStateStorage,
         consensusAdapter,
         mining.validators,
-        peerEventBus.toClassic,
+        peerEventBus,
         pendingTransactionsManagerTyped,
         blockTopic,
         ommersPool,

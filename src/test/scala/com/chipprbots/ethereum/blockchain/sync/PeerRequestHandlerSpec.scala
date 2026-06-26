@@ -26,17 +26,14 @@ import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Ping.PingEnc
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Pong
 import com.chipprbots.ethereum.testing.Tags.*
 
-class PeerRequestHandlerSpec
-    extends ScalaTestWithActorTestKit(ManualTime.config)
-    with AnyFlatSpecLike
-    with Matchers {
+class PeerRequestHandlerSpec extends ScalaTestWithActorTestKit(ManualTime.config) with AnyFlatSpecLike with Matchers {
 
   val manualTime: ManualTime = ManualTime()
 
   trait Fixtures {
-    val peerId: PeerId                    = PeerId("test-peer-1")
-    val otherPeerId: PeerId               = PeerId("other-peer")
-    val peerActorProbe: TestProbe         = TestProbe()(testKit.system.toClassic)
+    val peerId: PeerId = PeerId("test-peer-1")
+    val otherPeerId: PeerId = PeerId("other-peer")
+    val peerActorProbe: TestProbe = TestProbe()(testKit.system.toClassic)
     val peer: Peer = Peer(
       id = peerId,
       remoteAddress = new InetSocketAddress("127.0.0.1", 9000),

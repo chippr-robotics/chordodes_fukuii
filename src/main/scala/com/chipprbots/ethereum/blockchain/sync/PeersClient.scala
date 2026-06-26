@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed.{ActorRef as TypedActorRef, Behavior}
 import org.apache.pekko.actor.typed.scaladsl.{ActorContext, Behaviors}
 
@@ -80,7 +79,7 @@ object PeersClient {
   // ---- Typed behavior ----
 
   def behavior(
-      networkPeerManager: ActorRef,
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
       peerEventBus: TypedActorRef[PeerEventBusCommand],
       blacklist: Blacklist,
       syncConfig: SyncConfig
@@ -128,7 +127,7 @@ object PeersClient {
 
   private class Impl(
       ctx: ActorContext[Command],
-      networkPeerManager: ActorRef,
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
       peerEventBus: TypedActorRef[PeerEventBusCommand],
       blacklist: Blacklist,
       syncConfig: SyncConfig,

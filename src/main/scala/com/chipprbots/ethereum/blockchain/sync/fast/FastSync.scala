@@ -3,7 +3,6 @@ package com.chipprbots.ethereum.blockchain.sync.fast
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.DispatcherSelector
@@ -81,8 +80,8 @@ object FastSync {
       stateStorage: StateStorage,
       nodeStorage: NodeStorage,
       validators: Validators,
-      peerEventBus: ActorRef,
-      networkPeerManager: ActorRef,
+      peerEventBus: TypedActorRef[com.chipprbots.ethereum.network.PeerEventBusActor.Command],
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
       blacklist: Blacklist,
       syncConfig: SyncConfig,
       configBuilder: BlockchainConfigBuilder,
@@ -139,8 +138,8 @@ object FastSync {
       stateStorage: StateStorage,
       nodeStorage: NodeStorage,
       val validators: Validators,
-      peerEventBus: ActorRef,
-      networkPeerManager: ActorRef,
+      peerEventBus: TypedActorRef[com.chipprbots.ethereum.network.PeerEventBusActor.Command],
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
       blacklist: Blacklist,
       val syncConfig: SyncConfig,
       configBuilder: BlockchainConfigBuilder,
@@ -272,7 +271,7 @@ object FastSync {
       val pivotBlockSelector = ctx
         .spawn(
           PivotBlockSelector(
-            networkPeerManager,
+            networkPeerManager.toClassic,
             peerEventBus,
             syncConfig,
             pivotResultAdapter,
@@ -298,7 +297,7 @@ object FastSync {
             val pivotBlockSelector = ctx
               .spawn(
                 PivotBlockSelector(
-                  networkPeerManager,
+                  networkPeerManager.toClassic,
                   peerEventBus,
                   syncConfig,
                   pivotResultAdapter,
@@ -417,8 +416,8 @@ object FastSync {
                   syncConfig.stateSyncBloomFilterSize
                 ),
                 syncConfig,
-                networkPeerManager,
-                peerEventBus,
+                networkPeerManager.toClassic,
+                peerEventBus.toClassic,
                 blacklist,
                 schedulerResponseAdapter,
                 stateSyncStatsAdapter
@@ -684,7 +683,7 @@ object FastSync {
         ctx
           .spawn(
             PivotBlockSelector(
-              networkPeerManager,
+              networkPeerManager.toClassic,
               peerEventBus,
               syncConfig,
               pivotResultAdapter,
@@ -1119,8 +1118,8 @@ object FastSync {
                 replyTo = ctx.messageAdapter[FastSyncBranchResolverActor.BranchResolverResponse](
                   WrappedBranchResolverResponse(_)
                 ),
-                peerEventBus = peerEventBus,
-                networkPeerManager = networkPeerManager,
+                peerEventBus = peerEventBus.toClassic,
+                networkPeerManager = networkPeerManager.toClassic,
                 blockchain = blockchain,
                 blockchainReader = blockchainReader,
                 blacklist = blacklist,
