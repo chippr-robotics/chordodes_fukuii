@@ -444,11 +444,11 @@ Context: R6 analysis confirmed `TxHash` crosses no consensus paths and has no RL
 serialization at the field level — the hash is computed, not decoded from wire bytes.
 Reference: `.local/docs/opaque-type-domain-analysis.md` §1.
 
-Step 1 — Create `src/main/scala/io/fukuii/domain/TxHash.scala`:
+Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/TxHash.scala`:
 ```scala
-package io.fukuii.domain
+package com.chipprbots.ethereum.domain
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 opaque type TxHash = ByteString
 object TxHash:
@@ -494,12 +494,12 @@ Context: `logsBloom` is a fixed 256-byte field on `BlockHeader` and `Receipt`. N
 consensus validation (Ethash, fork dispatch, MESS). One-line RLP derivation via `.xmap`.
 Reference: `.local/docs/opaque-type-domain-analysis.md` §2.
 
-Step 1 — Create `src/main/scala/io/fukuii/domain/BloomFilter.scala`:
+Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/BloomFilter.scala`:
 ```scala
-package io.fukuii.domain
+package com.chipprbots.ethereum.domain
 
-import akka.util.ByteString
-import io.fukuii.rlp.RLPImplicits.given
+import org.apache.pekko.util.ByteString
+import com.chipprbots.ethereum.rlp.RLPImplicits.given
 
 opaque type BloomFilter = ByteString
 object BloomFilter:
@@ -543,11 +543,11 @@ ETH-only. ~15 files. RLP encoding in `getBlobTxBytesToSign` is already `RLPValue
 element — adding `.value` is surgical.
 Reference: `.local/docs/opaque-type-domain-analysis.md` §3.
 
-Step 1 — Create `src/main/scala/io/fukuii/domain/BlobVersionedHash.scala`:
+Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/BlobVersionedHash.scala`:
 ```scala
-package io.fukuii.domain
+package com.chipprbots.ethereum.domain
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 opaque type BlobVersionedHash = ByteString
 object BlobVersionedHash:
@@ -593,9 +593,9 @@ AccessListItem is never read inside the EVM opcode dispatcher directly — it fl
 transaction validation and into the access-list prewarming step.
 Reference: `.local/docs/opaque-type-domain-analysis.md` §4 Phase A.
 
-Step 1 — Create `src/main/scala/io/fukuii/domain/StorageKey.scala`:
+Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/StorageKey.scala`:
 ```scala
-package io.fukuii.domain
+package com.chipprbots.ethereum.domain
 
 opaque type StorageKey = BigInt
 object StorageKey:
@@ -643,11 +643,11 @@ runtime equality (Scala 3 opaque types preserve the underlying `==`). FORGE revi
 on the commit, not on implementation.
 Reference: `.local/docs/opaque-type-domain-analysis.md` §5.
 
-Step 1 — Create `src/main/scala/io/fukuii/domain/CodeHash.scala`:
+Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/CodeHash.scala`:
 ```scala
-package io.fukuii.domain
+package com.chipprbots.ethereum.domain
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 
 opaque type CodeHash = ByteString
 object CodeHash:
@@ -702,7 +702,7 @@ This crosses EVM opcode dispatch (EIP-2929), so FORGE review is mandatory.
 Reference: `.local/docs/opaque-type-domain-analysis.md` §4 Phase B.
 
 Pre-flight:
-1. Confirm §8b-M1 is committed: `grep "opaque type StorageKey" src/main/scala/io/fukuii/domain/StorageKey.scala`
+1. Confirm §8b-M1 is committed: `grep "opaque type StorageKey" src/main/scala/com/chipprbots/ethereum/domain/StorageKey.scala`
 2. Confirm `sbt compile-all` is clean before starting.
 
 Step 1 — Update `ProgramState.scala`:
@@ -751,10 +751,10 @@ Pre-flight:
   `grep -rn "parentHash\|ommersHash\|mixHash\|parentBeaconBlockRoot" src/main/ --include="*.scala" | wc -l`
   `sbt compile-all` — must be clean before starting.
 
-Step 1 — Create `src/main/scala/io/fukuii/domain/BlockHash.scala`:
+Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/BlockHash.scala`:
 ```scala
-package io.fukuii.domain
-import akka.util.ByteString
+package com.chipprbots.ethereum.domain
+import org.apache.pekko.util.ByteString
 
 opaque type BlockHash = ByteString
 object BlockHash:
@@ -816,10 +816,10 @@ Reference: `.local/docs/opaque-type-domain-analysis.md` §TrieRoot.
 Pre-flight:
   `grep -rn "stateRoot\|transactionsRoot\|receiptsRoot\|withdrawalsRoot\|requestsHash\|storageRoot" src/main/ --include="*.scala" | wc -l`
 
-Step 1 — Create `src/main/scala/io/fukuii/domain/TrieRoot.scala`:
+Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/TrieRoot.scala`:
 ```scala
-package io.fukuii.domain
-import akka.util.ByteString
+package com.chipprbots.ethereum.domain
+import org.apache.pekko.util.ByteString
 
 opaque type TrieRoot = ByteString
 object TrieRoot:
@@ -879,9 +879,9 @@ Reference: `.local/docs/opaque-type-domain-analysis.md` §Difficulty.
 
 Pre-flight: `grep -rn "difficulty" src/main/ --include="*.scala" | grep -v "//\|import\|total\|Difficulty\b" | wc -l`
 
-Step 1 — Create `src/main/scala/io/fukuii/domain/Difficulty.scala`:
+Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/Difficulty.scala`:
 ```scala
-package io.fukuii.domain
+package com.chipprbots.ethereum.domain
 
 opaque type Difficulty = BigInt
 object Difficulty:
@@ -942,9 +942,9 @@ and TD fields in P2P status messages are all raw `BigInt`. MESS compares total d
 for anti-reorg; the ETH merge checks `>= terminalTotalDifficulty`.
 Reference: `.local/docs/opaque-type-domain-analysis.md` §TotalDifficulty.
 
-Step 1 — Create `src/main/scala/io/fukuii/domain/TotalDifficulty.scala`:
+Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/TotalDifficulty.scala`:
 ```scala
-package io.fukuii.domain
+package com.chipprbots.ethereum.domain
 
 opaque type TotalDifficulty = BigInt
 object TotalDifficulty:
@@ -1002,9 +1002,9 @@ Context: `gasLimit`, `gasUsed`, `blobGasUsed`, `excessBlobGas`, `intrinsicGas` a
 for both chains. Define arithmetic and comparison extensions to keep validation code readable.
 Reference: `.local/docs/opaque-type-domain-analysis.md` §GasAmount.
 
-Step 1 — Create `src/main/scala/io/fukuii/domain/GasAmount.scala`:
+Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/GasAmount.scala`:
 ```scala
-package io.fukuii.domain
+package com.chipprbots.ethereum.domain
 
 opaque type GasAmount = BigInt
 object GasAmount:
@@ -1066,9 +1066,9 @@ is the most complex: `effectiveGasPrice = baseFee + min(maxFeePerGas - baseFee, 
 Define arithmetic extensions to keep this readable without pervasive `.value` noise.
 Reference: `.local/docs/opaque-type-domain-analysis.md` §GasPrice.
 
-Step 1 — Create `src/main/scala/io/fukuii/domain/GasPrice.scala`:
+Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/GasPrice.scala`:
 ```scala
-package io.fukuii.domain
+package com.chipprbots.ethereum.domain
 
 opaque type GasPrice = BigInt
 object GasPrice:
@@ -1141,9 +1141,9 @@ Pre-flight:
   Result should be ~500+. Accept this — migrations at this scale are mechanical.
   `sbt compile-all` — must be clean before starting.
 
-Step 1 — Create `src/main/scala/io/fukuii/domain/BlockNumber.scala`:
+Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/BlockNumber.scala`:
 ```scala
-package io.fukuii.domain
+package com.chipprbots.ethereum.domain
 
 opaque type BlockNumber = BigInt
 object BlockNumber:
@@ -1226,9 +1226,9 @@ Pre-flight:
   `grep -rn "chainId" src/main/ --include="*.scala" | grep -v "//\|import" | wc -l`
   `sbt compile-all` — must be clean before starting.
 
-Step 1 — Create `src/main/scala/io/fukuii/domain/ChainId.scala`:
+Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/ChainId.scala`:
 ```scala
-package io.fukuii.domain
+package com.chipprbots.ethereum.domain
 
 opaque type ChainId = BigInt
 object ChainId:
@@ -1533,8 +1533,9 @@ Next opportunity: after SNAP1 frees 4 bridges.
 | ~~§8k-B3~~ ✅ | 1 — SSC:555 (chainDownloaderReplyAdapter) | **14** |
 | ~~§8k-B4~~ ✅ | 2 — BlockImporter:207, :214 | **12** |
 | ~~§8k-B5~~ ✅ | 2 — PivotBlockSelector:418, :579 | **10** |
-| §8k-B6 | 4 — PeerEventBusActor:42, NodeBuilder:419/:1009, PeerRequestHandler:78 | 6 |
-| §8k-B7 | 1 — AkkaTaskOps:37 | **5 → TCP floor = 7 calls** |
+| ~~§8k-B6~~ ✅ | 2 — PeerEventBusActor:42, PeerRequestHandler:78 (NB:419+1009 moved to §8k-B8) | **8** |
+| ~~§8k-B7~~ ✅ | 1 — AkkaTaskOps:37 | **5** |
+| ~~§8k-B8~~ ✅ | NB:419+NB:1009 removed + 7 silent-drop GOAL-A fixes — structural pass-through eliminated; remaining bridges are explicit per-actor (see B8 outcome note) | **explicit** |
 
 **Run after each Primary Track sprint above:**
 
@@ -1788,9 +1789,175 @@ After migration:
 6. Update §8k-B gate table.
 ```
 
+**Actual outcome (2026-06-25):** Bridges 10→8 (not 10→6). Bridges 2+3 deferred as §8k-B8.
+- Bridge 1 (PEB:42) ✅ — `.watch()` removed; stream won't auto-complete on PEB death (acceptable: PEB is long-lived)
+- Bridge 4 (PRH:78) ✅ — `SendMessage`+`.toClassic` sender replaced with `SendMessageCmd`+`ActorRef.noSender`; bug fix: `SendMessage` was silently dropped by Typed NPMA
+- Bridge 2 (NB:419) DEFERRED — requires SyncController→FastSync→SNAPSyncController→ChainDownloader type cascade
+- Bridge 3 (NB:1009) DEFERRED — same cascade; `peerEventBus: ActorRef` must become `TypedActorRef[PEBCmd]` through all actors before NB:1009 can remove `.toClassic`
+- PeerRequestHandlerSpec added: 6 tests, including `SendMessageCmd` regression guard (`dfea77e20`)
+
 ---
 
-#### §8k-B7 — AkkaTaskOps: typed ask refactor (1 bridge)
+#### §8k-B8 — SyncController cascade: Classic ActorRef → TypedActorRef + non-Cmd bug fixes (2 bridges + 7 silent-drop bugs)
+
+**Files (cascade):** `NodeBuilder.scala:419,:1009`, `SyncController.scala:170,178,238,246`, `FastSync.scala:84,85,142,143`, `SNAPSyncController.scala:59,60,5171,5172`, `ChainDownloader.scala:73,74,942,943`, `PeersClient.scala:83,131`
+**Agent:** LOOM
+**Gate:** §8k-B6 complete ✅
+
+**Background (read before starting):**
+§8k-B6 removed 2 of 4 planned bridges. The remaining 2 bridges (NB:419 and NB:1009) require changing
+`peerEventBus` and `networkPeerManager` from Classic `ActorRef` to `TypedActorRef[T]` through a 5-actor
+cascade: SyncController → FastSync + SNAPSyncController + PeersClient → ChainDownloader. Without this
+cascade, NodeBuilder cannot drop `.toClassic` at lines 419 and 1009.
+
+Investigation also uncovered **7 non-Cmd bug sites** — sends to NPMA (Typed) using legacy non-Command
+messages that are silently dropped by the Typed behavior. These are functional bugs independent of the
+bridge removal and must be fixed in the same sprint.
+
+**Prompt:**
+```
+This is a LOOM sprint with two goals that must be completed in order:
+
+GOAL A: Fix 7 non-Cmd sends that are silently dropped by the Typed NetworkPeerManagerActor.
+GOAL B: Remove bridges NB:419 and NB:1009 via a type cascade through 5 actors.
+
+═══════════════════════════════════════════════════════════
+GOAL A — Fix silent-drop bugs (do this first; independent of GOAL B)
+═══════════════════════════════════════════════════════════
+
+The NetworkPeerManagerActor (NPMA) is a Typed `Behavior[Command]`. When a Classic `.toClassic`
+ref receives a non-Command message, the Typed behavior silently drops it (no error, no log).
+The following 7 sends are currently no-ops at runtime:
+
+SyncController.scala — 4 sites:
+  Line 378:  `networkPeerManager ! NPMA.RegisterSnapSyncController(ctx.system.deadLetters[...])` → `RegisterSnapSyncControllerCmd`
+  Line 1667: `networkPeerManager ! NPMA.RegisterSnapSyncController(snapSync)` → `RegisterSnapSyncControllerCmd`
+  Line 2078: `networkPeerManager ! NPMA.RegisterSnapSyncController(recoverySnapAdapter)` → `RegisterSnapSyncControllerCmd`
+  Line 2090: `networkPeerManager ! NPMA.RegisterSnapSyncController(ctx.system.deadLetters[...])` → `RegisterSnapSyncControllerCmd`
+
+SNAPSyncController.scala — 3 sites:
+  Line 2252: `networkPeerManager ! NPMA.UpdateClHead(header.number)` → `UpdateClHeadCmd`
+  Line 3864: `networkPeerManager ! PeerManagerActor.ConnectToPeer(uri)` → `NPMA.ConnectToPeerForwardCmd(uri)` (wrong type AND wrong Cmd; NPMA has ConnectToPeerForwardCmd which forwards to PMA)
+  Line 4257: `networkPeerManager ! NPMA.SendMessage(msg, peerId)` → `SendMessageCmd`
+
+For each site:
+  Replace the legacy case class with the `extends Command` variant listed above.
+  Do NOT change the type of `networkPeerManager` yet — that is GOAL B.
+
+After GOAL A: `sbt compile-all` must be clean. Run `sbt "testOnly *SyncControllerSpec *SNAPSyncControllerSpec"`.
+
+═══════════════════════════════════════════════════════════
+GOAL B — Type cascade: Classic ActorRef → TypedActorRef (bottom-up)
+═══════════════════════════════════════════════════════════
+
+Current state:
+  `NodeBuilder.networkPeerManager: ActorRef = classicSystem.spawn(...).toClassic`  (Bridge 2, line 419)
+  `NodeBuilder` passes `peerEventBus.toClassic` to SyncController at line 1009  (Bridge 3)
+
+All actors in the cascade are already `Behavior[Command]` (Typed). The Classic `ActorRef` params
+are bridges — they compile because of the `adapter.*` implicit conversion from Typed to Classic.
+
+Change parameters in this order (compile-all after each file):
+
+STEP 1 — PeersClient.scala (leaf, easiest):
+  Line 83:  `networkPeerManager: ActorRef` → `networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command]`
+  Line 131: same
+  peerEventBus is already `TypedActorRef[PeerEventBusCommand]` — no change.
+  The send `networkPeerManager ! GetHandshakedPeersCmd(...)` uses Typed `!` — no change needed to send sites.
+  Check whether `import adapter.*` is still needed in PeersClient; remove if not.
+
+STEP 2 — ChainDownloader.scala:
+  Line 73:  `networkPeerManager: ClassicActorRef` → `TypedActorRef[NetworkPeerManagerActor.Command]`
+  Line 74:  `peerEventBus: ClassicActorRef` → `TypedActorRef[PeerEventBusActor.Command]`
+  Lines 942-943: same both params.
+  `peerEventBus` is passed only to `PeerRequestHandler.behavior(... peerEventBus ...)` which already
+  takes `TypedActorRef[PeerEventBusCommand]` — no send-site changes needed for peerEventBus.
+  `networkPeerManager ! GetHandshakedPeersCmd(...)` at lines 133 and 984 — both Cmd, no change.
+  Remove `import org.apache.pekko.actor.ActorRef as ClassicActorRef` if it becomes unused.
+  Remove `import adapter.*` if it becomes unused.
+
+STEP 3 — SNAPSyncController.scala:
+  Lines 59-60:     `networkPeerManager: ActorRef`, `peerEventBus: ActorRef` → both TypedActorRef
+  Lines 5171-5172: same.
+  `peerEventBus` is passed to `new PeerListHelper(peerEventBus, ...)` — PeerListHelper already takes
+  `TypedActorRef[PeerEventBusCommand]`. Previously this compiled via implicit adapter conversion; now it
+  compiles correctly with the explicit type.
+  Check all `networkPeerManager !` sends — after GOAL A they all use Cmd variants; Typed `!` works.
+  Remove `adapter.*` if it becomes unused (check carefully — SSC may still use adapter for other purposes).
+
+STEP 4 — FastSync.scala:
+  Lines 84-85:   `networkPeerManager: ActorRef`, `peerEventBus: ActorRef` → both TypedActorRef
+  Lines 142-143: same.
+  `peerEventBus` passed to `new PeerListHelper(peerEventBus, ...)` — same as SSC above.
+  `networkPeerManager ! GetHandshakedPeersCmd(...)` at lines 101 and 193 — Cmd, no change.
+  All other peerEventBus/networkPeerManager propagations (lines 116, 117, 275-276, 301-302, 420-421,
+  687-688, 1122-1123, 1648-1649, 1672-1673, 1700-1701) — passing TypedActorRef through; no change to
+  send semantics.
+  Remove `adapter.*` if it becomes unused.
+
+STEP 5 — SyncController.scala:
+  Lines 170, 238: `peerEventBus: ActorRef` → `TypedActorRef[PeerEventBusActor.Command]`
+  Lines 178, 246: `networkPeerManager: ActorRef` → `TypedActorRef[NetworkPeerManagerActor.Command]`
+  All send sites in SyncController use Cmd variants (confirmed after GOAL A) — no additional send fixes.
+  Propagation to FastSync (lines 1622, 1655, 1818), SNAPSyncController, PeersClient (lines 600, 633,
+  823, 1126, 1202, 1746, 2245, 2426) — all now passing TypedActorRef through consistently.
+  Remove `import org.apache.pekko.actor.ActorRef` if unused.
+  Remove `import adapter.*` if unused (check entire file — SyncController is large; verify no remaining
+  classic interop before removing).
+
+STEP 6 — NodeBuilder.scala (removes both bridges):
+  Bridge 2, lines 405-419:
+    Change `lazy val networkPeerManager: ActorRef = classicSystem.spawn(...).toClassic`
+    to     `lazy val networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command] = classicSystem.spawn(...)`
+    (Remove `.toClassic`. Update the type annotation.)
+
+  Bridge 3, line 1009:
+    Change `peerEventBus.toClassic,` → `peerEventBus,`
+    (Now safe: SyncController accepts TypedActorRef[PEBCmd] after STEP 5.)
+
+  Check `lazy val debugService` at line 531 which uses `networkPeerManager` — verify its signature
+  accepts TypedActorRef or update accordingly.
+
+After GOAL B: `sbt compile-all` must be clean with 0 errors.
+
+═══════════════════════════════════════════════════════════
+POST-MIGRATION
+═══════════════════════════════════════════════════════════
+
+1. Test — run affected specs:
+   `sbt "testOnly *SyncControllerSpec *FastSyncSpec *SNAPSyncControllerSpec *ChainDownloaderSpec *PeerRequestHandlerSpec"`
+
+   NOTE on NetworkPeerManagerFake: `NetworkPeerManagerFake.scala` is a Classic actor that handles
+   `SendMessage` (non-Cmd) on a CE Topic. Tests that pass `networkPeerManager` as a parameter now
+   expect `TypedActorRef[NPMACmd]`. Either:
+   a) Pass `fakeNPM.ref.toTyped[NetworkPeerManagerActor.Command]` (bridge in test only — acceptable)
+   b) Replace the fake with a `testKit.createTestProbe[NetworkPeerManagerActor.Command]()` for tests
+      that now need to observe `SendMessageCmd` sends
+   Choose (a) for speed; flag (b) as a follow-up cleanup if specs fail.
+
+2. Bridge census — expected: 6 (down from 8):
+   `grep -rn "\.toClassic\|\.toTyped" src/main --include="*.scala" | grep -v "//"`
+
+3. Verify adapter imports removed from all 5 cascade actors (compile proves it, but grep confirms):
+   `grep -rn "scaladsl.adapter" src/main/scala/com/chipprbots/ethereum/blockchain/sync/ --include="*.scala"`
+
+4. Commit in two parts (risk-stratified):
+   Part 1 — bug fixes only (GOAL A, no type changes):
+     `git commit -m "fix(8k-B8a): SyncController+SNAPSyncController non-Cmd sends → Cmd variants (7 silent-drop bugs)"`
+   Part 2 — type cascade + bridge removal (GOAL B):
+     `git commit -m "fix(8k-B8b): SyncController cascade Classic ActorRef → TypedActorRef — bridges: 8→6 (NB:419, NB:1009)"`
+
+5. Update §8k-B gate table.
+```
+
+**Actual outcome (2026-06-25):** ✅ COMPLETE. Both NB:419 and NB:1009 removed.
+PeerRequestHandler was an unlisted sub-leaf (PeersClient passes `networkPeerManager` into `PRH.behavior`); migrated cleanly as STEP 0 before PeersClient.
+Removing the NodeBuilder implicit pass-through made all downstream Classic consumers explicitly `.toClassic` at their spawn sites — named per actor rather than implicit. Structural bridges 2+3 are gone; remaining bridges are attributable.
+Discovery: 13 additional non-Cmd `SendMessage` sends across 8 out-of-scope actors (see §8k-B9 + CHASE-QUEUE 2026-06-25). Commits: `3ee856a33` (B8a) + `895bfb901` (B8b).
+
+---
+
+#### ~~§8k-B7~~ ✅ — AkkaTaskOps: typed ask refactor (1 bridge)
 
 **File:** `AkkaTaskOps.scala:37`
 **Agent:** MITHRIL or CONDUIT
@@ -1823,9 +1990,62 @@ After all command variants are migrated:
 5. Update §8k-B status to COMPLETE. TCP floor achieved.
 ```
 
+**Actual outcome (2026-06-25):** ✅ COMPLETE. Commit `00644de79`.
+
 ---
 
-**Execution order:** §8k-B1 → §8k-B2 → §8k-B3 → §8k-B4 → §8k-B5 → §8k-B6 → §8k-B7
+#### §8k-B9 — SendMessage non-Cmd sweep: 8 actors × 13 sites (silent-drop investigation + fix)
+
+**Files:** `network/BlockchainHostActor.scala` (97, 302), `sync/fast/PivotBlockSelector.scala` (415, 570), `sync/regular/BlockBroadcast.scala` (64, 100, 108), `sync/snap/actors/AccountRangeWorker.scala` (106), `sync/snap/actors/StorageRangeCoordinator.scala` (1108), `sync/snap/actors/ByteCodeWorker.scala` (82), `sync/snap/actors/TrieNodeHealingCoordinator.scala` (1321), `transactions/PendingTransactionsManager.scala` (193, 400)
+**Agent:** LOOM
+**Gate:** None — investigation first; fix is mechanical if confirmed silent-drop.
+
+**Background:**
+§8k-B8 GOAL A fixed 7 `SendMessage`/non-Cmd sends in SyncController + SNAPSyncController.
+B8 GOAL B then exposed 13 additional legacy `NetworkPeerManagerActor.SendMessage(...)` calls
+across 8 already-Typed actors. These actors still receive `networkPeerManager` as Classic `ActorRef`
+(via `.toClassic` at their NodeBuilder spawn sites). `SendMessage` does NOT extend `Command` in the
+current NPMA ADT — whether it silently drops depends on what the NPMA Classic shell does with it.
+
+**Prompt:**
+```
+This sprint has two phases — investigate first, then fix.
+
+PHASE 1 — Verify whether these sends are currently silent-drops:
+
+1. Read NetworkPeerManagerActor.scala and its Classic shell (if any). Determine:
+   a) Does NPMA have a Classic shell that receives raw messages and forwards/handles SendMessage?
+   b) Does the Typed Behavior[Command] contain a SendMessage case?
+   c) If the shell just calls ctx.self.tell(msg, ...) for unknown types, do they silently drop?
+
+2. Grep to confirm all 13 send sites:
+   grep -rn "networkPeerManager ! NetworkPeerManagerActor.SendMessage\|networkPeerManager ! NPMA.SendMessage" \
+     src/main/ --include="*.scala"
+
+3. Report: silent-drop (proceed to Phase 2) or handled (log and close).
+
+PHASE 2 — Fix (only if confirmed silent-drops):
+
+For each of the 13 sites, replace:
+  `networkPeerManager ! NetworkPeerManagerActor.SendMessage(msg, peerId)`
+with:
+  `networkPeerManager ! NetworkPeerManagerActor.SendMessageCmd(msg, peerId)`
+
+These actors still hold a Classic ActorRef — using the Classic `!` with a `Command` subtype
+compiles because the adapter implicit converts `ActorRef[Command]` to `ActorRef` at the call site.
+Do NOT change the param type of `networkPeerManager` — that is a per-actor LOOM migration gate.
+
+After Phase 2:
+1. `sbt compile-all` — must be clean.
+2. `sbt "testOnly *BlockchainHostActorSpec *PivotBlockSelectorSpec *BlockBroadcastSpec *AccountRangeWorkerSpec *StorageRangeCoordinatorSpec *ByteCodeWorkerSpec *TrieNodeHealingCoordinatorSpec *PendingTransactionsManagerSpec"`
+3. `sbt scalafmtAll`
+4. Commit: `git commit -m "fix(8k-B9): replace legacy SendMessage with SendMessageCmd — 13 silent-drop sites across 8 actors"`
+5. Remove the CHASE-QUEUE 2026-06-25 SENDER entry once confirmed fixed.
+```
+
+---
+
+**Execution order:** §8k-B1 → §8k-B2 → §8k-B3 → §8k-B4 → §8k-B5 → §8k-B6 → §8k-B7 → §8k-B8 → §8k-B9
 
 §8k-B1 and §8k-B2 are immediate (no gate). §8k-B3 through §8k-B7 can proceed in parallel
 if separate agents are available, but §8k-B6 (PEB migration) unlocks the most adapter import
