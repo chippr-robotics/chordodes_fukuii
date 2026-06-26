@@ -1105,7 +1105,7 @@ private[actors] class StorageRangeCoordinatorImpl(
 
         import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetStorageRanges.GetStorageRangesEnc
         val messageSerializable: MessageSerializable = new GetStorageRangesEnc(request)
-        networkPeerManager ! NetworkPeerManagerActor.SendMessage(messageSerializable, peer.id)
+        networkPeerManager ! NetworkPeerManagerActor.SendMessageCmd(messageSerializable, peer.id)
         lastDispatchOrResponseMs = System.currentTimeMillis()
 
         Some(requestId)

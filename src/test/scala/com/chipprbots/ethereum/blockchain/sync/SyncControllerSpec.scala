@@ -40,7 +40,7 @@ import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.ledger.VMImpl
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor.SendMessage
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.SendMessageCmd
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockBodies
@@ -913,7 +913,7 @@ class SyncControllerSpec
           // ETH69 G5 by-hash backlink probe: block = Right(hash). Store pivot header in the
           // canonical chain so PivotBlockSelector's canonical-match check succeeds, then reply
           // with the pivot header as the single-element backlink chain.
-          case SendMessage(msg: ETHPackets.GetBlockHeaders.GetBlockHeadersEnc, peer)
+          case SendMessageCmd(msg: ETHPackets.GetBlockHeaders.GetBlockHeadersEnc, peer)
               if msg.underlyingMsg.block.isRight =>
             val requestId = msg.underlyingMsg.requestId
             blockchainWriter.storeBlockHeader(pivotHeader).commit()
@@ -922,7 +922,7 @@ class SyncControllerSpec
             this
 
           // Handle ETH66 GetBlockHeaders by block number (with requestId)
-          case SendMessage(msg: ETHPackets.GetBlockHeaders.GetBlockHeadersEnc, peer) =>
+          case SendMessageCmd(msg: ETHPackets.GetBlockHeaders.GetBlockHeadersEnc, peer) =>
             val underlyingMessage = msg.underlyingMsg
             val requestId = underlyingMessage.requestId
             val requestedBlockNumber = underlyingMessage.block.swap.toOption.get
@@ -936,7 +936,7 @@ class SyncControllerSpec
             this
 
           // Handle ETH68/69 GetReceipts (with requestId)
-          case SendMessage(msg: ETHPackets.GetReceipts.GetReceiptsEnc, peer) if !onlyPivot =>
+          case SendMessageCmd(msg: ETHPackets.GetReceipts.GetReceiptsEnc, peer) if !onlyPivot =>
             val requestId = msg.underlyingMsg.requestId
             if failedReceiptsTries > 0 then {
               sender ! MessageFromPeer(ETHPackets.Receipts68(requestId, RLPList()), peer)
@@ -949,7 +949,7 @@ class SyncControllerSpec
               this
             }
 
-          case SendMessage(msg: ETHPackets.GetBlockBodies.GetBlockBodiesEnc, peer) if !onlyPivot =>
+          case SendMessageCmd(msg: ETHPackets.GetBlockBodies.GetBlockBodiesEnc, peer) if !onlyPivot =>
             val requestId = msg.underlyingMsg.requestId
             if failedBodiesTries > 0 then {
               sender ! MessageFromPeer(ETHPackets.BlockBodies(requestId, Seq.empty), peer)
@@ -960,7 +960,7 @@ class SyncControllerSpec
               this
             }
 
-          case SendMessage(msg: GetBlockBodiesEnc, peer) if !onlyPivot =>
+          case SendMessageCmd(msg: GetBlockBodiesEnc, peer) if !onlyPivot =>
             val requestId = msg.underlyingMsg.requestId
             if failedBodiesTries > 0 then {
               sender ! MessageFromPeer(BlockBodies(requestId, Seq.empty), peer)
@@ -972,7 +972,7 @@ class SyncControllerSpec
             }
 
           // Handle GetNodeData (EIP-4938: rejected in ETH68, but still handled for legacy)
-          case SendMessage(_: ETHPackets.GetNodeData.GetNodeDataEnc, peer) if !onlyPivot =>
+          case SendMessageCmd(_: ETHPackets.GetNodeData.GetNodeDataEnc, peer) if !onlyPivot =>
             stateDownloadStarted = true
             if !failedNodeRequest then {
               sender ! MessageFromPeer(
@@ -985,7 +985,7 @@ class SyncControllerSpec
             }
             this
 
-          case SendMessage(_, _) =>
+          case SendMessageCmd(_, _) =>
             this
 
           case AutoPilotUpdateData(peers, pivot, data, failedReceipts, failedBodies, onlyPivot, failedNode) =>

@@ -53,7 +53,7 @@ class ByteCodeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     worker ! ByteCodeCoordinator.ByteCodeWorkerFetchTask(task, peer, reqId, BigInt(1024 * 1024))
 
     // Worker must have sent GetByteCodes to the network peer manager
-    val sendMsg = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
+    val sendMsg = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
     sendMsg.peerId shouldBe peer.id
     sendMsg.message shouldBe a[GetByteCodesEnc]
     val encoded = sendMsg.message.asInstanceOf[GetByteCodesEnc]
@@ -70,7 +70,7 @@ class ByteCodeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
 
     val reqId = BigInt(2)
     worker ! ByteCodeCoordinator.ByteCodeWorkerFetchTask(makeTask(), peer, reqId, BigInt(1024 * 1024))
-    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
+    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
 
     val code = ByteString("contract bytecode here")
     val response = ByteCodes(requestId = reqId, codes = Seq(code))
@@ -89,7 +89,7 @@ class ByteCodeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     // First task
     val reqId1 = BigInt(3)
     worker ! ByteCodeCoordinator.ByteCodeWorkerFetchTask(makeTask(Seq(codeHash1)), peer, reqId1, BigInt(1024 * 1024))
-    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
+    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
 
     // Second task — stashed while working
     val reqId2 = BigInt(4)
@@ -101,7 +101,7 @@ class ByteCodeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
 
     coordinator.expectMessage(1.second, ByteCodeCoordinator.ByteCodesResponseMsg(resp1))
     // Unstash triggers second task → GetByteCodes sent for reqId2
-    val sendMsg2 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
+    val sendMsg2 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
     sendMsg2.message.asInstanceOf[GetByteCodesEnc].underlyingMsg.requestId shouldBe reqId2
   }
 
@@ -114,7 +114,7 @@ class ByteCodeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
 
     val reqId = BigInt(5)
     worker ! ByteCodeCoordinator.ByteCodeWorkerFetchTask(makeTask(), peer, reqId, BigInt(1024 * 1024))
-    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
+    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
 
     worker ! ByteCodeCoordinator.ByteCodeRequestTimeout(reqId)
 
@@ -130,7 +130,7 @@ class ByteCodeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
 
     val reqId1 = BigInt(6)
     worker ! ByteCodeCoordinator.ByteCodeWorkerFetchTask(makeTask(), peer, reqId1, BigInt(1024 * 1024))
-    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
+    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
 
     worker ! ByteCodeCoordinator.ByteCodeRequestTimeout(reqId1)
     coordinator.expectMessageType[ByteCodeCoordinator.ByteCodeTaskFailed](1.second)
@@ -138,7 +138,7 @@ class ByteCodeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     // Worker should now be idle — second task accepted
     val reqId2 = BigInt(7)
     worker ! ByteCodeCoordinator.ByteCodeWorkerFetchTask(makeTask(), peer, reqId2, BigInt(1024 * 1024))
-    val sendMsg = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
+    val sendMsg = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
     sendMsg.message.asInstanceOf[GetByteCodesEnc].underlyingMsg.requestId shouldBe reqId2
   }
 
@@ -151,7 +151,7 @@ class ByteCodeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
 
     val reqId1 = BigInt(8)
     worker ! ByteCodeCoordinator.ByteCodeWorkerFetchTask(makeTask(Seq(codeHash1)), peer, reqId1, BigInt(1024 * 1024))
-    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
+    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
 
     // Stash a second task
     val reqId2 = BigInt(9)
@@ -161,7 +161,7 @@ class ByteCodeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     worker ! ByteCodeCoordinator.ByteCodeWorkerRelease(reqId1)
 
     // Unstash triggers second task → GetByteCodes for reqId2
-    val sendMsg2 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
+    val sendMsg2 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
     sendMsg2.message.asInstanceOf[GetByteCodesEnc].underlyingMsg.requestId shouldBe reqId2
   }
 
@@ -174,7 +174,7 @@ class ByteCodeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
 
     val reqId = BigInt(10)
     worker ! ByteCodeCoordinator.ByteCodeWorkerFetchTask(makeTask(), peer, reqId, BigInt(1024 * 1024))
-    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
+    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
 
     val wrongReqId = BigInt(999)
     val response = ByteCodes(requestId = wrongReqId, codes = Seq.empty)

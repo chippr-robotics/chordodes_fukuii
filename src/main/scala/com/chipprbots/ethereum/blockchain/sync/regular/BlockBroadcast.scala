@@ -61,7 +61,7 @@ class BlockBroadcast(val networkPeerManager: ActorRef, val isPoWChain: Boolean =
           isPoWChain
         )
         eth69Peers.foreach { case (_, PeerWithInfo(peer, _)) =>
-          networkPeerManager ! NetworkPeerManagerActor.SendMessage(bru, peer.id)
+          networkPeerManager ! NetworkPeerManagerActor.SendMessageCmd(bru, peer.id)
         }
       }
     }
@@ -97,7 +97,7 @@ class BlockBroadcast(val networkPeerManager: ActorRef, val isPoWChain: Boolean =
           Some(blockToBroadcast.as63)
       }
 
-      messageOpt.foreach(msg => networkPeerManager ! NetworkPeerManagerActor.SendMessage(msg, peer.id))
+      messageOpt.foreach(msg => networkPeerManager ! NetworkPeerManagerActor.SendMessageCmd(msg, peer.id))
     }
 
   private def broadcastNewBlockHash(blockToBroadcast: BlockToBroadcast, peers: Set[Peer]): Unit = peers.foreach {
@@ -105,7 +105,7 @@ class BlockBroadcast(val networkPeerManager: ActorRef, val isPoWChain: Boolean =
       val newBlockHeader = blockToBroadcast.block.header
       val newBlockHashMsg =
         ETHPackets.NewBlockHashes.NewBlockHashes(Seq(BlockHash(newBlockHeader.hash, newBlockHeader.number)))
-      networkPeerManager ! NetworkPeerManagerActor.SendMessage(newBlockHashMsg, peer.id)
+      networkPeerManager ! NetworkPeerManagerActor.SendMessageCmd(newBlockHashMsg, peer.id)
   }
 
   /** Obtains a random subset of peers. The returned set will verify: subsetPeers.size == sqrt(peers.size)

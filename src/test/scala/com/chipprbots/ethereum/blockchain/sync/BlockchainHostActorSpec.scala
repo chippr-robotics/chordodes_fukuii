@@ -77,7 +77,7 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
 
     // then
     networkPeerManager.expectMsg(
-      NetworkPeerManagerActor.SendMessage(
+      NetworkPeerManagerActor.SendMessageCmd(
         ETHPackets.Receipts68(
           BigInt(0),
           com.chipprbots.ethereum.rlp
@@ -109,7 +109,7 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
 
     // then
     networkPeerManager.expectMsg(
-      NetworkPeerManagerActor.SendMessage(ETHPackets.BlockBodies(BigInt(0), blockBodies), peerId)
+      NetworkPeerManagerActor.SendMessageCmd(ETHPackets.BlockBodies(BigInt(0), blockBodies), peerId)
     )
   }
 
@@ -132,7 +132,7 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
 
     // then
     networkPeerManager.expectMsg(
-      NetworkPeerManagerActor.SendMessage(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
+      NetworkPeerManagerActor.SendMessageCmd(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
     )
   }
 
@@ -155,7 +155,7 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
 
     // then
     networkPeerManager.expectMsg(
-      NetworkPeerManagerActor.SendMessage(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
+      NetworkPeerManagerActor.SendMessageCmd(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
     )
   }
 
@@ -177,7 +177,7 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
 
     // then
     networkPeerManager.expectMsg(
-      NetworkPeerManagerActor.SendMessage(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
+      NetworkPeerManagerActor.SendMessageCmd(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
     )
   }
 
@@ -200,7 +200,7 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
 
     // then
     networkPeerManager.expectMsg(
-      NetworkPeerManagerActor.SendMessage(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
+      NetworkPeerManagerActor.SendMessageCmd(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
     )
   }
 
@@ -227,7 +227,7 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
 
     // then
     networkPeerManager.expectMsg(
-      NetworkPeerManagerActor.SendMessage(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
+      NetworkPeerManagerActor.SendMessageCmd(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
     )
   }
 
@@ -250,7 +250,7 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
 
     // then
     networkPeerManager.expectMsg(
-      NetworkPeerManagerActor.SendMessage(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
+      NetworkPeerManagerActor.SendMessageCmd(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
     )
   }
 
@@ -273,7 +273,7 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
 
     // then
     networkPeerManager.expectMsg(
-      NetworkPeerManagerActor.SendMessage(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
+      NetworkPeerManagerActor.SendMessageCmd(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
     )
   }
 
@@ -296,7 +296,7 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
 
     // then
     networkPeerManager.expectMsg(
-      NetworkPeerManagerActor.SendMessage(
+      NetworkPeerManagerActor.SendMessageCmd(
         BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader, blockchainReader.genesisHeader)),
         peerId
       )
@@ -314,7 +314,7 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
     blockchainHost ! BlockchainHostActor.PeerEventReceived(MessageFromPeer(GetNodeData(Seq(evmCodeHash)), peerId))
 
     // then
-    networkPeerManager.expectMsg(NetworkPeerManagerActor.SendMessage(NodeData(Seq(fakeEvmCode)), peerId))
+    networkPeerManager.expectMsg(NetworkPeerManagerActor.SendMessageCmd(NodeData(Seq(fakeEvmCode)), peerId))
   }
 
   it should "return mptNode for hash" taggedAs (UnitTest) in new TestSetup {
@@ -335,7 +335,7 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
     )
 
     // then
-    networkPeerManager.expectMsg(NetworkPeerManagerActor.SendMessage(NodeData(Seq(extensionNode.toBytes)), peerId))
+    networkPeerManager.expectMsg(NetworkPeerManagerActor.SendMessageCmd(NodeData(Seq(extensionNode.toBytes)), peerId))
   }
 
   trait TestSetup extends EphemBlockchainTestSetup {

@@ -779,7 +779,7 @@ class RegularSyncSpec
         awaitCond(importedNewBlock)
 
         networkPeerManager.fishForSpecificMessageMatching(max = 10.seconds) {
-          case NetworkPeerManagerActor.SendMessage(message, _) =>
+          case NetworkPeerManagerActor.SendMessageCmd(message, _) =>
             message.underlyingMsg match {
               case NewBlock(block, _) if block == newBlock => true
               case _                                       => false
@@ -855,7 +855,7 @@ class RegularSyncSpec
         regularSync ! SyncProtocol.MinedBlock(newBlock)
 
         networkPeerManager.fishForSpecificMessageMatching() {
-          case NetworkPeerManagerActor.SendMessage(message, _) =>
+          case NetworkPeerManagerActor.SendMessageCmd(message, _) =>
             message.underlyingMsg match {
               case NewBlock(block, _) if block == newBlock => true
               case _                                       => false
@@ -890,7 +890,7 @@ class RegularSyncSpec
           awaitCond(importedNewBlock)
 
           networkPeerManager.fishForSpecificMessageMatching(max = 10.seconds) {
-            case NetworkPeerManagerActor.SendMessage(message, _) =>
+            case NetworkPeerManagerActor.SendMessageCmd(message, _) =>
               message.underlyingMsg match {
                 case ETHPackets.NewBlock(`newBlock`, _) => true
                 case _                                  => false

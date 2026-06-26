@@ -842,7 +842,7 @@ class PivotBlockSelectorSpec
     def expectGetBlockHeadersRequests(peers: Seq[Peer], blockNumber: BigInt): Unit = {
       val expectedPeerIds = peers.map(_.id)
       val receivedMessages =
-        (1 to expectedPeerIds.size).map(_ => networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage])
+        (1 to expectedPeerIds.size).map(_ => networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd])
 
       expectedPeerIds.foreach { peerId =>
         val sendMsg = receivedMessages
@@ -880,7 +880,7 @@ class PivotBlockSelectorSpec
         expectedPeers.map(p => MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(p.id)))*
       )
       val sends =
-        (1 to expectedPeers.size).map(_ => networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage])
+        (1 to expectedPeers.size).map(_ => networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd])
       sends.foreach { s =>
         s.message.underlyingMsg match {
           case GetBlockHeaders(_, Right(hash), maxHeaders, skip, reverse) =>
@@ -953,8 +953,8 @@ class PivotBlockSelectorSpec
 
     val networkPeerManager: TestProbe = TestProbe()
     networkPeerManager.ignoreMsg {
-      case NetworkPeerManagerActor.SendMessage(msg, _) if isNewBlock(msg.underlyingMsg) => true
-      case _: NetworkPeerManagerActor.GetHandshakedPeersCmd                             => true
+      case NetworkPeerManagerActor.SendMessageCmd(msg, _) if isNewBlock(msg.underlyingMsg) => true
+      case _: NetworkPeerManagerActor.GetHandshakedPeersCmd                                => true
     }
 
     val peerMessageBus: TestProbe = TestProbe()

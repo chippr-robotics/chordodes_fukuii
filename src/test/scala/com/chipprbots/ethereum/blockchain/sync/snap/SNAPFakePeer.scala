@@ -49,7 +49,7 @@ class SNAPFakePeer(
       def run(sender: ActorRef, msg: Any): AutoPilot = {
         if dropped.get() then return this
         msg match {
-          case NetworkPeerManagerActor.SendMessage(rawMsg, _) =>
+          case NetworkPeerManagerActor.SendMessageCmd(rawMsg, _) =>
             rawMsg.underlyingMsg match {
               case req: GetAccountRange =>
                 accountRangeHandler(req).foreach { resp =>

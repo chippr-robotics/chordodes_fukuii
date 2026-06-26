@@ -17,7 +17,7 @@ import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor.SendMessage
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.SendMessageCmd
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.MessageFromPeer
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
@@ -37,9 +37,9 @@ class NetworkPeerManagerFake(
     blocks: List[Block]
 )(implicit system: ActorSystem, ioRuntime: IORuntime) {
   private val responsesTopicIO: IO[Topic[IO, MessageFromPeer]] = Topic[IO, MessageFromPeer]
-  private val requestsTopicIO: IO[Topic[IO, SendMessage]] = Topic[IO, SendMessage]
+  private val requestsTopicIO: IO[Topic[IO, SendMessageCmd]] = Topic[IO, SendMessageCmd]
   private val responsesTopic: Topic[IO, MessageFromPeer] = responsesTopicIO.unsafeRunSync()
-  private val requestsTopic: Topic[IO, SendMessage] = requestsTopicIO.unsafeRunSync()
+  private val requestsTopic: Topic[IO, SendMessageCmd] = requestsTopicIO.unsafeRunSync()
   private val peersConnectedDeferred = Deferred.unsafe[IO, Unit]
 
   val probe: TestProbe = TestProbe("network_peer_manager")
@@ -55,7 +55,7 @@ class NetworkPeerManagerFake(
 
   def ref = probe.ref
 
-  val requests: Stream[IO, SendMessage] = requestsTopic.subscribe(100)
+  val requests: Stream[IO, SendMessageCmd] = requestsTopic.subscribe(100)
   val responses: Stream[IO, MessageFromPeer] = responsesTopic.subscribe(100)
   val onPeersConnected: IO[Unit] = peersConnectedDeferred.get
   val pivotBlockSelected: Stream[IO, BlockHeader] = responses
@@ -104,7 +104,7 @@ class NetworkPeerManagerFake(
 }
 object NetworkPeerManagerFake {
   class NetworkPeerManagerAutoPilot(
-      requests: Topic[IO, SendMessage],
+      requests: Topic[IO, SendMessageCmd],
       responses: Topic[IO, MessageFromPeer],
       peersConnected: Deferred[IO, Unit],
       peers: Map[Peer, PeerInfo],
@@ -116,7 +116,7 @@ object NetworkPeerManagerFake {
         case NetworkPeerManagerActor.GetHandshakedPeersCmd(replyTo) =>
           replyTo ! NetworkPeerManagerActor.HandshakedPeers(peers)
           peersConnected.complete(()).handleError(_ => ()).unsafeRunSync()
-        case sendMsg @ NetworkPeerManagerActor.SendMessage(rawMsg, peerId) =>
+        case sendMsg @ NetworkPeerManagerActor.SendMessageCmd(rawMsg, peerId) =>
           requests.publish1(sendMsg).unsafeRunSync()
           val response = rawMsg.underlyingMsg match {
             case GetBlockHeaders(requestId, startingBlock, maxHeaders, skip, reverse) =>

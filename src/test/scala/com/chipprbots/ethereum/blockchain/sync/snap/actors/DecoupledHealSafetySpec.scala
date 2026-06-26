@@ -58,7 +58,7 @@ class DecoupledHealSafetySpec extends ScalaTestWithActorTestKit() with AnyFlatSp
     if gauge == null then Double.NaN else gauge.value()
   }
 
-  private def getTrieNodesOf(send: NetworkPeerManagerActor.SendMessage): SNAP.GetTrieNodes =
+  private def getTrieNodesOf(send: NetworkPeerManagerActor.SendMessageCmd): SNAP.GetTrieNodes =
     send.message.underlyingMsg.asInstanceOf[SNAP.GetTrieNodes]
 
   private def stats(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): HealingStatistics = {
@@ -110,7 +110,7 @@ class DecoupledHealSafetySpec extends ScalaTestWithActorTestKit() with AnyFlatSp
     "drop a returned node whose keccak != requested hash — not stored, not counted, task stays pending" taggedAs UnitTest in {
       val stateRoot = kec256(ByteString("safety-t3-walk-root"))
       val storage = new TestMptStorage()
-      val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+      val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
       val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
       val coordinator = HealingTrieFixtures.spawnCoordinator(
         stateRoot = stateRoot,
@@ -131,7 +131,7 @@ class DecoupledHealSafetySpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       )
       val peer = PeerTestHelpers.createTestPeer("safety-t3-peer", testKit.createTestProbe[Any]().ref.toClassic)
       coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
-      val send = networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessage]
+      val send = networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd]
       val reqId = getTrieNodesOf(send).requestId
 
       val wrongContent = ByteString("safety-t3-wrong-content-bytes")
@@ -162,7 +162,7 @@ class DecoupledHealSafetySpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       val maxAttempts = 2 // small threshold so 3 unsatisfied attempts cross it deterministically
       val stateRoot = kec256(ByteString("safety-t4-walk-root"))
       val storage = new TestMptStorage()
-      val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+      val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
       val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
       val coordinator = HealingTrieFixtures.spawnCoordinator(
         stateRoot = stateRoot,
@@ -189,7 +189,7 @@ class DecoupledHealSafetySpec extends ScalaTestWithActorTestKit() with AnyFlatSp
         val peer =
           PeerTestHelpers.createTestPeer(s"safety-t4-peer-$round", testKit.createTestProbe[Any]().ref.toClassic)
         coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
-        val send = networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessage]
+        val send = networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd]
         val reqId = getTrieNodesOf(send).requestId
         coordinator ! TrieNodeHealingCoordinator.HealingRequestTimeout(reqId)
         // The task must be back in the pending frontier after the timeout (never abandoned).
@@ -265,7 +265,7 @@ class DecoupledHealSafetySpec extends ScalaTestWithActorTestKit() with AnyFlatSp
     val controller = testKit.createTestProbe[SNAPSyncController.Command]()
     val coordinator = HealingTrieFixtures.spawnCoordinator(
       stateRoot = root,
-      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]().ref.toClassic,
+      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]().ref.toClassic,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 64,

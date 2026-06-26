@@ -60,7 +60,7 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
     val reqId = BigInt(1)
     worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
 
-    val sendMsg = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
+    val sendMsg = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
     sendMsg.peerId shouldBe peer.id
     sendMsg.message shouldBe a[GetAccountRangeEnc]
     val msg = sendMsg.message.asInstanceOf[GetAccountRangeEnc].underlyingMsg
@@ -79,7 +79,7 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
 
     val reqId = BigInt(2)
     worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(root), peer, reqId, defaultBytes)
-    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
+    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
 
     val emptyResponse = AccountRange(requestId = reqId, accounts = Seq.empty, proof = rangeProof)
     worker ! AccountRangeCoordinator.AccountRangeResponseMsg(emptyResponse)
@@ -104,7 +104,7 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
 
     val reqId = BigInt(20)
     worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
-    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
+    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
 
     worker ! AccountRangeCoordinator.AccountRangeResponseMsg(
       AccountRange(requestId = reqId, accounts = Seq.empty, proof = Seq.empty)
@@ -123,7 +123,7 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
 
     val reqId = BigInt(3)
     worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
-    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
+    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
 
     worker ! AccountRangeCoordinator.RequestTimeout(reqId)
 
@@ -141,7 +141,7 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
 
     val reqId = BigInt(4)
     worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
-    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
+    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
 
     worker ! AccountRangeCoordinator.WorkerPeerDisconnected(peer.id.value)
 
@@ -159,7 +159,7 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
 
     val reqId1 = BigInt(5)
     worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId1, defaultBytes)
-    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
+    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
 
     // Send a second task while still working
     val reqId2 = BigInt(6)
@@ -179,14 +179,14 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
 
     val reqId1 = BigInt(7)
     worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId1, defaultBytes)
-    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
+    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
     worker ! AccountRangeCoordinator.RequestTimeout(reqId1)
     coordinator.expectMessageType[AccountRangeCoordinator.TaskFailed](1.second)
 
     // Worker should now be in idle — second task accepted
     val reqId2 = BigInt(8)
     worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId2, defaultBytes)
-    val sendMsg2 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
+    val sendMsg2 = networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
     sendMsg2.message.asInstanceOf[GetAccountRangeEnc].underlyingMsg.requestId shouldBe reqId2
   }
 
@@ -199,7 +199,7 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
 
     val reqId = BigInt(9)
     worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
-    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
+    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
 
     // Respond with the wrong request ID
     val wrongResponse = AccountRange(requestId = BigInt(999), accounts = Seq.empty, proof = Seq.empty)
@@ -220,7 +220,7 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
 
     val reqId = BigInt(10)
     worker ! AccountRangeCoordinator.FetchAccountRange(makeTask(), peer, reqId, defaultBytes)
-    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](1.second)
+    networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd](1.second)
 
     // Timeout fires — worker sends TaskFailed and transitions to idle
     worker ! AccountRangeCoordinator.RequestTimeout(reqId)

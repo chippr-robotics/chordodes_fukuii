@@ -56,8 +56,8 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     )
 
     // then
-    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessage(newBlockMsg, peer.id))
-    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessage(newBlockNewHashes, peer.id))
+    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessageCmd(newBlockMsg, peer.id))
+    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessageCmd(newBlockNewHashes, peer.id))
     networkPeerManagerProbe.expectNoMessage()
   }
 
@@ -82,8 +82,8 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     )
 
     // then
-    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessage(newBlockMsg, peer.id))
-    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessage(newBlockNewHashes, peer.id))
+    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessageCmd(newBlockMsg, peer.id))
+    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessageCmd(newBlockNewHashes, peer.id))
     networkPeerManagerProbe.expectNoMessage()
   }
 
@@ -125,8 +125,8 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     )
 
     // then
-    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessage(newBlockMsg, peer.id))
-    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessage(newBlockNewHashes, peer.id))
+    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessageCmd(newBlockMsg, peer.id))
+    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessageCmd(newBlockNewHashes, peer.id))
     networkPeerManagerProbe.expectNoMessage()
   }
 
@@ -181,17 +181,19 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     // then
     // Only two peers receive the complete block
     networkPeerManagerProbe.expectMsgPF() {
-      case NetworkPeerManagerActor.SendMessage(b, p) if b.underlyingMsg == firstBlockMsg && peersIds.contains(p) => ()
+      case NetworkPeerManagerActor.SendMessageCmd(b, p) if b.underlyingMsg == firstBlockMsg && peersIds.contains(p) =>
+        ()
     }
     networkPeerManagerProbe.expectMsgPF() {
-      case NetworkPeerManagerActor.SendMessage(b, p) if b.underlyingMsg == firstBlockMsg && peersIds.contains(p) => ()
+      case NetworkPeerManagerActor.SendMessageCmd(b, p) if b.underlyingMsg == firstBlockMsg && peersIds.contains(p) =>
+        ()
     }
 
     // All the peers should receive the block hashes
-    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessage(firstBlockNewHashes, peer.id))
-    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessage(firstBlockNewHashes, peer2.id))
-    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessage(firstBlockNewHashes, peer3.id))
-    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessage(firstBlockNewHashes, peer4.id))
+    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessageCmd(firstBlockNewHashes, peer.id))
+    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessageCmd(firstBlockNewHashes, peer2.id))
+    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessageCmd(firstBlockNewHashes, peer3.id))
+    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessageCmd(firstBlockNewHashes, peer4.id))
     networkPeerManagerProbe.expectNoMessage()
   }
 
@@ -268,9 +270,9 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     )
 
     val expectedBru: BlockRangeUpdate = ETH69.BlockRangeUpdate(BigInt(0), blockHeader.number, blockHeader.hash)
-    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessage(newBlockMsg, peer.id))
-    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessage(newBlockHashes, peer.id))
-    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessage(expectedBru, peer.id))
+    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessageCmd(newBlockMsg, peer.id))
+    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessageCmd(newBlockHashes, peer.id))
+    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessageCmd(expectedBru, peer.id))
     networkPeerManagerProbe.expectNoMessage()
   }
 
@@ -376,8 +378,8 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
 
     // ETH68 peer: gets both the block body and the hash (only peer in peersWithoutBlock)
     // sqrt(1) = 1, so they receive the full NewBlock too
-    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessage(newBlockMsg, peer.id))
-    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessage(newBlockHashes, peer.id))
+    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessageCmd(newBlockMsg, peer.id))
+    networkPeerManagerProbe.expectMsg(NetworkPeerManagerActor.SendMessageCmd(newBlockHashes, peer.id))
     // ETH69 peer: filtered out of peersWithoutBlock entirely — receives nothing
     networkPeerManagerProbe.expectNoMessage()
   }
@@ -450,15 +452,15 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
 
     // One NewBlock to either peer
     messages.count {
-      case NetworkPeerManagerActor.SendMessage(msg, _) if msg.underlyingMsg == ourBlock => false
-      case NetworkPeerManagerActor.SendMessage(msg, _) if msg.underlyingMsg.isInstanceOf[ETHPackets.NewBlock] =>
+      case NetworkPeerManagerActor.SendMessageCmd(msg, _) if msg.underlyingMsg == ourBlock => false
+      case NetworkPeerManagerActor.SendMessageCmd(msg, _) if msg.underlyingMsg.isInstanceOf[ETHPackets.NewBlock] =>
         true
       case _ => false
     } shouldBe 1
 
     // NewBlockHashes to both peers
     val hashRecipients: Set[PeerId] = messages.collect {
-      case NetworkPeerManagerActor.SendMessage(msg, id) if msg.underlyingMsg == newBlockHashes => id
+      case NetworkPeerManagerActor.SendMessageCmd(msg, id) if msg.underlyingMsg == newBlockHashes => id
     }
     hashRecipients should contain(peer.id)
     hashRecipients should contain(peer2.id)
@@ -466,7 +468,7 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     // BlockRangeUpdate to the ETH69 peer only
     val expectedBru: BlockRangeUpdate = ETH69.BlockRangeUpdate(BigInt(0), ourBlockHdr.number, ourBlockHdr.hash)
     val bruRecipients: Set[PeerId] = messages.collect {
-      case NetworkPeerManagerActor.SendMessage(msg, id) if msg.underlyingMsg == expectedBru => id
+      case NetworkPeerManagerActor.SendMessageCmd(msg, id) if msg.underlyingMsg == expectedBru => id
     }
     bruRecipients should contain(peer2.id)
     bruRecipients should have size 1
@@ -495,7 +497,7 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     import scala.concurrent.duration.*
     val messages: Seq[AnyRef] = networkPeerManagerProbe.receiveN(3, 3.seconds)
     val newBlocks: Seq[PeerId] = messages.collect {
-      case NetworkPeerManagerActor.SendMessage(msg, id) if msg.underlyingMsg.isInstanceOf[ETHPackets.NewBlock] => id
+      case NetworkPeerManagerActor.SendMessageCmd(msg, id) if msg.underlyingMsg.isInstanceOf[ETHPackets.NewBlock] => id
     }
     newBlocks should contain(peer.id) // ETH69 peer gets NewBlock on PoW chain
   }
@@ -520,7 +522,7 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     // Only NewBlockHashes + BRU should arrive (no NewBlock)
     val messages: IndexedSeq[Object] = (1 to 2).map(_ => networkPeerManagerProbe.receiveOne(2.seconds))
     messages.foreach {
-      case NetworkPeerManagerActor.SendMessage(msg, _) =>
+      case NetworkPeerManagerActor.SendMessageCmd(msg, _) =>
         msg.underlyingMsg should not be an[ETHPackets.NewBlock]
       case _ =>
     }
@@ -552,7 +554,7 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     import scala.concurrent.duration.*
     val allMessages: Seq[AnyRef] = networkPeerManagerProbe.receiveN(9, 5.seconds) // 3 × (NewBlock + Hashes + BRU)
     val bruCount: Int = allMessages.count {
-      case NetworkPeerManagerActor.SendMessage(msg, _) =>
+      case NetworkPeerManagerActor.SendMessageCmd(msg, _) =>
         msg.underlyingMsg.isInstanceOf[ETH69.BlockRangeUpdate]
       case _ => false
     }
@@ -585,8 +587,8 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     // Each block → NewBlockHashes only (PoS: no NewBlock, no BRU until block 32)
     val pre32Messages: IndexedSeq[Object] = (1 to 31).map(_ => networkPeerManagerProbe.receiveN(1, 2.seconds)).flatten
     val pre32Brus: Int = pre32Messages.count {
-      case NetworkPeerManagerActor.SendMessage(msg, _) => msg.underlyingMsg.isInstanceOf[ETH69.BlockRangeUpdate]
-      case _                                           => false
+      case NetworkPeerManagerActor.SendMessageCmd(msg, _) => msg.underlyingMsg.isInstanceOf[ETH69.BlockRangeUpdate]
+      case _                                              => false
     }
     pre32Brus shouldEqual 0 // no BRU before epoch boundary
 
@@ -594,8 +596,8 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     broadcastAt(32)
     val block32Messages: Seq[AnyRef] = networkPeerManagerProbe.receiveN(2, 2.seconds) // Hashes + BRU
     val block32Brus: Int = block32Messages.count {
-      case NetworkPeerManagerActor.SendMessage(msg, _) => msg.underlyingMsg.isInstanceOf[ETH69.BlockRangeUpdate]
-      case _                                           => false
+      case NetworkPeerManagerActor.SendMessageCmd(msg, _) => msg.underlyingMsg.isInstanceOf[ETH69.BlockRangeUpdate]
+      case _                                              => false
     }
     block32Brus shouldEqual 1 // BRU at epoch boundary (32 % 32 == 0)
     networkPeerManagerProbe.expectNoMessage()
@@ -641,8 +643,8 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
       import scala.concurrent.duration.*
       val messages: Seq[AnyRef] = pm.receiveN(2, 3.seconds)
       val hasNewBlock: Boolean = messages.exists {
-        case NetworkPeerManagerActor.SendMessage(msg, _) => msg.underlyingMsg.isInstanceOf[ETHPackets.NewBlock]
-        case _                                           => false
+        case NetworkPeerManagerActor.SendMessageCmd(msg, _) => msg.underlyingMsg.isInstanceOf[ETHPackets.NewBlock]
+        case _                                              => false
       }
       hasNewBlock shouldBe true // ETH68 always gets NewBlock
       pm.expectNoMessage()
@@ -666,8 +668,8 @@ class BlockBroadcastSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     import scala.concurrent.duration.*
     val messages: Seq[AnyRef] = networkPeerManagerProbe.receiveN(2, 3.seconds)
     val hasBru: Boolean = messages.exists {
-      case NetworkPeerManagerActor.SendMessage(msg, _) => msg.underlyingMsg.isInstanceOf[ETH69.BlockRangeUpdate]
-      case _                                           => false
+      case NetworkPeerManagerActor.SendMessageCmd(msg, _) => msg.underlyingMsg.isInstanceOf[ETH69.BlockRangeUpdate]
+      case _                                              => false
     }
     hasBru shouldBe false // ETH68 peer never gets BRU
     networkPeerManagerProbe.expectNoMessage()

@@ -190,7 +190,7 @@ object PendingTransactionsManager {
           }
           val sizes = txsToNotify.map(stx => BigInt(SignedTransaction.byteArraySerializable.toBytes(stx).length))
           val announcement = ETHPackets.NewPooledTransactionHashes(types, sizes, hashes)
-          networkPeerManager ! NetworkPeerManagerActor.SendMessage(announcement, peer.id)
+          networkPeerManager ! NetworkPeerManagerActor.SendMessageCmd(announcement, peer.id)
           txsToNotify.foreach(stx => setTxKnown(stx, peer.id))
         }
       }
@@ -397,7 +397,7 @@ object PendingTransactionsManager {
             pendingAnnouncements = pendingAnnouncements.updated(hash, (txType, size, peerId))
           }
           val requestId = ETHPackets.nextRequestId
-          networkPeerManager ! NetworkPeerManagerActor.SendMessage(
+          networkPeerManager ! NetworkPeerManagerActor.SendMessageCmd(
             ETHPackets.GetPooledTransactions(requestId, unknownHashes),
             peerId
           )

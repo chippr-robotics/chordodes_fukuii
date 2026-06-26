@@ -103,7 +103,7 @@ object AccountRangeWorker {
             import com.chipprbots.ethereum.network.p2p.MessageSerializable
             val messageSerializable: MessageSerializable = new GetAccountRangeEnc(request)
             networkPeerManager.tell(
-              NetworkPeerManagerActor.SendMessage(messageSerializable, peer.id),
+              NetworkPeerManagerActor.SendMessageCmd(messageSerializable, peer.id),
               org.apache.pekko.actor.ActorRef.noSender
             )
 

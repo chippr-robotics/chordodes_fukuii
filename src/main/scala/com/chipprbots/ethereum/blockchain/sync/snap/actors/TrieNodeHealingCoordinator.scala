@@ -1318,7 +1318,7 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
 
       import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetTrieNodes.GetTrieNodesEnc
       val messageSerializable: com.chipprbots.ethereum.network.p2p.MessageSerializable = new GetTrieNodesEnc(request)
-      networkPeerManager ! NetworkPeerManagerActor.SendMessage(messageSerializable, peer.id)
+      networkPeerManager ! NetworkPeerManagerActor.SendMessageCmd(messageSerializable, peer.id)
 
       log.debug(
         s"Requested ${batch.size} trie nodes from peer ${peer.id.value} " +

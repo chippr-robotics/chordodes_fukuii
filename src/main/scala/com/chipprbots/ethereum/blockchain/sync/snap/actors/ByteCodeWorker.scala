@@ -79,7 +79,7 @@ object ByteCodeWorker {
           import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetByteCodes.GetByteCodesEnc
           val messageSerializable: MessageSerializable = new GetByteCodesEnc(request)
           networkPeerManager.tell(
-            NetworkPeerManagerActor.SendMessage(messageSerializable, peer.id),
+            NetworkPeerManagerActor.SendMessageCmd(messageSerializable, peer.id),
             org.apache.pekko.actor.ActorRef.noSender
           )
 

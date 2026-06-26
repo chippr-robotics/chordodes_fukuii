@@ -44,7 +44,7 @@ class DecoupledHealObservabilitySpec
     if gauge == null then Double.NaN else gauge.value()
   }
 
-  private def getTrieNodesOf(send: NetworkPeerManagerActor.SendMessage): SNAP.GetTrieNodes =
+  private def getTrieNodesOf(send: NetworkPeerManagerActor.SendMessageCmd): SNAP.GetTrieNodes =
     send.message.underlyingMsg.asInstanceOf[SNAP.GetTrieNodes]
 
   /** Mirror of `TrieNodeHealingCoordinator.shortRootLabel`: the leading (up to) 8 bytes of a root packed big-endian
@@ -67,9 +67,9 @@ class DecoupledHealObservabilitySpec
       decoupled: Boolean
   ): (
       ActorRef[TrieNodeHealingCoordinator.Command],
-      org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[NetworkPeerManagerActor.SendMessage]
+      org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[NetworkPeerManagerActor.SendMessageCmd]
   ) = {
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
     val coordinator = HealingTrieFixtures.spawnCoordinator(
       stateRoot = stateRoot,
       networkPeerManager = networkPeerManager.ref.toClassic,
@@ -129,7 +129,7 @@ class DecoupledHealObservabilitySpec
       coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(Seq((Seq(ByteString(Array[Byte](0x00))), nodeHash)))
       val peer = PeerTestHelpers.createTestPeer("observ-t7-off-peer", testKit.createTestProbe[Any]().ref.toClassic)
       coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
-      val send = networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessage]
+      val send = networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd]
       getTrieNodesOf(send).rootHash shouldBe stateRoot
     }
 }

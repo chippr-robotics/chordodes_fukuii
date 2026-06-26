@@ -412,7 +412,7 @@ object PivotBlockSelector {
             skip = 0,
             reverse = true
           )
-          networkPeerManager ! NetworkPeerManagerActor.SendMessage(msg, peer)
+          networkPeerManager ! NetworkPeerManagerActor.SendMessageCmd(msg, peer)
         }
         timers.startSingleTimer(BacklinkTimeoutKey, BacklinkTimeout, peerResponseTimeout)
         ctx.log.debug(
@@ -567,7 +567,7 @@ object PivotBlockSelector {
         case _ =>
           ETHPackets.GetBlockHeaders(ETHPackets.nextRequestId, Left(blockNumber), 1, 0, reverse = false)
       }
-      networkPeerManager ! NetworkPeerManagerActor.SendMessage(getBlockHeadersMsg, peer)
+      networkPeerManager ! NetworkPeerManagerActor.SendMessageCmd(getBlockHeadersMsg, peer)
     }
 
     private def collectVoters(

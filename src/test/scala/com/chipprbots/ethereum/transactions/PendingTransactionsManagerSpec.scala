@@ -30,7 +30,7 @@ import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.domain.SignedTransactionWithSender
 import com.chipprbots.ethereum.domain.TransactionWithDynamicFee
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
-import com.chipprbots.ethereum.network.NetworkPeerManagerActor.SendMessage
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor.SendMessageCmd
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
 import com.chipprbots.ethereum.network.PeerId
@@ -193,9 +193,9 @@ class PendingTransactionsManagerSpec
     val stx: SignedTransactionWithSender = newStx()
     pendingTransactionsManager ! AddTransactions(stx)
 
-    val announcements: Seq[SendMessage] =
+    val announcements: Seq[SendMessageCmd] =
       etcPeerManager.receiveWhile(Timeouts.normalTimeout, messages = 3) {
-        case m @ NetworkPeerManagerActor.SendMessage(enc, _)
+        case m @ NetworkPeerManagerActor.SendMessageCmd(enc, _)
             if enc.underlyingMsg.isInstanceOf[ETHPackets.NewPooledTransactionHashes] =>
           m
       }
@@ -222,8 +222,8 @@ class PendingTransactionsManagerSpec
     // isTxKnown, so received txs are announced only to peers that don't already
     // know them.
     // Drain until no more messages arrive within shortTimeout.
-    val resps1: Seq[SendMessage] = etcPeerManager.receiveWhile(Timeouts.normalTimeout) {
-      case m: NetworkPeerManagerActor.SendMessage => m
+    val resps1: Seq[SendMessageCmd] = etcPeerManager.receiveWhile(Timeouts.normalTimeout) {
+      case m: NetworkPeerManagerActor.SendMessageCmd => m
     }
     (resps1.map(_.peerId).toSet should contain).allOf(peer2.id, peer3.id)
     resps1.map(_.message.underlyingMsg).foreach {
@@ -236,8 +236,8 @@ class PendingTransactionsManagerSpec
     val msg2 = tx2.toSet
     pendingTransactionsManager ! ProperSignedTransactions(msg2, peer2.id)
 
-    val resps2: Seq[SendMessage] = etcPeerManager.receiveWhile(Timeouts.normalTimeout) {
-      case m: NetworkPeerManagerActor.SendMessage => m
+    val resps2: Seq[SendMessageCmd] = etcPeerManager.receiveWhile(Timeouts.normalTimeout) {
+      case m: NetworkPeerManagerActor.SendMessageCmd => m
     }
     (resps2.map(_.peerId).toSet should contain).allOf(peer1.id, peer3.id)
     resps2.map(_.message.underlyingMsg).foreach {
@@ -310,8 +310,8 @@ class PendingTransactionsManagerSpec
     // processes in-order but NotifyPeers is deferred, firstTx gets invalidated
     // (by overrideTx) before its announce fires, so only otherTx and
     // overrideTx reach peer1. Both land as NewPooledTransactionHashes (ETH/67).
-    val announces: Seq[SendMessage] = etcPeerManager.receiveWhile(Timeouts.normalTimeout, messages = 3) {
-      case m: NetworkPeerManagerActor.SendMessage => m
+    val announces: Seq[SendMessageCmd] = etcPeerManager.receiveWhile(Timeouts.normalTimeout, messages = 3) {
+      case m: NetworkPeerManagerActor.SendMessageCmd => m
     }
     announces.foreach(_.peerId shouldBe peer1.id)
     val announcedHashes: Set[ByteString] = announces
@@ -337,7 +337,7 @@ class PendingTransactionsManagerSpec
 
     // On handshake the pool replays its current contents to the new peer as a
     // NewPooledTransactionHashes announce; the peer pulls bodies on demand.
-    val replayed: SendMessage = etcPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage]
+    val replayed: SendMessageCmd = etcPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd]
     replayed.peerId shouldBe peer1.id
     replayed.message.underlyingMsg match {
       case ETHPackets.NewPooledTransactionHashes(_, _, hashes) => hashes shouldBe Seq(stx.tx.hash)

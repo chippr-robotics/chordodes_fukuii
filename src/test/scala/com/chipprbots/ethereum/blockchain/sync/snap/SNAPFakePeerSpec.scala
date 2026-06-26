@@ -41,7 +41,7 @@ class SNAPFakePeerSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike 
     )
 
     fakePeer.probe.ref.tell(
-      NetworkPeerManagerActor.SendMessage(
+      NetworkPeerManagerActor.SendMessageCmd(
         new GetAccountRange.GetAccountRangeEnc(req),
         fakePeer.peer.id
       ),
@@ -70,7 +70,7 @@ class SNAPFakePeerSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike 
     )
 
     fakePeer.probe.ref.tell(
-      NetworkPeerManagerActor.SendMessage(
+      NetworkPeerManagerActor.SendMessageCmd(
         new GetAccountRange.GetAccountRangeEnc(req),
         fakePeer.peer.id
       ),
@@ -93,7 +93,7 @@ class SNAPFakePeerSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike 
     )
 
     fakePeer.probe.ref.tell(
-      NetworkPeerManagerActor.SendMessage(
+      NetworkPeerManagerActor.SendMessageCmd(
         new GetAccountRange.GetAccountRangeEnc(req),
         fakePeer.peer.id
       ),
@@ -122,7 +122,7 @@ class SNAPFakePeerSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike 
     )
 
     fakePeer.probe.ref.tell(
-      NetworkPeerManagerActor.SendMessage(
+      NetworkPeerManagerActor.SendMessageCmd(
         new GetAccountRange.GetAccountRangeEnc(req),
         fakePeer.peer.id
       ),
@@ -150,7 +150,7 @@ class SNAPFakePeerSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike 
     )
 
     fakePeer.probe.ref.tell(
-      NetworkPeerManagerActor.SendMessage(
+      NetworkPeerManagerActor.SendMessageCmd(
         new GetAccountRange.GetAccountRangeEnc(req),
         fakePeer.peer.id
       ),
@@ -187,7 +187,7 @@ class SNAPFakePeerSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike 
     )
 
     fakePeer.probe.ref.tell(
-      NetworkPeerManagerActor.SendMessage(
+      NetworkPeerManagerActor.SendMessageCmd(
         new GetAccountRange.GetAccountRangeEnc(req),
         fakePeer.peer.id
       ),

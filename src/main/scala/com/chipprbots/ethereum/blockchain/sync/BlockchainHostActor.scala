@@ -94,7 +94,7 @@ object BlockchainHostActor {
               ETHPackets.PooledTransactions(requestId, matchingTxs, blobTxRawBytes = matchingBlobBytes)
             case None => ETHPackets.PooledTransactions(0, matchingTxs) // requestId=0 for no-requestId case
           }
-          networkPeerManagerActor ! NetworkPeerManagerActor.SendMessage(responseMsg, peerId)
+          networkPeerManagerActor ! NetworkPeerManagerActor.SendMessageCmd(responseMsg, peerId)
         }
     }
 
@@ -299,7 +299,7 @@ object BlockchainHostActor {
           case _ =>
             val responseOpt = handleBlockFastDownload(message).orElse(handleEvmCodeMptFastDownload(message))
             responseOpt.foreach { response =>
-              networkPeerManagerActor ! NetworkPeerManagerActor.SendMessage(response, peerId)
+              networkPeerManagerActor ! NetworkPeerManagerActor.SendMessageCmd(response, peerId)
               // BLOCK-SERVE: INFO log so we can see which peers are requesting our chain
               // data — useful for detecting when we're serving from an orphan fork.
               val reqLabel = message match {

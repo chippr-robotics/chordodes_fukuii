@@ -108,7 +108,7 @@ class HealingFrontierResumeSpec extends ScalaTestWithActorTestKit() with AnyFlat
     val root = if rootInStorage then storedRoot(storage) else kec256(ByteString("write-on-queue-root"))
     val coordinator = HealingTrieFixtures.spawnCoordinator(
       stateRoot = root,
-      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]().ref.toClassic,
+      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]().ref.toClassic,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 16,

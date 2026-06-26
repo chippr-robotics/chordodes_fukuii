@@ -113,7 +113,7 @@ class ScopedVerificationObservabilitySpec extends ScalaTestWithActorTestKit() wi
     val controller = testKit.createTestProbe[SNAPSyncController.Command]()
     val coordinator = HealingTrieFixtures.spawnCoordinator(
       stateRoot = root,
-      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]().ref.toClassic,
+      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]().ref.toClassic,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 64,

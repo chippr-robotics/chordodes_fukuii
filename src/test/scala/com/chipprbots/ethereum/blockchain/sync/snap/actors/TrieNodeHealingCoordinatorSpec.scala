@@ -36,7 +36,7 @@ class TrieNodeHealingCoordinatorSpec
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = HealingTrieFixtures.spawnCoordinator(
@@ -55,7 +55,7 @@ class TrieNodeHealingCoordinatorSpec
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = HealingTrieFixtures.spawnCoordinator(
@@ -85,9 +85,9 @@ class TrieNodeHealingCoordinatorSpec
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
-    val peerProbe = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val peerProbe = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
 
     val peer = PeerTestHelpers.createTestPeer("test-peer", peerProbe.ref.toClassic)
 
@@ -108,14 +108,14 @@ class TrieNodeHealingCoordinatorSpec
     coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
 
     // Should send request to network peer manager
-    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessage]
+    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd]
   }
 
   it should "handle task completion" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = HealingTrieFixtures.spawnCoordinator(
@@ -138,7 +138,7 @@ class TrieNodeHealingCoordinatorSpec
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = HealingTrieFixtures.spawnCoordinator(
@@ -160,7 +160,7 @@ class TrieNodeHealingCoordinatorSpec
     val stateRoot = kec256(ByteString("test-state-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = HealingTrieFixtures.spawnCoordinator(
@@ -183,7 +183,7 @@ class TrieNodeHealingCoordinatorSpec
     val stateRoot = kec256(ByteString("force-complete-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = HealingTrieFixtures.spawnCoordinator(
@@ -207,7 +207,7 @@ class TrieNodeHealingCoordinatorSpec
     val stateRoot = kec256(ByteString("old-heal-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = HealingTrieFixtures.spawnCoordinator(
@@ -236,7 +236,7 @@ class TrieNodeHealingCoordinatorSpec
     val stateRoot = kec256(ByteString("pending-tasks-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = HealingTrieFixtures.spawnCoordinator(
@@ -274,7 +274,7 @@ class TrieNodeHealingCoordinatorSpec
     val stateRoot = kec256(ByteString("deque-load-test-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = HealingTrieFixtures.spawnCoordinator(
@@ -311,7 +311,7 @@ class TrieNodeHealingCoordinatorSpec
     val stateRoot = kec256(ByteString("deque-fifo-test-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = HealingTrieFixtures.spawnCoordinator(
@@ -341,7 +341,7 @@ class TrieNodeHealingCoordinatorSpec
     val stateRoot = kec256(ByteString("ec-override-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = HealingTrieFixtures.spawnCoordinator(
@@ -366,9 +366,9 @@ class TrieNodeHealingCoordinatorSpec
     val stateRoot = kec256(ByteString("force-complete-with-tasks-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
-    val peerProbe = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val peerProbe = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
 
     val peer = PeerTestHelpers.createTestPeer("force-heal-peer", peerProbe.ref.toClassic)
 
@@ -397,7 +397,7 @@ class TrieNodeHealingCoordinatorSpec
     // HealingRootUnservable (do NOT seed the root). The QueueMissingNodes tasks are still real and get
     // dispatched to the peer below.
     snapSyncController.expectMessage(SNAPSyncController.HealingRootUnservable(stateRoot))
-    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessage] // task dispatched
+    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd] // task dispatched
 
     // ForceComplete while tasks are in-flight: abandon all, signal complete immediately
     coordinator ! TrieNodeHealingCoordinator.HealingForceComplete
@@ -538,9 +538,9 @@ class TrieNodeHealingCoordinatorSpec
     val stateRoot = kec256(ByteString("nb7-stateless-gate-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
-    val peerProbe = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val peerProbe = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
     val peer = PeerTestHelpers.createTestPeer("stateless-peer", peerProbe.ref.toClassic)
 
     val coordinator = HealingTrieFixtures.spawnCoordinator(
@@ -557,7 +557,7 @@ class TrieNodeHealingCoordinatorSpec
     coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(stateRoot)
     coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(Seq((Seq(ByteString(Array[Byte](0x00))), kec256(ByteString("nb7-task")))))
     coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
-    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessage]
+    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd]
 
     // Empty TrieNodes response (requestId=1 is the first generated) → marks peer stateless
     coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = Seq.empty))
@@ -574,9 +574,9 @@ class TrieNodeHealingCoordinatorSpec
     val stateRoot = kec256(ByteString("nb7-timeout-no-stateless-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
-    val peerProbe = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val peerProbe = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
     val peer = PeerTestHelpers.createTestPeer("timeout-peer", peerProbe.ref.toClassic)
 
     val coordinator = HealingTrieFixtures.spawnCoordinator(
@@ -599,9 +599,9 @@ class TrieNodeHealingCoordinatorSpec
       )
     )
     coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
-    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessage] // reqId=1
-    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessage] // reqId=2
-    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessage] // reqId=3
+    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd] // reqId=1
+    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd] // reqId=2
+    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd] // reqId=3
 
     // Absent walk root ⇒ the seed-site guard already signalled HealingRootUnservable to the controller.
     // Drain it so the key expectNoMessage below is scoped strictly to the timeout→stateless behavior.
@@ -622,9 +622,9 @@ class TrieNodeHealingCoordinatorSpec
     val stateRoot = kec256(ByteString("nb7-readmit-root"))
     val storage = new TestMptStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
-    val peerProbe = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]()
+    val peerProbe = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
     val peer = PeerTestHelpers.createTestPeer("readmit-peer", peerProbe.ref.toClassic)
 
     val coordinator = HealingTrieFixtures.spawnCoordinator(
@@ -643,7 +643,7 @@ class TrieNodeHealingCoordinatorSpec
       Seq((Seq(ByteString(Array[Byte](0x00))), kec256(ByteString("nb7-readmit-task"))))
     )
     coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
-    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessage]
+    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd]
     coordinator ! TrieNodeHealingCoordinator.TrieNodesResponseMsg(SNAP.TrieNodes(requestId = 1, nodes = Seq.empty))
 
     // Pivot refresh: clears statelessPeers and re-seeds new root as pending task. (HealingPivotRefreshed
@@ -654,7 +654,7 @@ class TrieNodeHealingCoordinatorSpec
 
     // Peer is no longer stateless — HealingPeerAvailable should trigger dispatch for the new root
     coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
-    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessage]
+    networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd]
   }
 
   it should "discover all missing children via BFS when state root is a BranchNode (BFS smoke)" taggedAs UnitTest in {
@@ -678,7 +678,7 @@ class TrieNodeHealingCoordinatorSpec
 
     val coordinator = HealingTrieFixtures.spawnCoordinator(
       stateRoot = root,
-      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]().ref.toClassic,
+      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]().ref.toClassic,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 16,
@@ -721,7 +721,7 @@ class TrieNodeHealingCoordinatorSpec
     val ec = scala.concurrent.ExecutionContext.fromExecutorService(pool)
     val coordinator = HealingTrieFixtures.spawnCoordinator(
       stateRoot = root,
-      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]().ref.toClassic,
+      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]().ref.toClassic,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 16,
@@ -787,7 +787,7 @@ class TrieNodeHealingCoordinatorSpec
 
     val coordinator = HealingTrieFixtures.spawnCoordinator(
       stateRoot = root,
-      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]().ref.toClassic,
+      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]().ref.toClassic,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 16,
@@ -832,7 +832,7 @@ class TrieNodeHealingCoordinatorSpec
 
     val coordinator = HealingTrieFixtures.spawnCoordinator(
       stateRoot = root,
-      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]().ref.toClassic,
+      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]().ref.toClassic,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 16,
@@ -875,7 +875,7 @@ class TrieNodeHealingCoordinatorSpec
     val bfsQueue = new InMemoryBfsQueueStorage()
     val coordinator = HealingTrieFixtures.spawnCoordinator(
       stateRoot = root,
-      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]().ref.toClassic,
+      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]().ref.toClassic,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 16,
@@ -908,7 +908,7 @@ class TrieNodeHealingCoordinatorSpec
 
     val coordinator = HealingTrieFixtures.spawnCoordinator(
       stateRoot = fx.rootHash,
-      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]().ref.toClassic,
+      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]().ref.toClassic,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = fx.storage,
       batchSize = 16,
@@ -933,7 +933,7 @@ class TrieNodeHealingCoordinatorSpec
 
     val coordinator = HealingTrieFixtures.spawnCoordinator(
       stateRoot = fx.rootHash,
-      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]().ref.toClassic,
+      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]().ref.toClassic,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = fx.storage,
       batchSize = 16,
@@ -965,7 +965,7 @@ class TrieNodeHealingCoordinatorSpec
       val fx = HealingTrieFixtures.multiNodeWithSharedAncestor()
       val coordinator = HealingTrieFixtures.spawnCoordinator(
         stateRoot = fx.rootHash,
-        networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]().ref.toClassic,
+        networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]().ref.toClassic,
         requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
         mptStorage = fx.storage,
         batchSize = 16,
@@ -1027,7 +1027,7 @@ class TrieNodeHealingCoordinatorSpec
 
     val coordinator = HealingTrieFixtures.spawnCoordinator(
       stateRoot = fx.rootHash,
-      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]().ref.toClassic,
+      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]().ref.toClassic,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = fx.storage,
       batchSize = 16,
@@ -1076,7 +1076,7 @@ class TrieNodeHealingCoordinatorSpec
 
     val coordinator = HealingTrieFixtures.spawnCoordinator(
       stateRoot = fx.rootHash,
-      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessage]().ref.toClassic,
+      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]().ref.toClassic,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = fx.storage,
       batchSize = 16,
