@@ -181,7 +181,8 @@ object TestConverter {
         val maxPriorityFeePerGas = testTx.maxPriorityFeePerGas.map(parseBigInt).getOrElse(gasPrice)
         val maxFeePerGas = testTx.maxFeePerGas.map(parseBigInt).getOrElse(gasPrice)
         val maxFeePerBlobGas = testTx.maxFeePerBlobGas.map(parseBigInt).getOrElse(BigInt(0))
-        val blobVersionedHashes = testTx.blobVersionedHashes.getOrElse(List.empty).map(h => ByteString(parseHex(h)))
+        val blobVersionedHashes =
+          testTx.blobVersionedHashes.getOrElse(List.empty).map(h => BlobVersionedHash(ByteString(parseHex(h))))
         BlobTransaction(
           chainId = chainId,
           nonce = nonce,

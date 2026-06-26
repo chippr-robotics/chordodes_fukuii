@@ -92,7 +92,7 @@ object TransactionResponse {
             Some(tx.maxPriorityFeePerGas),
             Some(encodeAccessList(tx.accessList)),
             Some(tx.maxFeePerBlobGas),
-            Some(tx.blobVersionedHashes),
+            Some(tx.blobVersionedHashes.map(_.value)),
             None
           )
         case tx: SetCodeTransaction =>

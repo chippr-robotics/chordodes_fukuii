@@ -245,7 +245,7 @@ class StdSignedTransactionValidatorSpec extends AnyFlatSpec with Matchers {
       payload = ByteString.empty,
       accessList = Nil,
       maxFeePerBlobGas = maxFeePerBlobGas,
-      blobVersionedHashes = List(ByteString(new Array[Byte](32)))
+      blobVersionedHashes = List(BlobVersionedHash(ByteString(new Array[Byte](32))))
     ),
     pointSign = 0x00.toByte,
     signatureRandom = realR,

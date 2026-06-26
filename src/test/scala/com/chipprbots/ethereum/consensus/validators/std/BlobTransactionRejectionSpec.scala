@@ -41,7 +41,7 @@ class BlobTransactionRejectionSpec extends AnyFlatSpec with Matchers {
     payload = ByteString.empty,
     accessList = Nil,
     maxFeePerBlobGas = BigInt("1000000000"),
-    blobVersionedHashes = List(ByteString(Array.fill(32)(0.toByte)))
+    blobVersionedHashes = List(BlobVersionedHash(ByteString(Array.fill(32)(0.toByte))))
   )
 
   private val signedBlobTx = SignedTransaction(

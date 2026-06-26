@@ -121,7 +121,7 @@ object GraphQLSchema {
   }
 
   private def txBlobVersionedHashes(tx: Transaction): Option[List[ByteString]] = tx match {
-    case t: BlobTransaction => Some(t.blobVersionedHashes)
+    case t: BlobTransaction => Some(t.blobVersionedHashes.map(_.value))
     case _                  => None
   }
 

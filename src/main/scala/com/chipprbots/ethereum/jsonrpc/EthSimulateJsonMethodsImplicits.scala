@@ -293,7 +293,7 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
           case t: com.chipprbots.ethereum.domain.BlobTransaction =>
             List(
               "maxFeePerBlobGas" -> encodeAsHex(t.maxFeePerBlobGas),
-              "blobVersionedHashes" -> JArray(t.blobVersionedHashes.map(encodeAsHex).toList)
+              "blobVersionedHashes" -> JArray(t.blobVersionedHashes.map(h => encodeAsHex(h.value)).toList)
             )
           case _ => Nil
         }

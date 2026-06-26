@@ -223,7 +223,7 @@ case class BlobTransaction(
     payload: ByteString,
     accessList: List[AccessListItem],
     maxFeePerBlobGas: BigInt,
-    blobVersionedHashes: List[ByteString]
+    blobVersionedHashes: List[BlobVersionedHash]
 ) extends TypedTransaction {
   override def gasPrice: BigInt = maxFeePerGas
 
@@ -254,7 +254,7 @@ object BlobTransaction {
       payload: ByteString,
       accessList: List[AccessListItem],
       maxFeePerBlobGas: BigInt,
-      blobVersionedHashes: List[ByteString]
+      blobVersionedHashes: List[BlobVersionedHash]
   ): BlobTransaction =
     BlobTransaction(
       chainId,

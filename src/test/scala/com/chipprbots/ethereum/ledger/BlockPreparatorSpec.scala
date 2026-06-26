@@ -468,7 +468,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
         payload = ByteString.empty,
         accessList = Nil,
         maxFeePerBlobGas = 1000,
-        blobVersionedHashes = List.fill(numBlobs)(ByteString(Array.fill(32)(0.toByte)))
+        blobVersionedHashes = List.fill(numBlobs)(BlobVersionedHash(ByteString(Array.fill(32)(0.toByte))))
       )
       val stx = SignedTransaction(blobTx, ECDSASignature(0, 0, 0))
       val header = defaultBlockHeader.copy(

@@ -498,7 +498,7 @@ object ETHPackets {
                 RLPValue(payload.toArray),
                 toRlpList(accessList),
                 RLPValue(ByteUtils.bigIntToUnsignedByteArray(maxFeePerBlobGas)),
-                RLPList(blobVersionedHashes.map(h => RLPValue(h.toArray))*),
+                RLPList(blobVersionedHashes.map(h => RLPValue(h.value.toArray))*),
                 RLPValue(ByteUtils.bigIntToUnsignedByteArray(signedTx.signature.v)),
                 RLPValue(ByteUtils.bigIntToUnsignedByteArray(signedTx.signature.r)),
                 RLPValue(ByteUtils.bigIntToUnsignedByteArray(signedTx.signature.s))
@@ -622,7 +622,7 @@ object ETHPackets {
               fromRlpList[AccessListItem](accessList).toList,
               ByteUtils.bytesToBigInt(maxFeePerBlobGasBytes),
               blobVersionedHashes.items.map {
-                case v: RLPValue => ByteString(v.bytes)
+                case v: RLPValue => BlobVersionedHash(ByteString(v.bytes))
                 case other => throw new RuntimeException(s"Expected RLPValue for blob versioned hash, got: $other")
               }.toList
             ),

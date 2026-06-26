@@ -515,7 +515,7 @@ object SignedTransaction {
             RLPValue(tx.payload.toArray[Byte]),
             tx.accessList,
             tx.maxFeePerBlobGas,
-            RLPList(tx.blobVersionedHashes.map(h => RLPValue(h.toArray))*)
+            RLPList(tx.blobVersionedHashes.map(h => RLPValue(h.value.toArray))*)
           )
         )
       )

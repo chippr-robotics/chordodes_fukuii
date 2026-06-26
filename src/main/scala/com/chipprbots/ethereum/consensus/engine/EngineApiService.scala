@@ -180,7 +180,7 @@ class EngineApiService(
         val payloadHashes: Seq[ByteString] =
           block.body.transactionList.flatMap {
             case SignedTransaction(blobTx: com.chipprbots.ethereum.domain.BlobTransaction, _) =>
-              blobTx.blobVersionedHashes
+              blobTx.blobVersionedHashes.map(_.value)
             case _ => Nil
           }
         expected != payloadHashes
@@ -273,7 +273,7 @@ class EngineApiService(
         val payloadHashes: Seq[ByteString] =
           block.body.transactionList.flatMap {
             case SignedTransaction(blobTx: com.chipprbots.ethereum.domain.BlobTransaction, _) =>
-              blobTx.blobVersionedHashes
+              blobTx.blobVersionedHashes.map(_.value)
             case _ => Nil
           }
         if expected == payloadHashes then None

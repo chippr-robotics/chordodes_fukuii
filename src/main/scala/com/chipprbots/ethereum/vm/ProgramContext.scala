@@ -22,7 +22,7 @@ object ProgramContext {
       tx.gasLimit - evmConfig.calcTransactionIntrinsicGas(tx.payload, tx.isContractInit, accessList, authListSize)
 
     val blobHashes = tx match {
-      case blob: BlobTransaction => blob.blobVersionedHashes
+      case blob: BlobTransaction => blob.blobVersionedHashes.map(_.value)
       case _                     => Seq.empty
     }
 

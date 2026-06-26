@@ -813,7 +813,7 @@ class EthSimulateService(
           payload = payload,
           accessList = call.accessList.getOrElse(Nil),
           maxFeePerBlobGas = call.maxFeePerBlobGas.getOrElse(BigInt(0)),
-          blobVersionedHashes = call.blobVersionedHashes.getOrElse(Nil).toList
+          blobVersionedHashes = call.blobVersionedHashes.getOrElse(Nil).toList.map(BlobVersionedHash(_))
         )
       } else if !isLegacy then {
         TransactionWithDynamicFee(
