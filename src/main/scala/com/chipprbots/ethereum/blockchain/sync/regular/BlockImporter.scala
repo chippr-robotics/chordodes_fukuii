@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -38,6 +37,8 @@ import com.chipprbots.ethereum.mpt.*
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingAccountNodeException
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingStorageNodeException
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor
+import com.chipprbots.ethereum.network.PeerEventBusActor.Command as PeerEventBusCommand
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.ommers.OmmersPool
@@ -82,8 +83,8 @@ object BlockImporter {
       pendingTransactionsManager: TypedActorRef[PendingTransactionsManager.Command],
       blockTopic: TypedActorRef[Topic.Command[NewBlockImported]],
       supervisor: TypedActorRef[RegularSync.Command],
-      peerEventBus: ActorRef,
-      networkPeerManager: ActorRef,
+      peerEventBus: TypedActorRef[PeerEventBusCommand],
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
       blockchain: Blockchain,
       blacklist: Blacklist,
       configBuilder: BlockchainConfigBuilder
@@ -190,8 +191,8 @@ final private class BlockImporterLogic(
     pendingTransactionsManager: TypedActorRef[PendingTransactionsManager.Command],
     blockTopic: TypedActorRef[Topic.Command[NewBlockImported]],
     supervisor: TypedActorRef[RegularSync.Command],
-    peerEventBus: ActorRef,
-    networkPeerManager: ActorRef,
+    peerEventBus: TypedActorRef[PeerEventBusCommand],
+    networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
     blockchain: Blockchain,
     blacklist: Blacklist,
     configBuilder: BlockchainConfigBuilder

@@ -36,7 +36,7 @@ object ByteCodeWorker {
     */
   def apply(
       coordinator: ActorRef[ByteCodeCoordinator.Command],
-      networkPeerManager: org.apache.pekko.actor.ActorRef,
+      networkPeerManager: ActorRef[NetworkPeerManagerActor.Command],
       requestTracker: SNAPRequestTracker
   ): Behavior[Command] =
     Behaviors.withStash[Command](StashCapacity) { stash =>
@@ -45,7 +45,7 @@ object ByteCodeWorker {
 
   private def idle(
       coordinator: ActorRef[ByteCodeCoordinator.Command],
-      networkPeerManager: org.apache.pekko.actor.ActorRef,
+      networkPeerManager: ActorRef[NetworkPeerManagerActor.Command],
       requestTracker: SNAPRequestTracker,
       stash: StashBuffer[Command]
   ): Behavior[Command] =
@@ -78,10 +78,7 @@ object ByteCodeWorker {
           // Send request via NetworkPeerManager
           import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetByteCodes.GetByteCodesEnc
           val messageSerializable: MessageSerializable = new GetByteCodesEnc(request)
-          networkPeerManager.tell(
-            NetworkPeerManagerActor.SendMessageCmd(messageSerializable, peer.id),
-            org.apache.pekko.actor.ActorRef.noSender
-          )
+          networkPeerManager ! NetworkPeerManagerActor.SendMessageCmd(messageSerializable, peer.id)
 
           working(coordinator, networkPeerManager, requestTracker, stash, (task, peer, requestId))
 
@@ -91,7 +88,7 @@ object ByteCodeWorker {
 
   private def working(
       coordinator: ActorRef[ByteCodeCoordinator.Command],
-      networkPeerManager: org.apache.pekko.actor.ActorRef,
+      networkPeerManager: ActorRef[NetworkPeerManagerActor.Command],
       requestTracker: SNAPRequestTracker,
       stash: StashBuffer[Command],
       currentTask: (ByteCodeTask, Peer, BigInt)

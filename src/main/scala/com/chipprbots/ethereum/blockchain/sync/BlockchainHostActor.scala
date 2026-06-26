@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.Scheduler
@@ -58,7 +57,7 @@ object BlockchainHostActor {
       evmCodeStorage: EvmCodeStorage,
       peerConfiguration: PeerConfiguration,
       peerEventBusActor: typed.ActorRef[PeerEventBusCommand],
-      networkPeerManagerActor: ActorRef,
+      networkPeerManagerActor: typed.ActorRef[NetworkPeerManagerActor.Command],
       pendingTransactionsManager: typed.ActorRef[
         com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
       ]

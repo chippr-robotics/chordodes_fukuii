@@ -19,6 +19,7 @@ import org.slf4j.Logger
 import com.chipprbots.ethereum.blockchain.sync.ProgressMilestones
 import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncConfig
 import com.chipprbots.ethereum.blockchain.sync.snap.StorageTask
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.StorageRanges
 import com.chipprbots.ethereum.blockchain.sync.snap.actors
 import com.chipprbots.ethereum.db.storage.AppStateStorage
@@ -91,7 +92,7 @@ object StorageRecoveryActor {
       stateStorage: StateStorage,
       appStateStorage: AppStateStorage,
       flatSlotStorage: FlatSlotStorage,
-      networkPeerManager: ActorRef,
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
       syncController: TypedActorRef[SyncControllerMsg],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig
@@ -116,7 +117,7 @@ object StorageRecoveryActor {
       stateStorage: StateStorage,
       appStateStorage: AppStateStorage,
       flatSlotStorage: FlatSlotStorage,
-      networkPeerManager: ActorRef,
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
       syncController: TypedActorRef[SyncControllerMsg],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig,
@@ -140,7 +141,7 @@ object StorageRecoveryActor {
       stateStorage: StateStorage,
       appStateStorage: AppStateStorage,
       flatSlotStorage: FlatSlotStorage,
-      networkPeerManager: ActorRef,
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
       syncController: TypedActorRef[SyncControllerMsg],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig,
@@ -164,7 +165,7 @@ object StorageRecoveryActor {
       stateStorage: StateStorage,
       appStateStorage: AppStateStorage,
       flatSlotStorage: FlatSlotStorage,
-      networkPeerManager: ActorRef,
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
       syncController: TypedActorRef[SyncControllerMsg],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig,

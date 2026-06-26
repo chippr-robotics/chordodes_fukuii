@@ -2,7 +2,6 @@ package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.ActorRef
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.duration.*
@@ -80,7 +79,7 @@ class RebuildFrontierBfsMultiSeedSpec
   private def runSingleSeedWalk(storage: TestMptStorage, root: ByteString): Int = {
     val coordinator = HealingTrieFixtures.spawnCoordinator(
       stateRoot = root,
-      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]().ref.toClassic,
+      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]().ref,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 16,

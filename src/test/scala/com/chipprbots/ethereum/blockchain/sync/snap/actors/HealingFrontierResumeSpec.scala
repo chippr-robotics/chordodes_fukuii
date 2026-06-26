@@ -7,7 +7,6 @@ import java.util.concurrent.TimeUnit
 
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.ActorRef
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.ExecutionContext
@@ -108,7 +107,7 @@ class HealingFrontierResumeSpec extends ScalaTestWithActorTestKit() with AnyFlat
     val root = if rootInStorage then storedRoot(storage) else kec256(ByteString("write-on-queue-root"))
     val coordinator = HealingTrieFixtures.spawnCoordinator(
       stateRoot = root,
-      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]().ref.toClassic,
+      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]().ref,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 16,

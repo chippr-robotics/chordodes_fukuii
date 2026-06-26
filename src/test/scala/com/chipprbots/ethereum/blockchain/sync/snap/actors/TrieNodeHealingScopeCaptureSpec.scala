@@ -130,7 +130,7 @@ class TrieNodeHealingScopeCaptureSpec
     val controllerProbe = testKit.createTestProbe[SNAPSyncController.Command]()
     val coordinator = HealingTrieFixtures.spawnCoordinator(
       stateRoot = stateRoot,
-      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]().ref.toClassic,
+      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]().ref,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 64,

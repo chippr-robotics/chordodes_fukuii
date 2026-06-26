@@ -1,12 +1,10 @@
 package com.chipprbots.ethereum.blockchain.sync.fast
 
-import org.apache.pekko.actor.ActorRef as ClassicActorRef
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import cats.data.NonEmptyList
@@ -34,6 +32,7 @@ import com.chipprbots.ethereum.mpt.HexPrefix
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerId
+import com.chipprbots.ethereum.network.PeerEventBusActor.Command as PeerEventBusCommand
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.p2p.messages.Capability
@@ -77,8 +76,8 @@ object SyncStateSchedulerActor {
   def behavior(
       sync: SyncStateScheduler,
       syncConfig: SyncConfig,
-      networkPeerManager: ClassicActorRef,
-      peerEventBus: ClassicActorRef,
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
+      peerEventBus: TypedActorRef[PeerEventBusCommand],
       blacklist: Blacklist,
       replyTo: TypedActorRef[SyncStateSchedulerActorResponse],
       statsReplyTo: TypedActorRef[StateSyncStats]
@@ -191,8 +190,8 @@ object SyncStateSchedulerActor {
       timers: TimerScheduler[Command],
       sync: SyncStateScheduler,
       syncConfig: SyncConfig,
-      networkPeerManager: ClassicActorRef,
-      peerEventBus: ClassicActorRef,
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
+      peerEventBus: TypedActorRef[PeerEventBusCommand],
       @annotation.unused blacklist: Blacklist,
       replyTo: TypedActorRef[SyncStateSchedulerActorResponse],
       statsReplyTo: TypedActorRef[StateSyncStats],

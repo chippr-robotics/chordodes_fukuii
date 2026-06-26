@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum.transactions
 
-import org.apache.pekko.actor.ActorRef as ClassicActorRef
 import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.MailboxSelector
@@ -90,7 +89,7 @@ object PendingTransactionsManager {
   def apply(
       txPoolConfig: TxPoolConfig,
       peerManager: ActorRef[PeerManagerActor.Command],
-      networkPeerManager: ClassicActorRef,
+      networkPeerManager: ActorRef[NetworkPeerManagerActor.Command],
       peerEventBus: ActorRef[PeerEventBusCommand],
       pendingTxTopic: ActorRef[Topic.Command[NewPendingTransaction]],
       blockchainReader: com.chipprbots.ethereum.domain.BlockchainReader = null,

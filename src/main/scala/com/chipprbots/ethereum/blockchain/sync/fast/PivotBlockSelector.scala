@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum.blockchain.sync.fast
 
-import org.apache.pekko.actor.ActorRef as ClassicActorRef
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
@@ -79,7 +78,7 @@ object PivotBlockSelector {
   private case object BacklinkTimeoutKey
 
   def apply(
-      networkPeerManager: ClassicActorRef,
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
       peerEventBus: TypedActorRef[PeerEventBusCommand],
       syncConfig: SyncConfig,
       replyTo: TypedActorRef[Result],
@@ -175,7 +174,7 @@ object PivotBlockSelector {
   private class Impl(
       ctx: ActorContext[Command],
       timers: TimerScheduler[Command],
-      networkPeerManager: ClassicActorRef,
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
       peerEventBus: TypedActorRef[PeerEventBusCommand],
       syncConfig: SyncConfig,
       replyTo: TypedActorRef[Result],

@@ -1,12 +1,10 @@
 package com.chipprbots.ethereum.blockchain.sync.fast
 
-import org.apache.pekko.actor.ActorRef as ClassicActorRef
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 
 import scala.concurrent.duration.*
 
@@ -22,6 +20,7 @@ import com.chipprbots.ethereum.domain.Blockchain
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.Peer
+import com.chipprbots.ethereum.network.PeerEventBusActor.Command as PeerEventBusCommand
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.network.p2p.messages.Capability
@@ -114,8 +113,8 @@ object FastSyncBranchResolverActor {
   // scalastyle:off parameter.number
   def apply(
       replyTo: TypedActorRef[BranchResolverResponse],
-      peerEventBus: ClassicActorRef,
-      networkPeerManager: ClassicActorRef,
+      peerEventBus: TypedActorRef[PeerEventBusCommand],
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
       blockchain: Blockchain,
       blockchainReader: BlockchainReader,
       blacklist: Blacklist,
@@ -169,8 +168,8 @@ object FastSyncBranchResolverActor {
       context: ActorContext[Command],
       timers: TimerScheduler[Command],
       replyTo: TypedActorRef[BranchResolverResponse],
-      peerEventBus: ClassicActorRef,
-      networkPeerManager: ClassicActorRef,
+      peerEventBus: TypedActorRef[PeerEventBusCommand],
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
       blockchainReader: BlockchainReader,
       syncConfig: SyncConfig,
       peerListHelper: PeerListHelper,

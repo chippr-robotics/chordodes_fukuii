@@ -43,7 +43,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
   // Mirrors the `.props(...)` factory the actor previously exposed.
   private def bccProps(
       evmCodeStorage: TestEvmCodeStorage,
-      networkPeerManager: org.apache.pekko.actor.ActorRef,
+      networkPeerManager: org.apache.pekko.actor.typed.ActorRef[NetworkPeerManagerActor.Command],
       requestTracker: SNAPRequestTracker,
       batchSize: Int,
       snapSyncController: org.apache.pekko.actor.typed.ActorRef[SNAPSyncController.Command],
@@ -83,12 +83,12 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
   "ByteCodeCoordinator" should "initialize with empty task queue" taggedAs UnitTest in {
     val evmCodeStorage = new TestEvmCodeStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = bccProps(
       evmCodeStorage = evmCodeStorage,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       batchSize = 8,
       snapSyncController = snapSyncController.ref
@@ -100,12 +100,12 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
   it should "queue contract accounts for download" taggedAs UnitTest in {
     val evmCodeStorage = new TestEvmCodeStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = bccProps(
       evmCodeStorage = evmCodeStorage,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       batchSize = 8,
       snapSyncController = snapSyncController.ref
@@ -126,7 +126,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
   it should "create workers when peers are available" taggedAs UnitTest in {
     val evmCodeStorage = new TestEvmCodeStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
     val peerProbe = testKit.createTestProbe[Any]()
 
@@ -134,7 +134,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
 
     val coordinator = bccProps(
       evmCodeStorage = evmCodeStorage,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       batchSize = 8,
       snapSyncController = snapSyncController.ref
@@ -152,12 +152,12 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
   it should "handle task completion" taggedAs UnitTest in {
     val evmCodeStorage = new TestEvmCodeStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = bccProps(
       evmCodeStorage = evmCodeStorage,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       batchSize = 8,
       snapSyncController = snapSyncController.ref
@@ -176,7 +176,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
   it should "dispatch pending task immediately on ByteCodeTaskComplete without a new ByteCodePeerAvailable" taggedAs UnitTest in {
     val evmCodeStorage = new TestEvmCodeStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
     val peerProbe = testKit.createTestProbe[Any]()
     val peer = PeerTestHelpers.createTestPeer("redispatch-peer", peerProbe.ref.toClassic)
@@ -185,7 +185,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
     val peerCooldown = testCooldownConfig.copy(maxInFlightPerPeer = 1)
     val coordinator = bccProps(
       evmCodeStorage = evmCodeStorage,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       batchSize = 1,
       snapSyncController = snapSyncController.ref,
@@ -218,12 +218,12 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
   it should "report completion when all bytecodes downloaded" taggedAs UnitTest in {
     val evmCodeStorage = new TestEvmCodeStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = bccProps(
       evmCodeStorage = evmCodeStorage,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       batchSize = 8,
       snapSyncController = snapSyncController.ref
@@ -243,12 +243,12 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
   it should "handle task failures gracefully" taggedAs UnitTest in {
     val evmCodeStorage = new TestEvmCodeStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = bccProps(
       evmCodeStorage = evmCodeStorage,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       batchSize = 8,
       snapSyncController = snapSyncController.ref
@@ -264,7 +264,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
   it should "accept ByteCodes as a subsequence and re-queue missing hashes" taggedAs UnitTest in {
     val evmCodeStorage = new TestEvmCodeStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
     val peerProbe = testKit.createTestProbe[Any]()
 
@@ -272,7 +272,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
 
     val coordinator = bccProps(
       evmCodeStorage = evmCodeStorage,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       batchSize = 8,
       snapSyncController = snapSyncController.ref
@@ -314,7 +314,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
   it should "reject out-of-order ByteCodes responses and retry" taggedAs UnitTest in {
     val evmCodeStorage = new TestEvmCodeStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
     val peerProbe = testKit.createTestProbe[Any]()
 
@@ -322,7 +322,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
 
     val coordinator = bccProps(
       evmCodeStorage = evmCodeStorage,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       batchSize = 8,
       snapSyncController = snapSyncController.ref,
@@ -368,7 +368,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
   it should "reject duplicate bytecodes in a ByteCodes response" taggedAs UnitTest in {
     val evmCodeStorage = new TestEvmCodeStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
     val peerProbe = testKit.createTestProbe[Any]()
 
@@ -376,7 +376,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
 
     val coordinator = bccProps(
       evmCodeStorage = evmCodeStorage,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       batchSize = 8,
       snapSyncController = snapSyncController.ref,
@@ -418,7 +418,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
   it should "cool down peers after empty ByteCodes responses" taggedAs UnitTest in {
     val evmCodeStorage = new TestEvmCodeStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
     val peerProbe = testKit.createTestProbe[Any]()
 
@@ -426,7 +426,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
 
     val coordinator = bccProps(
       evmCodeStorage = evmCodeStorage,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       batchSize = 8,
       snapSyncController = snapSyncController.ref,
@@ -463,7 +463,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
   it should "allow a cooled-down peer to dispatch immediately after ByteCodePivotRefreshed" taggedAs UnitTest in {
     val evmCodeStorage = new TestEvmCodeStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
     val peerProbe = testKit.createTestProbe[Any]()
 
@@ -471,7 +471,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
 
     val coordinator = bccProps(
       evmCodeStorage = evmCodeStorage,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       batchSize = 8,
       snapSyncController = snapSyncController.ref,
@@ -508,7 +508,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
   it should "dispatch new tasks to a peer retained in knownAvailablePeers after ByteCodePivotRefreshed" taggedAs UnitTest in {
     val evmCodeStorage = new TestEvmCodeStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
     val peerProbe = testKit.createTestProbe[Any]()
 
@@ -516,7 +516,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
 
     val coordinator = bccProps(
       evmCodeStorage = evmCodeStorage,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       batchSize = 8,
       snapSyncController = snapSyncController.ref,
@@ -552,7 +552,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
   it should "reject a bytecode whose kec256 hash is not in the requested list and put peer in cooldown" taggedAs UnitTest in {
     val evmCodeStorage = new TestEvmCodeStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
     val peerProbe = testKit.createTestProbe[Any]()
 
@@ -560,7 +560,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
 
     val coordinator = bccProps(
       evmCodeStorage = evmCodeStorage,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       batchSize = 8,
       snapSyncController = snapSyncController.ref,
@@ -607,12 +607,12 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
   it should "force-complete bytecode sync, abandoning pending tasks (#1164)" taggedAs UnitTest in {
     val evmCodeStorage = new TestEvmCodeStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = bccProps(
       evmCodeStorage = evmCodeStorage,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       batchSize = 8,
       snapSyncController = snapSyncController.ref,
@@ -641,7 +641,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
   it should "return active workers to idle pool on ForceCompleteByteCodes mid-flight" taggedAs UnitTest in {
     val evmCodeStorage = new TestEvmCodeStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
     val peerProbe = testKit.createTestProbe[Any]()
     val peer = PeerTestHelpers.createTestPeer("fc-active-peer", peerProbe.ref.toClassic)
@@ -650,7 +650,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
     val peerCooldown = testCooldownConfig.copy(maxInFlightPerPeer = 2)
     val coordinator = bccProps(
       evmCodeStorage = evmCodeStorage,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       batchSize = 1,
       snapSyncController = snapSyncController.ref,
@@ -683,12 +683,12 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
   it should "handle ForceCompleteByteCodes when queues are already empty" taggedAs UnitTest in {
     val evmCodeStorage = new TestEvmCodeStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     val coordinator = bccProps(
       evmCodeStorage = evmCodeStorage,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       batchSize = 8,
       snapSyncController = snapSyncController.ref,
@@ -715,7 +715,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
   it should "remove a terminated worker from the pool and re-queue its active task" taggedAs UnitTest in {
     val evmCodeStorage = new TestEvmCodeStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
     val peerProbe = testKit.createTestProbe[Any]()
 
@@ -723,7 +723,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
 
     val coordinator = bccProps(
       evmCodeStorage = evmCodeStorage,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       batchSize = 8,
       snapSyncController = snapSyncController.ref,
@@ -750,7 +750,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
   it should "remove a terminated worker with no active task without affecting pending dispatch" taggedAs UnitTest in {
     val evmCodeStorage = new TestEvmCodeStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
     val peerProbe = testKit.createTestProbe[Any]()
 
@@ -758,7 +758,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
 
     val coordinator = bccProps(
       evmCodeStorage = evmCodeStorage,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       batchSize = 8,
       snapSyncController = snapSyncController.ref,
@@ -791,7 +791,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
   it should "restore workers to idle pool when a peer disconnects mid-flight" taggedAs UnitTest in {
     val evmCodeStorage = new TestEvmCodeStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
     val peerProbe = testKit.createTestProbe[Any]()
 
@@ -802,7 +802,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
     val peerCooldown = testCooldownConfig.copy(maxInFlightPerPeer = 3)
     val coordinator = bccProps(
       evmCodeStorage = evmCodeStorage,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       batchSize = 1,
       snapSyncController = snapSyncController.ref,
@@ -833,14 +833,14 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
   it should "emit ByteCodeBackpressureChanged when the pending queue crosses watermarks" taggedAs UnitTest in {
     val evmCodeStorage = new TestEvmCodeStorage()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
 
     // Tiny watermarks: high=4, low=2. batchSize=1 so one hash → one task → one queue entry,
     // letting us drive the transition with a handful of hashes.
     val coordinator = bccProps(
       evmCodeStorage = evmCodeStorage,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = requestTracker,
       batchSize = 1,
       snapSyncController = snapSyncController.ref,

@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 
-import org.apache.pekko.actor.ActorRef
+import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 
 import scala.util.Random
 
@@ -20,7 +20,10 @@ import com.chipprbots.ethereum.network.p2p.messages.ETH69
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.BlockHash
 
-class BlockBroadcast(val networkPeerManager: ActorRef, val isPoWChain: Boolean = false) {
+class BlockBroadcast(
+    val networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
+    val isPoWChain: Boolean = false
+) {
   private val log = LoggerFactory.getLogger(getClass)
 
   /** Broadcasts various NewBlock's messages to handshaked peers, considering that a block should not be sent to a peer

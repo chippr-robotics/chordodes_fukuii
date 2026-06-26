@@ -67,12 +67,12 @@ class DecoupledHealObservabilitySpec
       decoupled: Boolean
   ): (
       ActorRef[TrieNodeHealingCoordinator.Command],
-      org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[NetworkPeerManagerActor.SendMessageCmd]
+      org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[NetworkPeerManagerActor.Command]
   ) = {
-    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+    val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val coordinator = HealingTrieFixtures.spawnCoordinator(
       stateRoot = stateRoot,
-      networkPeerManager = networkPeerManager.ref.toClassic,
+      networkPeerManager = networkPeerManager.ref,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = new TestMptStorage(),
       batchSize = 16,

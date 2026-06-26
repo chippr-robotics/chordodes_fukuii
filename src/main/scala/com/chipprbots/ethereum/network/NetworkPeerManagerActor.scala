@@ -50,7 +50,7 @@ object NetworkPeerManagerActor {
 
   // Ask-path commands:
   final case class GetHandshakedPeersCmd(replyTo: typed.ActorRef[HandshakedPeers]) extends Command
-  final case class PeerInfoRequestCmd(peerId: PeerId, replyTo: ActorRef) extends Command
+  final case class PeerInfoRequestCmd(peerId: PeerId, replyTo: typed.ActorRef[PeerInfoResponse]) extends Command
 
   // Timer tick self-messages (keys and payloads for Behaviors.withTimers):
   private[network] case object LogNetworkSummaryTick extends Command

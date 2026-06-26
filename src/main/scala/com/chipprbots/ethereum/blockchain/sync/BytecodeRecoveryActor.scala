@@ -18,6 +18,7 @@ import org.slf4j.Logger
 
 import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncConfig
 import com.chipprbots.ethereum.db.storage.AppStateStorage
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.ByteCodes
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.StateStorage
@@ -66,7 +67,7 @@ object BytecodeRecoveryActor {
       stateStorage: StateStorage,
       evmCodeStorage: EvmCodeStorage,
       appStateStorage: AppStateStorage,
-      networkPeerManager: ActorRef,
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
       syncController: TypedActorRef[RecoveryComplete.type],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig
@@ -91,7 +92,7 @@ object BytecodeRecoveryActor {
       stateStorage: StateStorage,
       evmCodeStorage: EvmCodeStorage,
       appStateStorage: AppStateStorage,
-      networkPeerManager: ActorRef,
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
       syncController: TypedActorRef[RecoveryComplete.type],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig,
@@ -115,7 +116,7 @@ object BytecodeRecoveryActor {
       stateStorage: StateStorage,
       evmCodeStorage: EvmCodeStorage,
       appStateStorage: AppStateStorage,
-      networkPeerManager: ActorRef,
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
       syncController: TypedActorRef[RecoveryComplete.type],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig,
@@ -139,7 +140,7 @@ object BytecodeRecoveryActor {
       stateStorage: StateStorage,
       evmCodeStorage: EvmCodeStorage,
       appStateStorage: AppStateStorage,
-      networkPeerManager: ActorRef,
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
       syncController: TypedActorRef[RecoveryComplete.type],
       pivotBlockNumber: BigInt,
       snapSyncConfig: SNAPSyncConfig,

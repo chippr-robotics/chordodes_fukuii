@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum.jsonrpc
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed
 import org.apache.pekko.util.Timeout
 
@@ -32,7 +31,7 @@ object DebugService {
   */
 class DebugService(
     peerManager: typed.ActorRef[PeerManagerActor.Command],
-    networkPeerManager: ActorRef
+    networkPeerManager: typed.ActorRef[NetworkPeerManagerActor.Command]
 )(implicit scheduler: typed.Scheduler) {
 
   def listPeersInfo(@unused getPeersInfoRequest: ListPeersInfoRequest): ServiceResponse[ListPeersInfoResponse] =
@@ -54,7 +53,7 @@ class DebugService(
     given timeout: Timeout = Timeout(20.seconds)
 
     networkPeerManager
-      .askForVia[PeerInfoResponse](replyTo => NetworkPeerManagerActor.PeerInfoRequestCmd(peer, replyTo))
+      .askForTyped[PeerInfoResponse](replyTo => NetworkPeerManagerActor.PeerInfoRequestCmd(peer, replyTo))
       .map(resp => resp.peerInfo)
   }
 }

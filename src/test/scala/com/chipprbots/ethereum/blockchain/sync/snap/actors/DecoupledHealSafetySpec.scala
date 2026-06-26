@@ -110,11 +110,11 @@ class DecoupledHealSafetySpec extends ScalaTestWithActorTestKit() with AnyFlatSp
     "drop a returned node whose keccak != requested hash — not stored, not counted, task stays pending" taggedAs UnitTest in {
       val stateRoot = kec256(ByteString("safety-t3-walk-root"))
       val storage = new TestMptStorage()
-      val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+      val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
       val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
       val coordinator = HealingTrieFixtures.spawnCoordinator(
         stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref.toClassic,
+        networkPeerManager = networkPeerManager.ref,
         requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
         mptStorage = storage,
         batchSize = 16,
@@ -162,11 +162,11 @@ class DecoupledHealSafetySpec extends ScalaTestWithActorTestKit() with AnyFlatSp
       val maxAttempts = 2 // small threshold so 3 unsatisfied attempts cross it deterministically
       val stateRoot = kec256(ByteString("safety-t4-walk-root"))
       val storage = new TestMptStorage()
-      val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]()
+      val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
       val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
       val coordinator = HealingTrieFixtures.spawnCoordinator(
         stateRoot = stateRoot,
-        networkPeerManager = networkPeerManager.ref.toClassic,
+        networkPeerManager = networkPeerManager.ref,
         requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
         mptStorage = storage,
         batchSize = 16,
@@ -265,7 +265,7 @@ class DecoupledHealSafetySpec extends ScalaTestWithActorTestKit() with AnyFlatSp
     val controller = testKit.createTestProbe[SNAPSyncController.Command]()
     val coordinator = HealingTrieFixtures.spawnCoordinator(
       stateRoot = root,
-      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.SendMessageCmd]().ref.toClassic,
+      networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]().ref,
       requestTracker = new SNAPRequestTracker()(classicSystem.scheduler),
       mptStorage = storage,
       batchSize = 64,

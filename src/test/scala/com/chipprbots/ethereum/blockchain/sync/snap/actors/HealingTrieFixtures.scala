@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.util.ByteString
@@ -19,6 +18,7 @@ import com.chipprbots.ethereum.mpt.HashNode
 import com.chipprbots.ethereum.mpt.LeafNode
 import com.chipprbots.ethereum.mpt.MptNode
 import com.chipprbots.ethereum.mpt.NullNode
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.testing.TestMptStorage
 
 /** Deterministic synthetic-trie fixtures for the post-SNAP frontier-rebuild walk
@@ -53,7 +53,7 @@ object HealingTrieFixtures {
     */
   def spawnCoordinator(
       stateRoot: ByteString,
-      networkPeerManager: ActorRef,
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
       requestTracker: SNAPRequestTracker,
       mptStorage: MptStorage,
       batchSize: Int,

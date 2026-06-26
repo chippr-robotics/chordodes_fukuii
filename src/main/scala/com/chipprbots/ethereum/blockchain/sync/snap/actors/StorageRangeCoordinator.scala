@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -50,7 +49,7 @@ private[actors] class StorageRangeCoordinatorImpl(
     context: ActorContext[StorageRangeCoordinator.Command],
     timers: TimerScheduler[StorageRangeCoordinator.Command],
     initialStateRoot: ByteString,
-    networkPeerManager: ActorRef,
+    networkPeerManager: org.apache.pekko.actor.typed.ActorRef[NetworkPeerManagerActor.Command],
     requestTracker: SNAPRequestTracker,
     mptStorage: MptStorage,
     flatSlotStorage: FlatSlotStorage,
@@ -1680,7 +1679,7 @@ object StorageRangeCoordinator {
     */
   def apply(
       stateRoot: ByteString,
-      networkPeerManager: ActorRef,
+      networkPeerManager: org.apache.pekko.actor.typed.ActorRef[NetworkPeerManagerActor.Command],
       requestTracker: SNAPRequestTracker,
       mptStorage: MptStorage,
       flatSlotStorage: FlatSlotStorage,

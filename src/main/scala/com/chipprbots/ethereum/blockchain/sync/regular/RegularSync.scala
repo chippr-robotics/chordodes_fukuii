@@ -1,9 +1,7 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.event.Logging
 import org.apache.pekko.event.LoggingAdapter
@@ -25,6 +23,8 @@ import com.chipprbots.ethereum.domain.Blockchain
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
 import com.chipprbots.ethereum.ledger.BranchResolution
+import com.chipprbots.ethereum.network.NetworkPeerManagerActor
+import com.chipprbots.ethereum.network.PeerEventBusActor.Command as PeerEventBusCommand
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.ommers.OmmersPool
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
@@ -44,8 +44,8 @@ object RegularSync {
   // scalastyle:off parameter.number
   def apply(
       peersClient: TypedActorRef[PeersClient.Command],
-      networkPeerManager: ActorRef,
-      peerEventBus: ActorRef,
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
+      peerEventBus: TypedActorRef[PeerEventBusCommand],
       consensus: ConsensusAdapter,
       blockchain: Blockchain,
       blockchainReader: BlockchainReader,

@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
@@ -30,7 +29,7 @@ object BlockBroadcasterActor {
   def apply(
       broadcast: BlockBroadcast,
       peerEventBus: TypedActorRef[PeerEventBusCommand],
-      networkPeerManager: ActorRef,
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
       blacklist: Blacklist,
       syncConfig: SyncConfig
   ): Behavior[BroadcasterMsg] =
@@ -61,7 +60,7 @@ object BlockBroadcasterActor {
   private def running(
       peerListHelper: PeerListHelper,
       broadcast: BlockBroadcast,
-      networkPeerManager: ActorRef,
+      networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
       handshakedPeersAdapter: TypedActorRef[NetworkPeerManagerActor.HandshakedPeers]
   ): Behavior[BroadcasterMsg] =
     Behaviors.receiveMessage {
