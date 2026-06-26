@@ -9,7 +9,6 @@ import org.apache.pekko.actor.typed.DispatcherSelector
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import cats.data.NonEmptyList
@@ -271,7 +270,7 @@ object FastSync {
       val pivotBlockSelector = ctx
         .spawn(
           PivotBlockSelector(
-            networkPeerManager.toClassic,
+            networkPeerManager,
             peerEventBus,
             syncConfig,
             pivotResultAdapter,
@@ -297,7 +296,7 @@ object FastSync {
             val pivotBlockSelector = ctx
               .spawn(
                 PivotBlockSelector(
-                  networkPeerManager.toClassic,
+                  networkPeerManager,
                   peerEventBus,
                   syncConfig,
                   pivotResultAdapter,
@@ -416,8 +415,8 @@ object FastSync {
                   syncConfig.stateSyncBloomFilterSize
                 ),
                 syncConfig,
-                networkPeerManager.toClassic,
-                peerEventBus.toClassic,
+                networkPeerManager,
+                peerEventBus,
                 blacklist,
                 schedulerResponseAdapter,
                 stateSyncStatsAdapter
@@ -683,7 +682,7 @@ object FastSync {
         ctx
           .spawn(
             PivotBlockSelector(
-              networkPeerManager.toClassic,
+              networkPeerManager,
               peerEventBus,
               syncConfig,
               pivotResultAdapter,
@@ -1118,8 +1117,8 @@ object FastSync {
                 replyTo = ctx.messageAdapter[FastSyncBranchResolverActor.BranchResolverResponse](
                   WrappedBranchResolverResponse(_)
                 ),
-                peerEventBus = peerEventBus.toClassic,
-                networkPeerManager = networkPeerManager.toClassic,
+                peerEventBus = peerEventBus,
+                networkPeerManager = networkPeerManager,
                 blockchain = blockchain,
                 blockchainReader = blockchainReader,
                 blacklist = blacklist,

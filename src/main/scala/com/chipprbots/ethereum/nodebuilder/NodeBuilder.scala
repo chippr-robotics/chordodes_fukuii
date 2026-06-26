@@ -428,7 +428,7 @@ trait BlockchainHostBuilder {
       storagesInstance.storages.evmCodeStorage,
       peerConfiguration,
       peerEventBus,
-      networkPeerManager.toClassic,
+      networkPeerManager,
       pendingTransactionsManagerTyped
     ),
     "blockchain-host"
@@ -478,7 +478,7 @@ object PendingTransactionsManagerBuilder {
         PendingTransactionsManager(
           txPoolConfig,
           peerManager,
-          networkPeerManager.toClassic,
+          networkPeerManager,
           peerEventBus,
           pendingTxTopic,
           blockchainReader,
@@ -526,7 +526,7 @@ trait FilterManagerBuilder {
 trait DebugServiceBuilder {
   self: NetworkPeerManagerActorBuilder & PeerManagerActorBuilder & ActorSystemBuilder =>
 
-  lazy val debugService = new DebugService(peerManager, networkPeerManager.toClassic)(classicSystem.toTyped.scheduler)
+  lazy val debugService = new DebugService(peerManager, networkPeerManager)(classicSystem.toTyped.scheduler)
 }
 
 trait EthProofServiceBuilder {

@@ -2347,7 +2347,7 @@ private class SNAPSyncControllerImpl(
                 ctx.spawn(
                   actors.ByteCodeCoordinator(
                     evmCodeStorage = evmCodeStorage,
-                    networkPeerManager = networkPeerManager.toClassic,
+                    networkPeerManager = networkPeerManager,
                     requestTracker = requestTracker,
                     batchSize = ByteCodeTask.DEFAULT_BATCH_SIZE,
                     snapSyncController = ctx.self
@@ -2366,7 +2366,7 @@ private class SNAPSyncControllerImpl(
                 ctx.spawn(
                   actors.StorageRangeCoordinator(
                     stateRoot = rootBs,
-                    networkPeerManager = networkPeerManager.toClassic,
+                    networkPeerManager = networkPeerManager,
                     requestTracker = requestTracker,
                     mptStorage = storage,
                     flatSlotStorage = flatSlotStorage,
@@ -3411,7 +3411,7 @@ private class SNAPSyncControllerImpl(
         ctx.spawn(
           actors.ByteCodeCoordinator(
             evmCodeStorage = evmCodeStorage,
-            networkPeerManager = networkPeerManager.toClassic,
+            networkPeerManager = networkPeerManager,
             requestTracker = requestTracker,
             batchSize = ByteCodeTask.DEFAULT_BATCH_SIZE,
             snapSyncController = ctx.self
@@ -3434,7 +3434,7 @@ private class SNAPSyncControllerImpl(
         ctx.spawn(
           actors.StorageRangeCoordinator(
             stateRoot = rootHash,
-            networkPeerManager = networkPeerManager.toClassic,
+            networkPeerManager = networkPeerManager,
             requestTracker = requestTracker,
             mptStorage = storage,
             flatSlotStorage = flatSlotStorage,
@@ -3625,7 +3625,7 @@ private class SNAPSyncControllerImpl(
         ctx.spawn(
           actors.TrieNodeHealingCoordinator(
             stateRoot = root,
-            networkPeerManager = networkPeerManager.toClassic,
+            networkPeerManager = networkPeerManager,
             requestTracker = requestTracker,
             mptStorage = storage,
             batchSize = snapSyncConfig.healingBatchSize,
@@ -3693,7 +3693,7 @@ private class SNAPSyncControllerImpl(
             ctx.spawn(
               actors.TrieNodeHealingCoordinator(
                 stateRoot = root,
-                networkPeerManager = networkPeerManager.toClassic,
+                networkPeerManager = networkPeerManager,
                 requestTracker = requestTracker,
                 mptStorage = storage,
                 batchSize = snapSyncConfig.healingBatchSize,

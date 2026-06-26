@@ -8,7 +8,6 @@ import org.apache.pekko.actor.typed.PostStop
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
-import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.duration.*
@@ -1750,8 +1749,8 @@ object SyncController {
         .spawn(
           RegularSync.apply(
             peersClient,
-            networkPeerManager.toClassic,
-            peerEventBus.toClassic,
+            networkPeerManager,
+            peerEventBus,
             consensus,
             blockchain,
             blockchainReader,
@@ -1923,7 +1922,7 @@ object SyncController {
                         stateStorage,
                         evmCodeStorage,
                         appStateStorage,
-                        networkPeerManager.toClassic,
+                        networkPeerManager,
                         bytecodeRecoveryAdapter,
                         pivotBlock,
                         snapSyncConfig
@@ -1943,7 +1942,7 @@ object SyncController {
                         stateStorage,
                         appStateStorage,
                         flatSlotStorage,
-                        networkPeerManager.toClassic,
+                        networkPeerManager,
                         storageRecoveryAdapter,
                         pivotBlock,
                         snapSyncConfig
@@ -1999,7 +1998,7 @@ object SyncController {
                       stateStorage,
                       evmCodeStorage,
                       appStateStorage,
-                      networkPeerManager.toClassic,
+                      networkPeerManager,
                       bytecodeRecoveryAdapter,
                       pivotBlock,
                       snapSyncConfig,
@@ -2020,7 +2019,7 @@ object SyncController {
                       stateStorage,
                       appStateStorage,
                       flatSlotStorage,
-                      networkPeerManager.toClassic,
+                      networkPeerManager,
                       storageRecoveryAdapter,
                       pivotBlock,
                       snapSyncConfig,
@@ -2429,8 +2428,8 @@ object SyncController {
         .spawn(
           RegularSync.apply(
             peersClient,
-            networkPeerManager.toClassic,
-            peerEventBus.toClassic,
+            networkPeerManager,
+            peerEventBus,
             consensus,
             blockchain,
             blockchainReader,
