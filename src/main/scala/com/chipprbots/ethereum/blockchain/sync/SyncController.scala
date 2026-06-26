@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum.blockchain.sync
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
@@ -167,7 +166,7 @@ object SyncController {
       fastSyncStateStorage: FastSyncStateStorage,
       consensus: ConsensusAdapter,
       validators: Validators,
-      peerEventBus: ActorRef,
+      peerEventBus: TypedActorRef[com.chipprbots.ethereum.network.PeerEventBusActor.Command],
       pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
         com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
       ],
@@ -175,7 +174,7 @@ object SyncController {
         org.apache.pekko.actor.typed.pubsub.Topic.Command[com.chipprbots.ethereum.jsonrpc.NewBlockImported]
       ],
       ommersPool: org.apache.pekko.actor.typed.ActorRef[com.chipprbots.ethereum.ommers.OmmersPool.Command],
-      networkPeerManager: ActorRef,
+      networkPeerManager: TypedActorRef[com.chipprbots.ethereum.network.NetworkPeerManagerActor.Command],
       blacklist: Blacklist,
       syncConfig: SyncConfig,
       configBuilder: BlockchainConfigBuilder,
@@ -235,7 +234,7 @@ object SyncController {
       fastSyncStateStorage: FastSyncStateStorage,
       consensus: ConsensusAdapter,
       validators: Validators,
-      peerEventBus: ActorRef,
+      peerEventBus: TypedActorRef[com.chipprbots.ethereum.network.PeerEventBusActor.Command],
       pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
         com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
       ],
@@ -243,7 +242,7 @@ object SyncController {
         org.apache.pekko.actor.typed.pubsub.Topic.Command[com.chipprbots.ethereum.jsonrpc.NewBlockImported]
       ],
       ommersPool: org.apache.pekko.actor.typed.ActorRef[com.chipprbots.ethereum.ommers.OmmersPool.Command],
-      networkPeerManager: ActorRef,
+      networkPeerManager: TypedActorRef[com.chipprbots.ethereum.network.NetworkPeerManagerActor.Command],
       blacklist: Blacklist,
       syncConfig: SyncConfig,
       configBuilder: BlockchainConfigBuilder,
@@ -375,7 +374,7 @@ object SyncController {
         .foreach(c => ctx.stop(c))
 
       // Ensure snap-sync routing is not left pointing at a dead actor.
-      networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterSnapSyncController(
+      networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterSnapSyncControllerCmd(
         ctx.system.deadLetters[SNAPSyncController.Command]
       )
     }
@@ -1665,7 +1664,7 @@ object SyncController {
 
       // Register SNAPSyncController with NetworkPeerManagerActor for message routing
       networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor
-        .RegisterSnapSyncController(snapSync)
+        .RegisterSnapSyncControllerCmd(snapSync)
 
       // If a CL-driven head arrived before SNAP started (post-merge chains), prime the new
       // SNAP actor with it so pivot selection skips the TD-based path entirely.
@@ -1751,8 +1750,8 @@ object SyncController {
         .spawn(
           RegularSync.apply(
             peersClient,
-            networkPeerManager,
-            peerEventBus,
+            networkPeerManager.toClassic,
+            peerEventBus.toClassic,
             consensus,
             blockchain,
             blockchainReader,
@@ -1924,7 +1923,7 @@ object SyncController {
                         stateStorage,
                         evmCodeStorage,
                         appStateStorage,
-                        networkPeerManager,
+                        networkPeerManager.toClassic,
                         bytecodeRecoveryAdapter,
                         pivotBlock,
                         snapSyncConfig
@@ -1944,7 +1943,7 @@ object SyncController {
                         stateStorage,
                         appStateStorage,
                         flatSlotStorage,
-                        networkPeerManager,
+                        networkPeerManager.toClassic,
                         storageRecoveryAdapter,
                         pivotBlock,
                         snapSyncConfig
@@ -2000,7 +1999,7 @@ object SyncController {
                       stateStorage,
                       evmCodeStorage,
                       appStateStorage,
-                      networkPeerManager,
+                      networkPeerManager.toClassic,
                       bytecodeRecoveryAdapter,
                       pivotBlock,
                       snapSyncConfig,
@@ -2021,7 +2020,7 @@ object SyncController {
                       stateStorage,
                       appStateStorage,
                       flatSlotStorage,
-                      networkPeerManager,
+                      networkPeerManager.toClassic,
                       storageRecoveryAdapter,
                       pivotBlock,
                       snapSyncConfig,
@@ -2075,7 +2074,7 @@ object SyncController {
         // §8k-G4c/G4e-final: register recoverySnapAdapter as the SNAP routing target during recovery.
         // No SNAPSyncController exists during recovery — SyncController relays ByteCodesResponse →
         // BytecodeRecoveryActor and StorageRangesResponse → StorageRecoveryActor (see runningRecovery handlers).
-        networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterSnapSyncController(
+        networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterSnapSyncControllerCmd(
           recoverySnapAdapter
         )
         timers.startTimerWithFixedDelay(RecoveryPollerKey, PollRecoveryPeers, 2.seconds, 5.seconds)
@@ -2087,7 +2086,7 @@ object SyncController {
       */
     private def completeRecovery(): Behavior[Command] = {
       timers.cancel(RecoveryPollerKey)
-      networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterSnapSyncController(
+      networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.RegisterSnapSyncControllerCmd(
         ctx.system.deadLetters[SNAPSyncController.Command]
       )
       appStateStorage.clearRecoveryProgress().commit()
@@ -2430,8 +2429,8 @@ object SyncController {
         .spawn(
           RegularSync.apply(
             peersClient,
-            networkPeerManager,
-            peerEventBus,
+            networkPeerManager.toClassic,
+            peerEventBus.toClassic,
             consensus,
             blockchain,
             blockchainReader,

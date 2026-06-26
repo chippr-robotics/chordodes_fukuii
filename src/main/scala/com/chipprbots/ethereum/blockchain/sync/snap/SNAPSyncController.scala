@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum.blockchain.sync.snap
 
-import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
@@ -56,8 +55,8 @@ private class SNAPSyncControllerImpl(
     stateStorage: StateStorage,
     evmCodeStorage: EvmCodeStorage,
     flatSlotStorage: FlatSlotStorage,
-    networkPeerManager: ActorRef,
-    peerEventBus: ActorRef,
+    networkPeerManager: TypedActorRef[com.chipprbots.ethereum.network.NetworkPeerManagerActor.Command],
+    peerEventBus: TypedActorRef[com.chipprbots.ethereum.network.PeerEventBusActor.Command],
     syncConfig: SyncConfig,
     snapSyncConfig: SNAPSyncConfig,
     scheduler: Scheduler,
@@ -2249,7 +2248,7 @@ private class SNAPSyncControllerImpl(
     // variant skips this — `knownHeader` is None — and `NetworkPeerManagerActor` correctly
     // treats "never updated" as "pre-merge or unknown" → no-op).
     hint.knownHeader.foreach { header =>
-      networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.UpdateClHead(header.number)
+      networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.UpdateClHeadCmd(header.number)
     }
     // Reactive starts: if we're already at idle and a hint arrives during operator-driven
     // startup, the `Start` handler will pick this up. We don't auto-start here because
@@ -2348,7 +2347,7 @@ private class SNAPSyncControllerImpl(
                 ctx.spawn(
                   actors.ByteCodeCoordinator(
                     evmCodeStorage = evmCodeStorage,
-                    networkPeerManager = networkPeerManager,
+                    networkPeerManager = networkPeerManager.toClassic,
                     requestTracker = requestTracker,
                     batchSize = ByteCodeTask.DEFAULT_BATCH_SIZE,
                     snapSyncController = ctx.self
@@ -2367,7 +2366,7 @@ private class SNAPSyncControllerImpl(
                 ctx.spawn(
                   actors.StorageRangeCoordinator(
                     stateRoot = rootBs,
-                    networkPeerManager = networkPeerManager,
+                    networkPeerManager = networkPeerManager.toClassic,
                     requestTracker = requestTracker,
                     mptStorage = storage,
                     flatSlotStorage = flatSlotStorage,
@@ -3374,7 +3373,7 @@ private class SNAPSyncControllerImpl(
       ctx.spawn(
         actors.AccountRangeCoordinator(
           stateRoot = rootHash,
-          networkPeerManager = networkPeerManager,
+          networkPeerManager = networkPeerManager.toClassic,
           requestTracker = requestTracker,
           mptStorage = storage,
           concurrency = effectiveConcurrency,
@@ -3412,7 +3411,7 @@ private class SNAPSyncControllerImpl(
         ctx.spawn(
           actors.ByteCodeCoordinator(
             evmCodeStorage = evmCodeStorage,
-            networkPeerManager = networkPeerManager,
+            networkPeerManager = networkPeerManager.toClassic,
             requestTracker = requestTracker,
             batchSize = ByteCodeTask.DEFAULT_BATCH_SIZE,
             snapSyncController = ctx.self
@@ -3435,7 +3434,7 @@ private class SNAPSyncControllerImpl(
         ctx.spawn(
           actors.StorageRangeCoordinator(
             stateRoot = rootHash,
-            networkPeerManager = networkPeerManager,
+            networkPeerManager = networkPeerManager.toClassic,
             requestTracker = requestTracker,
             mptStorage = storage,
             flatSlotStorage = flatSlotStorage,
@@ -3626,7 +3625,7 @@ private class SNAPSyncControllerImpl(
         ctx.spawn(
           actors.TrieNodeHealingCoordinator(
             stateRoot = root,
-            networkPeerManager = networkPeerManager,
+            networkPeerManager = networkPeerManager.toClassic,
             requestTracker = requestTracker,
             mptStorage = storage,
             batchSize = snapSyncConfig.healingBatchSize,
@@ -3694,7 +3693,7 @@ private class SNAPSyncControllerImpl(
             ctx.spawn(
               actors.TrieNodeHealingCoordinator(
                 stateRoot = root,
-                networkPeerManager = networkPeerManager,
+                networkPeerManager = networkPeerManager.toClassic,
                 requestTracker = requestTracker,
                 mptStorage = storage,
                 batchSize = snapSyncConfig.healingBatchSize,
@@ -3861,7 +3860,7 @@ private class SNAPSyncControllerImpl(
         val suppressUntilMs = lastAttemptMs + 60_000L
         if nowMs >= suppressUntilMs then {
           ctx.log.info(s"snap-server-peer $host:$port not connected — reconnecting")
-          networkPeerManager ! com.chipprbots.ethereum.network.PeerManagerActor.ConnectToPeer(uri)
+          networkPeerManager ! com.chipprbots.ethereum.network.NetworkPeerManagerActor.ConnectToPeerForwardCmd(uri)
           snapServerPeerLastConnectAttemptMs(key) = nowMs
         } else {
           ctx.log.debug(
@@ -4254,7 +4253,10 @@ private class SNAPSyncControllerImpl(
             limitHash = ByteString(Array.fill[Byte](32)(0xff.toByte)),
             responseBytes = 1024
           )
-          networkPeerManager ! NetworkPeerManagerActor.SendMessage(new GetAccountRangeEnc(probe), peerWithInfo.peer.id)
+          networkPeerManager ! NetworkPeerManagerActor.SendMessageCmd(
+            new GetAccountRangeEnc(probe),
+            peerWithInfo.peer.id
+          )
           pivotProbeRequestId = Some(probeId)
           pendingProbeCommit = Some((newPivotBlock, newPivotHeader, reason))
           // C4: keyed by the probe's BigInt requestId so a stale probe's timeout never cancels a newer one.
@@ -5168,8 +5170,8 @@ object SNAPSyncController {
       stateStorage: StateStorage,
       evmCodeStorage: EvmCodeStorage,
       flatSlotStorage: FlatSlotStorage,
-      networkPeerManager: ActorRef,
-      peerEventBus: ActorRef,
+      networkPeerManager: TypedActorRef[com.chipprbots.ethereum.network.NetworkPeerManagerActor.Command],
+      peerEventBus: TypedActorRef[com.chipprbots.ethereum.network.PeerEventBusActor.Command],
       syncConfig: SyncConfig,
       snapSyncConfig: SNAPSyncConfig,
       scheduler: Scheduler,
