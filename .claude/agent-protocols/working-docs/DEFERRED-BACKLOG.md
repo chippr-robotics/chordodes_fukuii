@@ -2167,7 +2167,7 @@ Thread 3 (EIP-1559 fee routing) audited: functionally CORRECT — ETH base fee i
 
 ## Part 16: ETC-Only Artifact Sweep (R11)
 
-**Status**: OPEN — repo hygiene + alignment task
+**Status**: A ✅ `e0cebcd72` · B ✅ `6b2b41e49`+`d1a7073bf` · C ✅ `6be73300f` · D OPEN · E OPEN
 **Priority**: HIGH — the root pattern has already caused a missed-BEACON sprint (ETH/Sepolia sprint
 was run separately to catch what the modernization sprint missed because prompts were FORGE-only).
 **Agent**: general-purpose

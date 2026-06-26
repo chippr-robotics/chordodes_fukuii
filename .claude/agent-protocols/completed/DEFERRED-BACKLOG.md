@@ -2565,3 +2565,59 @@ Added `forAll { msg => decode(encode(msg)) == msg }` property-based round-trip t
 - `AccountRangeWorkerSpec` used `ClassicTestProbe` + `expectMsgType` — fully converted to Typed probe
 
 **Tests:** 101/101 (`AccountRangeCoordinatorSpec`, `AccountRangeWorkerSpec`, `SNAPSyncControllerSpec`) ✅
+
+---
+
+## §R11 — ETC-Only Artifact Sweep (A/B/C complete) ✅ 2026-06-26
+
+**Agent:** main session (A/C) · HERALD (B)
+**Branch:** `scala3-cleanup-june`
+**Commits:** `e0cebcd72` (A) · `6b2b41e49` + `d1a7073bf` (B + B-followup) · `6be73300f` (C)
+
+### §R11-A — Memory + Local Doc Bias Sweep ✅ `e0cebcd72`
+
+Swept `pre-migration-checklist.md` and `DEFERRED-BACKLOG.md` for FORGE-only routing language in
+shared ETC+ETH code paths (vm/, domain/, consensus/). Also added §R11-A through §R11-D spec series
+to `working-docs/DEFERRED-BACKLOG.md Part 16` to track remaining sweep work.
+
+**Key fixes:**
+- `pre-migration-checklist.md` Red Flags: "FORGE review" → "FORGE (ETC) or BEACON (ETH)" for consensus/ and vm/ paths
+- `DEFERRED-BACKLOG.md` §8b opaque-type gates: `CodeHash`, `StorageKey Phase B`, `HIGH-tier gate` → FORGE + BEACON
+- `DEFERRED-BACKLOG.md` §7c-E1 BlockchainWriter idempotency: FORGE → FORGE + BEACON (shared infrastructure)
+
+### §R11-B — Protocol Version Cleanup in Public Docs ✅ `6b2b41e49` + `d1a7073bf`
+
+Removed stale ETH63-67 references from `ARCHITECTURE.md`; confirmed live protocols are ETH68/69/70.
+
+**`6b2b41e49` fixes:**
+- `ARCHITECTURE.md`: `PeersClient` comment `(63/66/68)` → `(68/69/70)`
+- `ARCHITECTURE.md`: `ETH.scala` comment corrected to ETH68/69/70 live, ETH63-67 removed
+- Added note that `eth.conf`/`sepolia.conf` do not exist yet and ETH/Sepolia not yet in barad-dur
+
+**`d1a7073bf` corrections (followup):**
+- Reverted incorrect "eth.conf/sepolia.conf missing" claim — files are in `src/main/resources/conf/` (grep ran against wrong path)
+- Removed incorrect "ETH/Sepolia not yet in barad-dur" — `ops/barad-dur/sepolia/` already exists with compose + fukuii-conf/
+- Added `§R11-E` to `DEFERRED-BACKLOG.md`: ETH mainnet deployment parity (`ops/barad-dur/eth/` does not exist; Sepolia is covered, mainnet is not)
+
+### §R11-C — Agent Protocols + Constitution + Backlog Language ✅ `6be73300f`
+
+Fixed FORGE-only routing language in `inline-cleanup.md` and `DEFERRED-BACKLOG.md` for
+shared-chain code paths (vm/, domain/, EVM opcodes, consensus/).
+
+**`inline-cleanup.md` fixes (3):**
+- `asInstanceOf[T]` route: "FORGE if consensus" → "FORGE (ETC) or BEACON (ETH) if consensus"
+- Rule 4 (consensus files): "Route to FORGE" → "Route to FORGE (ETC) or BEACON (ETH)"
+- EVM/opcode domain row: "FORGE review" → "FORGE (ETC) or BEACON (ETH) review"
+
+**`DEFERRED-BACKLOG.md` fixes (5):**
+- §8b table CodeHash gate: "FORGE advisory" → "FORGE + BEACON advisory"
+- §8b table StorageKey Phase B gate: "FORGE" → "FORGE + BEACON"
+- §8b table HIGH-tier gate: "FORGE (consensus)" → "FORGE + BEACON (consensus)"
+- §8b-M1 gate text: "Phase B requires FORGE" → "Phase B requires FORGE + BEACON"
+- §8b-M1 prompt: "(FORGE gate)" → "(FORGE + BEACON gate)"
+
+**Remaining (D/E open):**
+- §R11-D — BEACON: PoS skill gap audit + write CL-setup/engine-API/Sepolia-sync/PoS-health skills
+- §R11-E — BEACON: ETH mainnet `ops/barad-dur/eth/` deployment parity
+
+**Cross-refs:** `working-docs/DEFERRED-BACKLOG.md Part 16 (D+E still open)`, `modernization-log/` (no log entry — pure docs sweep)
