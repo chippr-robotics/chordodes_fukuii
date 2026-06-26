@@ -2528,3 +2528,40 @@ Added `forAll { msg => decode(encode(msg)) == msg }` property-based round-trip t
 **Gaps remaining (explicit non-scope):**
 - Domain type invariants (`Block`, `BlockHeader`, `Transaction`) — deferred (8h original scope item 2)
 - Cryptographic operations (`keccak256`, `recoverPublicKey`) — deferred (8h original scope item 4)
+
+---
+
+## §8k-B — Bridge Elimination to TCP Floor ✅ DONE 2026-06-25
+
+**Agent:** PRISM (audit + B1–B7) / LOOM (B8–B11)
+**Branch:** `scala3-cleanup-june`
+**Final commit:** `68035cb85`
+
+**Goal:** Reduce post-CAPSTONE `.toClassic` bridge count from 19 grep lines to the permanent TCP floor (5 grep lines = 7 actual calls). All non-TCP `.toClassic` bridges were symptoms of unconverted Classic actor params; the fix strategy was to migrate the param first, then delete the bridge.
+
+**§8k-J TCP floor confirmed:** 5 grep lines remain (all permanent — `ServerActor.scala:70,77`, `RLPxConnectionHandler.scala:323`, `PeerManagerActor.scala:591,629`). No eliminatable bridges remain.
+
+**Bridge reduction log:**
+
+| Sprint | Bridges freed | After (grep lines) | Commit |
+|--------|--------------|---------------------|--------|
+| §8k-Q | 1 — FastSync:180 `fastSyncClassicSelf` deleted | **19** | prior |
+| §8k-B1 | 2 — BytecodeRecovery:199, StorageRecovery:229 (pointless round-trip removed) | **17** | prior |
+| §8k-B2 | 2 — SyncController NPMA RegisterSnapSyncController Classic→Typed | **15** | prior |
+| §8k-B3 | 1 — SSC chainDownloaderReplyAdapter Any→Typed Done | **14** | prior |
+| §8k-B4 | 2 — BlockImporter selfClassic+fetcherReplyTo | **12** | prior |
+| §8k-B5 | 2 — PivotBlockSelector blockHeadersAdapter | **10** | prior |
+| §8k-B6 | 2 — PeerEventBusActor Typed migration + NodeBuilder/PeerRequestHandler | **8** | prior |
+| §8k-B7 | 1 — AkkaTaskOps askFor Classic replyTo → Typed | **5 (floor!)** | prior |
+| §8k-B8 | NB:419+NB:1009 structural pass-through eliminated; 7 silent-drop GOAL-A fixes | **explicit** | prior |
+| §8k-B9 | SendMessage non-Cmd sweep: 8 actors × 13 sites | — | `81b4e91b4` |
+| §8k-B10 | 11+4 actors Classic ActorRef → TypedActorRef; NPMA PeerInfoRequestCmd.replyTo; SSC:3376 held | **6** | `e30facc0e`+`4523b9256` |
+| §8k-B11 | ARC+ARWorker `networkPeerManager` Classic→TypedActorRef; SSC:3376 `.toClassic` removed | **5 ✅** | `68035cb85` |
+
+**Notable implementation findings (§8k-B11):**
+- `AccountRangeWorker` used 2-arg Classic `.tell(msg, sender)` — converted to `!` for Typed `ActorRef`
+- Unused adapter import in `SNAPSyncController` surfaced only after `.toClassic` removal; Scala 3 `-Wunused` is a hard error — caught at compile step
+- `AccountRangeCoordinatorSpec` probes were typed to `SendMessageCmd` and passed via `.toClassic`; widened to `TestProbe[Command]` + `expectMessageType` throughout (18 probes)
+- `AccountRangeWorkerSpec` used `ClassicTestProbe` + `expectMsgType` — fully converted to Typed probe
+
+**Tests:** 101/101 (`AccountRangeCoordinatorSpec`, `AccountRangeWorkerSpec`, `SNAPSyncControllerSpec`) ✅
