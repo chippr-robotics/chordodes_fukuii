@@ -1270,7 +1270,7 @@ object ETHPackets {
         RLPList(
           receiptStateHash(r),
           RLPValue(ByteUtils.bigIntToUnsignedByteArray(r.cumulativeGasUsed)),
-          RLPValue(r.logsBloomFilter.toArray[Byte]),
+          RLPValue(r.logsBloomFilter.toArray),
           RLPList(r.logs.map(_.toRLPEncodable)*)
         )
       )

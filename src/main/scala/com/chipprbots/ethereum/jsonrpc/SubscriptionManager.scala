@@ -193,7 +193,7 @@ object SubscriptionManager {
         "hash" -> JString("0x" + h.hash.toHex),
         "parentHash" -> JString("0x" + h.parentHash.toHex),
         "sha3Uncles" -> JString("0x" + h.ommersHash.toHex),
-        "logsBloom" -> JString("0x" + h.logsBloom.toHex),
+        "logsBloom" -> JString("0x" + h.logsBloom.value.toHex),
         "transactionsRoot" -> JString("0x" + h.transactionsRoot.toHex),
         "stateRoot" -> JString("0x" + h.stateRoot.toHex),
         "receiptsRoot" -> JString("0x" + h.receiptsRoot.toHex),

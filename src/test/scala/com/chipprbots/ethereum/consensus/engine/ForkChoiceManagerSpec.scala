@@ -12,6 +12,7 @@ import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.consensus.engine.ForkChoiceManager.BeaconHead
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
+import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.testing.Tags.*
 
 /** Verifies the publisher pattern added in #1207: every `applyForkChoiceState` call must notify the registered listener
@@ -32,7 +33,7 @@ class ForkChoiceManagerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
       stateRoot = ByteString(Array.fill(32)(0x44.toByte)),
       transactionsRoot = BlockHeader.EmptyMpt,
       receiptsRoot = BlockHeader.EmptyMpt,
-      logsBloom = ByteString(new Array[Byte](256)),
+      logsBloom = BloomFilter.Empty,
       difficulty = 0,
       number = 12345,
       gasLimit = 30000000,

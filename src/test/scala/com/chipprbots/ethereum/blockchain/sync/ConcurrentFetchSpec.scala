@@ -13,6 +13,7 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.blockchain.sync.PeerListSupportNg.PeerWithInfo
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
@@ -375,7 +376,7 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
       stateRoot = hash32,
       transactionsRoot = hash32,
       receiptsRoot = hash32,
-      logsBloom = bloom256,
+      logsBloom = BloomFilter(bloom256),
       difficulty = 1,
       number = 0,
       gasLimit = 1000000,

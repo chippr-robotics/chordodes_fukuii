@@ -10,6 +10,7 @@ import com.chipprbots.ethereum.consensus.difficulty.DifficultyCalculator
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.*
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
+import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
@@ -69,7 +70,7 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers {
     stateRoot = ByteString(Hex.decode("00" * 32)),
     transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
     receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-    logsBloom = ByteString(Hex.decode("00" * 256)),
+    logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = 1000,
     number = 100,
     gasLimit = 1024000, // 1024 * 1000 — easy math for bound calculations

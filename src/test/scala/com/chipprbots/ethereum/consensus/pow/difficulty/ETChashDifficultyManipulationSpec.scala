@@ -9,6 +9,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import com.chipprbots.ethereum.consensus.mess.ArtificialFinality
 import com.chipprbots.ethereum.consensus.mess.MESSConfig
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
@@ -92,7 +93,7 @@ class ETChashDifficultyManipulationSpec extends AnyFlatSpec with Matchers with S
       stateRoot = ByteString(new Array[Byte](32)),
       transactionsRoot = ByteString(new Array[Byte](32)),
       receiptsRoot = ByteString(new Array[Byte](32)),
-      logsBloom = ByteString(new Array[Byte](256)),
+      logsBloom = BloomFilter.Empty,
       difficulty = difficulty,
       number = number,
       gasLimit = BigInt(8000000),

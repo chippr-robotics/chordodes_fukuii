@@ -60,37 +60,37 @@ object ReceiptStorage {
 
   given legacyReceiptPickler: Pickler[LegacyReceipt] =
     transformPickler[LegacyReceipt, (TransactionOutcome, BigInt, ByteString, Seq[TxLogEntry])] {
-      case (state, gas, filter, logs) => LegacyReceipt(state, gas, filter, logs)
+      case (state, gas, filter, logs) => LegacyReceipt(state, gas, BloomFilter(filter), logs)
     } { receipt =>
-      (receipt.postTransactionStateHash, receipt.cumulativeGasUsed, receipt.logsBloomFilter, receipt.logs)
+      (receipt.postTransactionStateHash, receipt.cumulativeGasUsed, receipt.logsBloomFilter.value, receipt.logs)
     }
 
   given type01ReceiptPickler: Pickler[Type01Receipt] =
     transformPickler[Type01Receipt, (TransactionOutcome, BigInt, ByteString, Seq[TxLogEntry])] {
-      case (state, gas, filter, logs) => Type01Receipt(LegacyReceipt(state, gas, filter, logs))
+      case (state, gas, filter, logs) => Type01Receipt(LegacyReceipt(state, gas, BloomFilter(filter), logs))
     } { receipt =>
-      (receipt.postTransactionStateHash, receipt.cumulativeGasUsed, receipt.logsBloomFilter, receipt.logs)
+      (receipt.postTransactionStateHash, receipt.cumulativeGasUsed, receipt.logsBloomFilter.value, receipt.logs)
     }
 
   given type02ReceiptPickler: Pickler[Type02Receipt] =
     transformPickler[Type02Receipt, (TransactionOutcome, BigInt, ByteString, Seq[TxLogEntry])] {
-      case (state, gas, filter, logs) => Type02Receipt(LegacyReceipt(state, gas, filter, logs))
+      case (state, gas, filter, logs) => Type02Receipt(LegacyReceipt(state, gas, BloomFilter(filter), logs))
     } { receipt =>
-      (receipt.postTransactionStateHash, receipt.cumulativeGasUsed, receipt.logsBloomFilter, receipt.logs)
+      (receipt.postTransactionStateHash, receipt.cumulativeGasUsed, receipt.logsBloomFilter.value, receipt.logs)
     }
 
   given type03ReceiptPickler: Pickler[Type03Receipt] =
     transformPickler[Type03Receipt, (TransactionOutcome, BigInt, ByteString, Seq[TxLogEntry])] {
-      case (state, gas, filter, logs) => Type03Receipt(LegacyReceipt(state, gas, filter, logs))
+      case (state, gas, filter, logs) => Type03Receipt(LegacyReceipt(state, gas, BloomFilter(filter), logs))
     } { receipt =>
-      (receipt.postTransactionStateHash, receipt.cumulativeGasUsed, receipt.logsBloomFilter, receipt.logs)
+      (receipt.postTransactionStateHash, receipt.cumulativeGasUsed, receipt.logsBloomFilter.value, receipt.logs)
     }
 
   given type04ReceiptPickler: Pickler[Type04Receipt] =
     transformPickler[Type04Receipt, (TransactionOutcome, BigInt, ByteString, Seq[TxLogEntry])] {
-      case (state, gas, filter, logs) => Type04Receipt(LegacyReceipt(state, gas, filter, logs))
+      case (state, gas, filter, logs) => Type04Receipt(LegacyReceipt(state, gas, BloomFilter(filter), logs))
     } { receipt =>
-      (receipt.postTransactionStateHash, receipt.cumulativeGasUsed, receipt.logsBloomFilter, receipt.logs)
+      (receipt.postTransactionStateHash, receipt.cumulativeGasUsed, receipt.logsBloomFilter.value, receipt.logs)
     }
 
   given receiptPickler: Pickler[Receipt] = compositePickler[Receipt]

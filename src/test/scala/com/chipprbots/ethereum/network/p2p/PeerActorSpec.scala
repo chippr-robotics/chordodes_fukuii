@@ -471,7 +471,7 @@ class PeerActorSpec
         stateRoot = ByteString("an"),
         transactionsRoot = ByteString("ETC"),
         receiptsRoot = ByteString("fork"),
-        logsBloom = ByteString("block")
+        logsBloom = BloomFilter(ByteString("block"))
       )
   }
 

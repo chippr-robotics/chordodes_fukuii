@@ -39,6 +39,7 @@ import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.getEncodedWithoutNonce
+import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.domain.UInt256
@@ -549,7 +550,7 @@ class EthMiningServiceSpec
         stateRoot = ByteString(MerklePatriciaTrie.EmptyRootHash),
         transactionsRoot = ByteString.empty,
         receiptsRoot = ByteString.empty,
-        logsBloom = ByteString.empty,
+        logsBloom = BloomFilter(ByteString.empty),
         difficulty = difficulty,
         number = 0,
         gasLimit = 16733003,
@@ -569,7 +570,7 @@ class EthMiningServiceSpec
         stateRoot = ByteString(Hex.decode("2627314387b135a548040d3ca99dbf308265a3f9bd9246bee3e34d12ea9ff0dc")),
         transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
         receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-        logsBloom = ByteString(Hex.decode("00" * 256)),
+        logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
         difficulty = difficulty,
         number = 1,
         gasLimit = 16733003,

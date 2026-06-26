@@ -566,7 +566,7 @@ class EngineApiController(
       "feeRecipient" -> JString(hex(header.beneficiary)),
       "stateRoot" -> JString(hex(header.stateRoot)),
       "receiptsRoot" -> JString(hex(header.receiptsRoot)),
-      "logsBloom" -> JString(hex(header.logsBloom)),
+      "logsBloom" -> JString(hex(header.logsBloom.value)),
       "prevRandao" -> JString(hex(header.mixHash)),
       "blockNumber" -> JString(hexQ(header.number)),
       "gasLimit" -> JString(hexQ(header.gasLimit)),

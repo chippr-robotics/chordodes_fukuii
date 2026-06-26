@@ -13,7 +13,7 @@ import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.domain.Withdrawal
 import com.chipprbots.ethereum.domain.Withdrawal.WithdrawalBytesDec
 import com.chipprbots.ethereum.domain.Withdrawal.WithdrawalEnc
-import com.chipprbots.ethereum.ledger.BloomFilter
+import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.mpt.ByteArraySerializable
 import com.chipprbots.ethereum.rlp.encode as rlpEncode
 import com.chipprbots.ethereum.utils.ByteUtils.or
@@ -85,9 +85,9 @@ object StdBlockValidator extends BlockValidator {
     * @return
     */
   private def validateLogBloom(blockHeader: BlockHeader, receipts: Seq[Receipt]): Either[BlockError, BlockValid] = {
-    val logsBloomOr =
-      if receipts.isEmpty then BloomFilter.EmptyBloomFilter
-      else ByteString(or(receipts.map(_.logsBloomFilter.toArray)*))
+    val logsBloomOr: BloomFilter =
+      if receipts.isEmpty then BloomFilter.Empty
+      else BloomFilter(ByteString(or(receipts.map(_.logsBloomFilter.toArray)*)))
     if logsBloomOr == blockHeader.logsBloom then Right(BlockValid)
     else Left(BlockLogBloomError)
   }

@@ -31,7 +31,7 @@ import com.chipprbots.ethereum.jsonrpc.FilterManager.LogFilterLogs
 import com.chipprbots.ethereum.jsonrpc.FilterManager.NewFilterResponse
 import com.chipprbots.ethereum.jsonrpc.FilterManager.PendingTransactionFilterLogs
 import com.chipprbots.ethereum.keystore.KeyStore
-import com.chipprbots.ethereum.ledger.BloomFilter
+import com.chipprbots.ethereum.ledger.BloomFilter as LedgerBloomFilter
 import com.chipprbots.ethereum.security.SecureRandomBuilder
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
@@ -68,7 +68,7 @@ class FilterManagerSpec
     val createResp: NewFilterResponse = createProbe.expectMessageType[NewFilterResponse]
 
     val logs1: Seq[TxLogEntry] = Seq(TxLogEntry(Address("0x4567"), Nil, ByteString()))
-    val bh1: BlockHeader = blockHeader.copy(number = 1, logsBloom = BloomFilter.create(logs1))
+    val bh1: BlockHeader = blockHeader.copy(number = 1, logsBloom = BloomFilter(LedgerBloomFilter.create(logs1)))
 
     val logs2: Seq[TxLogEntry] = Seq(
       TxLogEntry(
@@ -77,9 +77,9 @@ class FilterManagerSpec
         ByteString(Hex.decode("99aaff"))
       )
     )
-    val bh2: BlockHeader = blockHeader.copy(number = 2, logsBloom = BloomFilter.create(logs2))
+    val bh2: BlockHeader = blockHeader.copy(number = 2, logsBloom = BloomFilter(LedgerBloomFilter.create(logs2)))
 
-    val bh3: BlockHeader = blockHeader.copy(number = 3, logsBloom = BloomFilter.create(Nil))
+    val bh3: BlockHeader = blockHeader.copy(number = 3, logsBloom = BloomFilter(LedgerBloomFilter.create(Nil)))
 
     (() => blockchainReader.getBestBlockNumber).expects().returning(3).twice()
     blockchainReader.getBlockHeaderByNumber.expects(bh1.number).returning(Some(bh1))
@@ -112,7 +112,7 @@ class FilterManagerSpec
             LegacyReceipt.withHashOutcome(
               postTransactionStateHash = ByteString(),
               cumulativeGasUsed = 0,
-              logsBloomFilter = BloomFilter.create(logs2),
+              logsBloomFilter = BloomFilter(LedgerBloomFilter.create(logs2)),
               logs = logs2
             )
           )
@@ -161,7 +161,8 @@ class FilterManagerSpec
       ByteString(Hex.decode("99aaff"))
     ) // address doesn't match
 
-    val bh4: BlockHeader = blockHeader.copy(number = 4, logsBloom = BloomFilter.create(Seq(log4_1, log4_2)))
+    val bh4: BlockHeader =
+      blockHeader.copy(number = 4, logsBloom = BloomFilter(LedgerBloomFilter.create(Seq(log4_1, log4_2))))
 
     blockchainReader.getBlockHeaderByNumber.expects(BigInt(4)).returning(Some(bh4))
 
@@ -202,13 +203,13 @@ class FilterManagerSpec
             LegacyReceipt.withHashOutcome(
               postTransactionStateHash = ByteString(),
               cumulativeGasUsed = 0,
-              logsBloomFilter = BloomFilter.create(Seq(log4_1)),
+              logsBloomFilter = BloomFilter(LedgerBloomFilter.create(Seq(log4_1))),
               logs = Seq(log4_1)
             ),
             LegacyReceipt.withHashOutcome(
               postTransactionStateHash = ByteString(),
               cumulativeGasUsed = 0,
-              logsBloomFilter = BloomFilter.create(Seq(log4_2)),
+              logsBloomFilter = BloomFilter(LedgerBloomFilter.create(Seq(log4_2))),
               logs = Seq(log4_2)
             )
           )
@@ -248,7 +249,7 @@ class FilterManagerSpec
         ByteString(Hex.decode("99aaff"))
       )
     )
-    val bh: BlockHeader = blockHeader.copy(number = 1, logsBloom = BloomFilter.create(logs))
+    val bh: BlockHeader = blockHeader.copy(number = 1, logsBloom = BloomFilter(LedgerBloomFilter.create(logs)))
 
     (() => blockchainReader.getBestBlockNumber).expects().returning(1).anyNumberOfTimes()
     blockchainReader.getBlockHeaderByNumber.expects(bh.number).returning(Some(bh))
@@ -278,7 +279,7 @@ class FilterManagerSpec
             LegacyReceipt.withHashOutcome(
               postTransactionStateHash = ByteString(),
               cumulativeGasUsed = 0,
-              logsBloomFilter = BloomFilter.create(logs),
+              logsBloomFilter = BloomFilter(LedgerBloomFilter.create(logs)),
               logs = logs
             )
           )
@@ -292,7 +293,7 @@ class FilterManagerSpec
         ByteString(Hex.decode("99aaff"))
       )
     )
-    val bh2: BlockHeader = blockHeader.copy(number = 2, logsBloom = BloomFilter.create(logs2))
+    val bh2: BlockHeader = blockHeader.copy(number = 2, logsBloom = BloomFilter(LedgerBloomFilter.create(logs2)))
     val blockTransactions2: Seq[SignedTransaction] = Seq(
       SignedTransaction(
         tx = LegacyTransaction(
@@ -317,7 +318,7 @@ class FilterManagerSpec
               LegacyReceipt.withHashOutcome(
                 postTransactionStateHash = ByteString(),
                 cumulativeGasUsed = 0,
-                logsBloomFilter = BloomFilter.create(logs2),
+                logsBloomFilter = BloomFilter(LedgerBloomFilter.create(logs2)),
                 logs = logs2
               )
             )
@@ -516,9 +517,11 @@ class FilterManagerSpec
       stateRoot = ByteString(Hex.decode("52ce0ff43d7df2cf39f8cb8832f94d2280ebe856d84d8feb7b2281d3c5cfb990")),
       transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
       receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-      logsBloom = ByteString(
-        Hex.decode(
-          "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      logsBloom = BloomFilter(
+        ByteString(
+          Hex.decode(
+            "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+          )
         )
       ),
       difficulty = BigInt("17864037202"),

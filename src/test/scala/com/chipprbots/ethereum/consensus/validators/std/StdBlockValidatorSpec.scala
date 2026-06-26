@@ -8,7 +8,6 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.*
 import com.chipprbots.ethereum.domain.*
-import com.chipprbots.ethereum.ledger.BloomFilter
 import com.chipprbots.ethereum.testing.Tags.*
 
 class StdBlockValidatorSpec extends AnyFlatSpec with Matchers {
@@ -83,7 +82,7 @@ class StdBlockValidatorSpec extends AnyFlatSpec with Matchers {
     stateRoot = ByteString(Hex.decode("087f96537eba43885ab563227262580b27fc5e6516db79a6fc4d3bcd241dda67")),
     transactionsRoot = ByteString(Hex.decode("8ae451039a8bf403b899dcd23252d94761ddd23b88c769d9b7996546edc47fac")),
     receiptsRoot = ByteString(Hex.decode("8b472d8d4d39bae6a5570c2a42276ed2d6a56ac51a1a356d5b17c5564d01fd5d")),
-    logsBloom = ByteString(Hex.decode("0" * 512)),
+    logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
     difficulty = BigInt("14005986920576"),
     number = 3125369,
     gasLimit = 4699996,
@@ -157,28 +156,28 @@ class StdBlockValidatorSpec extends AnyFlatSpec with Matchers {
       postTransactionStateHash =
         ByteString(Hex.decode("ce0ac687bb90d457b6573d74e4a25ea7c012fee329eb386dbef161c847f9842d")),
       cumulativeGasUsed = 21000,
-      logsBloomFilter = ByteString(Hex.decode("0" * 512)),
+      logsBloomFilter = BloomFilter(ByteString(Hex.decode("0" * 512))),
       logs = Seq[TxLogEntry]()
     ),
     LegacyReceipt.withHashOutcome(
       postTransactionStateHash =
         ByteString(Hex.decode("b927d361126302acaa1fa5e93d0b7e349e278231fe2fc2846bfd54f50377f20a")),
       cumulativeGasUsed = 42000,
-      logsBloomFilter = ByteString(Hex.decode("0" * 512)),
+      logsBloomFilter = BloomFilter(ByteString(Hex.decode("0" * 512))),
       logs = Seq[TxLogEntry]()
     ),
     LegacyReceipt.withHashOutcome(
       postTransactionStateHash =
         ByteString(Hex.decode("1e913d6bdd412d71292173d7908f8792adcf958b84c89575bc871a1decaee56d")),
       cumulativeGasUsed = 63000,
-      logsBloomFilter = ByteString(Hex.decode("0" * 512)),
+      logsBloomFilter = BloomFilter(ByteString(Hex.decode("0" * 512))),
       logs = Seq[TxLogEntry]()
     ),
     LegacyReceipt.withHashOutcome(
       postTransactionStateHash =
         ByteString(Hex.decode("0c6e052bc83482bafaccffc4217adad49f3a9533c69c820966d75ed0154091e6")),
       cumulativeGasUsed = 84000,
-      logsBloomFilter = ByteString(Hex.decode("0" * 512)),
+      logsBloomFilter = BloomFilter(ByteString(Hex.decode("0" * 512))),
       logs = Seq[TxLogEntry]()
     )
   )
@@ -196,11 +195,11 @@ class StdBlockValidatorSpec extends AnyFlatSpec with Matchers {
   )
 
   val wrongLogBloomBlockHeader: BlockHeader = validBlockHeader.copy(
-    logsBloom = ByteString(Hex.decode("1" * 512))
+    logsBloom = BloomFilter(ByteString(Hex.decode("1" * 512)))
   )
 
   val blockWithOutReceipts: Block = Block(
-    validBlockHeader.copy(receiptsRoot = Account.EmptyStorageRootHash, logsBloom = BloomFilter.EmptyBloomFilter),
+    validBlockHeader.copy(receiptsRoot = Account.EmptyStorageRootHash, logsBloom = BloomFilter.Empty),
     validBlockBody
   )
 

@@ -395,7 +395,7 @@ class EthSimulateService(
       stateRoot = stateRoot,
       transactionsRoot = transactionsRoot,
       receiptsRoot = receiptsRoot,
-      logsBloom = logsBloom,
+      logsBloom = com.chipprbots.ethereum.domain.BloomFilter(logsBloom),
       gasUsed = gasUsed,
       extraFields = finalExtraFields
     )
@@ -554,7 +554,7 @@ class EthSimulateService(
       stateRoot = ByteString(new Array[Byte](32)), // Placeholder — filled after execution
       transactionsRoot = EmptyMpt,
       receiptsRoot = EmptyMpt,
-      logsBloom = EmptyBloom,
+      logsBloom = com.chipprbots.ethereum.domain.BloomFilter(EmptyBloom),
       difficulty = difficulty,
       number = number,
       gasLimit = gasLimit,
@@ -892,7 +892,8 @@ class EthSimulateService(
       val legacyReceipt = LegacyReceipt(
         postTransactionStateHash = outcome,
         cumulativeGasUsed = accumGas + gasUsed,
-        logsBloomFilter = BloomFilter.create(realLogs),
+        logsBloomFilter =
+          com.chipprbots.ethereum.domain.BloomFilter(com.chipprbots.ethereum.ledger.BloomFilter.create(realLogs)),
         logs = realLogs
       )
       val receipt: Receipt = tx match {

@@ -148,7 +148,7 @@ object FilterManager {
       receipts.zipWithIndex.foldLeft(Nil: Seq[TxLog]) { case (logsSoFar, (receipt, txIndex)) =>
         val txLogs =
           if bytesToCheckInBloomFilter.isEmpty || BloomFilter.containsAnyOf(
-              receipt.logsBloomFilter,
+              receipt.logsBloomFilter.value,
               bytesToCheckInBloomFilter
             )
           then {
@@ -201,7 +201,7 @@ object FilterManager {
           blockchainReader.getBlockHeaderByNumber(currentBlockNumber) match {
             case Some(header)
                 if bytesToCheckInBloomFilter.isEmpty || BloomFilter.containsAnyOf(
-                  header.logsBloom,
+                  header.logsBloom.value,
                   bytesToCheckInBloomFilter
                 ) =>
               blockchainReader.getReceiptsByHash(header.hash) match {

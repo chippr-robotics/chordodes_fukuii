@@ -81,7 +81,7 @@ class BlockValidationSpec extends AnyWordSpec with Matchers with MockFactory {
       signature = hash2ByteString(signature)
     )
 
-    val bloomFilter: ByteString = hash2ByteString("0" * 512)
+    val bloomFilter: BloomFilter = BloomFilter(hash2ByteString("0" * 512))
 
     val block: Block = Block(
       BlockHeader(

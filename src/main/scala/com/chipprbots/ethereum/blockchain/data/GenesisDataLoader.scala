@@ -226,7 +226,7 @@ class GenesisDataLoader(
       stateRoot = ByteString(stateMptRootHash),
       transactionsRoot = emptyTrieRootHash,
       receiptsRoot = emptyTrieRootHash,
-      logsBloom = zeros(bloomLength),
+      logsBloom = BloomFilter(zeros(bloomLength)),
       difficulty = BigInt(genesisData.difficulty.replace("0x", ""), 16),
       number = 0,
       gasLimit = BigInt(genesisData.gasLimit.replace("0x", ""), 16),

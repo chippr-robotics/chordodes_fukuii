@@ -26,7 +26,7 @@ case class BlockHeader(
     stateRoot: ByteString,
     transactionsRoot: ByteString,
     receiptsRoot: ByteString,
-    logsBloom: ByteString,
+    logsBloom: BloomFilter,
     difficulty: BigInt,
     number: BigInt,
     gasLimit: BigInt,
@@ -99,7 +99,7 @@ case class BlockHeader(
       s"stateRoot: ${ByteStringUtils.hash2string(stateRoot)} " +
       s"transactionsRoot: ${ByteStringUtils.hash2string(transactionsRoot)} " +
       s"receiptsRoot: ${ByteStringUtils.hash2string(receiptsRoot)} " +
-      s"logsBloom: ${ByteStringUtils.hash2string(logsBloom)} " +
+      s"logsBloom: ${ByteStringUtils.hash2string(logsBloom.value)} " +
       s"difficulty: $difficulty, " +
       s"number: $number, " +
       s"gasLimit: $gasLimit, " +
@@ -289,7 +289,7 @@ object BlockHeaderImplicits {
             stateRoot = byteStringFromEncodeable(items(3)),
             transactionsRoot = byteStringFromEncodeable(items(4)),
             receiptsRoot = byteStringFromEncodeable(items(5)),
-            logsBloom = byteStringFromEncodeable(items(6)),
+            logsBloom = BloomFilter(byteStringFromEncodeable(items(6))),
             difficulty = bigIntFromEncodeable(items(7)),
             number = bigIntFromEncodeable(items(8)),
             gasLimit = bigIntFromEncodeable(items(9)),

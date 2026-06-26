@@ -222,6 +222,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
     import SNAPSyncController.*
     import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
     import com.chipprbots.ethereum.domain.BlockHeader
+    import com.chipprbots.ethereum.domain.BloomFilter
 
     val headHash = ByteString(Array.fill(32)(0x42.toByte))
     val withoutHeader = CLPivotHint(headHash, None)
@@ -235,7 +236,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
       stateRoot = ByteString(Array.fill(32)(0x77.toByte)),
       transactionsRoot = BlockHeader.EmptyMpt,
       receiptsRoot = BlockHeader.EmptyMpt,
-      logsBloom = ByteString(new Array[Byte](256)),
+      logsBloom = BloomFilter.Empty,
       difficulty = 0,
       number = 9876543,
       gasLimit = 30000000,
@@ -1270,6 +1271,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
   private val validSepoliaHeader: com.chipprbots.ethereum.domain.BlockHeader = {
     import com.chipprbots.ethereum.domain.BlockHeader
     import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostShanghai
+    import com.chipprbots.ethereum.domain.BloomFilter
     BlockHeader(
       parentHash = ByteString(Array.fill(32)(0xab.toByte)),
       ommersHash = BlockHeader.EmptyOmmers,
@@ -1277,7 +1279,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
       stateRoot = ByteString(Array.fill(32)(0x77.toByte)),
       transactionsRoot = BlockHeader.EmptyMpt,
       receiptsRoot = BlockHeader.EmptyMpt,
-      logsBloom = ByteString(new Array[Byte](256)),
+      logsBloom = BloomFilter.Empty,
       difficulty = BigInt(0),
       number = BigInt(5187023),
       gasLimit = BigInt(30000000),

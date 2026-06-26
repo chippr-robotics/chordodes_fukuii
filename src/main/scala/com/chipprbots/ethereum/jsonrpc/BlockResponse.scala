@@ -115,7 +115,7 @@ object BlockResponse {
       parentHash = block.header.parentHash,
       nonce = if pendingBlock then None else Some(block.header.nonce),
       sha3Uncles = block.header.ommersHash,
-      logsBloom = block.header.logsBloom,
+      logsBloom = block.header.logsBloom.value,
       transactionsRoot = block.header.transactionsRoot,
       stateRoot = block.header.stateRoot,
       receiptsRoot = block.header.receiptsRoot,

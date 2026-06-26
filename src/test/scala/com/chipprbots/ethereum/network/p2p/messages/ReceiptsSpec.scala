@@ -18,6 +18,7 @@ import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Receipts68
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Receipts68.*
 import com.chipprbots.ethereum.rlp.*
 import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
+import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
 import com.chipprbots.ethereum.testing.Tags.*
 
@@ -41,7 +42,7 @@ class ReceiptsSpec extends AnyFlatSpec with Matchers {
   val legacyReceipt: Receipt = LegacyReceipt.withHashOutcome(
     postTransactionStateHash = exampleHash,
     cumulativeGasUsed = cumulativeGas,
-    logsBloomFilter = exampleLogsBloom,
+    logsBloomFilter = BloomFilter(exampleLogsBloom),
     logs = Seq(exampleLog)
   )
 

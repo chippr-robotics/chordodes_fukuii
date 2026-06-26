@@ -57,7 +57,7 @@ object ReceiptCodecs {
       val legacyRLPReceipt = RLPList(
         stateHash,
         cumulativeGasUsed,
-        RLPValue(logsBloomFilter.toArray[Byte]),
+        RLPValue(logsBloomFilter.toArray),
         RLPList(logs.map(_.toRLPEncodable)*)
       )
       receipt match {
@@ -112,7 +112,7 @@ object ReceiptCodecs {
         LegacyReceipt(
           stateHash,
           ByteUtils.bytesToBigInt(cumulativeGasUsedBytes),
-          ByteString(logsBloomFilterBytes),
+          BloomFilter(ByteString(logsBloomFilterBytes)),
           logs.items.map(_.toTxLogEntry)
         )
       // 3-field: ETH69/70 bloom-absent (EIP-7642)  [stateHash, gasUsed, logs]
@@ -131,7 +131,7 @@ object ReceiptCodecs {
         LegacyReceipt(
           stateHash,
           ByteUtils.bytesToBigInt(cumulativeGasUsedBytes),
-          ByteString(Array.fill(256)(0.toByte)),
+          BloomFilter.Empty,
           logs.items.map(_.toTxLogEntry)
         )
       case RLPList(items*) =>

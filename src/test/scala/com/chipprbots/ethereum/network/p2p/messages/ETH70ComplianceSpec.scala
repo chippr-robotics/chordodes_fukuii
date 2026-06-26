@@ -316,7 +316,7 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
         val receipt = LegacyReceipt(
           SuccessOutcome,
           cumulativeGasUsed = BigInt(21000),
-          logsBloomFilter = ByteString(Array.fill(256)(0xff.toByte)),
+          logsBloomFilter = BloomFilter(ByteString(Array.fill(256)(0xff.toByte))),
           logs = Seq.empty
         )
         val receiptRLP = new ReceiptBloomFreeEnc(receipt).toRLPEncodable
@@ -349,7 +349,7 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
         val receipt = LegacyReceipt(
           SuccessOutcome,
           cumulativeGasUsed = BigInt(21000),
-          logsBloomFilter = ByteString(Array.fill(256)(0.toByte)),
+          logsBloomFilter = BloomFilter(ByteString(Array.fill(256)(0.toByte))),
           logs = Seq.empty
         )
         val receiptRLP = new ReceiptBloomFreeEnc(receipt).toRLPEncodable

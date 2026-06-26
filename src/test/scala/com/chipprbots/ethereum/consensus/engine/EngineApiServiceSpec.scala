@@ -17,6 +17,7 @@ import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
 import com.chipprbots.ethereum.ledger.*
+import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.testing.Tags.*
 
 // scalastyle:off magic.number
@@ -38,7 +39,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         stateRoot = modifiedStateRoot, // block claims this stateRoot
         transactionsRoot = ByteString(new Array[Byte](32)),
         receiptsRoot = ByteString(new Array[Byte](32)),
-        logsBloom = ByteString(new Array[Byte](256)),
+        logsBloom = BloomFilter.Empty,
         difficulty = 0,
         number = 1,
         gasLimit = 3000000,
@@ -73,7 +74,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         stateRoot = stateRoot,
         transactionsRoot = ByteString(new Array[Byte](32)),
         receiptsRoot = ByteString(new Array[Byte](32)),
-        logsBloom = ByteString(new Array[Byte](256)),
+        logsBloom = BloomFilter.Empty,
         difficulty = 0,
         number = 1,
         gasLimit = 3000000,
@@ -108,7 +109,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         stateRoot = stateRoot,
         transactionsRoot = ByteString(new Array[Byte](32)),
         receiptsRoot = ByteString(new Array[Byte](32)),
-        logsBloom = ByteString(new Array[Byte](256)),
+        logsBloom = BloomFilter.Empty,
         difficulty = 0,
         number = 1,
         gasLimit = 3000000,
@@ -196,7 +197,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         stateRoot = genesisStateRoot,
         transactionsRoot = BlockHeader.EmptyMpt,
         receiptsRoot = BlockHeader.EmptyMpt,
-        logsBloom = ByteString(new Array[Byte](256)),
+        logsBloom = BloomFilter.Empty,
         difficulty = 0,
         number = 0,
         gasLimit = 3000000,
@@ -223,7 +224,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
           stateRoot = ByteString.empty, // will be filled after execution
           transactionsRoot = BlockHeader.EmptyMpt,
           receiptsRoot = BlockHeader.EmptyMpt,
-          logsBloom = ByteString(new Array[Byte](256)),
+          logsBloom = BloomFilter.Empty,
           difficulty = 0,
           number = 1,
           gasLimit = 3000000,
@@ -262,7 +263,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
           feeRecipient = Address(block.header.beneficiary),
           stateRoot = block.header.stateRoot,
           receiptsRoot = block.header.receiptsRoot,
-          logsBloom = block.header.logsBloom,
+          logsBloom = block.header.logsBloom.value,
           prevRandao = block.header.mixHash,
           blockNumber = block.header.number,
           gasLimit = block.header.gasLimit,
@@ -292,7 +293,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
           stateRoot = modified.stateRoot,
           transactionsRoot = payload.blockHash, // placeholder, need real txRoot
           receiptsRoot = modified.receiptsRoot,
-          logsBloom = modified.logsBloom,
+          logsBloom = BloomFilter(modified.logsBloom),
           difficulty = 0,
           number = modified.blockNumber,
           gasLimit = modified.gasLimit,
@@ -523,7 +524,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         stateRoot = ByteString(new Array[Byte](32)),
         transactionsRoot = BlockHeader.EmptyMpt,
         receiptsRoot = BlockHeader.EmptyMpt,
-        logsBloom = ByteString(new Array[Byte](256)),
+        logsBloom = BloomFilter.Empty,
         difficulty = 0,
         number = 2,
         gasLimit = 3000000,
@@ -539,7 +540,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         feeRecipient = Address(ByteString(new Array[Byte](20))),
         stateRoot = ByteString(new Array[Byte](32)),
         receiptsRoot = BlockHeader.EmptyMpt,
-        logsBloom = ByteString(new Array[Byte](256)),
+        logsBloom = BloomFilter.Empty.value,
         prevRandao = ByteString(new Array[Byte](32)),
         blockNumber = 2,
         gasLimit = 3000000,

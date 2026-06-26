@@ -183,7 +183,7 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
           "gasLimit" -> encodeAsHex(h.gasLimit),
           "gasUsed" -> encodeAsHex(h.gasUsed),
           "hash" -> encodeAsHex(blockHash),
-          "logsBloom" -> encodeAsHex(h.logsBloom),
+          "logsBloom" -> encodeAsHex(h.logsBloom.value),
           "miner" -> encodeAsHex(h.beneficiary),
           "mixHash" -> encodeAsHex(h.mixHash),
           "nonce" -> encodeAsHex(h.nonce),

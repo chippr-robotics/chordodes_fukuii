@@ -39,7 +39,7 @@ import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
 import com.chipprbots.ethereum.keystore.KeyStore
-import com.chipprbots.ethereum.ledger.BloomFilter
+import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ledger.StxLedger
 import com.chipprbots.ethereum.network.PeerManagerActor
@@ -273,7 +273,7 @@ class JsonRpcControllerFixture(implicit
     )
 
   val blockHeader: BlockHeader = Fixtures.Blocks.ValidBlock.header.copy(
-    logsBloom = BloomFilter.EmptyBloomFilter,
+    logsBloom = BloomFilter.Empty,
     difficulty = 10,
     number = 2,
     gasLimit = 0,

@@ -17,7 +17,6 @@ import com.chipprbots.ethereum.db.storage.StateStorage
 import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.ledger.BlockPreparator
 import com.chipprbots.ethereum.ledger.BlockResult
-import com.chipprbots.ethereum.ledger.BloomFilter
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.ledger.PreparedBlock
 import com.chipprbots.ethereum.mpt.ByteArraySerializable
@@ -56,7 +55,7 @@ abstract class BlockGeneratorSkeleton(
       // we are not able to calculate transactionsRoot here because we do not know if they will fail
       transactionsRoot = ByteString.empty,
       receiptsRoot = ByteString.empty,
-      logsBloom = ByteString.empty,
+      logsBloom = BloomFilter.Empty,
       difficulty = difficultyCalc.calculateDifficulty(blockNumber, blockTimestamp, parent.header),
       number = blockNumber,
       gasLimit = calculateGasLimit(parent.header.gasLimit, blockNumber),
@@ -102,7 +101,7 @@ abstract class BlockGeneratorSkeleton(
     blockPreparator.prepareBlock(evmCodeStorage, block, parent.header, initialWorldStateBeforeExecution) match {
       case PreparedBlock(prepareBlock, BlockResult(_, gasUsed, receipts, _), stateRoot, updatedWorld) =>
         val receiptsLogs: Seq[Array[Byte]] =
-          BloomFilter.EmptyBloomFilter.toArray +: receipts.map(_.logsBloomFilter.toArray)
+          BloomFilter.Empty.toArray +: receipts.map(_.logsBloomFilter.toArray)
         val bloomFilter = ByteString(or(receiptsLogs*))
 
         PendingBlockAndState(
@@ -112,7 +111,7 @@ abstract class BlockGeneratorSkeleton(
                 transactionsRoot = buildMpt(prepareBlock.body.transactionList, SignedTransaction.byteArraySerializable),
                 stateRoot = stateRoot,
                 receiptsRoot = buildMpt(receipts, Receipt.byteArraySerializable),
-                logsBloom = bloomFilter,
+                logsBloom = BloomFilter(bloomFilter),
                 gasUsed = gasUsed
               ),
               body = prepareBlock.body

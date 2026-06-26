@@ -11,6 +11,7 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.jsonrpc.EthBlocksJsonMethodsImplicits.given
 
 /** Test to verify that genesis block is serialized correctly:
@@ -26,7 +27,7 @@ class GenesisBlockResponseSpec extends AnyFlatSpec with Matchers {
       stateRoot = ByteString(Hex.decode("c22374cb808edd849fae4ef966b459424a1e6ada8d3752eaae4c60b15689ddd0")),
       transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
       receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-      logsBloom = ByteString(Hex.decode("0" * 512)),
+      logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
       difficulty = BigInt("131072"),
       number = 0,
       gasLimit = BigInt("8000000"),
@@ -63,7 +64,7 @@ class GenesisBlockResponseSpec extends AnyFlatSpec with Matchers {
       stateRoot = ByteString(Hex.decode("c22374cb808edd849fae4ef966b459424a1e6ada8d3752eaae4c60b15689ddd0")),
       transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
       receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-      logsBloom = ByteString(Hex.decode("0" * 512)),
+      logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
       difficulty = BigInt("131072"),
       number = 0,
       gasLimit = BigInt("8000000"),

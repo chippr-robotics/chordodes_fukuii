@@ -78,7 +78,7 @@ trait ObjectGenerators {
   } yield LegacyReceipt.withHashOutcome(
     postTransactionStateHash = ByteString(postTransactionStateHash),
     cumulativeGasUsed = cumulativeGasUsed,
-    logsBloomFilter = ByteString(logsBloomFilter),
+    logsBloomFilter = BloomFilter(ByteString(logsBloomFilter)),
     logs = Seq()
   )
 
@@ -281,7 +281,7 @@ trait ObjectGenerators {
     stateRoot = stateRoot,
     transactionsRoot = transactionsRoot,
     receiptsRoot = receiptsRoot,
-    logsBloom = logsBloom,
+    logsBloom = BloomFilter(logsBloom),
     difficulty = difficulty,
     number = number,
     gasLimit = gasLimit,

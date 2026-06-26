@@ -127,7 +127,7 @@ object TransactionReceiptResponse {
       gasUsed = gasUsedByTransaction,
       contractAddress = contractAddress,
       logs = txLogs,
-      logsBloom = receipt.logsBloomFilter,
+      logsBloom = receipt.logsBloomFilter.value,
       root = root,
       status = status,
       `type` = Some(txType),

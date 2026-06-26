@@ -508,7 +508,7 @@ class EthTxServiceSpec
     val fakeReceipt: LegacyReceipt = LegacyReceipt.withHashOutcome(
       postTransactionStateHash = ByteString(Hex.decode("01" * 32)),
       cumulativeGasUsed = 43,
-      logsBloomFilter = ByteString(Hex.decode("00" * 256)),
+      logsBloomFilter = BloomFilter(ByteString(Hex.decode("00" * 256))),
       logs = Seq(TxLogEntry(Address(42), Seq(ByteString(Hex.decode("01" * 32))), ByteString(Hex.decode("03" * 32))))
     )
 

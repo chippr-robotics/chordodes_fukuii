@@ -773,7 +773,7 @@ class EngineApiService(
                               stateRoot = ByteString.empty,
                               transactionsRoot = emptyTrieRoot,
                               receiptsRoot = emptyTrieRoot,
-                              logsBloom = ByteString(new Array[Byte](256)),
+                              logsBloom = BloomFilter.Empty,
                               difficulty = 0,
                               number = blockNumber,
                               gasLimit = gasLimit,
@@ -798,7 +798,6 @@ class EngineApiService(
                             // executeBlock early-returns cleanly on pre-Prague (processPragueSystemCalls
                             // is a no-op outside Prague), so there's nothing to lose by using it always.
                             import com.chipprbots.ethereum.consensus.validators.std.MptListValidator.intByteArraySerializable
-                            import com.chipprbots.ethereum.ledger.BloomFilter
                             import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
                             import com.chipprbots.ethereum.domain.Receipt
                             val (receipts, gasUsedTotal, finalStateRoot, executionRequests) =
@@ -816,7 +815,7 @@ class EngineApiService(
                               }
 
                             val receiptsLogs =
-                              BloomFilter.EmptyBloomFilter.toArray +: receipts.map(_.logsBloomFilter.toArray)
+                              BloomFilter.Empty.toArray +: receipts.map(_.logsBloomFilter.toArray)
                             val bloomFilter = ByteString(com.chipprbots.ethereum.utils.ByteUtils.or(receiptsLogs*))
                             def buildMpt[T](
                                 items: Seq[T],
@@ -871,7 +870,7 @@ class EngineApiService(
                               receiptsRoot = buildMpt(receipts, Receipt.byteArraySerializable),
                               transactionsRoot =
                                 buildMpt(skeletonBlock.body.transactionList, SignedTransaction.byteArraySerializable),
-                              logsBloom = bloomFilter,
+                              logsBloom = BloomFilter(bloomFilter),
                               gasUsed = gasUsedTotal,
                               extraFields = finalExtraFields
                             )
@@ -1156,7 +1155,7 @@ class EngineApiService(
       stateRoot = payload.stateRoot,
       transactionsRoot = computeTransactionsRoot(signedTxs),
       receiptsRoot = payload.receiptsRoot,
-      logsBloom = payload.logsBloom,
+      logsBloom = BloomFilter(payload.logsBloom),
       difficulty = 0,
       number = payload.blockNumber,
       gasLimit = payload.gasLimit,

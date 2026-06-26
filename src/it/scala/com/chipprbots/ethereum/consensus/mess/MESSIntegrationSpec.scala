@@ -6,6 +6,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.BloomFilter
 
 /** Integration test for MESS (ECIP-1100: Modified Exponential Subjective Scoring).
   *
@@ -27,7 +28,7 @@ class MESSIntegrationSpec extends AnyFlatSpec with Matchers {
       stateRoot = ByteString.empty,
       transactionsRoot = ByteString.empty,
       receiptsRoot = ByteString.empty,
-      logsBloom = ByteString.empty,
+      logsBloom = BloomFilter(ByteString.empty),
       difficulty = difficulty,
       number = number,
       gasLimit = 0,

@@ -666,7 +666,7 @@ object GraphQLSchema {
           }
         ),
         Field("timestamp", LongType, resolve = _.value.header.unixTimestamp),
-        Field("logsBloom", BytesType, resolve = _.value.header.logsBloom),
+        Field("logsBloom", BytesType, resolve = _.value.header.logsBloom.value),
         Field("mixHash", Bytes32Type, resolve = _.value.header.mixHash),
         Field("difficulty", BigIntType, resolve = _.value.header.difficulty),
         Field(

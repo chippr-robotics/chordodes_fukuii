@@ -81,7 +81,7 @@ object TestConverter {
       stateRoot = ByteString(parseHex(testHeader.stateRoot)),
       transactionsRoot = ByteString(parseHex(testHeader.transactionsTrie)),
       receiptsRoot = ByteString(parseHex(testHeader.receiptTrie)),
-      logsBloom = ByteString(parseHex(testHeader.bloom)),
+      logsBloom = BloomFilter(ByteString(parseHex(testHeader.bloom))),
       difficulty = parseBigInt(testHeader.difficulty),
       number = parseBigInt(testHeader.number),
       gasLimit = parseBigInt(testHeader.gasLimit),

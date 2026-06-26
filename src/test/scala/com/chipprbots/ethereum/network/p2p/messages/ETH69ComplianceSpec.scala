@@ -10,6 +10,7 @@ import com.chipprbots.ethereum.network.p2p.EthereumMessageDecoder
 import com.chipprbots.ethereum.network.p2p.NetworkMessageDecoder
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.domain.BloomFilter
 
 /** Wire-format compliance tests for ETH68 and ETH69.
   *
@@ -317,7 +318,7 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
         val receipt = LegacyReceipt(
           SuccessOutcome,
           cumulativeGasUsed = BigInt(21000),
-          logsBloomFilter = bloom256,
+          logsBloomFilter = BloomFilter(bloom256),
           logs = Seq.empty
         )
         val receiptRLP = new ReceiptBloomFreeEnc(receipt).toRLPEncodable
@@ -333,7 +334,7 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
         val receipt = LegacyReceipt(
           SuccessOutcome,
           cumulativeGasUsed = BigInt(21000),
-          logsBloomFilter = bloom256,
+          logsBloomFilter = BloomFilter(bloom256),
           logs = Seq.empty
         )
         // Build Receipts69 using the production bloom-free path
@@ -354,7 +355,7 @@ class ETH69ComplianceSpec extends AnyWordSpec with Matchers {
         val receipt = LegacyReceipt(
           HashOutcome(ByteString(Array.fill(32)(0x11.toByte))),
           cumulativeGasUsed = BigInt(50000),
-          logsBloomFilter = bloom256,
+          logsBloomFilter = BloomFilter(bloom256),
           logs = Seq.empty
         )
         val receiptRLP = new ReceiptBloomFreeEnc(receipt).toRLPEncodable

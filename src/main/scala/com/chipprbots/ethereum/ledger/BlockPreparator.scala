@@ -594,7 +594,8 @@ class BlockPreparator(
             val legacyReceipt = LegacyReceipt(
               postTransactionStateHash = transactionOutcome,
               cumulativeGasUsed = acumGas + gasUsed,
-              logsBloomFilter = BloomFilter.create(logs),
+              logsBloomFilter =
+                com.chipprbots.ethereum.domain.BloomFilter(com.chipprbots.ethereum.ledger.BloomFilter.create(logs)),
               logs = logs
             )
             val receipt = stx.tx match {

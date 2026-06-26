@@ -236,7 +236,7 @@ class BlockExecutionSpec
           resultingReceipts.head: @unchecked
         rootHashReceipt shouldBe HashOutcome(expectedStateRoot)
         gasUsedReceipt shouldBe resultingGasUsed
-        logsBloomFilterReceipt shouldBe BloomFilter.create(Nil)
+        logsBloomFilterReceipt shouldBe BloomFilter(com.chipprbots.ethereum.ledger.BloomFilter.create(Nil))
         logsReceipt shouldBe Nil
       }
 
@@ -315,7 +315,7 @@ class BlockExecutionSpec
               resultingReceipts.head: @unchecked
             rootHashReceipt shouldBe HashOutcome(expectedStateRoot)
             gasUsedReceipt shouldBe resultingGasUsed
-            logsBloomFilterReceipt shouldBe BloomFilter.create(logs)
+            logsBloomFilterReceipt shouldBe BloomFilter(com.chipprbots.ethereum.ledger.BloomFilter.create(logs))
             logsReceipt shouldBe logs
           }
         }
@@ -588,7 +588,7 @@ class BlockExecutionSpec
           receipt1: @unchecked
         rootHashReceipt1 shouldBe HashOutcome(expectedStateRootTx1)
         gasUsedReceipt1 shouldBe stx1.tx.tx.gasLimit
-        logsBloomFilterReceipt1 shouldBe BloomFilter.create(Nil)
+        logsBloomFilterReceipt1 shouldBe BloomFilter(com.chipprbots.ethereum.ledger.BloomFilter.create(Nil))
         logsReceipt1 shouldBe Nil
 
         // Check receipt2
@@ -604,7 +604,7 @@ class BlockExecutionSpec
           receipt2: @unchecked
         rootHashReceipt2 shouldBe HashOutcome(expectedStateRootTx2)
         gasUsedReceipt2 shouldBe (transaction1.gasLimit + transaction2.gasLimit)
-        logsBloomFilterReceipt2 shouldBe BloomFilter.create(Nil)
+        logsBloomFilterReceipt2 shouldBe BloomFilter(com.chipprbots.ethereum.ledger.BloomFilter.create(Nil))
         logsReceipt2 shouldBe Nil
 
         // Check world

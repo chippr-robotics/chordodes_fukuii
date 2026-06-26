@@ -9,7 +9,7 @@ import com.chipprbots.ethereum.mpt.ByteArraySerializable
 sealed trait Receipt {
   def postTransactionStateHash: TransactionOutcome
   def cumulativeGasUsed: BigInt
-  def logsBloomFilter: ByteString
+  def logsBloomFilter: BloomFilter
   def logs: Seq[TxLogEntry]
 }
 
@@ -18,7 +18,7 @@ abstract class TypedLegacyReceipt(@annotation.unused _transactionTypeId: Byte, v
     extends Receipt {
   def postTransactionStateHash: TransactionOutcome = delegateReceipt.postTransactionStateHash
   def cumulativeGasUsed: BigInt = delegateReceipt.cumulativeGasUsed
-  def logsBloomFilter: ByteString = delegateReceipt.logsBloomFilter
+  def logsBloomFilter: BloomFilter = delegateReceipt.logsBloomFilter
   def logs: Seq[TxLogEntry] = delegateReceipt.logs
 }
 
@@ -38,7 +38,7 @@ object LegacyReceipt {
   def withHashOutcome(
       postTransactionStateHash: ByteString,
       cumulativeGasUsed: BigInt,
-      logsBloomFilter: ByteString,
+      logsBloomFilter: BloomFilter,
       logs: Seq[TxLogEntry]
   ): LegacyReceipt =
     LegacyReceipt(HashOutcome(postTransactionStateHash), cumulativeGasUsed, logsBloomFilter, logs)
@@ -48,7 +48,7 @@ object Type01Receipt {
   def withHashOutcome(
       postTransactionStateHash: ByteString,
       cumulativeGasUsed: BigInt,
-      logsBloomFilter: ByteString,
+      logsBloomFilter: BloomFilter,
       logs: Seq[TxLogEntry]
   ): Type01Receipt =
     Type01Receipt(LegacyReceipt.withHashOutcome(postTransactionStateHash, cumulativeGasUsed, logsBloomFilter, logs))
@@ -65,7 +65,7 @@ object Type01Receipt {
 case class LegacyReceipt(
     postTransactionStateHash: TransactionOutcome,
     cumulativeGasUsed: BigInt,
-    logsBloomFilter: ByteString,
+    logsBloomFilter: BloomFilter,
     logs: Seq[TxLogEntry]
 ) extends Receipt {
   def toPrettyString(prefix: String): String = {
@@ -78,7 +78,7 @@ case class LegacyReceipt(
     s"${prefix}{ " +
       s"postTransactionStateHash: ${Hex.toHexString(stateHash)}, " +
       s"cumulativeGasUsed: $cumulativeGasUsed, " +
-      s"logsBloomFilter: ${Hex.toHexString(logsBloomFilter.toArray[Byte])}, " +
+      s"logsBloomFilter: ${Hex.toHexString(logsBloomFilter.toArray)}, " +
       s"logs: $logs" +
       s"}"
   }
@@ -97,7 +97,7 @@ object Type02Receipt {
   def withHashOutcome(
       postTransactionStateHash: ByteString,
       cumulativeGasUsed: BigInt,
-      logsBloomFilter: ByteString,
+      logsBloomFilter: BloomFilter,
       logs: Seq[TxLogEntry]
   ): Type02Receipt =
     Type02Receipt(LegacyReceipt.withHashOutcome(postTransactionStateHash, cumulativeGasUsed, logsBloomFilter, logs))

@@ -20,7 +20,7 @@ class ChainWeightSpec extends AnyFlatSpec with Matchers {
       stateRoot = ByteString.empty,
       transactionsRoot = ByteString.empty,
       receiptsRoot = ByteString.empty,
-      logsBloom = ByteString.empty,
+      logsBloom = BloomFilter(ByteString.empty),
       difficulty = difficulty,
       number = number,
       gasLimit = 0,
