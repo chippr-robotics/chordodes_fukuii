@@ -1,10 +1,3 @@
-# loop-metadata:
-#   loop_role: maker
-#   never_self_check: true
-#   model_tier: sonnet
-#   provides_gate: []
-#   invoked_by: [execute]
-#   applicable_recipes: [spec-conformance, test-greening]
 ---
 name: mithril
 description: >-

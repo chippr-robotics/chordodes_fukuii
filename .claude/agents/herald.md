@@ -1,10 +1,3 @@
-# loop-metadata:
-#   loop_role: checker
-#   never_self_check: false
-#   model_tier: sonnet
-#   provides_gate: [conformance-wire]
-#   invoked_by: [verify]
-#   applicable_recipes: [spec-conformance, ref-parity-audit]
 ---
 name: herald
 description: >-
