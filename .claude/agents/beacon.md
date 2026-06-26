@@ -54,7 +54,7 @@ exact file:line and the spec or reference-client behavior it must match.
 
 ### ETH / Sepolia reference
 
-Branch convention: `main` = ETH work; `upstream` = read-only canonical upstream.
+Branch convention: `upstream` = canonical ETH reference (read-only); `main` = ETC overlay.
 
 - **go-ethereum** (primary): https://github.com/white-b0x/go-ethereum
   - Authoritative for: PoS mechanics, timestamp fork dispatch, Osaka EIPs,

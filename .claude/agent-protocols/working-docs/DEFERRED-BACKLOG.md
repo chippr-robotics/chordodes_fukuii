@@ -1536,6 +1536,7 @@ Next opportunity: after SNAP1 frees 4 bridges.
 | ~~§8k-B6~~ ✅ | 2 — PeerEventBusActor:42, PeerRequestHandler:78 (NB:419+1009 moved to §8k-B8) | **8** |
 | ~~§8k-B7~~ ✅ | 1 — AkkaTaskOps:37 | **5** |
 | ~~§8k-B8~~ ✅ | NB:419+NB:1009 removed + 7 silent-drop GOAL-A fixes — structural pass-through eliminated; remaining bridges are explicit per-actor (see B8 outcome note) | **explicit** |
+| §8k-B10 | 22+ spawn sites across SC/FS/SSC/NB — change spawned-actor params Classic→TypedActorRef (11 actors); ARC sites excluded (not yet Typed) | **~7** |
 
 **Run after each Primary Track sprint above:**
 
@@ -2045,7 +2046,168 @@ After Phase 2:
 
 ---
 
-**Execution order:** §8k-B1 → §8k-B2 → §8k-B3 → §8k-B4 → §8k-B5 → §8k-B6 → §8k-B7 → §8k-B8 → §8k-B9
+#### §8k-B10 — Spawn site cleanup: Classic ActorRef → TypedActorRef in 11 spawned actors (22+ bridges)
+
+**Files (spawned actors):** `RegularSync.scala`, `BytecodeRecoveryActor.scala`, `StorageRecoveryActor.scala`, `PivotBlockSelector.scala`, `SyncStateSchedulerActor.scala`, `FastSyncBranchResolverActor.scala`, `ByteCodeCoordinator.scala`, `StorageRangeCoordinator.scala`, `TrieNodeHealingCoordinator.scala`, `BlockchainHostActor.scala`, `PendingTransactionsManager.scala`, `DebugService.scala`
+**Files (spawn sites):** `SyncController.scala`, `FastSync.scala`, `SNAPSyncController.scala`, `NodeBuilder.scala`
+**Agent:** LOOM
+**Gate:** §8k-B8 complete ✅
+
+**Background:**
+§8k-B8b changed `SyncController`, `FastSync`, `SNAPSyncController`, and `ChainDownloader` to accept
+`TypedActorRef[NPMA.Command]` and `TypedActorRef[PEB.Command]` instead of Classic `ActorRef`. This
+removed the NodeBuilder implicit pass-through (bridges NB:419 + NB:1009), but exposed every spawn site
+where these Typed refs are downcast to Classic for actors whose constructors still expect `ActorRef`.
+The bridge count rose from 5 → ~30.
+
+All 11 affected actors are already `Behavior[Command]`. This sprint does NOT run a full LOOM
+migration — it only changes constructor/factory param signatures from `ActorRef` to `TypedActorRef[T]`
+and removes the corresponding `.toClassic` at each spawn site.
+
+**DO NOT touch `AccountRangeCoordinator`** — ARC is not yet migrated to Typed; its spawn site(s) in
+SNAPSyncController remain until ARC is migrated.
+
+**Prompt:**
+```
+This is a LOOM sprint to eliminate 22+ spawn-site bridges by changing Classic ActorRef constructor
+params to TypedActorRef in 11 already-Typed actors. No full LOOM migration is needed — all 11 actors
+are already Behavior[Command]. Only their factory method signatures need updating.
+
+─────────────────────────────────────────────────────────
+BASELINE CENSUS (run first)
+─────────────────────────────────────────────────────────
+
+grep -rn "\.toClassic\b" src/main/ --include="*.scala" | grep -v "//" | grep -v "^\s*\*" | wc -l
+# Record this count. Expected ~28-30 after §8k-B8.
+
+─────────────────────────────────────────────────────────
+FIX PATTERN (identical for all 11 actors)
+─────────────────────────────────────────────────────────
+
+For each actor:
+  1. Grep for the factory/behavior method signature:
+       grep -n "networkPeerManager\|peerEventBus" src/main/scala/com/chipprbots/ethereum/.../<Actor>.scala | head -20
+  2. Change `networkPeerManager: ActorRef` → `networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command]`
+  3. Change `peerEventBus: ActorRef` → `peerEventBus: TypedActorRef[PeerEventBusActor.Command]`
+  4. Add imports if not present. Remove Classic ActorRef import alias if now unused.
+  5. Verify all internal `networkPeerManager !` sends use Cmd variants (they should — actor is Behavior[Command]).
+  6. `sbt compile-all` — must be clean before moving to next actor.
+
+─────────────────────────────────────────────────────────
+PHASE 1 — SyncController spawn sites (8 bridges)
+─────────────────────────────────────────────────────────
+
+STEP 1.1 — RegularSync.scala (spawned at SyncController:~1753/~1754 and ~2432/~2433)
+  Apply fix pattern. sbt compile-all.
+
+STEP 1.2 — BytecodeRecoveryActor.scala (spawned at SyncController:~1926/~1946)
+  Apply fix pattern. sbt compile-all.
+
+STEP 1.3 — StorageRecoveryActor.scala (spawned at SyncController:~2002/~2023)
+  Apply fix pattern. sbt compile-all.
+
+STEP 1.4 — SyncController.scala — remove .toClassic at spawn sites:
+  Lines ~1753, ~1754: RegularSync spawn — remove .toClassic from networkPeerManager and peerEventBus args
+  Lines ~2432, ~2433: RegularSync second spawn site — same
+  Lines ~1926, ~1946: BytecodeRecoveryActor spawn — same
+  Lines ~2002, ~2023: StorageRecoveryActor spawn — same
+  sbt compile-all after all removals.
+
+─────────────────────────────────────────────────────────
+PHASE 2 — FastSync spawn sites (7 bridges)
+─────────────────────────────────────────────────────────
+
+STEP 2.1 — PivotBlockSelector.scala (spawned at FastSync:~274 and ~686)
+  Apply fix pattern. sbt compile-all.
+
+STEP 2.2 — SyncStateSchedulerActor.scala (spawned at FastSync:~300 and ~1121/~1122)
+  Apply fix pattern. sbt compile-all.
+
+STEP 2.3 — FastSyncBranchResolverActor.scala (spawned at FastSync:~419/~420)
+  Apply fix pattern. sbt compile-all.
+
+STEP 2.4 — FastSync.scala — remove .toClassic at spawn sites:
+  Line ~274: PivotBlockSelector spawn
+  Line ~300: SyncStateSchedulerActor spawn
+  Lines ~419, ~420: FastSyncBranchResolverActor spawn
+  Line ~686: PivotBlockSelector second spawn
+  Lines ~1121, ~1122: SyncStateSchedulerActor second spawn
+  sbt compile-all after all removals.
+
+─────────────────────────────────────────────────────────
+PHASE 3 — SNAPSyncController spawn sites (5-6 bridges; ARC EXCLUDED)
+─────────────────────────────────────────────────────────
+
+⚠️ DO NOT touch AccountRangeCoordinator or its spawn site(s) in SSC (~line 3376).
+Before touching line ~3414: confirm what actor it spawns (ByteCodeCoordinator or ARC).
+If ~3414 spawns ARC, leave it. If it spawns BCC, remove .toClassic.
+
+STEP 3.1 — ByteCodeCoordinator.scala (spawned at SSC:~2350 and possibly ~3414)
+  Apply fix pattern. sbt compile-all.
+
+STEP 3.2 — StorageRangeCoordinator.scala (spawned at SSC:~2369 and ~3437)
+  Apply fix pattern. sbt compile-all.
+
+STEP 3.3 — TrieNodeHealingCoordinator.scala (spawned at SSC:~3628 and ~3696)
+  Confirm TNHC is Behavior[Command] (migrated in §8k-Q):
+    grep -n "Behavior\[" src/main/scala/com/chipprbots/ethereum/blockchain/sync/snap/actors/TrieNodeHealingCoordinator.scala | head -5
+  Apply fix pattern. sbt compile-all.
+
+STEP 3.4 — SNAPSyncController.scala — remove .toClassic at BCC/SRC/TNHC spawn sites only:
+  Lines ~2350 (BCC): remove .toClassic
+  Line ~3414 (BCC only if confirmed — verify first): remove .toClassic
+  Lines ~2369, ~3437 (SRC): remove .toClassic
+  Lines ~3628, ~3696 (TNHC): remove .toClassic
+  LEAVE line ~3376 (ARC) — DO NOT TOUCH.
+  sbt compile-all.
+
+─────────────────────────────────────────────────────────
+PHASE 4 — NodeBuilder spawn sites (3 bridges)
+─────────────────────────────────────────────────────────
+
+STEP 4.1 — BlockchainHostActor.scala (spawned at NodeBuilder:~431 via networkPeerManager.toClassic)
+  Apply fix pattern. sbt compile-all.
+
+STEP 4.2 — PendingTransactionsManager.scala (spawned at NodeBuilder:~481 via networkPeerManager.toClassic)
+  Apply fix pattern. sbt compile-all.
+
+STEP 4.3 — DebugService.scala (plain class instantiated at NodeBuilder:~529; not an actor)
+  Find the constructor param for networkPeerManager.
+  Change ActorRef → TypedActorRef[NetworkPeerManagerActor.Command].
+  sbt compile-all.
+
+STEP 4.4 — NodeBuilder.scala — remove .toClassic at instantiation sites:
+  Line ~431: BlockchainHostActor spawn — remove .toClassic
+  Line ~481: PendingTransactionsManager spawn — remove .toClassic
+  Line ~529: DebugService instantiation — remove .toClassic
+  sbt compile-all.
+
+─────────────────────────────────────────────────────────
+POST-MIGRATION
+─────────────────────────────────────────────────────────
+
+1. Bridge census:
+   grep -rn "\.toClassic\b" src/main/ --include="*.scala" | grep -v "//" | grep -v "^\s*\*" | wc -l
+   Expected: ~7 (TCP floor 5 grep lines: ServerActor:70/77, RLPxCH:323, PeerManagerActor:584/622
+              + ARC bridge(s) in SSC: 1-2 grep lines depending on line 3414 verdict)
+
+2. Run affected specs:
+   sbt "testOnly *RegularSyncSpec *FastSyncSpec *SNAPSyncControllerSpec *BlockchainHostActorSpec *PendingTransactionsManagerSpec"
+
+3. sbt scalafmtAll
+
+4. Commit in two parts (risk-stratified):
+   Part 1 — actor param changes only (Phases 1-4, Steps *.1-*.3):
+     git commit -m "fix(8k-B10a): change networkPeerManager/peerEventBus params Classic→TypedActorRef in 11 actors"
+   Part 2 — spawn site .toClassic removal (Phases 1-4, Steps *.4):
+     git commit -m "fix(8k-B10b): remove .toClassic at SC/FS/SSC/NB spawn sites — bridges: ~30→~7"
+
+5. Update §8k-B gate table row for §8k-B10.
+```
+
+---
+
+**Execution order:** §8k-B1 → §8k-B2 → §8k-B3 → §8k-B4 → §8k-B5 → §8k-B6 → §8k-B7 → §8k-B8 → §8k-B9 → §8k-B10
 
 §8k-B1 and §8k-B2 are immediate (no gate). §8k-B3 through §8k-B7 can proceed in parallel
 if separate agents are available, but §8k-B6 (PEB migration) unlocks the most adapter import

@@ -57,7 +57,7 @@ Nethermind is the secondary check.
 
 ### ETH / Sepolia reference
 
-Branch convention: `main` = ETH work; `upstream` = read-only canonical.
+Branch convention: `upstream` = canonical ETH reference (read-only); `main` = ETC overlay.
 
 - **go-ethereum** (primary): https://github.com/white-b0x/go-ethereum
   — use first for modernized file structure, peer management, sync architecture
