@@ -323,7 +323,7 @@ object AccountByAddressResource {
             |  "balance": "${account.balance}",
             |  "balanceETC": "$balanceEtc",
             |  "storageRoot": "${ByteStringUtils.hash2string(account.storageRoot)}",
-            |  "codeHash": "${ByteStringUtils.hash2string(account.codeHash)}"
+            |  "codeHash": "${ByteStringUtils.hash2string(account.codeHash.value)}"
             |}""".stripMargin
         case None =>
           s"""{

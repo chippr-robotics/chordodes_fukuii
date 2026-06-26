@@ -23,6 +23,7 @@ import com.chipprbots.ethereum.network.p2p.messages.SNAP.ByteCodes
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.StateStorage
 import com.chipprbots.ethereum.domain.Account
+import com.chipprbots.ethereum.domain.CodeHash
 import com.chipprbots.ethereum.mpt.*
 import com.chipprbots.ethereum.mpt.MptVisitors.*
 import com.chipprbots.ethereum.network.Peer
@@ -335,11 +336,11 @@ object BytecodeRecoveryActor {
 
       Account(leafNode.value) match {
         case Success(account) =>
-          if account.codeHash != Account.EmptyCodeHash && !seen.contains(account.codeHash) then {
-            seen += account.codeHash
+          if account.codeHash != Account.EmptyCodeHash && !seen.contains(account.codeHash.value) then {
+            seen += account.codeHash.value
             contractCount += 1
-            if evmCodeStorage.get(account.codeHash).isEmpty then {
-              missing += account.codeHash
+            if evmCodeStorage.get(account.codeHash.value).isEmpty then {
+              missing += account.codeHash.value
             }
           }
         case Failure(_) => // Skip malformed account RLP

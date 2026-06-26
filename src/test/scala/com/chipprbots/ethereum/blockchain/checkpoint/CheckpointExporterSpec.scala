@@ -21,6 +21,7 @@ import com.chipprbots.ethereum.blockchain.sync.EphemBlockchainTestSetup
 import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.db.storage.MptStorage
 import com.chipprbots.ethereum.domain.Account
+import com.chipprbots.ethereum.domain.CodeHash
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
@@ -71,7 +72,7 @@ class CheckpointExporterSpec
       )
         .put(
           crypto.kec256(addr1),
-          Account(nonce = UInt256(0), balance = UInt256(100), codeHash = codeAHash)
+          Account(nonce = UInt256(0), balance = UInt256(100), codeHash = CodeHash(codeAHash))
         )
         .put(
           crypto.kec256(addr2),
@@ -79,7 +80,7 @@ class CheckpointExporterSpec
             nonce = UInt256(0),
             balance = UInt256(0),
             storageRoot = storageRoot,
-            codeHash = codeBHash
+            codeHash = CodeHash(codeBHash)
           )
         )
         .put(
@@ -124,7 +125,7 @@ class CheckpointExporterSpec
         targetStorages.storages.stateStorage.getBackingStorage(0)
       )
       importedTrie.get(crypto.kec256(addr1)).value.balance shouldBe UInt256(100)
-      importedTrie.get(crypto.kec256(addr2)).value.codeHash shouldBe codeBHash
+      importedTrie.get(crypto.kec256(addr2)).value.codeHash shouldBe CodeHash(codeBHash)
       importedTrie.get(crypto.kec256(addr3)).value.nonce shouldBe UInt256(1)
 
       // Storage trie reachable from account 2
@@ -176,7 +177,7 @@ class CheckpointExporterSpec
       val sourceBackingStorage: MptStorage = sourceStorages.storages.stateStorage.getBackingStorage(100)
       val accountTrie: MerklePatriciaTrie[Array[Byte], Account] =
         MerklePatriciaTrie[Array[Byte], Account](sourceBackingStorage)
-          .put(crypto.kec256(addr1), Account(nonce = UInt256(0), balance = UInt256(100), codeHash = codeAHash))
+          .put(crypto.kec256(addr1), Account(nonce = UInt256(0), balance = UInt256(100), codeHash = CodeHash(codeAHash)))
           .put(crypto.kec256(addr2), Account(nonce = UInt256(1), balance = UInt256(1)))
       val stateRoot: ByteString = ByteString(accountTrie.getRootHash)
 

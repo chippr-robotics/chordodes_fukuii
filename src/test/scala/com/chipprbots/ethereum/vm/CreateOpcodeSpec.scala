@@ -10,6 +10,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Account
+import com.chipprbots.ethereum.domain.CodeHash
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.UInt256
@@ -139,7 +140,7 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
       REVERT
     )
 
-    val accountWithCode: ByteString => Account = code => Account.empty().withCode(kec256(code))
+    val accountWithCode: ByteString => Account = code => Account.empty().withCode(CodeHash(kec256(code)))
 
     val endowment: UInt256 = 123
     val initWorld: MockWorldState =
@@ -462,14 +463,14 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
     "account with non-empty code already exists" should {
 
       "fail to create contract" in {
-        val accountNonEmptyCode = Account(codeHash = ByteString("abc"))
+        val accountNonEmptyCode = Account(codeHash = CodeHash(ByteString("abc")))
 
-        val newAddress = newAccountAddress(accountNonEmptyCode.codeHash)
+        val newAddress = newAccountAddress(accountNonEmptyCode.codeHash.value)
 
         val world = fxt.initWorld.saveAccount(newAddress, accountNonEmptyCode)
         val context: PC = fxt.context.copy(world = world)
         val result =
-          CreateResult(context = context, opcode = opcode, salt = fxt.salt, createCode = accountNonEmptyCode.codeHash)
+          CreateResult(context = context, opcode = opcode, salt = fxt.salt, createCode = accountNonEmptyCode.codeHash.value)
 
         result.returnValue shouldEqual UInt256.Zero
         result.world.getGuaranteedAccount(newAddress) shouldEqual accountNonEmptyCode
@@ -482,12 +483,12 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
       "fail to create contract" in {
         val accountNonZeroNonce = Account(nonce = 1)
 
-        val newAddress = newAccountAddress(accountNonZeroNonce.codeHash)
+        val newAddress = newAccountAddress(accountNonZeroNonce.codeHash.value)
 
         val world = fxt.initWorld.saveAccount(newAddress, accountNonZeroNonce)
         val context: PC = fxt.context.copy(world = world)
         val result =
-          CreateResult(context = context, opcode = opcode, salt = fxt.salt, createCode = accountNonZeroNonce.codeHash)
+          CreateResult(context = context, opcode = opcode, salt = fxt.salt, createCode = accountNonZeroNonce.codeHash.value)
 
         result.returnValue shouldEqual UInt256.Zero
         result.world.getGuaranteedAccount(newAddress) shouldEqual accountNonZeroNonce

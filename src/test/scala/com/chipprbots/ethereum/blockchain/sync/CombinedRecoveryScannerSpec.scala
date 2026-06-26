@@ -13,6 +13,7 @@ import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.MptStorage
 import com.chipprbots.ethereum.db.storage.StateStorage
 import com.chipprbots.ethereum.domain.Account
+import com.chipprbots.ethereum.domain.CodeHash
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.defaultByteArraySerializable
@@ -76,7 +77,7 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite {
       )
   }
 
-  private def acc(storageRoot: ByteString, codeHash: ByteString): Account =
+  private def acc(storageRoot: ByteString, codeHash: CodeHash): Account =
     Account(nonce = UInt256.Zero, storageRoot = storageRoot, codeHash = codeHash)
 
   /** The proven single whole-trie pass (Task #2), used as the equivalence reference. */
@@ -90,11 +91,11 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite {
   private def gappyState(f: Fixture): ByteString =
     f.stateRootOf(
       Seq(
-        f.acct(1) -> acc(f.presentStorageRoot(1), f.presentCode(1)), // all present
-        f.acct(2) -> acc(Account.EmptyStorageRootHash, f.missingCodeHash(2)), // missing code
+        f.acct(1) -> acc(f.presentStorageRoot(1), CodeHash(f.presentCode(1))), // all present
+        f.acct(2) -> acc(Account.EmptyStorageRootHash, CodeHash(f.missingCodeHash(2))), // missing code
         f.acct(3) -> acc(f.missingStorageRoot(3), Account.EmptyCodeHash), // missing storage
-        f.acct(4) -> acc(f.missingStorageRoot(4), f.presentCode(4)), // missing storage, present code
-        f.acct(5) -> acc(f.presentStorageRoot(5), f.missingCodeHash(5)), // present storage, missing code
+        f.acct(4) -> acc(f.missingStorageRoot(4), CodeHash(f.presentCode(4))), // missing storage, present code
+        f.acct(5) -> acc(f.presentStorageRoot(5), CodeHash(f.missingCodeHash(5))), // present storage, missing code
         f.acct(6) -> acc(f.presentStorageRoot(6), Account.EmptyCodeHash), // present
         f.acct(7) -> Account.empty() // EOA
       )

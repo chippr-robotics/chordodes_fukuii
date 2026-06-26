@@ -155,7 +155,7 @@ class GenesisDataLoader(
             nonce = genesisAccount.nonce
               .getOrElse(blockchainConfig.accountStartNonce),
             balance = genesisAccount.balance,
-            codeHash = genesisAccount.code.fold(Account.EmptyCodeHash)(codeValue => crypto.kec256(codeValue)),
+            codeHash = genesisAccount.code.fold(Account.EmptyCodeHash)(codeValue => CodeHash(crypto.kec256(codeValue))),
             storageRoot = genesisAccount.storage.fold(Account.EmptyStorageRootHash)(computeStorageRootHash(_, storage))
           )
         )

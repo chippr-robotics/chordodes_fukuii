@@ -324,7 +324,7 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
           nonce = UInt256(currentBlockNumber),
           balance = UInt256(currentBlockNumber * BigInt(1000000000)),
           storageRoot = ByteString.empty,
-          codeHash = ByteString.empty
+          codeHash = Account.EmptyCodeHash
         )
         InMemoryWorldStateProxy.persistState(world.saveAccount(accountAddress, account))
       } else world

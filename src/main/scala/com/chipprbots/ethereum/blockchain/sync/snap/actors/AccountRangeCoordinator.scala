@@ -1599,7 +1599,7 @@ private class AccountRangeCoordinatorImpl(
       if account.codeHash != Account.EmptyCodeHash then {
         // Write 32-byte accountHash + 32-byte codeHash to bytecode file (crash recovery)
         contractAccountsOut.write(accountHash.toArray.padTo(32, 0.toByte), 0, 32)
-        contractAccountsOut.write(account.codeHash.toArray.padTo(32, 0.toByte), 0, 32)
+        contractAccountsOut.write(account.codeHash.value.toArray.padTo(32, 0.toByte), 0, 32)
         // Write 32-byte accountHash + 32-byte storageRoot to storage file (crash recovery)
         contractStorageOut.write(accountHash.toArray.padTo(32, 0.toByte), 0, 32)
         contractStorageOut.write(account.storageRoot.toArray.padTo(32, 0.toByte), 0, 32)
@@ -1608,11 +1608,11 @@ private class AccountRangeCoordinatorImpl(
         // Track unique codeHashes via Bloom filter + temp file (~4MB RAM vs 200MB HashSet).
         // The Bloom filter has 0.01% FPR — ~200 of 2M hashes may be missed but the
         // recovery scan (Bug 20 hardening) catches any gaps.
-        if !codeHashBloom.mightContain(account.codeHash) then {
-          codeHashBloom.put(account.codeHash)
-          uniqueCodeHashesOut.write(account.codeHash.toArray.padTo(32, 0.toByte), 0, 32)
+        if !codeHashBloom.mightContain(account.codeHash.value) then {
+          codeHashBloom.put(account.codeHash.value)
+          uniqueCodeHashesOut.write(account.codeHash.value.toArray.padTo(32, 0.toByte), 0, 32)
           uniqueCodeHashesCount += 1
-          newCodeHashes += account.codeHash
+          newCodeHashes += account.codeHash.value
         }
 
         // Collect storage task for inline dispatch (skip contracts with empty storage)

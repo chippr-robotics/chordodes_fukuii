@@ -791,14 +791,14 @@ final private class BlockImporterLogic(
               .getAccount(blockchainReader.getBestBranch, address, parentBlockNumber)
               .flatMap { account =>
                 if account.codeHash != Account.EmptyCodeHash then {
-                  evmCodeStorage.get(account.codeHash) match {
+                  evmCodeStorage.get(account.codeHash.value) match {
                     case None =>
                       log.info(
                         "Found missing code for contract {} (codeHash={})",
                         address,
-                        ByteStringUtils.hash2string(account.codeHash)
+                        ByteStringUtils.hash2string(account.codeHash.value)
                       )
-                      Some(account.codeHash)
+                      Some(account.codeHash.value)
                     case Some(_) => None
                   }
                 } else None

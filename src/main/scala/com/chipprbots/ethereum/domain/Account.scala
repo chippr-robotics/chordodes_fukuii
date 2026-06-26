@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.utils.ByteUtils
 
 object Account {
   val EmptyStorageRootHash: ByteString = ByteString(kec256(rlp.encode(Array.empty[Byte])))
-  val EmptyCodeHash: ByteString = kec256(ByteString())
+  val EmptyCodeHash: CodeHash = CodeHash.Empty
 
   def empty(startNonce: UInt256 = UInt256.Zero): Account =
     Account(nonce = startNonce, storageRoot = EmptyStorageRootHash, codeHash = EmptyCodeHash)
@@ -30,7 +30,7 @@ object Account {
         nonce.toRLPEncodable,
         balance.toRLPEncodable,
         byteStringEncDec.encode(storageRoot),
-        byteStringEncDec.encode(codeHash)
+        byteStringEncDec.encode(codeHash.value)
       )
     }
   }
@@ -46,7 +46,7 @@ object Account {
         val normalizedStorageRoot =
           if storageRootBytes.isEmpty then Account.EmptyStorageRootHash else ByteString(storageRootBytes)
         val normalizedCodeHash =
-          if codeHashBytes.isEmpty then Account.EmptyCodeHash else ByteString(codeHashBytes)
+          if codeHashBytes.isEmpty then Account.EmptyCodeHash else CodeHash(ByteString(codeHashBytes))
         Account(
           UInt256(ByteUtils.bytesToBigInt(nonceBytes)),
           UInt256(ByteUtils.bytesToBigInt(balanceBytes)),
@@ -69,7 +69,7 @@ case class Account(
     nonce: UInt256 = 0,
     balance: UInt256 = 0,
     storageRoot: ByteString = Account.EmptyStorageRootHash,
-    codeHash: ByteString = Account.EmptyCodeHash
+    codeHash: CodeHash = Account.EmptyCodeHash
 ) {
 
   def increaseBalance(value: UInt256): Account =
@@ -78,7 +78,7 @@ case class Account(
   def increaseNonce(value: UInt256 = 1): Account =
     copy(nonce = nonce + value)
 
-  def withCode(codeHash: ByteString): Account =
+  def withCode(codeHash: CodeHash): Account =
     copy(codeHash = codeHash)
 
   def withStorage(storageRoot: ByteString): Account =
@@ -97,6 +97,6 @@ case class Account(
 
   override def toString: String =
     s"Account(nonce: $nonce, balance: $balance, " +
-      s"storageRoot: ${Hex.toHexString(storageRoot.toArray[Byte])}, codeHash: ${Hex.toHexString(codeHash.toArray[Byte])})"
+      s"storageRoot: ${Hex.toHexString(storageRoot.toArray[Byte])}, codeHash: ${Hex.toHexString(codeHash.value.toArray[Byte])})"
 
 }

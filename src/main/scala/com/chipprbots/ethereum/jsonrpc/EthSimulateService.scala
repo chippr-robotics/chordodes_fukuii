@@ -630,7 +630,7 @@ class EthSimulateService(
           w = w.saveCode(address, code)
           // Update the account's codeHash immediately (not just in cache)
           // This prevents EIP-161 from deleting the account as "empty"
-          val codeHash = if code.isEmpty then Account.EmptyCodeHash else ByteString(kec256(code.toArray))
+          val codeHash = if code.isEmpty then Account.EmptyCodeHash else CodeHash(ByteString(kec256(code.toArray)))
           val acctWithCode = w.getAccount(address).getOrElse(Account.empty(blockchainConfig.accountStartNonce))
           w = w.saveAccount(address, acctWithCode.copy(codeHash = codeHash))
         }

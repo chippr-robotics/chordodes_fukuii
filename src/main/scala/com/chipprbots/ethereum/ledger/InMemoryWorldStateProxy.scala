@@ -80,11 +80,11 @@ object InMemoryWorldStateProxy {
   def persistState(worldState: InMemoryWorldStateProxy): InMemoryWorldStateProxy = {
     def persistCode(worldState: InMemoryWorldStateProxy): InMemoryWorldStateProxy =
       worldState.accountCodes.foldLeft(worldState) { case (updatedWorldState, (address, code)) =>
-        val codeHash = kec256(code)
-        updatedWorldState.evmCodeStorage.put(codeHash, code).commit()
+        val codeHashBs = kec256(code)
+        updatedWorldState.evmCodeStorage.put(codeHashBs, code).commit()
         updatedWorldState.copyWith(
           accountsStateTrie = updatedWorldState.accountsStateTrie +
-            (address -> updatedWorldState.getGuaranteedAccount(address).copy(codeHash = codeHash)),
+            (address -> updatedWorldState.getGuaranteedAccount(address).copy(codeHash = CodeHash(codeHashBs))),
           accountCodes = Map.empty
         )
       }
@@ -226,7 +226,7 @@ class InMemoryWorldStateProxy(
   override def getCode(address: Address): ByteString =
     accountCodes.getOrElse(
       address,
-      getAccount(address).flatMap(account => evmCodeStorage.get(account.codeHash)).getOrElse(ByteString.empty)
+      getAccount(address).flatMap(account => evmCodeStorage.get(account.codeHash.value)).getOrElse(ByteString.empty)
     )
 
   override def getStorage(address: Address): InMemoryWorldStateProxyStorage = {

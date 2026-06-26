@@ -74,7 +74,7 @@ class EthProofServiceSpec
 
     val givenAddress = givenResult.address
     givenAddress shouldBe address
-    givenResult.codeHash shouldBe account.codeHash
+    givenResult.codeHash shouldBe account.codeHash.value
     givenResult.storageHash shouldBe account.storageRoot
 
     givenResult.nonce shouldBe UInt256(transactionCountResponse.value)
@@ -120,7 +120,7 @@ class EthProofServiceSpec
         // root hash rather than the old raw-hash-reference encoding.
         ByteString(crypto.kec256(accountProof.accountProof.head.toArray[Byte])) shouldBe ByteString(mpt.getRootHash)
         accountProof.balance shouldBe balance.toBigInt
-        accountProof.codeHash shouldBe account.codeHash
+        accountProof.codeHash shouldBe account.codeHash.value
         accountProof.nonce shouldBe UInt256(nonce)
         accountProof.storageHash shouldBe account.storageRoot
         accountProof.storageProof.map { v =>
@@ -151,7 +151,7 @@ class EthProofServiceSpec
         // root hash rather than the old raw-hash-reference encoding.
         ByteString(crypto.kec256(accountProof.accountProof.head.toArray[Byte])) shouldBe ByteString(mpt.getRootHash)
         accountProof.balance shouldBe balance.toBigInt
-        accountProof.codeHash shouldBe account.codeHash
+        accountProof.codeHash shouldBe account.codeHash.value
         accountProof.nonce shouldBe UInt256(nonce)
         accountProof.storageHash shouldBe account.storageRoot
         r.proofAccount.storageProof.map { v =>
@@ -183,7 +183,7 @@ class EthProofServiceSpec
         // root hash rather than the old raw-hash-reference encoding.
         ByteString(crypto.kec256(accountProof.accountProof.head.toArray[Byte])) shouldBe ByteString(mpt.getRootHash)
         accountProof.balance shouldBe balance.toBigInt
-        accountProof.codeHash shouldBe account.codeHash
+        accountProof.codeHash shouldBe account.codeHash.value
         accountProof.nonce shouldBe UInt256(nonce)
         accountProof.storageHash shouldBe account.storageRoot
         accountProof.storageProof.size shouldBe 2
@@ -217,7 +217,7 @@ class EthProofServiceSpec
         // root hash rather than the old raw-hash-reference encoding.
         ByteString(crypto.kec256(accountProof.accountProof.head.toArray[Byte])) shouldBe ByteString(mpt.getRootHash)
         accountProof.balance shouldBe balance.toBigInt
-        accountProof.codeHash shouldBe account.codeHash
+        accountProof.codeHash shouldBe account.codeHash.value
         accountProof.nonce shouldBe UInt256(nonce)
         accountProof.storageHash shouldBe account.storageRoot
         accountProof.storageProof.size shouldBe 3
@@ -245,7 +245,7 @@ class EthProofServiceSpec
         // root hash rather than the old raw-hash-reference encoding.
         ByteString(crypto.kec256(accountProof.accountProof.head.toArray[Byte])) shouldBe ByteString(mpt.getRootHash)
         accountProof.balance shouldBe balance.toBigInt
-        accountProof.codeHash shouldBe account.codeHash
+        accountProof.codeHash shouldBe account.codeHash.value
         accountProof.nonce shouldBe UInt256(nonce)
         accountProof.storageHash shouldBe account.storageRoot
         accountProof.storageProof.size shouldBe 0

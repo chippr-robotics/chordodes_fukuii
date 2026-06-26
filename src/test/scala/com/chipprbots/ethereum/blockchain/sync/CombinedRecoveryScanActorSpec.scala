@@ -17,6 +17,7 @@ import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.StateStorage
 import com.chipprbots.ethereum.domain.Account
+import com.chipprbots.ethereum.domain.CodeHash
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.defaultByteArraySerializable
@@ -52,17 +53,17 @@ class CombinedRecoveryScanActorSpec extends ScalaTestWithActorTestKit() with Any
       )
     def missingStorage(seed: Int): ByteString = ByteString(kec256(Array[Byte](seed.toByte, 0x3c)))
     def acct(seed: Int): ByteString = ByteString(kec256(Array[Byte](seed.toByte)))
-    def account(storageRoot: ByteString, codeHash: ByteString): Account =
+    def account(storageRoot: ByteString, codeHash: CodeHash): Account =
       Account(nonce = UInt256.Zero, storageRoot = storageRoot, codeHash = codeHash)
 
     val mCode2 = missingCode(2)
     val mStor3 = missingStorage(3)
     val mCode5 = missingCode(5)
     val accounts = Seq(
-      acct(1) -> account(presentStorage(1), presentCode(1)),
-      acct(2) -> account(Account.EmptyStorageRootHash, mCode2),
+      acct(1) -> account(presentStorage(1), CodeHash(presentCode(1))),
+      acct(2) -> account(Account.EmptyStorageRootHash, CodeHash(mCode2)),
       acct(3) -> account(mStor3, Account.EmptyCodeHash),
-      acct(5) -> account(presentStorage(5), mCode5),
+      acct(5) -> account(presentStorage(5), CodeHash(mCode5)),
       acct(6) -> Account.empty()
     )
     val root = ByteString(

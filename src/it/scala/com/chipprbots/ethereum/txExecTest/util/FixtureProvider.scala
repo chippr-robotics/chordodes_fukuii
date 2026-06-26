@@ -111,9 +111,9 @@ object FixtureProvider {
                 Try(m.value.toArray[Byte].toAccount).toOption.foreach { account =>
                   // Note: We've already saved all EVM code above, so this check is now redundant
                   // but kept for backwards compatibility with fixtures that have correct codeHash
-                  if account.codeHash != DumpChainActor.emptyEvm then {
-                    fixtures.evmCode.get(account.codeHash).foreach { code =>
-                      storages.evmCodeStorage.put(account.codeHash, code).commit()
+                  if account.codeHash.value != DumpChainActor.emptyEvm then {
+                    fixtures.evmCode.get(account.codeHash.value).foreach { code =>
+                      storages.evmCodeStorage.put(account.codeHash.value, code).commit()
                     }
                   }
                   if account.storageRoot != DumpChainActor.emptyStorage then {

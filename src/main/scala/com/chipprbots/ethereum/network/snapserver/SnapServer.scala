@@ -101,7 +101,7 @@ object SnapServer extends Logger {
       else RLPValue(account.storageRoot.toArray)
     val chRlp: RLPEncodeable =
       if account.codeHash == Account.EmptyCodeHash then RLPValue(Array.emptyByteArray)
-      else RLPValue(account.codeHash.toArray)
+      else RLPValue(account.codeHash.value.toArray)
     RLPList(nonceRlp, balanceRlp, srRlp, chRlp)
   }
 
@@ -555,7 +555,7 @@ object SnapServer extends Logger {
     val it = hashes.take(1024).iterator
     while it.hasNext && (totalBytes < maxBytes || collected.isEmpty) do {
       val codeHash = it.next()
-      if codeHash == Account.EmptyCodeHash then {
+      if codeHash == Account.EmptyCodeHash.value then {
         collected += ByteString.empty
         // empty code contributes 0 bytes; do not count toward budget
       } else {

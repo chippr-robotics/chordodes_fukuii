@@ -158,7 +158,7 @@ final class CheckpointExporter(
               val it = codeHashes.iterator()
               while it.hasNext && exportError.isEmpty do {
                 val ch = it.next()
-                if ch != Account.EmptyCodeHash then {
+                if ch != Account.EmptyCodeHash.value then {
                   evmCodeStorage.get(ch) match {
                     case Some(code) =>
                       writer.writeBytecode(ch, code.toArray)
@@ -242,7 +242,7 @@ final class CheckpointExporter(
       Account(value) match {
         case scala.util.Success(acct) =>
           if acct.storageRoot != Account.EmptyStorageRootHash then storageRoots += acct.storageRoot
-          if acct.codeHash != Account.EmptyCodeHash then codeHashes.add(acct.codeHash)
+          if acct.codeHash != Account.EmptyCodeHash then codeHashes.add(acct.codeHash.value)
         case scala.util.Failure(_) =>
         // Storage-only or malformed leaf — best-effort; bytecodes still resolved per-trie.
       }

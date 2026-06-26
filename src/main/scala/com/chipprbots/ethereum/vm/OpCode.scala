@@ -484,7 +484,7 @@ case object EXTCODEHASH extends OpCode(0x3f, 1, 1, _.G_balance) with AddrAccessG
       if accountExists then {
         val code = state.world.getCode(address)
 
-        if code.isEmpty then UInt256(Account.EmptyCodeHash)
+        if code.isEmpty then UInt256(Account.EmptyCodeHash.value)
         else UInt256(kec256(code))
       } else {
         UInt256.Zero

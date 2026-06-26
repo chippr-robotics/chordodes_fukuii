@@ -348,7 +348,7 @@ object GetAccountTool {
             |  Nonce: ${account.nonce}
             |  Balance: ${account.balance} wei ($balanceEtc ETC)
             |  Storage Root: ${ByteStringUtils.hash2string(account.storageRoot)}
-            |  Code Hash: ${ByteStringUtils.hash2string(account.codeHash)}""".stripMargin
+            |  Code Hash: ${ByteStringUtils.hash2string(account.codeHash.value)}""".stripMargin
         case None =>
           s"""Account: $addrStr
             |  Block: $blockNum

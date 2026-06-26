@@ -42,7 +42,7 @@ class EthUserServiceSpec
       MerklePatriciaTrie[Array[Byte], Account](storagesInstance.storages.stateStorage.getBackingStorage(0))
         .put(
           crypto.kec256(address.bytes.toArray[Byte]),
-          Account(0, UInt256(0), ByteString(""), ByteString("code hash"))
+          Account(0, UInt256(0), ByteString(""), CodeHash(ByteString("code hash")))
         )
 
     val newBlockHeader: BlockHeader = blockToRequest.header.copy(stateRoot = ByteString(mpt.getRootHash))
@@ -64,7 +64,7 @@ class EthUserServiceSpec
       MerklePatriciaTrie[Array[Byte], Account](storagesInstance.storages.stateStorage.getBackingStorage(0))
         .put(
           crypto.kec256(address.bytes.toArray[Byte]),
-          Account(0, UInt256(123), ByteString(""), ByteString("code hash"))
+          Account(0, UInt256(123), ByteString(""), CodeHash(ByteString("code hash")))
         )
 
     val newBlockHeader: BlockHeader = blockToRequest.header.copy(stateRoot = ByteString(mpt.getRootHash))
@@ -109,7 +109,7 @@ class EthUserServiceSpec
       MerklePatriciaTrie[Array[Byte], Account](storagesInstance.storages.stateStorage.getBackingStorage(0))
         .put(
           crypto.kec256(address.bytes.toArray[Byte]),
-          Account(0, UInt256(0), ByteString(storageMpt.getRootHash), ByteString(""))
+          Account(0, UInt256(0), ByteString(storageMpt.getRootHash), CodeHash(ByteString("")))
         )
 
     val newBlockHeader: BlockHeader = blockToRequest.header.copy(stateRoot = ByteString(mpt.getRootHash))
@@ -129,7 +129,7 @@ class EthUserServiceSpec
 
     val mpt: MerklePatriciaTrie[Array[Byte], Account] =
       MerklePatriciaTrie[Array[Byte], Account](storagesInstance.storages.stateStorage.getBackingStorage(0))
-        .put(crypto.kec256(address.bytes.toArray[Byte]), Account(999, UInt256(0), ByteString(""), ByteString("")))
+        .put(crypto.kec256(address.bytes.toArray[Byte]), Account(999, UInt256(0), ByteString(""), CodeHash(ByteString(""))))
 
     val newBlockHeader: BlockHeader = blockToRequest.header.copy(stateRoot = ByteString(mpt.getRootHash))
     val newblock: Block = blockToRequest.copy(header = newBlockHeader)

@@ -736,7 +736,7 @@ private class ByteCodeCoordinatorImpl(
       if codeHash.length != 32 then {
         invalidCount += 1
         false
-      } else if codeHash == Account.EmptyCodeHash then {
+      } else if codeHash == Account.EmptyCodeHash.value then {
         false
       } else if seen.contains(codeHash) then {
         dupeCount += 1

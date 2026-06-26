@@ -9,6 +9,7 @@ import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.StateStorage
 import com.chipprbots.ethereum.domain.Account
+import com.chipprbots.ethereum.domain.CodeHash
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.defaultByteArraySerializable
@@ -52,11 +53,11 @@ class CombinedRecoveryScanSpec extends AnyFunSuite {
     val a5Code = missingCodeHash(5)
 
     val accounts: Seq[(ByteString, Account)] = Seq(
-      acctHash(1) -> Account(nonce = UInt256.Zero, storageRoot = presentStorageRoot(1), codeHash = presentCode(1)),
-      acctHash(2) -> Account(nonce = UInt256.Zero, storageRoot = Account.EmptyStorageRootHash, codeHash = a2Code),
+      acctHash(1) -> Account(nonce = UInt256.Zero, storageRoot = presentStorageRoot(1), codeHash = CodeHash(presentCode(1))),
+      acctHash(2) -> Account(nonce = UInt256.Zero, storageRoot = Account.EmptyStorageRootHash, codeHash = CodeHash(a2Code)),
       acctHash(3) -> Account(nonce = UInt256.Zero, storageRoot = a3Stor, codeHash = Account.EmptyCodeHash),
-      acctHash(4) -> Account(nonce = UInt256.Zero, storageRoot = a4Stor, codeHash = presentCode(4)),
-      acctHash(5) -> Account(nonce = UInt256.Zero, storageRoot = presentStorageRoot(5), codeHash = a5Code),
+      acctHash(4) -> Account(nonce = UInt256.Zero, storageRoot = a4Stor, codeHash = CodeHash(presentCode(4))),
+      acctHash(5) -> Account(nonce = UInt256.Zero, storageRoot = presentStorageRoot(5), codeHash = CodeHash(a5Code)),
       acctHash(6) -> Account(
         nonce = UInt256.Zero,
         storageRoot = presentStorageRoot(6),
@@ -105,7 +106,7 @@ class CombinedRecoveryScanSpec extends AnyFunSuite {
       MerklePatriciaTrie[Array[Byte], Array[Byte]](mpt)
         .put(
           Array.fill[Byte](32)(0xaa.toByte),
-          Account(nonce = UInt256.Zero, storageRoot = storageRoot, codeHash = codeHash).toBytes
+          Account(nonce = UInt256.Zero, storageRoot = storageRoot, codeHash = CodeHash(codeHash)).toBytes
         )
         .put(Array.fill[Byte](32)(0xbb.toByte), Account.empty().toBytes)
         .getRootHash

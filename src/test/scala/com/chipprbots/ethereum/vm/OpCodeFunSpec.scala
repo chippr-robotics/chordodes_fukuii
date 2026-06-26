@@ -9,6 +9,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Account
+import com.chipprbots.ethereum.domain.CodeHash
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.TxLogEntry
 import com.chipprbots.ethereum.domain.UInt256
@@ -189,7 +190,7 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
       val (_, stack1) = stateIn.stack.pop()
       val codeHash = kec256(extCode)
 
-      val account = Account(codeHash = codeHash)
+      val account = Account(codeHash = CodeHash(codeHash))
       val accAddr = Address(addr.mod(UInt256(BigInt(2).pow(160))))
       val world1 = stateIn.world.saveAccount(accAddr, account).saveCode(accAddr, extCode)
 
@@ -198,7 +199,7 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
 
       withStackVerification(op, stateInWithAccount, stateOutWithAccount) {
         // if account is empty we should push 0 onto stack
-        val toPushOnStack = if codeHash == Account.EmptyCodeHash then UInt256.Zero else UInt256(codeHash)
+        val toPushOnStack = if codeHash == Account.EmptyCodeHash.value then UInt256.Zero else UInt256(codeHash)
         val stack2 = stack1.push(toPushOnStack)
         stateOutWithAccount shouldEqual stateInWithAccount.addAccessedAddress(Address(addr)).withStack(stack2).step()
       }
@@ -311,7 +312,7 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
 
       addr = Address(stateIn.stack.pop()._1)
       hash = kec256(extCode)
-      world = if doSave then stateIn.world.saveAccount(addr, Account.empty().copy(codeHash = hash)) else stateIn.world
+      world = if doSave then stateIn.world.saveAccount(addr, Account.empty().copy(codeHash = CodeHash(hash))) else stateIn.world
     } yield stateIn.withWorld(world)
 
     forAll(stateGen) { stateIn =>

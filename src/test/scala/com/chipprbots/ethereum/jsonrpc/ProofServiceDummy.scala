@@ -11,12 +11,12 @@ import com.chipprbots.ethereum.jsonrpc.ProofService.ProofAccount
 
 object ProofServiceDummy extends ProofService {
 
-  val EmptyAddress: Address = Address(Account.EmptyCodeHash)
+  val EmptyAddress: Address = Address(Account.EmptyCodeHash.value)
   val EmptyProofAccount: ProofAccount = ProofAccount(
     EmptyAddress,
     Seq.empty,
     BigInt(42),
-    Account.EmptyCodeHash,
+    Account.EmptyCodeHash.value,
     UInt256.Zero,
     Account.EmptyStorageRootHash,
     Seq.empty

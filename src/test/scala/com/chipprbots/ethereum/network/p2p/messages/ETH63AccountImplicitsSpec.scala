@@ -7,6 +7,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Account.*
+import com.chipprbots.ethereum.domain.CodeHash
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.rlp
 import com.chipprbots.ethereum.rlp.RLPList
@@ -51,6 +52,6 @@ class ETH63AccountImplicitsSpec extends AnyFlatSpec with Matchers {
     val decoded = encoded.toAccount
 
     decoded.storageRoot shouldBe customStorageRoot
-    decoded.codeHash shouldBe customCodeHash
+    decoded.codeHash shouldBe CodeHash(customCodeHash)
   }
 }

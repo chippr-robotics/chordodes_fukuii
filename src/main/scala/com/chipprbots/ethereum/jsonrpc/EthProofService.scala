@@ -128,7 +128,7 @@ object ProofService {
         address = address,
         accountProof = accountProof,
         balance = account.balance,
-        codeHash = account.codeHash,
+        codeHash = account.codeHash.value,
         nonce = account.nonce,
         storageHash = account.storageRoot,
         storageProof = storageProof

@@ -12,6 +12,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Account
+import com.chipprbots.ethereum.domain.CodeHash
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.UInt256
@@ -160,7 +161,7 @@ class ShiftingOpCodeSpec extends AnyWordSpec with Matchers with ScalaCheckProper
     val senderAddr: Address = Address(0xcafebabeL)
     val senderAcc: Account = Account(nonce = 1, balance = 1000000)
 
-    val accountWithCode: ByteString => Account = code => Account.empty().withCode(kec256(code))
+    val accountWithCode: ByteString => Account = code => Account.empty().withCode(CodeHash(kec256(code)))
 
     def defaultWorld: MockWorldState = MockWorldState().saveAccount(senderAddr, senderAcc)
 

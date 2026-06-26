@@ -192,7 +192,7 @@ class SyncStateScheduler(
             // We are scheduling both storage trie and code requests with highest priority to be sure that leaf nodes completed
             // as fast as possible
             val evmRequests = if account.codeHash != emptyCodeHash then {
-              Seq(StateNodeRequest(account.codeHash, None, Code, Seq(parentRequest.nodeHash), maxMptTrieDepth, 0))
+              Seq(StateNodeRequest(account.codeHash.value, None, Code, Seq(parentRequest.nodeHash), maxMptTrieDepth, 0))
             } else {
               Seq()
             }
