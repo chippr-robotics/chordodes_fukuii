@@ -20,6 +20,7 @@ import com.chipprbots.ethereum.blockchain.sync.PeerRequestHandler.ResponseReceiv
 import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs.*
 import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.domain.BlockBody
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
@@ -546,8 +547,8 @@ class ChainDownloader private (
                 .and(appStateStorage.putBackfillBestHeader(header.number))
                 .commit()
 
-              bodiesQueue :+= header.hash
-              receiptsQueue :+= header.hash
+              bodiesQueue :+= header.hash.value
+              receiptsQueue :+= header.hash.value
               prevHash = Some(header.hash)
               validCount += 1
           }
@@ -580,7 +581,7 @@ class ChainDownloader private (
       // Store received bodies + atomically advance the body cursor (#1169).
       val received = requestedHashes.zip(bodies)
       val highestBodyNumber = received
-        .flatMap { case (hash, _) => blockchainReader.getBlockHeaderByHash(hash).map(_.number) }
+        .flatMap { case (hash, _) => blockchainReader.getBlockHeaderByHash(BlockHash(hash)).map(_.number) }
         .maxOption
         .getOrElse(BigInt(0))
       val cursorUpdate =
@@ -589,7 +590,7 @@ class ChainDownloader private (
         else appStateStorage.emptyBatchUpdate
 
       received
-        .map { case (hash, body) => blockchainWriter.storeBlockBody(hash, body) }
+        .map { case (hash, body) => blockchainWriter.storeBlockBody(BlockHash(hash), body) }
         .reduce(_.and(_))
         .and(cursorUpdate)
         .commit()
@@ -638,12 +639,12 @@ class ChainDownloader private (
         // ahead of disk.
         val receiptsByHash = requestedHashes.zip(receiptsByBlock)
         val highestReceiptNumber = receiptsByHash
-          .flatMap { case (hash, _) => blockchainReader.getBlockHeaderByHash(hash).map(_.number) }
+          .flatMap { case (hash, _) => blockchainReader.getBlockHeaderByHash(BlockHash(hash)).map(_.number) }
           .maxOption
           .getOrElse(BigInt(0))
 
         receiptsByHash.zipWithIndex.foreach { case ((hash, receipts), idx) =>
-          val storeUpdate = blockchainWriter.storeReceipts(hash, receipts)
+          val storeUpdate = blockchainWriter.storeReceipts(BlockHash(hash), receipts)
           val withCursor =
             if idx == receiptsByHash.size - 1 && highestReceiptNumber > appStateStorage.getBackfillBestReceipt() then
               storeUpdate.and(appStateStorage.putBackfillBestReceipt(highestReceiptNumber))
@@ -726,12 +727,12 @@ class ChainDownloader private (
         // Store complete receipts + advance backfill cursor (#1169 pattern)
         if completeByHash.nonEmpty then {
           val highestReceiptNumber = completeByHash
-            .flatMap { case (h, _) => blockchainReader.getBlockHeaderByHash(h).map(_.number) }
+            .flatMap { case (h, _) => blockchainReader.getBlockHeaderByHash(BlockHash(h)).map(_.number) }
             .maxOption
             .getOrElse(BigInt(0))
 
           completeByHash.zipWithIndex.foreach { case ((hash, receipts), idx) =>
-            val storeUpdate = blockchainWriter.storeReceipts(hash, receipts)
+            val storeUpdate = blockchainWriter.storeReceipts(BlockHash(hash), receipts)
             val withCursor =
               if idx == completeByHash.size - 1 && highestReceiptNumber > appStateStorage.getBackfillBestReceipt() then
                 storeUpdate.and(appStateStorage.putBackfillBestReceipt(highestReceiptNumber))
@@ -845,10 +846,10 @@ class ChainDownloader private (
           blockchainReader.getBlockHeaderByNumber(i) match {
             case Some(header) =>
               if needsBodyCheck && blockchainReader.getBlockBodyByHash(header.hash).isEmpty then {
-                bodiesQueue :+= header.hash
+                bodiesQueue :+= header.hash.value
               }
               if needsReceiptCheck && blockchainReader.getReceiptsByHash(header.hash).isEmpty then {
-                receiptsQueue :+= header.hash
+                receiptsQueue :+= header.hash.value
               }
             case None => // shouldn't happen
           }

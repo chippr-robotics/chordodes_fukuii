@@ -124,7 +124,7 @@ class EthFilterService(
         // Returns None when the hash resolves to no block (emit empty logs).
         val resolvedPair: Option[(Option[BlockParam], Option[BlockParam])] =
           if blockHash.isDefined then {
-            val blockNum = blockHash.flatMap(h => blockchainReader.getBlockByHash(h).map(_.header.number))
+            val blockNum = blockHash.flatMap(h => blockchainReader.getBlockByHash(BlockHash(h)).map(_.header.number))
             blockNum match {
               case Some(n) =>
                 val bp = Some(BlockParam.WithNumber(n))

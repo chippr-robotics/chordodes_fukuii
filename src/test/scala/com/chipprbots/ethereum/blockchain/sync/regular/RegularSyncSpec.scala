@@ -433,7 +433,7 @@ class RegularSyncSpec
 
           // The canonical chain head must be rewound to the resolver's LCA, not a blind 128-block rewind.
           (blockchainWriter
-            .setCanonicalChainHead(_: BigInt, _: ByteString, _: BigInt))
+            .setCanonicalChainHead(_: BigInt, _: com.chipprbots.ethereum.domain.BlockHash, _: BigInt))
             .verify(lca, lcaHeader.hash, capturedBest)
             .once()
 
@@ -484,7 +484,7 @@ class RegularSyncSpec
               case PeersClient.Request(ETHGetBlockBodies(_, hashes), _, _, replyTo)
                   if !hashes.toSet.subsetOf(blocks.hashes.toSet) &&
                     hashes.toSet.subsetOf(testBlocks.hashes.toSet) =>
-                val matchingBodies = hashes.flatMap(hash => testBlocks.find(_.hash == hash)).map(_.body)
+                val matchingBodies = hashes.flatMap(hash => testBlocks.find(_.hash.value == hash)).map(_.body)
                 replyTo ! PeersClient.Response(defaultPeer, BlockBodies(BigInt(0), matchingBodies))
                 None
             }
@@ -581,7 +581,7 @@ class RegularSyncSpec
         val failingBlock: Block = testBlocksChunked.head.head
         setImportResult(
           failingBlock,
-          IO.pure(BlockImportFailedDueToMissingNode(new MissingNodeException(failingBlock.hash)))
+          IO.pure(BlockImportFailedDueToMissingNode(new MissingNodeException(failingBlock.hash.value)))
         )
       }
 
@@ -619,7 +619,7 @@ class RegularSyncSpec
       "retry fetching node if validation failed" taggedAs (UnitTest, SyncTest) in sync(
         new MissingStateNodeFixture {
           def fishForFailingBlockNodeRequest(): Boolean = peersClient.fishForSpecificMessage(max = 10.seconds) {
-            case PeersClient.Request(GetNodeData(hash :: Nil), _, _, _) if hash == failingBlock.hash => true
+            case PeersClient.Request(GetNodeData(hash :: Nil), _, _, _) if hash == failingBlock.hash.value => true
           }
 
           class WrongNodeDataPeersClientAutoPilot(var handledRequests: Int = 0) extends PeersClientAutoPilot {
@@ -671,14 +671,14 @@ class RegularSyncSpec
               blockExecutionScheduler: IORuntime,
               blockchainConfig: BlockchainConfig
           ): IO[BlockImportResult] =
-            IO.pure(BlockImportFailedDueToMissingNode(new MissingNodeException(failingBlock.hash)))
+            IO.pure(BlockImportFailedDueToMissingNode(new MissingNodeException(failingBlock.hash.value)))
 
           override def evaluateBranch(blocks: NonEmptyList[Block])(implicit
               blockExecutionScheduler: IORuntime,
               blockchainConfig: BlockchainConfig
           ): IO[BlockImportResult] =
             if saveNodeWasCalled then IO.pure(BlockImportedToTop(Nil))
-            else IO.pure(BlockImportFailedDueToMissingNode(new MissingNodeException(failingBlock.hash)))
+            else IO.pure(BlockImportFailedDueToMissingNode(new MissingNodeException(failingBlock.hash.value)))
         }
 
         override lazy val branchResolution: BranchResolution = new BranchResolution(blockchainReader) {
@@ -792,7 +792,7 @@ class RegularSyncSpec
         goToTop()
 
         blockFetcher !
-          MessageFromPeer(NewBlockHashes(List(BlockHash(newBlock.hash, newBlock.number))), defaultPeer.id)
+          MessageFromPeer(NewBlockHashes(List(BlockHash(newBlock.hash.value, newBlock.number))), defaultPeer.id)
 
         peersClient.expectMsgPF() { case PeersClient.Request(ETHGetBlockHeaders(_, _, _, _, _), _, _, _) =>
           true

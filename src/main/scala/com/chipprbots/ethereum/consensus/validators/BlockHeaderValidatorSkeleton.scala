@@ -105,7 +105,7 @@ trait BlockHeaderValidatorSkeleton extends BlockHeaderValidator {
       getBlockHeaderByHash: GetBlockHeaderByHash
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
     for {
-      blockHeaderParent <- getBlockHeaderByHash(blockHeader.parentHash)
+      blockHeaderParent <- getBlockHeaderByHash(blockHeader.parentHash.value)
         .map(Right(_))
         .getOrElse(Left(HeaderParentNotFoundError))
       _ <- validate(blockHeader, blockHeaderParent)

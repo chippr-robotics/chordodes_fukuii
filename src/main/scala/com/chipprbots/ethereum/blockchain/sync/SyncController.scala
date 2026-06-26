@@ -1708,7 +1708,10 @@ object SyncController {
               // INFO-6: guard against NumberFormatException from a malformed fukuii.seed-chain-weights property.
               Try(BigInt(tdStr.trim)).toOption match {
                 case Some(td) =>
-                  val hash = ByteString(com.chipprbots.ethereum.utils.Hex.decode(hashHex.stripPrefix("0x")))
+                  val hash =
+                    com.chipprbots.ethereum.domain.BlockHash(
+                      ByteString(com.chipprbots.ethereum.utils.Hex.decode(hashHex.stripPrefix("0x")))
+                    )
                   blockchainWriter
                     .storeChainWeight(hash, com.chipprbots.ethereum.domain.ChainWeight.totalDifficultyOnly(td))
                     .commit()

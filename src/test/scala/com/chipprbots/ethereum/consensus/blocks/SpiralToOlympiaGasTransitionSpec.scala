@@ -22,6 +22,7 @@ import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
 import com.chipprbots.ethereum.domain.SignedTransaction
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
@@ -87,7 +88,7 @@ class SpiralToOlympiaGasTransitionSpec
       timestamp: Long
   ): BlockHeader =
     Fixtures.Blocks.ValidBlock.header.copy(
-      parentHash = parentHash,
+      parentHash = BlockHash(parentHash),
       number = number,
       gasLimit = gasLimit,
       gasUsed = 0,
@@ -218,7 +219,7 @@ class SpiralToOlympiaGasTransitionSpec
           number = olympiaBlock,
           gasLimit = generatedGas,
           baseFee = InitialBaseFee,
-          parentHash = parent.hash,
+          parentHash = parent.hash.value,
           timestamp = 2000L
         )
         validate(child, parent) shouldBe Right(BlockHeaderValid)
@@ -234,7 +235,7 @@ class SpiralToOlympiaGasTransitionSpec
           number = olympiaBlock,
           gasLimit = StepOneGasLimit,
           baseFee = InitialBaseFee,
-          parentHash = spiralParent.hash,
+          parentHash = spiralParent.hash.value,
           timestamp = 2000L
         )
         val secondGas = legacyMiner.calcGasLimit(StepOneGasLimit, olympiaBlock + 1)
@@ -243,7 +244,7 @@ class SpiralToOlympiaGasTransitionSpec
           number = olympiaBlock + 1,
           gasLimit = secondGas,
           baseFee = expectedBaseFee,
-          parentHash = firstOlympia.hash,
+          parentHash = firstOlympia.hash.value,
           timestamp = 3000L
         )
         validate(secondOlympia, firstOlympia) shouldBe Right(BlockHeaderValid)
@@ -259,7 +260,7 @@ class SpiralToOlympiaGasTransitionSpec
           number = olympiaBlock,
           gasLimit = SpiralGasLimit * 2,
           baseFee = InitialBaseFee,
-          parentHash = parent.hash,
+          parentHash = parent.hash.value,
           timestamp = 2000L
         )
         validate(doubledGas, parent) shouldBe Left(HeaderGasLimitError)

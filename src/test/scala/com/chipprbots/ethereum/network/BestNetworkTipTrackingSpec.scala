@@ -197,8 +197,8 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
         capability = cap,
         networkId = 1,
         chainWeight = ChainWeight.totalDifficultyOnly(td),
-        bestHash = Fixtures.Blocks.Genesis.header.hash,
-        genesisHash = Fixtures.Blocks.Genesis.header.hash
+        bestHash = Fixtures.Blocks.Genesis.header.hash.value,
+        genesisHash = Fixtures.Blocks.Genesis.header.hash.value
       )
       PeerInfo(
         remoteStatus = status,

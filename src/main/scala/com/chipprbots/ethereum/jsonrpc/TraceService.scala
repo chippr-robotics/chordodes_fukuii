@@ -14,6 +14,7 @@ import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage.TransactionLocation
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.Blockchain
 import com.chipprbots.ethereum.domain.BlockchainReader
@@ -129,7 +130,7 @@ class TraceService(
           .toRight(JsonRpcError.InvalidParams("Transaction not found"))
         TransactionLocation(blockHash, txIndex) = location
         block <- blockchainReader
-          .getBlockByHash(blockHash)
+          .getBlockByHash(BlockHash(blockHash))
           .toRight(JsonRpcError.InvalidParams(s"Block not found for hash ${blockHash.toHex}"))
         parentHeader <- blockchainReader
           .getBlockHeaderByHash(block.header.parentHash)
@@ -148,7 +149,7 @@ class TraceService(
           tracer.getResult,
           req.txHash,
           txIndex,
-          block.header.hash,
+          block.header.hash.value,
           block.header.number
         )
       } yield TraceTransactionResponse(flat)
@@ -192,7 +193,7 @@ class TraceService(
           .toRight(JsonRpcError.InvalidParams("Transaction not found"))
         TransactionLocation(blockHash, txIndex) = location
         block <- blockchainReader
-          .getBlockByHash(blockHash)
+          .getBlockByHash(BlockHash(blockHash))
           .toRight(JsonRpcError.InvalidParams(s"Block not found for hash ${blockHash.toHex}"))
         parentHeader <- blockchainReader
           .getBlockHeaderByHash(block.header.parentHash)
@@ -296,7 +297,7 @@ class TraceService(
       val world = stxLedger.advanceWorldToTx(block.header, stxs, txIndex, parentStateRoot)
       val tracer = new CallTracer(onlyTopCall = false)
       stxLedger.simulateTransactionWithTracer(stx, block.header, Some(world), tracer)
-      flattenCallTree(tracer.getResult, stx.tx.hash.value, txIndex, block.header.hash, block.header.number)
+      flattenCallTree(tracer.getResult, stx.tx.hash.value, txIndex, block.header.hash.value, block.header.number)
     }
   }
 
@@ -314,7 +315,7 @@ class TraceService(
     stxLedger.simulateTransactionWithTracer(stx, block.header, world, callTracer)
 
     val traceField: JValue = if options.trace then {
-      JArray(flattenCallTree(callTracer.getResult, txHash, txIndex, block.header.hash, block.header.number).toList)
+      JArray(flattenCallTree(callTracer.getResult, txHash, txIndex, block.header.hash.value, block.header.number).toList)
     } else JNull
 
     val vmTraceField: JValue = if options.vmTrace then {

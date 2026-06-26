@@ -162,7 +162,7 @@ final class CheckpointImporter(
             blockchainWriter
               .storeBlockHeader(header.blockHeader)
               .and(blockchainWriter.storeChainWeight(blockHash, header.chainWeight))
-              .and(appStateStorage.putBestBlockInfo(BlockInfo(blockHash, blockNum)))
+              .and(appStateStorage.putBestBlockInfo(BlockInfo(blockHash.value, blockNum)))
               .and(appStateStorage.snapSyncDone())
               .and(appStateStorage.bytecodeRecoveryDone())
               .and(appStateStorage.storageRecoveryDone())

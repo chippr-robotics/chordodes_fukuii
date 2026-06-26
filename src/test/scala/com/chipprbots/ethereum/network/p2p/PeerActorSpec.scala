@@ -364,7 +364,7 @@ class PeerActorSpec
       chainWeight =
         ChainWeight.totalDifficultyOnly(daoForkBlockChainTotalDifficulty - 200000), // remote is before the fork
       bestHash = ByteString("blockhash"),
-      genesisHash = Fixtures.Blocks.Genesis.header.hash
+      genesisHash = Fixtures.Blocks.Genesis.header.hash.value
     )
 
     val peerActor: TestActorRef[Nothing] = TestActorRef(
@@ -465,8 +465,8 @@ class PeerActorSpec
 
     val nonEtcForkBlockHeader: BlockHeader =
       etcForkBlockHeader.copy(
-        parentHash = ByteString("this"),
-        ommersHash = ByteString("is"),
+        parentHash = BlockHash(ByteString("this")),
+        ommersHash = BlockHash(ByteString("is")),
         beneficiary = ByteString("not"),
         stateRoot = ByteString("an"),
         transactionsRoot = ByteString("ETC"),
@@ -550,7 +550,7 @@ class PeerActorSpec
     // Override classicSystem to use the explicit scheduler from TestKit
     implicit override lazy val classicSystem: ActorSystem = PeerActorSpec.this.system
 
-    val genesisHash = genesisBlock.hash
+    val genesisHash = genesisBlock.hash.value
 
     val daoForkBlockChainTotalDifficulty: BigInt = BigInt("39490964433395682584")
 

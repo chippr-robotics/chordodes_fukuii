@@ -81,7 +81,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     // then
     peersInfoHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
     val expectedPeerInfo: PeerInfo = initialPeerInfo
-      .withBestBlockData(initialPeerInfo.maxBlockNumber + 4, firstHeader.hash)
+      .withBestBlockData(initialPeerInfo.maxBlockNumber + 4, firstHeader.hash.value)
       .withChainWeight(newBlockWeight)
     requestSender.expectMsg(PeerInfoResponse(Some(expectedPeerInfo)))
   }
@@ -102,7 +102,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     // then
     peersInfoHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
     requestSender.expectMsg(
-      PeerInfoResponse(Some(peer1Info.withBestBlockData(initialPeerInfo.maxBlockNumber + 4, firstHeader.hash)))
+      PeerInfoResponse(Some(peer1Info.withBestBlockData(initialPeerInfo.maxBlockNumber + 4, firstHeader.hash.value)))
     )
   }
 
@@ -282,7 +282,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     // After receiving peer best block number, peer should be provided as handshaked peer
     peersInfoHolder ! GetHandshakedPeersCmd(requestSender.ref)
     requestSender.expectMsg(
-      HandshakedPeers(Map(freshPeer -> freshPeerInfo.withBestBlockData(newMaxBlock, firstHeader.hash)))
+      HandshakedPeers(Map(freshPeer -> freshPeerInfo.withBestBlockData(newMaxBlock, firstHeader.hash.value)))
     )
   }
 
@@ -518,8 +518,8 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
       capability = Capability.ETH63,
       networkId = 1,
       chainWeight = ChainWeight.totalDifficultyOnly(10000),
-      bestHash = Fixtures.Blocks.Block3125369.header.hash,
-      genesisHash = Fixtures.Blocks.Genesis.header.hash
+      bestHash = Fixtures.Blocks.Block3125369.header.hash.value,
+      genesisHash = Fixtures.Blocks.Genesis.header.hash.value
     )
 
     val initialPeerInfo: PeerInfo = PeerInfo(
@@ -535,7 +535,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     // In production, genesisHash should already be set correctly from handshake,
     // but we explicitly set both here for test clarity and to avoid test brittleness.
     def createGenesisPeerInfo(basePeerInfo: PeerInfo = initialPeerInfo): PeerInfo = {
-      val genesisHash = Fixtures.Blocks.Genesis.header.hash
+      val genesisHash = Fixtures.Blocks.Genesis.header.hash.value
       val genesisStatus: RemoteStatus = basePeerInfo.remoteStatus.copy(
         bestHash = genesisHash,
         genesisHash = genesisHash // Explicitly set to match bestHash for isAtGenesis() == true
@@ -803,7 +803,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
         BlockRangeUpdate(
           earliestBlock = BigInt(0),
           latestBlock = advancingBlock.number,
-          latestBlockHash = advancingBlock.hash
+          latestBlockHash = advancingBlock.hash.value
         ),
         peer1.id
       )

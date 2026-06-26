@@ -35,7 +35,7 @@ class OmmersPoolSpec extends ScalaTestWithActorTestKit with AnyFreeSpecLike with
         block2Chain1
       )
 
-      ommersPool ! GetOmmers(block3Chain1.parentHash, ommersProbe.ref)
+      ommersPool ! GetOmmers(block3Chain1.parentHash.value, ommersProbe.ref)
       ommersProbe.expectMessage(Timeouts.normalTimeout, OmmersPool.Ommers(Seq.empty))
     }
 
@@ -59,7 +59,7 @@ class OmmersPoolSpec extends ScalaTestWithActorTestKit with AnyFreeSpecLike with
           block3Chain3
         )
 
-        ommersPool ! GetOmmers(block1Chain4.parentHash, ommersProbe.ref)
+        ommersPool ! GetOmmers(block1Chain4.parentHash.value, ommersProbe.ref)
         ommersProbe.expectMessage(Timeouts.normalTimeout, OmmersPool.Ommers(Seq(block1Chain1)))
       }
 
@@ -86,7 +86,7 @@ class OmmersPoolSpec extends ScalaTestWithActorTestKit with AnyFreeSpecLike with
         // Notice that in terms of additions, current pool implementation is behaving as a queue with a fixed size!
         ommersPool ! AddOmmers(block1Chain5)
 
-        ommersPool ! GetOmmers(block2Chain4.parentHash, ommersProbe.ref)
+        ommersPool ! GetOmmers(block2Chain4.parentHash.value, ommersProbe.ref)
         ommersProbe.expectMessage(Timeouts.normalTimeout, OmmersPool.Ommers(Seq(block1Chain5, block1Chain1)))
       }
 
@@ -108,7 +108,7 @@ class OmmersPoolSpec extends ScalaTestWithActorTestKit with AnyFreeSpecLike with
           block3Chain3
         )
 
-        ommersPool ! GetOmmers(block3Chain1.parentHash, ommersProbe.ref)
+        ommersPool ! GetOmmers(block3Chain1.parentHash.value, ommersProbe.ref)
         ommersProbe.expectMessage(Timeouts.normalTimeout, OmmersPool.Ommers(Seq(block2Chain2, block3Chain3)))
       }
 

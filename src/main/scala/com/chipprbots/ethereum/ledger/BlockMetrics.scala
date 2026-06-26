@@ -1,10 +1,10 @@
 package com.chipprbots.ethereum.ledger
 
-import org.apache.pekko.util.ByteString
 
 import com.google.common.util.concurrent.AtomicDouble
 
 import com.chipprbots.ethereum.domain.Block
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.metrics.MetricsContainer
 
 case object BlockMetrics extends MetricsContainer {
@@ -33,7 +33,7 @@ case object BlockMetrics extends MetricsContainer {
   final private val MessGravityGauge =
     metrics.registry.gauge("chain.mess.gravity.gauge", new AtomicDouble(0d))
 
-  def measure(block: Block, getBlockByHashFn: ByteString => Option[Block]): Unit = {
+  def measure(block: Block, getBlockByHashFn: BlockHash => Option[Block]): Unit = {
     BlockNumberGauge.set(block.number.toDouble)
     BlockGasLimitGauge.set(block.header.gasLimit.toDouble)
     BlockGasUsedGauge.set(block.header.gasUsed.toDouble)

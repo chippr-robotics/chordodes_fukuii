@@ -68,8 +68,8 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
     lazy val testPeers: Map[Peer, NetworkPeerManagerActor.PeerInfo] = twoAcceptedPeers.map { case (k, peerInfo) =>
       val lastBlock = bestBlockAtStart
       k -> peerInfo
-        .withBestBlockData(lastBlock.number, lastBlock.hash)
-        .copy(remoteStatus = peerInfo.remoteStatus.copy(bestHash = lastBlock.hash))
+        .withBestBlockData(lastBlock.number, lastBlock.hash.value)
+        .copy(remoteStatus = peerInfo.remoteStatus.copy(bestHash = lastBlock.hash.value))
     }
     lazy val networkPeerManager =
       new NetworkPeerManagerFake(

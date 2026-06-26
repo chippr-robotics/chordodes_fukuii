@@ -49,7 +49,7 @@ abstract class BlockGeneratorSkeleton(
   )(implicit blockchainConfig: BlockchainConfig): BlockHeader =
     BlockHeader(
       parentHash = parent.header.hash,
-      ommersHash = ByteString(kec256(x.toBytes: Array[Byte])),
+      ommersHash = BlockHash(ByteString(kec256(x.toBytes: Array[Byte]))),
       beneficiary = beneficiary.bytes,
       stateRoot = ByteString.empty,
       // we are not able to calculate transactionsRoot here because we do not know if they will fail
@@ -64,7 +64,7 @@ abstract class BlockGeneratorSkeleton(
       extraData = blockchainConfig.daoForkConfig
         .flatMap(daoForkConfig => daoForkConfig.getExtraData(blockNumber))
         .getOrElse(headerExtraData),
-      mixHash = ByteString.empty,
+      mixHash = BlockHash(ByteString.empty),
       nonce = ByteString.empty
     )
 

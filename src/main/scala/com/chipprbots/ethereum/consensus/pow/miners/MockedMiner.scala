@@ -33,6 +33,7 @@ import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.Send
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.StartMining
 import com.chipprbots.ethereum.consensus.pow.miners.MockedMiner.StopMining
 import com.chipprbots.ethereum.domain.Block
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
@@ -138,7 +139,7 @@ private class MockedMiner(
     case Send(mineBlocks: MineBlocks, replyTo) =>
       mineBlocks.parentBlock match {
         case Some(parentHash) =>
-          blockchainReader.getBlockByHash(parentHash) match {
+          blockchainReader.getBlockByHash(BlockHash(parentHash)) match {
             case Some(parentBlock) => startMiningBlocks(mineBlocks, parentBlock, replyTo)
             case None =>
               val error = s"Unable to get parent block with hash ${ByteStringUtils.hash2string(parentHash)} for mining"

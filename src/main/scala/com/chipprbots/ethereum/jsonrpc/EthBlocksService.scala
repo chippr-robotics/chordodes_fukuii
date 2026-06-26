@@ -105,7 +105,7 @@ class EthBlocksService(
     */
   def getBlockTransactionCountByHash(request: TxCountByBlockHashRequest): ServiceResponse[TxCountByBlockHashResponse] =
     IO {
-      val txsCount = blockchainReader.getBlockBodyByHash(request.blockHash).map(_.transactionList.size)
+      val txsCount = blockchainReader.getBlockBodyByHash(BlockHash(request.blockHash)).map(_.transactionList.size)
       Right(TxCountByBlockHashResponse(txsCount))
     }
 
@@ -118,8 +118,11 @@ class EthBlocksService(
     */
   def getByBlockHash(request: BlockByBlockHashRequest): ServiceResponse[BlockByBlockHashResponse] = IO {
     val BlockByBlockHashRequest(blockHash, fullTxs) = request
-    val blockOpt = blockchainReader.getBlockByHash(blockHash).orElse(blockQueue.getBlockByHash(blockHash))
-    val weight = blockchainReader.getChainWeightByHash(blockHash).orElse(blockQueue.getChainWeightByHash(blockHash))
+    val blockOpt =
+      blockchainReader.getBlockByHash(BlockHash(blockHash)).orElse(blockQueue.getBlockByHash(BlockHash(blockHash)))
+    val weight = blockchainReader
+      .getChainWeightByHash(BlockHash(blockHash))
+      .orElse(blockQueue.getChainWeightByHash(BlockHash(blockHash)))
 
     // Hide engine-API optimistic blocks (ACCEPTED with unknown parent, stored via
     // storeBlockByHashOnly) — they skip the number→hash mapping and haven't been executed.
@@ -177,7 +180,7 @@ class EthBlocksService(
   ): ServiceResponse[UncleByBlockHashAndIndexResponse] = IO {
     val UncleByBlockHashAndIndexRequest(blockHash, uncleIndex) = request
     val uncleHeaderOpt = blockchainReader
-      .getBlockBodyByHash(blockHash)
+      .getBlockBodyByHash(BlockHash(blockHash))
       .flatMap { body =>
         if uncleIndex >= 0 && uncleIndex < body.uncleNodesList.size then
           Some(body.uncleNodesList.apply(uncleIndex.toInt))
@@ -238,7 +241,7 @@ class EthBlocksService(
       req: GetUncleCountByBlockHashRequest
   ): ServiceResponse[GetUncleCountByBlockHashResponse] =
     IO {
-      blockchainReader.getBlockBodyByHash(req.blockHash) match {
+      blockchainReader.getBlockBodyByHash(BlockHash(req.blockHash)) match {
         case Some(blockBody) =>
           Right(GetUncleCountByBlockHashResponse(blockBody.uncleNodesList.size))
         case None =>

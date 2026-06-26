@@ -12,6 +12,7 @@ import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlympia
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.UInt256
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
@@ -64,8 +65,8 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers {
 
   // Minimal valid parent/child pair — only fields relevant to gas limit validation
   private val parentHeader = BlockHeader(
-    parentHash = ByteString(Hex.decode("00" * 32)),
-    ommersHash = ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")),
+    parentHash = BlockHash(ByteString(Hex.decode("00" * 32))),
+    ommersHash = BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
     beneficiary = ByteString(Hex.decode("00" * 20)),
     stateRoot = ByteString(Hex.decode("00" * 32)),
     transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
@@ -77,7 +78,7 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers {
     gasUsed = 0,
     unixTimestamp = 1000000,
     extraData = ByteString.empty,
-    mixHash = ByteString(Hex.decode("00" * 32)),
+    mixHash = BlockHash(ByteString(Hex.decode("00" * 32))),
     nonce = ByteString(Hex.decode("00" * 8))
   )
 

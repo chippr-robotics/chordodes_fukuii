@@ -10,7 +10,7 @@ import com.chipprbots.ethereum.utils.ByteStringUtils.*
 
 sealed abstract class ImportMessages(block: Block) {
   import ImportMessages.*
-  protected lazy val hash: ByteString = block.header.hash
+  protected lazy val hash: ByteString = block.header.hash.value
   protected lazy val number: BigInt = block.number
 
   def preImport(): LogEntry
@@ -71,7 +71,7 @@ class NewBlockImportMessages(block: Block, peerId: PeerId) extends ImportMessage
   override def orphaned(): LogEntry = (DebugLevel, s"Ignoring orphaned block $number ($hash) from $peerId")
   override def reorganisedChain(oldBranch: List[Block], newBranch: List[Block]): LogEntry = {
     val ancestorNumber = oldBranch.headOption.map(_.header.number - 1).getOrElse(number - newBranch.size)
-    val ancestorHash = oldBranch.headOption.map(b => hash2string(b.header.parentHash).take(8)).getOrElse("?")
+    val ancestorHash = oldBranch.headOption.map(b => hash2string(b.header.parentHash.value).take(8)).getOrElse("?")
     val dropped = oldBranch.size
     val added = newBranch.size
     val dropfrom = oldBranch.headOption.map(_.header.number).getOrElse(number)

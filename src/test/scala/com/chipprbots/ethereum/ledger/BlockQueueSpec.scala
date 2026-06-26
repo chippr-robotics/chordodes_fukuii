@@ -16,6 +16,7 @@ import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.ChainWeight
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.ledger.BlockQueue.Leaf
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
@@ -29,7 +30,7 @@ class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory {
     setBestBlockNumber(1).twice()
     setChainWeightForParent(block, Some(parentWeight))
 
-    blockQueue.enqueueBlock(block) shouldEqual Some(Leaf(block.header.hash, parentWeight.increase(block.header)))
+    blockQueue.enqueueBlock(block) shouldEqual Some(Leaf(block.header.hash.value, parentWeight.increase(block.header)))
     blockQueue.enqueueBlock(block) shouldEqual None
     blockQueue.isQueued(block.header.hash) shouldBe true
   }
@@ -72,7 +73,7 @@ class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory {
     setBestBlockNumber(1)
     setChainWeightForParent(block1, Some(parentWeight))
 
-    blockQueue.enqueueBlock(block1) shouldEqual Some(Leaf(block1.header.hash, parentWeight.increase(block1.header)))
+    blockQueue.enqueueBlock(block1) shouldEqual Some(Leaf(block1.header.hash.value, parentWeight.increase(block1.header)))
   }
 
   it should "enqueue a block with queued ancestors rooted to the main chain updating its total difficulty" taggedAs (
@@ -80,9 +81,9 @@ class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory {
     StateTest
   ) in new TestConfig {
     val block1: Block = getBlock(1, 101)
-    val block2a: Block = getBlock(2, 102, block1.header.hash)
-    val block2b: Block = getBlock(2, 99, block1.header.hash)
-    val block3: Block = getBlock(3, 103, block2a.header.hash)
+    val block2a: Block = getBlock(2, 102, block1.header.hash.value)
+    val block2b: Block = getBlock(2, 99, block1.header.hash.value)
+    val block3: Block = getBlock(3, 103, block2a.header.hash.value)
 
     val parentWeight: ChainWeight = ChainWeight.totalDifficultyOnly(42)
 
@@ -97,7 +98,7 @@ class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory {
     blockQueue.enqueueBlock(block2b)
 
     val expectedWeight: ChainWeight = List(block1, block2a, block3).map(_.header).foldLeft(parentWeight)(_.increase(_))
-    blockQueue.enqueueBlock(block3) shouldEqual Some(Leaf(block3.header.hash, expectedWeight))
+    blockQueue.enqueueBlock(block3) shouldEqual Some(Leaf(block3.header.hash.value, expectedWeight))
   }
 
   it should "enqueue an orphaned block" in new TestConfig {
@@ -111,9 +112,9 @@ class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory {
 
   it should "remove a branch from a leaf up to the first shared ancestor" in new TestConfig {
     val block1: Block = getBlock(1)
-    val block2a: Block = getBlock(2, parent = block1.header.hash)
-    val block2b: Block = getBlock(2, parent = block1.header.hash)
-    val block3: Block = getBlock(3, parent = block2a.header.hash)
+    val block2a: Block = getBlock(2, parent = block1.header.hash.value)
+    val block2b: Block = getBlock(2, parent = block1.header.hash.value)
+    val block3: Block = getBlock(3, parent = block2a.header.hash.value)
 
     setBestBlockNumber(1).anyNumberOfTimes()
     setChainWeightForParent(block1)
@@ -137,9 +138,9 @@ class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory {
   it should "remove a whole subtree down from an ancestor to all its leaves" in new TestConfig {
     val block1a: Block = getBlock(1)
     val block1b: Block = getBlock(1)
-    val block2a: Block = getBlock(2, parent = block1a.header.hash)
-    val block2b: Block = getBlock(2, parent = block1a.header.hash)
-    val block3: Block = getBlock(3, parent = block2a.header.hash)
+    val block2a: Block = getBlock(2, parent = block1a.header.hash.value)
+    val block2b: Block = getBlock(2, parent = block1a.header.hash.value)
+    val block3: Block = getBlock(3, parent = block2a.header.hash.value)
 
     setBestBlockNumber(1).anyNumberOfTimes()
     setChainWeightForParent(block1a)
@@ -182,7 +183,7 @@ class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory {
     def setChainWeightForParent(
         block: Block,
         weight: Option[ChainWeight] = None
-    ): CallHandler1[ByteString, Option[ChainWeight]] =
+    ): CallHandler1[BlockHash, Option[ChainWeight]] =
       blockchainReader.getChainWeightByHash.expects(block.header.parentHash).returning(weight)
 
     def randomHash(): ByteString =
@@ -203,7 +204,7 @@ class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory {
         salt: ByteString = randomHash()
     ): Block =
       Block(
-        defaultHeader.copy(parentHash = parent, difficulty = difficulty, number = number, extraData = salt),
+        defaultHeader.copy(parentHash = BlockHash(parent), difficulty = difficulty, number = number, extraData = salt),
         BlockBody.empty
       )
   }

@@ -32,6 +32,7 @@ import com.chipprbots.ethereum.consensus.pow.WorkNotifier
 import com.chipprbots.ethereum.consensus.pow.miners.MinerProtocol
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
@@ -115,7 +116,7 @@ class EthMiningService(
       reportActive()
       blockchainReader.getBestBlock match {
         case Some(block) =>
-          (getOmmersFromPool(block.hash), getTransactionsFromPool).parMapN { case (ommers, pendingTxs) =>
+          (getOmmersFromPool(block.hash.value), getTransactionsFromPool).parMapN { case (ommers, pendingTxs) =>
             val blockGenerator = ethash.blockGenerator
             val PendingBlockAndState(pb, _) = blockGenerator.generateBlock(
               block,
@@ -170,7 +171,7 @@ class EthMiningService(
               import pendingBlock.*
               syncingController ! SyncController.WrappedSyncProtocol(
                 SyncProtocol.MinedBlock(
-                  block.copy(header = block.header.copy(nonce = req.nonce, mixHash = req.mixHash))
+                  block.copy(header = block.header.copy(nonce = req.nonce, mixHash = BlockHash(req.mixHash)))
                 )
               )
               PoWMiningMetrics.recordBlockMined(0L) // duration tracked at coordinator level

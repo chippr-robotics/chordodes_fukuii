@@ -20,6 +20,7 @@ import com.chipprbots.ethereum.crypto
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.Receipt
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.mpt.ExtensionNode
 import com.chipprbots.ethereum.mpt.HashNode
 import com.chipprbots.ethereum.mpt.HexPrefix
@@ -66,8 +67,8 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
     val receipts: Seq[Seq[Receipt]] = Seq(Seq(), Seq())
 
     blockchainWriter
-      .storeReceipts(receiptsHashes.head, receipts.head)
-      .and(blockchainWriter.storeReceipts(receiptsHashes(1), receipts(1)))
+      .storeReceipts(BlockHash(receiptsHashes.head), receipts.head)
+      .and(blockchainWriter.storeReceipts(BlockHash(receiptsHashes(1)), receipts(1)))
       .commit()
 
     // when
@@ -98,8 +99,8 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
     val blockBodies: Seq[BlockBody] = Seq(baseBlockBody, baseBlockBody)
 
     blockchainWriter
-      .storeBlockBody(blockBodiesHashes(0), blockBodies(0))
-      .and(blockchainWriter.storeBlockBody(blockBodiesHashes(1), blockBodies(1)))
+      .storeBlockBody(BlockHash(blockBodiesHashes(0)), blockBodies(0))
+      .and(blockchainWriter.storeBlockBody(BlockHash(blockBodiesHashes(1)), blockBodies(1)))
       .commit()
 
     // when
@@ -195,7 +196,7 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
 
     // when
     blockchainHost ! BlockchainHostActor.PeerEventReceived(
-      MessageFromPeer(GetBlockHeaders(BigInt(0), Right(firstHeader.hash), 2, 0, reverse = false), peerId)
+      MessageFromPeer(GetBlockHeaders(BigInt(0), Right(firstHeader.hash.value), 2, 0, reverse = false), peerId)
     )
 
     // then
@@ -220,7 +221,7 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
     // when
     blockchainHost ! BlockchainHostActor.PeerEventReceived(
       MessageFromPeer(
-        ETHPackets.GetBlockHeaders(BigInt(0), Right(firstHeader.hash), maxHeaders = 2, skip = 1, reverse = false),
+        ETHPackets.GetBlockHeaders(BigInt(0), Right(firstHeader.hash.value), maxHeaders = 2, skip = 1, reverse = false),
         peerId
       )
     )
@@ -245,7 +246,7 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
 
     // when
     blockchainHost ! BlockchainHostActor.PeerEventReceived(
-      MessageFromPeer(GetBlockHeaders(BigInt(0), Right(firstHeader.hash), 2, 1, reverse = true), peerId)
+      MessageFromPeer(GetBlockHeaders(BigInt(0), Right(firstHeader.hash.value), 2, 1, reverse = true), peerId)
     )
 
     // then
@@ -268,7 +269,7 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
 
     // when
     blockchainHost ! BlockchainHostActor.PeerEventReceived(
-      MessageFromPeer(GetBlockHeaders(BigInt(0), Right(firstHeader.hash), 3, 1, reverse = true), peerId)
+      MessageFromPeer(GetBlockHeaders(BigInt(0), Right(firstHeader.hash.value), 3, 1, reverse = true), peerId)
     )
 
     // then
@@ -291,7 +292,7 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
 
     // when
     blockchainHost ! BlockchainHostActor.PeerEventReceived(
-      MessageFromPeer(GetBlockHeaders(BigInt(0), Right(firstHeader.hash), 4, 1, reverse = true), peerId)
+      MessageFromPeer(GetBlockHeaders(BigInt(0), Right(firstHeader.hash.value), 4, 1, reverse = true), peerId)
     )
 
     // then

@@ -220,8 +220,8 @@ class GenesisDataLoader(
     }
 
     BlockHeader(
-      parentHash = zeros(hashLength),
-      ommersHash = ByteString(crypto.kec256(rlp.encode(RLPList()))),
+      parentHash = BlockHash(zeros(hashLength)),
+      ommersHash = BlockHash(ByteString(crypto.kec256(rlp.encode(RLPList())))),
       beneficiary = genesisData.coinbase,
       stateRoot = ByteString(stateMptRootHash),
       transactionsRoot = emptyTrieRootHash,
@@ -233,7 +233,7 @@ class GenesisDataLoader(
       gasUsed = 0,
       unixTimestamp = BigInt(genesisData.timestamp.replace("0x", ""), 16).toLong,
       extraData = genesisData.extraData,
-      mixHash = genesisData.mixHash.getOrElse(zeros(hashLength)),
+      mixHash = BlockHash(genesisData.mixHash.getOrElse(zeros(hashLength))),
       nonce = padToEightBytes(genesisData.nonce),
       extraFields = extraFields
     )

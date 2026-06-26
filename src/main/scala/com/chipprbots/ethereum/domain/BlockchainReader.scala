@@ -34,8 +34,8 @@ class BlockchainReader(
     * @return
     *   [[BlockHeader]] if found
     */
-  def getBlockHeaderByHash(hash: ByteString): Option[BlockHeader] =
-    blockHeadersStorage.get(hash)
+  def getBlockHeaderByHash(hash: BlockHash): Option[BlockHeader] =
+    blockHeadersStorage.get(hash.value)
 
   /** Allows to query a blockBody by block hash
     *
@@ -44,8 +44,8 @@ class BlockchainReader(
     * @return
     *   [[com.chipprbots.ethereum.domain.BlockBody]] if found
     */
-  def getBlockBodyByHash(hash: ByteString): Option[BlockBody] =
-    blockBodiesStorage.get(hash)
+  def getBlockBodyByHash(hash: BlockHash): Option[BlockBody] =
+    blockBodiesStorage.get(hash.value)
 
   /** Allows to query for a block based on it's hash
     *
@@ -54,7 +54,7 @@ class BlockchainReader(
     * @return
     *   Block if found
     */
-  def getBlockByHash(hash: ByteString): Option[Block] =
+  def getBlockByHash(hash: BlockHash): Option[Block] =
     for {
       header <- getBlockHeaderByHash(hash)
       body <- getBlockBodyByHash(hash)
@@ -63,7 +63,7 @@ class BlockchainReader(
   def getBlockHeaderByNumber(number: BigInt): Option[BlockHeader] =
     for {
       hash <- getHashByBlockNumber(number)
-      header <- getBlockHeaderByHash(hash)
+      header <- getBlockHeaderByHash(BlockHash(hash))
     } yield header
 
   /** Returns MPT node searched by it's hash
@@ -80,7 +80,7 @@ class BlockchainReader(
     * @return
     *   Receipts if found
     */
-  def getReceiptsByHash(blockhash: ByteString): Option[Seq[Receipt]] = receiptStorage.get(blockhash)
+  def getReceiptsByHash(blockhash: BlockHash): Option[Seq[Receipt]] = receiptStorage.get(blockhash.value)
 
   /** get the current best stored branch */
   def getBestBranch: Branch = {
@@ -99,7 +99,7 @@ class BlockchainReader(
   def getBestBlock: Option[Block] = {
     val bestKnownBlockinfo = appStateStorage.getBestBlockInfo()
     log.debug("Trying to get best block with number {}", bestKnownBlockinfo.number)
-    val bestBlock = getBlockByHash(bestKnownBlockinfo.hash)
+    val bestBlock = getBlockByHash(BlockHash(bestKnownBlockinfo.hash))
     if bestBlock.isEmpty then {
       log.debug(
         "Best block {} (number: {}) not found in storage — expected during SNAP sync (pivot header only).",
@@ -118,7 +118,7 @@ class BlockchainReader(
     */
   def getBestBlockHeader: Option[BlockHeader] = {
     val bestKnownBlockinfo = appStateStorage.getBestBlockInfo()
-    getBlockHeaderByHash(bestKnownBlockinfo.hash)
+    getBlockHeaderByHash(BlockHash(bestKnownBlockinfo.hash))
   }
 
   def genesisHeader: BlockHeader =
@@ -132,23 +132,23 @@ class BlockchainReader(
     case BestBranch(_, tipBlockNumber) if tipBlockNumber >= number && number >= 0 =>
       for {
         hash <- getHashByBlockNumber(number)
-        block <- getBlockByHash(hash)
+        block <- getBlockByHash(BlockHash(hash))
       } yield block
     case EmptyBranch | BestBranch(_, _) => None
   }
 
   /** Returns a block hash for the block at the given height if any */
-  def getHashByBlockNumber(branch: Branch, number: BigInt): Option[ByteString] = branch match {
+  def getHashByBlockNumber(branch: Branch, number: BigInt): Option[BlockHash] = branch match {
     case BestBranch(_, tipBlockNumber) =>
       if tipBlockNumber >= number && number >= 0 then {
-        blockNumberMappingStorage.get(number)
+        blockNumberMappingStorage.get(number).map(BlockHash.apply)
       } else None
 
     case EmptyBranch => None
   }
 
   /** Checks if given block hash is in this chain. (i.e. is an ancestor of the tip block) */
-  def isInChain(branch: Branch, hash: ByteString): Boolean = branch match {
+  def isInChain(branch: Branch, hash: BlockHash): Boolean = branch match {
     case BestBranch(_, tipBlockNumber) =>
       (for {
         header <- getBlockHeaderByHash(hash) if header.number <= tipBlockNumber
@@ -187,7 +187,7 @@ class BlockchainReader(
     * @return
     *   ChainWeight if found
     */
-  def getChainWeightByHash(blockhash: ByteString): Option[ChainWeight] = chainWeightStorage.get(blockhash)
+  def getChainWeightByHash(blockhash: BlockHash): Option[ChainWeight] = chainWeightStorage.get(blockhash.value)
 
   /** ETH/69 TD resolution for PoW chains (ETC). Returns the best available ChainWeight and a source label.
     *
@@ -201,7 +201,7 @@ class BlockchainReader(
       latestBlock: BigInt,
       isPoWChain: Boolean
   ): (ChainWeight, String) =
-    getChainWeightByHash(latestBlockHash) match {
+    getChainWeightByHash(BlockHash(latestBlockHash)) match {
       case Some(cw)            => (cw, "DB_LOOKUP")
       case None if !isPoWChain => (ChainWeight.totalDifficultyOnly(latestBlock), "POS_PROXY")
       case None =>
@@ -265,7 +265,7 @@ class BlockchainReader(
   private def getBlockByNumber(number: BigInt): Option[Block] =
     for {
       hash <- getHashByBlockNumber(number)
-      block <- getBlockByHash(hash)
+      block <- getBlockByHash(BlockHash(hash))
     } yield block
 
   /** Returns a block hash given a block number

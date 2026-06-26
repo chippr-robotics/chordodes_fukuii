@@ -48,7 +48,7 @@ object GraphQLTypes {
   final case class GBlock(block: Block, totalDifficulty: Option[BigInt]) {
     def header: BlockHeader = block.header
     def number: BigInt = block.header.number
-    def hash: ByteString = block.header.hash
+    def hash: ByteString = block.header.hash.value
   }
 
   /** A transaction in flight. `blockInfo` is present when the tx has been mined. */

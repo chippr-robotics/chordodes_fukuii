@@ -27,7 +27,7 @@ class BlockBodiesStorageSpec
         val totalStorage = insertBlockBodiesMapping(newBlocks)
 
         blocks.foreach { case NewBlock(block, _) =>
-          assert(totalStorage.get(block.header.hash).contains(block.body))
+          assert(totalStorage.get(block.header.hash.value).contains(block.body))
         }
       }
     }
@@ -42,15 +42,15 @@ class BlockBodiesStorageSpec
 
         val batchUpdates = toDelete.foldLeft(storage.emptyBatchUpdate) {
           case (updates, ETHPackets.NewBlock(block, _)) =>
-            updates.and(storage.remove(block.header.hash))
+            updates.and(storage.remove(block.header.hash.value))
         }
 
         batchUpdates.commit()
 
         toLeave.foreach { case NewBlock(block, _) =>
-          assert(storage.get(block.header.hash).contains(block.body))
+          assert(storage.get(block.header.hash.value).contains(block.body))
         }
-        toDelete.foreach { case NewBlock(block, _) => assert(storage.get(block.header.hash).isEmpty) }
+        toDelete.foreach { case NewBlock(block, _) => assert(storage.get(block.header.hash.value).isEmpty) }
       }
     }
 
@@ -58,7 +58,7 @@ class BlockBodiesStorageSpec
       val storage = new BlockBodiesStorage(EphemDataSource())
 
       val batchUpdates = newBlocks.foldLeft(storage.emptyBatchUpdate) { case (updates, ETHPackets.NewBlock(block, _)) =>
-        updates.and(storage.put(block.header.hash, block.body))
+        updates.and(storage.put(block.header.hash.value, block.body))
       }
 
       batchUpdates.commit()

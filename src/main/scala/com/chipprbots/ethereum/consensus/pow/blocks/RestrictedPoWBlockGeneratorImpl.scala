@@ -51,7 +51,7 @@ class RestrictedPoWBlockGeneratorImpl(
       val parentHash = pHeader.hash
 
       val validatedOmmers =
-        validators.ommersValidator.validate(parentHash, blockNumber, ommers, blockchainReader) match {
+        validators.ommersValidator.validate(parentHash.value, blockNumber, ommers, blockchainReader) match {
           case Left(_)  => emptyX
           case Right(_) => ommers
         }

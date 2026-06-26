@@ -60,7 +60,7 @@ class ChainImporter(
         }
         val firstBlock = blocks.head
         log.error(
-          s"Chain import: block ${firstBlock.header.number} expects parent=${com.chipprbots.ethereum.utils.ByteStringUtils.hash2string(firstBlock.header.parentHash)}"
+          s"Chain import: block ${firstBlock.header.number} expects parent=${com.chipprbots.ethereum.utils.ByteStringUtils.hash2string(firstBlock.header.parentHash.value)}"
         )
 
         var imported = 0

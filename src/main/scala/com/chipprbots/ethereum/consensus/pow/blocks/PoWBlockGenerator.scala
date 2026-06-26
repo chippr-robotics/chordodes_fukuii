@@ -83,7 +83,7 @@ class PoWBlockGeneratorImpl(
       val blockNumber = pHeader.number + 1
       val parentHash = pHeader.hash
 
-      val ommers = validators.ommersValidator.validate(parentHash, blockNumber, x, blockchainReader) match {
+      val ommers = validators.ommersValidator.validate(parentHash.value, blockNumber, x, blockchainReader) match {
         case Left(_)  => emptyX
         case Right(_) => x
 

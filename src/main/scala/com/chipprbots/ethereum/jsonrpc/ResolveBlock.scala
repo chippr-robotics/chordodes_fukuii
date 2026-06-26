@@ -48,13 +48,13 @@ trait ResolveBlock {
       case BlockParam.Safe =>
         forkChoiceManagerOpt
           .flatMap(_.getSafeBlockHash)
-          .flatMap(h => blockchainReader.getBlockByHash(h))
+          .flatMap(h => blockchainReader.getBlockByHash(BlockHash(h)))
           .map(b => Right(ResolvedBlock(b, pendingState = None)))
           .getOrElse(Left(JsonRpcError.InvalidParams("safe block not available")))
       case BlockParam.Finalized =>
         forkChoiceManagerOpt
           .flatMap(_.getFinalizedBlockHash)
-          .flatMap(h => blockchainReader.getBlockByHash(h))
+          .flatMap(h => blockchainReader.getBlockByHash(BlockHash(h)))
           .map(b => Right(ResolvedBlock(b, pendingState = None)))
           .getOrElse(Left(JsonRpcError.InvalidParams("finalized block not available")))
       case BlockParam.Pending =>
@@ -66,7 +66,7 @@ trait ResolveBlock {
 
   private def getBlockByHash(hash: org.apache.pekko.util.ByteString): Either[JsonRpcError, Block] =
     blockchainReader
-      .getBlockByHash(hash)
+      .getBlockByHash(BlockHash(hash))
       .toRight(JsonRpcError.InvalidParams(s"Block not found for hash"))
 
   private def getBlock(number: BigInt): Either[JsonRpcError, Block] =

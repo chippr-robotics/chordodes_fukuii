@@ -12,6 +12,7 @@ import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.blockchain.sync.codec.MptNodeCodecs.*
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
@@ -136,7 +137,7 @@ object BlockchainHostActor {
         import ETHPackets.ReceiptBloomEnc
         val receipts = blockHashes
           .take(peerConfiguration.fastSyncHostConfiguration.maxReceiptsPerMessage)
-          .flatMap(hash => blockchainReader.getReceiptsByHash(hash))
+          .flatMap(hash => blockchainReader.getReceiptsByHash(BlockHash(hash)))
         val receiptsRLP = RLPList(receipts.map(rs => RLPList(rs.map(_.toRLPEncodable)*))*)
         context.log.info("HOST_RECEIPTS_ETH68: requestId={} blocks={}", requestId, receipts.size)
         Some(ETHPackets.Receipts68(requestId, receiptsRLP))
@@ -146,7 +147,7 @@ object BlockchainHostActor {
         import ETHPackets.ReceiptBloomFreeEnc
         val receipts = blockHashes
           .take(peerConfiguration.fastSyncHostConfiguration.maxReceiptsPerMessage)
-          .flatMap(hash => blockchainReader.getReceiptsByHash(hash))
+          .flatMap(hash => blockchainReader.getReceiptsByHash(BlockHash(hash)))
         val receiptsRLP = RLPList(receipts.map(rs => RLPList(rs.map(_.toRLPEncodable)*))*)
         context.log.info(
           "HOST_RECEIPTS_ETH69: requestId={} blocks={} (bloom-absent, EIP-7642)",
@@ -170,7 +171,7 @@ object BlockchainHostActor {
             .foldLeft((Vector.empty[RLPList], false, 0L, false)) {
               case (acc @ (_, _, _, true), _) => acc // already truncated mid-block — skip remaining
               case ((lists, _, cumBytes, false), (hash, blockIdx)) =>
-                blockchainReader.getReceiptsByHash(hash) match {
+                blockchainReader.getReceiptsByHash(BlockHash(hash)) match {
                   case None => (lists, false, cumBytes, false) // unknown block — skip silently
                   case Some(receipts) =>
                     val toServe = if blockIdx == 0 then receipts.drop(firstBlockReceiptIndex.toInt) else receipts
@@ -202,7 +203,7 @@ object BlockchainHostActor {
       case ETHPackets.GetBlockBodies(requestId, hashes) =>
         val blockBodies = hashes
           .take(peerConfiguration.fastSyncHostConfiguration.maxBlocksBodiesPerMessage)
-          .flatMap(hash => blockchainReader.getBlockBodyByHash(hash))
+          .flatMap(hash => blockchainReader.getBlockBodyByHash(BlockHash(hash)))
         context.log.debug(
           "HOST_BLOCK_BODIES_ETH68: requestId={} requested={} returning={}",
           requestId,
@@ -241,7 +242,8 @@ object BlockchainHostActor {
         reverse: Boolean,
         requestIdOpt: Option[BigInt]
     ): Option[MessageSerializable] = {
-      val blockNumber = block.fold(a => Some(a), b => blockchainReader.getBlockHeaderByHash(b).map(_.number))
+      val blockNumber =
+        block.fold(a => Some(a), b => blockchainReader.getBlockHeaderByHash(BlockHash(b)).map(_.number))
 
       blockNumber match {
         case Some(startBlockNumber) if startBlockNumber >= 0 && maxHeaders >= 0 && skip >= 0 =>

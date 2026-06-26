@@ -174,7 +174,7 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
 
       private def encodeSimulatedBlock(block: SimulateBlockResult, returnFullTxs: Boolean): JValue = {
         val h = block.header
-        val blockHash = h.hash
+        val blockHash = h.hash.value
 
         // Standard block header fields — conditionally include fork-specific fields
         val baseHeaderFields = List(
@@ -185,12 +185,12 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
           "hash" -> encodeAsHex(blockHash),
           "logsBloom" -> encodeAsHex(h.logsBloom.value),
           "miner" -> encodeAsHex(h.beneficiary),
-          "mixHash" -> encodeAsHex(h.mixHash),
+          "mixHash" -> encodeAsHex(h.mixHash.value),
           "nonce" -> encodeAsHex(h.nonce),
           "number" -> encodeAsHex(h.number),
-          "parentHash" -> encodeAsHex(h.parentHash),
+          "parentHash" -> encodeAsHex(h.parentHash.value),
           "receiptsRoot" -> encodeAsHex(h.receiptsRoot),
-          "sha3Uncles" -> encodeAsHex(h.ommersHash),
+          "sha3Uncles" -> encodeAsHex(h.ommersHash.value),
           "size" -> encodeAsHex(BigInt(Block.size(Block(h, block.body)))),
           "stateRoot" -> encodeAsHex(h.stateRoot),
           "timestamp" -> encodeAsHex(BigInt(h.unixTimestamp)),
@@ -202,7 +202,8 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
         val baseFeeField = h.baseFee.map(bf => "baseFeePerGas" -> encodeAsHex(bf)).toList
         val blobFields = h.blobGasUsed.map(bg => "blobGasUsed" -> encodeAsHex(bg)).toList ++
           h.excessBlobGas.map(eb => "excessBlobGas" -> encodeAsHex(eb)).toList
-        val beaconField = h.parentBeaconBlockRoot.map(pb => "parentBeaconBlockRoot" -> encodeAsHex(pb)).toList
+        val beaconField =
+          h.parentBeaconBlockRoot.map(pb => "parentBeaconBlockRoot" -> encodeAsHex(pb.value)).toList
         val requestsField = h.requestsHash.map(rh => "requestsHash" -> encodeAsHex(rh)).toList
         val withdrawalsRootField = h.withdrawalsRoot.map(wr => "withdrawalsRoot" -> encodeAsHex(wr)).toList
 
@@ -233,7 +234,7 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
           senderAddr: com.chipprbots.ethereum.domain.Address
       ): JValue = {
         val tx = stx.tx
-        val blockHash = header.hash
+        val blockHash = header.hash.value
         val txType = tx match {
           case _: com.chipprbots.ethereum.domain.LegacyTransaction         => BigInt(0)
           case _: com.chipprbots.ethereum.domain.TransactionWithAccessList => BigInt(1)

@@ -19,6 +19,7 @@ import com.chipprbots.ethereum.utils.ForkTimestamps
 import com.chipprbots.ethereum.utils.MonetaryPolicyConfig
 import com.chipprbots.ethereum.utils.NetworkType
 import com.chipprbots.ethereum.domain.UInt256
+import com.chipprbots.ethereum.domain.BlockHash
 
 class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
   import SNAPSyncController.SyncPhase.*
@@ -230,8 +231,8 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
     withoutHeader.knownHeader shouldBe None
 
     val header = BlockHeader(
-      parentHash = ByteString(new Array[Byte](32)),
-      ommersHash = BlockHeader.EmptyOmmers,
+      parentHash = BlockHash(ByteString(new Array[Byte](32))),
+      ommersHash = BlockHash(BlockHeader.EmptyOmmers),
       beneficiary = ByteString(new Array[Byte](20)),
       stateRoot = ByteString(Array.fill(32)(0x77.toByte)),
       transactionsRoot = BlockHeader.EmptyMpt,
@@ -243,7 +244,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
       gasUsed = 0,
       unixTimestamp = 1700000000,
       extraData = ByteString.empty,
-      mixHash = ByteString(new Array[Byte](32)),
+      mixHash = BlockHash(ByteString(new Array[Byte](32))),
       nonce = ByteString(new Array[Byte](8)),
       extraFields = HefPostOlympia(BigInt("1000000000"))
     )
@@ -1273,8 +1274,8 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
     import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostShanghai
     import com.chipprbots.ethereum.domain.BloomFilter
     BlockHeader(
-      parentHash = ByteString(Array.fill(32)(0xab.toByte)),
-      ommersHash = BlockHeader.EmptyOmmers,
+      parentHash = BlockHash(ByteString(Array.fill(32)(0xab.toByte))),
+      ommersHash = BlockHash(BlockHeader.EmptyOmmers),
       beneficiary = ByteString(new Array[Byte](20)),
       stateRoot = ByteString(Array.fill(32)(0x77.toByte)),
       transactionsRoot = BlockHeader.EmptyMpt,
@@ -1286,7 +1287,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
       gasUsed = BigInt(0),
       unixTimestamp = 1700000000L, // well above shanghaiTimestamp=1677557088
       extraData = ByteString.empty,
-      mixHash = ByteString(new Array[Byte](32)),
+      mixHash = BlockHash(ByteString(new Array[Byte](32))),
       nonce = ByteString(new Array[Byte](8)),
       extraFields = HefPostShanghai(
         baseFee = BigInt(7),

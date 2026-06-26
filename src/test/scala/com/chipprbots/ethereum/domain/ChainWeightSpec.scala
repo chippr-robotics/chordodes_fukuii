@@ -6,6 +6,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.testing.Tags.*
+import com.chipprbots.ethereum.domain.BlockHash
 
 class ChainWeightSpec extends AnyFlatSpec with Matchers {
 
@@ -14,8 +15,8 @@ class ChainWeightSpec extends AnyFlatSpec with Matchers {
       difficulty: BigInt
   ): BlockHeader =
     BlockHeader(
-      parentHash = ByteString.empty,
-      ommersHash = ByteString.empty,
+      parentHash = BlockHash(ByteString.empty),
+      ommersHash = BlockHash(ByteString.empty),
       beneficiary = ByteString.empty,
       stateRoot = ByteString.empty,
       transactionsRoot = ByteString.empty,
@@ -27,7 +28,7 @@ class ChainWeightSpec extends AnyFlatSpec with Matchers {
       gasUsed = 0,
       unixTimestamp = 0,
       extraData = ByteString.empty,
-      mixHash = ByteString.empty,
+      mixHash = BlockHash(ByteString.empty),
       nonce = ByteString.empty
     )
 

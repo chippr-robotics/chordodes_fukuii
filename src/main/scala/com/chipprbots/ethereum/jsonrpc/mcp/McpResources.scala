@@ -223,8 +223,8 @@ object LatestBlockResource {
         val txCount = block.body.transactionList.size
         s"""{
           |  "number": ${h.number},
-          |  "hash": "${ByteStringUtils.hash2string(h.hash)}",
-          |  "parentHash": "${ByteStringUtils.hash2string(h.parentHash)}",
+          |  "hash": "${ByteStringUtils.hash2string(h.hash.value)}",
+          |  "parentHash": "${ByteStringUtils.hash2string(h.parentHash.value)}",
           |  "miner": "0x${org.bouncycastle.util.encoders.Hex.toHexString(h.beneficiary.toArray)}",
           |  "difficulty": "${h.difficulty}",
           |  "totalDifficulty": "$td",
@@ -258,8 +258,8 @@ object BlockByNumberResource {
           .getOrElse("unknown")
         s"""{
           |  "number": ${h.number},
-          |  "hash": "${ByteStringUtils.hash2string(h.hash)}",
-          |  "parentHash": "${ByteStringUtils.hash2string(h.parentHash)}",
+          |  "hash": "${ByteStringUtils.hash2string(h.hash.value)}",
+          |  "parentHash": "${ByteStringUtils.hash2string(h.parentHash.value)}",
           |  "miner": "0x${org.bouncycastle.util.encoders.Hex.toHexString(h.beneficiary.toArray)}",
           |  "difficulty": "${h.difficulty}",
           |  "totalDifficulty": "$td",

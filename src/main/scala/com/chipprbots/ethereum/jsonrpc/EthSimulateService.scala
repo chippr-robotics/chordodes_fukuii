@@ -179,7 +179,7 @@ class EthSimulateService(
       evmCodeStorage = evmCodeStorage,
       mptStorage = blockchain.getReadOnlyMptStorage(),
       getBlockHashByNumber =
-        (n: BigInt) => simulatedBlockHashes.get(n).orElse(blockchainReader.getBlockHeaderByNumber(n).map(_.hash)),
+        (n: BigInt) => simulatedBlockHashes.get(n).orElse(blockchainReader.getBlockHeaderByNumber(n).map(_.hash.value)),
       accountStartNonce = blockchainConfig.accountStartNonce,
       stateRootHash = baseBlock.header.stateRoot,
       noEmptyAccounts = evmConfig.noEmptyAccounts,
@@ -237,7 +237,7 @@ class EthSimulateService(
           case Left(err) => break(Left(err))
           case Right((gapHeader, gapWorld, gapBlockResult, gapGasUsed)) =>
             blockResults += gapBlockResult
-            simulatedBlockHashes(gapHeader.number) = gapHeader.hash
+            simulatedBlockHashes(gapHeader.number) = gapHeader.hash.value
             parentHeader = gapHeader
             world = gapWorld
             globalAccumGas += gapGasUsed
@@ -274,7 +274,7 @@ class EthSimulateService(
         case Left(err) => break(Left(err))
         case Right((bscHeader, bscWorld, bscBlockResult, bscGasUsed)) =>
           blockResults += bscBlockResult
-          simulatedBlockHashes(bscHeader.number) = bscHeader.hash
+          simulatedBlockHashes(bscHeader.number) = bscHeader.hash.value
           parentHeader = bscHeader
           world = bscWorld
           globalAccumGas += bscGasUsed
@@ -401,7 +401,7 @@ class EthSimulateService(
     )
 
     // Update call results with correct block hash and number
-    val blockHash = finalHeader.hash
+    val blockHash = finalHeader.hash.value
     val updatedCallResults = callResults.zipWithIndex.map { case (cr, _) =>
       cr.copy(logs =
         cr.logs.map(
@@ -549,7 +549,7 @@ class EthSimulateService(
 
     BlockHeader(
       parentHash = parentHeader.hash,
-      ommersHash = EmptyOmmersHash,
+      ommersHash = BlockHash(EmptyOmmersHash),
       beneficiary = beneficiary,
       stateRoot = ByteString(new Array[Byte](32)), // Placeholder — filled after execution
       transactionsRoot = EmptyMpt,
@@ -561,7 +561,7 @@ class EthSimulateService(
       gasUsed = BigInt(0), // Placeholder — filled after execution
       unixTimestamp = timestamp.toLong,
       extraData = ByteString.empty,
-      mixHash = prevRandao,
+      mixHash = BlockHash(prevRandao),
       nonce = ByteString(new Array[Byte](8)),
       extraFields = extraFields
     )
@@ -1032,7 +1032,7 @@ class EthSimulateService(
           else world
         val storage = w1.getStorage(BeaconRootContractAddress)
         val s1 = storage.store(timestampIdx.toBigInt, timestamp.toBigInt)
-        val s2 = s1.store(rootIdx.toBigInt, UInt256(beaconRoot).toBigInt)
+        val s2 = s1.store(rootIdx.toBigInt, UInt256(beaconRoot.value).toBigInt)
         w1.saveStorage(BeaconRootContractAddress, s2)
       case None => world
     }
@@ -1056,7 +1056,7 @@ class EthSimulateService(
         .saveCode(HistoryStorageAddress, HistoryStorageCode)
     } else world
     // Store parent hash at slot (blockNumber - 1) % HistoryServeWindow
-    val parentHashValue = UInt256(blockHeader.parentHash)
+    val parentHashValue = UInt256(blockHeader.parentHash.value)
     val slot = (blockNumber - 1) % HistoryServeWindow
     val storage = w1.getStorage(HistoryStorageAddress)
     val updatedStorage = storage.store(slot, parentHashValue.toBigInt)

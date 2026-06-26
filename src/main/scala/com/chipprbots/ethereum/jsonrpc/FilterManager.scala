@@ -164,7 +164,7 @@ object FilterManager {
                   logIndex = logIndex,
                   transactionIndex = txIndex,
                   transactionHash = tx.hash.value,
-                  blockHash = block.header.hash,
+                  blockHash = block.header.hash.value,
                   blockNumber = block.header.number,
                   address = log.loggerAddress,
                   data = log.data,
@@ -182,7 +182,7 @@ object FilterManager {
       blockParam match {
         case BlockParam.WithNumber(blockNumber) => blockNumber
         case BlockParam.WithHash(hash) =>
-          blockchainReader.getBlockHeaderByHash(hash).map(_.number).getOrElse(bestBlockNumber)
+          blockchainReader.getBlockHeaderByHash(BlockHash(hash)).map(_.number).getOrElse(bestBlockNumber)
         case BlockParam.Earliest  => 0
         case BlockParam.Latest    => bestBlockNumber
         case BlockParam.Safe      => bestBlockNumber
@@ -239,7 +239,7 @@ object FilterManager {
         if currentBlockNumber > bestBlock then hashesSoFar
         else
           blockchainReader.getBlockHeaderByNumber(currentBlockNumber) match {
-            case Some(header) => recur(currentBlockNumber + 1, hashesSoFar :+ header.hash)
+            case Some(header) => recur(currentBlockNumber + 1, hashesSoFar :+ header.hash.value)
             case None         => hashesSoFar
           }
 

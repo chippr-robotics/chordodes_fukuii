@@ -85,8 +85,8 @@ class BlockValidationSpec extends AnyWordSpec with Matchers with MockFactory {
 
     val block: Block = Block(
       BlockHeader(
-        parentHash = hash2ByteString("8345d132564b3660aa5f27c9415310634b50dbc92579c65a0825d9a255227a71"),
-        ommersHash = hash2ByteString("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"),
+        parentHash = BlockHash(hash2ByteString("8345d132564b3660aa5f27c9415310634b50dbc92579c65a0825d9a255227a71")),
+        ommersHash = BlockHash(hash2ByteString("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")),
         beneficiary = hash2ByteString("df7d7e053933b5cc24372f878c90e62dadad5d42"),
         stateRoot = hash2ByteString("087f96537eba43885ab563227262580b27fc5e6516db79a6fc4d3bcd241dda67"),
         transactionsRoot = hash2ByteString("8ae451039a8bf403b899dcd23252d94761ddd23b88c769d9b7996546edc47fac"),
@@ -98,7 +98,7 @@ class BlockValidationSpec extends AnyWordSpec with Matchers with MockFactory {
         gasUsed = 84000,
         unixTimestamp = 1486131165,
         extraData = hash2ByteString("d5830104098650617269747986312e31332e30826c69"),
-        mixHash = hash2ByteString("be90ac33b3f6d0316e60eef505ff5ec7333c9f3c85c1a36fc2523cd6b75ddb8a"),
+        mixHash = BlockHash(hash2ByteString("be90ac33b3f6d0316e60eef505ff5ec7333c9f3c85c1a36fc2523cd6b75ddb8a")),
         nonce = hash2ByteString("2b0fb0c002946392")
       ),
       BlockBody(

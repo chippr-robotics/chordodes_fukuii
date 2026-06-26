@@ -38,7 +38,7 @@ class TestModeBlockExecution(
     TestModeWorldStateProxy(
       evmCodeStorage = evmCodeStorage,
       nodesKeyValueStorage = blockchain.getBackingMptStorage(block.header.number),
-      getBlockHashByNumber = (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash),
+      getBlockHashByNumber = (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
       accountStartNonce = blockchainConfig.accountStartNonce,
       stateRootHash = parentHeader.stateRoot,
       noEmptyAccounts = EvmConfig.forBlock(block.header.number, blockchainConfig).noEmptyAccounts,

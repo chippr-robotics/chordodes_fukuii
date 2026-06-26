@@ -588,13 +588,13 @@ final private class BlockImporterLogic(
         consensus.evaluateBranch(nel).flatMap {
           case BlockImportedToTop(blockImportData) =>
             val importedNow = blockImportData.map(_.block)
-            importedNow.foreach(b => unknownParentStrikes -= b.hash)
+            importedNow.foreach(b => unknownParentStrikes -= b.hash.value)
             val imported = importedNow.reverse ::: importedBlocks
             imported.headOption.foreach(b => supervisor ! ProgressProtocol.ImportedBlock(b.number, internally = false))
             IO.pure((imported, None))
 
           case ChainReorganised(_, newBranch, _) =>
-            newBranch.foreach(b => unknownParentStrikes -= b.hash)
+            newBranch.foreach(b => unknownParentStrikes -= b.hash.value)
             val imported = newBranch.reverse ::: importedBlocks
             imported.headOption.foreach(b => supervisor ! ProgressProtocol.ImportedBlock(b.number, internally = false))
             IO.pure((imported, None))
@@ -614,10 +614,10 @@ final private class BlockImporterLogic(
               "Block {} batch import failed, hash {} parent {}",
               failedBlock.number,
               failedBlock.header.hashAsHexString,
-              ByteStringUtils.hash2string(failedBlock.header.parentHash)
+              ByteStringUtils.hash2string(failedBlock.header.parentHash.value)
             )
-            val strikes = unknownParentStrikes.getOrElse(failedBlock.hash, 0) + 1
-            unknownParentStrikes = unknownParentStrikes + (failedBlock.hash -> strikes)
+            val strikes = unknownParentStrikes.getOrElse(failedBlock.hash.value, 0) + 1
+            unknownParentStrikes = unknownParentStrikes + (failedBlock.hash.value -> strikes)
             if strikes == BadBlockEvictionThreshold then {
               log.warning(
                 "BAD-BLOCK-EVICT: block {} (hash={}) import failure x{} — evicting peer",
@@ -634,13 +634,13 @@ final private class BlockImporterLogic(
             if strikes >= ForkDetectThreshold then {
               val ourHashAtHeight = blockchainReader
                 .getBlockHeaderByNumber(failedBlock.number)
-                .map(h => ByteStringUtils.hash2string(h.hash))
+                .map(h => ByteStringUtils.hash2string(h.hash.value))
                 .getOrElse("<not found>")
               log.warning(
                 s"FORK-DETECT: block ${failedBlock.number} (hash=${failedBlock.header.hashAsHexString}) " +
                   s"has failed $strikes consecutive times. " +
                   s"Our canonical hash at height ${failedBlock.number}: $ourHashAtHeight. " +
-                  s"Received parent hash: ${ByteStringUtils.hash2string(failedBlock.header.parentHash)}. " +
+                  s"Received parent hash: ${ByteStringUtils.hash2string(failedBlock.header.parentHash.value)}. " +
                   "Triggering chain rollback and header re-sync."
               )
               selfRef ! StartForkRecovery(failedBlock.number)

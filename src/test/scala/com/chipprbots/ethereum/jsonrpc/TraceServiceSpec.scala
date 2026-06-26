@@ -64,10 +64,10 @@ class TraceServiceSpec
 
     blockchainWriter.storeBlock(block).commit()
     storagesInstance.storages.blockHeadersStorage
-      .put(block.header.parentHash, block.header.copy(number = block.header.number - 1))
+      .put(block.header.parentHash.value, block.header.copy(number = block.header.number - 1))
       .commit()
 
-    txMappingStorage.get.expects(txHash).returning(Some(TransactionLocation(block.header.hash, txIndex)))
+    txMappingStorage.get.expects(txHash).returning(Some(TransactionLocation(block.header.hash.value, txIndex)))
     mockLedger.advanceWorldToTx.expects(*, *, *, *).returning(mockWorld)
     (mockLedger
       .simulateTransactionWithTracer(
@@ -93,11 +93,11 @@ class TraceServiceSpec
       val emptyBlock: Block = block.copy(body = block.body.copy(transactionList = Seq.empty))
       blockchainWriter.storeBlock(emptyBlock).commit()
       storagesInstance.storages.blockHeadersStorage
-        .put(emptyBlock.header.parentHash, emptyBlock.header.copy(number = emptyBlock.header.number - 1))
+        .put(emptyBlock.header.parentHash.value, emptyBlock.header.copy(number = emptyBlock.header.number - 1))
         .commit()
 
       val result: Either[JsonRpcError, TraceBlockResponse] = service
-        .traceBlock(TraceBlockRequest(BlockParam.WithHash(emptyBlock.header.hash)))
+        .traceBlock(TraceBlockRequest(BlockParam.WithHash(emptyBlock.header.hash.value)))
         .unsafeRunSync()
 
       result shouldBe Right(TraceBlockResponse(Seq.empty))
@@ -123,10 +123,10 @@ class TraceServiceSpec
 
     blockchainWriter.storeBlock(block).commit()
     storagesInstance.storages.blockHeadersStorage
-      .put(block.header.parentHash, block.header.copy(number = block.header.number - 1))
+      .put(block.header.parentHash.value, block.header.copy(number = block.header.number - 1))
       .commit()
 
-    txMappingStorage.get.expects(txHash).returning(Some(TransactionLocation(block.header.hash, txIndex)))
+    txMappingStorage.get.expects(txHash).returning(Some(TransactionLocation(block.header.hash.value, txIndex)))
     mockLedger.advanceWorldToTx.expects(*, *, *, *).returning(mockWorld)
     (mockLedger
       .simulateTransactionWithTracer(
@@ -153,7 +153,7 @@ class TraceServiceSpec
       val emptyBlock: Block = block.copy(body = block.body.copy(transactionList = Seq.empty))
       blockchainWriter.storeBlock(emptyBlock).commit()
       storagesInstance.storages.blockHeadersStorage
-        .put(emptyBlock.header.parentHash, emptyBlock.header.copy(number = emptyBlock.header.number - 1))
+        .put(emptyBlock.header.parentHash.value, emptyBlock.header.copy(number = emptyBlock.header.number - 1))
         .commit()
       blockchainWriter.saveBestKnownBlocks(emptyBlock.header.hash, emptyBlock.header.number)
 
@@ -218,8 +218,8 @@ class TraceServiceSpec
       val result: Either[JsonRpcError, TraceFilterResponse] = service
         .traceFilter(
           TraceFilterRequest(
-            fromBlock = BlockParam.WithHash(emptyBlock.header.hash), // N = 3125369
-            toBlock = BlockParam.WithHash(parentBlock.header.hash) // N-1 = 3125368
+            fromBlock = BlockParam.WithHash(emptyBlock.header.hash.value), // N = 3125369
+            toBlock = BlockParam.WithHash(parentBlock.header.hash.value) // N-1 = 3125368
           )
         )
         .unsafeRunSync()
@@ -236,7 +236,7 @@ class TraceServiceSpec
       saveAsBestBlock = true
     )
     storagesInstance.storages.blockHeadersStorage
-      .put(emptyBlock.header.parentHash, emptyBlock.header.copy(number = emptyBlock.header.number - 1))
+      .put(emptyBlock.header.parentHash.value, emptyBlock.header.copy(number = emptyBlock.header.number - 1))
       .commit()
 
     val result: Either[JsonRpcError, TraceFilterResponse] = service

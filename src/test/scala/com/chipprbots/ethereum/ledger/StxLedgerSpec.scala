@@ -92,7 +92,7 @@ class StxLedgerSpec extends AnyFlatSpec with Matchers with Logger {
     val stxFromAddress: SignedTransactionWithSender =
       SignedTransactionWithSender(SignedTransaction(tx, fakeSignature), fromAddress)
 
-    val newBlock: Block = genesisBlock.copy(header = block.header.copy(number = 1, parentHash = genesisHash))
+    val newBlock: Block = genesisBlock.copy(header = block.header.copy(number = 1, parentHash = BlockHash(genesisHash)))
 
     val preparedBlock: PreparedBlock =
       mining.blockPreparator.prepareBlock(
@@ -178,7 +178,7 @@ trait ScenarioSetup extends EphemBlockchainTestSetup {
     InMemoryWorldStateProxy(
       storagesInstance.storages.evmCodeStorage,
       blockchain.getBackingMptStorage(-1),
-      (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash),
+      (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
       UInt256.Zero,
       ByteString(MerklePatriciaTrie.EmptyRootHash),
       noEmptyAccounts = false,
@@ -232,14 +232,14 @@ trait ScenarioSetup extends EphemBlockchainTestSetup {
   val block: Block = someGenesisBlock.toBlock
   val genesisBlock: Block =
     block.copy(header = block.header.copy(stateRoot = worldWithAccount.stateRootHash, gasLimit = 1000000))
-  val genesisHash: ByteString = genesisBlock.header.hash
+  val genesisHash: ByteString = genesisBlock.header.hash.value
   val genesisHeader: BlockHeader = genesisBlock.header
   val genesisWeight: ChainWeight = ChainWeight.zero.increase(genesisHeader)
   val lastBlockGasLimit: BigInt = genesisBlock.header.gasLimit
 
   blockchainWriter
     .storeBlock(genesisBlock)
-    .and(blockchainWriter.storeReceipts(genesisHash, Nil))
-    .and(blockchainWriter.storeChainWeight(genesisHash, genesisWeight))
+    .and(blockchainWriter.storeReceipts(BlockHash(genesisHash), Nil))
+    .and(blockchainWriter.storeChainWeight(BlockHash(genesisHash), genesisWeight))
     .commit()
 }

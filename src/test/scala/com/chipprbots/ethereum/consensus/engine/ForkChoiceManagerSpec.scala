@@ -13,6 +13,7 @@ import com.chipprbots.ethereum.consensus.engine.ForkChoiceManager.BeaconHead
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
 import com.chipprbots.ethereum.domain.BloomFilter
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.testing.Tags.*
 
 /** Verifies the publisher pattern added in #1207: every `applyForkChoiceState` call must notify the registered listener
@@ -27,8 +28,8 @@ class ForkChoiceManagerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     val fcm = new ForkChoiceManager(blockchainReader, blockchainWriter)
 
     val storedHeader: BlockHeader = BlockHeader(
-      parentHash = ByteString(new Array[Byte](32)),
-      ommersHash = BlockHeader.EmptyOmmers,
+      parentHash = BlockHash(ByteString(new Array[Byte](32))),
+      ommersHash = BlockHash(BlockHeader.EmptyOmmers),
       beneficiary = ByteString(new Array[Byte](20)),
       stateRoot = ByteString(Array.fill(32)(0x44.toByte)),
       transactionsRoot = BlockHeader.EmptyMpt,
@@ -40,14 +41,14 @@ class ForkChoiceManagerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
       gasUsed = 0,
       unixTimestamp = 1700000000,
       extraData = ByteString.empty,
-      mixHash = ByteString(new Array[Byte](32)),
+      mixHash = BlockHash(ByteString(new Array[Byte](32))),
       nonce = ByteString(new Array[Byte](8)),
       extraFields = HefPostOlympia(BigInt("1000000000"))
     )
     blockchainWriter.storeBlockHeader(storedHeader).commit()
 
     val unknownHeadHash: ByteString = ByteString(Array.fill(32)(0x99.toByte))
-    val knownHeadHash: ByteString = storedHeader.hash
+    val knownHeadHash: ByteString = storedHeader.hash.value
   }
 
   "ForkChoiceManager" should "publish BeaconHead with knownHeader=None when head is unknown (SYNCING branch)" taggedAs UnitTest in new Fixture {

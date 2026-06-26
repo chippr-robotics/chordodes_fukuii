@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum.vm
 
-import org.apache.pekko.util.ByteString
 
 import org.scalacheck.Gen
 import org.scalatest.funsuite.AnyFunSuite
@@ -15,6 +14,7 @@ import com.chipprbots.ethereum.domain.StorageKey
 import com.chipprbots.ethereum.domain.TxLogEntry
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.domain.UInt256.*
+import org.apache.pekko.util.ByteString
 import com.chipprbots.ethereum.vm.Generators.*
 
 import Fixtures.blockchainConfig

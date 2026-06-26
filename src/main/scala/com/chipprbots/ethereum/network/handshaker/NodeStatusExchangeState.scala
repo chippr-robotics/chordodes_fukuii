@@ -31,7 +31,7 @@ trait NodeStatusExchangeState[T <: Message] extends InProgressState[PeerInfo] wi
     log.debug("Peer returned status ({})", status)
 
     val validNetworkID = status.networkId == handshakerConfiguration.peerConfiguration.networkId
-    val validGenesisHash = status.genesisHash == blockchainReader.genesisHeader.hash
+    val validGenesisHash = status.genesisHash == blockchainReader.genesisHeader.hash.value
 
     if validNetworkID && validGenesisHash then {
       forkResolverOpt match {

@@ -19,6 +19,7 @@ import com.chipprbots.ethereum.consensus.Consensus.ExtendedCurrentBestBranchPart
 import com.chipprbots.ethereum.consensus.Consensus.KeptCurrentBestBranch
 import com.chipprbots.ethereum.consensus.Consensus.SelectedNewBestBranch
 import com.chipprbots.ethereum.domain.Block
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.ledger.BlockExecutionError.ValidationBeforeExecError
@@ -111,7 +112,7 @@ class ConsensusAdapter(
               BranchExecutionFailure(blocksToEnqueue, failingBlockHash, error)
             ) =>
           blocksToEnqueue.foreach(blockQueue.enqueueBlock(_))
-          blockQueue.removeSubtree(failingBlockHash)
+          blockQueue.removeSubtree(BlockHash(failingBlockHash))
           log.warn("extended best branch partially because of error: {}", error)
           BlockImportedToTop(blockImportData)
         case KeptCurrentBestBranch =>
@@ -119,7 +120,7 @@ class ConsensusAdapter(
           BlockEnqueued
         case BranchExecutionFailure(blocksToEnqueue, failingBlockHash, error) =>
           blocksToEnqueue.foreach(blockQueue.enqueueBlock(_))
-          blockQueue.removeSubtree(failingBlockHash)
+          blockQueue.removeSubtree(BlockHash(failingBlockHash))
           BlockImportFailed(error)
         case ConsensusError(blocksToEnqueue, error) =>
           blocksToEnqueue.foreach(blockQueue.enqueueBlock(_))
@@ -156,6 +157,6 @@ class ConsensusAdapter(
   private def enqueueAndGetBranch(block: Block, bestBlockNumber: BigInt): Option[NonEmptyList[Block]] =
     blockQueue
       .enqueueBlock(block, bestBlockNumber)
-      .map(topBlock => blockQueue.getBranch(topBlock.hash, dequeue = true))
+      .map(topBlock => blockQueue.getBranch(BlockHash(topBlock.hash), dequeue = true))
       .flatMap(NonEmptyList.fromList)
 }

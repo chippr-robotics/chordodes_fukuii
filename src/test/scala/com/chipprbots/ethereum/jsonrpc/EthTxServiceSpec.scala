@@ -48,7 +48,7 @@ class EthTxServiceSpec
   ) in new TestSetup {
     val txIndexToRequest: Int = blockToRequest.body.transactionList.size / 2
     val request: GetTransactionByBlockHashAndIndexRequest =
-      GetTransactionByBlockHashAndIndexRequest(blockToRequest.header.hash, txIndexToRequest)
+      GetTransactionByBlockHashAndIndexRequest(blockToRequest.header.hash.value, txIndexToRequest)
     val response: GetTransactionByBlockHashAndIndexResponse =
       ethTxService.getTransactionByBlockHashAndIndex(request).unsafeRunSync().toOption.get
 
@@ -60,7 +60,7 @@ class EthTxServiceSpec
 
     val invalidTxIndex = blockToRequest.body.transactionList.size
     val requestWithInvalidIndex: GetTransactionByBlockHashAndIndexRequest =
-      GetTransactionByBlockHashAndIndexRequest(blockToRequest.header.hash, invalidTxIndex)
+      GetTransactionByBlockHashAndIndexRequest(blockToRequest.header.hash.value, invalidTxIndex)
     val response: GetTransactionByBlockHashAndIndexResponse = ethTxService
       .getTransactionByBlockHashAndIndex(requestWithInvalidIndex)
       .unsafeRunSync()
@@ -78,7 +78,7 @@ class EthTxServiceSpec
 
     val txIndexToRequest: Int = blockToRequest.body.transactionList.size / 2
     val request: GetTransactionByBlockHashAndIndexRequest =
-      GetTransactionByBlockHashAndIndexRequest(blockToRequest.header.hash, txIndexToRequest)
+      GetTransactionByBlockHashAndIndexRequest(blockToRequest.header.hash.value, txIndexToRequest)
     val response: GetTransactionByBlockHashAndIndexResponse =
       ethTxService.getTransactionByBlockHashAndIndex(request).unsafeRunSync().toOption.get
 
@@ -95,7 +95,7 @@ class EthTxServiceSpec
     // given
     val txIndexToRequest: Int = blockToRequest.body.transactionList.size / 2
     val request: GetTransactionByBlockHashAndIndexRequest =
-      GetTransactionByBlockHashAndIndexRequest(blockToRequest.header.hash, txIndexToRequest)
+      GetTransactionByBlockHashAndIndexRequest(blockToRequest.header.hash.value, txIndexToRequest)
 
     // when
     val response: RawTransactionResponse =
@@ -111,7 +111,7 @@ class EthTxServiceSpec
 
     val invalidTxIndex = blockToRequest.body.transactionList.size
     val requestWithInvalidIndex: GetTransactionByBlockHashAndIndexRequest =
-      GetTransactionByBlockHashAndIndexRequest(blockToRequest.header.hash, invalidTxIndex)
+      GetTransactionByBlockHashAndIndexRequest(blockToRequest.header.hash.value, invalidTxIndex)
 
     // when
     val response: RawTransactionResponse = ethTxService
@@ -132,7 +132,7 @@ class EthTxServiceSpec
     blockchainWriter.storeBlock(blockToRequest).commit()
     val txIndexToRequest: Int = blockToRequest.body.transactionList.size / 2
     val request: GetTransactionByBlockHashAndIndexRequest =
-      GetTransactionByBlockHashAndIndexRequest(blockToRequest.header.hash, txIndexToRequest)
+      GetTransactionByBlockHashAndIndexRequest(blockToRequest.header.hash.value, txIndexToRequest)
 
     // when
     val response: RawTransactionResponse =

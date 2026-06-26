@@ -51,8 +51,8 @@ class NetworkPeerManagerActorHandshakeSpec extends ScalaTestWithActorTestKit wit
     capability = Capability.ETH69,
     networkId = 61L,
     chainWeight = ChainWeight.totalDifficultyOnly(10000),
-    bestHash = Fixtures.Blocks.Block3125369.header.hash,
-    genesisHash = Fixtures.Blocks.Genesis.header.hash
+    bestHash = Fixtures.Blocks.Block3125369.header.hash.value,
+    genesisHash = Fixtures.Blocks.Genesis.header.hash.value
   )
   private val peerInfo = PeerInfo(peerStatus, forkAccepted = true)
 

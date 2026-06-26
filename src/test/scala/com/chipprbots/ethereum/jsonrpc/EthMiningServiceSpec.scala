@@ -43,6 +43,7 @@ import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.domain.UInt256
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.jsonrpc.EthMiningService.*
 import com.chipprbots.ethereum.jsonrpc.NodeJsonRpcHealthChecker.JsonRpcHealthConfig
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
@@ -93,7 +94,7 @@ class EthMiningServiceSpec
     // Handle the actor messages
     replyPTM(PendingTransactionsManager.PendingTransactionsResponse(Nil))
     ommersPool.expectMsgPF() {
-      case OmmersPool.GetOmmers(hash, replyTo) if hash == parentBlock.hash =>
+      case OmmersPool.GetOmmers(hash, replyTo) if hash == parentBlock.hash.value =>
         replyTo ! OmmersPool.Ommers(Nil)
     }
 
@@ -153,7 +154,7 @@ class EthMiningServiceSpec
     // Handle the actor messages
     replyPTM(PendingTransactionsManager.PendingTransactionsResponse(Nil))
     ommersPool.expectMsgPF() {
-      case OmmersPool.GetOmmers(hash, replyTo) if hash == parentBlock.hash =>
+      case OmmersPool.GetOmmers(hash, replyTo) if hash == parentBlock.hash.value =>
         replyTo ! OmmersPool.Ommers(Nil)
     }
 
@@ -190,7 +191,7 @@ class EthMiningServiceSpec
     replyPTM(PendingTransactionsManager.PendingTransactionsResponse(Nil))
 
     ommersPool.expectMsgPF() {
-      case OmmersPool.GetOmmers(hash, replyTo) if hash == parentBlock.hash =>
+      case OmmersPool.GetOmmers(hash, replyTo) if hash == parentBlock.hash.value =>
         replyTo ! OmmersPool.Ommers(Nil)
     }
 
@@ -223,7 +224,7 @@ class EthMiningServiceSpec
     replyPTM(PendingTransactionsManager.PendingTransactionsResponse(Nil))
 
     ommersPool.expectMsgPF() {
-      case OmmersPool.GetOmmers(hash, replyTo) if hash == parentBlock.hash =>
+      case OmmersPool.GetOmmers(hash, replyTo) if hash == parentBlock.hash.value =>
         replyTo ! OmmersPool.Ommers(Nil)
     }
 
@@ -361,7 +362,7 @@ class EthMiningServiceSpec
 
     replyPTM(PendingTransactionsManager.PendingTransactionsResponse(Nil))
     ommersPool.expectMsgPF() {
-      case OmmersPool.GetOmmers(hash, replyTo) if hash == parentBlock.hash =>
+      case OmmersPool.GetOmmers(hash, replyTo) if hash == parentBlock.hash.value =>
         replyTo ! OmmersPool.Ommers(Nil)
     }
 
@@ -468,7 +469,7 @@ class EthMiningServiceSpec
     replyPTM(PendingTransactionsManager.PendingTransactionsResponse(Nil))
 
     ommersPool.expectMsgPF() {
-      case OmmersPool.GetOmmers(hash, replyTo) if hash == parentBlock.hash =>
+      case OmmersPool.GetOmmers(hash, replyTo) if hash == parentBlock.hash.value =>
         replyTo ! OmmersPool.Ommers(Nil)
     }
 
@@ -544,8 +545,8 @@ class EthMiningServiceSpec
     val difficulty = 131072
     val parentBlock: Block = Block(
       header = BlockHeader(
-        parentHash = ByteString.empty,
-        ommersHash = ByteString.empty,
+        parentHash = BlockHash(ByteString.empty),
+        ommersHash = BlockHash(ByteString.empty),
         beneficiary = ByteString.empty,
         stateRoot = ByteString(MerklePatriciaTrie.EmptyRootHash),
         transactionsRoot = ByteString.empty,
@@ -557,7 +558,7 @@ class EthMiningServiceSpec
         gasUsed = 0,
         unixTimestamp = 1494604900,
         extraData = ByteString.empty,
-        mixHash = ByteString.empty,
+        mixHash = BlockHash(ByteString.empty),
         nonce = ByteString.empty
       ),
       body = BlockBody.empty
@@ -565,7 +566,7 @@ class EthMiningServiceSpec
     val block: Block = Block(
       header = BlockHeader(
         parentHash = parentBlock.header.hash,
-        ommersHash = ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")),
+        ommersHash = BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
         beneficiary = ByteString(Hex.decode("000000000000000000000000000000000000002a")),
         stateRoot = ByteString(Hex.decode("2627314387b135a548040d3ca99dbf308265a3f9bd9246bee3e34d12ea9ff0dc")),
         transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
@@ -577,7 +578,7 @@ class EthMiningServiceSpec
         gasUsed = 0,
         unixTimestamp = 1494604913,
         extraData = ByteString(Hex.decode("6d696e6564207769746820657463207363616c61")),
-        mixHash = ByteString.empty,
+        mixHash = BlockHash(ByteString.empty),
         nonce = ByteString.empty
       ),
       body = BlockBody.empty
@@ -589,7 +590,7 @@ class EthMiningServiceSpec
     val fakeWorld: InMemoryWorldStateProxy = InMemoryWorldStateProxy(
       storagesInstance.storages.evmCodeStorage,
       blockchain.getReadOnlyMptStorage(),
-      (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash),
+      (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
       UInt256.Zero,
       ByteString.empty,
       noEmptyAccounts = false,

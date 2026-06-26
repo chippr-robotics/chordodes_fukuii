@@ -31,6 +31,7 @@ import com.chipprbots.ethereum.db.storage.StateStorage
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage
 import com.chipprbots.ethereum.domain
 import com.chipprbots.ethereum.domain.Account
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.Block.*
@@ -321,10 +322,10 @@ class TestService(
   )(blockImportResult: BlockImportResult): ServiceResponse[ImportRawBlockResponse] =
     blockImportResult match {
       case BlockImportedToTop(blockImportData) =>
-        val blockHash = s"0x${ByteStringUtils.hash2string(blockImportData.head.block.header.hash)}"
+        val blockHash = s"0x${ByteStringUtils.hash2string(blockImportData.head.block.header.hash.value)}"
         ImportRawBlockResponse(blockHash).rightNow
       case BlockEnqueued | ChainReorganised(_, _, _) =>
-        val blockHash = s"0x${ByteStringUtils.hash2string(block.hash)}"
+        val blockHash = s"0x${ByteStringUtils.hash2string(block.hash.value)}"
         ImportRawBlockResponse(blockHash).rightNow
       case e =>
         log.warn("Block import failed with {}", e)
@@ -384,7 +385,7 @@ class TestService(
     val blockOpt = request.parameters.blockHashOrNumber
       .fold(
         number => blockchainReader.getBlockByNumber(blockchainReader.getBestBranch, number),
-        blockHash => blockchainReader.getBlockByHash(blockHash)
+        blockHash => blockchainReader.getBlockByHash(BlockHash(blockHash))
       )
 
     if blockOpt.isEmpty then {
@@ -428,7 +429,7 @@ class TestService(
     val blockOpt = request.parameters.blockHashOrNumber
       .fold(
         number => blockchainReader.getBlockByNumber(blockchainReader.getBestBranch, number),
-        hash => blockchainReader.getBlockByHash(hash)
+        hash => blockchainReader.getBlockByHash(BlockHash(hash))
       )
 
     (for {
@@ -474,7 +475,7 @@ class TestService(
 
     val result = for {
       transactionLocation <- transactionMappingStorage.get(request.transactionHash)
-      block <- blockchainReader.getBlockByHash(transactionLocation.blockHash)
+      block <- blockchainReader.getBlockByHash(BlockHash(transactionLocation.blockHash))
       _ <- block.body.transactionList.lift(transactionLocation.txIndex)
       receipts <- blockchainReader.getReceiptsByHash(block.header.hash)
       logs = receipts.flatMap(receipt => receipt.logs)

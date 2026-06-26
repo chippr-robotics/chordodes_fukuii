@@ -10,6 +10,7 @@ import com.chipprbots.ethereum.consensus.mining.Mining
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage
 import com.chipprbots.ethereum.db.storage.TransactionMappingStorage.TransactionLocation
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.Blockchain
 import com.chipprbots.ethereum.domain.BlockchainReader
@@ -120,7 +121,7 @@ class DebugTracingService(
           .toRight(JsonRpcError.InvalidParams("Transaction not found"))
         TransactionLocation(blockHash, txIndex) = location
         block <- blockchainReader
-          .getBlockByHash(blockHash)
+          .getBlockByHash(BlockHash(blockHash))
           .toRight(JsonRpcError.InvalidParams(s"Block not found for hash ${blockHash.toHex}"))
         parentHeader <- blockchainReader
           .getBlockHeaderByHash(block.header.parentHash)
@@ -201,7 +202,7 @@ class DebugTracingService(
     IO {
       for {
         block <- blockchainReader
-          .getBlockByHash(req.blockHash)
+          .getBlockByHash(BlockHash(req.blockHash))
           .toRight(JsonRpcError.InvalidParams(s"Block not found for hash ${req.blockHash.toHex}"))
         result <- traceAllTxsInBlock(block, req.config)
       } yield TraceBlockByHashResponse(result)
@@ -309,7 +310,7 @@ class DebugTracingService(
     IO {
       for {
         block <- blockchainReader
-          .getBlockByHash(req.blockHash)
+          .getBlockByHash(BlockHash(req.blockHash))
           .toRight(JsonRpcError.InvalidParams(s"Block not found for hash ${req.blockHash.toHex}"))
         _ <- Either.cond(block.header.number > 0, (), JsonRpcError.InvalidParams("Genesis block is not traceable"))
         parentHeader <- blockchainReader
@@ -365,7 +366,7 @@ class DebugTracingService(
                 stxLedger.simulateTransactionWithTracer(stx, block.header, Some(world), tracer)
                 tracer.getResult
               }
-              TraceChainBlockResult(block.header.number, block.header.hash, traces)
+              TraceChainBlockResult(block.header.number, block.header.hash.value, traces)
             }
           }
         }

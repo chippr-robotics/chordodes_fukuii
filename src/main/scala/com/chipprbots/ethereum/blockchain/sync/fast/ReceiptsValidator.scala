@@ -4,6 +4,7 @@ import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.consensus.validators.Validators
 import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.BlockError
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.Receipt
 
@@ -28,7 +29,7 @@ trait ReceiptsValidator {
   def validateReceipts(requestedHashes: Seq[ByteString], receipts: Seq[Seq[Receipt]]): ReceiptsValidationResult = {
     val blockHashesWithReceipts = requestedHashes.zip(receipts)
     val blockHeadersWithReceipts = blockHashesWithReceipts.map { case (hash, blockReceipts) =>
-      blockchainReader.getBlockHeaderByHash(hash) -> blockReceipts
+      blockchainReader.getBlockHeaderByHash(BlockHash(hash)) -> blockReceipts
     }
 
     val errorIterator = blockHeadersWithReceipts.iterator.map {

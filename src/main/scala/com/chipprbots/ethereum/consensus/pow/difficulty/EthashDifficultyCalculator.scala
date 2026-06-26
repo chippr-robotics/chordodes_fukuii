@@ -23,7 +23,7 @@ object EthashDifficultyCalculator extends DifficultyCalculator {
       if blockNumber < homesteadBlockNumber then {
         if blockTimestamp < parentHeader.unixTimestamp + 13 then 1 else -1
       } else if blockNumber >= byzantiumBlockNumber || blockNumber >= atlantisBlockNumber then {
-        val parentUncleFactor = if parentHeader.ommersHash == BlockHeader.EmptyOmmers then 1 else 2
+        val parentUncleFactor = if parentHeader.ommersHash.value == BlockHeader.EmptyOmmers then 1 else 2
         math.max(parentUncleFactor - (timestampDiff / 9), FrontierTimestampDiffLimit)
       } else {
         math.max(1 - (timestampDiff / 10), FrontierTimestampDiffLimit)

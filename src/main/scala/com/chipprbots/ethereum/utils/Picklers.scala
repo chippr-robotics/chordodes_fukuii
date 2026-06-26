@@ -11,6 +11,7 @@ import com.chipprbots.ethereum.domain.StorageKey
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlobTransaction
 import com.chipprbots.ethereum.domain.BlockBody
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
@@ -32,6 +33,8 @@ object Picklers {
     transformPickler[BloomFilter, Array[Byte]](arr => BloomFilter.fromArray(arr))(_.toArray)
   given blobVersionedHashPickler: Pickler[BlobVersionedHash] =
     transformPickler[BlobVersionedHash, Array[Byte]](arr => BlobVersionedHash(ByteString(arr)))(_.toArray)
+  given blockHashPickler: Pickler[BlockHash] =
+    transformPickler[BlockHash, Array[Byte]](arr => BlockHash(ByteString(arr)))(_.toArray)
   given ecdsaSignaturePickler: Pickler[ECDSASignature] = generatePickler[ECDSASignature]
   given hefEmptyPickler: Pickler[HefEmpty.type] = generatePickler[HefEmpty.type]
   given hefPostOlympiaPickler: Pickler[HefPostOlympia] = generatePickler[HefPostOlympia]

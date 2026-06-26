@@ -4,6 +4,7 @@ import org.apache.pekko.util.ByteString
 
 import com.chipprbots.ethereum.consensus.mining.Mining
 import com.chipprbots.ethereum.domain.Block
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.Blockchain
 import com.chipprbots.ethereum.domain.BlockchainReader
@@ -53,7 +54,7 @@ class TestEthBlockServiceWrapper(
         case BlockByBlockHashResponse(Some(baseBlockResponse)) =>
           val ethResponseOpt = for {
             hash <- baseBlockResponse.hash
-            fullBlock <- blockchainReader.getBlockByHash(hash).orElse(blockQueue.getBlockByHash(hash))
+            fullBlock <- blockchainReader.getBlockByHash(BlockHash(hash)).orElse(blockQueue.getBlockByHash(BlockHash(hash)))
           } yield toEthResponse(fullBlock, baseBlockResponse)
 
           ethResponseOpt match {
@@ -178,7 +179,7 @@ object EthTransactionResponse {
     EthTransactionResponse(
       hash = stx.hash.value,
       nonce = stx.tx.nonce,
-      blockHash = blockHeader.map(_.hash),
+      blockHash = blockHeader.map(_.hash.value),
       blockNumber = blockHeader.map(_.number),
       transactionIndex = transactionIndex.map(txIndex => BigInt(txIndex)),
       from = SignedTransaction.getSender(stx).map(_.bytes),

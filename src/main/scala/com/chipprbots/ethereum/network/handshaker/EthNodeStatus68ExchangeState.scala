@@ -65,7 +65,7 @@ case class EthNodeStatus68ExchangeState(
     )
 
     val localBestBlock = blockchainReader.getBestBlockNumber
-    val localGenesisHash = blockchainReader.genesisHeader.hash
+    val localGenesisHash = blockchainReader.genesisHeader.hash.value
     val storedTimestamp = blockchainReader.getBlockHeaderByNumber(localBestBlock).map(_.unixTimestamp).getOrElse(0L)
     val localBestTimestamp = if storedTimestamp == 0L then System.currentTimeMillis() / 1000 else storedTimestamp
     val localForkId = ForkId.create(localGenesisHash, blockchainConfig)(localBestBlock, localBestTimestamp)
@@ -97,7 +97,7 @@ case class EthNodeStatus68ExchangeState(
     } else {
       (for {
         validationResult <-
-          ForkIdValidator.validatePeer[SyncIO](blockchainReader.genesisHeader.hash, blockchainConfig)(
+          ForkIdValidator.validatePeer[SyncIO](blockchainReader.genesisHeader.hash.value, blockchainConfig)(
             blockchainReader.getBestBlockNumber,
             forkId
           )
@@ -169,7 +169,7 @@ case class EthNodeStatus68ExchangeState(
         ttdFallback
       }
 
-    val genesisHash = blockchainReader.genesisHeader.hash
+    val genesisHash = blockchainReader.genesisHeader.hash.value
 
     // ALIGNMENT WITH CORE-GETH: Use actual current block number for ForkId calculation.
     // Core-geth uses head.Number.Uint64() and head.Time for forkID — not checkpoints.
@@ -182,7 +182,7 @@ case class EthNodeStatus68ExchangeState(
       protocolVersion = negotiatedCapability.version,
       networkId = peerConfiguration.networkId,
       totalDifficulty = chainWeight.totalDifficulty,
-      bestHash = bestBlockHeader.hash,
+      bestHash = bestBlockHeader.hash.value,
       genesisHash = genesisHash,
       forkId = forkId
     )

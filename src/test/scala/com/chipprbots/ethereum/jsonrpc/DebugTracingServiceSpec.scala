@@ -79,10 +79,10 @@ class DebugTracingServiceSpec
       blockchainWriter.storeBlock(block).commit()
       // Inject a parent header at the exact parentHash the block references
       storagesInstance.storages.blockHeadersStorage
-        .put(block.header.parentHash, block.header.copy(number = block.header.number - 1))
+        .put(block.header.parentHash.value, block.header.copy(number = block.header.number - 1))
         .commit()
 
-      txMappingStorage.get.expects(txHash).returning(Some(TransactionLocation(block.header.hash, txIndex)))
+      txMappingStorage.get.expects(txHash).returning(Some(TransactionLocation(block.header.hash.value, txIndex)))
       mockLedger.advanceWorldToTx.expects(*, *, *, *).returning(mockWorld)
       (mockLedger
         .simulateTransactionWithTracer(
@@ -119,11 +119,11 @@ class DebugTracingServiceSpec
       val emptyBlock: Block = block.copy(body = block.body.copy(transactionList = Seq.empty))
       blockchainWriter.storeBlock(emptyBlock).commit()
       storagesInstance.storages.blockHeadersStorage
-        .put(emptyBlock.header.parentHash, emptyBlock.header.copy(number = emptyBlock.header.number - 1))
+        .put(emptyBlock.header.parentHash.value, emptyBlock.header.copy(number = emptyBlock.header.number - 1))
         .commit()
 
       val result: Either[JsonRpcError, TraceBlockByHashResponse] = service
-        .traceBlockByHash(TraceBlockByHashRequest(emptyBlock.header.hash))
+        .traceBlockByHash(TraceBlockByHashRequest(emptyBlock.header.hash.value))
         .unsafeRunSync()
 
       result shouldBe Right(TraceBlockByHashResponse(Seq.empty))
@@ -142,7 +142,7 @@ class DebugTracingServiceSpec
         saveAsBestBlock = true
       )
       storagesInstance.storages.blockHeadersStorage
-        .put(emptyBlock.header.parentHash, emptyBlock.header.copy(number = emptyBlock.header.number - 1))
+        .put(emptyBlock.header.parentHash.value, emptyBlock.header.copy(number = emptyBlock.header.number - 1))
         .commit()
 
       val result: Either[JsonRpcError, TraceBlockByNumberResponse] = service
@@ -194,7 +194,7 @@ class DebugTracingServiceSpec
     "return InvalidParams when block is not found" taggedAs (UnitTest, RPCTest) in new TestSetup {
       import com.chipprbots.ethereum.jsonrpc.DebugTracingService.IntermediateRootsRequest
       val result: Either[JsonRpcError, IntermediateRootsResponse] = service
-        .intermediateRoots(IntermediateRootsRequest(block.header.hash))
+        .intermediateRoots(IntermediateRootsRequest(block.header.hash.value))
         .unsafeRunSync()
       result.isLeft shouldBe true
       result.swap.getOrElse(fail("Expected Left")).message should include("Block not found")
@@ -205,11 +205,11 @@ class DebugTracingServiceSpec
     val emptyBlock: Block = block.copy(body = block.body.copy(transactionList = Seq.empty))
     blockchainWriter.storeBlock(emptyBlock).commit()
     storagesInstance.storages.blockHeadersStorage
-      .put(emptyBlock.header.parentHash, emptyBlock.header.copy(number = emptyBlock.header.number - 1))
+      .put(emptyBlock.header.parentHash.value, emptyBlock.header.copy(number = emptyBlock.header.number - 1))
       .commit()
 
     val result: Either[JsonRpcError, IntermediateRootsResponse] = service
-      .intermediateRoots(IntermediateRootsRequest(emptyBlock.header.hash))
+      .intermediateRoots(IntermediateRootsRequest(emptyBlock.header.hash.value))
       .unsafeRunSync()
 
     result shouldBe Right(IntermediateRootsResponse(Seq.empty))

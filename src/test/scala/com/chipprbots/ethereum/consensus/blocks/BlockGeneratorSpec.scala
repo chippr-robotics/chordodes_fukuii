@@ -48,14 +48,14 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
     val fullBlock: Block = pendingBlock.block.copy(
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
-        mixHash = minedMixHash,
+        mixHash = BlockHash(minedMixHash),
         unixTimestamp = miningTimestamp,
         gasLimit = generatedBlockGasLimit
       )
     )
     validators.blockHeaderValidator.validate(
       fullBlock.header,
-      blockchainReader.getBlockHeaderByHash
+      (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))
     ) shouldBe Right(BlockHeaderValid)
     blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
     fullBlock.header.extraData shouldBe headerExtraData
@@ -76,14 +76,14 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
     val fullBlock: Block = pendingBlock.block.copy(
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
-        mixHash = minedMixHash,
+        mixHash = BlockHash(minedMixHash),
         unixTimestamp = miningTimestamp,
         gasLimit = generatedBlockGasLimit
       )
     )
     validators.blockHeaderValidator.validate(
       fullBlock.header,
-      blockchainReader.getBlockHeaderByHash
+      (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))
     ) shouldBe Right(BlockHeaderValid)
     blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
     fullBlock.header.extraData shouldBe headerExtraData
@@ -107,7 +107,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
     val fullBlock: Block = pendingBlock.block.copy(
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
-        mixHash = minedMixHash,
+        mixHash = BlockHash(minedMixHash),
         unixTimestamp = miningTimestamp,
         gasLimit = generatedBlockGasLimit
       )
@@ -162,14 +162,14 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
     val fullBlock: Block = pendingBlock.block.copy(
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
-        mixHash = minedMixHash,
+        mixHash = BlockHash(minedMixHash),
         unixTimestamp = miningTimestamp,
         gasLimit = generatedBlockGasLimit
       )
     )
     validators.blockHeaderValidator.validate(
       fullBlock.header,
-      blockchainReader.getBlockHeaderByHash
+      (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))
     ) shouldBe Right(BlockHeaderValid)
 
     blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
@@ -204,7 +204,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
     val fullBlock: Block = pendingBlock.block.copy(
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
-        mixHash = minedMixHash,
+        mixHash = BlockHash(minedMixHash),
         unixTimestamp = miningTimestamp,
         gasLimit = generatedBlockGasLimit
       )
@@ -212,7 +212,7 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
 
     validators.blockHeaderValidator.validate(
       fullBlock.header,
-      blockchainReader.getBlockHeaderByHash
+      (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))
     ) shouldBe Right(BlockHeaderValid)
     blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
     fullBlock.body.transactionList shouldBe Seq(signedTransaction)
@@ -275,14 +275,14 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
       pendingBlock.block.copy(
         header = pendingBlock.block.header.copy(
           nonce = minedNonce,
-          mixHash = minedMixHash,
+          mixHash = BlockHash(minedMixHash),
           unixTimestamp = miningTimestamp,
           gasLimit = generatedBlockGasLimit
         )
       )
     validators.blockHeaderValidator.validate(
       fullBlock.header,
-      blockchainReader.getBlockHeaderByHash
+      (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))
     ) shouldBe Right(BlockHeaderValid)
     blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
     fullBlock.body.transactionList shouldBe Seq(generalTx)
@@ -373,12 +373,12 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
       pendingBlock.block.copy(
         header = pendingBlock.block.header.copy(
           nonce = minedNonce,
-          mixHash = minedMixHash,
+          mixHash = BlockHash(minedMixHash),
           unixTimestamp = miningTimestamp,
           gasLimit = generatedBlockGasLimit
         )
       )
-    validators.blockHeaderValidator.validate(fullBlock.header, blockchainReader.getBlockHeaderByHash) shouldBe Right(
+    validators.blockHeaderValidator.validate(fullBlock.header, (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))) shouldBe Right(
       BlockHeaderValid
     )
     blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
@@ -411,12 +411,12 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
       pendingBlock.block.copy(
         header = pendingBlock.block.header.copy(
           nonce = minedNonce,
-          mixHash = minedMixHash,
+          mixHash = BlockHash(minedMixHash),
           unixTimestamp = miningTimestamp,
           gasLimit = generatedBlockGasLimit
         )
       )
-    validators.blockHeaderValidator.validate(fullBlock.header, blockchainReader.getBlockHeaderByHash) shouldBe Right(
+    validators.blockHeaderValidator.validate(fullBlock.header, (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))) shouldBe Right(
       BlockHeaderValid
     )
     blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
@@ -465,12 +465,12 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
     val fullBlock: Block = pendingBlock.block.copy(
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
-        mixHash = minedMixHash,
+        mixHash = BlockHash(minedMixHash),
         unixTimestamp = miningTimestamp,
         gasLimit = generatedBlockGasLimit
       )
     )
-    validators.blockHeaderValidator.validate(fullBlock.header, blockchainReader.getBlockHeaderByHash) shouldBe Right(
+    validators.blockHeaderValidator.validate(fullBlock.header, (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))) shouldBe Right(
       BlockHeaderValid
     )
     blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
@@ -505,12 +505,12 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
     val fullBlock: Block = pendingBlock.block.copy(
       header = pendingBlock.block.header.copy(
         nonce = minedNonce,
-        mixHash = minedMixHash,
+        mixHash = BlockHash(minedMixHash),
         unixTimestamp = miningTimestamp,
         gasLimit = generatedBlockGasLimit
       )
     )
-    validators.blockHeaderValidator.validate(fullBlock.header, blockchainReader.getBlockHeaderByHash) shouldBe Right(
+    validators.blockHeaderValidator.validate(fullBlock.header, (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))) shouldBe Right(
       BlockHeaderValid
     )
     blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]

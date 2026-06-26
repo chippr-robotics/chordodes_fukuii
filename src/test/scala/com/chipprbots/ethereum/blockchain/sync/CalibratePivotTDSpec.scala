@@ -415,7 +415,7 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
     def setBestBlockHeader(hdr: BlockHeader): Unit = {
       blockchainWriter.storeBlockHeader(hdr).commit()
       storagesInstance.storages.appStateStorage
-        .putBestBlockInfo(BlockInfo(hdr.hash, hdr.number))
+        .putBestBlockInfo(BlockInfo(hdr.hash.value, hdr.number))
         .commit()
     }
 

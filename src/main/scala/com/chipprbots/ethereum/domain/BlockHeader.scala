@@ -20,8 +20,8 @@ import BlockHeader.HeaderExtraFields.*
 import BlockHeaderImplicits.*
 
 case class BlockHeader(
-    parentHash: ByteString,
-    ommersHash: ByteString,
+    parentHash: BlockHash,
+    ommersHash: BlockHash,
     beneficiary: ByteString,
     stateRoot: ByteString,
     transactionsRoot: ByteString,
@@ -33,7 +33,7 @@ case class BlockHeader(
     gasUsed: BigInt,
     unixTimestamp: Long,
     extraData: ByteString,
-    mixHash: ByteString,
+    mixHash: BlockHash,
     nonce: ByteString,
     extraFields: HeaderExtraFields = HeaderExtraFields.HefEmpty
 ) {
@@ -71,9 +71,9 @@ case class BlockHeader(
     case _                                 => None
   }
 
-  val parentBeaconBlockRoot: Option[ByteString] = extraFields match {
-    case HefPostCancun(_, _, _, _, pbbr)    => Some(pbbr)
-    case HefPostPrague(_, _, _, _, pbbr, _) => Some(pbbr)
+  val parentBeaconBlockRoot: Option[BlockHash] = extraFields match {
+    case HefPostCancun(_, _, _, _, pbbr)    => Some(BlockHash(pbbr))
+    case HefPostPrague(_, _, _, _, pbbr, _) => Some(BlockHash(pbbr))
     case _                                  => None
   }
 
@@ -86,15 +86,15 @@ case class BlockHeader(
   def isPoW: Boolean = !isPoS
 
   /** Post-merge, mixHash carries the prevRandao value from the beacon chain. */
-  def prevRandao: Option[ByteString] = if isPoS then Some(mixHash) else None
+  def prevRandao: Option[ByteString] = if isPoS then Some(mixHash.value) else None
 
   def isParentOf(child: BlockHeader): Boolean = number + 1 == child.number && child.parentHash == hash
 
   override def toString: String =
     s"BlockHeader { " +
       s"hash: $hashAsHexString, " +
-      s"parentHash: ${ByteStringUtils.hash2string(parentHash)}, " +
-      s"ommersHash: ${ByteStringUtils.hash2string(ommersHash)}, " +
+      s"parentHash: ${ByteStringUtils.hash2string(parentHash.value)}, " +
+      s"ommersHash: ${ByteStringUtils.hash2string(ommersHash.value)}, " +
       s"beneficiary: ${ByteStringUtils.hash2string(beneficiary)} " +
       s"stateRoot: ${ByteStringUtils.hash2string(stateRoot)} " +
       s"transactionsRoot: ${ByteStringUtils.hash2string(transactionsRoot)} " +
@@ -106,7 +106,7 @@ case class BlockHeader(
       s"gasUsed: $gasUsed, " +
       s"unixTimestamp: $unixTimestamp, " +
       s"extraData: ${ByteStringUtils.hash2string(extraData)} " +
-      s"mixHash: ${ByteStringUtils.hash2string(mixHash)} " +
+      s"mixHash: ${ByteStringUtils.hash2string(mixHash.value)} " +
       s"nonce: ${ByteStringUtils.hash2string(nonce)}" +
       s"}"
 
@@ -114,9 +114,9 @@ case class BlockHeader(
     * @return
     *   \- hash that can be used to get block bodies / receipts
     */
-  lazy val hash: ByteString = ByteString(kec256(this.toBytes: Array[Byte]))
+  lazy val hash: BlockHash = BlockHash(ByteString(kec256(this.toBytes: Array[Byte])))
 
-  lazy val hashAsHexString: String = ByteStringUtils.hash2string(hash)
+  lazy val hashAsHexString: String = ByteStringUtils.hash2string(hash.value)
 
   def idTag: String =
     s"$number: $hashAsHexString"
@@ -220,8 +220,8 @@ object BlockHeaderImplicits {
       import blockHeader.*
 
       val baseItems: Seq[RLPEncodeable] = Seq(
-        RLPValue(parentHash.toArray),
-        RLPValue(ommersHash.toArray),
+        RLPValue(parentHash.value.toArray),
+        RLPValue(ommersHash.value.toArray),
         RLPValue(beneficiary.toArray),
         RLPValue(stateRoot.toArray),
         RLPValue(transactionsRoot.toArray),
@@ -233,7 +233,7 @@ object BlockHeaderImplicits {
         RLPValue(ByteUtils.bigIntToUnsignedByteArray(gasUsed)),
         RLPValue(ByteUtils.bigIntToUnsignedByteArray(unixTimestamp)),
         RLPValue(extraData.toArray),
-        RLPValue(mixHash.toArray),
+        RLPValue(mixHash.value.toArray),
         RLPValue(nonce.toArray)
       )
 
@@ -283,8 +283,8 @@ object BlockHeaderImplicits {
             throw new Exception(s"BlockHeader cannot be decoded: expected >= 15 items, got ${items.length}")
 
           val base = BlockHeader(
-            parentHash = byteStringFromEncodeable(items(0)),
-            ommersHash = byteStringFromEncodeable(items(1)),
+            parentHash = BlockHash(byteStringFromEncodeable(items(0))),
+            ommersHash = BlockHash(byteStringFromEncodeable(items(1))),
             beneficiary = byteStringFromEncodeable(items(2)),
             stateRoot = byteStringFromEncodeable(items(3)),
             transactionsRoot = byteStringFromEncodeable(items(4)),
@@ -296,7 +296,7 @@ object BlockHeaderImplicits {
             gasUsed = bigIntFromEncodeable(items(10)),
             unixTimestamp = longFromEncodeable(items(11)),
             extraData = byteStringFromEncodeable(items(12)),
-            mixHash = byteStringFromEncodeable(items(13)),
+            mixHash = BlockHash(byteStringFromEncodeable(items(13))),
             nonce = byteStringFromEncodeable(items(14))
           )
 

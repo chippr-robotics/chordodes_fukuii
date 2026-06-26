@@ -229,7 +229,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
       // Build h10 whose parentHash points to a header that is NOT stored
       val h10: BlockHeader = Fixtures.Blocks.Genesis.header.copy(
         number = BigInt(10),
-        parentHash = fakeMissingHash // parentHash for a header that doesn't exist
+        parentHash = BlockHash(fakeMissingHash) // parentHash for a header that doesn't exist
       )
       blockchainWriter.storeBlockHeader(h10).commit()
       blockchainWriter.storeChainWeight(h10.hash, ChainWeight.totalDifficultyOnly(BigInt(10))).commit()
@@ -571,7 +571,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers {
     def setBestBlockHeader(hdr: BlockHeader): Unit = {
       blockchainWriter.storeBlockHeader(hdr).commit()
       storagesInstance.storages.appStateStorage
-        .putBestBlockInfo(BlockInfo(hdr.hash, hdr.number))
+        .putBestBlockInfo(BlockInfo(hdr.hash.value, hdr.number))
         .commit()
     }
 

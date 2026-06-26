@@ -9,6 +9,7 @@ import scala.annotation.tailrec
 
 import org.bouncycastle.util.encoders.Hex
 
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
 
@@ -76,7 +77,7 @@ object OmmersPool {
       generationLimit: Int
   ): List[BlockHeader] = {
     @tailrec
-    def rec(hash: ByteString, limit: Int, acc: List[BlockHeader]): List[BlockHeader] =
+    def rec(hash: BlockHash, limit: Int, acc: List[BlockHeader]): List[BlockHeader] =
       if limit > 0 then {
         blockchainReader.getBlockHeaderByHash(hash) match {
           case Some(bh) => rec(bh.parentHash, limit - 1, acc :+ bh)
@@ -85,7 +86,7 @@ object OmmersPool {
       } else {
         acc
       }
-    rec(parentHash, generationLimit, List.empty)
+    rec(BlockHash(parentHash), generationLimit, List.empty)
   }
 
   private def logStatus(

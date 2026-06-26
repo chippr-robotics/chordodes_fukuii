@@ -204,8 +204,8 @@ class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers {
       protocolVersion = Capability.ETH63.version,
       networkId = 1,
       totalDifficulty = Fixtures.Blocks.Genesis.header.difficulty,
-      bestHash = Fixtures.Blocks.Genesis.header.hash,
-      genesisHash = Fixtures.Blocks.Genesis.header.hash,
+      bestHash = Fixtures.Blocks.Genesis.header.hash.value,
+      genesisHash = Fixtures.Blocks.Genesis.header.hash.value,
       forkId = ForkId(0, None)
     )
     val defaultStatus: RemoteStatus = RemoteStatus(defaultStatusMsg)

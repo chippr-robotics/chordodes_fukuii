@@ -394,7 +394,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
             transactionHash = ByteString(Hex.decode("23" * 32)),
             transactionIndex = 1,
             blockNumber = Fixtures.Blocks.Block3125369.header.number,
-            blockHash = Fixtures.Blocks.Block3125369.header.hash,
+            blockHash = Fixtures.Blocks.Block3125369.header.hash.value,
             from = Address(arbitraryValue1),
             to = None,
             cumulativeGasUsed = arbitraryValue * 10,
@@ -405,7 +405,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
                 logIndex = 0,
                 transactionIndex = 1,
                 transactionHash = ByteString(Hex.decode("23" * 32)),
-                blockHash = Fixtures.Blocks.Block3125369.header.hash,
+                blockHash = Fixtures.Blocks.Block3125369.header.hash.value,
                 blockNumber = Fixtures.Blocks.Block3125369.header.number,
                 address = Address(arbitraryValue),
                 data = ByteString(Hex.decode("43" * 32)),
@@ -437,7 +437,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
         JField("transactionHash", JString("0x" + "23" * 32)),
         JField("transactionIndex", JString("0x1")),
         JField("blockNumber", JString("0x2fb079")),
-        JField("blockHash", JString("0x" + Hex.toHexString(Fixtures.Blocks.Block3125369.header.hash.toArray[Byte]))),
+        JField("blockHash", JString("0x" + Hex.toHexString(Fixtures.Blocks.Block3125369.header.hash.value.toArray[Byte]))),
         JField("from", JString("0x0000000000000000000000000000000000000001")),
         JField("to", JNull),
         JField("cumulativeGasUsed", JString("0x1a4")),
@@ -453,7 +453,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
                 JField("transactionHash", JString("0x" + "23" * 32)),
                 JField(
                   "blockHash",
-                  JString("0x" + Hex.toHexString(Fixtures.Blocks.Block3125369.header.hash.toArray[Byte]))
+                  JString("0x" + Hex.toHexString(Fixtures.Blocks.Block3125369.header.hash.value.toArray[Byte]))
                 ),
                 JField("blockNumber", JString("0x2fb079")),
                 JField("address", JString("0x000000000000000000000000000000000000002a")),
@@ -484,7 +484,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
             transactionHash = ByteString(Hex.decode("23" * 32)),
             transactionIndex = 1,
             blockNumber = Fixtures.Blocks.Block3125369.header.number,
-            blockHash = Fixtures.Blocks.Block3125369.header.hash,
+            blockHash = Fixtures.Blocks.Block3125369.header.hash.value,
             from = Address(arbitraryValue1),
             to = None,
             cumulativeGasUsed = arbitraryValue * 10,
@@ -495,7 +495,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
                 logIndex = 0,
                 transactionIndex = 1,
                 transactionHash = ByteString(Hex.decode("23" * 32)),
-                blockHash = Fixtures.Blocks.Block3125369.header.hash,
+                blockHash = Fixtures.Blocks.Block3125369.header.hash.value,
                 blockNumber = Fixtures.Blocks.Block3125369.header.number,
                 address = Address(arbitraryValue),
                 data = ByteString(Hex.decode("43" * 32)),
@@ -526,7 +526,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
         JField("transactionHash", JString("0x" + "23" * 32)),
         JField("transactionIndex", JString("0x1")),
         JField("blockNumber", JString("0x2fb079")),
-        JField("blockHash", JString("0x" + Hex.toHexString(Fixtures.Blocks.Block3125369.header.hash.toArray[Byte]))),
+        JField("blockHash", JString("0x" + Hex.toHexString(Fixtures.Blocks.Block3125369.header.hash.value.toArray[Byte]))),
         JField("from", JString("0x0000000000000000000000000000000000000001")),
         JField("to", JNull),
         JField("cumulativeGasUsed", JString("0x1a4")),
@@ -542,7 +542,7 @@ class JsonRpcControllerEthLegacyTransactionSpec
                 JField("transactionHash", JString("0x" + "23" * 32)),
                 JField(
                   "blockHash",
-                  JString("0x" + Hex.toHexString(Fixtures.Blocks.Block3125369.header.hash.toArray[Byte]))
+                  JString("0x" + Hex.toHexString(Fixtures.Blocks.Block3125369.header.hash.value.toArray[Byte]))
                 ),
                 JField("blockNumber", JString("0x2fb079")),
                 JField("address", JString("0x000000000000000000000000000000000000002a")),

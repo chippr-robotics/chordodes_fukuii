@@ -83,7 +83,7 @@ class JsonRpcControllerEthSpec
 
   it should "handle eth_blockNumber request" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
     val bestBlockNumber = 10
-    blockchainWriter.saveBestKnownBlocks(ByteString.empty, bestBlockNumber)
+    blockchainWriter.saveBestKnownBlocks(BlockHash(ByteString.empty), bestBlockNumber)
 
     val rpcRequest: JsonRpcRequest = newJsonRpcRequest("eth_blockNumber")
     val response: JsonRpcResponse = jsonRpcController.handleRequest(rpcRequest).unsafeRunSync()

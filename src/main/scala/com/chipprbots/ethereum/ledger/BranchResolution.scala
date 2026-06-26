@@ -138,9 +138,9 @@ class BranchResolution(blockchainReader: BlockchainReader) extends Logger {
           log.warn(
             s"ECBP1100-MESS status=rejected age=${timeDeltaSeconds}s span.proposed=${proposedSpanSeconds}s " +
               s"tdr/gravity=${f"$tdrRatio%.4f"} " +
-              s"common.bno=$commonAncestorNumber common.hash=${hash2string(commonAncestorHash).take(8)} " +
-              s"current.bno=${currentHead.number} current.hash=${hash2string(currentHead.hash).take(8)} " +
-              s"proposed.bno=${proposedTip.number} proposed.hash=${hash2string(proposedTip.hash).take(8)}"
+              s"common.bno=$commonAncestorNumber common.hash=${hash2string(commonAncestorHash.value).take(8)} " +
+              s"current.bno=${currentHead.number} current.hash=${hash2string(currentHead.hash.value).take(8)} " +
+              s"proposed.bno=${proposedTip.number} proposed.hash=${hash2string(proposedTip.hash.value).take(8)}"
           )
         } else if currentHead.number - commonAncestorNumber > 2 then {
           // Log MESS acceptance only for non-trivial reorgs (> 2 blocks), matching core-geth forkchoice.go:177
@@ -148,9 +148,9 @@ class BranchResolution(blockchainReader: BlockchainReader) extends Logger {
           log.info(
             s"ECBP1100-MESS status=accepted age=${timeDeltaSeconds}s span.proposed=${proposedSpanSeconds}s " +
               s"tdr/gravity=${f"$tdrRatio%.4f"} " +
-              s"common.bno=$commonAncestorNumber common.hash=${hash2string(commonAncestorHash).take(8)} " +
-              s"current.bno=${currentHead.number} current.hash=${hash2string(currentHead.hash).take(8)} " +
-              s"proposed.bno=${proposedTip.number} proposed.hash=${hash2string(proposedTip.hash).take(8)}"
+              s"common.bno=$commonAncestorNumber common.hash=${hash2string(commonAncestorHash.value).take(8)} " +
+              s"current.bno=${currentHead.number} current.hash=${hash2string(currentHead.hash.value).take(8)} " +
+              s"proposed.bno=${proposedTip.number} proposed.hash=${hash2string(proposedTip.hash.value).take(8)}"
           )
         } else {
           BlockMetrics.incrementMessAccepted()

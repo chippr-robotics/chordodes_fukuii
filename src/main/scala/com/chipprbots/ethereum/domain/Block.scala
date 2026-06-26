@@ -24,7 +24,7 @@ case class Block(header: BlockHeader, body: BlockBody) {
 
   def number: BigInt = header.number
 
-  def hash: ByteString = header.hash
+  def hash: BlockHash = header.hash
 
   def isParentOf(child: Block): Boolean = header.isParentOf(child.header)
 }

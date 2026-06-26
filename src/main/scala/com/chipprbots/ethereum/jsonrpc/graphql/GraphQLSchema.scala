@@ -21,6 +21,7 @@ import sangria.schema.fields
 import com.chipprbots.ethereum.consensus.engine.BlobGasUtils
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.AccessListItem
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlobTransaction
 import com.chipprbots.ethereum.domain.Block
@@ -186,7 +187,7 @@ object GraphQLSchema {
       InMemoryWorldStateProxy(
         ctx.evmCodeStorage,
         ctx.blockchain.getBackingMptStorage(b.header.number),
-        (n: BigInt) => ctx.blockchainReader.getBlockHeaderByNumber(n).map(_.hash),
+        (n: BigInt) => ctx.blockchainReader.getBlockHeaderByNumber(n).map(_.hash.value),
         ctx.blockchainConfig.accountStartNonce,
         b.header.stateRoot,
         noEmptyAccounts = false,
@@ -667,7 +668,7 @@ object GraphQLSchema {
         ),
         Field("timestamp", LongType, resolve = _.value.header.unixTimestamp),
         Field("logsBloom", BytesType, resolve = _.value.header.logsBloom.value),
-        Field("mixHash", Bytes32Type, resolve = _.value.header.mixHash),
+        Field("mixHash", Bytes32Type, resolve = _.value.header.mixHash.value),
         Field("difficulty", BigIntType, resolve = _.value.header.difficulty),
         Field(
           "totalDifficulty",
@@ -703,7 +704,7 @@ object GraphQLSchema {
             } else None
           }
         ),
-        Field("ommerHash", Bytes32Type, resolve = _.value.header.ommersHash),
+        Field("ommerHash", Bytes32Type, resolve = _.value.header.ommersHash.value),
         Field(
           "transactions",
           OptionType(ListType(TransactionType)),
@@ -738,7 +739,7 @@ object GraphQLSchema {
                 .flatMap(asOption[Vector[Vector[ByteString]]])
                 .getOrElse(Vector.empty)
                 .map(_.toSeq)
-            val receipts = c.ctx.blockchainReader.getReceiptsByHash(c.value.hash).getOrElse(Seq.empty)
+            val receipts = c.ctx.blockchainReader.getReceiptsByHash(BlockHash(c.value.hash)).getOrElse(Seq.empty)
             val txs = c.value.block.body.transactionList
             val out = scala.collection.mutable.ArrayBuffer.empty[GLog]
             var baseLogIndex = 0
@@ -934,7 +935,7 @@ object GraphQLSchema {
                   throw GraphQLDataFetchingError.notFound("block", s"Block number $bn was not found")
               }
             case (None, Some(h)) =>
-              reader.getBlockByHash(h) match {
+              reader.getBlockByHash(BlockHash(h)) match {
                 case Some(b) => Some(buildGBlock(c.ctx, b))
                 case None =>
                   val hex = "0x" + h.toArray.map("%02x".format(_)).mkString
@@ -979,7 +980,7 @@ object GraphQLSchema {
                     (tr.blockHash, tr.transactionIndex) match {
                       case (Some(bh), Some(idx)) =>
                         cats.effect.IO.pure(
-                          c.ctx.blockchainReader.getBlockByHash(bh).flatMap { b =>
+                          c.ctx.blockchainReader.getBlockByHash(BlockHash(bh)).flatMap { b =>
                             b.body.transactionList.lift(idx.toInt).map { stx =>
                               GTransaction(stx, Some(GTxBlockInfo(b, idx.toInt)))
                             }

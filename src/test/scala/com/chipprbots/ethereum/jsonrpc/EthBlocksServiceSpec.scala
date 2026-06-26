@@ -25,6 +25,7 @@ import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.UInt256
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.jsonrpc.EthBlocksService.*
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.testing.Tags.*
@@ -46,7 +47,7 @@ class EthBlocksServiceSpec
     RPCTest
   ) in new TestSetup {
     val bestBlockNumber = 10
-    blockchainWriter.saveBestKnownBlocks(ByteString.empty, bestBlockNumber)
+    blockchainWriter.saveBestKnownBlocks(BlockHash(ByteString.empty), bestBlockNumber)
 
     val response: BestBlockNumberResponse =
       ethBlocksService.bestBlockNumber(BestBlockNumberRequest()).unsafeRunSync().toOption.get
@@ -85,7 +86,7 @@ class EthBlocksServiceSpec
   it should "answer eth_getBlockByHash with the block response correctly when it's chain weight is taggedAs (UnitTest, RPCTest) in blockchain" in new TestSetup {
     blockchainWriter
       .storeBlock(blockToRequest)
-      .and(blockchainWriter.storeChainWeight(blockToRequestHash, blockWeight))
+      .and(blockchainWriter.storeChainWeight(BlockHash(blockToRequestHash), blockWeight))
       .commit()
 
     val request: BlockByBlockHashRequest = BlockByBlockHashRequest(blockToRequestHash, fullTxs = true)
@@ -125,7 +126,7 @@ class EthBlocksServiceSpec
   ) in new TestSetup {
     blockchainWriter
       .storeBlock(blockToRequest)
-      .and(blockchainWriter.storeChainWeight(blockToRequestHash, blockWeight))
+      .and(blockchainWriter.storeChainWeight(BlockHash(blockToRequestHash), blockWeight))
       .commit()
 
     val request: BlockByBlockHashRequest = BlockByBlockHashRequest(blockToRequestHash, fullTxs = true)
@@ -165,7 +166,7 @@ class EthBlocksServiceSpec
   ) in new TestSetup {
     blockchainWriter
       .storeBlock(blockToRequest)
-      .and(blockchainWriter.storeChainWeight(blockToRequestHash, blockWeight))
+      .and(blockchainWriter.storeChainWeight(BlockHash(blockToRequestHash), blockWeight))
       .commit()
     blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.header.number)
 
@@ -186,7 +187,7 @@ class EthBlocksServiceSpec
   it should "answer eth_getBlockByNumber with the block response correctly when it's chain weight is taggedAs (UnitTest, RPCTest) in blockchain" in new TestSetup {
     blockchainWriter
       .storeBlock(blockToRequest)
-      .and(blockchainWriter.storeChainWeight(blockToRequestHash, blockWeight))
+      .and(blockchainWriter.storeChainWeight(BlockHash(blockToRequestHash), blockWeight))
       .commit()
     blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
 
@@ -230,7 +231,7 @@ class EthBlocksServiceSpec
   ) in new TestSetup {
     blockchainWriter
       .storeBlock(blockToRequest)
-      .and(blockchainWriter.storeChainWeight(blockToRequestHash, blockWeight))
+      .and(blockchainWriter.storeChainWeight(BlockHash(blockToRequestHash), blockWeight))
       .commit()
     blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
 
@@ -466,7 +467,7 @@ class EthBlocksServiceSpec
     blockchainWriter.storeBlock(blockToRequest).commit()
 
     val response: ServiceResponse[GetUncleCountByBlockHashResponse] =
-      ethBlocksService.getUncleCountByBlockHash(GetUncleCountByBlockHashRequest(blockToRequest.header.hash))
+      ethBlocksService.getUncleCountByBlockHash(GetUncleCountByBlockHashRequest(blockToRequest.header.hash.value))
 
     response.unsafeRunSync() shouldEqual Right(
       GetUncleCountByBlockHashResponse(blockToRequest.body.uncleNodesList.size)
@@ -489,7 +490,7 @@ class EthBlocksServiceSpec
 
     val blockToRequest: Block = Block(Fixtures.Blocks.Block3125369.header, Fixtures.Blocks.Block3125369.body)
     val blockToRequestNumber = blockToRequest.header.number
-    val blockToRequestHash = blockToRequest.header.hash
+    val blockToRequestHash = blockToRequest.header.hash.value
     val blockWeight: ChainWeight = ChainWeight.totalDifficultyOnly(blockToRequest.header.difficulty)
 
     val uncle = Fixtures.Blocks.DaoForkBlock.header
@@ -499,7 +500,7 @@ class EthBlocksServiceSpec
     val fakeWorld: InMemoryWorldStateProxy = InMemoryWorldStateProxy(
       storagesInstance.storages.evmCodeStorage,
       blockchain.getBackingMptStorage(-1),
-      (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash),
+      (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
       UInt256.Zero,
       ByteString.empty,
       noEmptyAccounts = false,

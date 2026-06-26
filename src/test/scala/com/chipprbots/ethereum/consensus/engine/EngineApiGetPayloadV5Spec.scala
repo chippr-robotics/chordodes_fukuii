@@ -18,6 +18,7 @@ import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostPrague
 import com.chipprbots.ethereum.domain.BloomFilter
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.jsonrpc.JsonRpcRequest
 import com.chipprbots.ethereum.testing.Tags.*
 
@@ -37,8 +38,8 @@ class EngineApiGetPayloadV5Spec extends AnyWordSpec with Matchers {
 
   private def makeBlock(timestamp: Long): Block = {
     val header = BlockHeader(
-      parentHash = ByteString(new Array[Byte](32)),
-      ommersHash = BlockHeader.EmptyOmmers,
+      parentHash = BlockHash(ByteString(new Array[Byte](32))),
+      ommersHash = BlockHash(BlockHeader.EmptyOmmers),
       beneficiary = ByteString(new Array[Byte](20)),
       stateRoot = ByteString(new Array[Byte](32)),
       transactionsRoot = BlockHeader.EmptyMpt,
@@ -50,7 +51,7 @@ class EngineApiGetPayloadV5Spec extends AnyWordSpec with Matchers {
       gasUsed = 0,
       unixTimestamp = timestamp,
       extraData = ByteString.empty,
-      mixHash = ByteString(new Array[Byte](32)),
+      mixHash = BlockHash(ByteString(new Array[Byte](32))),
       nonce = ByteString(new Array[Byte](8)),
       extraFields = HefPostPrague(
         baseFee = BigInt("1000000000"),

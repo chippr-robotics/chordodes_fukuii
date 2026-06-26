@@ -1,7 +1,5 @@
 package com.chipprbots.ethereum.consensus
 
-import org.apache.pekko.util.ByteString
-
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.effect.unsafe.IORuntime
@@ -10,6 +8,7 @@ import scala.annotation.tailrec
 
 import com.chipprbots.ethereum.consensus.Consensus.*
 import com.chipprbots.ethereum.domain.Block
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
@@ -120,14 +119,14 @@ class ConsensusImpl(
         ConsensusErrorDueToMissingNode(Nil, reason)
 
       case (Nil, Some(error)) =>
-        BranchExecutionFailure(Nil, branch.head.header.hash, error.toString)
+        BranchExecutionFailure(Nil, branch.head.header.hash.value, error.toString)
 
       case (importedBlocks, Some(error)) =>
         saveLastBlock(importedBlocks)
         val failingBlock = branch.toList.drop(importedBlocks.length).head
         ExtendedCurrentBestBranchPartially(
           importedBlocks,
-          BranchExecutionFailure(Nil, failingBlock.hash, error.toString)
+          BranchExecutionFailure(Nil, failingBlock.hash.value, error.toString)
         )
     }
 
@@ -149,13 +148,13 @@ class ConsensusImpl(
       bestBlockNumber: BigInt,
       newBranch: NonEmptyList[Block],
       parentWeight: ChainWeight,
-      parentHash: ByteString
+      parentHash: BlockHash
   )(implicit
       blockchainConfig: BlockchainConfig
   ): ConsensusResult = {
     log.debug(
       "Reorganise: collecting old block(s) from parent {} up to {}",
-      ByteStringUtils.hash2string(parentHash),
+      ByteStringUtils.hash2string(parentHash.value),
       bestBlockNumber
     )
 
@@ -190,7 +189,7 @@ class ConsensusImpl(
         )
         BranchExecutionFailure(
           executedBlocks.map(_.block),
-          newBranch.toList.drop(executedBlocks.length).head.hash,
+          newBranch.toList.drop(executedBlocks.length).head.hash.value,
           s"Error while trying to reorganise chain: $error"
         )
     }
@@ -228,9 +227,9 @@ class ConsensusImpl(
 
   // Read-only traversal of the current canonical chain from fromNumber down to (exclusive) parent.
   // Does NOT delete or modify any DB state — used solely to populate SelectedNewBestBranch.
-  private def collectOldBranch(parent: ByteString, fromNumber: BigInt): List[BlockData] = {
+  private def collectOldBranch(parent: BlockHash, fromNumber: BigInt): List[BlockData] = {
     @tailrec
-    def go(parent: ByteString, fromNumber: BigInt, acc: List[BlockData]): List[BlockData] =
+    def go(parent: BlockHash, fromNumber: BigInt, acc: List[BlockData]): List[BlockData] =
       blockchainReader.getBlockByNumber(blockchainReader.getBestBranch, fromNumber) match {
         case Some(block) if block.header.hash == parent || fromNumber == 0 =>
           acc

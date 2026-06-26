@@ -139,8 +139,8 @@ class JsonRpcControllerSpec
       capability = Capability.ETH63,
       networkId = 1,
       chainWeight = ChainWeight.totalDifficultyOnly(10000),
-      bestHash = Fixtures.Blocks.Block3125369.header.hash,
-      genesisHash = Fixtures.Blocks.Genesis.header.hash
+      bestHash = Fixtures.Blocks.Block3125369.header.hash.value,
+      genesisHash = Fixtures.Blocks.Genesis.header.hash.value
     )
     val initialPeerInfo: PeerInfo = PeerInfo(
       remoteStatus = peerStatus,

@@ -10,6 +10,7 @@ import com.chipprbots.ethereum.consensus.mess.ArtificialFinality
 import com.chipprbots.ethereum.consensus.mess.MESSConfig
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BloomFilter
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
@@ -87,8 +88,8 @@ class ETChashDifficultyManipulationSpec extends AnyFlatSpec with Matchers with S
       hasUncles: Boolean = false
   ): BlockHeader =
     BlockHeader(
-      parentHash = ByteString(new Array[Byte](32)),
-      ommersHash = if hasUncles then ByteString(new Array[Byte](32)) else BlockHeader.EmptyOmmers,
+      parentHash = BlockHash(ByteString(new Array[Byte](32))),
+      ommersHash = BlockHash(if hasUncles then ByteString(new Array[Byte](32)) else BlockHeader.EmptyOmmers),
       beneficiary = ByteString(new Array[Byte](20)),
       stateRoot = ByteString(new Array[Byte](32)),
       transactionsRoot = ByteString(new Array[Byte](32)),
@@ -100,7 +101,7 @@ class ETChashDifficultyManipulationSpec extends AnyFlatSpec with Matchers with S
       gasUsed = BigInt(0),
       unixTimestamp = timestamp,
       extraData = ByteString.empty,
-      mixHash = ByteString(new Array[Byte](32)),
+      mixHash = BlockHash(ByteString(new Array[Byte](32))),
       nonce = ByteString(new Array[Byte](8))
     )
 

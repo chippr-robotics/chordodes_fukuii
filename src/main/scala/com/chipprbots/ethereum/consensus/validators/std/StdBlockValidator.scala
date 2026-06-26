@@ -54,7 +54,7 @@ object StdBlockValidator extends BlockValidator {
     */
   private def validateOmmersHash(block: Block): Either[BlockError, BlockValid] = {
     val encodedOmmers: Array[Byte] = block.body.uncleNodesList.toBytes
-    if kec256(encodedOmmers).sameElements(block.header.ommersHash) then Right(BlockValid)
+    if kec256(encodedOmmers).sameElements(block.header.ommersHash.value) then Right(BlockValid)
     else Left(BlockOmmersHashError)
   }
 

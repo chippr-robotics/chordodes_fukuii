@@ -642,14 +642,14 @@ object NetworkPeerManagerActor {
       blockchainReader.foreach { reader =>
         peerInfo.remoteStatus.latestBlock.foreach { peerBlockNum =>
           reader.getBlockHeaderByNumber(peerBlockNum).foreach { ourHeader =>
-            if ourHeader.hash != peerInfo.remoteStatus.bestHash then
+            if ourHeader.hash.value != peerInfo.remoteStatus.bestHash then
               log.warn(
                 "PEER-CHAIN-DIVERGE: Peer {} reports hash={} at block {}; our hash={}. " +
                   "One of us may be on a fork.",
                 peer.id,
                 ByteStringUtils.hash2string(peerInfo.remoteStatus.bestHash),
                 peerBlockNum,
-                ByteStringUtils.hash2string(ourHeader.hash)
+                ByteStringUtils.hash2string(ourHeader.hash.value)
               )
           }
         }
@@ -902,9 +902,9 @@ object NetworkPeerManagerActor {
 
       message match {
         case m: ETHPackets.BlockHeaders =>
-          update(m.headers.map(header => (header.number, header.hash)))
+          update(m.headers.map(header => (header.number, header.hash.value)))
         case m: ETHPackets.NewBlock =>
-          update(Seq((m.block.header.number, m.block.header.hash)))
+          update(Seq((m.block.header.number, m.block.header.hash.value)))
         case m: NewBlockHashes =>
           update(m.hashes.map(h => (h.number, h.hash)))
         case m: ETHPackets.BlockRangeUpdate =>

@@ -18,6 +18,7 @@ import org.json4s.jvalue2monadic
 import com.chipprbots.ethereum.blockchain.sync.SyncController
 import com.chipprbots.ethereum.blockchain.sync.SyncProtocol
 import com.chipprbots.ethereum.domain.Address
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps
 import com.chipprbots.ethereum.jsonrpc.McpDependencies
 import com.chipprbots.ethereum.jsonrpc.McpService.*
@@ -106,14 +107,14 @@ object BlockchainInfoTool {
   def execute(deps: McpDependencies): IO[String] = IO {
     val bestBlockNum = deps.blockchainReader.getBestBlockNumber
     val bestBlock = deps.blockchainReader.getBestBlock
-    val bestHash = bestBlock.map(b => ByteStringUtils.hash2string(b.header.hash)).getOrElse("unknown")
+    val bestHash = bestBlock.map(b => ByteStringUtils.hash2string(b.header.hash.value)).getOrElse("unknown")
     val td = bestBlock
       .flatMap(b => deps.blockchainReader.getChainWeightByHash(b.header.hash))
       .map(_.totalDifficulty.toString)
       .getOrElse("unknown")
     val genesisHash = deps.blockchainReader
       .getBlockHeaderByNumber(0)
-      .map(h => ByteStringUtils.hash2string(h.hash))
+      .map(h => ByteStringUtils.hash2string(h.hash.value))
       .getOrElse("unknown")
     s"""Blockchain Information:
       |  Network: ${deps.blockchainConfig.chainId match {
@@ -267,7 +268,7 @@ object GetBlockTool {
         deps.blockchainReader.getBestBlock.map(_.header)
       case s if s.startsWith("0x") && s.length > 10 =>
         val hash = org.apache.pekko.util.ByteString(org.bouncycastle.util.encoders.Hex.decode(s.drop(2)))
-        deps.blockchainReader.getBlockByHash(hash).map(_.header)
+        deps.blockchainReader.getBlockByHash(BlockHash(hash)).map(_.header)
       case s =>
         Try(BigInt(s)).toOption.flatMap(n => deps.blockchainReader.getBlockHeaderByNumber(n))
     }
@@ -275,8 +276,8 @@ object GetBlockTool {
       case Some(h) =>
         val td = deps.blockchainReader.getChainWeightByHash(h.hash).map(_.totalDifficulty.toString).getOrElse("unknown")
         s"""Block #${h.number}:
-          |  Hash: ${ByteStringUtils.hash2string(h.hash)}
-          |  Parent: ${ByteStringUtils.hash2string(h.parentHash)}
+          |  Hash: ${ByteStringUtils.hash2string(h.hash.value)}
+          |  Parent: ${ByteStringUtils.hash2string(h.parentHash.value)}
           |  Miner: 0x${org.bouncycastle.util.encoders.Hex.toHexString(h.beneficiary.toArray)}
           |  Difficulty: ${h.difficulty}
           |  Total Difficulty: $td
@@ -385,7 +386,7 @@ object DetectReorgTool {
       .flatMap {
         case Seq(parent, child) if child.parentHash != parent.hash =>
           Some(
-            s"  Reorg detected: block ${child.number} parent ${ByteStringUtils.hash2string(child.parentHash)} != block ${parent.number} hash ${ByteStringUtils.hash2string(parent.hash)}"
+            s"  Reorg detected: block ${child.number} parent ${ByteStringUtils.hash2string(child.parentHash.value)} != block ${parent.number} hash ${ByteStringUtils.hash2string(parent.hash.value)}"
           )
         case _ => None
       }

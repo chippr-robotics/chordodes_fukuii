@@ -12,6 +12,7 @@ import com.chipprbots.ethereum.consensus.pow.PoWMiningCoordinator.CoordinatorPro
 import com.chipprbots.ethereum.consensus.pow.miners.MinerProtocol.MiningResult
 import com.chipprbots.ethereum.consensus.pow.miners.MinerProtocol.MiningSuccessful
 import com.chipprbots.ethereum.domain.Block
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.jsonrpc.EthMiningService
 import com.chipprbots.ethereum.jsonrpc.EthMiningService.SubmitHashRateRequest
 import com.chipprbots.ethereum.utils.BlockchainConfig
@@ -38,7 +39,7 @@ trait Miner extends Logger {
 
         syncController ! SyncController.WrappedSyncProtocol(
           SyncProtocol.MinedBlock(
-            block.copy(header = block.header.copy(nonce = nonce, mixHash = mixHash))
+            block.copy(header = block.header.copy(nonce = nonce, mixHash = BlockHash(mixHash)))
           )
         )
         PoWMiningCoordinator.MiningSuccessful

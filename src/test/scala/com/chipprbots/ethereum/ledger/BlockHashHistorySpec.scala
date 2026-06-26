@@ -61,7 +61,7 @@ class BlockHashHistorySpec extends AnyFlatSpec with Matchers {
     val emptyWorld: InMemoryWorldStateProxy = InMemoryWorldStateProxy(
       storagesInstance.storages.evmCodeStorage,
       blockchain.getBackingMptStorage(-1),
-      (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash),
+      (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
       UInt256.Zero,
       ByteString(MerklePatriciaTrie.EmptyRootHash),
       noEmptyAccounts = false,
@@ -71,7 +71,7 @@ class BlockHashHistorySpec extends AnyFlatSpec with Matchers {
     def makeBlock(number: BigInt, parentHash: ByteString, isOlympia: Boolean = true): Block = Block(
       header = Fixtures.Blocks.ValidBlock.header.copy(
         number = number,
-        parentHash = parentHash,
+        parentHash = BlockHash(parentHash),
         gasLimit = 8_000_000,
         gasUsed = 0,
         extraFields = if isOlympia then HefPostOlympia(BigInt(0)) else HefEmpty

@@ -113,7 +113,7 @@ object TransactionResponse {
     TransactionResponse(
       hash = stx.hash.value,
       nonce = stx.tx.nonce,
-      blockHash = blockHeader.map(_.hash),
+      blockHash = blockHeader.map(_.hash.value),
       blockNumber = blockHeader.map(_.number),
       transactionIndex = transactionIndex.map(txIndex => BigInt(txIndex)),
       from = SignedTransaction.getSender(stx).map(_.bytes),

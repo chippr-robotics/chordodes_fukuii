@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum.network.p2p.messages
 
-import org.apache.pekko.util.ByteString
 
 import org.scalacheck.Gen
 import org.scalatest.matchers.should.Matchers
@@ -11,6 +10,7 @@ import com.chipprbots.ethereum.ObjectGenerators
 import com.chipprbots.ethereum.forkid.ForkId
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.testing.Tags.*
+import org.apache.pekko.util.ByteString
 
 class ETHPacketsRoundTripSpec extends AnyWordSpec with Matchers with ScalaCheckPropertyChecks with ObjectGenerators {
 

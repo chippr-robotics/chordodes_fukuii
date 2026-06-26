@@ -5,6 +5,7 @@ import java.util.concurrent.atomic.AtomicReference
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.util.ByteString
 
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
@@ -60,7 +61,7 @@ class ForkChoiceManager(
     *   Right(()) if valid, Left(error) if head block is unknown
     */
   def applyForkChoiceState(newState: ForkChoiceState): Either[String, Unit] = {
-    val maybeHeader = blockchainReader.getBlockHeaderByHash(newState.headBlockHash)
+    val maybeHeader = blockchainReader.getBlockHeaderByHash(BlockHash(newState.headBlockHash))
 
     // Publish to the listener regardless of head-known status — SNAP needs the
     // unknown-head case as its trigger to start / re-pivot. The listener message
@@ -80,8 +81,8 @@ class ForkChoiceManager(
       // Rewrite number→hash mapping for the new canonical branch (no-op if already canonical).
       // Then persist canonical best-block pointer.
       maybeHeader.foreach { header =>
-        blockchainWriter.promoteBranchToCanonical(newState.headBlockHash, blockchainReader)
-        blockchainWriter.saveBestKnownBlocks(newState.headBlockHash, header.number)
+        blockchainWriter.promoteBranchToCanonical(BlockHash(newState.headBlockHash), blockchainReader)
+        blockchainWriter.saveBestKnownBlocks(BlockHash(newState.headBlockHash), header.number)
       }
 
       Right(())

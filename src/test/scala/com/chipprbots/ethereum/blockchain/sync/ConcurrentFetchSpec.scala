@@ -15,6 +15,7 @@ import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.ChainWeight
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
 import com.chipprbots.ethereum.network.Peer
@@ -370,8 +371,8 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
     }
 
     val stubHeader: BlockHeader = BlockHeader(
-      parentHash = hash32,
-      ommersHash = hash32,
+      parentHash = BlockHash(hash32),
+      ommersHash = BlockHash(hash32),
       beneficiary = beneficiary,
       stateRoot = hash32,
       transactionsRoot = hash32,
@@ -383,7 +384,7 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
       gasUsed = 0,
       unixTimestamp = 0,
       extraData = ByteString.empty,
-      mixHash = hash32,
+      mixHash = BlockHash(hash32),
       nonce = nonce8
     )
   }

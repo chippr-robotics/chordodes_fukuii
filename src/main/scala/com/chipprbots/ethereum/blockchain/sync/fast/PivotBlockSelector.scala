@@ -303,13 +303,16 @@ object PivotBlockSelector {
             blockHeaders.headers.find(_.number == pivotBlockNumber) match {
               case Some(targetBlockHeader) =>
                 val newValue =
-                  headers.get(targetBlockHeader.hash).map(_.vote).getOrElse(BlockHeaderWithVotes(targetBlockHeader))
+                  headers
+                    .get(targetBlockHeader.hash.value)
+                    .map(_.vote)
+                    .getOrElse(BlockHeaderWithVotes(targetBlockHeader))
                 votingProcess(
                   updatedPeersToAsk,
                   waitingPeers,
                   pivotBlockNumber,
-                  headers.updated(targetBlockHeader.hash, newValue),
-                  votesByPeer.updated(peerId, targetBlockHeader.hash),
+                  headers.updated(targetBlockHeader.hash.value, newValue),
+                  votesByPeer.updated(peerId, targetBlockHeader.hash.value),
                   state
                 )
               case None =>
@@ -346,7 +349,7 @@ object PivotBlockSelector {
         maybeBlockHeaderWithVotes match {
           case Some(hWv) =>
             // Probe the peers that backed the winning header (they should be able to serve its ancestors).
-            val backlinkPeers = votesByPeer.collect { case (pid, hash) if hash == hWv.header.hash => pid }.toSet
+            val backlinkPeers = votesByPeer.collect { case (pid, hash) if hash == hWv.header.hash.value => pid }.toSet
             startBacklinkVerification(hWv.header, backlinkPeers, state)
           case None => Behaviors.stopped // unreachable: guarded by `exists` above
         }
@@ -406,7 +409,7 @@ object PivotBlockSelector {
           )
           val msg: MessageSerializable = ETHPackets.GetBlockHeaders(
             ETHPackets.nextRequestId,
-            Right(pivotBlockHeader.hash),
+            Right(pivotBlockHeader.hash.value),
             maxHeaders = BacklinkDepth,
             skip = 0,
             reverse = true

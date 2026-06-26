@@ -190,9 +190,9 @@ object SubscriptionManager {
       val h = block.header
       val base = JObject(
         "number" -> JString("0x" + h.number.toString(16)),
-        "hash" -> JString("0x" + h.hash.toHex),
-        "parentHash" -> JString("0x" + h.parentHash.toHex),
-        "sha3Uncles" -> JString("0x" + h.ommersHash.toHex),
+        "hash" -> JString("0x" + h.hash.value.toHex),
+        "parentHash" -> JString("0x" + h.parentHash.value.toHex),
+        "sha3Uncles" -> JString("0x" + h.ommersHash.value.toHex),
         "logsBloom" -> JString("0x" + h.logsBloom.value.toHex),
         "transactionsRoot" -> JString("0x" + h.transactionsRoot.toHex),
         "stateRoot" -> JString("0x" + h.stateRoot.toHex),
@@ -235,7 +235,7 @@ object SubscriptionManager {
                 "logIndex" -> JString("0x" + globalIdx.toHexString),
                 "transactionIndex" -> JString("0x" + txIndex.toHexString),
                 "transactionHash" -> JString("0x" + tx.hash.toHex),
-                "blockHash" -> JString("0x" + block.header.hash.toHex),
+                "blockHash" -> JString("0x" + block.header.hash.value.toHex),
                 "blockNumber" -> JString("0x" + block.header.number.toString(16)),
                 "address" -> JString(log.loggerAddress.toString),
                 "data" -> JString("0x" + log.data.toHex),

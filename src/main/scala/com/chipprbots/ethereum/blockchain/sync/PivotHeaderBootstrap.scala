@@ -221,7 +221,7 @@ object PivotHeaderBootstrap {
           val resolvedNumber = if byHashMode then header.number else targetBlock
           ctx.log.info(
             s"[PIVOT] Bootstrap complete — block=${header.number} hash=${header.hashAsHexString.take(10)} " +
-              s"parentHash=${header.parentHash.take(4).toArray.map("%02x".format(_)).mkString}"
+              s"parentHash=${header.parentHash.value.take(4).toArray.map("%02x".format(_)).mkString}"
           )
           replyTo ! Completed(resolvedNumber, header)
         } catch {
@@ -329,7 +329,7 @@ object PivotHeaderBootstrap {
             case Some(header) =>
               ctx.self ! Retry(
                 s"received header (number=${header.number}, hash=${com.chipprbots.ethereum.utils.ByteStringUtils
-                    .hash2string(header.hash)}) doesn't match target $targetDesc"
+                    .hash2string(header.hash.value)}) doesn't match target $targetDesc"
               )
             case None if peerOpt.isDefined && isFailed =>
               // RequestFailed: peer explicitly rejected the request — consume an attempt and rotate.
@@ -358,7 +358,7 @@ object PivotHeaderBootstrap {
 
     private def matchesTarget(header: BlockHeader): Boolean =
       targetHash match {
-        case Some(hash) => header.hash == hash
+        case Some(hash) => header.hash.value == hash
         case None       => header.number == targetBlock
       }
   }

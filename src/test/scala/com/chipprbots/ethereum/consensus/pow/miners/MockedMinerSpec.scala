@@ -93,12 +93,12 @@ class MockedMinerSpec
         val parentHash = origin.hash
 
         val errorMsg: String =
-          s"Unable to get parent block with hash ${ByteStringUtils.hash2string(parentHash)} for mining"
+          s"Unable to get parent block with hash ${ByteStringUtils.hash2string(parentHash.value)} for mining"
 
         blockchainReader.getBlockByHash.expects(parentHash).returns(None)
 
         withStartedMiner {
-          sendToMiner(MineBlocks(2, withTransactions = false, Some(parentHash)))
+          sendToMiner(MineBlocks(2, withTransactions = false, Some(parentHash.value)))
 
           expectNoNewBlockMsg(noMessageTimeOut)
 
@@ -143,7 +143,7 @@ class MockedMinerSpec
         blockCreatorBehaviour(parent, withTransactions = false, bfm)
 
         withStartedMiner {
-          sendToMiner(MineBlocks(1, withTransactions = false, Some(parentHash)))
+          sendToMiner(MineBlocks(1, withTransactions = false, Some(parentHash.value)))
 
           parentActor.expectMsg(MiningOrdered)
 

@@ -17,6 +17,7 @@ import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefEmpty
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostCancun
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostShanghai
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
@@ -48,7 +49,7 @@ class PoSBlockHeaderValidatorSpec
 
   private val baseExtraData: ByteString = ByteString("test".getBytes)
   private val withdrawalsRoot: ByteString = Fixtures.Blocks.ValidBlock.header.stateRoot
-  private val beaconRoot: ByteString = Fixtures.Blocks.ValidBlock.header.parentHash
+  private val beaconRoot: ByteString = Fixtures.Blocks.ValidBlock.header.parentHash.value
 
   implicit val config: BlockchainConfig = blockchainConfig.copy(
     forkTimestamps = ForkTimestamps(
@@ -62,7 +63,7 @@ class PoSBlockHeaderValidatorSpec
     Fixtures.Blocks.ValidBlock.header.copy(
       difficulty = 0,
       nonce = EmptyNonce,
-      ommersHash = BlockHeader.EmptyOmmers,
+      ommersHash = BlockHash(BlockHeader.EmptyOmmers),
       gasUsed = 0,
       unixTimestamp = HeaderTs,
       extraData = baseExtraData,
@@ -96,7 +97,7 @@ class PoSBlockHeaderValidatorSpec
       // Post-merge, mixHash carries prevRandao (EIP-4399) and is NOT constrained to zero.
       // This documents that the validator intentionally does not reject a non-zero mixHash.
       "accept the header (mixHash is not validated post-merge)" taggedAs (UnitTest, ConsensusTest) in {
-        val withMixHash = validCancunHeader.copy(mixHash = ByteString(Array.fill[Byte](32)(1)))
+        val withMixHash = validCancunHeader.copy(mixHash = BlockHash(ByteString(Array.fill[Byte](32)(1))))
         PoSBlockHeaderValidator.validateHeaderOnly(withMixHash) shouldBe Right(BlockHeaderValid)
       }
     }
@@ -119,7 +120,7 @@ class PoSBlockHeaderValidatorSpec
 
     "ommers hash is not the empty-list hash" should {
       "fail with PoSOmmersError" taggedAs (UnitTest, ConsensusTest) in {
-        val badOmmers = validCancunHeader.copy(ommersHash = ByteString(Array.fill[Byte](32)(9)))
+        val badOmmers = validCancunHeader.copy(ommersHash = BlockHash(ByteString(Array.fill[Byte](32)(9))))
         PoSBlockHeaderValidator.validateHeaderOnly(badOmmers) shouldBe Left(PoSOmmersError)
       }
     }

@@ -17,6 +17,7 @@ import com.chipprbots.ethereum.crypto.ECDSASignature
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.UInt256
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.security.SecureRandomBuilder
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
@@ -117,8 +118,8 @@ class RestrictedEthashBlockHeaderValidatorSpec
       * RestrictedEthashBlockHeaderValidator
       */
     val validParent: BlockHeader = BlockHeader(
-      parentHash = ByteStringUtils.string2hash("c12a822d0c9a1a777cd1023172ec304aca76e403355e4eb56592d299e4b86503"),
-      ommersHash = ByteStringUtils.string2hash("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"),
+      parentHash = BlockHash(ByteStringUtils.string2hash("c12a822d0c9a1a777cd1023172ec304aca76e403355e4eb56592d299e4b86503")),
+      ommersHash = BlockHash(ByteStringUtils.string2hash("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")),
       beneficiary = ByteStringUtils.string2hash("0011223344556677889900112233445566778899"),
       stateRoot = ByteStringUtils.string2hash("e3a3e62598cdb02a3551f9e932ed248a741ca174c00d977a56d9bb2c6473dd34"),
       transactionsRoot =
@@ -133,13 +134,13 @@ class RestrictedEthashBlockHeaderValidatorSpec
       extraData = ByteStringUtils.string2hash(
         "6d616e746973808fc245b89183f28ac985019992f202a73c7ab600b0aefa18dcba71a8f3576129280d56f4f499e7a8a53a047e91d73d881745b7a6ac7ca9449fc2b3bb1608921c"
       ),
-      mixHash = ByteStringUtils.string2hash("2db10efede75cfe87b6f378d9b03e712098e8cd3759784db56d65cc9e9911675"),
+      mixHash = BlockHash(ByteStringUtils.string2hash("2db10efede75cfe87b6f378d9b03e712098e8cd3759784db56d65cc9e9911675")),
       nonce = ByteStringUtils.string2hash("a57246871d5c8bcc")
     )
 
     val validHeader: BlockHeader = BlockHeader(
-      parentHash = ByteStringUtils.string2hash("28aad5edd02d139bf4fcf15d04ec04c93f12e382c64983fa271a9084189b3b23"),
-      ommersHash = ByteStringUtils.string2hash("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"),
+      parentHash = BlockHash(ByteStringUtils.string2hash("28aad5edd02d139bf4fcf15d04ec04c93f12e382c64983fa271a9084189b3b23")),
+      ommersHash = BlockHash(ByteStringUtils.string2hash("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")),
       beneficiary = ByteStringUtils.string2hash("0011223344556677889900112233445566778899"),
       stateRoot = ByteStringUtils.string2hash("a485afd5bfcef9da8df9c0fe4315e1f4bc2c96eb34920eeaddf534b807cd71e6"),
       transactionsRoot =
@@ -154,7 +155,7 @@ class RestrictedEthashBlockHeaderValidatorSpec
       extraData = ByteStringUtils.string2hash(
         "6d616e746973dccb0bbbfb07910cf745bde048bd0887d03e2ac790575b7cad36bf44d83e55877ea832719c978d2336b64c2200d0ced5777cd98e2d74d2cd5c0608c8a91067ae1b"
       ),
-      mixHash = ByteStringUtils.string2hash("311575b0d0550f5c8858636621c66172c2633f0a6d6d7f7a254c5be9fcc998a5"),
+      mixHash = BlockHash(ByteStringUtils.string2hash("311575b0d0550f5c8858636621c66172c2633f0a6d6d7f7a254c5be9fcc998a5")),
       nonce = ByteStringUtils.string2hash("b841838f136f2bed")
     )
   }

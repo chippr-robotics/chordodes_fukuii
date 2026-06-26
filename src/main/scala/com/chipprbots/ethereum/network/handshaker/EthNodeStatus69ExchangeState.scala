@@ -82,7 +82,7 @@ case class EthNodeStatus69ExchangeState(
       latestBlockHash
     )
 
-    val localGenesisHash = blockchainReader.genesisHeader.hash
+    val localGenesisHash = blockchainReader.genesisHeader.hash.value
 
     if networkId != peerConfiguration.networkId then {
       log.debug(
@@ -101,7 +101,7 @@ case class EthNodeStatus69ExchangeState(
     } else {
       (for {
         validationResult <-
-          ForkIdValidator.validatePeer[SyncIO](blockchainReader.genesisHeader.hash, blockchainConfig)(
+          ForkIdValidator.validatePeer[SyncIO](blockchainReader.genesisHeader.hash.value, blockchainConfig)(
             blockchainReader.getBestBlockNumber,
             forkId
           )
@@ -147,7 +147,7 @@ case class EthNodeStatus69ExchangeState(
   override protected def createStatusMsg(): MessageSerializable = {
     val bestBlockHeader = getBestBlockHeader()
     val bestBlockNumber = blockchainReader.getBestBlockNumber
-    val genesisHash = blockchainReader.genesisHeader.hash
+    val genesisHash = blockchainReader.genesisHeader.hash.value
 
     // Compute ForkId from current block (same as ETH64-68)
     val forkIdTimestamp =
@@ -162,7 +162,7 @@ case class EthNodeStatus69ExchangeState(
       forkId = forkId,
       earliestBlock = BigInt(0), // Full archive node
       latestBlock = bestBlockNumber,
-      latestBlockHash = bestBlockHeader.hash
+      latestBlockHash = bestBlockHeader.hash.value
     )
 
     log.debug(

@@ -275,8 +275,8 @@ trait ObjectGenerators {
     mixHash <- byteStringOfLengthNGen(8)
     nonce <- byteStringOfLengthNGen(8)
   } yield BlockHeader(
-    parentHash = parentHash,
-    ommersHash = ommersHash,
+    parentHash = BlockHash(parentHash),
+    ommersHash = BlockHash(ommersHash),
     beneficiary = beneficiary,
     stateRoot = stateRoot,
     transactionsRoot = transactionsRoot,
@@ -288,7 +288,7 @@ trait ObjectGenerators {
     gasUsed = gasUsed,
     unixTimestamp = unixTimestamp,
     extraData = extraData,
-    mixHash = mixHash,
+    mixHash = BlockHash(mixHash),
     nonce = nonce
   )
 

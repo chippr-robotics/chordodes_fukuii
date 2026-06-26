@@ -7,6 +7,7 @@ import cats.implicits.*
 
 import com.chipprbots.ethereum.consensus.blocks.BlockGenerator
 import com.chipprbots.ethereum.domain.Account
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.Blockchain
@@ -232,7 +233,7 @@ class EthProofService(
       case BlockParam.WithNumber(blockNumber) => getBlock(blockNumber).map(ResolvedBlock(_, pendingState = None))
       case BlockParam.WithHash(hash) =>
         blockchainReader
-          .getBlockByHash(hash)
+          .getBlockByHash(BlockHash(hash))
           .toRight(JsonRpcError.InvalidParams("Block not found for hash"))
           .map(ResolvedBlock(_, pendingState = None))
       case BlockParam.Earliest  => getBlock(0).map(ResolvedBlock(_, pendingState = None))

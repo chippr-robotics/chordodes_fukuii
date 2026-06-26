@@ -158,7 +158,7 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
         .onCall { case (block: Block, _, _) =>
           importedBlocksSet.add(block)
           results
-            .getOrElse(block.header.hash, IO.pure(BlockEnqueued))
+            .getOrElse(block.header.hash.value, IO.pure(BlockEnqueued))
             .flatTap(_ => importedBlocksSubject.publish1(block).void)
         }
       // Batch path: regular sync blocks via tryImportBlocks
@@ -172,7 +172,7 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
               case block :: rest =>
                 importedBlocksSet.add(block)
                 results
-                  .getOrElse(block.header.hash, IO.pure(BlockImportedToTop(Nil)))
+                  .getOrElse(block.header.hash.value, IO.pure(BlockImportedToTop(Nil)))
                   .flatTap(_ => importedBlocksSubject.publish1(block).void)
                   .flatMap {
                     case BlockImportedToTop(data)       => go(rest, data.reverse ::: acc)
@@ -304,7 +304,7 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
     def bestBlock: Block = importedBlocksSet.maxBy(_.number)
 
     def setImportResult(block: Block, result: IO[BlockImportResult]): Unit =
-      results(block.header.hash) = result
+      results(block.header.hash.value) = result
 
     class PeersClientAutoPilot(blocks: List[Block] = testBlocks) extends AutoPilot {
 
@@ -330,7 +330,7 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
           None
         // Handle ETH68/69 GetBlockBodies (with requestId)
         case PeersClient.Request(ETHGetBlockBodies(_, hashes), _, _, replyTo) =>
-          val matchingBodies = hashes.flatMap(hash => blocks.find(_.hash == hash)).map(_.body)
+          val matchingBodies = hashes.flatMap(hash => blocks.find(_.hash.value == hash)).map(_.body)
 
           replyTo ! PeersClient.Response(defaultPeer, BlockBodies(BigInt(0), matchingBodies))
           None
@@ -360,12 +360,12 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
       def headNumberUnsafe: BigInt = blocks.head.number
       def headNumber: Option[BigInt] = blocks.headOption.map(_.number)
       def headers: List[BlockHeader] = blocks.map(_.header)
-      def hashes: List[ByteString] = headers.map(_.hash)
+      def hashes: List[ByteString] = headers.map(_.hash.value)
       def bodies: List[BlockBody] = blocks.map(_.body)
       def numbers: List[BigInt] = blocks.map(_.number)
       def numberAt(index: Int): Option[BigInt] = blocks.get(index).map(_.number)
       def numberAtUnsafe(index: Int): BigInt = numberAt(index).get
-      def byHash(hash: ByteString): Option[Block] = blocks.find(_.hash == hash)
+      def byHash(hash: ByteString): Option[Block] = blocks.find(_.hash.value == hash)
       def byHashUnsafe(hash: ByteString): Block = byHash(hash).get
     }
 

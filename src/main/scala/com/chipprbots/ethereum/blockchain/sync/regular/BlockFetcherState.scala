@@ -117,7 +117,7 @@ case class BlockFetcherState(
     .orElse(readyBlocks.lastOption.map(_.number))
     .getOrElse(lastBlock) + 1
 
-  def takeHashes(amount: Int): Seq[ByteString] = waitingHeaders.take(amount).map(_.hash)
+  def takeHashes(amount: Int): Seq[ByteString] = waitingHeaders.take(amount).map(_.hash.value)
 
   def appendHeaders(headers: Seq[BlockHeader]): Either[ValidationErrors, BlockFetcherState] =
     validatedHeaders(headers.sortBy(_.number)).map { validHeaders =>
@@ -333,9 +333,9 @@ case class BlockFetcherState(
 
   def exists(hash: ByteString): Boolean = existsInReadyBlocks(hash) || existsInWaitingHeaders(hash)
 
-  private def existsInWaitingHeaders(hash: ByteString): Boolean = waitingHeaders.exists(_.hash == hash)
+  private def existsInWaitingHeaders(hash: ByteString): Boolean = waitingHeaders.exists(_.hash.value == hash)
 
-  private def existsInReadyBlocks(hash: ByteString): Boolean = readyBlocks.exists(_.hash == hash)
+  private def existsInReadyBlocks(hash: ByteString): Boolean = readyBlocks.exists(_.hash.value == hash)
 
   def withLastBlock(nr: BigInt): BlockFetcherState = copy(lastBlock = nr)
 

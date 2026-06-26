@@ -6,7 +6,6 @@ import java.util.concurrent.atomic.AtomicReference
 import org.apache.pekko.actor.ActorSystem as ClassicActorSystem
 import org.apache.pekko.actor.typed
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
-import org.apache.pekko.util.ByteString
 
 import cats.effect.unsafe.IORuntime
 
@@ -18,6 +17,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.Fixtures
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.branch.EmptyBranch
 import com.chipprbots.ethereum.jsonrpc.AdminService.AdminBlockIPResponse
@@ -171,7 +171,7 @@ class AdminServiceSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll 
     val stubBlockchainReader: BlockchainReader = new BlockchainReader(null, null, null, null, null, null, null) {
       override val genesisHeader = Fixtures.Blocks.Block3125369.header
       override def getBestBranch = EmptyBranch
-      override def getChainWeightByHash(hash: ByteString) = None
+      override def getChainWeightByHash(hash: BlockHash) = None
     }
 
     val service = new AdminService(

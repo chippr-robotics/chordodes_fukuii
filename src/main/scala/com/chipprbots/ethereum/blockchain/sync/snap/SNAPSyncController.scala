@@ -2593,7 +2593,7 @@ private class SNAPSyncControllerImpl(
           ctx.log.info("🛰  SNAP pivot from CL forkchoiceUpdated")
           ctx.log.info("=" * 80)
           ctx.log.info(
-            s"CL head: ${header.number} (${com.chipprbots.ethereum.utils.ByteStringUtils.hash2string(header.hash)})"
+            s"CL head: ${header.number} (${com.chipprbots.ethereum.utils.ByteStringUtils.hash2string(header.hash.value)})"
           )
           ctx.log.info(s"State root: ${header.stateRoot.toHex.take(16)}...")
           ctx.log.info(s"Beginning fast state sync with ${snapSyncConfig.accountConcurrency} concurrent workers")
@@ -4164,10 +4164,10 @@ private class SNAPSyncControllerImpl(
     // Always advance the self-reported best-block pointer so STATUS messages show the correct
     // pivot block number.
     appStateStorage
-      .putBestBlockInfo(com.chipprbots.ethereum.domain.appstate.BlockInfo(pivotHash, pivotBlockNumber))
+      .putBestBlockInfo(com.chipprbots.ethereum.domain.appstate.BlockInfo(pivotHash.value, pivotBlockNumber))
       .commit()
     ctx.log.info(
-      s"Updated best block for ETH status: block=$pivotBlockNumber, hash=${pivotHash.toHex.take(16)}..., " +
+      s"Updated best block for ETH status: block=$pivotBlockNumber, hash=${pivotHash.value.toHex.take(16)}..., " +
         s"estimatedTD=$estimatedTotalDifficulty (source=$tdSource)"
     )
   }
@@ -4717,7 +4717,7 @@ private class SNAPSyncControllerImpl(
           // sets the number, leaving getBestBlockInfo().hash empty).
           appStateStorage
             .putBestBlockInfo(
-              com.chipprbots.ethereum.domain.appstate.BlockInfo(pivotHash, pivot)
+              com.chipprbots.ethereum.domain.appstate.BlockInfo(pivotHash.value, pivot)
             )
             .commit()
 
@@ -4738,7 +4738,7 @@ private class SNAPSyncControllerImpl(
             .and(appStateStorage.storageRecoveryDone())
             .commitSync()
 
-          ctx.log.info(s"SNAP sync completed successfully at block $pivot (hash=${pivotHash.take(8).toHex})")
+          ctx.log.info(s"SNAP sync completed successfully at block $pivot (hash=${pivotHash.value.take(8).toHex})")
 
         case None =>
           // Fallback: shouldn't happen since PivotHeaderBootstrap stored the header

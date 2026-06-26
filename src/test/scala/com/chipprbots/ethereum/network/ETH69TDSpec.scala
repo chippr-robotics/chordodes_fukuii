@@ -24,8 +24,8 @@ import com.chipprbots.ethereum.testing.Tags.*
   */
 class ETH69TDSpec extends AnyFlatSpec with Matchers {
 
-  private val genesisHash = Fixtures.Blocks.Genesis.header.hash
-  private val latestHash = Fixtures.Blocks.Block3125369.header.hash
+  private val genesisHash = Fixtures.Blocks.Genesis.header.hash.value
+  private val latestHash = Fixtures.Blocks.Block3125369.header.hash.value
   private val latestBlockNr = Fixtures.Blocks.Block3125369.header.number
 
   private val dummyForkId = ForkId(0L, None)

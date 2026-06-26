@@ -21,6 +21,7 @@ import com.chipprbots.ethereum.blockchain.sync.fast.PivotBlockSelector.Result
 import com.chipprbots.ethereum.blockchain.sync.fast.PivotBlockSelector.SelectPivotBlock
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.ChainWeight
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.HandshakedPeers
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
@@ -884,7 +885,7 @@ class PivotBlockSelectorSpec
       sends.foreach { s =>
         s.message.underlyingMsg match {
           case GetBlockHeaders(_, Right(hash), maxHeaders, skip, reverse) =>
-            hash shouldBe pivot.hash
+            hash shouldBe pivot.hash.value
             maxHeaders shouldBe PivotBlockSelector.BacklinkDepth
             skip shouldBe 0
             reverse shouldBe true
@@ -1177,7 +1178,7 @@ class PivotBlockSelectorSpec
       // Oldest → newest, linking parentHash forward, then reverse to newest → oldest.
       val oldestNum = tipNum - depth + 1
       val ascending = (oldestNum to tipNum).foldLeft(Vector.empty[BlockHeader]) { (acc, n) =>
-        val parentHash = acc.lastOption.map(_.hash).getOrElse(ByteString("genesis-parent"))
+        val parentHash = acc.lastOption.map(_.hash).getOrElse(BlockHash(ByteString("genesis-parent")))
         acc :+ baseBlockHeader.copy(number = n, parentHash = parentHash, extraData = ByteString(s"backlink-$n"))
       }
       ascending.reverse

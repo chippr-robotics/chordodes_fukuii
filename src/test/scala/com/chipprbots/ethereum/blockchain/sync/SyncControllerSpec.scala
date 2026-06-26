@@ -875,8 +875,8 @@ class SyncControllerSpec
         headers.foldLeft(new BlockchainData(Map.empty, Map.empty, Map.empty)) { (state, header) =>
           state.copy(
             headers = state.headers + (header.number -> header),
-            bodies = state.bodies + (header.hash -> BlockBody.empty),
-            receipts = state.receipts + (header.hash -> Seq.empty)
+            bodies = state.bodies + (header.hash.value -> BlockBody.empty),
+            receipts = state.receipts + (header.hash.value -> Seq.empty)
           )
         }
     }
@@ -917,7 +917,7 @@ class SyncControllerSpec
               if msg.underlyingMsg.block.isRight =>
             val requestId = msg.underlyingMsg.requestId
             blockchainWriter.storeBlockHeader(pivotHeader).commit()
-            storagesInstance.storages.blockNumberMappingStorage.put(pivotHeader.number, pivotHeader.hash).commit()
+            storagesInstance.storages.blockNumberMappingStorage.put(pivotHeader.number, pivotHeader.hash.value).commit()
             sender ! MessageFromPeer(ETHPackets.BlockHeaders(requestId, Seq(pivotHeader)), peer)
             this
 
@@ -1113,14 +1113,14 @@ class SyncControllerSpec
         if headers.isEmpty then result
         else {
           val header = headers.head
-          val newHeader = header.copy(parentHash = parenthash)
-          val newHash = newHeader.hash
+          val newHeader = header.copy(parentHash = BlockHash(parenthash))
+          val newHash = newHeader.hash.value
           genChain(newHash, headers.tail, result :+ newHeader)
         }
 
       val first = headers.head
 
-      first +: genChain(first.hash, headers.tail)
+      first +: genChain(first.hash.value, headers.tail)
     }
 
     def startWithState(state: SyncState): Unit =

@@ -59,7 +59,7 @@ trait Blockchain {
     */
   def getReadOnlyMptStorage(): MptStorage
 
-  def removeBlock(hash: ByteString): Unit
+  def removeBlock(hash: BlockHash): Unit
 
   /** Flush all in-memory MPT trie nodes written during block execution to RocksDB.
     *
@@ -127,13 +127,15 @@ class BlockchainImpl(
   private def removeBlockNumberMapping(number: BigInt): DataSourceBatchUpdate =
     blockNumberMappingStorage.remove(number)
 
-  override def removeBlock(blockHash: ByteString): Unit = {
+  override def removeBlock(blockHash: BlockHash): Unit = {
     val maybeBlock = blockchainReader.getBlockByHash(blockHash)
 
     maybeBlock match {
       case Some(block) => removeBlock(block)
       case None =>
-        log.warn(s"Attempted removing block with hash ${ByteStringUtils.hash2string(blockHash)} that we don't have")
+        log.warn(
+          s"Attempted removing block with hash ${ByteStringUtils.hash2string(blockHash.value)} that we don't have"
+        )
     }
   }
 
@@ -150,7 +152,7 @@ class BlockchainImpl(
       else blockNumberMappingStorage.emptyBatchUpdate
 
     val potentialNewBestBlockNumber: BigInt = (block.number - 1).max(0)
-    val potentialNewBestBlockHash: ByteString = block.header.parentHash
+    val potentialNewBestBlockHash: ByteString = block.header.parentHash.value
 
     val bestBlockNumberUpdates =
       if appStateStorage.getBestBlockNumber() > potentialNewBestBlockNumber then
@@ -158,10 +160,10 @@ class BlockchainImpl(
       else appStateStorage.emptyBatchUpdate
 
     blockHeadersStorage
-      .remove(blockHash)
-      .and(blockBodiesStorage.remove(blockHash))
-      .and(chainWeightStorage.remove(blockHash))
-      .and(receiptStorage.remove(blockHash))
+      .remove(blockHash.value)
+      .and(blockBodiesStorage.remove(blockHash.value))
+      .and(chainWeightStorage.remove(blockHash.value))
+      .and(receiptStorage.remove(blockHash.value))
       .and(removeTxsLocations(txList))
       .and(blockNumberMappingUpdates)
       .and(bestBlockNumberUpdates)
@@ -169,7 +171,7 @@ class BlockchainImpl(
 
     log.debug(
       "Removed block with hash {}. New best block number - {}",
-      ByteStringUtils.hash2string(blockHash),
+      ByteStringUtils.hash2string(blockHash.value),
       potentialNewBestBlockNumber
     )
   }

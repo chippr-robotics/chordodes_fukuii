@@ -53,7 +53,7 @@ class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues
       // Best-block pointers
       val best: BlockInfo = freshStorage.storages.appStateStorage.getBestBlockInfo()
       best.number shouldBe header.blockHeader.number
-      best.hash shouldBe header.blockHeader.hash
+      best.hash shouldBe header.blockHeader.hash.value
 
       // Phase flags set so SNAP isn't re-entered
       freshStorage.storages.appStateStorage.isSnapSyncDone() shouldBe true

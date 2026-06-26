@@ -25,6 +25,7 @@ import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.Receipt
 import com.chipprbots.ethereum.domain.branch.Branch
 import com.chipprbots.ethereum.domain.branch.EmptyBranch
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.testing.Tags.*
 
 class BranchResolutionSpec
@@ -61,7 +62,7 @@ class BranchResolutionSpec
       val headers: NonEmptyList[BlockHeader] = getChainHeadersNel(5, 10)
 
       setGenesisHeader(genesisHeader) // Check genesis block
-      setHeaderInChain(headers.head.parentHash, result = false)
+      setHeaderInChain(headers.head.parentHash.value, result = false)
 
       branchResolution.resolveBranch(headers) shouldEqual UnknownBranch
     }
@@ -71,10 +72,10 @@ class BranchResolutionSpec
         val headers: NonEmptyList[BlockHeader] = getChainHeadersNel(1, 10)
 
         setBestBlockNumber(10)
-        setHeaderInChain(headers.head.parentHash)
-        setChainWeightByHash(headers.head.parentHash, ChainWeight.zero)
+        setHeaderInChain(headers.head.parentHash.value)
+        setChainWeightByHash(headers.head.parentHash.value, ChainWeight.zero)
 
-        val oldBlocks: List[Block] = getChain(1, 10, headers.head.parentHash, headers.head.difficulty - 1)
+        val oldBlocks: List[Block] = getChain(1, 10, headers.head.parentHash.value, headers.head.difficulty - 1)
         oldBlocks.map(b => setBlockByNumber(b.header.number, Some(b)))
 
         branchResolution.resolveBranch(headers) shouldEqual NewBetterBranch(oldBlocks)
@@ -85,25 +86,25 @@ class BranchResolutionSpec
         val headers: NonEmptyList[BlockHeader] = getChainHeadersNel(1, 10)
 
         setBestBlockNumber(10)
-        setHeaderInChain(headers.head.parentHash)
-        setChainWeightByHash(headers.head.parentHash, ChainWeight.zero)
+        setHeaderInChain(headers.head.parentHash.value)
+        setChainWeightByHash(headers.head.parentHash.value, ChainWeight.zero)
 
-        val oldBlocks: List[Block] = getChain(1, 10, headers.head.parentHash, headers.head.difficulty)
+        val oldBlocks: List[Block] = getChain(1, 10, headers.head.parentHash.value, headers.head.difficulty)
         oldBlocks.map(b => setBlockByNumber(b.header.number, Some(b)))
 
         branchResolution.resolveBranch(headers) shouldEqual NoChainSwitch
       }
 
     "correctly handle a branch that goes up to the genesis block" in new BranchResolutionTestSetupImpl {
-      val headers: NonEmptyList[BlockHeader] = genesisHeader :: getChainHeadersNel(1, 10, genesisHeader.hash)
+      val headers: NonEmptyList[BlockHeader] = genesisHeader :: getChainHeadersNel(1, 10, genesisHeader.hash.value)
 
-      setHeaderInChain(genesisHeader.parentHash, result = false)
+      setHeaderInChain(genesisHeader.parentHash.value, result = false)
       setGenesisHeader(genesisHeader)
       setBestBlockNumber(10)
-      setChainWeightByHash(genesisHeader.hash, ChainWeight.zero)
+      setChainWeightByHash(genesisHeader.hash.value, ChainWeight.zero)
       setBlockByNumber(0, Some(Block(genesisHeader, BlockBody(Nil, Nil))))
 
-      val oldBlocks: List[Block] = getChain(1, 10, genesisHeader.hash, headers.tail.head.difficulty - 1)
+      val oldBlocks: List[Block] = getChain(1, 10, genesisHeader.hash.value, headers.tail.head.difficulty - 1)
       oldBlocks.foreach(b => setBlockByNumber(b.header.number, Some(b)))
 
       branchResolution.resolveBranch(headers) shouldEqual NewBetterBranch(oldBlocks)
@@ -111,9 +112,9 @@ class BranchResolutionSpec
 
     "report an unknown branch if the included genesis header is different than ours" in new BranchResolutionTestSetupImpl {
       val differentGenesis: BlockHeader = genesisHeader.copy(extraData = ByteString("I'm different ;("))
-      val headers: NonEmptyList[BlockHeader] = differentGenesis :: getChainHeadersNel(1, 10, differentGenesis.hash)
+      val headers: NonEmptyList[BlockHeader] = differentGenesis :: getChainHeadersNel(1, 10, differentGenesis.hash.value)
 
-      setHeaderInChain(differentGenesis.parentHash, result = false)
+      setHeaderInChain(differentGenesis.parentHash.value, result = false)
       setGenesisHeader(genesisHeader)
 
       branchResolution.resolveBranch(headers) shouldEqual UnknownBranch
@@ -124,10 +125,10 @@ class BranchResolutionSpec
       val commonParent: BlockHeader = headers.toList(1)
 
       setBestBlockNumber(8)
-      setHeaderInChain(headers.head.parentHash)
-      setChainWeightByHash(commonParent.hash, ChainWeight.zero)
+      setHeaderInChain(headers.head.parentHash.value)
+      setChainWeightByHash(commonParent.hash.value, ChainWeight.zero)
 
-      val oldBlocks: List[Block] = getChain(3, 8, commonParent.hash)
+      val oldBlocks: List[Block] = getChain(3, 8, commonParent.hash.value)
       oldBlocks.foreach(b => setBlockByNumber(b.header.number, Some(b)))
 
       setBlockByNumber(1, Some(Block(headers.head, BlockBody(Nil, Nil))))
@@ -138,12 +139,12 @@ class BranchResolutionSpec
     }
 
     "report a new better branch with higher chain weight even if its shorter than the current " in new BranchResolutionTestSetupImpl {
-      val commonParent: Block = getBlock(1, parent = genesisHeader.hash)
+      val commonParent: Block = getBlock(1, parent = genesisHeader.hash.value)
       val parentWeight: ChainWeight = ChainWeight.zero.increase(commonParent.header)
-      val longerBranchLowerWeight: List[Block] = getChain(2, 10, commonParent.hash, difficulty = 100)
-      val shorterBranchHigherWeight: NonEmptyList[Block] = getChainNel(2, 8, commonParent.hash, difficulty = 200)
+      val longerBranchLowerWeight: List[Block] = getChain(2, 10, commonParent.hash.value, difficulty = 100)
+      val shorterBranchHigherWeight: NonEmptyList[Block] = getChainNel(2, 8, commonParent.hash.value, difficulty = 200)
 
-      setHeaderInChain(commonParent.hash)
+      setHeaderInChain(commonParent.hash.value)
       setChainWeightForBlock(commonParent, parentWeight)
       setBestBlockNumber(longerBranchLowerWeight.last.number)
       longerBranchLowerWeight.foreach(b => setBlockByNumber(b.number, Some(b)))
@@ -336,7 +337,7 @@ class BranchResolutionSpec
       val parentHash: ByteString = randomHash()
       // Best block is 5; new header extends at 6 — no old blocks displaced
       val newHeader: BlockHeader =
-        Block(defaultHeader.copy(number = 6, difficulty = 0, parentHash = parentHash), BlockBody(Nil, Nil)).header
+        Block(defaultHeader.copy(number = 6, difficulty = 0, parentHash = BlockHash(parentHash)), BlockBody(Nil, Nil)).header
       val parentWeight: ChainWeight = ChainWeight.totalDifficultyOnly(1000)
 
       setBestBlockNumber(5)
@@ -379,7 +380,7 @@ class BranchResolutionSpec
     val branchResolution = new BranchResolution(blockchainReader)
 
     // Helper methods implementation (have MockFactory context here)
-    override def setBlockExists(block: Block, inChain: Boolean, inQueue: Boolean): CallHandler1[ByteString, Boolean] = {
+    override def setBlockExists(block: Block, inChain: Boolean, inQueue: Boolean): CallHandler1[BlockHash, Boolean] = {
       blockchainReader.getBlockByHash
         .expects(block.header.hash)
         .anyNumberOfTimes()
@@ -398,14 +399,14 @@ class BranchResolutionSpec
     override def setChainWeightForBlock(
         block: Block,
         weight: ChainWeight
-    ): CallHandler1[ByteString, Option[ChainWeight]] =
-      setChainWeightByHash(block.hash, weight)
+    ): CallHandler1[BlockHash, Option[ChainWeight]] =
+      setChainWeightByHash(block.hash.value, weight)
 
     override def setChainWeightByHash(
         hash: ByteString,
         weight: ChainWeight
-    ): CallHandler1[ByteString, Option[ChainWeight]] =
-      blockchainReader.getChainWeightByHash.expects(hash).anyNumberOfTimes().returning(Some(weight))
+    ): CallHandler1[BlockHash, Option[ChainWeight]] =
+      blockchainReader.getChainWeightByHash.expects(BlockHash(hash)).anyNumberOfTimes().returning(Some(weight))
 
     override def expectBlockSaved(
         block: Block,
@@ -418,8 +419,8 @@ class BranchResolutionSpec
         .expects(block, receipts, weight, saveAsBestBlock)
         .once()
 
-    override def setHeaderInChain(hash: ByteString, result: Boolean = true): CallHandler2[Branch, ByteString, Boolean] =
-      blockchainReader.isInChain.expects(*, hash).returning(result)
+    override def setHeaderInChain(hash: ByteString, result: Boolean = true): CallHandler2[Branch, BlockHash, Boolean] =
+      blockchainReader.isInChain.expects(*, BlockHash(hash)).returning(result)
 
     override def setBlockByNumber(number: BigInt, block: Option[Block]): CallHandler2[Branch, BigInt, Option[Block]] =
       blockchainReader.getBlockByNumber.expects(*, number).returning(block)
@@ -461,7 +462,7 @@ class BranchResolutionSpec
     /** Expect blockchainReader.getBlockHeaderByHash(commonParentHash) once, returning a header with `ts`. */
     def expectAncestorHeader(ts: Long = ancestorTs): Unit =
       blockchainReader.getBlockHeaderByHash
-        .expects(commonParentHash)
+        .expects(BlockHash(commonParentHash))
         .returning(Some(defaultHeader.copy(number = 9, unixTimestamp = ts)))
   }
 

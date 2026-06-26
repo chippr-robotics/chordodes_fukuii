@@ -10,6 +10,7 @@ import com.chipprbots.ethereum.consensus.pow.validators.OmmersValidator.OmmersVa
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValidator
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
@@ -118,11 +119,11 @@ class StdOmmersValidator(blockHeaderValidator: BlockHeaderValidator) extends Omm
   ): Either[OmmersError, OmmersValid] = {
 
     val ancestors = collectAncestors(parentHash, blockNumber, getNBlocksBack)
-    lazy val ommersHashes: Seq[ByteString] = ommers.map(_.hash)
-    lazy val ommersThatAreAncestors: Seq[ByteString] = ancestors.map(_.hash).intersect(ommersHashes)
+    lazy val ommersHashes: Seq[BlockHash] = ommers.map(_.hash)
+    lazy val ommersThatAreAncestors: Seq[BlockHash] = ancestors.map(_.hash).intersect(ommersHashes)
 
-    lazy val ancestorsParents: Seq[ByteString] = ancestors.map(_.parentHash)
-    lazy val ommersParentsHashes: Seq[ByteString] = ommers.map(_.parentHash)
+    lazy val ancestorsParents: Seq[BlockHash] = ancestors.map(_.parentHash)
+    lazy val ommersParentsHashes: Seq[BlockHash] = ommers.map(_.parentHash)
 
     // parent not an ancestor or is too old (we only compare up to 6 previous ancestors)
     lazy val ommersParentsAreAllAncestors: Boolean = ommersParentsHashes.forall(ancestorsParents.contains)

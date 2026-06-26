@@ -51,7 +51,7 @@ class BlockBroadcast(
     val newHeader = blockToBroadcast.block.header
     val shouldSendBRU = isPoWChain || (newHeader.number % 32 == 0)
     if shouldSendBRU then {
-      val bru = ETH69.BlockRangeUpdate(BigInt(0), newHeader.number, newHeader.hash)
+      val bru = ETH69.BlockRangeUpdate(BigInt(0), newHeader.number, newHeader.hash.value)
       val eth69Peers = peersWithoutBlock.filter { case (_, PeerWithInfo(_, info)) =>
         info.remoteStatus.capability == Capability.ETH69
       }
@@ -107,7 +107,7 @@ class BlockBroadcast(
     peer =>
       val newBlockHeader = blockToBroadcast.block.header
       val newBlockHashMsg =
-        ETHPackets.NewBlockHashes.NewBlockHashes(Seq(BlockHash(newBlockHeader.hash, newBlockHeader.number)))
+        ETHPackets.NewBlockHashes.NewBlockHashes(Seq(BlockHash(newBlockHeader.hash.value, newBlockHeader.number)))
       networkPeerManager ! NetworkPeerManagerActor.SendMessageCmd(newBlockHashMsg, peer.id)
   }
 

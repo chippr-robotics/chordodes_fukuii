@@ -41,7 +41,7 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     blockchainWriter.save(block1, Nil, block1Weight, saveAsBestBlock = true)
 
     val (cw, source) =
-      blockchainReader.resolveETH69ChainWeight(block1.header.hash, block1.header.number, isPoWChain = true)
+      blockchainReader.resolveETH69ChainWeight(block1.header.hash.value, block1.header.number, isPoWChain = true)
     source shouldBe "DB_LOOKUP"
     cw.totalDifficulty shouldBe block1Weight.totalDifficulty
   }

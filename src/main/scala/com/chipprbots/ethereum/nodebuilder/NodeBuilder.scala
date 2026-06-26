@@ -176,7 +176,7 @@ trait DiscoveryConfigBuilder extends BlockchainConfigBuilder with StorageBuilder
   lazy val discoveryConfig: DiscoveryConfig = {
     val reader = com.chipprbots.ethereum.domain.BlockchainReader(storagesInstance.storages)
     val enrFilter = new com.chipprbots.ethereum.network.discovery.DnsDiscovery.EnrForkIdFilter(
-      genesisHash = () => reader.genesisHeader.hash,
+      genesisHash = () => reader.genesisHeader.hash.value,
       blockchainConfig = blockchainConfig,
       currentBestBlock = () => reader.getBestBlockNumber
     )
@@ -226,7 +226,7 @@ trait PeerDiscoveryManagerBuilder {
           storagesInstance.storages.knownNodesStorage,
           forkIdTag = Some(
             new com.chipprbots.ethereum.network.discovery.ForkIdTag(
-              genesisHash = () => blockchainReader.genesisHeader.hash,
+              genesisHash = () => blockchainReader.genesisHeader.hash.value,
               blockchainConfig = blockchainConfig,
               currentBestBlock = () => blockchainReader.getBestBlockNumber
             )

@@ -97,7 +97,7 @@ trait TestSetup extends SecureRandomBuilder with EphemBlockchainTestSetup {
   val emptyWorld: InMemoryWorldStateProxy = InMemoryWorldStateProxy(
     storagesInstance.storages.evmCodeStorage,
     blockchain.getBackingMptStorage(-1),
-    (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash),
+    (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
     UInt256.Zero,
     ByteString(MerklePatriciaTrie.EmptyRootHash),
     noEmptyAccounts = false,
@@ -151,7 +151,7 @@ trait TestSetup extends SecureRandomBuilder with EphemBlockchainTestSetup {
     val initialWorld = InMemoryWorldStateProxy(
       storagesInstance.storages.evmCodeStorage,
       blockchain.getBackingMptStorage(-1),
-      (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash),
+      (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
       UInt256.Zero,
       stateRootHash,
       noEmptyAccounts = false,
@@ -196,7 +196,7 @@ trait BlockchainSetup extends TestSetup {
     .storeBlockHeader(validBlockParentHeader)
     .and(blockchainWriter.storeBlockBody(validBlockParentHeader.hash, validBlockBodyWithNoTxs))
     .and(storagesInstance.storages.appStateStorage.putBestBlockNumber(validBlockParentHeader.number))
-    .and(storagesInstance.storages.chainWeightStorage.put(validBlockParentHeader.hash, ChainWeight.zero))
+    .and(storagesInstance.storages.chainWeightStorage.put(validBlockParentHeader.hash.value, ChainWeight.zero))
     .commit()
 
   val validTx: LegacyTransaction = defaultTx.copy(
@@ -238,7 +238,7 @@ trait DaoForkTestSetup extends TestSetup {
     override val blockExtraData: Option[ByteString] = Some(ByteString("refund extra data"))
     override val range: Int = 10
     override val drainList: Seq[Address] = Seq(Address(1), Address(2), Address(3))
-    override val forkBlockHash: ByteString = proDaoBlock.header.hash
+    override val forkBlockHash: ByteString = proDaoBlock.header.hash.value
     override val forkBlockNumber: BigInt = proDaoBlock.header.number
     override val refundContract: Option[Address] = Some(Address(4))
     override val includeOnForkIdList: Boolean = false
@@ -320,7 +320,7 @@ trait TestSetupWithVmAndValidators extends EphemBlockchainTestSetup {
       ommers: Seq[BlockHeader] = Nil
   ): Block =
     Block(
-      defaultHeader.copy(parentHash = parent, difficulty = difficulty, number = number, extraData = salt),
+      defaultHeader.copy(parentHash = BlockHash(parent), difficulty = difficulty, number = number, extraData = salt),
       BlockBody(Nil, ommers)
     )
 
@@ -329,7 +329,7 @@ trait TestSetupWithVmAndValidators extends EphemBlockchainTestSetup {
       Nil
     } else {
       val block = getBlock(number = from, difficulty = difficulty, parent = parent)
-      block :: getChain(from + 1, to, block.header.hash, difficulty)
+      block :: getChain(from + 1, to, block.header.hash.value, difficulty)
     }
 
   def getChainNel(
@@ -406,7 +406,7 @@ trait TestSetupWithVmAndValidators extends EphemBlockchainTestSetup {
           val emptyWorld = InMemoryWorldStateProxy(
             storagesInstance.storages.evmCodeStorage,
             blockchain.getBackingMptStorage(-1),
-            (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash),
+            (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
             blockchainConfig.accountStartNonce,
             ByteString(MerklePatriciaTrie.EmptyRootHash),
             noEmptyAccounts = false,

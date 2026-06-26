@@ -111,10 +111,10 @@ object BlockResponse {
 
     BlockResponse(
       number = block.header.number,
-      hash = if pendingBlock then None else Some(block.header.hash),
-      parentHash = block.header.parentHash,
+      hash = if pendingBlock then None else Some(block.header.hash.value),
+      parentHash = block.header.parentHash.value,
       nonce = if pendingBlock then None else Some(block.header.nonce),
-      sha3Uncles = block.header.ommersHash,
+      sha3Uncles = block.header.ommersHash.value,
       logsBloom = block.header.logsBloom.value,
       transactionsRoot = block.header.transactionsRoot,
       stateRoot = block.header.stateRoot,
@@ -127,9 +127,9 @@ object BlockResponse {
       gasLimit = block.header.gasLimit,
       gasUsed = block.header.gasUsed,
       timestamp = block.header.unixTimestamp,
-      mixHash = block.header.mixHash,
+      mixHash = block.header.mixHash.value,
       transactions = transactions,
-      uncles = block.body.uncleNodesList.map(_.hash),
+      uncles = block.body.uncleNodesList.map(_.hash.value),
       signature = signatureStr,
       signer = signerStr,
       baseFeePerGas = block.header.baseFee,
@@ -137,7 +137,7 @@ object BlockResponse {
       withdrawals = withdrawals,
       blobGasUsed = block.header.blobGasUsed,
       excessBlobGas = block.header.excessBlobGas,
-      parentBeaconBlockRoot = block.header.parentBeaconBlockRoot,
+      parentBeaconBlockRoot = block.header.parentBeaconBlockRoot.map(_.value),
       requestsHash = block.header.requestsHash
     )
   }

@@ -78,7 +78,7 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
     blockchainWriter.save(firstBlock, Nil, newChainWeight, saveAsBestBlock = true)
 
     val newLocalStatusMsg: Status68 =
-      localStatusMsg.copy(totalDifficulty = newChainWeight.totalDifficulty, bestHash = firstBlock.header.hash)
+      localStatusMsg.copy(totalDifficulty = newChainWeight.totalDifficulty, bestHash = firstBlock.header.hash.value)
 
     initHandshakerWithoutResolver.nextMessage.map(_.messageToSend) shouldBe Right(localHello: HelloEnc)
     val handshakerAfterHelloOpt: Option[Handshaker[PeerInfo]] = initHandshakerWithoutResolver.applyMessage(remoteHello)
@@ -109,7 +109,7 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
     val newLocalStatusMsg: Status68 =
       localStatusMsg
         .copy(
-          bestHash = firstBlock.header.hash,
+          bestHash = firstBlock.header.hash.value,
           totalDifficulty = newChainWeight.totalDifficulty,
           forkId = ForkId(0xfc64ec04L, Some(1150000))
         )
@@ -146,7 +146,7 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
     val newLocalStatusMsg: Status68 =
       localStatusMsg
         .copy(
-          bestHash = firstBlock.header.hash,
+          bestHash = firstBlock.header.hash.value,
           totalDifficulty = newChainWeight.totalDifficulty,
           forkId = ForkId(0xfc64ec04L, Some(1150000))
         )
@@ -361,9 +361,9 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
           case statusEnc: ETHPackets.Status68.Status68.Status68Enc =>
             val statusMsg = statusEnc.underlyingMsg
             // Best block should be the low block
-            statusMsg.bestHash shouldBe lowBlock.header.hash
+            statusMsg.bestHash shouldBe lowBlock.header.hash.value
             // ForkId should be calculated using actual block number (1000), matching core-geth
-            val expectedForkId = ForkId.create(genesisBlock.header.hash, blockchainConfig)(lowBlockNumber)
+            val expectedForkId = ForkId.create(genesisBlock.header.hash.value, blockchainConfig)(lowBlockNumber)
             statusMsg.forkId shouldBe expectedForkId
           case other =>
             fail(s"Expected ETHPackets.Status68.Status68Enc message but got: $other")
@@ -409,9 +409,9 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
         nextMsg.messageToSend match {
           case statusEnc: ETHPackets.Status68.Status68.Status68Enc =>
             val statusMsg = statusEnc.underlyingMsg
-            statusMsg.bestHash shouldBe highBlock.header.hash
+            statusMsg.bestHash shouldBe highBlock.header.hash.value
             // ForkId should be calculated using actual block number (19,200,000), matching core-geth
-            val expectedForkId = ForkId.create(genesisBlock.header.hash, blockchainConfig)(highBlockNumber)
+            val expectedForkId = ForkId.create(genesisBlock.header.hash.value, blockchainConfig)(highBlockNumber)
             statusMsg.forkId shouldBe expectedForkId
           case other =>
             fail(s"Expected ETHPackets.Status68.Status68Enc message but got: $other")
@@ -490,8 +490,8 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
       protocolVersion = Capability.ETH68.version,
       networkId = Config.Network.peer.networkId,
       totalDifficulty = genesisBlock.header.difficulty,
-      bestHash = genesisBlock.header.hash,
-      genesisHash = genesisBlock.header.hash,
+      bestHash = genesisBlock.header.hash.value,
+      genesisHash = genesisBlock.header.hash.value,
       forkId = ForkId(0xfc64ec04L, Some(1150000)) // ETC genesis forkId (block 0)
     )
     val localStatus: RemoteStatus = RemoteStatus(
@@ -510,8 +510,8 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
       protocolVersion = Capability.ETH68.version,
       networkId = Config.Network.peer.networkId,
       totalDifficulty = genesisBlock.header.difficulty,
-      bestHash = genesisBlock.header.hash,
-      genesisHash = genesisBlock.header.hash,
+      bestHash = genesisBlock.header.hash.value,
+      genesisHash = genesisBlock.header.hash.value,
       forkId = ForkId(1L, None)
     )
     val localStatus: RemoteStatus = RemoteStatus(
@@ -548,8 +548,8 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
       protocolVersion = Capability.ETH68.version,
       networkId = Config.Network.peer.networkId,
       totalDifficulty = 0,
-      bestHash = genesisBlock.header.hash,
-      genesisHash = genesisBlock.header.hash,
+      bestHash = genesisBlock.header.hash.value,
+      genesisHash = genesisBlock.header.hash.value,
       forkId = ForkId(0xfc64ec04L, Some(1150000))
     )
 
@@ -579,8 +579,8 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
       protocolVersion = Capability.ETH68.version,
       networkId = Config.Network.peer.networkId,
       totalDifficulty = 0,
-      bestHash = genesisBlock.header.hash,
-      genesisHash = genesisBlock.header.hash,
+      bestHash = genesisBlock.header.hash.value,
+      genesisHash = genesisBlock.header.hash.value,
       forkId = ForkId(0xfc64ec04L, Some(1150000))
     )
 
@@ -609,11 +609,11 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
     val remoteStatusMsg: ETH69.Status = ETH69.Status(
       protocolVersion = Capability.ETH69.version,
       networkId = Config.Network.peer.networkId,
-      genesisHash = genesisBlock.header.hash,
+      genesisHash = genesisBlock.header.hash.value,
       forkId = ForkId(0xfc64ec04L, Some(1150000)),
       earliestBlock = BigInt(0),
       latestBlock = BigInt(1000000),
-      latestBlockHash = genesisBlock.header.hash
+      latestBlockHash = genesisBlock.header.hash.value
     )
   }
 }

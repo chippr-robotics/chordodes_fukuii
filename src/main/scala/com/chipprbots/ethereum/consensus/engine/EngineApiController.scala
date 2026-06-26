@@ -562,19 +562,19 @@ class EngineApiController(
       case _                                                                  => (None, None, None)
     }
     val baseFields = List(
-      "parentHash" -> JString(hex(header.parentHash)),
+      "parentHash" -> JString(hex(header.parentHash.value)),
       "feeRecipient" -> JString(hex(header.beneficiary)),
       "stateRoot" -> JString(hex(header.stateRoot)),
       "receiptsRoot" -> JString(hex(header.receiptsRoot)),
       "logsBloom" -> JString(hex(header.logsBloom.value)),
-      "prevRandao" -> JString(hex(header.mixHash)),
+      "prevRandao" -> JString(hex(header.mixHash.value)),
       "blockNumber" -> JString(hexQ(header.number)),
       "gasLimit" -> JString(hexQ(header.gasLimit)),
       "gasUsed" -> JString(hexQ(header.gasUsed)),
       "timestamp" -> JString(s"0x${header.unixTimestamp.toHexString}"),
       "extraData" -> JString(hex(header.extraData)),
       "baseFeePerGas" -> JString(hexQ(baseFee.getOrElse(BigInt(0)))),
-      "blockHash" -> JString(hex(header.hash)),
+      "blockHash" -> JString(hex(header.hash.value)),
       "transactions" -> JArray(txs.toList)
     )
     val withdrawalsField = withdrawals.map(w => "withdrawals" -> w).toList

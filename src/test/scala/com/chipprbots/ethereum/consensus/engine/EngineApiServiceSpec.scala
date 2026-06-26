@@ -33,8 +33,8 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       val correctStateRoot = ByteString(Array.fill(32)(0x11.toByte))
       val modifiedStateRoot = ByteString(Array.fill(32)(0xaa.toByte))
       val header = BlockHeader(
-        parentHash = ByteString(new Array[Byte](32)),
-        ommersHash = ByteString(new Array[Byte](32)),
+        parentHash = BlockHash(ByteString(new Array[Byte](32))),
+        ommersHash = BlockHash(ByteString(new Array[Byte](32))),
         beneficiary = ByteString(new Array[Byte](20)),
         stateRoot = modifiedStateRoot, // block claims this stateRoot
         transactionsRoot = ByteString(new Array[Byte](32)),
@@ -46,7 +46,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         gasUsed = 21000,
         unixTimestamp = 1000,
         extraData = ByteString.empty,
-        mixHash = ByteString(new Array[Byte](32)),
+        mixHash = BlockHash(ByteString(new Array[Byte](32))),
         nonce = ByteString(new Array[Byte](8)),
         extraFields = HefPostOlympia(BigInt("1000000000"))
       )
@@ -68,8 +68,8 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       val validators = MockValidatorsAlwaysSucceed
       val stateRoot = ByteString(Array.fill(32)(0x11.toByte))
       val header = BlockHeader(
-        parentHash = ByteString(new Array[Byte](32)),
-        ommersHash = ByteString(new Array[Byte](32)),
+        parentHash = BlockHash(ByteString(new Array[Byte](32))),
+        ommersHash = BlockHash(ByteString(new Array[Byte](32))),
         beneficiary = ByteString(new Array[Byte](20)),
         stateRoot = stateRoot,
         transactionsRoot = ByteString(new Array[Byte](32)),
@@ -81,7 +81,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         gasUsed = 99999, // block claims this gasUsed
         unixTimestamp = 1000,
         extraData = ByteString.empty,
-        mixHash = ByteString(new Array[Byte](32)),
+        mixHash = BlockHash(ByteString(new Array[Byte](32))),
         nonce = ByteString(new Array[Byte](8)),
         extraFields = HefPostOlympia(BigInt("1000000000"))
       )
@@ -103,8 +103,8 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       val validators = MockValidatorsAlwaysSucceed
       val stateRoot = ByteString(Array.fill(32)(0x11.toByte))
       val header = BlockHeader(
-        parentHash = ByteString(new Array[Byte](32)),
-        ommersHash = ByteString(new Array[Byte](32)),
+        parentHash = BlockHash(ByteString(new Array[Byte](32))),
+        ommersHash = BlockHash(ByteString(new Array[Byte](32))),
         beneficiary = ByteString(new Array[Byte](20)),
         stateRoot = stateRoot,
         transactionsRoot = ByteString(new Array[Byte](32)),
@@ -116,7 +116,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         gasUsed = 21000,
         unixTimestamp = 1000,
         extraData = ByteString.empty,
-        mixHash = ByteString(new Array[Byte](32)),
+        mixHash = BlockHash(ByteString(new Array[Byte](32))),
         nonce = ByteString(new Array[Byte](8)),
         extraFields = HefPostOlympia(BigInt("1000000000"))
       )
@@ -176,7 +176,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         val world = InMemoryWorldStateProxy(
           storagesInstance.storages.evmCodeStorage,
           blockchain.getBackingMptStorage(0),
-          (n: BigInt) => blockchainReader.getBlockHeaderByNumber(n).map(_.hash),
+          (n: BigInt) => blockchainReader.getBlockHeaderByNumber(n).map(_.hash.value),
           UInt256.Zero,
           ByteString(com.chipprbots.ethereum.mpt.MerklePatriciaTrie.EmptyRootHash),
           noEmptyAccounts = false,
@@ -191,8 +191,8 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       }
 
       val genesisHeader: BlockHeader = BlockHeader(
-        parentHash = ByteString(new Array[Byte](32)),
-        ommersHash = BlockHeader.EmptyOmmers,
+        parentHash = BlockHash(ByteString(new Array[Byte](32))),
+        ommersHash = BlockHash(BlockHeader.EmptyOmmers),
         beneficiary = ByteString(new Array[Byte](20)),
         stateRoot = genesisStateRoot,
         transactionsRoot = BlockHeader.EmptyMpt,
@@ -204,7 +204,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         gasUsed = 0,
         unixTimestamp = 1000,
         extraData = ByteString.empty,
-        mixHash = ByteString(new Array[Byte](32)),
+        mixHash = BlockHash(ByteString(new Array[Byte](32))),
         nonce = ByteString(new Array[Byte](8)),
         extraFields = HefPostOlympia(BigInt("1000000000"))
       )
@@ -219,7 +219,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
 
         val headerTemplate = BlockHeader(
           parentHash = genesisHeader.hash,
-          ommersHash = BlockHeader.EmptyOmmers,
+          ommersHash = BlockHash(BlockHeader.EmptyOmmers),
           beneficiary = ByteString(new Array[Byte](20)),
           stateRoot = ByteString.empty, // will be filled after execution
           transactionsRoot = BlockHeader.EmptyMpt,
@@ -231,7 +231,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
           gasUsed = 0,
           unixTimestamp = 1001,
           extraData = ByteString("fukuii".getBytes),
-          mixHash = ByteString(Array.fill(32)(0x42.toByte)), // prevRandao
+          mixHash = BlockHash(ByteString(Array.fill(32)(0x42.toByte))), // prevRandao
           nonce = ByteString(new Array[Byte](8)),
           extraFields = HefPostShanghai(
             baseFee = BigInt("1000000000"),
@@ -259,19 +259,19 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         import com.chipprbots.ethereum.rlp.encode as rlpEncode
 
         ExecutionPayload(
-          parentHash = block.header.parentHash,
+          parentHash = block.header.parentHash.value,
           feeRecipient = Address(block.header.beneficiary),
           stateRoot = block.header.stateRoot,
           receiptsRoot = block.header.receiptsRoot,
           logsBloom = block.header.logsBloom.value,
-          prevRandao = block.header.mixHash,
+          prevRandao = block.header.mixHash.value,
           blockNumber = block.header.number,
           gasLimit = block.header.gasLimit,
           gasUsed = block.header.gasUsed,
           timestamp = block.header.unixTimestamp,
           extraData = block.header.extraData,
           baseFeePerGas = block.header.baseFee.getOrElse(BigInt(0)),
-          blockHash = block.header.hash,
+          blockHash = block.header.hash.value,
           transactions = block.body.transactionList.map { stx =>
             ByteString(rlpEncode(SignedTransactionEnc(stx).toRLPEncodable))
           },
@@ -287,8 +287,8 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         val _ = engineApi.asInstanceOf[{ def payloadToBlock(p: ExecutionPayload): Block }]
         // Instead, manually build the header and compute hash
         val header = BlockHeader(
-          parentHash = modified.parentHash,
-          ommersHash = BlockHeader.EmptyOmmers,
+          parentHash = BlockHash(modified.parentHash),
+          ommersHash = BlockHash(BlockHeader.EmptyOmmers),
           beneficiary = modified.feeRecipient.bytes,
           stateRoot = modified.stateRoot,
           transactionsRoot = payload.blockHash, // placeholder, need real txRoot
@@ -300,7 +300,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
           gasUsed = modified.gasUsed,
           unixTimestamp = modified.timestamp,
           extraData = modified.extraData,
-          mixHash = modified.prevRandao,
+          mixHash = BlockHash(modified.prevRandao),
           nonce = ByteString(new Array[Byte](8)),
           extraFields = HefPostShanghai(
             baseFee = modified.baseFeePerGas,
@@ -308,7 +308,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
           )
         )
         // Need to use same txRoot as the original block
-        modified.copy(blockHash = header.hash)
+        modified.copy(blockHash = header.hash.value)
       }
     }
 
@@ -362,7 +362,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       val modifiedHeader: BlockHeader = validBlock.header.copy(stateRoot = randomStateRoot)
       val modifiedPayload: ExecutionPayload = payload.copy(
         stateRoot = randomStateRoot,
-        blockHash = modifiedHeader.hash
+        blockHash = modifiedHeader.hash.value
       )
 
       val result: PayloadStatusV1 = engineApi.newPayload(modifiedPayload).unsafeRunSync()
@@ -404,7 +404,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       val modifiedHeader: BlockHeader = validBlock.header.copy(gasUsed = modifiedGasUsed)
       val modifiedPayload: ExecutionPayload = payload.copy(
         gasUsed = modifiedGasUsed,
-        blockHash = modifiedHeader.hash
+        blockHash = modifiedHeader.hash.value
       )
 
       val result: PayloadStatusV1 = engineApi.newPayload(modifiedPayload).unsafeRunSync()
@@ -418,10 +418,10 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
 
       // Modify parentHash to unknown hash and recompute blockHash
       val unknownParent: ByteString = ByteString(kec256(Array[Byte](9, 8, 7, 6)))
-      val modifiedHeader: BlockHeader = validBlock.header.copy(parentHash = unknownParent)
+      val modifiedHeader: BlockHeader = validBlock.header.copy(parentHash = BlockHash(unknownParent))
       val modifiedPayload: ExecutionPayload = payload.copy(
         parentHash = unknownParent,
-        blockHash = modifiedHeader.hash
+        blockHash = modifiedHeader.hash.value
       )
 
       val result: PayloadStatusV1 = engineApi.newPayload(modifiedPayload).unsafeRunSync()
@@ -436,16 +436,16 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       val payload: ExecutionPayload = blockToPayload(validBlock)
 
       val unknownParent: ByteString = ByteString(kec256(Array[Byte](9, 8, 7, 6)))
-      val modifiedHeader: BlockHeader = validBlock.header.copy(parentHash = unknownParent)
+      val modifiedHeader: BlockHeader = validBlock.header.copy(parentHash = BlockHash(unknownParent))
       val modifiedPayload: ExecutionPayload = payload.copy(
         parentHash = unknownParent,
-        blockHash = modifiedHeader.hash
+        blockHash = modifiedHeader.hash.value
       )
 
       engineApi.newPayload(modifiedPayload).unsafeRunSync()
 
       // ACCEPTED block IS stored by hash (for later re-validation)
-      blockchainReader.getBlockHeaderByHash(modifiedPayload.blockHash) shouldBe defined
+      blockchainReader.getBlockHeaderByHash(BlockHash(modifiedPayload.blockHash)) shouldBe defined
       // But NOT stored by number
       blockchainReader.getBlockHeaderByNumber(1).map(_.hash) should not be Some(modifiedPayload.blockHash)
     }
@@ -458,7 +458,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       val modifiedHeader: BlockHeader = validBlock.header.copy(unixTimestamp = genesisHeader.unixTimestamp)
       val modifiedPayload: ExecutionPayload = payload.copy(
         timestamp = genesisHeader.unixTimestamp,
-        blockHash = modifiedHeader.hash
+        blockHash = modifiedHeader.hash.value
       )
 
       val result: PayloadStatusV1 = engineApi.newPayload(modifiedPayload).unsafeRunSync()
@@ -475,7 +475,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       val modifiedHeader: BlockHeader = validBlock.header.copy(number = 5)
       val modifiedPayload: ExecutionPayload = payload.copy(
         blockNumber = 5,
-        blockHash = modifiedHeader.hash
+        blockHash = modifiedHeader.hash.value
       )
 
       val result: PayloadStatusV1 = engineApi.newPayload(modifiedPayload).unsafeRunSync()
@@ -492,14 +492,14 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       val modifiedHeader: BlockHeader = validBlock.header.copy(stateRoot = randomStateRoot)
       val modifiedPayload: ExecutionPayload = payload.copy(
         stateRoot = randomStateRoot,
-        blockHash = modifiedHeader.hash
+        blockHash = modifiedHeader.hash.value
       )
 
       val result: PayloadStatusV1 = engineApi.newPayload(modifiedPayload).unsafeRunSync()
       result.status shouldBe Invalid
 
       // The INVALID block should NOT be accessible by hash
-      blockchainReader.getBlockHeaderByHash(modifiedPayload.blockHash) shouldBe None
+      blockchainReader.getBlockHeaderByHash(BlockHash(modifiedPayload.blockHash)) shouldBe None
     }
 
     "mark child of INVALID block as INVALID" taggedAs UnitTest in new EngineApiTestSetup {
@@ -511,15 +511,15 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       val modifiedHeader: BlockHeader = validBlock.header.copy(stateRoot = randomStateRoot)
       val invalidPayload: ExecutionPayload = payload.copy(
         stateRoot = randomStateRoot,
-        blockHash = modifiedHeader.hash
+        blockHash = modifiedHeader.hash.value
       )
       val r1: PayloadStatusV1 = engineApi.newPayload(invalidPayload).unsafeRunSync()
       r1.status shouldBe Invalid
 
       // Now send a child block referencing the invalid parent
       val childHeader: BlockHeader = BlockHeader(
-        parentHash = invalidPayload.blockHash,
-        ommersHash = BlockHeader.EmptyOmmers,
+        parentHash = BlockHash(invalidPayload.blockHash),
+        ommersHash = BlockHash(BlockHeader.EmptyOmmers),
         beneficiary = ByteString(new Array[Byte](20)),
         stateRoot = ByteString(new Array[Byte](32)),
         transactionsRoot = BlockHeader.EmptyMpt,
@@ -531,7 +531,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         gasUsed = 0,
         unixTimestamp = 1002,
         extraData = ByteString("fukuii".getBytes),
-        mixHash = ByteString(new Array[Byte](32)),
+        mixHash = BlockHash(ByteString(new Array[Byte](32))),
         nonce = ByteString(new Array[Byte](8)),
         extraFields = HefPostShanghai(BigInt("1000000000"), BlockHeader.EmptyMpt)
       )
@@ -548,7 +548,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         timestamp = 1002,
         extraData = ByteString("fukuii".getBytes),
         baseFeePerGas = BigInt("1000000000"),
-        blockHash = childHeader.hash,
+        blockHash = childHeader.hash.value,
         transactions = Seq.empty,
         withdrawals = Some(Nil)
       )

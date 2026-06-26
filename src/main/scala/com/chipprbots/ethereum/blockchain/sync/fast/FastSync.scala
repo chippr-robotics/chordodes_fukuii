@@ -1005,7 +1005,7 @@ object FastSync {
       val shouldValidate = session.exists(s => header.number >= s.syncState.nextBlockToFullyValidate)
 
       if shouldValidate then {
-        validators.blockHeaderValidator.validate(header, blockchainReader.getBlockHeaderByHash) match {
+        validators.blockHeaderValidator.validate(header, h => blockchainReader.getBlockHeaderByHash(BlockHash(h))) match {
           case Right(_) =>
             updateValidationState(header)
             Right(header)
@@ -1032,13 +1032,13 @@ object FastSync {
           else s
         s2.copy(syncState =
           s2.syncState
-            .enqueueBlockBodies(Seq(header.hash))
-            .enqueueReceipts(Seq(header.hash))
+            .enqueueBlockBodies(Seq(header.hash.value))
+            .enqueueReceipts(Seq(header.hash.value))
         )
       }
       session.foreach { s =>
-        s.bodiesFetcherQueue.enqueue(Seq(header.hash))
-        s.receiptsFetcherQueue.enqueue(Seq(header.hash))
+        s.bodiesFetcherQueue.enqueue(Seq(header.hash.value))
+        s.receiptsFetcherQueue.enqueue(Seq(header.hash.value))
       }
     }
 
@@ -1191,7 +1191,7 @@ object FastSync {
             } else {
               blockHashesWithReceipts
                 .map { case (hash, receiptsForBlock) =>
-                  blockchainWriter.storeReceipts(hash, receiptsForBlock)
+                  blockchainWriter.storeReceipts(BlockHash(hash), receiptsForBlock)
                 }
                 .reduce(_.and(_))
                 .commit()
@@ -1378,7 +1378,7 @@ object FastSync {
       else {
         blockHashesWithBodies
           .map { case (hash, body) =>
-            blockchainWriter.storeBlockBody(hash, body)
+            blockchainWriter.storeBlockBody(BlockHash(hash), body)
           }
           .reduce(_.and(_))
           .commit()
@@ -1751,7 +1751,8 @@ object FastSync {
       )
 
     private def updateBestBlockIfNeeded(receivedHashes: Seq[ByteString]): Unit = {
-      val fullBlocks = receivedHashes.flatMap { hash =>
+      val fullBlocks = receivedHashes.flatMap { rawHash =>
+        val hash = BlockHash(rawHash)
         for {
           header <- blockchainReader.getBlockHeaderByHash(hash)
           _ <- blockchainReader.getBlockBodyByHash(hash)
@@ -1766,8 +1767,8 @@ object FastSync {
           // Set best block info with BOTH hash and number (putBestBlockNumber only
           // sets the number, leaving getBestBlockInfo().hash stale/empty).
           appStateStorage
-            .putBestBlockInfo(BlockInfo(bestReceivedBlock.hash, bestReceivedBlock.number))
-            .and(blockNumberMappingStorage.put(bestReceivedBlock.number, bestReceivedBlock.hash))
+            .putBestBlockInfo(BlockInfo(bestReceivedBlock.hash.value, bestReceivedBlock.number))
+            .and(blockNumberMappingStorage.put(bestReceivedBlock.number, bestReceivedBlock.hash.value))
             .commit()
         }
         updateSession(s =>

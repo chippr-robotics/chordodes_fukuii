@@ -6,6 +6,7 @@ import scala.annotation.tailrec
 import scala.jdk.CollectionConverters.*
 
 import com.chipprbots.ethereum.domain.Block
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.ledger.BlockQueue.Leaf
@@ -30,8 +31,8 @@ class BlockQueue(
 ) extends Logger {
 
   // note these two maps make this class thread-unsafe
-  private val blocks = new java.util.concurrent.ConcurrentHashMap[ByteString, QueuedBlock].asScala
-  private val parentToChildren = new java.util.concurrent.ConcurrentHashMap[ByteString, Set[ByteString]].asScala
+  private val blocks = new java.util.concurrent.ConcurrentHashMap[BlockHash, QueuedBlock].asScala
+  private val parentToChildren = new java.util.concurrent.ConcurrentHashMap[BlockHash, Set[BlockHash]].asScala
 
   /** Enqueue a block for optional later inclusion into the blockchain. Queued blocks are stored as trees with
     * bi-directional relations. Therefore when a younger blocks arrives, for which the total difficulty is known, we can
@@ -87,10 +88,10 @@ class BlockQueue(
     }
   }
 
-  def getBlockByHash(hash: ByteString): Option[Block] =
+  def getBlockByHash(hash: BlockHash): Option[Block] =
     blocks.get(hash).map(_.block)
 
-  def isQueued(hash: ByteString): Boolean =
+  def isQueued(hash: BlockHash): Boolean =
     blocks.contains(hash)
 
   /** Returns the weight of the block corresponding to the hash, or None if not found
@@ -99,7 +100,7 @@ class BlockQueue(
     * @return
     *   the weight of the block corresponding to the hash, or None if not found
     */
-  def getChainWeightByHash(hash: ByteString): Option[ChainWeight] =
+  def getChainWeightByHash(hash: BlockHash): Option[ChainWeight] =
     blocks.get(hash).flatMap(_.weight)
 
   /** Takes a branch going from descendant block upwards to the oldest ancestor
@@ -110,9 +111,9 @@ class BlockQueue(
     * @return
     *   full branch from oldest ancestor to descendant, even if not all of it is removed
     */
-  def getBranch(descendant: ByteString, dequeue: Boolean): List[Block] = {
+  def getBranch(descendant: BlockHash, dequeue: Boolean): List[Block] = {
 
-    def recur(hash: ByteString, childShared: Boolean): List[Block] =
+    def recur(hash: BlockHash, childShared: Boolean): List[Block] =
       blocks.get(hash) match {
         case Some(QueuedBlock(block, _)) =>
           import block.header.parentHash
@@ -137,7 +138,7 @@ class BlockQueue(
     * @param ancestor
     *   hash of the ancestor block
     */
-  def removeSubtree(ancestor: ByteString): Unit =
+  def removeSubtree(ancestor: BlockHash): Unit =
     blocks.get(ancestor).foreach { case QueuedBlock(block, _) =>
       val children = parentToChildren.getOrElse(ancestor, Set.empty)
       children.foreach(removeSubtree)
@@ -172,7 +173,7 @@ class BlockQueue(
     * @return
     *   Best leaf from the affected subtree
     */
-  private def updateChainWeights(ancestor: ByteString): Option[Leaf] =
+  private def updateChainWeights(ancestor: BlockHash): Option[Leaf] =
     blocks.get(ancestor).flatMap(_.weight).flatMap { weight =>
       parentToChildren.get(ancestor) match {
 
@@ -186,7 +187,7 @@ class BlockQueue(
           updatedChildren.flatMap(qb => updateChainWeights(qb.block.header.hash)).maxByOption(_.weight)
 
         case _ =>
-          Some(Leaf(ancestor, weight))
+          Some(Leaf(ancestor.value, weight))
       }
     }
 
@@ -199,7 +200,7 @@ class BlockQueue(
     *   hash of the ancestor, if found
     */
   @tailrec
-  private def findClosestChainedAncestor(descendant: Block): Option[ByteString] =
+  private def findClosestChainedAncestor(descendant: Block): Option[BlockHash] =
     blocks.get(descendant.header.parentHash) match {
       case Some(QueuedBlock(block, Some(_))) =>
         Some(block.header.hash)

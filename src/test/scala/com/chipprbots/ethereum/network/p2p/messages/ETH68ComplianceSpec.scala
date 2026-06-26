@@ -51,8 +51,8 @@ class ETH68ComplianceSpec extends AnyWordSpec with Matchers {
           68,
           61L,
           td,
-          Fixtures.Blocks.Block3125369.header.hash,
-          Fixtures.Blocks.Genesis.header.hash,
+          Fixtures.Blocks.Block3125369.header.hash.value,
+          Fixtures.Blocks.Genesis.header.hash.value,
           ForkId(0xbe46d57cL, None)
         )
         val encoded = msg.toBytes
@@ -78,7 +78,7 @@ class ETH68ComplianceSpec extends AnyWordSpec with Matchers {
       "preserve requestId through encode/decode" taggedAs UnitTest in {
         val requestId = BigInt(42)
         val msg =
-          ETHPackets.GetBlockHeaders(requestId, Right(Fixtures.Blocks.Block3125369.header.hash), 1, 0, reverse = false)
+          ETHPackets.GetBlockHeaders(requestId, Right(Fixtures.Blocks.Block3125369.header.hash.value), 1, 0, reverse = false)
         eth68Decoder.fromBytes(Codes.GetBlockHeadersCode, msg.toBytes) match {
           case Right(decoded: ETHPackets.GetBlockHeaders) =>
             decoded.requestId shouldEqual requestId
@@ -114,7 +114,7 @@ class ETH68ComplianceSpec extends AnyWordSpec with Matchers {
 
       "preserve requestId through encode/decode" taggedAs UnitTest in {
         val requestId = BigInt(99)
-        val msg = ETHPackets.GetBlockBodies(requestId, Seq(Fixtures.Blocks.Block3125369.header.hash))
+        val msg = ETHPackets.GetBlockBodies(requestId, Seq(Fixtures.Blocks.Block3125369.header.hash.value))
         eth68Decoder.fromBytes(Codes.GetBlockBodiesCode, msg.toBytes) match {
           case Right(decoded: ETHPackets.GetBlockBodies) =>
             decoded.requestId shouldEqual requestId
@@ -133,7 +133,7 @@ class ETH68ComplianceSpec extends AnyWordSpec with Matchers {
 
       "preserve requestId through encode/decode" taggedAs UnitTest in {
         val requestId = BigInt(7)
-        val msg = ETHPackets.GetReceipts(requestId, Seq(Fixtures.Blocks.Block3125369.header.hash))
+        val msg = ETHPackets.GetReceipts(requestId, Seq(Fixtures.Blocks.Block3125369.header.hash.value))
         eth68Decoder.fromBytes(Codes.GetReceiptsCode, msg.toBytes) match {
           case Right(decoded: ETHPackets.GetReceipts) =>
             decoded.requestId shouldEqual requestId

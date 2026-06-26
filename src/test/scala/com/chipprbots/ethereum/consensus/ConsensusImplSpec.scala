@@ -177,7 +177,7 @@ class ConsensusImplSpec extends AnyFlatSpec with Matchers with ScalaFutures with
 
     implicit val runtime: IORuntime = IORuntime.global
 
-    def setFailingBlock(block: Block): Unit = failingBlockHash = Some(block.hash)
+    def setFailingBlock(block: Block): Unit = failingBlockHash = Some(block.hash.value)
   }
 }
 

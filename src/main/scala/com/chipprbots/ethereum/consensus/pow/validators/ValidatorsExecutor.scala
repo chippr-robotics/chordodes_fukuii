@@ -95,7 +95,7 @@ object ValidatorsExecutor {
       _ <- self.blockHeaderValidator.validate(header, getBlockHeaderByHash)
       _ <- self.blockValidator.validateHeaderAndBody(header, body)
       _ <- self.ommersValidator.validate(
-        header.parentHash,
+        header.parentHash.value,
         header.number,
         body.uncleNodesList,
         getBlockHeaderByHash,

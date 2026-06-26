@@ -72,9 +72,9 @@ class ConsensusAdapterSpec
     UnitTest,
     ConsensusTest
   ) in new ImportBlockTestSetupImpl {
-    val block: Block = getBlock(6, parent = bestBlock.header.hash)
+    val block: Block = getBlock(6, parent = bestBlock.header.hash.value)
     val difficulty: BigInt = block.header.difficulty
-    val hash: ByteString = block.header.hash
+    val hash: ByteString = block.header.hash.value
 
     setBlockExists(block, inChain = false, inQueue = false)
     setBestBlock(bestBlock)
@@ -89,7 +89,7 @@ class ConsensusAdapterSpec
     blockchainWriter.saveBestKnownBlocks.expects(*, *).returning(())
 
     blockQueue.enqueueBlock.expects(block, bestNum).returning(Some(Leaf(hash, newWeight)))
-    blockQueue.getBranch.expects(hash, true).returning(List(block))
+    blockQueue.getBranch.expects(BlockHash(hash), true).returning(List(block))
 
     blockchainReader.getBlockHeaderByHash.expects(*).anyNumberOfTimes().returning(Some(block.header))
     blockchain.getBackingMptStorage
@@ -106,17 +106,17 @@ class ConsensusAdapterSpec
     UnitTest,
     ConsensusTest
   ) in new ImportBlockTestSetupImpl {
-    val block: Block = getBlock(6, parent = bestBlock.header.hash)
+    val block: Block = getBlock(6, parent = bestBlock.header.hash.value)
 
     setBlockExists(block, inChain = false, inQueue = false)
     setBestBlock(bestBlock)
     setChainWeightForBlock(bestBlock, currentWeight)
 
-    val hash: ByteString = block.header.hash
+    val hash: ByteString = block.header.hash.value
     blockQueue.enqueueBlock
       .expects(block, bestNum)
       .returning(Some(Leaf(hash, currentWeight.increase(block.header))))
-    blockQueue.getBranch.expects(hash, true).returning(List(block))
+    blockQueue.getBranch.expects(BlockHash(hash), true).returning(List(block))
 
     val mptStorage: MptStorage = mock[MptStorage]
     val mptNode: LeafNode = LeafNode(
@@ -144,7 +144,7 @@ class ConsensusAdapterSpec
     UnitTest,
     ConsensusTest
   ) in new ImportBlockTestSetupImpl {
-    val block: Block = getBlock(6, parent = bestBlock.header.hash)
+    val block: Block = getBlock(6, parent = bestBlock.header.hash.value)
 
     setBlockExists(block, inChain = false, inQueue = false)
     // After the post-PivotHeaderBootstrap fix, evaluateBranchBlock falls back to
@@ -163,7 +163,7 @@ class ConsensusAdapterSpec
     UnitTest,
     ConsensusTest
   ) in new ImportBlockTestSetupImpl {
-    val block: Block = getBlock(6, parent = bestBlock.header.hash)
+    val block: Block = getBlock(6, parent = bestBlock.header.hash.value)
 
     setBlockExists(block, inChain = false, inQueue = false)
     setBestBlock(bestBlock)
@@ -192,10 +192,10 @@ class ConsensusAdapterSpec
     ConsensusTest
   ) in new EphemBlockchain {
     val block1: Block = getBlock(bestNum - 2)
-    val newBlock2: Block = getBlock(bestNum - 1, difficulty = 101, parent = block1.header.hash)
-    val newBlock3: Block = getBlock(bestNum, difficulty = 105, parent = newBlock2.header.hash)
-    val oldBlock2: Block = getBlock(bestNum - 1, difficulty = 102, parent = block1.header.hash)
-    val oldBlock3: Block = getBlock(bestNum, difficulty = 103, parent = oldBlock2.header.hash)
+    val newBlock2: Block = getBlock(bestNum - 1, difficulty = 101, parent = block1.header.hash.value)
+    val newBlock3: Block = getBlock(bestNum, difficulty = 105, parent = newBlock2.header.hash.value)
+    val oldBlock2: Block = getBlock(bestNum - 1, difficulty = 102, parent = block1.header.hash.value)
+    val oldBlock3: Block = getBlock(bestNum, difficulty = 103, parent = oldBlock2.header.hash.value)
 
     val weight1: ChainWeight = ChainWeight.totalDifficultyOnly(block1.header.difficulty + 999)
     val newWeight2: ChainWeight = weight1.increase(newBlock2.header)
@@ -242,10 +242,10 @@ class ConsensusAdapterSpec
 
   it should "handle error when trying to reorganise chain" taggedAs (UnitTest, ConsensusTest) in new EphemBlockchain {
     val block1: Block = getBlock(bestNum - 2)
-    val newBlock2: Block = getBlock(bestNum - 1, difficulty = 101, parent = block1.header.hash)
-    val newBlock3: Block = getBlock(bestNum, difficulty = 105, parent = newBlock2.header.hash)
-    val oldBlock2: Block = getBlock(bestNum - 1, difficulty = 102, parent = block1.header.hash)
-    val oldBlock3: Block = getBlock(bestNum, difficulty = 103, parent = oldBlock2.header.hash)
+    val newBlock2: Block = getBlock(bestNum - 1, difficulty = 101, parent = block1.header.hash.value)
+    val newBlock3: Block = getBlock(bestNum, difficulty = 105, parent = newBlock2.header.hash.value)
+    val oldBlock2: Block = getBlock(bestNum - 1, difficulty = 102, parent = block1.header.hash.value)
+    val oldBlock3: Block = getBlock(bestNum, difficulty = 103, parent = oldBlock2.header.hash.value)
 
     val weight1: ChainWeight = ChainWeight.totalDifficultyOnly(block1.header.difficulty + 999)
     val newWeight2: ChainWeight = weight1.increase(newBlock2.header)
@@ -345,17 +345,17 @@ class ConsensusAdapterSpec
 
   it should "correctly import block with ommers and ancestor taggedAs (UnitTest, ConsensusTest) in block queue " in new OmmersTestSetup {
     val ancestorForValidation: Block = getBlock(0, difficulty = 1)
-    val ancestorForValidation1: Block = getBlock(difficulty = 2, parent = ancestorForValidation.header.hash)
-    val ancestorForValidation2: Block = getBlock(2, difficulty = 3, parent = ancestorForValidation1.header.hash)
+    val ancestorForValidation1: Block = getBlock(difficulty = 2, parent = ancestorForValidation.header.hash.value)
+    val ancestorForValidation2: Block = getBlock(2, difficulty = 3, parent = ancestorForValidation1.header.hash.value)
 
-    val block1: Block = getBlock(bestNum - 2, parent = ancestorForValidation2.header.hash)
-    val ommerBlock: Block = getBlock(bestNum - 1, difficulty = 101, parent = block1.header.hash)
-    val oldBlock2: Block = getBlock(bestNum - 1, difficulty = 102, parent = block1.header.hash)
-    val oldBlock3: Block = getBlock(bestNum, difficulty = 103, parent = oldBlock2.header.hash)
-    val newBlock2: Block = getBlock(bestNum - 1, difficulty = 102, parent = block1.header.hash)
+    val block1: Block = getBlock(bestNum - 2, parent = ancestorForValidation2.header.hash.value)
+    val ommerBlock: Block = getBlock(bestNum - 1, difficulty = 101, parent = block1.header.hash.value)
+    val oldBlock2: Block = getBlock(bestNum - 1, difficulty = 102, parent = block1.header.hash.value)
+    val oldBlock3: Block = getBlock(bestNum, difficulty = 103, parent = oldBlock2.header.hash.value)
+    val newBlock2: Block = getBlock(bestNum - 1, difficulty = 102, parent = block1.header.hash.value)
 
     val newBlock3WithOmmer: Block =
-      getBlock(bestNum, difficulty = 105, parent = newBlock2.header.hash, ommers = Seq(ommerBlock.header))
+      getBlock(bestNum, difficulty = 105, parent = newBlock2.header.hash.value, ommers = Seq(ommerBlock.header))
 
     val weight1: ChainWeight = ChainWeight.totalDifficultyOnly(block1.header.difficulty + 999)
     val oldWeight2: ChainWeight = weight1.increase(oldBlock2.header)
@@ -409,8 +409,8 @@ class ConsensusAdapterSpec
 
     blockchainWriter.save(currentBestBlock, Nil, block1Weight, saveAsBestBlock = true)
 
-    val newBlock1: Block = getBlock(bestNum - 1, difficulty = 101, parent = currentBestBlock.header.hash)
-    val newBlock2: Block = getBlock(bestNum, difficulty = 105, parent = newBlock1.header.hash)
+    val newBlock1: Block = getBlock(bestNum - 1, difficulty = 101, parent = currentBestBlock.header.hash.value)
+    val newBlock2: Block = getBlock(bestNum, difficulty = 105, parent = newBlock1.header.hash.value)
 
     (mockExecution
       .executeAndValidateBlocks(_: List[Block], _: ChainWeight)(_: BlockchainConfig))
@@ -440,9 +440,9 @@ class ConsensusAdapterSpec
 
     blockchainWriter.save(currentBestBlock, Nil, currentWeight, saveAsBestBlock = true)
 
-    val newBlock1: Block = getBlock(bestNum + 1, difficulty = 101, parent = currentBestBlock.header.hash)
-    val newBlock2: Block = getBlock(bestNum + 2, difficulty = 105, parent = newBlock1.header.hash)
-    val newBlock2bis: Block = getBlock(bestNum + 2, difficulty = 50, parent = newBlock1.header.hash)
+    val newBlock1: Block = getBlock(bestNum + 1, difficulty = 101, parent = currentBestBlock.header.hash.value)
+    val newBlock2: Block = getBlock(bestNum + 2, difficulty = 105, parent = newBlock1.header.hash.value)
+    val newBlock2bis: Block = getBlock(bestNum + 2, difficulty = 50, parent = newBlock1.header.hash.value)
 
     (mockExecution
       .executeAndValidateBlocks(_: List[Block], _: ChainWeight)(_: BlockchainConfig))
@@ -475,10 +475,10 @@ class ConsensusAdapterSpec
 
     blockchainWriter.save(currentBestBlock, Nil, currentWeight, saveAsBestBlock = true)
 
-    val newBlock1: Block = getBlock(bestNum + 1, difficulty = 101, parent = currentBestBlock.header.hash)
-    val newBlock2: Block = getBlock(bestNum + 2, difficulty = 105, parent = newBlock1.header.hash)
-    val newBlock3: Block = getBlock(bestNum + 3, difficulty = 105, parent = newBlock2.header.hash)
-    val newBlock3bis: Block = getBlock(bestNum + 3, difficulty = 50, parent = newBlock2.header.hash)
+    val newBlock1: Block = getBlock(bestNum + 1, difficulty = 101, parent = currentBestBlock.header.hash.value)
+    val newBlock2: Block = getBlock(bestNum + 2, difficulty = 105, parent = newBlock1.header.hash.value)
+    val newBlock3: Block = getBlock(bestNum + 3, difficulty = 105, parent = newBlock2.header.hash.value)
+    val newBlock3bis: Block = getBlock(bestNum + 3, difficulty = 50, parent = newBlock2.header.hash.value)
 
     (mockExecution
       .executeAndValidateBlocks(_: List[Block], _: ChainWeight)(_: BlockchainConfig))
@@ -511,15 +511,15 @@ class ConsensusAdapterSpec
     val mockExecution: BlockExecution = mock[BlockExecution]
 
     val currentBestBlock: Block = getBlock(bestNum)
-    val block1: Block = getBlock(bestNum + 1, difficulty = 101, parent = currentBestBlock.header.hash)
-    val block2: Block = getBlock(bestNum + 2, difficulty = 105, parent = block1.header.hash)
+    val block1: Block = getBlock(bestNum + 1, difficulty = 101, parent = currentBestBlock.header.hash.value)
+    val block2: Block = getBlock(bestNum + 2, difficulty = 105, parent = block1.header.hash.value)
     blockchainWriter.save(currentBestBlock, Nil, currentWeight, saveAsBestBlock = true)
     blockchainWriter.save(block1, Nil, currentWeight, saveAsBestBlock = true)
     blockchainWriter.save(block2, Nil, currentWeight, saveAsBestBlock = true)
 
-    val badBlock: Block = getBlock(bestNum + 2, difficulty = 105, parent = block1.header.hash)
-    val newBlock3: Block = getBlock(bestNum + 3, difficulty = 105, parent = badBlock.header.hash)
-    val newBlock3bis: Block = getBlock(bestNum + 3, difficulty = 10, parent = badBlock.header.hash)
+    val badBlock: Block = getBlock(bestNum + 2, difficulty = 105, parent = block1.header.hash.value)
+    val newBlock3: Block = getBlock(bestNum + 3, difficulty = 105, parent = badBlock.header.hash.value)
+    val newBlock3bis: Block = getBlock(bestNum + 3, difficulty = 10, parent = badBlock.header.hash.value)
 
     (mockExecution
       .executeAndValidateBlocks(_: List[Block], _: ChainWeight)(_: BlockchainConfig))
@@ -555,7 +555,7 @@ class ConsensusAdapterSpec
     (() => blockchainReader.getBestBranch).expects().anyNumberOfTimes().returning(EmptyBranch)
 
     // Helper methods implementation (have MockFactory context here)
-    override def setBlockExists(block: Block, inChain: Boolean, inQueue: Boolean): CallHandler1[ByteString, Boolean] = {
+    override def setBlockExists(block: Block, inChain: Boolean, inQueue: Boolean): CallHandler1[BlockHash, Boolean] = {
       blockchainReader.getBlockByHash
         .expects(block.header.hash)
         .anyNumberOfTimes()
@@ -574,14 +574,14 @@ class ConsensusAdapterSpec
     override def setChainWeightForBlock(
         block: Block,
         weight: ChainWeight
-    ): CallHandler1[ByteString, Option[ChainWeight]] =
-      setChainWeightByHash(block.hash, weight)
+    ): CallHandler1[BlockHash, Option[ChainWeight]] =
+      setChainWeightByHash(block.hash.value, weight)
 
     override def setChainWeightByHash(
         hash: ByteString,
         weight: ChainWeight
-    ): CallHandler1[ByteString, Option[ChainWeight]] =
-      blockchainReader.getChainWeightByHash.expects(hash).anyNumberOfTimes().returning(Some(weight))
+    ): CallHandler1[BlockHash, Option[ChainWeight]] =
+      blockchainReader.getChainWeightByHash.expects(BlockHash(hash)).anyNumberOfTimes().returning(Some(weight))
 
     override def expectBlockSaved(
         block: Block,
@@ -594,8 +594,8 @@ class ConsensusAdapterSpec
         .expects(block, receipts, weight, saveAsBestBlock)
         .once()
 
-    override def setHeaderInChain(hash: ByteString, result: Boolean = true): CallHandler2[Branch, ByteString, Boolean] =
-      blockchainReader.isInChain.expects(*, hash).returning(result)
+    override def setHeaderInChain(hash: ByteString, result: Boolean = true): CallHandler2[Branch, BlockHash, Boolean] =
+      blockchainReader.isInChain.expects(*, BlockHash(hash)).returning(result)
 
     override def setBlockByNumber(number: BigInt, block: Option[Block]): CallHandler2[Branch, BigInt, Option[Block]] =
       blockchainReader.getBlockByNumber.expects(*, number).returning(block)

@@ -8,6 +8,7 @@ import com.chipprbots.ethereum.consensus.pow.validators.OmmersValidator.OmmersEr
 import com.chipprbots.ethereum.consensus.pow.validators.OmmersValidator.OmmersValid
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderError
 import com.chipprbots.ethereum.domain.Block
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.utils.BlockchainConfig
@@ -29,11 +30,12 @@ trait OmmersValidator {
       blockchainReader: BlockchainReader
   )(implicit blockchainConfig: BlockchainConfig): Either[OmmersError, OmmersValid] = {
 
-    val getBlockHeaderByHash: ByteString => Option[BlockHeader] = blockchainReader.getBlockHeaderByHash
+    val getBlockHeaderByHash: ByteString => Option[BlockHeader] =
+      (h: ByteString) => blockchainReader.getBlockHeaderByHash(BlockHash(h))
     val getNBlocksBack: (ByteString, Int) => List[Block] =
       (tailBlockHash, n) =>
         Iterator
-          .iterate(blockchainReader.getBlockByHash(tailBlockHash))(
+          .iterate(blockchainReader.getBlockByHash(BlockHash(tailBlockHash)))(
             _.filter(_.number > 0) // avoid trying to fetch parent of genesis
               .flatMap(block => blockchainReader.getBlockByHash(block.header.parentHash))
           )

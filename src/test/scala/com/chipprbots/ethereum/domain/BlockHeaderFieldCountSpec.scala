@@ -35,7 +35,7 @@ class BlockHeaderFieldCountSpec
   private val PostCancunTs: Long = 3_000L
 
   private val withdrawalsRoot: ByteString = Fixtures.Blocks.ValidBlock.header.stateRoot
-  private val beaconRoot: ByteString = Fixtures.Blocks.ValidBlock.header.parentHash
+  private val beaconRoot: ByteString = Fixtures.Blocks.ValidBlock.header.parentHash.value
 
   private val ethConfig: BlockchainConfig = blockchainConfig.copy(
     networkType = NetworkType.ETH,

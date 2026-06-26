@@ -9,6 +9,7 @@ import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.HeaderUnexp
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
 import com.chipprbots.ethereum.consensus.validators.Validators
 import com.chipprbots.ethereum.domain.BlockBody
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.utils.BlockchainConfig
@@ -27,7 +28,7 @@ trait SyncBlocksValidator {
   def validateBlocks(requestedHashes: Seq[ByteString], blockBodies: Seq[BlockBody]): BlockBodyValidationResult =
     requestedHashes
       .zip(blockBodies)
-      .map { case (hash, body) => (blockchainReader.getBlockHeaderByHash(hash), body) }
+      .map { case (hash, body) => (blockchainReader.getBlockHeaderByHash(BlockHash(hash)), body) }
       .foldLeft[BlockBodyValidationResult](Valid) {
         case (Valid, (Some(header), body)) =>
           validators.blockValidator

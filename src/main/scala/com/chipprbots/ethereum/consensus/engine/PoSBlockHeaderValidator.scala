@@ -42,7 +42,7 @@ object PoSBlockHeaderValidator extends BlockHeaderValidatorSkeleton {
   private def validatePoSOmmers(
       blockHeader: BlockHeader
   ): Either[BlockHeaderError, BlockHeaderValid] =
-    if blockHeader.ommersHash == BlockHeader.EmptyOmmers then Right(BlockHeaderValid)
+    if blockHeader.ommersHash.value == BlockHeader.EmptyOmmers then Right(BlockHeaderValid)
     else Left(PoSOmmersError)
 
   private def validateWithdrawalsRoot(
