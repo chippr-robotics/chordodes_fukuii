@@ -45,7 +45,7 @@ class DeleteAccountsSpec extends AnyFlatSpec with Matchers with MockFactory {
     val newWorld: InMemoryWorldStateProxy =
       InMemoryWorldStateProxy.persistState(mining.blockPreparator.deleteAccounts(accountAddresses)(worldState))
     accountAddresses.foreach(a => assert(newWorld.getAccount(a).isEmpty))
-    newWorld.stateRootHash shouldBe Account.EmptyStorageRootHash
+    newWorld.stateRootHash shouldBe Account.EmptyStorageRootHash.value
   }
 
   // scalastyle:off magic.number

@@ -10,4 +10,4 @@ object CodeHash:
   def apply(bs: ByteString): CodeHash = bs
   extension (ch: CodeHash)
     def value: ByteString = ch
-    def isEmpty: Boolean   = ch == Empty
+    def isEmpty: Boolean = ch == Empty

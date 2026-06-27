@@ -437,7 +437,10 @@ class JsonRpcControllerEthLegacyTransactionSpec
         JField("transactionHash", JString("0x" + "23" * 32)),
         JField("transactionIndex", JString("0x1")),
         JField("blockNumber", JString("0x2fb079")),
-        JField("blockHash", JString("0x" + Hex.toHexString(Fixtures.Blocks.Block3125369.header.hash.value.toArray[Byte]))),
+        JField(
+          "blockHash",
+          JString("0x" + Hex.toHexString(Fixtures.Blocks.Block3125369.header.hash.value.toArray[Byte]))
+        ),
         JField("from", JString("0x0000000000000000000000000000000000000001")),
         JField("to", JNull),
         JField("cumulativeGasUsed", JString("0x1a4")),
@@ -526,7 +529,10 @@ class JsonRpcControllerEthLegacyTransactionSpec
         JField("transactionHash", JString("0x" + "23" * 32)),
         JField("transactionIndex", JString("0x1")),
         JField("blockNumber", JString("0x2fb079")),
-        JField("blockHash", JString("0x" + Hex.toHexString(Fixtures.Blocks.Block3125369.header.hash.value.toArray[Byte]))),
+        JField(
+          "blockHash",
+          JString("0x" + Hex.toHexString(Fixtures.Blocks.Block3125369.header.hash.value.toArray[Byte]))
+        ),
         JField("from", JString("0x0000000000000000000000000000000000000001")),
         JField("to", JNull),
         JField("cumulativeGasUsed", JString("0x1a4")),

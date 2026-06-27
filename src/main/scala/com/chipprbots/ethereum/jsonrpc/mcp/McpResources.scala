@@ -232,7 +232,7 @@ object LatestBlockResource {
           |  "gasUsed": ${h.gasUsed},
           |  "timestamp": ${h.unixTimestamp},
           |  "transactionCount": $txCount,
-          |  "stateRoot": "${ByteStringUtils.hash2string(h.stateRoot)}",
+          |  "stateRoot": "${ByteStringUtils.hash2string(h.stateRoot.value)}",
           |  "extraData": "0x${org.bouncycastle.util.encoders.Hex.toHexString(h.extraData.toArray)}"
           |}""".stripMargin
       case None =>
@@ -266,7 +266,7 @@ object BlockByNumberResource {
           |  "gasLimit": ${h.gasLimit},
           |  "gasUsed": ${h.gasUsed},
           |  "timestamp": ${h.unixTimestamp},
-          |  "stateRoot": "${ByteStringUtils.hash2string(h.stateRoot)}",
+          |  "stateRoot": "${ByteStringUtils.hash2string(h.stateRoot.value)}",
           |  "extraData": "0x${org.bouncycastle.util.encoders.Hex.toHexString(h.extraData.toArray)}"
           |}""".stripMargin
       case None =>
@@ -322,7 +322,7 @@ object AccountByAddressResource {
             |  "nonce": ${account.nonce},
             |  "balance": "${account.balance}",
             |  "balanceETC": "$balanceEtc",
-            |  "storageRoot": "${ByteStringUtils.hash2string(account.storageRoot)}",
+            |  "storageRoot": "${ByteStringUtils.hash2string(account.storageRoot.value)}",
             |  "codeHash": "${ByteStringUtils.hash2string(account.codeHash.value)}"
             |}""".stripMargin
         case None =>

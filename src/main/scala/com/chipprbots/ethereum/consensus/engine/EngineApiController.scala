@@ -564,8 +564,8 @@ class EngineApiController(
     val baseFields = List(
       "parentHash" -> JString(hex(header.parentHash.value)),
       "feeRecipient" -> JString(hex(header.beneficiary)),
-      "stateRoot" -> JString(hex(header.stateRoot)),
-      "receiptsRoot" -> JString(hex(header.receiptsRoot)),
+      "stateRoot" -> JString(hex(header.stateRoot.value)),
+      "receiptsRoot" -> JString(hex(header.receiptsRoot.value)),
       "logsBloom" -> JString(hex(header.logsBloom.value)),
       "prevRandao" -> JString(hex(header.mixHash.value)),
       "blockNumber" -> JString(hexQ(header.number)),

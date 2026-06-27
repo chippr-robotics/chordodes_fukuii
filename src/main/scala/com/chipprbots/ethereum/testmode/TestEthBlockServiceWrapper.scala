@@ -54,7 +54,9 @@ class TestEthBlockServiceWrapper(
         case BlockByBlockHashResponse(Some(baseBlockResponse)) =>
           val ethResponseOpt = for {
             hash <- baseBlockResponse.hash
-            fullBlock <- blockchainReader.getBlockByHash(BlockHash(hash)).orElse(blockQueue.getBlockByHash(BlockHash(hash)))
+            fullBlock <- blockchainReader
+              .getBlockByHash(BlockHash(hash))
+              .orElse(blockQueue.getBlockByHash(BlockHash(hash)))
           } yield toEthResponse(fullBlock, baseBlockResponse)
 
           ethResponseOpt match {

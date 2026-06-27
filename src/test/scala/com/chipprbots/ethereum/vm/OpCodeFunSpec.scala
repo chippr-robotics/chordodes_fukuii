@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum.vm
 
-
 import org.scalacheck.Gen
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
@@ -313,7 +312,9 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
 
       addr = Address(stateIn.stack.pop()._1)
       hash = kec256(extCode)
-      world = if doSave then stateIn.world.saveAccount(addr, Account.empty().copy(codeHash = CodeHash(hash))) else stateIn.world
+      world =
+        if doSave then stateIn.world.saveAccount(addr, Account.empty().copy(codeHash = CodeHash(hash)))
+        else stateIn.world
     } yield stateIn.withWorld(world)
 
     forAll(stateGen) { stateIn =>

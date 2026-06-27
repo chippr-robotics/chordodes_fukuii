@@ -13,6 +13,7 @@ import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostOlymp
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
@@ -68,9 +69,9 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers {
     parentHash = BlockHash(ByteString(Hex.decode("00" * 32))),
     ommersHash = BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
     beneficiary = ByteString(Hex.decode("00" * 20)),
-    stateRoot = ByteString(Hex.decode("00" * 32)),
-    transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-    receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+    stateRoot = TrieRoot(ByteString(Hex.decode("00" * 32))),
+    transactionsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+    receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = 1000,
     number = 100,

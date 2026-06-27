@@ -78,7 +78,13 @@ class ETH68ComplianceSpec extends AnyWordSpec with Matchers {
       "preserve requestId through encode/decode" taggedAs UnitTest in {
         val requestId = BigInt(42)
         val msg =
-          ETHPackets.GetBlockHeaders(requestId, Right(Fixtures.Blocks.Block3125369.header.hash.value), 1, 0, reverse = false)
+          ETHPackets.GetBlockHeaders(
+            requestId,
+            Right(Fixtures.Blocks.Block3125369.header.hash.value),
+            1,
+            0,
+            reverse = false
+          )
         eth68Decoder.fromBytes(Codes.GetBlockHeadersCode, msg.toBytes) match {
           case Right(decoded: ETHPackets.GetBlockHeaders) =>
             decoded.requestId shouldEqual requestId

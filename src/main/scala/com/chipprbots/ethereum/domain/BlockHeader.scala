@@ -23,9 +23,9 @@ case class BlockHeader(
     parentHash: BlockHash,
     ommersHash: BlockHash,
     beneficiary: ByteString,
-    stateRoot: ByteString,
-    transactionsRoot: ByteString,
-    receiptsRoot: ByteString,
+    stateRoot: TrieRoot,
+    transactionsRoot: TrieRoot,
+    receiptsRoot: TrieRoot,
     logsBloom: BloomFilter,
     difficulty: BigInt,
     number: BigInt,
@@ -96,9 +96,9 @@ case class BlockHeader(
       s"parentHash: ${ByteStringUtils.hash2string(parentHash.value)}, " +
       s"ommersHash: ${ByteStringUtils.hash2string(ommersHash.value)}, " +
       s"beneficiary: ${ByteStringUtils.hash2string(beneficiary)} " +
-      s"stateRoot: ${ByteStringUtils.hash2string(stateRoot)} " +
-      s"transactionsRoot: ${ByteStringUtils.hash2string(transactionsRoot)} " +
-      s"receiptsRoot: ${ByteStringUtils.hash2string(receiptsRoot)} " +
+      s"stateRoot: ${ByteStringUtils.hash2string(stateRoot.value)} " +
+      s"transactionsRoot: ${ByteStringUtils.hash2string(transactionsRoot.value)} " +
+      s"receiptsRoot: ${ByteStringUtils.hash2string(receiptsRoot.value)} " +
       s"logsBloom: ${ByteStringUtils.hash2string(logsBloom.value)} " +
       s"difficulty: $difficulty, " +
       s"number: $number, " +
@@ -223,9 +223,9 @@ object BlockHeaderImplicits {
         RLPValue(parentHash.value.toArray),
         RLPValue(ommersHash.value.toArray),
         RLPValue(beneficiary.toArray),
-        RLPValue(stateRoot.toArray),
-        RLPValue(transactionsRoot.toArray),
-        RLPValue(receiptsRoot.toArray),
+        RLPValue(stateRoot.value.toArray),
+        RLPValue(transactionsRoot.value.toArray),
+        RLPValue(receiptsRoot.value.toArray),
         RLPValue(logsBloom.toArray),
         RLPValue(ByteUtils.bigIntToUnsignedByteArray(difficulty)),
         RLPValue(ByteUtils.bigIntToUnsignedByteArray(number)),
@@ -286,9 +286,9 @@ object BlockHeaderImplicits {
             parentHash = BlockHash(byteStringFromEncodeable(items(0))),
             ommersHash = BlockHash(byteStringFromEncodeable(items(1))),
             beneficiary = byteStringFromEncodeable(items(2)),
-            stateRoot = byteStringFromEncodeable(items(3)),
-            transactionsRoot = byteStringFromEncodeable(items(4)),
-            receiptsRoot = byteStringFromEncodeable(items(5)),
+            stateRoot = TrieRoot(byteStringFromEncodeable(items(3))),
+            transactionsRoot = TrieRoot(byteStringFromEncodeable(items(4))),
+            receiptsRoot = TrieRoot(byteStringFromEncodeable(items(5))),
             logsBloom = BloomFilter(byteStringFromEncodeable(items(6))),
             difficulty = bigIntFromEncodeable(items(7)),
             number = bigIntFromEncodeable(items(8)),

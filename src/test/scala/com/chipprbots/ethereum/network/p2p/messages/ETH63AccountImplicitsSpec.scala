@@ -51,7 +51,7 @@ class ETH63AccountImplicitsSpec extends AnyFlatSpec with Matchers {
 
     val decoded = encoded.toAccount
 
-    decoded.storageRoot shouldBe customStorageRoot
+    decoded.storageRoot.value shouldBe customStorageRoot
     decoded.codeHash shouldBe CodeHash(customCodeHash)
   }
 }

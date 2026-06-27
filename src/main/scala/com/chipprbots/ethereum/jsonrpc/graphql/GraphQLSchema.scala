@@ -189,7 +189,7 @@ object GraphQLSchema {
         ctx.blockchain.getBackingMptStorage(b.header.number),
         (n: BigInt) => ctx.blockchainReader.getBlockHeaderByNumber(n).map(_.hash.value),
         ctx.blockchainConfig.accountStartNonce,
-        b.header.stateRoot,
+        b.header.stateRoot.value,
         noEmptyAccounts = false,
         ethCompatibleStorage = ctx.blockchainConfig.ethCompatibleStorage
       )
@@ -414,7 +414,7 @@ object GraphQLSchema {
             resolveAccount(c.ctx, c.value.address, c.value.blockNumber) match {
               case Some(acct) =>
                 val v = c.ctx.blockchain.getAccountStorageAt(
-                  acct.storageRoot,
+                  acct.storageRoot.value,
                   slotBigInt,
                   c.ctx.blockchainConfig.ethCompatibleStorage
                 )
@@ -633,14 +633,14 @@ object GraphQLSchema {
             c => c.ctx.blockchainReader.getBlockByHash(c.value.header.parentHash).map(b => buildGBlock(c.ctx, b))
         ),
         Field("nonce", BytesType, resolve = _.value.header.nonce),
-        Field("transactionsRoot", Bytes32Type, resolve = _.value.header.transactionsRoot),
+        Field("transactionsRoot", Bytes32Type, resolve = _.value.header.transactionsRoot.value),
         Field(
           "transactionCount",
           OptionType(LongType),
           resolve = c => Some(c.value.block.body.transactionList.size.toLong)
         ),
-        Field("stateRoot", Bytes32Type, resolve = _.value.header.stateRoot),
-        Field("receiptsRoot", Bytes32Type, resolve = _.value.header.receiptsRoot),
+        Field("stateRoot", Bytes32Type, resolve = _.value.header.stateRoot.value),
+        Field("receiptsRoot", Bytes32Type, resolve = _.value.header.receiptsRoot.value),
         Field(
           "miner",
           AccountType,

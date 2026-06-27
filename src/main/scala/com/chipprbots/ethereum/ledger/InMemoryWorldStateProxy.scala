@@ -99,7 +99,7 @@ object InMemoryWorldStateProxy {
           accountsStateTrie = updatedWorldState.accountsStateTrie +
             (address -> updatedWorldState
               .getGuaranteedAccount(address)
-              .copy(storageRoot = ByteString(newStorageRootHash)))
+              .copy(storageRoot = TrieRoot(ByteString(newStorageRootHash))))
         )
       }
 
@@ -278,7 +278,7 @@ class InMemoryWorldStateProxy(
       override def persist(): Unit = stateStorage.persist()
       override def storeRawNodes(nodes: Seq[(ByteString, Array[Byte])]): Unit = stateStorage.storeRawNodes(nodes)
     }
-    createProxiedContractStorageTrie(contextStorage, storageRoot)
+    createProxiedContractStorageTrie(contextStorage, storageRoot.value)
   }
 
   private def copyWith(

@@ -468,9 +468,9 @@ class PeerActorSpec
         parentHash = BlockHash(ByteString("this")),
         ommersHash = BlockHash(ByteString("is")),
         beneficiary = ByteString("not"),
-        stateRoot = ByteString("an"),
-        transactionsRoot = ByteString("ETC"),
-        receiptsRoot = ByteString("fork"),
+        stateRoot = TrieRoot(ByteString("an")),
+        transactionsRoot = TrieRoot(ByteString("ETC")),
+        receiptsRoot = TrieRoot(ByteString("fork")),
         logsBloom = BloomFilter(ByteString("block"))
       )
   }

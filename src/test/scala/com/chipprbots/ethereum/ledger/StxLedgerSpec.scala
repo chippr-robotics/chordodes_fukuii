@@ -102,7 +102,7 @@ class StxLedgerSpec extends AnyFlatSpec with Matchers with Logger {
         None
       )
     val preparedWorld: InMemoryWorldStateProxy = preparedBlock.updatedWorld
-    val header: BlockHeader = preparedBlock.block.header.copy(number = 1, stateRoot = preparedBlock.stateRootHash)
+    val header: BlockHeader = preparedBlock.block.header.copy(number = 1, stateRoot = TrieRoot(preparedBlock.stateRootHash))
 
     /** All operations in `ledger.prepareBlock` are performed on ReadOnlyWorldStateProxy so there are no updates in
       * underlying storages, but StateRootHash returned by it `expect` this updates to be in storages. It leads to
@@ -231,7 +231,7 @@ trait ScenarioSetup extends EphemBlockchainTestSetup {
 
   val block: Block = someGenesisBlock.toBlock
   val genesisBlock: Block =
-    block.copy(header = block.header.copy(stateRoot = worldWithAccount.stateRootHash, gasLimit = 1000000))
+    block.copy(header = block.header.copy(stateRoot = TrieRoot(worldWithAccount.stateRootHash), gasLimit = 1000000))
   val genesisHash: ByteString = genesisBlock.header.hash.value
   val genesisHeader: BlockHeader = genesisBlock.header
   val genesisWeight: ChainWeight = ChainWeight.zero.increase(genesisHeader)

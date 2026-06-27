@@ -378,7 +378,10 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
           gasLimit = generatedBlockGasLimit
         )
       )
-    validators.blockHeaderValidator.validate(fullBlock.header, (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))) shouldBe Right(
+    validators.blockHeaderValidator.validate(
+      fullBlock.header,
+      (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))
+    ) shouldBe Right(
       BlockHeaderValid
     )
     blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
@@ -416,7 +419,10 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
           gasLimit = generatedBlockGasLimit
         )
       )
-    validators.blockHeaderValidator.validate(fullBlock.header, (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))) shouldBe Right(
+    validators.blockHeaderValidator.validate(
+      fullBlock.header,
+      (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))
+    ) shouldBe Right(
       BlockHeaderValid
     )
     blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
@@ -470,7 +476,10 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
         gasLimit = generatedBlockGasLimit
       )
     )
-    validators.blockHeaderValidator.validate(fullBlock.header, (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))) shouldBe Right(
+    validators.blockHeaderValidator.validate(
+      fullBlock.header,
+      (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))
+    ) shouldBe Right(
       BlockHeaderValid
     )
     blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]
@@ -510,7 +519,10 @@ class BlockGeneratorSpec extends AnyFlatSpec with Matchers with Logger {
         gasLimit = generatedBlockGasLimit
       )
     )
-    validators.blockHeaderValidator.validate(fullBlock.header, (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))) shouldBe Right(
+    validators.blockHeaderValidator.validate(
+      fullBlock.header,
+      (h => blockchainReader.getBlockHeaderByHash(BlockHash(h)))
+    ) shouldBe Right(
       BlockHeaderValid
     )
     blockExecution.executeAndValidateBlock(fullBlock) shouldBe a[Right[?, Seq[Receipt]]]

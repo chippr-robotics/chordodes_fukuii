@@ -75,12 +75,12 @@ object TestConverter {
       else HefEmpty
 
     BlockHeader(
-      parentHash = ByteString(parseHex(testHeader.parentHash)),
-      ommersHash = ByteString(parseHex(testHeader.uncleHash)),
+      parentHash = BlockHash(ByteString(parseHex(testHeader.parentHash))),
+      ommersHash = BlockHash(ByteString(parseHex(testHeader.uncleHash))),
       beneficiary = ByteString(parseHex(testHeader.coinbase)),
-      stateRoot = ByteString(parseHex(testHeader.stateRoot)),
-      transactionsRoot = ByteString(parseHex(testHeader.transactionsTrie)),
-      receiptsRoot = ByteString(parseHex(testHeader.receiptTrie)),
+      stateRoot = TrieRoot(ByteString(parseHex(testHeader.stateRoot))),
+      transactionsRoot = TrieRoot(ByteString(parseHex(testHeader.transactionsTrie))),
+      receiptsRoot = TrieRoot(ByteString(parseHex(testHeader.receiptTrie))),
       logsBloom = BloomFilter(ByteString(parseHex(testHeader.bloom))),
       difficulty = parseBigInt(testHeader.difficulty),
       number = parseBigInt(testHeader.number),
@@ -88,7 +88,7 @@ object TestConverter {
       gasUsed = parseBigInt(testHeader.gasUsed),
       unixTimestamp = parseBigInt(testHeader.timestamp).toLong,
       extraData = ByteString(parseHex(testHeader.extraData)),
-      mixHash = ByteString(parseHex(testHeader.mixHash)),
+      mixHash = BlockHash(ByteString(parseHex(testHeader.mixHash))),
       nonce = ByteString(parseHex(testHeader.nonce)),
       extraFields = extraFields
     )

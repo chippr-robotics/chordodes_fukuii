@@ -19,6 +19,7 @@ import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.BlockchainReader
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.mpt.*
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerEventCmd
@@ -222,7 +223,7 @@ class SnapServingActorSpec extends AnyFlatSpec with Matchers with MockFactory wi
     val staleRoot = kec256(ByteString("stale-state-root"))
     // A BlockHeader whose stateRoot is freshRoot. Derived from the genesis fixture so
     // all mandatory fields are valid; only stateRoot is replaced.
-    val freshHeader = Fixtures.Blocks.Genesis.header.copy(stateRoot = freshRoot)
+    val freshHeader = Fixtures.Blocks.Genesis.header.copy(stateRoot = TrieRoot(freshRoot))
 
     // Stub: tip=200, every canonical header has freshRoot → staleRoot is never in the cache.
     val readerStub = stub[BlockchainReader]

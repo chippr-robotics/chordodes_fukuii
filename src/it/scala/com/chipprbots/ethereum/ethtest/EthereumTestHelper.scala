@@ -69,7 +69,7 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup {
             mptStorage = testBlockchainStorages.stateStorage.getReadOnlyStorage,
             getBlockHashByNumber = (_: BigInt) => None,
             accountStartNonce = blockchainConfig.accountStartNonce,
-            stateRootHash = Account.EmptyStorageRootHash,
+            stateRootHash = Account.EmptyStorageRootHash.value,
             noEmptyAccounts = false,
             ethCompatibleStorage = blockchainConfig.ethCompatibleStorage
           )
@@ -86,7 +86,7 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup {
         mptStorage = mptStorage,
         getBlockHashByNumber = (_: BigInt) => None,
         accountStartNonce = blockchainConfig.accountStartNonce,
-        stateRootHash = Account.EmptyStorageRootHash,
+        stateRootHash = Account.EmptyStorageRootHash.value,
         noEmptyAccounts = false,
         ethCompatibleStorage = blockchainConfig.ethCompatibleStorage
       )
@@ -164,12 +164,12 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup {
 
       // Store the genesis/parent block
       val genesisBlock = Block(genesisHeader, BlockBody(Seq.empty, Seq.empty))
-      testBlockchainStorages.blockHeadersStorage.put(genesisHeader.hash, genesisHeader).commit()
-      testBlockchainStorages.blockBodiesStorage.put(genesisHeader.hash, genesisBlock.body).commit()
-      testBlockchainStorages.blockNumberMappingStorage.put(genesisHeader.number, genesisHeader.hash).commit()
+      testBlockchainStorages.blockHeadersStorage.put(genesisHeader.hash.value, genesisHeader).commit()
+      testBlockchainStorages.blockBodiesStorage.put(genesisHeader.hash.value, genesisBlock.body).commit()
+      testBlockchainStorages.blockNumberMappingStorage.put(genesisHeader.number, genesisHeader.hash.value).commit()
 
       // Also need to store chain weight for the genesis block
-      testBlockchainStorages.chainWeightStorage.put(genesisHeader.hash, ChainWeight.zero).commit()
+      testBlockchainStorages.chainWeightStorage.put(genesisHeader.hash.value, ChainWeight.zero).commit()
 
       // Create BlockExecution using the test infrastructure
       val syncConfig = Config.SyncConfig(Config.config)
@@ -194,17 +194,17 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup {
         result match {
           case Right(receiptList) =>
             // Store the executed block
-            testBlockchainStorages.blockHeadersStorage.put(block.header.hash, block.header).commit()
-            testBlockchainStorages.blockBodiesStorage.put(block.header.hash, block.body).commit()
-            testBlockchainStorages.blockNumberMappingStorage.put(block.header.number, block.header.hash).commit()
-            testBlockchainStorages.receiptStorage.put(block.header.hash, receiptList).commit()
+            testBlockchainStorages.blockHeadersStorage.put(block.header.hash.value, block.header).commit()
+            testBlockchainStorages.blockBodiesStorage.put(block.header.hash.value, block.body).commit()
+            testBlockchainStorages.blockNumberMappingStorage.put(block.header.number, block.header.hash.value).commit()
+            testBlockchainStorages.receiptStorage.put(block.header.hash.value, receiptList).commit()
 
             // Update chain weight
             val parentWeight = testBlockchainStorages.chainWeightStorage
-              .get(block.header.parentHash)
+              .get(block.header.parentHash.value)
               .getOrElse(ChainWeight.zero)
             val newWeight = parentWeight.increase(block.header)
-            testBlockchainStorages.chainWeightStorage.put(block.header.hash, newWeight).commit()
+            testBlockchainStorages.chainWeightStorage.put(block.header.hash.value, newWeight).commit()
 
           case Left(execError) =>
             throw new RuntimeException(s"Block execution failed: $execError")
@@ -222,7 +222,7 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup {
         getBlockHashByNumber = (num: BigInt) =>
           testBlockchainStorages.blockNumberMappingStorage
             .get(num)
-            .flatMap(hash => testBlockchainStorages.blockHeadersStorage.get(hash).map(_.hash)),
+            .flatMap(hash => testBlockchainStorages.blockHeadersStorage.get(hash).map(_.hash.value)),
         accountStartNonce = blockchainConfig.accountStartNonce,
         stateRootHash = lastStateRoot,
         noEmptyAccounts = false,
@@ -241,12 +241,12 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup {
       testBlock: TestBlock
   ): BlockHeader =
     BlockHeader(
-      parentHash = ByteString(Array.fill(32)(0.toByte)),
-      ommersHash = ByteString(parseHex("0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")),
+      parentHash = BlockHash(ByteString(Array.fill(32)(0.toByte))),
+      ommersHash = BlockHash(ByteString(parseHex("0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
       beneficiary = ByteString(Array.fill(20)(0.toByte)),
-      stateRoot = stateRoot,
-      transactionsRoot = ByteString(parseHex("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-      receiptsRoot = ByteString(parseHex("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+      stateRoot = TrieRoot(stateRoot),
+      transactionsRoot = TrieRoot(ByteString(parseHex("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+      receiptsRoot = TrieRoot(ByteString(parseHex("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
       logsBloom = BloomFilter(ByteString(Array.fill(256)(0.toByte))),
       difficulty = BigInt(0),
       number = blockNumber,
@@ -254,7 +254,7 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup {
       gasUsed = BigInt(0),
       unixTimestamp = parseBigInt(testBlock.blockHeader.timestamp).toLong - 1,
       extraData = ByteString.empty,
-      mixHash = ByteString(Array.fill(32)(0.toByte)),
+      mixHash = BlockHash(ByteString(Array.fill(32)(0.toByte))),
       nonce = ByteString(Array.fill(8)(0.toByte))
     )
 

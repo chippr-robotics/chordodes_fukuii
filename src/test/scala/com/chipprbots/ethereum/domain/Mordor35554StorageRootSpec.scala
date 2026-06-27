@@ -21,7 +21,7 @@ class Mordor35554StorageRootSpec extends AnyFunSuite {
     val (stateStorage, _, _) = StateStorage.createTestStateStorage(dataSource)
     val mptStorage = stateStorage.getBackingStorage(0)
 
-    val storageTrie = EthereumUInt256Mpt.storageMpt(Account.EmptyStorageRootHash, mptStorage)
+    val storageTrie = EthereumUInt256Mpt.storageMpt(Account.EmptyStorageRootHash.value, mptStorage)
     val updated = storageTrie.put(key, value)
 
     assert(updated.getRootHash.sameElements(expectedStorageRoot))

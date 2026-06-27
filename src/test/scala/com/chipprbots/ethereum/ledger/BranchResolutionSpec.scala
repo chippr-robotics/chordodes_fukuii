@@ -112,7 +112,8 @@ class BranchResolutionSpec
 
     "report an unknown branch if the included genesis header is different than ours" in new BranchResolutionTestSetupImpl {
       val differentGenesis: BlockHeader = genesisHeader.copy(extraData = ByteString("I'm different ;("))
-      val headers: NonEmptyList[BlockHeader] = differentGenesis :: getChainHeadersNel(1, 10, differentGenesis.hash.value)
+      val headers: NonEmptyList[BlockHeader] =
+        differentGenesis :: getChainHeadersNel(1, 10, differentGenesis.hash.value)
 
       setHeaderInChain(differentGenesis.parentHash.value, result = false)
       setGenesisHeader(genesisHeader)
@@ -337,7 +338,10 @@ class BranchResolutionSpec
       val parentHash: ByteString = randomHash()
       // Best block is 5; new header extends at 6 — no old blocks displaced
       val newHeader: BlockHeader =
-        Block(defaultHeader.copy(number = 6, difficulty = 0, parentHash = BlockHash(parentHash)), BlockBody(Nil, Nil)).header
+        Block(
+          defaultHeader.copy(number = 6, difficulty = 0, parentHash = BlockHash(parentHash)),
+          BlockBody(Nil, Nil)
+        ).header
       val parentWeight: ChainWeight = ChainWeight.totalDifficultyOnly(1000)
 
       setBestBlockNumber(5)

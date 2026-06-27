@@ -189,12 +189,12 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
           "nonce" -> encodeAsHex(h.nonce),
           "number" -> encodeAsHex(h.number),
           "parentHash" -> encodeAsHex(h.parentHash.value),
-          "receiptsRoot" -> encodeAsHex(h.receiptsRoot),
+          "receiptsRoot" -> encodeAsHex(h.receiptsRoot.value),
           "sha3Uncles" -> encodeAsHex(h.ommersHash.value),
           "size" -> encodeAsHex(BigInt(Block.size(Block(h, block.body)))),
-          "stateRoot" -> encodeAsHex(h.stateRoot),
+          "stateRoot" -> encodeAsHex(h.stateRoot.value),
           "timestamp" -> encodeAsHex(BigInt(h.unixTimestamp)),
-          "transactionsRoot" -> encodeAsHex(h.transactionsRoot),
+          "transactionsRoot" -> encodeAsHex(h.transactionsRoot.value),
           "uncles" -> JArray(Nil)
         ) ++ (if h.withdrawalsRoot.isDefined then List("withdrawals" -> JArray(Nil)) else Nil)
 

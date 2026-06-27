@@ -231,7 +231,8 @@ trait OpCodeGasSpecPostEip2929 extends AnyFunSuite with OpCodeTesting with Match
       ).sample.get.withStack(stackIn).withStorage(storage).copy(gas = startGas)
 
       val stateOut =
-        if alreadyAccessed then op.execute(stateIn.addAccessedStorageKey(stateIn.ownAddress, StorageKey(offset.toBigInt)))
+        if alreadyAccessed then
+          op.execute(stateIn.addAccessedStorageKey(stateIn.ownAddress, StorageKey(offset.toBigInt)))
         else op.execute(stateIn)
       verifyGas(expectedGasConsumption, stateIn, stateOut, allowOOG = false)
     }

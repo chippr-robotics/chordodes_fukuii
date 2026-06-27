@@ -142,7 +142,7 @@ class TraceService(
           JsonRpcError.InvalidParams(s"Transaction index $txIndex out of range")
         )
         targetStx = stxs(txIndex)
-        world = stxLedger.advanceWorldToTx(block.header, stxs, txIndex, parentHeader.stateRoot)
+        world = stxLedger.advanceWorldToTx(block.header, stxs, txIndex, parentHeader.stateRoot.value)
         tracer = new CallTracer(onlyTopCall = false)
         _ = stxLedger.simulateTransactionWithTracer(targetStx, block.header, Some(world), tracer)
         flat = flattenCallTree(
@@ -171,7 +171,7 @@ class TraceService(
         parentHeader <- blockchainReader
           .getBlockHeaderByHash(block.header.parentHash)
           .toRight(JsonRpcError.InvalidParams("Parent block not found"))
-        traces = traceAllTxsFlat(block, parentHeader.stateRoot)
+        traces = traceAllTxsFlat(block, parentHeader.stateRoot.value)
       } yield TraceBlockResponse(traces)
     }.recover { case _: MissingNodeException =>
       Left(JsonRpcError.NodeNotFound)
@@ -205,7 +205,7 @@ class TraceService(
           JsonRpcError.InvalidParams(s"Transaction index $txIndex out of range")
         )
         targetStx = stxs(txIndex)
-        world = stxLedger.advanceWorldToTx(block.header, stxs, txIndex, parentHeader.stateRoot)
+        world = stxLedger.advanceWorldToTx(block.header, stxs, txIndex, parentHeader.stateRoot.value)
         result = buildReplayResult(targetStx, block, Some(world), req.txHash, txIndex, req.options)
       } yield TraceReplayTransactionResponse(result)
     }.recover { case _: MissingNodeException =>
@@ -230,7 +230,7 @@ class TraceService(
           .toRight(JsonRpcError.InvalidParams("Parent block not found"))
         stxs = SignedTransactionWithSender.getSignedTransactions(block.body.transactionList)
         results = stxs.zipWithIndex.map { case (stx, txIndex) =>
-          val world = stxLedger.advanceWorldToTx(block.header, stxs, txIndex, parentHeader.stateRoot)
+          val world = stxLedger.advanceWorldToTx(block.header, stxs, txIndex, parentHeader.stateRoot.value)
           buildReplayResult(stx, block, Some(world), stx.tx.hash.value, txIndex, req.options)
         }
       } yield TraceReplayBlockTransactionsResponse(results)
@@ -315,7 +315,9 @@ class TraceService(
     stxLedger.simulateTransactionWithTracer(stx, block.header, world, callTracer)
 
     val traceField: JValue = if options.trace then {
-      JArray(flattenCallTree(callTracer.getResult, txHash, txIndex, block.header.hash.value, block.header.number).toList)
+      JArray(
+        flattenCallTree(callTracer.getResult, txHash, txIndex, block.header.hash.value, block.header.number).toList
+      )
     } else JNull
 
     val vmTraceField: JValue = if options.vmTrace then {
@@ -446,7 +448,7 @@ class TraceService(
               .getBlockByNumber(branch, blockNum)
               .flatMap { block =>
                 blockchainReader.getBlockHeaderByHash(block.header.parentHash).map { parentHeader =>
-                  val flat = traceAllTxsFlat(block, parentHeader.stateRoot)
+                  val flat = traceAllTxsFlat(block, parentHeader.stateRoot.value)
                   applyAddressFilter(flat, req.fromAddress, req.toAddress)
                 }
               }

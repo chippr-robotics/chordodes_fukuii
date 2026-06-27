@@ -656,7 +656,7 @@ class BlockPreparator(
           mptStorage = blockchain.getReadOnlyMptStorage(),
           getBlockHashByNumber = (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
           accountStartNonce = blockchainConfig.accountStartNonce,
-          stateRootHash = parent.stateRoot,
+          stateRootHash = parent.stateRoot.value,
           noEmptyAccounts = EvmConfig.forBlock(block.header.number, blockchainConfig).noEmptyAccounts,
           ethCompatibleStorage = blockchainConfig.ethCompatibleStorage
         )

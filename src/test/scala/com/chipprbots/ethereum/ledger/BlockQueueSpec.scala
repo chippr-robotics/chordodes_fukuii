@@ -73,7 +73,9 @@ class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory {
     setBestBlockNumber(1)
     setChainWeightForParent(block1, Some(parentWeight))
 
-    blockQueue.enqueueBlock(block1) shouldEqual Some(Leaf(block1.header.hash.value, parentWeight.increase(block1.header)))
+    blockQueue.enqueueBlock(block1) shouldEqual Some(
+      Leaf(block1.header.hash.value, parentWeight.increase(block1.header))
+    )
   }
 
   it should "enqueue a block with queued ancestors rooted to the main chain updating its total difficulty" taggedAs (

@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.rlp.RLPImplicits.given
 import com.chipprbots.ethereum.utils.ByteUtils
 
 object Account {
-  val EmptyStorageRootHash: ByteString = ByteString(kec256(rlp.encode(Array.empty[Byte])))
+  val EmptyStorageRootHash: TrieRoot = TrieRoot(ByteString(kec256(rlp.encode(Array.empty[Byte]))))
   val EmptyCodeHash: CodeHash = CodeHash.Empty
 
   def empty(startNonce: UInt256 = UInt256.Zero): Account =
@@ -29,7 +29,7 @@ object Account {
       RLPList(
         nonce.toRLPEncodable,
         balance.toRLPEncodable,
-        byteStringEncDec.encode(storageRoot),
+        byteStringEncDec.encode(storageRoot.value),
         byteStringEncDec.encode(codeHash.value)
       )
     }
@@ -44,7 +44,7 @@ object Account {
             RLPValue(codeHashBytes)
           ) =>
         val normalizedStorageRoot =
-          if storageRootBytes.isEmpty then Account.EmptyStorageRootHash else ByteString(storageRootBytes)
+          if storageRootBytes.isEmpty then Account.EmptyStorageRootHash else TrieRoot(ByteString(storageRootBytes))
         val normalizedCodeHash =
           if codeHashBytes.isEmpty then Account.EmptyCodeHash else CodeHash(ByteString(codeHashBytes))
         Account(
@@ -68,7 +68,7 @@ object Account {
 case class Account(
     nonce: UInt256 = 0,
     balance: UInt256 = 0,
-    storageRoot: ByteString = Account.EmptyStorageRootHash,
+    storageRoot: TrieRoot = Account.EmptyStorageRootHash,
     codeHash: CodeHash = Account.EmptyCodeHash
 ) {
 
@@ -81,7 +81,7 @@ case class Account(
   def withCode(codeHash: CodeHash): Account =
     copy(codeHash = codeHash)
 
-  def withStorage(storageRoot: ByteString): Account =
+  def withStorage(storageRoot: TrieRoot): Account =
     copy(storageRoot = storageRoot)
 
   /** According to EIP161: An account is considered empty when it has no code and zero nonce and zero balance. An
@@ -97,6 +97,6 @@ case class Account(
 
   override def toString: String =
     s"Account(nonce: $nonce, balance: $balance, " +
-      s"storageRoot: ${Hex.toHexString(storageRoot.toArray[Byte])}, codeHash: ${Hex.toHexString(codeHash.value.toArray[Byte])})"
+      s"storageRoot: ${Hex.toHexString(storageRoot.toArray)}, codeHash: ${Hex.toHexString(codeHash.value.toArray[Byte])})"
 
 }

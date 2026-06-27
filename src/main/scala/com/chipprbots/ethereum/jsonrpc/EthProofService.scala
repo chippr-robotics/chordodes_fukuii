@@ -131,7 +131,7 @@ object ProofService {
         balance = account.balance,
         codeHash = account.codeHash.value,
         nonce = account.nonce,
-        storageHash = account.storageRoot,
+        storageHash = account.storageRoot.value,
         storageProof = storageProof
       )
   }
@@ -204,7 +204,7 @@ class EthProofService(
       .map { storageKey =>
         blockchain
           .getStorageProofAt(
-            rootHash = account.storageRoot,
+            rootHash = account.storageRoot.value,
             position = storageKey.v,
             ethCompatibleStorage = ethCompatibleStorage
           )

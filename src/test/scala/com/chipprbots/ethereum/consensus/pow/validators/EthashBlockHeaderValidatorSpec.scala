@@ -159,7 +159,8 @@ class EthashBlockHeaderValidatorSpec
     val invalidMixHash = ByteString(Hex.decode("1f947f00807f7f7f2f7f00ff82ff00de015980607f129c77afedff4680c10171"))
     val blockHeaderWithInvalidNonce = validBlockHeader.copy(nonce = invalidNonce)
     val blockHeaderWithInvalidMixHash = validBlockHeader.copy(mixHash = BlockHash(invalidMixHash))
-    val blockHeaderWithInvalidNonceAndMixHash = validBlockHeader.copy(nonce = invalidNonce, mixHash = BlockHash(invalidMixHash))
+    val blockHeaderWithInvalidNonceAndMixHash =
+      validBlockHeader.copy(nonce = invalidNonce, mixHash = BlockHash(invalidMixHash))
 
     val parent = Block(validParentBlockHeader, validParentBlockBody)
 
@@ -173,14 +174,20 @@ class EthashBlockHeaderValidatorSpec
       .storeBlockHeader(validParentBlockHeader)
       .and(blockchainWriter.storeBlockBody(validParentBlockHeader.hash, validParentBlockBody))
       .commit()
-    PoWBlockHeaderValidator.validate(validBlockHeader, ((h: ByteString) => blockchainReader.getBlockHeaderByHash(BlockHash(h)))) match {
+    PoWBlockHeaderValidator.validate(
+      validBlockHeader,
+      ((h: ByteString) => blockchainReader.getBlockHeaderByHash(BlockHash(h)))
+    ) match {
       case Right(_) => succeed
       case _        => fail()
     }
   }
 
   it should "return a failure if the parent's header is not taggedAs (UnitTest, ConsensusTest) in storage" in new EphemBlockchainTestSetup {
-    PoWBlockHeaderValidator.validate(validBlockHeader, ((h: ByteString) => blockchainReader.getBlockHeaderByHash(BlockHash(h)))) match {
+    PoWBlockHeaderValidator.validate(
+      validBlockHeader,
+      ((h: ByteString) => blockchainReader.getBlockHeaderByHash(BlockHash(h)))
+    ) match {
       case Left(HeaderParentNotFoundError) => succeed
       case _                               => fail()
     }
@@ -298,9 +305,9 @@ class EthashBlockHeaderValidatorSpec
     parentHash = BlockHash(ByteString(Hex.decode("77af90df2b60071da7f11060747b6590a3bc2f357da4addccb5eef7cb8c2b723"))),
     ommersHash = BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
     beneficiary = ByteString(Hex.decode("10807cacf99ac84b7b8f9b4077e3a11ee8880bf9")),
-    stateRoot = ByteString(Hex.decode("32deebbf585e9b0d0153b96d62283e903c10fac41fc4181438e29732c490ac6e")),
-    transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-    receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+    stateRoot = TrieRoot(ByteString(Hex.decode("32deebbf585e9b0d0153b96d62283e903c10fac41fc4181438e29732c490ac6e"))),
+    transactionsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+    receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = BigInt("20626433633447"),
     number = 3582022,
@@ -316,9 +323,9 @@ class EthashBlockHeaderValidatorSpec
     parentHash = BlockHash(ByteString(Hex.decode("e6e90c1ba10df710365a2ae9f899bd787416d98f19874f4cb1a62f09c3b8277d"))),
     ommersHash = BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
     beneficiary = ByteString(Hex.decode("4c2b4e716883a2c3f6b980b70b577e54b9441060")),
-    stateRoot = ByteString(Hex.decode("0920dc025715c278dc297aa7b2d1bf5a60666d92be22d338135d13571539fad7")),
-    transactionsRoot = ByteString(Hex.decode("6616c23aeb486dd47aca667814ffed831553c7322440913b95847235a4c3bb97")),
-    receiptsRoot = ByteString(Hex.decode("5fa90473cd08a08fc766329651d81bb6e4ef2bb330cf90c3025927a3bafe0c57")),
+    stateRoot = TrieRoot(ByteString(Hex.decode("0920dc025715c278dc297aa7b2d1bf5a60666d92be22d338135d13571539fad7"))),
+    transactionsRoot = TrieRoot(ByteString(Hex.decode("6616c23aeb486dd47aca667814ffed831553c7322440913b95847235a4c3bb97"))),
+    receiptsRoot = TrieRoot(ByteString(Hex.decode("5fa90473cd08a08fc766329651d81bb6e4ef2bb330cf90c3025927a3bafe0c57"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = BigInt("20616098743527"),
     number = 3582021,
@@ -334,9 +341,9 @@ class EthashBlockHeaderValidatorSpec
     parentHash = BlockHash(ByteString(Hex.decode("a5280b4589a1534946f83dba3fcec698be2046010c4d39fc0437c61837adc0f5"))),
     ommersHash = BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
     beneficiary = ByteString(Hex.decode("ea674fdde714fd979de3edf0f56aa9716b898ec8")),
-    stateRoot = ByteString.fromInts(0),
-    transactionsRoot = ByteString(Hex.decode("f868d6aa999090d90d802ff6b46ace5870a07a50fd935af0635bd95acf62262a")),
-    receiptsRoot = ByteString(Hex.decode("f868d6aa999090d90d802ff6b46ace5870a07a50fd935af0635bd95acf62262a")),
+    stateRoot = TrieRoot(ByteString.fromInts(0)),
+    transactionsRoot = TrieRoot(ByteString(Hex.decode("f868d6aa999090d90d802ff6b46ace5870a07a50fd935af0635bd95acf62262a"))),
+    receiptsRoot = TrieRoot(ByteString(Hex.decode("f868d6aa999090d90d802ff6b46ace5870a07a50fd935af0635bd95acf62262a"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = BigInt("3482399171761329"),
     number = 5863375,
@@ -352,9 +359,9 @@ class EthashBlockHeaderValidatorSpec
     parentHash = BlockHash(ByteString(Hex.decode("ce5633dd4e056415c9e170b1fd934d88eec437c8a6f58014a2a1ef801a132ac5"))),
     ommersHash = BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
     beneficiary = ByteString(Hex.decode("b2930b35844a230f00e51431acae96fe543a0347")),
-    stateRoot = ByteString.fromInts(0),
-    transactionsRoot = ByteString(Hex.decode("f868d6aa999090d90d802ff6b46ace5870a07a50fd935af0635bd95acf62262a")),
-    receiptsRoot = ByteString(Hex.decode("f868d6aa999090d90d802ff6b46ace5870a07a50fd935af0635bd95acf62262a")),
+    stateRoot = TrieRoot(ByteString.fromInts(0)),
+    transactionsRoot = TrieRoot(ByteString(Hex.decode("f868d6aa999090d90d802ff6b46ace5870a07a50fd935af0635bd95acf62262a"))),
+    receiptsRoot = TrieRoot(ByteString(Hex.decode("f868d6aa999090d90d802ff6b46ace5870a07a50fd935af0635bd95acf62262a"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = BigInt("3480699544328087"),
     number = 5863374,
@@ -370,9 +377,9 @@ class EthashBlockHeaderValidatorSpec
     parentHash = BlockHash(ByteString(Hex.decode("d882d5c210bab4cb7ef0b9f3dc2130cb680959afcd9a8f9bf83ee6f13e2f9da3"))),
     ommersHash = BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
     beneficiary = ByteString(Hex.decode("95f484419881c6e9b6de7fb3f8ad03763bd49a89")),
-    stateRoot = ByteString(Hex.decode("634a2b20c9e02afdda7157afe384306c5acc4fb9c09b45dc0203c0fbb2fed0e6")),
-    transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-    receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+    stateRoot = TrieRoot(ByteString(Hex.decode("634a2b20c9e02afdda7157afe384306c5acc4fb9c09b45dc0203c0fbb2fed0e6"))),
+    transactionsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+    receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = BigInt("989772"),
     number = 20,
@@ -388,9 +395,9 @@ class EthashBlockHeaderValidatorSpec
     parentHash = BlockHash(ByteString(Hex.decode("677a5fb51d52321b03552e3c667f602cc489d15fc1d7824445aee6d94a9db2e7"))),
     ommersHash = BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
     beneficiary = ByteString(Hex.decode("95f484419881c6e9b6de7fb3f8ad03763bd49a89")),
-    stateRoot = ByteString(Hex.decode("cddeeb071e2f69ad765406fb7c96c0cd42ddfc6ec54535822b564906f9e38e44")),
-    transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-    receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+    stateRoot = TrieRoot(ByteString(Hex.decode("cddeeb071e2f69ad765406fb7c96c0cd42ddfc6ec54535822b564906f9e38e44"))),
+    transactionsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+    receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = BigInt("989289"),
     number = 19,
@@ -449,9 +456,9 @@ class EthashBlockHeaderValidatorSpec
     parentHash = BlockHash(ByteString(Hex.decode("05c45c9671ee31736b9f37ee98faa72c89e314059ecff3257206e6ab498eb9d1"))),
     ommersHash = BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
     beneficiary = ByteString(Hex.decode("2a65aca4d5fc5b5c859090a6c34d164135398226")),
-    stateRoot = ByteString(Hex.decode("fa8d3b3cbd37caba2faf09d5e472ae6c47a58d846751bc72306166a71d0fa4fa")),
-    transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-    receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+    stateRoot = TrieRoot(ByteString(Hex.decode("fa8d3b3cbd37caba2faf09d5e472ae6c47a58d846751bc72306166a71d0fa4fa"))),
+    transactionsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+    receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
     logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
     difficulty = BigInt("62230570926948"),
     number = 1920008,
@@ -467,9 +474,9 @@ class EthashBlockHeaderValidatorSpec
     parentHash = BlockHash(ByteString(Hex.decode("41254723e12eb736ddef151371e4c3d614233e6cad95f2d9017de2ab8b469a18"))),
     ommersHash = BlockHash(ByteString(Hex.decode("808d06176049aecfd504197dde49f46c3dd75f1af055e417d100228162eefdd8"))),
     beneficiary = ByteString(Hex.decode("ea674fdde714fd979de3edf0f56aa9716b898ec8")),
-    stateRoot = ByteString(Hex.decode("49eb333152713b78d920440ef065ed7f681611e0c2e6933d657d6f4a7f1936ee")),
-    transactionsRoot = ByteString(Hex.decode("a8060f1391fd4cbde4b03d83b32a1bda445578cd6ec6b7982db20c499ed3682b")),
-    receiptsRoot = ByteString(Hex.decode("ab66b1986e713eaf5621059e79f04ba9c528187c1b9da969f46442c3f915c120")),
+    stateRoot = TrieRoot(ByteString(Hex.decode("49eb333152713b78d920440ef065ed7f681611e0c2e6933d657d6f4a7f1936ee"))),
+    transactionsRoot = TrieRoot(ByteString(Hex.decode("a8060f1391fd4cbde4b03d83b32a1bda445578cd6ec6b7982db20c499ed3682b"))),
+    receiptsRoot = TrieRoot(ByteString(Hex.decode("ab66b1986e713eaf5621059e79f04ba9c528187c1b9da969f46442c3f915c120"))),
     logsBloom = BloomFilter(
       ByteString(
         Hex.decode(
@@ -491,9 +498,9 @@ class EthashBlockHeaderValidatorSpec
     parentHash = BlockHash(ByteString(Hex.decode("69d04aec94ad69d7d190d3b51d24cd42dded0c4767598a1d30480363509acbef"))),
     ommersHash = BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
     beneficiary = ByteString(Hex.decode("4bb96091ee9d802ed039c4d1a5f6216f90f81b01")),
-    stateRoot = ByteString(Hex.decode("6ee63abee7416d3a671bcbefa01aa5d4ea427e246d548e15c5f3d9a108e738fd")),
-    transactionsRoot = ByteString(Hex.decode("0c6d4a643ed081f92e384a5853f14d7f5ff5d68b65d0c90b46159584a80effe0")),
-    receiptsRoot = ByteString(Hex.decode("a7d1ddb80060d4b77c07007e9a9f0b83413bd2c5de71501683ba4764982eef4b")),
+    stateRoot = TrieRoot(ByteString(Hex.decode("6ee63abee7416d3a671bcbefa01aa5d4ea427e246d548e15c5f3d9a108e738fd"))),
+    transactionsRoot = TrieRoot(ByteString(Hex.decode("0c6d4a643ed081f92e384a5853f14d7f5ff5d68b65d0c90b46159584a80effe0"))),
+    receiptsRoot = TrieRoot(ByteString(Hex.decode("a7d1ddb80060d4b77c07007e9a9f0b83413bd2c5de71501683ba4764982eef4b"))),
     logsBloom = BloomFilter(
       ByteString(
         Hex.decode(

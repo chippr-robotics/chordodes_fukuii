@@ -36,7 +36,7 @@ object StdBlockValidator extends BlockValidator {
     */
   private def validateTransactionRoot(block: Block): Either[BlockError, BlockValid] = {
     val isValid = MptListValidator.isValid[SignedTransaction](
-      block.header.transactionsRoot.toArray[Byte],
+      block.header.transactionsRoot.toArray,
       block.body.transactionList,
       SignedTransaction.byteArraySerializable
     )
@@ -70,7 +70,7 @@ object StdBlockValidator extends BlockValidator {
   private def validateReceipts(blockHeader: BlockHeader, receipts: Seq[Receipt]): Either[BlockError, BlockValid] = {
 
     val isValid =
-      MptListValidator.isValid[Receipt](blockHeader.receiptsRoot.toArray[Byte], receipts, Receipt.byteArraySerializable)
+      MptListValidator.isValid[Receipt](blockHeader.receiptsRoot.toArray, receipts, Receipt.byteArraySerializable)
     if isValid then Right(BlockValid)
     else Left(BlockReceiptsHashError)
   }

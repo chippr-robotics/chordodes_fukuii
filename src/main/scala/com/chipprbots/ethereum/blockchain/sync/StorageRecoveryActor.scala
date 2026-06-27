@@ -498,14 +498,14 @@ object StorageRecoveryActor {
         case Success(account) =>
           if account.storageRoot != Account.EmptyStorageRootHash then {
             contractCount += 1
-            if !seenRoots.contains(account.storageRoot) then {
-              seenRoots += account.storageRoot
+            if !seenRoots.contains(account.storageRoot.value) then {
+              seenRoots += account.storageRoot.value
               checkedCount += 1
               try
                 mptStorage.get(account.storageRoot.toArray)
               catch {
                 case _: MerklePatriciaTrie.MPTException =>
-                  missing += ((accountHash, account.storageRoot))
+                  missing += ((accountHash, account.storageRoot.value))
               }
             }
           }

@@ -87,7 +87,7 @@ object FastSyncItSpecUtils {
           val account = blockchainReader.getAccount(blockchainReader.getBestBranch, accountAddress, blockNumber).get
           val code = evmCodeStorage.get(codeHash).get
           val storedData = accountExpectedStorageAddresses.map { addr =>
-            ByteUtils.toBigInt(bl.getAccountStorageAt(account.storageRoot, addr, ethCompatibleStorage = true))
+            ByteUtils.toBigInt(bl.getAccountStorageAt(account.storageRoot.value, addr, ethCompatibleStorage = true))
           }
           val haveAllStoredData = accountExpectedStorageAddresses.zip(storedData).forall { case (address, value) =>
             address == value

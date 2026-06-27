@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum.vm
 
-
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address

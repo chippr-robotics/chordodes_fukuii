@@ -1616,8 +1616,8 @@ private class AccountRangeCoordinatorImpl(
         }
 
         // Collect storage task for inline dispatch (skip contracts with empty storage)
-        if account.storageRoot.nonEmpty && account.storageRoot != emptyRoot then {
-          newStorageTasks += StorageTask.createStorageTask(accountHash, account.storageRoot)
+        if account.storageRoot.value.nonEmpty && account.storageRoot.value != emptyRoot then {
+          newStorageTasks += StorageTask.createStorageTask(accountHash, account.storageRoot.value)
         }
       }
     }

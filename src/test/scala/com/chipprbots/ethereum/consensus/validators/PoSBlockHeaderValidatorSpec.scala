@@ -48,7 +48,7 @@ class PoSBlockHeaderValidatorSpec
   private val HeaderTs: Long = 3_000L
 
   private val baseExtraData: ByteString = ByteString("test".getBytes)
-  private val withdrawalsRoot: ByteString = Fixtures.Blocks.ValidBlock.header.stateRoot
+  private val withdrawalsRoot: ByteString = Fixtures.Blocks.ValidBlock.header.stateRoot.value
   private val beaconRoot: ByteString = Fixtures.Blocks.ValidBlock.header.parentHash.value
 
   implicit val config: BlockchainConfig = blockchainConfig.copy(

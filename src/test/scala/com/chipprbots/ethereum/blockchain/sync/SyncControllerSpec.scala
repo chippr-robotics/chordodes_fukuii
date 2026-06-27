@@ -661,7 +661,7 @@ class SyncControllerSpec
     val pivotNum = BigInt(100)
     val rootA = ByteString(Array.fill[Byte](32)(0x11)) // stored in pivot header
     val rootB = ByteString(Array.fill[Byte](32)(0x22)) // snapSyncStateRoot — differs from rootA
-    val pivotHeader = baseBlockHeader.copy(number = pivotNum, stateRoot = rootA)
+    val pivotHeader = baseBlockHeader.copy(number = pivotNum, stateRoot = TrieRoot(rootA))
 
     // Both roots present in MPT — triggers SC-1a symmetric case
     seedMptNode(testSetup, rootA, rootB)
@@ -680,7 +680,7 @@ class SyncControllerSpec
       assert(syncController.children.exists(_.path.name.startsWith("regular-sync")))
     }
     // SyncController must have rewritten the pivot header's stateRoot from rootA to rootB
-    blockchainReader.getBlockHeaderByNumber(pivotNum).map(_.stateRoot) shouldBe Some(rootB)
+    blockchainReader.getBlockHeaderByNumber(pivotNum).map(_.stateRoot) shouldBe Some(TrieRoot(rootB))
   }
 
   it should "substitute finalized root into pivot header when pivot stateRoot is missing from MPT (SC-1b)" taggedAs (
@@ -691,7 +691,7 @@ class SyncControllerSpec
     val pivotNum = BigInt(100)
     val rootA = ByteString(Array.fill[Byte](32)(0x33)) // stored in pivot header, NOT in MPT
     val rootB = ByteString(Array.fill[Byte](32)(0x44)) // finalizedRoot, present in MPT
-    val pivotHeader = baseBlockHeader.copy(number = pivotNum, stateRoot = rootA)
+    val pivotHeader = baseBlockHeader.copy(number = pivotNum, stateRoot = TrieRoot(rootA))
 
     // Only rootB in MPT — pivotRootExists=false → finalized substitution path
     seedMptNode(testSetup, rootB)
@@ -709,7 +709,7 @@ class SyncControllerSpec
       someTimePasses()
       assert(syncController.children.exists(_.path.name.startsWith("regular-sync")))
     }
-    blockchainReader.getBlockHeaderByNumber(pivotNum).map(_.stateRoot) shouldBe Some(rootB)
+    blockchainReader.getBlockHeaderByNumber(pivotNum).map(_.stateRoot) shouldBe Some(TrieRoot(rootB))
   }
 
   it should "clear both done flags and restart SNAP when HealingImpossible is received" taggedAs (
@@ -859,7 +859,7 @@ class SyncControllerSpec
       )
     )
 
-    val EmptyTrieRootHash: ByteString = Account.EmptyStorageRootHash
+    val EmptyTrieRootHash: ByteString = Account.EmptyStorageRootHash.value
     val baseBlockHeader = Fixtures.Blocks.Genesis.header
 
     blockchainWriter.storeChainWeight(baseBlockHeader.parentHash, ChainWeight.zero).commit()
@@ -1077,7 +1077,7 @@ class SyncControllerSpec
     val defaultStateRoot = "deae1dfad5ec8dcef15915811e1f044d2543674fd648f94345231da9fc2646cc"
 
     val defaultPivotBlockHeader: BlockHeader =
-      baseBlockHeader.copy(number = defaultExpectedPivotBlock, stateRoot = ByteString(Hex.decode(defaultStateRoot)))
+      baseBlockHeader.copy(number = defaultExpectedPivotBlock, stateRoot = TrieRoot(ByteString(Hex.decode(defaultStateRoot))))
 
     val defaultState: SyncState =
       SyncState(

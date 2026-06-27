@@ -88,9 +88,9 @@ class BlockValidationSpec extends AnyWordSpec with Matchers with MockFactory {
         parentHash = BlockHash(hash2ByteString("8345d132564b3660aa5f27c9415310634b50dbc92579c65a0825d9a255227a71")),
         ommersHash = BlockHash(hash2ByteString("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")),
         beneficiary = hash2ByteString("df7d7e053933b5cc24372f878c90e62dadad5d42"),
-        stateRoot = hash2ByteString("087f96537eba43885ab563227262580b27fc5e6516db79a6fc4d3bcd241dda67"),
-        transactionsRoot = hash2ByteString("8ae451039a8bf403b899dcd23252d94761ddd23b88c769d9b7996546edc47fac"),
-        receiptsRoot = hash2ByteString("8b472d8d4d39bae6a5570c2a42276ed2d6a56ac51a1a356d5b17c5564d01fd5d"),
+        stateRoot = TrieRoot(hash2ByteString("087f96537eba43885ab563227262580b27fc5e6516db79a6fc4d3bcd241dda67")),
+        transactionsRoot = TrieRoot(hash2ByteString("8ae451039a8bf403b899dcd23252d94761ddd23b88c769d9b7996546edc47fac")),
+        receiptsRoot = TrieRoot(hash2ByteString("8b472d8d4d39bae6a5570c2a42276ed2d6a56ac51a1a356d5b17c5564d01fd5d")),
         logsBloom = bloomFilter,
         difficulty = BigInt("14005986920576"),
         number = 3125369,
@@ -142,7 +142,7 @@ class BlockValidationSpec extends AnyWordSpec with Matchers with MockFactory {
       mkReceipt("0c6e052bc83482bafaccffc4217adad49f3a9533c69c820966d75ed0154091e6", 84000)
     )
 
-    val stateRootHash: ByteString = block.header.stateRoot
+    val stateRootHash: ByteString = block.header.stateRoot.value
     val gasUsed: BigInt = block.header.gasUsed
 
   }

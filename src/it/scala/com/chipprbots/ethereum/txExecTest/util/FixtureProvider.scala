@@ -116,8 +116,8 @@ object FixtureProvider {
                       storages.evmCodeStorage.put(account.codeHash.value, code).commit()
                     }
                   }
-                  if account.storageRoot != DumpChainActor.emptyStorage then {
-                    traverse(account.storageRoot)
+                  if account.storageRoot.value != DumpChainActor.emptyStorage then {
+                    traverse(account.storageRoot.value)
                   }
                 }
 
@@ -125,7 +125,7 @@ object FixtureProvider {
 
             }
 
-          traverse(header.stateRoot)
+          traverse(header.stateRoot.value)
         }
       }
 
@@ -256,8 +256,8 @@ object FixtureProvider {
     val emptyRoot = ByteString(MerklePatriciaTrie.EmptyRootHash)
     val missing = headers.values
       .filter(_.number > 0)
-      .filterNot(_.stateRoot == emptyRoot) // an all-empty state needs no dumped node
-      .filterNot(header => stateTree.contains(header.stateRoot) || contractTrees.contains(header.stateRoot))
+      .filterNot(_.stateRoot.value == emptyRoot) // an all-empty state needs no dumped node
+      .filterNot(header => stateTree.contains(header.stateRoot.value) || contractTrees.contains(header.stateRoot.value))
       .map(header => header.number -> Hex.toHexString(header.stateRoot.toArray))
       .toSeq
       .sortBy(_._1)

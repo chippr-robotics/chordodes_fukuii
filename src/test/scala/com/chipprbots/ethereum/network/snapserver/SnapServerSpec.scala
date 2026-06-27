@@ -9,6 +9,7 @@ import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.CodeHash
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.mpt.*
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestMptStorage
@@ -62,7 +63,7 @@ class SnapServerSpec extends AnyFlatSpec with Matchers {
 
   /** Account with a given storage root. */
   private def accountWithStorage(storageRoot: ByteString): Account =
-    Account(nonce = 1, balance = 500, storageRoot = storageRoot)
+    Account(nonce = 1, balance = 500, storageRoot = TrieRoot(storageRoot))
 
   /** HP-encoded empty path — asks serveTrieNodes for the root node of the trie. */
   private val hpRootPath: ByteString = ByteString(Array(0x00.toByte))
@@ -187,7 +188,7 @@ class SnapServerSpec extends AnyFlatSpec with Matchers {
   it should "not slim-encode accounts that have non-default storageRoot or codeHash" taggedAs UnitTest in {
     val fakeStorageRoot = kec256(ByteString("some storage"))
     val fakeCodeHash = kec256(ByteString("some code"))
-    val account = Account(nonce = 1, balance = 0, storageRoot = fakeStorageRoot, codeHash = CodeHash(fakeCodeHash))
+    val account = Account(nonce = 1, balance = 0, storageRoot = TrieRoot(fakeStorageRoot), codeHash = CodeHash(fakeCodeHash))
 
     val slim = SnapServer.toSlimAccountRlp(account)
     val fields = slim.items

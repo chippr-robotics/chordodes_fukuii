@@ -11,6 +11,7 @@ import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.db.storage.MptStorage
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.UInt256
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.mpt.*
 import com.chipprbots.ethereum.testing.Tags.*
 
@@ -71,7 +72,7 @@ class StateValidatorSpec extends AnyFlatSpec with Matchers {
     // Create storage trie first
     val storageTrie = MerklePatriciaTrie[ByteString, ByteString](storage)
       .put(ByteString("slot1"), ByteString("value1"))
-    val storageRoot = ByteString(storageTrie.getRootHash)
+    val storageRoot = TrieRoot(ByteString(storageTrie.getRootHash))
 
     // Create account with matching storage root
     val account = Account(
@@ -169,14 +170,14 @@ class StateValidatorSpec extends AnyFlatSpec with Matchers {
     val account1 = Account(
       nonce = 1,
       balance = 100,
-      storageRoot = storage1Root,
+      storageRoot = TrieRoot(storage1Root),
       codeHash = Account.EmptyCodeHash
     )
 
     val account2 = Account(
       nonce = 2,
       balance = 200,
-      storageRoot = missingStorageRoot,
+      storageRoot = TrieRoot(missingStorageRoot),
       codeHash = Account.EmptyCodeHash
     )
 

@@ -43,6 +43,7 @@ import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
 import com.chipprbots.ethereum.domain.ChainWeight
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.network.ForkResolver
@@ -164,7 +165,7 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
   val evmCodeStorage = storagesInstance.storages.evmCodeStorage
 
   val genesis: Block = Block(
-    Fixtures.Blocks.Genesis.header.copy(stateRoot = ByteString(MerklePatriciaTrie.EmptyRootHash)),
+    Fixtures.Blocks.Genesis.header.copy(stateRoot = TrieRoot(ByteString(MerklePatriciaTrie.EmptyRootHash))),
     Fixtures.Blocks.Genesis.body
   )
   val genesisWeight: ChainWeight = ChainWeight.zero.increase(genesis.header)
@@ -319,9 +320,9 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
     InMemoryWorldStateProxy(
       storagesInstance.storages.evmCodeStorage,
       bl.getBackingMptStorage(block.number),
-      (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash),
+      (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
       blockchainConfig.accountStartNonce,
-      block.header.stateRoot,
+      block.header.stateRoot.value,
       noEmptyAccounts = EvmConfig.forBlock(block.number, blockchainConfig).noEmptyAccounts,
       ethCompatibleStorage = blockchainConfig.ethCompatibleStorage
     )
@@ -394,7 +395,7 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
       parent.header.copy(
         parentHash = parent.header.hash,
         number = newBlockNumber,
-        stateRoot = newWorld.stateRootHash,
+        stateRoot = TrieRoot(newWorld.stateRootHash),
         unixTimestamp = parent.header.unixTimestamp + 1
       )
     )
@@ -416,7 +417,7 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
         currentBestBlock.copy(header =
           currentBestBlock.header.copy(
             number = newBlockNumber,
-            stateRoot = newWorld.stateRootHash
+            stateRoot = TrieRoot(newWorld.stateRootHash)
           )
         )
       val newWeight = ChainWeight.totalDifficultyOnly(1)

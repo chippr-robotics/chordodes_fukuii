@@ -25,6 +25,7 @@ import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateSchedulerActor
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.Transaction
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
@@ -59,7 +60,7 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
     lazy val testBlocks: List[Block] = BlockHelpers.generateChain(
       20,
       BlockHelpers.genesis,
-      block => block.copy(header = block.header.copy(stateRoot = stateRoot))
+      block => block.copy(header = block.header.copy(stateRoot = TrieRoot(stateRoot)))
     )
 
     lazy val bestBlockAtStart: Block = testBlocks(10)

@@ -284,8 +284,8 @@ object GetBlockTool {
           |  Gas Limit: ${h.gasLimit}
           |  Gas Used: ${h.gasUsed}
           |  Timestamp: ${h.unixTimestamp} (${java.time.Instant.ofEpochSecond(h.unixTimestamp)})
-          |  Transactions Root: ${ByteStringUtils.hash2string(h.transactionsRoot)}
-          |  State Root: ${ByteStringUtils.hash2string(h.stateRoot)}
+          |  Transactions Root: ${ByteStringUtils.hash2string(h.transactionsRoot.value)}
+          |  State Root: ${ByteStringUtils.hash2string(h.stateRoot.value)}
           |  Extra Data: 0x${org.bouncycastle.util.encoders.Hex.toHexString(h.extraData.toArray)}""".stripMargin
       case None => s"Block not found: $blockArg"
     }
@@ -348,7 +348,7 @@ object GetAccountTool {
             |  Block: $blockNum
             |  Nonce: ${account.nonce}
             |  Balance: ${account.balance} wei ($balanceEtc ETC)
-            |  Storage Root: ${ByteStringUtils.hash2string(account.storageRoot)}
+            |  Storage Root: ${ByteStringUtils.hash2string(account.storageRoot.value)}
             |  Code Hash: ${ByteStringUtils.hash2string(account.codeHash.value)}""".stripMargin
         case None =>
           s"""Account: $addrStr

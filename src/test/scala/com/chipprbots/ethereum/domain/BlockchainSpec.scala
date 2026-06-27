@@ -104,7 +104,7 @@ class BlockchainSpec
       storagesInstance.storages.stateStorage.getBackingStorage(0)
     )
     val mptWithAcc: MerklePatriciaTrie[Address, Account] = emptyMpt.put(address, account)
-    val headerWithAcc: BlockHeader = validHeader.copy(stateRoot = ByteString(mptWithAcc.getRootHash))
+    val headerWithAcc: BlockHeader = validHeader.copy(stateRoot = TrieRoot(ByteString(mptWithAcc.getRootHash)))
 
     blockchainWriter.storeBlockHeader(headerWithAcc).commit()
     blockchainWriter.saveBestKnownBlocks(headerWithAcc.hash, headerWithAcc.number)
@@ -125,7 +125,7 @@ class BlockchainSpec
     )
     val mptWithAcc: MerklePatriciaTrie[Address, Account] = emptyMpt.put(address, account)
 
-    val headerWithAcc: BlockHeader = validHeader.copy(stateRoot = ByteString(mptWithAcc.getRootHash))
+    val headerWithAcc: BlockHeader = validHeader.copy(stateRoot = TrieRoot(ByteString(mptWithAcc.getRootHash)))
 
     blockchainWriter.storeBlockHeader(headerWithAcc).commit()
     blockchainWriter.saveBestKnownBlocks(headerWithAcc.hash, headerWithAcc.number)
@@ -164,7 +164,7 @@ class BlockchainSpec
     val mptWithAcc: MerklePatriciaTrie[Address, Account] = emptyMpt.put(Address(42), Account.empty(UInt256(7)))
 
     val headerWithAcc: BlockHeader =
-      Fixtures.Blocks.ValidBlock.header.copy(stateRoot = ByteString(mptWithAcc.getRootHash))
+      Fixtures.Blocks.ValidBlock.header.copy(stateRoot = TrieRoot(ByteString(mptWithAcc.getRootHash)))
 
     blockchainWriter.storeBlockHeader(headerWithAcc).commit()
     blockchainWriter.saveBestKnownBlocks(headerWithAcc.hash, headerWithAcc.number)

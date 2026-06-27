@@ -447,7 +447,7 @@ object SnapServer extends Logger {
             val storageNibblesList = pathSet.tail
             resolveLeafAccount(rootNode, storage, accountNibbles) match {
               case Some(account) if account.storageRoot != Account.EmptyStorageRootHash =>
-                val storageRootNode = fetchRootNode(account.storageRoot, storage)
+                val storageRootNode = fetchRootNode(account.storageRoot.value, storage)
                 if storageRootNode != NullNode then {
                   storageNibblesList.foreach { storagePath =>
                     if accumulated < maxBytes || collected.isEmpty then {

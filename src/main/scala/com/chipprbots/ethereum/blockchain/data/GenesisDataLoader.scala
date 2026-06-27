@@ -156,7 +156,9 @@ class GenesisDataLoader(
               .getOrElse(blockchainConfig.accountStartNonce),
             balance = genesisAccount.balance,
             codeHash = genesisAccount.code.fold(Account.EmptyCodeHash)(codeValue => CodeHash(crypto.kec256(codeValue))),
-            storageRoot = genesisAccount.storage.fold(Account.EmptyStorageRootHash)(computeStorageRootHash(_, storage))
+            storageRoot = genesisAccount.storage.fold(Account.EmptyStorageRootHash)(s =>
+              TrieRoot(computeStorageRootHash(s, storage))
+            )
           )
         )
         .getRootHash
@@ -223,9 +225,9 @@ class GenesisDataLoader(
       parentHash = BlockHash(zeros(hashLength)),
       ommersHash = BlockHash(ByteString(crypto.kec256(rlp.encode(RLPList())))),
       beneficiary = genesisData.coinbase,
-      stateRoot = ByteString(stateMptRootHash),
-      transactionsRoot = emptyTrieRootHash,
-      receiptsRoot = emptyTrieRootHash,
+      stateRoot = TrieRoot(ByteString(stateMptRootHash)),
+      transactionsRoot = TrieRoot(emptyTrieRootHash),
+      receiptsRoot = TrieRoot(emptyTrieRootHash),
       logsBloom = BloomFilter(zeros(bloomLength)),
       difficulty = BigInt(genesisData.difficulty.replace("0x", ""), 16),
       number = 0,

@@ -49,11 +49,11 @@ final class CombinedRecoveryScan(
         }
         // Storage: a contract whose storage-root node is referenced but absent from MptStorage.
         val isContract = account.storageRoot != Account.EmptyStorageRootHash
-        if isContract && seenStorageRoots.add(account.storageRoot) then {
+        if isContract && seenStorageRoots.add(account.storageRoot.value) then {
           try {
             val _ = mptStorage.get(account.storageRoot.toArray)
           } catch {
-            case _: MerklePatriciaTrie.MPTException => missingStorage += ((accountHash, account.storageRoot))
+            case _: MerklePatriciaTrie.MPTException => missingStorage += ((accountHash, account.storageRoot.value))
           }
         }
         onAccount(isContract)

@@ -224,7 +224,7 @@ class BlockExecutionSpec
           originAddress -> UpdateBalance(-minerPaymentForTxs), // Origin payment for tx execution and nonce increase
           minerAddress -> UpdateBalance(minerPaymentForTxs) // Miner reward for tx execution
         )
-        val expectedStateRoot: ByteString = applyChanges(validBlockParentHeader.stateRoot, changes)
+        val expectedStateRoot: ByteString = applyChanges(validBlockParentHeader.stateRoot.value, changes)
         expectedStateRoot shouldBe InMemoryWorldStateProxy.persistState(resultingWorldState).stateRootHash
 
         // Check valid gasUsed
@@ -303,7 +303,7 @@ class BlockExecutionSpec
               originAddress -> UpdateBalance(-minerPaymentForTxs), // Origin payment for tx execution and nonce increase
               minerAddress -> UpdateBalance(minerPaymentForTxs) // Miner reward for tx execution
             ) ++ addressesToDelete.map(address => address -> DeleteAccount) // Delete all accounts to be deleted
-            val expectedStateRoot = applyChanges(validBlockParentHeader.stateRoot, changes)
+            val expectedStateRoot = applyChanges(validBlockParentHeader.stateRoot.value, changes)
             expectedStateRoot shouldBe InMemoryWorldStateProxy.persistState(resultingWorldState).stateRootHash
 
             // Check valid gasUsed
@@ -385,9 +385,9 @@ class BlockExecutionSpec
           ommerAddress -> UpdateBalance(UInt256(ommerReward))
         }
 
-        val expectedStateRoot = applyChanges(validBlockParentHeader.stateRoot, changes)
+        val expectedStateRoot = applyChanges(validBlockParentHeader.stateRoot.value, changes)
 
-        val blockHeader: BlockHeader = validBlockHeader.copy(stateRoot = expectedStateRoot)
+        val blockHeader: BlockHeader = validBlockHeader.copy(stateRoot = TrieRoot(expectedStateRoot))
         val blockBodyWithOmmers = validBlockBodyWithNoTxs.copy(
           uncleNodesList = ommersAddresses.map(ommerAddress =>
             defaultBlockHeader.copy(
@@ -443,8 +443,8 @@ class BlockExecutionSpec
       val changes: Seq[(Address, UpdateBalance)] = Seq(
         minerAddress -> UpdateBalance(UInt256(blockReward)) // Paying miner for block processing
       )
-      val expectedStateRoot: ByteString = applyChanges(validBlockParentHeader.stateRoot, changes)
-      val blockHeader: BlockHeader = validBlockHeader.copy(stateRoot = expectedStateRoot)
+      val expectedStateRoot: ByteString = applyChanges(validBlockParentHeader.stateRoot.value, changes)
+      val blockHeader: BlockHeader = validBlockHeader.copy(stateRoot = TrieRoot(expectedStateRoot))
       val block: Block = Block(blockHeader, validBlockBodyWithNoTxs)
 
       assert(seqFailingValidators.forall { _ =>
@@ -494,7 +494,7 @@ class BlockExecutionSpec
 
       val changes: Seq[(Address, UpdateBalance)] =
         Seq(minerAddress -> UpdateBalance(UInt256(blockReward))) // Paying miner for block processing
-      val correctStateRoot: ByteString = applyChanges(validBlockParentHeader.stateRoot, changes)
+      val correctStateRoot: ByteString = applyChanges(validBlockParentHeader.stateRoot.value, changes)
 
       val correctGasUsed: BigInt = 0
       val incorrectStateRoot: ByteString =
@@ -509,7 +509,7 @@ class BlockExecutionSpec
       forAll(table) { (stateRootHash, cumulativeGasUsedBlock, validators) =>
         val blockExecution = mkBlockExecution(validators = validators)
         val blockHeader: BlockHeader =
-          validBlockHeader.copy(gasUsed = cumulativeGasUsedBlock, stateRoot = stateRootHash)
+          validBlockHeader.copy(gasUsed = cumulativeGasUsedBlock, stateRoot = TrieRoot(stateRootHash))
         val block = Block(blockHeader, validBlockBodyWithNoTxs)
 
         val blockExecResult = blockExecution.executeAndValidateBlock(block)
@@ -582,7 +582,7 @@ class BlockExecutionSpec
           origin1Address -> UpdateBalance(-minerPaymentForTx1), // Origin payment for tx execution and nonce increase
           minerAddress -> UpdateBalance(minerPaymentForTx1) // Miner reward for tx execution
         )
-        val expectedStateRootTx1 = applyChanges(validBlockParentHeader.stateRoot, changesTx1)
+        val expectedStateRootTx1 = applyChanges(validBlockParentHeader.stateRoot.value, changesTx1)
 
         val LegacyReceipt(rootHashReceipt1, gasUsedReceipt1, logsBloomFilterReceipt1, logsReceipt1) =
           receipt1: @unchecked
@@ -618,7 +618,7 @@ class BlockExecutionSpec
         val blockExpectedStateRoot = applyChanges(expectedStateRootTx2, changes)
 
         val blockWithCorrectStateAndGasUsed = block.copy(
-          header = block.header.copy(stateRoot = blockExpectedStateRoot, gasUsed = gasUsedReceipt2)
+          header = block.header.copy(stateRoot = TrieRoot(blockExpectedStateRoot), gasUsed = gasUsedReceipt2)
         )
         assert(blockExecution.executeAndValidateBlock(blockWithCorrectStateAndGasUsed).isRight)
       }
@@ -724,7 +724,7 @@ class BlockExecutionSpec
         mptStorage = blockchain.getReadOnlyMptStorage(),
         getBlockHashByNumber = (n: BigInt) => blockchainReader.getBlockHeaderByNumber(n).map(_.hash.value),
         accountStartNonce = blockchainConfig.accountStartNonce,
-        stateRootHash = validBlockParentHeader.stateRoot,
+        stateRootHash = validBlockParentHeader.stateRoot.value,
         noEmptyAccounts = false,
         ethCompatibleStorage = true
       )

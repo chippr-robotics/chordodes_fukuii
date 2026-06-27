@@ -36,6 +36,7 @@ import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.ChainWeight
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.*
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerActor
@@ -63,7 +64,7 @@ class StateSyncSpec
       val trieProvider = TrieProvider()
       val target = trieProvider.buildWorld(nodeData)
       setAutoPilotWithProvider(trieProvider)
-      syncStateSchedulerActor ! StartSyncingTo(target, 1)
+      syncStateSchedulerActor ! StartSyncingTo(TrieRoot(target), 1)
       syncInitResponse.expectMessage(20.seconds, StateSyncFinished)
     }
   }
@@ -76,7 +77,7 @@ class StateSyncSpec
       val trieProvider1 = TrieProvider()
       val target = trieProvider1.buildWorld(nodeData)
       setAutoPilotWithProvider(trieProvider1, partialResponseConfig)
-      syncStateSchedulerActor ! StartSyncingTo(target, 1)
+      syncStateSchedulerActor ! StartSyncingTo(TrieRoot(target), 1)
       syncInitResponse.expectMessage(20.seconds, StateSyncFinished)
     }
   }
@@ -89,7 +90,7 @@ class StateSyncSpec
       val trieProvider1 = TrieProvider()
       val target = trieProvider1.buildWorld(nodeData)
       setAutoPilotWithProvider(trieProvider1, mixedResponseConfig)
-      syncStateSchedulerActor ! StartSyncingTo(target, 1)
+      syncStateSchedulerActor ! StartSyncingTo(TrieRoot(target), 1)
       syncInitResponse.expectMessage(20.seconds, StateSyncFinished)
     }
   }
@@ -99,7 +100,7 @@ class StateSyncSpec
       val trieProvider1 = TrieProvider()
       val target = trieProvider1.buildWorld(nodeData)
       setAutoPilotWithProvider(trieProvider1)
-      syncStateSchedulerActor ! StartSyncingTo(target, 1)
+      syncStateSchedulerActor ! StartSyncingTo(TrieRoot(target), 1)
       syncStateSchedulerActor ! RestartRequested
       // Stats go to syncInitStats; responses go to syncInitResponse — wait directly for WaitingForNewTargetBlock.
       syncInitResponse.expectMessage(20.seconds, WaitingForNewTargetBlock)
@@ -120,7 +121,7 @@ class StateSyncSpec
     val trieProvider1: TrieProvider = TrieProvider()
     val target: ByteString = trieProvider1.buildWorld(nodeData)
     setAutoPilotWithProvider(trieProvider1)
-    syncStateSchedulerActor ! StartSyncingTo(target, 1)
+    syncStateSchedulerActor ! StartSyncingTo(TrieRoot(target), 1)
     syncInitResponse.expectMessage(20.seconds, StateSyncFinished)
   }
 

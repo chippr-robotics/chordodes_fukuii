@@ -75,7 +75,7 @@ class EthProofServiceSpec
     val givenAddress = givenResult.address
     givenAddress shouldBe address
     givenResult.codeHash shouldBe account.codeHash.value
-    givenResult.storageHash shouldBe account.storageRoot
+    givenResult.storageHash shouldBe account.storageRoot.value
 
     givenResult.nonce shouldBe UInt256(transactionCountResponse.value)
 
@@ -122,7 +122,7 @@ class EthProofServiceSpec
         accountProof.balance shouldBe balance.toBigInt
         accountProof.codeHash shouldBe account.codeHash.value
         accountProof.nonce shouldBe UInt256(nonce)
-        accountProof.storageHash shouldBe account.storageRoot
+        accountProof.storageHash shouldBe account.storageRoot.value
         accountProof.storageProof.map { v =>
           v.proof.nonEmpty shouldBe true
           v.value shouldBe BigInt(0)
@@ -153,7 +153,7 @@ class EthProofServiceSpec
         accountProof.balance shouldBe balance.toBigInt
         accountProof.codeHash shouldBe account.codeHash.value
         accountProof.nonce shouldBe UInt256(nonce)
-        accountProof.storageHash shouldBe account.storageRoot
+        accountProof.storageHash shouldBe account.storageRoot.value
         r.proofAccount.storageProof.map { v =>
           v.proof.nonEmpty shouldBe true
           v.value shouldBe BigInt(value)
@@ -185,7 +185,7 @@ class EthProofServiceSpec
         accountProof.balance shouldBe balance.toBigInt
         accountProof.codeHash shouldBe account.codeHash.value
         accountProof.nonce shouldBe UInt256(nonce)
-        accountProof.storageHash shouldBe account.storageRoot
+        accountProof.storageHash shouldBe account.storageRoot.value
         accountProof.storageProof.size shouldBe 2
         accountProof.storageProof.map { v =>
           v.proof.nonEmpty shouldBe true
@@ -219,7 +219,7 @@ class EthProofServiceSpec
         accountProof.balance shouldBe balance.toBigInt
         accountProof.codeHash shouldBe account.codeHash.value
         accountProof.nonce shouldBe UInt256(nonce)
-        accountProof.storageHash shouldBe account.storageRoot
+        accountProof.storageHash shouldBe account.storageRoot.value
         accountProof.storageProof.size shouldBe 3
         expectedValueStorageKey.forall(accountProof.storageProof.map(_.value).contains) shouldBe true
       }
@@ -247,7 +247,7 @@ class EthProofServiceSpec
         accountProof.balance shouldBe balance.toBigInt
         accountProof.codeHash shouldBe account.codeHash.value
         accountProof.nonce shouldBe UInt256(nonce)
-        accountProof.storageHash shouldBe account.storageRoot
+        accountProof.storageHash shouldBe account.storageRoot.value
         accountProof.storageProof.size shouldBe 0
       }
     )
@@ -278,7 +278,7 @@ class EthProofServiceSpec
     val account: Account = Account(
       nonce = nonce,
       balance = balance,
-      storageRoot = ByteString(storageMpt.getRootHash)
+      storageRoot = TrieRoot(ByteString(storageMpt.getRootHash))
     )
 
     val mpt: MerklePatriciaTrie[Array[Byte], Account] =
@@ -289,7 +289,7 @@ class EthProofServiceSpec
         )
 
     val blockToRequest: Block = Block(Fixtures.Blocks.Block3125369.header, Fixtures.Blocks.Block3125369.body)
-    val newBlockHeader: BlockHeader = blockToRequest.header.copy(stateRoot = ByteString(mpt.getRootHash))
+    val newBlockHeader: BlockHeader = blockToRequest.header.copy(stateRoot = TrieRoot(ByteString(mpt.getRootHash)))
     val newblock: Block = blockToRequest.copy(header = newBlockHeader)
     blockchainWriter.storeBlock(newblock).commit()
     blockchainWriter.saveBestKnownBlocks(newblock.hash, newblock.number)

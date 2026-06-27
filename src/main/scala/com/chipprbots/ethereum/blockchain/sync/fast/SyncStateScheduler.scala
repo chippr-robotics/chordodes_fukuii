@@ -197,7 +197,7 @@ class SyncStateScheduler(
               Seq()
             }
 
-            val storageRequests = if account.storageRoot != emptyStateRootHash then {
+            val storageRequests = if account.storageRoot.value != emptyStateRootHash then {
               // Compute the full account hash from the leaf's nibble path + leaf key.
               // This is needed for GetTrieNodes storage requests: [accountHash, storagePath].
               val leafKeyNibbles = n.key.toArray.toSeq
@@ -205,7 +205,7 @@ class SyncStateScheduler(
               val acctHash = ByteString(HexPrefix.nibblesToBytes(fullAccountPath.toArray))
               Seq(
                 StateNodeRequest(
-                  account.storageRoot,
+                  account.storageRoot.value,
                   None,
                   StorageNode,
                   Seq(parentRequest.nodeHash),

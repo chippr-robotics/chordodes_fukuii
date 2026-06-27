@@ -174,7 +174,8 @@ trait MinerSpecSetup
     Block(
       BlockHeader(
         parentHash = parentHeader.hash,
-        ommersHash = BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
+        ommersHash =
+          BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
         beneficiary = miningConfig.coinbase.bytes,
         stateRoot = parentHeader.stateRoot,
         transactionsRoot = parentHeader.transactionsRoot,

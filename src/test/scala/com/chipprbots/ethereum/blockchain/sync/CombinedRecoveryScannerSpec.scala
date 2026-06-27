@@ -14,6 +14,7 @@ import com.chipprbots.ethereum.db.storage.MptStorage
 import com.chipprbots.ethereum.db.storage.StateStorage
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.CodeHash
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.defaultByteArraySerializable
@@ -77,7 +78,7 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite {
       )
   }
 
-  private def acc(storageRoot: ByteString, codeHash: CodeHash): Account =
+  private def acc(storageRoot: TrieRoot, codeHash: CodeHash): Account =
     Account(nonce = UInt256.Zero, storageRoot = storageRoot, codeHash = codeHash)
 
   /** The proven single whole-trie pass (Task #2), used as the equivalence reference. */
@@ -91,12 +92,12 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite {
   private def gappyState(f: Fixture): ByteString =
     f.stateRootOf(
       Seq(
-        f.acct(1) -> acc(f.presentStorageRoot(1), CodeHash(f.presentCode(1))), // all present
+        f.acct(1) -> acc(TrieRoot(f.presentStorageRoot(1)), CodeHash(f.presentCode(1))), // all present
         f.acct(2) -> acc(Account.EmptyStorageRootHash, CodeHash(f.missingCodeHash(2))), // missing code
-        f.acct(3) -> acc(f.missingStorageRoot(3), Account.EmptyCodeHash), // missing storage
-        f.acct(4) -> acc(f.missingStorageRoot(4), CodeHash(f.presentCode(4))), // missing storage, present code
-        f.acct(5) -> acc(f.presentStorageRoot(5), CodeHash(f.missingCodeHash(5))), // present storage, missing code
-        f.acct(6) -> acc(f.presentStorageRoot(6), Account.EmptyCodeHash), // present
+        f.acct(3) -> acc(TrieRoot(f.missingStorageRoot(3)), Account.EmptyCodeHash), // missing storage
+        f.acct(4) -> acc(TrieRoot(f.missingStorageRoot(4)), CodeHash(f.presentCode(4))), // missing storage, present code
+        f.acct(5) -> acc(TrieRoot(f.presentStorageRoot(5)), CodeHash(f.missingCodeHash(5))), // present storage, missing code
+        f.acct(6) -> acc(TrieRoot(f.presentStorageRoot(6)), Account.EmptyCodeHash), // present
         f.acct(7) -> Account.empty() // EOA
       )
     )
@@ -137,7 +138,7 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite {
     val f = new Fixture
     // One account per nibble 1..8 → 8 shards, each with a missing storage gap.
     val root =
-      f.stateRootOf((1 to 8).map(n => f.acctWithNibble(n, 0) -> acc(f.missingStorageRoot(n), Account.EmptyCodeHash)))
+      f.stateRootOf((1 to 8).map(n => f.acctWithNibble(n, 0) -> acc(TrieRoot(f.missingStorageRoot(n)), Account.EmptyCodeHash)))
     val (refCode, refStorage) = referenceGaps(f, root)
 
     val app = new AppStateStorage(EphemDataSource())
@@ -179,8 +180,8 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite {
     // Two accounts, forced into DIFFERENT shards (nibble 1 vs 15), both missing the SAME storage root.
     val root = f.stateRootOf(
       Seq(
-        f.acctWithNibble(1, 1) -> acc(sharedRoot, Account.EmptyCodeHash),
-        f.acctWithNibble(15, 2) -> acc(sharedRoot, Account.EmptyCodeHash)
+        f.acctWithNibble(1, 1) -> acc(TrieRoot(sharedRoot), Account.EmptyCodeHash),
+        f.acctWithNibble(15, 2) -> acc(TrieRoot(sharedRoot), Account.EmptyCodeHash)
       )
     )
     val r = new CombinedRecoveryScanner(

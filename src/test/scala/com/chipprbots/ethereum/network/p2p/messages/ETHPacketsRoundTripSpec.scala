@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum.network.p2p.messages
 
-
 import org.scalacheck.Gen
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec

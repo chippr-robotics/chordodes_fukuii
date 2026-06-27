@@ -46,7 +46,7 @@ class StxLedger(
         mptStorage = blockchain.getReadOnlyMptStorage(),
         getBlockHashByNumber = (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
         accountStartNonce = blockchainConfig.accountStartNonce,
-        stateRootHash = blockHeader.stateRoot,
+        stateRootHash = blockHeader.stateRoot.value,
         noEmptyAccounts = EvmConfig.forBlock(blockHeader.number, blockchainConfig).noEmptyAccounts,
         ethCompatibleStorage = blockchainConfig.ethCompatibleStorage
       )
@@ -88,7 +88,7 @@ class StxLedger(
         mptStorage = blockchain.getReadOnlyMptStorage(),
         getBlockHashByNumber = (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
         accountStartNonce = blockchainConfig.accountStartNonce,
-        stateRootHash = blockHeader.stateRoot,
+        stateRootHash = blockHeader.stateRoot.value,
         noEmptyAccounts = EvmConfig.forBlock(blockHeader.number, blockchainConfig).noEmptyAccounts,
         ethCompatibleStorage = blockchainConfig.ethCompatibleStorage
       )

@@ -10,6 +10,7 @@ import com.chipprbots.ethereum.consensus.difficulty.DifficultyCalculator
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
@@ -28,9 +29,9 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
       parentHash = BlockHash(ByteString(new Array[Byte](32))),
       ommersHash = BlockHash(if hasUncles then ByteString(new Array[Byte](32)) else BlockHeader.EmptyOmmers),
       beneficiary = ByteString(new Array[Byte](20)),
-      stateRoot = ByteString(new Array[Byte](32)),
-      transactionsRoot = ByteString(new Array[Byte](32)),
-      receiptsRoot = ByteString(new Array[Byte](32)),
+      stateRoot = TrieRoot(ByteString(new Array[Byte](32))),
+      transactionsRoot = TrieRoot(ByteString(new Array[Byte](32))),
+      receiptsRoot = TrieRoot(ByteString(new Array[Byte](32))),
       logsBloom = BloomFilter.Empty,
       difficulty = difficulty,
       number = number,

@@ -83,7 +83,7 @@ final class CheckpointExporter(
               log.info(
                 "[CHECKPOINT EXPORT] block={} stateRoot={} writing to {}",
                 blockNumber,
-                hex8(header.stateRoot),
+                hex8(header.stateRoot.value),
                 output
               )
 
@@ -99,7 +99,7 @@ final class CheckpointExporter(
 
               // Phase 1: account trie
               walkTrie(
-                rootHash = header.stateRoot,
+                rootHash = header.stateRoot.value,
                 isMainTrie = true,
                 mpt = mpt,
                 writer = writer,
@@ -126,7 +126,7 @@ final class CheckpointExporter(
               // Phase 2: per-account storage tries
               while storageRoots.nonEmpty && exportError.isEmpty do {
                 val sroot = storageRoots.dequeue()
-                if sroot != Account.EmptyStorageRootHash then {
+                if sroot != Account.EmptyStorageRootHash.value then {
                   walkTrie(
                     rootHash = sroot,
                     isMainTrie = false,
@@ -241,7 +241,7 @@ final class CheckpointExporter(
     case LeafNode(_, value, _, _, _) if isMainTrie =>
       Account(value) match {
         case scala.util.Success(acct) =>
-          if acct.storageRoot != Account.EmptyStorageRootHash then storageRoots += acct.storageRoot
+          if acct.storageRoot != Account.EmptyStorageRootHash then storageRoots += acct.storageRoot.value
           if acct.codeHash != Account.EmptyCodeHash then codeHashes.add(acct.codeHash.value)
         case scala.util.Failure(_) =>
         // Storage-only or malformed leaf — best-effort; bytecodes still resolved per-trie.

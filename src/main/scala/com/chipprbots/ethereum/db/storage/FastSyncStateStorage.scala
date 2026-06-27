@@ -12,6 +12,7 @@ import boopickle.Default.*
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSync.*
 import com.chipprbots.ethereum.db.dataSource.DataSource
 import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
@@ -37,6 +38,8 @@ class FastSyncStateStorage(val dataSource: DataSource)
     transformPickler[BloomFilter, Array[Byte]](arr => BloomFilter.fromArray(arr))(_.toArray)
   given blockHashPickler: Pickler[BlockHash] =
     transformPickler[BlockHash, Array[Byte]](arr => BlockHash(ByteString(arr)))(_.toArray)
+  given trieRootPickler: Pickler[TrieRoot] =
+    transformPickler[TrieRoot, Array[Byte]](arr => TrieRoot(ByteString(arr)))(_.toArray)
 
   given headerExtraFieldsPickler: CompositePickler[HeaderExtraFields] =
     compositePickler[HeaderExtraFields]

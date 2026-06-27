@@ -24,6 +24,7 @@ import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.domain.Transaction
 import com.chipprbots.ethereum.domain.TransactionWithAccessList
 import com.chipprbots.ethereum.domain.TransactionWithDynamicFee
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.domain.Withdrawal
 
 object Picklers {
@@ -35,6 +36,8 @@ object Picklers {
     transformPickler[BlobVersionedHash, Array[Byte]](arr => BlobVersionedHash(ByteString(arr)))(_.toArray)
   given blockHashPickler: Pickler[BlockHash] =
     transformPickler[BlockHash, Array[Byte]](arr => BlockHash(ByteString(arr)))(_.toArray)
+  given trieRootPickler: Pickler[TrieRoot] =
+    transformPickler[TrieRoot, Array[Byte]](arr => TrieRoot(ByteString(arr)))(_.toArray)
   given ecdsaSignaturePickler: Pickler[ECDSASignature] = generatePickler[ECDSASignature]
   given hefEmptyPickler: Pickler[HefEmpty.type] = generatePickler[HefEmpty.type]
   given hefPostOlympiaPickler: Pickler[HefPostOlympia] = generatePickler[HefPostOlympia]

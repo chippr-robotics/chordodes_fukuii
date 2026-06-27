@@ -97,7 +97,7 @@ final class CheckpointImporter(
       "[CHECKPOINT IMPORT] starting block={} chainId={} stateRoot={}",
       blockNum,
       header.chainId,
-      hex8(header.blockHeader.stateRoot)
+      hex8(header.blockHeader.stateRoot.value)
     )
 
     def flushNodes(): Unit =

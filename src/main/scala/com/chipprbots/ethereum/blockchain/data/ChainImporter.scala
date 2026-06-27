@@ -52,7 +52,7 @@ class ChainImporter(
         genesisOpt.foreach { genesis =>
           log.error(s"Chain import: genesis hash=${genesis.hashAsHexString}")
           log.error(
-            s"Chain import: genesis stateRoot=${com.chipprbots.ethereum.utils.ByteStringUtils.hash2string(genesis.stateRoot)}"
+            s"Chain import: genesis stateRoot=${com.chipprbots.ethereum.utils.ByteStringUtils.hash2string(genesis.stateRoot.value)}"
           )
           log.error(
             s"Chain import: genesis difficulty=${genesis.difficulty}, gasLimit=${genesis.gasLimit}, extraData=${com.chipprbots.ethereum.utils.ByteStringUtils.hash2string(genesis.extraData)}"

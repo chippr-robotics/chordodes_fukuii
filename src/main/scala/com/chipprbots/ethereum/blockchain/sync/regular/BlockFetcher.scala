@@ -449,7 +449,7 @@ class BlockFetcher(
         // blocks; if the requested parent stateRoot is older than that, every peer returns empty
         // TrieNodes and StateNodeFetcher exhausts. The recent canonical root IS servable, and
         // the same nibble path usually still leads to the same content-addressed node.
-        val fallbackRoot = state.recentCanonicalStateRoot.filter(r => !stateRoot.contains(r))
+        val fallbackRoot = state.recentCanonicalStateRoot.map(_.value).filter(r => !stateRoot.contains(r))
         stateNodeFetcher ! StateNodeFetcher.FetchStateNode(
           hash,
           replyTo,

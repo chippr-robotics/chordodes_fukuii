@@ -273,7 +273,7 @@ object RegularSyncItSpecUtils {
       InMemoryWorldStateProxy(
         storagesInstance.storages.evmCodeStorage,
         bl.getBackingMptStorage(block.number),
-        (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash),
+        (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
         UInt256.Zero,
         ByteString(MerklePatriciaTrie.EmptyRootHash),
         noEmptyAccounts = false,
@@ -297,7 +297,7 @@ object RegularSyncItSpecUtils {
         parent.header.copy(
           parentHash = parent.header.hash,
           number = newBlockNumber,
-          stateRoot = newWorld.stateRootHash,
+          stateRoot = TrieRoot(newWorld.stateRootHash),
           difficulty = plusDifficulty + parent.header.difficulty
         )
       )

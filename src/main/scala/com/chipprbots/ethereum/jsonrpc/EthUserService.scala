@@ -42,7 +42,7 @@ class EthUserService(
           blockchain.getBackingMptStorage(block.header.number),
           (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
           blockchainConfig.accountStartNonce,
-          block.header.stateRoot,
+          block.header.stateRoot.value,
           noEmptyAccounts = false,
           ethCompatibleStorage = blockchainConfig.ethCompatibleStorage
         )
@@ -60,7 +60,7 @@ class EthUserService(
   def getStorageAt(req: GetStorageAtRequest): ServiceResponse[GetStorageAtResponse] =
     withAccount(req.address, req.block) { account =>
       GetStorageAtResponse(
-        blockchain.getAccountStorageAt(account.storageRoot, req.position, blockchainConfig.ethCompatibleStorage)
+        blockchain.getAccountStorageAt(account.storageRoot.value, req.position, blockchainConfig.ethCompatibleStorage)
       )
     }
 
@@ -71,7 +71,7 @@ class EthUserService(
 
   def getStorageRoot(req: GetStorageRootRequest): ServiceResponse[GetStorageRootResponse] =
     withAccount(req.address, req.block) { account =>
-      GetStorageRootResponse(account.storageRoot)
+      GetStorageRootResponse(account.storageRoot.value)
     }
 
   private def withAccount[T](address: Address, blockParam: BlockParam)(makeResponse: Account => T): ServiceResponse[T] =

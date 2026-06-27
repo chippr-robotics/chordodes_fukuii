@@ -28,6 +28,7 @@ import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.Processin
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.SchedulerState
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.SyncResponse
 
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.mpt.HexPrefix
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.Peer
@@ -58,7 +59,7 @@ object SyncStateSchedulerActor {
   // Internal commands: StartSyncingTo/RestartRequested are received by the Behavior[Command] core and
   // converted to these Cmd forms using the replyTo passed at construction (no sender() needed).
   final private[fast] case class StartSyncingToCmd(
-      stateRoot: ByteString,
+      stateRoot: TrieRoot,
       blockNumber: BigInt,
       replyTo: TypedActorRef[SyncStateSchedulerActorResponse]
   ) extends Command
@@ -134,7 +135,7 @@ object SyncStateSchedulerActor {
   case object PrintInfoKey
 
   sealed trait SyncStateSchedulerActorCommand
-  final case class StartSyncingTo(stateRoot: ByteString, blockNumber: BigInt)
+  final case class StartSyncingTo(stateRoot: TrieRoot, blockNumber: BigInt)
       extends SyncStateSchedulerActorCommand
       with Command
   case object RestartRequested extends SyncStateSchedulerActorCommand with Command
@@ -314,20 +315,20 @@ object SyncStateSchedulerActor {
       }
 
     private def startSyncing(
-        root: ByteString,
+        root: TrieRoot,
         bn: BigInt,
         initialStats: ProcessingStatistics,
         initiator: TypedActorRef[SyncStateSchedulerActorResponse]
     ): Behavior[Command] = {
       timers.startTimerAtFixedRate(PrintInfoKey, PrintInfo, 30.seconds)
-      currentStateRoot = root
+      currentStateRoot = root.value
       consecutiveUselessResponses = 0
-      ctx.log.info("Starting state sync to root {} on block {}", ByteStringUtils.hash2string(root), bn)
-      sync.initState(root) match {
+      ctx.log.info("Starting state sync to root {} on block {}", ByteStringUtils.hash2string(root.value), bn)
+      sync.initState(root.value) match {
         case None =>
           ctx.log.info(
             "Empty state root {} — nothing to sync, completing immediately.",
-            ByteStringUtils.hash2string(root)
+            ByteStringUtils.hash2string(root.value)
           )
           initiator ! StateSyncFinished
           idle(initialStats)

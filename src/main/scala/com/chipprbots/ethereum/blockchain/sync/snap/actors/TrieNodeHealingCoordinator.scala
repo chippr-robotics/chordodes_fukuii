@@ -1727,7 +1727,7 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
                         // before the de-dup gate, when there is a non-empty storage root to follow.
                         if account.storageRoot != Account.EmptyStorageRootHash then childRefsSeen.incrementAndGet()
                         if account.storageRoot != Account.EmptyStorageRootHash &&
-                          markIfNew(account.storageRoot)
+                          markIfNew(account.storageRoot.value)
                         then {
                           distinctEnqueued.incrementAndGet()
                           val allNibbles = nibbles ++ leaf.key.toArray
@@ -2034,8 +2034,8 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
             // Besu equivalent: getChildRequests() → getStorageTrieNodeRequests() on account leaf values.
             Account(leaf.value).foreach { account =>
               if account.storageRoot != Account.EmptyStorageRootHash &&
-                !pendingHashSet.contains(account.storageRoot) &&
-                !isNodeInStorage(account.storageRoot)
+                !pendingHashSet.contains(account.storageRoot.value) &&
+                !isNodeInStorage(account.storageRoot.value)
               then {
                 val leafNibbles = leaf.key.toArray
                 val allNibbles = parentNibbles ++ leafNibbles
@@ -2048,9 +2048,9 @@ private[actors] class TrieNodeHealingCoordinatorImpl(
                     .toArray
                   val accountHash = ByteString(accountHashBytes)
                   val emptyStoragePath = ByteString(HexPrefix.encode(Array.empty[Byte], isLeaf = false))
-                  newEntries += HealingEntry(Seq(accountHash, emptyStoragePath), account.storageRoot)
+                  newEntries += HealingEntry(Seq(accountHash, emptyStoragePath), account.storageRoot.value)
                   log.debug(
-                    s"[HEAL-LEAF] Seeded storage trie root ${Hex.toHexString(account.storageRoot.take(4).toArray)} " +
+                    s"[HEAL-LEAF] Seeded storage trie root ${Hex.toHexString(account.storageRoot.value.take(4).toArray)} " +
                       s"for account ${Hex.toHexString(accountHashBytes.take(4))}"
                   )
                 }

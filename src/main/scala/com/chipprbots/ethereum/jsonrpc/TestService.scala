@@ -249,7 +249,7 @@ class TestService(
 
   private def storeGenesisAccountStorageData(accounts: Map[String, GenesisAccount]): Unit = {
     val emptyStorage = domain.EthereumUInt256Mpt.storageMpt(
-      Account.EmptyStorageRootHash,
+      Account.EmptyStorageRootHash.value,
       stateStorage.getBackingStorage(0)
     )
     val storagesToPersist = accounts
@@ -450,7 +450,7 @@ class TestService(
         .view
         .dropWhile { case (hash, _) => UInt256(hash) < request.parameters.begin }
         .map { case (keyHash, keyValue) =>
-          (keyHash.toArray, keyValue, blockchain.getAccountStorageAt(account.storageRoot, keyValue, true))
+          (keyHash.toArray, keyValue, blockchain.getAccountStorageAt(account.storageRoot.value, keyValue, true))
         }
         .filterNot { case (_, _, storageValue) => storageValue == ByteString(0) }
         .take(request.parameters.maxResults + 1)

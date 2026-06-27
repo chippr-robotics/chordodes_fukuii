@@ -181,7 +181,7 @@ class EthSimulateService(
       getBlockHashByNumber =
         (n: BigInt) => simulatedBlockHashes.get(n).orElse(blockchainReader.getBlockHeaderByNumber(n).map(_.hash.value)),
       accountStartNonce = blockchainConfig.accountStartNonce,
-      stateRootHash = baseBlock.header.stateRoot,
+      stateRootHash = baseBlock.header.stateRoot.value,
       noEmptyAccounts = evmConfig.noEmptyAccounts,
       ethCompatibleStorage = blockchainConfig.ethCompatibleStorage
     )
@@ -392,9 +392,9 @@ class EthSimulateService(
       case other            => other
     }
     val finalHeader = simHeader.copy(
-      stateRoot = stateRoot,
-      transactionsRoot = transactionsRoot,
-      receiptsRoot = receiptsRoot,
+      stateRoot = TrieRoot(stateRoot),
+      transactionsRoot = TrieRoot(transactionsRoot),
+      receiptsRoot = TrieRoot(receiptsRoot),
       logsBloom = com.chipprbots.ethereum.domain.BloomFilter(logsBloom),
       gasUsed = gasUsed,
       extraFields = finalExtraFields
@@ -551,9 +551,9 @@ class EthSimulateService(
       parentHash = parentHeader.hash,
       ommersHash = BlockHash(EmptyOmmersHash),
       beneficiary = beneficiary,
-      stateRoot = ByteString(new Array[Byte](32)), // Placeholder — filled after execution
-      transactionsRoot = EmptyMpt,
-      receiptsRoot = EmptyMpt,
+      stateRoot = TrieRoot(ByteString(new Array[Byte](32))), // Placeholder — filled after execution
+      transactionsRoot = TrieRoot(EmptyMpt),
+      receiptsRoot = TrieRoot(EmptyMpt),
       logsBloom = com.chipprbots.ethereum.domain.BloomFilter(EmptyBloom),
       difficulty = difficulty,
       number = number,

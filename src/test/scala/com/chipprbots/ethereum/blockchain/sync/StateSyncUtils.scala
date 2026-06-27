@@ -111,7 +111,7 @@ object StateSyncUtils extends EphemBlockchainTestSetup {
         val code = address.flatMap(a => evmCodeStorage.get(a.codeHash.value))
 
         val storageCorrect = dataToCheck.accountStorage.forall { case (key, value) =>
-          val stored = blockchain.getAccountStorageAt(address.get.storageRoot, key, ethCompatibleStorage = true)
+          val stored = blockchain.getAccountStorageAt(address.get.storageRoot.value, key, ethCompatibleStorage = true)
           ByteUtils.toBigInt(stored) == value
         }
 

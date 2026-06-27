@@ -23,6 +23,7 @@ import com.chipprbots.ethereum.db.storage.MptStorage
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.CodeHash
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
 import com.chipprbots.ethereum.domain.ChainWeight
@@ -79,7 +80,7 @@ class CheckpointExporterSpec
           Account(
             nonce = UInt256(0),
             balance = UInt256(0),
-            storageRoot = storageRoot,
+            storageRoot = TrieRoot(storageRoot),
             codeHash = CodeHash(codeBHash)
           )
         )
@@ -90,7 +91,7 @@ class CheckpointExporterSpec
       val stateRoot: ByteString = ByteString(accountTrie.getRootHash)
 
       // Header with the constructed stateRoot — use a fixture for the bulk and override stateRoot.
-      val header: BlockHeader = Fixtures.Blocks.Block3125369.header.copy(stateRoot = stateRoot, number = 100)
+      val header: BlockHeader = Fixtures.Blocks.Block3125369.header.copy(stateRoot = TrieRoot(stateRoot), number = 100)
       val weight: ChainWeight = ChainWeight(BigInt(42))
       sourceWriter.storeBlockHeader(header).and(sourceWriter.storeChainWeight(header.hash, weight)).commit()
 
@@ -177,11 +178,14 @@ class CheckpointExporterSpec
       val sourceBackingStorage: MptStorage = sourceStorages.storages.stateStorage.getBackingStorage(100)
       val accountTrie: MerklePatriciaTrie[Array[Byte], Account] =
         MerklePatriciaTrie[Array[Byte], Account](sourceBackingStorage)
-          .put(crypto.kec256(addr1), Account(nonce = UInt256(0), balance = UInt256(100), codeHash = CodeHash(codeAHash)))
+          .put(
+            crypto.kec256(addr1),
+            Account(nonce = UInt256(0), balance = UInt256(100), codeHash = CodeHash(codeAHash))
+          )
           .put(crypto.kec256(addr2), Account(nonce = UInt256(1), balance = UInt256(1)))
       val stateRoot: ByteString = ByteString(accountTrie.getRootHash)
 
-      val header: BlockHeader = Fixtures.Blocks.Block3125369.header.copy(stateRoot = stateRoot, number = 100)
+      val header: BlockHeader = Fixtures.Blocks.Block3125369.header.copy(stateRoot = TrieRoot(stateRoot), number = 100)
       val weight: ChainWeight = ChainWeight(BigInt(42))
       sourceWriter.storeBlockHeader(header).and(sourceWriter.storeChainWeight(header.hash, weight)).commit()
 

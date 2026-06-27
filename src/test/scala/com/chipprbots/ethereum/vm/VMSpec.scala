@@ -97,7 +97,8 @@ class VMSpec extends AnyWordSpec with ScalaCheckPropertyChecks with Matchers {
         VMTest
       ) in new ContractCreation {
         val nonEmptyCodeHash: ByteString = ByteString(1)
-        val world: MockWorldState = defaultWorld.saveAccount(expectedNewAddress, Account(codeHash = CodeHash(nonEmptyCodeHash)))
+        val world: MockWorldState =
+          defaultWorld.saveAccount(expectedNewAddress, Account(codeHash = CodeHash(nonEmptyCodeHash)))
 
         val context: PC = getContext(world = world)
         val result: ProgramResult[MockWorldState, MockStorage] = vm.run(context)

@@ -353,7 +353,7 @@ class EngineApiService(
                     block.body.numberOfTxs,
                     !extendsCanonical,
                     derivedRequests.size,
-                    block.header.stateRoot.take(8).map("%02x".format(_)).mkString
+                    block.header.stateRoot.value.take(8).map("%02x".format(_)).mkString
                   )
                   Some(true) // fully executed
                 }
@@ -473,7 +473,8 @@ class EngineApiService(
       val safeHash = forkChoiceState.safeBlockHash
       val finalizedHash = forkChoiceState.finalizedBlockHash
       val safeUnknown = safeHash != zeroHash && blockchainReader.getBlockHeaderByHash(BlockHash(safeHash)).isEmpty
-      val finalizedUnknown = finalizedHash != zeroHash && blockchainReader.getBlockHeaderByHash(BlockHash(finalizedHash)).isEmpty
+      val finalizedUnknown =
+        finalizedHash != zeroHash && blockchainReader.getBlockHeaderByHash(BlockHash(finalizedHash)).isEmpty
       // Head-known-but-unvalidated: the block was stored optimistically (storeBlockByHashOnly,
       // no receipts, no canonical number mapping) because its parent chain isn't traceable.
       // In this state we're still syncing, so ALL status flavors — including safe/finalized
@@ -773,9 +774,9 @@ class EngineApiService(
                                 )
                               ),
                               beneficiary = attrs.suggestedFeeRecipient.bytes,
-                              stateRoot = ByteString.empty,
-                              transactionsRoot = emptyTrieRoot,
-                              receiptsRoot = emptyTrieRoot,
+                              stateRoot = TrieRoot.Empty,
+                              transactionsRoot = TrieRoot(emptyTrieRoot),
+                              receiptsRoot = TrieRoot(emptyTrieRoot),
                               logsBloom = BloomFilter.Empty,
                               difficulty = 0,
                               number = blockNumber,
@@ -814,7 +815,7 @@ class EngineApiService(
                                   )
                                 case Left(err) =>
                                   log.error("Proposer-mode execution failed: {}", err)
-                                  (Seq.empty[Receipt], BigInt(0), parent.header.stateRoot, Seq.empty[ByteString])
+                                  (Seq.empty[Receipt], BigInt(0), parent.header.stateRoot.value, Seq.empty[ByteString])
                               }
 
                             val receiptsLogs =
@@ -869,10 +870,11 @@ class EngineApiService(
                             }
 
                             val updatedHeader = header.copy(
-                              stateRoot = finalStateRoot,
-                              receiptsRoot = buildMpt(receipts, Receipt.byteArraySerializable),
-                              transactionsRoot =
-                                buildMpt(skeletonBlock.body.transactionList, SignedTransaction.byteArraySerializable),
+                              stateRoot = TrieRoot(finalStateRoot),
+                              receiptsRoot = TrieRoot(buildMpt(receipts, Receipt.byteArraySerializable)),
+                              transactionsRoot = TrieRoot(
+                                buildMpt(skeletonBlock.body.transactionList, SignedTransaction.byteArraySerializable)
+                              ),
                               logsBloom = BloomFilter(bloomFilter),
                               gasUsed = gasUsedTotal,
                               extraFields = finalExtraFields
@@ -1155,9 +1157,9 @@ class EngineApiService(
       parentHash = BlockHash(payload.parentHash),
       ommersHash = BlockHash(BlockHeader.EmptyOmmers),
       beneficiary = payload.feeRecipient.bytes,
-      stateRoot = payload.stateRoot,
-      transactionsRoot = computeTransactionsRoot(signedTxs),
-      receiptsRoot = payload.receiptsRoot,
+      stateRoot = TrieRoot(payload.stateRoot),
+      transactionsRoot = TrieRoot(computeTransactionsRoot(signedTxs)),
+      receiptsRoot = TrieRoot(payload.receiptsRoot),
       logsBloom = BloomFilter(payload.logsBloom),
       difficulty = 0,
       number = payload.blockNumber,

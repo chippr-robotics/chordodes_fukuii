@@ -455,7 +455,7 @@ final private class BlockImporterLogic(
                 val parentStateRoot =
                   try
                     Option(blockchainReader.getBlockHeaderByHash(failedBlock.header.parentHash)).flatten
-                      .map(_.stateRoot)
+                      .map(_.stateRoot.value)
                   catch {
                     case ex: Exception =>
                       log.warning("Failed to get parent state root during node recovery: {}", ex.getMessage); None
@@ -486,7 +486,7 @@ final private class BlockImporterLogic(
                 val parentStateRoot =
                   try
                     Option(blockchainReader.getBlockHeaderByHash(failedBlock.header.parentHash)).flatten
-                      .map(_.stateRoot)
+                      .map(_.stateRoot.value)
                   catch {
                     case ex: Exception =>
                       log.warning("Failed to get parent state root during node recovery: {}", ex.getMessage); None
@@ -515,7 +515,7 @@ final private class BlockImporterLogic(
                 val parentStateRoot =
                   try
                     Option(blockchainReader.getBlockHeaderByHash(failedBlock.header.parentHash)).flatten
-                      .map(_.stateRoot)
+                      .map(_.stateRoot.value)
                   catch {
                     case ex: Exception =>
                       log.warning("Failed to get parent state root during node recovery: {}", ex.getMessage); None
@@ -545,7 +545,7 @@ final private class BlockImporterLogic(
                     val parentStateRoot =
                       try
                         Option(blockchainReader.getBlockHeaderByHash(failedBlock.header.parentHash)).flatten
-                          .map(_.stateRoot)
+                          .map(_.stateRoot.value)
                       catch { case _: Exception => None }
                     pendingStateNodeHash = Some(codeHash)
                     // isByteCode=true routes the fetch through SNAP GetByteCodes (works on ETH68+)

@@ -323,7 +323,7 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
         val account = Account(
           nonce = UInt256(currentBlockNumber),
           balance = UInt256(currentBlockNumber * BigInt(1000000000)),
-          storageRoot = ByteString.empty,
+          storageRoot = TrieRoot(ByteString.empty),
           codeHash = Account.EmptyCodeHash
         )
         InMemoryWorldStateProxy.persistState(world.saveAccount(accountAddress, account))

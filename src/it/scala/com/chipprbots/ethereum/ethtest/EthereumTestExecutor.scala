@@ -75,7 +75,7 @@ object EthereumTestExecutor {
         mptStorage = mptStorage,
         getBlockHashByNumber = (_: BigInt) => None,
         accountStartNonce = blockchainConfig.accountStartNonce,
-        stateRootHash = Account.EmptyStorageRootHash,
+        stateRootHash = Account.EmptyStorageRootHash.value,
         noEmptyAccounts = false,
         ethCompatibleStorage = blockchainConfig.ethCompatibleStorage
       )

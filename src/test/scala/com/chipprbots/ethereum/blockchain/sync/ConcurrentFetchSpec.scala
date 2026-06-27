@@ -16,6 +16,7 @@ import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.PeerInfo
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor.RemoteStatus
 import com.chipprbots.ethereum.network.Peer
@@ -374,9 +375,9 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
       parentHash = BlockHash(hash32),
       ommersHash = BlockHash(hash32),
       beneficiary = beneficiary,
-      stateRoot = hash32,
-      transactionsRoot = hash32,
-      receiptsRoot = hash32,
+      stateRoot = TrieRoot(hash32),
+      transactionsRoot = TrieRoot(hash32),
+      receiptsRoot = TrieRoot(hash32),
       logsBloom = BloomFilter(bloom256),
       difficulty = 1,
       number = 0,

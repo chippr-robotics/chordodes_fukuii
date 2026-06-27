@@ -20,6 +20,7 @@ import com.chipprbots.ethereum.utils.MonetaryPolicyConfig
 import com.chipprbots.ethereum.utils.NetworkType
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.TrieRoot
 
 class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
   import SNAPSyncController.SyncPhase.*
@@ -234,9 +235,9 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
       parentHash = BlockHash(ByteString(new Array[Byte](32))),
       ommersHash = BlockHash(BlockHeader.EmptyOmmers),
       beneficiary = ByteString(new Array[Byte](20)),
-      stateRoot = ByteString(Array.fill(32)(0x77.toByte)),
-      transactionsRoot = BlockHeader.EmptyMpt,
-      receiptsRoot = BlockHeader.EmptyMpt,
+      stateRoot = TrieRoot(ByteString(Array.fill(32)(0x77.toByte))),
+      transactionsRoot = TrieRoot(BlockHeader.EmptyMpt),
+      receiptsRoot = TrieRoot(BlockHeader.EmptyMpt),
       logsBloom = BloomFilter.Empty,
       difficulty = 0,
       number = 9876543,
@@ -1277,9 +1278,9 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
       parentHash = BlockHash(ByteString(Array.fill(32)(0xab.toByte))),
       ommersHash = BlockHash(BlockHeader.EmptyOmmers),
       beneficiary = ByteString(new Array[Byte](20)),
-      stateRoot = ByteString(Array.fill(32)(0x77.toByte)),
-      transactionsRoot = BlockHeader.EmptyMpt,
-      receiptsRoot = BlockHeader.EmptyMpt,
+      stateRoot = TrieRoot(ByteString(Array.fill(32)(0x77.toByte))),
+      transactionsRoot = TrieRoot(BlockHeader.EmptyMpt),
+      receiptsRoot = TrieRoot(BlockHeader.EmptyMpt),
       logsBloom = BloomFilter.Empty,
       difficulty = BigInt(0),
       number = BigInt(5187023),

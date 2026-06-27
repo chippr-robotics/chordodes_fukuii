@@ -77,10 +77,10 @@ class StateValidator(mptStorage: MptStorage) {
                   // caller does not treat an un-walked trie as intact; log so corrupt
                   // storage data (not just a missing node) is visible.
                   log.warn(
-                    s"Unexpected error walking storage trie ${account.storageRoot.take(8).toHex}; flagging for healing: ${e.getMessage}",
+                    s"Unexpected error walking storage trie ${account.storageRoot.value.take(8).toHex}; flagging for healing: ${e.getMessage}",
                     e
                   )
-                  missingStorageNodes += account.storageRoot
+                  missingStorageNodes += account.storageRoot.value
               }
             }
           }
@@ -332,7 +332,7 @@ class StateValidator(mptStorage: MptStorage) {
               } catch {
                 case _: MerklePatriciaTrie.MissingNodeException =>
                   val compactPath = ByteString(HexPrefix.encode(Array.empty[Byte], isLeaf = false))
-                  result += ((Seq(ByteString(accountHashBytes), compactPath), account.storageRoot))
+                  result += ((Seq(ByteString(accountHashBytes), compactPath), account.storageRoot.value))
                   flushIfFull()
               }
             }

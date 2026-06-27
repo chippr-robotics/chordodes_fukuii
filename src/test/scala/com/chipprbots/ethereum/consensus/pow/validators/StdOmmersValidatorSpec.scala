@@ -15,6 +15,7 @@ import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.testing.Tags.*
 
 class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks with ObjectGenerators {
@@ -154,12 +155,14 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
     val ommersValidator = new StdOmmersValidator(PoWBlockHeaderValidator)
 
     val ommerInvalidBranch: BlockHeader = BlockHeader(
-      parentHash = BlockHash(ByteString(Hex.decode("fd07e36cfaf327801e5696134b12345f6a89fb1e8f017f2411a29d0ae810ab8b"))),
-      ommersHash = BlockHash(ByteString(Hex.decode("7766c4251396a6833ccbe4be86fbda3a200dccbe6a15d80ae3de5378b1540e04"))),
+      parentHash =
+        BlockHash(ByteString(Hex.decode("fd07e36cfaf327801e5696134b12345f6a89fb1e8f017f2411a29d0ae810ab8b"))),
+      ommersHash =
+        BlockHash(ByteString(Hex.decode("7766c4251396a6833ccbe4be86fbda3a200dccbe6a15d80ae3de5378b1540e04"))),
       beneficiary = ByteString(Hex.decode("28921e4e2c9d84f4c0f0c0ceb991f45751a0fe93")),
-      stateRoot = ByteString(Hex.decode("e766f9c51536e9038849e5eb0a143c3b3409b5385098359837cbf3324ad22328")),
-      transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-      receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+      stateRoot = TrieRoot(ByteString(Hex.decode("e766f9c51536e9038849e5eb0a143c3b3409b5385098359837cbf3324ad22328"))),
+      transactionsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+      receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
       logsBloom = BloomFilter(
         ByteString(
           Hex.decode(
@@ -179,12 +182,14 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
 
     // Ommers from block 0xe9fb121a7ee5cb03b33adbf59e95321a2453f09db98068e1f31f0da79860c50c (of number 97)
     val ommer1: BlockHeader = BlockHeader(
-      parentHash = BlockHash(ByteString(Hex.decode("fd07e36cfaf327801e5696134b36678f6a89fb1e8f017f2411a29d0ae810ab8b"))),
-      ommersHash = BlockHash(ByteString(Hex.decode("7766c4251396a6833ccbe4be86fbda3a200dccbe6a15d80ae3de5378b1540e04"))),
+      parentHash =
+        BlockHash(ByteString(Hex.decode("fd07e36cfaf327801e5696134b36678f6a89fb1e8f017f2411a29d0ae810ab8b"))),
+      ommersHash =
+        BlockHash(ByteString(Hex.decode("7766c4251396a6833ccbe4be86fbda3a200dccbe6a15d80ae3de5378b1540e04"))),
       beneficiary = ByteString(Hex.decode("1b7047b4338acf65be94c1a3e8c5c9338ad7d67c")),
-      stateRoot = ByteString(Hex.decode("52ce0ff43d7df2cf39f8cb8832f94d2280ebe856d84d8feb7b2281d3c5cfb990")),
-      transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-      receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+      stateRoot = TrieRoot(ByteString(Hex.decode("52ce0ff43d7df2cf39f8cb8832f94d2280ebe856d84d8feb7b2281d3c5cfb990"))),
+      transactionsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+      receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
       logsBloom = BloomFilter(
         ByteString(
           Hex.decode(
@@ -202,12 +207,14 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
       nonce = ByteString(Hex.decode("62bc3dca012c1b27"))
     )
     val ommer2: BlockHeader = BlockHeader(
-      parentHash = BlockHash(ByteString(Hex.decode("fd07e36cfaf327801e5696134b36678f6a89fb1e8f017f2411a29d0ae810ab8b"))),
-      ommersHash = BlockHash(ByteString(Hex.decode("7766c4251396a6833ccbe4be86fbda3a200dccbe6a15d80ae3de5378b1540e04"))),
+      parentHash =
+        BlockHash(ByteString(Hex.decode("fd07e36cfaf327801e5696134b36678f6a89fb1e8f017f2411a29d0ae810ab8b"))),
+      ommersHash =
+        BlockHash(ByteString(Hex.decode("7766c4251396a6833ccbe4be86fbda3a200dccbe6a15d80ae3de5378b1540e04"))),
       beneficiary = ByteString(Hex.decode("28921e4e2c9d84f4c0f0c0ceb991f45751a0fe93")),
-      stateRoot = ByteString(Hex.decode("e766f9c51536e9038849e5eb0a143c3b3409b5385098359837cbf3324ad22328")),
-      transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-      receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+      stateRoot = TrieRoot(ByteString(Hex.decode("e766f9c51536e9038849e5eb0a143c3b3409b5385098359837cbf3324ad22328"))),
+      transactionsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+      receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
       logsBloom = BloomFilter(
         ByteString(
           Hex.decode(
@@ -229,12 +236,14 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
 
     val block90: Block = Block(
       BlockHeader(
-        parentHash = BlockHash(ByteString(Hex.decode("6da5970538eba5db93162e219182fca7e093cfe4fbd8dd0b82789adb25dcbb42"))),
-        ommersHash = BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
+        parentHash =
+          BlockHash(ByteString(Hex.decode("6da5970538eba5db93162e219182fca7e093cfe4fbd8dd0b82789adb25dcbb42"))),
+        ommersHash =
+          BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
         beneficiary = ByteString(Hex.decode("d7e30ae310c1d1800f5b641baa7af95b2e1fd98c")),
-        stateRoot = ByteString(Hex.decode("da6f0baf5f17d201b3d711299091ecee68cf56469b1e09704713934de1c74517")),
-        transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-        receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+        stateRoot = TrieRoot(ByteString(Hex.decode("da6f0baf5f17d201b3d711299091ecee68cf56469b1e09704713934de1c74517"))),
+        transactionsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+        receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
         logsBloom = BloomFilter(
           ByteString(
             Hex.decode(
@@ -255,12 +264,14 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
     )
     val block91: Block = Block(
       BlockHeader(
-        parentHash = BlockHash(ByteString(Hex.decode("69d2798993659c0d864d6f2824440b091368c147efc6c33410ef181036fc2bf1"))),
-        ommersHash = BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
+        parentHash =
+          BlockHash(ByteString(Hex.decode("69d2798993659c0d864d6f2824440b091368c147efc6c33410ef181036fc2bf1"))),
+        ommersHash =
+          BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
         beneficiary = ByteString(Hex.decode("28921e4e2c9d84f4c0f0c0ceb991f45751a0fe93")),
-        stateRoot = ByteString(Hex.decode("0d528286094ba4781aed7a19a9c890e07651be9b73e999585c926810ec888198")),
-        transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-        receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+        stateRoot = TrieRoot(ByteString(Hex.decode("0d528286094ba4781aed7a19a9c890e07651be9b73e999585c926810ec888198"))),
+        transactionsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+        receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
         logsBloom = BloomFilter(
           ByteString(
             Hex.decode(
@@ -281,12 +292,14 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
     )
     val block92: Block = Block(
       BlockHeader(
-        parentHash = BlockHash(ByteString(Hex.decode("d691ed6cf02375620d9cca9052bcf38a4a23f5c77058581c8bb54a06e2eb6ed9"))),
-        ommersHash = BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
+        parentHash =
+          BlockHash(ByteString(Hex.decode("d691ed6cf02375620d9cca9052bcf38a4a23f5c77058581c8bb54a06e2eb6ed9"))),
+        ommersHash =
+          BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
         beneficiary = ByteString(Hex.decode("bb7b8287f3f0a933474a79eae42cbca977791171")),
-        stateRoot = ByteString(Hex.decode("a7be51c65294e0f504e781ce19ae192998fb919805cc0822d5142500204b6917")),
-        transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-        receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+        stateRoot = TrieRoot(ByteString(Hex.decode("a7be51c65294e0f504e781ce19ae192998fb919805cc0822d5142500204b6917"))),
+        transactionsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+        receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
         logsBloom = BloomFilter(
           ByteString(
             Hex.decode(
@@ -307,12 +320,14 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
     )
     val block93: Block = Block(
       BlockHeader(
-        parentHash = BlockHash(ByteString(Hex.decode("c86dcbd8ba3cd836bd9c00d9dababe81ed5a42310ade70a77700d42b5ff8b64c"))),
-        ommersHash = BlockHash(ByteString(Hex.decode("445ccaa7ee03cf387e4835482288f6b08dc351eef4ecc94b3ed8de56afd298a6"))),
+        parentHash =
+          BlockHash(ByteString(Hex.decode("c86dcbd8ba3cd836bd9c00d9dababe81ed5a42310ade70a77700d42b5ff8b64c"))),
+        ommersHash =
+          BlockHash(ByteString(Hex.decode("445ccaa7ee03cf387e4835482288f6b08dc351eef4ecc94b3ed8de56afd298a6"))),
         beneficiary = ByteString(Hex.decode("bb7b8287f3f0a933474a79eae42cbca977791171")),
-        stateRoot = ByteString(Hex.decode("38f5e900f8dee62e0fdd52818dbedfe0869fa95a876357dd94669f56f25e980b")),
-        transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-        receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+        stateRoot = TrieRoot(ByteString(Hex.decode("38f5e900f8dee62e0fdd52818dbedfe0869fa95a876357dd94669f56f25e980b"))),
+        transactionsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+        receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
         logsBloom = BloomFilter(
           ByteString(
             Hex.decode(
@@ -333,13 +348,15 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
         Seq.empty,
         Seq[BlockHeader](
           BlockHeader(
-            parentHash = BlockHash(ByteString(Hex.decode("69d2798993659c0d864d6f2824440b091368c147efc6c33410ef181036fc2bf1"))),
-            ommersHash = BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
+            parentHash =
+              BlockHash(ByteString(Hex.decode("69d2798993659c0d864d6f2824440b091368c147efc6c33410ef181036fc2bf1"))),
+            ommersHash =
+              BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
             beneficiary = ByteString(Hex.decode("bb7b8287f3f0a933474a79eae42cbca977791171")),
-            stateRoot = ByteString(Hex.decode("e0ae53ea50eb6fb40b764b748ccd6d4f6184a6f3c474899c74df102310c37d6a")),
+            stateRoot = TrieRoot(ByteString(Hex.decode("e0ae53ea50eb6fb40b764b748ccd6d4f6184a6f3c474899c74df102310c37d6a"))),
             transactionsRoot =
-              ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-            receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+              TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+            receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
             logsBloom = BloomFilter(
               ByteString(
                 Hex.decode(
@@ -353,7 +370,8 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
             gasUsed = 0,
             unixTimestamp = 1438270425,
             extraData = ByteString(Hex.decode("476574682f4c5649562f76312e302e302f6c696e75782f676f312e342e32")),
-            mixHash = BlockHash(ByteString(Hex.decode("7e0b76b9b1698947617c1ea7cb7c36f47aefc2c4095c6df90aa6e2b3da6e49ac"))),
+            mixHash =
+              BlockHash(ByteString(Hex.decode("7e0b76b9b1698947617c1ea7cb7c36f47aefc2c4095c6df90aa6e2b3da6e49ac"))),
             nonce = ByteString(Hex.decode("edcbf5efad298bb3"))
           )
         )
@@ -361,12 +379,14 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
     )
     val block94: Block = Block(
       BlockHeader(
-        parentHash = BlockHash(ByteString(Hex.decode("fd07e36cfaf327801e5696134b36678f6a89fb1e8f017f2411a29d0ae810ab8b"))),
-        ommersHash = BlockHash(ByteString(Hex.decode("7766c4251396a6833ccbe4be86fbda3a200dccbe6a15d80ae3de5378b1540e04"))),
+        parentHash =
+          BlockHash(ByteString(Hex.decode("fd07e36cfaf327801e5696134b36678f6a89fb1e8f017f2411a29d0ae810ab8b"))),
+        ommersHash =
+          BlockHash(ByteString(Hex.decode("7766c4251396a6833ccbe4be86fbda3a200dccbe6a15d80ae3de5378b1540e04"))),
         beneficiary = ByteString(Hex.decode("d7e30ae310c1d1800f5b641baa7af95b2e1fd98c")),
-        stateRoot = ByteString(Hex.decode("fcd09860439502fcd9e3f208ed043bfeffc985b3a289f69e79f9b81f32f9010e")),
-        transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-        receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+        stateRoot = TrieRoot(ByteString(Hex.decode("fcd09860439502fcd9e3f208ed043bfeffc985b3a289f69e79f9b81f32f9010e"))),
+        transactionsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+        receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
         logsBloom = BloomFilter(
           ByteString(
             Hex.decode(
@@ -387,13 +407,15 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
         Seq.empty,
         Seq[BlockHeader](
           BlockHeader(
-            parentHash = BlockHash(ByteString(Hex.decode("6da5970538eba5db93162e219182fca7e093cfe4fbd8dd0b82789adb25dcbb42"))),
-            ommersHash = BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
+            parentHash =
+              BlockHash(ByteString(Hex.decode("6da5970538eba5db93162e219182fca7e093cfe4fbd8dd0b82789adb25dcbb42"))),
+            ommersHash =
+              BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
             beneficiary = ByteString(Hex.decode("bb7b8287f3f0a933474a79eae42cbca977791171")),
-            stateRoot = ByteString(Hex.decode("57a99a5a9d93104df18d3cdba5d1c84e1e5c22527c0c375e59e38944311bfe14")),
+            stateRoot = TrieRoot(ByteString(Hex.decode("57a99a5a9d93104df18d3cdba5d1c84e1e5c22527c0c375e59e38944311bfe14"))),
             transactionsRoot =
-              ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-            receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+              TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+            receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
             logsBloom = BloomFilter(
               ByteString(
                 Hex.decode(
@@ -407,7 +429,8 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
             gasUsed = 0,
             unixTimestamp = 1438270421,
             extraData = ByteString(Hex.decode("476574682f4c5649562f76312e302e302f6c696e75782f676f312e342e32")),
-            mixHash = BlockHash(ByteString(Hex.decode("0688a1217172b2f81b168a25459a2cad5cc2337aab1d17b30c7d803c565bf0b3"))),
+            mixHash =
+              BlockHash(ByteString(Hex.decode("0688a1217172b2f81b168a25459a2cad5cc2337aab1d17b30c7d803c565bf0b3"))),
             nonce = ByteString(Hex.decode("efc94c53e5ad946a"))
           )
         )
@@ -415,12 +438,14 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
     )
     val block95: Block = Block(
       BlockHeader(
-        parentHash = BlockHash(ByteString(Hex.decode("665586bdd5aefc860f8ff2d186617544d5aa6e5ae7203bf54b26f310be372e91"))),
-        ommersHash = BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
+        parentHash =
+          BlockHash(ByteString(Hex.decode("665586bdd5aefc860f8ff2d186617544d5aa6e5ae7203bf54b26f310be372e91"))),
+        ommersHash =
+          BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
         beneficiary = ByteString(Hex.decode("bb7b8287f3f0a933474a79eae42cbca977791171")),
-        stateRoot = ByteString(Hex.decode("1b39e9e77df97fd50ad637eea384839ba6aec610015450518936c9fd8e20efed")),
-        transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-        receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+        stateRoot = TrieRoot(ByteString(Hex.decode("1b39e9e77df97fd50ad637eea384839ba6aec610015450518936c9fd8e20efed"))),
+        transactionsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+        receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
         logsBloom = BloomFilter(
           ByteString(
             Hex.decode(
@@ -441,12 +466,14 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
     )
     val block96: Block = Block(
       BlockHeader(
-        parentHash = BlockHash(ByteString(Hex.decode("c0f772db658b2279a736f232e75d98629a53d36086e34a18f9fe65a4650d50a7"))),
-        ommersHash = BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
+        parentHash =
+          BlockHash(ByteString(Hex.decode("c0f772db658b2279a736f232e75d98629a53d36086e34a18f9fe65a4650d50a7"))),
+        ommersHash =
+          BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
         beneficiary = ByteString(Hex.decode("1b7047b4338acf65be94c1a3e8c5c9338ad7d67c")),
-        stateRoot = ByteString(Hex.decode("563401469b5c16712b251e6042620838dcf4b88b6c59969a86faa94c7b4402d8")),
-        transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-        receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+        stateRoot = TrieRoot(ByteString(Hex.decode("563401469b5c16712b251e6042620838dcf4b88b6c59969a86faa94c7b4402d8"))),
+        transactionsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+        receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
         logsBloom = BloomFilter(
           ByteString(
             Hex.decode(
@@ -468,12 +495,14 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
 
     val block89: Block = Block(
       BlockHeader(
-        parentHash = BlockHash(ByteString(Hex.decode("ba39b4ee19e5db0f5a85c344aa2bd2e7b0cdb2404b7d5c0e6cdc08c83f85083e"))),
-        ommersHash = BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
+        parentHash =
+          BlockHash(ByteString(Hex.decode("ba39b4ee19e5db0f5a85c344aa2bd2e7b0cdb2404b7d5c0e6cdc08c83f85083e"))),
+        ommersHash =
+          BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
         beneficiary = ByteString(Hex.decode("1b7047b4338acf65be94c1a3e8c5c9338ad7d67c")),
-        stateRoot = ByteString(Hex.decode("17e5e23d006df68fd13c0f3ce71a5e510abeee28b88a4e207fce171fbc3ef60d")),
-        transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-        receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+        stateRoot = TrieRoot(ByteString(Hex.decode("17e5e23d006df68fd13c0f3ce71a5e510abeee28b88a4e207fce171fbc3ef60d"))),
+        transactionsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+        receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
         logsBloom = BloomFilter(
           ByteString(
             Hex.decode(

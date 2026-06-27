@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum.ledger
 
-
 import com.google.common.util.concurrent.AtomicDouble
 
 import com.chipprbots.ethereum.domain.Block

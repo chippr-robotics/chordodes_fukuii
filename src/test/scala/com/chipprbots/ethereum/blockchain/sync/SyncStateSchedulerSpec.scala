@@ -29,6 +29,7 @@ import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.BlockchainImpl
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.Generators.genMultipleNodeData
 
@@ -269,7 +270,7 @@ class SyncStateSchedulerSpec
       val worldHash = prov.buildWorld(nodeData)
       val (scheduler, schedulerBlockchain, schedulerBlockchainWriter, schedulerBlockchainReader, allStorages) =
         buildScheduler()
-      val header = Fixtures.Blocks.ValidBlock.header.copy(stateRoot = worldHash, number = 1)
+      val header = Fixtures.Blocks.ValidBlock.header.copy(stateRoot = TrieRoot(worldHash), number = 1)
       schedulerBlockchainWriter.storeBlockHeader(header).commit()
       schedulerBlockchainWriter.saveBestKnownBlocks(header.hash, 1)
       var state = scheduler.initState(worldHash).get

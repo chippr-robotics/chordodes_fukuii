@@ -19,6 +19,7 @@ import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostPrague
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.jsonrpc.JsonRpcRequest
 import com.chipprbots.ethereum.testing.Tags.*
 
@@ -41,9 +42,9 @@ class EngineApiGetPayloadV5Spec extends AnyWordSpec with Matchers {
       parentHash = BlockHash(ByteString(new Array[Byte](32))),
       ommersHash = BlockHash(BlockHeader.EmptyOmmers),
       beneficiary = ByteString(new Array[Byte](20)),
-      stateRoot = ByteString(new Array[Byte](32)),
-      transactionsRoot = BlockHeader.EmptyMpt,
-      receiptsRoot = BlockHeader.EmptyMpt,
+      stateRoot = TrieRoot(ByteString(new Array[Byte](32))),
+      transactionsRoot = TrieRoot(BlockHeader.EmptyMpt),
+      receiptsRoot = TrieRoot(BlockHeader.EmptyMpt),
       logsBloom = BloomFilter.Empty,
       difficulty = 0,
       number = 1,

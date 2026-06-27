@@ -912,7 +912,7 @@ object FastSync {
               log.debug("Current pivot block is fresh enough, starting state download.")
               // Empty root has means that there were no transactions in blockchain, and Mpt trie is empty
               // Asking for this root would result only with empty transactions
-              if s.syncState.pivotBlock.stateRoot == ByteString(MerklePatriciaTrie.EmptyRootHash) then {
+              if s.syncState.pivotBlock.stateRoot.value == ByteString(MerklePatriciaTrie.EmptyRootHash) then {
                 updateSession(s =>
                   s.copy(syncState = s.syncState.copy(stateSyncFinished = true, updatingPivotBlock = false))
                 )
@@ -983,7 +983,7 @@ object FastSync {
                 s2.syncState.safeDownloadTarget
               )
               // Start the state scheduler — without this, state download never begins after restart.
-              if !s2.syncState.stateSyncFinished && pivotBlockHeader.stateRoot != ByteString(
+              if !s2.syncState.stateSyncFinished && pivotBlockHeader.stateRoot.value != ByteString(
                   MerklePatriciaTrie.EmptyRootHash
                 )
               then {
@@ -1005,7 +1005,10 @@ object FastSync {
       val shouldValidate = session.exists(s => header.number >= s.syncState.nextBlockToFullyValidate)
 
       if shouldValidate then {
-        validators.blockHeaderValidator.validate(header, h => blockchainReader.getBlockHeaderByHash(BlockHash(h))) match {
+        validators.blockHeaderValidator.validate(
+          header,
+          h => blockchainReader.getBlockHeaderByHash(BlockHash(h))
+        ) match {
           case Right(_) =>
             updateValidationState(header)
             Right(header)
@@ -1468,7 +1471,7 @@ object FastSync {
           // Start state download in parallel with block download — don't wait for blocks to finish.
           // State only depends on the pivot block's state root, which we know from the start.
           if !s.stateSyncStarted && !s.syncState.stateSyncFinished && notInTheMiddleOfUpdate &&
-            s.syncState.pivotBlock.stateRoot != ByteString(MerklePatriciaTrie.EmptyRootHash)
+            s.syncState.pivotBlock.stateRoot.value != ByteString(MerklePatriciaTrie.EmptyRootHash)
           then {
             log.info(
               "Starting state download in parallel with block download for pivot block {}",

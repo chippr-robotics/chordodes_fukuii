@@ -89,7 +89,7 @@ object StdValidators {
 
     if header.gasUsed != gasUsed then
       Left(ValidationAfterExecError(s"Block has invalid gas used, expected ${header.gasUsed} but got $gasUsed"))
-    else if header.stateRoot != stateRootHash then
+    else if header.stateRoot.value != stateRootHash then
       Left(ValidationAfterExecError(s"Block has invalid state root hash, expected ${Hex
           .toHexString(header.stateRoot.toArray)} but got ${Hex.toHexString(stateRootHash.toArray)}"))
     else {

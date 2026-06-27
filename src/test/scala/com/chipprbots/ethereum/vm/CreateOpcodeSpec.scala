@@ -470,7 +470,12 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
         val world = fxt.initWorld.saveAccount(newAddress, accountNonEmptyCode)
         val context: PC = fxt.context.copy(world = world)
         val result =
-          CreateResult(context = context, opcode = opcode, salt = fxt.salt, createCode = accountNonEmptyCode.codeHash.value)
+          CreateResult(
+            context = context,
+            opcode = opcode,
+            salt = fxt.salt,
+            createCode = accountNonEmptyCode.codeHash.value
+          )
 
         result.returnValue shouldEqual UInt256.Zero
         result.world.getGuaranteedAccount(newAddress) shouldEqual accountNonEmptyCode
@@ -488,7 +493,12 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
         val world = fxt.initWorld.saveAccount(newAddress, accountNonZeroNonce)
         val context: PC = fxt.context.copy(world = world)
         val result =
-          CreateResult(context = context, opcode = opcode, salt = fxt.salt, createCode = accountNonZeroNonce.codeHash.value)
+          CreateResult(
+            context = context,
+            opcode = opcode,
+            salt = fxt.salt,
+            createCode = accountNonZeroNonce.codeHash.value
+          )
 
         result.returnValue shouldEqual UInt256.Zero
         result.world.getGuaranteedAccount(newAddress) shouldEqual accountNonZeroNonce

@@ -36,6 +36,7 @@ import com.chipprbots.ethereum.db.storage.StateStorage
 import com.chipprbots.ethereum.domain.Blockchain
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.BlockchainWriter
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.ledger.BranchResolution
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.utils.Config
@@ -736,7 +737,7 @@ object SyncController {
             Behaviors.same
 
           case PivotHeaderBootstrap.Completed(block, header) if healingServeRootRequester.isDefined =>
-            val rootHex = header.stateRoot.take(4).toArray.map("%02x".format(_)).mkString
+            val rootHex = header.stateRoot.value.take(4).toArray.map("%02x".format(_)).mkString
             log.info(s"[HEAL-SERVE-ROOT] Fetched header for block $block (root $rootHex). Replying to healing.")
             stopHealingServeRootBootstrap()
             healingServeRootRequester.foreach(
@@ -1505,9 +1506,9 @@ object SyncController {
             log.info(
               "SNAP state root diagnostic: stored snapStateRoot={}, pivotBlockStateRoot={}, bestBlock={}, match={}",
               snapStateRoot.map(r => r.take(8).toArray.map("%02x".format(_)).mkString).getOrElse("none"),
-              pivotStateRoot.map(r => r.take(8).toArray.map("%02x".format(_)).mkString).getOrElse("none"),
+              pivotStateRoot.map(r => r.value.take(8).toArray.map("%02x".format(_)).mkString).getOrElse("none"),
               bestBlockNum,
-              snapStateRoot == pivotStateRoot
+              snapStateRoot == pivotStateRoot.map(_.value)
             )
             // After SNAP sync with deferred merkleization + pivot refreshes, the finalized trie root
             // may differ from the pivot block header's stateRoot. The trie nodes are stored under
@@ -1520,7 +1521,7 @@ object SyncController {
                 catch { case _: Exception => false }
               log.info(
                 "State root availability check: pivotRoot({})={}",
-                header.stateRoot.take(8).toArray.map("%02x".format(_)).mkString,
+                header.stateRoot.value.take(8).toArray.map("%02x".format(_)).mkString,
                 if pivotRootExists then "EXISTS" else "MISSING"
               )
               if !pivotRootExists then {
@@ -1539,16 +1540,16 @@ object SyncController {
                       log.warn(
                         "Substituting finalized trie root {} into pivot block header (replacing missing root {})",
                         fRoot.take(8).toArray.map("%02x".format(_)).mkString,
-                        header.stateRoot.take(8).toArray.map("%02x".format(_)).mkString
+                        header.stateRoot.value.take(8).toArray.map("%02x".format(_)).mkString
                       )
-                      val updatedHeader = header.copy(stateRoot = fRoot)
+                      val updatedHeader = header.copy(stateRoot = TrieRoot(fRoot))
                       blockchainWriter.storeBlockHeader(updatedHeader).commit()
                     }
                   case None =>
                     log.error(
                       "Pivot state root {} MISSING and no finalized root stored! " +
                         "Database is in an unrecoverable state — clear data and re-sync.",
-                      header.stateRoot.take(8).toArray.map("%02x".format(_)).mkString
+                      header.stateRoot.value.take(8).toArray.map("%02x".format(_)).mkString
                     )
                 }
               } else {
@@ -1556,7 +1557,7 @@ object SyncController {
                 // The downloaded account trie is stored under snapStateRoot; update the pivot header
                 // to match so the startup diagnostic passes and regular sync reads the correct trie.
                 snapStateRoot.foreach { snapRoot =>
-                  if snapRoot != header.stateRoot then {
+                  if snapRoot != header.stateRoot.value then {
                     val snapRootExists =
                       try { mptStorage.get(snapRoot.toArray); true }
                       catch { case _: Exception => false }
@@ -1570,9 +1571,9 @@ object SyncController {
                         "snapStateRoot({}) differs from pivotHeader.stateRoot({}) — " +
                           "updating pivot block header to use downloaded state root.",
                         snapRoot.take(8).toArray.map("%02x".format(_)).mkString,
-                        header.stateRoot.take(8).toArray.map("%02x".format(_)).mkString
+                        header.stateRoot.value.take(8).toArray.map("%02x".format(_)).mkString
                       )
-                      val updatedHeader = header.copy(stateRoot = snapRoot)
+                      val updatedHeader = header.copy(stateRoot = TrieRoot(snapRoot))
                       blockchainWriter.storeBlockHeader(updatedHeader).commit()
                     }
                   }
@@ -2178,10 +2179,10 @@ object SyncController {
           Behaviors.same
 
         case PivotHeaderBootstrap.Completed(block, header) if recentRootRequester.isDefined =>
-          val rootHex = header.stateRoot.take(4).toArray.map("%02x".format(_)).mkString
+          val rootHex = header.stateRoot.value.take(4).toArray.map("%02x".format(_)).mkString
           log.info(s"Recovery recent-root: fetched header for block $block (root $rootHex). Replying.")
           stopRecentRootBootstrap()
-          recentRootRequester.foreach(_ ! StorageRecoveryActor.RecentRoot(block, Some(header.stateRoot)))
+          recentRootRequester.foreach(_ ! StorageRecoveryActor.RecentRoot(block, Some(header.stateRoot.value)))
           recentRootRequester = None
           Behaviors.same
 

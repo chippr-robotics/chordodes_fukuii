@@ -18,7 +18,7 @@ object ProofServiceDummy extends ProofService {
     BigInt(42),
     Account.EmptyCodeHash.value,
     UInt256.Zero,
-    Account.EmptyStorageRootHash,
+    Account.EmptyStorageRootHash.value,
     Seq.empty
   )
   val EmptyProofResponse: GetProofResponse = GetProofResponse(EmptyProofAccount)

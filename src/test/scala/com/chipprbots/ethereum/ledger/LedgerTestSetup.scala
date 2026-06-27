@@ -179,10 +179,10 @@ trait TestSetup extends SecureRandomBuilder with EphemBlockchainTestSetup {
 trait BlockchainSetup extends TestSetup {
   val blockchainStorages = storagesInstance.storages
 
-  val validBlockParentHeader: BlockHeader = defaultBlockHeader.copy(stateRoot = initialWorld.stateRootHash)
+  val validBlockParentHeader: BlockHeader = defaultBlockHeader.copy(stateRoot = TrieRoot(initialWorld.stateRootHash))
   val validBlockParentBlock: Block = Block(validBlockParentHeader, BlockBody.empty)
   val validBlockHeader: BlockHeader = defaultBlockHeader.copy(
-    stateRoot = initialWorld.stateRootHash,
+    stateRoot = TrieRoot(initialWorld.stateRootHash),
     parentHash = validBlockParentHeader.hash,
     beneficiary = minerAddress.bytes,
     receiptsRoot = Account.EmptyStorageRootHash,

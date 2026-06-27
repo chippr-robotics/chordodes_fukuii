@@ -964,7 +964,7 @@ object NetworkPeerManagerActor {
         val newCache = scala.collection.mutable.Set.empty[ByteString]
         var n = tip
         while n >= from do {
-          reader.getBlockHeaderByNumber(n).foreach(h => newCache += h.stateRoot)
+          reader.getBlockHeaderByNumber(n).foreach(h => newCache += h.stateRoot.value)
           n = n - 1
         }
         freshRootCache = newCache
@@ -1021,7 +1021,7 @@ object NetworkPeerManagerActor {
                     case com.chipprbots.ethereum.mpt.LeafNode(key, value, _, _, _) =>
                       if rem.sameElements(key.toArray) then {
                         val acct = value.toArray.toAccount
-                        Some(acct.storageRoot)
+                        Some(acct.storageRoot.value)
                       } else None
                     case com.chipprbots.ethereum.mpt.ExtensionNode(sk, next, _, _, _) =>
                       if rem.length >= sk.length && rem.take(sk.length).sameElements(sk.toArray) then

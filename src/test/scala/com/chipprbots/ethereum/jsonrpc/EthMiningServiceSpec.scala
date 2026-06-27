@@ -44,6 +44,7 @@ import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.jsonrpc.EthMiningService.*
 import com.chipprbots.ethereum.jsonrpc.NodeJsonRpcHealthChecker.JsonRpcHealthConfig
 import com.chipprbots.ethereum.jsonrpc.server.controllers.JsonRpcBaseController.JsonRpcConfig
@@ -548,9 +549,9 @@ class EthMiningServiceSpec
         parentHash = BlockHash(ByteString.empty),
         ommersHash = BlockHash(ByteString.empty),
         beneficiary = ByteString.empty,
-        stateRoot = ByteString(MerklePatriciaTrie.EmptyRootHash),
-        transactionsRoot = ByteString.empty,
-        receiptsRoot = ByteString.empty,
+        stateRoot = TrieRoot(ByteString(MerklePatriciaTrie.EmptyRootHash)),
+        transactionsRoot = TrieRoot(ByteString.empty),
+        receiptsRoot = TrieRoot(ByteString.empty),
         logsBloom = BloomFilter(ByteString.empty),
         difficulty = difficulty,
         number = 0,
@@ -566,11 +567,12 @@ class EthMiningServiceSpec
     val block: Block = Block(
       header = BlockHeader(
         parentHash = parentBlock.header.hash,
-        ommersHash = BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
+        ommersHash =
+          BlockHash(ByteString(Hex.decode("1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"))),
         beneficiary = ByteString(Hex.decode("000000000000000000000000000000000000002a")),
-        stateRoot = ByteString(Hex.decode("2627314387b135a548040d3ca99dbf308265a3f9bd9246bee3e34d12ea9ff0dc")),
-        transactionsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
-        receiptsRoot = ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")),
+        stateRoot = TrieRoot(ByteString(Hex.decode("2627314387b135a548040d3ca99dbf308265a3f9bd9246bee3e34d12ea9ff0dc"))),
+        transactionsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
+        receiptsRoot = TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
         logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
         difficulty = difficulty,
         number = 1,

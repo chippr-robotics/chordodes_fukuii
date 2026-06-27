@@ -10,6 +10,7 @@ import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.StateStorage
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.CodeHash
+import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.defaultByteArraySerializable
@@ -53,14 +54,22 @@ class CombinedRecoveryScanSpec extends AnyFunSuite {
     val a5Code = missingCodeHash(5)
 
     val accounts: Seq[(ByteString, Account)] = Seq(
-      acctHash(1) -> Account(nonce = UInt256.Zero, storageRoot = presentStorageRoot(1), codeHash = CodeHash(presentCode(1))),
-      acctHash(2) -> Account(nonce = UInt256.Zero, storageRoot = Account.EmptyStorageRootHash, codeHash = CodeHash(a2Code)),
-      acctHash(3) -> Account(nonce = UInt256.Zero, storageRoot = a3Stor, codeHash = Account.EmptyCodeHash),
-      acctHash(4) -> Account(nonce = UInt256.Zero, storageRoot = a4Stor, codeHash = CodeHash(presentCode(4))),
-      acctHash(5) -> Account(nonce = UInt256.Zero, storageRoot = presentStorageRoot(5), codeHash = CodeHash(a5Code)),
+      acctHash(1) -> Account(
+        nonce = UInt256.Zero,
+        storageRoot = TrieRoot(presentStorageRoot(1)),
+        codeHash = CodeHash(presentCode(1))
+      ),
+      acctHash(2) -> Account(
+        nonce = UInt256.Zero,
+        storageRoot = Account.EmptyStorageRootHash,
+        codeHash = CodeHash(a2Code)
+      ),
+      acctHash(3) -> Account(nonce = UInt256.Zero, storageRoot = TrieRoot(a3Stor), codeHash = Account.EmptyCodeHash),
+      acctHash(4) -> Account(nonce = UInt256.Zero, storageRoot = TrieRoot(a4Stor), codeHash = CodeHash(presentCode(4))),
+      acctHash(5) -> Account(nonce = UInt256.Zero, storageRoot = TrieRoot(presentStorageRoot(5)), codeHash = CodeHash(a5Code)),
       acctHash(6) -> Account(
         nonce = UInt256.Zero,
-        storageRoot = presentStorageRoot(6),
+        storageRoot = TrieRoot(presentStorageRoot(6)),
         codeHash = Account.EmptyCodeHash
       ),
       acctHash(7) -> Account.empty()
@@ -98,9 +107,9 @@ class CombinedRecoveryScanSpec extends AnyFunSuite {
     val code = Array.fill[Byte](8)(0x7d)
     val codeHash = ByteString(kec256(code))
     evm.put(codeHash, ByteString(code)).commit()
-    val storageRoot = ByteString(
+    val storageRoot = TrieRoot(ByteString(
       MerklePatriciaTrie[Array[Byte], Array[Byte]](mpt).put(Array[Byte](1, 2), Array[Byte](3, 4)).getRootHash
-    )
+    ))
 
     val stateRoot = ByteString(
       MerklePatriciaTrie[Array[Byte], Array[Byte]](mpt)

@@ -5,8 +5,10 @@ import org.apache.pekko.util.ByteString
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
+import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BloomFilter
+import com.chipprbots.ethereum.domain.TrieRoot
 
 /** Integration test for MESS (ECIP-1100: Modified Exponential Subjective Scoring).
   *
@@ -22,12 +24,12 @@ class MESSIntegrationSpec extends AnyFlatSpec with Matchers {
       @scala.annotation.unused hash: ByteString = ByteString.empty
   ): BlockHeader =
     BlockHeader(
-      parentHash = ByteString.empty,
-      ommersHash = ByteString.empty,
+      parentHash = BlockHash(ByteString.empty),
+      ommersHash = BlockHash(ByteString.empty),
       beneficiary = ByteString.empty,
-      stateRoot = ByteString.empty,
-      transactionsRoot = ByteString.empty,
-      receiptsRoot = ByteString.empty,
+      stateRoot = TrieRoot(ByteString.empty),
+      transactionsRoot = TrieRoot(ByteString.empty),
+      receiptsRoot = TrieRoot(ByteString.empty),
       logsBloom = BloomFilter(ByteString.empty),
       difficulty = difficulty,
       number = number,
@@ -35,7 +37,7 @@ class MESSIntegrationSpec extends AnyFlatSpec with Matchers {
       gasUsed = 0,
       unixTimestamp = timestamp,
       extraData = ByteString.empty,
-      mixHash = ByteString.empty,
+      mixHash = BlockHash(ByteString.empty),
       nonce = ByteString.empty
     )
 

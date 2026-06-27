@@ -36,9 +36,9 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         parentHash = BlockHash(ByteString(new Array[Byte](32))),
         ommersHash = BlockHash(ByteString(new Array[Byte](32))),
         beneficiary = ByteString(new Array[Byte](20)),
-        stateRoot = modifiedStateRoot, // block claims this stateRoot
-        transactionsRoot = ByteString(new Array[Byte](32)),
-        receiptsRoot = ByteString(new Array[Byte](32)),
+        stateRoot = TrieRoot(modifiedStateRoot), // block claims this stateRoot
+        transactionsRoot = TrieRoot(ByteString(new Array[Byte](32))),
+        receiptsRoot = TrieRoot(ByteString(new Array[Byte](32))),
         logsBloom = BloomFilter.Empty,
         difficulty = 0,
         number = 1,
@@ -66,14 +66,14 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
 
     "reject block with modified gasUsed" taggedAs UnitTest in {
       val validators = MockValidatorsAlwaysSucceed
-      val stateRoot = ByteString(Array.fill(32)(0x11.toByte))
+      val stateRoot = TrieRoot(ByteString(Array.fill(32)(0x11.toByte)))
       val header = BlockHeader(
         parentHash = BlockHash(ByteString(new Array[Byte](32))),
         ommersHash = BlockHash(ByteString(new Array[Byte](32))),
         beneficiary = ByteString(new Array[Byte](20)),
         stateRoot = stateRoot,
-        transactionsRoot = ByteString(new Array[Byte](32)),
-        receiptsRoot = ByteString(new Array[Byte](32)),
+        transactionsRoot = TrieRoot(ByteString(new Array[Byte](32))),
+        receiptsRoot = TrieRoot(ByteString(new Array[Byte](32))),
         logsBloom = BloomFilter.Empty,
         difficulty = 0,
         number = 1,
@@ -90,7 +90,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       val result = StdValidators.validateBlockAfterExecution(
         self = validators,
         block = block,
-        stateRootHash = stateRoot,
+        stateRootHash = stateRoot.value,
         receipts = Seq.empty,
         gasUsed = 21000 // execution computed different gasUsed
       )
@@ -101,14 +101,14 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
 
     "accept block with matching stateRoot and gasUsed" taggedAs UnitTest in {
       val validators = MockValidatorsAlwaysSucceed
-      val stateRoot = ByteString(Array.fill(32)(0x11.toByte))
+      val stateRoot = TrieRoot(ByteString(Array.fill(32)(0x11.toByte)))
       val header = BlockHeader(
         parentHash = BlockHash(ByteString(new Array[Byte](32))),
         ommersHash = BlockHash(ByteString(new Array[Byte](32))),
         beneficiary = ByteString(new Array[Byte](20)),
         stateRoot = stateRoot,
-        transactionsRoot = ByteString(new Array[Byte](32)),
-        receiptsRoot = ByteString(new Array[Byte](32)),
+        transactionsRoot = TrieRoot(ByteString(new Array[Byte](32))),
+        receiptsRoot = TrieRoot(ByteString(new Array[Byte](32))),
         logsBloom = BloomFilter.Empty,
         difficulty = 0,
         number = 1,
@@ -125,7 +125,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       val result = StdValidators.validateBlockAfterExecution(
         self = validators,
         block = block,
-        stateRootHash = stateRoot, // matches
+        stateRootHash = stateRoot.value, // matches
         receipts = Seq.empty,
         gasUsed = 21000 // matches
       )
@@ -194,9 +194,9 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         parentHash = BlockHash(ByteString(new Array[Byte](32))),
         ommersHash = BlockHash(BlockHeader.EmptyOmmers),
         beneficiary = ByteString(new Array[Byte](20)),
-        stateRoot = genesisStateRoot,
-        transactionsRoot = BlockHeader.EmptyMpt,
-        receiptsRoot = BlockHeader.EmptyMpt,
+        stateRoot = TrieRoot(genesisStateRoot),
+        transactionsRoot = TrieRoot(BlockHeader.EmptyMpt),
+        receiptsRoot = TrieRoot(BlockHeader.EmptyMpt),
         logsBloom = BloomFilter.Empty,
         difficulty = 0,
         number = 0,
@@ -221,9 +221,9 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
           parentHash = genesisHeader.hash,
           ommersHash = BlockHash(BlockHeader.EmptyOmmers),
           beneficiary = ByteString(new Array[Byte](20)),
-          stateRoot = ByteString.empty, // will be filled after execution
-          transactionsRoot = BlockHeader.EmptyMpt,
-          receiptsRoot = BlockHeader.EmptyMpt,
+          stateRoot = TrieRoot(ByteString.empty), // will be filled after execution
+          transactionsRoot = TrieRoot(BlockHeader.EmptyMpt),
+          receiptsRoot = TrieRoot(BlockHeader.EmptyMpt),
           logsBloom = BloomFilter.Empty,
           difficulty = 0,
           number = 1,
@@ -245,7 +245,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
           case Right((receipts, gasUsed, computedStateRoot)) =>
             // Build the correct header with computed values
             val correctHeader = headerTemplate.copy(
-              stateRoot = computedStateRoot,
+              stateRoot = TrieRoot(computedStateRoot),
               gasUsed = gasUsed
             )
             (Block(correctHeader, block.body), receipts)
@@ -261,8 +261,8 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         ExecutionPayload(
           parentHash = block.header.parentHash.value,
           feeRecipient = Address(block.header.beneficiary),
-          stateRoot = block.header.stateRoot,
-          receiptsRoot = block.header.receiptsRoot,
+          stateRoot = block.header.stateRoot.value,
+          receiptsRoot = block.header.receiptsRoot.value,
           logsBloom = block.header.logsBloom.value,
           prevRandao = block.header.mixHash.value,
           blockNumber = block.header.number,
@@ -290,9 +290,9 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
           parentHash = BlockHash(modified.parentHash),
           ommersHash = BlockHash(BlockHeader.EmptyOmmers),
           beneficiary = modified.feeRecipient.bytes,
-          stateRoot = modified.stateRoot,
-          transactionsRoot = payload.blockHash, // placeholder, need real txRoot
-          receiptsRoot = modified.receiptsRoot,
+          stateRoot = TrieRoot(modified.stateRoot),
+          transactionsRoot = TrieRoot(payload.blockHash), // placeholder, need real txRoot
+          receiptsRoot = TrieRoot(modified.receiptsRoot),
           logsBloom = BloomFilter(modified.logsBloom),
           difficulty = 0,
           number = modified.blockNumber,
@@ -359,7 +359,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
 
       // Modify the stateRoot and recompute blockHash to match
       val randomStateRoot: ByteString = ByteString(kec256(Array[Byte](1, 2, 3, 4)))
-      val modifiedHeader: BlockHeader = validBlock.header.copy(stateRoot = randomStateRoot)
+      val modifiedHeader: BlockHeader = validBlock.header.copy(stateRoot = TrieRoot(randomStateRoot))
       val modifiedPayload: ExecutionPayload = payload.copy(
         stateRoot = randomStateRoot,
         blockHash = modifiedHeader.hash.value
@@ -489,7 +489,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       val payload: ExecutionPayload = blockToPayload(validBlock)
 
       val randomStateRoot: ByteString = ByteString(kec256(Array[Byte](1, 2, 3, 4)))
-      val modifiedHeader: BlockHeader = validBlock.header.copy(stateRoot = randomStateRoot)
+      val modifiedHeader: BlockHeader = validBlock.header.copy(stateRoot = TrieRoot(randomStateRoot))
       val modifiedPayload: ExecutionPayload = payload.copy(
         stateRoot = randomStateRoot,
         blockHash = modifiedHeader.hash.value
@@ -508,7 +508,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
 
       // First send an INVALID block (bad stateRoot)
       val randomStateRoot: ByteString = ByteString(kec256(Array[Byte](1, 2, 3, 4)))
-      val modifiedHeader: BlockHeader = validBlock.header.copy(stateRoot = randomStateRoot)
+      val modifiedHeader: BlockHeader = validBlock.header.copy(stateRoot = TrieRoot(randomStateRoot))
       val invalidPayload: ExecutionPayload = payload.copy(
         stateRoot = randomStateRoot,
         blockHash = modifiedHeader.hash.value
@@ -521,9 +521,9 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         parentHash = BlockHash(invalidPayload.blockHash),
         ommersHash = BlockHash(BlockHeader.EmptyOmmers),
         beneficiary = ByteString(new Array[Byte](20)),
-        stateRoot = ByteString(new Array[Byte](32)),
-        transactionsRoot = BlockHeader.EmptyMpt,
-        receiptsRoot = BlockHeader.EmptyMpt,
+        stateRoot = TrieRoot(ByteString(new Array[Byte](32))),
+        transactionsRoot = TrieRoot(BlockHeader.EmptyMpt),
+        receiptsRoot = TrieRoot(BlockHeader.EmptyMpt),
         logsBloom = BloomFilter.Empty,
         difficulty = 0,
         number = 2,

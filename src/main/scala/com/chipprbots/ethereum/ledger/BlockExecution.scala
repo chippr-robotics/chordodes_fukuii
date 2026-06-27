@@ -149,7 +149,7 @@ class BlockExecution(
       blockchain.getBackingMptStorage(block.header.number),
       (number: BigInt) => blockchainReader.getBlockHeaderByNumber(number).map(_.hash.value),
       accountStartNonce = blockchainConfig.accountStartNonce,
-      stateRootHash = parentHeader.stateRoot,
+      stateRootHash = parentHeader.stateRoot.value,
       noEmptyAccounts = EvmConfig.forBlock(block.header.number, blockchainConfig).noEmptyAccounts,
       ethCompatibleStorage = blockchainConfig.ethCompatibleStorage
     )

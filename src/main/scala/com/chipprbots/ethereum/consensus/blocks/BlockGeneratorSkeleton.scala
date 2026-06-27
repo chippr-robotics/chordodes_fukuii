@@ -51,10 +51,10 @@ abstract class BlockGeneratorSkeleton(
       parentHash = parent.header.hash,
       ommersHash = BlockHash(ByteString(kec256(x.toBytes: Array[Byte]))),
       beneficiary = beneficiary.bytes,
-      stateRoot = ByteString.empty,
+      stateRoot = TrieRoot.Empty,
       // we are not able to calculate transactionsRoot here because we do not know if they will fail
-      transactionsRoot = ByteString.empty,
-      receiptsRoot = ByteString.empty,
+      transactionsRoot = TrieRoot.Empty,
+      receiptsRoot = TrieRoot.Empty,
       logsBloom = BloomFilter.Empty,
       difficulty = difficultyCalc.calculateDifficulty(blockNumber, blockTimestamp, parent.header),
       number = blockNumber,
@@ -108,9 +108,10 @@ abstract class BlockGeneratorSkeleton(
           PendingBlock(
             block.copy(
               header = block.header.copy(
-                transactionsRoot = buildMpt(prepareBlock.body.transactionList, SignedTransaction.byteArraySerializable),
-                stateRoot = stateRoot,
-                receiptsRoot = buildMpt(receipts, Receipt.byteArraySerializable),
+                transactionsRoot =
+                  TrieRoot(buildMpt(prepareBlock.body.transactionList, SignedTransaction.byteArraySerializable)),
+                stateRoot = TrieRoot(stateRoot),
+                receiptsRoot = TrieRoot(buildMpt(receipts, Receipt.byteArraySerializable)),
                 logsBloom = BloomFilter(bloomFilter),
                 gasUsed = gasUsed
               ),
