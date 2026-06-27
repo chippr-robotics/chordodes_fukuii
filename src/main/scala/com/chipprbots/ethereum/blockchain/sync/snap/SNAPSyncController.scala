@@ -2975,8 +2975,8 @@ private class SNAPSyncControllerImpl(
     * SNAP sync cannot proceed.
     *
     * @param reason
-    *   Description of the failure
-    * Yields `true` if the retry limit is exceeded and the caller should fall back to fast sync.
+    *   Description of the failure Yields `true` if the retry limit is exceeded and the caller should fall back to fast
+    *   sync.
     */
   private def recordCriticalFailure(reason: String): Boolean = {
     SNAPSyncMetrics.incrementSyncError()
@@ -4860,8 +4860,8 @@ private class SNAPSyncControllerImpl(
 
   // --- SNAP progress persistence helpers ---
 
-  /** Deserialize range progress from legacy AppStateStorage plain-text format (migration fallback).
-    * Yields `(pivotBlock, rangeProgress)` or `None` if parsing fails.
+  /** Deserialize range progress from legacy AppStateStorage plain-text format (migration fallback). Yields
+    * `(pivotBlock, rangeProgress)` or `None` if parsing fails.
     */
   private def deserializeSnapProgress(data: String): Option[(BigInt, Map[ByteString, ByteString])] =
     try {
@@ -5146,9 +5146,8 @@ object SNAPSyncController {
     * @param clHeadNumber
     *   the consensus-layer head block number, when available
     * @param maxStaleness
-    *   configured `maxPivotStalenessBlocks` (default 4096)
-    * Yields `Right(())` if the candidate is fresh enough, or `Left(floor)` with the rejected freshness
-    * floor for diagnostic logging at the call site.
+    *   configured `maxPivotStalenessBlocks` (default 4096) Yields `Right(())` if the candidate is fresh enough, or
+    *   `Left(floor)` with the rejected freshness floor for diagnostic logging at the call site.
     */
   private[snap] def pivotPassesFreshnessFloor(
       networkBest: BigInt,
