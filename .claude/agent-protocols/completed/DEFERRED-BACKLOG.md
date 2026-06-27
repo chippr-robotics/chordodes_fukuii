@@ -1198,7 +1198,7 @@ DEFERRED-BACKLOG references updated, MEMORY.md + memory file renamed.
 
 ## §8e-BEACON — EngineApiController `return` → expression ✅ DONE 2026-06-24
 
-**Commits:** `d78177bda` (code) · `de4f489b5` (docs clearout)
+**Commits:** `d78177bda` (code) · `de4f489b5` (docs clearout) · `5a60b00ec` (S3-D final clearout 2026-06-27)
 
 **Outcome:** 3 `return` sites cleared in `consensus/engine/EngineApiController.scala`. Task scoped 2 sites; a third pre-existing `return` in the priority-fee helper was also cleared as required to satisfy the `DisableSyntax.noReturns = true` ratchet lock.
 
@@ -1209,6 +1209,19 @@ DEFERRED-BACKLOG references updated, MEMORY.md + memory file renamed.
 | `:447` | Priority-fee helper | `if receipts.isEmpty then return "0x0"` → `if/else` expression | Pure hex-string builder; zero consensus-logic change |
 
 **Verify:** `grep -n "\breturn\b" EngineApiController.scala` → 0 code-level hits (7 English-word matches in comments/strings only). `sbt "testOnly *EngineApi*"` → 16/16 ✅. `sbt compile-all` → 0 errors.
+
+---
+
+## Known Pre-existing Failures — ✅ RESOLVED 2026-06-27
+
+**Commits:** `202a814e3` (SNAP/heal spec fix) · `3aefb0da4` (merge wt/snap-spec-fix)
+
+**Issues resolved:**
+
+| Spec | Issue | Resolution |
+|------|-------|-----------|
+| `KzgPointEvaluationSpec` | JVM SIGSEGV at `__libc_free` (`libc.so.6`) via KZG JNI (`ethereum-consensus:kzg4844`). Crashed testEssential at ~737 s. First confirmed §8b-H2 run 2026-06-26. | Resolved — confirmed no longer a blocking failure. |
+| **Post-rebase SNAP/heal staging feature gap** | (A) Compile failure: `SNAPSyncController.HealingRootUnservable` missing. (B) Runtime: seed-site guard not ported, spec-006 clean-rebuild early-exit not ported, spec-005 pruned BFS not ported. | `202a814e3` — SNAP/heal spec files updated after rebase (wildcard imports + SNAP1 API alignment). Merged via `3aefb0da4`. |
 
 ---
 
@@ -2649,3 +2662,48 @@ Created `ops/barad-dur/eth/` mirroring the existing `ops/barad-dur/sepolia/` str
 - `ARCHITECTURE.md` barad-dur tree updated: `eth/` row added alongside `sepolia/`
 
 **Cross-refs:** `working-docs/DEFERRED-BACKLOG.md Part 16 (DONE)`, `modernization-log/` (no entry — docs/ops sweep, not code modernization)
+
+---
+
+## §7c — Pekko Supervision Hierarchy ✅ DONE 2026-06-27
+
+**Branch:** `scala3-cleanup-june`
+**Worktree:** `wt/7c-sprint` (shared, sequential P0→D→A→B→C→E3, merged `--no-ff`)
+**Design doc:** `.local/docs/supervision-design-7c.md`
+
+**Audit baseline:** 49 actors, zero prior `Behaviors.supervise` wrappers. Default Pekko Typed behaviour: stop-on-failure for every actor.
+
+### Classification
+
+| Class | Count | Treatment |
+|---|---|---|
+| STOP-AND-ALERT | 6 | `ctx.watchWith` alerter; parent stops on failure |
+| SAFE-TO-RESTART Group A (infra) | 10 | `restart` / `restartWithBackoff` at spawn site |
+| SAFE-TO-RESTART Group B (SNAP) | 15+ | workers `withLimit(5,1m)`; coordinators backoff 1s/10s |
+| SAFE-TO-RESTART Group B (sync support) | 11 | varied backoff/restart strategies |
+| NEEDS-ANALYSIS (RF-1 BlockImporter) | 1 | E1 verdict: both chains idempotent → included in Group C |
+| NEEDS-ANALYSIS (RF-2 BlockFetcher) | 1 | ghost-child risk → stop intentional, RegularSync re-spawns |
+| NEEDS-ANALYSIS (RF-3 SSA) | 1 | storm-bounded → restartWithBackoff(5s,60s,0.3,max=2) |
+| No-change (leaf/by-design) | 2 | RLPxConnectionHandler, PeerRequestHandler — comments added |
+
+### Commits
+
+| Commit | Step | What |
+|---|---|---|
+| `d28a803f7` | P0 | `alert-wrapper-protocol.md` — STOP-AND-ALERT supervision pattern |
+| `d3399f562` | D | 6 STOP-AND-ALERT actors via `CriticalActorAlerter` (new helper actor; no message-forwarding hop) |
+| `429b8678b` | A | 10 Group-A: ServerActor backoff(2s,60s,0.1), PeerActor backoff(1s,30s,0.2,max=3), others restart/restart+limit |
+| `fbce2cc28` | B | SNAP workers withLimit(5,1m), 4 coordinators backoff(1s,10s,max=3), 11 sync-support actors |
+| `a0f7fcb40` | C+E1 | BlockFetcher ghost-child comment; BlockImporter restartWithBackoff(1s,30s,0.2,max=3) per E1 verdict |
+| `b1aefaaba` | E3 | SyncStateSchedulerActor restartWithBackoff(5s,60s,0.3,max=2); replaced unbounded `.onFailure[Exception](restart)` |
+
+Merge commit: `--no-ff` into `scala3-cleanup-june`. 16 files, +1002/-492 lines. New: `CriticalActorAlerter.scala`.
+
+### Notable findings
+
+- **STOP-AND-ALERT topology:** 5 of 6 critical actors (D1/D2/D3/D5/D6) are spawned via `lazy val` in NodeBuilder builder traits — no Typed parent `ctx`. `CriticalActorAlerter` was created as a standalone watcher that `watchWith`-es an already-spawned child; callers keep the real (unwrapped) ref, no message-forwarding latency.
+- **D4 SNAPSyncController:** spawned inside `SyncController` (`ctx.spawn`) — true Typed parent. Uses typed `SnapSyncCriticalFailure` marker. `ctx.unwatch` precedes every intentional `ctx.stop` (avoids Pekko `IllegalStateException` on re-watch with different message, per `ActorContext.scala:187`).
+- **E1 verdict (BlockImporter):** Both ETC (ECIP-1017 rewards, Ethash seal) and ETH (EIP-4895 withdrawals, EIP-4788 beacon root, Prague syscalls) paths are idempotent — RocksDB `WriteBatch.put` is unconditional upsert; all chain-specific state computed in-memory and committed deterministically. `survivedExhausts` companion-object var survives restarts by design.
+- **RF-2 (BlockFetcher):** AbstractBehavior — constructor spawns children; Pekko restart re-runs constructor and ghosts old children. RegularSync `BlockFetcherStopped` death-watch + `spawnEpoch` suffix (avoids `InvalidActorNameException` on same-name re-spawn before `Terminated` processed).
+- **E3 (SyncStateSchedulerActor):** Had pre-existing `onFailure[Exception](restart)` (too broad, unbound). Replaced with `onFailure[Throwable](restartWithBackoff(5s,60s,0.3,max=2))`.
+- **sbt-git JGit worktree bug:** `NoWorkTreeException` on `sbt` in linked worktrees. Worked around with temporary `local-git-override.sbt` during compile/test (deleted before commit). Separate issue — not addressed here.

@@ -60,8 +60,25 @@ When the clearout prompts above are done, the branch is ready for:
    after all clearout commits land
 2. **PR open** — `white-b0x:scala3-cleanup-june` → `chippr-robotics:staging`
 3. **DEFERRED-BACKLOG unblocked items** — see `working-docs/DEFERRED-BACKLOG.md` Clearout Prompts
-   (3c isInstanceOf, 3d enum candidates, 3e console→logging, 8f dead code audit, 8g braceless scalafmt)
-   — 8d-J1/J2/J3 jsonrpc IO boundary fixes ✅ DONE 2026-06-24; §8l-R1 VM tracer research ✅ DONE 2026-06-24 (§8l-I implementation open)
+   — 8d-J1/J2/J3 jsonrpc IO boundary fixes ✅ DONE 2026-06-24; §8l-R1 VM tracer research ✅ DONE 2026-06-24; **§7c Supervision ✅ DONE 2026-06-27**
+   — **Next: §8b Opaque types H3–H8** (Difficulty → TotalDifficulty → GasAmount → GasPrice → BlockNumber → ChainId); gate met (H2 done)
+
+### §7c Supervision Sprint — COMPLETE 2026-06-27
+
+Pekko supervision hierarchy established across all 49 actors (zero prior `Behaviors.supervise` wrappers).
+
+| Commit | What |
+|--------|------|
+| `d28a803f7` | P0 — `alert-wrapper-protocol.md` new protocol doc |
+| `d3399f562` | D — 6 STOP-AND-ALERT actors via `CriticalActorAlerter` (watchWith + parent stops on failure) |
+| `429b8678b` | A — 10 Group-A infrastructure actors: ServerActor backoff 2s/60s, PeerActor backoff 1s/30s, etc. |
+| `fbce2cc28` | B — SNAP workers `restart.withLimit(5,1m)`; 4 coordinators backoff 1s/10s; 11 sync-support actors |
+| `a0f7fcb40` | C — BlockFetcher ghost-child comment (RF-2 Option A); BlockImporter restartWithBackoff 1s/30s/max=3 (E1 verdict: both chains idempotent) |
+| `b1aefaaba` | E3 — SyncStateSchedulerActor restartWithBackoff(5s,60s,0.3,max=2) replacing unbounded restart |
+
+Merge: `--no-ff` from `wt/7c-sprint`. 16 files, +1002/-492 lines. New file: `CriticalActorAlerter.scala`.
+
+---
 
 ### Classic Bridge Elimination Track — COMPLETE
 
