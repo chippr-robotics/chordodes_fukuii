@@ -704,3 +704,57 @@ ExplicitResultTypes      # explicit return types on public defs (enable graduall
 
 **Global sequence:** See CODEBASE-AUDIT.md Clearout Prompts header.
 
+---
+
+### §8a-E6 RLPxConnectionHandlerSpec — partial migration (pure unit tests now; TCP tests Wave 3 gated)
+
+**File:** `src/test/scala/com/chipprbots/ethereum/network/rlpx/RLPxConnectionHandlerSpec.scala`
+
+**What is blocking full migration:**
+
+Three Classic-only APIs that the TCP interaction tests depend on:
+
+1. **`TestActorRef`** — synchronous Classic actor ref. Used so `connection.lastSender` is reliable immediately after `expectMsgClass(Tcp.Register)`. The bridge child actor (spawned inside `RLPxConnectionHandler` to handle Pekko IO TCP events) sends `Tcp.Register` to the connection probe; `lastSender` captures its ref so the test can inject `Tcp.Received`. No Typed equivalent — Typed spawning is async.
+
+2. **`connection.lastSender` / `connection.reply()`** — Classic `TestProbe` APIs for capturing the sender of the last received message and replying to it. Used to inject `Tcp.Received` into the bridge child and to send `Ack` back to the actor. No equivalent on Typed `TestProbe`.
+
+3. **Pekko IO TCP is Classic-only** — `Tcp.Register`, `Tcp.Write`, `Tcp.Received` are Classic messages. The bridge child that sends/receives these is a Classic actor spawned via `context.toClassic.actorOf`. Migrating this requires either Pekko Typed TCP bindings or a redesigned bridge — Wave 3 network sprint work.
+
+**What CAN be done now — extract the pure unit tests:**
+
+The `computeCapabilityOffsets` suite (6 tests, lines 269–358) has zero actor dependencies — pure function calls, no `TestSetup`, no Classic APIs. Extract these into a new file `RLPxCapabilityOffsetsSpec.scala` as a plain `AnyFlatSpec` + `Matchers`. This removes those 6 tests from the Classic `TestKit` class permanently.
+
+**Fix:**
+
+1. Create `src/test/scala/com/chipprbots/ethereum/network/rlpx/RLPxCapabilityOffsetsSpec.scala` — move the 6 `computeCapabilityOffsets` tests there as a plain `AnyFlatSpec`. No actor system, no imports from `pekko.testkit`.
+
+2. Delete those 6 tests from `RLPxConnectionHandlerSpec.scala`. Leave the TCP interaction tests and `TestSetup` untouched — still Classic, still `TestActorRef`.
+
+3. Add `// Wave 3 gate: TCP tests require TestActorRef + lastSender — blocked on Typed TCP bridge migration` comment at the class declaration.
+
+**Verify:** `fukuii-test only "*RLPxCapabilityOffsets*"` → 6/6. `fukuii-test only "*RLPxConnectionHandler*"` → existing TCP tests still pass. Then commit referencing §8a-E6.
+
+---
+
+### §8a-E6 PeerActorSpec — remove Classic system dependency (13/15 tests failing)
+
+**File:** `src/test/scala/com/chipprbots/ethereum/network/p2p/PeerActorSpec.scala`
+**Compile baseline:** 0 errors (migration complete, imports clean).
+**Test result:** 2/15 pass, 13/15 fail with `IllegalStateException: cannot create children while terminating or terminated` at `ActorTestKit.createTestProbe`.
+
+**Root cause:** `NodeStatusSetup extends EphemBlockchainTestSetup`, which creates or terminates a Classic `ActorSystem` during test lifecycle. This kills the shared `ScalaTestWithActorTestKit` system after the first test, breaking all subsequent `testKit.createTestProbe()` calls.
+
+**Fix — rewrite `NodeStatusSetup` to remove the `EphemBlockchainTestSetup` dependency:**
+
+1. Read `EphemBlockchainTestSetup` to understand what it provides: it is almost certainly just storage fixtures (ephem RocksDB/in-memory `DataSource`, `StoragesInstance`, `BlockchainWriter`, `BlockchainReader`). These do NOT require a Classic `ActorSystem` — the Classic system was a historical artefact.
+
+2. Rewrite `NodeStatusSetup` to instantiate the storage fixtures directly (same ephem/in-memory backing, same `StoragesInstance` wiring) WITHOUT extending `EphemBlockchainTestSetup`. Remove the `classicSystem` field entirely from the test file. `testKit` is the only system.
+
+3. If `EphemBlockchainTestSetup` has useful helper methods (`saveEtcChainAtDaoFork`, fixture blocks, etc.) copy those inline into `TestSetup` or `NodeStatusSetup` — do not pull in the Classic system lifecycle to get them.
+
+4. `implicit override lazy val classicSystem` in `TestSetup` — delete it. Nothing in PeerActorSpec should reference Classic after this rewrite.
+
+**Goal:** zero `classicSystem`, zero `toClassic`, zero Classic imports in PeerActorSpec. Only `testKit`, `ManualTime`, Typed probes, Typed `ActorRef`.
+
+**Verify:** `fukuii-test only "*PeerActorSpec"` → 15/15 pass. Then `sbt scalafmtAll` and commit referencing §8a-E6.
+

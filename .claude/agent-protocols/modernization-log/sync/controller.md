@@ -161,3 +161,11 @@
 - **Files:** `sync/SyncController.scala`
 - **What:** All 10 `.toClassic.tell` bridge calls in catch-all arms eliminated. `runningPivotHeaderBootstrap` catch-all replaced with explicit typed arms for `StartRegularSyncBootstrapByHash` (full restart with incremented `bootstrapGeneration`), stale `PivotHeaderBootstrap.Completed`, `HealingImpossible`, `HandshakedPeers`, `CalibrateChainWeightFromPeer`, `isInternalMarker`, and terminal `log.warn`. `runningRecovery` terminal catch-all replaced with `log.warn` (all four SNAP response types already handled above). Dead `runningRegularSyncBootstrap` function removed (no spawn site; superseded by `runningPivotHeaderBootstrap`). Two remaining `.toClassic` refs (NPMA `RegisterSnapSyncController`) intentionally out of scope.
 - **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8k-N`
+
+---
+
+## §8a-E6b — ChainWeightCalibrationSpec ignoreMsg fix (2026-06-27)
+
+#### `731cef566` — §8a-E6b: ChainWeightCalibrationSpec drainRegistration ignoreMsg fix
+- **What:** `fishForMessage { case GetHandshakedPeers => ... }` failed because actors now send `GetHandshakedPeersCmd` (Typed `case class` with `replyTo`) at T+0 via adapter. Replaced with `networkPeerManager.ignoreMsg { case GetHandshakedPeers => true; case _: GetHandshakedPeersCmd => true }`. Minimal fix — full `ScalaTestWithActorTestKit` migration remains Wave 3 gated (alongside PeerActorSpec, E6).
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §8a-E6b`

@@ -69,3 +69,11 @@
 ## Open
 
 - `Ordering.Iterable` deprecation warning — BEACON gate
+
+---
+
+## §7f — ForkChoiceManager.setListener TypedActorRef (2026-06-27)
+
+#### `456f12499` — §8k-G4a: ForkChoiceManager.setListener — TypedActorRef narrow adapter
+- **What:** `AtomicReference[ActorRef]` → `AtomicReference[Option[TypedActorRef[ForkChoiceManager.BeaconHead]]]`. `SyncController` passes `ctx.messageAdapter[ForkChoiceManager.BeaconHead](WrappedExternal.apply)` as a narrow typed adapter. Removes the last non-TCP `.toClassic` conversion in the codebase.
+- **Cross-refs:** `completed/DEFERRED-BACKLOG.md §7f`, `sync/controller.md §8k-N`
