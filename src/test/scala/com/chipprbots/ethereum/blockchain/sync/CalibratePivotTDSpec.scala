@@ -188,9 +188,9 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers:
         blockchainReader.getBestBlockHeader.get.hash
       )
       stored shouldBe defined
-      stored.get.totalDifficulty shouldBe peerTD
+      stored.get.totalDifficulty.value shouldBe peerTD
       // Stored TD now ≈ peerTD; ratio on next restart = ~1×
-      val correctedTD = stored.get.totalDifficulty
+      val correctedTD: BigInt = stored.get.totalDifficulty.value
       val ratioAfter: Double = correctedTD.toDouble / peerTD.toDouble
       ratioAfter should be(1.0 +- 0.01) // within 1% of peerTD
 
@@ -217,7 +217,7 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers:
       )
       stored shouldBe defined
       // After re-calibration: stored ≈ restart9PeerTD; ratio ≈ 1×
-      val ratio: Double = stored.get.totalDifficulty.toDouble / restart9PeerTD.toDouble
+      val ratio: Double = stored.get.totalDifficulty.value.toDouble / restart9PeerTD.toDouble
       ratio should be(1.0 +- 0.01)
 
   // ─── T8.1 Mixed ETH68/ETH69 network: Tier 2 fires ─────────────────────────
@@ -234,7 +234,7 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers:
       val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(
         blockchainReader.getBestBlockHeader.get.hash
       )
-      stored.get.totalDifficulty shouldBe peerTD // Tier 2: peerTD direct
+      stored.get.totalDifficulty.value shouldBe peerTD // Tier 2: peerTD direct
 
       // No retry: calibration succeeded
       testScheduler.timePasses(30.minutes)
@@ -283,7 +283,7 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers:
       val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(
         blockchainReader.getBestBlockHeader.get.hash
       )
-      stored.get.totalDifficulty shouldBe correctTD // unchanged
+      stored.get.totalDifficulty.value shouldBe correctTD // unchanged
 
   // ─── T8.4 Tier 1 exact: peerTD * bestBlock / peerBlock ────────────────────
   it should "apply Tier 1 interpolation when both peerTD and peerBlock are provided" taggedAs (UnitTest, SyncTest) in
@@ -300,7 +300,7 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers:
       val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(
         blockchainReader.getBestBlockHeader.get.hash
       )
-      stored.get.totalDifficulty shouldBe expectedTD
+      stored.get.totalDifficulty.value shouldBe expectedTD
 
   // ─── Shared actor setup ───────────────────────────────────────────────────
 

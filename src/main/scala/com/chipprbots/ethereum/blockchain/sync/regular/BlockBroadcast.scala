@@ -122,4 +122,4 @@ object BlockBroadcast:
     * versions of NewBlock msg)
     */
   case class BlockToBroadcast(block: Block, chainWeight: ChainWeight):
-    def as63: ETHPackets.NewBlock = ETHPackets.NewBlock(block, chainWeight.totalDifficulty)
+    def as63: ETHPackets.NewBlock = ETHPackets.NewBlock(block, chainWeight.totalDifficulty.value)

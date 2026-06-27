@@ -89,12 +89,12 @@ class ChainWeightStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks 
     // Legacy checkpoint number is discarded, only totalDifficulty is preserved
     val retrieved = storage.get(blockHash)
     assert(retrieved.isDefined, "Should successfully deserialize legacy format")
-    assert(retrieved.get.totalDifficulty == totalDifficulty)
+    assert(retrieved.get.totalDifficulty.value == totalDifficulty)
   }
 
   test("ChainWeightStorage round-trips current format", UnitTest, DatabaseTest) {
     val blockHash = byteStringOfLengthNGen(32).sample.get
-    val chainWeight = ChainWeight(BigInt(5000))
+    val chainWeight = ChainWeight.totalDifficultyOnly(BigInt(5000))
 
     val storage = new ChainWeightStorage(EphemDataSource())
     storage.put(blockHash, chainWeight).commit()
@@ -102,7 +102,7 @@ class ChainWeightStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks 
     val retrieved = storage.get(blockHash)
     assert(retrieved.isDefined)
     assert(retrieved.get == chainWeight)
-    assert(retrieved.get.totalDifficulty == BigInt(5000))
+    assert(retrieved.get.totalDifficulty.value == BigInt(5000))
   }
 
   test("ChainWeightStorage handles corrupted data gracefully", UnitTest, DatabaseTest) {

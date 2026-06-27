@@ -67,7 +67,7 @@ class ETH69TDSpec extends AnyFlatSpec with Matchers:
     val status = eth69Status(latestBlockNr, latestHash)
     val remoteStatus = RemoteStatus.fromETH69Status(status, Capability.ETH69, false, Nil, proxy)
 
-    remoteStatus.chainWeight.totalDifficulty shouldBe latestBlockNr
+    remoteStatus.chainWeight.totalDifficulty.value shouldBe latestBlockNr
     remoteStatus.latestBlock shouldBe Some(latestBlockNr)
   }
 
@@ -149,7 +149,7 @@ class ETH69TDSpec extends AnyFlatSpec with Matchers:
       genesisHash = genesisHash
     )
 
-    eth68RemoteStatus.chainWeight.totalDifficulty shouldBe wireTD
+    eth68RemoteStatus.chainWeight.totalDifficulty.value shouldBe wireTD
     eth68RemoteStatus.latestBlock shouldBe None
   }
 
@@ -166,7 +166,7 @@ class ETH69TDSpec extends AnyFlatSpec with Matchers:
     val peerInfo = PeerInfo(eth68RemoteStatus, forkAccepted = true)
 
     peerInfo.maxBlockNumber shouldBe BigInt(0)
-    peerInfo.chainWeight.totalDifficulty shouldBe BigInt("100000000000000000000000000")
+    peerInfo.chainWeight.totalDifficulty.value shouldBe BigInt("100000000000000000000000000")
   }
 
   it should "ETH68: chainWeight.totalDifficulty is the actual wire TD, not a block number" taggedAs UnitTest in {
@@ -181,8 +181,8 @@ class ETH69TDSpec extends AnyFlatSpec with Matchers:
     val peerInfo = PeerInfo(eth68RemoteStatus, forkAccepted = true)
 
     // For ETH68 the TD comparison in BlockBroadcast uses peerInfo.chainWeight — it must be accurate
-    peerInfo.chainWeight.totalDifficulty shouldBe wireTD
-    peerInfo.chainWeight.totalDifficulty should be > BigInt(100_000_000L) // clearly not a block number
+    peerInfo.chainWeight.totalDifficulty.value shouldBe wireTD
+    peerInfo.chainWeight.totalDifficulty.value should be > BigInt(100_000_000L) // clearly not a block number
   }
 
   // -------------------------------------------------------------------------

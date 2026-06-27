@@ -608,7 +608,7 @@ object NetworkPeerManagerActor:
 
       // Track best ETH68 peer TD for timed calibration (CalibrateChainWeightNow).
       if peerInfo.remoteStatus.capability != com.chipprbots.ethereum.network.p2p.messages.Capability.ETH69 then
-        val peerTD = peerInfo.remoteStatus.chainWeight.totalDifficulty
+        val peerTD = peerInfo.remoteStatus.chainWeight.totalDifficulty.value
         if bestNetworkTip.forall { case (best, _) => peerTD > best } then
           val prevTD = bestNetworkTip.map(_._1).getOrElse(BigInt(0))
           bestNetworkTip = Some((peerTD, peerInfo.maxBlockNumber))
@@ -635,11 +635,11 @@ object NetworkPeerManagerActor:
           }
         }
         if peerInfo.remoteStatus.capability != com.chipprbots.ethereum.network.p2p.messages.Capability.ETH69 then
-          val peerTD = peerInfo.remoteStatus.chainWeight.totalDifficulty
+          val peerTD = peerInfo.remoteStatus.chainWeight.totalDifficulty.value
           reader.getBestBlock.foreach { ourBest =>
             reader.getChainWeightByHash(ourBest.header.hash).foreach { ourWeight =>
-              if peerTD > ourWeight.totalDifficulty then
-                val ratio = peerTD / ourWeight.totalDifficulty
+              if peerTD > ourWeight.totalDifficulty.value then
+                val ratio = peerTD / ourWeight.totalDifficulty.value
                 if ratio > BigInt(10_000) then
                   // TD-PROXY-GAP: stored TD is a genesis proxy from SNAP finalization.
                   chainWeightCalibrationTarget.foreach { target =>
@@ -651,7 +651,7 @@ object NetworkPeerManagerActor:
                       "Calibrating from peer STATUS data and evicting peer for 5 minutes.",
                     peer.id,
                     peerTD,
-                    ourWeight.totalDifficulty,
+                    ourWeight.totalDifficulty.value,
                     ratio
                   )
                   peer.ref ! DisconnectPeer(Disconnect.Reasons.UselessPeer)
@@ -673,7 +673,7 @@ object NetworkPeerManagerActor:
                     "TD-DIVERGE: Peer {} TD={} > our TD={} at block {}. We may be on a lighter fork or behind.",
                     peer.id,
                     peerTD,
-                    ourWeight.totalDifficulty,
+                    ourWeight.totalDifficulty.value,
                     ourBest.header.number
                   )
             }
@@ -794,7 +794,7 @@ object NetworkPeerManagerActor:
     private def updateChainWeight(message: Message)(initialPeerInfo: PeerInfo): PeerInfo =
       message match
         case newBlock: ETHPackets.NewBlock =>
-          val prevTD = initialPeerInfo.chainWeight.totalDifficulty
+          val prevTD = initialPeerInfo.chainWeight.totalDifficulty.value
           val actualTD = newBlock.totalDifficulty
           val delta = actualTD - prevTD
           val deltaPercent = if prevTD > 0 then (delta * 100) / prevTD else BigInt(0)

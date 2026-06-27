@@ -344,9 +344,10 @@ final private class BlockImporterLogic(
         // Also save as contract code — if this was a code fetch, the hash is the codeHash
         // and the data is the bytecode. EvmCodeStorage is keyed by codeHash, same as the fetch.
         try evmCodeStorage.put(hash, node).commit()
-        catch case _: Exception => ()
-        // Successful state-node delivery — reset stuck-counter so a later transient failure on a
-        // different block doesn't escalate to SNAP re-sync prematurely.
+        catch
+          case _: Exception => ()
+          // Successful state-node delivery — reset stuck-counter so a later transient failure on a
+          // different block doesn't escalate to SNAP re-sync prematurely.
         BlockImporter.survivedExhausts = 0
         pendingStateNodeHash = None
         importBlocks(blocksToRetry, blockImportType)(state)

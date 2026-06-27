@@ -68,10 +68,10 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers:
     // given
     val newBlockWeight: ChainWeight = ChainWeight.totalDifficultyOnly(300)
     val firstHeader: BlockHeader = baseBlockHeader.copy(number = peer1Info.maxBlockNumber + 4)
-    val firstBlock: NewBlock = NewBlock(Block(firstHeader, BlockBody(Nil, Nil)), newBlockWeight.totalDifficulty)
+    val firstBlock: NewBlock = NewBlock(Block(firstHeader, BlockBody(Nil, Nil)), newBlockWeight.totalDifficulty.value)
 
     val secondHeader: BlockHeader = baseBlockHeader.copy(number = peer2Info.maxBlockNumber + 2)
-    val secondBlock: NewBlock = NewBlock(Block(secondHeader, BlockBody(Nil, Nil)), newBlockWeight.totalDifficulty)
+    val secondBlock: NewBlock = NewBlock(Block(secondHeader, BlockBody(Nil, Nil)), newBlockWeight.totalDifficulty.value)
 
     // when
     peersInfoHolder ! PeerEventCmd(MessageFromPeer(firstBlock, peer1.id))
@@ -175,7 +175,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers:
     setupNewPeer(peer1, peer1Probe, peer1Info)
 
     // given
-    val newBlock: NewBlock = NewBlock(baseBlock, initialPeerInfo.chainWeight.totalDifficulty + 1)
+    val newBlock: NewBlock = NewBlock(baseBlock, initialPeerInfo.chainWeight.totalDifficulty.value + 1)
 
     // when
     peersInfoHolder ! PeerEventCmd(MessageFromPeer(newBlock, peer1.id))
@@ -740,14 +740,14 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers:
 
     // No response received yet — correction has not fired; chainWeight is still inflated.
     readerHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
-    requestSender.expectMsgType[PeerInfoResponse].peerInfo.get.chainWeight.totalDifficulty shouldBe inflatedTD
+    requestSender.expectMsgType[PeerInfoResponse].peerInfo.get.chainWeight.totalDifficulty.value shouldBe inflatedTD
 
     // Trigger correction: send probe response. isPeerStatic = true → DB_LOOKUP → actualTD.
     val probeResponse = BlockHeaders(BigInt(0), Seq(archiveProbeBlock))
     readerHolder ! PeerEventCmd(MessageFromPeer(probeResponse, peer1.id))
 
     readerHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
-    requestSender.expectMsgType[PeerInfoResponse].peerInfo.get.chainWeight.totalDifficulty shouldBe actualTD
+    requestSender.expectMsgType[PeerInfoResponse].peerInfo.get.chainWeight.totalDifficulty.value shouldBe actualTD
 
   it should "ETH69 mining peer: active block signal suppresses tick probes — monotonic guard stays active" taggedAs (
     UnitTest,
@@ -790,4 +790,4 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers:
 
     // counter = 0 < StaticPeerProbeThreshold (3); monotonic guard remains active — no correction.
     readerHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
-    requestSender.expectMsgType[PeerInfoResponse].peerInfo.get.chainWeight.totalDifficulty shouldBe inflatedTD
+    requestSender.expectMsgType[PeerInfoResponse].peerInfo.get.chainWeight.totalDifficulty.value shouldBe inflatedTD

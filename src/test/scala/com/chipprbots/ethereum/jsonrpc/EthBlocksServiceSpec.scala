@@ -96,7 +96,7 @@ class EthBlocksServiceSpec
     response.blockResponse shouldBe Some(
       BlockResponse(blockToRequest, fullTxs = true, weight = Some(blockWeight))
     )
-    response.blockResponse.get.totalDifficulty shouldBe Some(blockWeight.totalDifficulty)
+    response.blockResponse.get.totalDifficulty shouldBe Some(blockWeight.totalDifficulty.value)
     response.blockResponse.get.transactions.toOption shouldBe Some(stxResponses)
 
   it should "answer eth_getBlockByHash with the block response correctly when it's chain weight is not taggedAs (UnitTest, RPCTest) in blockchain" in new TestSetup:
@@ -130,7 +130,7 @@ class EthBlocksServiceSpec
     response.blockResponse shouldBe Some(
       BlockResponse(blockToRequest, fullTxs = false, weight = Some(blockWeight))
     )
-    response.blockResponse.get.totalDifficulty shouldBe Some(blockWeight.totalDifficulty)
+    response.blockResponse.get.totalDifficulty shouldBe Some(blockWeight.totalDifficulty.value)
     response.blockResponse.get.transactions.left.toOption shouldBe Some(blockToRequest.body.transactionList.map(_.hash))
 
   it should "answer eth_getBlockByNumber with the correct block when the pending block is requested" taggedAs (
@@ -193,7 +193,7 @@ class EthBlocksServiceSpec
     response.blockResponse shouldBe Some(
       BlockResponse(blockToRequest, fullTxs = true, weight = Some(blockWeight))
     )
-    response.blockResponse.get.totalDifficulty shouldBe Some(blockWeight.totalDifficulty)
+    response.blockResponse.get.totalDifficulty shouldBe Some(blockWeight.totalDifficulty.value)
     response.blockResponse.get.transactions.toOption shouldBe Some(stxResponses)
 
   it should "answer eth_getBlockByNumber with the block response correctly when it's chain weight is not taggedAs (UnitTest, RPCTest) in blockchain" in new TestSetup:
@@ -231,7 +231,7 @@ class EthBlocksServiceSpec
     response.blockResponse shouldBe Some(
       BlockResponse(blockToRequest, fullTxs = false, weight = Some(blockWeight))
     )
-    response.blockResponse.get.totalDifficulty shouldBe Some(blockWeight.totalDifficulty)
+    response.blockResponse.get.totalDifficulty shouldBe Some(blockWeight.totalDifficulty.value)
     response.blockResponse.get.transactions.left.toOption shouldBe Some(blockToRequest.body.transactionList.map(_.hash))
 
   it should "get transaction count by block number" taggedAs (UnitTest, RPCTest) in new TestSetup:
@@ -337,7 +337,7 @@ class EthBlocksServiceSpec
       ethBlocksService.getUncleByBlockHashAndIndex(request).unsafeRunSync().toOption.get
 
     response.uncleBlockResponse shouldBe Some(BlockResponse(uncle, Some(uncleWeight), pendingBlock = false))
-    response.uncleBlockResponse.get.totalDifficulty shouldBe Some(uncleWeight.totalDifficulty)
+    response.uncleBlockResponse.get.totalDifficulty shouldBe Some(uncleWeight.totalDifficulty.value)
     response.uncleBlockResponse.get.transactions shouldBe Left(Nil)
     response.uncleBlockResponse.get.uncles shouldBe Nil
 
@@ -422,7 +422,7 @@ class EthBlocksServiceSpec
       ethBlocksService.getUncleByBlockNumberAndIndex(request).unsafeRunSync().toOption.get
 
     response.uncleBlockResponse shouldBe Some(BlockResponse(uncle, Some(uncleWeight), pendingBlock = false))
-    response.uncleBlockResponse.get.totalDifficulty shouldBe Some(uncleWeight.totalDifficulty)
+    response.uncleBlockResponse.get.totalDifficulty shouldBe Some(uncleWeight.totalDifficulty.value)
     response.uncleBlockResponse.get.transactions shouldBe Left(Nil)
     response.uncleBlockResponse.get.uncles shouldBe Nil
 

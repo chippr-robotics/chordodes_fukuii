@@ -712,9 +712,10 @@ object PrecompiledContracts:
           proof.toArray
         )
         if !isValid then return None // scalafix:ok DisableSyntax.return
-      catch case _: Exception => return None // scalafix:ok DisableSyntax.return
+      catch
+        case _: Exception => return None // scalafix:ok DisableSyntax.return
 
-      // Return FIELD_ELEMENTS_PER_BLOB ++ BLS_MODULUS as 32-byte big-endian
+        // Return FIELD_ELEMENTS_PER_BLOB ++ BLS_MODULUS as 32-byte big-endian
       val result = ByteString(
         com.chipprbots.ethereum.utils.ByteUtils.padLeft(ByteString(FIELD_ELEMENTS_PER_BLOB.toByteArray), 32).toArray ++
           com.chipprbots.ethereum.utils.ByteUtils.padLeft(ByteString(BLS_MODULUS.toByteArray), 32).toArray

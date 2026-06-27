@@ -51,7 +51,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
         blockchainReader.getBestBlockHeader.get.hash
       )
       stored shouldBe defined
-      stored.get.totalDifficulty shouldBe expected
+      stored.get.totalDifficulty.value shouldBe expected
 
   // ─── T2.2 Tier 2: STATUS-only, no block number ────────────────────────────
   it should "apply Tier 2 (peerTD direct) when peerMaxBlock is 0" taggedAs (UnitTest, SyncTest) in
@@ -66,7 +66,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
         blockchainReader.getBestBlockHeader.get.hash
       )
       stored shouldBe defined
-      stored.get.totalDifficulty shouldBe peerTD
+      stored.get.totalDifficulty.value shouldBe peerTD
 
   // ─── T2.3 Tier 3 entry: sentinel triggers local chain computation ──────────
   it should "call calibrateTDFromLocalChain when peerTD is 0 (ETH69 sentinel)" taggedAs (UnitTest, SyncTest) in
@@ -143,7 +143,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
         blockchainReader.getBestBlockHeader.get.hash
       )
       stored shouldBe defined
-      stored.get.totalDifficulty should be > BigInt("17179869184000")
+      stored.get.totalDifficulty.value should be > BigInt("17179869184000")
 
   // ─── T3.1 Core traversal: anchor at h7, accumulate h8-h10 ─────────────────
   "calibrateTDFromLocalChain" should
@@ -171,7 +171,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
       val expectedTD: BigInt = anchorTD + h8.difficulty.value + h9.difficulty.value + h10.difficulty.value
       val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(h10.hash)
       stored shouldBe defined
-      stored.get.totalDifficulty shouldBe expectedTD
+      stored.get.totalDifficulty.value shouldBe expectedTD
 
   // ─── T3.2 No anchor within MaxWalkBlocks: defer ────────────────────────────
   it should "return false and schedule retry when no plausible anchor found within walk limit" taggedAs (
@@ -207,7 +207,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
       )
 
       val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(h10.hash)
-      stored.get.totalDifficulty shouldBe correctTD
+      stored.get.totalDifficulty.value shouldBe correctTD
 
       // No retry needed — success
       testScheduler.timePasses(30.minutes)
@@ -298,7 +298,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
       val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(bestHdr.hash)
       stored shouldBe defined
       val expectedTD: BigInt = anchorTD + chain.tail.foldLeft(BigInt(0))((acc, h) => acc + h.difficulty.value)
-      stored.get.totalDifficulty shouldBe expectedTD
+      stored.get.totalDifficulty.value shouldBe expectedTD
 
   // ─── T3.7 Boundary: gap = MaxWalkBlocks + 1 defers ───────────────────────
   it should "defer when gap is one past MaxWalkBlocks" taggedAs (UnitTest, SyncTest) in
@@ -354,7 +354,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
       // accumulated = anchorTD_10 + h11.difficulty + ... + h15.difficulty (5 headers)
       val gapHeaders: Vector[BlockHeader] = chain.slice(6, 11) // h11..h15
       val expectedTD: BigInt = anchorTD_10 + gapHeaders.foldLeft(BigInt(0))(_ + _.difficulty.value)
-      stored.get.totalDifficulty shouldBe expectedTD
+      stored.get.totalDifficulty.value shouldBe expectedTD
 
   // ─── T4.1 Retry loop: two consecutive 30-minute retries ──────────────────
   "ChainWeightCalibration retry loop" should
@@ -424,7 +424,7 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
       val stored: Option[ChainWeight] = blockchainReader.getChainWeightByHash(
         blockchainReader.getBestBlockHeader.get.hash
       )
-      stored.get.totalDifficulty shouldBe peerTD
+      stored.get.totalDifficulty.value shouldBe peerTD
 
       testScheduler.timePasses(30.minutes)
       networkPeerManager.expectNoMessage(200.millis)

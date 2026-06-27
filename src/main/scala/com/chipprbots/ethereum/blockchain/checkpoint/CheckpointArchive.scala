@@ -13,6 +13,7 @@ import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockHeaderImplicits.BlockHeaderByteArrayDec
 import com.chipprbots.ethereum.domain.BlockHeaderImplicits.BlockHeaderEnc
 import com.chipprbots.ethereum.domain.ChainWeight
+import com.chipprbots.ethereum.domain.TotalDifficulty
 import com.chipprbots.ethereum.utils.ByteUtils
 
 /** Binary file format for an exported chain state — used by `CheckpointImporter` to bootstrap a fresh datadir at a
@@ -100,7 +101,7 @@ object CheckpointArchive:
       val hdrBytes = h.blockHeader.toBytes
       wInt(hdrBytes.length)
       w(hdrBytes)
-      val weightBytes = ByteUtils.bigIntToUnsignedByteArray(h.chainWeight.totalDifficulty)
+      val weightBytes = ByteUtils.bigIntToUnsignedByteArray(h.chainWeight.totalDifficulty.value)
       wInt(weightBytes.length)
       w(weightBytes)
 
@@ -185,7 +186,7 @@ object CheckpointArchive:
               else
                 val weightBytes = r(weightLen)
                 val totalDifficulty = if weightBytes.isEmpty then BigInt(0) else BigInt(1, weightBytes)
-                Right(Header(chainId, header, ChainWeight(totalDifficulty)))
+                Right(Header(chainId, header, ChainWeight(TotalDifficulty(totalDifficulty))))
       catch case _: EOFException => Left(Truncated("header-section"))
 
     def nextEntry(): Either[DecodeError, Entry] =

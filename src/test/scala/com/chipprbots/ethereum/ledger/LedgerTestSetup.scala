@@ -343,7 +343,7 @@ trait TestSetupWithVmAndValidators extends EphemBlockchainTestSetup:
 
   val bestNum: BigInt = BigInt(5)
 
-  val bestBlock: Block = getBlock(bestNum, currentWeight.totalDifficulty / 2)
+  val bestBlock: Block = getBlock(bestNum, currentWeight.totalDifficulty.value / 2)
 
   val execError: ValidationAfterExecError = ValidationAfterExecError("error")
 

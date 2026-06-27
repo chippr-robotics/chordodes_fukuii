@@ -67,7 +67,6 @@ object ETH69:
       )
 
     extension (bytes: Array[Byte])
-
       /** Decode an ETH/69 STATUS frame.
         *
         * Tolerant of three shapes:

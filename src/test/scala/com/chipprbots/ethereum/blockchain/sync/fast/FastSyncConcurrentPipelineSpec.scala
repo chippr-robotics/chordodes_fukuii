@@ -169,7 +169,7 @@ class FastSyncConcurrentPipelineSpec extends AnyFlatSpec with Matchers:
         Peer(PeerId(id), new InetSocketAddress("127.0.0.1", 30303), TestProbe().ref.toTyped[PeerActor.Command], false)
       val peerInfo = PeerInfo(
         remoteStatus,
-        ChainWeight(BigInt(1000)),
+        ChainWeight.totalDifficultyOnly(BigInt(1000)),
         forkAccepted = true,
         maxBlockNumber = 1000,
         bestBlockHash = hash32

@@ -212,7 +212,7 @@ object GraphQLSchema:
 
   // Build a GBlock wrapper, fetching total difficulty if available.
   private def buildGBlock(ctx: GraphQLContext, block: Block): GBlock =
-    val td = ctx.blockchainReader.getChainWeightByHash(block.header.hash).map(_.totalDifficulty)
+    val td = ctx.blockchainReader.getChainWeightByHash(block.header.hash).map(_.totalDifficulty.value)
     GBlock(block, td)
 
   // ---------------------------------------------------------------------------

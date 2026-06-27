@@ -225,7 +225,7 @@ object FastSync:
     private def ourBestTotalDifficulty(): BigInt =
       blockchainReader.getBestBlock
         .flatMap(best => blockchainReader.getChainWeightByHash(best.header.hash))
-        .map(_.totalDifficulty)
+        .map(_.totalDifficulty.value)
         .getOrElse(BigInt(0))
 
     // ETH69 G5 — closures for the pivot-selector's parent-chain backlink probe. `getCanonicalHeaderByNumber`

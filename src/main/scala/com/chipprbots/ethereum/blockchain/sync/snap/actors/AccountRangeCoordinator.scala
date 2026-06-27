@@ -558,19 +558,23 @@ private class AccountRangeCoordinatorImpl(
     // during storage sync (Bug 20 fix: streaming from file to avoid OOM). The controller
     // deletes it after streaming completes.
     try contractAccountsOut.close()
-    catch case _: Exception =>
-    try contractStorageOut.close()
-    catch case _: Exception =>
-    try uniqueCodeHashesOut.close()
-    catch case _: Exception =>
-    try Files.deleteIfExists(contractAccountsFile)
-    catch case _: Exception =>
-    // contractStorageFile intentionally NOT deleted — controller manages its lifecycle
-    // uniqueCodeHashesFile intentionally NOT deleted — controller manages its lifecycle
-    // (needed for accounts-complete recovery across process restarts)
-    log.info(
-      s"AccountRangeCoordinator stopped. Downloaded $accountsDownloaded accounts, identified $contractAccountsCount contracts ($uniqueCodeHashesCount unique codeHashes)"
-    )
+    catch
+      case _: Exception =>
+        try contractStorageOut.close()
+        catch
+          case _: Exception =>
+            try uniqueCodeHashesOut.close()
+            catch
+              case _: Exception =>
+                try Files.deleteIfExists(contractAccountsFile)
+                catch
+                  case _: Exception =>
+                    // contractStorageFile intentionally NOT deleted — controller manages its lifecycle
+                    // uniqueCodeHashesFile intentionally NOT deleted — controller manages its lifecycle
+                    // (needed for accounts-complete recovery across process restarts)
+                    log.info(
+                      s"AccountRangeCoordinator stopped. Downloaded $accountsDownloaded accounts, identified $contractAccountsCount contracts ($uniqueCodeHashesCount unique codeHashes)"
+                    )
 
   /** Collect current task positions and send to controller for resume across restarts. */
   private def sendProgressSnapshot(): Unit =

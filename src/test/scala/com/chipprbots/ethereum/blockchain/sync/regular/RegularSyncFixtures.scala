@@ -485,7 +485,7 @@ trait RegularSyncFixtures:
         if block == newBlock then
           importedNewBlock = true
           IO.pure(
-            BlockImportedToTop(List(BlockData(newBlock, Nil, ChainWeight(newBlock.number))))
+            BlockImportedToTop(List(BlockData(newBlock, Nil, ChainWeight.totalDifficultyOnly(newBlock.number))))
           )
         else
           if block == testBlocks.last then importedLastTestBlock = true
@@ -539,7 +539,7 @@ trait RegularSyncFixtures:
 
     def sendNewBlock(block: Block = newBlock, peer: Peer = defaultPeer): Unit =
       blockFetcher ! MessageFromPeer(
-        ETHPackets.NewBlock(block, ChainWeight.totalDifficultyOnly(block.number).totalDifficulty),
+        ETHPackets.NewBlock(block, ChainWeight.totalDifficultyOnly(block.number).totalDifficulty.value),
         peer.id
       )
 

@@ -560,7 +560,7 @@ object PivotBlockSelector:
 
       val tdGatedPeers = peerListHelper.peersToDownloadFrom.collect {
         case (_, PeerWithInfo(peer, PeerInfo(_, chainWeight, true, maxBlockNumber, _)))
-            if maxBlockNumber > 0 && chainWeight.totalDifficulty >= minPeerTD =>
+            if maxBlockNumber > 0 && chainWeight.totalDifficulty.value >= minPeerTD =>
           (peer, maxBlockNumber)
       }
 

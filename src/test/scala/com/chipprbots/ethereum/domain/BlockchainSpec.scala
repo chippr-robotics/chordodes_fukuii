@@ -60,10 +60,10 @@ class BlockchainSpec
     blockchainWriter.save(
       validBlock.copy(header = validBlock.header.copy(number = validBlock.number - 1)),
       Seq.empty,
-      ChainWeight(BigInt(100)),
+      ChainWeight.totalDifficultyOnly(BigInt(100)),
       saveAsBestBlock = true
     )
-    blockchainWriter.save(validBlock, Seq.empty, ChainWeight(BigInt(100)), saveAsBestBlock = true)
+    blockchainWriter.save(validBlock, Seq.empty, ChainWeight.totalDifficultyOnly(BigInt(100)), saveAsBestBlock = true)
     blockchainReader.isInChain(blockchainReader.getBestBranch, validBlock.hash) should ===(true)
     // simulation of node restart
     blockchainWriter.saveBestKnownBlocks(validBlock.header.parentHash, validBlock.header.number - 1)

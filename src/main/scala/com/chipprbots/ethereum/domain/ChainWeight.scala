@@ -2,10 +2,10 @@ package com.chipprbots.ethereum.domain
 
 object ChainWeight:
   def totalDifficultyOnly(td: BigInt): ChainWeight =
-    ChainWeight(td)
+    ChainWeight(TotalDifficulty(td))
 
   val zero: ChainWeight =
-    ChainWeight(0)
+    ChainWeight(TotalDifficulty.Zero)
 
 /** Represents the weight of a blockchain chain.
   *
@@ -16,7 +16,7 @@ object ChainWeight:
   *   Sum of all block difficulties in the chain
   */
 case class ChainWeight(
-    totalDifficulty: BigInt
+    totalDifficulty: TotalDifficulty
 ) extends Ordered[ChainWeight]:
 
   override def compare(that: ChainWeight): Int =
@@ -30,9 +30,9 @@ case class ChainWeight(
     *   New ChainWeight with the block incorporated
     */
   def increase(header: BlockHeader): ChainWeight =
-    ChainWeight(totalDifficulty + header.difficulty.value)
+    ChainWeight(totalDifficulty + header.difficulty)
 
   // Test API
 
   def increaseTotalDifficulty(td: BigInt): ChainWeight =
-    copy(totalDifficulty = totalDifficulty + td)
+    copy(totalDifficulty = TotalDifficulty(totalDifficulty.value + td))

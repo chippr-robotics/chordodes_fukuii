@@ -11,8 +11,7 @@ object UInt256RLPImplicits:
     def toRLPEncodable: RLPEncodeable =
       RLPValue(if obj.equals(UInt256.Zero) then Array.empty[Byte] else obj.bytes.dropWhile(_ == 0).toArray[Byte])
 
-  extension (bytes: ByteString)
-    def toUInt256: UInt256 = rawDecode(bytes.toArray).toUInt256
+  extension (bytes: ByteString) def toUInt256: UInt256 = rawDecode(bytes.toArray).toUInt256
 
   extension (rLPEncodeable: RLPEncodeable)
     def toUInt256: UInt256 = rLPEncodeable match

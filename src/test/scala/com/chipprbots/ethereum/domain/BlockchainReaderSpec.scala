@@ -22,7 +22,7 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     StateTest
   ) in new EphemBlockchainTestSetup:
     forAll(ObjectGenerators.newBlockGen(secureRandom, chainId)) { case NewBlock(block, weight) =>
-      blockchainWriter.save(block, Nil, ChainWeight(weight), true)
+      blockchainWriter.save(block, Nil, ChainWeight.totalDifficultyOnly(weight), true)
 
       blockchainReader.getBestBlock shouldBe Some(block)
     }
@@ -42,7 +42,7 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     val (cw, source) =
       blockchainReader.resolveETH69ChainWeight(block1.header.hash.value, block1.header.number, isPoWChain = true)
     source shouldBe "DB_LOOKUP"
-    cw.totalDifficulty shouldBe block1Weight.totalDifficulty
+    cw.totalDifficulty.value shouldBe block1Weight.totalDifficulty.value
 
   it should "return CANONICAL_NUMBER when peer hash is unknown but peer block number is canonical (Tier 2)" taggedAs (
     UnitTest,
@@ -63,7 +63,7 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     val (cw, source) =
       blockchainReader.resolveETH69ChainWeight(unknownPeerHash, block1.header.number, isPoWChain = true)
     source shouldBe "CANONICAL_NUMBER"
-    cw.totalDifficulty shouldBe block1Weight.totalDifficulty
+    cw.totalDifficulty.value shouldBe block1Weight.totalDifficulty.value
 
   it should "return COLD_START (TD=0) when ourBestNum=0 (DB not yet bootstrapped)" taggedAs (
     UnitTest,
@@ -77,7 +77,7 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
 
     val (cw, source) = blockchainReader.resolveETH69ChainWeight(unknownHash, peerBlockNum, isPoWChain = true)
     source shouldBe "COLD_START"
-    cw.totalDifficulty shouldBe BigInt(0)
+    cw.totalDifficulty.value shouldBe BigInt(0)
 
   it should "return POW_SCALING proportional estimate when ourBestNum > 0 but peer is ahead" taggedAs (
     UnitTest,
@@ -96,13 +96,13 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
 
     val (cw, source) = blockchainReader.resolveETH69ChainWeight(unknownHash, peerBlockNum, isPoWChain = true)
     source shouldBe "POW_SCALING"
-    cw.totalDifficulty should be > BigInt(0)
+    cw.totalDifficulty.value should be > BigInt(0)
     // ring buffer has < 1000 entries → rollingMedianDifficulty = None → rate = head.difficulty (not totalTD/headNumber)
-    val ourBestTD = block1Weight.totalDifficulty
+    val ourBestTD: BigInt = block1Weight.totalDifficulty.value
     val ourBestNum = block1.header.number
     val gap: BigInt = (peerBlockNum - ourBestNum).max(BigInt(0))
     val rate: BigInt = block1.header.difficulty.value
-    cw.totalDifficulty shouldBe ourBestTD + rate * gap
+    cw.totalDifficulty.value shouldBe ourBestTD + rate * gap
 
   it should "return POS_PROXY block number for post-merge peers (isPoWChain = false)" taggedAs (
     UnitTest,
@@ -117,7 +117,7 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
 
     val (cw, source) = blockchainReader.resolveETH69ChainWeight(unknownHash, peerBlockNum, isPoWChain = false)
     source shouldBe "POS_PROXY"
-    cw.totalDifficulty shouldBe peerBlockNum
+    cw.totalDifficulty.value shouldBe peerBlockNum
 
   // ETC mainnet post-Spiral realistic anchor values
   private val etcBestTD = BigInt("24244691155597214264244")
@@ -144,7 +144,7 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     val (cw, source) = blockchainReader.resolveETH69ChainWeight(unknownHash, peerBlock, isPoWChain = true)
     source shouldBe "POW_SCALING"
 
-    val estimate = cw.totalDifficulty
+    val estimate: BigInt = cw.totalDifficulty.value
     val tolerance: BigInt = etcBestTD / 1000 // 0.1%
     estimate should be >= (etcBestTD - tolerance)
     estimate should be <= (etcBestTD + tolerance)
@@ -167,7 +167,7 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     val unknownHash: ByteString = ByteString(Array.fill(32)(0xff.toByte))
     val (cw, source) = blockchainReader.resolveETH69ChainWeight(unknownHash, etcBestNum, isPoWChain = true)
     source shouldBe "CANONICAL_NUMBER"
-    cw.totalDifficulty shouldBe etcBestTD // exact real TD — no inflation
+    cw.totalDifficulty.value shouldBe etcBestTD // exact real TD — no inflation
 
   it should "COLD_START TD=0 is always less than any real ETC chain TD" taggedAs (
     UnitTest,
@@ -180,5 +180,5 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
       isPoWChain = true
     )
     source shouldBe "COLD_START"
-    cw.totalDifficulty shouldBe BigInt(0)
-    cw.totalDifficulty should be < BigInt("1000000000000000000") // << any real PoW TD
+    cw.totalDifficulty.value shouldBe BigInt(0)
+    cw.totalDifficulty.value should be < BigInt("1000000000000000000") // << any real PoW TD

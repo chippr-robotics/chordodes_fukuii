@@ -9,8 +9,15 @@ import boopickle.Default.*
 import com.chipprbots.ethereum.db.dataSource.DataSource
 import com.chipprbots.ethereum.db.storage.ChainWeightStorage.*
 import com.chipprbots.ethereum.domain.ChainWeight
+import com.chipprbots.ethereum.domain.TotalDifficulty
 import com.chipprbots.ethereum.utils.ByteUtils.byteSequenceToBuffer
 import com.chipprbots.ethereum.utils.ByteUtils.compactPickledBytes
+
+// boopickle derives Pickler[ChainWeight] via its case-class macro.
+// Since ChainWeight.totalDifficulty is now TotalDifficulty (opaque BigInt),
+// we provide a Pickler that delegates to the existing BigInt pickler.
+private given Pickler[TotalDifficulty] =
+  transformPickler[TotalDifficulty, BigInt](TotalDifficulty.apply)(_.value)
 
 /** This class is used to store the ChainWeight of blocks, by using: Key: hash of the block Value: ChainWeight
   */
@@ -31,7 +38,7 @@ class ChainWeightStorage(val dataSource: DataSource) extends TransactionalKeyVal
           // Handle legacy format with (totalDifficulty, Option[messScore]) or
           // older format with (lastCheckpointNumber, totalDifficulty)
           val legacy = Unpickle[LegacyChainWeight].fromBytes(buffer)
-          ChainWeight(legacy.totalDifficulty)
+          ChainWeight(TotalDifficulty(legacy.totalDifficulty))
         catch
           case e: Exception =>
             throw new IllegalStateException(

@@ -116,7 +116,7 @@ private class SNAPSyncControllerImpl(
             p.peerInfo.maxBlockNumber > BigInt(0) // Wait for eager probe; peerBlock=0 → ETH68_BOOTSTRAP risk
           }
           .foreach { p =>
-            val td = p.peerInfo.remoteStatus.chainWeight.totalDifficulty
+            val td = p.peerInfo.remoteStatus.chainWeight.totalDifficulty.value
             val block = p.peerInfo.maxBlockNumber
             if bestEth68PeerForCalibration.forall { case (best, _) => td > best } then
               val prevBestTD = bestEth68PeerForCalibration.map(_._1).getOrElse(BigInt(0))
@@ -3927,9 +3927,9 @@ private class SNAPSyncControllerImpl(
     * caller falls back to the block-number proxy in that case.
     */
   private def calibratePivotTD(pivotBlockNumber: BigInt): Option[BigInt] =
-    val genesisBlockTD = blockchainReader
+    val genesisBlockTD: BigInt = blockchainReader
       .getChainWeightByHash(blockchainReader.genesisHeader.hash)
-      .map(_.totalDifficulty)
+      .map(_.totalDifficulty.value)
       .getOrElse(blockchainReader.genesisHeader.difficulty.value)
 
     // Current peers + best peer seen historically this session (fallback when all ETH68
@@ -3943,7 +3943,7 @@ private class SNAPSyncControllerImpl(
         p.peerInfo.remoteStatus.capability != Capability.ETH69 &&
         p.peerInfo.maxBlockNumber > pivotBlockNumber
       }
-      .map(p => (p.peerInfo.remoteStatus.chainWeight.totalDifficulty, p.peerInfo.maxBlockNumber))
+      .map(p => (p.peerInfo.remoteStatus.chainWeight.totalDifficulty.value, p.peerInfo.maxBlockNumber))
       .toSeq
 
     val historicalCandidate: Seq[(BigInt, BigInt)] =
@@ -3985,12 +3985,12 @@ private class SNAPSyncControllerImpl(
     val (estimatedTotalDifficulty, tdSource) =
       blockchainReader
         .getChainWeightByHash(pivotHash)
-        .map(cw => (cw.totalDifficulty, "REAL_PIVOT_TD"))
+        .map(cw => (cw.totalDifficulty.value, "REAL_PIVOT_TD"))
         .orElse(calibratePivotTD(pivotBlockNumber).map(td => (td, "PEER_INTERPOLATED_TD")))
         .getOrElse {
           val genesisTD: BigInt = blockchainReader
             .getChainWeightByHash(blockchainReader.genesisHeader.hash)
-            .map(_.totalDifficulty)
+            .map(_.totalDifficulty.value)
             .getOrElse(blockchainReader.genesisHeader.difficulty.value)
           val proxy: BigInt =
             if pivotBlockNumber == BigInt(0) then header.difficulty.value else pivotBlockNumber.max(genesisTD)
@@ -4524,12 +4524,12 @@ private class SNAPSyncControllerImpl(
           // last resort (no ETH68 peers at all — rare but possible in isolated test environments).
           val genesisBlockTD: BigInt = blockchainReader
             .getChainWeightByHash(blockchainReader.genesisHeader.hash)
-            .map(_.totalDifficulty)
+            .map(_.totalDifficulty.value)
             .getOrElse(blockchainReader.genesisHeader.difficulty.value)
           val (finalTD, tdSource) =
             blockchainReader
               .getChainWeightByHash(pivotHash)
-              .map(_.totalDifficulty)
+              .map(_.totalDifficulty.value)
               .filter(_ > genesisBlockTD * BigInt(1000))
               .map(td => (td, "REAL_DB_TD"))
               .orElse(calibratePivotTD(pivot).map(td => (td, "PEER_INTERPOLATED_TD")))

@@ -153,7 +153,7 @@ class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues
       CheckpointArchive.Header(
         chainId = checkpointChainId,
         blockHeader = Fixtures.Blocks.Block3125369.header,
-        chainWeight = ChainWeight(BigInt("987654321"))
+        chainWeight = ChainWeight.totalDifficultyOnly(BigInt("987654321"))
       )
 
     def hash(s: String): ByteString = ByteString(s.padTo(32, '_').getBytes("UTF-8"))

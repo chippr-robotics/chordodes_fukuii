@@ -19,7 +19,7 @@ class CheckpointArchiveSpec extends AnyWordSpec with Matchers with EitherValues:
     CheckpointArchive.Header(
       chainId = 61L,
       blockHeader = Fixtures.Blocks.Block3125369.header,
-      chainWeight = ChainWeight(BigInt("123456789012345678901234567890"))
+      chainWeight = ChainWeight.totalDifficultyOnly(BigInt("123456789012345678901234567890"))
     )
 
   private def hex(s: String): ByteString = ByteString(s.getBytes("UTF-8"))

@@ -170,7 +170,7 @@ class AdminService(
     val headHex = "0x" + Hex.toHexString(headHash.toArray)
     val totalDiff = blockchainReader
       .getChainWeightByHash(com.chipprbots.ethereum.domain.BlockHash(headHash))
-      .map(w => "0x" + w.totalDifficulty.toString(16))
+      .map(w => "0x" + w.totalDifficulty.value.toString(16))
       .getOrElse("0x0")
     val ethInfo = EthProtocolInfo(
       difficulty = totalDiff,

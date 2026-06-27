@@ -76,7 +76,10 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
     blockchainWriter.save(firstBlock, Nil, newChainWeight, saveAsBestBlock = true)
 
     val newLocalStatusMsg: Status68 =
-      localStatusMsg.copy(totalDifficulty = newChainWeight.totalDifficulty, bestHash = firstBlock.header.hash.value)
+      localStatusMsg.copy(
+        totalDifficulty = newChainWeight.totalDifficulty.value,
+        bestHash = firstBlock.header.hash.value
+      )
 
     initHandshakerWithoutResolver.nextMessage.map(_.messageToSend) shouldBe Right(localHello: HelloEnc)
     val handshakerAfterHelloOpt: Option[Handshaker[PeerInfo]] = initHandshakerWithoutResolver.applyMessage(remoteHello)
@@ -106,7 +109,7 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
       localStatusMsg
         .copy(
           bestHash = firstBlock.header.hash.value,
-          totalDifficulty = newChainWeight.totalDifficulty,
+          totalDifficulty = newChainWeight.totalDifficulty.value,
           forkId = ForkId(0xfc64ec04L, Some(1150000))
         )
 
@@ -141,7 +144,7 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
       localStatusMsg
         .copy(
           bestHash = firstBlock.header.hash.value,
-          totalDifficulty = newChainWeight.totalDifficulty,
+          totalDifficulty = newChainWeight.totalDifficulty.value,
           forkId = ForkId(0xfc64ec04L, Some(1150000))
         )
 

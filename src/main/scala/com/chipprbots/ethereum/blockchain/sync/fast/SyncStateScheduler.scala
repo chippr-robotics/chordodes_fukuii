@@ -319,8 +319,7 @@ object SyncStateScheduler:
     override def compare(o1: StateNodeRequest, o2: StateNodeRequest): Int =
       o2.nodeDepth.compare(o1.nodeDepth)
 
-  extension [A, B](o: io.vavr.Tuple2[A, B])
-    def asScala(): (A, B) = (o._1, o._2)
+  extension [A, B](o: io.vavr.Tuple2[A, B]) def asScala(): (A, B) = (o._1, o._2)
 
   final case class SyncResponse(hash: ByteString, data: ByteString)
 

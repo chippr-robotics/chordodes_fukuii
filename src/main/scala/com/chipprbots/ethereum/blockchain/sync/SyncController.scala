@@ -950,17 +950,17 @@ object SyncController:
           if peerTD > BigInt(0) then
             // Tier 1 or 2: ETH68 peer TD available
             blockchainReader.getBestBlock.foreach { bestBlock =>
-              val genesisWeight = blockchainReader
+              val genesisWeight: BigInt = blockchainReader
                 .getChainWeightByHash(blockchainReader.genesisHeader.hash)
-                .map(_.totalDifficulty)
+                .map(_.totalDifficulty.value)
                 .getOrElse(blockchainReader.genesisHeader.difficulty.value)
               val calibratedTD =
                 if peerMaxBlock > BigInt(0) then peerTD * bestBlock.header.number / peerMaxBlock
                 else peerTD
               if calibratedTD > genesisWeight * BigInt(1000) then
-                val storedTD = blockchainReader
+                val storedTD: BigInt = blockchainReader
                   .getChainWeightByHash(bestBlock.header.hash)
-                  .map(_.totalDifficulty)
+                  .map(_.totalDifficulty.value)
                   .getOrElse(BigInt(0))
                 blockchainWriter
                   .storeChainWeight(
@@ -2346,8 +2346,8 @@ object SyncController:
 
           while !anchorFound && !abort do
             blockchainReader.getChainWeightByHash(cur.hash) match
-              case Some(cw) if cw.totalDifficulty > cur.number * MinTDPerBlock =>
-                anchorTD = cw.totalDifficulty
+              case Some(cw) if cw.totalDifficulty.value > cur.number * MinTDPerBlock =>
+                anchorTD = cw.totalDifficulty.value
                 anchorFound = true
                 log.debug(
                   "TIMED_CALIBRATION_LOCAL: anchor found at block={} anchorTD={} (walked {} headers)",
@@ -2384,15 +2384,15 @@ object SyncController:
             var td = anchorTD
             headersAboveAnchor.reverseIterator.foreach(h => td += h.difficulty.value)
 
-            val genesisWeight = blockchainReader
+            val genesisWeight: BigInt = blockchainReader
               .getChainWeightByHash(blockchainReader.genesisHeader.hash)
-              .map(_.totalDifficulty)
+              .map(_.totalDifficulty.value)
               .getOrElse(blockchainReader.genesisHeader.difficulty.value)
 
             if td > genesisWeight * BigInt(1000) then
-              val storedTD = blockchainReader
+              val storedTD: BigInt = blockchainReader
                 .getChainWeightByHash(bestHeader.hash)
-                .map(_.totalDifficulty)
+                .map(_.totalDifficulty.value)
                 .getOrElse(BigInt(0))
               blockchainWriter
                 .storeChainWeight(bestHeader.hash, com.chipprbots.ethereum.domain.ChainWeight.totalDifficultyOnly(td))

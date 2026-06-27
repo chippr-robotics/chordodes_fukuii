@@ -92,7 +92,7 @@ class CheckpointExporterSpec
 
       // Header with the constructed stateRoot — use a fixture for the bulk and override stateRoot.
       val header: BlockHeader = Fixtures.Blocks.Block3125369.header.copy(stateRoot = TrieRoot(stateRoot), number = 100)
-      val weight: ChainWeight = ChainWeight(BigInt(42))
+      val weight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt(42))
       sourceWriter.storeBlockHeader(header).and(sourceWriter.storeChainWeight(header.hash, weight)).commit()
 
       // Export
@@ -184,7 +184,7 @@ class CheckpointExporterSpec
       val stateRoot: ByteString = ByteString(accountTrie.getRootHash)
 
       val header: BlockHeader = Fixtures.Blocks.Block3125369.header.copy(stateRoot = TrieRoot(stateRoot), number = 100)
-      val weight: ChainWeight = ChainWeight(BigInt(42))
+      val weight: ChainWeight = ChainWeight.totalDifficultyOnly(BigInt(42))
       sourceWriter.storeBlockHeader(header).and(sourceWriter.storeChainWeight(header.hash, weight)).commit()
 
       // Export — must NOT throw MPTException(Invalid Node) when nodes are wrapped.

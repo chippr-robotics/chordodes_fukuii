@@ -145,8 +145,7 @@ object WireProtocol:
 
       override def toRLPEncodable: RLPEncodeable = RLPList()
 
-    extension (bytes: Array[Byte])
-      def toPing: Ping = Ping()
+    extension (bytes: Array[Byte]) def toPing: Ping = Ping()
 
   case class Ping() extends Message:
     override val code: Int = Ping.code
@@ -163,8 +162,7 @@ object WireProtocol:
 
       override def toRLPEncodable: RLPEncodeable = RLPList()
 
-    extension (bytes: Array[Byte])
-      def toPong: Pong = Pong()
+    extension (bytes: Array[Byte]) def toPong: Pong = Pong()
 
   case class Pong() extends Message:
     override val code: Int = Pong.code

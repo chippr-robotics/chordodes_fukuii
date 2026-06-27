@@ -86,7 +86,7 @@ object BlockResponse:
         })
       else Left(block.body.transactionList.map(_.hash.value))
 
-    val td = weight.map(_.totalDifficulty)
+    val td = weight.map(_.totalDifficulty.value)
 
     val signature =
       if block.header.extraData.length >= ECDSASignature.EncodedLength then

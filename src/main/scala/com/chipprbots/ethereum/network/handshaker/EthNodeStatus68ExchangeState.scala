@@ -177,7 +177,7 @@ case class EthNodeStatus68ExchangeState(
     val status = ETHPackets.Status68.Status68(
       protocolVersion = negotiatedCapability.version,
       networkId = peerConfiguration.networkId,
-      totalDifficulty = chainWeight.totalDifficulty,
+      totalDifficulty = chainWeight.totalDifficulty.value,
       bestHash = bestBlockHeader.hash.value,
       genesisHash = genesisHash,
       forkId = forkId

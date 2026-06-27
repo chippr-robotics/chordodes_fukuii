@@ -130,7 +130,7 @@ class RegularSyncSpec
 
         val sub136 = peerEventBus.expectMsgType[SubscribeCmd]
         sub136.subscriber ! MessageFromPeer(
-          NewBlock(testBlocks.last, ChainWeight(testBlocks.last.number).totalDifficulty),
+          NewBlock(testBlocks.last, ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty.value),
           defaultPeer.id
         )
 
@@ -190,7 +190,7 @@ class RegularSyncSpec
           bodiesSender ! PeersClient.Response(defaultPeer, BlockBodies(BigInt(0), testBlocksChunked.head.bodies))
 
           blockFetcher ! MessageFromPeer(
-            NewBlock(testBlocks.last, ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty),
+            NewBlock(testBlocks.last, ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty.value),
             defaultPeer.id
           )
           // Headers from a much later chunk — HeadersNotMatchingWaitingHeaders fires.
@@ -246,7 +246,10 @@ class RegularSyncSpec
 
         val sub249 = peerEventBus.expectMsgType[SubscribeCmd]
         sub249.subscriber ! MessageFromPeer(
-          NewBlock(testBlocks.last, ChainWeight(testBlocks.last.header.difficulty.value).totalDifficulty),
+          NewBlock(
+            testBlocks.last,
+            ChainWeight.totalDifficultyOnly(testBlocks.last.header.difficulty.value).totalDifficulty.value
+          ),
           defaultPeer.id
         )
 
@@ -490,7 +493,10 @@ class RegularSyncSpec
 
           val sub383 = peerEventBus.expectMsgType[SubscribeCmd]
           sub383.subscriber ! MessageFromPeer(
-            NewBlock(alternativeBlocks.last, ChainWeight(alternativeBlocks.last.number).totalDifficulty),
+            NewBlock(
+              alternativeBlocks.last,
+              ChainWeight.totalDifficultyOnly(alternativeBlocks.last.number).totalDifficulty.value
+            ),
             defaultPeer.id
           )
           // increase timeout slightly to reduce intermittent flakiness in forked test JVMs
@@ -550,7 +556,10 @@ class RegularSyncSpec
         val sub445 = peerEventBus.expectMsgType[SubscribeCmd]
         val blockFetcher: TypedActorRef[PeerEvent] = sub445.subscriber
         sub445.subscriber ! MessageFromPeer(
-          NewBlock(originalBranch.last, ChainWeight(originalBranch.last.number).totalDifficulty),
+          NewBlock(
+            originalBranch.last,
+            ChainWeight.totalDifficultyOnly(originalBranch.last.number).totalDifficulty.value
+          ),
           defaultPeer.id
         )
 
@@ -558,7 +567,7 @@ class RegularSyncSpec
 
         // As node will be on top, we have to re-trigger the fetching process by simulating a block from the fork being broadcasted
         blockFetcher ! MessageFromPeer(
-          NewBlock(betterBranch.last, ChainWeight(betterBranch.last.number).totalDifficulty),
+          NewBlock(betterBranch.last, ChainWeight.totalDifficultyOnly(betterBranch.last.number).totalDifficulty.value),
           defaultPeer.id
         )
         awaitCond(bestBlock == betterBranch.last, 5.seconds)
@@ -703,7 +712,10 @@ class RegularSyncSpec
         regularSync ! SyncProtocol.Start
         val sub576 = peerEventBus.expectMsgType[SubscribeCmd]
 
-        sub576.subscriber ! MessageFromPeer(NewBlock(newBlock, ChainWeight(BigInt(1)).totalDifficulty), defaultPeer.id)
+        sub576.subscriber ! MessageFromPeer(
+          NewBlock(newBlock, ChainWeight.totalDifficultyOnly(BigInt(1)).totalDifficulty.value),
+          defaultPeer.id
+        )
 
         // Wait for actor to finish processing and verify it never calls evaluateBranchBlock
         // Use assertForDuration to continuously verify the mock is never called
@@ -725,7 +737,7 @@ class RegularSyncSpec
 
         val sub598 = peerEventBus.expectMsgType[SubscribeCmd]
         sub598.subscriber ! MessageFromPeer(
-          NewBlock(testBlocks.last, ChainWeight(testBlocks.last.number).totalDifficulty),
+          NewBlock(testBlocks.last, ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty.value),
           defaultPeer.id
         )
 
@@ -791,7 +803,7 @@ class RegularSyncSpec
 
         val sub665 = peerEventBus.expectMsgType[SubscribeCmd]
         sub665.subscriber ! MessageFromPeer(
-          NewBlock(testBlocks.last, ChainWeight(testBlocks.last.number).totalDifficulty),
+          NewBlock(testBlocks.last, ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty.value),
           defaultPeer.id
         )
 
@@ -890,7 +902,7 @@ class RegularSyncSpec
             sub766.subscriber ! MessageFromPeer(
               NewBlock(
                 testBlocks.last,
-                ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty
+                ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty.value
               ),
               defaultPeer.id
             )
@@ -917,7 +929,7 @@ class RegularSyncSpec
             sub796.subscriber ! MessageFromPeer(
               NewBlock(
                 testBlocks.last,
-                ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty
+                ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty.value
               ),
               defaultPeer.id
             )
@@ -944,7 +956,7 @@ class RegularSyncSpec
             sub824.subscriber ! MessageFromPeer(
               NewBlock(
                 testBlocks.last,
-                ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty
+                ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty.value
               ),
               defaultPeer.id
             )
@@ -974,7 +986,7 @@ class RegularSyncSpec
             sub854.subscriber ! MessageFromPeer(
               NewBlock(
                 testBlocks.last,
-                ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty
+                ChainWeight.totalDifficultyOnly(testBlocks.last.number).totalDifficulty.value
               ),
               defaultPeer.id
             )

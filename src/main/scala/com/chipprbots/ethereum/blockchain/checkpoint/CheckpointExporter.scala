@@ -228,7 +228,7 @@ final class CheckpointExporter(
           if acct.storageRoot != Account.EmptyStorageRootHash then storageRoots += acct.storageRoot.value
           if acct.codeHash != Account.EmptyCodeHash then codeHashes.add(acct.codeHash.value)
         case scala.util.Failure(_) =>
-      // Storage-only or malformed leaf — best-effort; bytecodes still resolved per-trie.
+    // Storage-only or malformed leaf — best-effort; bytecodes still resolved per-trie.
     case _: LeafNode =>
     // Storage slot leaf; no further traversal
     case ExtensionNode(_, next, _, _, _) =>

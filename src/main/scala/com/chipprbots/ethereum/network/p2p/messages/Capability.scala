@@ -110,11 +110,9 @@ object Capability:
     case ETH66 | ETH67 | ETH68 | ETH69 | ETH70 | SNAP1 => true
     case _                                             => false
 
-  extension (msg: Capability)
-    def toRLPEncodable: RLPEncodeable = RLPList(msg.name.toRLPEncodable, msg.version)
+  extension (msg: Capability) def toRLPEncodable: RLPEncodeable = RLPList(msg.name.toRLPEncodable, msg.version)
 
-  extension (bytes: Array[Byte])
-    def toCapability: Option[Capability] = rawDecode(bytes).toCapability
+  extension (bytes: Array[Byte]) def toCapability: Option[Capability] = rawDecode(bytes).toCapability
 
   extension (rLPEncodeable: RLPEncodeable)
     def toCapability: Option[Capability] = rLPEncodeable match

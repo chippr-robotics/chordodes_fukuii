@@ -20,8 +20,7 @@ object MptNodeCodecs:
   implicit class MptNodeEnc(obj: MptNode) extends RLPSerializable:
     def toRLPEncodable: RLPEncodeable = MptTraversals.encode(obj)
 
-  extension (bytes: Array[Byte])
-    def toMptNode: MptNode = MptTraversals.decodeNode(bytes)
+  extension (bytes: Array[Byte]) def toMptNode: MptNode = MptTraversals.decodeNode(bytes)
 
   extension (rlp: RLPEncodeable)
     def toMptNode: MptNode = rlp match

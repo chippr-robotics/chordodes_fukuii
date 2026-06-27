@@ -200,9 +200,9 @@ class BlockchainReader(
           case None =>
             val ourBestNum = getBestBlockNumber
             val bestHeaderOpt = getBestBlockHeader
-            val ourBestTD = bestHeaderOpt
+            val ourBestTD: BigInt = bestHeaderOpt
               .flatMap(h => getChainWeightByHash(h.hash))
-              .map(_.totalDifficulty)
+              .map(_.totalDifficulty.value)
               .getOrElse(BigInt(1))
             if ourBestNum > 0 then
               val rate = rollingMedianDifficulty.orElse(bestHeaderOpt.map(_.difficulty.value)).getOrElse(BigInt(1))

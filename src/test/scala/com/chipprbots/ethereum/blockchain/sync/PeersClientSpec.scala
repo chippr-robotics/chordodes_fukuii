@@ -168,7 +168,7 @@ class PeersClientSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyC
     def peerInfo(td: Int, fork: Boolean = true): PeerInfo =
       PeerInfo(
         peerStatus,
-        ChainWeight(BigInt(td)),
+        ChainWeight.totalDifficultyOnly(BigInt(td)),
         forkAccepted = fork,
         maxBlockNumber = 42,
         bestBlockHash = chainHeadHash
