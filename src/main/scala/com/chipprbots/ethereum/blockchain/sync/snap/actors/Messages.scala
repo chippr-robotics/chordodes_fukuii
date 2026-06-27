@@ -75,10 +75,10 @@ object Messages {
     *
     * Sent by `SNAPSyncController` at the start of the local-merkleize finalize re-fetch. It (1) sets the coordinator's
     * `finalizing` latch so any subsequent `PivotRefreshed` is IGNORED (no `rootHash` re-tag, no re-enqueue) — without
-    * this, an incoming pivot advance would re-tag the in-flight re-fetch mid-stream and re-create the stale-leaf
-    * mosaic the feature exists to eliminate; and (2) re-targets EVERY range (completed + pending + active) to
-    * `rFinal`, re-arming completed ranges from their pristine start so the workers re-fetch them via
-    * `GetAccountRange(rFinal)` and `handleStoreAccountChunk` overwrites the stale leaves in `flatAccountStorage`.
+    * this, an incoming pivot advance would re-tag the in-flight re-fetch mid-stream and re-create the stale-leaf mosaic
+    * the feature exists to eliminate; and (2) re-targets EVERY range (completed + pending + active) to `rFinal`,
+    * re-arming completed ranges from their pristine start so the workers re-fetch them via `GetAccountRange(rFinal)`
+    * and `handleStoreAccountChunk` overwrites the stale leaves in `flatAccountStorage`.
     *
     * On re-fetch completion the coordinator reports `FinalizingRefetchComplete(rFinal)` to the controller, which then
     * runs the `computedRoot == header.stateRoot` gate. The latch is released by `EndFinalizing`.
@@ -220,10 +220,10 @@ object Messages {
     */
   case class StoragePivotRefreshed(newStateRoot: ByteString) extends StorageRangeCoordinatorMessage
 
-  /** Spec 008 US3 (Decision 3 / C2) — the symmetric storage finalize freeze latch. Sets the coordinator's
-    * `finalizing` latch so any subsequent `StoragePivotRefreshed` is IGNORED for the duration of the finalize
-    * re-fetch, mirroring `BeginFinalizing` on the account coordinator. The frozen `rFinal` becomes the storage
-    * `stateRoot` so slot reconciliation fetches `GetStorageRange(rFinal)`.
+  /** Spec 008 US3 (Decision 3 / C2) — the symmetric storage finalize freeze latch. Sets the coordinator's `finalizing`
+    * latch so any subsequent `StoragePivotRefreshed` is IGNORED for the duration of the finalize re-fetch, mirroring
+    * `BeginFinalizing` on the account coordinator. The frozen `rFinal` becomes the storage `stateRoot` so slot
+    * reconciliation fetches `GetStorageRange(rFinal)`.
     */
   final case class BeginStorageFinalizing(rFinal: ByteString) extends StorageRangeCoordinatorMessage
 

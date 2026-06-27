@@ -49,7 +49,8 @@ case class AccountTask(
 
   /** Pristine lower bound of this range, captured at construction. Falls back to the current `next` only when
     * `firstHash` was never set (test-only tasks that never participate in the spec 008 finalize re-fetch). Production
-    * tasks (`createInitialTasks`) always set `firstHash`, so this returns the original start even after `next` advances.
+    * tasks (`createInitialTasks`) always set `firstHash`, so this returns the original start even after `next`
+    * advances.
     */
   def rangeStart: ByteString = firstHash.getOrElse(next)
 

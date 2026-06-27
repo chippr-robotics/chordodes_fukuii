@@ -1535,4 +1535,120 @@ class AccountRangeCoordinatorSpec
       }
     }
   }
+
+  // ========================================
+  // Spec 008 US3 (T017) — finalize freeze latch (C2)
+  // ========================================
+  // While the finalize re-fetch holds the freeze latch, a pivot advance (PivotRefreshed) MUST NOT
+  // re-tag any task's rootHash and MUST NOT re-enqueue — otherwise it re-introduces the cross-pivot
+  // leaf mosaic the feature exists to eliminate. After EndFinalizing, pivot-advance is honored again.
+  // Driven deterministically via TestActorRef + the package-private `finalizeFreezeLatch` (no clock).
+
+  it should "IGNORE PivotRefreshed while the finalize freeze latch is engaged (no rootHash re-tag, no re-enqueue) (T017/C2)" taggedAs UnitTest in {
+    val rFinal = kec256(ByteString("t017-r-final"))
+    val advance = kec256(ByteString("t017-pivot-advance"))
+    val coord = newCoordinator(stateRoot = rFinal)
+    val ua = coord.underlyingActor
+
+    // Engage the latch exactly as BeginFinalizing would.
+    coord ! Messages.BeginFinalizing(rFinal)
+    coord ! Messages.GetProgress
+    expectMsgType[AccountRangeStats](2.seconds) // barrier: BeginFinalizing fully processed
+    ua.finalizeFreezeLatch shouldBe true
+
+    // Snapshot the frozen-root task fingerprint BEFORE the pivot advance: every pending task is
+    // tagged with rFinal, and we record the exact (next, rootHash) of each so we can assert no
+    // mutation occurred.
+    val before = ua.pendingTasks.toVector.map(t => (t.last, t.next, t.rootHash))
+    before.foreach { case (_, _, root) => root shouldBe rFinal }
+    val pendingSizeBefore = ua.pendingTasks.size
+
+    // Deliver a pivot advance — it MUST be a no-op under the latch.
+    coord ! Messages.PivotRefreshed(advance)
+    coord ! Messages.GetProgress
+    expectMsgType[AccountRangeStats](2.seconds) // barrier: PivotRefreshed fully processed
+
+    // The frozen root is untouched; no task was re-tagged to `advance`; the queue is unchanged.
+    ua.stateRoot shouldBe rFinal
+    val after = ua.pendingTasks.toVector.map(t => (t.last, t.next, t.rootHash))
+    after shouldBe before
+    after.foreach { case (_, _, root) => root shouldBe rFinal }
+    after.foreach { case (_, _, root) => (root should not).equal(advance) }
+    ua.pendingTasks.size shouldBe pendingSizeBefore
+
+    system.stop(coord)
+  }
+
+  it should "HONOR PivotRefreshed again after EndFinalizing releases the latch (T017/C2)" taggedAs UnitTest in {
+    val rFinal = kec256(ByteString("t017-end-r-final"))
+    val advance = kec256(ByteString("t017-end-advance"))
+    val coord = newCoordinator(stateRoot = rFinal)
+    val ua = coord.underlyingActor
+
+    coord ! Messages.BeginFinalizing(rFinal)
+    coord ! Messages.GetProgress
+    expectMsgType[AccountRangeStats](2.seconds)
+    ua.finalizeFreezeLatch shouldBe true
+
+    // Release the latch.
+    coord ! Messages.EndFinalizing
+    coord ! Messages.GetProgress
+    expectMsgType[AccountRangeStats](2.seconds)
+    ua.finalizeFreezeLatch shouldBe false
+
+    // A subsequent pivot advance is now honored — every pending task is re-tagged to the new root.
+    coord ! Messages.PivotRefreshed(advance)
+    coord ! Messages.GetProgress
+    expectMsgType[AccountRangeStats](2.seconds)
+
+    ua.stateRoot shouldBe advance
+    ua.pendingTasks.foreach(_.rootHash shouldBe advance)
+    ua.pendingTasks.toVector should not be empty
+
+    system.stop(coord)
+  }
+
+  it should "re-arm COMPLETED ranges from their pristine start on BeginFinalizing so they re-download against R_final (T017/Decision 1)" taggedAs UnitTest in {
+    // The crux of US3: today PivotRefreshed only re-tags PENDING tasks; COMPLETED ranges are never
+    // re-fetched. BeginFinalizing must re-arm completed ranges (next = rangeStart, done = false,
+    // rootHash = R_final, back onto the pending queue) so the workers re-download them against the
+    // frozen root and `handleStoreAccountChunk` overwrites the stale leaves.
+    val oldRoot = kec256(ByteString("t017-rearm-old"))
+    val rFinal = kec256(ByteString("t017-rearm-final"))
+    val coord = newCoordinator(stateRoot = oldRoot)
+    val ua = coord.underlyingActor
+
+    // Drain the freshly-constructed pending queue and mark every initial range COMPLETED at oldRoot,
+    // advancing each task's `next` to its `last` (exactly what a real range completion does).
+    val initialBuf = scala.collection.mutable.ArrayBuffer.empty[AccountTask]
+    while (ua.pendingTasks.nonEmpty) initialBuf += ua.pendingTasks.dequeue()
+    val initial = initialBuf.toVector
+    initial should not be empty
+    initial.foreach { t =>
+      t.next = t.last
+      t.done = true
+      t.pending = false
+      ua.completedTasks += t
+    }
+    ua.pendingTasks shouldBe empty
+    val completedCount = ua.completedTasks.size
+
+    // BeginFinalizing(rFinal): the completed ranges must be re-armed back into the pending queue,
+    // each from its pristine rangeStart and re-tagged to rFinal.
+    coord ! Messages.BeginFinalizing(rFinal)
+    coord ! Messages.GetProgress
+    expectMsgType[AccountRangeStats](2.seconds)
+
+    ua.finalizeFreezeLatch shouldBe true
+    ua.completedTasks shouldBe empty
+    ua.pendingTasks.size shouldBe completedCount
+    ua.pendingTasks.foreach { t =>
+      t.rootHash shouldBe rFinal
+      t.done shouldBe false
+      // Re-armed from the pristine lower bound, NOT left at the completed `last`.
+      t.next shouldBe t.rangeStart
+    }
+
+    system.stop(coord)
+  }
 }

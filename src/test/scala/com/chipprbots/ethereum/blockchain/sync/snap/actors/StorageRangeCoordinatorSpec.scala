@@ -1015,4 +1015,73 @@ class StorageRangeCoordinatorSpec
     // After commit, all nodes have been emitted to the accumulator.
     accumulated.nonEmpty shouldBe true
   }
+
+  // ========================================
+  // Spec 008 US3 (T017) — symmetric storage finalize freeze latch (C2)
+  // ========================================
+  // While the finalize re-fetch holds the storage freeze latch, a StoragePivotRefreshed MUST be a
+  // no-op (frozen `stateRoot` not re-tagged, no in-flight re-target). After EndStorageFinalizing,
+  // pivot-advance is honored again. Driven deterministically via TestActorRef + the package-private
+  // `finalizeFreezeLatch` (no clock).
+
+  private def newLatchStorageCoordinator(stateRoot: ByteString): TestActorRef[StorageRangeCoordinator] =
+    TestActorRef[StorageRangeCoordinator](
+      StorageRangeCoordinator.props(
+        stateRoot = stateRoot,
+        networkPeerManager = TestProbe().ref,
+        requestTracker = new SNAPRequestTracker()(system.scheduler),
+        mptStorage = new TestMptStorage(),
+        flatSlotStorage = new FlatSlotStorage(EphemDataSource()),
+        maxAccountsPerBatch = 8,
+        maxInFlightRequests = 8,
+        requestTimeout = 30.seconds,
+        snapSyncController = TestProbe().ref
+      )
+    )
+
+  it should "IGNORE StoragePivotRefreshed while the finalize freeze latch is engaged (no stateRoot re-tag) (T017/C2)" taggedAs UnitTest in {
+    val rFinal = kec256(ByteString("t017-storage-final"))
+    val advance = kec256(ByteString("t017-storage-advance"))
+    val coord = newLatchStorageCoordinator(rFinal)
+    val ua = coord.underlyingActor
+
+    coord ! Messages.BeginStorageFinalizing(rFinal)
+    ua.finalizeFreezeLatch shouldBe true
+    ua.stateRoot shouldBe rFinal
+
+    // Seed a counter the non-latched StoragePivotRefreshed path would reset, so we can prove the
+    // latched path did NOT run it.
+    ua.consecutiveTaskFailures = 42
+
+    coord ! Messages.StoragePivotRefreshed(advance)
+
+    // TestActorRef is synchronous: by now the message is fully processed (or ignored).
+    ua.stateRoot shouldBe rFinal // frozen root untouched
+    (ua.stateRoot should not).equal(advance)
+    ua.consecutiveTaskFailures shouldBe 42 // non-latched reset did NOT run
+
+    system.stop(coord)
+  }
+
+  it should "HONOR StoragePivotRefreshed again after EndStorageFinalizing releases the latch (T017/C2)" taggedAs UnitTest in {
+    val rFinal = kec256(ByteString("t017-storage-end-final"))
+    val advance = kec256(ByteString("t017-storage-end-advance"))
+    val coord = newLatchStorageCoordinator(rFinal)
+    val ua = coord.underlyingActor
+
+    coord ! Messages.BeginStorageFinalizing(rFinal)
+    ua.finalizeFreezeLatch shouldBe true
+
+    coord ! Messages.EndStorageFinalizing
+    ua.finalizeFreezeLatch shouldBe false
+
+    ua.consecutiveTaskFailures = 42
+    coord ! Messages.StoragePivotRefreshed(advance)
+
+    // Now honored: stateRoot advances and the non-latched path reset the counter.
+    ua.stateRoot shouldBe advance
+    ua.consecutiveTaskFailures shouldBe 0
+
+    system.stop(coord)
+  }
 }

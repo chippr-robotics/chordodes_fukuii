@@ -87,7 +87,8 @@ class AccountRangeCoordinator(
   import SNAPSyncController.PivotStateUnservable
 
   // Mutable state root — updated in-place when the controller refreshes the pivot.
-  private var stateRoot: ByteString = initialStateRoot
+  // `private[actors]` so the spec-008 US3 finalize-latch tests can assert the frozen root is not re-tagged.
+  private[actors] var stateRoot: ByteString = initialStateRoot
 
   // Per-peer concurrency budget — dynamically adjusted by SNAPSyncController via UpdateMaxInFlightPerPeer.
   // Part of global per-peer request budgeting (Geth-aligned: total 5 per peer across all coordinators).
@@ -307,7 +308,8 @@ class AccountRangeCoordinator(
   )
   // requestId -> (task, worker, peer)
   private[actors] val activeTasks = mutable.Map[BigInt, (AccountTask, ActorRef, Peer)]()
-  private val completedTasks = mutable.ArrayBuffer[AccountTask]()
+  // `private[actors]` so the spec-008 US3 finalize-re-arm test can seed/assert completed ranges.
+  private[actors] val completedTasks = mutable.ArrayBuffer[AccountTask]()
 
   // Worker pool
   private[actors] val workers = mutable.ArrayBuffer[ActorRef]()
@@ -1036,16 +1038,16 @@ class AccountRangeCoordinator(
       idleWorkers += worker
     }
 
-  /** Spec 008 US3 (Decision 1 + 3 / C2) — engage the finalize freeze latch on `rFinal` and re-target EVERY range so
-    * the retained flat-account leaves are made coherent for one final pivot.
+  /** Spec 008 US3 (Decision 1 + 3 / C2) — engage the finalize freeze latch on `rFinal` and re-target EVERY range so the
+    * retained flat-account leaves are made coherent for one final pivot.
     *
     * Today only PENDING tasks are re-tagged on a pivot advance (`PivotRefreshed`), and COMPLETED ranges are never
     * re-fetched — that is precisely why the retained leaves form a mosaic across pivots. Here we re-arm completed
     * ranges from their pristine start (`next = rangeStart`, `done = false`), re-tag every range's `rootHash` to
-    * `rFinal`, drain any in-flight tasks back to pending, and resume dispatch. The existing worker dispatch then
-    * issues `GetAccountRange(rFinal)` (the worker snapshots `task.rootHash` as `expectedRoot`, so proofs are verified
-    * against `rFinal`), and `handleStoreAccountChunk` overwrites the stale leaves in `flatAccountStorage`. No
-    * worker-pool rewrite — we only re-tag and re-enqueue tasks through the same path a pivot refresh uses.
+    * `rFinal`, drain any in-flight tasks back to pending, and resume dispatch. The existing worker dispatch then issues
+    * `GetAccountRange(rFinal)` (the worker snapshots `task.rootHash` as `expectedRoot`, so proofs are verified against
+    * `rFinal`), and `handleStoreAccountChunk` overwrites the stale leaves in `flatAccountStorage`. No worker-pool
+    * rewrite — we only re-tag and re-enqueue tasks through the same path a pivot refresh uses.
     *
     * Full re-fetch fallback (research Decision 1): we re-fetch ALL ranges, not just those whose completion root differs
     * from `rFinal`. On an advancing sync most ranges are stale at finalize, so the distinction saves little; ~11 min
@@ -1090,7 +1092,9 @@ class AccountRangeCoordinator(
     pivotRefreshRequested = false
     lastDispatchOrResponseMs = System.currentTimeMillis()
 
-    log.info(s"[FLAT-MERKLEIZE] Re-armed ${pendingTasks.size} ranges for finalize re-fetch against ${rFinal.take(4).toHex}")
+    log.info(
+      s"[FLAT-MERKLEIZE] Re-armed ${pendingTasks.size} ranges for finalize re-fetch against ${rFinal.take(4).toHex}"
+    )
     tryRedispatchPendingTasks()
     knownAvailablePeers.filterNot(isPeerStateless).foreach(dispatchIfPossible)
   }

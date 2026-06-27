@@ -848,6 +848,22 @@ class SNAPSyncController(
       // over its high-water mark.
       accountRangeCoordinator.foreach(_ ! actors.Messages.ByteCodeQueuePressure(paused))
 
+    case PivotStateUnservable(rootHash, reason, emptyResponses) if currentPhase == FinalizeRefetch =>
+      // Spec 008 US3 (T016 / C2 fail-closed): during the finalize re-fetch the coordinator escalates
+      // `PivotStateUnservable` when peers stop serving the frozen `R_final` (its workers' per-request proof-verify
+      // against `expectedRoot=R_final` fails). We must NOT run the normal in-place pivot refresh here — that would
+      // re-tag the frozen root and re-introduce the cross-pivot mosaic. Route straight to the fail-closed path:
+      // release the latches, retry on a fresher `R_final` (bounded), else hand off to the lazy-heal path. NEVER
+      // finalizes an unverified set (the batch-2 gate is the backstop).
+      log.warning(
+        "[FLAT-MERKLEIZE] PivotStateUnservable during finalize re-fetch (root={}, emptyResponses={}): {}. " +
+          "Failing closed.",
+        rootHash.toHex,
+        emptyResponses,
+        reason
+      )
+      failFinalizeRefetch(s"peers stopped serving R_final during re-fetch: $reason")
+
     case PivotStateUnservable(rootHash, reason, emptyResponses) =>
       // When peers can no longer serve the current state root, refresh the pivot in-place
       // instead of restarting. This preserves downloaded trie data (content-addressed nodes
@@ -1007,6 +1023,32 @@ class SNAPSyncController(
       // header; if the roll hasn't settled it freezes on the current committed pivot, and the batch-2 computed-root
       // gate still fails closed on any mismatch — bounded by MaxFinalizeRefetchAttempts. Never finalizes unverified.
       beginFinalizeRefetch()
+
+    case FinalizingRefetchComplete(rFinal) =>
+      // Spec 008 US3 (T015): the AccountRangeCoordinator re-downloaded EVERY range against the frozen `rFinal`, so the
+      // retained flat-account leaves are now coherent for that single pivot. Run the batch-2 computed-root gate via
+      // `runFinalizeGateAndComplete` (which releases the latches and routes through `finalizeSnapSync`).
+      //
+      // Guard against a STALE completion from a superseded attempt: `failFinalizeRefetch` clears `finalizeRefetchRoot`
+      // and `finalizeRefetchInProgress`, and `beginFinalizeRefetch` re-sets `finalizeRefetchRoot` to the new R_final on
+      // retry. If a late completion for an old root arrives after we have moved on (or already completed), drop it —
+      // acting on it would run the gate against the wrong pivot. The gate in `finalizeSnapSync` is the consensus
+      // backstop regardless, but dropping here keeps the control flow coherent and avoids a double-finalize.
+      if (!finalizeRefetchInProgress) {
+        log.warning(
+          "[FLAT-MERKLEIZE] Dropping FinalizingRefetchComplete({}) — no finalize re-fetch in progress (superseded or " +
+            "already completed).",
+          rFinal.toHex
+        )
+      } else if (!finalizeRefetchRoot.contains(rFinal)) {
+        log.warning(
+          "[FLAT-MERKLEIZE] Dropping stale FinalizingRefetchComplete({}) — current frozen root is {}.",
+          rFinal.toHex,
+          finalizeRefetchRoot.map(_.toHex).getOrElse("none")
+        )
+      } else {
+        runFinalizeGateAndComplete(rFinal)
+      }
 
     case RetryBootstrapAtBlock(blockNumber) =>
       pivotBootstrapRetryTask = None
@@ -4358,8 +4400,9 @@ class SNAPSyncController(
     // Calculate state progress based on current phase
     // SNAP sync involves multiple phases: accounts, bytecode, storage, healing
     val (pulledStates, knownStates) = currentPhase match {
-      case AccountRangeSync =>
-        // In account range sync, we track accounts synced
+      case AccountRangeSync | FinalizeRefetch =>
+        // In account range sync (and the US3 finalize re-fetch, which re-runs the account-range download against the
+        // frozen R_final), we track accounts synced.
         (progress.accountsSynced, estimateOrActual(progress.estimatedTotalAccounts, progress.accountsSynced))
 
       case ByteCodeAndStorageSync =>
@@ -4515,9 +4558,9 @@ class SNAPSyncController(
     * servability is proven by the re-fetch's per-request proof-verify, so no extra probe round-trip), spawn a FRESH
     * AccountRangeCoordinator targeted at `R_final` (the original one self-stopped after account download), engage its
     * freeze latch + re-arm all ranges via `BeginFinalizing(R_final)`, and engage the storage coordinator's latch so a
-    * concurrent pivot advance can't re-target either mid-stream. The fresh coordinator writes the re-fetched leaves into
-    * the SAME `flatAccountStorage`, overwriting the stale ones. On `FinalizingRefetchComplete` the controller runs the
-    * batch-2 gate (`runFinalizeGateAndComplete`). Fail-closed paths route to `failFinalizeRefetch` (T016).
+    * concurrent pivot advance can't re-target either mid-stream. The fresh coordinator writes the re-fetched leaves
+    * into the SAME `flatAccountStorage`, overwriting the stale ones. On `FinalizingRefetchComplete` the controller runs
+    * the batch-2 gate (`runFinalizeGateAndComplete`). Fail-closed paths route to `failFinalizeRefetch` (T016).
     *
     * The account state-root NUMBER depends only on each leaf's RLP (`storageRoot` is field 3 of the leaf — research
     * Decision 1), so storage-slot reconciliation is for block-IMPORT coherence, not the gate; we engage the storage
@@ -4599,8 +4642,8 @@ class SNAPSyncController(
     }
   }
 
-  /** Spec 008 US3 (T015) — the finalize re-fetch re-downloaded every range against `rFinal`; run the batch-2 gate.
-    * The gate itself lives in `finalizeSnapSync` (byte-untouched): we release the latches and call `completeSnapSync()`,
+  /** Spec 008 US3 (T015) — the finalize re-fetch re-downloaded every range against `rFinal`; run the batch-2 gate. The
+    * gate itself lives in `finalizeSnapSync` (byte-untouched): we release the latches and call `completeSnapSync()`,
     * which routes through `finalizeSnapSync` → `computeLocalStateRoot == pivotHeader.stateRoot`. A mismatch there still
     * fails closed (HealingImpossible), so this method does not duplicate the gate — it just hands off to it now that
     * the leaves are coherent.
@@ -5013,10 +5056,10 @@ object SNAPSyncController {
   case object Dormant extends SyncPhase
 
   /** Spec 008 US3 — the local-merkleize finalize freeze+re-fetch phase. Entered (when `flatAccountMerkleize` is on and
-    * a flat-account set was retained) instead of going straight to `completeSnapSync()`: a fresh AccountRangeCoordinator
-    * re-downloads every range against the frozen `R_final` so the retained leaves are coherent for one pivot, then the
-    * `computeLocalStateRoot == header` gate runs. On success → `completeSnapSync()`; on fail-closed → the existing
-    * `HealingImpossible` / lazy-heal handoff (T016).
+    * a flat-account set was retained) instead of going straight to `completeSnapSync()`: a fresh
+    * AccountRangeCoordinator re-downloads every range against the frozen `R_final` so the retained leaves are coherent
+    * for one pivot, then the `computeLocalStateRoot == header` gate runs. On success → `completeSnapSync()`; on
+    * fail-closed → the existing `HealingImpossible` / lazy-heal handoff (T016).
     */
   case object FinalizeRefetch extends SyncPhase
 
@@ -5078,10 +5121,10 @@ object SNAPSyncController {
   case object StorageRangeSyncComplete
   case object StorageRangeSyncForceCompleted
 
-  /** Spec 008 US3 — `AccountRangeCoordinator` → controller: the finalize re-fetch has re-downloaded every range
-    * against the frozen `rFinal`, so the retained flat-account leaves are now coherent for that one pivot. The
-    * controller runs the local-merkleize gate (`computeLocalStateRoot == pivotHeader(rFinal).stateRoot`) on receipt.
-    * `rFinal` echoes the frozen root so a stale completion from a superseded finalize attempt is dropped.
+  /** Spec 008 US3 — `AccountRangeCoordinator` → controller: the finalize re-fetch has re-downloaded every range against
+    * the frozen `rFinal`, so the retained flat-account leaves are now coherent for that one pivot. The controller runs
+    * the local-merkleize gate (`computeLocalStateRoot == pivotHeader(rFinal).stateRoot`) on receipt. `rFinal` echoes
+    * the frozen root so a stale completion from a superseded finalize attempt is dropped.
     */
   final case class FinalizingRefetchComplete(rFinal: ByteString)
 

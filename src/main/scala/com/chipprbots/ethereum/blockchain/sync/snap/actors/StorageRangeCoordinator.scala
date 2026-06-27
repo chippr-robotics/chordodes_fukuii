@@ -77,7 +77,8 @@ class StorageRangeCoordinator(
   import Messages._
 
   // Mutable state root — updated in-place when the controller refreshes the pivot.
-  private var stateRoot: ByteString = initialStateRoot
+  // `private[actors]` so the spec-008 US3 storage finalize-latch test can assert the frozen root is not re-tagged.
+  private[actors] var stateRoot: ByteString = initialStateRoot
 
   // Per-peer concurrency budget — dynamically adjusted by SNAPSyncController via UpdateMaxInFlightPerPeer.
   private var maxInFlightPerPeer: Int = initialMaxInFlightPerPeer
@@ -892,7 +893,9 @@ class StorageRangeCoordinator(
     case EndStorageFinalizing =>
       // Spec 008 US3 (C2): release the latch (success or fail-closed abort). StoragePivotRefreshed honored again.
       if (finalizeFreezeLatch) {
-        log.info(s"EndStorageFinalizing: releasing storage finalize freeze latch (was frozen at ${stateRoot.take(4).toHex})")
+        log.info(
+          s"EndStorageFinalizing: releasing storage finalize freeze latch (was frozen at ${stateRoot.take(4).toHex})"
+        )
         finalizeFreezeLatch = false
       }
 
