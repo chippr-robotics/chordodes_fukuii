@@ -92,30 +92,9 @@ These items have external gates and cannot be actioned until those gates open. P
 
 ---
 
-#### D1 — INFO-13 only: RegularSync Classic LoggingAdapter
+#### D1 — ✅ DONE 913c22363
 
-**Gate:** None — address inline during §7c supervision sprint when `RegularSync.scala` is open, or earlier if convenient.
-**Agent:** LOOM or MITHRIL (single-file change)
-**Files:** `blockchain/sync/regular/RegularSync.scala`
-
-**Finding:** Line 7 imports `org.apache.pekko.actor.{Logging, LoggingAdapter}` and line 69 has:
-```scala
-val log: LoggingAdapter = Logging(ctx.system.classicSystem, classOf[RegularSyncImpl])
-```
-
-**Fix:** Remove the `LoggingAdapter` import and declaration. Add `with LazyLogging` to `RegularSyncImpl` (or the enclosing class). Replace all `log.xxx(...)` calls with SLF4J `logger.xxx(...)` per `logging-standards.md`. Grep for `log\.` in the file to catch all usages.
-
-**Verification:** `sbt compile-all`. `grep -n "LoggingAdapter\|classicSystem" src/main/scala/com/chipprbots/ethereum/blockchain/sync/regular/RegularSync.scala` → 0 results.
-
-**MANDATORY final step:**
-1. `sbt scalafmtAll`
-2. `git add blockchain/sync/regular/RegularSync.scala`
-3. `git commit -m "chore(d1): RegularSync — replace LoggingAdapter with LazyLogging (INFO-13)"`
-4. `SHA=$(git rev-parse --short HEAD)`
-5. Remove `INFO-13` row from DEFERRED table; add `✅ DONE $SHA`
-6. `git add .claude/` → `git commit -m "docs(d1): INFO-13 clearout — $SHA"`
-
-*(W7 ✅ DONE. INFO-14/BlockImporter ✅ DONE. Only INFO-13 remains from the original D1 set.)*
+*(W7 ✅ DONE. INFO-14/BlockImporter ✅ DONE. INFO-13 ✅ DONE `913c22363`.)*
 
 ---
 
