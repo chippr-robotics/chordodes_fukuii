@@ -345,8 +345,15 @@ trait AuthHandshakerBuilder {
 trait PeerEventBusBuilder {
   self: ActorSystemBuilder =>
 
-  lazy val peerEventBus: TypedActorRef[PeerEventBusActor.Command] =
-    classicSystem.spawn(PeerEventBusActor.behavior(), "peer-event-bus")
+  lazy val peerEventBus: TypedActorRef[PeerEventBusActor.Command] = {
+    val ref = classicSystem.spawn(PeerEventBusActor.behavior(), "peer-event-bus")
+    // §7c-D1: STOP-AND-ALERT — restart would silently drop all subscribers.
+    classicSystem.spawn(
+      com.chipprbots.ethereum.network.CriticalActorAlerter(ref, "peer-event-bus"),
+      "peer-event-bus-alerter"
+    )
+    ref
+  }
 }
 
 trait PeerStatisticsBuilder {
@@ -374,26 +381,34 @@ trait PeerManagerActorBuilder {
 
   lazy val peerConfiguration: PeerConfiguration = instanceConfig.Network.peer
 
-  lazy val peerManager: TypedActorRef[PeerManagerActor.Command] = classicSystem.spawn(
-    PeerManagerActor.behavior(
-      peerEventBus,
-      peerDiscoveryManagerTyped,
-      instanceConfig.Network.peer,
-      knownNodesManager,
-      peerStatistics,
-      PeerManagerActor.peerFactory(
-        instanceConfig.Network.peer,
+  lazy val peerManager: TypedActorRef[PeerManagerActor.Command] = {
+    val ref = classicSystem.spawn(
+      PeerManagerActor.behavior(
         peerEventBus,
+        peerDiscoveryManagerTyped,
+        instanceConfig.Network.peer,
         knownNodesManager,
-        handshaker,
-        authHandshaker,
-        instanceConfig.supportedCapabilities
+        peerStatistics,
+        PeerManagerActor.peerFactory(
+          instanceConfig.Network.peer,
+          peerEventBus,
+          knownNodesManager,
+          handshaker,
+          authHandshaker,
+          instanceConfig.supportedCapabilities
+        ),
+        discoveryConfig,
+        blacklist
       ),
-      discoveryConfig,
-      blacklist
-    ),
-    "peer-manager"
-  )
+      "peer-manager"
+    )
+    // §7c-D2: STOP-AND-ALERT — restart rebuilds the peer table from scratch and severs connections.
+    classicSystem.spawn(
+      com.chipprbots.ethereum.network.CriticalActorAlerter(ref, "peer-manager"),
+      "peer-manager-alerter"
+    )
+    ref
+  }
 
 }
 
@@ -401,20 +416,28 @@ trait NetworkPeerManagerActorBuilder {
   self: ActorSystemBuilder & PeerManagerActorBuilder & PeerEventBusBuilder & ForkResolverBuilder & StorageBuilder &
     BlockchainBuilder & BlockchainConfigBuilder =>
 
-  lazy val networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command] = classicSystem
-    .spawn(
-      NetworkPeerManagerActor.behavior(
-        peerManager,
-        peerEventBus,
-        storagesInstance.storages.appStateStorage,
-        forkResolverOpt,
-        evmCodeStorageOpt = Some(storagesInstance.storages.evmCodeStorage),
-        mptStorageOpt = Some(storagesInstance.storages.stateStorage.getReadOnlyStorage),
-        blockchainReader = Some(blockchainReader),
-        isPoWChain = blockchainConfig.terminalTotalDifficulty.isEmpty
-      ),
-      "network-peer-manager"
+  lazy val networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command] = {
+    val ref = classicSystem
+      .spawn(
+        NetworkPeerManagerActor.behavior(
+          peerManager,
+          peerEventBus,
+          storagesInstance.storages.appStateStorage,
+          forkResolverOpt,
+          evmCodeStorageOpt = Some(storagesInstance.storages.evmCodeStorage),
+          mptStorageOpt = Some(storagesInstance.storages.stateStorage.getReadOnlyStorage),
+          blockchainReader = Some(blockchainReader),
+          isPoWChain = blockchainConfig.terminalTotalDifficulty.isEmpty
+        ),
+        "network-peer-manager"
+      )
+    // §7c-D3: STOP-AND-ALERT — network state cannot be safely reconstructed after a restart.
+    classicSystem.spawn(
+      com.chipprbots.ethereum.network.CriticalActorAlerter(ref, "network-peer-manager"),
+      "network-peer-manager-alerter"
     )
+    ref
+  }
 
 }
 
@@ -928,11 +951,18 @@ trait JSONRpcIpcServerBuilder {
 trait SubscriptionManagerBuilder {
   self: ActorSystemBuilder & BlockchainBuilder & EventTopicsBuilder =>
 
-  lazy val subscriptionManager: org.apache.pekko.actor.typed.ActorRef[SubscriptionManager.Command] =
-    classicSystem.spawn(
+  lazy val subscriptionManager: org.apache.pekko.actor.typed.ActorRef[SubscriptionManager.Command] = {
+    val ref = classicSystem.spawn(
       SubscriptionManager(blockchainReader, pendingTxTopic, blockTopic),
       "subscription-manager"
     )
+    // §7c-D6: STOP-AND-ALERT — restart drops all active eth_subscribe subscriptions.
+    classicSystem.spawn(
+      com.chipprbots.ethereum.network.CriticalActorAlerter(ref, "subscription-manager"),
+      "subscription-manager-alerter"
+    )
+    ref
+  }
 }
 
 trait JSONRpcWsServerBuilder {
@@ -989,34 +1019,42 @@ trait SyncControllerBuilder extends SyncControllerRefBuilder {
   // SyncController is Pekko Typed (Group ROOT, narrowed) — a `Behavior[Command]`. Spawned via
   // classicSystem.spawn so it lives in the Classic system's guardian tree while exposing a fully-Typed
   // ActorRef[Command]. All callers now hold a TypedActorRef[SyncController.Command] (OQ-5 kill, 8k-G).
-  lazy val syncController: org.apache.pekko.actor.typed.ActorRef[SyncController.Command] = classicSystem
-    .spawn(
-      SyncController(
-        blockchain,
-        blockchainReader,
-        blockchainWriter,
-        storagesInstance.storages.appStateStorage,
-        storagesInstance.storages.blockNumberMappingStorage,
-        storagesInstance.storages.evmCodeStorage,
-        storagesInstance.storages.stateStorage,
-        storagesInstance.storages.nodeStorage,
-        storagesInstance.storages.flatSlotStorage,
-        storagesInstance.storages.fastSyncStateStorage,
-        consensusAdapter,
-        mining.validators,
-        peerEventBus,
-        pendingTransactionsManagerTyped,
-        blockTopic,
-        ommersPool,
-        networkPeerManager,
-        blacklist,
-        syncConfig,
-        this,
-        messConfigOpt,
-        forkChoiceManagerForSync
-      ),
-      "sync-controller"
+  lazy val syncController: org.apache.pekko.actor.typed.ActorRef[SyncController.Command] = {
+    val ref = classicSystem
+      .spawn(
+        SyncController(
+          blockchain,
+          blockchainReader,
+          blockchainWriter,
+          storagesInstance.storages.appStateStorage,
+          storagesInstance.storages.blockNumberMappingStorage,
+          storagesInstance.storages.evmCodeStorage,
+          storagesInstance.storages.stateStorage,
+          storagesInstance.storages.nodeStorage,
+          storagesInstance.storages.flatSlotStorage,
+          storagesInstance.storages.fastSyncStateStorage,
+          consensusAdapter,
+          mining.validators,
+          peerEventBus,
+          pendingTransactionsManagerTyped,
+          blockTopic,
+          ommersPool,
+          networkPeerManager,
+          blacklist,
+          syncConfig,
+          this,
+          messConfigOpt,
+          forkChoiceManagerForSync
+        ),
+        "sync-controller"
+      )
+    // §7c-D5: STOP-AND-ALERT — restart loses chain-sync progress and may trigger a re-org.
+    classicSystem.spawn(
+      com.chipprbots.ethereum.network.CriticalActorAlerter(ref, "sync-controller"),
+      "sync-controller-alerter"
     )
+    ref
+  }
 
 }
 
