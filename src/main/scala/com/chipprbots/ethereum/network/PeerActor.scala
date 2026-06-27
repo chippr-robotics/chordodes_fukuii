@@ -178,6 +178,8 @@ object PeerActor {
       rlpxConfiguration: RLPxConfiguration,
       capabilities: List[Capability]
   ): ActorContext[Command] => ActorRef[RLPxConnectionHandler.Command] = { ctx =>
+    // RLPxConnectionHandler: default stop intentional — connection-scoped leaf actor,
+    // restart would re-handshake from scratch; the PeerActor wrapper handles reconnect.
     ctx.spawn(
       RLPxConnectionHandler.apply(
         capabilities,

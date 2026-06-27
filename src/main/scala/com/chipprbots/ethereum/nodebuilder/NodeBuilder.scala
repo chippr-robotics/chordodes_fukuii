@@ -5,6 +5,8 @@ import java.util.concurrent.atomic.AtomicReference
 
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.ActorSystem
+import org.apache.pekko.actor.typed.SupervisorStrategy
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
 
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.util.ByteString
@@ -197,7 +199,9 @@ trait KnownNodesManagerBuilder {
 
   lazy val knownNodesManager: org.apache.pekko.actor.typed.ActorRef[KnownNodesManager.Command] =
     classicSystem.spawn(
-      KnownNodesManager(knownNodesManagerConfig, storagesInstance.storages.knownNodesStorage),
+      Behaviors
+        .supervise(KnownNodesManager(knownNodesManagerConfig, storagesInstance.storages.knownNodesStorage))
+        .onFailure[Throwable](SupervisorStrategy.restart),
       "known-nodes-manager"
     )
 
@@ -215,25 +219,29 @@ trait PeerDiscoveryManagerBuilder {
   // Typed ref — for in-scope callers and direct Typed wiring.
   lazy val peerDiscoveryManagerTyped: org.apache.pekko.actor.typed.ActorRef[PeerDiscoveryManager.Command] =
     classicSystem.spawn(
-      PeerDiscoveryManager(
-        localNodeId = ByteString(nodeStatusHolder.get.nodeId),
-        discoveryConfig,
-        storagesInstance.storages.knownNodesStorage,
-        discoveryServiceResource(
-          discoveryConfig,
-          tcpPort = instanceConfig.Network.Server.port,
-          nodeStatusHolder,
-          storagesInstance.storages.knownNodesStorage,
-          forkIdTag = Some(
-            new com.chipprbots.ethereum.network.discovery.ForkIdTag(
-              genesisHash = () => blockchainReader.genesisHeader.hash.value,
-              blockchainConfig = blockchainConfig,
-              currentBestBlock = () => blockchainReader.getBestBlockNumber
-            )
+      Behaviors
+        .supervise(
+          PeerDiscoveryManager(
+            localNodeId = ByteString(nodeStatusHolder.get.nodeId),
+            discoveryConfig,
+            storagesInstance.storages.knownNodesStorage,
+            discoveryServiceResource(
+              discoveryConfig,
+              tcpPort = instanceConfig.Network.Server.port,
+              nodeStatusHolder,
+              storagesInstance.storages.knownNodesStorage,
+              forkIdTag = Some(
+                new com.chipprbots.ethereum.network.discovery.ForkIdTag(
+                  genesisHash = () => blockchainReader.genesisHeader.hash.value,
+                  blockchainConfig = blockchainConfig,
+                  currentBestBlock = () => blockchainReader.getBestBlockNumber
+                )
+              )
+            ),
+            randomNodeBufferSize = instanceConfig.Network.peer.maxOutgoingPeers
           )
-        ),
-        randomNodeBufferSize = instanceConfig.Network.peer.maxOutgoingPeers
-      ),
+        )
+        .onFailure[Throwable](SupervisorStrategy.restart),
       "peer-discovery-manager-typed"
     )
 
@@ -362,13 +370,17 @@ trait PeerStatisticsBuilder {
   given clock: Clock = Clock.systemUTC()
 
   lazy val peerStatistics: org.apache.pekko.actor.typed.ActorRef[PeerStatisticsActor.Command] = classicSystem.spawn(
-    PeerStatisticsActor(
-      peerEventBus,
-      // `slotCount * slotDuration` should be set so that it's at least as long
-      // as any client of the `PeerStatisticsActor` requires.
-      slotDuration = instanceConfig.Network.peer.statSlotDuration,
-      slotCount = instanceConfig.Network.peer.statSlotCount
-    ),
+    Behaviors
+      .supervise(
+        PeerStatisticsActor(
+          peerEventBus,
+          // `slotCount * slotDuration` should be set so that it's at least as long
+          // as any client of the `PeerStatisticsActor` requires.
+          slotDuration = instanceConfig.Network.peer.statSlotDuration,
+          slotCount = instanceConfig.Network.peer.statSlotCount
+        )
+      )
+      .onFailure[Throwable](SupervisorStrategy.restart),
     "peer-statistics"
   )
 }
@@ -467,7 +479,12 @@ trait ServerActorBuilder {
   lazy val networkConfig = instanceConfig.Network
 
   lazy val server: org.apache.pekko.actor.typed.ActorRef[ServerActor.Command] =
-    classicSystem.spawn(ServerActor(nodeStatusHolder, peerManager, blacklist), "server")
+    classicSystem.spawn(
+      Behaviors
+        .supervise(ServerActor(nodeStatusHolder, peerManager, blacklist))
+        .onFailure[Throwable](SupervisorStrategy.restartWithBackoff(2.seconds, 60.seconds, 0.1)),
+      "server"
+    )
 
 }
 
@@ -498,15 +515,21 @@ object PendingTransactionsManagerBuilder {
 
     lazy val pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[PendingTransactionsManager.Command] =
       classicSystem.spawn(
-        PendingTransactionsManager(
-          txPoolConfig,
-          peerManager,
-          networkPeerManager,
-          peerEventBus,
-          pendingTxTopic,
-          blockchainReader,
-          storagesInstance.storages.stateStorage
-        ),
+        Behaviors
+          .supervise(
+            PendingTransactionsManager(
+              txPoolConfig,
+              peerManager,
+              networkPeerManager,
+              peerEventBus,
+              pendingTxTopic,
+              blockchainReader,
+              storagesInstance.storages.stateStorage
+            )
+          )
+          .onFailure[Throwable](
+            SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2).withMaxRestarts(3)
+          ),
         "pending-transactions-manager"
       )
   }
@@ -534,14 +557,20 @@ trait FilterManagerBuilder {
 
   lazy val filterManager: org.apache.pekko.actor.typed.ActorRef[FilterManager.Command] =
     classicSystem.spawn(
-      FilterManager(
-        blockchainReader,
-        mining.blockGenerator,
-        keyStore,
-        pendingTransactionsManager,
-        filterConfig,
-        txPoolConfig
-      ),
+      Behaviors
+        .supervise(
+          FilterManager(
+            blockchainReader,
+            mining.blockGenerator,
+            keyStore,
+            pendingTransactionsManager,
+            filterConfig,
+            txPoolConfig
+          )
+        )
+        .onFailure[Throwable](
+          SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2).withMaxRestarts(3)
+        ),
       "filter-manager"
     )
 }
@@ -981,7 +1010,12 @@ trait OmmersPoolBuilder {
 
   lazy val ommersPoolSize: Int = 30
   lazy val ommersPool: org.apache.pekko.actor.typed.ActorRef[OmmersPool.Command] =
-    classicSystem.spawn(OmmersPool(blockchainReader, ommersPoolSize), "ommers-pool")
+    classicSystem.spawn(
+      Behaviors
+        .supervise(OmmersPool(blockchainReader, ommersPoolSize))
+        .onFailure[Throwable](SupervisorStrategy.restart),
+      "ommers-pool"
+    )
 }
 
 trait VmBuilder {
