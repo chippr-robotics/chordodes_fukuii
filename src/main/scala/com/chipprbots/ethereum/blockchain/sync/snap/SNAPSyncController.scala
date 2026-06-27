@@ -299,7 +299,7 @@ private class SNAPSyncControllerImpl(
 
   // Proactive pivot rolling: keep pivot within core-geth's 128-block snapshot window.
   // ETC network is predominantly core-geth peers; once the pivot ages beyond 128 blocks,
-  // all external peers return accounts=[], proof=[] and only local Besu can serve.
+  // all external peers respond with accounts=[], proof=[] and only local Besu can serve.
   // Rolling proactively at 100 blocks preserves all downloaded state (unlike go-ethereum).
   private var lastProactivePivotBlock: Option[BigInt] = None
   private val SnapServeWindowBlocks: BigInt = BigInt(100)
@@ -617,7 +617,7 @@ private class SNAPSyncControllerImpl(
 
   // ── Behaviors ────────────────────────────────────────────────────────────────────────────────
   // Each behavior is `Behaviors.receiveMessage` over the sealed Command, with a PostStop signal for
-  // cleanup. `context.become(X)` becomes `return X()`; sender() becomes replyTo; the two peer-list
+  // cleanup. `context.become(X)` becomes `break(X())`; sender() becomes replyTo; the two peer-list
   // partials are inlined as explicit arms (C1); aroundReceive's stagnation dispatch is inlined into
   // `syncing` (C2).
 
@@ -1317,7 +1317,7 @@ private class SNAPSyncControllerImpl(
           // Global budget remains 5 per peer: storage=3, bytecode=2.
           storageRangeCoordinator.foreach(_ ! actors.StorageRangeCoordinator.UpdateMaxInFlightPerPeer(3))
           // ByteCode budget 8 per peer: with 2 local ETC-capable peers (Besu + core-geth) that gives
-          // 16 concurrent requests vs 4 at budget=2. External ETH-mainnet peers return empty quickly
+          // 16 concurrent requests vs 4 at budget=2. External ETH-mainnet peers respond with empty quickly
           // and cool down; local peers handle the full load at <1ms RTT.
           bytecodeCoordinator.foreach(_ ! actors.ByteCodeCoordinator.UpdateMaxInFlightPerPeer(8))
           // Clear accumulated peer cooldowns and seed initial dispatch — without this, peers on
@@ -2639,7 +2639,7 @@ private class SNAPSyncControllerImpl(
 
       // If bootstrap checkpoints are configured, we should not start SNAP from a peer that is behind
       // the highest trusted checkpoint. SNAP servers only guarantee serving very recent state; picking
-      // an ancient pivot (e.g. millions of blocks behind the network head) will cause peers to return
+      // an ancient pivot (e.g. millions of blocks behind the network head) will cause peers to emit
       // empty/no-proof AccountRange responses.
       val bootstrapPivotBlock = appStateStorage.getBootstrapPivotBlock()
 
@@ -2950,8 +2950,8 @@ private class SNAPSyncControllerImpl(
     math.min(delaySeconds, BootstrapRetryMaxDelay.toSeconds).seconds
   }
 
-  /** Check if bootstrap retry has exceeded the maximum count. If so, fall back to fast sync and return `Some(<completed
-    * behavior>)` so the caller can `return` it; otherwise `None` (caller continues / stays).
+  /** Check if bootstrap retry has exceeded the maximum count. If so, fall back to fast sync and yield `Some(<completed
+    * behavior>)` for the caller to `break` on; otherwise `None` (caller continues / stays).
     */
   private def checkBootstrapRetryTimeout(context: String): Option[Behavior[Command]] =
     if bootstrapRetryCount >= MaxBootstrapRetries then {
@@ -2976,8 +2976,7 @@ private class SNAPSyncControllerImpl(
     *
     * @param reason
     *   Description of the failure
-    * @return
-    *   true if we should fallback to fast sync
+    * Yields `true` if the retry limit is exceeded and the caller should fall back to fast sync.
     */
   private def recordCriticalFailure(reason: String): Boolean = {
     SNAPSyncMetrics.incrementSyncError()
@@ -3549,7 +3548,7 @@ private class SNAPSyncControllerImpl(
               // Exclude genesis peers (maxBlockNumber=0): nodes that announced block 0 in STATUS
               // and have never advanced. On ETC this is typically ETH mainnet geth nodes connecting
               // due to the shared legacy networkId=1 (pre-DAO split). They cannot serve ETC state
-              // and return empty StorageRanges on every request, burning 5 strikes per peer and
+              // and emit empty StorageRanges on every request, burning 5 strikes per peer and
               // collapsing the eligible pool within one pivot cycle.
               // NOTE: this filter is safe unlike the former `>= pivot` guard removed in PR #1238:
               // a peer at block 0 cannot serve *any* historical state; a stale peer at block N <
@@ -4034,7 +4033,7 @@ private class SNAPSyncControllerImpl(
           // Back the roll target off the live tip by at least SnapServeWindowMargin so the
           // new root is one peers have actually indexed. pivotBlockOffset stays a floor (a
           // larger configured offset still wins). Rolling to networkBest exactly (offset=0)
-          // froze the ETC pivot on 2026-06-01 — peers return "not indexed" for the tip root.
+          // froze the ETC pivot on 2026-06-01 — peers emit "not indexed" for the tip root.
           // NOTE: the post-merge (CL-anchored) branch above has the same latent issue at
           // offset=0; deferred — it fires rarely and has its own freshness-floor handling.
           .map(networkBest => networkBest - BigInt(snapSyncConfig.pivotBlockOffset).max(SnapServeWindowMargin))
@@ -4592,7 +4591,7 @@ private class SNAPSyncControllerImpl(
                   s"Waiting for peers to reconnect (downloaded=${progress.accountsDownloaded})."
               )
               // Don't increment stall counter — this is a peer availability issue, not a sync failure.
-              // Reset the stall timer so we don't immediately escalate when peers return.
+              // Reset the stall timer so we don't immediately escalate when peers reconnect.
               lastAccountProgressMs = System.currentTimeMillis()
             } else {
               consecutiveAccountStallRefreshes += 1
@@ -4862,8 +4861,7 @@ private class SNAPSyncControllerImpl(
   // --- SNAP progress persistence helpers ---
 
   /** Deserialize range progress from legacy AppStateStorage plain-text format (migration fallback).
-    * @return
-    *   (pivotBlock, rangeProgress) or None if parsing fails
+    * Yields `(pivotBlock, rangeProgress)` or `None` if parsing fails.
     */
   private def deserializeSnapProgress(data: String): Option[(BigInt, Map[ByteString, ByteString])] =
     try {
@@ -5149,9 +5147,8 @@ object SNAPSyncController {
     *   the consensus-layer head block number, when available
     * @param maxStaleness
     *   configured `maxPivotStalenessBlocks` (default 4096)
-    * @return
-    *   Right(()) if the candidate is fresh enough, Left(floor) with the rejected freshness floor for diagnostic logging
-    *   on the call site
+    * Yields `Right(())` if the candidate is fresh enough, or `Left(floor)` with the rejected freshness
+    * floor for diagnostic logging at the call site.
     */
   private[snap] def pivotPassesFreshnessFloor(
       networkBest: BigInt,
