@@ -1711,6 +1711,155 @@ class TrieNodeHealingCoordinatorSpec
       isInStorage(storage, fxA.rootHash) shouldBe true
     }
 
+  // ─── spec 009 (Moving-Root Delta Heal) US1 — end-to-end wiring + supersession (T016) ─────────────────────────────
+  //
+  // T013 ties the flag-ON path together: heal start SEEDS the absent served root → delta discovery → a pruned
+  // descent → the coordinator declares StateHealingComplete. StateHealingComplete is the unit-level proxy for the
+  // controller's finalize-on-canonical-root: the controller only calls finalizeSnapSync (anchor guard unchanged)
+  // after the coordinator signals completion against the current heal root, which is always a canonical header
+  // stateRoot via completePivotRefreshWithStateRoot. The full fresh-SNAP integration + finalize-on-canonical-root
+  // is exercised by the fresh-Mordor E2E (T021); here we cover the wiring seams (seed→discover→descend→complete)
+  // and the flag-OFF/flag-ON A/B at the coordinator boundary.
+
+  "Moving-root delta heal (spec 009 US1, T016a end-to-end wiring)" should
+    "seed the absent served root, drive the delta + pruned descent, and declare completion (flag ON)" taggedAs UnitTest in {
+      // The full flag-ON seam: a fresh-heal-style absent root is SEEDED (T006), fetched against the single served
+      // root (T005), its delta discovered (T007), and once the frontier drains a pruned descent gates completion
+      // (T011) → StateHealingComplete. This is the end-to-end the controller hangs finalizeSnapSync off of.
+      val fx = MovingRootDeltaHealFixtures.deltaTrie()
+      val networkPeerManager = TestProbe()
+      val snapSyncController = TestProbe()
+      val coordinator = system.actorOf(
+        TrieNodeHealingCoordinator.props(
+          stateRoot = fx.rootHash,
+          networkPeerManager = networkPeerManager.ref,
+          requestTracker = new SNAPRequestTracker()(system.scheduler),
+          mptStorage = fx.storage,
+          batchSize = 16,
+          snapSyncController = snapSyncController.ref,
+          healingWriterEcOverride = Some(system.dispatcher),
+          movingRootDeltaHeal = true
+        )
+      )
+
+      coordinator ! Messages.StartTrieNodeHealing(fx.rootHash)
+      val peer = PeerTestHelpers.createTestPeer("md-us1-e2e-peer", TestProbe().ref)
+      coordinator.tell(Messages.HealingPeerAvailable(peer), TestProbe().ref)
+
+      // Drain the whole delta: serve every requested known-delta node (root, then the discovered child). The same
+      // single served root is used for every fetch (the wiring collapses fetch == heal root).
+      val deltaByPath = fx.deltaNodes.map(n => n.pathset -> n).toMap
+      var draining = true
+      var rounds = 0
+      while (draining && rounds < 16) {
+        rounds += 1
+        networkPeerManager.receiveOne(2.seconds) match {
+          case send: NetworkPeerManagerActor.SendMessage =>
+            val req = getTrieNodesOf(send)
+            req.rootHash shouldBe fx.rootHash // seed→fetch wiring: one served root for the whole heal
+            val nodesToServe = req.paths.flatMap(deltaByPath.get)
+            coordinator ! Messages.TrieNodesResponseMsg(
+              SNAP.TrieNodes(requestId = req.requestId, nodes = nodesToServe.map(_.encoded))
+            )
+          case null => draining = false
+          case _    => ()
+        }
+      }
+
+      // The frontier drained AND a pruned descent against the heal root found zero absent ⇒ completion is declared.
+      // StateHealingComplete is exactly the signal the controller waits for before finalizeSnapSync (T013 wiring).
+      snapSyncController.fishForMessage(10.seconds) {
+        case SNAPSyncController.StateHealingComplete   => true
+        case _: SNAPSyncController.ProgressNodesHealed => false
+        case _                                         => false
+      }
+      // Both delta nodes are durably present (the heal really closed the gap — not a vacuous completion).
+      awaitAssert(isInStorage(fx.storage, fx.rootHash) shouldBe true, max = 5.seconds, interval = 100.millis)
+      awaitAssert(isInStorage(fx.storage, fx.childNode.hash) shouldBe true, max = 5.seconds, interval = 100.millis)
+    }
+
+  "Moving-root delta heal (spec 009 US1, T016b flag-OFF byte-unchanged)" should
+    "take the spec-004 HealingRootUnservable handoff for an absent root when the flag is OFF" taggedAs UnitTest in {
+      // T016b: flag OFF ⇒ the legacy spec-004 decoupled path is byte-unchanged. An absent heal root is NOT seeded;
+      // the coordinator signals HealingRootUnservable (the spec-004 lazy-heal handoff) exactly as before spec 009.
+      // This is the direct A/B contrast to the flag-ON C2 test (which SEEDS the same absent root instead). The
+      // existing 38 spec-004 tests in this suite all run with the default movingRootDeltaHeal=false and remain green
+      // — this test pins the single behavioral fork point.
+      val fx = MovingRootDeltaHealFixtures.deltaTrie() // same absent-root fixture as the flag-ON C2 test
+      val networkPeerManager = TestProbe()
+      val snapSyncController = TestProbe()
+      val coordinator = system.actorOf(
+        TrieNodeHealingCoordinator.props(
+          stateRoot = fx.rootHash,
+          networkPeerManager = networkPeerManager.ref,
+          requestTracker = new SNAPRequestTracker()(system.scheduler),
+          mptStorage = fx.storage,
+          batchSize = 16,
+          snapSyncController = snapSyncController.ref,
+          healingWriterEcOverride = Some(system.dispatcher),
+          movingRootDeltaHeal = false // flag OFF — spec-004 path
+        )
+      )
+
+      coordinator ! Messages.StartTrieNodeHealing(fx.rootHash)
+
+      // Flag OFF: the absent root is NOT seeded — the spec-004 handoff fires (byte-identical to pre-spec-009).
+      snapSyncController.expectMsg(3.seconds, SNAPSyncController.HealingRootUnservable(fx.rootHash))
+      // And no frontier task was seeded (the seed-from-absent-root behavior is gated entirely behind the flag).
+      healPendingTasks(coordinator) shouldBe 0
+    }
+
+  "Moving-root delta heal (spec 009 US1, T016c A/B parity)" should
+    "reach completion against the SAME root under flag OFF and flag ON for an already-complete trie (no divergent root)" taggedAs UnitTest in {
+      // T016c (SC-005 unit proxy): for a controlled fixture whose trie is already fully present locally (root present,
+      // zero missing nodes), BOTH the flag-OFF (spec-004) and the flag-ON (moving-root) paths run the SAME pruned
+      // descent from the SAME present root, find zero absent, and declare StateHealingComplete against that one root.
+      // The completion outcome (and the root it completes against) is identical — no divergent finalized root. The
+      // present-and-complete trie is the controlled A/B fixture: it removes the absent-root fork (where the two paths
+      // legitimately differ — seed vs handoff) and isolates the shared completion gate, which MUST agree.
+      def runAlreadyCompleteHeal(flag: Boolean): Unit = {
+        // A minimal already-complete trie: a single account leaf IS the root (no children), present on disk.
+        val storage = new TestMptStorage()
+        val leaf =
+          com.chipprbots.ethereum.mpt.LeafNode(
+            ByteString(Array[Byte](0x0a, 0x0b, 0x0c)),
+            ByteString(com.chipprbots.ethereum.domain.Account.empty().toBytes)
+          )
+        storage.putNode(leaf)
+        val rootHash = ByteString(leaf.hash)
+
+        val networkPeerManager = TestProbe()
+        val snapSyncController = TestProbe()
+        val coordinator = system.actorOf(
+          TrieNodeHealingCoordinator.props(
+            stateRoot = rootHash,
+            networkPeerManager = networkPeerManager.ref,
+            requestTracker = new SNAPRequestTracker()(system.scheduler),
+            mptStorage = storage,
+            batchSize = 16,
+            snapSyncController = snapSyncController.ref,
+            healingWriterEcOverride = Some(system.dispatcher),
+            movingRootDeltaHeal = flag
+          )
+        )
+
+        coordinator ! Messages.StartTrieNodeHealing(rootHash)
+        coordinator ! Messages.HealingCheckCompletion
+
+        // Both paths: the present root + empty delta ⇒ a clean pruned descent ⇒ completion against THIS root.
+        snapSyncController.fishForMessage(10.seconds) {
+          case SNAPSyncController.StateHealingComplete   => true
+          case _: SNAPSyncController.ProgressNodesHealed => false
+          case _                                         => false
+        }
+        // The root the heal completed against is unchanged — no re-peg, no divergent finalized root.
+        isInStorage(storage, rootHash) shouldBe true
+      }
+
+      runAlreadyCompleteHeal(flag = false) // spec-004 path completes against the present root
+      runAlreadyCompleteHeal(flag = true) // moving-root path completes against the SAME present root — parity
+    }
+
   /** Build a `deltaTrie`-shaped fixture whose hashes differ from the default (perturbed leaf value via `seed`), so a
     * re-peg to it is a genuine differing-root move (not a same-root no-op).
     */

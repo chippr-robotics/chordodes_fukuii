@@ -292,6 +292,16 @@ class SNAPSyncController(
   // The serve root is considered stale when it is more than this many blocks behind the network head. Matches
   // SyncController.RecentRootMarginBlocks (64) so the refreshed root lands comfortably inside peers' serve window.
   private val HealingServeRootMarginBlocks: BigInt = BigInt(64)
+  // spec 009 T014/C6 (Moving-Root Delta Heal — BOUNDED re-peg last-resort). Under `movingRootDeltaHeal` heal start
+  // SEEDS the served root instead of emitting `HealingRootUnservable`, so the controller's HealingRootUnservable
+  // handoff is no longer reached from the seed-site. It survives ONLY as a bounded LAST-RESORT: if every re-peg
+  // attempt during StateHealing finds NO suitable served root (`refreshPivotInPlace`'s newPivotOpt.isEmpty branch),
+  // this counter increments; once it reaches the budget the controller takes the SAME fail-safe lazy-heal handoff
+  // (completeSnapSync → on-demand GetTrieNodes during block execution, anchor guard still enforced) rather than
+  // looping the 30s RetryPivotRefresh forever. This is fail-SAFE (it never force-marks-done or weakens any gate),
+  // never fail-OPEN. Reset on any successful re-peg (completePivotRefreshWithStateRoot) and on entering healing.
+  private var healRepegNoRootAttempts: Int = 0
+  private val MaxHealRepegNoRootAttempts: Int = 10 // 10 × 30s ≈ 5 min of no servable root before lazy handoff
   // Suppress duplicate ConnectToPeer for snap-server-peers for 60s after a send attempt.
   // Prevents the race where the reconnect timer fires within the 5s peersScanInterval
   // window after STATUS_EXCHANGE completes (peer in ETH handshake but not yet in handshakedPeers).
@@ -1207,6 +1217,14 @@ class SNAPSyncController(
     // a root cannot be reconstructed from nothing and cannot be fetched against an advancing serve root). This fires at
     // the SEED, so it covers every entry into healing — crucially the BootstrapComplete RESTART handlers that call
     // startStateHealing() directly and bypass shouldSkipHealingAfterDownloads (the whole point of the seed-site guard).
+    //
+    // spec 009 T014/C6 (Moving-Root Delta Heal): under `movingRootDeltaHeal` the coordinator's absent-root branch now
+    // SEEDS the served root and fetches it (TrieNodeHealingCoordinator.scala, the moving-root branch) — it does NOT
+    // emit HealingRootUnservable. So under the flag THIS handler is reached only as a BOUNDED last-resort: when the
+    // controller's own re-peg budget (`MaxHealRepegNoRootAttempts` in refreshPivotInPlace) is exhausted with no
+    // servable root, that branch calls completeSnapSync() directly (the same handoff below). The handler remains for
+    // the flag-OFF path (where the coordinator still emits HealingRootUnservable) and as a defensive catch — either
+    // way it is fail-SAFE, never fail-open.
     //
     // Hand off to lazy on-demand healing exactly as shouldSkipHealingAfterDownloads's deferred path does: stop the
     // (idle) coordinator and call completeSnapSync(). The missing trie nodes are then fetched on-demand via GetTrieNodes
@@ -3457,6 +3475,7 @@ class SNAPSyncController(
     }
 
     trieWalkInProgress = false // Reset for fresh healing phase
+    healRepegNoRootAttempts = 0 // spec 009 T014/C6: fresh healing phase — reset the bounded re-peg last-resort budget
     log.info(s"Starting state healing with batch size ${snapSyncConfig.healingBatchSize}")
 
     stateRoot.foreach { root =>
@@ -3937,9 +3956,35 @@ class SNAPSyncController(
     }
 
     if (newPivotOpt.isEmpty) {
-      log.warning(
-        "Cannot refresh pivot: no suitable SNAP peers available. Scheduling retry in 30s."
-      )
+      // spec 009 T014/C6: bound the moving-root re-peg during healing. Under the flag a re-peg that finds NO
+      // suitable served root counts against a budget; once exhausted, take the SAME fail-safe lazy-heal handoff
+      // the (now-rare) HealingRootUnservable signal uses — completeSnapSync() → on-demand GetTrieNodes during
+      // block execution, with the snapStateRoot == pivotHeader.stateRoot anchor guard still enforced. This is the
+      // bounded LAST-RESORT (never fail-open): rather than looping the 30s RetryPivotRefresh indefinitely with no
+      // peer that can serve any recent root, we converge to a real Completed/regular-sync state. Outside healing
+      // (or flag OFF), keep the unbounded 30s-retry behavior byte-identical (SNAP peers are intermittent on ETC).
+      if (snapSyncConfig.movingRootDeltaHeal && currentPhase == StateHealing) {
+        healRepegNoRootAttempts += 1
+        if (healRepegNoRootAttempts >= MaxHealRepegNoRootAttempts) {
+          log.warning(
+            s"[HEAL-REPEG] No servable root for $healRepegNoRootAttempts consecutive re-peg attempts " +
+              s"(budget $MaxHealRepegNoRootAttempts exhausted, ~${MaxHealRepegNoRootAttempts * 30}s). Taking the " +
+              s"fail-safe lazy-heal handoff (completeSnapSync) — missing nodes fetched on-demand via GetTrieNodes " +
+              s"during block execution; the anchor guard still gates finalization. NOT a false completion."
+          )
+          pivotBootstrapRetryTask.foreach(_.cancel()); pivotBootstrapRetryTask = None
+          healRepegNoRootAttempts = 0
+          completeSnapSync()
+          return
+        }
+        log.warning(
+          s"Cannot re-peg heal root: no suitable SNAP peers available (attempt " +
+            s"$healRepegNoRootAttempts/$MaxHealRepegNoRootAttempts). Scheduling retry in 30s."
+        )
+      } else
+        log.warning(
+          "Cannot refresh pivot: no suitable SNAP peers available. Scheduling retry in 30s."
+        )
       // Don't restart or fallback — SNAP peers are intermittent on ETC mainnet.
       // The serve window is ~28 min; peers will reappear when new blocks are mined.
       // Restarting can't help with no peers, and it destroys all downloaded trie data.
@@ -4224,6 +4269,9 @@ class SNAPSyncController(
     bytecodeCoordinator.foreach(_ ! actors.Messages.ByteCodePivotRefreshed)
     // Healing coordinator: update root, clear pending tasks and stateless peers.
     // Then re-walk the trie with the new root to discover missing nodes.
+    // spec 009 T014/C6: a successful re-peg landed a fresh served root — reset the bounded no-root budget so
+    // the lazy-heal last-resort only fires after a fresh run of consecutive empty re-peg attempts.
+    healRepegNoRootAttempts = 0
     trieNodeHealingCoordinator.foreach { coordinator =>
       coordinator ! actors.Messages.HealingPivotRefreshed(newStateRoot)
     }
@@ -4918,8 +4966,19 @@ object SNAPSyncController {
     // complementary-guard note in checkAllDownloadsComplete — but it is left unchanged here because
     // it is a distinct anti-corruption guard outside this fix's scope.
     //
-    // The NON-deferred path always returns false (run healing): there the account trie IS built
-    // locally (SnapHashTrie emit/flush writes the root), so the heal has a servable root and works.
+    // The NON-deferred path always returns false (RUN healing). This is CORRECT, but the historical
+    // rationale here was FALSE and is corrected per spec 009 Phase-0 Decision 1: the non-deferred path
+    // does NOT "write the root". `SnapHashTrie` emit/flush writes per-task FRAGMENT roots that explicitly
+    // do NOT equal the pivot's claimed state root (AccountRangeCoordinator.handleStoreAccountChunk), and
+    // `finalizeTrie()` returns the claimed root verbatim without computing it — so after any mid-download
+    // pivot advance no single header root equals the on-disk mosaic, and the pivot/heal root node is
+    // typically ABSENT from the hash-keyed CF. The heal still works because it does NOT need a local
+    // coherent root: under `movingRootDeltaHeal` the coordinator SEEDS the (absent) served heal root as a
+    // frontier task and FETCHES it against a probe-confirmed served root (GetTrieNodes returns the root
+    // node, whose keccak matches the content gate), then `discoverMissingChildren` drives the top-down
+    // delta. The local mosaic is only a content-addressed cache that lets discovery prune present
+    // subtrees. Returning false (run healing) on the non-deferred path is therefore correct on BOTH the
+    // flag-ON (seed+fetch) and flag-OFF (spec-004) paths.
     snapSyncConfig.deferredMerkleization && !resumedStaleCursors
 
   /** Freshness gate for `refreshPivotInPlace`: reject candidate pivots whose source peer is more than `maxStaleness`

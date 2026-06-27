@@ -185,12 +185,18 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "run healing when deferred merkleization is OFF" taggedAs UnitTest in {
-    // The non-deferred path is unchanged: the account trie IS built locally (SnapHashTrie writes the
-    // root), so the walk root is servable and healing works. Healing must run.
-    val config = SNAPSyncConfig(deferredMerkleization = false)
+    // spec 009 T013: the non-deferred path ALWAYS runs healing (returns false). The historical rationale was
+    // FALSE — the non-deferred path writes per-task FRAGMENT roots, NOT the pivot/heal root, so that root node is
+    // typically ABSENT locally. Healing still works because under movingRootDeltaHeal the coordinator SEEDS the
+    // absent served root and FETCHES it (it does not need a local coherent root). The routing decision here is
+    // unchanged on BOTH flag states; assert both.
+    SNAPSyncController.shouldSkipHealingAfterDownloads(
+      snapSyncConfig = SNAPSyncConfig(deferredMerkleization = false, movingRootDeltaHeal = false),
+      resumedStaleCursors = false
+    ) shouldBe false
 
     SNAPSyncController.shouldSkipHealingAfterDownloads(
-      snapSyncConfig = config,
+      snapSyncConfig = SNAPSyncConfig(deferredMerkleization = false, movingRootDeltaHeal = true),
       resumedStaleCursors = false
     ) shouldBe false
   }

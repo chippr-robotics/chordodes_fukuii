@@ -1055,7 +1055,17 @@ class TrieNodeHealingCoordinator(
       // unchanged walk root (FR-001), so byte-for-byte completion parity with the coupled path is preserved by
       // construction. No-op when the feature is disabled (the fetch would ignore `serveRoot` anyway, but skipping
       // keeps the observability/counter state inert so the OFF path is byte-identical to today, SC-006).
-      if (!decoupledHealServeRoot) {
+      //
+      // spec 009 T014/C6 (Moving-Root Delta Heal): under `movingRootDeltaHeal` the serve root IS the walk root
+      // (the fetch collapses to `stateRoot`, T005), so the spec-004 serve-root machinery is SUPERSEDED — gate it
+      // OFF and treat any late HealingServeRootRefresh as a no-op (the controller already stops pushing it under
+      // the flag, but a late in-flight reply could still arrive). serveRoot/serveRootRefreshCount stay inert; the
+      // re-peg moves the single heal root via HealingPivotRefreshed instead. Flag OFF: byte-identical to spec-004.
+      if (movingRootDeltaHeal) {
+        log.debug(
+          "[HEAL-SERVE-ROOT] HealingServeRootRefresh ignored — superseded by moving-root delta heal (single root)"
+        )
+      } else if (!decoupledHealServeRoot) {
         log.debug("[HEAL-SERVE-ROOT] HealingServeRootRefresh ignored — decoupled-heal-serve-root disabled")
       } else if (newServeRoot.isEmpty || newServeRoot == serveRoot) {
         // T011 U2: never adopt an empty/zero serve root; a same-root refresh is a no-op (no counter churn).
