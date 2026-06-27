@@ -892,8 +892,8 @@ class EngineApiService(
                             )
                           )
                         }
-              // closes: parentOpt match
-            // closes: payloadAttributes match
+            // closes: parentOpt match
+          // closes: payloadAttributes match
           // end else (invalidAttrs check)
           // end else (safe/finalized check)
           // end case Right

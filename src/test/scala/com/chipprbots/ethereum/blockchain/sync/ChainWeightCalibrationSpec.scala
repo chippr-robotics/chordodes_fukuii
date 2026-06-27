@@ -524,19 +524,19 @@ class ChainWeightCalibrationSpec extends AnyFlatSpec with Matchers:
     /** Start sync and drain all startup messages sent to networkPeerManager.
       *
       * startRegularSync() triggers several startup messages to networkPeerManager:
-      *   1. RegisterChainWeightCalibrationTargetCmd — sent synchronously
-      *   2. GetHandshakedPeersCmd × N (T+0) — each PeerListSupportNg actor contributes one
-      *   3. CalibrateChainWeightNowCmd (T+30s) — startup timed calibration from SyncController
+      *   1. RegisterChainWeightCalibrationTargetCmd — sent synchronously 2. GetHandshakedPeersCmd × N (T+0) — each
+      *      PeerListSupportNg actor contributes one 3. CalibrateChainWeightNowCmd (T+30s) — startup timed calibration
+      *      from SyncController
       *
-      * fishForMessage skips GetHandshakedPeersCmd until CalibrateChainWeightNowCmd arrives.
-      * After this returns the probe is clean; subsequent expectMsg calls test only the scenario.
+      * fishForMessage skips GetHandshakedPeersCmd until CalibrateChainWeightNowCmd arrives. After this returns the
+      * probe is clean; subsequent expectMsg calls test only the scenario.
       */
     def drainRegistration(): Unit =
       startSync()
       networkPeerManager.expectMsgClass(classOf[RegisterChainWeightCalibrationTargetCmd])
       testScheduler.timePasses(31.seconds)
       networkPeerManager.fishForMessage(3.seconds) {
-        case CalibrateChainWeightNowCmd => true  // consumed; done
+        case CalibrateChainWeightNowCmd => true // consumed; done
         case _: GetHandshakedPeersCmd   => false // skip — periodic peer-list poll
       }
 

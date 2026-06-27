@@ -199,6 +199,7 @@ class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory:
         salt: ByteString = randomHash()
     ): Block =
       Block(
-        defaultHeader.copy(parentHash = BlockHash(parent), difficulty = Difficulty(difficulty), number = number, extraData = salt),
+        defaultHeader
+          .copy(parentHash = BlockHash(parent), difficulty = Difficulty(difficulty), number = number, extraData = salt),
         BlockBody.empty
       )

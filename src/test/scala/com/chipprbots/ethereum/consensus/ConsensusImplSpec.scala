@@ -64,7 +64,11 @@ class ConsensusImplSpec extends AnyFlatSpec with Matchers with ScalaFutures with
 
   it should "reorganise the chain if the new chain is better" taggedAs (UnitTest, ConsensusTest) in new ConsensusSetup:
     val newBetterBranch: List[Block] =
-      BlockHelpers.generateChain(3, initialChain(2), b => b.copy(header = b.header.copy(difficulty = Difficulty(10000000))))
+      BlockHelpers.generateChain(
+        3,
+        initialChain(2),
+        b => b.copy(header = b.header.copy(difficulty = Difficulty(10000000)))
+      )
 
     whenReady(consensus.evaluateBranch(NonEmptyList.fromListUnsafe(newBetterBranch)).unsafeToFuture()) {
       _ shouldBe a[SelectedNewBestBranch]
@@ -77,7 +81,11 @@ class ConsensusImplSpec extends AnyFlatSpec with Matchers with ScalaFutures with
     ConsensusTest
   ) in new ConsensusSetup:
     val newBetterBranch: List[Block] =
-      BlockHelpers.generateChain(3, initialChain(2), b => b.copy(header = b.header.copy(difficulty = Difficulty(10000000))))
+      BlockHelpers.generateChain(
+        3,
+        initialChain(2),
+        b => b.copy(header = b.header.copy(difficulty = Difficulty(10000000)))
+      )
 
     // first block succeeds, second fails
     setFailingBlock(newBetterBranch(1))
@@ -94,7 +102,11 @@ class ConsensusImplSpec extends AnyFlatSpec with Matchers with ScalaFutures with
     ConsensusTest
   ) in new ConsensusSetup:
     val newBetterBranch: List[Block] =
-      BlockHelpers.generateChain(3, initialChain(2), b => b.copy(header = b.header.copy(difficulty = Difficulty(10000000))))
+      BlockHelpers.generateChain(
+        3,
+        initialChain(2),
+        b => b.copy(header = b.header.copy(difficulty = Difficulty(10000000)))
+      )
 
     // first block fails immediately — no blocks execute
     setFailingBlock(newBetterBranch.head)
@@ -113,7 +125,11 @@ class ConsensusImplSpec extends AnyFlatSpec with Matchers with ScalaFutures with
     val oldTip = initialBestBlock // b4
     val oldBlock: Block = initialChain(3) // b3 (gets evicted)
     val newBetterBranch: List[Block] =
-      BlockHelpers.generateChain(3, initialChain(2), b => b.copy(header = b.header.copy(difficulty = Difficulty(10000000))))
+      BlockHelpers.generateChain(
+        3,
+        initialChain(2),
+        b => b.copy(header = b.header.copy(difficulty = Difficulty(10000000)))
+      )
 
     whenReady(consensus.evaluateBranch(NonEmptyList.fromListUnsafe(newBetterBranch)).unsafeToFuture()) {
       _ shouldBe a[SelectedNewBestBranch]
@@ -130,7 +146,11 @@ class ConsensusImplSpec extends AnyFlatSpec with Matchers with ScalaFutures with
   ) in new ConsensusSetup:
     // single block at same height as initialBestBlock (b4), building on b3
     val newTip: List[Block] =
-      BlockHelpers.generateChain(1, initialChain(3), b => b.copy(header = b.header.copy(difficulty = Difficulty(10000000))))
+      BlockHelpers.generateChain(
+        1,
+        initialChain(3),
+        b => b.copy(header = b.header.copy(difficulty = Difficulty(10000000)))
+      )
 
     whenReady(consensus.evaluateBranch(NonEmptyList.fromListUnsafe(newTip)).unsafeToFuture()) {
       _ shouldBe a[SelectedNewBestBranch]

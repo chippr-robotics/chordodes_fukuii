@@ -370,7 +370,12 @@ class EthMiningServiceSpec
       override lazy val miningConfig: MiningConfig = MiningConfigs.miningConfig.copy(staleThreshold = 0)
 
       // Save both blocks so best = block.number (1)
-      blockchainWriter.save(parentBlock, Nil, ChainWeight.totalDifficultyOnly(parentBlock.header.difficulty.value), true)
+      blockchainWriter.save(
+        parentBlock,
+        Nil,
+        ChainWeight.totalDifficultyOnly(parentBlock.header.difficulty.value),
+        true
+      )
       blockchainWriter.save(block, Nil, ChainWeight.totalDifficultyOnly(block.header.difficulty.value), true)
 
       // getPrepared returns parentBlock (number=0); best=1; diff=1 > threshold=0 → stale

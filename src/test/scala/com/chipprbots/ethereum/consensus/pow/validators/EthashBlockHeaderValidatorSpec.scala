@@ -97,7 +97,8 @@ class EthashBlockHeaderValidatorSpec
     forAll(bigIntGen) { difficulty =>
       val blockHeader = validBlockHeader.copy(difficulty = Difficulty(difficulty))
       val validateResult = PoWBlockHeaderValidator.validate(blockHeader, validParent.header)
-      if Difficulty(difficulty) != validBlockHeader.difficulty then assert(validateResult == Left(HeaderDifficultyError))
+      if Difficulty(difficulty) != validBlockHeader.difficulty then
+        assert(validateResult == Left(HeaderDifficultyError))
       else assert(validateResult == Right(BlockHeaderValid))
     }
   }
@@ -201,7 +202,11 @@ class EthashBlockHeaderValidatorSpec
     ConsensusTest
   ) in new EphemBlockchainTestSetup:
     val parentHeader: BlockHeader =
-      validParentBlockHeader.copy(number = 5000101, unixTimestamp = 1513175023, difficulty = Difficulty(BigInt("22627021745803")))
+      validParentBlockHeader.copy(
+        number = 5000101,
+        unixTimestamp = 1513175023,
+        difficulty = Difficulty(BigInt("22627021745803"))
+      )
     val parent: Block = Block(parentHeader, parentBody)
 
     val blockNumber: BigInt = parentHeader.number + 1
@@ -217,7 +222,11 @@ class EthashBlockHeaderValidatorSpec
     ConsensusTest
   ) in new EphemBlockchainTestSetup:
     val parentHeader: BlockHeader =
-      validParentBlockHeader.copy(number = 5899999, unixTimestamp = 1525176000, difficulty = Difficulty(BigInt("22627021745803")))
+      validParentBlockHeader.copy(
+        number = 5899999,
+        unixTimestamp = 1525176000,
+        difficulty = Difficulty(BigInt("22627021745803"))
+      )
     val parent: Block = Block(parentHeader, parentBody)
 
     val blockNumber: BigInt = parentHeader.number + 1

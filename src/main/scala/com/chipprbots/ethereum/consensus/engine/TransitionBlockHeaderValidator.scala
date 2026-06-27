@@ -32,7 +32,8 @@ object TransitionBlockHeaderValidator extends BlockHeaderValidator:
       blockHeader: BlockHeader,
       getBlockHeaderByHash: GetBlockHeaderByHash
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
-    if blockHeader.difficulty == Difficulty.Zero then PoSBlockHeaderValidator.validate(blockHeader, getBlockHeaderByHash)
+    if blockHeader.difficulty == Difficulty.Zero then
+      PoSBlockHeaderValidator.validate(blockHeader, getBlockHeaderByHash)
     else poWValidator.validate(blockHeader, getBlockHeaderByHash)
 
   override def validateHeaderOnly(blockHeader: BlockHeader)(implicit

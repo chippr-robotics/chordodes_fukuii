@@ -423,7 +423,9 @@ trait RegularSyncFixtures:
           )
         then
           importedBlocksSet.add(block)
-          BlockImportedToTop(List(BlockData(block, Nil, ChainWeight.totalDifficultyOnly(block.header.difficulty.value))))
+          BlockImportedToTop(
+            List(BlockData(block, Nil, ChainWeight.totalDifficultyOnly(block.header.difficulty.value)))
+          )
         else if block.number > bestBlock.number then
           importedBlocksSet.add(block)
           BlockEnqueued
@@ -495,7 +497,8 @@ trait RegularSyncFixtures:
       .when(*, *, *)
       .onCall { case (nel: (NonEmptyList[Block] @unchecked), _, _) =>
         if nel.toList.contains(testBlocks.last) then importedLastTestBlock = true
-        val blockData = nel.toList.map(b => BlockData(b, Nil, ChainWeight.totalDifficultyOnly(b.header.difficulty.value)))
+        val blockData =
+          nel.toList.map(b => BlockData(b, Nil, ChainWeight.totalDifficultyOnly(b.header.difficulty.value)))
         IO.pure(BlockImportedToTop(blockData))
       }
 

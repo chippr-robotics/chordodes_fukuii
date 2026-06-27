@@ -312,7 +312,8 @@ trait TestSetupWithVmAndValidators extends EphemBlockchainTestSetup:
       ommers: Seq[BlockHeader] = Nil
   ): Block =
     Block(
-      defaultHeader.copy(parentHash = BlockHash(parent), difficulty = Difficulty(difficulty), number = number, extraData = salt),
+      defaultHeader
+        .copy(parentHash = BlockHash(parent), difficulty = Difficulty(difficulty), number = number, extraData = salt),
       BlockBody(Nil, ommers)
     )
 

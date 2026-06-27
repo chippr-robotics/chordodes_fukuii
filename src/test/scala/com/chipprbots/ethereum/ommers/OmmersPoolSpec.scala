@@ -129,7 +129,8 @@ class OmmersPoolSpec extends ScalaTestWithActorTestKit with AnyFreeSpecLike with
       */
     val block0: BlockHeader = Block3125369.header.copy(number = 0, difficulty = Difficulty.Zero)
 
-    val block1Chain1: BlockHeader = Block3125369.header.copy(number = 1, parentHash = block0.hash, difficulty = Difficulty(11))
+    val block1Chain1: BlockHeader =
+      Block3125369.header.copy(number = 1, parentHash = block0.hash, difficulty = Difficulty(11))
     val block2Chain1: BlockHeader =
       Block3125369.header.copy(number = 2, parentHash = block1Chain1.hash, difficulty = Difficulty(21))
     val block3Chain1: BlockHeader =
@@ -143,11 +144,13 @@ class OmmersPoolSpec extends ScalaTestWithActorTestKit with AnyFreeSpecLike with
     val block3Chain3: BlockHeader =
       Block3125369.header.copy(number = 3, parentHash = block2Chain1.hash, difficulty = Difficulty(33))
 
-    val block1Chain4: BlockHeader = Block3125369.header.copy(number = 1, parentHash = block0.hash, difficulty = Difficulty(14))
+    val block1Chain4: BlockHeader =
+      Block3125369.header.copy(number = 1, parentHash = block0.hash, difficulty = Difficulty(14))
     val block2Chain4: BlockHeader =
       Block3125369.header.copy(number = 2, parentHash = block1Chain4.hash, difficulty = Difficulty(24))
 
-    val block1Chain5: BlockHeader = Block3125369.header.copy(number = 1, parentHash = block0.hash, difficulty = Difficulty(15))
+    val block1Chain5: BlockHeader =
+      Block3125369.header.copy(number = 1, parentHash = block0.hash, difficulty = Difficulty(15))
 
     // Mock created lazily so it's initialized when accessed within the MockFactory context
     lazy val blockchainReader: BlockchainReader = mock[BlockchainReader]
