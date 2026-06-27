@@ -32,7 +32,7 @@ final class CheckpointImporter(
     stateStorage: StateStorage,
     evmCodeStorage: EvmCodeStorage,
     appStateStorage: AppStateStorage
-) {
+):
   import CheckpointImporter.*
   private val log = LoggerFactory.getLogger(getClass)
 
@@ -43,9 +43,9 @@ final class CheckpointImporter(
     * The magic sniff covers Bug 35: an operator using `--gzip` who didn't add the `.gz` extension to the output path
     * still gets a working import.
     */
-  def importFromFile(path: Path, expectedChainId: Option[Long] = None): Either[ImportError, ImportResult] = {
+  def importFromFile(path: Path, expectedChainId: Option[Long] = None): Either[ImportError, ImportResult] =
     val raw = new FileInputStream(path.toFile)
-    try {
+    try
       val pushback = new java.io.PushbackInputStream(raw, 2)
       val b0 = pushback.read()
       val b1 = pushback.read()
@@ -60,25 +60,21 @@ final class CheckpointImporter(
         else pushback
       try importFromStream(in, expectedChainId)
       finally in.close()
-    } finally raw.close()
-  }
+    finally raw.close()
 
-  def importFromStream(in: InputStream, expectedChainId: Option[Long]): Either[ImportError, ImportResult] = {
+  def importFromStream(in: InputStream, expectedChainId: Option[Long]): Either[ImportError, ImportResult] =
     val reader = new CheckpointArchive.Reader(in)
-    reader.readHeader() match {
+    reader.readHeader() match
       case Left(err) => Left(BadFormat(err))
       case Right(h) =>
-        expectedChainId match {
+        expectedChainId match
           case Some(want) if want != h.chainId => Left(ChainIdMismatch(want, h.chainId))
           case _                               => streamEntries(reader, h)
-        }
-    }
-  }
 
   private def streamEntries(
       reader: CheckpointArchive.Reader,
       header: CheckpointArchive.Header
-  ): Either[ImportError, ImportResult] = {
+  ): Either[ImportError, ImportResult] =
     val startMs = System.currentTimeMillis()
     val blockNum = header.blockHeader.number
     val blockHash = header.blockHeader.hash
@@ -101,28 +97,25 @@ final class CheckpointImporter(
     )
 
     def flushNodes(): Unit =
-      if nodeBuf.nonEmpty then {
+      if nodeBuf.nonEmpty then
         mpt.storeRawNodes(nodeBuf.toSeq)
         nodeBuf.clear()
-      }
 
     def flushCodes(): Unit =
-      if codeBuf.nonEmpty then {
+      if codeBuf.nonEmpty then
         var batch = evmCodeStorage.emptyBatchUpdate
         var i = 0
-        while i < codeBuf.length do {
+        while i < codeBuf.length do
           val (h, code) = codeBuf(i)
           batch = batch.and(evmCodeStorage.put(h, ByteString(code)))
           i += 1
-        }
         batch.commit()
         codeBuf.clear()
-      }
 
     var done = false
     var loopError: Option[ImportError] = None
     while !done do
-      reader.nextEntry() match {
+      reader.nextEntry() match
         case Left(err) =>
           flushNodes(); flushCodes()
           loopError = Some(BadFormat(err))
@@ -131,7 +124,7 @@ final class CheckpointImporter(
           nodeBuf += ((hash, rlpBytes))
           totalNodes += 1
           nodeBytes += rlpBytes.length
-          if nodeBuf.size >= NodeBatchSize then {
+          if nodeBuf.size >= NodeBatchSize then
             flushNodes()
             if totalNodes % LogInterval == 0 then
               log.info(
@@ -140,7 +133,6 @@ final class CheckpointImporter(
                 nodeBytes / (1024 * 1024),
                 totalBytecodes
               )
-          }
         case Right(CheckpointArchive.BytecodeEntry(hash, code)) =>
           codeBuf += ((hash, code))
           totalBytecodes += 1
@@ -149,12 +141,11 @@ final class CheckpointImporter(
         case Right(CheckpointArchive.EndOfStream) =>
           flushNodes(); flushCodes()
           done = true
-      }
 
-    loopError match {
+    loopError match
       case Some(err) => Left(err)
       case None =>
-        reader.verifyCrc() match {
+        reader.verifyCrc() match
           case Left(err) => Left(BadFormat(err))
           case Right(_)  =>
             // Header, chain weight, best-block pointer, and the done-markers all committed in a
@@ -182,15 +173,11 @@ final class CheckpointImporter(
             )
 
             Right(ImportResult(blockNum, totalNodes, totalBytecodes, elapsed))
-        }
-    }
-  }
 
   private def hex8(bs: ByteString): String =
     bs.take(8).toArray.map("%02x".format(_)).mkString
-}
 
-object CheckpointImporter {
+object CheckpointImporter:
   // 10k * ~500 B per node ≈ 5 MiB per write batch — comfortable for RocksDB's default write buffer.
   val NodeBatchSize: Int = 10000
   val BytecodeBatchSize: Int = 1000
@@ -206,4 +193,3 @@ object CheckpointImporter {
       bytecodesImported: Long,
       elapsedMs: Long
   )
-}

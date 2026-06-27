@@ -10,7 +10,7 @@ import com.chipprbots.ethereum.network.PeerActor
 import com.chipprbots.ethereum.network.PeerId
 
 /** Test utilities for creating mock Peer instances in unit tests */
-object PeerTestHelpers {
+object PeerTestHelpers:
 
   /** Create a test peer with a dummy InetSocketAddress
     *
@@ -28,4 +28,3 @@ object PeerTestHelpers {
       ref = ref.toTyped[PeerActor.Command],
       incomingConnection = false
     )
-}

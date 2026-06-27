@@ -1,7 +1,7 @@
 package com.chipprbots.ethereum.blockchain.sync
 import com.chipprbots.ethereum.domain.Block
 
-object SyncProtocol {
+object SyncProtocol:
 
   /** Marker trait for messages that SNAPSyncController sends up to SyncController. Not sealed because the companion
     * message types live in SNAPSyncController.scala (a separate file). SyncController receives them via a
@@ -22,12 +22,11 @@ object SyncProtocol {
 
   /** Progress messages sent from BlockFetcher / BlockImporter back to RegularSync. */
   sealed trait ProgressProtocol extends RegularSyncCommand
-  object ProgressProtocol {
+  object ProgressProtocol:
     case object StartedFetching extends ProgressProtocol
     case class StartingFrom(blockNumber: BigInt) extends ProgressProtocol
     case class GotNewBlock(blockNumber: BigInt) extends ProgressProtocol
     case class ImportedBlock(blockNumber: BigInt, internally: Boolean) extends ProgressProtocol
-  }
 
   sealed trait SyncProtocolMsg
   case object Start extends SyncProtocolMsg with RegularSyncCommand
@@ -79,23 +78,19 @@ object SyncProtocol {
     */
   final case class CalibrateChainWeightFromPeer(peerTD: BigInt, peerMaxBlock: BigInt) extends SyncProtocolMsg
 
-  sealed trait Status {
-    def syncing: Boolean = this match {
+  sealed trait Status:
+    def syncing: Boolean = this match
       case Status.Syncing(_, _, _) => true
       case Status.NotSyncing       => false
       case Status.SyncDone         => false
-    }
 
     def notSyncing: Boolean = !syncing
-  }
-  object Status {
-    case class Progress(current: BigInt, target: BigInt) {
+  object Status:
+    case class Progress(current: BigInt, target: BigInt):
       val isEmpty: Boolean = current == 0 && target == 0
       val nonEmpty: Boolean = !isEmpty
-    }
-    object Progress {
+    object Progress:
       val empty: Progress = Progress(0, 0)
-    }
     case class Syncing(
         startingBlockNumber: BigInt,
         blocksProgress: Progress,
@@ -104,5 +99,3 @@ object SyncProtocol {
 
     case object NotSyncing extends Status
     case object SyncDone extends Status
-  }
-}

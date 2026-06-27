@@ -11,7 +11,7 @@ import scala.util.Try
 import com.typesafe.config.Config as TypesafeConfig
 import com.typesafe.config.ConfigValue
 
-object ConfigUtils {
+object ConfigUtils:
 
   def parseCorsAllowedOrigins(config: TypesafeConfig, key: String): HttpOriginMatcher =
     Try(parseMultipleOrigins(config.getStringList(key).asScala.toSeq)).recoverWith { case _ =>
@@ -20,10 +20,9 @@ object ConfigUtils {
 
   def parseMultipleOrigins(origins: Seq[String]): HttpOriginMatcher = HttpOriginMatcher(origins.map(HttpOrigin(_))*)
 
-  def parseSingleOrigin(origin: String): HttpOriginMatcher = origin match {
+  def parseSingleOrigin(origin: String): HttpOriginMatcher = origin match
     case "*" => HttpOriginMatcher.*
     case s   => HttpOriginMatcher.Default(HttpOrigin(s) :: Nil)
-  }
 
   def getOptionalValue[V](config: TypesafeConfig, getter: TypesafeConfig => String => V, path: String): Option[V] =
     if config.hasPath(path) then Some(getter(config)(path))
@@ -34,5 +33,3 @@ object ConfigUtils {
     .asScala
     .toSet
     .flatMap((entry: Entry[String, ConfigValue]) => entry.getKey.split('.').headOption)
-
-}

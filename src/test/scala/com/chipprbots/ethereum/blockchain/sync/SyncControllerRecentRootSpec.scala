@@ -8,7 +8,7 @@ import com.chipprbots.ethereum.testing.Tags.*
 /** The pure target-selection used by the recovery recent-root roll: roll `margin` blocks back from the highest known
   * SNAP-capable peer head, so the target is inside peers' snapshot serve window; decline when no height is known.
   */
-class SyncControllerRecentRootSpec extends AnyFunSuite with ParallelTestExecution {
+class SyncControllerRecentRootSpec extends AnyFunSuite with ParallelTestExecution:
 
   test("picks margin blocks back from the highest peer head", UnitTest, SyncTest) {
     assert(
@@ -32,4 +32,3 @@ class SyncControllerRecentRootSpec extends AnyFunSuite with ParallelTestExecutio
   test("clamps to block 1 when the head is below the margin", UnitTest, SyncTest) {
     assert(SyncController.recentRootTarget(Seq(BigInt(10)), margin = BigInt(64)).contains(BigInt(1)))
   }
-}

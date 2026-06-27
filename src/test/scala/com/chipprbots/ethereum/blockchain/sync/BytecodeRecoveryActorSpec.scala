@@ -33,7 +33,7 @@ import com.chipprbots.ethereum.utils.Config
   * T4: Coordinator crashes mid-download → Terminated handler commits flag and fires RecoveryComplete. T5: No
   * peer/progress arrives within timeout → abandon fires, RecoveryComplete emitted.
   */
-class BytecodeRecoveryActorSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers with Eventually {
+class BytecodeRecoveryActorSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers with Eventually:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
@@ -44,7 +44,7 @@ class BytecodeRecoveryActorSpec extends ScalaTestWithActorTestKit() with AnyFlat
   private def newConfig(abandonAfter: FiniteDuration = 10.minutes): SNAPSyncConfig =
     SNAPSyncConfig(storageRecoveryAbandonTimeout = abandonAfter)
 
-  private def newStorages(): (StateStorage, AppStateStorage, EvmCodeStorage) = {
+  private def newStorages(): (StateStorage, AppStateStorage, EvmCodeStorage) =
     val ds = EphemDataSource()
     val nodeStorage = new NodeStorage(ds)
     val appStateStorage = new AppStateStorage(ds)
@@ -58,7 +58,6 @@ class BytecodeRecoveryActorSpec extends ScalaTestWithActorTestKit() with AnyFlat
       )
     )
     (stateStorage, appStateStorage, evmCodeStorage)
-  }
 
   "BytecodeRecoveryActor" should
     "emit RecoveryComplete immediately and commit flag when no bytecodes are missing" taggedAs (
@@ -236,4 +235,3 @@ class BytecodeRecoveryActorSpec extends ScalaTestWithActorTestKit() with AnyFlat
 
       testKit.stop(actor)
     }
-}

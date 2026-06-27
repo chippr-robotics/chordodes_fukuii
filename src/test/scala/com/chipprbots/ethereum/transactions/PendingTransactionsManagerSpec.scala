@@ -155,9 +155,9 @@ class PendingTransactionsManagerSpec
     with AnyFlatSpecLike
     with Matchers
     with ScalaFutures
-    with Eventually {
+    with Eventually:
 
-  "PendingTransactionsManager" should "store pending transactions received from peers" taggedAs (UnitTest) in new TestSetup {
+  "PendingTransactionsManager" should "store pending transactions received from peers" taggedAs (UnitTest) in new TestSetup:
     val msg: Set[SignedTransactionWithSender] = (1 to 10).map(e => newStx(e)).toSet
     pendingTransactionsManager ! ProperSignedTransactions(msg, PeerId("1"))
 
@@ -166,9 +166,8 @@ class PendingTransactionsManagerSpec
         pendingTransactionsManager.ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref)).futureValue
       pendingTxs.pendingTransactions.map(_.stx).toSet shouldBe msg
     }
-  }
 
-  it should "ignore known transaction" taggedAs (UnitTest) in new TestSetup {
+  it should "ignore known transaction" taggedAs (UnitTest) in new TestSetup:
     val msg: Set[SignedTransactionWithSender] = Seq(newStx(1)).toSet
     pendingTransactionsManager ! ProperSignedTransactions(msg, PeerId("1"))
     pendingTransactionsManager ! ProperSignedTransactions(msg, PeerId("2"))
@@ -179,9 +178,8 @@ class PendingTransactionsManagerSpec
       pendingTxs.pendingTransactions.map(_.stx).length shouldBe 1
       pendingTxs.pendingTransactions.map(_.stx).toSet shouldBe msg
     }
-  }
 
-  it should "broadcast received pending transactions to other peers" taggedAs (UnitTest) in new TestSetup {
+  it should "broadcast received pending transactions to other peers" taggedAs (UnitTest) in new TestSetup:
     // PendingTransactionsManager now tracks peers via PeerHandshakeSuccessful
     // events. When a tx lands it announces the hashes (ETH/67
     // NewPooledTransactionHashes) to every connected peer rather than
@@ -207,9 +205,8 @@ class PendingTransactionsManagerSpec
     val pendingTxs: PendingTransactionsResponse =
       pendingTransactionsManager.ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref)).futureValue
     pendingTxs.pendingTransactions.map(_.stx) shouldBe Seq(stx)
-  }
 
-  it should "notify other peers about received transactions and handle removal" taggedAs (UnitTest) in new TestSetup {
+  it should "notify other peers about received transactions and handle removal" taggedAs (UnitTest) in new TestSetup:
     pendingTransactionsManager ! WrappedPeerEvent(PeerEvent.PeerHandshakeSuccessful(peer1, new HandshakeResult {}))
     pendingTransactionsManager ! WrappedPeerEvent(PeerEvent.PeerHandshakeSuccessful(peer2, new HandshakeResult {}))
     pendingTransactionsManager ! WrappedPeerEvent(PeerEvent.PeerHandshakeSuccessful(peer3, new HandshakeResult {}))
@@ -253,9 +250,8 @@ class PendingTransactionsManagerSpec
       pendingTransactionsManager.ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref)).futureValue
     pendingTxs.pendingTransactions.size shouldBe 6
     pendingTxs.pendingTransactions.map(_.stx).toSet shouldBe (tx2.take(2) ++ tx1.takeRight(4)).toSet
-  }
 
-  it should "not add pending transaction again when it was removed while waiting for peers" taggedAs (UnitTest) in new TestSetup {
+  it should "not add pending transaction again when it was removed while waiting for peers" taggedAs (UnitTest) in new TestSetup:
     // Previously the broadcast path was deferred until the peer manager replied
     // to GetPeers; the test removed the tx before the reply arrived and verified
     // nothing was sent. With the event-driven peer tracking, we reproduce the
@@ -283,9 +279,8 @@ class PendingTransactionsManagerSpec
         pendingTransactionsManager.ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref)).futureValue
       pendingTxs.pendingTransactions.size shouldBe 0
     }
-  }
 
-  it should "override transactions with the same sender and nonce" taggedAs (UnitTest) in new TestSetup {
+  it should "override transactions with the same sender and nonce" taggedAs (UnitTest) in new TestSetup:
     val firstTx: SignedTransactionWithSender = newStx(1, tx, keyPair1)
     val otherTx: SignedTransactionWithSender = newStx(1, tx, keyPair2)
     val overrideTx: SignedTransactionWithSender = newStx(1, tx.copy(value = 2 * tx.value), keyPair1)
@@ -315,17 +310,16 @@ class PendingTransactionsManagerSpec
     }
     announces.foreach(_.peerId shouldBe peer1.id)
     val announcedHashes: Set[ByteString] = announces
-      .flatMap(_.message.underlyingMsg match {
+      .flatMap(_.message.underlyingMsg match
         case ETHPackets.NewPooledTransactionHashes(_, _, hashes) => hashes
         case SignedTransactions(txs)                             => txs.map(_.hash.value)
         case _                                                   => Nil
-      })
+      )
       .toSet
     (announcedHashes should contain).allOf(otherTx.tx.hash.value, overrideTx.tx.hash.value)
     announcedHashes shouldNot contain(firstTx.tx.hash.value)
-  }
 
-  it should "broadcast pending transactions to newly connected peers" taggedAs (UnitTest) in new TestSetup {
+  it should "broadcast pending transactions to newly connected peers" taggedAs (UnitTest) in new TestSetup:
     // When a peer handshakes after the pool already holds transactions, the
     // manager should immediately replay them to that peer — the original intent
     // of this test. With the event-driven tracking the flow is: add tx (no
@@ -339,22 +333,19 @@ class PendingTransactionsManagerSpec
     // NewPooledTransactionHashes announce; the peer pulls bodies on demand.
     val replayed: SendMessageCmd = etcPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessageCmd]
     replayed.peerId shouldBe peer1.id
-    replayed.message.underlyingMsg match {
+    replayed.message.underlyingMsg match
       case ETHPackets.NewPooledTransactionHashes(_, _, hashes) => hashes shouldBe Seq(stx.tx.hash)
       case SignedTransactions(txs)                             => txs shouldBe Seq(stx.tx)
       case other                                               => fail(s"Unexpected: $other")
-    }
-  }
 
-  it should "remove transaction on timeout" taggedAs (UnitTest) in new TestSetup {
-    override val txPoolConfig: TxPoolConfig = new TxPoolConfig {
+  it should "remove transaction on timeout" taggedAs (UnitTest) in new TestSetup:
+    override val txPoolConfig: TxPoolConfig = new TxPoolConfig:
       override val txPoolSize: Int = 300
       override val transactionTimeout: FiniteDuration = 500.millis
       override val getTransactionFromPoolTimeout: FiniteDuration = Timeouts.normalTimeout
 
       // unused
       override val pendingTxManagerQueryTimeout: FiniteDuration = Timeouts.veryLongTimeout
-    }
 
     override val pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[Command] = testKit.spawn(
       PendingTransactionsManager(txPoolConfig, peerManager.ref, etcPeerManager.ref, peerMessageBus.ref, pendingTxTopic),
@@ -376,7 +367,6 @@ class PendingTransactionsManagerSpec
         pendingTransactionsManager.ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref)).futureValue
       pendingTxsAfter.pendingTransactions.map(_.stx).toSet shouldBe Set.empty
     }
-  }
 
   // ── ECIP-1122 pool admission integration tests ──────────────────────────────
   //
@@ -393,7 +383,7 @@ class PendingTransactionsManagerSpec
   it should "reject zero-tip legacy tx at pool admission (ECIP-1122, null reader)" taggedAs (
     UnitTest,
     OlympiaTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val zeroTipLegacy: LegacyTransaction = LegacyTransaction(
       nonce = BigInt(0),
       gasPrice = BigInt(0), // tip = gasPrice - baseFee = 0 - 0 = 0 < minTip(1)
@@ -409,12 +399,11 @@ class PendingTransactionsManagerSpec
         pendingTransactionsManager.ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref)).futureValue
       resp.pendingTransactions shouldBe empty
     }
-  }
 
   it should "accept 1-wei-tip legacy tx at pool admission (ECIP-1122, null reader)" taggedAs (
     UnitTest,
     OlympiaTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val validLegacy: LegacyTransaction = LegacyTransaction(
       nonce = BigInt(0),
       gasPrice = BigInt(1), // tip = 1 - 0 = 1 >= minTip(1)
@@ -430,7 +419,6 @@ class PendingTransactionsManagerSpec
         pendingTransactionsManager.ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref)).futureValue
       resp.pendingTransactions.map(_.stx).toSet shouldBe Set(stx)
     }
-  }
 
   // TestSetup with a fake BlockchainReader returning baseFee = 1 gwei.
   // minTip = 1 wei (default). Tests rejection of zero-effectiveTip EIP-1559 txs
@@ -438,7 +426,7 @@ class PendingTransactionsManagerSpec
   it should "reject Type-2 tx with zero effectiveTip at pool admission (ECIP-1122, 1 gwei baseFee)" taggedAs (
     UnitTest,
     OlympiaTest
-  ) in new TestSetupWithBaseFee {
+  ) in new TestSetupWithBaseFee:
     val zeroTipType2: TransactionWithDynamicFee = TransactionWithDynamicFee(
       chainId = BigInt(61),
       nonce = BigInt(0),
@@ -457,12 +445,11 @@ class PendingTransactionsManagerSpec
         pendingTransactionsManager.ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref)).futureValue
       resp.pendingTransactions shouldBe empty
     }
-  }
 
   it should "accept Type-2 tx with 1-wei effectiveTip at pool admission (ECIP-1122, 1 gwei baseFee)" taggedAs (
     UnitTest,
     OlympiaTest
-  ) in new TestSetupWithBaseFee {
+  ) in new TestSetupWithBaseFee:
     val validType2: TransactionWithDynamicFee = TransactionWithDynamicFee(
       chainId = BigInt(61),
       nonce = BigInt(0),
@@ -481,12 +468,11 @@ class PendingTransactionsManagerSpec
         pendingTransactionsManager.ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref)).futureValue
       resp.pendingTransactions.map(_.stx).toSet shouldBe Set(stx)
     }
-  }
 
   it should "protect nonce queue: rejected zero-tip tx does not block same-nonce valid tx" taggedAs (
     UnitTest,
     OlympiaTest
-  ) in new TestSetupWithBaseFee {
+  ) in new TestSetupWithBaseFee:
     val baseFee = BaseFeeCalculator.InitialBaseFee
     val zeroTip: TransactionWithDynamicFee = TransactionWithDynamicFee(
       chainId = BigInt(61),
@@ -529,10 +515,9 @@ class PendingTransactionsManagerSpec
         pendingTransactionsManager.ask[PendingTransactionsResponse](ref => GetPendingTransactionsReq(ref)).futureValue
       resp.pendingTransactions.map(_.stx.tx.hash) shouldBe Seq(acceptedStx.tx.hash) // same nonce accepted
     }
-  }
 
   /** TestSetup variant with a fake BlockchainReader that returns baseFee = 1 gwei. */
-  trait TestSetupWithBaseFee extends TestSetup {
+  trait TestSetupWithBaseFee extends TestSetup:
     private val blockWithBaseFee: Block = Block(
       header = com.chipprbots.ethereum.Fixtures.Blocks.ValidBlock.header.copy(
         extraFields = HefPostOlympia(BaseFeeCalculator.InitialBaseFee)
@@ -541,9 +526,8 @@ class PendingTransactionsManagerSpec
     )
 
     private val fakeBlockchainReader: BlockchainReader =
-      new BlockchainReader(null, null, null, null, null, null, null) {
+      new BlockchainReader(null, null, null, null, null, null, null):
         override def getBestBlock: Option[Block] = Some(blockWithBaseFee)
-      }
 
     override val pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[Command] = testKit.spawn(
       PendingTransactionsManager(
@@ -564,9 +548,8 @@ class PendingTransactionsManagerSpec
         keyPair: AsymmetricCipherKeyPair = crypto.generateKeyPair(secureRandom)
     ): SignedTransactionWithSender =
       SignedTransactionWithSender(SignedTransaction.sign(tx, keyPair, Some(0x3d)), Address(keyPair))
-  }
 
-  trait TestSetup extends SecureRandomBuilder {
+  trait TestSetup extends SecureRandomBuilder:
     implicit val classicSystem: org.apache.pekko.actor.ActorSystem = testKit.system.classicSystem
 
     val keyPair1: AsymmetricCipherKeyPair = crypto.generateKeyPair(secureRandom)
@@ -588,14 +571,13 @@ class PendingTransactionsManagerSpec
     val peer3TestProbe: TestProbe = TestProbe()
     val peer3: Peer = Peer(PeerId("peer3"), new InetSocketAddress("127.0.0.3", 9000), peer3TestProbe.ref, false)
 
-    val txPoolConfig: TxPoolConfig = new TxPoolConfig {
+    val txPoolConfig: TxPoolConfig = new TxPoolConfig:
       override val txPoolSize: Int = 300
 
       // unused
       override val pendingTxManagerQueryTimeout: FiniteDuration = Timeouts.veryLongTimeout
       override val transactionTimeout: FiniteDuration = Timeouts.veryLongTimeout
       override val getTransactionFromPoolTimeout: FiniteDuration = Timeouts.veryLongTimeout
-    }
 
     implicit lazy val typedScheduler: org.apache.pekko.actor.typed.Scheduler = testKit.system.scheduler
     implicit val askTimeout: org.apache.pekko.util.Timeout = org.apache.pekko.util.Timeout(Timeouts.veryLongTimeout)
@@ -615,6 +597,3 @@ class PendingTransactionsManagerSpec
       PendingTransactionsManager(txPoolConfig, peerManager.ref, etcPeerManager.ref, peerMessageBus.ref, pendingTxTopic),
       s"ptm-test-${java.util.UUID.randomUUID()}"
     )
-  }
-
-}

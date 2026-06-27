@@ -12,29 +12,26 @@ import com.chipprbots.ethereum.domain.BlockHeader
 
 /** Provides everything related to consensus. Different mining protocols are implemented in sub-packages.
   */
-package object mining {
+package object mining:
   final type GetBlockHeaderByHash = ByteString => Option[BlockHeader]
   final type GetNBlocksBack = (ByteString, Int) => Seq[Block]
 
-  def wrongMiningArgument[T <: Mining: ClassTag](mining: Mining): Nothing = {
+  def wrongMiningArgument[T <: Mining: ClassTag](mining: Mining): Nothing =
     val requiredClass = implicitly[ClassTag[T]].runtimeClass
     val msg = s"Mining is of ${mining.getClass} it should be of $requiredClass"
     throw new IllegalArgumentException(msg)
-  }
 
-  def wrongValidatorsArgument[T <: Validators: ClassTag](validators: Validators): Nothing = {
+  def wrongValidatorsArgument[T <: Validators: ClassTag](validators: Validators): Nothing =
     val requiredClass = implicitly[ClassTag[T]].runtimeClass
     val msg = s"validators are of ${validators.getClass} it should be of $requiredClass"
     throw new IllegalArgumentException(msg)
-  }
 
-  def wrongBlockGeneratorArgument[T <: BlockGenerator: ClassTag](blockGenerator: BlockGenerator): Nothing = {
+  def wrongBlockGeneratorArgument[T <: BlockGenerator: ClassTag](blockGenerator: BlockGenerator): Nothing =
     val requiredClass = implicitly[ClassTag[T]].runtimeClass
     val msg = s"Block generator is of ${blockGenerator.getClass} it should be of $requiredClass"
     throw new IllegalArgumentException(msg)
-  }
 
-  implicit final class RichMining(val mining: Mining) extends AnyVal {
+  implicit final class RichMining(val mining: Mining) extends AnyVal:
 
     /** There are APIs that expect that the standard Ethash mining is running and so depend on either its configuration
       * or general PoW semantics. This is a method that can handle such cases via a respective if/then/else construct:
@@ -42,9 +39,6 @@ package object mining {
       * called, otherwise the `_else` value is computed.
       */
     def ifEthash[A](_then: PoWMining => A)(_else: => A): A =
-      mining match {
+      mining match
         case ethash: PoWMining => _then(ethash)
         case _                 => _else
-      }
-  }
-}

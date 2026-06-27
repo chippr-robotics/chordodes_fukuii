@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.domain
 
-object HeadersSeq {
+object HeadersSeq:
   def lastNumber(headers: HeadersSeq): Option[BigInt] = headers.lastOption.map(_.number)
 
   def areChain(headers: HeadersSeq): Boolean =
@@ -9,4 +9,3 @@ object HeadersSeq {
         parent.hash == child.parentHash && parent.number + 1 == child.number
       }
     else headers.nonEmpty
-}

@@ -8,7 +8,7 @@ import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.utils.ByteStringUtils.*
 
-sealed abstract class ImportMessages(block: Block) {
+sealed abstract class ImportMessages(block: Block):
   import ImportMessages.*
   protected lazy val hash: ByteString = block.header.hash.value
   protected lazy val number: BigInt = block.number
@@ -23,7 +23,7 @@ sealed abstract class ImportMessages(block: Block) {
   def missingStateNode(exception: MissingNodeException): LogEntry
 
   def messageForImportResult(importResult: BlockImportResult): LogEntry =
-    importResult match {
+    importResult match
       case BlockImportedToTop(_)                     => importedToTheTop()
       case BlockEnqueued                             => enqueued()
       case DuplicateBlock                            => duplicated()
@@ -31,14 +31,11 @@ sealed abstract class ImportMessages(block: Block) {
       case ChainReorganised(oldBranch, newBranch, _) => reorganisedChain(oldBranch, newBranch)
       case BlockImportFailed(error)                  => importFailed(error)
       case BlockImportFailedDueToMissingNode(reason) => missingStateNode(reason)
-    }
-}
 
-object ImportMessages {
+object ImportMessages:
   type LogEntry = (LogLevel, String)
-}
 
-class MinedBlockImportMessages(block: Block) extends ImportMessages(block) {
+class MinedBlockImportMessages(block: Block) extends ImportMessages(block):
   import ImportMessages.*
   override def preImport(): LogEntry = (DebugLevel, s"Importing new mined block (${block.idTag})")
   override def importedToTheTop(): LogEntry =
@@ -53,9 +50,8 @@ class MinedBlockImportMessages(block: Block) extends ImportMessages(block) {
     (WarningLevel, s"Failed to execute mined block because of $error")
   override def missingStateNode(exception: MissingNodeException): LogEntry =
     (ErrorLevel, s"Ignoring mined block $exception")
-}
 
-class NewBlockImportMessages(block: Block, peerId: PeerId) extends ImportMessages(block) {
+class NewBlockImportMessages(block: Block, peerId: PeerId) extends ImportMessages(block):
   import ImportMessages.*
   override def preImport(): LogEntry = (DebugLevel, s"Handling NewBlock message for block (${block.idTag})")
   override def importedToTheTop(): LogEntry =
@@ -69,7 +65,7 @@ class NewBlockImportMessages(block: Block, peerId: PeerId) extends ImportMessage
   override def duplicated(): LogEntry =
     (DebugLevel, s"Ignoring duplicate block $number ($hash) from $peerId")
   override def orphaned(): LogEntry = (DebugLevel, s"Ignoring orphaned block $number ($hash) from $peerId")
-  override def reorganisedChain(oldBranch: List[Block], newBranch: List[Block]): LogEntry = {
+  override def reorganisedChain(oldBranch: List[Block], newBranch: List[Block]): LogEntry =
     val ancestorNumber = oldBranch.headOption.map(_.header.number - 1).getOrElse(number - newBranch.size)
     val ancestorHash = oldBranch.headOption.map(b => hash2string(b.header.parentHash.value).take(8)).getOrElse("?")
     val dropped = oldBranch.size
@@ -88,9 +84,7 @@ class NewBlockImportMessages(block: Block, peerId: PeerId) extends ImportMessage
         s"Chain reorg detected number=$ancestorNumber hash=$ancestorHash " +
           s"drop=$dropped dropfrom=$dropfrom add=$added addfrom=$addfrom peer=$peerId"
       )
-  }
   override def importFailed(error: String): LogEntry =
     (DebugLevel, s"Failed to import block ${block.idTag} from $peerId")
   override def missingStateNode(exception: MissingNodeException): LogEntry =
     (ErrorLevel, s"Ignoring broadcast block, reason: $exception")
-}

@@ -19,12 +19,12 @@ import Fixtures.blockchainConfig
   *
   * BASEFEE pushes the current block's baseFee onto the stack. Returns 0 if baseFee is not set (pre-Olympia blocks).
   */
-class OlympiaBaseFeeOpcodeSpec extends AnyWordSpec with Matchers {
+class OlympiaBaseFeeOpcodeSpec extends AnyWordSpec with Matchers:
 
   val configPreOlympia: EvmConfig = EvmConfig.SpiralConfigBuilder(blockchainConfig)
   val configOlympia: EvmConfig = EvmConfig.OlympiaConfigBuilder(blockchainConfig)
 
-  object fxt {
+  object fxt:
     val ownerAddr: Address = Address(0xcafe)
     val callerAddr: Address = Address(0xca11)
 
@@ -71,7 +71,7 @@ class OlympiaBaseFeeOpcodeSpec extends AnyWordSpec with Matchers {
         header: BlockHeader,
         config: EvmConfig,
         startGas: BigInt = 1000000
-    ): ProgramContext[MockWorldState, MockStorage] = {
+    ): ProgramContext[MockWorldState, MockStorage] =
       val world = MockWorldState()
         .saveAccount(ownerAddr, Account(balance = UInt256(1000), nonce = 1))
         .saveCode(ownerAddr, code)
@@ -95,8 +95,6 @@ class OlympiaBaseFeeOpcodeSpec extends AnyWordSpec with Matchers {
         warmAddresses = Set(ownerAddr),
         warmStorage = Set.empty
       )
-    }
-  }
 
   import fxt.*
 
@@ -181,4 +179,3 @@ class OlympiaBaseFeeOpcodeSpec extends AnyWordSpec with Matchers {
       }
     }
   }
-}

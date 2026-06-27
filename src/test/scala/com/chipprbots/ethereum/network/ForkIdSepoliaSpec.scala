@@ -19,7 +19,7 @@ import com.chipprbots.ethereum.utils.Config.*
   * every incoming Sepolia peer to disconnect at ETH handshake with ErrLocalIncompatibleOrStale. This is silent —
   * `testEssential` does not exercise the Sepolia ForkId path.
   */
-class ForkIdSepoliaSpec extends AnyWordSpec with Matchers {
+class ForkIdSepoliaSpec extends AnyWordSpec with Matchers:
 
   private val sepoliaConf = blockchains.blockchains("sepolia")
 
@@ -75,4 +75,3 @@ class ForkIdSepoliaSpec extends AnyWordSpec with Matchers {
       create(1735372, 2000000000) shouldBe ForkId(0x268956b6L, None)
     }
   }
-}

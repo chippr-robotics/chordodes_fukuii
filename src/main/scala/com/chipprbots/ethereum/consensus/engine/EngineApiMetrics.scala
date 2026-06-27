@@ -8,7 +8,7 @@ import com.chipprbots.ethereum.metrics.MetricsContainer
 
 /** Prometheus metrics for Engine API interactions. Exposed via /metrics endpoint for Grafana dashboards.
   */
-object EngineApiMetrics extends MetricsContainer {
+object EngineApiMetrics extends MetricsContainer:
 
   private val _newPayloadCount = new AtomicLong(0)
   private val _newPayloadValidCount = new AtomicLong(0)
@@ -39,23 +39,18 @@ object EngineApiMetrics extends MetricsContainer {
   val latestPayloadTimestamp: Gauge =
     metrics.gauge("engine_latest_payload_timestamp", () => _latestPayloadTimestamp.get().toDouble)
 
-  def recordNewPayload(status: String, blockNumber: Long, timestamp: Long): Unit = {
+  def recordNewPayload(status: String, blockNumber: Long, timestamp: Long): Unit =
     _newPayloadCount.incrementAndGet()
     _latestPayloadBlockNumber.set(blockNumber)
     _latestPayloadTimestamp.set(timestamp)
-    status match {
+    status match
       case "VALID"   => _newPayloadValidCount.incrementAndGet()
       case "SYNCING" => _newPayloadSyncingCount.incrementAndGet()
       case _         => _newPayloadInvalidCount.incrementAndGet()
-    }
-  }
 
-  def recordForkchoiceUpdated(status: String): Unit = {
+  def recordForkchoiceUpdated(status: String): Unit =
     _forkchoiceUpdatedCount.incrementAndGet()
-    status match {
+    status match
       case "VALID"   => _forkchoiceValidCount.incrementAndGet()
       case "SYNCING" => _forkchoiceSyncingCount.incrementAndGet()
       case _         => ()
-    }
-  }
-}

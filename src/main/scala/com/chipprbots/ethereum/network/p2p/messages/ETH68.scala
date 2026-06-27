@@ -25,7 +25,7 @@ package com.chipprbots.ethereum.network.p2p.messages
   * REJECTED messages are enforced in ETH68MessageDecoder (MessageDecoders.scala) by returning MalformedMessageError,
   * consistent with go-ethereum handler.go and Erigon ProtoIds.
   */
-object ETH68 {
+object ETH68:
 
   // Type aliases — documents what ETH68 IS. All pre-ETH68 protocol files deleted.
   // ETHPackets is the canonical source for all ETH68+ wire types.
@@ -42,4 +42,3 @@ object ETH68 {
   type PooledTransactions = ETHPackets.PooledTransactions
   type GetReceipts = ETHPackets.GetReceipts
   type Receipts = ETHPackets.Receipts68
-}

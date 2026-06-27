@@ -35,7 +35,7 @@ class NetworkPeerManagerFake(
     syncConfig: SyncConfig,
     peers: Map[Peer, PeerInfo],
     blocks: List[Block]
-)(implicit system: ActorSystem, ioRuntime: IORuntime) {
+)(implicit system: ActorSystem, ioRuntime: IORuntime):
   private val responsesTopicIO: IO[Topic[IO, MessageFromPeer]] = Topic[IO, MessageFromPeer]
   private val requestsTopicIO: IO[Topic[IO, SendMessageCmd]] = Topic[IO, SendMessageCmd]
   private val responsesTopic: Topic[IO, MessageFromPeer] = responsesTopicIO.unsafeRunSync()
@@ -67,11 +67,8 @@ class NetworkPeerManagerFake(
       val headersFromPeers = headersFromPeersChunk.toList
       val (headers, respondedPeers) = headersFromPeers.unzip
 
-      if headers.distinct.size == 1 && respondedPeers.toSet == peers.keySet.map(_.id) then {
-        Stream.emit(headers.head)
-      } else {
-        Stream.empty
-      }
+      if headers.distinct.size == 1 && respondedPeers.toSet == peers.keySet.map(_.id) then Stream.emit(headers.head)
+      else Stream.empty
     }
 
   val fetchedHeaders: Stream[IO, Seq[BlockHeader]] = responses.collect {
@@ -83,10 +80,9 @@ class NetworkPeerManagerFake(
   }
   val requestedReceipts: Stream[IO, Seq[ByteString]] = requests.collect(
     Function.unlift(msg =>
-      msg.message.underlyingMsg match {
+      msg.message.underlyingMsg match
         case GetReceipts(_, hashes) => Some(hashes)
         case _                      => None
-      }
     )
   )
   val fetchedBlocks: Stream[IO, List[Block]] = fetchedBodies
@@ -101,8 +97,7 @@ class NetworkPeerManagerFake(
     case MessageFromPeer(ETHPackets.NodeData(values), _) => values
   }
 
-}
-object NetworkPeerManagerFake {
+object NetworkPeerManagerFake:
   class NetworkPeerManagerAutoPilot(
       requests: Topic[IO, SendMessageCmd],
       responses: Topic[IO, MessageFromPeer],
@@ -110,15 +105,15 @@ object NetworkPeerManagerFake {
       peers: Map[Peer, PeerInfo],
       blocks: List[Block]
   )(implicit ioRuntime: IORuntime)
-      extends AutoPilot {
-    def run(sender: ActorRef, msg: Any): NetworkPeerManagerAutoPilot = {
-      msg match {
+      extends AutoPilot:
+    def run(sender: ActorRef, msg: Any): NetworkPeerManagerAutoPilot =
+      msg match
         case NetworkPeerManagerActor.GetHandshakedPeersCmd(replyTo) =>
           replyTo ! NetworkPeerManagerActor.HandshakedPeers(peers)
           peersConnected.complete(()).handleError(_ => ()).unsafeRunSync()
         case sendMsg @ NetworkPeerManagerActor.SendMessageCmd(rawMsg, peerId) =>
           requests.publish1(sendMsg).unsafeRunSync()
-          val response = rawMsg.underlyingMsg match {
+          val response = rawMsg.underlyingMsg match
             case GetBlockHeaders(requestId, startingBlock, maxHeaders, skip, reverse) =>
               BlockHeaders(requestId, headersFor(startingBlock, maxHeaders, skip, reverse))
 
@@ -130,31 +125,26 @@ object NetworkPeerManagerFake {
 
             case ETHPackets.GetNodeData(mptElementsHashes) =>
               ETHPackets.NodeData(Seq.empty)
-          }
           val theResponse = MessageFromPeer(response, peerId)
           sender ! theResponse
           responses.publish1(theResponse).unsafeRunSync()
-      }
       this
-    }
 
     private def headersFor(
         startingBlock: Either[BigInt, ByteString],
         maxHeaders: BigInt,
         skip: BigInt,
         reverse: Boolean
-    ): Seq[BlockHeader] = {
+    ): Seq[BlockHeader] =
       val startIndex = blocks.indexWhere(blockMatchesStart(_, startingBlock))
       if startIndex < 0 then Seq.empty
-      else {
+      else
         val orderedBlocks = if reverse then blocks.take(startIndex + 1).reverse else blocks.drop(startIndex)
         val step = (skip + 1).toInt
         orderedBlocks.zipWithIndex
           .collect { case (block, index) if index % step == 0 => block }
           .take(maxHeaders.toInt)
           .map(_.header)
-      }
-    }
 
     private def bodiesFor(hashes: Seq[ByteString]): Seq[BlockBody] =
       hashes.flatMap(hash => blocks.find(_.hash.value == hash)).map(_.body)
@@ -164,5 +154,3 @@ object NetworkPeerManagerFake {
 
     def blockMatchesStart(block: Block, startingBlock: Either[BigInt, ByteString]): Boolean =
       startingBlock.fold(nr => block.number == nr, hash => block.hash.value == hash)
-  }
-}

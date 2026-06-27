@@ -30,7 +30,7 @@ class PoWBlockCreator(
     ommersPool: typed.ActorRef[OmmersPool.Command],
     coinbaseProvider: CoinbaseProvider,
     system: ActorSystem
-) extends TransactionPicker {
+) extends TransactionPicker:
   override lazy val scheduler: Scheduler = system.toTyped.scheduler
 
   lazy val fullConsensusConfig = mining.config
@@ -41,7 +41,7 @@ class PoWBlockCreator(
       parentBlock: Block,
       withTransactions: Boolean = true,
       initialWorldStateBeforeExecution: Option[InMemoryWorldStateProxy] = None
-  )(implicit blockchainConfig: BlockchainConfig): IO[PendingBlockAndState] = {
+  )(implicit blockchainConfig: BlockchainConfig): IO[PendingBlockAndState] =
     val transactions = if withTransactions then getTransactionsFromPool else IO.pure(PendingTransactionsResponse(Nil))
     (getOmmersFromPool(parentBlock.hash.value), transactions).parMapN { case (ommers, pendingTxs) =>
       blockGenerator.generateBlock(
@@ -52,9 +52,8 @@ class PoWBlockCreator(
         initialWorldStateBeforeExecution
       )
     }
-  }
 
-  private def getOmmersFromPool(parentBlockHash: ByteString): IO[OmmersPool.Ommers] = {
+  private def getOmmersFromPool(parentBlockHash: ByteString): IO[OmmersPool.Ommers] =
     import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
     implicit val sc: Scheduler = scheduler
     IO.fromFuture(IO(ommersPool.ask[OmmersPool.Ommers](OmmersPool.GetOmmers(parentBlockHash, _))))
@@ -62,6 +61,3 @@ class PoWBlockCreator(
         log.error("Failed to get ommers, mining block with empty ommers list", ex)
         OmmersPool.Ommers(Nil)
       }
-  }
-
-}

@@ -11,20 +11,20 @@ import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
 import com.chipprbots.ethereum.utils.ByteUtils
 
-object WireProtocol {
+object WireProtocol:
 
-  object Hello {
+  object Hello:
 
     val code = 0x00
 
     implicit class HelloEnc(val underlyingMsg: Hello)
         extends MessageSerializableImplicit[Hello](underlyingMsg)
-        with RLPSerializable {
+        with RLPSerializable:
       import com.chipprbots.ethereum.rlp.*
 
       override def code: Int = Hello.code
 
-      override def toRLPEncodable: RLPEncodeable = {
+      override def toRLPEncodable: RLPEncodeable =
         import msg.*
         RLPList(
           p2pVersion,
@@ -33,13 +33,11 @@ object WireProtocol {
           listenPort,
           RLPValue(nodeId.toArray[Byte])
         )
-      }
-    }
 
-    extension (bytes: Array[Byte]) {
-      def toHello: Hello = {
+    extension (bytes: Array[Byte])
+      def toHello: Hello =
         import Capability.*
-        rawDecode(bytes) match {
+        rawDecode(bytes) match
           case RLPList(
                 RLPValue(p2pVersionBytes),
                 RLPValue(clientIdBytes),
@@ -54,10 +52,6 @@ object WireProtocol {
             val nodeId = ByteString(nodeIdBytes)
             Hello(p2pVersion, clientId, capabilities.items.map(_.toCapability).flatten, listenPort, nodeId)
           case _ => throw new RuntimeException("Cannot decode Hello")
-        }
-      }
-    }
-  }
 
   case class Hello(
       p2pVersion: Long,
@@ -65,7 +59,7 @@ object WireProtocol {
       capabilities: Seq[Capability],
       listenPort: Long,
       nodeId: ByteString
-  ) extends Message {
+  ) extends Message:
 
     override val code: Int = Hello.code
 
@@ -78,10 +72,9 @@ object WireProtocol {
         s"nodeId: ${Hex.toHexString(nodeId.toArray[Byte])} " +
         s"}"
     override def toShortString: String = toString
-  }
 
-  object Disconnect {
-    object Reasons {
+  object Disconnect:
+    object Reasons:
       val DisconnectRequested = 0x00
       val TcpSubsystemError = 0x01
       val BreachOfProtocol = 0x02
@@ -95,10 +88,9 @@ object WireProtocol {
       val IdentityTheSame = 0xa
       val TimeoutOnReceivingAMessage = 0x0b
       val Other = 0x10
-    }
 
     def reasonToString(reasonCode: Long): String =
-      reasonCode match {
+      reasonCode match
         case Reasons.DisconnectRequested            => "Disconnect requested"
         case Reasons.TcpSubsystemError              => "TCP sub-system error"
         case Reasons.BreachOfProtocol               => "Breach of protocol, e.g. malformed message, bad RLP"
@@ -113,20 +105,18 @@ object WireProtocol {
         case Reasons.TimeoutOnReceivingAMessage     => "Timeout on receiving a message"
         case Reasons.Other                          => "Some other reason specific to a subprotocol"
         case other                                  => s"unknown reason code: $other"
-      }
 
     val code = 0x01
 
     implicit class DisconnectEnc(val underlyingMsg: Disconnect)
         extends MessageSerializableImplicit[Disconnect](underlyingMsg)
-        with RLPSerializable {
+        with RLPSerializable:
       override def code: Int = Disconnect.code
 
       override def toRLPEncodable: RLPEncodeable = RLPList(msg.reason)
-    }
 
-    extension (bytes: Array[Byte]) {
-      def toDisconnect: Disconnect = rawDecode(bytes) match {
+    extension (bytes: Array[Byte])
+      def toDisconnect: Disconnect = rawDecode(bytes) match
         case RLPList(RLPValue(reasonBytes), _*) =>
           val reason = ByteUtils.bytesToBigInt(reasonBytes).toLong
           Disconnect(reason = reason)
@@ -135,61 +125,47 @@ object WireProtocol {
           val reason = ByteUtils.bytesToBigInt(reasonBytes).toLong
           Disconnect(reason = reason)
         case _ => throw new RuntimeException("Cannot decode Disconnect")
-      }
-    }
-  }
 
-  case class Disconnect(reason: Long) extends Message {
+  case class Disconnect(reason: Long) extends Message:
     override val code: Int = Disconnect.code
 
     override def toString: String =
       s"Disconnect(${Disconnect.reasonToString(reason)})"
 
     override def toShortString: String = toString
-  }
 
-  object Ping {
+  object Ping:
 
     val code = 0x02
 
     implicit class PingEnc(val underlyingMsg: Ping)
         extends MessageSerializableImplicit[Ping](underlyingMsg)
-        with RLPSerializable {
+        with RLPSerializable:
       override def code: Int = Ping.code
 
       override def toRLPEncodable: RLPEncodeable = RLPList()
-    }
 
-    extension (bytes: Array[Byte]) {
+    extension (bytes: Array[Byte])
       def toPing: Ping = Ping()
-    }
-  }
 
-  case class Ping() extends Message {
+  case class Ping() extends Message:
     override val code: Int = Ping.code
     override def toShortString: String = toString
-  }
 
-  object Pong {
+  object Pong:
 
     val code = 0x03
 
     implicit class PongEnc(val underlyingMsg: Pong)
         extends MessageSerializableImplicit[Pong](underlyingMsg)
-        with RLPSerializable {
+        with RLPSerializable:
       override def code: Int = Pong.code
 
       override def toRLPEncodable: RLPEncodeable = RLPList()
-    }
 
-    extension (bytes: Array[Byte]) {
+    extension (bytes: Array[Byte])
       def toPong: Pong = Pong()
-    }
-  }
 
-  case class Pong() extends Message {
+  case class Pong() extends Message:
     override val code: Int = Pong.code
     override def toShortString: String = toString
-  }
-
-}

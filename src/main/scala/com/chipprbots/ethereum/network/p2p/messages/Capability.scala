@@ -8,20 +8,17 @@ import com.chipprbots.ethereum.rlp.RLPValue
 import com.chipprbots.ethereum.rlp.rawDecode
 
 sealed trait ProtocolFamily
-object ProtocolFamily {
+object ProtocolFamily:
   case object ETH extends ProtocolFamily
   case object SNAP extends ProtocolFamily
-  extension (msg: ProtocolFamily) {
-    def toRLPEncodable: RLPEncodeable = msg match {
+  extension (msg: ProtocolFamily)
+    def toRLPEncodable: RLPEncodeable = msg match
       case ETH  => RLPValue("eth".getBytes())
       case SNAP => RLPValue("snap".getBytes())
-    }
-  }
-}
 
 sealed abstract class Capability(val name: ProtocolFamily, val version: Byte)
 
-object Capability {
+object Capability:
   case object ETH63 extends Capability(ProtocolFamily.ETH, 63) // scalastyle:ignore magic.number
   case object ETH64 extends Capability(ProtocolFamily.ETH, 64) // scalastyle:ignore magic.number
   case object ETH65 extends Capability(ProtocolFamily.ETH, 65) // scalastyle:ignore magic.number
@@ -32,7 +29,7 @@ object Capability {
   case object ETH70 extends Capability(ProtocolFamily.ETH, 70) // scalastyle:ignore magic.number
   case object SNAP1 extends Capability(ProtocolFamily.SNAP, 1) // scalastyle:ignore magic.number
 
-  def parse(s: String): Option[Capability] = s match {
+  def parse(s: String): Option[Capability] = s match
     case "eth/63" => Some(ETH63)
     case "eth/64" => Some(ETH64)
     case "eth/65" => Some(ETH65)
@@ -43,12 +40,11 @@ object Capability {
     case "eth/70" => Some(ETH70)
     case "snap/1" => Some(SNAP1)
     case _        => None
-  }
 
   def parseUnsafe(s: String): Capability =
     parse(s).getOrElse(throw new RuntimeException(s"Capability $s not supported by Fukuii"))
 
-  def negotiate(c1: List[Capability], c2: List[Capability]): Option[Capability] = {
+  def negotiate(c1: List[Capability], c2: List[Capability]): Option[Capability] =
     // ETH protocol versions are backward compatible
     // If we advertise ETH68 and peer advertises ETH64, we should negotiate ETH64
     // This means we need to find the highest common version for each protocol family
@@ -69,25 +65,22 @@ object Capability {
       // We only return a capability from our own set (ethVersions1) to guarantee we have
       // a decoder for it. The .orElse(ethVersions2...) fallback was a bug: it could
       // return a peer cap we don't support (e.g. ETH67 when we only have ETH68/69).
-      if ethVersions1.nonEmpty && ethVersions2.nonEmpty then {
+      if ethVersions1.nonEmpty && ethVersions2.nonEmpty then
         val versions1 = ethVersions1.map(_.version).toSet
         val versions2 = ethVersions2.map(_.version).toSet
         val commonVersions = versions1.intersect(versions2)
         if commonVersions.isEmpty then None
-        else {
+        else
           val maxCommon = commonVersions.max
           ethVersions1.find(_.version == maxCommon) // always from our side — we have the decoder
-        }
-      } else None,
+      else None,
       // SNAP: exact match required
       if snapVersions1.intersect(snapVersions2).nonEmpty then Some(SNAP1) else None
     ).flatten
 
-    negotiatedCapabilities match {
+    negotiatedCapabilities match
       case Nil => None
       case l   => Some(best(l))
-    }
-  }
 
   /** Select the best capability from a list, with protocol-family-aware scoring. Priority: ETC > ETH > SNAP (within
     * each family, higher versions preferred)
@@ -113,25 +106,18 @@ object Capability {
   /** Determines if this capability uses RequestId wrapper in messages (ETH66+, SNAP1+) ETH66, ETH67, ETH68, SNAP1 use
     * RequestId wrapper ETH63, ETH64, ETH65 do not use RequestId wrapper
     */
-  def usesRequestId(capability: Capability): Boolean = capability match {
+  def usesRequestId(capability: Capability): Boolean = capability match
     case ETH66 | ETH67 | ETH68 | ETH69 | ETH70 | SNAP1 => true
     case _                                             => false
-  }
 
-  extension (msg: Capability) {
+  extension (msg: Capability)
     def toRLPEncodable: RLPEncodeable = RLPList(msg.name.toRLPEncodable, msg.version)
-  }
 
-  extension (bytes: Array[Byte]) {
+  extension (bytes: Array[Byte])
     def toCapability: Option[Capability] = rawDecode(bytes).toCapability
-  }
 
-  extension (rLPEncodeable: RLPEncodeable) {
-    def toCapability: Option[Capability] = rLPEncodeable match {
+  extension (rLPEncodeable: RLPEncodeable)
+    def toCapability: Option[Capability] = rLPEncodeable match
       case RLPList(RLPValue(nameBytes), RLPValue(versionBytes), _*) if versionBytes.nonEmpty =>
         parse(s"${new String(nameBytes, java.nio.charset.StandardCharsets.UTF_8)}/${versionBytes(0)}")
       case _ => None // Silently ignore unknown/malformed capability structures (EIP-8 lenience)
-    }
-  }
-
-}

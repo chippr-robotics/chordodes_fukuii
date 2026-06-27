@@ -7,7 +7,7 @@ import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 
 sealed trait BlockParam
 
-object BlockParam {
+object BlockParam:
   case class WithNumber(n: BigInt) extends BlockParam
   case class WithHash(hash: org.apache.pekko.util.ByteString) extends BlockParam
   case object Latest extends BlockParam
@@ -15,20 +15,19 @@ object BlockParam {
   case object Earliest extends BlockParam
   case object Safe extends BlockParam
   case object Finalized extends BlockParam
-}
 
 case class ResolvedBlock(block: Block, pendingState: Option[InMemoryWorldStateProxy])
 
-trait ResolveBlock {
+trait ResolveBlock:
   def blockchain: Blockchain
   def blockchainReader: BlockchainReader
   def mining: Mining
   def forkChoiceManagerOpt: Option[ForkChoiceManager] = None
 
   def resolveBlock(blockParam: BlockParam): Either[JsonRpcError, ResolvedBlock] =
-    blockParam match {
+    blockParam match
       case BlockParam.WithNumber(blockNumber) =>
-        getBlock(blockNumber) match {
+        getBlock(blockNumber) match
           case Right(block)                                       => Right(ResolvedBlock(block, pendingState = None))
           case Left(_) if blockNumber > BigInt(Long.MaxValue) / 2 =>
             // Large number that doesn't match a block — try interpreting as a block hash
@@ -41,7 +40,6 @@ trait ResolveBlock {
             )
             getBlockByHash(hashBytes).map(ResolvedBlock(_, pendingState = None))
           case left => left.map(ResolvedBlock(_, pendingState = None))
-        }
       case BlockParam.WithHash(hash) => getBlockByHash(hash).map(ResolvedBlock(_, pendingState = None))
       case BlockParam.Earliest       => getBlock(0).map(ResolvedBlock(_, pendingState = None))
       case BlockParam.Latest         => getLatestBlock().map(ResolvedBlock(_, pendingState = None))
@@ -62,7 +60,6 @@ trait ResolveBlock {
           .map(pb => ResolvedBlock(pb.pendingBlock.block, pendingState = Some(pb.worldState)))
           .map(Right.apply)
           .getOrElse(resolveBlock(BlockParam.Latest)) // Default behavior in other clients
-    }
 
   private def getBlockByHash(hash: org.apache.pekko.util.ByteString): Either[JsonRpcError, Block] =
     blockchainReader
@@ -77,4 +74,3 @@ trait ResolveBlock {
   private def getLatestBlock(): Either[JsonRpcError, Block] =
     blockchainReader.getBestBlock
       .toRight(JsonRpcError.InvalidParams("Latest block not found"))
-}

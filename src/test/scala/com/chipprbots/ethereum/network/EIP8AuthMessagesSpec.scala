@@ -17,7 +17,7 @@ import com.chipprbots.ethereum.rlp.*
 import com.chipprbots.ethereum.security.SecureRandomBuilder
 import com.chipprbots.ethereum.testing.Tags.*
 
-class EIP8AuthMessagesSpec extends AnyFlatSpec with Matchers with SecureRandomBuilder {
+class EIP8AuthMessagesSpec extends AnyFlatSpec with Matchers with SecureRandomBuilder:
 
   val testKeyPair = new AsymmetricCipherKeyPair(
     new ECPublicKeyParameters(
@@ -194,4 +194,3 @@ class EIP8AuthMessagesSpec extends AnyFlatSpec with Matchers with SecureRandomBu
       encoded.toAuthInitiateMessageV4
     }
   }
-}

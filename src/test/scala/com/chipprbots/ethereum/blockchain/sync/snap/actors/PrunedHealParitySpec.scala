@@ -46,31 +46,28 @@ import java.util.concurrent.{Executors, TimeUnit}
   * completeness marker + an empty emitted-missing-node set in both modes, and that verification never rewrites the
   * root.
   */
-class PrunedHealParitySpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers {
+class PrunedHealParitySpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
   /** A present, complete root: a childless leaf in storage (full-walk verification finds 0 missing and completes). */
-  private def storedRoot(storage: TestMptStorage): ByteString = {
+  private def storedRoot(storage: TestMptStorage): ByteString =
     val leaf = LeafNode(ByteString(Array[Byte](0x01)), ByteString(Array[Byte](0x02)))
     storage.putNode(leaf)
     ByteString(leaf.hash)
-  }
 
   /** A clean storage-trie leaf to heal (no children). Returns (pathset, hash, encoded). */
-  private def cleanLeaf(seed: Int): (Seq[ByteString], ByteString, ByteString) = {
+  private def cleanLeaf(seed: Int): (Seq[ByteString], ByteString, ByteString) =
     val leaf = LeafNode(ByteString(Array[Byte](0x01)), ByteString(kec256(ByteString(s"parity-leaf-$seed")).toArray))
     val encoded = MptTraversals.encodeNode(leaf)
     val hash = kec256(ByteString(encoded))
     val accountHash = kec256(ByteString(s"parity-account-$seed"))
     (Seq(accountHash, ByteString(Array[Byte](0x20, seed.toByte))), hash, ByteString(encoded))
-  }
 
-  private def deleteRecursively(f: File): Unit = {
+  private def deleteRecursively(f: File): Unit =
     Option(f.listFiles()).foreach(_.foreach(deleteRecursively))
     f.delete()
     ()
-  }
 
   private def awaitStateHealingComplete(
       controller: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
@@ -91,12 +88,12 @@ class PrunedHealParitySpec extends ScalaTestWithActorTestKit() with AnyFlatSpecL
   /** Drive the SAME healed state to completion. The prunedHealVerification flag was removed from the production API;
     * this helper now drives a single canonical run and confirms completion + parity invariants hold.
     */
-  private def runToCompletion()(implicit tk: ActorTestKit): CompletionOutcome = {
+  private def runToCompletion()(implicit tk: ActorTestKit): CompletionOutcome =
     val pool = Executors.newSingleThreadExecutor()
     val ec = ExecutionContext.fromExecutorService(pool)
     val dbPath = Files.createTempDirectory("pruned-parity-rocksdb").toAbsolutePath.toString
     val dataSource = RocksDbDataSource(
-      new RocksDbConfig {
+      new RocksDbConfig:
         override val createIfMissing: Boolean = true
         override val paranoidChecks: Boolean = true
         override val path: String = dbPath
@@ -106,7 +103,7 @@ class PrunedHealParitySpec extends ScalaTestWithActorTestKit() with AnyFlatSpecL
         override val levelCompaction: Boolean = true
         override val blockSize: Long = 16384
         override val blockCacheSize: Long = 33554432
-      },
+      ,
       Namespaces.nsSeq
     )
     val store = new HealingFrontierStorage(dataSource)
@@ -125,7 +122,7 @@ class PrunedHealParitySpec extends ScalaTestWithActorTestKit() with AnyFlatSpecL
       healingFrontierStorage = Some(store),
       healingWriterEcOverride = Some(ec)
     )
-    try {
+    try
       SNAPSyncMetrics.setHealingPrunedVerification(-1L)
       val peer = PeerTestHelpers.createTestPeer("parity-peer", tk.createTestProbe[Any]().ref.toClassic)
       coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
@@ -139,14 +136,12 @@ class PrunedHealParitySpec extends ScalaTestWithActorTestKit() with AnyFlatSpecL
         markerComplete = store.isComplete,
         rootUnchanged = root == storedRoot(new TestMptStorage())
       )
-    } finally {
+    finally
       tk.stop(coordinator)
       pool.shutdown()
       pool.awaitTermination(5, TimeUnit.SECONDS)
       dataSource.destroy()
       deleteRecursively(new File(dbPath))
-    }
-  }
 
   "Pruned vs full-trie completion (T-4)" should
     "reach StateHealingComplete, leave the completeness marker unset (persistence off), and not rewrite the state root" taggedAs UnitTest in {
@@ -166,4 +161,3 @@ class PrunedHealParitySpec extends ScalaTestWithActorTestKit() with AnyFlatSpecL
       // LIVE-ONLY: literal byte-for-byte STATE-ROOT parity and "no MissingRootNode at first block import" are
       // not feasible in the in-memory unit harness; they are asserted by the quickstart §Validation 4 live run.
     }
-}

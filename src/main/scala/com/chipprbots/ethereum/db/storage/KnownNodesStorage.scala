@@ -9,7 +9,7 @@ import com.chipprbots.ethereum.db.dataSource.DataSourceBatchUpdate
 
 /** This class is used to store discovered nodes Value: stored nodes list
   */
-class KnownNodesStorage(val dataSource: DataSource) extends TransactionalKeyValueStorage[String, Set[String]] {
+class KnownNodesStorage(val dataSource: DataSource) extends TransactionalKeyValueStorage[String, Set[String]]:
   val key = "KnownNodes"
 
   val namespace: IndexedSeq[Byte] = Namespaces.KnownNodesNamespace
@@ -28,9 +28,6 @@ class KnownNodesStorage(val dataSource: DataSource) extends TransactionalKeyValu
   def getKnownNodes: Set[URI] =
     get(key).getOrElse(Set.empty).filter(_.nonEmpty).map(new URI(_))
 
-  def updateKnownNodes(toAdd: Set[URI] = Set.empty, toRemove: Set[URI] = Set.empty): DataSourceBatchUpdate = {
+  def updateKnownNodes(toAdd: Set[URI] = Set.empty, toRemove: Set[URI] = Set.empty): DataSourceBatchUpdate =
     val updated = (getKnownNodes ++ toAdd) -- toRemove
     put(key, updated.map(_.toString))
-  }
-
-}

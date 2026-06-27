@@ -8,7 +8,7 @@ import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.domain.Receipt
 
-trait ReceiptsValidator {
+trait ReceiptsValidator:
 
   import ReceiptsValidator.*
   import ReceiptsValidationResult.*
@@ -26,7 +26,7 @@ trait ReceiptsValidator {
     * @return
     *   the valid receipts or the error encountered while validating them
     */
-  def validateReceipts(requestedHashes: Seq[ByteString], receipts: Seq[Seq[Receipt]]): ReceiptsValidationResult = {
+  def validateReceipts(requestedHashes: Seq[ByteString], receipts: Seq[Seq[Receipt]]): ReceiptsValidationResult =
     val blockHashesWithReceipts = requestedHashes.zip(receipts)
     val blockHeadersWithReceipts = blockHashesWithReceipts.map { case (hash, blockReceipts) =>
       blockchainReader.getBlockHeaderByHash(BlockHash(hash)) -> blockReceipts
@@ -34,10 +34,9 @@ trait ReceiptsValidator {
 
     val errorIterator = blockHeadersWithReceipts.iterator.map {
       case (Some(header), receipt) =>
-        validators.blockValidator.validateBlockAndReceipts(header, receipt) match {
+        validators.blockValidator.validateBlockAndReceipts(header, receipt) match
           case Left(err) => Some(Invalid(err))
           case _         => None
-        }
       case (None, _) => Some(DbError)
     }
 
@@ -46,15 +45,10 @@ trait ReceiptsValidator {
     }
 
     receiptsValidationError.getOrElse(Valid(blockHashesWithReceipts))
-  }
 
-}
-
-object ReceiptsValidator {
+object ReceiptsValidator:
   sealed trait ReceiptsValidationResult
-  object ReceiptsValidationResult {
+  object ReceiptsValidationResult:
     case class Valid(blockHashesAndReceipts: Seq[(ByteString, Seq[Receipt])]) extends ReceiptsValidationResult
     case class Invalid(error: BlockError) extends ReceiptsValidationResult
     case object DbError extends ReceiptsValidationResult
-  }
-}

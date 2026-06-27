@@ -19,7 +19,7 @@ import Fixtures.blockchainConfig
   * EIP-6049 is an informational EIP that deprecates SELFDESTRUCT but does NOT change its behavior. The opcode continues
   * to work exactly as before - this EIP only marks it as deprecated.
   */
-class Eip6049Spec extends AnyWordSpec with Matchers {
+class Eip6049Spec extends AnyWordSpec with Matchers:
 
   // Config before EIP-6049 (Mystique fork - no deprecation flag)
   val configPreEip6049: EvmConfig = EvmConfig.MystiqueConfigBuilder(blockchainConfig)
@@ -27,7 +27,7 @@ class Eip6049Spec extends AnyWordSpec with Matchers {
   // Config with EIP-6049 (Spiral fork - deprecation flag enabled)
   val configWithEip6049: EvmConfig = EvmConfig.SpiralConfigBuilder(blockchainConfig)
 
-  object fxt {
+  object fxt:
     val ownerAddr: Address = Address(0x0123)
     val beneficiaryAddr: Address = Address(0xface)
     val otherAddr: Address = Address(0x9999)
@@ -47,7 +47,7 @@ class Eip6049Spec extends AnyWordSpec with Matchers {
         header: com.chipprbots.ethereum.domain.BlockHeader,
         config: EvmConfig,
         startGas: BigInt = 1000000
-    ): ProgramContext[MockWorldState, MockStorage] = {
+    ): ProgramContext[MockWorldState, MockStorage] =
       val world = MockWorldState()
         .saveAccount(ownerAddr, Account(balance = UInt256(1000), nonce = 1))
         .saveAccount(beneficiaryAddr, Account(balance = UInt256(500)))
@@ -73,8 +73,6 @@ class Eip6049Spec extends AnyWordSpec with Matchers {
         warmAddresses = Set(ownerAddr),
         warmStorage = Set.empty
       )
-    }
-  }
 
   import fxt.*
 
@@ -200,4 +198,3 @@ class Eip6049Spec extends AnyWordSpec with Matchers {
       }
     }
   }
-}

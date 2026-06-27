@@ -18,7 +18,7 @@ import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetByteCodes.GetByteCod
 import com.chipprbots.ethereum.testing.PeerTestHelpers
 import com.chipprbots.ethereum.testing.Tags.*
 
-class ByteCodeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
+class ByteCodeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
@@ -34,12 +34,11 @@ class ByteCodeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
   private def makeWorker(
       coordinator: TestProbe[ByteCodeCoordinator.Command],
       networkPeerManager: TestProbe[NetworkPeerManagerActor.Command]
-  ): org.apache.pekko.actor.typed.ActorRef[ByteCodeWorker.Command] = {
+  ): org.apache.pekko.actor.typed.ActorRef[ByteCodeWorker.Command] =
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     testKit.spawn(
       ByteCodeWorker(coordinator.ref, networkPeerManager.ref, requestTracker)
     )
-  }
 
   "ByteCodeWorker" should "send GetByteCodes to peer via NetworkPeerManager on ByteCodeWorkerFetchTask" taggedAs UnitTest in {
     val coordinator = makeCoordinatorProbe()
@@ -183,4 +182,3 @@ class ByteCodeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     // Coordinator should NOT receive anything for the mismatched response
     coordinator.expectNoMessage(200.millis)
   }
-}

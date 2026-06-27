@@ -31,7 +31,7 @@ class EngineApiService(
       com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
     ]]
 )(implicit blockchainConfig: BlockchainConfig, typedScheduler: org.apache.pekko.actor.typed.Scheduler)
-    extends Logger {
+    extends Logger:
 
   import org.apache.pekko.util.Timeout
   import scala.concurrent.duration.*
@@ -82,29 +82,25 @@ class EngineApiService(
   private val pendingPayloadTimestamps = new java.util.concurrent.ConcurrentHashMap[ByteString, Long]()
 
   /** Remove a payloadId from all four pending maps and the timestamp index. */
-  private def removePayloadEntry(payloadId: ByteString): Unit = {
+  private def removePayloadEntry(payloadId: ByteString): Unit =
     pendingPayloads.remove(payloadId)
     pendingPayloadRequests.remove(payloadId)
     pendingPayloadReceipts.remove(payloadId)
     pendingPayloadBlobsBundle.remove(payloadId)
     pendingPayloadTimestamps.remove(payloadId)
-  }
 
   /** If the timestamp map is at cap, find the oldest entry and remove it from all four maps. */
   private def evictOldestIfAtCapacity(): Unit = evictionLock.synchronized {
-    if pendingPayloadTimestamps.size() >= PayloadCap then {
+    if pendingPayloadTimestamps.size() >= PayloadCap then
       var oldestKey: ByteString = null
       var oldestTs: Long = Long.MaxValue
       val iter = pendingPayloadTimestamps.entrySet().iterator()
-      while iter.hasNext do {
+      while iter.hasNext do
         val e = iter.next()
-        if e.getValue < oldestTs then {
+        if e.getValue < oldestTs then
           oldestTs = e.getValue
           oldestKey = e.getKey
-        }
-      }
       if oldestKey ne null then removePayloadEntry(oldestKey)
-    }
   }
 
   /** Blocks that returned INVALID via newPayload. Maps blockHash → latestValidHash. forkchoiceUpdated should not accept
@@ -123,18 +119,16 @@ class EngineApiService(
   /** Mark `hash` as INVALID and recursively invalidate every optimistically-accepted descendant. All descendants
     * inherit the same `latestValidHash`.
     */
-  private def markInvalidRecursive(hash: ByteString, lvh: ByteString): Unit = {
+  private def markInvalidRecursive(hash: ByteString, lvh: ByteString): Unit =
     invalidBlocks.put(hash, lvh)
     val children = Option(acceptedChildrenByParent.remove(hash))
     children.foreach { set =>
       val iter = set.iterator()
-      while iter.hasNext do {
+      while iter.hasNext do
         val child = iter.next()
         blockchainWriter.removeBlockByHash(BlockHash(child)).commit()
         markInvalidRecursive(child, lvh)
-      }
     }
-  }
 
   /** Return the latest block number from the blockchain storage. */
   def getLatestBlockNumber: BigInt =
@@ -151,7 +145,7 @@ class EngineApiService(
   def newPayload(payload: ExecutionPayload): IO[PayloadStatusV1] = IO {
     val block = payloadToBlock(payload)
 
-    if block.header.hash.value != payload.blockHash then {
+    if block.header.hash.value != payload.blockHash then
       log.warn(
         "[ENGINE-API] newPayload #{}: block-hash mismatch computed={} payload={}",
         payload.blockNumber,
@@ -170,7 +164,7 @@ class EngineApiService(
       // We never stored anything under payload.blockHash in this call, so there is nothing
       // safe and correct to remove.
       PayloadStatusV1(Invalid, latestValidHash = None, validationError = Some("block hash mismatch"))
-    } else if {
+    else if
       // EIP-4844 versioned-hash check must run BEFORE the "already stored" dedup. The hive
       // "NewPayloadV3 Versioned Hashes, Non-Empty Hashes" tests call newPayloadV3 twice for
       // the same payload — once with matching hashes (expected VALID, block gets stored),
@@ -185,7 +179,7 @@ class EngineApiService(
           }
         expected != payloadHashes
       }
-    } then {
+    then
       // VersionedHashes mismatch: INVALID per EIP-4844 with latestValidHash=parent.hash.
       // Do NOT add to invalidBlocks — the mismatch is between the CL-supplied
       // `expectedBlobVersionedHashes` argument and the payload's actual blob txs, not a
@@ -196,13 +190,13 @@ class EngineApiService(
       val lvh =
         blockchainReader.getBlockHeaderByHash(BlockHash(payload.parentHash)).map(_.hash.value).getOrElse(zeroHash)
       PayloadStatusV1(Invalid, latestValidHash = Some(lvh), validationError = Some("INVALID_VERSIONED_HASHES"))
-    } else if blockchainReader.getBlockHeaderByHash(BlockHash(payload.blockHash)).exists { h =>
+    else if blockchainReader.getBlockHeaderByHash(BlockHash(payload.blockHash)).exists { h =>
         blockchainReader.getBlockHeaderByNumber(h.number).exists(_.hash.value == payload.blockHash)
       }
-    then {
+    then
       // Already fully stored with number mapping — skip re-execution
       PayloadStatusV1(Valid, latestValidHash = Some(payload.blockHash))
-    } else if invalidBlocks.containsKey(payload.parentHash) then {
+    else if invalidBlocks.containsKey(payload.parentHash) then
       // Parent was previously marked INVALID — child inherits invalidity.
       // Propagate the parent's latestValidHash (the last valid ancestor).
       val propagatedLvh = invalidBlocks.get(payload.parentHash) // non-null: containsKey guard
@@ -214,7 +208,7 @@ class EngineApiService(
         latestValidHash = Some(propagatedLvh),
         validationError = Some("parent block was previously invalidated")
       )
-    } else {
+    else
       // Try full execution if parent block is known
       val parentKnown = blockchainReader.getBlockHeaderByHash(BlockHash(payload.parentHash)).isDefined
       val parentHeader = blockchainReader.getBlockHeaderByHash(BlockHash(payload.parentHash))
@@ -227,7 +221,7 @@ class EngineApiService(
           Some(s"invalid timestamp: ${block.header.unixTimestamp} <= parent ${parent.unixTimestamp}")
         else if block.header.gasLimit < BigInt(5000) then
           Some(s"gas limit below minimum: ${block.header.gasLimit} < 5000")
-        else {
+        else
           // EIP-1559 gas limit bounds: |gasLimit - parent.gasLimit| < parent.gasLimit / 1024
           val diff = (block.header.gasLimit - parent.gasLimit).abs
           val limit = parent.gasLimit / 1024
@@ -237,7 +231,7 @@ class EngineApiService(
           // EIP-7691 (Prague) raises target 3→6 blobs; EIP-7892 BPO1/BPO2 raise it 6→8→12.
           // Pass the right target based on the CHILD block's fork timestamp (child is the
           // one being validated; parent may precede the active BPO).
-          else if block.header.excessBlobGas.isDefined then {
+          else if block.header.excessBlobGas.isDefined then
             val parentExcess = parent.excessBlobGas.getOrElse(BigInt(0))
             val parentUsed = parent.blobGasUsed.getOrElse(BigInt(0))
             val parentBaseFee = parent.baseFee.getOrElse(BigInt(0))
@@ -252,7 +246,7 @@ class EngineApiService(
             if actual != expectedExcess then
               // Include canonical EEST exception name so the test framework's mapper matches.
               Some(s"INCORRECT_EXCESS_BLOB_GAS: expected $expectedExcess got $actual")
-            else {
+            else
               // Validate blobGasUsed: count blob txs * GAS_PER_BLOB
               val blobTxCount = block.body.transactionList.collect {
                 case SignedTransaction(blobTx: com.chipprbots.ethereum.domain.BlobTransaction, _) =>
@@ -263,9 +257,7 @@ class EngineApiService(
               if actualBlobGas != expectedBlobGas then
                 Some(s"INCORRECT_BLOB_GAS_USED: expected $expectedBlobGas got $actualBlobGas")
               else None
-            }
-          } else None
-        }
+          else None
       }
       // EIP-4844 (newPayloadV3): the CL declares which versioned hashes it expects this
       // payload to carry. Derive our own ordered list from the payload's blob txs and
@@ -286,13 +278,13 @@ class EngineApiService(
       }
 
       val preExecError = headerInvalid.orElse(versionedHashesInvalid)
-      if preExecError.isDefined then {
+      if preExecError.isDefined then
         val latestValid = parentHeader.map(_.hash.value).getOrElse(zeroHash)
         blockchainWriter.removeBlockByHash(BlockHash(payload.blockHash)).commit()
         markInvalidRecursive(payload.blockHash, latestValid)
         EngineApiMetrics.recordNewPayload("INVALID", payload.blockNumber.toLong, payload.timestamp)
         PayloadStatusV1(Invalid, latestValidHash = Some(latestValid), validationError = Some(preExecError.get))
-      } else {
+      else
 
         // Tracks the tx-level reason for an execution failure so we can surface it in
         // PayloadStatus.validationError (for EEST exception mapping, e.g.
@@ -308,86 +300,81 @@ class EngineApiService(
           blockchainReader.getBlockHeaderByNumber(p.number).exists(_.hash == p.hash) ||
           blockchainReader.getReceiptsByHash(p.hash).isDefined
         }
-        val executionResult = if parentKnown && parentValidated then {
-          try
-            blockExecution.executeAndValidateBlockFull(block, alreadyValidated = true) match {
-              case Right((receipts, derivedRequests)) =>
-                // EIP-7685: Per Engine API spec, verify the CL-supplied executionRequests match
-                // what block execution actually produced. Mismatch → INVALID (e.g. CL attempted
-                // to inject a deposit/withdrawal request that the execution layer didn't emit).
-                val suppliedRequests = payload.executionRequests.getOrElse(Nil)
-                val requestsMismatch =
-                  blockchainConfig.isPragueTimestamp(block.header.unixTimestamp) &&
-                    suppliedRequests != derivedRequests
-                if requestsMismatch then {
-                  val lvh = parentHeader.map(_.hash.value).getOrElse(zeroHash)
-                  blockchainWriter.removeBlockByHash(BlockHash(payload.blockHash)).commit()
-                  markInvalidRecursive(payload.blockHash, lvh)
-                  executionErrorReason.set(
-                    Some(
-                      s"INVALID_REQUESTS: executionRequests mismatch " +
-                        s"(supplied=${suppliedRequests.size}, derived=${derivedRequests.size})"
-                    )
-                  )
-                  log.warn("[ENGINE-API] newPayload #{}: INVALID_REQUESTS", payload.blockNumber)
-                  Some(false)
-                } else {
-                  // Detect whether this payload extends canonical (parent == current best) or is a
-                  // sidechain. For canonical-extending payloads we write number→hash; for sidechains
-                  // we store by-hash-only so later forkchoiceUpdated can promote via
-                  // ForkChoiceManager.promoteBranchToCanonical.
-                  val extendsCanonical = parentHeader.exists { p =>
-                    blockchainReader.getBlockHeaderByNumber(p.number).exists(_.hash == p.hash)
-                  }
-                  if extendsCanonical then blockchainWriter.storeBlock(block).commit()
-                  else blockchainWriter.storeBlockByHashOnly(block).commit()
-                  blockchainWriter.storeReceipts(block.header.hash, receipts).commit()
-                  // NB: do NOT remove txs from the pool here. A newPayload'd block is stored
-                  // but not yet canonical (no FCU has advanced bestBlock); the same txs must
-                  // remain available for an alternative sibling payload on the same parent
-                  // (hive 'Sidechain Reorg' test). Pool removal happens in forkchoiceUpdated
-                  // once the block is promoted.
-                  log.info(
-                    "[ENGINE-API] newPayload #{}: EXECUTED OK (txs={} sidechain={} requests={} headerStateRoot={}...)",
-                    payload.blockNumber,
-                    block.body.numberOfTxs,
-                    !extendsCanonical,
-                    derivedRequests.size,
-                    block.header.stateRoot.value.take(8).map("%02x".format(_)).mkString
-                  )
-                  Some(true) // fully executed
-                }
-              case Left(error) =>
-                error match {
-                  case com.chipprbots.ethereum.ledger.BlockExecutionError.MPTError(_) |
-                      com.chipprbots.ethereum.ledger.BlockExecutionError.MissingParentError =>
-                    // Missing state — can't validate, return SYNCING
-                    log.warn("[ENGINE-API] newPayload #{}: missing state, SYNCING", payload.blockNumber)
-                    None
-                  case _ =>
-                    // Genuine validation failure (wrong stateRoot, gasUsed, receipts, etc.)
+        val executionResult =
+          if parentKnown && parentValidated then
+            try
+              blockExecution.executeAndValidateBlockFull(block, alreadyValidated = true) match
+                case Right((receipts, derivedRequests)) =>
+                  // EIP-7685: Per Engine API spec, verify the CL-supplied executionRequests match
+                  // what block execution actually produced. Mismatch → INVALID (e.g. CL attempted
+                  // to inject a deposit/withdrawal request that the execution layer didn't emit).
+                  val suppliedRequests = payload.executionRequests.getOrElse(Nil)
+                  val requestsMismatch =
+                    blockchainConfig.isPragueTimestamp(block.header.unixTimestamp) &&
+                      suppliedRequests != derivedRequests
+                  if requestsMismatch then
                     val lvh = parentHeader.map(_.hash.value).getOrElse(zeroHash)
                     blockchainWriter.removeBlockByHash(BlockHash(payload.blockHash)).commit()
                     markInvalidRecursive(payload.blockHash, lvh)
-                    executionErrorReason.set(Some(error.describe))
-                    log.warn("[ENGINE-API] newPayload #{}: INVALID reason={}", payload.blockNumber, error.describe)
+                    executionErrorReason.set(
+                      Some(
+                        s"INVALID_REQUESTS: executionRequests mismatch " +
+                          s"(supplied=${suppliedRequests.size}, derived=${derivedRequests.size})"
+                      )
+                    )
+                    log.warn("[ENGINE-API] newPayload #{}: INVALID_REQUESTS", payload.blockNumber)
                     Some(false)
-                }
-            }
-          catch {
-            case _: com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MPTException =>
-              // Missing state nodes — can't execute, return SYNCING
-              log.warn("[ENGINE-API] newPayload #{}: MPT error, SYNCING", payload.blockNumber)
-              None
-            case e: Exception =>
-              log.warn("[ENGINE-API] newPayload #{}: error={} SYNCING", payload.blockNumber, e.getMessage)
-              None
-          }
-        } else {
-          None // parent not known
-        }
+                  else
+                    // Detect whether this payload extends canonical (parent == current best) or is a
+                    // sidechain. For canonical-extending payloads we write number→hash; for sidechains
+                    // we store by-hash-only so later forkchoiceUpdated can promote via
+                    // ForkChoiceManager.promoteBranchToCanonical.
+                    val extendsCanonical = parentHeader.exists { p =>
+                      blockchainReader.getBlockHeaderByNumber(p.number).exists(_.hash == p.hash)
+                    }
+                    if extendsCanonical then blockchainWriter.storeBlock(block).commit()
+                    else blockchainWriter.storeBlockByHashOnly(block).commit()
+                    blockchainWriter.storeReceipts(block.header.hash, receipts).commit()
+                    // NB: do NOT remove txs from the pool here. A newPayload'd block is stored
+                    // but not yet canonical (no FCU has advanced bestBlock); the same txs must
+                    // remain available for an alternative sibling payload on the same parent
+                    // (hive 'Sidechain Reorg' test). Pool removal happens in forkchoiceUpdated
+                    // once the block is promoted.
+                    log.info(
+                      "[ENGINE-API] newPayload #{}: EXECUTED OK (txs={} sidechain={} requests={} headerStateRoot={}...)",
+                      payload.blockNumber,
+                      block.body.numberOfTxs,
+                      !extendsCanonical,
+                      derivedRequests.size,
+                      block.header.stateRoot.value.take(8).map("%02x".format(_)).mkString
+                    )
+                    Some(true) // fully executed
+                case Left(error) =>
+                  error match
+                    case com.chipprbots.ethereum.ledger.BlockExecutionError.MPTError(_) |
+                        com.chipprbots.ethereum.ledger.BlockExecutionError.MissingParentError =>
+                      // Missing state — can't validate, return SYNCING
+                      log.warn("[ENGINE-API] newPayload #{}: missing state, SYNCING", payload.blockNumber)
+                      None
+                    case _ =>
+                      // Genuine validation failure (wrong stateRoot, gasUsed, receipts, etc.)
+                      val lvh = parentHeader.map(_.hash.value).getOrElse(zeroHash)
+                      blockchainWriter.removeBlockByHash(BlockHash(payload.blockHash)).commit()
+                      markInvalidRecursive(payload.blockHash, lvh)
+                      executionErrorReason.set(Some(error.describe))
+                      log.warn("[ENGINE-API] newPayload #{}: INVALID reason={}", payload.blockNumber, error.describe)
+                      Some(false)
+            catch
+              case _: com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MPTException =>
+                // Missing state nodes — can't execute, return SYNCING
+                log.warn("[ENGINE-API] newPayload #{}: MPT error, SYNCING", payload.blockNumber)
+                None
+              case e: Exception =>
+                log.warn("[ENGINE-API] newPayload #{}: error={} SYNCING", payload.blockNumber, e.getMessage)
+                None
+          else None // parent not known
 
-        executionResult match {
+        executionResult match
           case Some(true) =>
             // Fully executed and validated
             EngineApiMetrics.recordNewPayload("VALID", payload.blockNumber.toLong, payload.timestamp)
@@ -420,9 +407,7 @@ class EngineApiService(
             log.info("[ENGINE-API] newPayload #{}: ACCEPTED (parent unknown)", payload.blockNumber)
             EngineApiMetrics.recordNewPayload("ACCEPTED", payload.blockNumber.toLong, payload.timestamp)
             PayloadStatusV1(Accepted)
-        }
-      } // end headerInvalid else
-    }
+      // end headerInvalid else
   }
 
   /** engine_forkchoiceUpdatedV1/V2/V3 — Update fork choice state, optionally start payload building. Returns
@@ -437,7 +422,7 @@ class EngineApiService(
     // (applyForkChoiceState calls saveBestKnownBlocks which would make the block canonical)
     val zeroHash = ByteString(new Array[Byte](32))
 
-    if invalidBlocks.containsKey(forkChoiceState.headBlockHash) then {
+    if invalidBlocks.containsKey(forkChoiceState.headBlockHash) then
       val latestValid = Option(invalidBlocks.get(forkChoiceState.headBlockHash))
       EngineApiMetrics.recordForkchoiceUpdated("INVALID")
       IO.pure(
@@ -451,7 +436,7 @@ class EngineApiService(
           )
         )
       )
-    } else {
+    else
       // Check if the head block is fully stored (number→hash mapping exists).
       // Blocks stored via storeBlockByHashOnly (ACCEPTED) don't have this mapping.
       // Chain-imported blocks (chain.rlp) and newPayload VALID blocks DO have it.
@@ -484,7 +469,7 @@ class EngineApiService(
         blockExistsByHash && !blockFullyStored && !isGenesis &&
           blockchainReader.getReceiptsByHash(BlockHash(forkChoiceState.headBlockHash)).isEmpty
 
-      if !blockExistsByHash && !isGenesis then {
+      if !blockExistsByHash && !isGenesis then
         // Head unknown — client is still syncing to this head. Notify ForkChoiceManager
         // anyway so its BeaconHead listener (SyncController) can drive SNAP-sync pivot
         // selection. Without this, post-merge cold-start hangs forever in CL-PIVOT
@@ -492,26 +477,26 @@ class EngineApiService(
         forkChoiceManager.applyForkChoiceState(forkChoiceState)
         EngineApiMetrics.recordForkchoiceUpdated("SYNCING")
         IO.pure(Right(ForkchoiceUpdatedResponse(payloadStatus = PayloadStatusV1(Syncing))))
-      } else if headOptimistic then {
+      else if headOptimistic then
         // Same rationale as the unknown-head case: drive ForkChoiceManager so SNAP sync
         // can re-pivot on the freshest CL head while we're still optimistically caught up.
         forkChoiceManager.applyForkChoiceState(forkChoiceState)
         EngineApiMetrics.recordForkchoiceUpdated("SYNCING")
         IO.pure(Right(ForkchoiceUpdatedResponse(payloadStatus = PayloadStatusV1(Syncing))))
-      } else if safeUnknown || finalizedUnknown then {
+      else if safeUnknown || finalizedUnknown then
         val msg = if safeUnknown then "unknown safe block hash" else "unknown finalized block hash"
         EngineApiMetrics.recordForkchoiceUpdated("INVALID")
         IO.pure(Left(msg))
-      } else if headHeader.isDefined && !isAncestorOrEqual(safeHash, forkChoiceState.headBlockHash, zeroHash) then {
+      else if headHeader.isDefined && !isAncestorOrEqual(safeHash, forkChoiceState.headBlockHash, zeroHash) then
         EngineApiMetrics.recordForkchoiceUpdated("INVALID")
         IO.pure(Left("invalid forkchoice state: safe block is not an ancestor of head"))
-      } else if headHeader.isDefined && !isAncestorOrEqual(finalizedHash, forkChoiceState.headBlockHash, zeroHash)
-      then {
+      else if headHeader.isDefined && !isAncestorOrEqual(finalizedHash, forkChoiceState.headBlockHash, zeroHash)
+      then
         EngineApiMetrics.recordForkchoiceUpdated("INVALID")
         IO.pure(Left("invalid forkchoice state: finalized block is not an ancestor of head"))
-      } else {
+      else
 
-        forkChoiceManager.applyForkChoiceState(forkChoiceState) match {
+        forkChoiceManager.applyForkChoiceState(forkChoiceState) match
           case Left(_) =>
             // Head not known — return SYNCING so CL knows we need newPayload
             EngineApiMetrics.recordForkchoiceUpdated("SYNCING")
@@ -534,7 +519,7 @@ class EngineApiService(
             // or below the finalized height. Blocks ABOVE the watermark are left intact —
             // a block invalid but not yet finalized may still be an FCU head candidate,
             // and premature eviction is a consensus fault.
-            if finalizedHash != zeroHash then {
+            if finalizedHash != zeroHash then
               blockchainReader.getBlockHeaderByHash(BlockHash(finalizedHash)).foreach { finalizedHeader =>
                 val finalizedNumber = finalizedHeader.number
                 invalidBlocks.entrySet().removeIf { e =>
@@ -544,7 +529,6 @@ class EngineApiService(
                   blockchainReader.getBlockHeaderByHash(BlockHash(e.getKey)).exists(_.number <= finalizedNumber)
                 }
               }
-            }
 
             // Validate payload attributes AFTER applying forkchoice — per engine-API spec
             // step ordering (apply forkchoiceState, THEN check attrs) and hive's
@@ -552,18 +536,17 @@ class EngineApiService(
             // even when attrs are rejected with -38003.
             val invalidAttrsMsg: Option[String] = payloadAttributes.flatMap { attrs =>
               if attrs.timestamp == 0 then Some("invalid payload attributes: zero timestamp")
-              else {
+              else
                 blockchainReader.getBlockHeaderByHash(BlockHash(forkChoiceState.headBlockHash)).flatMap { parent =>
                   if attrs.timestamp <= parent.unixTimestamp then Some("invalid payload attributes: timestamp too low")
                   else None
                 }
-              }
             }
-            if invalidAttrsMsg.isDefined then {
+            if invalidAttrsMsg.isDefined then
               EngineApiMetrics.recordForkchoiceUpdated("INVALID")
               IO.pure(Left("ATTR:" + invalidAttrsMsg.get))
-            } else {
-              payloadAttributes match {
+            else
+              payloadAttributes match
                 case None =>
                   EngineApiMetrics.recordForkchoiceUpdated("VALID")
                   IO.pure(
@@ -600,7 +583,7 @@ class EngineApiService(
                   val id = ByteString(idBytes.take(8))
 
                   val parentOpt = blockchainReader.getBlockByHash(BlockHash(forkChoiceState.headBlockHash))
-                  parentOpt match {
+                  parentOpt match
                     case None =>
                       EngineApiMetrics.recordForkchoiceUpdated("VALID")
                       IO.pure(
@@ -619,13 +602,12 @@ class EngineApiService(
                       val baseFee: BigInt =
                         if parent.header.number == 0 then parentBaseFee
                         else if parent.header.gasUsed == parentGasTarget then parentBaseFee
-                        else if parent.header.gasUsed > parentGasTarget then {
+                        else if parent.header.gasUsed > parentGasTarget then
                           val delta = parentBaseFee * (parent.header.gasUsed - parentGasTarget) / parentGasTarget / 8
                           parentBaseFee + (if delta == BigInt(0) then BigInt(1) else delta)
-                        } else {
+                        else
                           val delta = parentBaseFee * (parentGasTarget - parent.header.gasUsed) / parentGasTarget / 8
                           if parentBaseFee - delta < 0 then BigInt(0) else parentBaseFee - delta
-                        }
 
                       // Fetch pending transactions from the tx pool using IO.fromFuture so the
                       // CE3 compute thread is not blocked waiting for the actor response.
@@ -649,13 +631,12 @@ class EngineApiService(
                           IO {
                             val expectedChainId = blockchainConfig.chainId
                             val filtered = response.pendingTransactions.map(_.stx.tx).filter { stx =>
-                              val txChainId: Option[BigInt] = stx.tx match {
+                              val txChainId: Option[BigInt] = stx.tx match
                                 case t: com.chipprbots.ethereum.domain.TransactionWithAccessList => Some(t.chainId)
                                 case t: com.chipprbots.ethereum.domain.TransactionWithDynamicFee => Some(t.chainId)
                                 case t: com.chipprbots.ethereum.domain.BlobTransaction           => Some(t.chainId)
                                 case t: com.chipprbots.ethereum.domain.SetCodeTransaction        => Some(t.chainId)
                                 case _ => None // legacy txs don't have explicit chainID
-                              }
                               txChainId.forall(_ == expectedChainId)
                             }
                             // Sort by (sender, nonce) so execution processes each sender's txs
@@ -677,21 +658,19 @@ class EngineApiService(
                             // MAX_BLOB_GAS_PER_BLOCK (6 blobs Cancun, 9 blobs Prague). Without this cap
                             // the proposer packs every pool blob tx into one block and getPayloadV3's
                             // blobsBundle grows past the test's `ExpectedIncludedBlobCount`.
-                            val pendingTxsForBlock = {
+                            val pendingTxsForBlock =
                               val maxBlobGas = BlobGasUtils.maxBlobGasPerBlock(attrs.timestamp, blockchainConfig)
                               pendingTxs
                                 .foldLeft((Seq.empty[SignedTransaction], BigInt(0))) { case ((kept, blobGas), stx) =>
-                                  stx.tx match {
+                                  stx.tx match
                                     case b: com.chipprbots.ethereum.domain.BlobTransaction =>
                                       val add = BigInt(b.blobVersionedHashes.size) * BlobGasUtils.GAS_PER_BLOB
                                       if blobGas + add <= maxBlobGas then (kept :+ stx, blobGas + add)
                                       else (kept, blobGas) // skip this blob tx, smaller ones later may still fit
                                     case _ =>
                                       (kept :+ stx, blobGas)
-                                  }
                                 }
                                 ._1
-                            }
 
                             val emptyWithdrawalsRoot = ByteString(
                               kec256(
@@ -805,7 +784,7 @@ class EngineApiService(
                             import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
                             import com.chipprbots.ethereum.domain.Receipt
                             val (receipts, gasUsedTotal, finalStateRoot, executionRequests) =
-                              blockExecution.executeForProposer(skeletonBlock) match {
+                              blockExecution.executeForProposer(skeletonBlock) match
                                 case Right(result) =>
                                   (
                                     result.receipts,
@@ -816,7 +795,6 @@ class EngineApiService(
                                 case Left(err) =>
                                   log.error("Proposer-mode execution failed: {}", err)
                                   (Seq.empty[Receipt], BigInt(0), parent.header.stateRoot.value, Seq.empty[ByteString])
-                              }
 
                             val receiptsLogs =
                               BloomFilter.Empty.toArray +: receipts.map(_.logsBloomFilter.toArray)
@@ -824,7 +802,7 @@ class EngineApiService(
                             def buildMpt[T](
                                 items: Seq[T],
                                 ser: com.chipprbots.ethereum.mpt.ByteArraySerializable[T]
-                            ): ByteString = {
+                            ): ByteString =
                               val storage = new com.chipprbots.ethereum.db.storage.SerializingMptStorage(
                                 new com.chipprbots.ethereum.db.storage.ArchiveNodeStorage(
                                   new com.chipprbots.ethereum.db.storage.NodeStorage(
@@ -838,7 +816,6 @@ class EngineApiService(
                                 t.put(idx, item)
                               }
                               ByteString(trie.getRootHash)
-                            }
 
                             // Blob-gas accounting: sum GAS_PER_BLOB * blob_count across blob txs.
                             val blobGasUsed: BigInt = skeletonBlock.body.transactionList.map {
@@ -848,7 +825,7 @@ class EngineApiService(
                             }.sum
 
                             // Finalize extraFields with execution-derived values.
-                            val finalExtraFields = initialExtraFields match {
+                            val finalExtraFields = initialExtraFields match
                               case _: HefPostPrague =>
                                 HefPostPrague(
                                   baseFee,
@@ -867,7 +844,6 @@ class EngineApiService(
                                   parentBeaconBlockRoot
                                 )
                               case other => other
-                            }
 
                             val updatedHeader = header.copy(
                               stateRoot = TrieRoot(finalStateRoot),
@@ -916,14 +892,13 @@ class EngineApiService(
                             )
                           )
                         }
-                  } // closes: parentOpt match
-              } // closes: payloadAttributes match
-            } // end else (invalidAttrs check)
+              // closes: parentOpt match
+            // closes: payloadAttributes match
+          // end else (invalidAttrs check)
           // end else (safe/finalized check)
           // end case Right
-        }
-      } // end else (blockFullyStored check)
-    } // end else (invalidBlocks check)
+      // end else (blockFullyStored check)
+    // end else (invalidBlocks check)
   }
 
   /** engine_getPayloadV1/V2/V3/V4 — Return a previously built payload by ID. */
@@ -937,15 +912,14 @@ class EngineApiService(
     // removePayloadEntry call also cleans up pendingPayloadRequests entries that V1/V2/V3
     // paths would otherwise orphan (they never call getPayloadExecutionRequests which does
     // the only explicit .remove of that map).
-    Option(pendingPayloads.get(payloadId)) match {
+    Option(pendingPayloads.get(payloadId)) match
       case Some(block) =>
         val age = Option(pendingPayloadTimestamps.get(payloadId)).map(System.nanoTime() - _).getOrElse(0L)
-        if age > PayloadTtlNs then {
+        if age > PayloadTtlNs then
           removePayloadEntry(payloadId)
           Left("Payload not available")
-        } else Right(block)
+        else Right(block)
       case None => Left("Payload not available")
-    }
   }
 
   /** Return the EIP-7685 executionRequests (typed byte strings, type-prefixed) associated with a payload we built. Only
@@ -975,7 +949,7 @@ class EngineApiService(
   private def buildBlobsBundle(
       txs: Seq[SignedTransaction],
       blobTxRawBytes: Map[ByteString, ByteString]
-  ): BlobsBundleData = {
+  ): BlobsBundleData =
     import com.chipprbots.ethereum.rlp.{rawDecode, RLPList, RLPValue}
     import com.chipprbots.ethereum.crypto.KzgCellProofs
     val blobTxHashes = txs.collect {
@@ -986,19 +960,19 @@ class EngineApiService(
     val allProofs = Seq.newBuilder[ByteString]
     val allCellProofsPerBlob = Seq.newBuilder[Seq[ByteString]]
     blobTxHashes.foreach { h =>
-      blobTxRawBytes.get(h.value) match {
+      blobTxRawBytes.get(h.value) match
         case Some(raw) if raw.length > 1 && raw(0) == 0x03 =>
           try
-            rawDecode(raw.toArray.drop(1)) match {
+            rawDecode(raw.toArray.drop(1)) match
               case RLPList(_, blobs: RLPList, commitments: RLPList, proofs: RLPList) =>
                 blobs.items.foreach {
                   case RLPValue(b) =>
                     allBlobs += ByteString(b)
                     val cellProofs: Seq[ByteString] =
-                      try {
+                      try
                         val (_, perCellProofs) = KzgCellProofs.computeCellsAndKzgProofs(b)
                         perCellProofs.toSeq.map(ByteString(_))
-                      } catch {
+                      catch
                         case e: Exception =>
                           log.warn(
                             "EIP-7594 cell-proof computation failed for blob in tx {}: {}",
@@ -1006,7 +980,6 @@ class EngineApiService(
                             e.getMessage
                           )
                           Seq.empty
-                      }
                     allCellProofsPerBlob += cellProofs
                   case _ =>
                 }
@@ -1017,20 +990,16 @@ class EngineApiService(
                   "Blob tx {} sidecar RLP shape unexpected; skipping",
                   h.value.toArray.map("%02x".format(_)).mkString
                 )
-            }
-          catch {
+          catch
             case e: Exception =>
               log.warn(
                 "Failed to decode blob tx {} sidecar: {}",
                 h.value.toArray.map("%02x".format(_)).mkString,
                 e.getMessage
               )
-          }
         case _ => // tx from network / historical — we didn't store a sidecar
-      }
     }
     BlobsBundleData(allBlobs.result(), allCommitments.result(), allProofs.result(), allCellProofsPerBlob.result())
-  }
 
   /** engine_exchangeCapabilities — return supported Engine API methods. */
   def exchangeCapabilities(clCapabilities: Seq[String]): IO[Seq[String]] = IO {
@@ -1065,22 +1034,21 @@ class EngineApiService(
   private def isAncestorOrEqual(ancestor: ByteString, descendant: ByteString, zeroHash: ByteString): Boolean =
     if ancestor == zeroHash then true
     else if ancestor == descendant then true
-    else {
+    else
       var cursor: ByteString = descendant
       var steps = 0
       val maxWalk = 8192
       var found = false
       while !found && steps < maxWalk && cursor != zeroHash do
-        blockchainReader.getBlockHeaderByHash(BlockHash(cursor)) match {
+        blockchainReader.getBlockHeaderByHash(BlockHash(cursor)) match
           case Some(h) =>
-            if h.parentHash.value == ancestor then { found = true }
-            else { cursor = h.parentHash.value; steps += 1 }
+            if h.parentHash.value == ancestor then found = true
+            else
+              cursor = h.parentHash.value; steps += 1
           case None =>
             // Missing ancestor data — assume not present rather than loop forever
             cursor = zeroHash
-        }
       found
-    }
 
   /** engine_getPayloadBodiesByHashV1: look up a block body by hash. Returns (rawTransactions, encodedWithdrawals) or
     * None if not found.
@@ -1094,7 +1062,7 @@ class EngineApiService(
       blockchainReader.getBlockBodyByHash(header.hash).map(bodyToPayloadBody)
     }
 
-  private def bodyToPayloadBody(body: BlockBody): (Seq[ByteString], Option[Seq[org.json4s.JValue]]) = {
+  private def bodyToPayloadBody(body: BlockBody): (Seq[ByteString], Option[Seq[org.json4s.JValue]]) =
     val rawTxs = body.transactionList.map { stx =>
       ByteString(rlpEncode(SignedTransactionEnc(stx).toRLPEncodable))
     }
@@ -1110,10 +1078,9 @@ class EngineApiService(
       }
     }
     (rawTxs, withdrawals)
-  }
 
   /** Convert an ExecutionPayload into a Block. */
-  private def payloadToBlock(payload: ExecutionPayload): Block = {
+  private def payloadToBlock(payload: ExecutionPayload): Block =
     // Decode transactions from raw bytes
     val signedTxs = payload.transactions.map { txBytes =>
       txBytes.toArray.toSignedTransaction
@@ -1124,7 +1091,7 @@ class EngineApiService(
     val pbbr = payload.parentBeaconBlockRoot.getOrElse(ByteString(new Array[Byte](32)))
 
     val extraFields =
-      (payload.executionRequests, payload.blobGasUsed, payload.excessBlobGas, payload.withdrawals) match {
+      (payload.executionRequests, payload.blobGasUsed, payload.excessBlobGas, payload.withdrawals) match
         case (Some(requests), Some(bgu), Some(ebg), _) =>
           // Prague/Electra: has executionRequests → HefPostPrague with requestsHash
           HefPostPrague(
@@ -1151,7 +1118,6 @@ class EngineApiService(
           )
         case _ =>
           HefPostOlympia(baseFee = payload.baseFeePerGas)
-      }
 
     val header = BlockHeader(
       parentHash = BlockHash(payload.parentHash),
@@ -1179,31 +1145,26 @@ class EngineApiService(
     )
 
     Block(header, body)
-  }
 
   /** Compute requestsHash per EIP-7685: sha256(sha256(request_0) ++ sha256(request_1) ++ ...)
     */
-  private def computeRequestsHash(requests: Seq[ByteString]): ByteString = {
+  private def computeRequestsHash(requests: Seq[ByteString]): ByteString =
     val outerDigest = MessageDigest.getInstance("SHA-256")
     requests.foreach { request =>
-      if request.length > 1 then {
+      if request.length > 1 then
         val innerDigest = MessageDigest.getInstance("SHA-256")
         innerDigest.update(request.toArray)
         outerDigest.update(innerDigest.digest())
-      }
     }
     ByteString(outerDigest.digest())
-  }
 
   /** Compute the withdrawals trie root via ephemeral MPT (same approach as StdBlockValidator). */
   private def computeWithdrawalsRoot(withdrawals: Seq[Withdrawal]): ByteString =
-    if withdrawals.isEmpty then {
-      BlockHeader.EmptyMpt
-    } else {
-      val serializable = new ByteArraySerializable[Withdrawal] {
+    if withdrawals.isEmpty then BlockHeader.EmptyMpt
+    else
+      val serializable = new ByteArraySerializable[Withdrawal]:
         override def fromBytes(bytes: Array[Byte]): Withdrawal = bytes.toWithdrawal
         override def toBytes(input: Withdrawal): Array[Byte] = rlpEncode(WithdrawalEnc(input).toRLPEncodable)
-      }
       val stateStorage = com.chipprbots.ethereum.db.storage.StateStorage.getReadOnlyStorage(
         com.chipprbots.ethereum.db.dataSource.EphemDataSource()
       )
@@ -1212,13 +1173,11 @@ class EngineApiService(
       )(MptListValidator.intByteArraySerializable, serializable)
       val root = withdrawals.zipWithIndex.foldLeft(trie)((t, r) => t.put(r._2, r._1)).getRootHash
       ByteString(root)
-    }
 
   /** Compute the transactions trie root via ephemeral MPT (same approach as StdBlockValidator). */
   private def computeTransactionsRoot(txs: Seq[SignedTransaction]): ByteString =
-    if txs.isEmpty then {
-      BlockHeader.EmptyMpt
-    } else {
+    if txs.isEmpty then BlockHeader.EmptyMpt
+    else
       val stateStorage = com.chipprbots.ethereum.db.storage.StateStorage.getReadOnlyStorage(
         com.chipprbots.ethereum.db.dataSource.EphemDataSource()
       )
@@ -1227,8 +1186,6 @@ class EngineApiService(
       )(MptListValidator.intByteArraySerializable, SignedTransaction.byteArraySerializable)
       val root = txs.zipWithIndex.foldLeft(trie)((t, r) => t.put(r._2, r._1)).getRootHash
       ByteString(root)
-    }
-}
 
 /** EIP-4844 / EIP-7691 / EIP-7892 blob gas computation utilities.
   *
@@ -1247,7 +1204,7 @@ class EngineApiService(
   * Use the fork-aware `targetBlobGasPerBlock(timestamp, config)` / `maxBlobGasPerBlock(timestamp, config)` for any
   * blob-gas validation; the static `*_TARGET_BLOB_GAS` / `*_MAX_BLOB_GAS` values are kept only as the ladder rungs.
   */
-object BlobGasUtils {
+object BlobGasUtils:
   val GAS_PER_BLOB: BigInt = BigInt(131072)
 
   // Cancun (EIP-4844): 3 target, 6 max
@@ -1304,11 +1261,10 @@ object BlobGasUtils {
       parentExcessBlobGas: BigInt,
       parentBlobGasUsed: BigInt,
       target: BigInt = TARGET_BLOB_GAS_PER_BLOCK
-  ): BigInt = {
+  ): BigInt =
     val total = parentExcessBlobGas + parentBlobGasUsed
     if total < target then BigInt(0)
     else total - target
-  }
 
   /** EIP-7918 (Osaka) excess-blob-gas calculation. Geth reference: `eip4844.calcExcessBlobGas` — post-Osaka, when
     * `reservePrice > blobPrice`, the protocol uses an alternate formula that preserves a fraction of
@@ -1336,22 +1292,19 @@ object BlobGasUtils {
       targetGas: BigInt,
       maxGas: BigInt,
       updateFraction: BigInt
-  ): BigInt = {
+  ): BigInt =
     val total = parentExcessBlobGas + parentBlobGasUsed
     if total < targetGas then return BigInt(0)
     val reservePrice = BLOB_BASE_COST * parentBaseFee
     val blobBaseFee = fakeExponential(MIN_BLOB_BASE_FEE, parentExcessBlobGas, updateFraction)
     val blobPrice = blobBaseFee * GAS_PER_BLOB
-    if reservePrice > blobPrice then {
+    if reservePrice > blobPrice then
       // Both `targetGas` and `maxGas` are gas units; the blob-count ratio (Max-Target)/Max
       // is the same regardless of unit, so we can compute against gas directly. Integer
       // division truncates toward zero (same as geth's uint64 arithmetic).
       val scaled = parentBlobGasUsed * (maxGas - targetGas) / maxGas
       parentExcessBlobGas + scaled
-    } else {
-      total - targetGas
-    }
-  }
+    else total - targetGas
 
   /** Calculate the blob gas price using the fake exponential function. Per EIP-4844:
     * fake_exponential(MIN_BLOB_BASE_FEE, excess_blob_gas, BLOB_BASE_FEE_UPDATE_FRACTION)
@@ -1364,10 +1317,9 @@ object BlobGasUtils {
       excessBlobGas: BigInt,
       blockTimestamp: Long,
       blockchainConfig: com.chipprbots.ethereum.utils.BlockchainConfig
-  ): BigInt = {
+  ): BigInt =
     val fraction = updateFractionFor(blockTimestamp, blockchainConfig)
     fakeExponential(MIN_BLOB_BASE_FEE, excessBlobGas, fraction)
-  }
 
   /** Fork-aware blob-base-fee update fraction. Each BPO bumps the fraction proportional to its MAX, matching geth's
     * `params.config.go` `Default{Cancun,Prague,Osaka,BPO1,BPO2}BlobConfig.UpdateFraction`. Osaka itself reuses the
@@ -1395,16 +1347,13 @@ object BlobGasUtils {
       parentBaseFee: BigInt,
       childTimestamp: Long,
       blockchainConfig: com.chipprbots.ethereum.utils.BlockchainConfig
-  ): BigInt = {
+  ): BigInt =
     val target = targetBlobGasPerBlock(childTimestamp, blockchainConfig)
-    if blockchainConfig.isOsakaTimestamp(childTimestamp) then {
+    if blockchainConfig.isOsakaTimestamp(childTimestamp) then
       val max = maxBlobGasPerBlock(childTimestamp, blockchainConfig)
       val fraction = updateFractionFor(childTimestamp, blockchainConfig)
       calcExcessBlobGasOsaka(parentExcessBlobGas, parentBlobGasUsed, parentBaseFee, target, max, fraction)
-    } else {
-      calcExcessBlobGas(parentExcessBlobGas, parentBlobGasUsed, target)
-    }
-  }
+    else calcExcessBlobGas(parentExcessBlobGas, parentBlobGasUsed, target)
 
   /** Fork-aware MAX_BLOB_GAS_PER_BLOCK. EIP-7892 BPOs raise the cap on Sepolia/mainnet post-Osaka; the latest active
     * BPO wins.
@@ -1436,23 +1385,19 @@ object BlobGasUtils {
     * block_base_fee) / (gas_per_blob * MAX_BLOBS_PER_BLOCK)) Simplified conservative floor: max(current, block_base_fee
     * / CEILING_RATIO).
     */
-  def getBlobGasPriceOsaka(excessBlobGas: BigInt, blockBaseFee: BigInt): BigInt = {
+  def getBlobGasPriceOsaka(excessBlobGas: BigInt, blockBaseFee: BigInt): BigInt =
     val base = fakeExponential(MIN_BLOB_BASE_FEE, excessBlobGas, BLOB_BASE_FEE_UPDATE_FRACTION)
     val floor = blockBaseFee / BigInt(8) // conservative: blob_fee ≥ base_fee / 8
     base.max(floor).max(MIN_BLOB_BASE_FEE)
-  }
 
   /** fake_exponential: approximates factor * e^(numerator / denominator) using Taylor expansion. Per EIP-4844 spec.
     */
-  private def fakeExponential(factor: BigInt, numerator: BigInt, denominator: BigInt): BigInt = {
+  private def fakeExponential(factor: BigInt, numerator: BigInt, denominator: BigInt): BigInt =
     var i = BigInt(1)
     var output = BigInt(0)
     var numeratorAccum = factor * denominator
-    while numeratorAccum > 0 do {
+    while numeratorAccum > 0 do
       output += numeratorAccum
       numeratorAccum = (numeratorAccum * numerator) / (denominator * i)
       i += 1
-    }
     output / denominator
-  }
-}

@@ -77,7 +77,7 @@ import com.chipprbots.ethereum.vm.EvmConfig
 abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCustomConfig)
     extends SecureRandomBuilder
     with TestSyncConfig
-    with BlockchainConfigBuilder {
+    with BlockchainConfigBuilder:
   // Use longer timeout in CI environment to accommodate slower I/O and network operations
   // CI environments (GitHub Actions, etc.) often have higher latency due to shared resources
   private val baseTimeout = 5.seconds
@@ -106,7 +106,7 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
   lazy val tempDir: Path = Files.createTempDirectory("temp-fast-sync")
 
   def getRockDbTestConfig(dbPath: String): RocksDbConfig =
-    new RocksDbConfig {
+    new RocksDbConfig:
       override val createIfMissing: Boolean = true
       override val paranoidChecks: Boolean = false
       override val path: String = dbPath
@@ -116,23 +116,20 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
       override val levelCompaction: Boolean = true
       override val blockSize: Long = 16384
       override val blockCacheSize: Long = 33554432
-    }
 
   sealed trait LocalPruningConfigBuilder
       extends PruningConfigBuilder
-      with com.chipprbots.ethereum.TestInstanceConfigProvider {
+      with com.chipprbots.ethereum.TestInstanceConfigProvider:
     override val pruningMode: PruningMode = ArchivePruning
-  }
 
   lazy val nodeStatusHolder = new AtomicReference(nodeStatus)
   lazy val storagesInstance: RocksDbDataSourceComponent & LocalPruningConfigBuilder & Storages.DefaultStorages =
     new RocksDbDataSourceComponent
       with LocalPruningConfigBuilder
       with Storages.DefaultStorages
-      with com.chipprbots.ethereum.TestInstanceConfigProvider {
+      with com.chipprbots.ethereum.TestInstanceConfigProvider:
       override lazy val dataSource: RocksDbDataSource =
         RocksDbDataSource(getRockDbTestConfig(tempDir.toAbsolutePath.toString), Namespaces.nsSeq)
-    }
   implicit override lazy val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
   lazy val discoveryConfig: DiscoveryConfig = DiscoveryConfig(Config.config, blockchainConfig.bootstrapNodes)
 
@@ -150,12 +147,13 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
 
   lazy val knownNodesManager: ActorRef =
     system.actorOf(
-      org.apache.pekko.actor.Props(new org.apache.pekko.actor.Actor {
-        @annotation.nowarn("msg=Matchable")
-        def receive: Receive = { case cmd: KnownNodesManager.Command =>
-          knownNodesManagerTyped ! cmd
-        }
-      }),
+      org.apache.pekko.actor.Props(
+        new org.apache.pekko.actor.Actor:
+          @annotation.nowarn("msg=Matchable")
+          def receive: Receive = { case cmd: KnownNodesManager.Command =>
+            knownNodesManagerTyped ! cmd
+          }
+      ),
       "known-nodes-manager"
     )
 
@@ -174,17 +172,15 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
 
   lazy val nh = nodeStatusHolder
 
-  val peerConf: PeerConfiguration = new PeerConfiguration {
-    override val fastSyncHostConfiguration: FastSyncHostConfiguration = new FastSyncHostConfiguration {
+  val peerConf: PeerConfiguration = new PeerConfiguration:
+    override val fastSyncHostConfiguration: FastSyncHostConfiguration = new FastSyncHostConfiguration:
       val maxBlocksHeadersPerMessage: Int = fakePeerCustomConfig.hostConfig.maxBlocksHeadersPerMessage
       val maxBlocksBodiesPerMessage: Int = fakePeerCustomConfig.hostConfig.maxBlocksBodiesPerMessage
       val maxReceiptsPerMessage: Int = fakePeerCustomConfig.hostConfig.maxReceiptsPerMessage
       val maxMptComponentsPerMessage: Int = fakePeerCustomConfig.hostConfig.maxMptComponentsPerMessage
-    }
-    override val rlpxConfiguration: RLPxConfiguration = new RLPxConfiguration {
+    override val rlpxConfiguration: RLPxConfiguration = new RLPxConfiguration:
       override val waitForTcpAckTimeout: FiniteDuration = Timeouts.normalTimeout
       override val waitForHandshakeTimeout: FiniteDuration = Timeouts.normalTimeout
-    }
     override val waitForHelloTimeout: FiniteDuration = 3 seconds
     override val waitForStatusTimeout: FiniteDuration = 30 seconds
     override val waitForChainCheckTimeout: FiniteDuration = 15 seconds
@@ -206,12 +202,11 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
     override val longBlacklistDuration: FiniteDuration = 3.minutes
     override val statSlotDuration: FiniteDuration = 1.minute
     override val statSlotCount: Int = 30
-  }
 
   lazy val peerEventBus = system.spawn(PeerEventBusActor.behavior(), "peer-event-bus")
 
   private val handshakerConfiguration: NetworkHandshakerConfiguration =
-    new NetworkHandshakerConfiguration {
+    new NetworkHandshakerConfiguration:
       override val forkResolverOpt: Option[ForkResolver] = None
       override val nodeStatusHolder: AtomicReference[NodeStatus] = nh
       override val peerConfiguration: PeerConfiguration = peerConf
@@ -219,7 +214,6 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
       override val blockchainReader: BlockchainReader = CommonFakePeer.this.blockchainReader
       override val appStateStorage: AppStateStorage = storagesInstance.storages.appStateStorage
       override val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
-    }
 
   lazy val handshaker: Handshaker[PeerInfo] = NetworkHandshaker(handshakerConfiguration)
 
@@ -330,15 +324,14 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
   private def broadcastBlock(block: Block, weight: ChainWeight) =
     broadcasterActor ! BroadcastBlock(BlockToBroadcast(block, weight))
 
-  def getCurrentState(): BlockchainState = {
+  def getCurrentState(): BlockchainState =
     val bestBlock = blockchainReader.getBestBlock.get
     val currentWorldState = getMptForBlock(bestBlock)
     val currentWeight = blockchainReader.getChainWeightByHash(bestBlock.hash).get
     BlockchainState(bestBlock, currentWorldState, currentWeight)
-  }
 
   def startPeer(): IO[Unit] =
-    for {
+    for
       _ <- IO {
         peerManager ! PeerManagerActor.StartConnectingCmd
         server ! ServerActor.StartServer(listenAddress)
@@ -346,13 +339,13 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
       _ <- retryUntilWithDelay(IO(nodeStatusHolder.get()), 1.second, 5) { status =>
         status.serverStatus == Listening(listenAddress)
       }
-    } yield ()
+    yield ()
 
   def shutdown(): IO[Unit] =
-    for {
+    for
       _ <- IO.fromFuture(IO(system.terminate()))
       _ <- IO(storagesInstance.dataSource.destroy())
-    } yield ()
+    yield ()
 
   /** Ask the PeerManager to dial the given nodes and block until every requested node has been persisted as a known
     * node (which only happens after a successful *outgoing* handshake).
@@ -364,7 +357,7 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
     *   time out non-deterministically.
     */
   def connectToPeers(nodes: Set[Node], maxRetries: Int = 15): IO[Unit] =
-    for {
+    for
       _ <- IO {
         peerManager ! PeerManagerActor.DiscoveredNodesReceived(nodes)
       }
@@ -374,7 +367,7 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
           val currentNodes = knownNodes.map(Node.fromUri).map(_.id)
           requestedNodes.subsetOf(currentNodes)
       }
-    } yield ()
+    yield ()
 
   /** Best-effort variant of [[connectToPeers]] for redundant/reverse dials. When both peers dial each other
     * simultaneously, the PeerManager's connection de-duplication (`canConnectTo` / `hasIncomingPendingFromHost`)
@@ -388,7 +381,7 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
 
   private def createChildBlock(parent: Block, parentWeight: ChainWeight, parentWorld: InMemoryWorldStateProxy)(
       updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy
-  ): (Block, ChainWeight, InMemoryWorldStateProxy) = {
+  ): (Block, ChainWeight, InMemoryWorldStateProxy) =
     val newBlockNumber = parent.header.number + 1
     val newWorld = updateWorldForBlock(newBlockNumber, parentWorld)
     val newBlock = parent.copy(header =
@@ -401,7 +394,6 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
     )
     val newWeight = parentWeight.increase(newBlock.header)
     (newBlock, newWeight, parentWorld)
-  }
 
   private def generateInvalidBlock(
       currentBestBlock: Block
@@ -442,11 +434,8 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
       n: BigInt
   )(updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy): IO[Unit] =
     IO(blockchainReader.getBestBlock).flatMap { block =>
-      if block.get.number >= n then {
-        IO(())
-      } else {
-        generateValidBlock(block.get)(updateWorldForBlock).flatMap(_ => importBlocksUntil(n)(updateWorldForBlock))
-      }
+      if block.get.number >= n then IO(())
+      else generateValidBlock(block.get)(updateWorldForBlock).flatMap(_ => importBlocksUntil(n)(updateWorldForBlock))
     }
 
   def importInvalidBlocks(
@@ -454,17 +443,15 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
       to: BigInt
   )(updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy): IO[Unit] =
     IO(blockchainReader.getBestBlock).flatMap { block =>
-      if block.get.number >= to then {
-        IO(())
-      } else if block.get.number >= from then {
+      if block.get.number >= to then IO(())
+      else if block.get.number >= from then
         generateInvalidBlock(block.get)(updateWorldForBlock).flatMap(_ =>
           importInvalidBlocks(from, to)(updateWorldForBlock)
         )
-      } else {
+      else
         generateValidBlock(block.get)(updateWorldForBlock).flatMap(_ =>
           importInvalidBlocks(from, to)(updateWorldForBlock)
         )
-      }
 
     }
 
@@ -473,16 +460,11 @@ abstract class CommonFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCu
       to: BigInt
   )(updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy): IO[Unit] =
     IO(blockchainReader.getBestBlock).flatMap { block =>
-      if block.get.number >= to then {
-        IO(())
-      } else if block.get.number >= from then {
+      if block.get.number >= to then IO(())
+      else if block.get.number >= from then
         generateInvalidBlock(block.get)(updateWorldForBlock).flatMap(_ =>
           importInvalidBlockNumbers(from, to)(updateWorldForBlock)
         )
-      } else {
-        importBlocksUntil(from)(updateWorldForBlock)
-      }
+      else importBlocksUntil(from)(updateWorldForBlock)
 
     }
-
-}

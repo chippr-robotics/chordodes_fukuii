@@ -43,26 +43,24 @@ class EthServiceSpec
     with OptionValues
     with MockFactory
     with NormalPatience
-    with TypeCheckedTripleEquals {
+    with TypeCheckedTripleEquals:
 
   implicit val runtime: IORuntime = IORuntime.global
   implicit private val classicActorSystem: ActorSystem = system.toClassic
 
-  "EthInfoService" should "return ethereum protocol version" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  "EthInfoService" should "return ethereum protocol version" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val response: Either[JsonRpcError, ProtocolVersionResponse] =
       ethService.protocolVersion(ProtocolVersionRequest()).unsafeRunSync()
     val protocolVersion = response.toOption.get.value
 
     Integer.parseInt(protocolVersion.drop(2), 16) shouldEqual currentProtocolVersion
-  }
 
-  it should "return configured chain id" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "return configured chain id" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val response: ChainIdResponse = ethService.chainId(ChainIdRequest()).unsafeRunSync().toOption.get
 
     assert(response === ChainIdResponse(blockchainConfig.chainId))
-  }
 
-  it should "return syncing info if the peer is syncing" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "return syncing info if the peer is syncing" taggedAs (UnitTest, RPCTest) in new TestSetup:
     syncingController.setAutoPilot(
       syncStatusAutoPilot(SyncProtocol.Status.Syncing(999, Progress(200, 10000), Some(Progress(100, 144))))
     )
@@ -80,26 +78,23 @@ class EthServiceSpec
         )
       )
     )
-  }
 
   // scalastyle:off magic.number
-  it should "return no syncing info if the peer is not syncing" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "return no syncing info if the peer is not syncing" taggedAs (UnitTest, RPCTest) in new TestSetup:
     syncingController.setAutoPilot(syncStatusAutoPilot(SyncProtocol.Status.NotSyncing))
 
     val response: Either[JsonRpcError, SyncingResponse] = ethService.syncing(SyncingRequest()).unsafeRunSync()
 
     response shouldEqual Right(SyncingResponse(None))
-  }
 
-  it should "return no syncing info if sync is done" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "return no syncing info if sync is done" taggedAs (UnitTest, RPCTest) in new TestSetup:
     syncingController.setAutoPilot(syncStatusAutoPilot(SyncProtocol.Status.SyncDone))
 
     val response: Either[JsonRpcError, SyncingResponse] = ethService.syncing(SyncingRequest()).unsafeRunSync()
 
     response shouldEqual Right(SyncingResponse(None))
-  }
 
-  it should "execute call and return a value" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "execute call and return a value" taggedAs (UnitTest, RPCTest) in new TestSetup:
     blockchainWriter.storeBlock(blockToRequest).commit()
     blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
 
@@ -127,9 +122,8 @@ class EthServiceSpec
     val response: ServiceResponse[CallResponse] = ethService.call(CallRequest(tx, BlockParam.Latest))
 
     response.unsafeRunSync() shouldEqual Right(CallResponse(ByteString("return_value")))
-  }
 
-  it should "execute estimateGas and return a value" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "execute estimateGas and return a value" taggedAs (UnitTest, RPCTest) in new TestSetup:
     blockchainWriter.storeBlock(blockToRequest).commit()
     blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
 
@@ -161,10 +155,9 @@ class EthServiceSpec
     val response: ServiceResponse[EstimateGasResponse] = ethService.estimateGas(CallRequest(tx, BlockParam.Latest))
 
     response.unsafeRunSync() shouldEqual Right(EstimateGasResponse(123))
-  }
 
   // NOTE TestSetup uses Ethash consensus; check `consensusConfig`.
-  class TestSetup(implicit system: ActorSystem) extends EphemBlockchainTestSetup {
+  class TestSetup(implicit system: ActorSystem) extends EphemBlockchainTestSetup:
     val blockGenerator: PoWBlockGenerator = mock[PoWBlockGenerator]
     val appStateStorage: AppStateStorage = mock[AppStateStorage]
     val keyStore: KeyStore = mock[KeyStore]
@@ -193,5 +186,3 @@ class EthServiceSpec
     val blockToRequest: Block = Block(Fixtures.Blocks.Block3125369.header, Fixtures.Blocks.Block3125369.body)
     val txToRequest = Fixtures.Blocks.Block3125369.body.transactionList.head
     val txSender: Address = SignedTransaction.getSender(txToRequest).get
-  }
-}

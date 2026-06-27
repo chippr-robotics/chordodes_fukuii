@@ -8,13 +8,13 @@ case class SSLConfig(
     passwordFile: String
 )
 
-object SSLConfig {
+object SSLConfig:
 
   val key = "certificate"
 
   def apply(config: Config): Option[SSLConfig] =
     if config.getIsNull(key) then None
-    else {
+    else
       val certificateConfig = config.getConfig(key)
       Some(
         SSLConfig(
@@ -23,6 +23,3 @@ object SSLConfig {
           passwordFile = certificateConfig.getString("password-file")
         )
       )
-    }
-
-}

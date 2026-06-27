@@ -19,7 +19,7 @@ import scodec.bits.BitVector
 import com.chipprbots.ethereum.network.discovery.codecs.RLPCodecs
 import com.chipprbots.ethereum.testing.Tags.*
 
-class Discv4SyncResponderSpec extends AnyFlatSpec with Matchers {
+class Discv4SyncResponderSpec extends AnyFlatSpec with Matchers:
 
   // Match the codecs used in DiscoveryServiceBuilder.
   implicit val sigalg: SigAlg = new Secp256k1SigAlg
@@ -27,10 +27,9 @@ class Discv4SyncResponderSpec extends AnyFlatSpec with Matchers {
   implicit val payloadCodec: Codec[Payload] = RLPCodecs.payloadCodec
 
   /** Extract reply bytes from a [[StaticUDPPeerGroup.SyncResult.Reply]], or fail. */
-  private def replyBitsOf(result: StaticUDPPeerGroup.SyncResult): BitVector = result match {
+  private def replyBitsOf(result: StaticUDPPeerGroup.SyncResult): BitVector = result match
     case StaticUDPPeerGroup.SyncResult.Reply(bits) => bits
     case other                                     => fail(s"expected SyncResult.Reply, got $other")
-  }
 
   private val sender = new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 31000)
 
@@ -171,7 +170,7 @@ class Discv4SyncResponderSpec extends AnyFlatSpec with Matchers {
       rateLimiter = limiter
     )
 
-    def freshPingBits(): BitVector = {
+    def freshPingBits(): BitVector =
       val ping = Payload.Ping(
         version = 4,
         from = makeAddress(31000),
@@ -180,7 +179,6 @@ class Discv4SyncResponderSpec extends AnyFlatSpec with Matchers {
         enrSeq = None
       )
       encodePacket(Packet.pack(ping, privateKey).require)
-    }
 
     // Burst of 2 — both should be served.
     replyBitsOf(responder(sender, freshPingBits()))
@@ -218,4 +216,3 @@ class Discv4SyncResponderSpec extends AnyFlatSpec with Matchers {
     replyBitsOf(responder(sender, encodePacket(pingPacket)))
     dedup.isAlreadyResponded(pingPacket.hash) shouldBe true
   }
-}

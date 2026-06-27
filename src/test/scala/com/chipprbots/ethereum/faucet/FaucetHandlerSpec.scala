@@ -36,44 +36,40 @@ class FaucetHandlerSpec
     with Matchers
     with MockFactory
     with ScalaFutures
-    with NormalPatience {
+    with NormalPatience:
 
   "Faucet Handler" - {
     "without wallet unlocked" - {
 
-      "should not respond in case wallet unlock fails" in new TestSetup {
+      "should not respond in case wallet unlock fails" in new TestSetup:
         withUnavailableFaucet {
           handler ! Command.Initialize
           responseProbe.expectNoMessage()
         }
-      }
 
-      "shouldn't send funds if the Faucet isn't initialized" in new TestSetup {
+      "shouldn't send funds if the Faucet isn't initialized" in new TestSetup:
         handler ! Command.Status(responseProbe.ref)
         responseProbe.expectMessage(FaucetHandlerResponse.StatusResponse(FaucetStatus.FaucetUnavailable))
 
         handler ! Command.SendFunds(paymentAddress, responseProbe.ref)
         responseProbe.expectMessage(FaucetHandlerResponse.FaucetIsUnavailable)
-      }
     }
 
     "with wallet unlocked" - {
 
-      "should not respond when Initialization is received in available state" in new TestSetup {
+      "should not respond when Initialization is received in available state" in new TestSetup:
         withInitializedFaucet {
           handler ! Command.Initialize
           responseProbe.expectNoMessage()
         }
-      }
 
-      "should respond that it is available when ask the status if it was initialized successfully" in new TestSetup {
+      "should respond that it is available when ask the status if it was initialized successfully" in new TestSetup:
         withInitializedFaucet {
           handler ! Command.Status(responseProbe.ref)
           responseProbe.expectMessage(FaucetHandlerResponse.StatusResponse(FaucetStatus.WalletAvailable))
         }
-      }
 
-      "should be able to paid if it was initialized successfully" in new TestSetup {
+      "should be able to paid if it was initialized successfully" in new TestSetup:
         withInitializedFaucet {
           val retTxId = ByteString(Hex.decode("112233"))
           walletService.sendFunds.expects(wallet, paymentAddress).returning(IO.pure(Right(retTxId)))
@@ -81,9 +77,8 @@ class FaucetHandlerSpec
           handler ! Command.SendFunds(paymentAddress, responseProbe.ref)
           responseProbe.expectMessage(FaucetHandlerResponse.TransactionSent(retTxId))
         }
-      }
 
-      "should failed the payment if don't can parse the payload" in new TestSetup {
+      "should failed the payment if don't can parse the payload" in new TestSetup:
         withInitializedFaucet {
           val errorMessage = RpcClientError("parser error")
           walletService.sendFunds
@@ -93,9 +88,8 @@ class FaucetHandlerSpec
           handler ! Command.SendFunds(paymentAddress, responseProbe.ref)
           responseProbe.expectMessage(FaucetHandlerResponse.WalletRpcClientError(errorMessage.msg))
         }
-      }
 
-      "should failed the payment if throw rpc client error" in new TestSetup {
+      "should failed the payment if throw rpc client error" in new TestSetup:
         withInitializedFaucet {
           val errorMessage = ParserError("error parser")
           walletService.sendFunds
@@ -105,13 +99,12 @@ class FaucetHandlerSpec
           handler ! Command.SendFunds(paymentAddress, responseProbe.ref)
           responseProbe.expectMessage(FaucetHandlerResponse.WalletRpcClientError(errorMessage.msg))
         }
-      }
     }
   }
 
   given runtime: IORuntime = IORuntime.global
 
-  trait TestSetup extends FaucetConfigBuilder {
+  trait TestSetup extends FaucetConfigBuilder:
     val walletService: WalletService = mock[WalletService]
     val paymentAddress: Address = Address("0x99")
 
@@ -124,16 +117,15 @@ class FaucetHandlerSpec
     val (prvKey, pubKey) = keyPairToByteStrings(walletKeyPair)
     val wallet: Wallet = Wallet(Address(crypto.kec256(pubKey)), prvKey)
 
-    def withUnavailableFaucet(behaviour: => Unit): Unit = {
+    def withUnavailableFaucet(behaviour: => Unit): Unit =
       (() => walletService.getWallet).expects().returning(IO.pure(Left(DecryptionFailed)))
 
       handler ! Command.Status(responseProbe.ref)
       responseProbe.expectMessage(FaucetHandlerResponse.StatusResponse(FaucetStatus.FaucetUnavailable))
 
       behaviour
-    }
 
-    def withInitializedFaucet(behaviour: => Unit): Unit = {
+    def withInitializedFaucet(behaviour: => Unit): Unit =
       (() => walletService.getWallet).expects().returning(IO.pure(Right(wallet)))
 
       handler ! Command.Initialize
@@ -141,6 +133,3 @@ class FaucetHandlerSpec
       responseProbe.expectMessage(FaucetHandlerResponse.StatusResponse(FaucetStatus.WalletAvailable))
 
       behaviour
-    }
-  }
-}

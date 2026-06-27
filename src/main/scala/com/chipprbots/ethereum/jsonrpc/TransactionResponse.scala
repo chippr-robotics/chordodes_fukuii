@@ -6,7 +6,7 @@ import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 
-trait BaseTransactionResponse {
+trait BaseTransactionResponse:
   def hash: ByteString
   def nonce: BigInt
   def blockHash: Option[ByteString]
@@ -18,7 +18,6 @@ trait BaseTransactionResponse {
   def gasPrice: BigInt
   def gas: BigInt
   def input: ByteString
-}
 
 final case class TransactionResponse(
     hash: ByteString,
@@ -53,7 +52,7 @@ final case class TransactionData(
     transactionIndex: Option[Int] = None
 )
 
-object TransactionResponse {
+object TransactionResponse:
 
   given blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
 
@@ -64,9 +63,9 @@ object TransactionResponse {
       stx: SignedTransaction,
       blockHeader: Option[BlockHeader] = None,
       transactionIndex: Option[Int] = None
-  ): TransactionResponse = {
+  ): TransactionResponse =
     val (txType, txChainId, txMaxFee, txMaxPriority, txAccessList, txMaxBlobFee, txBlobHashes, txAuthList) =
-      stx.tx match {
+      stx.tx match
         case _: LegacyTransaction =>
           // EIP-155: extract chainId from v value for replay-protected legacy txs
           val legacyChainId = if stx.signature.v > 35 then Some((stx.signature.v - 35) / 2) else None
@@ -106,7 +105,6 @@ object TransactionResponse {
             None,
             Some(encodeAuthorizationList(tx.authorizationList))
           )
-      }
 
     val effectiveGasPrice = Transaction.effectiveGasPrice(stx.tx, blockHeader.flatMap(_.baseFee))
 
@@ -137,7 +135,6 @@ object TransactionResponse {
       s = Some(stx.signature.s),
       blockTimestamp = blockHeader.map(h => BigInt(h.unixTimestamp))
     )
-  }
 
   private def encodeAccessList(accessList: List[AccessListItem]): Seq[Map[String, Any]] =
     accessList.map { item =>
@@ -158,5 +155,3 @@ object TransactionResponse {
         "s" -> auth.s
       )
     }
-
-}

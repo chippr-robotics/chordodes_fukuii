@@ -10,10 +10,10 @@ import com.chipprbots.ethereum.jsonrpc.serialization.JsonEncoder
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder.NoParamsMethodDecoder
 
-object EthFilterJsonMethodsImplicits extends JsonMethodsImplicits {
+object EthFilterJsonMethodsImplicits extends JsonMethodsImplicits:
 
   // Manual encoder for TxLog to avoid Scala 3 reflection issues
-  private def encodeTxLog(log: FilterManager.TxLog): JValue = {
+  private def encodeTxLog(log: FilterManager.TxLog): JValue =
     val base = List(
       "logIndex" -> encodeAsHex(log.logIndex),
       "transactionIndex" -> encodeAsHex(log.transactionIndex),
@@ -27,22 +27,17 @@ object EthFilterJsonMethodsImplicits extends JsonMethodsImplicits {
     )
     val tsField = log.blockTimestamp.map(ts => "blockTimestamp" -> encodeAsHex(ts)).toList
     JObject(base ::: tsField)
-  }
 
-  given newFilterResponseEnc: JsonEncoder[NewFilterResponse] = new JsonEncoder[NewFilterResponse] {
+  given newFilterResponseEnc: JsonEncoder[NewFilterResponse] = new JsonEncoder[NewFilterResponse]:
     def encodeJson(t: NewFilterResponse): JValue = encodeAsHex(t.filterId)
-  }
 
-  given eth_newFilter: JsonMethodDecoder[NewFilterRequest] = new JsonMethodDecoder[NewFilterRequest] {
+  given eth_newFilter: JsonMethodDecoder[NewFilterRequest] = new JsonMethodDecoder[NewFilterRequest]:
     def decodeJson(params: Option[JArray]): Either[JsonRpcError, NewFilterRequest] =
-      params match {
+      params match
         case Some(JArray((filterObj: JObject) :: Nil)) =>
-          for {
-            filter <- extractFilter(filterObj)
-          } yield NewFilterRequest(filter)
+          for filter <- extractFilter(filterObj)
+          yield NewFilterRequest(filter)
         case _ => Left(InvalidParams())
-      }
-  }
 
   given eth_newBlockFilter: NoParamsMethodDecoder[NewBlockFilterRequest] = new NoParamsMethodDecoder(
     NewBlockFilterRequest()
@@ -52,81 +47,66 @@ object EthFilterJsonMethodsImplicits extends JsonMethodsImplicits {
     new NoParamsMethodDecoder(NewPendingTransactionFilterRequest()) {}
 
   given eth_uninstallFilter: (JsonMethodDecoder[UninstallFilterRequest] & JsonEncoder[UninstallFilterResponse]) =
-    new JsonMethodDecoder[UninstallFilterRequest] with JsonEncoder[UninstallFilterResponse] {
+    new JsonMethodDecoder[UninstallFilterRequest] with JsonEncoder[UninstallFilterResponse]:
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, UninstallFilterRequest] =
-        params match {
+        params match
           case Some(JArray((rawFilterId: JValue) :: Nil)) =>
-            for {
-              filterId <- extractQuantity(rawFilterId)
-            } yield UninstallFilterRequest(filterId)
+            for filterId <- extractQuantity(rawFilterId)
+            yield UninstallFilterRequest(filterId)
           case _ => Left(InvalidParams())
-        }
       override def encodeJson(t: UninstallFilterResponse): JValue = JBool(t.success)
-    }
 
   given eth_getFilterChanges: (JsonMethodDecoder[GetFilterChangesRequest] & JsonEncoder[GetFilterChangesResponse]) =
-    new JsonMethodDecoder[GetFilterChangesRequest] with JsonEncoder[GetFilterChangesResponse] {
+    new JsonMethodDecoder[GetFilterChangesRequest] with JsonEncoder[GetFilterChangesResponse]:
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetFilterChangesRequest] =
-        params match {
+        params match
           case Some(JArray((rawFilterId: JValue) :: Nil)) =>
-            for {
-              filterId <- extractQuantity(rawFilterId)
-            } yield GetFilterChangesRequest(filterId)
+            for filterId <- extractQuantity(rawFilterId)
+            yield GetFilterChangesRequest(filterId)
           case _ => Left(InvalidParams())
-        }
       override def encodeJson(t: GetFilterChangesResponse): JValue =
-        t.filterChanges match {
+        t.filterChanges match
           case FilterManager.LogFilterChanges(logs)                    => JArray(logs.map(encodeTxLog).toList)
           case FilterManager.BlockFilterChanges(blockHashes)           => JArray(blockHashes.map(encodeAsHex).toList)
           case FilterManager.PendingTransactionFilterChanges(txHashes) => JArray(txHashes.map(encodeAsHex).toList)
-        }
-    }
 
   given eth_getFilterLogs: (JsonMethodDecoder[GetFilterLogsRequest] & JsonEncoder[GetFilterLogsResponse]) =
-    new JsonMethodDecoder[GetFilterLogsRequest] with JsonEncoder[GetFilterLogsResponse] {
+    new JsonMethodDecoder[GetFilterLogsRequest] with JsonEncoder[GetFilterLogsResponse]:
       import FilterManager.*
 
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetFilterLogsRequest] =
-        params match {
+        params match
           case Some(JArray((rawFilterId: JValue) :: Nil)) =>
-            for {
-              filterId <- extractQuantity(rawFilterId)
-            } yield GetFilterLogsRequest(filterId)
+            for filterId <- extractQuantity(rawFilterId)
+            yield GetFilterLogsRequest(filterId)
           case _ => Left(InvalidParams())
-        }
 
       override def encodeJson(t: GetFilterLogsResponse): JValue =
-        t.filterLogs match {
+        t.filterLogs match
           case LogFilterLogs(logs)                    => JArray(logs.map(encodeTxLog).toList)
           case BlockFilterLogs(blockHashes)           => JArray(blockHashes.map(encodeAsHex).toList)
           case PendingTransactionFilterLogs(txHashes) => JArray(txHashes.map(encodeAsHex).toList)
-        }
-    }
 
   given eth_getLogs: (JsonMethodDecoder[GetLogsRequest] & JsonEncoder[GetLogsResponse]) =
-    new JsonMethodDecoder[GetLogsRequest] with JsonEncoder[GetLogsResponse] {
+    new JsonMethodDecoder[GetLogsRequest] with JsonEncoder[GetLogsResponse]:
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetLogsRequest] =
-        params match {
+        params match
           case Some(JArray((filterObj: JObject) :: Nil)) =>
-            for {
-              filter <- extractFilter(filterObj)
-            } yield GetLogsRequest(filter)
+            for filter <- extractFilter(filterObj)
+            yield GetLogsRequest(filter)
           case _ => Left(InvalidParams())
-        }
 
       override def encodeJson(t: GetLogsResponse): JValue =
         JArray(t.filterLogs.logs.map(encodeTxLog).toList)
-    }
 
-  private def extractFilter(obj: JObject): Either[JsonRpcError, Filter] = {
+  private def extractFilter(obj: JObject): Either[JsonRpcError, Filter] =
     def allSuccess[T](eithers: Seq[Either[JsonRpcError, T]]): Either[JsonRpcError, Seq[T]] =
-      if eithers.forall(_.isRight) then {
+      if eithers.forall(_.isRight) then
         val values = eithers.collect { case Right(v) => v }
         Right(values)
-      } else {
+      else
         val values = eithers.collect { case Left(err) => err.message }
         Left(InvalidParams(msg = values.mkString("\n")))
-      }
 
     def parseTopic(jstr: JString): Either[JsonRpcError, ByteString] =
       extractBytes(jstr).left.map(_ =>
@@ -153,22 +133,20 @@ object EthFilterJsonMethodsImplicits extends JsonMethodsImplicits {
         case other    => Some(extractBlockParam(other))
       }
 
-    for {
+    for
       fromBlock <- toEitherOpt(optionalBlockParam("fromBlock"))
       toBlock <- toEitherOpt(optionalBlockParam("toBlock"))
-      address <- {
+      address <-
         // Support both single string and array of addresses
-        (obj \ "address") match {
+        (obj \ "address") match
           case JString(s) => extractAddress(JString(s)).map(a => Some(Seq(a)))
           case JArray(arr) =>
             val addrs = arr.map { case JString(s) => extractAddress(JString(s)); case _ => Left(InvalidParams()) }
             if addrs.forall(_.isRight) then Right(Some(addrs.collect { case Right(a) => a }))
             else Left(InvalidParams("Invalid address in array"))
           case _ => Right(None)
-        }
-      }
       topics <- topicsEither
-    } yield {
+    yield
       val blockHash = (obj \ "blockHash")
         .extractOpt[String]
         .flatMap(s =>
@@ -177,6 +155,3 @@ object EthFilterJsonMethodsImplicits extends JsonMethodsImplicits {
             .toOption
         )
       Filter(fromBlock = fromBlock, toBlock = toBlock, address = address, topics = topics, blockHash = blockHash)
-    }
-  }
-}

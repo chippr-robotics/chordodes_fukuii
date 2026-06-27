@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.ByteUtils.compactPickledBytes
 
-class ChainWeightStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ObjectGenerators {
+class ChainWeightStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ObjectGenerators:
   test("ChainWeightStorage insert", UnitTest, DatabaseTest) {
     forAll(Gen.listOf(byteStringOfLengthNGen(32))) { blockByteArrayHashes =>
       val blockHashes = blockByteArrayHashes.distinct
@@ -131,4 +131,3 @@ class ChainWeightStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks 
       s"Error message should indicate deserialization failure. Got: ${exception.getMessage}"
     )
   }
-}

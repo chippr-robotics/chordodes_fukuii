@@ -22,7 +22,7 @@ import io.circe.parser.*
   *
   * See ADR-014 for rationale and compatibility analysis.
   */
-object EthereumTestsAdapter {
+object EthereumTestsAdapter:
 
   /** Load and parse a JSON blockchain test file
     *
@@ -36,19 +36,16 @@ object EthereumTestsAdapter {
   )(implicit @scala.annotation.unused runtime: IORuntime): IO[BlockchainTestSuite] =
     IO {
       val source = Source.fromInputStream(getClass.getResourceAsStream(resourcePath))
-      try {
+      try
         val jsonString = source.mkString
-        parse(jsonString) match {
+        parse(jsonString) match
           case Right(json) =>
-            json.as[BlockchainTestSuite] match {
+            json.as[BlockchainTestSuite] match
               case Right(suite) => suite
               case Left(error)  => throw new RuntimeException(s"Failed to decode test suite: $error")
-            }
           case Left(error) => throw new RuntimeException(s"Failed to parse JSON: $error")
-        }
-      } finally source.close()
+      finally source.close()
     }
-}
 
 /** Container for multiple blockchain test cases
   *
@@ -56,11 +53,10 @@ object EthereumTestsAdapter {
   */
 case class BlockchainTestSuite(tests: Map[String, BlockchainTest])
 
-object BlockchainTestSuite {
+object BlockchainTestSuite:
   implicit val decoder: Decoder[BlockchainTestSuite] = Decoder.instance { cursor =>
     cursor.as[Map[String, BlockchainTest]].map(BlockchainTestSuite(_))
   }
-}
 
 /** Single blockchain test case
   *
@@ -85,9 +81,9 @@ case class BlockchainTest(
     genesisBlockHeader: Option[TestBlockHeader]
 )
 
-object BlockchainTest {
+object BlockchainTest:
   implicit val decoder: Decoder[BlockchainTest] = Decoder.instance { cursor =>
-    for {
+    for
       pre <- cursor.downField("pre").as[Map[String, AccountState]]
       // Make blocks optional - some VM tests may not have blocks field
       blocks <- cursor.downField("blocks").as[Option[Seq[TestBlock]]].map(_.getOrElse(Seq.empty))
@@ -99,9 +95,8 @@ object BlockchainTest {
         .map(_.getOrElse(Map.empty))
       network <- cursor.downField("network").as[String]
       genesisBlockHeader <- cursor.downField("genesisBlockHeader").as[Option[TestBlockHeader]]
-    } yield BlockchainTest(pre, blocks, postState, network, genesisBlockHeader)
+    yield BlockchainTest(pre, blocks, postState, network, genesisBlockHeader)
   }
-}
 
 /** Account state in ethereum/tests format
   *
@@ -121,16 +116,15 @@ case class AccountState(
     storage: Map[String, String]
 )
 
-object AccountState {
+object AccountState:
   implicit val decoder: Decoder[AccountState] = Decoder.instance { cursor =>
-    for {
+    for
       balance <- cursor.downField("balance").as[String]
       code <- cursor.downField("code").as[String]
       nonce <- cursor.downField("nonce").as[String]
       storage <- cursor.downField("storage").as[Map[String, String]]
-    } yield AccountState(balance, code, nonce, storage)
+    yield AccountState(balance, code, nonce, storage)
   }
-}
 
 /** Test block from ethereum/tests
   *
@@ -148,16 +142,15 @@ case class TestBlock(
     withdrawals: Option[Seq[TestWithdrawal]] = None // EIP-4895 (Shanghai+)
 )
 
-object TestBlock {
+object TestBlock:
   implicit val decoder: Decoder[TestBlock] = Decoder.instance { cursor =>
-    for {
+    for
       header <- cursor.downField("blockHeader").as[TestBlockHeader]
       txs <- cursor.downField("transactions").as[Seq[TestTransaction]]
       uncles <- cursor.downField("uncleHeaders").as[Seq[TestBlockHeader]]
       withdrawals <- cursor.downField("withdrawals").as[Option[Seq[TestWithdrawal]]]
-    } yield TestBlock(header, txs, uncles, withdrawals)
+    yield TestBlock(header, txs, uncles, withdrawals)
   }
-}
 
 /** EIP-4895 withdrawal from ethereum/tests (hex-encoded fields) */
 case class TestWithdrawal(
@@ -167,16 +160,15 @@ case class TestWithdrawal(
     amount: String
 )
 
-object TestWithdrawal {
+object TestWithdrawal:
   implicit val decoder: Decoder[TestWithdrawal] = Decoder.instance { cursor =>
-    for {
+    for
       index <- cursor.downField("index").as[String]
       validatorIndex <- cursor.downField("validatorIndex").as[String]
       address <- cursor.downField("address").as[String]
       amount <- cursor.downField("amount").as[String]
-    } yield TestWithdrawal(index, validatorIndex, address, amount)
+    yield TestWithdrawal(index, validatorIndex, address, amount)
   }
-}
 
 /** Block header from ethereum/tests (hex-encoded fields) */
 case class TestBlockHeader(
@@ -205,9 +197,9 @@ case class TestBlockHeader(
     requestsHash: Option[String] = None // EIP-7685 (Prague+)
 )
 
-object TestBlockHeader {
+object TestBlockHeader:
   implicit val decoder: Decoder[TestBlockHeader] = Decoder.instance { cursor =>
-    for {
+    for
       parentHash <- cursor.downField("parentHash").as[String]
       uncleHash <- cursor.downField("uncleHash").as[String]
       coinbase <- cursor.downField("coinbase").as[String]
@@ -229,7 +221,7 @@ object TestBlockHeader {
       excessBlobGas <- cursor.downField("excessBlobGas").as[Option[String]]
       parentBeaconBlockRoot <- cursor.downField("parentBeaconBlockRoot").as[Option[String]]
       requestsHash <- cursor.downField("requestsHash").as[Option[String]]
-    } yield TestBlockHeader(
+    yield TestBlockHeader(
       parentHash,
       uncleHash,
       coinbase,
@@ -253,7 +245,6 @@ object TestBlockHeader {
       requestsHash
     )
   }
-}
 
 /** Transaction from ethereum/tests (hex-encoded fields) */
 case class TestTransaction(
@@ -281,18 +272,17 @@ case class TestAccessListItem(
     storageKeys: List[String]
 )
 
-object TestAccessListItem {
+object TestAccessListItem:
   implicit val decoder: Decoder[TestAccessListItem] = Decoder.instance { cursor =>
-    for {
+    for
       address <- cursor.downField("address").as[String]
       storageKeys <- cursor.downField("storageKeys").as[List[String]]
-    } yield TestAccessListItem(address, storageKeys)
+    yield TestAccessListItem(address, storageKeys)
   }
-}
 
-object TestTransaction {
+object TestTransaction:
   implicit val decoder: Decoder[TestTransaction] = Decoder.instance { cursor =>
-    for {
+    for
       data <- cursor.downField("data").as[String]
       gasLimit <- cursor.downField("gasLimit").as[String]
       // gasPrice is optional: type-0x02 (EIP-1559) and type-0x03 (EIP-4844) carry
@@ -311,7 +301,7 @@ object TestTransaction {
       maxFeePerGas <- cursor.downField("maxFeePerGas").as[Option[String]]
       maxFeePerBlobGas <- cursor.downField("maxFeePerBlobGas").as[Option[String]]
       blobVersionedHashes <- cursor.downField("blobVersionedHashes").as[Option[List[String]]]
-    } yield TestTransaction(
+    yield TestTransaction(
       data,
       gasLimit,
       gasPrice,
@@ -330,4 +320,3 @@ object TestTransaction {
       blobVersionedHashes
     )
   }
-}

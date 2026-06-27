@@ -17,7 +17,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   * matter for the SNAP sync peer-selection feedback loop: score degrades monotonically on consecutive failures,
   * recovers after successes, and shouldRetry caps at 1 hour regardless of blacklist count.
   */
-class PeerScoreFeedbackSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks {
+class PeerScoreFeedbackSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks:
 
   // -----------------------------------------------------------------------
   // Score degrades monotonically on consecutive timeouts
@@ -159,4 +159,3 @@ class PeerScoreFeedbackSpec extends AnyFlatSpec with Matchers with ScalaCheckPro
       // EMA formula: 0.7 * 1000 + 0.3 * 0 = 700
       s1.averageLatencyMs.get shouldBe 700.0 +- 1.0
     }
-}

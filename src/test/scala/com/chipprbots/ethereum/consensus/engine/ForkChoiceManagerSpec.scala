@@ -21,11 +21,11 @@ import com.chipprbots.ethereum.testing.Tags.*
   * with a `BeaconHead` message — including the unknown-head (Left("SYNCING")) branch, which is the trigger SNAP needs
   * on post-merge chains.
   */
-class ForkChoiceManagerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
+class ForkChoiceManagerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers:
 
   implicit private val classicActorSystem: org.apache.pekko.actor.ActorSystem = system.toClassic
 
-  trait Fixture extends EphemBlockchainTestSetup {
+  trait Fixture extends EphemBlockchainTestSetup:
     val fcm = new ForkChoiceManager(blockchainReader, blockchainWriter)
 
     val storedHeader: BlockHeader = BlockHeader(
@@ -50,9 +50,8 @@ class ForkChoiceManagerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
 
     val unknownHeadHash: ByteString = ByteString(Array.fill(32)(0x99.toByte))
     val knownHeadHash: ByteString = storedHeader.hash.value
-  }
 
-  "ForkChoiceManager" should "publish BeaconHead with knownHeader=None when head is unknown (SYNCING branch)" taggedAs UnitTest in new Fixture {
+  "ForkChoiceManager" should "publish BeaconHead with knownHeader=None when head is unknown (SYNCING branch)" taggedAs UnitTest in new Fixture:
     val probe: TestProbe = TestProbe()
     fcm.setListener(probe.ref)
 
@@ -62,9 +61,8 @@ class ForkChoiceManagerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     val received: BeaconHead = probe.expectMsgType[ForkChoiceManager.BeaconHead]
     received.headHash shouldBe unknownHeadHash
     received.knownHeader shouldBe None
-  }
 
-  it should "publish BeaconHead with knownHeader=Some when head is locally known" taggedAs UnitTest in new Fixture {
+  it should "publish BeaconHead with knownHeader=Some when head is locally known" taggedAs UnitTest in new Fixture:
     val probe: TestProbe = TestProbe()
     fcm.setListener(probe.ref)
 
@@ -74,15 +72,13 @@ class ForkChoiceManagerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     val received: BeaconHead = probe.expectMsgType[ForkChoiceManager.BeaconHead]
     received.headHash shouldBe knownHeadHash
     received.knownHeader.map(_.number) shouldBe Some(BigInt(12345))
-  }
 
-  it should "not throw when no listener is registered" taggedAs UnitTest in new Fixture {
+  it should "not throw when no listener is registered" taggedAs UnitTest in new Fixture:
     // No listener — must still succeed
     val state: ForkChoiceState = ForkChoiceState(unknownHeadHash, ByteString.empty, ByteString.empty)
     fcm.applyForkChoiceState(state) shouldBe Left("SYNCING")
-  }
 
-  it should "stop publishing after clearListener" taggedAs UnitTest in new Fixture {
+  it should "stop publishing after clearListener" taggedAs UnitTest in new Fixture:
     val probe: TestProbe = TestProbe()
     fcm.setListener(probe.ref)
     fcm.applyForkChoiceState(ForkChoiceState(knownHeadHash, ByteString.empty, ByteString.empty))
@@ -91,9 +87,8 @@ class ForkChoiceManagerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     fcm.clearListener()
     fcm.applyForkChoiceState(ForkChoiceState(unknownHeadHash, ByteString.empty, ByteString.empty))
     probe.expectNoMessage()
-  }
 
-  it should "replace the previously-registered listener on a second setListener" taggedAs UnitTest in new Fixture {
+  it should "replace the previously-registered listener on a second setListener" taggedAs UnitTest in new Fixture:
     val first: TestProbe = TestProbe()
     val second: TestProbe = TestProbe()
     fcm.setListener(first.ref)
@@ -102,5 +97,3 @@ class ForkChoiceManagerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     fcm.applyForkChoiceState(ForkChoiceState(knownHeadHash, ByteString.empty, ByteString.empty))
     second.expectMsgType[ForkChoiceManager.BeaconHead]
     first.expectNoMessage()
-  }
-}

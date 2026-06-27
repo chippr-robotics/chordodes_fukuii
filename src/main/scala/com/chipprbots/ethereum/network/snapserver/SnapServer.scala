@@ -27,61 +27,54 @@ import com.chipprbots.ethereum.utils.Logger
   * one item is emitted) the path from the root to the last returned key. These let the requester rebuild a partial trie
   * and verify the range is contiguous against the claimed root hash.
   */
-object SnapServer extends Logger {
+object SnapServer extends Logger:
 
   /** Convert a 32-byte hash into its 64-nibble key path. */
-  def hashToNibbles(hash: ByteString): Array[Byte] = {
+  def hashToNibbles(hash: ByteString): Array[Byte] =
     val out = new Array[Byte](hash.size * 2)
     var i = 0
-    while i < hash.size do {
+    while i < hash.size do
       val b = hash(i) & 0xff
       out(i * 2) = ((b >>> 4) & 0x0f).toByte
       out(i * 2 + 1) = (b & 0x0f).toByte
       i += 1
-    }
     out
-  }
 
   /** Convert a 64-nibble key path back to a 32-byte hash. Returns None if length is odd. */
   def nibblesToHash(nibbles: Array[Byte]): Option[ByteString] =
     if nibbles.length % 2 != 0 then None
-    else {
+    else
       val out = new Array[Byte](nibbles.length / 2)
       var i = 0
-      while i < out.length do {
+      while i < out.length do
         out(i) = (((nibbles(i * 2) & 0x0f) << 4) | (nibbles(i * 2 + 1) & 0x0f)).toByte
         i += 1
-      }
       Some(ByteString(out))
-    }
 
   /** Compare two nibble arrays lexicographically (treating each nibble as a digit 0..15). */
-  private def cmpNibbles(a: Array[Byte], b: Array[Byte]): Int = {
+  private def cmpNibbles(a: Array[Byte], b: Array[Byte]): Int =
     val len = math.min(a.length, b.length)
     var i = 0
     var diff = 0
-    while i < len && diff == 0 do {
+    while i < len && diff == 0 do
       diff = (a(i) & 0xff) - (b(i) & 0xff)
       i += 1
-    }
     if diff != 0 then diff else a.length - b.length
-  }
 
   private def isEmptyRoot(root: ByteString): Boolean =
     root.toArray.sameElements(MerklePatriciaTrie.EmptyRootHash)
 
   /** Resolve a node (which may be a HashNode pointer) into its concrete form. */
-  private def resolve(node: MptNode, storage: MptStorage): MptNode = node match {
+  private def resolve(node: MptNode, storage: MptStorage): MptNode = node match
     case HashNode(hash) =>
       try storage.get(hash)
-      catch { case _: Throwable => NullNode }
+      catch case _: Throwable => NullNode
     case other => other
-  }
 
   /** Read the root node of a trie by its hash. Returns NullNode if missing. */
   private def fetchRootNode(rootHash: ByteString, storage: MptStorage): MptNode =
     try storage.get(rootHash.toArray)
-    catch { case _: Throwable => NullNode }
+    catch case _: Throwable => NullNode
 
   /** Slim-account RLP element per geth's snap protocol convention: the storageRoot and codeHash fields are encoded as
     * empty bytes when they equal the canonical empty-trie root and empty-code hash respectively. Saves ~64 bytes per
@@ -93,7 +86,7 @@ object SnapServer extends Logger {
     * Returns the parsed RLP element so callers can either embed it (in `AccountRange`'s RLP envelope) or serialise it
     * (`rlp.encode(toSlimAccountRlp(...))`) for byte-budget accounting.
     */
-  def toSlimAccountRlp(account: Account): RLPList = {
+  def toSlimAccountRlp(account: Account): RLPList =
     val nonceRlp: RLPEncodeable = RLPValue(ByteUtils.bigIntToUnsignedByteArray(account.nonce))
     val balanceRlp: RLPEncodeable = RLPValue(ByteUtils.bigIntToUnsignedByteArray(account.balance))
     val srRlp: RLPEncodeable =
@@ -103,7 +96,6 @@ object SnapServer extends Logger {
       if account.codeHash == Account.EmptyCodeHash then RLPValue(Array.emptyByteArray)
       else RLPValue(account.codeHash.value.toArray)
     RLPList(nonceRlp, balanceRlp, srRlp, chRlp)
-  }
 
   /** Range walker — yields (keyHash, leafValue) pairs whose key falls in [originNibbles, limitNibbles] (inclusive on
     * both ends), traversing the trie in key order. Caller stops consuming when their byte budget is exceeded.
@@ -142,12 +134,12 @@ object SnapServer extends Logger {
       storage: MptStorage,
       originNibbles: Array[Byte],
       limitNibbles: Array[Byte]
-  )(visit: (ByteString, ByteString) => Boolean): Unit = {
+  )(visit: (ByteString, ByteString) => Boolean): Unit =
     var stop = false
 
     def descend(node: MptNode, prefix: Array[Byte]): Unit =
-      if !stop && subtreeIntersectsRange(prefix, originNibbles, limitNibbles) then {
-        resolve(node, storage) match {
+      if !stop && subtreeIntersectsRange(prefix, originNibbles, limitNibbles) then
+        resolve(node, storage) match
           case NullNode                      => ()
           case LeafNode(key, value, _, _, _) =>
             // Geth semantics (eth/protocols/snap/handler.go:304-322): emit any leaf
@@ -156,37 +148,32 @@ object SnapServer extends Logger {
             // (returns the matching leaf, then stops) and the "first at-or-after"
             // semantics for keys that don't exist.
             val fullKey = prefix ++ key.toArray
-            if cmpNibbles(fullKey, originNibbles) >= 0 then {
+            if cmpNibbles(fullKey, originNibbles) >= 0 then
               nibblesToHash(fullKey).foreach { h =>
                 val keep = visit(h, value)
                 val pastLimit = cmpNibbles(fullKey, limitNibbles) >= 0
                 if !keep || pastLimit then stop = true
               }
-            }
           case ExtensionNode(sharedKey, next, _, _, _) =>
             descend(next, prefix ++ sharedKey.toArray)
           case BranchNode(children, terminator, _, _, _) =>
             terminator.foreach { value =>
-              if cmpNibbles(prefix, originNibbles) >= 0 then {
+              if cmpNibbles(prefix, originNibbles) >= 0 then
                 nibblesToHash(prefix).foreach { h =>
                   val keep = visit(h, value)
                   val pastLimit = cmpNibbles(prefix, limitNibbles) >= 0
                   if !keep || pastLimit then stop = true
                 }
-              }
             }
             var nibble = 0
-            while nibble < 16 && !stop do {
+            while nibble < 16 && !stop do
               val child = children(nibble)
               if child != NullNode then descend(child, prefix :+ nibble.toByte)
               nibble += 1
-            }
           case _: HashNode => () // resolve() above prevents reaching here
-        }
-      } // if !stop && subtreeIntersectsRange
+    // if !stop && subtreeIntersectsRange
 
     descend(root, Array.emptyByteArray)
-  }
 
   /** Collect the proof path for a given key — the nodes traversed from root to the leaf (or the deepest reachable node
     * along the path if the key is absent). The proof is returned as a sequence of RLP-encoded MPT nodes (with each
@@ -196,36 +183,30 @@ object SnapServer extends Logger {
       root: MptNode,
       storage: MptStorage,
       keyNibbles: Array[Byte]
-  ): Seq[ByteString] = {
+  ): Seq[ByteString] =
     val acc = scala.collection.mutable.ArrayBuffer.empty[ByteString]
 
-    def descend(node: MptNode, remaining: Array[Byte]): Unit = {
+    def descend(node: MptNode, remaining: Array[Byte]): Unit =
       val resolved = resolve(node, storage)
-      resolved match {
+      resolved match
         case NullNode => ()
         case _ =>
           acc += ByteString(MptTraversals.encodeNode(resolved))
-          resolved match {
+          resolved match
             case LeafNode(_, _, _, _, _) => ()
             case ExtensionNode(sharedKey, next, _, _, _) =>
               val sk = sharedKey.toArray
-              if remaining.length >= sk.length && remaining.take(sk.length).sameElements(sk) then {
+              if remaining.length >= sk.length && remaining.take(sk.length).sameElements(sk) then
                 descend(next, remaining.drop(sk.length))
-              }
             case BranchNode(children, _, _, _, _) =>
-              if remaining.nonEmpty then {
+              if remaining.nonEmpty then
                 val nibble = remaining(0) & 0x0f
                 val child = children(nibble)
                 if child != NullNode then descend(child, remaining.drop(1))
-              }
             case _ => ()
-          }
-      }
-    }
 
     descend(root, keyNibbles)
     acc.toSeq
-  }
 
   /** Build an `AccountRange` response by walking the state trie at `rootHash` between `startingHash` and `limitHash`,
     * emitting accounts whose RLP totals up to (but generally not exceeding) `responseBytes`. Always emits at least one
@@ -240,29 +221,27 @@ object SnapServer extends Logger {
       storage: MptStorage
   ): AccountRange =
     if isEmptyRoot(rootHash) then AccountRange(requestId, Seq.empty, Seq.empty)
-    else {
+    else
       val rootNode = fetchRootNode(rootHash, storage)
-      if rootNode == NullNode then {
+      if rootNode == NullNode then
         log.debug("SNAP serveAccountRange: root {} not in storage", rootHash.take(4))
         AccountRange(requestId, Seq.empty, Seq.empty)
-      } else {
+      else
 
         // SNAP "wrong-order" handling: when startingHash > limitHash hive's tests expect us
         // to return the FIRST available key at/after `startingHash`. With the geth-style
         // emit-on->=origin / stop-on->=limit semantics now in place, widening `limit` to
         // FF…FF gets us "first key at-or-after start" naturally — the walker emits one then
         // stops because the next key is >= origin >= limit.
-        val isReversed = {
+        val isReversed =
           val s = startingHash.toArray
           val l = limitHash.toArray
           var i = 0
           var ord = 0
-          while i < s.length && i < l.length && ord == 0 do {
+          while i < s.length && i < l.length && ord == 0 do
             ord = (s(i) & 0xff) - (l(i) & 0xff)
             i += 1
-          }
           ord > 0
-        }
         val effectiveLimit = if isReversed then ByteString(Array.fill[Byte](32)(0xff.toByte)) else limitHash
         val originNibbles = hashToNibbles(startingHash)
         val limitNibbles = hashToNibbles(effectiveLimit)
@@ -294,23 +273,21 @@ object SnapServer extends Logger {
         //   - Right bound proof: path to the last emitted key, but only when at least one account
         //     was emitted AND the response was truncated (otherwise the right edge is implicit).
         //   - When zero accounts emitted, only the left-bound proof is sent.
-        val proof: Seq[ByteString] = {
+        val proof: Seq[ByteString] =
           val leftProof = proofFor(rootNode, storage, hashToNibbles(startingHash))
-          collected.lastOption match {
+          collected.lastOption match
             case None => leftProof // empty range — left proof alone proves absence
             case Some((lastKey, _)) =>
               val lastNibbles = hashToNibbles(lastKey)
               val startNibbles = hashToNibbles(startingHash)
               if lastNibbles.sameElements(startNibbles) then leftProof
               else leftProof ++ proofFor(rootNode, storage, lastNibbles)
-          }
-        }
         // De-duplicate proof nodes (some appear on both paths).
         val dedupedProof = proof.distinct
 
         AccountRange(requestId, collected.toSeq, dedupedProof)
-      } // else rootNode != NullNode
-    } // else !isEmptyRoot
+      // else rootNode != NullNode
+  // else !isEmptyRoot
 
   /** Build a `StorageRanges` response — for each account, walk the per-account storage trie between `startingHash` and
     * `limitHash`. Only the first account's range is proved (per SNAP/1 spec — subsequent accounts are returned in full,
@@ -327,7 +304,7 @@ object SnapServer extends Logger {
       accountRoot: ByteString => Option[ByteString]
   ): StorageRanges =
     if isEmptyRoot(rootHash) then StorageRanges(requestId, Seq.empty, Seq.empty)
-    else {
+    else
       val maxBytes = responseBytes.min(BigInt(2 * 1024 * 1024)).max(BigInt(0)).toInt
       val deadline = System.currentTimeMillis() + 4000
       var accumulated = 0
@@ -335,20 +312,18 @@ object SnapServer extends Logger {
       var firstProof: Seq[ByteString] = Seq.empty
       var done = false
       val it = accountHashes.iterator
-      while it.hasNext && !done && System.currentTimeMillis() < deadline do {
+      while it.hasNext && !done && System.currentTimeMillis() < deadline do
         val accountHash = it.next()
-        accountRoot(accountHash) match {
+        accountRoot(accountHash) match
           case None =>
             // Account or its storage root unknown — skip.
             perAccount += Seq.empty
           case Some(storageRoot) =>
-            if isEmptyRoot(storageRoot) then {
-              perAccount += Seq.empty
-            } else {
+            if isEmptyRoot(storageRoot) then perAccount += Seq.empty
+            else
               val rootNode = fetchRootNode(storageRoot, storage)
-              if rootNode == NullNode then {
-                perAccount += Seq.empty
-              } else {
+              if rootNode == NullNode then perAccount += Seq.empty
+              else
                 // First account uses the requested [start, limit] range; subsequent
                 // accounts are returned in FULL.
                 val isFirst = perAccount.isEmpty
@@ -371,33 +346,26 @@ object SnapServer extends Logger {
                   System.currentTimeMillis() < deadline
                 }
                 val truncated = accumulated >= maxBytes
-                if isFirst then {
+                if isFirst then
                   // Per geth (handler.go:435-438): the right-bound proof is only
                   // needed when the response was truncated. If the walker ran to
                   // completion the right edge is implicit.
-                  firstProof = {
+                  firstProof =
                     val first = collected.headOption.map(_._1).getOrElse(startingHash)
                     val leftProof = proofFor(rootNode, storage, hashToNibbles(first))
                     val full =
                       if !truncated then leftProof
                       else
-                        collected.lastOption match {
+                        collected.lastOption match
                           case Some((last, _)) if last != first =>
                             leftProof ++ proofFor(rootNode, storage, hashToNibbles(last))
                           case _ => leftProof
-                        }
                     full.distinct
-                  }
-                }
                 perAccount += collected.toSeq
                 if truncated then done = true
-              }
-            }
-        }
-      }
 
       StorageRanges(requestId, perAccount.toSeq, firstProof)
-    } // else !isEmptyRoot
+  // else !isEmptyRoot
 
   /** Build a `TrieNodes` response — look up each requested HP-encoded path from `rootHash` and return the raw
     * RLP-encoded node found at that path. Missing nodes yield empty bytes per SNAP/1 spec.
@@ -408,7 +376,7 @@ object SnapServer extends Logger {
       paths: Seq[Seq[ByteString]],
       responseBytes: BigInt,
       storage: MptStorage
-  ): TrieNodes = {
+  ): TrieNodes =
     val maxBytes = responseBytes.min(BigInt(2 * 1024 * 1024)).max(BigInt(0)).toInt
     val deadline = System.currentTimeMillis() + 4000
     var accumulated: Int = 0
@@ -416,28 +384,27 @@ object SnapServer extends Logger {
     // Per geth (handler.go:522-525), a zero-item pathset anywhere in the request
     // is a protocol-level bad request — the whole response is empty.
     if paths.exists(_.isEmpty) then TrieNodes(requestId, Seq.empty)
-    else {
+    else
       val rootNode = fetchRootNode(rootHash, storage)
       val collected = scala.collection.mutable.ArrayBuffer.empty[ByteString]
 
-      if rootNode == NullNode then {
+      if rootNode == NullNode then
         // Root not found — return empty (sparse), matching go-ethereum's handler.go behaviour.
         TrieNodes(requestId, Seq.empty)
-      } else {
+      else
         var idx = 0
         while idx < paths.size && (accumulated < maxBytes || collected.isEmpty) && System.currentTimeMillis() < deadline
-        do {
+        do
           val pathSet = paths(idx)
-          if pathSet.size == 1 then {
+          if pathSet.size == 1 then
             // Single-element path: account-trie node lookup (HP-encoded partial path).
             val nibbles = decodeHpPath(pathSet.head.toArray)
-            collectNodeAtPath(rootNode, storage, nibbles) match {
+            collectNodeAtPath(rootNode, storage, nibbles) match
               case Some(enc) =>
                 collected += enc; accumulated += enc.size
               case None =>
                 collected += ByteString.empty; accumulated += 1
-            }
-          } else {
+          else
             // Multi-element path per geth handler.go:521-577 — pathSet(0) is the
             // account HASH (raw 32 bytes, used with GetAccountByHash); pathSet(1..)
             // are HP-encoded storage-trie paths inside that account's storage trie.
@@ -445,36 +412,29 @@ object SnapServer extends Logger {
             // MptStorage serves both state and storage tries.
             val accountNibbles = hashToNibbles(pathSet.head)
             val storageNibblesList = pathSet.tail
-            resolveLeafAccount(rootNode, storage, accountNibbles) match {
+            resolveLeafAccount(rootNode, storage, accountNibbles) match
               case Some(account) if account.storageRoot != Account.EmptyStorageRootHash =>
                 val storageRootNode = fetchRootNode(account.storageRoot.value, storage)
-                if storageRootNode != NullNode then {
+                if storageRootNode != NullNode then
                   storageNibblesList.foreach { storagePath =>
-                    if accumulated < maxBytes || collected.isEmpty then {
+                    if accumulated < maxBytes || collected.isEmpty then
                       val sn = decodeHpPath(storagePath.toArray)
-                      collectNodeAtPath(storageRootNode, storage, sn) match {
+                      collectNodeAtPath(storageRootNode, storage, sn) match
                         case Some(enc) =>
                           collected += enc; accumulated += enc.size
                         case None =>
                           collected += ByteString.empty; accumulated += 1
-                      }
-                    }
                   }
-                } else {
+                else {
                   // Storage root not in our DB — skip (sparse), matching go-ethereum.
                   // TrieNodeHealingCoordinator matches by keccak256 hash, not position,
                   // so sparse responses are handled correctly.
                 }
               // Account missing or has no storage — skip (sparse), matching go-ethereum.
               case _ =>
-            }
-          }
           idx += 1
-        }
         TrieNodes(requestId, collected.toSeq)
-      }
-    } // else paths.nonEmpty
-  }
+    // else paths.nonEmpty
 
   /** Walk the state trie following `nibbles` to a leaf and decode that leaf's value as an `Account`. Returns None if
     * the path doesn't terminate at a leaf or the leaf isn't a valid account RLP.
@@ -483,48 +443,44 @@ object SnapServer extends Logger {
       root: MptNode,
       storage: MptStorage,
       nibbles: Array[Byte]
-  ): Option[Account] = {
+  ): Option[Account] =
 
-    def descend(node: MptNode, remaining: Array[Byte]): Option[Account] = {
+    def descend(node: MptNode, remaining: Array[Byte]): Option[Account] =
       val resolved = resolve(node, storage)
-      resolved match {
+      resolved match
         case NullNode => None
         case LeafNode(key, value, _, _, _) =>
           val k = key.toArray
-          if remaining.sameElements(k) then {
+          if remaining.sameElements(k) then
             try Some(value.toArray.toAccount)
-            catch { case _: Throwable => None }
-          } else None
+            catch case _: Throwable => None
+          else None
         case ExtensionNode(sharedKey, next, _, _, _) =>
           val sk = sharedKey.toArray
           if remaining.length >= sk.length && remaining.take(sk.length).sameElements(sk) then
             descend(next, remaining.drop(sk.length))
           else None
         case BranchNode(children, terminator, _, _, _) =>
-          if remaining.isEmpty then {
+          if remaining.isEmpty then
             // The account sits in the branch terminator slot.
             terminator.flatMap { v =>
               try Some(v.toArray.toAccount)
-              catch { case _: Throwable => None }
+              catch case _: Throwable => None
             }
-          } else {
+          else
             val nibble = remaining(0) & 0x0f
             val child = children(nibble)
             if child == NullNode then None else descend(child, remaining.drop(1))
-          }
         case _: HashNode => None
-      }
-    }
 
     descend(root, nibbles)
-  }
 
   /** Decode an HP-encoded (Hex Prefix, EIP-2 / yellow-paper) path back to its nibble representation. Drops the
     * leaf/extension flag bit.
     */
   private def decodeHpPath(bytes: Array[Byte]): Array[Byte] =
     if bytes.isEmpty then Array.emptyByteArray
-    else {
+    else
       val firstByte = bytes(0) & 0xff
       val oddLen = (firstByte & 0x10) != 0
       val skipFirst = if oddLen then 0 else 1
@@ -533,7 +489,6 @@ object SnapServer extends Logger {
         Array(((b >>> 4) & 0x0f).toByte, (b & 0x0f).toByte)
       }
       firstNibble ++ rest.drop(skipFirst - 1).take(rest.length - (skipFirst - 1))
-    }
 
   /** Serve an incoming `GetByteCodes` request (SNAP/1).
     *
@@ -548,25 +503,22 @@ object SnapServer extends Logger {
       hashes: Seq[ByteString],
       responseBytes: BigInt,
       storage: EvmCodeStorage
-  ): ByteCodes = {
+  ): ByteCodes =
     val maxBytes = responseBytes.min(BigInt(2 * 1024 * 1024)).max(BigInt(0)).toInt
     val collected = scala.collection.mutable.ListBuffer.empty[ByteString]
     var totalBytes = 0
     val it = hashes.take(1024).iterator
-    while it.hasNext && (totalBytes < maxBytes || collected.isEmpty) do {
+    while it.hasNext && (totalBytes < maxBytes || collected.isEmpty) do
       val codeHash = it.next()
-      if codeHash == Account.EmptyCodeHash.value then {
+      if codeHash == Account.EmptyCodeHash.value then
         collected += ByteString.empty
         // empty code contributes 0 bytes; do not count toward budget
-      } else {
+      else
         storage.get(codeHash).foreach { code =>
           collected += code
           totalBytes += code.size
         }
-      }
-    }
     ByteCodes(requestId = requestId, codes = collected.toList)
-  }
 
   /** Walk the trie following `nibbles` and return the encoded node found at that exact path (as a raw MPT node), or
     * None if the path doesn't terminate cleanly at a node.
@@ -575,14 +527,13 @@ object SnapServer extends Logger {
       root: MptNode,
       storage: MptStorage,
       nibbles: Array[Byte]
-  ): Option[ByteString] = {
+  ): Option[ByteString] =
 
-    def descend(node: MptNode, remaining: Array[Byte]): Option[ByteString] = {
+    def descend(node: MptNode, remaining: Array[Byte]): Option[ByteString] =
       val resolved = resolve(node, storage)
-      if remaining.isEmpty then {
-        Some(ByteString(MptTraversals.encodeNode(resolved)))
-      } else {
-        resolved match {
+      if remaining.isEmpty then Some(ByteString(MptTraversals.encodeNode(resolved)))
+      else
+        resolved match
           case NullNode => None
           case LeafNode(key, _, _, _, _) =>
             val k = key.toArray
@@ -599,10 +550,5 @@ object SnapServer extends Logger {
             if child == NullNode then None
             else descend(child, remaining.drop(1))
           case _: HashNode => None // resolve handles
-        }
-      }
-    }
 
     descend(root, nibbles)
-  }
-}

@@ -36,8 +36,8 @@ final case class MiningConfig(
     recommitInterval: FiniteDuration
 )
 
-object MiningConfig extends Logger {
-  object Keys {
+object MiningConfig extends Logger:
+  object Keys:
     final val Mining = "mining"
     final val Protocol = "protocol"
     final val Coinbase = "coinbase"
@@ -48,7 +48,6 @@ object MiningConfig extends Logger {
     final val NotifyUrls = "notify-urls"
     final val StaleThreshold = "stale-threshold"
     final val RecommitInterval = "recommit-interval"
-  }
 
   final val AllowedProtocols: Set[String] = Protocol.KnownProtocolNames
 
@@ -58,20 +57,18 @@ object MiningConfig extends Logger {
       " but it should be one of " +
       AllowedProtocols.map("'" + _ + "'").mkString(",")
 
-  private def readProtocol(miningConfig: TypesafeConfig): Protocol = {
+  private def readProtocol(miningConfig: TypesafeConfig): Protocol =
     val protocol = miningConfig.getString(Keys.Protocol)
 
     // If the mining protocol is not a known one, then it is a fatal error
     // and the application must exit.
-    if !AllowedProtocols(protocol) then {
+    if !AllowedProtocols(protocol) then
       val error = AllowedProtocolsError(protocol)
       throw new RuntimeException(error)
-    }
 
     Protocol(protocol)
-  }
 
-  def apply(fukuiiConfig: TypesafeConfig): MiningConfig = {
+  def apply(fukuiiConfig: TypesafeConfig): MiningConfig =
     val config = fukuiiConfig.getConfig(Keys.Mining)
 
     val protocol = readProtocol(config)
@@ -106,5 +103,3 @@ object MiningConfig extends Logger {
       staleThreshold = staleThreshold,
       recommitInterval = recommitInterval
     )
-  }
-}

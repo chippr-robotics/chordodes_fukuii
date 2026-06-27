@@ -8,7 +8,7 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.domain.BlockHash
 
-class ChainWeightSpec extends AnyFlatSpec with Matchers {
+class ChainWeightSpec extends AnyFlatSpec with Matchers:
 
   def createHeader(
       number: BigInt,
@@ -84,4 +84,3 @@ class ChainWeightSpec extends AnyFlatSpec with Matchers {
 
     increased.totalDifficulty shouldBe BigInt(100)
   }
-}

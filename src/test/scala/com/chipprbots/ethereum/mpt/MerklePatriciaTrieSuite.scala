@@ -25,7 +25,7 @@ import com.chipprbots.ethereum.proof.MptProofVerifier
 import com.chipprbots.ethereum.proof.ProofVerifyResult.ValidProof
 import com.chipprbots.ethereum.testing.Tags.*
 
-class MerklePatriciaTrieSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ObjectGenerators {
+class MerklePatriciaTrieSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ObjectGenerators:
 
   val dataSource: EphemDataSource = EphemDataSource()
   val (stateStorage, emptyNodeStorage, cachedNodeStorage) = StateStorage.createTestStateStorage(dataSource)
@@ -33,15 +33,13 @@ class MerklePatriciaTrieSuite extends AnyFunSuite with ScalaCheckPropertyChecks 
   val emptyMpt: MerklePatriciaTrie[Array[Byte], Array[Byte]] =
     MerklePatriciaTrie[Array[Byte], Array[Byte]](emptyEphemNodeStorage)
 
-  implicit val intByteArraySerializable: ByteArraySerializable[Int] = new ByteArraySerializable[Int] {
-    override def toBytes(input: Int): Array[Byte] = {
+  implicit val intByteArraySerializable: ByteArraySerializable[Int] = new ByteArraySerializable[Int]:
+    override def toBytes(input: Int): Array[Byte] =
       val b: ByteBuffer = ByteBuffer.allocate(4)
       b.putInt(input)
       b.array
-    }
 
     override def fromBytes(bytes: Array[Byte]): Int = ByteBuffer.wrap(bytes).getInt()
-  }
 
   test("PatriciaTrie gets inserted key-value pairs", UnitTest, MPTTest) {
     forAll(keyValueListGen()) { (keyValueList: Seq[(Int, Int)]) =>
@@ -650,4 +648,3 @@ class MerklePatriciaTrieSuite extends AnyFunSuite with ScalaCheckPropertyChecks 
       val obtained = trie.get(key)
       assert(obtained.isEmpty)
     }
-}

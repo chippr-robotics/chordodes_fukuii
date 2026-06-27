@@ -22,7 +22,7 @@ import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 import com.chipprbots.ethereum.testing.Tags.*
 
-class PeersClientSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks {
+class PeersClientSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks:
 
   import Peers.*
 
@@ -143,7 +143,7 @@ class PeersClientSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyC
     ) shouldEqual None
   }
 
-  object Peers {
+  object Peers:
     implicit val system: ActorSystem = ActorSystem("PeersClient_System")
 
     val peer1: Peer =
@@ -187,5 +187,3 @@ class PeersClientSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyC
         bestBlockHash = genesisHash,
         maxBlockNumber = 0
       )
-  }
-}

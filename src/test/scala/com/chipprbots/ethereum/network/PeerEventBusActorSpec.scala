@@ -32,14 +32,14 @@ import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Ping
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Pong
 import com.chipprbots.ethereum.testing.Tags.*
 
-class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers with ScalaFutures {
+class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers with ScalaFutures:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
   "PeerEventBusActor" should "relay messages received to subscribers" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
 
     val probe1: TestProbe = TestProbe()(classicSystem)
     val probe2: TestProbe = TestProbe()(classicSystem)
@@ -62,9 +62,7 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     probe1.expectNoMessage()
     probe2.expectMsg(msgFromPeer2)
 
-  }
-
-  it should "relay messages via streams" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "relay messages via streams" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     val classifier1: MessageClassifier = MessageClassifier(Set(Ping.code), PeerSelector.WithId(PeerId("1")))
     val classifier2: MessageClassifier = MessageClassifier(Set(Ping.code), PeerSelector.AllPeers)
 
@@ -90,9 +88,8 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     // Elements are already buffered; Futures complete as soon as take(N) demand is satisfied.
     stream1.futureValue shouldEqual Seq(msgFromPeer)
     stream2.futureValue shouldEqual Seq(msgFromPeer, msgFromPeer2)
-  }
 
-  it should "only relay matching message codes" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "only relay matching message codes" taggedAs (UnitTest, NetworkTest) in new TestSetup:
 
     val probe1: TestProbe = TestProbe()
     val classifier1: MessageClassifier = MessageClassifier(Set(Ping.code), PeerSelector.WithId(PeerId("1")))
@@ -106,9 +103,8 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     val msgFromPeer2: MessageFromPeer = MessageFromPeer(Pong(), PeerId("1"))
     peerEventBusActor ! PublishCmd(msgFromPeer2)
     probe1.expectNoMessage()
-  }
 
-  it should "relay peers disconnecting to its subscribers" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "relay peers disconnecting to its subscribers" taggedAs (UnitTest, NetworkTest) in new TestSetup:
 
     val probe1: TestProbe = TestProbe()
     val probe2: TestProbe = TestProbe()
@@ -139,9 +135,8 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     peerEventBusActor ! PublishCmd(msgPeerDisconnected)
     probe1.expectNoMessage()
     probe2.expectMsg(msgPeerDisconnected)
-  }
 
-  it should "relay peers handshaked to its subscribers" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "relay peers handshaked to its subscribers" taggedAs (UnitTest, NetworkTest) in new TestSetup:
 
     val probe1: TestProbe = TestProbe()
     val probe2: TestProbe = TestProbe()
@@ -167,12 +162,11 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     peerEventBusActor ! PublishCmd(msgPeerHandshaked)
     probe1.expectNoMessage()
     probe2.expectMsg(msgPeerHandshaked)
-  }
 
   it should "relay a single notification when subscribed twice to the same message code" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
 
     val probe1: TestProbe = TestProbe()
     peerEventBusActor ! SubscribeCmd(
@@ -189,12 +183,11 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
 
     probe1.expectMsg(msgFromPeer)
     probe1.expectNoMessage()
-  }
 
   it should "allow to handle subscriptions using AllPeers and WithId PeerSelector at the same time" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
 
     val probe1: TestProbe = TestProbe()
     peerEventBusActor ! SubscribeCmd(
@@ -227,9 +220,8 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
 
     // Still received after unsubscribing from AllPeers
     probe1.expectMsg(msgFromPeer)
-  }
 
-  it should "allow to subscribe to new messages" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "allow to subscribe to new messages" taggedAs (UnitTest, NetworkTest) in new TestSetup:
 
     val probe1: TestProbe = TestProbe()
     peerEventBusActor ! SubscribeCmd(
@@ -245,9 +237,8 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     peerEventBusActor ! PublishCmd(msgFromPeer)
 
     probe1.expectMsg(msgFromPeer)
-  }
 
-  it should "not change subscriptions when subscribing to empty set" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "not change subscriptions when subscribing to empty set" taggedAs (UnitTest, NetworkTest) in new TestSetup:
 
     val probe1: TestProbe = TestProbe()
     peerEventBusActor ! SubscribeCmd(
@@ -263,9 +254,8 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     peerEventBusActor ! PublishCmd(msgFromPeer)
 
     probe1.expectMsg(msgFromPeer)
-  }
 
-  it should "allow to unsubscribe from messages" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "allow to unsubscribe from messages" taggedAs (UnitTest, NetworkTest) in new TestSetup:
 
     val probe1: TestProbe = TestProbe()
     peerEventBusActor ! SubscribeCmd(
@@ -298,9 +288,8 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     peerEventBusActor ! PublishCmd(msgFromPeer2)
 
     probe1.expectNoMessage()
-  }
 
-  trait TestSetup {
+  trait TestSetup:
     val peerEventBusActor: typed.ActorRef[PeerEventBusActor.Command] =
       testKit.spawn(PeerEventBusActor.behavior(), s"pea-${java.util.UUID.randomUUID()}")
 
@@ -318,7 +307,3 @@ class PeerEventBusActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
       maxBlockNumber = Fixtures.Blocks.Block3125369.header.number,
       bestBlockHash = peerStatus.bestHash
     )
-
-  }
-
-}

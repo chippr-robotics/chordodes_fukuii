@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPValue
 import com.chipprbots.ethereum.testing.Tags.*
 
-class ETH63AccountImplicitsSpec extends AnyFlatSpec with Matchers {
+class ETH63AccountImplicitsSpec extends AnyFlatSpec with Matchers:
 
   "Account.AccountDec" should "normalize empty storageRoot/codeHash to canonical empty hashes" taggedAs (UnitTest) in {
     // RLP([nonce, balance, storageRoot, codeHash])
@@ -54,4 +54,3 @@ class ETH63AccountImplicitsSpec extends AnyFlatSpec with Matchers {
     decoded.storageRoot.value shouldBe customStorageRoot
     decoded.codeHash shouldBe CodeHash(customCodeHash)
   }
-}

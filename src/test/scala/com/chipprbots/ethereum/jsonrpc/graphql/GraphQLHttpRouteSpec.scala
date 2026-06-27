@@ -55,7 +55,7 @@ import com.chipprbots.ethereum.utils.FilterConfig
 import com.chipprbots.ethereum.utils.Logger
 
 /** End-to-end test for the POST /graphql HTTP route mounted on JsonRpcHttpServer. */
-class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRouteTest with MockFactory {
+class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRouteTest with MockFactory:
 
   implicit val runtime: IORuntime = IORuntime.global
 
@@ -66,7 +66,7 @@ class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRoute
   it should "respond with 200 and JSON body to a well-formed POST /graphql" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val body =
       """{"query":"{ chainID }"}"""
     val req: HttpRequest = HttpRequest(
@@ -80,9 +80,8 @@ class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRoute
       val json = parse(responseAs[String]).toOption.get
       json.hcursor.downField("data").downField("chainID").as[String].toOption.get should startWith("0x")
     }
-  }
 
-  it should "return 400 on invalid JSON body" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "return 400 on invalid JSON body" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val req: HttpRequest = HttpRequest(
       method = HttpMethods.POST,
       uri = "/graphql",
@@ -91,9 +90,8 @@ class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRoute
     req ~> Route.seal(server.route) ~> check {
       status shouldBe StatusCodes.BadRequest
     }
-  }
 
-  it should "return 400 for syntactically invalid GraphQL" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "return 400 for syntactically invalid GraphQL" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val body = """{"query":"{ not valid graphql"}"""
     val req: HttpRequest = HttpRequest(
       method = HttpMethods.POST,
@@ -103,11 +101,8 @@ class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRoute
     req ~> Route.seal(server.route) ~> check {
       status shouldBe StatusCodes.BadRequest
     }
-  }
 
-  it should "return 404 when GraphQL is disabled" taggedAs (UnitTest, RPCTest) in new TestSetup(graphQLEnabled =
-    false
-  ) {
+  it should "return 404 when GraphQL is disabled" taggedAs (UnitTest, RPCTest) in new TestSetup(graphQLEnabled = false):
     val body = """{"query":"{ chainID }"}"""
     val req: HttpRequest = HttpRequest(
       method = HttpMethods.POST,
@@ -117,10 +112,9 @@ class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRoute
     req ~> Route.seal(server.route) ~> check {
       status shouldBe StatusCodes.NotFound
     }
-  }
 
   // -------------------------------------------------------------------------
-  abstract class TestSetup(val graphQLEnabled: Boolean = true) extends EphemBlockchainTestSetup {
+  abstract class TestSetup(val graphQLEnabled: Boolean = true) extends EphemBlockchainTestSetup:
 
     implicit override lazy val classicSystem: ActorSystem = GraphQLHttpRouteSpec.this.system
 
@@ -168,10 +162,10 @@ class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRoute
     )
     lazy val ethFilterService = new EthFilterService(
       filterManager,
-      new FilterConfig {
+      new FilterConfig:
         override val filterTimeout: FiniteDuration = 10.seconds
         override val filterManagerQueryTimeout: FiniteDuration = 2.seconds
-      },
+      ,
       blockchainReader
     )
 
@@ -179,7 +173,7 @@ class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRoute
 
     val graphQLSvc: Option[GraphQLService] =
       if !graphQLEnabled then None
-      else {
+      else
         val ctx = GraphQLContext(
           blockchain,
           blockchainReader,
@@ -193,22 +187,19 @@ class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRoute
           ethFilterService
         )
         Some(new GraphQLService(ctx, executionTimeout = 10.seconds))
-      }
 
-    val rateLimitConfig: RateLimitConfig = new RateLimitConfig {
+    val rateLimitConfig: RateLimitConfig = new RateLimitConfig:
       override val enabled: Boolean = false
       override val minRequestInterval: FiniteDuration = FiniteDuration.apply(20, TimeUnit.MILLISECONDS)
       override val latestTimestampCacheSize: Int = 1024
-    }
 
-    val cfg: JsonRpcHttpServerConfig = new JsonRpcHttpServerConfig {
+    val cfg: JsonRpcHttpServerConfig = new JsonRpcHttpServerConfig:
       override val mode: String = "mockJsonRpc"
       override val enabled: Boolean = true
       override val interface: String = ""
       override val port: Int = 0
       override val corsAllowedOrigins = HttpOriginMatcher.*
       override val rateLimit: RateLimitConfig = rateLimitConfig
-    }
 
     val controller: MockableJsonRpcControllerForGraphQL = mock[MockableJsonRpcControllerForGraphQL]
     val healthChecker: JsonRpcHealthChecker = mock[JsonRpcHealthChecker]
@@ -220,18 +211,15 @@ class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRoute
     val weight: ChainWeight = ChainWeight.totalDifficultyOnly(block.header.difficulty)
     blockchainWriter.storeBlock(block).and(blockchainWriter.storeChainWeight(block.header.hash, weight)).commit()
     blockchainWriter.saveBestKnownBlocks(block.hash, block.number)
-  }
-}
 
 /** Mockable controller — matches the pattern in JsonRpcHttpServerSpec. */
-class MockableJsonRpcControllerForGraphQL extends JsonRpcBaseController with ApisBase with Logger {
+class MockableJsonRpcControllerForGraphQL extends JsonRpcBaseController with ApisBase with Logger:
   override def apisHandleFns: Map[String, PartialFunction[JsonRpcRequest, cats.effect.IO[JsonRpcResponse]]] = Map.empty
   override def enabledApis: Seq[String] = Seq.empty
   override def available: List[String] = List.empty
   @SuppressWarnings(Array("scalafix:DisableSyntax.null"))
   override val config: JsonRpcConfig = null
   implicit override def executionContext: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
-}
 
 class GraphQLFakeServer(
     val jsonRpcController: JsonRpcBaseController,
@@ -240,9 +228,8 @@ class GraphQLFakeServer(
     override val graphQLService: Option[GraphQLService]
 )(implicit val actorSystem: ActorSystem)
     extends JsonRpcHttpServer
-    with Logger {
+    with Logger:
 
   def run(): Unit = ()
   override def corsAllowedOrigins: HttpOriginMatcher = config.corsAllowedOrigins
   override protected val rateLimit: RateLimit = new RateLimit(config.rateLimit)
-}

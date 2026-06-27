@@ -22,7 +22,7 @@ import com.chipprbots.ethereum.jsonrpc.ProofService.StorageProofKey
 import com.chipprbots.ethereum.mpt.MptNode
 import com.chipprbots.ethereum.mpt.MptTraversals
 
-object ProofService {
+object ProofService:
 
   /** Request to eth get proof
     *
@@ -39,27 +39,24 @@ object ProofService {
 
   case class GetProofResponse(proofAccount: ProofAccount)
 
-  sealed trait StorageProof {
+  sealed trait StorageProof:
     def key: StorageProofKey
     def value: BigInt
     def proof: Seq[ByteString]
-  }
 
-  object StorageProof {
+  object StorageProof:
     def apply(position: BigInt, value: Option[BigInt], proof: Option[Vector[MptNode]]): StorageProof =
-      (value, proof) match {
+      (value, proof) match
         case (Some(value), Some(proof)) =>
           StorageValueProof(StorageProofKey(position), value, proof.map(asRlpSerializedNode))
         case (None, Some(proof)) =>
           EmptyStorageValue(StorageProofKey(position), proof.map(asRlpSerializedNode))
         case (Some(value), None) => EmptyStorageProof(StorageProofKey(position), value)
         case (None, None)        => EmptyStorageValueProof(StorageProofKey(position))
-      }
 
     def asRlpSerializedNode(node: MptNode): ByteString =
       // Use cached RLP encoding if available (preserves original storage bytes)
       node.cachedRlpEncoded.map(ByteString(_)).getOrElse(ByteString(MptTraversals.encodeNode(node)))
-  }
 
   /** Object proving a relationship of a storage value to an account's storageHash
     *
@@ -70,16 +67,13 @@ object ProofService {
     * @param proof
     *   the set of node values needed to traverse a patricia merkle tree (from root to leaf) to retrieve a value
     */
-  case class EmptyStorageValueProof(key: StorageProofKey) extends StorageProof {
+  case class EmptyStorageValueProof(key: StorageProofKey) extends StorageProof:
     val value: BigInt = BigInt(0)
     val proof: Seq[ByteString] = Seq.empty[MptNode].map(asRlpSerializedNode)
-  }
-  case class EmptyStorageValue(key: StorageProofKey, proof: Seq[ByteString]) extends StorageProof {
+  case class EmptyStorageValue(key: StorageProofKey, proof: Seq[ByteString]) extends StorageProof:
     val value: BigInt = BigInt(0)
-  }
-  case class EmptyStorageProof(key: StorageProofKey, value: BigInt) extends StorageProof {
+  case class EmptyStorageProof(key: StorageProofKey, value: BigInt) extends StorageProof:
     val proof: Seq[ByteString] = Seq.empty[MptNode].map(asRlpSerializedNode)
-  }
   case class StorageValueProof(key: StorageProofKey, value: BigInt, proof: Seq[ByteString]) extends StorageProof
 
   /** The key used to get the storage slot in its account tree */
@@ -117,7 +111,7 @@ object ProofService {
       storageProof: Seq[StorageProof]
   )
 
-  object ProofAccount {
+  object ProofAccount:
 
     def apply(
         account: Account,
@@ -134,21 +128,17 @@ object ProofService {
         storageHash = account.storageRoot.value,
         storageProof = storageProof
       )
-  }
 
   sealed trait MptProofError
-  object MptProofError {
+  object MptProofError:
     case object UnableRebuildMpt extends MptProofError
     case object KeyNotFoundInRebuidMpt extends MptProofError
-  }
-}
 
-trait ProofService {
+trait ProofService:
 
   /** Returns the account- and storage-values of the specified account including the Merkle-proof.
     */
   def getProof(req: GetProofRequest): ServiceResponse[GetProofResponse]
-}
 
 /** Spec: [EIP-1186](https://eips.ethereum.org/EIPS/eip-1186) besu:
   * https://github.com/PegaSysEng/pantheon/pull/1824/files parity:
@@ -159,7 +149,7 @@ class EthProofService(
     blockchainReader: BlockchainReader,
     blockGenerator: BlockGenerator,
     ethCompatibleStorage: Boolean
-) extends ProofService {
+) extends ProofService:
 
   def getProof(req: GetProofRequest): ServiceResponse[GetProofResponse] =
     getProofAccount(req.address, req.storageKeys, req.blockNumber)
@@ -180,7 +170,7 @@ class EthProofService(
       storageKeys: Seq[StorageProofKey],
       block: BlockParam
   ): IO[Either[JsonRpcError, ProofAccount]] = IO {
-    for {
+    for
       blockNumber <- resolveBlock(block).map(_.block.number)
       account <- Either.fromOption(
         blockchainReader.getAccount(blockchainReader.getBestBranch, address, blockNumber),
@@ -193,7 +183,7 @@ class EthProofService(
         noAccountProof(address, blockNumber)
       )
       storageProof = getStorageProof(account, storageKeys)
-    } yield ProofAccount(account, accountProof, storageProof, address)
+    yield ProofAccount(account, accountProof, storageProof, address)
   }
 
   def getStorageProof(
@@ -219,7 +209,7 @@ class EthProofService(
   private def asRlpSerializedNode(node: MptNode): ByteString =
     ByteString(MptTraversals.encodeNode(node))
 
-  private def resolveBlock(blockParam: BlockParam): Either[JsonRpcError, ResolvedBlock] = {
+  private def resolveBlock(blockParam: BlockParam): Either[JsonRpcError, ResolvedBlock] =
     def getBlock(number: BigInt): Either[JsonRpcError, Block] =
       blockchainReader
         .getBlockByNumber(blockchainReader.getBestBranch, number)
@@ -229,7 +219,7 @@ class EthProofService(
       blockchainReader.getBestBlock
         .toRight(JsonRpcError.InvalidParams("Latest block not found"))
 
-    blockParam match {
+    blockParam match
       case BlockParam.WithNumber(blockNumber) => getBlock(blockNumber).map(ResolvedBlock(_, pendingState = None))
       case BlockParam.WithHash(hash) =>
         blockchainReader
@@ -245,6 +235,3 @@ class EthProofService(
           .map(pb => ResolvedBlock(pb.pendingBlock.block, pendingState = Some(pb.worldState)))
           .map(Right.apply)
           .getOrElse(resolveBlock(BlockParam.Latest)) // Default behavior in other clients
-    }
-  }
-}

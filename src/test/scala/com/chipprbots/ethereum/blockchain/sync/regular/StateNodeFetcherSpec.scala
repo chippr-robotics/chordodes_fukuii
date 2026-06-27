@@ -40,7 +40,7 @@ class StateNodeFetcherSpec
     with AnyFreeSpecLike
     with Matchers
     with BeforeAndAfterEach
-    with TestSyncConfig {
+    with TestSyncConfig:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
@@ -59,7 +59,7 @@ class StateNodeFetcherSpec
     *   - a typed TestProbe playing the BlockFetcher supervisor
     *   - the StateNodeFetcher actor under test
     */
-  private trait TestSetup {
+  private trait TestSetup:
     val peersClientProbe: TestProbe = TestProbe()
     val replyToProbe: TestProbe = TestProbe()
     val supervisorProbe: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[FetchCommand] =
@@ -72,11 +72,10 @@ class StateNodeFetcherSpec
       )
 
     val targetHash: ByteString = ByteString(Array.fill[Byte](32)(0xab.toByte))
-  }
 
   "StateNodeFetcher" - {
 
-    "with isByteCode=true, routes the request to SNAP GetByteCodes via BestSnapPeerExcluding" taggedAs UnitTest in new TestSetup {
+    "with isByteCode=true, routes the request to SNAP GetByteCodes via BestSnapPeerExcluding" taggedAs UnitTest in new TestSetup:
       fetcher ! StateNodeFetcher.FetchStateNode(
         hash = targetHash,
         originalSender = replyToProbe.ref,
@@ -97,9 +96,8 @@ class StateNodeFetcherSpec
       // First attempt excludes nothing; on empty/wrong responses the responding peer is added to
       // triedPeers so the next retry rotates to a different snap server (no more single-peer hammer).
       req.peerSelector shouldBe BestSnapPeerExcluding(Set.empty)
-    }
 
-    "with stateRoot + paths, routes the request to SNAP GetTrieNodes (not GetByteCodes)" taggedAs UnitTest in new TestSetup {
+    "with stateRoot + paths, routes the request to SNAP GetTrieNodes (not GetByteCodes)" taggedAs UnitTest in new TestSetup:
       val stateRoot: ByteString = ByteString(Array.fill[Byte](32)(0x11.toByte))
       val paths: Seq[Seq[ByteString]] = Seq(Seq(ByteString(Array(0x01.toByte, 0x02.toByte))))
 
@@ -115,9 +113,8 @@ class StateNodeFetcherSpec
       req.message shouldBe a[GetTrieNodes]
       req.message.asInstanceOf[GetTrieNodes].rootHash shouldBe stateRoot
       req.peerSelector shouldBe BestSnapPeerExcluding(Set.empty)
-    }
 
-    "de-duplicates a second FetchStateNode for the in-flight hash (no parallel request)" taggedAs UnitTest in new TestSetup {
+    "de-duplicates a second FetchStateNode for the in-flight hash (no parallel request)" taggedAs UnitTest in new TestSetup:
       // First fetch — fires a request.
       fetcher ! StateNodeFetcher.FetchStateNode(
         hash = targetHash,
@@ -137,9 +134,8 @@ class StateNodeFetcherSpec
       )
 
       peersClientProbe.expectNoMessage(500.millis)
-    }
 
-    "fires a fresh request when the second FetchStateNode is for a DIFFERENT hash" taggedAs UnitTest in new TestSetup {
+    "fires a fresh request when the second FetchStateNode is for a DIFFERENT hash" taggedAs UnitTest in new TestSetup:
       fetcher ! StateNodeFetcher.FetchStateNode(
         hash = targetHash,
         originalSender = replyToProbe.ref,
@@ -159,9 +155,8 @@ class StateNodeFetcherSpec
 
       val req: Request[?] = peersClientProbe.expectMsgClass(3.seconds, classOf[PeersClient.Request[?]])
       req.message.asInstanceOf[GetByteCodes].hashes shouldBe Seq(otherHash)
-    }
 
-    "exhausts after MaxStateNodeFetchRetries RetryStateNodeRequest events and signals BlockImporter" taggedAs UnitTest in new TestSetup {
+    "exhausts after MaxStateNodeFetchRetries RetryStateNodeRequest events and signals BlockImporter" taggedAs UnitTest in new TestSetup:
       fetcher ! StateNodeFetcher.FetchStateNode(
         hash = targetHash,
         originalSender = replyToProbe.ref,
@@ -180,9 +175,8 @@ class StateNodeFetcherSpec
       replyToProbe.expectMsgPF(3.seconds) { case FetchedStateNode(NodeData(values)) =>
         values shouldBe empty
       }
-    }
 
-    "before exhaustion, RetryStateNodeRequest does NOT signal BlockImporter" taggedAs UnitTest in new TestSetup {
+    "before exhaustion, RetryStateNodeRequest does NOT signal BlockImporter" taggedAs UnitTest in new TestSetup:
       fetcher ! StateNodeFetcher.FetchStateNode(
         hash = targetHash,
         originalSender = replyToProbe.ref,
@@ -197,6 +191,4 @@ class StateNodeFetcherSpec
       }
 
       replyToProbe.expectNoMessage(500.millis)
-    }
   }
-}

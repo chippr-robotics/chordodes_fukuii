@@ -1,10 +1,10 @@
 package com.chipprbots.ethereum.network.p2p
 
-package object messages {
+package object messages:
 
   val SubProtocolOffset = 0x10
 
-  object Codes {
+  object Codes:
     val StatusCode: Int = SubProtocolOffset + 0x00
     val NewBlockHashesCode: Int = SubProtocolOffset + 0x01
     val SignedTransactionsCode: Int = SubProtocolOffset + 0x02
@@ -27,5 +27,3 @@ package object messages {
     val ReceiptsCode: Int = SubProtocolOffset + 0x10
     // ETH/69: Block range update notification
     val BlockRangeUpdateCode: Int = SubProtocolOffset + 0x11
-  }
-}

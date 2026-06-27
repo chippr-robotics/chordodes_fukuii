@@ -25,7 +25,7 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.BuildInfo
 import com.chipprbots.ethereum.utils.NodeStatus
 
-object McpService {
+object McpService:
   // MCP Initialize
   case class McpInitializeRequest(params: Option[JValue])
   case class McpInitializeResponse(
@@ -107,7 +107,6 @@ object McpService {
 
   case class McpPromptsGetRequest(name: String, arguments: Option[JValue])
   case class McpPromptsGetResponse(description: Option[String], messages: List[JValue])
-}
 
 class McpService(
     peerManager: typed.ActorRef[PeerManagerActor.Command],
@@ -116,7 +115,7 @@ class McpService(
     blockchainConfig: BlockchainConfig,
     nodeStatusHolder: AtomicReference[NodeStatus],
     transactionMappingStorage: TransactionMappingStorage
-)(implicit val executionContext: ExecutionContext, scheduler: typed.Scheduler) {
+)(implicit val executionContext: ExecutionContext, scheduler: typed.Scheduler):
 
   import McpService.*
 
@@ -147,7 +146,7 @@ class McpService(
       )
     )
 
-  def toolsList(@unused request: McpToolsListRequest): ServiceResponse[McpToolsListResponse] = {
+  def toolsList(@unused request: McpToolsListRequest): ServiceResponse[McpToolsListResponse] =
     import org.json4s.JsonDSL.*
 
     val tools = McpToolRegistry.getAllTools().map { toolDef =>
@@ -162,7 +161,6 @@ class McpService(
     }
 
     IO.pure(Right(McpToolsListResponse(tools)))
-  }
 
   def toolsCall(request: McpToolsCallRequest): ServiceResponse[McpToolsCallResponse] =
     McpToolRegistry
@@ -183,7 +181,7 @@ class McpService(
         )
       }
 
-  def resourcesList(@unused request: McpResourcesListRequest): ServiceResponse[McpResourcesListResponse] = {
+  def resourcesList(@unused request: McpResourcesListRequest): ServiceResponse[McpResourcesListResponse] =
     val resources = McpResourceRegistry.getAllResources().map { resDef =>
       McpResource(
         uri = resDef.uri,
@@ -194,10 +192,9 @@ class McpService(
     }
 
     IO.pure(Right(McpResourcesListResponse(resources)))
-  }
 
   def resourcesRead(request: McpResourcesReadRequest): ServiceResponse[McpResourcesReadResponse] =
-    McpResourceRegistry.readResource(request.uri, deps) match {
+    McpResourceRegistry.readResource(request.uri, deps) match
       case Right(contentIO) =>
         contentIO.map { content =>
           Right(
@@ -214,9 +211,8 @@ class McpService(
         }
       case Left(error) =>
         IO.pure(Left(JsonRpcError.InvalidParams(error)))
-    }
 
-  def promptsList(@unused request: McpPromptsListRequest): ServiceResponse[McpPromptsListResponse] = {
+  def promptsList(@unused request: McpPromptsListRequest): ServiceResponse[McpPromptsListResponse] =
     val prompts = McpPromptRegistry.getAllPrompts().map { promptDef =>
       McpPrompt(
         name = promptDef.name,
@@ -226,9 +222,8 @@ class McpService(
     }
 
     IO.pure(Right(McpPromptsListResponse(prompts)))
-  }
 
-  def promptsGet(request: McpPromptsGetRequest): ServiceResponse[McpPromptsGetResponse] = {
+  def promptsGet(request: McpPromptsGetRequest): ServiceResponse[McpPromptsGetResponse] =
     val (description, messages) = McpPromptRegistry.getPrompt(request.name)
 
     IO.pure(
@@ -239,8 +234,6 @@ class McpService(
         )
       )
     )
-  }
-}
 
 /** Bundle of dependencies available to MCP tools and resources */
 case class McpDependencies(

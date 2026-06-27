@@ -17,11 +17,11 @@ case class IrregularStateChangeDaoForkBlockExchangeState(
     forkResolver: ForkResolver,
     remoteStatus: RemoteStatus
 ) extends InProgressState[PeerInfo]
-    with Logger {
+    with Logger:
 
   import handshakerConfiguration.*
 
-  def nextMessage: NextMessage = {
+  def nextMessage: NextMessage =
     val getBlockHeadersMsg: MessageSerializable =
       if Capability.usesRequestId(remoteStatus.capability) then
         ETHPackets.GetBlockHeaders(
@@ -44,31 +44,27 @@ case class IrregularStateChangeDaoForkBlockExchangeState(
       messageToSend = getBlockHeadersMsg,
       timeout = peerConfiguration.waitForChainCheckTimeout
     )
-  }
 
-  private def processForkBlockHeaders(blockHeaders: Seq[BlockHeader]): HandshakerState[PeerInfo] = {
+  private def processForkBlockHeaders(blockHeaders: Seq[BlockHeader]): HandshakerState[PeerInfo] =
     val forkBlockHeaderOpt = blockHeaders.find(_.number == forkResolver.forkBlockNumber)
 
-    forkBlockHeaderOpt match {
+    forkBlockHeaderOpt match
       case Some(forkBlockHeader) =>
         val fork = forkResolver.recognizeFork(forkBlockHeader)
 
         log.debug("Peer is running the {} fork", fork)
 
-        if forkResolver.isAccepted(fork) then {
+        if forkResolver.isAccepted(fork) then
           log.debug("Fork is accepted")
           // setting maxBlockNumber to 0, as we do not know best block number yet
           ConnectedState(PeerInfo.withForkAccepted(remoteStatus))
-        } else {
+        else
           log.debug("Fork is not accepted")
           DisconnectedState[PeerInfo](Disconnect.Reasons.UselessPeer)
-        }
 
       case None =>
         log.debug("Peer did not respond with fork block header")
         ConnectedState(PeerInfo.withNotForkAccepted(remoteStatus))
-    }
-  }
 
   def applyResponseMessage: PartialFunction[Message, HandshakerState[PeerInfo]] = {
     case ETHPackets.BlockHeaders(_, blockHeaders) => processForkBlockHeaders(blockHeaders)
@@ -77,7 +73,7 @@ case class IrregularStateChangeDaoForkBlockExchangeState(
   private def createBlockHeaderResponse(requestId: BigInt, header: Option[BlockHeader]): MessageSerializable =
     ETHPackets.BlockHeaders(requestId, header.toSeq)
 
-  override def respondToRequest(receivedMessage: Message): Option[MessageSerializable] = receivedMessage match {
+  override def respondToRequest(receivedMessage: Message): Option[MessageSerializable] = receivedMessage match
 
     case ETHPackets.GetBlockHeaders(requestId, Left(number), numHeaders, _, _)
         if number == forkResolver.forkBlockNumber && numHeaders == 1 =>
@@ -86,9 +82,5 @@ case class IrregularStateChangeDaoForkBlockExchangeState(
 
     case _ => None
 
-  }
-
   def processTimeout: HandshakerState[PeerInfo] =
     DisconnectedState(Disconnect.Reasons.TimeoutOnReceivingAMessage)
-
-}

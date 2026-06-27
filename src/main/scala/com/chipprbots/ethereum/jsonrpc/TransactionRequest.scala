@@ -14,7 +14,7 @@ case class TransactionRequest(
     gasPrice: Option[BigInt] = None,
     nonce: Option[BigInt] = None,
     data: Option[ByteString] = None
-) {
+):
 
   private val defaultGasPrice: BigInt = 2 * BigInt(10).pow(10)
   private val defaultGasLimit: BigInt = 90000
@@ -34,4 +34,3 @@ case class TransactionRequest(
   // Bridge overload — retained for callers not yet wired to the gas oracle.
   def toTransaction(defaultNonce: BigInt): LegacyTransaction =
     toTransaction(defaultNonce, defaultGasPrice)
-}

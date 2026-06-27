@@ -16,7 +16,7 @@ import com.chipprbots.ethereum.rlp.RLPValue
   * list). go-ethereum and besu re-request bodies forever when they see this — the items don't decode as a list of byte
   * strings. The correct framing wraps the typed envelope in an RLP byte string: `RLPValue(typeByte || rlp(payload))`.
   */
-class BlockBodyWireFormatSpec extends AnyFlatSpec with Matchers {
+class BlockBodyWireFormatSpec extends AnyFlatSpec with Matchers:
 
   import BlockBody.*
 
@@ -37,7 +37,7 @@ class BlockBodyWireFormatSpec extends AnyFlatSpec with Matchers {
     val bytes = BlockBodyEnc(body).toBytes
     val decoded = rlp.rawDecode(bytes)
 
-    decoded match {
+    decoded match
       case RLPList(txs: RLPList, _: RLPList) =>
         txs.items.size shouldBe 1
         // Generic RLP parsers (geth, besu) read the typed-tx envelope as a single byte string.
@@ -51,7 +51,6 @@ class BlockBodyWireFormatSpec extends AnyFlatSpec with Matchers {
         payload.head shouldBe 0x01.toByte
       case other =>
         fail(s"Expected 2-item RLPList(txs, uncles), got: $other")
-    }
   }
 
   it should "round-trip post-Shanghai bodies with withdrawals through fukuii's own decoder" in {
@@ -73,19 +72,16 @@ class BlockBodyWireFormatSpec extends AnyFlatSpec with Matchers {
     val body = BlockBody(transactionList = Nil, uncleNodesList = Nil, withdrawals = Some(Seq.empty))
     val bytes = BlockBodyEnc(body).toBytes
 
-    rlp.rawDecode(bytes) match {
+    rlp.rawDecode(bytes) match
       case rlpList: RLPList => rlpList.items.size shouldBe 3
       case other            => fail(s"Expected RLPList, got: $other")
-    }
   }
 
   it should "frame pre-Shanghai bodies as a 2-item RLP list" in {
     val body = BlockBody(transactionList = Nil, uncleNodesList = Nil, withdrawals = None)
     val bytes = BlockBodyEnc(body).toBytes
 
-    rlp.rawDecode(bytes) match {
+    rlp.rawDecode(bytes) match
       case rlpList: RLPList => rlpList.items.size shouldBe 2
       case other            => fail(s"Expected RLPList, got: $other")
-    }
   }
-}

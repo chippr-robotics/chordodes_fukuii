@@ -10,7 +10,7 @@ import com.chipprbots.ethereum.db.dataSource.DataSource
 import com.chipprbots.ethereum.db.storage.BlockHeadersStorage.BlockHeaderHash
 
 class BlockNumberMappingStorage(val dataSource: DataSource)
-    extends TransactionalKeyValueStorage[BigInt, BlockHeaderHash] {
+    extends TransactionalKeyValueStorage[BigInt, BlockHeaderHash]:
   override val namespace: IndexedSeq[Byte] = Namespaces.HeightsNamespace
 
   override def keySerializer: (BigInt) => IndexedSeq[Byte] = index => ArraySeq.unsafeWrapArray(index.toByteArray)
@@ -22,4 +22,3 @@ class BlockNumberMappingStorage(val dataSource: DataSource)
   override def valueSerializer: (BlockHeaderHash) => IndexedSeq[Byte] = identity
 
   override def valueDeserializer: (IndexedSeq[Byte]) => BlockHeaderHash = arr => ByteString(arr.toArray[Byte])
-}

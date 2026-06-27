@@ -48,7 +48,7 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
   * self-Commands via `ctx.self` and log via a plain SLF4J `asyncLog`. Retry / wait-for-peer scheduling moves from the
   * injected `scheduler` to `Behaviors.withTimers`.
   */
-object PivotHeaderBootstrap {
+object PivotHeaderBootstrap:
 
   sealed trait Command
   private case object Fetch extends Command
@@ -169,7 +169,7 @@ object PivotHeaderBootstrap {
       maxRetryDelay: FiniteDuration,
       waitForPeerDelay: FiniteDuration,
       preferSnapPeers: Boolean
-  ) {
+  ):
 
     // Safe from any thread (the `peersClient ?` callbacks run off the actor thread).
     private val asyncLog = LoggerFactory.getLogger(getClass)
@@ -180,23 +180,21 @@ object PivotHeaderBootstrap {
     implicit private val scheduler: Scheduler = ctx.system.scheduler
 
     private val byHashMode: Boolean = targetHash.isDefined
-    private def targetDesc: String = targetHash match {
+    private def targetDesc: String = targetHash match
       case Some(h) => s"hash=${com.chipprbots.ethereum.utils.ByteStringUtils.hash2string(h)}"
       case None    => s"block=$targetBlock"
-    }
 
     private var attempt: Int = 0
     private val triedPeers: scala.collection.mutable.Set[PeerId] = scala.collection.mutable.Set.empty
     private var waitCount: Int = 0
 
-    private def currentRetryDelay: FiniteDuration = {
+    private def currentRetryDelay: FiniteDuration =
       // Exponential backoff: initialRetryDelay * 2^(attempt-1), capped at maxRetryDelay
       val backoffMs = math.min(
         initialRetryDelay.toMillis * (1L << math.min(attempt - 1, 20)),
         maxRetryDelay.toMillis
       )
       backoffMs.millis
-    }
 
     // Use a short, fixed timeout for single-header requests.
     // syncConfig.peerResponseTimeout (90s in cirith-ungol) is far too long for fetching 1 header.
@@ -206,16 +204,15 @@ object PivotHeaderBootstrap {
     def running(): Behavior[Command] = Behaviors.receiveMessage {
       case Fetch =>
         attempt += 1
-        if attempt > maxAttempts then {
+        if attempt > maxAttempts then
           replyTo ! Failed(s"exhausted attempts ($maxAttempts) fetching pivot header $targetDesc")
           Behaviors.stopped
-        } else {
+        else
           fetchOnce()
           Behaviors.same
-        }
 
       case Fetched(header) =>
-        try {
+        try
           blockchainWriter.storeBlockHeader(header).commit()
           // For by-hash mode: report the actual block number we discovered.
           val resolvedNumber = if byHashMode then header.number else targetBlock
@@ -224,10 +221,9 @@ object PivotHeaderBootstrap {
               s"parentHash=${header.parentHash.value.take(4).toArray.map("%02x".format(_)).mkString}"
           )
           replyTo ! Completed(resolvedNumber, header)
-        } catch {
+        catch
           case t: Throwable =>
             replyTo ! Failed(s"failed storing pivot header $targetDesc: ${t.getMessage}")
-        }
         Behaviors.stopped
 
       case Retry(reason) =>
@@ -252,19 +248,18 @@ object PivotHeaderBootstrap {
         // Models Besu's waitForPeer(!peersUsed.contains(p)) / go-ethereum's idle-loop peer wait.
         // Does NOT increment `attempt` — starvation waits don't consume the retry budget.
         waitCount += 1
-        if waitCount % 4 == 0 then {
+        if waitCount % 4 == 0 then
           ctx.log.warn(
             "Pivot header bootstrap for {} has been waiting for a fresh peer for ~{}s ({} peer(s) tried so far)",
             targetDesc,
             waitCount * waitForPeerDelay.toSeconds,
             triedPeers.size
           )
-        }
         fetchOnce()
         Behaviors.same
     }
 
-    private def fetchOnce(): Unit = {
+    private def fetchOnce(): Unit =
       // Build the GetBlockHeaders request — Right(hash) for by-hash mode, Left(number) for by-number.
       val target: Either[BigInt, ByteString] = targetHash.toRight(targetBlock)
       val msg = ETHPackets.GetBlockHeaders(ETHPackets.nextRequestId, target, maxHeaders = 1, skip = 0, reverse = false)
@@ -323,7 +318,7 @@ object PivotHeaderBootstrap {
         }
         .foreach { case (peerOpt, headerOpt, isFailed) =>
           peerOpt.foreach(p => triedPeers += p.id)
-          headerOpt match {
+          headerOpt match
             case Some(header) if matchesTarget(header) =>
               ctx.self ! Fetched(header)
             case Some(header) =>
@@ -352,14 +347,9 @@ object PivotHeaderBootstrap {
               // Schedule the wait via a self-message; startSingleTimer is thread-safe to call here, but to
               // keep timer ownership on the actor thread we send a self-Command that arms the timer there.
               ctx.self ! ScheduleWaitForPeer
-          }
         }
-    }
 
     private def matchesTarget(header: BlockHeader): Boolean =
-      targetHash match {
+      targetHash match
         case Some(hash) => header.hash.value == hash
         case None       => header.number == targetBlock
-      }
-  }
-}

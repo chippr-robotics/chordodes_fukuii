@@ -35,7 +35,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   * Verifies that headersFetcherQueue, bodiesFetcherQueue, and receiptsFetcherQueue operate independently. No actor
   * choreography — all assertions deterministic.
   */
-class FastSyncConcurrentPipelineSpec extends AnyFlatSpec with Matchers {
+class FastSyncConcurrentPipelineSpec extends AnyFlatSpec with Matchers:
 
   import Helpers.*
 
@@ -145,7 +145,7 @@ class FastSyncConcurrentPipelineSpec extends AnyFlatSpec with Matchers {
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
-  private object Helpers {
+  private object Helpers:
     implicit val system: ActorSystem = ActorSystem("FastSyncPipeline_System")
 
     val peer1: PeerWithInfo = mkPeer("peer-1")
@@ -164,7 +164,7 @@ class FastSyncConcurrentPipelineSpec extends AnyFlatSpec with Matchers {
       genesisHash = hash32
     )
 
-    def mkPeer(id: String): PeerWithInfo = {
+    def mkPeer(id: String): PeerWithInfo =
       val peer =
         Peer(PeerId(id), new InetSocketAddress("127.0.0.1", 30303), TestProbe().ref.toTyped[PeerActor.Command], false)
       val peerInfo = PeerInfo(
@@ -175,6 +175,3 @@ class FastSyncConcurrentPipelineSpec extends AnyFlatSpec with Matchers {
         bestBlockHash = hash32
       )
       PeerWithInfo(peer, peerInfo)
-    }
-  }
-}

@@ -43,7 +43,7 @@ import com.chipprbots.ethereum.utils.ByteUtils
   * All raw TCP I/O is delegated to a Classic bridge actor (OutboundTcpBridge / InboundTcpBridge) so sender() is never
   * needed in this Typed behavior.
   */
-object RLPxConnectionHandler {
+object RLPxConnectionHandler:
 
   // =========================================================================
   // Command ADT
@@ -103,19 +103,17 @@ object RLPxConnectionHandler {
 
   case class CancellableAckTimeout(seqNumber: Int, cancellable: Cancellable)
 
-  trait RLPxConfiguration {
+  trait RLPxConfiguration:
     val waitForHandshakeTimeout: FiniteDuration
     val waitForTcpAckTimeout: FiniteDuration
-  }
 
   // =========================================================================
   // Pure functions
   // =========================================================================
 
-  def ethWireSizeFor(cap: Capability): Int = cap match {
+  def ethWireSizeFor(cap: Capability): Int = cap match
     case Capability.ETH69 => 0x12
     case _                => 0x11
-  }
 
   case class CapabilityOffsets(peerEthBase: Int, peerEthSize: Int, peerSnapBase: Option[Int])
 
@@ -123,7 +121,7 @@ object RLPxConnectionHandler {
       peerCaps: List[Capability],
       negotiatedEth: Capability,
       supportsSnap: Boolean
-  ): CapabilityOffsets = {
+  ): CapabilityOffsets =
     val snapPresent = peerCaps.contains(Capability.SNAP1)
     val ethPresent = peerCaps.exists(_.name == com.chipprbots.ethereum.network.p2p.messages.ProtocolFamily.ETH)
     val snapOnlyPeer = snapPresent && !ethPresent
@@ -135,7 +133,6 @@ object RLPxConnectionHandler {
       else Some(CanonicalEthBase + peerEthWireSize)
 
     CapabilityOffsets(peerEthBase = CanonicalEthBase, peerEthWireSize, peerSnapBase)
-  }
 
   def ethMessageCodecFactory(
       frameCodec: FrameCodec,
@@ -144,28 +141,26 @@ object RLPxConnectionHandler {
       clientId: String,
       compressionPolicy: CompressionPolicy,
       supportsSnap: Boolean
-  ): MessageCodec = {
+  ): MessageCodec =
     val ethDecoder = EthereumMessageDecoder.ethMessageDecoder(negotiated)
     val decoderWithSnap =
       if supportsSnap then NetworkMessageDecoder.orElse(ethDecoder).orElse(SNAPMessageDecoder)
       else NetworkMessageDecoder.orElse(ethDecoder)
     new MessageCodec(frameCodec, decoderWithSnap, p2pVersion, clientId, compressionPolicy)
-  }
 
   // =========================================================================
   // HelloCodec (pure value, no actor lifecycle — unchanged)
   // =========================================================================
 
-  case class HelloCodec(secrets: Secrets) {
+  case class HelloCodec(secrets: Secrets):
     import MessageCodec.*
     lazy val frameCodec = new FrameCodec(secrets)
 
-    def readHello(remainingData: ByteString): Option[(Hello, Seq[Frame])] = {
+    def readHello(remainingData: ByteString): Option[(Hello, Seq[Frame])] =
       val frames = frameCodec.readFrames(remainingData)
       frames.headOption.flatMap(extractHello).map(h => (h, frames.drop(1)))
-    }
 
-    def writeHello(h: HelloEnc): ByteString = {
+    def writeHello(h: HelloEnc): ByteString =
       val encoded: Array[Byte] = h.toBytes
       val numFrames = Math.ceil(encoded.length / MaxFramePayloadSize.toDouble).toInt
       val frames = (0 until numFrames).map { frameNo =>
@@ -174,17 +169,14 @@ object RLPxConnectionHandler {
         Frame(header, h.code, ByteString(payload))
       }
       frameCodec.writeFrames(frames)
-    }
 
     private def extractHello(frame: Frame): Option[Hello] =
       if frame.`type` == Hello.code then
-        NetworkMessageDecoder.fromBytes(frame.`type`, frame.payload.toArray) match {
+        NetworkMessageDecoder.fromBytes(frame.`type`, frame.payload.toArray) match
           case Left(err)       => throw err
           case Right(h: Hello) => Some(h)
           case Right(_)        => None
-        }
       else None
-  }
 
   // =========================================================================
   // Classic TCP bridge — outbound (initiates TCP Connect)
@@ -194,7 +186,7 @@ object RLPxConnectionHandler {
       tcpManager: ClassicActorRef,
       remoteAddress: InetSocketAddress,
       typedSelf: ActorRef[Command]
-  ) extends ClassicActor {
+  ) extends ClassicActor:
 
     override def preStart(): Unit = tcpManager ! Tcp.Connect(remoteAddress)
 
@@ -223,7 +215,6 @@ object RLPxConnectionHandler {
       case w: Tcp.Write => connectionRef ! w
       case Tcp.Close    => connectionRef ! Tcp.Close
     }
-  }
 
   // =========================================================================
   // Classic TCP bridge — inbound (TCP connection already established)
@@ -232,12 +223,11 @@ object RLPxConnectionHandler {
   private class InboundTcpBridge(
       connectionRef: ClassicActorRef,
       typedSelf: ActorRef[Command]
-  ) extends ClassicActor {
+  ) extends ClassicActor:
 
-    override def preStart(): Unit = {
+    override def preStart(): Unit =
       connectionRef ! Tcp.Register(self)
       context.watch(connectionRef)
-    }
 
     override def receive: ClassicActor.Receive = {
       case Tcp.Received(data)              => typedSelf ! TcpReceived(data)
@@ -248,7 +238,6 @@ object RLPxConnectionHandler {
       case w: Tcp.Write                    => connectionRef ! w
       case Tcp.Close                       => connectionRef ! Tcp.Close
     }
-  }
 
   // =========================================================================
   // Props factory — used by Classic PeerActor (co-existence, signature unchanged)
@@ -306,7 +295,7 @@ object RLPxConnectionHandler {
       peerId: String,
       tcpManager: ClassicActorRef,
       context: ActorContext[Command]
-  ) {
+  ):
     import AuthHandshaker.{InitiatePacketLength, ResponsePacketLength}
 
     private val log = context.log
@@ -317,14 +306,18 @@ object RLPxConnectionHandler {
     // -----------------------------------------------------------------------
 
     private def schedule(delay: FiniteDuration, msg: Command): Cancellable =
-      context.system.scheduler.scheduleOnce(delay, new Runnable { def run() = context.self ! msg })
+      context.system.scheduler.scheduleOnce(
+        delay,
+        new Runnable:
+          def run() = context.self ! msg
+      )
 
     private def bridgeWrite(bridge: ClassicActorRef, data: ByteString): Unit =
       bridge.tell(Tcp.Write(data, Ack), context.self.toClassic)
 
     private def increaseSeqNumber(n: Int): Int = if n == Int.MaxValue then 0 else n + 1
 
-    private def writeUncompressedHello(hello: HelloEnc, messageCodec: MessageCodec): ByteString = {
+    private def writeUncompressedHello(hello: HelloEnc, messageCodec: MessageCodec): ByteString =
       import MessageCodec.MaxFramePayloadSize
       val encoded = hello.toBytes
       val numFrames = Math.ceil(encoded.length / MaxFramePayloadSize.toDouble).toInt
@@ -333,7 +326,6 @@ object RLPxConnectionHandler {
         Frame(Header(payload.length, 0, None, None), hello.code, ByteString(payload))
       }
       messageCodec.frameCodec.writeFrames(frames)
-    }
 
     private def spawnOutboundBridge(remoteAddress: InetSocketAddress): ClassicActorRef =
       context.actorOf(
@@ -355,26 +347,22 @@ object RLPxConnectionHandler {
         peerEthBase: Int,
         peerEthSize: Int,
         peerSnapBase: Option[Int]
-    ) {
+    ):
       def translateType(messageType: Int): Int =
-        if messageType < CanonicalEthBase then {
-          messageType
-        } else {
-          peerSnapBase match {
+        if messageType < CanonicalEthBase then messageType
+        else
+          peerSnapBase match
             case Some(snapBase) if messageType >= snapBase && messageType < snapBase + CanonicalSnapSize =>
               CanonicalSnapBase + (messageType - snapBase)
             case _ =>
               if messageType >= peerEthBase && messageType < peerEthBase + peerEthSize then
                 CanonicalEthBase + (messageType - peerEthBase)
               else messageType
-          }
-        }
 
       def toPeerWireType(canonicalType: Int): Int =
-        if canonicalType < CanonicalEthBase then {
-          canonicalType
-        } else if canonicalType >= CanonicalSnapBase && canonicalType < CanonicalSnapBase + CanonicalSnapSize then {
-          peerSnapBase match {
+        if canonicalType < CanonicalEthBase then canonicalType
+        else if canonicalType >= CanonicalSnapBase && canonicalType < CanonicalSnapBase + CanonicalSnapSize then
+          peerSnapBase match
             case Some(snapBase) => snapBase + (canonicalType - CanonicalSnapBase)
             case None =>
               log.warn(
@@ -383,17 +371,14 @@ object RLPxConnectionHandler {
                 canonicalType.toHexString
               )
               canonicalType
-          }
-        } else if canonicalType >= CanonicalEthBase && canonicalType < CanonicalEthBase + CanonicalEthSize then {
+        else if canonicalType >= CanonicalEthBase && canonicalType < CanonicalEthBase + CanonicalEthSize then
           peerEthBase + (canonicalType - CanonicalEthBase)
-        } else {
-          canonicalType
-        }
+        else canonicalType
 
       def translateFrames(frames: Seq[Frame]): Seq[Frame] =
         if frames.isEmpty then frames
-        else {
-          if log.isDebugEnabled then {
+        else
+          if log.isDebugEnabled then
             val translations = frames.flatMap { frame =>
               val t = translateType(frame.`type`)
               if t == frame.`type` then None
@@ -406,19 +391,16 @@ object RLPxConnectionHandler {
                 translations.size,
                 translations.mkString(",")
               )
-          }
           frames.map { frame =>
             val t = translateType(frame.`type`)
             if t == frame.`type` then frame else frame.copy(`type` = t)
           }
-        }
-    }
 
     private def computeInboundTranslator(
         hello: Hello,
         negotiatedEth: Capability,
         supportsSnap: Boolean
-    ): InboundTranslator = {
+    ): InboundTranslator =
       val offsets = RLPxConnectionHandler.computeCapabilityOffsets(
         peerCaps = hello.capabilities.toList,
         negotiatedEth = negotiatedEth,
@@ -430,13 +412,12 @@ object RLPxConnectionHandler {
           s"peerEthBase=0x${offsets.peerEthBase.toHexString} peerSnapBase=$snapBaseStr"
       )
       InboundTranslator(offsets.peerEthBase, offsets.peerEthSize, offsets.peerSnapBase)
-    }
 
     // -----------------------------------------------------------------------
     // processMessage — sends to parent, returns Unit (no state change)
     // -----------------------------------------------------------------------
 
-    private def processMessage(messageTry: Either[DecodingError, Message]): Unit = messageTry match {
+    private def processMessage(messageTry: Either[DecodingError, Message]): Unit = messageTry match
       case Right(message) =>
         parent ! MessageReceived(message)
 
@@ -464,17 +445,15 @@ object RLPxConnectionHandler {
         parent ! com.chipprbots.ethereum.network.PeerActor.DisconnectPeer(
           com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect.Reasons.BreachOfProtocol
         )
-    }
 
     private def processFrames(
         frames: Seq[Frame],
         messageCodec: MessageCodec,
         inboundTranslator: InboundTranslator
     ): Unit =
-      if frames.nonEmpty then {
+      if frames.nonEmpty then
         val translatedFrames = inboundTranslator.translateFrames(frames)
         messageCodec.readFrames(translatedFrames).foreach(processMessage)
-      }
 
     // -----------------------------------------------------------------------
     // Codec negotiation helpers
@@ -509,25 +488,22 @@ object RLPxConnectionHandler {
     // decodeV4Packet — unchanged
     // -----------------------------------------------------------------------
 
-    private def decodeV4Packet(data: ByteString): (ByteString, ByteString) = {
-      if data.length < 2 then {
+    private def decodeV4Packet(data: ByteString): (ByteString, ByteString) =
+      if data.length < 2 then
         val headHex = Hex.toHexString(data.toArray)
         throw new RuntimeException(s"EIP-8 packet too short for size prefix: len=${data.length} headHex=${headHex}")
-      }
       val encryptedPayloadSize = ByteUtils.bigEndianToShort(data.take(2).toArray)
       if encryptedPayloadSize > 2048 then
         throw new RuntimeException(
           s"EIP-8 handshake packet too large: sizePrefix=${encryptedPayloadSize} max=2048"
         )
       val totalFrameSize = encryptedPayloadSize + 2
-      if encryptedPayloadSize <= 0 || totalFrameSize > data.length then {
+      if encryptedPayloadSize <= 0 || totalFrameSize > data.length then
         val headHex = Hex.toHexString(data.take(Math.min(32, data.length)).toArray)
         throw new RuntimeException(
           s"EIP-8 frame size mismatch: sizePrefix=${encryptedPayloadSize} totalFrameSize=${totalFrameSize} bufferLen=${data.length} headHex=${headHex}"
         )
-      }
       data.splitAt(totalFrameSize)
-    }
 
     // -----------------------------------------------------------------------
     // processHandshakeResult — returns the next behavior
@@ -537,7 +513,7 @@ object RLPxConnectionHandler {
         result: AuthHandshakeResult,
         remainingData: ByteString,
         bridge: ClassicActorRef
-    ): Behavior[Command] = result match {
+    ): Behavior[Command] = result match
       case AuthHandshakeSuccess(secrets, remotePubKey) =>
         log.debug("[RLPx] Auth handshake SUCCESS for peer {}, establishing secure connection", peerId)
         parent ! ConnectionEstablished(remotePubKey)
@@ -554,7 +530,6 @@ object RLPxConnectionHandler {
         log.warn("[Stopping Connection] Auth handshake FAILED for peer {}", peerId)
         parent ! ConnectionFailed
         stopping()
-    }
 
     // -----------------------------------------------------------------------
     // extractHelloAndTransition — reads frames looking for Hello, returns next behavior
@@ -569,7 +544,7 @@ object RLPxConnectionHandler {
         cancellableAckTimeout: Option[CancellableAckTimeout] = None,
         seqNumber: Int = 0
     ): Behavior[Command] =
-      Try(extractor.readHello(data)) match {
+      Try(extractor.readHello(data)) match
         case Failure(err) =>
           log.warn("[RLPx] Malformed Hello from peer {}: {} — disconnecting", peerId, err.getMessage)
           parent ! ConnectionFailed
@@ -582,7 +557,7 @@ object RLPxConnectionHandler {
             hello.p2pVersion,
             hello.capabilities.mkString(", ")
           )
-          negotiateCodec(hello, extractor) match {
+          negotiateCodec(hello, extractor) match
             case None =>
               log.debug(
                 "[Stopping Connection] Unable to negotiate protocol with peer {} — peerCaps=[{}], ourCaps=[{}]",
@@ -598,10 +573,9 @@ object RLPxConnectionHandler {
               parent ! InitialHelloReceived(hello, negotiated)
               processFrames(restFrames, messageCodec, inboundTranslator)
               // Enable inbound compression after full Hello exchange (mirrors core-geth SetSnappy timing)
-              if helloWriteAcknowledged then {
+              if helloWriteAcknowledged then
                 messageCodec.enableInboundCompression("handshake-complete")
                 log.debug("[RLPx] Enabled inbound compression for peer {} after handshake complete", peerId)
-              }
               log.debug("[RLPx] Connection FULLY ESTABLISHED with peer {}, entering handshaked state", peerId)
               handshaked(
                 messageCodec,
@@ -610,7 +584,6 @@ object RLPxConnectionHandler {
                 cancellableAckTimeout = cancellableAckTimeout,
                 seqNumber = seqNumber
               )
-          }
 
         case Success(None) =>
           log.debug("[RLPx] Did not find 'Hello' in message from peer {}, continuing to await", peerId)
@@ -622,16 +595,14 @@ object RLPxConnectionHandler {
             cancellableAckTimeout,
             seqNumber
           )
-      }
 
     // -----------------------------------------------------------------------
     // stopping — terminal behavior
     // -----------------------------------------------------------------------
 
-    def stopping(): Behavior[Command] = {
+    def stopping(): Behavior[Command] =
       log.debug("[RLPx] Connection handler for peer {} stopping", peerId)
       Behaviors.stopped
-    }
 
     // -----------------------------------------------------------------------
     // State 1: waitingForCommand
@@ -717,7 +688,7 @@ object RLPxConnectionHandler {
           log.debug("[RLPx] EIP-8 (v4) auth-init decode failed for peer {}", peerId, ex)
         )
 
-        maybePreEIP8.orElse(maybePostEIP8) match {
+        maybePreEIP8.orElse(maybePostEIP8) match
           case Success((responsePacket, result, remainingData)) =>
             log.debug("[RLPx] Auth handshake init processed for peer {}, sending response", peerId)
             bridgeWrite(bridge, responsePacket)
@@ -730,7 +701,6 @@ object RLPxConnectionHandler {
             )
             parent ! ConnectionFailed
             stopping()
-        }
 
       case TcpAckReceived =>
         Behaviors.same // auth handshake response write ack — no action
@@ -786,7 +756,7 @@ object RLPxConnectionHandler {
           val result = handshaker.handleResponseMessageV4(packetData, peerId.toString)
           (result, remainingData)
         }
-        maybePreEIP8.orElse(maybePostEIP8) match {
+        maybePreEIP8.orElse(maybePostEIP8) match
           case Success((result, remainingData)) =>
             log.debug("[RLPx] Auth handshake response processed for peer {}", peerId)
             processHandshakeResult(result, remainingData, bridge)
@@ -798,7 +768,6 @@ object RLPxConnectionHandler {
             )
             parent ! ConnectionFailed
             stopping()
-        }
 
       case TcpWriteFailed =>
         log.debug("[Stopping Connection] Write to peer {} failed during auth handshake response", peerId)
@@ -857,12 +826,10 @@ object RLPxConnectionHandler {
       case TcpAckReceived if cancellableAckTimeout.nonEmpty =>
         cancellableAckTimeout.foreach(_.cancellable.cancel())
         val (newPending, newAcknowledged) =
-          if helloAckPending then {
+          if helloAckPending then
             log.debug("[RLPx] Hello write acknowledged for peer {} - deferring compression enable", peerId)
             (false, true)
-          } else {
-            (helloAckPending, helloWriteAcknowledged)
-          }
+          else (helloAckPending, helloWriteAcknowledged)
         awaitInitialHello(extractor, bridge, newPending, newAcknowledged, None, seqNumber)
 
       case TcpAckReceived =>
@@ -947,7 +914,7 @@ object RLPxConnectionHandler {
         val messages = messageCodec.readFrames(translatedFrames)
         log.debug("RECV_MSG: peer={}, decoded {} message(s)", peerId, messages.size)
         messages.zipWithIndex.foreach { case (msgResult, idx) =>
-          msgResult match {
+          msgResult match
             case Right(msg) =>
               log.debug(
                 "RECV_MSG: peer={}, msg[{}] type={}, code=0x{}",
@@ -960,7 +927,6 @@ object RLPxConnectionHandler {
                 log.info("RECV_SNAP_MSG: peer={}, msg[{}] {}", peerId, idx, msg.toShortString)
             case Left(err) =>
               log.debug("RECV_MSG: peer={}, msg[{}] DECODE_ERROR: {}", peerId, idx, err.getMessage)
-          }
         }
         messages.foreach(processMessage)
         Behaviors.same
@@ -999,19 +965,18 @@ object RLPxConnectionHandler {
         messageToSend: MessageSerializable,
         seqNumber: Int,
         remainingMsgsToSend: Queue[MessageSerializable]
-    ): Behavior[Command] = {
+    ): Behavior[Command] =
       val canonicalCode = messageToSend.code
       val wireCode = inboundTranslator.toPeerWireType(canonicalCode)
 
       val serializableToEncode: MessageSerializable =
         if wireCode == canonicalCode then messageToSend
         else
-          new MessageSerializable {
+          new MessageSerializable:
             override def code: Int = wireCode
             override def toBytes: Array[Byte] = messageToSend.toBytes
             override def underlyingMsg: Message = messageToSend.underlyingMsg
             override def toShortString: String = messageToSend.toShortString
-          }
 
       val out = messageCodec.encodeMessage(serializableToEncode)
       val msgType = messageToSend.underlyingMsg.getClass.getSimpleName
@@ -1037,6 +1002,3 @@ object RLPxConnectionHandler {
         Some(CancellableAckTimeout(seqNumber, timeout)),
         increaseSeqNumber(seqNumber)
       )
-    }
-  }
-}

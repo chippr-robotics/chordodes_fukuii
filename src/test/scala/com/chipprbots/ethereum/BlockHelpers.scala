@@ -12,7 +12,7 @@ import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields
 import com.chipprbots.ethereum.security.SecureRandomBuilder
 
-object BlockHelpers extends SecureRandomBuilder {
+object BlockHelpers extends SecureRandomBuilder:
 
   // scalastyle:off magic.number
   val defaultHeader: BlockHeader = Fixtures.Blocks.ValidBlock.header.copy(
@@ -45,15 +45,14 @@ object BlockHelpers extends SecureRandomBuilder {
       generated :+ (parent |> generateBlock |> adjustBlock)
     }
 
-  def resetHeaderExtraFields(hef: BlockHeader.HeaderExtraFields): BlockHeader.HeaderExtraFields = hef match {
+  def resetHeaderExtraFields(hef: BlockHeader.HeaderExtraFields): BlockHeader.HeaderExtraFields = hef match
     case HeaderExtraFields.HefEmpty                => HeaderExtraFields.HefEmpty
     case HeaderExtraFields.HefPostOlympia(baseFee) => HeaderExtraFields.HefPostOlympia(baseFee)
     case s: HeaderExtraFields.HefPostShanghai      => s
     case c: HeaderExtraFields.HefPostCancun        => c
     case p: HeaderExtraFields.HefPostPrague        => p
-  }
 
-  def generateBlock(parent: Block): Block = {
+  def generateBlock(parent: Block): Block =
     val header = parent.header.copy(
       extraData = randomHash(),
       number = parent.number + 1,
@@ -65,12 +64,9 @@ object BlockHelpers extends SecureRandomBuilder {
     val stx = SignedTransaction.sign(tx, keyPair, None)
 
     Block(header, BlockBody(List(stx), List(ommer)))
-  }
 
   def updateHeader(block: Block, updater: BlockHeader => BlockHeader): Block =
     block.copy(header = updater(block.header))
 
   def withTransactions(block: Block, transactions: List[SignedTransaction]): Block =
     block.copy(body = block.body.copy(transactionList = transactions))
-
-}

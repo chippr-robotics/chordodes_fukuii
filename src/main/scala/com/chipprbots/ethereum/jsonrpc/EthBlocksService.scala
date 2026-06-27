@@ -17,7 +17,7 @@ import com.chipprbots.ethereum.rlp
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 
-object EthBlocksService {
+object EthBlocksService:
   case class BestBlockNumberRequest()
   case class BestBlockNumberResponse(bestBlockNumber: BigInt)
 
@@ -73,15 +73,13 @@ object EthBlocksService {
   case class GetRawReceiptsRequest(block: BlockParam)
   case class GetRawReceiptsResponse(rawReceipts: Option[Seq[ByteString]])
 
-}
-
 class EthBlocksService(
     val blockchain: Blockchain,
     val blockchainReader: BlockchainReader,
     val mining: Mining,
     val blockQueue: BlockQueue,
     private val _forkChoiceManagerOpt: Option[ForkChoiceManager] = None
-) extends ResolveBlock {
+) extends ResolveBlock:
   final override def forkChoiceManagerOpt: Option[ForkChoiceManager] = _forkChoiceManagerOpt
   import EthBlocksService.*
 
@@ -210,7 +208,7 @@ class EthBlocksService(
     val UncleByBlockNumberAndIndexRequest(blockParam, uncleIndex) = request
     val uncleBlockResponseOpt = resolveBlock(blockParam).toOption
       .flatMap { case ResolvedBlock(block, pending) =>
-        if uncleIndex >= 0 && uncleIndex < block.body.uncleNodesList.size then {
+        if uncleIndex >= 0 && uncleIndex < block.body.uncleNodesList.size then
           val uncleHeader = block.body.uncleNodesList.apply(uncleIndex.toInt)
           val weight = blockchainReader.getChainWeightByHash(uncleHeader.hash)
 
@@ -222,7 +220,7 @@ class EthBlocksService(
               pendingBlock = pending.isDefined
             )
           )
-        } else None
+        else None
       }
 
     Right(UncleByBlockNumberAndIndexResponse(uncleBlockResponseOpt))
@@ -241,14 +239,13 @@ class EthBlocksService(
       req: GetUncleCountByBlockHashRequest
   ): ServiceResponse[GetUncleCountByBlockHashResponse] =
     IO {
-      blockchainReader.getBlockBodyByHash(BlockHash(req.blockHash)) match {
+      blockchainReader.getBlockBodyByHash(BlockHash(req.blockHash)) match
         case Some(blockBody) =>
           Right(GetUncleCountByBlockHashResponse(blockBody.uncleNodesList.size))
         case None =>
           Left(
             JsonRpcError.InvalidParams(s"Block with hash ${Hex.toHexString(req.blockHash.toArray[Byte])} not found")
           )
-      }
     }
 
   def getBlockReceipts(req: GetBlockReceiptsRequest): ServiceResponse[GetBlockReceiptsResponse] = IO {
@@ -376,4 +373,3 @@ class EthBlocksService(
     }
     Right(GetRawReceiptsResponse(raw))
   }
-}

@@ -12,7 +12,7 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.*
 import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.messages.Codes
 
-object PeerStatisticsActor {
+object PeerStatisticsActor:
 
   /** Behavior factory for the Typed PeerStatisticsActor.
     *
@@ -67,7 +67,7 @@ object PeerStatisticsActor {
         Behaviors.same
     }
 
-  private def observe(msg: Message)(implicit clock: Clock): PeerStat = {
+  private def observe(msg: Message)(implicit clock: Clock): PeerStat =
     val now = clock.millis
     PeerStat(
       responsesReceived = if ResponseCodes(msg.code) then 1 else 0,
@@ -75,7 +75,6 @@ object PeerStatisticsActor {
       firstSeenTimeMillis = Some(now),
       lastSeenTimeMillis = Some(now)
     )
-  }
 
   /** Protocol for the Typed PeerStatisticsActor. */
   sealed trait Command
@@ -118,4 +117,3 @@ object PeerStatisticsActor {
       messageCodes = RequestCodes.union(ResponseCodes),
       peerSelector = PeerSelector.AllPeers
     )
-}

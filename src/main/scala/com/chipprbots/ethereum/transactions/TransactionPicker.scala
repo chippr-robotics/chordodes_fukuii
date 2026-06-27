@@ -12,7 +12,7 @@ import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTransactionsResponse
 import com.chipprbots.ethereum.utils.Logger
 
-trait TransactionPicker extends Logger {
+trait TransactionPicker extends Logger:
 
   protected def pendingTransactionsManager: ActorRef[PendingTransactionsManager.Command]
   protected def getTransactionFromPoolTimeout: FiniteDuration
@@ -30,4 +30,3 @@ trait TransactionPicker extends Logger {
         log.error("Failed to get transactions, mining block with empty transactions list", ex)
         PendingTransactionsResponse(Nil)
       }
-}

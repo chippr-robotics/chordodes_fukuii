@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.utils.Hex
 
 /** This class is used to store app state variables Key: see AppStateStorage.Keys Value: stored string value
   */
-class AppStateStorage(val dataSource: DataSource) extends TransactionalKeyValueStorage[Key, Value] {
+class AppStateStorage(val dataSource: DataSource) extends TransactionalKeyValueStorage[Key, Value]:
 
   val namespace: IndexedSeq[Byte] = Namespaces.AppStateNamespace
   def keySerializer: Key => IndexedSeq[Byte] = k =>
@@ -428,21 +428,19 @@ class AppStateStorage(val dataSource: DataSource) extends TransactionalKeyValueS
   /** True iff SNAP is done AND a backfill target was previously persisted AND any of the three cursors is below the
     * target. `SyncController.start()` uses this to spawn a standalone `ChainDownloader` alongside regular sync.
     */
-  def needsBackfillResume(): Boolean = {
+  def needsBackfillResume(): Boolean =
     if !isSnapSyncDone() then return false
     val target = getBackfillTarget()
     if target <= 0 then return false
     getBackfillBestHeader() < target ||
     getBackfillBestBody() < target ||
     getBackfillBestReceipt() < target
-  }
-}
 
-object AppStateStorage {
+object AppStateStorage:
   type Key = String
   type Value = String
 
-  object Keys {
+  object Keys:
     val BestBlockNumber = "BestBlockNumber"
     val BestBlockHash = "BestBlockHash"
     val FastSyncDone = "FastSyncDone"
@@ -470,6 +468,3 @@ object AppStateStorage {
     val BackfillBestHeader = "BackfillBestHeader"
     val BackfillBestBody = "BackfillBestBody"
     val BackfillBestReceipt = "BackfillBestReceipt"
-  }
-
-}

@@ -53,25 +53,24 @@ class PoWMiningCoordinatorSpec
     extends ScalaTestWithActorTestKit
     with AnyFreeSpecLike
     with Matchers
-    with org.scalamock.scalatest.MockFactory {
+    with org.scalamock.scalatest.MockFactory:
 
   "PoWMinerCoordinator actor" - {
     "should throw exception when starting with other message than StartMining(mode)" taggedAs (
       UnitTest,
       ConsensusTest,
       SlowTest
-    ) in new TestSetup {
+    ) in new TestSetup:
       override def coordinatorName = "FailedCoordinator"
       LoggingTestKit.error("StopMining").expect {
         coordinator ! StopMining
       }
-    }
 
     "should start recurrent mining when receiving message StartMining(RecurrentMining)" taggedAs (
       UnitTest,
       ConsensusTest,
       SlowTest
-    ) in new TestSetup {
+    ) in new TestSetup:
       override def coordinatorName = "RecurrentMiningSetup"
       setBlockForMining(parentBlock)
 
@@ -81,13 +80,12 @@ class PoWMiningCoordinatorSpec
       sync.expectNoMessage(100.millis)
 
       coordinator ! StopMining
-    }
 
     "should start on demand mining when receiving message StartMining(OnDemandMining)" taggedAs (
       UnitTest,
       ConsensusTest,
       SlowTest
-    ) in new TestSetup {
+    ) in new TestSetup:
       override def coordinatorName = "OnDemandMining"
 
       coordinator ! SetMiningMode(OnDemandMining)
@@ -96,7 +94,6 @@ class PoWMiningCoordinatorSpec
       sync.expectNoMessage(100.millis)
 
       coordinator ! StopMining
-    }
 
     "in Recurrent Mining" - {
       // DELETED (P10): "MineNext starts EthashMiner"
@@ -105,7 +102,7 @@ class PoWMiningCoordinatorSpec
       // by EthashMiner's error handler, so the test "passed" while emitting a spurious ERROR log.
       // Full recurrent mining coverage is provided by "Miners mine recurrently" (InstantMiner).
 
-      "Miners mine recurrently" taggedAs (UnitTest, ConsensusTest, SlowTest) in new TestSetup {
+      "Miners mine recurrently" taggedAs (UnitTest, ConsensusTest, SlowTest) in new TestSetup:
         override def coordinatorName: String = s"AutomaticMining-${System.nanoTime()}"
         val probe: TestProbe = TestProbe()
         val testMiner = new InstantMiner(blockCreator, sync.ref, ethMiningService)
@@ -132,13 +129,12 @@ class PoWMiningCoordinatorSpec
 
         coordinator ! StopMining
         probe.expectTerminated(coordinator.ref.toClassic)
-      }
 
       "Continue to attempt to mine if blockchainReader.getBestBlock return None" taggedAs (
         UnitTest,
         ConsensusTest,
         SlowTest
-      ) in new TestSetup {
+      ) in new TestSetup:
         override def coordinatorName: String = s"AlwaysAttemptToMine-${System.nanoTime()}"
         val probe: TestProbe = TestProbe()
         val testMiner = new InstantMiner(blockCreator, sync.ref, ethMiningService)
@@ -167,9 +163,8 @@ class PoWMiningCoordinatorSpec
 
         coordinator ! StopMining
         probe.expectTerminated(coordinator.ref.toClassic)
-      }
 
-      "StopMining stops PoWMinerCoordinator" taggedAs (UnitTest, ConsensusTest, SlowTest) in new TestSetup {
+      "StopMining stops PoWMinerCoordinator" taggedAs (UnitTest, ConsensusTest, SlowTest) in new TestSetup:
         override def coordinatorName: String = s"StoppingMining-${System.nanoTime()}"
         val probe: TestProbe = TestProbe()
         override val coordinator: org.apache.pekko.actor.typed.ActorRef[CoordinatorProtocol] = testKit.spawn(
@@ -190,7 +185,6 @@ class PoWMiningCoordinatorSpec
         coordinator ! StopMining
 
         probe.expectTerminated(coordinator.ref.toClassic)
-      }
     }
   }
 
@@ -202,7 +196,7 @@ class PoWMiningCoordinatorSpec
       syncController: ActorRef,
       ethMiningService: EthMiningService
   )(implicit runtime: IORuntime)
-      extends Miner {
+      extends Miner:
     def processMining(
         bestBlock: Block
     )(implicit blockchainConfig: BlockchainConfig): Future[CoordinatorProtocol] =
@@ -218,9 +212,8 @@ class PoWMiningCoordinatorSpec
           handleMiningResult(fakeResult, syncController, block)
         }
         .unsafeToFuture()
-  }
 
-  class TestSetup extends MinerSpecSetup {
+  class TestSetup extends MinerSpecSetup:
     def coordinatorName: String = "DefaultCoordinator"
 
     // Override classicSystem to use the ScalaTestWithActorTestKit's actor system (converted to classic)
@@ -333,10 +326,9 @@ class PoWMiningCoordinatorSpec
       .anyNumberOfTimes()
 
     ommersPool.setAutoPilot { (_: ActorRef, msg: Any) =>
-      msg match {
+      msg match
         case OmmersPool.GetOmmers(_, replyTo) => replyTo ! OmmersPool.Ommers(Nil)
         case _                                => ()
-      }
       TestActor.KeepRunning
     }
 
@@ -344,5 +336,3 @@ class PoWMiningCoordinatorSpec
       sender ! PendingTransactionsManager.PendingTransactionsResponse(Nil)
       TestActor.KeepRunning
     }
-  }
-}

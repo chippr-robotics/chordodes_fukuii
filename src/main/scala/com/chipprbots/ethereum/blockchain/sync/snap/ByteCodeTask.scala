@@ -21,7 +21,7 @@ case class ByteCodeTask(
     pending: Boolean = false,
     done: Boolean = false,
     bytecodes: Seq[ByteString] = Seq.empty
-) {
+):
 
   require(codeHashes.nonEmpty, "ByteCodeTask must have at least one code hash")
   require(
@@ -36,11 +36,10 @@ case class ByteCodeTask(
   def isPending: Boolean = pending
 
   /** Get task identifier for logging */
-  def taskString: String = {
+  def taskString: String =
     val hashesStr = codeHashes.take(3).map(_.take(4).toArray.map("%02x".format(_)).mkString).mkString(", ")
     val suffix = if codeHashes.size > 3 then s", ... (${codeHashes.size} total)" else ""
     s"[$hashesStr$suffix]"
-  }
 
   /** Calculate progress based on downloaded bytecodes */
   def progress: Double =
@@ -50,9 +49,8 @@ case class ByteCodeTask(
 
   /** Get number of hashes in this task */
   def size: Int = codeHashes.size
-}
 
-object ByteCodeTask {
+object ByteCodeTask:
 
   /** Default batch size for bytecode requests.
     *
@@ -76,7 +74,7 @@ object ByteCodeTask {
   def createBytecodeTasksFromAccounts(
       contractAccounts: Seq[(ByteString, ByteString)],
       batchSize: Int = DEFAULT_BATCH_SIZE
-  ): Seq[ByteCodeTask] = {
+  ): Seq[ByteCodeTask] =
     require(batchSize > 0, "Batch size must be positive")
 
     if contractAccounts.isEmpty then Seq.empty
@@ -90,7 +88,6 @@ object ByteCodeTask {
           ByteCodeTask(codeHashes, accountHashes)
         }
         .toSeq
-  }
 
   /** Create a single bytecode task from code hashes
     *
@@ -99,10 +96,9 @@ object ByteCodeTask {
     * @return
     *   ByteCode task
     */
-  def createTask(codeHashes: Seq[ByteString]): ByteCodeTask = {
+  def createTask(codeHashes: Seq[ByteString]): ByteCodeTask =
     require(codeHashes.nonEmpty, "Must provide at least one code hash")
     ByteCodeTask(codeHashes)
-  }
 
   /** Create bytecode tasks by batching code hashes
     *
@@ -116,7 +112,7 @@ object ByteCodeTask {
   def createBatchedTasks(
       codeHashes: Seq[ByteString],
       batchSize: Int = DEFAULT_BATCH_SIZE
-  ): Seq[ByteCodeTask] = {
+  ): Seq[ByteCodeTask] =
     require(batchSize > 0, "Batch size must be positive")
 
     if codeHashes.isEmpty then Seq.empty
@@ -125,5 +121,3 @@ object ByteCodeTask {
         .grouped(batchSize)
         .map(batch => ByteCodeTask(batch))
         .toSeq
-  }
-}

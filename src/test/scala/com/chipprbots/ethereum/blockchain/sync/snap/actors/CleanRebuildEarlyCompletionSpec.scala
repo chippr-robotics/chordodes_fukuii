@@ -50,7 +50,7 @@ class CleanRebuildEarlyCompletionSpec
     extends ScalaTestWithActorTestKit()
     with AnyFlatSpecLike
     with Matchers
-    with Eventually {
+    with Eventually:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
@@ -59,26 +59,23 @@ class CleanRebuildEarlyCompletionSpec
     * childless-leaf root ⇒ the rebuild walk discovers nothing ⇒ it is a CLEAN walk (0 missing). Mirrors
     * `HealingFrontierResumeSpec.storedRoot` / `HealingTrieFixtures.childlessLeafRoot`.
     */
-  private def storedLeafRoot(storage: TestMptStorage, seed: Int): ByteString = {
+  private def storedLeafRoot(storage: TestMptStorage, seed: Int): ByteString =
     val leaf = LeafNode(ByteString(Array[Byte](seed.toByte)), ByteString(Array[Byte](seed.toByte)))
     storage.putNode(leaf)
     ByteString(leaf.hash)
-  }
 
-  private def deleteRecursively(f: File): Unit = {
+  private def deleteRecursively(f: File): Unit =
     Option(f.listFiles()).foreach(_.foreach(deleteRecursively))
     f.delete()
     ()
-  }
 
   /** Query the coordinator's `pendingTasks` via the public progress message (a dedicated probe per query so the shared
     * inbox cannot steal the reply — mirrors `HealingFrontierResumeSpec.pendingTasks`).
     */
-  private def pendingTasks(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int = {
+  private def pendingTasks(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int =
     val probe = testKit.createTestProbe[HealingStatistics]()
     coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref)
     probe.expectMessageType[HealingStatistics].pendingTasks
-  }
 
   /** Owns the RocksDB store, a dedicated single-thread EC for the coordinator's rebuild/flush `Future`s, and the
     * coordinator. `storage`/`root` are supplied by the caller so a fixture can inject a clean trie (childless leaf) or
@@ -96,12 +93,12 @@ class CleanRebuildEarlyCompletionSpec
           HealingFrontierStorage,
           org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
       ) => Unit
-  ): Unit = {
+  ): Unit =
     val pool = Executors.newSingleThreadExecutor()
     val ec = ExecutionContext.fromExecutorService(pool)
     val dbPath = Files.createTempDirectory("clean-rebuild-early-completion-rocksdb").toAbsolutePath.toString
     val dataSource = RocksDbDataSource(
-      new RocksDbConfig {
+      new RocksDbConfig:
         override val createIfMissing: Boolean = true
         override val paranoidChecks: Boolean = true
         override val path: String = dbPath
@@ -111,7 +108,7 @@ class CleanRebuildEarlyCompletionSpec
         override val levelCompaction: Boolean = true
         override val blockSize: Long = 16384
         override val blockCacheSize: Long = 33554432
-      },
+      ,
       Namespaces.nsSeq
     )
     val store = new HealingFrontierStorage(dataSource)
@@ -129,7 +126,7 @@ class CleanRebuildEarlyCompletionSpec
       healingWriterEcOverride = Some(ec)
     )
     try body(coordinator, root, store, controllerProbe)
-    finally {
+    finally
       // 1) No more actor-thread RocksDB ops. 2) Drain the EC so the rebuild `loadAll`/walk iterators are closed.
       testKit.stop(coordinator)
       pool.shutdown()
@@ -137,8 +134,6 @@ class CleanRebuildEarlyCompletionSpec
       // 3) Now nothing references the store — safe to free the native handles.
       dataSource.destroy()
       deleteRecursively(new File(dbPath))
-    }
-  }
 
   // ---- T-1 (FR-001/SC-001): one walk, not two, on a clean rebuild ----
 
@@ -219,10 +214,9 @@ class CleanRebuildEarlyCompletionSpec
     withRebuildFixture(storage, root) { (coordinator, r, store, controller) =>
       coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(r)
       controller.expectMessage(5.seconds, SNAPSyncController.StateHealingComplete)
-      val earlyPathMarker = {
+      val earlyPathMarker =
         eventually(timeout(5.seconds), interval(100.millis))(store.isComplete shouldBe true)
         store.isComplete
-      }
       // The two-walk path's marker is the same CF `g` 0x01 sentinel written via the same markComplete(); the
       // early path neither changes what the marker asserts nor its bytes. Parity is `true == true`.
       earlyPathMarker shouldBe true
@@ -244,4 +238,3 @@ class CleanRebuildEarlyCompletionSpec
       controller.expectNoMessage(2.seconds)
     }
   }
-}

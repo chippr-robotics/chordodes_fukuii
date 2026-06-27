@@ -17,30 +17,25 @@ import com.chipprbots.ethereum.rlp.RLPValue
 
 // C1: ArrayBuffer instead of linked-list cons cells — contiguous storage reduces GC object count.
 // Mirrors go-ethereum triedb/hashdb/database.go: Cap() flushes oldest nodes when dirtiesSize > limit.
-class NodeCapper(withUpdates: Boolean) {
+class NodeCapper(withUpdates: Boolean):
   private val nodesToUpdate = mutable.ArrayBuffer.empty[(NodeHash, NodeEncoded)]
 
   def capNode(nodeEncoded: RLPEncodeable, depth: Int): RLPEncodeable =
     if depth > 0 then capNode(nodeEncoded)
     else nodeEncoded
 
-  private def capNode(nodeEncoded: RLPEncodeable): RLPEncodeable = {
+  private def capNode(nodeEncoded: RLPEncodeable): RLPEncodeable =
     val asArray = com.chipprbots.ethereum.rlp.encode(nodeEncoded)
     if asArray.length < MptNode.MaxEncodedNodeLength then nodeEncoded
-    else {
+    else
       val hash = Node.hashFn(asArray)
-      if withUpdates then {
-        nodesToUpdate += ((ByteString(hash), asArray))
-      }
+      if withUpdates then nodesToUpdate += ((ByteString(hash), asArray))
       RLPValue(hash)
-    }
-  }
 
   def getNodesToUpdate: Seq[(NodeHash, NodeEncoded)] = nodesToUpdate.toSeq
-}
 
 class RlpHashingVisitor(downstream: MptVisitor[RLPEncodeable], depth: Int, nodeCapper: NodeCapper)
-    extends MptVisitor[RLPEncodeable] {
+    extends MptVisitor[RLPEncodeable]:
   def visitLeaf(value: LeafNode): RLPEncodeable =
     value.parsedRlp.getOrElse {
       val leafEncoded = downstream.visitLeaf(value)
@@ -58,14 +53,13 @@ class RlpHashingVisitor(downstream: MptVisitor[RLPEncodeable], depth: Int, nodeC
 
   def visitNull(): RLPEncodeable =
     downstream.visitNull()
-}
 
 class RlpHashingBranchVisitor(
     downstream: BranchVisitor[RLPEncodeable],
     depth: Int,
     parsedRlp: Option[RLPEncodeable],
     nodeCapper: NodeCapper
-) extends BranchVisitor[RLPEncodeable] {
+) extends BranchVisitor[RLPEncodeable]:
   override def done(): RLPEncodeable =
     parsedRlp.getOrElse {
       val branchEncoded = downstream.done()
@@ -80,14 +74,13 @@ class RlpHashingBranchVisitor(
 
   override def visitTerminator(term: Option[NodeHash]): Unit =
     if parsedRlp.isEmpty then downstream.visitTerminator(term)
-}
 
 class RlpHashingExtensionVisitor(
     downstream: ExtensionVisitor[RLPEncodeable],
     depth: Int,
     parsedRlp: Option[RLPEncodeable],
     nodeCapper: NodeCapper
-) extends ExtensionVisitor[RLPEncodeable] {
+) extends ExtensionVisitor[RLPEncodeable]:
   override def visitNext(value: => RLPEncodeable): Unit =
     if parsedRlp.isEmpty then downstream.visitNext(value)
 
@@ -99,4 +92,3 @@ class RlpHashingExtensionVisitor(
       val extensionNodeEncoded = downstream.done()
       nodeCapper.capNode(extensionNodeEncoded, depth)
     }
-}

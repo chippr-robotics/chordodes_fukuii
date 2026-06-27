@@ -23,7 +23,7 @@ import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 import com.chipprbots.ethereum.testing.Tags.*
 
-class PivotHeaderBootstrapSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers {
+class PivotHeaderBootstrapSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
@@ -34,14 +34,12 @@ class PivotHeaderBootstrapSpec extends ScalaTestWithActorTestKit() with AnyFlatS
   val ds: EphemDataSource = EphemDataSource()
   val noopBatch: DataSourceBatchUpdate = DataSourceBatchUpdate(ds, Array.empty)
 
-  val noopWriter: BlockchainWriter = new BlockchainWriter(null, null, null, null, null, null, null) {
+  val noopWriter: BlockchainWriter = new BlockchainWriter(null, null, null, null, null, null, null):
     override def storeBlockHeader(blockHeader: BlockHeader): DataSourceBatchUpdate = noopBatch
-  }
 
-  val throwingWriter: BlockchainWriter = new BlockchainWriter(null, null, null, null, null, null, null) {
+  val throwingWriter: BlockchainWriter = new BlockchainWriter(null, null, null, null, null, null, null):
     override def storeBlockHeader(blockHeader: BlockHeader): DataSourceBatchUpdate =
       throw new RuntimeException("storage error")
-  }
 
   val testPeer: Peer = Peer(PeerId("test-peer"), new InetSocketAddress("127.0.0.1", 9999), TestProbe().ref, false)
   val testPeer2: Peer = Peer(PeerId("test-peer-2"), new InetSocketAddress("127.0.0.1", 9998), TestProbe().ref, false)
@@ -230,4 +228,3 @@ class PivotHeaderBootstrapSpec extends ScalaTestWithActorTestKit() with AnyFlatS
 
     parent.expectMsg(3.seconds, PivotHeaderBootstrap.Completed(targetBlock, correctHeader))
   }
-}

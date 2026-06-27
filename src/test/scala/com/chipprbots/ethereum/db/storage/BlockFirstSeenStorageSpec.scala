@@ -9,10 +9,10 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.testing.Tags.*
 
-class BlockFirstSeenStorageSpec extends AnyFlatSpec with Matchers {
+class BlockFirstSeenStorageSpec extends AnyFlatSpec with Matchers:
 
   // In-memory implementation for testing
-  class InMemoryBlockFirstSeenStorage extends BlockFirstSeenStorage {
+  class InMemoryBlockFirstSeenStorage extends BlockFirstSeenStorage:
     private val storage = mutable.Map[ByteString, Long]()
 
     override def put(blockHash: ByteString, timestamp: Long): Unit =
@@ -23,7 +23,6 @@ class BlockFirstSeenStorageSpec extends AnyFlatSpec with Matchers {
 
     override def remove(blockHash: ByteString): Unit =
       storage.remove(blockHash)
-  }
 
   "BlockFirstSeenStorage" should "store and retrieve timestamps" taggedAs (IntegrationTest, DatabaseTest) in {
     val storage = new InMemoryBlockFirstSeenStorage()
@@ -107,4 +106,3 @@ class BlockFirstSeenStorageSpec extends AnyFlatSpec with Matchers {
     // Should retrieve using equivalent ByteString
     storage.get(hash2) shouldBe Some(1000L)
   }
-}

@@ -17,7 +17,7 @@ import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.jsonrpc.EthMiningService
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 
-object PoWMiningCoordinator {
+object PoWMiningCoordinator:
   trait CoordinatorProtocol
 
   final case class SetMiningMode(mode: MiningMode) extends CoordinatorProtocol
@@ -31,10 +31,9 @@ object PoWMiningCoordinator {
   case object MiningUnsuccessful extends CoordinatorProtocol
 
   // MiningMode will allow to remove MockerMiner
-  enum MiningMode {
+  enum MiningMode:
     case RecurrentMining // for normal mining
     case OnDemandMining // for testing
-  }
 
   sealed trait MiningResponse
 
@@ -60,7 +59,6 @@ object PoWMiningCoordinator {
           minerOpt
         )
       )
-}
 
 class PoWMiningCoordinator private (
     context: ActorContext[CoordinatorProtocol],
@@ -70,7 +68,7 @@ class PoWMiningCoordinator private (
     blockchainReader: BlockchainReader,
     configBuilder: BlockchainConfigBuilder,
     minerOpt: Option[Miner]
-) extends AbstractBehavior[CoordinatorProtocol](context) {
+) extends AbstractBehavior[CoordinatorProtocol](context):
 
   import configBuilder.*
   import PoWMiningCoordinator.*
@@ -81,11 +79,10 @@ class PoWMiningCoordinator private (
   private val log = context.log
   private val dagManager = new EthashDAGManager(blockCreator)
 
-  override def onMessage(msg: CoordinatorProtocol): Behavior[CoordinatorProtocol] = msg match {
+  override def onMessage(msg: CoordinatorProtocol): Behavior[CoordinatorProtocol] = msg match
     case SetMiningMode(mode) =>
       log.info("Received message {}", SetMiningMode(mode))
       switchMiningMode(mode)
-  }
 
   private def handleMiningRecurrent(): Behavior[CoordinatorProtocol] = Behaviors.receiveMessage {
     case SetMiningMode(mode) =>
@@ -114,21 +111,18 @@ class PoWMiningCoordinator private (
       switchMiningMode(mode)
   }
 
-  private def switchMiningMode(mode: MiningMode): Behavior[CoordinatorProtocol] = mode match {
+  private def switchMiningMode(mode: MiningMode): Behavior[CoordinatorProtocol] = mode match
     case RecurrentMining =>
       context.self ! MineNext
       handleMiningRecurrent()
     case OnDemandMining => handleMiningOnDemand()
-  }
 
-  private def mineWithEthash(bestBlock: Block): Unit = {
+  private def mineWithEthash(bestBlock: Block): Unit =
     log.debug("Mining with Ethash")
     val miner = minerOpt.getOrElse(
       new EthashMiner(dagManager, blockCreator, syncController, ethMiningService)
     )
     mine(miner, bestBlock)
-  }
 
   private def mine(miner: Miner, bestBlock: Block): Unit =
     miner.processMining(bestBlock).foreach(_ => context.self ! MineNext)(context.executionContext)
-}

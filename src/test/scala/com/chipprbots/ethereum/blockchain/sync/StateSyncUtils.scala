@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteUtils
 
-object StateSyncUtils extends EphemBlockchainTestSetup {
+object StateSyncUtils extends EphemBlockchainTestSetup:
 
   final case class MptNodeData(
       accountAddress: Address,
@@ -28,20 +28,18 @@ object StateSyncUtils extends EphemBlockchainTestSetup {
       blockchainReader: BlockchainReader,
       evmCodeStorage: EvmCodeStorage,
       blockchainConfig: BlockchainConfig
-  ) {
+  ):
     def getNodes(hashes: List[ByteString]): List[SyncResponse] =
       hashes.map { hash =>
-        val maybeResult = blockchainReader.getMptNodeByHash(hash) match {
+        val maybeResult = blockchainReader.getMptNodeByHash(hash) match
           case Some(value) => Some(ByteString(value.encode))
           case None        => evmCodeStorage.get(hash)
-        }
-        maybeResult match {
+        maybeResult match
           case Some(result) => SyncResponse(hash, result)
           case None         => throw new RuntimeException("Missing expected data in storage")
-        }
       }
 
-    def buildWorld(accountData: Seq[MptNodeData], existingTree: Option[ByteString] = None): ByteString = {
+    def buildWorld(accountData: Seq[MptNodeData], existingTree: Option[ByteString] = None): ByteString =
       val init = InMemoryWorldStateProxy(
         evmCodeStorage,
         blockchain.getBackingMptStorage(1),
@@ -69,11 +67,9 @@ object StateSyncUtils extends EphemBlockchainTestSetup {
 
       val persisted = InMemoryWorldStateProxy.persistState(modifiedWorld)
       persisted.stateRootHash
-    }
-  }
 
-  object TrieProvider {
-    def apply(): TrieProvider = {
+  object TrieProvider:
+    def apply(): TrieProvider =
       val freshStorage = getNewStorages
       val blockchainReader = BlockchainReader(freshStorage.storages)
       new TrieProvider(
@@ -82,8 +78,6 @@ object StateSyncUtils extends EphemBlockchainTestSetup {
         freshStorage.storages.evmCodeStorage,
         blockchainConfig
       )
-    }
-  }
 
   def createNodeDataStartingFrom(initialNumber: Int, lastNumber: Int, storageOffset: Int): Seq[MptNodeData] =
     (initialNumber until lastNumber).map { i =>
@@ -100,11 +94,10 @@ object StateSyncUtils extends EphemBlockchainTestSetup {
       blockchainReader: BlockchainReader,
       evmCodeStorage: EvmCodeStorage,
       blNumber: BigInt
-  ): Boolean = {
+  ): Boolean =
     def go(remaining: List[MptNodeData]): Boolean =
-      if remaining.isEmpty then {
-        true
-      } else {
+      if remaining.isEmpty then true
+      else
         val dataToCheck = remaining.head
         val address =
           blockchainReader.getAccount(blockchainReader.getBestBranch, dataToCheck.accountAddress, blNumber)
@@ -115,13 +108,7 @@ object StateSyncUtils extends EphemBlockchainTestSetup {
           ByteUtils.toBigInt(stored) == value
         }
 
-        if address.isDefined && code.isDefined && storageCorrect then {
-          go(remaining.tail)
-        } else {
-          false
-        }
-      }
+        if address.isDefined && code.isDefined && storageCorrect then go(remaining.tail)
+        else false
 
     go(nodeData)
-  }
-}

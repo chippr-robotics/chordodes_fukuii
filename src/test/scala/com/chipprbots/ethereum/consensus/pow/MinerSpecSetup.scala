@@ -44,7 +44,7 @@ import com.chipprbots.ethereum.utils.Config
 trait MinerSpecSetup
     extends MiningConfigBuilder
     with BlockchainConfigBuilder
-    with com.chipprbots.ethereum.TestInstanceConfigProvider {
+    with com.chipprbots.ethereum.TestInstanceConfigProvider:
   // Abstract mock members - must be implemented by test class that has MockFactory
   def mockBlockchainReader: BlockchainReader
   def mockBlockchain: BlockchainImpl
@@ -118,7 +118,7 @@ trait MinerSpecSetup
   protected def getParentBlock(parentBlockNumber: Int): Block =
     origin.copy(header = origin.header.copy(number = parentBlockNumber))
 
-  def buildPoWConsensus(): PoWMining = {
+  def buildPoWConsensus(): PoWMining =
     val fukuiiConfig = Config.config
     val specificConfig = EthashConfig(fukuiiConfig)
 
@@ -136,7 +136,6 @@ trait MinerSpecSetup
       validators,
       additionalPoWData
     )
-  }
 
   // Abstract method for setting up block generation expectations
   // Must be implemented by the test class with MockFactory context
@@ -155,12 +154,11 @@ trait MinerSpecSetup
     * NOTE: The expectation is set to anyNumberOfTimes() to avoid failures when tests crash before actually mining
     * (e.g., actor initialization failures).
     */
-  protected def setBlockForMining(parentBlock: Block, transactions: Seq[SignedTransaction] = Seq(txToMine)): Block = {
+  protected def setBlockForMining(parentBlock: Block, transactions: Seq[SignedTransaction] = Seq(txToMine)): Block =
     val block = createBlockForMining(parentBlock, transactions)
     setBlockForMiningExpectation(parentBlock, block, fakeWorld)
       .anyNumberOfTimes()
     block
-  }
 
   /** Creates a block for mining WITHOUT setting up any mock expectations. Use this when the test will set up its own
     * mocks (e.g., MockedMiner tests where blockCreator is mocked and blockGenerator is never called).
@@ -168,7 +166,7 @@ trait MinerSpecSetup
   protected def createBlockForMining(
       parentBlock: Block,
       transactions: Seq[SignedTransaction] = Seq(txToMine)
-  ): Block = {
+  ): Block =
     val parentHeader: BlockHeader = parentBlock.header
 
     Block(
@@ -192,22 +190,18 @@ trait MinerSpecSetup
       ),
       BlockBody(transactions, Nil)
     )
-  }
 
-  private def calculateGasLimit(parentGas: UInt256): UInt256 = {
+  private def calculateGasLimit(parentGas: UInt256): UInt256 =
     val GasLimitBoundDivisor: Int = 1024
     val target = UInt256(miningConfig.gasLimitTarget)
     val delta = parentGas / GasLimitBoundDivisor - 1
-    if parentGas < target then {
+    if parentGas < target then
       val next = parentGas + delta
       if next > target then target else next
-    } else if parentGas > target then {
+    else if parentGas > target then
       val next = parentGas - delta
       if next < target then target else next
-    } else {
-      parentGas
-    }
-  }
+    else parentGas
 
   // Abstract method for block creator behavior expectations
   def blockCreatorBehaviourExpectation(
@@ -244,26 +238,23 @@ trait MinerSpecSetup
   // Abstract method for prepareMocks expectations
   def setupMiningServiceExpectation(): Unit
 
-  protected def prepareMocks(): Unit = {
+  protected def prepareMocks(): Unit =
     setupMiningServiceExpectation()
 
     ommersPool.setAutoPilot { (_: ActorRef, msg: Any) =>
-      msg match {
+      msg match
         case OmmersPool.GetOmmers(_, replyTo) => replyTo ! OmmersPool.Ommers(Nil)
         case _                                => ()
-      }
       TestActor.KeepRunning
     }
 
     pendingTransactionsManager.setAutoPilot { (_: ActorRef, msg: Any) =>
-      msg match {
+      msg match
         case PendingTransactionsManager.GetPendingTransactionsReq(replyTo) =>
           replyTo ! PendingTransactionsManager.PendingTransactionsResponse(Nil)
         case _ => ()
-      }
       TestActor.KeepRunning
     }
-  }
 
   protected def waitForMinedBlock(implicit timeout: Duration): Block =
     // ROOT-c: miners now wrap mined-block sends in SyncController.WrappedSyncProtocol so they survive SyncController's
@@ -275,4 +266,3 @@ trait MinerSpecSetup
 
   protected def expectNoNewBlockMsg(timeout: FiniteDuration): Unit =
     sync.expectNoMessage(timeout)
-}

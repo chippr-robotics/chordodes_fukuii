@@ -38,7 +38,7 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
   *
   * T7/T8 use the SyncController actor (regular-sync mode) to verify end-to-end behaviour.
   */
-class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
+class CalibratePivotTDSpec extends AnyFlatSpec with Matchers:
 
   // ─── T5 / T6: Pure interpolation math ────────────────────────────────────
   //
@@ -169,7 +169,7 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
       UnitTest,
       SyncTest
     ) in
-    new CalibrationActorSetup {
+    new CalibrationActorSetup:
       // Simulate Restart #7 state: stored TD = 3.32e18, real peer TD = 24.64e21
       // Ratio = 7411× — below TD-PROXY-GAP 10,000× threshold, so NPA gap-detection never fires.
       // Fix A: timed CalibrateChainWeightNow at T+30s forces correction unconditionally.
@@ -193,14 +193,13 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
       val correctedTD = stored.get.totalDifficulty
       val ratioAfter: Double = correctedTD.toDouble / peerTD.toDouble
       ratioAfter should be(1.0 +- 0.01) // within 1% of peerTD
-    }
 
   // ─── T7.2 Calibration is sticky across restarts ────────────────────────────
   it should "store the corrected TD so subsequent imports accumulate from the right base" taggedAs (
     UnitTest,
     SyncTest
   ) in
-    new CalibrationActorSetup {
+    new CalibrationActorSetup:
       val correctedTD: BigInt = BigInt("24640000000000000000000") // 24.64e21 (what Fix A writes)
       val bestBlockNum: BigInt = BigInt(24720000)
 
@@ -220,12 +219,11 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
       // After re-calibration: stored ≈ restart9PeerTD; ratio ≈ 1×
       val ratio: Double = stored.get.totalDifficulty.toDouble / restart9PeerTD.toDouble
       ratio should be(1.0 +- 0.01)
-    }
 
   // ─── T8.1 Mixed ETH68/ETH69 network: Tier 2 fires ─────────────────────────
   "Integration: Fix A scenarios" should
     "calibrate via Tier 2 when ETH68 STATUS arrives (mixed network)" taggedAs (UnitTest, SyncTest) in
-    new CalibrationActorSetup {
+    new CalibrationActorSetup:
       val peerTD: BigInt = BigInt("24640000000000000000000") // 24.64e21
       setupBestBlockWithTD(BigInt(24720000), BigInt("3320000000000000000"))
       drainRegistration()
@@ -241,11 +239,10 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
       // No retry: calibration succeeded
       testScheduler.timePasses(30.minutes)
       networkPeerManager.expectNoMessage(200.millis)
-    }
 
   // ─── T8.2 Pure ETH69 network: retry until anchor found ────────────────────
   it should "enter the retry loop on sentinel (0,0) and succeed when anchor appears" taggedAs (UnitTest, SyncTest) in
-    new CalibrationActorSetup {
+    new CalibrationActorSetup:
       setupBestBlockWithTD(BigInt(24720000), BigInt("3320000000000000000"))
       drainRegistration()
 
@@ -268,14 +265,13 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
       )
       testScheduler.timePasses(30.minutes)
       networkPeerManager.expectNoMessage(200.millis) // no retry after success
-    }
 
   // ─── T8.3 Re-calibration of an already-correct node is idempotent ─────────
   it should "overwrite a correct TD with the same value (idempotent on double-calibration)" taggedAs (
     UnitTest,
     SyncTest
   ) in
-    new CalibrationActorSetup {
+    new CalibrationActorSetup:
       val correctTD: BigInt = BigInt("24640000000000000000000")
       setupBestBlockWithTD(BigInt(24720000), correctTD)
       drainRegistration()
@@ -288,11 +284,10 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
         blockchainReader.getBestBlockHeader.get.hash
       )
       stored.get.totalDifficulty shouldBe correctTD // unchanged
-    }
 
   // ─── T8.4 Tier 1 exact: peerTD * bestBlock / peerBlock ────────────────────
   it should "apply Tier 1 interpolation when both peerTD and peerBlock are provided" taggedAs (UnitTest, SyncTest) in
-    new CalibrationActorSetup {
+    new CalibrationActorSetup:
       val bestBlockNum: BigInt = BigInt(24720000)
       val peerTD: BigInt = BigInt("24640000000000000000000")
       val peerBlock: BigInt = BigInt(24730000) // peer is slightly ahead of our best block
@@ -306,11 +301,10 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
         blockchainReader.getBestBlockHeader.get.hash
       )
       stored.get.totalDifficulty shouldBe expectedTD
-    }
 
   // ─── Shared actor setup ───────────────────────────────────────────────────
 
-  trait CalibrationActorSetup extends EphemBlockchainTestSetup with TestSyncConfig with TestSyncPeers {
+  trait CalibrationActorSetup extends EphemBlockchainTestSetup with TestSyncConfig with TestSyncPeers:
 
     implicit override lazy val system: ActorSystem =
       ActorSystem("CalibratePivotTDSpec_System", ConfigFactory.load("explicit-scheduler"))
@@ -387,7 +381,7 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
       .commit()
     blockchainWriter.storeChainWeight(Fixtures.Blocks.Genesis.header.parentHash, ChainWeight.zero).commit()
 
-    def drainRegistration(): Unit = {
+    def drainRegistration(): Unit =
       syncController ! SyncController.WrappedSyncProtocol(SyncProtocol.Start)
       networkPeerManager.expectMsgClass(classOf[RegisterChainWeightCalibrationTargetCmd])
       testScheduler.timePasses(31.seconds)
@@ -397,10 +391,9 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
         case CalibrateChainWeightNow => true
         case GetHandshakedPeers      => false
       }
-    }
 
     /** Store a best block with a specific stored chain weight (simulate pre-Fix-A state). */
-    def setupBestBlockWithTD(blockNum: BigInt, storedTD: BigInt): Unit = {
+    def setupBestBlockWithTD(blockNum: BigInt, storedTD: BigInt): Unit =
       val hdr = Fixtures.Blocks.Genesis.header.copy(number = blockNum)
       val blk = Block(hdr, BlockBody(Nil, Nil))
       blockchainWriter.save(
@@ -409,20 +402,18 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
         ChainWeight.totalDifficultyOnly(storedTD),
         saveAsBestBlock = true
       )
-    }
 
     /** Store a header as best block (header-only, no body required for calibrateTDFromLocalChain). */
-    def setBestBlockHeader(hdr: BlockHeader): Unit = {
+    def setBestBlockHeader(hdr: BlockHeader): Unit =
       blockchainWriter.storeBlockHeader(hdr).commit()
       storagesInstance.storages.appStateStorage
         .putBestBlockInfo(BlockInfo(hdr.hash.value, hdr.number))
         .commit()
-    }
 
-    def buildParentHashChain(startNum: Int, length: Int): Vector[BlockHeader] = {
+    def buildParentHashChain(startNum: Int, length: Int): Vector[BlockHeader] =
       var prev = Fixtures.Blocks.Genesis.header
       val buf = scala.collection.mutable.ArrayBuffer.empty[BlockHeader]
-      for i <- 0 until length do {
+      for i <- 0 until length do
         val n = startNum + i
         val h = Fixtures.Blocks.Genesis.header.copy(
           number = BigInt(n),
@@ -432,11 +423,7 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers {
         blockchainWriter.storeBlockHeader(h).commit()
         buf += h
         prev = h
-      }
       buf.toVector
-    }
 
     def cleanup(): Unit = Await.result(system.terminate(), 10.seconds)
-  }
-}
 // scalastyle:on magic.number

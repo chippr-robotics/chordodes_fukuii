@@ -30,7 +30,7 @@ import com.chipprbots.ethereum.blockchain.sync.Blacklist
 import com.chipprbots.ethereum.utils.NodeStatus
 import com.chipprbots.ethereum.utils.ServerStatus
 
-object ServerActor {
+object ServerActor:
 
   /** Behavior factory for the Typed ServerActor.
     *
@@ -101,7 +101,7 @@ object ServerActor {
   ): Behavior[Command] =
     Behaviors.receiveMessagePartial {
       case TcpBound(localAddress) =>
-        advertisedAddressOverride match {
+        advertisedAddressOverride match
           case Some(override_) =>
             finishBinding(ctx, nodeStatusHolder, peerManager, blacklist, localAddress, override_)
           case None if localAddress.getAddress.isAnyLocalAddress =>
@@ -113,7 +113,6 @@ object ServerActor {
             waitingForIpDetection(ctx, nodeStatusHolder, peerManager, blacklist, localAddress)
           case None =>
             finishBinding(ctx, nodeStatusHolder, peerManager, blacklist, localAddress, localAddress.getAddress)
-        }
 
       case TcpCommandFailed(b) =>
         ctx.log.warn("Binding to {} failed", b.localAddress)
@@ -158,7 +157,7 @@ object ServerActor {
       blacklist: Blacklist,
       localAddress: InetSocketAddress,
       advertisedHost: InetAddress
-  ): Behavior[Command] = {
+  ): Behavior[Command] =
     val advertisedAddress = new InetSocketAddress(advertisedHost, localAddress.getPort)
     ctx.log.info("Listening on {}", localAddress)
     ctx.log.info(
@@ -169,7 +168,6 @@ object ServerActor {
     )
     nodeStatusHolder.getAndUpdate(_.copy(serverStatus = ServerStatus.Listening(advertisedAddress)))
     listening(ctx, peerManager, blacklist)
-  }
 
   private def listening(
       ctx: ActorContext[Command],
@@ -179,25 +177,22 @@ object ServerActor {
     Behaviors.receiveMessagePartial { case TcpConnected(connection, remoteAddress) =>
       val addr = remoteAddress.getAddress
       val isLocal = addr.isLoopbackAddress || addr.isSiteLocalAddress
-      if !isLocal && blacklist.isBlacklisted(PeerManagerActor.PeerAddress(remoteAddress.getHostString)) then {
+      if !isLocal && blacklist.isBlacklisted(PeerManagerActor.PeerAddress(remoteAddress.getHostString)) then
         ctx.log.debug("Dropping inbound TCP from blacklisted {}", remoteAddress.getHostString)
         connection ! Close
-      } else {
-        peerManager ! PeerManagerActor.HandlePeerConnectionCmd(connection, remoteAddress)
-      }
+      else peerManager ! PeerManagerActor.HandlePeerConnectionCmd(connection, remoteAddress)
       Behaviors.same
     }
 
   /** Classic bridge actor: registered as the `Bind` handler with the TCP extension. Lifts Classic `Tcp.Event` messages
     * into the typed [[Command]] ADT, capturing `sender()` (the connection actor) for [[Connected]].
     */
-  private class TcpEventBridge(parent: TypedActorRef[Command]) extends ClassicActor {
+  private class TcpEventBridge(parent: TypedActorRef[Command]) extends ClassicActor:
     override def receive: Receive = {
       case Bound(localAddress)    => parent ! TcpBound(localAddress)
       case CommandFailed(b: Bind) => parent ! TcpCommandFailed(b)
       case Connected(remote, _)   => parent ! TcpConnected(sender(), remote)
     }
-  }
 
   sealed trait Command
   case class StartServer(address: InetSocketAddress, advertisedAddress: Option[InetAddress] = None) extends Command
@@ -207,4 +202,3 @@ object ServerActor {
   private[network] case class TcpBound(localAddress: InetSocketAddress) extends Command
   private[network] case class TcpCommandFailed(bind: Bind) extends Command
   private[network] case class TcpConnected(connection: ActorRef, remoteAddress: InetSocketAddress) extends Command
-}

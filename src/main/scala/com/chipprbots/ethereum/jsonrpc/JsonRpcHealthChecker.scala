@@ -4,7 +4,7 @@ import cats.effect.IO
 
 import com.chipprbots.ethereum.healthcheck.HealthcheckResponse
 
-trait JsonRpcHealthChecker {
+trait JsonRpcHealthChecker:
   def healthCheck: IO[HealthcheckResponse]
 
   def readinessCheck(): IO[HealthcheckResponse]
@@ -21,4 +21,3 @@ trait JsonRpcHealthChecker {
         JsonRpcControllerMetrics.HealhcheckErrorCounter.increment()
         IO.raiseError(t)
       }
-}

@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.testing.Tags.*
 /** Validates that ETH68 and ETH69 messages are correctly routed to their decoders. ETH62-67 decoder routing removed:
   * Fukuii only negotiates ETH68 and ETH69.
   */
-class MessageRoutingValidationSpec extends AnyFlatSpec with Matchers {
+class MessageRoutingValidationSpec extends AnyFlatSpec with Matchers:
 
   val exampleHash: ByteString = ByteString(
     Hex.decode("fccdbfe911f9df0a6cc0107d1240f76dfdd1d301b65fdc3cd2ae62752affbef6")
@@ -111,4 +111,3 @@ class MessageRoutingValidationSpec extends AnyFlatSpec with Matchers {
       .asInstanceOf[MessageDecoder.MalformedMessageError]
       .message should include("not supported in eth/69")
   }
-}

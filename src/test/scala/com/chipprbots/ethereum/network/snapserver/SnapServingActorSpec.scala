@@ -38,11 +38,12 @@ import com.chipprbots.ethereum.testing.TestMptStorage
 // and sends responses via peerManagerActor.SendMessage, including when the peer is unknown,
 // storage is absent, or the state root falls outside the 128-block freshness window.
 
-class SnapServingActorSpec extends AnyFlatSpec with Matchers with MockFactory with BeforeAndAfterAll {
+class SnapServingActorSpec extends AnyFlatSpec with Matchers with MockFactory with BeforeAndAfterAll:
 
   implicit val system: ActorSystem = ActorSystem("SnapServingActorSpec_System")
 
-  override def afterAll(): Unit = { val _ = system.terminate() }
+  override def afterAll(): Unit =
+    val _ = system.terminate()
 
   private val zeroHash = ByteString(new Array[Byte](32))
   private val maxHash = ByteString(Array.fill[Byte](32)(0xff.toByte))
@@ -77,13 +78,12 @@ class SnapServingActorSpec extends AnyFlatSpec with Matchers with MockFactory wi
     .toClassic
 
   /** Build a state trie with n EOA accounts and return (rootHash, storage). */
-  private def buildAccountTrie(n: Int): (ByteString, TestMptStorage) = {
+  private def buildAccountTrie(n: Int): (ByteString, TestMptStorage) =
     val storage = new TestMptStorage()
     val trie = (0 until n).foldLeft(MerklePatriciaTrie[ByteString, Account](storage)) { (t, i) =>
       t.put(kec256(ByteString(s"acct-actor-$i")), Account(nonce = i + 1, balance = 1000))
     }
     (ByteString(trie.getRootHash), storage)
-  }
 
   /** Drain one outbound SendMessage from the peerManager probe. */
   private def nextSend(pm: TestProbe): PeerManagerActor.SendMessageCmd =
@@ -251,4 +251,3 @@ class SnapServingActorSpec extends AnyFlatSpec with Matchers with MockFactory wi
     resp.accounts shouldBe empty
     resp.proof shouldBe empty
   }
-}

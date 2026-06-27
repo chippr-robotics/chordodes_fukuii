@@ -14,7 +14,7 @@ import io.prometheus.metrics.instrumentation.jvm.JvmMetrics
 import kamon.Kamon
 import org.slf4j.LoggerFactory
 
-case class Metrics(metricsPrefix: String, registry: MeterRegistry, serverPort: Int = 0) {
+case class Metrics(metricsPrefix: String, registry: MeterRegistry, serverPort: Int = 0):
 
   private def mkName: String => String = MetricsUtils.mkNameWithPrefix(metricsPrefix)
 
@@ -23,20 +23,18 @@ case class Metrics(metricsPrefix: String, registry: MeterRegistry, serverPort: I
 
   private var logbackMetricsBinder: Option[LogbackMetrics] = None
 
-  def start(): Unit = {
+  def start(): Unit =
     server // We need this to evaluate the lazy val!
     JvmMetrics.builder().register()
     val lm = new LogbackMetrics()
     lm.bindTo(registry)
     logbackMetricsBinder = Some(lm)
     Kamon.init()
-  }
 
-  def close(): Unit = {
+  def close(): Unit =
     logbackMetricsBinder.foreach(_.close())
     registry.close()
     server.close()
-  }
 
   /** Returns a [[io.micrometer.core.instrument.Gauge Gauge]].
     * @param computeValue
@@ -72,9 +70,8 @@ case class Metrics(metricsPrefix: String, registry: MeterRegistry, serverPort: I
     DistributionSummary
       .builder(mkName(name))
       .register(registry)
-}
 
-object Metrics {
+object Metrics:
   private val log = LoggerFactory.getLogger(getClass)
 
   final val MetricsPrefix = "app"
@@ -109,15 +106,15 @@ object Metrics {
     */
   def configure(config: MetricsConfig, instanceId: String = "default"): Try[Unit] =
     Try {
-      if config.enabled then {
+      if config.enabled then
         val registry = MeterRegistryBuilder.build(MetricsPrefix)
         val metrics = new Metrics(MetricsPrefix, registry, config.port)
         val existing = instances.putIfAbsent(instanceId, metrics)
-        if existing == null then {
+        if existing == null then
           metrics.start()
           // First instance also becomes the default
           val becameDefault = defaultRef.compareAndSet(defaultMetrics, metrics)
-          if !becameDefault then {
+          if !becameDefault then
             // Identify the owner of `defaultRef` — that's the instance whose writes the shared
             // registry actually reflects. `instances` may have other entries too (3+-way
             // multi-instance), but the default-owner is the one operators need to know about.
@@ -135,15 +132,11 @@ object Metrics {
               config.port.toString,
               ownerId
             )
-          }
-        } else {
+        else
           metrics.close()
           // Already configured for this instance — not an error in multi-instance mode
-        }
-      }
     }
 
   /** Shut down metrics for a specific instance. */
   def closeInstance(instanceId: String): Unit =
     Option(instances.remove(instanceId)).foreach(_.close())
-}

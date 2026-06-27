@@ -21,7 +21,7 @@ import com.chipprbots.ethereum.utils.Logger
   *
   * Reference: go-ethereum/eth/downloader/queue.go — receiptTaskQueue
   */
-class ReceiptsFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[GetReceipts, Receipts68] with Logger {
+class ReceiptsFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[GetReceipts, Receipts68] with Logger:
 
   import ReceiptsFetcherQueue.*
 
@@ -82,7 +82,7 @@ class ReceiptsFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[Get
   }
 
   def deliver(peer: PeerWithInfo, resp: Receipts68, elapsedMs: Long): DeliveryResult = synchronized {
-    inFlightMap.get(peer.peer.id) match {
+    inFlightMap.get(peer.peer.id) match
       case None =>
         DeliveryResult.Duplicate
 
@@ -101,7 +101,6 @@ class ReceiptsFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[Get
             s"elapsed=${elapsedMs}ms, pending=${pendingQueue.size}"
         )
         DeliveryResult.Delivered(blockCount)
-    }
   }
 
   def expireStale(nowMs: Long): Seq[(PeerId, GetReceipts)] = synchronized {
@@ -124,14 +123,11 @@ class ReceiptsFetcherQueue(tracker: PeerRateTracker) extends ConcurrentFetch[Get
       taken: Vector[ByteString],
       sentMs: Long,
       deadlineMs: Long
-  ) {
+  ):
     def snapshot: InFlightRequest[GetReceipts] =
       InFlightRequest(req, peer, sentMs, deadlineMs)
-  }
-}
 
-object ReceiptsFetcherQueue {
+object ReceiptsFetcherQueue:
 
   /** ETH protocol maximum receipt batches per request (matches go-ethereum/eth/handler.go maxReceiptsServe). */
   val MaxReceiptsPerRequest: Int = 256
-}

@@ -22,7 +22,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   *   - `PeerInfo.apply` initialises maxBlockNumber from latestBlock (not from chainWeight.totalDifficulty)
   *   - The fallback path (peer ahead of us) uses block-number proxy correctly
   */
-class ETH69TDSpec extends AnyFlatSpec with Matchers {
+class ETH69TDSpec extends AnyFlatSpec with Matchers:
 
   private val genesisHash = Fixtures.Blocks.Genesis.header.hash.value
   private val latestHash = Fixtures.Blocks.Block3125369.header.hash.value
@@ -324,4 +324,3 @@ class ETH69TDSpec extends AnyFlatSpec with Matchers {
     decoded.latestBlock shouldBe BigInt(0)
     decoded.earliestBlock shouldBe BigInt(0)
   }
-}

@@ -20,7 +20,7 @@ package com.chipprbots.ethereum.consensus.pow.difficulty
   * Note: the Merge spike (Sept 2022) and post-Merge decline (2022–2024) DO involve GPU miners migrating from ETH and
   * then leaving. Only the current oscillation era (Oct 2024+) is the ASIC flex-load phenomenon.
   */
-object OscillationFixtures {
+object OscillationFixtures:
 
   /** Single-block snapshot sufficient for difficulty and TD verification. */
   case class BlockSnapshot(
@@ -430,4 +430,3 @@ object OscillationFixtures {
 
   /** DAA c coefficient for a given inter-block gap: max(1 − floor(gap/9), −99). */
   def cCoeff(gapSecs: Long): Long = math.max(1L - gapSecs / 9L, -99L)
-}

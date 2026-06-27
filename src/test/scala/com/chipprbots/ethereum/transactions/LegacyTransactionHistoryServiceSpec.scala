@@ -24,10 +24,10 @@ class LegacyTransactionHistoryServiceSpec
     with FreeSpecBase
     with SpecFixtures
     with Matchers
-    with DiffMatcher {
+    with DiffMatcher:
 
   implicit private val classicActorSystem: org.apache.pekko.actor.ActorSystem = system.toClassic
-  class Fixture extends EphemBlockchainTestSetup {
+  class Fixture extends EphemBlockchainTestSetup:
     val pendingTransactionManager: TestProbe = TestProbe()
     pendingTransactionManager.setAutoPilot(PendingTransactionsManagerAutoPilot())
     val transactionHistoryService =
@@ -37,7 +37,6 @@ class LegacyTransactionHistoryServiceSpec
         Timeouts.normalTimeout,
         system.scheduler
       )
-  }
 
   def createFixture() = new Fixture
 
@@ -83,7 +82,7 @@ class LegacyTransactionHistoryServiceSpec
       )
     )
 
-    for {
+    for
       _ <- IO {
         blockchainWriter
           .storeBlock(blockWithTx1)
@@ -94,7 +93,7 @@ class LegacyTransactionHistoryServiceSpec
         blockchainWriter.saveBestKnownBlocks(blockWithTxs2and3.hash, blockWithTxs2and3.number)
       }
       response <- transactionHistoryService.getAccountTransactions(address, BigInt(3125360) to BigInt(3125370))
-    } yield assert(response === expectedTxs)
+    yield assert(response === expectedTxs)
   }
 
   "does not return account recent transactions from older blocks and return pending txs" in testCaseM {
@@ -112,14 +111,12 @@ class LegacyTransactionHistoryServiceSpec
       val expectedSent =
         Seq(ExtendedTransactionData(signedTx, isOutgoing = true, None))
 
-      for {
+      for
         _ <- IO(blockchainWriter.storeBlock(blockWithTx).commit())
         _ <- IO(pendingTransactionManager.ref ! PendingTransactionsManager.AddTransactions(txWithSender))
         response <- transactionHistoryService.getAccountTransactions(
           txWithSender.senderAddress,
           BigInt(3125371) to BigInt(3125381)
         )
-      } yield assert(response === expectedSent)
+      yield assert(response === expectedSent)
   }
-
-}

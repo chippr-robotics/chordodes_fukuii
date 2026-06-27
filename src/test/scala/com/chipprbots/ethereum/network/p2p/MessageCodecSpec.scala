@@ -19,22 +19,21 @@ import com.chipprbots.ethereum.network.rlpx.MessageCodec.CompressionPolicy
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 
-class MessageCodecSpec extends AnyFlatSpec with Matchers {
+class MessageCodecSpec extends AnyFlatSpec with Matchers:
 
   behavior of "MessageCodec Snappy negotiation"
 
   it should "compress messages when both peers advertise compression support" taggedAs (UnitTest, NetworkTest) in
-    new TestSetup {
+    new TestSetup:
       enableInboundCompressionOnAllCodecs()
       val encodedStatus: ByteString = messageCodec.encodeMessage(status)
 
       val decoded: Seq[Either[DecodingError, Message]] = remoteMessageCodec.readMessages(encodedStatus)
       decoded should have size 1
       decoded.head shouldBe Right(status)
-    }
 
   it should "skip compression when the remote peer is below the Snappy threshold" taggedAs (UnitTest, NetworkTest) in
-    new TestSetup {
+    new TestSetup:
       override lazy val negotiatedRemoteP2PVersion: Long = 4L
       override lazy val remoteAdvertisedVersion: Int = 4
 
@@ -42,20 +41,18 @@ class MessageCodecSpec extends AnyFlatSpec with Matchers {
       val decoded: Seq[Either[DecodingError, Message]] = remoteMessageCodec.readMessages(encodedStatus)
       decoded should have size 1
       decoded.head shouldBe Right(status)
-    }
 
   it should "skip compression when the local node advertises p2p v4 even if the peer supports Snappy" taggedAs
-    (UnitTest, NetworkTest) in new TestSetup {
+    (UnitTest, NetworkTest) in new TestSetup:
       override lazy val localAdvertisedVersion: Int = 4
 
       val encodedStatus: ByteString = messageCodec.encodeMessage(status)
       val decoded: Seq[Either[DecodingError, Message]] = remoteMessageCodec.readMessages(encodedStatus)
       decoded should have size 1
       decoded.head shouldBe Right(status)
-    }
 
   it should "fall back to uncompressed frames when peers misbehave under compression" taggedAs
-    (UnitTest, NetworkTest) in new TestSetup {
+    (UnitTest, NetworkTest) in new TestSetup:
       enableInboundCompressionOnAllCodecs()
       val statusBytes = status.toBytes
       val uncompressedFrame: Frame =
@@ -65,9 +62,8 @@ class MessageCodecSpec extends AnyFlatSpec with Matchers {
       val decoded: Seq[Either[DecodingError, Message]] = messageCodec.readMessages(bytes)
       decoded should have size 1
       decoded.head shouldBe Right(status)
-    }
 
-  trait TestSetup extends SecureChannelSetup {
+  trait TestSetup extends SecureChannelSetup:
     val frameCodec = new FrameCodec(secrets)
     val remoteFrameCodec = new FrameCodec(remoteSecrets)
 
@@ -97,20 +93,15 @@ class MessageCodecSpec extends AnyFlatSpec with Matchers {
         peerP2pVersion: Long,
         peerClientId: String,
         localAdvertisedP2pVersion: Int
-    ): MessageCodec = {
+    ): MessageCodec =
       val policy = CompressionPolicy.fromHandshake(localAdvertisedP2pVersion, peerP2pVersion)
       new MessageCodec(codec, decoder, peerP2pVersion, peerClientId, policy)
-    }
 
     lazy val messageCodec: MessageCodec =
       mkCodec(frameCodec, decoder, negotiatedRemoteP2PVersion, remoteClientId, localAdvertisedVersion)
     lazy val remoteMessageCodec: MessageCodec =
       mkCodec(remoteFrameCodec, decoder, negotiatedLocalP2PVersion, localClientId, remoteAdvertisedVersion)
 
-    def enableInboundCompressionOnAllCodecs(): Unit = {
+    def enableInboundCompressionOnAllCodecs(): Unit =
       messageCodec.enableInboundCompression("test-setup")
       remoteMessageCodec.enableInboundCompression("test-setup")
-    }
-  }
-
-}

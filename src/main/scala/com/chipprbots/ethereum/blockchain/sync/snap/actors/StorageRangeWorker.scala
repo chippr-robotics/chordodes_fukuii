@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.blockchain.sync.snap.*
   * responses back. Pekko Typed leaf actor (Group W1). `coordinator` is a typed ref (§8k-A). The idle watchdog uses a
   * Typed `TimerScheduler` rather than `system.scheduler.scheduleOnce`.
   */
-object StorageRangeWorker {
+object StorageRangeWorker:
 
   import StorageRangeCoordinator.*
 
@@ -43,14 +43,13 @@ object StorageRangeWorker {
       currentRequestId: Option[BigInt]
   ): Behavior[Command] =
     Behaviors.receive[Command] { (_, msg) =>
-      msg match {
+      msg match
         case FetchStorageRanges(_, peer) =>
           // Request work from coordinator by notifying it of peer availability
           coordinator ! StoragePeerAvailable(peer)
           timers.startSingleTimer(StorageCheckIdle, 30.seconds)
           working(coordinator, timers, currentRequestId)
         case _ => Behaviors.same
-      }
     }
 
   private def working(
@@ -59,7 +58,7 @@ object StorageRangeWorker {
       currentRequestId: Option[BigInt]
   ): Behavior[Command] =
     Behaviors.receive[Command] { (context, msg) =>
-      msg match {
+      msg match
         case StorageRangesResponseMsg(response) =>
           // Forward response to coordinator for processing
           coordinator ! StorageRangesResponseMsg(response)
@@ -67,21 +66,18 @@ object StorageRangeWorker {
 
         case StorageCheckIdle =>
           // If still working after timeout, go back to idle
-          if currentRequestId.isEmpty then {
+          if currentRequestId.isEmpty then
             context.log.debug("[STORAGE-WORKER] idle check: no active request — worker idle, awaiting assignment")
             idle(coordinator, timers, currentRequestId = None)
-          } else Behaviors.same
+          else Behaviors.same
 
         case StorageRequestTimeout(requestId) =>
-          currentRequestId match {
+          currentRequestId match
             case Some(reqId) if reqId == requestId =>
               context.log.warn(s"Storage request $requestId timed out")
               coordinator ! StorageTaskFailed(requestId, "Timeout")
               idle(coordinator, timers, currentRequestId = None)
             case _ => Behaviors.same
-          }
 
         case _: FetchStorageRanges => Behaviors.same // busy; ignore (matches Classic behaviour)
-      }
     }
-}

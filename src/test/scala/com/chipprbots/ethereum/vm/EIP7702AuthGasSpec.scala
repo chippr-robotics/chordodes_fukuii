@@ -19,7 +19,7 @@ class EIP7702AuthGasSpec
     extends AnyFlatSpec
     with Matchers
     with BlockchainConfigBuilder
-    with com.chipprbots.ethereum.TestInstanceConfigProvider {
+    with com.chipprbots.ethereum.TestInstanceConfigProvider:
 
   val olympiaBlock: BigInt = 10
 
@@ -62,4 +62,3 @@ class EIP7702AuthGasSpec
 
     gasFull shouldBe (gasBase + calldataCost + accessListCost + authCost)
   }
-}

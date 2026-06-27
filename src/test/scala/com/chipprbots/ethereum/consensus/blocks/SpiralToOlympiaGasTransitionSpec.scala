@@ -45,7 +45,7 @@ class SpiralToOlympiaGasTransitionSpec
     extends AnyWordSpec
     with Matchers
     with BlockchainConfigBuilder
-    with com.chipprbots.ethereum.TestInstanceConfigProvider {
+    with com.chipprbots.ethereum.TestInstanceConfigProvider:
 
   private val olympiaBlock: BigInt = BigInt(100)
 
@@ -111,12 +111,11 @@ class SpiralToOlympiaGasTransitionSpec
           staleThreshold = 7,
           recommitInterval = 0.seconds
         ),
-        new DifficultyCalculator {
+        new DifficultyCalculator:
           def calculateDifficulty(blockNumber: BigInt, blockTimestamp: Long, parent: BlockHeader)(implicit
               blockchainConfig: BlockchainConfig
           ): BigInt = BigInt(1)
-        }
-      ) {
+      ):
     type X = Ommers
     override protected def newBlockBody(transactions: Seq[SignedTransaction], x: Ommers): BlockBody =
       BlockBody(transactions, Nil)
@@ -142,7 +141,6 @@ class SpiralToOlympiaGasTransitionSpec
 
     def calcGasLimit(parentGas: BigInt, blockNumber: BigInt)(implicit bc: BlockchainConfig): BigInt =
       calculateGasLimit(parentGas, blockNumber)
-  }
 
   "Spiral-to-Olympia gas transition (EIP-7935)" when {
 
@@ -173,10 +171,9 @@ class SpiralToOlympiaGasTransitionSpec
         val threshold = OlympiaGasTarget * 99 / 100
         var gas = SpiralGasLimit
         var blocks = 0
-        while gas < threshold && blocks < 10_000 do {
+        while gas < threshold && blocks < 10_000 do
           gas = legacyMiner.calcGasLimit(gas, olympiaBlock + blocks)
           blocks += 1
-        }
         gas should be >= threshold
         blocks shouldBe 2055
         info(s"legacy 8M config → 99% of 60M in $blocks blocks (~${blocks * 13.0 / 3600.0}h at 13s/block)")
@@ -307,5 +304,4 @@ class SpiralToOlympiaGasTransitionSpec
       }
     }
   }
-}
 // scalastyle:on magic.number

@@ -24,10 +24,9 @@ import com.chipprbots.ethereum.utils.Logger
 class ChainInstance(val instanceId: String, override val instanceConfig: InstanceConfig)
     extends BaseNode
     with StdMiningBuilder
-    with Logger {
+    with Logger:
 
   def blockchainReaderRef: BlockchainReader = blockchainReader
 
   override def toString: String =
     s"ChainInstance($instanceId, network=${instanceConfig.blockchains.network})"
-}

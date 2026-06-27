@@ -37,12 +37,12 @@ class DebugServiceSpec
     with AnyFlatSpecLike
     with Matchers
     with MockFactory
-    with ScalaFutures {
+    with ScalaFutures:
 
   implicit val runtime: IORuntime = IORuntime.global
   implicit private val classicActorSystem: ActorSystem = system.toClassic
 
-  "DebugService" should "return list of peers info" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  "DebugService" should "return list of peers info" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val result: Future[Either[JsonRpcError, ListPeersInfoResponse]] =
       debugService.listPeersInfo(ListPeersInfoRequest()).unsafeToFuture()
 
@@ -54,9 +54,8 @@ class DebugServiceSpec
     cmd1Npma.replyTo ! NetworkPeerManagerActor.PeerInfoResponse(Some(peer1Info))
 
     result.futureValue shouldBe Right(ListPeersInfoResponse(List(peer1Info)))
-  }
 
-  it should "return empty list if there are no peers available" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "return empty list if there are no peers available" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val result: Future[Either[JsonRpcError, ListPeersInfoResponse]] =
       debugService.listPeersInfo(ListPeersInfoRequest()).unsafeToFuture()
 
@@ -64,9 +63,8 @@ class DebugServiceSpec
     cmd2.replyTo ! Peers(Map.empty)
 
     result.futureValue shouldBe Right(ListPeersInfoResponse(List.empty))
-  }
 
-  it should "return empty list if there is no peer info" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "return empty list if there is no peer info" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val result: Future[Either[JsonRpcError, ListPeersInfoResponse]] =
       debugService.listPeersInfo(ListPeersInfoRequest()).unsafeToFuture()
 
@@ -78,9 +76,8 @@ class DebugServiceSpec
     cmd3Npma.replyTo ! NetworkPeerManagerActor.PeerInfoResponse(None)
 
     result.futureValue shouldBe Right(ListPeersInfoResponse(List.empty))
-  }
 
-  class TestSetup(implicit system: ActorSystem) {
+  class TestSetup(implicit system: ActorSystem):
     implicit val scheduler: typed.Scheduler = system.toTyped.scheduler
     val peerManager: TestProbe = TestProbe()
     val etcPeerManager: TestProbe = TestProbe()
@@ -103,5 +100,3 @@ class DebugServiceSpec
     val peer1Probe: TestProbe = TestProbe()
     val peer1: Peer = Peer(PeerId("peer1"), new InetSocketAddress("127.0.0.1", 1), peer1Probe.ref, false)
     val peer1Info: PeerInfo = initialPeerInfo.withForkAccepted(false)
-  }
-}

@@ -10,14 +10,13 @@ import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.StateNode
 import com.chipprbots.ethereum.blockchain.sync.fast.SyncStateScheduler.StateNodeRequest
 import com.chipprbots.ethereum.testing.Tags.*
 
-class SchedulerStateSpec extends AnyFlatSpec with Matchers {
-  "SchedulerState" should "schedule node hashes for retrieval" taggedAs (UnitTest, SyncTest) in new TestSetup {
+class SchedulerStateSpec extends AnyFlatSpec with Matchers:
+  "SchedulerState" should "schedule node hashes for retrieval" taggedAs (UnitTest, SyncTest) in new TestSetup:
     val stateWithRequest: SchedulerState = schedulerState.schedule(request1)
     assert(stateWithRequest != schedulerState)
     assert(stateWithRequest.getPendingRequestByHash(request1.nodeHash).contains(request1))
-  }
 
-  it should "return enqueued elements taggedAs (UnitTest, SyncTest) in depth order" in new TestSetup {
+  it should "return enqueued elements taggedAs (UnitTest, SyncTest) in depth order" in new TestSetup:
     val stateWithRequests: SchedulerState =
       schedulerState.schedule(request2).schedule(request3).schedule(request1).schedule(request4)
     assert(stateWithRequests != schedulerState)
@@ -25,9 +24,8 @@ class SchedulerStateSpec extends AnyFlatSpec with Matchers {
     assert(allMissingElements == reqestsInDepthOrder.map(_.nodeHash))
     val (allMissingElements1, _) = newState.getAllMissingHashes
     assert(allMissingElements1.isEmpty)
-  }
 
-  it should "return at most n enqueued elements taggedAs (UnitTest, SyncTest) in depth order" in new TestSetup {
+  it should "return at most n enqueued elements taggedAs (UnitTest, SyncTest) in depth order" in new TestSetup:
     val stateWithRequests: SchedulerState =
       schedulerState.schedule(request2).schedule(request3).schedule(request1).schedule(request4)
     assert(stateWithRequests != schedulerState)
@@ -35,9 +33,8 @@ class SchedulerStateSpec extends AnyFlatSpec with Matchers {
     assert(twoMissingElements == reqestsInDepthOrder.take(2).map(_.nodeHash))
     val (allMissingElements1, _) = newState.getAllMissingHashes
     assert(allMissingElements1.size == 2)
-  }
 
-  trait TestSetup extends EphemBlockchainTestSetup {
+  trait TestSetup extends EphemBlockchainTestSetup:
     val schedulerState: SchedulerState = SchedulerState()
     val request1: StateNodeRequest = StateNodeRequest(ByteString(1), None, StateNode, Seq(), 1, 0)
     val request2: StateNodeRequest = StateNodeRequest(ByteString(2), None, StateNode, Seq(), 2, 0)
@@ -45,5 +42,3 @@ class SchedulerStateSpec extends AnyFlatSpec with Matchers {
     val request4: StateNodeRequest = StateNodeRequest(ByteString(4), None, StateNode, Seq(), 4, 0)
 
     val reqestsInDepthOrder: List[StateNodeRequest] = List(request4, request3, request2, request1)
-  }
-}

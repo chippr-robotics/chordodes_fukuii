@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.db.dataSource.DataSource
 import com.chipprbots.ethereum.db.dataSource.DataSourceUpdate
 import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource.IterationError
 
-trait KeyValueStorage[K, V, T <: KeyValueStorage[K, V, T]] extends SimpleMap[K, V, T] {
+trait KeyValueStorage[K, V, T <: KeyValueStorage[K, V, T]] extends SimpleMap[K, V, T]:
 
   val dataSource: DataSource
   val namespace: IndexedSeq[Byte]
@@ -41,7 +41,7 @@ trait KeyValueStorage[K, V, T <: KeyValueStorage[K, V, T]] extends SimpleMap[K, 
     * @return
     *   the new KeyValueStorage after the removals and insertions were done.
     */
-  def update(toRemove: Seq[K], toUpsert: Seq[(K, V)]): T = {
+  def update(toRemove: Seq[K], toUpsert: Seq[(K, V)]): T =
     dataSource.update(
       Seq(
         DataSourceUpdate(
@@ -52,7 +52,6 @@ trait KeyValueStorage[K, V, T <: KeyValueStorage[K, V, T]] extends SimpleMap[K, 
       )
     )
     apply(dataSource)
-  }
 
   def storageContent: Stream[IO, Either[IterationError, (K, V)]] =
     dataSource.iterate(namespace).map { result =>
@@ -62,4 +61,3 @@ trait KeyValueStorage[K, V, T <: KeyValueStorage[K, V, T]] extends SimpleMap[K, 
         (kseq, vseq)
       }
     }
-}

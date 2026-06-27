@@ -32,7 +32,7 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   * dropped: a Typed `Behavior` exposes no `underlyingActor`. The behavioral coverage that survives is asserted through
   * observable effects on the `networkPeerManager` and `snapSyncController` probes — the same approach used in BCC/SRC.
   */
-class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers {
+class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   private val statusProbe = testKit.createTestProbe[AccountRangeStats]()
@@ -358,11 +358,10 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     // Route failures through the worker so it properly transitions to idle before each re-dispatch.
     // The worker (Typed) is resolved via selection; WorkerPeerDisconnected skips cooldown and stateless
     // marking, allowing immediate re-dispatch each iteration.
-    for _ <- 1 to (AccountRangeCoordinator.MaxRequeuesPerTask + 1) do {
+    for _ <- 1 to (AccountRangeCoordinator.MaxRequeuesPerTask + 1) do
       networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd]
       val workerRef = resolveWorkerChild(coordinator)
       workerRef ! AccountRangeCoordinator.WorkerPeerDisconnected(peer.id.value)
-    }
 
     snapSyncController.expectMessageType[SNAPSyncController.PivotStateUnservable]
   }
@@ -691,4 +690,3 @@ class AccountRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     coord ! AccountRangeCoordinator.ByteCodeQueuePressure(paused = false)
     networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd]
   }
-}

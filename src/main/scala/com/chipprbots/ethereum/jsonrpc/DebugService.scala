@@ -21,10 +21,9 @@ import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.network.PeerManagerActor.Peers
 
-object DebugService {
+object DebugService:
   case class ListPeersInfoRequest()
   case class ListPeersInfoResponse(peers: List[PeerInfo])
-}
 
 /** Non-tracing debug_* RPC methods. `debug_trace*` / `trace_*` live in [[DebugTracingService]] / [[TraceService]]
   * against the [[com.chipprbots.ethereum.vm.ExecutionTracer]] interface.
@@ -32,28 +31,25 @@ object DebugService {
 class DebugService(
     peerManager: typed.ActorRef[PeerManagerActor.Command],
     networkPeerManager: typed.ActorRef[NetworkPeerManagerActor.Command]
-)(implicit scheduler: typed.Scheduler) {
+)(implicit scheduler: typed.Scheduler):
 
   def listPeersInfo(@unused getPeersInfoRequest: ListPeersInfoRequest): ServiceResponse[ListPeersInfoResponse] =
-    for {
+    for
       ids <- getPeerIds
       peers <- ids.traverse(getPeerInfo)
-    } yield Right(ListPeersInfoResponse(peers.flatten))
+    yield Right(ListPeersInfoResponse(peers.flatten))
 
-  private def getPeerIds: IO[List[PeerId]] = {
+  private def getPeerIds: IO[List[PeerId]] =
     given timeout: Timeout = Timeout(20.seconds)
 
     peerManager
       .askForTyped[Peers](PeerManagerActor.GetPeersCmd(_))
       .handleError(_ => Peers(Map.empty[Peer, PeerActor.Status]))
       .map(_.peers.keySet.map(_.id).toList)
-  }
 
-  private def getPeerInfo(peer: PeerId): IO[Option[PeerInfo]] = {
+  private def getPeerInfo(peer: PeerId): IO[Option[PeerInfo]] =
     given timeout: Timeout = Timeout(20.seconds)
 
     networkPeerManager
       .askForTyped[PeerInfoResponse](replyTo => NetworkPeerManagerActor.PeerInfoRequestCmd(peer, replyTo))
       .map(resp => resp.peerInfo)
-  }
-}

@@ -49,7 +49,7 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
   * (`pivotBlockRetryCount`, `totalSelectionAttempts`, `pivotRetryState`) is threaded as immutable [[PivotState]]
   * through behavior factory closures — no mutable `Impl` fields.
   */
-object PivotBlockSelector {
+object PivotBlockSelector:
 
   // Besu: PivotBlockRetriever.SUSPICIOUS_NUMBER_OF_RETRIES = 5
   val SuspiciousRetryThreshold: Int = 5
@@ -144,22 +144,19 @@ object PivotBlockSelector {
   case object SelectionFailed
   final case class Result(targetBlockHeader: BlockHeader)
 
-  case class BlockHeaderWithVotes(header: BlockHeader, votes: Int = 1) {
+  case class BlockHeaderWithVotes(header: BlockHeader, votes: Int = 1):
     def vote: BlockHeaderWithVotes = copy(votes = votes + 1)
-  }
 
-  extension (headers: Map[ByteString, BlockHeaderWithVotes]) {
+  extension (headers: Map[ByteString, BlockHeaderWithVotes])
     def mostVotedHeader: Option[BlockHeaderWithVotes] =
       headers.toList.maximumByOption { case (_, headerWithVotes) => headerWithVotes.votes }.map(_._2)
-  }
 
   final case class ElectionDetails(
       participants: List[Peer],
       currentBestBlockNumber: BigInt,
       expectedPivotBlock: BigInt
-  ) {
+  ):
     def hasEnoughVoters(minNumberOfVoters: Int): Boolean = participants.size >= minNumberOfVoters
-  }
 
   private case class PivotState(
       pivotBlockRetryCount: Int,
@@ -186,12 +183,12 @@ object PivotBlockSelector {
       ourBestTotalDifficulty: () => BigInt,
       getCanonicalHeaderByNumber: BigInt => Option[BlockHeader],
       validateHeaderPoW: BlockHeader => Boolean
-  ) {
+  ):
     import syncConfig.*
 
     private val maxTotalSelectionAttempts = syncConfig.pivotBlockMaxTotalSelectionAttempts
 
-    private def handleCommon(message: Command): Option[Behavior[Command]] = message match {
+    private def handleCommon(message: Command): Option[Behavior[Command]] = message match
       case ScanPeers =>
         networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter)
         Some(Behaviors.same)
@@ -202,13 +199,12 @@ object PivotBlockSelector {
         peerListHelper.handlePeerDisconnected(pd.peerId)
         Some(Behaviors.same)
       case _ => None
-    }
 
     def idle(state: PivotState): Behavior[Command] = Behaviors.receiveMessage { message =>
       handleCommon(message).getOrElse {
-        message match {
+        message match
           case SelectPivotBlock =>
-            if state.totalSelectionAttempts >= maxTotalSelectionAttempts then {
+            if state.totalSelectionAttempts >= maxTotalSelectionAttempts then
               ctx.log.error(
                 "Pivot block selection failed after {} total attempts. Stopping pivot block selector.",
                 maxTotalSelectionAttempts
@@ -216,21 +212,19 @@ object PivotBlockSelector {
               selectionFailedTo ! SelectionFailed
               peerEventBus ! UnsubscribeAllCmd(blockHeadersAdapter)
               Behaviors.stopped
-            } else {
+            else
               startPivotBlockSelection(
                 collectVoters(extraOffset = state.backlinkFailureCount * syncConfig.pivotBlockOffset),
                 state.copy(totalSelectionAttempts = state.totalSelectionAttempts + 1)
               )
-            }
           case _ => Behaviors.same
-        }
       }
     }
 
-    private def startPivotBlockSelection(election: ElectionDetails, state: PivotState): Behavior[Command] = {
+    private def startPivotBlockSelection(election: ElectionDetails, state: PivotState): Behavior[Command] =
       val ElectionDetails(correctPeers, currentBestBlockNumber, expectedPivotBlock) = election
 
-      if election.hasEnoughVoters(minPeersToChoosePivotBlock) then {
+      if election.hasEnoughVoters(minPeersToChoosePivotBlock) then
         val (peersToAsk, waitingPeers) =
           correctPeers.splitAt(minPeersToChoosePivotBlock + peersToChoosePivotBlockMargin)
 
@@ -252,7 +246,7 @@ object PivotBlockSelector {
           Map.empty,
           state
         )
-      } else {
+      else
         ctx.log.debug(
           "Cannot pick pivot block. Need at least {} peers, but there are only {} which meet the criteria " +
             "({} all available at the moment). Best block number = {}",
@@ -262,25 +256,21 @@ object PivotBlockSelector {
           currentBestBlockNumber
         )
         retryPivotBlockSelection(currentBestBlockNumber, state)
-      }
-    }
 
-    private def retryPivotBlockSelection(pivotBlockNumber: BigInt, state: PivotState): Behavior[Command] = {
+    private def retryPivotBlockSelection(pivotBlockNumber: BigInt, state: PivotState): Behavior[Command] =
       val newRetryCount = state.pivotBlockRetryCount + 1
-      if newRetryCount <= maxPivotBlockFailuresCount && pivotBlockNumber > 0 then {
+      if newRetryCount <= maxPivotBlockFailuresCount && pivotBlockNumber > 0 then
         startPivotBlockSelection(
           collectVoters(Some(pivotBlockNumber)),
           state.copy(pivotBlockRetryCount = newRetryCount)
         )
-      } else {
+      else
         ctx.log.debug(
           "Cannot pick pivot block. Current best block number [{}]. Scheduling retry with backoff (attempt {})",
           pivotBlockNumber,
           state.pivotRetryState.attempt + 1
         )
         scheduleRetry(state.copy(pivotBlockRetryCount = newRetryCount))
-      }
-    }
 
     def runningPivotBlockElection(
         peersToAsk: Set[PeerId],
@@ -293,14 +283,14 @@ object PivotBlockSelector {
         state: PivotState
     ): Behavior[Command] = Behaviors.receiveMessage { message =>
       handleCommon(message).getOrElse {
-        message match {
+        message match
           case WrappedMessageFromPeer(MessageFromPeer(blockHeaders: ETHPackets.BlockHeaders, peerId)) =>
             peerEventBus ! UnsubscribeCmd(
               MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peerId)),
               blockHeadersAdapter
             )
             val updatedPeersToAsk = peersToAsk - peerId
-            blockHeaders.headers.find(_.number == pivotBlockNumber) match {
+            blockHeaders.headers.find(_.number == pivotBlockNumber) match
               case Some(targetBlockHeader) =>
                 val newValue =
                   headers
@@ -318,7 +308,6 @@ object PivotBlockSelector {
               case None =>
                 blacklist.add(peerId, blacklistDuration, InvalidPivotBlockElectionResponse)
                 votingProcess(updatedPeersToAsk, waitingPeers, pivotBlockNumber, headers, votesByPeer, state)
-            }
           case ElectionPivotBlockTimeout =>
             peersToAsk.foreach(peerId => blacklist.add(peerId, blacklistDuration, PivotBlockElectionTimeout))
             peerEventBus ! UnsubscribeAllCmd(blockHeadersAdapter)
@@ -328,7 +317,6 @@ object PivotBlockSelector {
             )
             scheduleRetry(state)
           case _ => Behaviors.same
-        }
       }
     }
 
@@ -339,23 +327,22 @@ object PivotBlockSelector {
         headers: Map[ByteString, BlockHeaderWithVotes],
         votesByPeer: Map[PeerId, ByteString],
         state: PivotState
-    ): Behavior[Command] = {
+    ): Behavior[Command] =
       val maybeBlockHeaderWithVotes = headers.mostVotedHeader
-      if peersToAsk.isEmpty && maybeBlockHeaderWithVotes.exists(_.votes >= minPeersToChoosePivotBlock) then {
+      if peersToAsk.isEmpty && maybeBlockHeaderWithVotes.exists(_.votes >= minPeersToChoosePivotBlock) then
         timers.cancel(ElectionTimeoutKey)
         // ETH69 G5 — the elected pivot has won the vote, but a sybil/low-difficulty-fork set can still produce
         // a majority for a fabricated header. Before handing it to FastSync as the SNAP anchor, probe its
         // parent chain back N blocks and require a link into our local canonical chain.
-        maybeBlockHeaderWithVotes match {
+        maybeBlockHeaderWithVotes match
           case Some(hWv) =>
             // Probe the peers that backed the winning header (they should be able to serve its ancestors).
             val backlinkPeers = votesByPeer.collect { case (pid, hash) if hash == hWv.header.hash.value => pid }.toSet
             startBacklinkVerification(hWv.header, backlinkPeers, state)
           case None => Behaviors.stopped // unreachable: guarded by `exists` above
-        }
-      } else if !isPossibleToReachConsensus(peersToAsk.size, maybeBlockHeaderWithVotes.map(_.votes).getOrElse(0)) then {
+      else if !isPossibleToReachConsensus(peersToAsk.size, maybeBlockHeaderWithVotes.map(_.votes).getOrElse(0)) then
         timers.cancel(ElectionTimeoutKey)
-        if waitingPeers.nonEmpty then {
+        if waitingPeers.nonEmpty then
           val additionalPeer :: newWaitingPeers = waitingPeers: @unchecked
           obtainBlockHeaderFromPeer(additionalPeer, pivotBlockNumber)
           timers.startSingleTimer(ElectionTimeoutKey, ElectionPivotBlockTimeout, peerResponseTimeout)
@@ -367,18 +354,14 @@ object PivotBlockSelector {
             votesByPeer,
             state
           )
-        } else {
+        else
           peerEventBus ! UnsubscribeAllCmd(blockHeadersAdapter)
           ctx.log.warn(
             "Not enough votes for pivot block. Scheduling retry with backoff (attempt {})",
             state.pivotRetryState.attempt + 1
           )
           scheduleRetry(state)
-        }
-      } else {
-        runningPivotBlockElection(peersToAsk, waitingPeers, pivotBlockNumber, headers, votesByPeer, state)
-      }
-    }
+      else runningPivotBlockElection(peersToAsk, waitingPeers, pivotBlockNumber, headers, votesByPeer, state)
 
     private def isPossibleToReachConsensus(peersLeft: Int, bestHeaderVotes: Int): Boolean =
       peersLeft + bestHeaderVotes >= minPeersToChoosePivotBlock
@@ -394,14 +377,14 @@ object PivotBlockSelector {
         backlinkPeers: Set[PeerId],
         state: PivotState
     ): Behavior[Command] =
-      if backlinkPeers.isEmpty then {
+      if backlinkPeers.isEmpty then
         ctx.log.warn(
           "ETH69_PIVOT_BACKLINK_FAIL: pivot block={} elected but no voting peer remains to probe its parent chain",
           pivotBlockHeader.number
         )
         peerEventBus ! UnsubscribeAllCmd(blockHeadersAdapter)
         scheduleRetry(state.copy(backlinkFailureCount = state.backlinkFailureCount + 1))
-      } else {
+      else
         backlinkPeers.foreach { peer =>
           peerEventBus ! SubscribeCmd(
             MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer)),
@@ -425,7 +408,6 @@ object PivotBlockSelector {
           BacklinkDepth
         )
         verifyingBacklink(pivotBlockHeader, backlinkPeers, state)
-      }
 
     /** Awaits the reverse header chain. The first peer that returns a usable chain decides the outcome:
       *   - PoW invalid on any returned header → forged chain: blacklist the peer, deepen-retry.
@@ -439,7 +421,7 @@ object PivotBlockSelector {
         state: PivotState
     ): Behavior[Command] = Behaviors.receiveMessage { message =>
       handleCommon(message).getOrElse {
-        message match {
+        message match
           case WrappedMessageFromPeer(MessageFromPeer(blockHeaders: ETHPackets.BlockHeaders, peerId))
               if backlinkPeers.contains(peerId) =>
             timers.cancel(BacklinkTimeoutKey)
@@ -454,7 +436,6 @@ object PivotBlockSelector {
             )
             scheduleRetry(state.copy(backlinkFailureCount = state.backlinkFailureCount + 1))
           case _ => Behaviors.same
-        }
       }
     }
 
@@ -464,19 +445,19 @@ object PivotBlockSelector {
         returnedHeaders: Seq[BlockHeader],
         peerId: PeerId,
         state: PivotState
-    ): Behavior[Command] = {
+    ): Behavior[Command] =
       // Expect a reverse chain starting at the pivot itself.
       val chain = returnedHeaders
       val startsAtPivot = chain.headOption.exists(_.hash == pivotBlockHeader.hash)
 
-      if chain.isEmpty || !startsAtPivot then {
+      if chain.isEmpty || !startsAtPivot then
         ctx.log.warn(
           "ETH69_PIVOT_BACKLINK_FAIL: peer {} returned an empty/non-pivot-rooted backlink for block={}",
           peerId,
           pivotBlockHeader.number
         )
         scheduleRetry(state.copy(backlinkFailureCount = state.backlinkFailureCount + 1))
-      } else {
+      else
         // 1. PoW validity of every returned header (no parent needed — isolated nonce/difficulty check).
         val powInvalidHeader = chain.find(h => !validateHeaderPoW(h))
         // 2. parentHash continuity: each header's parentHash must equal the next (older) header's hash.
@@ -485,7 +466,7 @@ object PivotBlockSelector {
           case _                  => true
         }
 
-        if powInvalidHeader.isDefined then {
+        if powInvalidHeader.isDefined then
           // Forged PoW in the served chain — the peer fabricated a pivot ancestry. Treat as malicious.
           blacklist.add(peerId, blacklistDuration, InvalidPivotBlockElectionResponse)
           ctx.log.warn(
@@ -495,20 +476,20 @@ object PivotBlockSelector {
             pivotBlockHeader.number
           )
           scheduleRetry(state.copy(backlinkFailureCount = state.backlinkFailureCount + 1))
-        } else if !continuous then {
+        else if !continuous then
           ctx.log.warn(
             "ETH69_PIVOT_BACKLINK_FAIL: peer {} backlink for pivot {} has a broken parentHash chain",
             peerId,
             pivotBlockHeader.number
           )
           scheduleRetry(state.copy(backlinkFailureCount = state.backlinkFailureCount + 1))
-        } else {
+        else
           // 3. Canonical match: any returned header that equals our local canonical header at its height links
           //    the pivot to the honest chain we already trust.
           val canonicalMatch = chain.find { h =>
             getCanonicalHeaderByNumber(h.number).exists(_.hash == h.hash)
           }
-          canonicalMatch match {
+          canonicalMatch match
             case Some(anchor) =>
               ctx.log.info(
                 "ETH69 G5: pivot block={} backlink confirmed — connects to canonical block={} within {} hop(s)",
@@ -526,26 +507,20 @@ object PivotBlockSelector {
                 BacklinkDepth
               )
               scheduleRetry(state.copy(backlinkFailureCount = state.backlinkFailureCount + 1))
-          }
-        }
-      }
-    }
 
-    private def scheduleRetry(state: PivotState): Behavior[Command] = {
+    private def scheduleRetry(state: PivotState): Behavior[Command] =
       val delay = state.pivotRetryState.nextDelay
       val newPivotRetryState = state.pivotRetryState.recordAttempt
-      if newPivotRetryState.attempt % SuspiciousRetryThreshold == 0 then {
+      if newPivotRetryState.attempt % SuspiciousRetryThreshold == 0 then
         ctx.log.warn(
           "{} pivot block selection retries have failed to obtain a valid pivot block",
           newPivotRetryState.attempt
         )
-      }
       ctx.log.debug("Scheduling pivot block selection retry in {}", delay)
       timers.startSingleTimer(RetryKey, SelectPivotBlock, delay)
       idle(state.copy(pivotBlockRetryCount = 0, pivotRetryState = newPivotRetryState))
-    }
 
-    private def sendResponseAndCleanup(pivotBlockHeader: BlockHeader, pivotRetryState: RetryState): Unit = {
+    private def sendResponseAndCleanup(pivotBlockHeader: BlockHeader, pivotRetryState: RetryState): Unit =
       val resetState = pivotRetryState.reset
       val attempts = resetState.attempt
       ctx.log.info(
@@ -556,26 +531,23 @@ object PivotBlockSelector {
       )
       replyTo ! Result(pivotBlockHeader)
       peerEventBus ! UnsubscribeAllCmd(blockHeadersAdapter)
-    }
 
-    private def obtainBlockHeaderFromPeer(peer: PeerId, blockNumber: BigInt): Unit = {
+    private def obtainBlockHeaderFromPeer(peer: PeerId, blockNumber: BigInt): Unit =
       peerEventBus ! SubscribeCmd(
         MessageClassifier(Set(Codes.BlockHeadersCode), PeerSelector.WithId(peer)),
         blockHeadersAdapter
       )
-      val getBlockHeadersMsg: MessageSerializable = peerListHelper.handshakedPeers.get(peer) match {
+      val getBlockHeadersMsg: MessageSerializable = peerListHelper.handshakedPeers.get(peer) match
         case Some(peerWithInfo) if Capability.usesRequestId(peerWithInfo.peerInfo.remoteStatus.capability) =>
           ETHPackets.GetBlockHeaders(ETHPackets.nextRequestId, Left(blockNumber), 1, 0, reverse = false)
         case _ =>
           ETHPackets.GetBlockHeaders(ETHPackets.nextRequestId, Left(blockNumber), 1, 0, reverse = false)
-      }
       networkPeerManager ! NetworkPeerManagerActor.SendMessageCmd(getBlockHeadersMsg, peer)
-    }
 
     private def collectVoters(
         previousBestBlockNumber: Option[BigInt] = None,
         extraOffset: BigInt = 0
-    ): ElectionDetails = {
+    ): ElectionDetails =
       // ETH69 G1 — TD consensus gate (P0). Before this gate, peers entered the snap-sync voter pool
       // by maxBlockNumber alone. An attacker on a long low-difficulty fork passes Tier3 TD estimation
       // at handshake (estimate looks legitimate) and wins pivot election by block-number ranking with
@@ -594,7 +566,7 @@ object PivotBlockSelector {
 
       val peersUsedToChooseTarget =
         if tdGatedPeers.nonEmpty then tdGatedPeers
-        else {
+        else
           val blockNumberOnlyPeers = peerListHelper.peersToDownloadFrom.collect {
             case (_, PeerWithInfo(peer, PeerInfo(_, _, true, maxBlockNumber, _))) if maxBlockNumber > 0 =>
               (peer, maxBlockNumber)
@@ -607,7 +579,6 @@ object PivotBlockSelector {
               minPeerTD
             )
           blockNumberOnlyPeers
-        }
 
       val peersSortedByBestNumber = peersUsedToChooseTarget.toList.sortBy { case (_, number) => -number }
       val bestPeerBestBlockNumber = peersSortedByBestNumber.headOption
@@ -627,6 +598,3 @@ object PivotBlockSelector {
         .map { case (peer, _) => peer }
 
       ElectionDetails(correctPeers, currentBestBlockNumber, expectedPivotBlock)
-    }
-  }
-}

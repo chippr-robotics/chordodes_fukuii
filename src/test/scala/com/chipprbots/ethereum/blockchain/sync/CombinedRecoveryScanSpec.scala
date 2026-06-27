@@ -20,7 +20,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   * account must find exactly the gaps the two legacy walks (BytecodeRecoveryActor + StorageRecoveryActor) would — no
   * misses, no spurious, no double-counts. Built against a real account trie covering every present/missing combination.
   */
-class CombinedRecoveryScanSpec extends AnyFunSuite {
+class CombinedRecoveryScanSpec extends AnyFunSuite:
 
   test("combined scan finds exactly the missing bytecodes and storage tries in one pass", UnitTest, SyncTest) {
     val ds = EphemDataSource()
@@ -29,21 +29,19 @@ class CombinedRecoveryScanSpec extends AnyFunSuite {
     val evm = new EvmCodeStorage(ds)
 
     // present bytecode: store the code; codeHash = keccak(code) (non-empty)
-    def presentCode(seed: Byte): ByteString = {
+    def presentCode(seed: Byte): ByteString =
       val code = Array.fill[Byte](8)(seed)
       val h = ByteString(kec256(code))
       evm.put(h, ByteString(code)).commit()
       h
-    }
     // a codeHash that was never stored (and isn't the empty-code hash)
     def missingCodeHash(seed: Byte): ByteString = ByteString(Array.fill[Byte](32)((seed ^ 0x5a).toByte))
     // present storage: build a 2-slot storage trie in mpt; its root node is stored (non-empty)
-    def presentStorageRoot(seed: Byte): ByteString = {
+    def presentStorageRoot(seed: Byte): ByteString =
       val t = MerklePatriciaTrie[Array[Byte], Array[Byte]](mpt)
         .put(Array[Byte](seed, 0x01), Array[Byte](seed, 0x11))
         .put(Array[Byte](seed, 0x02), Array[Byte](seed, 0x22))
       ByteString(t.getRootHash)
-    }
     // a non-empty storageRoot that was never stored
     def missingStorageRoot(seed: Byte): ByteString = ByteString(Array.fill[Byte](32)((seed ^ 0x3c).toByte))
     def acctHash(i: Int): ByteString = ByteString(Array.fill[Byte](32)(i.toByte))
@@ -132,4 +130,3 @@ class CombinedRecoveryScanSpec extends AnyFunSuite {
     assert(scan.missingBytecodes.isEmpty, s"expected no bytecode gaps, got ${scan.missingBytecodes.size}")
     assert(scan.missingStorageTries.isEmpty, s"expected no storage gaps, got ${scan.missingStorageTries.size}")
   }
-}

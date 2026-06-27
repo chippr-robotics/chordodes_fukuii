@@ -50,16 +50,19 @@ case class PayloadAttributes(
 )
 
 /** Status values for PayloadStatusV1 */
-sealed trait PayloadStatus {
+sealed trait PayloadStatus:
   def value: String
-}
-object PayloadStatus {
-  case object Valid extends PayloadStatus { val value = "VALID" }
-  case object Invalid extends PayloadStatus { val value = "INVALID" }
-  case object Syncing extends PayloadStatus { val value = "SYNCING" }
-  case object Accepted extends PayloadStatus { val value = "ACCEPTED" }
-  case class InvalidBlockHash(msg: String) extends PayloadStatus { val value = "INVALID_BLOCK_HASH" }
-}
+object PayloadStatus:
+  case object Valid extends PayloadStatus:
+    val value = "VALID"
+  case object Invalid extends PayloadStatus:
+    val value = "INVALID"
+  case object Syncing extends PayloadStatus:
+    val value = "SYNCING"
+  case object Accepted extends PayloadStatus:
+    val value = "ACCEPTED"
+  case class InvalidBlockHash(msg: String) extends PayloadStatus:
+    val value = "INVALID_BLOCK_HASH"
 
 /** Response to engine_newPayload */
 case class PayloadStatusV1(

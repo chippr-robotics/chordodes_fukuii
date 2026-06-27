@@ -16,12 +16,12 @@ import Fixtures.blockchainConfig
 
 /** Tests for EIP-3541: Reject new contracts starting with 0xEF byte https://eips.ethereum.org/EIPS/eip-3541
   */
-class Eip3541Spec extends AnyWordSpec with Matchers {
+class Eip3541Spec extends AnyWordSpec with Matchers:
 
   val configPreMystique: EvmConfig = EvmConfig.MagnetoConfigBuilder(blockchainConfig)
   val configMystique: EvmConfig = EvmConfig.MystiqueConfigBuilder(blockchainConfig)
 
-  object fxt {
+  object fxt:
     val fakeHeaderPreMystique: BlockHeader =
       BlockFixtures.ValidBlock.header.copy(number = Fixtures.MagnetoBlockNumber)
     val fakeHeaderMystique: BlockHeader =
@@ -154,7 +154,6 @@ class Eip3541Spec extends AnyWordSpec with Matchers {
     val initWorld: MockWorldState =
       MockWorldState().saveAccount(creatorAddr, Account.empty().increaseBalance(UInt256(1000000)))
     val newAddr: Address = initWorld.increaseNonce(creatorAddr).createAddress(creatorAddr)
-  }
 
   "EIP-3541" should {
     "be disabled before Mystique fork" taggedAs (UnitTest, VMTest) in {
@@ -291,4 +290,3 @@ class Eip3541Spec extends AnyWordSpec with Matchers {
       result.gasRemaining shouldBe 0
     }
   }
-}

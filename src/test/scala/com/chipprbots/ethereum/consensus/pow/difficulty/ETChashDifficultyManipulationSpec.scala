@@ -32,7 +32,7 @@ import OscillationFixtures.*
   *
   * All on-chain block data is from OscillationFixtures (core-geth verified).
   */
-class ETChashDifficultyManipulationSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks {
+class ETChashDifficultyManipulationSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks:
 
   // -------------------------------------------------------------------------
   // Shared infrastructure
@@ -110,7 +110,7 @@ class ETChashDifficultyManipulationSpec extends AnyFlatSpec with Matchers with S
     header(s.number, s.difficulty, s.timestamp)
 
   /** For each consecutive (parent, child) pair verify that the DAA produces child.difficulty. */
-  private def verifyDifficultyChain(blocks: Seq[BlockSnapshot]): Unit = {
+  private def verifyDifficultyChain(blocks: Seq[BlockSnapshot]): Unit =
     require(blocks.size >= 2, "need at least parent + one child")
     blocks.sliding(2).foreach {
       case Seq(parent, child) =>
@@ -124,7 +124,6 @@ class ETChashDifficultyManipulationSpec extends AnyFlatSpec with Matchers with S
         }
       case _ => // sliding(2) on Seq of 1 — can't happen given the require above
     }
-  }
 
   /** Simulate `count` blocks, each `gapSecs` apart, starting from `parentDiff`/`parentTs`. Returns (blockNumber,
     * difficulty) pairs for the synthetic chain.
@@ -135,11 +134,11 @@ class ETChashDifficultyManipulationSpec extends AnyFlatSpec with Matchers with S
       parentTs: Long,
       gapSecs: Long,
       count: Int
-  ): Seq[(BigInt, BigInt)] = {
+  ): Seq[(BigInt, BigInt)] =
     val results = scala.collection.mutable.ArrayBuffer.empty[(BigInt, BigInt)]
     var prevDiff = parentDiff
     var prevTs = parentTs
-    for i <- 1 to count do {
+    for i <- 1 to count do
       val num = startBlock + i
       val childTs = prevTs + gapSecs
       val parentHdr = header(num - 1, prevDiff, prevTs)
@@ -147,9 +146,7 @@ class ETChashDifficultyManipulationSpec extends AnyFlatSpec with Matchers with S
       results += ((num, newDiff))
       prevDiff = newDiff
       prevTs = childTs
-    }
     results.toSeq
-  }
 
   // -------------------------------------------------------------------------
   // Group A — S1: Ethereum Merge spike (Sept 2022)
@@ -170,12 +167,11 @@ class ETChashDifficultyManipulationSpec extends AnyFlatSpec with Matchers with S
     (Seq(mergeSpikeParent) ++ mergeSpike).sliding(2).foreach {
       case Seq(parent, child) =>
         val gap = child.timestamp - parent.timestamp
-        if gap < 9 then {
+        if gap < 9 then
           val expectedDelta = parent.difficulty / 2048
           withClue(s"block ${child.number} gap=${gap}s") {
             child.difficulty shouldBe parent.difficulty + expectedDelta
           }
-        }
       case _ =>
     }
   }
@@ -393,14 +389,13 @@ class ETChashDifficultyManipulationSpec extends AnyFlatSpec with Matchers with S
       val chain = syntheticChain(cycleStart.number, startDiff, startTs, gapSecs, count = 500)
       val endDiff = chain.last._2
 
-      if cCoeff(gapSecs) == 0L then {
+      if cCoeff(gapSecs) == 0L then
         // Below threshold — no trough; difficulty stays approximately flat
         val drift = (endDiff - startDiff).abs
         drift should be < startDiff / 20 // < 5% movement
-      } else {
+      else
         // Above threshold — measurable trough
         endDiff should be < startDiff
-      }
     }
   }
 
@@ -559,5 +554,4 @@ class ETChashDifficultyManipulationSpec extends AnyFlatSpec with Matchers with S
     messConfig.isActiveAtBlock(olympiaActivation) shouldBe true
     messConfig.isActiveAtBlock(olympiaActivation + 1) shouldBe true
   }
-}
 // scalastyle:on magic.number

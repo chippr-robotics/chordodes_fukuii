@@ -13,7 +13,7 @@ import com.chipprbots.ethereum.rlp.*
 import com.chipprbots.ethereum.rlp.RLPImplicits.given
 import com.chipprbots.ethereum.utils.ByteUtils
 
-object Account {
+object Account:
   val EmptyStorageRootHash: TrieRoot = TrieRoot(ByteString(kec256(rlp.encode(Array.empty[Byte]))))
   val EmptyCodeHash: CodeHash = CodeHash.Empty
 
@@ -21,8 +21,8 @@ object Account {
     Account(nonce = startNonce, storageRoot = EmptyStorageRootHash, codeHash = EmptyCodeHash)
 
   // RLP codec — inlined from ETH63.AccountImplicits (go-ethereum / Erigon inline pattern)
-  implicit class AccountEnc(val account: Account) extends RLPSerializable {
-    override def toRLPEncodable: RLPEncodeable = {
+  implicit class AccountEnc(val account: Account) extends RLPSerializable:
+    override def toRLPEncodable: RLPEncodeable =
       import account.*
       import UInt256RLPImplicits.*
       import RLPImplicits.byteStringEncDec
@@ -32,11 +32,9 @@ object Account {
         byteStringEncDec.encode(storageRoot.value),
         byteStringEncDec.encode(codeHash.value)
       )
-    }
-  }
 
-  implicit class AccountDec(val bytes: Array[Byte]) extends AnyVal {
-    def toAccount: Account = rawDecode(bytes) match {
+  implicit class AccountDec(val bytes: Array[Byte]) extends AnyVal:
+    def toAccount: Account = rawDecode(bytes) match
       case RLPList(
             RLPValue(nonceBytes),
             RLPValue(balanceBytes),
@@ -54,23 +52,19 @@ object Account {
           normalizedCodeHash
         )
       case _ => throw new RuntimeException("Cannot decode Account")
-    }
-  }
 
-  implicit val accountSerializer: ByteArraySerializable[Account] = new ByteArraySerializable[Account] {
+  implicit val accountSerializer: ByteArraySerializable[Account] = new ByteArraySerializable[Account]:
     override def fromBytes(bytes: Array[Byte]): Account = bytes.toAccount
     override def toBytes(input: Account): Array[Byte] = input.toBytes
-  }
 
   def apply(bytes: ByteString): Try[Account] = Try(accountSerializer.fromBytes(bytes.toArray))
-}
 
 case class Account(
     nonce: UInt256 = 0,
     balance: UInt256 = 0,
     storageRoot: TrieRoot = Account.EmptyStorageRootHash,
     codeHash: CodeHash = Account.EmptyCodeHash
-) {
+):
 
   def increaseBalance(value: UInt256): Account =
     copy(balance = balance + value)
@@ -98,5 +92,3 @@ case class Account(
   override def toString: String =
     s"Account(nonce: $nonce, balance: $balance, " +
       s"storageRoot: ${Hex.toHexString(storageRoot.toArray)}, codeHash: ${Hex.toHexString(codeHash.value.toArray[Byte])})"
-
-}

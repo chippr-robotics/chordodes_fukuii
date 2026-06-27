@@ -27,7 +27,7 @@ class BlockHeaderFieldCountSpec
     extends AnyWordSpec
     with Matchers
     with BlockchainConfigBuilder
-    with com.chipprbots.ethereum.TestInstanceConfigProvider {
+    with com.chipprbots.ethereum.TestInstanceConfigProvider:
 
   private val ShanghaiTs: Long = 1_000L
   private val CancunTs: Long = 2_000L
@@ -114,5 +114,4 @@ class BlockHeaderFieldCountSpec
       }
     }
   }
-}
 // scalastyle:on magic.number

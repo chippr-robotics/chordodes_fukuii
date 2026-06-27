@@ -22,7 +22,7 @@ import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.TrieRoot
 
-class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
+class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers:
   import SNAPSyncController.SyncPhase.*
 
   "SNAPSyncConfig" should "load from config correctly" taggedAs UnitTest in {
@@ -444,7 +444,8 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
     // Simulate the counter behaviour extracted from SNAPSyncController.
     var generation: Long = 0L
 
-    def invalidate(): Long = { generation += 1; generation }
+    def invalidate(): Long =
+      generation += 1; generation
     def isStale(gen: Long): Boolean = gen != generation
 
     // Initial state: generation=0, any message with gen=0 is current
@@ -910,10 +911,9 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
     (consecutivePivotRefreshes >= MaxConsecutivePivotRefreshes) shouldBe true
 
     // Each time threshold is reached, record a critical failure and reset
-    if consecutivePivotRefreshes >= MaxConsecutivePivotRefreshes then {
+    if consecutivePivotRefreshes >= MaxConsecutivePivotRefreshes then
       criticalFailureCount += 1
       consecutivePivotRefreshes = 0
-    }
 
     criticalFailureCount shouldBe 1
     consecutivePivotRefreshes shouldBe 0 // reset after escalation
@@ -941,11 +941,10 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
     var criticalFailureCount = 0
     val maxSnapSyncFailures = 5
 
-    for _ <- 1 until maxSnapSyncFailures do {
+    for _ <- 1 until maxSnapSyncFailures do
       criticalFailureCount += 1
       // recordCriticalFailure returns false (not yet at threshold)
       (criticalFailureCount >= maxSnapSyncFailures) shouldBe false
-    }
 
     // Final failure tips over threshold
     criticalFailureCount += 1
@@ -1274,7 +1273,7 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
     )
   )
 
-  private val validSepoliaHeader: com.chipprbots.ethereum.domain.BlockHeader = {
+  private val validSepoliaHeader: com.chipprbots.ethereum.domain.BlockHeader =
     import com.chipprbots.ethereum.domain.BlockHeader
     import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.HefPostShanghai
     import com.chipprbots.ethereum.domain.BloomFilter
@@ -1299,8 +1298,6 @@ class SNAPSyncControllerSpec extends AnyFlatSpec with Matchers {
         withdrawalsRoot = ByteString(Array.fill(32)(0x56.toByte))
       )
     )
-  }
-}
 
 /** Test helper: a `StateValidator` subclass that returns canned results without traversing the trie. Used in
   * orchestration tests to drive the controller's validation handlers without paying the cost of a real walk.
@@ -1316,22 +1313,19 @@ class FakeStateValidator(
     throwOnStorage: Option[Throwable] = None,
     accountGate: Option[CountDownLatch] = None,
     storageGate: Option[CountDownLatch] = None
-) extends StateValidator(storage) {
+) extends StateValidator(storage):
 
   @volatile var accountCallCount: Int = 0
   @volatile var storageCallCount: Int = 0
 
-  override def validateAccountTrie(stateRoot: ByteString): Either[String, Seq[ByteString]] = {
+  override def validateAccountTrie(stateRoot: ByteString): Either[String, Seq[ByteString]] =
     accountCallCount += 1
     accountGate.foreach(_.countDown())
     throwOnAccount.foreach(t => throw t)
     accountResult
-  }
 
-  override def validateAllStorageTries(stateRoot: ByteString): Either[String, Seq[ByteString]] = {
+  override def validateAllStorageTries(stateRoot: ByteString): Either[String, Seq[ByteString]] =
     storageCallCount += 1
     storageGate.foreach(_.countDown())
     throwOnStorage.foreach(t => throw t)
     storageResult
-  }
-}

@@ -16,7 +16,7 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
 
 // scalastyle:off magic.number
-class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks {
+class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks:
 
   // Minimal BlockHeader for difficulty tests
   private def header(
@@ -232,5 +232,4 @@ class EthashDifficultyCalculatorSpec extends AnyFlatSpec with Matchers with Scal
     // Should be different from Ethash calculator
     result should be > BigInt(0)
   }
-}
 // scalastyle:on magic.number

@@ -19,7 +19,7 @@ import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.rlp.RLPValue
 import com.chipprbots.ethereum.rlp.rawDecode
 
-class SNAPMessagesSpec extends AnyWordSpec with Matchers {
+class SNAPMessagesSpec extends AnyWordSpec with Matchers:
 
   private val zeroHash = ByteString(new Array[Byte](32))
   private val maxHash = ByteString(Array.fill(32)(0xff.toByte))
@@ -38,11 +38,10 @@ class SNAPMessagesSpec extends AnyWordSpec with Matchers {
 
       val encoded = msg.toBytes
 
-      rawDecode(encoded) match {
+      rawDecode(encoded) match
         case RLPList(RLPValue(requestIdBytes), _*) =>
           requestIdBytes shouldBe Array(0x80.toByte)
         case _ => fail("Expected RLPList with request-id as first element")
-      }
     }
 
     "encode GetAccountRange requestId=0 as empty bytes per RLP spec" in {
@@ -56,11 +55,10 @@ class SNAPMessagesSpec extends AnyWordSpec with Matchers {
 
       val encoded = msg.toBytes
 
-      rawDecode(encoded) match {
+      rawDecode(encoded) match
         case RLPList(RLPValue(requestIdBytes), _*) =>
           requestIdBytes shouldBe empty
         case _ => fail("Expected RLPList with request-id as first element")
-      }
     }
 
     "round-trip GetAccountRange with all fields preserved" in {
@@ -275,4 +273,3 @@ class SNAPMessagesSpec extends AnyWordSpec with Matchers {
       an[Exception] should be thrownBy malformed.toGetStorageRanges
     }
   }
-}

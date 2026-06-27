@@ -7,18 +7,16 @@ import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 
-object SyncCommonItSpec {
+object SyncCommonItSpec:
   val IdentityUpdate: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy = (_, world) => world
 
-  def randomAddress(): InetSocketAddress = {
+  def randomAddress(): InetSocketAddress =
     val s = new ServerSocket(0)
     try new InetSocketAddress("localhost", s.getLocalPort)
     finally s.close()
-  }
 
   final case class BlockchainState(
       bestBlock: Block,
       currentWorldState: InMemoryWorldStateProxy,
       currentWeight: ChainWeight
   )
-}

@@ -38,7 +38,7 @@ class PoSBlockHeaderValidatorSpec
     extends AnyWordSpec
     with Matchers
     with BlockchainConfigBuilder
-    with com.chipprbots.ethereum.TestInstanceConfigProvider {
+    with com.chipprbots.ethereum.TestInstanceConfigProvider:
 
   private val EmptyNonce: ByteString = ByteString(Array.fill[Byte](8)(0))
   private val ShanghaiTs: Long = 1_000L
@@ -147,5 +147,4 @@ class PoSBlockHeaderValidatorSpec
       }
     }
   }
-}
 // scalastyle:on magic.number

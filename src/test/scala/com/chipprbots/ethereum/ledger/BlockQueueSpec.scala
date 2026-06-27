@@ -22,9 +22,9 @@ import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
-class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory {
+class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory:
 
-  "BlockQueue" should "ignore block if it's already in the queue" taggedAs (UnitTest, StateTest) in new TestConfig {
+  "BlockQueue" should "ignore block if it's already in the queue" taggedAs (UnitTest, StateTest) in new TestConfig:
     val block: Block = getBlock(1)
     val parentWeight = ChainWeight.zero
     setBestBlockNumber(1).twice()
@@ -33,9 +33,8 @@ class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory {
     blockQueue.enqueueBlock(block) shouldEqual Some(Leaf(block.header.hash.value, parentWeight.increase(block.header)))
     blockQueue.enqueueBlock(block) shouldEqual None
     blockQueue.isQueued(block.header.hash) shouldBe true
-  }
 
-  it should "ignore blocks outside of range" taggedAs (UnitTest, StateTest) in new TestConfig {
+  it should "ignore blocks outside of range" taggedAs (UnitTest, StateTest) in new TestConfig:
     val block1: Block = getBlock(1)
     val block30: Block = getBlock(30)
     setBestBlockNumber(15).twice()
@@ -45,9 +44,8 @@ class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory {
 
     blockQueue.enqueueBlock(block30)
     blockQueue.isQueued(block30.header.hash) shouldBe false
-  }
 
-  it should "remove the blocks that fall out of range" taggedAs (UnitTest, StateTest) in new TestConfig {
+  it should "remove the blocks that fall out of range" taggedAs (UnitTest, StateTest) in new TestConfig:
     val block1: Block = getBlock(1)
     setBestBlockNumber(1)
     setChainWeightForParent(block1)
@@ -62,12 +60,11 @@ class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory {
     blockQueue.enqueueBlock(block20)
     blockQueue.isQueued(block20.header.hash) shouldBe true
     blockQueue.isQueued(block1.header.hash) shouldBe false
-  }
 
   it should "enqueue a block with parent on the main chain updating its total difficulty" taggedAs (
     UnitTest,
     StateTest
-  ) in new TestConfig {
+  ) in new TestConfig:
     val block1: Block = getBlock(1, 13)
     val parentWeight: ChainWeight = ChainWeight.totalDifficultyOnly(42)
     setBestBlockNumber(1)
@@ -76,12 +73,11 @@ class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory {
     blockQueue.enqueueBlock(block1) shouldEqual Some(
       Leaf(block1.header.hash.value, parentWeight.increase(block1.header))
     )
-  }
 
   it should "enqueue a block with queued ancestors rooted to the main chain updating its total difficulty" taggedAs (
     UnitTest,
     StateTest
-  ) in new TestConfig {
+  ) in new TestConfig:
     val block1: Block = getBlock(1, 101)
     val block2a: Block = getBlock(2, 102, block1.header.hash.value)
     val block2b: Block = getBlock(2, 99, block1.header.hash.value)
@@ -101,18 +97,16 @@ class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory {
 
     val expectedWeight: ChainWeight = List(block1, block2a, block3).map(_.header).foldLeft(parentWeight)(_.increase(_))
     blockQueue.enqueueBlock(block3) shouldEqual Some(Leaf(block3.header.hash.value, expectedWeight))
-  }
 
-  it should "enqueue an orphaned block" in new TestConfig {
+  it should "enqueue an orphaned block" in new TestConfig:
     val block1: Block = getBlock(1)
     setBestBlockNumber(1)
     setChainWeightForParent(block1)
 
     blockQueue.enqueueBlock(block1) shouldBe None
     blockQueue.isQueued(block1.header.hash) shouldBe true
-  }
 
-  it should "remove a branch from a leaf up to the first shared ancestor" in new TestConfig {
+  it should "remove a branch from a leaf up to the first shared ancestor" in new TestConfig:
     val block1: Block = getBlock(1)
     val block2a: Block = getBlock(2, parent = block1.header.hash.value)
     val block2b: Block = getBlock(2, parent = block1.header.hash.value)
@@ -135,9 +129,8 @@ class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory {
     blockQueue.isQueued(block2a.header.hash) shouldBe false
     blockQueue.isQueued(block2b.header.hash) shouldBe true
     blockQueue.isQueued(block1.header.hash) shouldBe true
-  }
 
-  it should "remove a whole subtree down from an ancestor to all its leaves" in new TestConfig {
+  it should "remove a whole subtree down from an ancestor to all its leaves" in new TestConfig:
     val block1a: Block = getBlock(1)
     val block1b: Block = getBlock(1)
     val block2a: Block = getBlock(2, parent = block1a.header.hash.value)
@@ -170,9 +163,8 @@ class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory {
     blockQueue.isQueued(block2b.header.hash) shouldBe false
     blockQueue.isQueued(block1a.header.hash) shouldBe false
     blockQueue.isQueued(block1b.header.hash) shouldBe true
-  }
 
-  trait TestConfig {
+  trait TestConfig:
     val syncConfig: SyncConfig =
       SyncConfig(Config.config).copy(maxQueuedBlockNumberAhead = 10, maxQueuedBlockNumberBehind = 10)
     val blockchainReader: BlockchainReader = mock[BlockchainReader]
@@ -209,6 +201,3 @@ class BlockQueueSpec extends AnyFlatSpec with Matchers with MockFactory {
         defaultHeader.copy(parentHash = BlockHash(parent), difficulty = difficulty, number = number, extraData = salt),
         BlockBody.empty
       )
-  }
-
-}

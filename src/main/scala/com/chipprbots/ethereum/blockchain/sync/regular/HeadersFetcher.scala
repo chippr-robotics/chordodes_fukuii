@@ -34,7 +34,7 @@ class HeadersFetcher(
     val supervisor: ActorRef[FetchCommand],
     context: ActorContext[HeadersFetcher.HeadersFetcherCommand]
 ) extends AbstractBehavior[HeadersFetcher.HeadersFetcherCommand](context)
-    with FetchRequest[HeadersFetcherCommand] {
+    with FetchRequest[HeadersFetcherCommand]:
 
   val log: Logger = context.log
   given scheduler: Scheduler = context.system.scheduler
@@ -45,7 +45,7 @@ class HeadersFetcher(
   override def makeAdaptedMessage[T <: Message](peer: Peer, msg: T): HeadersFetcherCommand = AdaptedMessage(peer, msg)
 
   override def onMessage(message: HeadersFetcherCommand): Behavior[HeadersFetcherCommand] =
-    message match {
+    message match
       case FetchHeadersByNumber(block: BigInt, amount: BigInt) =>
         log.debug("Start fetching headers from block {} (amount: {})", block, amount)
         requestHeaders(Left(block), amount)
@@ -61,11 +61,8 @@ class HeadersFetcher(
           headers.headOption.map(_.number),
           peer.id
         )
-        if headers.isEmpty then {
-          log.debug("Received empty headers response from peer {}", peer.id)
-        } else {
-          log.debug("Headers range: {} to {}", headers.headOption.map(_.number), headers.lastOption.map(_.number))
-        }
+        if headers.isEmpty then log.debug("Received empty headers response from peer {}", peer.id)
+        else log.debug("Headers range: {} to {}", headers.headOption.map(_.number), headers.lastOption.map(_.number))
         supervisor ! BlockFetcher.ReceivedHeaders(peer, headers)
         Behaviors.same
       case HeadersFetcher.RetryHeadersRequest =>
@@ -75,9 +72,8 @@ class HeadersFetcher(
       case _ =>
         log.debug("HeadersFetcher received unhandled message")
         Behaviors.unhandled
-    }
 
-  private def requestHeaders(block: Either[BigInt, ByteString], amount: BigInt): Unit = {
+  private def requestHeaders(block: Either[BigInt, ByteString], amount: BigInt): Unit =
     val blockDesc = block.fold(num => s"number $num", hash => s"hash ${ByteStringUtils.hash2string(hash)}")
     log.debug("Requesting headers from block {} (amount: {})", blockDesc, amount)
     val msg = ETH68GetBlockHeaders(ETHPackets.nextRequestId, block, amount, skip = 0, reverse = false)
@@ -103,10 +99,8 @@ class HeadersFetcher(
         log.debug("Headers request failed with exception: {}", ex.getMessage)
         HeadersFetcher.RetryHeadersRequest
     }
-  }
-}
 
-object HeadersFetcher {
+object HeadersFetcher:
 
   def apply(
       peersClient: ActorRef[PeersClient.Command],
@@ -120,4 +114,3 @@ object HeadersFetcher {
   final case class FetchHeadersByHash(block: ByteString, amount: BigInt) extends HeadersFetcherCommand
   case object RetryHeadersRequest extends HeadersFetcherCommand
   final private case class AdaptedMessage[T <: Message](peer: Peer, msg: T) extends HeadersFetcherCommand
-}

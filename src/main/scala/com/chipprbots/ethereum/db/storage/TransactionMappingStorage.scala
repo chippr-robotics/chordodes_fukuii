@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.utils.ByteUtils.byteSequenceToBuffer
 import com.chipprbots.ethereum.utils.ByteUtils.compactPickledBytes
 
 class TransactionMappingStorage(val dataSource: DataSource)
-    extends TransactionalKeyValueStorage[TxHash, TransactionLocation] {
+    extends TransactionalKeyValueStorage[TxHash, TransactionLocation]:
 
   val namespace: IndexedSeq[Byte] = Namespaces.TransactionMappingNamespace
   def keySerializer: TxHash => IndexedSeq[Byte] = identity
@@ -22,11 +22,8 @@ class TransactionMappingStorage(val dataSource: DataSource)
 
   given byteStringPickler: Pickler[ByteString] =
     transformPickler[ByteString, Array[Byte]](ByteString(_))(_.toArray[Byte])
-}
 
-object TransactionMappingStorage {
+object TransactionMappingStorage:
   type TxHash = IndexedSeq[Byte]
 
   case class TransactionLocation(blockHash: ByteString, txIndex: Int)
-
-}

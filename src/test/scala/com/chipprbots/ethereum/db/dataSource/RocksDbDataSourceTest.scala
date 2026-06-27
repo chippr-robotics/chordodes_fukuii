@@ -6,13 +6,13 @@ import org.scalatest.flatspec.AnyFlatSpec
 
 import com.chipprbots.ethereum.db.storage.Namespaces
 
-class RocksDbDataSourceTest extends AnyFlatSpec with DataSourceTestBehavior {
+class RocksDbDataSourceTest extends AnyFlatSpec with DataSourceTestBehavior:
 
-  private def createDataSource(@scala.annotation.unused path: String): RocksDbDataSource = {
+  private def createDataSource(@scala.annotation.unused path: String): RocksDbDataSource =
     val dbPath: String = Files.createTempDirectory("temp-test-rocksdb").toAbsolutePath.toString
 
     RocksDbDataSource(
-      new RocksDbConfig {
+      new RocksDbConfig:
         override val createIfMissing: Boolean = true
         override val paranoidChecks: Boolean = true
         override val path: String = dbPath
@@ -22,10 +22,8 @@ class RocksDbDataSourceTest extends AnyFlatSpec with DataSourceTestBehavior {
         override val levelCompaction: Boolean = true
         override val blockSize: Long = 16384
         override val blockCacheSize: Long = 33554432
-      },
+      ,
       Namespaces.nsSeq
     )
-  }
 
   (it should behave).like(dataSource(createDataSource))
-}

@@ -4,7 +4,7 @@ import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 
 /** Enumerates the known mining protocols that Fukuii can use. For the respective implementations, see [[Mining]].
   */
-sealed trait Protocol {
+sealed trait Protocol:
 
   /** We use this `name` to specify the protocol in configuration.
     *
@@ -12,17 +12,15 @@ sealed trait Protocol {
     *   [[Protocol.Names]]
     */
   def name: String
-}
 
-object Protocol {
-  object Names {
+object Protocol:
+  object Names:
     // This is the standard Ethereum PoW mining protocol.
     final val PoW = "pow"
 
     final val MockedPow = "mocked"
 
     final val RestrictedPoW = "restricted-pow"
-  }
 
   sealed abstract class ProtocolImpl(val name: String) extends Protocol
 
@@ -67,4 +65,3 @@ object Protocol {
   sealed abstract class AdditionalPoWProtocolData
   case object NoAdditionalPoWData extends AdditionalPoWProtocolData
   case class RestrictedPoWMinerData(miningNodeKey: AsymmetricCipherKeyPair) extends AdditionalPoWProtocolData
-}

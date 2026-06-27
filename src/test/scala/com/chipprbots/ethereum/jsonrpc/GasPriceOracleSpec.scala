@@ -51,7 +51,7 @@ class GasPriceOracleSpec
     with ScalaFutures
     with OptionValues
     with MockFactory
-    with TypeCheckedTripleEquals {
+    with TypeCheckedTripleEquals:
 
   implicit val runtime: IORuntime = IORuntime.global
   implicit private val classicActorSystem: ActorSystem = system.toClassic
@@ -133,7 +133,7 @@ class GasPriceOracleSpec
       bestNum: BigInt,
       window: Map[BigInt, Option[Block]],
       bestBlock: Option[Block]
-  ): BlockchainReader = {
+  ): BlockchainReader =
     val r = mock[BlockchainReader]
     val branch = if bestNum > 0 then BestBranch(zeroHash, bestNum) else EmptyBranch
     (() => r.getBestBlockNumber).expects().returning(bestNum).anyNumberOfTimes()
@@ -143,14 +143,13 @@ class GasPriceOracleSpec
       r.getBlockByNumber.expects(branch, n).returning(bOpt).anyNumberOfTimes()
     }
     r
-  }
 
   /** Window covering bestNum-20..bestNum, all empty (no txs → oracle returns floor). */
   private def emptyWindow(bestNum: BigInt): Map[BigInt, Option[Block]] =
     (BigInt(0).max(bestNum - 20) to bestNum).map(n => n -> None).toMap
 
   /** Build EthTxService with a mocked reader and given config. */
-  private def svc(reader: BlockchainReader, cfg: BlockchainConfig = defaultCfg): EthTxService = {
+  private def svc(reader: BlockchainReader, cfg: BlockchainConfig = defaultCfg): EthTxService =
     implicit val implCfg: BlockchainConfig = cfg
     val probe = TestProbe()
     new EthTxService(
@@ -162,7 +161,6 @@ class GasPriceOracleSpec
       stub[TransactionMappingStorage],
       system.scheduler
     )
-  }
 
   /** Build EthBlocksService with stubbed dependencies (uses Config singleton for blockchainConfig). */
   private def blocksSvc(): EthBlocksService =
@@ -533,4 +531,3 @@ class GasPriceOracleSpec
     val highResult = svc(rHigh, ethLondonCfg).suggestGasPrice()
     highResult should be > lowResult
   }
-}

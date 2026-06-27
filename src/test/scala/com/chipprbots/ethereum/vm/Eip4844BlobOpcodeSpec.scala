@@ -27,7 +27,7 @@ import com.chipprbots.ethereum.vm.Fixtures.blockchainConfig
   *
   * go-ethereum reference: consensus/misc/eip4844/eip4844_test.go TestCalcBlobFee
   */
-class Eip4844BlobOpcodeSpec extends AnyWordSpec with Matchers {
+class Eip4844BlobOpcodeSpec extends AnyWordSpec with Matchers:
 
   // ETC Olympia config — now uses EtcOlympiaOpCodes (BLOBHASH/BLOBBASEFEE excluded)
   val etcOlympiaConfig: EvmConfig = EvmConfig.OlympiaConfigBuilder(blockchainConfig)
@@ -152,7 +152,7 @@ class Eip4844BlobOpcodeSpec extends AnyWordSpec with Matchers {
       header: BlockHeader,
       config: EvmConfig,
       blobVersionedHashes: Seq[ByteString] = Seq.empty
-  ): ProgramContext[MockWorldState, MockStorage] = {
+  ): ProgramContext[MockWorldState, MockStorage] =
     val world = MockWorldState()
       .saveAccount(ownerAddr, Account(balance = UInt256(1000), nonce = 1))
       .saveCode(ownerAddr, code)
@@ -176,7 +176,6 @@ class Eip4844BlobOpcodeSpec extends AnyWordSpec with Matchers {
       warmStorage = Set.empty,
       blobVersionedHashes = blobVersionedHashes
     )
-  }
 
   "EtcOlympiaOpCodes list" should {
 
@@ -417,4 +416,3 @@ class Eip4844BlobOpcodeSpec extends AnyWordSpec with Matchers {
       }
     }
   }
-}

@@ -23,7 +23,7 @@ import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.Bl
 class BlockBroadcast(
     val networkPeerManager: TypedActorRef[NetworkPeerManagerActor.Command],
     val isPoWChain: Boolean = false
-) {
+):
   private val log = LoggerFactory.getLogger(getClass)
 
   /** Broadcasts various NewBlock's messages to handshaked peers, considering that a block should not be sent to a peer
@@ -35,7 +35,7 @@ class BlockBroadcast(
     * @param handshakedPeers,
     *   to which the blocks will be broadcasted to
     */
-  def broadcastBlock(blockToBroadcast: BlockToBroadcast, handshakedPeers: Map[PeerId, PeerWithInfo]): Unit = {
+  def broadcastBlock(blockToBroadcast: BlockToBroadcast, handshakedPeers: Map[PeerId, PeerWithInfo]): Unit =
     val peersWithoutBlock = handshakedPeers.filter { case (_, PeerWithInfo(_, peerInfo)) =>
       shouldSendNewBlock(blockToBroadcast, peerInfo)
     }
@@ -50,12 +50,12 @@ class BlockBroadcast(
     // gate, go-ethereum aligned (shouldSend() returns true only every 32 blocks forward).
     val newHeader = blockToBroadcast.block.header
     val shouldSendBRU = isPoWChain || (newHeader.number % 32 == 0)
-    if shouldSendBRU then {
+    if shouldSendBRU then
       val bru = ETH69.BlockRangeUpdate(BigInt(0), newHeader.number, newHeader.hash.value)
       val eth69Peers = peersWithoutBlock.filter { case (_, PeerWithInfo(_, info)) =>
         info.remoteStatus.capability == Capability.ETH69
       }
-      if eth69Peers.nonEmpty then {
+      if eth69Peers.nonEmpty then
         log.info(
           "ETH69_BRU_BROADCAST: block={} hash={} to {} ETH69 peers (isPoW={})",
           newHeader.number,
@@ -66,11 +66,8 @@ class BlockBroadcast(
         eth69Peers.foreach { case (_, PeerWithInfo(peer, _)) =>
           networkPeerManager ! NetworkPeerManagerActor.SendMessageCmd(bru, peer.id)
         }
-      }
-    }
-  }
 
-  private def shouldSendNewBlock(newBlock: BlockToBroadcast, peerInfo: PeerInfo): Boolean = {
+  private def shouldSendNewBlock(newBlock: BlockToBroadcast, peerInfo: PeerInfo): Boolean =
     val blockAhead = newBlock.block.header.number > peerInfo.maxBlockNumber
     // ETH/69 peers: chainWeight may be actual TD (local lookup) or a block-number proxy (peer
     // ahead of us). The proxy case makes the TD comparison always true, spamming every ETH69 peer.
@@ -78,13 +75,12 @@ class BlockBroadcast(
     val heavierChain = peerInfo.remoteStatus.capability != Capability.ETH69 &&
       newBlock.chainWeight > peerInfo.chainWeight
     blockAhead || heavierChain
-  }
 
   private def broadcastNewBlock(blockToBroadcast: BlockToBroadcast, peers: Map[PeerId, PeerWithInfo]): Unit =
     obtainRandomPeerSubset(peers.values.map(_.peer).toSet).foreach { peer =>
       val remoteStatus = peers(peer.id).peerInfo.remoteStatus
 
-      val messageOpt: Option[MessageSerializable] = remoteStatus.capability match {
+      val messageOpt: Option[MessageSerializable] = remoteStatus.capability match
         case Capability.ETH63 | Capability.ETH64 | Capability.ETH65 | Capability.ETH66 | Capability.ETH67 |
             Capability.ETH68 =>
           Some(blockToBroadcast.as63)
@@ -98,7 +94,6 @@ class BlockBroadcast(
           None // PoS: no NewBlock — same as ETH69
         case Capability.SNAP1 =>
           Some(blockToBroadcast.as63)
-      }
 
       messageOpt.foreach(msg => networkPeerManager ! NetworkPeerManagerActor.SendMessageCmd(msg, peer.id))
     }
@@ -117,18 +112,14 @@ class BlockBroadcast(
     * @return
     *   a random subset of peers
     */
-  private[sync] def obtainRandomPeerSubset(peers: Set[Peer]): Set[Peer] = {
+  private[sync] def obtainRandomPeerSubset(peers: Set[Peer]): Set[Peer] =
     val numberOfPeersToSend = Math.sqrt(peers.size).toInt
     Random.shuffle(peers.toSeq).take(numberOfPeersToSend).toSet
-  }
-}
 
-object BlockBroadcast {
+object BlockBroadcast:
 
   /** BlockToBroadcast was created to decouple block information from protocol new block messages (they are different
     * versions of NewBlock msg)
     */
-  case class BlockToBroadcast(block: Block, chainWeight: ChainWeight) {
+  case class BlockToBroadcast(block: Block, chainWeight: ChainWeight):
     def as63: ETHPackets.NewBlock = ETHPackets.NewBlock(block, chainWeight.totalDifficulty)
-  }
-}

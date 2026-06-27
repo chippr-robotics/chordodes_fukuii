@@ -31,9 +31,9 @@ import com.chipprbots.ethereum.utils.Logger
   */
 class ApacheHttpClientStreamClient(val configuration: StreamClientConfiguration)
     extends AbstractStreamClient[StreamClientConfiguration, ApacheHttpClientStreamClient.HttpCallable]()
-    with Logger {
+    with Logger:
 
-  private val httpClient: CloseableHttpClient = {
+  private val httpClient: CloseableHttpClient =
     import org.apache.hc.client5.http.config.RequestConfig
     import org.apache.hc.core5.util.Timeout
 
@@ -48,7 +48,6 @@ class ApacheHttpClientStreamClient(val configuration: StreamClientConfiguration)
       .custom()
       .setDefaultRequestConfig(requestConfig)
       .build()
-  }
 
   override def getConfiguration(): StreamClientConfiguration = configuration
 
@@ -64,30 +63,26 @@ class ApacheHttpClientStreamClient(val configuration: StreamClientConfiguration)
     httpCallable
 
   override def stop(): Unit =
-    try
-      httpClient.close()
-    catch {
+    try httpClient.close()
+    catch
       case ex: Exception =>
         log.warn("Error closing Apache HttpClient", ex)
-    }
 
   override protected def abort(callable: ApacheHttpClientStreamClient.HttpCallable): Unit =
     callable.abort()
 
-  override protected def logExecutionException(t: Throwable): Boolean = {
+  override protected def logExecutionException(t: Throwable): Boolean =
     log.warn("HTTP request execution failed", t)
     true
-  }
-}
 
-object ApacheHttpClientStreamClient {
+object ApacheHttpClientStreamClient:
 
   /** Callable that executes HTTP requests using Apache HttpClient. */
   class HttpCallable(
       requestMessage: StreamRequestMessage,
       httpClient: CloseableHttpClient
   ) extends Callable[StreamResponseMessage]
-      with Logger {
+      with Logger:
 
     @volatile private var aborted = false
 
@@ -97,10 +92,10 @@ object ApacheHttpClientStreamClient {
     override def call(): StreamResponseMessage =
       if aborted then null
       else
-        try {
+        try
           val uri = requestMessage.getOperation().getURI()
 
-          requestMessage.getOperation().getMethod match {
+          requestMessage.getOperation().getMethod match
             case UpnpRequest.Method.GET =>
               executeGet(uri.toString())
             case UpnpRequest.Method.POST =>
@@ -109,22 +104,20 @@ object ApacheHttpClientStreamClient {
               log.warn(s"Unsupported HTTP method: $method")
               // Return new response with error status
               new StreamResponseMessage(new UpnpResponse(UpnpResponse.Status.METHOD_NOT_SUPPORTED))
-          }
-        } catch {
+        catch
           case ex: Exception if !aborted =>
             log.warn(s"HTTP request failed: ${ex.getMessage}")
             // Return new response with error status
             new StreamResponseMessage(new UpnpResponse(UpnpResponse.Status.INTERNAL_SERVER_ERROR))
           case _: Exception =>
             null
-        }
 
     /** Helper method to populate StreamResponseMessage from Apache HttpClient response */
     private def populateResponse(
         statusCode: Int,
         statusMessage: String,
         response: org.apache.hc.core5.http.ClassicHttpResponse
-    ): StreamResponseMessage = {
+    ): StreamResponseMessage =
       val upnpResponse = new UpnpResponse(statusCode, statusMessage)
       val streamResponse = new StreamResponseMessage(upnpResponse)
 
@@ -137,27 +130,22 @@ object ApacheHttpClientStreamClient {
 
       // Set response body
       val entity = response.getEntity()
-      if entity != null then {
+      if entity != null then
         val bodyBytes = EntityUtils.toByteArray(entity)
         streamResponse.setBody(UpnpMessage.BodyType.BYTES, bodyBytes)
         // Use charset from Content-Type if available, otherwise UTF-8
         val charset = Option(entity.getContentType())
           .flatMap { contentTypeStr =>
-            try
-              Option(ContentType.parse(contentTypeStr).getCharset).map(_.name())
-            catch {
-              case _: Exception => None
-            }
+            try Option(ContentType.parse(contentTypeStr).getCharset).map(_.name())
+            catch case _: Exception => None
           }
           .getOrElse("UTF-8")
         // setBodyCharacters expects bytes, properly encode the string representation
         streamResponse.setBodyCharacters(new String(bodyBytes, charset).getBytes(charset))
-      }
 
       streamResponse
-    }
 
-    private def executeGet(uri: String): StreamResponseMessage = {
+    private def executeGet(uri: String): StreamResponseMessage =
       val request = new HttpGet(uri)
 
       // Set request headers
@@ -170,15 +158,11 @@ object ApacheHttpClientStreamClient {
       httpClient.execute(
         request,
         response =>
-          if aborted then {
-            null
-          } else {
-            populateResponse(response.getCode(), response.getReasonPhrase(), response)
-          }
+          if aborted then null
+          else populateResponse(response.getCode(), response.getReasonPhrase(), response)
       )
-    }
 
-    private def executePost(uri: String): StreamResponseMessage = {
+    private def executePost(uri: String): StreamResponseMessage =
       val request = new HttpPost(uri)
 
       // Set request headers
@@ -189,33 +173,24 @@ object ApacheHttpClientStreamClient {
       }
 
       // Set request body
-      if requestMessage.hasBody() then {
+      if requestMessage.hasBody() then
         val bodyBytes = requestMessage.getBodyBytes()
         val contentType = requestMessage.getContentTypeHeader()
         val entity = new ByteArrayEntity(
           bodyBytes,
-          if contentType != null then {
-            try
-              ContentType.parse(contentType.toString())
-            catch {
+          if contentType != null then
+            try ContentType.parse(contentType.toString())
+            catch
               case ex: Exception =>
                 log.warn(s"Invalid content type header: '$contentType'. Using default.", ex)
                 null
-            }
-          } else null
+          else null
         )
         request.setEntity(entity)
-      }
 
       httpClient.execute(
         request,
         response =>
-          if aborted then {
-            null
-          } else {
-            populateResponse(response.getCode(), response.getReasonPhrase(), response)
-          }
+          if aborted then null
+          else populateResponse(response.getCode(), response.getReasonPhrase(), response)
       )
-    }
-  }
-}

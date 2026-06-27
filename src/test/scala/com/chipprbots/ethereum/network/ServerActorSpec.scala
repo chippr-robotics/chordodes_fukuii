@@ -20,7 +20,7 @@ import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.NodeStatus
 import com.chipprbots.ethereum.utils.ServerStatus
 
-class ServerActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers with Eventually {
+class ServerActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers with Eventually:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
@@ -54,10 +54,9 @@ class ServerActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike wit
         "ServerStatus should have transitioned to Listening"
       )
     }
-    holder.get().serverStatus match {
+    holder.get().serverStatus match
       case ServerStatus.Listening(address) => address.getAddress shouldBe explicit
       case other                           => fail(s"Expected Listening, got $other")
-    }
   }
 
   it should "finalise advertisement via DetectedIP when bound to a wildcard address" taggedAs (
@@ -88,10 +87,9 @@ class ServerActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike wit
         "ServerStatus should reach Listening after DetectedIP"
       )
     }
-    holder.get().serverStatus match {
+    holder.get().serverStatus match
       case ServerStatus.Listening(address) => address.getAddress shouldBe detectedIp
       case other                           => fail(s"Expected Listening, got $other")
-    }
   }
 
   it should "fall back to loopback when DetectedIP carries None" taggedAs (UnitTest, NetworkTest) in {
@@ -113,9 +111,7 @@ class ServerActorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike wit
         "ServerStatus should reach Listening (loopback) after DetectedIP(None)"
       )
     }
-    holder.get().serverStatus match {
+    holder.get().serverStatus match
       case ServerStatus.Listening(address) => address.getAddress shouldBe InetAddress.getLoopbackAddress
       case other                           => fail(s"Expected Listening, got $other")
-    }
   }
-}

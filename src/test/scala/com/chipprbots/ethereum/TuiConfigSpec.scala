@@ -7,7 +7,7 @@ import com.chipprbots.ethereum.console.*
 import com.chipprbots.ethereum.testing.Tags.*
 
 /** Tests for TuiConfig - configuration for the TUI module. */
-class TuiConfigSpec extends AnyFlatSpec with Matchers {
+class TuiConfigSpec extends AnyFlatSpec with Matchers:
 
   "TuiConfig" should "have sensible default values" taggedAs (UnitTest) in {
     val config = TuiConfig.default
@@ -52,4 +52,3 @@ class TuiConfigSpec extends AnyFlatSpec with Matchers {
     TuiConfig.DefaultBannerDisplayDurationMs shouldBe 1000L
     TuiConfig.DefaultShutdownTimeoutMs shouldBe 1000L
   }
-}

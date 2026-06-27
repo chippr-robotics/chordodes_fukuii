@@ -22,7 +22,7 @@ final case class BfsEntry(hash: Array[Byte], pathset: Seq[Array[Byte]], isStorag
   * Two implementations: `RocksDbBfsQueueStorage` (production, CF-backed) and `InMemoryBfsQueueStorage` (tests / default
   * when no DataSource is wired).
   */
-trait BfsQueueStorage {
+trait BfsQueueStorage:
 
   /** Write `entries` to the queue, assigning sequential keys. Thread-safe via AtomicLong. */
   def enqueueBatch(entries: Seq[(Array[Byte], Seq[Array[Byte]], Boolean)]): Unit
@@ -40,22 +40,20 @@ trait BfsQueueStorage {
 
   /** Delete all entries and reset the counter to 0. */
   def clear(): Unit
-}
 
-object BfsQueueStorage {
+object BfsQueueStorage:
 
   val DefaultChunkSize: Int = 50_000
 
-  def longToBytes(l: Long): Array[Byte] = {
+  def longToBytes(l: Long): Array[Byte] =
     val buf = ByteBuffer.allocate(8)
     buf.putLong(l)
     buf.array()
-  }
 
   /** Encodes a queue entry to a compact byte representation: `[32 B hash][1 B pathset count][{2 B len, N B data}...][1
     * B isStorage]`
     */
-  def encodeEntry(hash: Array[Byte], pathset: Seq[Array[Byte]], isStorage: Boolean): Array[Byte] = {
+  def encodeEntry(hash: Array[Byte], pathset: Seq[Array[Byte]], isStorage: Boolean): Array[Byte] =
     val payloadSize = 32 + 1 + pathset.map(p => 2 + p.length).sum + 1
     val buf = ByteBuffer.allocate(payloadSize)
     val hashLen = math.min(hash.length, 32)
@@ -68,9 +66,8 @@ object BfsQueueStorage {
     }
     buf.put(if isStorage then 1.toByte else 0.toByte)
     buf.array()
-  }
 
-  def decodeEntry(bytes: Array[Byte]): BfsEntry = {
+  def decodeEntry(bytes: Array[Byte]): BfsEntry =
     val buf = ByteBuffer.wrap(bytes)
     val hash = new Array[Byte](32)
     buf.get(hash)
@@ -83,20 +80,18 @@ object BfsQueueStorage {
     }
     val isStorage = buf.get() != 0
     BfsEntry(hash, pathset, isStorage)
-  }
-}
 
 /** RocksDB column-family-backed implementation. The CF (`Namespaces.BfsQueueNamespace`) is auto-opened at DB start like
   * all other namespaces. Memory during BFS = O(chunk_size) ≈ 4 MB.
   */
-class RocksDbBfsQueueStorage(dataSource: DataSource, namespace: Namespace) extends BfsQueueStorage {
+class RocksDbBfsQueueStorage(dataSource: DataSource, namespace: Namespace) extends BfsQueueStorage:
   import BfsQueueStorage.*
 
   private val writeCounter = new AtomicLong(0L)
 
   def counter: Long = writeCounter.get()
 
-  def enqueueBatch(entries: Seq[(Array[Byte], Seq[Array[Byte]], Boolean)]): Unit = {
+  def enqueueBatch(entries: Seq[(Array[Byte], Seq[Array[Byte]], Boolean)]): Unit =
     if entries.isEmpty then return
     val upserts = entries.map { case (hash, pathset, isStorage) =>
       val key = longToBytes(writeCounter.getAndIncrement())
@@ -104,10 +99,9 @@ class RocksDbBfsQueueStorage(dataSource: DataSource, namespace: Namespace) exten
       (key, value)
     }
     dataSource.update(Seq(DataSourceUpdateOptimized(namespace, toRemove = Seq.empty, toUpsert = upserts)))
-  }
 
   def iterateRange(from: Long, to: Long, chunkSize: Int = DefaultChunkSize): Iterator[Seq[BfsEntry]] =
-    dataSource match {
+    dataSource match
       case rdb: RocksDbDataSource =>
         // Forward iterator scan: O(1) seek + sequential block reads. Keys are dense big-endian
         // longs in sorted SST files — the ideal case for a range scan vs batch point-lookups.
@@ -119,18 +113,15 @@ class RocksDbBfsQueueStorage(dataSource: DataSource, namespace: Namespace) exten
       case _ =>
         // Fallback for InMemoryBfsQueueStorage tests: retain multiGetOptimized behaviour.
         val rangeTo = to
-        new Iterator[Seq[BfsEntry]] {
+        new Iterator[Seq[BfsEntry]]:
           private var pos: Long = from
           def hasNext: Boolean = pos < rangeTo
-          def next(): Seq[BfsEntry] = {
+          def next(): Seq[BfsEntry] =
             val end = math.min(rangeTo, pos + chunkSize)
             val keys = (pos until end).map(longToBytes)
             val values = dataSource.multiGetOptimized(namespace, keys)
             pos = end
             values.flatten.map(decodeEntry)
-          }
-        }
-    }
 
   def deleteRange(from: Long, to: Long): Unit =
     // Single native range tombstone — O(1) regardless of (to - from). The previous
@@ -139,18 +130,16 @@ class RocksDbBfsQueueStorage(dataSource: DataSource, namespace: Namespace) exten
     // at full CPU (observed live 2026-06-12) while the next walk waited.
     if from < to then dataSource.deleteRange(namespace, longToBytes(from), longToBytes(to))
 
-  def clear(): Unit = {
+  def clear(): Unit =
     // Tombstone the ENTIRE keyspace, not just [0, counter): the counter is in-memory only, so
     // after a crash-restart it reads 0 while the column family still holds the dead walk's
     // entries. The old `if (counter > 0)` guard skipped deletion entirely in that state,
     // leaving the garbage on disk forever. Long.MaxValue exceeds any key ever assigned.
     dataSource.deleteRange(namespace, longToBytes(0L), longToBytes(Long.MaxValue))
     writeCounter.set(0L)
-  }
-}
 
 /** In-memory implementation for tests and the default (no DataSource wired). */
-class InMemoryBfsQueueStorage extends BfsQueueStorage {
+class InMemoryBfsQueueStorage extends BfsQueueStorage:
   import BfsQueueStorage.*
 
   private val data = mutable.LongMap[Array[Byte]]()
@@ -164,26 +153,21 @@ class InMemoryBfsQueueStorage extends BfsQueueStorage {
       data(key) = encodeEntry(hash, pathset, isStorage)
     }
 
-  def iterateRange(from: Long, to: Long, chunkSize: Int = DefaultChunkSize): Iterator[Seq[BfsEntry]] = {
+  def iterateRange(from: Long, to: Long, chunkSize: Int = DefaultChunkSize): Iterator[Seq[BfsEntry]] =
     val rangeFrom = from
     val rangeTo = to
-    new Iterator[Seq[BfsEntry]] {
+    new Iterator[Seq[BfsEntry]]:
       private var pos: Long = rangeFrom
       def hasNext: Boolean = pos < rangeTo
-      def next(): Seq[BfsEntry] = {
+      def next(): Seq[BfsEntry] =
         val end = math.min(rangeTo, pos + chunkSize)
         val entries = (pos until end).flatMap(k => data.get(k).map(decodeEntry))
         pos = end
         entries
-      }
-    }
-  }
 
   def deleteRange(from: Long, to: Long): Unit =
     (from until to).foreach(data.remove)
 
-  def clear(): Unit = {
+  def clear(): Unit =
     data.clear()
     writeCounter.set(0L)
-  }
-}

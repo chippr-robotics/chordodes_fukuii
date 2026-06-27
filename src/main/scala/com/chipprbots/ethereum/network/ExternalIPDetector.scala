@@ -31,7 +31,7 @@ import org.jupnp.support.igd.callback.GetExternalIP
   * Mirrors the strategy used by core-geth (--nat=any: UPnP → STUN → HTTP) and Besu. Called once at startup when no
   * explicit advertised-address is configured.
   */
-object ExternalIPDetector {
+object ExternalIPDetector:
 
   private val UpnpTimeoutMs = 3000
 
@@ -61,21 +61,21 @@ object ExternalIPDetector {
   private def tryUpnp(): Option[InetAddress] = Try {
     val ipFuture = new CompletableFuture[String]()
     val upnpSvc = new UpnpServiceImpl(new ClientOnlyUpnpServiceConfiguration())
-    try {
+    try
       upnpSvc.startup()
       upnpSvc
         .getRegistry()
-        .addListener(new RegistryListener() {
+        .addListener(new RegistryListener():
           // Walk a device tree looking for a WANIPConnection or WANPPPConnection service and
           // execute GetExternalIP as soon as one is found.
-          private def walkDevice(d: RemoteDevice): Unit = {
+          private def walkDevice(d: RemoteDevice): Unit =
             for svc <- d.getServices() do
               if svc.getServiceType.getType == "WANIPConnection" ||
                 svc.getServiceType.getType == "WANPPPConnection"
               then
                 upnpSvc
                   .getControlPoint()
-                  .execute(new GetExternalIP(svc) {
+                  .execute(new GetExternalIP(svc):
                     protected def success(ip: String): Unit =
                       ipFuture.complete(ip)
 
@@ -83,9 +83,8 @@ object ExternalIPDetector {
                     def failure(inv: ActionInvocation[?], resp: UpnpResponse, msg: String): Unit = ()
                     // Don't completeExceptionally here — on multi-IGD networks a later device may
                     // succeed. Total UPnP failure is handled by the ipFuture.get() timeout below.
-                  })
+                  )
             for sub <- d.getEmbeddedDevices() do walkDevice(sub)
-          }
 
           def remoteDeviceAdded(r: Registry, d: RemoteDevice): Unit = walkDevice(d)
           def remoteDeviceDiscoveryStarted(r: Registry, d: RemoteDevice): Unit = ()
@@ -96,12 +95,12 @@ object ExternalIPDetector {
           def localDeviceRemoved(r: Registry, d: LocalDevice): Unit = ()
           def beforeShutdown(r: Registry): Unit = ()
           def afterShutdown(): Unit = ()
-        })
+        )
       upnpSvc.getControlPoint().search()
       Try(ipFuture.get(UpnpTimeoutMs, TimeUnit.MILLISECONDS)).toOption
-    } finally
+    finally
       try upnpSvc.shutdown()
-      catch { case _: Throwable => () }
+      catch case _: Throwable => ()
   }.toOption.flatten.flatMap(ip => Try(InetAddress.getByName(ip)).toOption)
 
   // Step 2: RFC 5389 STUN Binding Request — fast UDP, typically <100ms on internet-connected hosts.
@@ -133,7 +132,7 @@ object ExternalIPDetector {
     }
   }
 
-  private def parseXorMappedAddress(buf: Array[Byte], len: Int, txId: Array[Byte]): InetAddress = {
+  private def parseXorMappedAddress(buf: Array[Byte], len: Int, txId: Array[Byte]): InetAddress =
     val resp = ByteBuffer.wrap(buf, 0, len)
     val msgType = resp.getShort() & 0xffff
     if msgType != 0x0101 then
@@ -149,26 +148,22 @@ object ExternalIPDetector {
     // position is now at 20 — start of attribute section
     val bodyEnd = 20 + msgLen
     var result: Option[InetAddress] = None
-    while resp.position() < bodyEnd && result.isEmpty do {
+    while resp.position() < bodyEnd && result.isEmpty do
       val attrType = resp.getShort() & 0xffff
       val attrLen = resp.getShort() & 0xffff
       val attrStart = resp.position() // start of attribute VALUE (after type+length headers)
-      if attrType == 0x0020 then { // XOR-MAPPED-ADDRESS
+      if attrType == 0x0020 then // XOR-MAPPED-ADDRESS
         resp.get() // reserved byte
         val family = resp.get() & 0xff
-        if family == 0x01 then { // IPv4
+        if family == 0x01 then // IPv4
           resp.getShort() // xor-port (unused — we only need the IP)
           val xorAddr = resp.getInt() ^ 0x2112a442
           result = Some(InetAddress.getByAddress(ByteBuffer.allocate(4).putInt(xorAddr).array()))
-        }
-      }
       // Advance past the full padded attribute value (4-byte alignment)
       resp.position(attrStart + ((attrLen + 3) & ~3))
-    }
     result.getOrElse(
       throw new IllegalStateException("STUN response contained no XOR-MAPPED-ADDRESS for IPv4")
     )
-  }
 
   // Step 3: HTTPS probe — same approach as Besu HttpProbeIpDetector / Nethermind IPResolver.
   private def tryHttp(): Option[InetAddress] =
@@ -182,11 +177,11 @@ object ExternalIPDetector {
             new java.io.BufferedReader(
               new java.io.InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8)
             )
-          try {
+          try
             val line = reader.readLine()
             if line == null || line.trim.isEmpty then throw new IllegalStateException(s"Empty response from $url")
             InetAddress.getByName(line.trim)
-          } finally reader.close()
+          finally reader.close()
         }.toOption
       }
       .nextOption()
@@ -199,6 +194,7 @@ object ExternalIPDetector {
       .find { addr =>
         !addr.isLoopbackAddress &&
         !addr.isLinkLocalAddress &&
-        (addr match { case _: Inet4Address => true; case _ => false })
+        (addr match
+          case _: Inet4Address => true; case _ => false
+        )
       }
-}

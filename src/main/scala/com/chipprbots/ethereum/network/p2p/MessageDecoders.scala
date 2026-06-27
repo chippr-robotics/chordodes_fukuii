@@ -12,10 +12,10 @@ import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Pong.*
 
 import MessageDecoder.*
 
-object NetworkMessageDecoder extends MessageDecoder {
+object NetworkMessageDecoder extends MessageDecoder:
 
   override def fromBytes(msgCode: Int, payload: Array[Byte]): Either[DecodingError, Message] =
-    msgCode match {
+    msgCode match
       case Disconnect.code =>
         Try(payload.toDisconnect).toEither.left.map(ex =>
           MalformedMessageError(Option(ex.getMessage).getOrElse(ex.toString), Some(ex))
@@ -33,16 +33,13 @@ object NetworkMessageDecoder extends MessageDecoder {
           MalformedMessageError(Option(ex.getMessage).getOrElse(ex.toString), Some(ex))
         )
       case _ => Left(UnknownMessageTypeError(msgCode, s"Unknown network message type: $msgCode"))
-    }
-
-}
 
 /** ETH/68 decoder. Imports exclusively from ETHPackets — zero dependency on ETH62-67.
   *
   * Equivalent to: go-ethereum var eth68 = map[uint64]msgHandler{...} (handler.go) Erigon ProtoIds[Protocol_ETH68]
   * (libsentry/protocol.go)
   */
-object ETH68MessageDecoder extends MessageDecoder {
+object ETH68MessageDecoder extends MessageDecoder:
   import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status68.Status68.* // toStatus68
   import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes.*
   import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
@@ -76,7 +73,7 @@ object ETH68MessageDecoder extends MessageDecoder {
   )
 
   def fromBytes(msgCode: Int, payload: Array[Byte]): Either[DecodingError, Message] =
-    msgCode match {
+    msgCode match
       case Codes.StatusCode =>
         Try(payload.toStatus68).toEither.left.map(ex =>
           MalformedMessageError(Option(ex.getMessage).getOrElse(ex.toString), Some(ex))
@@ -132,15 +129,13 @@ object ETH68MessageDecoder extends MessageDecoder {
           MalformedMessageError(Option(ex.getMessage).getOrElse(ex.toString), Some(ex))
         )
       case _ => Left(UnknownMessageTypeError(msgCode, s"Unknown eth/68 message type: $msgCode"))
-    }
-}
 
 /** ETH/69 decoder. ETH69 adds Status69 (no TD), BlockRangeUpdate, and uses bloom-absent Receipts69.
   *
   * Imports exclusively from ETHPackets — zero dependency on ETH62-67. Key fix: ReceiptsCode uses ETHPackets.Receipts69
   * (bloom-absent) not ETHPackets.Receipts68 (bloom-inclusive).
   */
-object ETH69MessageDecoder extends MessageDecoder {
+object ETH69MessageDecoder extends MessageDecoder:
   import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status69.Status69.* // toStatus69
   import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes.*
   import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
@@ -176,7 +171,7 @@ object ETH69MessageDecoder extends MessageDecoder {
   )
 
   def fromBytes(msgCode: Int, payload: Array[Byte]): Either[DecodingError, Message] =
-    msgCode match {
+    msgCode match
       case Codes.StatusCode =>
         Try(payload.toStatus69).toEither.left.map(ex =>
           MalformedMessageError(Option(ex.getMessage).getOrElse(ex.toString), Some(ex))
@@ -236,15 +231,13 @@ object ETH69MessageDecoder extends MessageDecoder {
           MalformedMessageError(Option(ex.getMessage).getOrElse(ex.toString), Some(ex))
         )
       case _ => Left(UnknownMessageTypeError(msgCode, s"Unknown eth/69 message type: $msgCode"))
-    }
-}
 
 /** ETH/70 decoder. ETH70 adds partial receipt delivery via firstBlockReceiptIndex (GetReceipts70) and
   * lastBlockIncomplete (Receipts70). All other message types are identical to ETH69.
   *
   * Reference: EIP-7706 / go-ethereum eth/protocols/eth/protocol.go
   */
-object ETH70MessageDecoder extends MessageDecoder {
+object ETH70MessageDecoder extends MessageDecoder:
   import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.Status70.Status70.* // ETH70-owned Status type
   import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.NewBlockHashes.*
   import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
@@ -280,7 +273,7 @@ object ETH70MessageDecoder extends MessageDecoder {
   )
 
   def fromBytes(msgCode: Int, payload: Array[Byte]): Either[DecodingError, Message] =
-    msgCode match {
+    msgCode match
       case Codes.StatusCode =>
         Try(payload.toStatus70).toEither.left.map(ex =>
           MalformedMessageError(Option(ex.getMessage).getOrElse(ex.toString), Some(ex))
@@ -340,27 +333,23 @@ object ETH70MessageDecoder extends MessageDecoder {
           MalformedMessageError(Option(ex.getMessage).getOrElse(ex.toString), Some(ex))
         )
       case _ => Left(UnknownMessageTypeError(msgCode, s"Unknown eth/70 message type: $msgCode"))
-    }
-}
 
 // scalastyle:off
-object EthereumMessageDecoder {
+object EthereumMessageDecoder:
   def ethMessageDecoder(protocolVersion: Capability): MessageDecoder =
-    protocolVersion match {
+    protocolVersion match
       case Capability.ETH68 => ETH68MessageDecoder
       case Capability.ETH69 => ETH69MessageDecoder
       case Capability.ETH70 => ETH70MessageDecoder
       case Capability.SNAP1 => SNAPMessageDecoder
       case unsupported      => throw new IllegalArgumentException(s"Unsupported protocol version: $unsupported")
-    }
-}
 
 /** SNAP/1 protocol message decoder
   *
   * Decodes SNAP/1 protocol messages (satellite protocol for state sync). SNAP is used alongside ETH protocol, not as a
   * replacement.
   */
-object SNAPMessageDecoder extends MessageDecoder {
+object SNAPMessageDecoder extends MessageDecoder:
   import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
   import com.chipprbots.ethereum.network.p2p.messages.SNAP.Codes.*
   import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetAccountRange.*
@@ -373,7 +362,7 @@ object SNAPMessageDecoder extends MessageDecoder {
   import com.chipprbots.ethereum.network.p2p.messages.SNAP.TrieNodes.*
 
   def fromBytes(msgCode: Int, payload: Array[Byte]): Either[DecodingError, Message] =
-    msgCode match {
+    msgCode match
       case GetAccountRangeCode =>
         Try(payload.toGetAccountRange).toEither.left.map(ex =>
           MalformedMessageError(Option(ex.getMessage).getOrElse(ex.toString), Some(ex))
@@ -407,5 +396,3 @@ object SNAPMessageDecoder extends MessageDecoder {
           MalformedMessageError(Option(ex.getMessage).getOrElse(ex.toString), Some(ex))
         )
       case _ => Left(UnknownMessageTypeError(msgCode, s"Unknown snap/1 message type: $msgCode"))
-    }
-}

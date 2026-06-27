@@ -17,12 +17,12 @@ import com.chipprbots.ethereum.mpt.NodesKeyValueStorage
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.NodeCacheConfig
 
-class ReferenceCountNodeStorageSpec extends AnyFlatSpec with Matchers {
+class ReferenceCountNodeStorageSpec extends AnyFlatSpec with Matchers:
 
   "ReferenceCountNodeStorage" should "not remove a key if no more references until pruning" taggedAs (
     UnitTest,
     DatabaseTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val storage = new ReferenceCountNodeStorage(nodeStorage, 1)
 
     val inserted: Seq[(ByteString, Array[Byte])] = insertRangeKeys(4, storage)
@@ -34,12 +34,11 @@ class ReferenceCountNodeStorageSpec extends AnyFlatSpec with Matchers {
     ReferenceCountNodeStorage.prune(1, nodeStorage, inMemory = false)
 
     storage.get(key1) shouldBe None
-  }
 
   it should "not remove a key that was inserted after deletion when pruning" taggedAs (
     UnitTest,
     DatabaseTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val storage = new ReferenceCountNodeStorage(nodeStorage, bn = 1)
 
     val inserted: Seq[(ByteString, Array[Byte])] = insertRangeKeys(1, storage)
@@ -69,12 +68,10 @@ class ReferenceCountNodeStorageSpec extends AnyFlatSpec with Matchers {
     ReferenceCountNodeStorage.prune(4, nodeStorage, inMemory = false)
     storage3.get(key1) shouldEqual None
 
-  }
-
   it should "not remove a key that it's still referenced when pruning" taggedAs (
     UnitTest,
     DatabaseTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val storage = new ReferenceCountNodeStorage(nodeStorage, bn = 1)
 
     val inserted: Seq[(ByteString, Array[Byte])] = insertRangeKeys(1, storage)
@@ -96,12 +93,11 @@ class ReferenceCountNodeStorageSpec extends AnyFlatSpec with Matchers {
 
     ReferenceCountNodeStorage.prune(3, nodeStorage, inMemory = false)
     storage3.get(key1).get shouldEqual val1
-  }
 
   it should "not delete a key that's was referenced in later blocks when pruning" taggedAs (
     UnitTest,
     DatabaseTest
-  ) in new TestSetup {
+  ) in new TestSetup:
 
     val storage = new ReferenceCountNodeStorage(nodeStorage, bn = 1)
     val inserted: Seq[(ByteString, Array[Byte])] = insertRangeKeys(4, storage)
@@ -131,17 +127,15 @@ class ReferenceCountNodeStorageSpec extends AnyFlatSpec with Matchers {
     storage2.get(key2).get shouldEqual val2
     storage2.get(key3) shouldBe None
     storage2.get(key4) shouldBe None
-  }
 
-  it should "not throw an error when deleting a key that does not exist" in new TestSetup {
+  it should "not throw an error when deleting a key that does not exist" in new TestSetup:
     val storage = new ReferenceCountNodeStorage(nodeStorage, bn = 1)
 
     storage.remove(ByteString("doesnotexist"))
 
     dataSource.storage.size shouldEqual 0
-  }
 
-  it should "allow to rollback operations" in new TestSetup {
+  it should "allow to rollback operations" in new TestSetup:
     val storage = new ReferenceCountNodeStorage(nodeStorage, bn = 1)
 
     val inserted: Seq[(ByteString, Array[Byte])] = insertRangeKeys(4, storage)
@@ -161,9 +155,8 @@ class ReferenceCountNodeStorageSpec extends AnyFlatSpec with Matchers {
     storage2.get(key1).get shouldEqual val1
     storage2.get(key2).get shouldEqual val2
     storage2.get(key3) shouldEqual None
-  }
 
-  it should "allow rollbacks after pruning" in new TestSetup {
+  it should "allow rollbacks after pruning" in new TestSetup:
 
     val storage = new ReferenceCountNodeStorage(nodeStorage, bn = 1)
 
@@ -192,15 +185,12 @@ class ReferenceCountNodeStorageSpec extends AnyFlatSpec with Matchers {
     ReferenceCountNodeStorage.rollback(1, nodeStorage, inMemory = false)
     storage2.get(key3) shouldEqual None
 
-  }
-
-  it should "not save snapshots when requested" in new TestSetup {
+  it should "not save snapshots when requested" in new TestSetup:
     val storage = new FastSyncNodeStorage(nodeStorage, bn = 1)
     val inserted: Seq[(ByteString, Array[Byte])] = insertRangeKeys(4, storage)
     dataSource.storage.size shouldEqual inserted.size // only inserted keys, no additional data
-  }
 
-  it should "allow rollbacks after pruning in memory" in new TestSetup {
+  it should "allow rollbacks after pruning in memory" in new TestSetup:
 
     val storage = new ReferenceCountNodeStorage(cachedNodeStorage, bn = 1)
 
@@ -228,9 +218,8 @@ class ReferenceCountNodeStorageSpec extends AnyFlatSpec with Matchers {
     ReferenceCountNodeStorage.rollback(2, cachedNodeStorage, inMemory = true)
     ReferenceCountNodeStorage.rollback(1, cachedNodeStorage, inMemory = true)
     storage2.get(key3) shouldEqual None
-  }
 
-  it should "allow pruning which happens partially on disk, partially in memory" in new TestSetup {
+  it should "allow pruning which happens partially on disk, partially in memory" in new TestSetup:
 
     val storage = new ReferenceCountNodeStorage(cachedNodeStorage, bn = 1)
 
@@ -267,9 +256,8 @@ class ReferenceCountNodeStorageSpec extends AnyFlatSpec with Matchers {
     cachedNodeStorage.persist() shouldEqual false //
     underlying.size shouldEqual 9 // 4 keys + 4 snapshots + 1 block index
     dataSource.storage.size shouldEqual 10 // pruned 1 snapshot and 1 block index from disk from block 2
-  }
 
-  it should "allow to rollback operations which happens partially on disk, partially in memory" in new TestSetup {
+  it should "allow to rollback operations which happens partially on disk, partially in memory" in new TestSetup:
     val storage = new ReferenceCountNodeStorage(cachedNodeStorage, bn = 1)
 
     val inserted: Seq[(ByteString, Array[Byte])] = insertRangeKeys(4, storage)
@@ -305,14 +293,13 @@ class ReferenceCountNodeStorageSpec extends AnyFlatSpec with Matchers {
     // Best saved block is 2, so all block 2 data are on disk
     ReferenceCountNodeStorage.rollback(2, cachedNodeStorage, inMemory = false)
     storage3.get(key3) shouldEqual None
-  }
 
   // ---- US7 (spec 002): batched multiGet must equal per-key get on basic pruning ----
 
   it should "batch multiGet identically to per-key get, incl. None for absent keys (US7/FR-021/FR-022)" taggedAs (
     UnitTest,
     DatabaseTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val storage = new ReferenceCountNodeStorage(nodeStorage, bn = 1)
     val inserted: Seq[(ByteString, Array[Byte])] = insertRangeKeys(4, storage)
     val present: Seq[ByteString] = inserted.map(_._1)
@@ -328,36 +315,29 @@ class ReferenceCountNodeStorageSpec extends AnyFlatSpec with Matchers {
     viaMulti(1) shouldBe None // absent
     viaMulti(4) shouldBe None // absent
     viaMulti.head.map(_.toSeq) shouldEqual Some(inserted.head._2.toSeq)
-  }
 
   it should "inherit the batched multiGet on FastSyncNodeStorage with results identical to get (US7/SC-006)" taggedAs (
     UnitTest,
     DatabaseTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val storage = new FastSyncNodeStorage(nodeStorage, bn = 1)
     val inserted: Seq[(ByteString, Array[Byte])] = insertRangeKeys(3, storage)
     val keys: Seq[ByteString] = inserted.map(_._1) :+ kec256(ByteString("nope"))
     storage.multiGet(keys).map(_.map(_.toSeq)) shouldEqual keys.map(storage.get).map(_.map(_.toSeq))
-  }
 
-  trait TestSetup {
+  trait TestSetup:
     val dataSource: EphemDataSource = EphemDataSource()
     val nodeStorage = new NodeStorage(dataSource)
 
-    def insertRangeKeys(n: Int, storage: NodesKeyValueStorage): Seq[(ByteString, Array[Byte])] = {
+    def insertRangeKeys(n: Int, storage: NodesKeyValueStorage): Seq[(ByteString, Array[Byte])] =
       val toInsert = (1 to n).map(i => kec256(ByteString(s"key$i")) -> ByteString(s"value$i").toArray[Byte])
       toInsert.foreach(i => storage.put(i._1, i._2))
       toInsert
-    }
 
-    object testCacheConfig extends NodeCacheConfig {
+    object testCacheConfig extends NodeCacheConfig:
       override val maxSize = 10
       override val maxHoldTime: FiniteDuration = FiniteDuration(5, TimeUnit.MINUTES)
-    }
 
     val underlying: mutable.Map[ByteString, Array[Byte]] = MapCache.getMap[ByteString, Array[Byte]]
     val cache = new MapCache[ByteString, Array[Byte]](underlying, testCacheConfig)
     val cachedNodeStorage = new CachedNodeStorage(nodeStorage, cache)
-
-  }
-}

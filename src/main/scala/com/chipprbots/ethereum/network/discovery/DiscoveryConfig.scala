@@ -22,13 +22,13 @@ case class DiscoveryConfig(
     channelCapacity: Int
 )
 
-object DiscoveryConfig extends Logger {
+object DiscoveryConfig extends Logger:
   def apply(
       etcClientConfig: com.typesafe.config.Config,
       bootstrapNodes: Set[String],
       dnsDiscoveryDomains: Seq[String] = Seq.empty,
       enrForkIdFilter: Option[DnsDiscovery.EnrForkIdFilter] = None
-  ): DiscoveryConfig = {
+  ): DiscoveryConfig =
     val discoveryConfig = etcClientConfig.getConfig("network.discovery")
 
     // Load static nodes from datadir/static-nodes.json if it exists.
@@ -40,26 +40,21 @@ object DiscoveryConfig extends Logger {
       com.chipprbots.ethereum.network.StaticNodesLoader.load(datadir).map(_.toString).toSet
 
     // Resolve DNS discovery domains (EIP-1459) to enode URLs
-    val dnsNodes: Set[String] = if dnsDiscoveryDomains.nonEmpty then {
+    val dnsNodes: Set[String] = if dnsDiscoveryDomains.nonEmpty then
       log.info(s"Resolving ${dnsDiscoveryDomains.size} DNS discovery domain(s): ${dnsDiscoveryDomains.mkString(", ")}")
       dnsDiscoveryDomains.flatMap { domain =>
         DnsDiscovery.resolveEnodes(domain, enrForkIdFilter)
       }.toSet
-    } else {
-      Set.empty
-    }
+    else Set.empty
 
     // Check if bootstrap nodes should be used (controlled by modifiers like 'enterprise')
     // Default to true if not specified to maintain backward compatibility
     val useBootstrapNodes =
-      try
-        System.getProperty("fukuii.network.discovery.use-bootstrap-nodes", "true").toBoolean
-      catch {
-        case _: Exception => true
-      }
+      try System.getProperty("fukuii.network.discovery.use-bootstrap-nodes", "true").toBoolean
+      catch case _: Exception => true
 
     // Combine nodes based on configuration
-    val allBootstrapNodes = if useBootstrapNodes then {
+    val allBootstrapNodes = if useBootstrapNodes then
       // Public/default mode: merge bootstrap nodes, DNS-discovered nodes, and static nodes
       val combined = bootstrapNodes ++ dnsNodes ++ staticNodes
       val sources = Seq(
@@ -67,19 +62,14 @@ object DiscoveryConfig extends Logger {
         if dnsNodes.nonEmpty then Some(s"${dnsNodes.size} DNS") else None,
         if staticNodes.nonEmpty then Some(s"${staticNodes.size} static") else None
       ).flatten
-      if sources.nonEmpty then {
-        log.info(s"Bootstrap nodes: ${combined.size} total (${sources.mkString(", ")})")
-      }
+      if sources.nonEmpty then log.info(s"Bootstrap nodes: ${combined.size} total (${sources.mkString(", ")})")
       combined
-    } else {
+    else
       // Enterprise mode: use only static nodes, ignore bootstrap nodes and DNS
-      if staticNodes.nonEmpty then {
+      if staticNodes.nonEmpty then
         log.info(s"Using ${staticNodes.size} static node(s) from static-nodes.json (bootstrap nodes ignored)")
-      } else {
-        log.warn("Bootstrap nodes disabled but no static-nodes.json found - node may not connect to any peers")
-      }
+      else log.warn("Bootstrap nodes disabled but no static-nodes.json found - node may not connect to any peers")
       staticNodes
-    }
 
     DiscoveryConfig(
       discoveryEnabled = discoveryConfig.getBoolean("discovery-enabled"),
@@ -97,6 +87,3 @@ object DiscoveryConfig extends Logger {
       kademliaAlpha = discoveryConfig.getInt("kademlia-alpha"),
       channelCapacity = discoveryConfig.getInt("channel-capacity")
     )
-  }
-
-}

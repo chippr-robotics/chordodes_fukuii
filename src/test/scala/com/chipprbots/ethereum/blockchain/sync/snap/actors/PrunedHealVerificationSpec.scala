@@ -48,27 +48,21 @@ import java.util.concurrent.{Executors, TimeUnit}
   * → `VerificationBFSComplete` → the single `HealingCheckCompletion` chokepoint. Deterministic: no `Thread.sleep`;
   * `awaitAssert` / `fishForMessage` / `expectMsg` only.
   */
-class PrunedHealVerificationSpec
-    extends ScalaTestWithActorTestKit()
-    with AnyFlatSpecLike
-    with Matchers
-    with Eventually {
+class PrunedHealVerificationSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers with Eventually:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
 
-  private def gaugeValue(name: String): Double = {
+  private def gaugeValue(name: String): Double =
     val gauge = Metrics.get().registry.find(name).gauge()
     if gauge == null then Double.NaN else gauge.value()
-  }
 
   private def emptyChildren: Array[MptNode] = Array.fill[MptNode](16)(NullNode)
 
-  private def deleteRecursively(f: File): Unit = {
+  private def deleteRecursively(f: File): Unit =
     Option(f.listFiles()).foreach(_.foreach(deleteRecursively))
     f.delete()
     ()
-  }
 
   private def awaitStateHealingComplete(
       controller: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
@@ -89,28 +83,24 @@ class PrunedHealVerificationSpec
   /** Open frontier = pending (queued) + active (in-flight). See the same helper in
     * TrieNodeHealingScopedVerificationSpec.
     */
-  private def openFrontier(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int = {
+  private def openFrontier(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int =
     val probe = testKit.createTestProbe[HealingStatistics]()
     coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref)
     val stats = probe.expectMessageType[HealingStatistics]
     stats.pendingTasks + stats.activeTasks
-  }
 
   /** A [[TestMptStorage]] that records every hash passed to `get` / `multiGetNodes`, so a test can prove that a pruned
     * subtree root's children are NEVER read (descend-and-stop). The read set is the union of both access paths the walk
     * uses (`rebuildFrontierBFS` reads via `multiGetNodes`; `isNodeInStorage` reads via `get`).
     */
-  private class CountingMptStorage extends TestMptStorage {
+  private class CountingMptStorage extends TestMptStorage:
     val reads: mutable.Set[ByteString] = mutable.Set.empty[ByteString]
-    override def get(key: Array[Byte]): MptNode = {
+    override def get(key: Array[Byte]): MptNode =
       reads.synchronized(reads += ByteString(key))
       super.get(key)
-    }
-    override def multiGetNodes(hashes: Seq[Array[Byte]]): Seq[Option[MptNode]] = {
+    override def multiGetNodes(hashes: Seq[Array[Byte]]): Seq[Option[MptNode]] =
       reads.synchronized(hashes.foreach(h => reads += ByteString(h)))
       super.multiGetNodes(hashes)
-    }
-  }
 
   /** Build a verification-driving fixture and run `body`. `frontierPersistenceEnabled = true` + `markComplete()` is the
     * resume precondition that routes `StartTrieNodeHealing(root)` through `startVerificationBFS` (see class doc). The
@@ -126,12 +116,12 @@ class PrunedHealVerificationSpec
           HealingFrontierStorage,
           org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
       ) => Unit
-  ): Unit = {
+  ): Unit =
     val pool = Executors.newSingleThreadExecutor()
     val ec = ExecutionContext.fromExecutorService(pool)
     val dbPath = Files.createTempDirectory("pruned-verify-rocksdb").toAbsolutePath.toString
     val dataSource = RocksDbDataSource(
-      new RocksDbConfig {
+      new RocksDbConfig:
         override val createIfMissing: Boolean = true
         override val paranoidChecks: Boolean = true
         override val path: String = dbPath
@@ -141,7 +131,7 @@ class PrunedHealVerificationSpec
         override val levelCompaction: Boolean = true
         override val blockSize: Long = 16384
         override val blockCacheSize: Long = 33554432
-      },
+      ,
       Namespaces.nsSeq
     )
     val store = new HealingFrontierStorage(dataSource)
@@ -159,29 +149,26 @@ class PrunedHealVerificationSpec
       healingWriterEcOverride = Some(ec)
     )
     try body(coordinator, store, controller)
-    finally {
+    finally
       testKit.stop(coordinator)
       pool.shutdown()
       pool.awaitTermination(5, TimeUnit.SECONDS)
       dataSource.destroy()
       deleteRecursively(new File(dbPath))
-    }
-  }
 
   // ── Synthetic-trie builders ────────────────────────────────────────────────────────────────────
 
   /** A storage-trie leaf used as a present grandchild beneath a subtree root. */
-  private def storedLeaf(storage: TestMptStorage, seed: String): ByteString = {
+  private def storedLeaf(storage: TestMptStorage, seed: String): ByteString =
     val leaf = LeafNode(ByteString(Array[Byte](0x01)), ByteString(kec256(ByteString(seed)).toArray))
     storage.putNode(leaf)
     ByteString(leaf.hash)
-  }
 
   /** Build: root(branch) → subtreeRoot(branch, present) → grandchild(leaf, present). Returns (rootHash,
     * subtreeRootHash, grandchildHash). Recording `markSubtreeComplete(subtreeRootHash)` should prune the descent into
     * the grandchild.
     */
-  private def presentSubtree(storage: TestMptStorage): (ByteString, ByteString, ByteString) = {
+  private def presentSubtree(storage: TestMptStorage): (ByteString, ByteString, ByteString) =
     val grandchild = storedLeaf(storage, "pruned-present-grandchild")
     val subChildren = emptyChildren
     subChildren(4) = HashNode(grandchild.toArray)
@@ -194,13 +181,12 @@ class PrunedHealVerificationSpec
     val root = BranchNode(rootChildren, None)
     storage.putNode(root)
     (ByteString(root.hash), subtreeRootHash, grandchild)
-  }
 
   /** Build: root(branch) → presentNodeX(branch, present) → MISSING grandchild (referenced by X, not in storage).
     * Returns (rootHash, presentNodeXHash, missingGrandchildHash). With NO record for X the walk must descend X and
     * surface the missing grandchild.
     */
-  private def presentNodeAboveMissing(storage: TestMptStorage): (ByteString, ByteString, ByteString) = {
+  private def presentNodeAboveMissing(storage: TestMptStorage): (ByteString, ByteString, ByteString) =
     val missingGrandchild = kec256(ByteString("pruned-missing-grandchild")) // never stored
     val xChildren = emptyChildren
     xChildren(2) = HashNode(missingGrandchild.toArray)
@@ -213,7 +199,6 @@ class PrunedHealVerificationSpec
     val root = BranchNode(rootChildren, None)
     storage.putNode(root)
     (ByteString(root.hash), nodeXHash, missingGrandchild)
-  }
 
   // ── T-1: prune-on-record ───────────────────────────────────────────────────────────────────────
 
@@ -346,4 +331,3 @@ class PrunedHealVerificationSpec
         gaugeValue("snapsync.healing.pruned_duration_ms.gauge") should be >= 0.0
       }
     }
-}

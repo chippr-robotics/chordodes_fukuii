@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.db.storage
 
-package object pruning {
+package object pruning:
 
   enum PruningMode:
     case ArchivePruning
@@ -9,7 +9,7 @@ package object pruning {
 
   export PruningMode.{ArchivePruning, BasicPruning, InMemoryPruning}
 
-  trait PruneSupport {
+  trait PruneSupport:
 
     /** Remove unused data for the given block number
       * @param blockNumber
@@ -26,5 +26,3 @@ package object pruning {
       *   NodeStorage
       */
     def rollback(blockNumber: BigInt, nodeStorage: NodesStorage, inMemory: Boolean): Unit
-  }
-}

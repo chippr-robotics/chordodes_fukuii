@@ -18,7 +18,7 @@ import com.chipprbots.ethereum.utils.Logger
 
 class QAService(
     mining: Mining
-) extends Logger {
+) extends Logger:
 
   /** qa_mineBlocks that instructs mocked miner to mine given number of blocks
     *
@@ -35,23 +35,21 @@ class QAService(
         log.debug("Unable to mine requested blocks", throwable)
         Left(JsonRpcError.InternalError)
       }
-}
 
-object QAService {
+object QAService:
   case class MineBlocksRequest(numBlocks: Int, withTransactions: Boolean, parentBlock: Option[ByteString] = None)
   case class MineBlocksResponse(responseType: MinerResponseType, message: Option[String])
-  object MineBlocksResponse {
+  object MineBlocksResponse:
     def apply(minerResponse: MockedMinerResponse): MineBlocksResponse =
       MineBlocksResponse(MinerResponseType(minerResponse), extractMessage(minerResponse))
 
-    private def extractMessage(response: MockedMinerResponse): Option[String] = response match {
+    private def extractMessage(response: MockedMinerResponse): Option[String] = response match
       case MinerIsWorking | MiningOrdered | MinerNotExist => None
       case MiningError(msg)                               => Some(msg)
       case MinerNotSupported(msg)                         => Some(msg.toString)
-    }
 
     sealed trait MinerResponseType extends EnumEntry
-    object MinerResponseType extends Enum[MinerResponseType] {
+    object MinerResponseType extends Enum[MinerResponseType]:
       val values: IndexedSeq[MinerResponseType] = findValues
 
       case object MinerIsWorking extends MinerResponseType
@@ -60,13 +58,9 @@ object QAService {
       case object MiningError extends MinerResponseType
       case object MinerNotSupport extends MinerResponseType
 
-      def apply(minerResponse: MockedMinerResponse): MinerResponseType = minerResponse match {
+      def apply(minerResponse: MockedMinerResponse): MinerResponseType = minerResponse match
         case MockedMinerResponses.MinerIsWorking       => MinerIsWorking
         case MockedMinerResponses.MiningOrdered        => MiningOrdered
         case MockedMinerResponses.MinerNotExist        => MinerNotExist
         case MockedMinerResponses.MiningError(_)       => MiningError
         case MockedMinerResponses.MinerNotSupported(_) => MinerNotSupport
-      }
-    }
-  }
-}

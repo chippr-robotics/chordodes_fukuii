@@ -13,25 +13,24 @@ import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
 import com.chipprbots.ethereum.security.SecureRandomBuilder
 import com.chipprbots.ethereum.testing.Tags.*
 
-class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks with SecureRandomBuilder {
+class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks with SecureRandomBuilder:
 
   val chainId: Option[BigInt] = Some(BigInt(0x3d))
 
   "BlockchainReader" should "be able to get the best block after it was stored by BlockchainWriter" taggedAs (
     UnitTest,
     StateTest
-  ) in new EphemBlockchainTestSetup {
+  ) in new EphemBlockchainTestSetup:
     forAll(ObjectGenerators.newBlockGen(secureRandom, chainId)) { case NewBlock(block, weight) =>
       blockchainWriter.save(block, Nil, ChainWeight(weight), true)
 
       blockchainReader.getBestBlock shouldBe Some(block)
     }
-  }
 
   "BlockchainReader.resolveETH69ChainWeight" should "return DB_LOOKUP when peer hash is in ChainWeightStorage (Tier 1)" taggedAs (
     UnitTest,
     StateTest
-  ) in new EphemBlockchainTestSetup {
+  ) in new EphemBlockchainTestSetup:
     val genesis: Block = Block(Fixtures.Blocks.Genesis.header, Fixtures.Blocks.Genesis.body)
     val genesisWeight: ChainWeight = ChainWeight.zero.increase(genesis.header)
     blockchainWriter.save(genesis, Nil, genesisWeight, saveAsBestBlock = true)
@@ -44,12 +43,11 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
       blockchainReader.resolveETH69ChainWeight(block1.header.hash.value, block1.header.number, isPoWChain = true)
     source shouldBe "DB_LOOKUP"
     cw.totalDifficulty shouldBe block1Weight.totalDifficulty
-  }
 
   it should "return CANONICAL_NUMBER when peer hash is unknown but peer block number is canonical (Tier 2)" taggedAs (
     UnitTest,
     StateTest
-  ) in new EphemBlockchainTestSetup {
+  ) in new EphemBlockchainTestSetup:
     val genesis: Block = Block(Fixtures.Blocks.Genesis.header, Fixtures.Blocks.Genesis.body)
     val genesisWeight: ChainWeight = ChainWeight.zero.increase(genesis.header)
     blockchainWriter.save(genesis, Nil, genesisWeight, saveAsBestBlock = true)
@@ -66,12 +64,11 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
       blockchainReader.resolveETH69ChainWeight(unknownPeerHash, block1.header.number, isPoWChain = true)
     source shouldBe "CANONICAL_NUMBER"
     cw.totalDifficulty shouldBe block1Weight.totalDifficulty
-  }
 
   it should "return COLD_START (TD=0) when ourBestNum=0 (DB not yet bootstrapped)" taggedAs (
     UnitTest,
     StateTest
-  ) in new EphemBlockchainTestSetup {
+  ) in new EphemBlockchainTestSetup:
     val genesis: Block = Block(Fixtures.Blocks.Genesis.header, Fixtures.Blocks.Genesis.body)
     blockchainWriter.save(genesis, Nil, ChainWeight.zero.increase(genesis.header), saveAsBestBlock = false)
 
@@ -81,12 +78,11 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     val (cw, source) = blockchainReader.resolveETH69ChainWeight(unknownHash, peerBlockNum, isPoWChain = true)
     source shouldBe "COLD_START"
     cw.totalDifficulty shouldBe BigInt(0)
-  }
 
   it should "return POW_SCALING proportional estimate when ourBestNum > 0 but peer is ahead" taggedAs (
     UnitTest,
     StateTest
-  ) in new EphemBlockchainTestSetup {
+  ) in new EphemBlockchainTestSetup:
     val genesis: Block = Block(Fixtures.Blocks.Genesis.header, Fixtures.Blocks.Genesis.body)
     val genesisWeight: ChainWeight = ChainWeight.zero.increase(genesis.header)
     blockchainWriter.save(genesis, Nil, genesisWeight, saveAsBestBlock = true)
@@ -107,12 +103,11 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     val gap: BigInt = (peerBlockNum - ourBestNum).max(BigInt(0))
     val rate: BigInt = block1.header.difficulty
     cw.totalDifficulty shouldBe ourBestTD + rate * gap
-  }
 
   it should "return POS_PROXY block number for post-merge peers (isPoWChain = false)" taggedAs (
     UnitTest,
     StateTest
-  ) in new EphemBlockchainTestSetup {
+  ) in new EphemBlockchainTestSetup:
     val genesis: Block = Block(Fixtures.Blocks.Genesis.header, Fixtures.Blocks.Genesis.body)
     val genesisWeight: ChainWeight = ChainWeight.zero.increase(genesis.header)
     blockchainWriter.save(genesis, Nil, genesisWeight, saveAsBestBlock = true)
@@ -123,7 +118,6 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     val (cw, source) = blockchainReader.resolveETH69ChainWeight(unknownHash, peerBlockNum, isPoWChain = false)
     source shouldBe "POS_PROXY"
     cw.totalDifficulty shouldBe peerBlockNum
-  }
 
   // ETC mainnet post-Spiral realistic anchor values
   private val etcBestTD = BigInt("24244691155597214264244")
@@ -132,7 +126,7 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
   it should "POW_SCALING estimate be within 0.1% of real TD when peer is within 1000 blocks of our head" taggedAs (
     UnitTest,
     StateTest
-  ) in new EphemBlockchainTestSetup {
+  ) in new EphemBlockchainTestSetup:
     val genesis: Block = Block(Fixtures.Blocks.Genesis.header, Fixtures.Blocks.Genesis.body)
     val gWeight: ChainWeight = ChainWeight.zero.increase(genesis.header)
     blockchainWriter.save(genesis, Nil, gWeight, saveAsBestBlock = true)
@@ -154,12 +148,11 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     val tolerance: BigInt = etcBestTD / 1000 // 0.1%
     estimate should be >= (etcBestTD - tolerance)
     estimate should be <= (etcBestTD + tolerance)
-  }
 
   it should "return exact real TD (non-inflation) via CANONICAL_NUMBER when peer is at our head height" taggedAs (
     UnitTest,
     StateTest
-  ) in new EphemBlockchainTestSetup {
+  ) in new EphemBlockchainTestSetup:
     val genesis: Block = Block(Fixtures.Blocks.Genesis.header, Fixtures.Blocks.Genesis.body)
     blockchainWriter.save(genesis, Nil, ChainWeight.zero.increase(genesis.header), saveAsBestBlock = true)
 
@@ -175,12 +168,11 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     val (cw, source) = blockchainReader.resolveETH69ChainWeight(unknownHash, etcBestNum, isPoWChain = true)
     source shouldBe "CANONICAL_NUMBER"
     cw.totalDifficulty shouldBe etcBestTD // exact real TD — no inflation
-  }
 
   it should "COLD_START TD=0 is always less than any real ETC chain TD" taggedAs (
     UnitTest,
     StateTest
-  ) in new EphemBlockchainTestSetup {
+  ) in new EphemBlockchainTestSetup:
     // No best block saved → ourBestNum=0 → COLD_START
     val (cw, source) = blockchainReader.resolveETH69ChainWeight(
       ByteString(Array.fill(32)(0xab.toByte)),
@@ -190,6 +182,3 @@ class BlockchainReaderSpec extends AnyFlatSpec with Matchers with ScalaCheckProp
     source shouldBe "COLD_START"
     cw.totalDifficulty shouldBe BigInt(0)
     cw.totalDifficulty should be < BigInt("1000000000000000000") // << any real PoW TD
-  }
-
-}

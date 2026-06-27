@@ -61,7 +61,7 @@ case class TransactionReceiptResponse(
     blockTimestamp: Option[BigInt] = None
 )
 
-object TransactionReceiptResponse {
+object TransactionReceiptResponse:
 
   def apply(
       receipt: Receipt,
@@ -71,16 +71,14 @@ object TransactionReceiptResponse {
       blockHeader: BlockHeader,
       gasUsedByTransaction: BigInt,
       baseLogIndex: Int
-  )(implicit blockchainConfig: com.chipprbots.ethereum.utils.BlockchainConfig): TransactionReceiptResponse = {
-    val contractAddress = if stx.tx.isContractInit then {
+  )(implicit blockchainConfig: com.chipprbots.ethereum.utils.BlockchainConfig): TransactionReceiptResponse =
+    val contractAddress = if stx.tx.isContractInit then
       // do not subtract 1 from nonce because in transaction we have nonce of account before transaction execution
       val hash = kec256(
         rlp.encode(RLPList(toEncodeable(signedTransactionSender.bytes), UInt256(stx.tx.nonce).toRLPEncodable))
       )
       Some(Address(hash))
-    } else {
-      None
-    }
+    else None
     val txLogs = receipt.logs.zipWithIndex.map { case (txLog, index) =>
       TxLog(
         logIndex = baseLogIndex + index,
@@ -95,26 +93,23 @@ object TransactionReceiptResponse {
       )
     }
 
-    val (root, status) = receipt.postTransactionStateHash match {
+    val (root, status) = receipt.postTransactionStateHash match
       case FailureOutcome         => (None, Some(BigInt(0)))
       case SuccessOutcome         => (None, Some(BigInt(1)))
       case HashOutcome(stateHash) => (Some(stateHash), None)
-    }
 
-    val txType: BigInt = stx.tx match {
+    val txType: BigInt = stx.tx match
       case _: LegacyTransaction         => BigInt(0)
       case _: TransactionWithAccessList => BigInt(1)
       case _: TransactionWithDynamicFee => BigInt(2)
       case _: BlobTransaction           => BigInt(3)
       case _: SetCodeTransaction        => BigInt(4)
-    }
 
     val effectiveGasPrice = Transaction.effectiveGasPrice(stx.tx, blockHeader.baseFee)
 
-    val blobGasUsed: Option[BigInt] = stx.tx match {
+    val blobGasUsed: Option[BigInt] = stx.tx match
       case blob: BlobTransaction => Some(BigInt(blob.blobVersionedHashes.size) * BigInt(131072))
       case _                     => None
-    }
 
     new TransactionReceiptResponse(
       transactionHash = stx.hash.value,
@@ -142,5 +137,3 @@ object TransactionReceiptResponse {
       ),
       blockTimestamp = Some(BigInt(blockHeader.unixTimestamp))
     )
-  }
-}

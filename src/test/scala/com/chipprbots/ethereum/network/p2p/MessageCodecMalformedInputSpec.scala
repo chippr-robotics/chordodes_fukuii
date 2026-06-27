@@ -30,7 +30,7 @@ class MessageCodecMalformedInputSpec
     extends AnyFlatSpec
     with Matchers
     with ScalaCheckPropertyChecks
-    with SecureChannelSetup {
+    with SecureChannelSetup:
 
   // Fresh codec per call: FrameCodec is stateful (accumulates unprocessedData across readFrames calls).
   // Using a def ensures each test gets an isolated instance with no carry-over bytes.
@@ -160,11 +160,11 @@ class MessageCodecMalformedInputSpec
   behavior of "MessageCodec.readFrames (property-based)"
 
   it should "never throw for any payload on any type code" taggedAs (UnitTest, NetworkTest) in {
-    val frameGen = for {
+    val frameGen = for
       typeCode <- Gen.choose(0x00, 0x1fff)
       payloadSize <- Gen.choose(0, 512)
       payload <- Gen.listOfN(payloadSize, Arbitrary.arbitrary[Byte])
-    } yield frame(typeCode, payload.toArray)
+    yield frame(typeCode, payload.toArray)
 
     forAll(Gen.nonEmptyListOf(frameGen)) { (frames: List[Frame]) =>
       noException should be thrownBy {
@@ -175,10 +175,10 @@ class MessageCodecMalformedInputSpec
 
   it should "return Left for every frame with random-byte payloads on a known type code" taggedAs
     (UnitTest, NetworkTest) in {
-      val payloadGen: Gen[Array[Byte]] = for {
+      val payloadGen: Gen[Array[Byte]] = for
         size <- Gen.choose(1, 256)
         bytes <- Gen.listOfN(size, Arbitrary.arbitrary[Byte])
-      } yield bytes.toArray
+      yield bytes.toArray
 
       forAll(payloadGen) { (payload: Array[Byte]) =>
         // 0x10 = StatusCode — any non-conforming payload must decode to Left
@@ -222,4 +222,3 @@ class MessageCodecMalformedInputSpec
       }
     }
   }
-}

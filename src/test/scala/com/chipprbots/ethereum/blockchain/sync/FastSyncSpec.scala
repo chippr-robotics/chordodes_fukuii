@@ -37,10 +37,11 @@ import com.chipprbots.ethereum.utils.ByteUtils
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 import com.chipprbots.ethereum.utils.GenOps.GenOps
 
-class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with SpecFixtures { self =>
+class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with SpecFixtures:
+  self =>
   implicit override val timeout: Timeout = Timeout(60.seconds)
 
-  class Fixture extends EphemBlockchainTestSetup with TestSyncConfig with TestSyncPeers {
+  class Fixture extends EphemBlockchainTestSetup with TestSyncConfig with TestSyncPeers:
     implicit override lazy val system: ActorSystem = self.system.classicSystem
 
     val blacklistMaxElems: Int = 100
@@ -48,14 +49,13 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
 
     override lazy val syncConfig: SyncConfig =
       defaultSyncConfig.copy(pivotBlockOffset = 5, fastSyncBlockValidationX = 5, fastSyncThrottle = 1.millis)
-    lazy val (stateRoot, trieProvider) = {
+    lazy val (stateRoot, trieProvider) =
       val stateNodesData = ObjectGenerators.genMultipleNodeData(20).pickValue
 
       lazy val trieProvider = StateSyncUtils.TrieProvider()
       lazy val stateRoot = trieProvider.buildWorld(stateNodesData)
 
       (stateRoot, trieProvider)
-    }
 
     lazy val testBlocks: List[Block] = BlockHelpers.generateChain(
       20,
@@ -138,7 +138,6 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
       fastSync ! FastSync.WrappedSyncProtocol(SyncProtocol.GetStatus(replyProbe.ref.toTyped[Status]))
       cb(Right(replyProbe.expectMsgClass(timeout.duration, classOf[Status])))
     }
-  }
 
   override def createFixture(): Fixture = new Fixture
 
@@ -150,7 +149,7 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
       ) in testCaseM { (fixture: Fixture) =>
         import fixture.*
 
-        (for {
+        (for
           _ <- saveGenesis
           _ <- saveTestBlocksWithWeights
           // Subscribe BEFORE startSync so no topic events can be missed under load.
@@ -164,7 +163,7 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
           _ <- networkPeerManager.onPeersConnected
           _ <- pivotFiber.joinWith(cats.effect.IO.raiseError(new RuntimeException("pivot fiber canceled")))
           _ <- blocksFiber.joinWith(cats.effect.IO.raiseError(new RuntimeException("blocks fiber canceled")))
-        } yield {
+        yield
           val peer = testPeers.keys.head
 
           // Simulate a typed receipt coming over the ETH66 Receipts message as:
@@ -195,7 +194,7 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
           // If the actor crashes, we'll receive Terminated.
           watcher.expectNoMessage(500.millis)
           assert(true)
-        }).timeout(timeout.duration)
+        ).timeout(timeout.duration)
       }
     }
 
@@ -245,7 +244,7 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
         SyncTest
       ) in testCaseM { (fixture: Fixture) =>
         import fixture.*
-        (for {
+        (for
           _ <- saveGenesis
           _ <- saveTestBlocksWithWeights
           // Subscribe BEFORE startSync — see companion test for race condition explanation.
@@ -265,7 +264,7 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
             // idle receives Terminated → DeathPactException → FastSync terminates.
             watcher.expectTerminated(fastSync, timeout.duration)
           }
-        } yield succeed).timeout(timeout.duration)
+        yield succeed).timeout(timeout.duration)
       }
     }
 
@@ -276,10 +275,10 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
       ) in testCaseM { (fixture: Fixture) =>
         import fixture.*
 
-        (for {
+        (for
           _ <- startSync
           status <- getSyncStatus
-        } yield assert(status === Status.NotSyncing)).timeout(timeout.duration)
+        yield assert(status === Status.NotSyncing)).timeout(timeout.duration)
       }
 
       "returns Syncing when pivot block is selected and started fetching data" taggedAs (
@@ -288,7 +287,7 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
       ) in testCaseM { (fixture: Fixture) =>
         import fixture.*
 
-        (for {
+        (for
           _ <- saveGenesis
           _ <- saveTestBlocksWithWeights
           pivotFiber <- networkPeerManager.pivotBlockSelected.head.compile.lastOrError.start
@@ -304,13 +303,13 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
             .head
             .compile
             .lastOrError
-        } yield status match {
+        yield status match
           case Status.Syncing(startingBlockNumber, blocksProgress, stateNodesProgress) =>
             assert(startingBlockNumber === BigInt(0))
             assert(blocksProgress.target === expectedPivotBlockNumber)
             assert(stateNodesProgress.isDefined)
           case Status.NotSyncing | Status.SyncDone => fail("Expected syncing status")
-        }).timeout(timeout.duration)
+        ).timeout(timeout.duration)
       }
 
       "returns Syncing with block progress once both header and body is fetched" taggedAs (
@@ -319,7 +318,7 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
       ) in testCaseM { (fixture: Fixture) =>
         import fixture.*
 
-        (for {
+        (for
           _ <- saveGenesis
           _ <- saveTestBlocksWithWeights
           // Subscribe BEFORE startSync so no topic events can be missed under load.
@@ -332,19 +331,19 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
           blocksBatch <- blocksFiber.joinWith(cats.effect.IO.raiseError(new RuntimeException("blocks fiber canceled")))
           status <- getSyncStatus
           lastBlockFromBatch = blocksBatch.lastOption.map(_.number).getOrElse(BigInt(0))
-        } yield status match {
+        yield status match
           case Status.Syncing(startingBlockNumber, blocksProgress, stateNodesProgress) =>
             assert(startingBlockNumber === BigInt(0))
             assert(blocksProgress.current >= lastBlockFromBatch)
             assert(blocksProgress.target === expectedPivotBlockNumber)
             assert(stateNodesProgress === Some(Progress(0, 1)))
           case Status.NotSyncing | Status.SyncDone => fail("Expected other state")
-        })
+        )
           .timeout(timeout.duration)
       }
 
       "returns Syncing with state nodes progress" taggedAs (UnitTest, SyncTest) in customTestCaseM(
-        new Fixture {
+        new Fixture:
           override lazy val syncConfig: SyncConfig =
             defaultSyncConfig.copy(
               peersScanInterval = 1.second,
@@ -352,11 +351,10 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
               fastSyncBlockValidationX = 1,
               fastSyncThrottle = 1.millis
             )
-        }
       ) { (fixture: Fixture) =>
         import fixture.*
 
-        (for {
+        (for
           _ <- saveGenesis
           _ <- saveTestBlocksWithWeights
           // Subscribe BEFORE startSync so no topic events can be missed under load.
@@ -383,15 +381,14 @@ class FastSyncSpec extends ScalaTestWithActorTestKit() with FreeSpecBase with Sp
             .head
             .compile
             .lastOrError
-        } yield {
+        yield
           // Validate state nodes progress is reported correctly
           val Status.Syncing(_, _, maybeStateProgress) = status
           val stateProgress = maybeStateProgress.getOrElse(fail("State nodes progress should be defined"))
           assert(stateProgress.target >= 1, "State nodes target should be at least 1")
           assert(stateProgress.current >= 0, "State nodes current should be non-negative")
           succeed
-        }).timeout(timeout.duration)
+        ).timeout(timeout.duration)
       }
     }
   }
-}

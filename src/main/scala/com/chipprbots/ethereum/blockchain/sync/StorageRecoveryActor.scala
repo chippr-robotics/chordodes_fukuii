@@ -48,7 +48,7 @@ import com.chipprbots.ethereum.network.Peer
   *   1. Walk state trie, find contracts with missing storage tries 2. If none missing → mark recovery done, report to
   *      SyncController 3. If missing → download via StorageRangeCoordinator, then mark done
   */
-object StorageRecoveryActor {
+object StorageRecoveryActor:
 
   sealed trait Command
   private case class ScanResult(missingStorage: Seq[(ByteString, ByteString)]) extends Command
@@ -174,7 +174,7 @@ object StorageRecoveryActor {
       coordinatorForTesting: Option[ActorRef]
   ): Behavior[Command] =
     Behaviors.setup { ctx =>
-      preloaded match {
+      preloaded match
         case Some(missing) =>
           ctx.self ! ScanResult(missing)
         case None =>
@@ -190,16 +190,15 @@ object StorageRecoveryActor {
               ctx.log.error("Storage recovery scan failed", ex)
               ScanResult(Seq.empty)
           }
-      }
       Behaviors.receiveMessage {
         case ScanResult(missing) =>
-          if missing.isEmpty then {
+          if missing.isEmpty then
             ctx.log.info("Storage recovery: all contract storage tries present. Marking recovery complete.")
             RecoveryMetrics.setStoragePhase(RecoveryMetrics.PhaseComplete)
             appStateStorage.storageRecoveryDone().commit()
             syncController ! RecoveryComplete
             Behaviors.stopped
-          } else {
+          else
             ctx.log.warn(
               s"Storage recovery: found ${missing.size} contracts with missing storage. Starting download..."
             )
@@ -213,7 +212,7 @@ object StorageRecoveryActor {
                 case _                                                            => DroppedSrcMsg
               }
             val coordinator: org.apache.pekko.actor.typed.ActorRef[actors.StorageRangeCoordinator.Command] =
-              coordinatorForTesting match {
+              coordinatorForTesting match
                 case Some(testRef) => testRef.toTyped[actors.StorageRangeCoordinator.Command]
                 case None =>
                   val requestTracker = new snap.SNAPRequestTracker()(ctx.system.classicSystem.scheduler)
@@ -241,7 +240,6 @@ object StorageRecoveryActor {
                     "storage-recovery-coordinator",
                     org.apache.pekko.actor.typed.DispatcherSelector.fromConfig("sync-dispatcher")
                   )
-              }
 
             ctx.watchWith(coordinator, CoordinatorTerminated)
 
@@ -269,7 +267,6 @@ object StorageRecoveryActor {
               appStateStorage,
               snapSyncConfig
             )
-          }
 
         case _ => Behaviors.unhandled
       }
@@ -285,7 +282,7 @@ object StorageRecoveryActor {
       syncController: TypedActorRef[SyncControllerMsg],
       appStateStorage: AppStateStorage,
       snapSyncConfig: SNAPSyncConfig
-  ): Behavior[Command] = {
+  ): Behavior[Command] =
     val expectedCount = missing.size
     var progressSeq = 0L
     var downloadedCount = 0L
@@ -304,21 +301,19 @@ object StorageRecoveryActor {
 
     Behaviors.withTimers { timers =>
 
-      def recordProgress(): Unit = {
+      def recordProgress(): Unit =
         progressSeq += 1
         lastProgressNanos = System.nanoTime()
         unservableCount = 0
         timers.cancel("abandon")
         rollsAttempted = 0
         awaitingRoot = false
-      }
 
-      def scheduleAbandonCheck(): Unit = {
+      def scheduleAbandonCheck(): Unit =
         timers.cancel("abandon")
         timers.startSingleTimer("abandon", CheckAbandon(progressSeq), abandonAfter)
-      }
 
-      def finishRecovery(reason: String): Behavior[Command] = {
+      def finishRecovery(reason: String): Behavior[Command] =
         timers.cancel("abandon")
         logResidualGaps(missing, stateStorage, pivotBlockNumber, ctx.log)
         RecoveryMetrics.setStoragePhase(RecoveryMetrics.PhaseComplete)
@@ -326,7 +321,6 @@ object StorageRecoveryActor {
         ctx.log.info(s"Storage recovery finished ($reason).")
         syncController ! RecoveryComplete
         Behaviors.stopped
-      }
 
       Behaviors.receiveMessage {
         case StoragePeerAvailable(peer) =>
@@ -351,10 +345,9 @@ object StorageRecoveryActor {
           crossed.foreach { m =>
             val elapsedSecs = (System.nanoTime() - lastRateNanos) / 1e9
             val rate = if elapsedSecs > 0 then ((recoveredCount - lastRateRecovered) / elapsedSecs).toLong else 0L
-            if m % 10 == 0 || m <= 5 || m >= 95 then {
+            if m % 10 == 0 || m <= 5 || m >= 95 then
               lastRateNanos = System.nanoTime()
               lastRateRecovered = recoveredCount
-            }
             ctx.log.info(
               s"[SNAP-PROGRESS] STORAGE-RECOVERY $m% — $recoveredCount / $expectedCount storage roots | $rate roots/s"
             )
@@ -363,16 +356,15 @@ object StorageRecoveryActor {
 
         case PivotUnservable(_, _, _) =>
           unservableCount += 1
-          if unservableCount <= 3 || unservableCount % 100 == 0 then {
+          if unservableCount <= 3 || unservableCount % 100 == 0 then
             ctx.log.info(
               "Storage recovery: coordinator reports root {} unservable ({} events, no progress for {}s).",
               currentRoot.take(4).toArray.map("%02x".format(_)).mkString,
               unservableCount,
               (System.nanoTime() - lastProgressNanos) / 1_000_000_000L
             )
-          }
           if !timers.isTimerActive("abandon") then scheduleAbandonCheck()
-          if !awaitingRoot && rollsAttempted < maxRolls then {
+          if !awaitingRoot && rollsAttempted < maxRolls then
             awaitingRoot = true
             ctx.log.info(
               "Storage recovery: requesting a recent root to roll off the aged pivot (roll {} of {}).",
@@ -380,12 +372,11 @@ object StorageRecoveryActor {
               maxRolls
             )
             syncController ! RequestRecentRoot(ctx.self)
-          } else if rollsAttempted >= maxRolls then {
+          else if rollsAttempted >= maxRolls then
             ctx.log.info(
               "Storage recovery: exhausted {} recent-root rolls; letting the abandon timer run for the residue.",
               maxRolls
             )
-          }
           Behaviors.same
 
         case RecentRoot(_, _) if !awaitingRoot =>
@@ -394,7 +385,7 @@ object StorageRecoveryActor {
 
         case RecentRoot(blockNumber, rootOpt) =>
           awaitingRoot = false
-          rootOpt match {
+          rootOpt match
             case Some(root) if root != currentRoot =>
               val oldRoot = currentRoot
               rollsAttempted += 1
@@ -415,11 +406,10 @@ object StorageRecoveryActor {
               )
             case None =>
               ctx.log.info("Storage recovery: no recent root available to roll to. Letting the abandon timer run.")
-          }
           Behaviors.same
 
         case CheckAbandon(progressAtSchedule) =>
-          if progressAtSchedule == progressSeq then {
+          if progressAtSchedule == progressSeq then
             ctx.log.warn(
               "Storage recovery abandoning download: no slot progress for {}s after {} unservable events and {} " +
                 "root roll(s). Remaining contract storage will be fetched on-demand via GetTrieNodes during regular sync.",
@@ -428,9 +418,7 @@ object StorageRecoveryActor {
               rollsAttempted
             )
             finishRecovery("abandoned: download stalled")
-          } else {
-            Behaviors.same
-          }
+          else Behaviors.same
 
         case CoordinatorTerminated =>
           ctx.log.error(
@@ -447,22 +435,19 @@ object StorageRecoveryActor {
         case ScanResult(_) => Behaviors.unhandled
       }
     }
-  }
 
   private def logResidualGaps(
       missing: Seq[(ByteString, ByteString)],
       stateStorage: StateStorage,
       pivotBlockNumber: BigInt,
       log: Logger
-  ): Unit = {
+  ): Unit =
     val mptStorage = stateStorage.getBackingStorage(pivotBlockNumber)
     val residual = missing.count { case (_, storageRoot) =>
-      try {
+      try
         mptStorage.get(storageRoot.toArray)
         false
-      } catch {
-        case _: MerklePatriciaTrie.MPTException => true
-      }
+      catch case _: MerklePatriciaTrie.MPTException => true
     }
     if residual == 0 then log.info(s"Storage recovery: all ${missing.size} contract storage tries present on disk.")
     else
@@ -471,14 +456,13 @@ object StorageRecoveryActor {
           s"$residual residual (hot contracts changed since pivot, or never served). Regular sync will fetch " +
           s"these on-demand via GetTrieNodes when block execution reaches them."
       )
-  }
 
   private def scanForMissingStorage(
       stateRoot: ByteString,
       stateStorage: StateStorage,
       pivotBlockNumber: BigInt,
       log: Logger
-  ): Seq[(ByteString, ByteString)] = {
+  ): Seq[(ByteString, ByteString)] =
     RecoveryMetrics.setStoragePhase(RecoveryMetrics.PhaseScanning)
     val mptStorage = stateStorage.getBackingStorage(pivotBlockNumber)
     val rootNode = mptStorage.get(stateRoot.toArray)
@@ -489,47 +473,37 @@ object StorageRecoveryActor {
     var contractCount = 0L
     var checkedCount = 0L
 
-    val onLeaf: (ByteString, LeafNode) => Unit = { (accountHash, leafNode) =>
+    val onLeaf: (ByteString, LeafNode) => Unit = (accountHash, leafNode) =>
       accountCount += 1
-      if accountCount % 100_000 == 0 then {
+      if accountCount % 100_000 == 0 then
         RecoveryMetrics.setStorageScanProgress(accountCount, contractCount, missing.size.toLong)
-      }
-      if accountCount % 1_000_000 == 0 then {
+      if accountCount % 1_000_000 == 0 then
         log.info(
           s"Storage recovery scan: $accountCount accounts, $contractCount contracts, " +
             s"$checkedCount checked, ${missing.size} missing"
         )
-      }
 
-      Account(leafNode.value) match {
+      Account(leafNode.value) match
         case Success(account) =>
-          if account.storageRoot != Account.EmptyStorageRootHash then {
+          if account.storageRoot != Account.EmptyStorageRootHash then
             contractCount += 1
-            if !seenRoots.contains(account.storageRoot.value) then {
+            if !seenRoots.contains(account.storageRoot.value) then
               seenRoots += account.storageRoot.value
               checkedCount += 1
-              try
-                mptStorage.get(account.storageRoot.toArray)
-              catch {
+              try mptStorage.get(account.storageRoot.toArray)
+              catch
                 case _: MerklePatriciaTrie.MPTException =>
                   missing += ((accountHash, account.storageRoot.value))
-              }
-            }
-          }
         case Failure(_) => // Skip malformed account RLP
-      }
-    }
-
-    try {
+    try
       val visitor = new PathTrackingLeafWalkVisitor(mptStorage, ByteString.empty, onLeaf)
       MptTraversals.dispatch(rootNode, visitor)
-    } catch {
+    catch
       case e: MerklePatriciaTrie.MPTException =>
         log.error(
           s"Trie walk failed at account $accountCount — partial results: ${missing.size} missing storage tries",
           e
         )
-    }
 
     log.info(
       s"Storage recovery scan complete: $accountCount accounts, $contractCount contracts, " +
@@ -537,5 +511,3 @@ object StorageRecoveryActor {
     )
     RecoveryMetrics.setStorageScanProgress(accountCount, contractCount, missing.size.toLong)
     missing.toSeq
-  }
-}

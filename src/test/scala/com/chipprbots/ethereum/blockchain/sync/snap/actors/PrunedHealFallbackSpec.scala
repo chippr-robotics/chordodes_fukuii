@@ -41,23 +41,21 @@ import java.util.concurrent.{Executors, TimeUnit}
   * Harness mirrors [[ScopedVerificationFallbackSpec]] / [[PrunedHealVerificationSpec]]. Deterministic: `fishForMessage`
   * / `awaitAssert`, no `Thread.sleep`.
   */
-class PrunedHealFallbackSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers with Eventually {
+class PrunedHealFallbackSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers with Eventually:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
 
-  private def gaugeValue(name: String): Double = {
+  private def gaugeValue(name: String): Double =
     val gauge = Metrics.get().registry.find(name).gauge()
     if gauge == null then Double.NaN else gauge.value()
-  }
 
   private def emptyChildren: Array[MptNode] = Array.fill[MptNode](16)(NullNode)
 
-  private def deleteRecursively(f: File): Unit = {
+  private def deleteRecursively(f: File): Unit =
     Option(f.listFiles()).foreach(_.foreach(deleteRecursively))
     f.delete()
     ()
-  }
 
   private def awaitStateHealingComplete(
       controller: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
@@ -68,16 +66,15 @@ class PrunedHealFallbackSpec extends ScalaTestWithActorTestKit() with AnyFlatSpe
       case _                                         => FishingOutcomes.continueAndIgnore
     }
 
-  private def storedLeaf(storage: TestMptStorage, seed: String): ByteString = {
+  private def storedLeaf(storage: TestMptStorage, seed: String): ByteString =
     val leaf = LeafNode(ByteString(Array[Byte](0x01)), ByteString(kec256(ByteString(seed)).toArray))
     storage.putNode(leaf)
     ByteString(leaf.hash)
-  }
 
   /** root(branch) → subtreeRoot(branch, present) → grandchild(leaf, present). Same shape as the prune fixture, used
     * here to prove a RECORDED subtree is NOT pruned when the flag is off / scheme is Path.
     */
-  private def presentSubtree(storage: TestMptStorage): (ByteString, ByteString) = {
+  private def presentSubtree(storage: TestMptStorage): (ByteString, ByteString) =
     val grandchild = storedLeaf(storage, "fallback-present-grandchild")
     val subChildren = emptyChildren
     subChildren(4) = HashNode(grandchild.toArray)
@@ -89,22 +86,19 @@ class PrunedHealFallbackSpec extends ScalaTestWithActorTestKit() with AnyFlatSpe
     val root = BranchNode(rootChildren, None)
     storage.putNode(root)
     (ByteString(root.hash), subtreeRootHash)
-  }
 
   /** A clean storage-trie leaf to heal. */
-  private def cleanLeaf(seed: Int): (Seq[ByteString], ByteString, ByteString) = {
+  private def cleanLeaf(seed: Int): (Seq[ByteString], ByteString, ByteString) =
     val leaf = LeafNode(ByteString(Array[Byte](0x01)), ByteString(kec256(ByteString(s"fallback-leaf-$seed")).toArray))
     val encoded = MptTraversals.encodeNode(leaf)
     val hash = kec256(ByteString(encoded))
     val accountHash = kec256(ByteString(s"fallback-account-$seed"))
     (Seq(accountHash, ByteString(Array[Byte](0x20, seed.toByte))), hash, ByteString(encoded))
-  }
 
-  private def storedRoot(storage: TestMptStorage): ByteString = {
+  private def storedRoot(storage: TestMptStorage): ByteString =
     val leaf = LeafNode(ByteString(Array[Byte](0x01)), ByteString(Array[Byte](0x02)))
     storage.putNode(leaf)
     ByteString(leaf.hash)
-  }
 
   /** Build a verification-driving fixture. `markComplete()` + empty frontier + `frontierPersistenceEnabled = true`
     * routes `StartTrieNodeHealing` to the verification pass (so we can drive the WALK directly). For the default-off
@@ -129,7 +123,7 @@ class PrunedHealFallbackSpec extends ScalaTestWithActorTestKit() with AnyFlatSpe
           HealingFrontierStorage,
           org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
       ) => Unit
-  ): Unit = {
+  ): Unit =
     val pool = Executors.newSingleThreadExecutor()
     val ec = ExecutionContext.fromExecutorService(pool)
     val dbPath = Files.createTempDirectory("pruned-fallback-rocksdb").toAbsolutePath.toString
@@ -139,12 +133,12 @@ class PrunedHealFallbackSpec extends ScalaTestWithActorTestKit() with AnyFlatSpe
 
     // Path-scheme only: make the root readable through the path-keyed gate so the verification walk is entered.
     val pathNodeStorageOpt: Option[PathNodeStorage] =
-      if seedPathRoot then {
+      if seedPathRoot then
         val pns = new PathNodeStorage(dataSource)
         val rootRlp = storage.get(stateRoot.toArray).encode // == kec256(rootRlp) == stateRoot by construction
         pns.writeAccountNode(Array.empty[Byte], rootRlp)
         Some(pns)
-      } else None
+      else None
 
     val controller = testKit.createTestProbe[SNAPSyncController.Command]()
     val coordinator = HealingTrieFixtures.spawnCoordinator(
@@ -160,17 +154,15 @@ class PrunedHealFallbackSpec extends ScalaTestWithActorTestKit() with AnyFlatSpe
       pathNodeStorageOpt = pathNodeStorageOpt
     )
     try body(coordinator, store, controller)
-    finally {
+    finally
       testKit.stop(coordinator)
       pool.shutdown()
       pool.awaitTermination(5, TimeUnit.SECONDS)
       dataSource.destroy()
       deleteRecursively(new File(dbPath))
-    }
-  }
 
   private def rocksDbConfig(dbPath: String): RocksDbConfig =
-    new RocksDbConfig {
+    new RocksDbConfig:
       override val createIfMissing: Boolean = true
       override val paranoidChecks: Boolean = true
       override val path: String = dbPath
@@ -180,7 +172,6 @@ class PrunedHealFallbackSpec extends ScalaTestWithActorTestKit() with AnyFlatSpe
       override val levelCompaction: Boolean = true
       override val blockSize: Long = 16384
       override val blockCacheSize: Long = 33554432
-    }
 
   // ── T-6: flag off ⇒ full-trie walk, no pruning ─────────────────────────────────────────────────
 
@@ -267,7 +258,7 @@ class PrunedHealFallbackSpec extends ScalaTestWithActorTestKit() with AnyFlatSpe
         // is gone from the Typed API — persistence is now controlled solely by the presence of
         // healingFrontierStorage. The store is passed to host spec-005 subtree records.
       )
-      try {
+      try
         store.isComplete shouldBe false
         store.loadAll() shouldBe empty
         val peer = PeerTestHelpers.createTestPeer("decouple-peer", testKit.createTestProbe[Any]().ref.toClassic)
@@ -284,12 +275,10 @@ class PrunedHealFallbackSpec extends ScalaTestWithActorTestKit() with AnyFlatSpe
         // (markSubtreeComplete(stateRoot), gated on prunedEnabled), so the reconstructed frontier stays empty even
         // though that additive CF 'g' record may now exist.
         store.loadAll() shouldBe empty
-      } finally {
+      finally
         testKit.stop(coordinator)
         pool.shutdown()
         pool.awaitTermination(5, TimeUnit.SECONDS)
         dataSource.destroy()
         deleteRecursively(new File(dbPath))
-      }
     }
-}

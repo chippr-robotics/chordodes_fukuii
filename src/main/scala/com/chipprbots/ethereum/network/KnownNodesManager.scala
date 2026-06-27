@@ -11,7 +11,7 @@ import scala.concurrent.duration.*
 
 import com.chipprbots.ethereum.db.storage.KnownNodesStorage
 
-object KnownNodesManager {
+object KnownNodesManager:
 
   /** Behavior factory for the Typed KnownNodesManager.
     *
@@ -83,18 +83,17 @@ object KnownNodesManager {
       config: KnownNodesManagerConfig,
       knownNodesStorage: KnownNodesStorage,
       state: State
-  ): State = {
+  ): State =
     ctx.log.debug(s"Persisting ${state.knownNodes.size} known nodes.")
     val pruned =
-      if state.knownNodes.size > config.maxPersistedNodes then {
+      if state.knownNodes.size > config.maxPersistedNodes then
         val toAbandon = state.knownNodes.take(state.knownNodes.size - config.maxPersistedNodes)
         state.copy(toRemove = state.toRemove ++ toAbandon, toAdd = state.toAdd -- toAbandon)
-      } else state
-    if pruned.toAdd.nonEmpty || pruned.toRemove.nonEmpty then {
+      else state
+    if pruned.toAdd.nonEmpty || pruned.toRemove.nonEmpty then
       knownNodesStorage.updateKnownNodes(toAdd = pruned.toAdd, toRemove = pruned.toRemove).commit()
       pruned.copy(toAdd = Set.empty, toRemove = Set.empty)
-    } else pruned
-  }
+    else pruned
 
   sealed trait Command
 
@@ -112,13 +111,10 @@ object KnownNodesManager {
 
   case class KnownNodesManagerConfig(persistInterval: FiniteDuration, maxPersistedNodes: Int)
 
-  object KnownNodesManagerConfig {
-    def apply(etcClientConfig: com.typesafe.config.Config): KnownNodesManagerConfig = {
+  object KnownNodesManagerConfig:
+    def apply(etcClientConfig: com.typesafe.config.Config): KnownNodesManagerConfig =
       val knownNodesManagerConfig = etcClientConfig.getConfig("network.known-nodes")
       KnownNodesManagerConfig(
         persistInterval = knownNodesManagerConfig.getDuration("persist-interval").toMillis.millis,
         maxPersistedNodes = knownNodesManagerConfig.getInt("max-persisted-nodes")
       )
-    }
-  }
-}

@@ -28,15 +28,14 @@ class HealingTask(
     var pending: Boolean = true,
     var done: Boolean = false,
     var nodeData: Option[ByteString] = None
-) {
+):
 
   /** Returns a short string representation for debugging */
-  def toShortString: String = {
+  def toShortString: String =
     val pathStr = if path.isEmpty then "root" else s"depth=${path.length}"
     val hashStr = hash.take(4).map(b => f"$b%02x").mkString
     val status = if done then "done" else if pending then "pending" else "active"
     s"HealingTask($pathStr, hash=$hashStr..., $status)"
-  }
 
   /** Returns the progress of this task (0.0 to 1.0) */
   def progress: Double =
@@ -44,9 +43,8 @@ class HealingTask(
     else if nodeData.isDefined then 0.9
     else if !pending then 0.5
     else 0.0
-}
 
-object HealingTask {
+object HealingTask:
 
   /** Creates a healing task for a missing node at the given path and hash.
     *
@@ -69,13 +67,12 @@ object HealingTask {
       pending: Boolean,
       done: Boolean,
       nodeData: Option[ByteString] = None
-  ): HealingTask = {
+  ): HealingTask =
     val task = new HealingTask(path, hash, rootHash)
     task.pending = pending
     task.done = done
     task.nodeData = nodeData
     task
-  }
 
   /** Creates healing tasks from a list of missing node paths and hashes.
     *
@@ -101,4 +98,3 @@ object HealingTask {
   /** Maximum iterations for iterative healing process. Prevents infinite loops in case of persistent missing nodes.
     */
   val MAX_HEALING_ITERATIONS: Int = 10
-}

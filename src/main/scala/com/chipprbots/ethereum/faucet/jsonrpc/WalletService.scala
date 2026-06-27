@@ -17,13 +17,13 @@ import com.chipprbots.ethereum.rlp
 import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.Logger
 
-class WalletService(walletRpcClient: WalletRpcClientApi, keyStore: KeyStore, config: FaucetConfig) extends Logger {
+class WalletService(walletRpcClient: WalletRpcClientApi, keyStore: KeyStore, config: FaucetConfig) extends Logger:
 
   def sendFunds(wallet: Wallet, addressTo: Address): IO[Either[RpcError, ByteString]] =
-    (for {
+    (for
       nonce <- EitherT(walletRpcClient.getNonce(wallet.address))
       txId <- EitherT(walletRpcClient.sendTransaction(prepareTx(wallet, addressTo, nonce)))
-    } yield txId).value.map {
+    yield txId).value.map {
       case Right(txId) =>
         val txIdHex = s"0x${ByteStringUtils.hash2string(txId)}"
         log.info(s"Sending ${config.txValue} ETC to $addressTo in tx: $txIdHex.")
@@ -33,23 +33,19 @@ class WalletService(walletRpcClient: WalletRpcClientApi, keyStore: KeyStore, con
         Left(error)
     }
 
-  private def prepareTx(wallet: Wallet, targetAddress: Address, nonce: BigInt): ByteString = {
+  private def prepareTx(wallet: Wallet, targetAddress: Address, nonce: BigInt): ByteString =
     val transaction =
       LegacyTransaction(nonce, config.txGasPrice, config.txGasLimit, Some(targetAddress), config.txValue, ByteString())
 
     val stx = wallet.signTx(transaction, None)
     ByteString(rlp.encode(stx.tx.toRLPEncodable))
-  }
 
   def getWallet: IO[Either[KeyStoreError, Wallet]] = IO {
-    keyStore.unlockAccount(config.walletAddress, config.walletPassword) match {
+    keyStore.unlockAccount(config.walletAddress, config.walletPassword) match
       case Right(w) =>
         log.info(s"unlock wallet for use in faucet (${config.walletAddress})")
         Right(w)
       case Left(err) =>
         log.debug(s"Cannot unlock wallet for use in faucet (${config.walletAddress}), because of $err")
         Left(err)
-    }
   }
-
-}

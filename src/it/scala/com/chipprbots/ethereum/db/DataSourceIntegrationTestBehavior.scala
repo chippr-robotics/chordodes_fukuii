@@ -17,7 +17,7 @@ import com.chipprbots.ethereum.db.dataSource.DataSourceUpdate
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.ByteStringUtils.*
 
-trait DataSourceIntegrationTestBehavior extends ScalaCheckPropertyChecks with ObjectGenerators {
+trait DataSourceIntegrationTestBehavior extends ScalaCheckPropertyChecks with ObjectGenerators:
 
   this: AnyFlatSpec =>
 
@@ -29,14 +29,12 @@ trait DataSourceIntegrationTestBehavior extends ScalaCheckPropertyChecks with Ob
 
   val MaxIncreaseInLength = 10
 
-  def withDir(testCode: String => Any): Unit = {
+  def withDir(testCode: String => Any): Unit =
     val path = Files.createTempDirectory("testdb").getFileName.toString
     try testCode(path)
-    finally {
+    finally
       val dir = new File(path)
       assert(!dir.exists() || dir.delete(), "File deletion failed")
-    }
-  }
 
   def prepareUpdate(
       namespace: Namespace = OtherNamespace,
@@ -54,7 +52,7 @@ trait DataSourceIntegrationTestBehavior extends ScalaCheckPropertyChecks with Ob
     }
 
   // scalastyle:off
-  def dataSource(createDataSource: => String => DataSource): Unit = {
+  def dataSource(createDataSource: => String => DataSource): Unit =
     it should "be able to insert keys in separate updates" taggedAs (IntegrationTest, DatabaseTest, SlowTest) in {
       forAll(seqByteStringOfNItemsGen(KeySizeWithoutPrefix)) { (unFilteredKeyList: Seq[ByteString]) =>
         withDir { path =>
@@ -255,7 +253,4 @@ trait DataSourceIntegrationTestBehavior extends ScalaCheckPropertyChecks with Ob
         }
       }
     }
-  }
   // scalastyle:on
-
-}

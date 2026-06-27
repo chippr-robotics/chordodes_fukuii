@@ -41,7 +41,7 @@ import com.chipprbots.ethereum.utils.Hex
   * Divergence from Besu: VmTraceGenerator post-processes TraceFrames; this tracer streams during execution.
   * Semantically equivalent for standard use cases.
   */
-class VmTracer extends ExecutionTracer {
+class VmTracer extends ExecutionTracer:
 
   private case class VmFrame(
       var code: ByteString = ByteString.empty,
@@ -61,23 +61,20 @@ class VmTracer extends ExecutionTracer {
   private val frameStack = mutable.Stack[VmFrame]()
   private var rootFrame: Option[VmFrame] = None
 
-  override def onTxStart(from: Address, to: Option[Address], gas: BigInt, value: BigInt, input: ByteString): Unit = {
+  override def onTxStart(from: Address, to: Option[Address], gas: BigInt, value: BigInt, input: ByteString): Unit =
     val frame = VmFrame()
     frameStack.push(frame)
     rootFrame = Some(frame)
-  }
 
   override def onStep[W <: WorldStateProxy[W, S], S <: Storage[S]](
       opCode: OpCode,
       prevState: ProgramState[W, S],
       nextState: ProgramState[W, S]
-  ): Unit = {
+  ): Unit =
     if frameStack.isEmpty then return
     val frame = frameStack.top
 
-    if frame.code.isEmpty then {
-      frame.code = prevState.env.program.code
-    }
+    if frame.code.isEmpty then frame.code = prevState.env.program.code
 
     val cost = prevState.gas - nextState.gas
     val exUsed = nextState.gas
@@ -86,7 +83,7 @@ class VmTracer extends ExecutionTracer {
       if opCode.alpha > 0 then nextState.stack.toSeq.take(opCode.alpha).map(_.toBigInt)
       else Seq.empty
 
-    val exMem: Option[(BigInt, ByteString)] = opCode match {
+    val exMem: Option[(BigInt, ByteString)] = opCode match
       case MSTORE if prevState.stack.size >= 2 =>
         val offset = prevState.stack.toSeq.head
         val data = nextState.memory.load(offset, UInt256(32))._1
@@ -97,16 +94,14 @@ class VmTracer extends ExecutionTracer {
         Some((offset.toBigInt, data))
       case _ =>
         None
-    }
 
-    val exStore: Option[(BigInt, BigInt)] = opCode match {
+    val exStore: Option[(BigInt, BigInt)] = opCode match
       case SSTORE if prevState.stack.size >= 2 =>
         val key = prevState.stack.toSeq(0).toBigInt
         val v = prevState.stack.toSeq(1).toBigInt
         Some((key, v))
       case _ =>
         None
-    }
 
     frame.ops += VmOp(
       pc = prevState.pc,
@@ -116,7 +111,6 @@ class VmTracer extends ExecutionTracer {
       exMem = exMem,
       exStore = exStore
     )
-  }
 
   override def onCallEnter(
       opCode: String,
@@ -125,30 +119,25 @@ class VmTracer extends ExecutionTracer {
       gas: BigInt,
       value: BigInt,
       input: ByteString
-  ): Unit = {
+  ): Unit =
     val frame = VmFrame()
     frameStack.push(frame)
-  }
 
-  override def onCallExit(gasUsed: BigInt, output: ByteString, error: Option[String]): Unit = {
+  override def onCallExit(gasUsed: BigInt, output: ByteString, error: Option[String]): Unit =
     if frameStack.size <= 1 then return
     val frame = frameStack.pop()
     val encoded = encodeFrame(frame)
-    if frameStack.nonEmpty && frameStack.top.ops.nonEmpty then {
-      frameStack.top.ops.last.sub = Some(encoded)
-    }
-  }
+    if frameStack.nonEmpty && frameStack.top.ops.nonEmpty then frameStack.top.ops.last.sub = Some(encoded)
 
-  override def getResult: JValue = rootFrame match {
+  override def getResult: JValue = rootFrame match
     case Some(frame) => encodeFrame(frame)
     case None        => JNull
-  }
 
   private def encodeFrame(frame: VmFrame): JValue =
     ("code" -> encodeHexBytes(frame.code)) ~
       ("ops" -> JArray(frame.ops.toList.map(encodeOp)))
 
-  private def encodeOp(op: VmOp): JValue = {
+  private def encodeOp(op: VmOp): JValue =
     val ex: JValue =
       ("mem" -> op.exMem
         .map { case (off, data) =>
@@ -167,9 +156,7 @@ class VmTracer extends ExecutionTracer {
       ("ex" -> ex) ~
       ("pc" -> JInt(op.pc)) ~
       ("sub" -> op.sub.getOrElse(JNull: JValue))
-  }
 
   private def encodeHexBytes(bs: ByteString): JString =
     if bs.isEmpty then JString("0x")
     else JString("0x" + Hex.toHexString(bs.toArray))
-}

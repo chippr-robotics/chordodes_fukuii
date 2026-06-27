@@ -7,11 +7,10 @@ import com.chipprbots.ethereum.network.PeerId
 
 /** Result of delivering a response to a concurrent fetch queue. */
 sealed trait DeliveryResult
-object DeliveryResult {
+object DeliveryResult:
   final case class Delivered(items: Int) extends DeliveryResult
   final case class Invalid(reason: String) extends DeliveryResult
   case object Duplicate extends DeliveryResult
-}
 
 /** Snapshot of an in-flight request sent to a peer.
   *
@@ -40,7 +39,7 @@ final case class InFlightRequest[Req](
   *
   * Reference: go-ethereum/eth/downloader/fetchers_concurrent.go — typedQueue interface.
   */
-trait ConcurrentFetch[Req, Resp] {
+trait ConcurrentFetch[Req, Resp]:
 
   /** Number of items waiting to be assigned to a peer (not yet in-flight). */
   def pending: Int
@@ -88,9 +87,8 @@ trait ConcurrentFetch[Req, Resp] {
     *   (peerId, originalReq) pairs that expired
     */
   def expireStale(nowMs: Long): Seq[(PeerId, Req)]
-}
 
-object ConcurrentFetch {
+object ConcurrentFetch:
 
   /** Core dispatch step — port of the assignment loop in go-ethereum's concurrentFetch().
     *
@@ -122,7 +120,7 @@ object ConcurrentFetch {
       targetRttMs: Long,
       label: String,
       log: Logger
-  ): Seq[(PeerWithInfo, Req)] = {
+  ): Seq[(PeerWithInfo, Req)] =
     if queue.pending == 0 then return Seq.empty
 
     val idlePeers = availablePeers
@@ -144,7 +142,7 @@ object ConcurrentFetch {
     val sorted = idlePeers.sortBy(p => -queue.capacity(p, targetRttMs))
 
     val assignments = scala.collection.mutable.Buffer[(PeerWithInfo, Req)]()
-    for peer <- sorted if queue.pending > 0 do {
+    for peer <- sorted if queue.pending > 0 do
       val items = queue.capacity(peer, targetRttMs).max(1)
       queue.reserve(peer, items).foreach { req =>
         log.debug(
@@ -154,7 +152,4 @@ object ConcurrentFetch {
         )
         assignments += (peer -> req)
       }
-    }
     assignments.toSeq
-  }
-}

@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.vm
 
-object Fixtures {
+object Fixtures:
 
   val ConstantinopleBlockNumber = 200
   val PetersburgBlockNumber = 400
@@ -35,5 +35,3 @@ object Fixtures {
     olympiaBlockNumber = OlympiaBlockNumber,
     chainId = 0x3d
   )
-
-}

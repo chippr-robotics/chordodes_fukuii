@@ -13,14 +13,13 @@ import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
 
-object OmmersPool {
+object OmmersPool:
 
   sealed trait Command
   case class AddOmmers(ommers: List[BlockHeader]) extends Command
 
-  object AddOmmers {
+  object AddOmmers:
     def apply(b: BlockHeader*): AddOmmers = AddOmmers(b.toList)
-  }
 
   case class GetOmmers(parentBlockHash: ByteString, replyTo: ActorRef[Ommers]) extends Command
 
@@ -51,7 +50,7 @@ object OmmersPool {
       ommersPool: Seq[BlockHeader]
   ): Behavior[Command] =
     Behaviors.receive { (context, message) =>
-      message match {
+      message match
         case AddOmmers(ommers) =>
           val updated = (ommers ++ ommersPool).take(ommersPoolSize).distinct
           logStatus(context, event = "Ommers after add", ommers = updated)
@@ -68,33 +67,26 @@ object OmmersPool {
           logStatus(context, event = s"Ommers given parent block ${Hex.toHexString(parentBlockHash.toArray)}", ommers)
           replyTo ! OmmersPool.Ommers(ommers)
           Behaviors.same
-      }
     }
 
   private def collectAncestors(
       blockchainReader: BlockchainReader,
       parentHash: ByteString,
       generationLimit: Int
-  ): List[BlockHeader] = {
+  ): List[BlockHeader] =
     @tailrec
     def rec(hash: BlockHash, limit: Int, acc: List[BlockHeader]): List[BlockHeader] =
-      if limit > 0 then {
-        blockchainReader.getBlockHeaderByHash(hash) match {
+      if limit > 0 then
+        blockchainReader.getBlockHeaderByHash(hash) match
           case Some(bh) => rec(bh.parentHash, limit - 1, acc :+ bh)
           case None     => acc
-        }
-      } else {
-        acc
-      }
+      else acc
     rec(BlockHash(parentHash), generationLimit, List.empty)
-  }
 
   private def logStatus(
       context: org.apache.pekko.actor.typed.scaladsl.ActorContext[Command],
       event: String,
       ommers: Seq[BlockHeader]
-  ): Unit = {
+  ): Unit =
     lazy val ommersAsString: Seq[String] = ommers.map(bh => s"[number = ${bh.number}, hash = ${bh.hashAsHexString}]")
     context.log.debug(s"$event ${ommersAsString}")
-  }
-}

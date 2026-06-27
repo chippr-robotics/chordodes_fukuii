@@ -32,7 +32,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   * wrong-version payloads silently. Timestamps used here are declared as far-future sentinels in
   * src/test/resources/application.conf.
   */
-class EngineApiVersionRejectionSpec extends AnyWordSpec with Matchers {
+class EngineApiVersionRejectionSpec extends AnyWordSpec with Matchers:
 
   implicit val ioRuntime: IORuntime = IORuntime.global
 
@@ -52,12 +52,11 @@ class EngineApiVersionRejectionSpec extends AnyWordSpec with Matchers {
     new EngineApiService(null, null, null, null, None)(null, null) {}
 
   private def stubServiceWithBlock(block: Block): EngineApiService =
-    new EngineApiService(null, null, null, null, None)(null, null) {
+    new EngineApiService(null, null, null, null, None)(null, null):
       override def getPayload(payloadId: ByteString): IO[Either[String, Block]] =
         IO.pure(Right(block))
-    }
 
-  private def makeBlock(timestamp: Long, hef: BlockHeader.HeaderExtraFields): Block = {
+  private def makeBlock(timestamp: Long, hef: BlockHeader.HeaderExtraFields): Block =
     val header = BlockHeader(
       parentHash = BlockHash(ByteString(new Array[Byte](32))),
       ommersHash = BlockHash(BlockHeader.EmptyOmmers),
@@ -77,7 +76,6 @@ class EngineApiVersionRejectionSpec extends AnyWordSpec with Matchers {
       extraFields = hef
     )
     Block(header, BlockBody(Nil, Nil, withdrawals = Some(Nil)))
-  }
 
   private val shanghaiBlock: Block = makeBlock(
     ShanghaiTs,
@@ -202,4 +200,3 @@ class EngineApiVersionRejectionSpec extends AnyWordSpec with Matchers {
       response.error.map(_.message).exists(_.contains("Cancun")) shouldBe true
     }
   }
-}

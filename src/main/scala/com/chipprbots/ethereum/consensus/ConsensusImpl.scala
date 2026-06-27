@@ -28,7 +28,7 @@ class ConsensusImpl(
     blockchainWriter: BlockchainWriter,
     blockExecution: BlockExecution
 ) extends Consensus
-    with Logger {
+    with Logger:
 
   /** Try to set the given branch as the new best branch if it is better than the current best branch.
     * @param branch
@@ -53,14 +53,12 @@ class ConsensusImpl(
     // then fall back to header-only — that's the state right after PivotHeaderBootstrap
     // completes. handleBranchImport only consumes header.hash and header.number,
     // so a header is sufficient. Closes #1201's post-bootstrap follow-up.
-    blockchainReader.getBestBlock.map(_.header).orElse(blockchainReader.getBestBlockHeader) match {
+    blockchainReader.getBestBlock.map(_.header).orElse(blockchainReader.getBestBlockHeader) match
       case Some(bestHeader) =>
-        blockchainReader.getChainWeightByHash(bestHeader.hash) match {
+        blockchainReader.getChainWeightByHash(bestHeader.hash) match
           case Some(weight) => handleBranchImport(branch, bestHeader, weight)
           case None         => returnNoTotalDifficultyForHeader(bestHeader)
-        }
       case None => returnNoBestBlock()
-    }
 
   private def handleBranchImport(
       branch: NonEmptyList[Block],
@@ -69,19 +67,17 @@ class ConsensusImpl(
   )(implicit
       blockExecutionScheduler: IORuntime,
       blockchainConfig: BlockchainConfig
-  ): IO[ConsensusResult] = {
+  ): IO[ConsensusResult] =
 
     val consensusResult: IO[ConsensusResult] =
-      if currentBestHeader.hash == branch.head.header.parentHash then {
+      if currentBestHeader.hash == branch.head.header.parentHash then
         IO.delay(importToTop(branch, currentBestBlockWeight)).evalOn(blockExecutionScheduler.compute)
-      } else {
+      else
         IO
           .delay(importToNewBranch(branch, currentBestHeader.number, currentBestBlockWeight))
           .evalOn(blockExecutionScheduler.compute)
-      }
 
     consensusResult.flatTap(result => IO(measureBlockMetrics(result)))
-  }
 
   private def importToNewBranch(
       branch: NonEmptyList[Block],
@@ -89,28 +85,24 @@ class ConsensusImpl(
       currentBestBlockWeight: ChainWeight
   )(implicit
       blockchainConfig: BlockchainConfig
-  ) = {
+  ) =
     val parentHash = branch.head.header.parentHash
 
-    blockchainReader.getChainWeightByHash(parentHash) match {
+    blockchainReader.getChainWeightByHash(parentHash) match
       case Some(parentWeight) =>
-        if newBranchWeight(branch, parentWeight) > currentBestBlockWeight then {
+        if newBranchWeight(branch, parentWeight) > currentBestBlockWeight then
           reorganise(currentBestBlockNumber, branch, parentWeight, parentHash)
-        } else {
-          KeptCurrentBestBranch
-        }
+        else KeptCurrentBestBranch
       case None =>
         ConsensusError(
           branch.toList,
           s"Could not get weight for parent block ${Hex.toHexString(parentHash.toArray)} (number ${branch.head.number - 1})"
         )
-    }
-  }
 
   private def importToTop(branch: NonEmptyList[Block], currentBestBlockWeight: ChainWeight)(implicit
       blockchainConfig: BlockchainConfig
   ): ConsensusResult =
-    blockExecution.executeAndValidateBlocks(branch.toList, currentBestBlockWeight) match {
+    blockExecution.executeAndValidateBlocks(branch.toList, currentBestBlockWeight) match
       case (importedBlocks, None) =>
         saveLastBlock(importedBlocks)
         ExtendedCurrentBestBranch(importedBlocks)
@@ -128,7 +120,6 @@ class ConsensusImpl(
           importedBlocks,
           BranchExecutionFailure(Nil, failingBlock.hash.value, error.toString)
         )
-    }
 
   private def saveLastBlock(blocks: List[BlockData]): Unit = blocks.lastOption.foreach(b =>
     blockchainWriter.saveBestKnownBlocks(
@@ -151,7 +142,7 @@ class ConsensusImpl(
       parentHash: BlockHash
   )(implicit
       blockchainConfig: BlockchainConfig
-  ): ConsensusResult = {
+  ): ConsensusResult =
     log.debug(
       "Reorganise: collecting old block(s) from parent {} up to {}",
       ByteStringUtils.hash2string(parentHash.value),
@@ -167,7 +158,7 @@ class ConsensusImpl(
     // Advance bestKnown to furthest successfully executed block (even on partial failure)
     executedBlocks.lastOption.foreach(b => blockchainWriter.saveBestKnownBlocks(b.block.hash, b.block.number))
 
-    maybeError match {
+    maybeError match
       case None =>
         SelectedNewBestBranch(oldBlocksData.map(_.block), executedBlocks.map(_.block), executedBlocks.map(_.weight))
 
@@ -192,13 +183,11 @@ class ConsensusImpl(
           newBranch.toList.drop(executedBlocks.length).head.hash.value,
           s"Error while trying to reorganise chain: $error"
         )
-    }
-  }
 
   private def newBranchWeight(newBranch: NonEmptyList[Block], parentWeight: ChainWeight) =
     newBranch.foldLeft(parentWeight)((w, b) => w.increase(b.header))
 
-  private def returnNoTotalDifficultyForHeader(bestHeader: BlockHeader): IO[ConsensusError] = {
+  private def returnNoTotalDifficultyForHeader(bestHeader: BlockHeader): IO[ConsensusError] =
     log.error(
       "Getting total difficulty for current best block with hash: {} failed",
       bestHeader.hashAsHexString
@@ -209,43 +198,37 @@ class ConsensusImpl(
         s"Couldn't get total difficulty for current best block with hash: ${bestHeader.hashAsHexString}"
       )
     )
-  }
 
-  private def returnNoBestBlock(): IO[ConsensusError] = {
+  private def returnNoBestBlock(): IO[ConsensusError] =
     log.error("Getting current best block failed")
     IO.pure(ConsensusError(Nil, "Couldn't find the current best block"))
-  }
 
   private def measureBlockMetrics(importResult: ConsensusResult): Unit =
-    importResult match {
+    importResult match
       case ExtendedCurrentBestBranch(blockImportData) =>
         blockImportData.foreach(blockData => BlockMetrics.measure(blockData.block, blockchainReader.getBlockByHash))
       case SelectedNewBestBranch(_, newBranch, _) =>
         newBranch.foreach(block => BlockMetrics.measure(block, blockchainReader.getBlockByHash))
       case _ => ()
-    }
 
   // Read-only traversal of the current canonical chain from fromNumber down to (exclusive) parent.
   // Does NOT delete or modify any DB state — used solely to populate SelectedNewBestBranch.
-  private def collectOldBranch(parent: BlockHash, fromNumber: BigInt): List[BlockData] = {
+  private def collectOldBranch(parent: BlockHash, fromNumber: BigInt): List[BlockData] =
     @tailrec
     def go(parent: BlockHash, fromNumber: BigInt, acc: List[BlockData]): List[BlockData] =
-      blockchainReader.getBlockByNumber(blockchainReader.getBestBranch, fromNumber) match {
+      blockchainReader.getBlockByNumber(blockchainReader.getBestBranch, fromNumber) match
         case Some(block) if block.header.hash == parent || fromNumber == 0 =>
           acc
 
         case Some(block) =>
           val hash = block.header.hash
-          val blockDataOpt = for {
+          val blockDataOpt = for
             receipts <- blockchainReader.getReceiptsByHash(hash)
             weight <- blockchainReader.getChainWeightByHash(hash)
-          } yield BlockData(block, receipts, weight)
+          yield BlockData(block, receipts, weight)
           go(parent, fromNumber - 1, blockDataOpt.map(_ :: acc).getOrElse(acc))
 
         case None =>
           log.error(s"collectOldBranch: unexpected missing block at number $fromNumber")
           acc
-      }
     go(parent, fromNumber, Nil)
-  }
-}

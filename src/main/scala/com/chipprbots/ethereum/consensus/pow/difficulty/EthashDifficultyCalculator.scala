@@ -4,7 +4,7 @@ import com.chipprbots.ethereum.consensus.difficulty.DifficultyCalculator
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
-object EthashDifficultyCalculator extends DifficultyCalculator {
+object EthashDifficultyCalculator extends DifficultyCalculator:
   import DifficultyCalculator.*
   private val ExpDifficultyPeriod: Int = 100_000
   private val ByzantiumRelaxDifficulty: BigInt = 3_000_000
@@ -13,24 +13,21 @@ object EthashDifficultyCalculator extends DifficultyCalculator {
 
   def calculateDifficulty(blockNumber: BigInt, blockTimestamp: Long, parentHeader: BlockHeader)(implicit
       blockchainConfig: BlockchainConfig
-  ): BigInt = {
+  ): BigInt =
     import blockchainConfig.forkBlockNumbers.*
 
     lazy val timestampDiff = blockTimestamp - parentHeader.unixTimestamp
 
     val x: BigInt = parentHeader.difficulty / DifficultyBoundDivision
     val c: BigInt =
-      if blockNumber < homesteadBlockNumber then {
-        if blockTimestamp < parentHeader.unixTimestamp + 13 then 1 else -1
-      } else if blockNumber >= byzantiumBlockNumber || blockNumber >= atlantisBlockNumber then {
+      if blockNumber < homesteadBlockNumber then if blockTimestamp < parentHeader.unixTimestamp + 13 then 1 else -1
+      else if blockNumber >= byzantiumBlockNumber || blockNumber >= atlantisBlockNumber then
         val parentUncleFactor = if parentHeader.ommersHash.value == BlockHeader.EmptyOmmers then 1 else 2
         math.max(parentUncleFactor - (timestampDiff / 9), FrontierTimestampDiffLimit)
-      } else {
-        math.max(1 - (timestampDiff / 10), FrontierTimestampDiffLimit)
-      }
+      else math.max(1 - (timestampDiff / 10), FrontierTimestampDiffLimit)
 
     val extraDifficulty: BigInt =
-      if blockNumber < difficultyBombRemovalBlockNumber then {
+      if blockNumber < difficultyBombRemovalBlockNumber then
         // calculate a fake block number for the ice-age delay
         val fakeBlockNumber: BigInt =
           // https://eips.ethereum.org/EIPS/eip-2384
@@ -44,22 +41,18 @@ object EthashDifficultyCalculator extends DifficultyCalculator {
         val difficultyBombExponent = calculateBombExponent(fakeBlockNumber)
         if difficultyBombExponent >= 0 then BigInt(2).pow(difficultyBombExponent)
         else 0
-      } else 0
+      else 0
 
     val difficultyWithoutBomb = MinimumDifficulty.max(parentHeader.difficulty + x * c)
     difficultyWithoutBomb + extraDifficulty
-  }
 
   private def calculateBombExponent(blockNumber: BigInt)(implicit
       blockchainConfig: BlockchainConfig
-  ): Int = {
+  ): Int =
     import blockchainConfig.forkBlockNumbers.*
     if blockNumber < difficultyBombPauseBlockNumber then (blockNumber / ExpDifficultyPeriod - 2).toInt
     else if blockNumber < difficultyBombContinueBlockNumber then
       ((difficultyBombPauseBlockNumber / ExpDifficultyPeriod) - 2).toInt
-    else {
+    else
       val delay = (difficultyBombContinueBlockNumber - difficultyBombPauseBlockNumber) / ExpDifficultyPeriod
       ((blockNumber / ExpDifficultyPeriod) - delay - 2).toInt
-    }
-  }
-}

@@ -5,7 +5,7 @@ import org.apache.pekko.util.ByteString
 /** Storage for tracking when blocks were first seen by this node. Used by MESS (Modified Exponential Subjective
   * Scoring) to apply time-based penalties to late-arriving blocks for protection against long-range attacks.
   */
-trait BlockFirstSeenStorage {
+trait BlockFirstSeenStorage:
 
   /** Records the timestamp when a block was first seen by this node.
     *
@@ -40,4 +40,3 @@ trait BlockFirstSeenStorage {
     *   true if timestamp exists, false otherwise
     */
   def contains(blockHash: ByteString): Boolean = get(blockHash).isDefined
-}

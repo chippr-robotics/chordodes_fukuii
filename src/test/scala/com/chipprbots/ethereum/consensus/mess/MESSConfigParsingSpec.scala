@@ -20,7 +20,7 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
   * olympia-block-number needs updating.
   */
 // scalastyle:off magic.number
-class MESSConfigParsingSpec extends AnyFlatSpec with Matchers with ParallelTestExecution {
+class MESSConfigParsingSpec extends AnyFlatSpec with Matchers with ParallelTestExecution:
 
   private val fullConfig = ConfigFactory.load()
   private val etcRaw = fullConfig.getConfig("fukuii.blockchains.etc")
@@ -73,4 +73,3 @@ class MESSConfigParsingSpec extends AnyFlatSpec with Matchers with ParallelTestE
     val config = BlockchainConfig.fromRawConfig(rawNoOlympia)
     config.messConfig.reactivationBlock shouldBe None
   }
-}

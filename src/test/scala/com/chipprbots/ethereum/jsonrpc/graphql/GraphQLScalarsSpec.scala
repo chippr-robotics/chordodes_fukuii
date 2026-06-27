@@ -6,7 +6,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import sangria.ast
 
-class GraphQLScalarsSpec extends AnyFlatSpec with Matchers {
+class GraphQLScalarsSpec extends AnyFlatSpec with Matchers:
 
   import GraphQLScalars.*
 
@@ -108,4 +108,3 @@ class GraphQLScalarsSpec extends AnyFlatSpec with Matchers {
     LongType.coerceUserInput(5: Int).toOption.get shouldBe 5L
     LongType.coerceUserInput(5L).toOption.get shouldBe 5L
   }
-}

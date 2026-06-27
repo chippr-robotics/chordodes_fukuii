@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
   *   [[com.chipprbots.ethereum.consensus.mining.Mining.blockGenerator]],
   *   [[com.chipprbots.ethereum.ledger.BlockPreparator BlockPreparator]]
   */
-trait BlockGenerator {
+trait BlockGenerator:
 
   /** The type of consensus-specific data used in the block generation process. For example, under
     * [[com.chipprbots.ethereum.consensus.pow.PoWMining EthashConsensus]], this represents the
@@ -41,14 +41,12 @@ trait BlockGenerator {
       x: X,
       initialWorldStateBeforeExecution: Option[InMemoryWorldStateProxy]
   )(implicit blockchainConfig: BlockchainConfig): PendingBlockAndState
-}
 
 /** Internal API, used for testing.
   *
   * This is a [[BlockGenerator]] API for the needs of the test suites.
   */
-trait TestBlockGenerator extends BlockGenerator {
+trait TestBlockGenerator extends BlockGenerator:
   def blockTimestampProvider: BlockTimestampProvider
 
   def withBlockTimestampProvider(blockTimestampProvider: BlockTimestampProvider): TestBlockGenerator
-}

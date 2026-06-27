@@ -29,12 +29,12 @@ import com.chipprbots.ethereum.utils.Logger
 class EngineApiController(
     engineApiService: EngineApiService,
     jsonRpcControllerOpt: Option[com.chipprbots.ethereum.jsonrpc.JsonRpcController] = None
-) extends Logger {
+) extends Logger:
 
   private def reqId(request: JsonRpcRequest): JValue = request.id.getOrElse(JNull)
 
   def handleRequest(request: JsonRpcRequest): IO[JsonRpcResponse] =
-    request.method match {
+    request.method match
       case "engine_newPayloadV1"        => handleNewPayload(request, version = 1)
       case "engine_newPayloadV2"        => handleNewPayload(request, version = 2)
       case "engine_newPayloadV3"        => handleNewPayload(request, version = 3)
@@ -62,11 +62,11 @@ class EngineApiController(
       // CL clients and hive tests send eth_* methods through the authrpc port.
       // Forward to the real JSON-RPC controller for proper responses.
       case method if method.startsWith("eth_") || method.startsWith("net_") || method.startsWith("web3_") =>
-        jsonRpcControllerOpt match {
+        jsonRpcControllerOpt match
           case Some(ctrl) => ctrl.handleRequest(request)
           case None       =>
             // Fallback stubs when JSON-RPC controller is not wired
-            method match {
+            method match
               case "eth_syncing" => IO.pure(JsonRpcResponse("2.0", Some(JBool(false)), None, reqId(request)))
               case "eth_blockNumber" =>
                 val blockNum = engineApiService.getLatestBlockNumber
@@ -74,25 +74,22 @@ class EngineApiController(
                   JsonRpcResponse("2.0", Some(JString(s"0x${blockNum.toLong.toHexString}")), None, reqId(request))
                 )
               case _ => IO.pure(JsonRpcResponse("2.0", Some(JNull), None, reqId(request)))
-            }
-        }
       case other =>
         log.warn(s"Engine API: unknown method '$other'")
         IO.pure(JsonRpcResponse("2.0", None, Some(JsonRpcError.MethodNotFound), reqId(request)))
-    }
 
   private val UnsupportedFork = -38005
 
-  private def handleNewPayload(request: JsonRpcRequest, version: Int): IO[JsonRpcResponse] = {
+  private def handleNewPayload(request: JsonRpcRequest, version: Int): IO[JsonRpcResponse] =
     val params = request.params.map(_.arr).getOrElse(Nil)
-    params.headOption match {
+    params.headOption match
       case Some(payloadJson: JObject) =>
         // Per Engine API spec, newPayload* must never raise a JSON-RPC error on a malformed or
         // deliberately-invalid payload; it must return a PayloadStatus with status=INVALID and
         // validationError describing the problem. hive's engine-withdrawals and engine-api
         // modified-payload tests rely on this.
         val payloadOpt = scala.util.Try(decodeExecutionPayload(payloadJson)).toEither
-        payloadOpt match {
+        payloadOpt match
           case Left(ex) =>
             val msg = Option(ex.getMessage).getOrElse(ex.getClass.getSimpleName)
             log.warn("[ENGINE-API] newPayload v{} decode failure: {}", version, msg)
@@ -139,7 +136,7 @@ class EngineApiController(
             //   - at least one Cancun field is nil → -32602 (params shape wrong for method)
             val hasAllCancunFields =
               payload.blobGasUsed.isDefined && payload.excessBlobGas.isDefined
-            val versionError: Option[(Int, String)] = version match {
+            val versionError: Option[(Int, String)] = version match
               // V4 is valid only for Prague and Osaka payloads (go-ethereum: checkFork(Prague,
               // Osaka, BPO1-5)).  When Amsterdam is later defined, add a prior guard:
               //   case 4 if isAmsterdamTimestamp =>
@@ -175,19 +172,18 @@ class EngineApiController(
               case 1 if isShanghaiPayload =>
                 Some(UnsupportedFork -> "newPayloadV1 cannot be used post-Shanghai, use V2")
               case _ => None
-            }
 
-            if versionError.isDefined then {
+            if versionError.isDefined then
               val (code, msg) = versionError.get
               IO.pure(
                 JsonRpcResponse("2.0", None, Some(JsonRpcError(code, msg, None)), reqId(request))
               )
-            } else {
+            else
               // V3+: params[1] is expectedBlobVersionedHashes, params[2] is parentBeaconBlockRoot.
               // Previously we skipped params[1] entirely, which silently dropped the EIP-4844
               // versioned-hash check the CL relies on — every "NewPayloadV3 Versioned Hashes"
               // hive test passed the payload regardless of what the CL claimed to have seen.
-              if version >= 3 then {
+              if version >= 3 then
                 val expectedBlobVersionedHashes = params.lift(1).collect { case JArray(items) =>
                   items.collect { case JString(hex) => hexToByteString(hex) }
                 }
@@ -196,15 +192,13 @@ class EngineApiController(
                   expectedBlobVersionedHashes = expectedBlobVersionedHashes,
                   parentBeaconBlockRoot = parentBeaconBlockRoot
                 )
-              }
 
               // V4: fourth param is executionRequests (EIP-7685)
-              if version >= 4 then {
+              if version >= 4 then
                 val executionRequests = params.lift(3).collect { case JArray(items) =>
                   items.collect { case JString(hex) => hexToByteString(hex) }
                 }
                 payload = payload.copy(executionRequests = executionRequests)
-              }
 
               // validateRequests: reject entries with no type prefix or non-strictly-ascending
               // type bytes. Matches go-ethereum catalyst/api.go:1257. Only applicable Prague+.
@@ -238,18 +232,14 @@ class EngineApiController(
                 engineApiService.newPayload(payload).map { status =>
                   JsonRpcResponse("2.0", Some(encodePayloadStatus(status)), None, reqId(request))
                 }
-            }
-        }
       case _ =>
         IO.pure(
           JsonRpcResponse("2.0", None, Some(JsonRpcError.InvalidParams("missing execution payload")), reqId(request))
         )
-    }
-  }
 
-  private def handleForkchoiceUpdated(request: JsonRpcRequest, version: Int): IO[JsonRpcResponse] = {
+  private def handleForkchoiceUpdated(request: JsonRpcRequest, version: Int): IO[JsonRpcResponse] =
     val params = request.params.map(_.arr).getOrElse(Nil)
-    params.headOption match {
+    params.headOption match
       case Some(fcsJson: JObject) =>
         // Per Engine API spec, a malformed forkchoice state or payload attributes must not raise
         // a JSON-RPC error from the decoder; decoding errors come back as -38003 (invalid
@@ -259,7 +249,7 @@ class EngineApiController(
           val payloadAttrs = params.lift(1).collect { case obj: JObject => decodePayloadAttributes(obj) }
           (fcs, payloadAttrs)
         }.toEither
-        decoded match {
+        decoded match
           case Left(ex) =>
             val msg = Option(ex.getMessage).getOrElse(ex.getClass.getSimpleName)
             IO.pure(
@@ -291,7 +281,7 @@ class EngineApiController(
             //   V2: accepts pre-Shanghai (V1-shape) OR post-Shanghai (V2-shape), beaconRoot absent
             //   V3: timestamp ≥ cancun,                                         withdrawals + beaconRoot present
             val InvalidAttrs = -38003
-            val versionError: Option[(Int, String)] = (version, payloadAttrs) match {
+            val versionError: Option[(Int, String)] = (version, payloadAttrs) match
               case (3, Some(_)) if !isCancunTimestamp && hasBeaconRoot =>
                 Some(UnsupportedFork -> "forkchoiceUpdatedV3 with beacon root before Cancun activation")
               case (2, Some(_)) if isCancunTimestamp && hasBeaconRoot =>
@@ -322,9 +312,8 @@ class EngineApiController(
               case (3, Some(_)) if isCancunTimestamp && !hasBeaconRoot =>
                 Some(InvalidAttrs -> "forkchoiceUpdatedV3 attrs must include parentBeaconBlockRoot post-Cancun")
               case _ => None
-            }
 
-            if versionError.isDefined then {
+            if versionError.isDefined then
               val (code, msg) = versionError.get
               // Per engine-API step ordering (apply forkchoiceState, THEN validate attrs):
               // InvalidAttrs errors STILL require the forkchoice to be applied first. Hive
@@ -332,7 +321,7 @@ class EngineApiController(
               // the new head even on -38003. Forward an attrs-less FCU to the service, then
               // overlay the version error. UnsupportedFork (-38005) does not apply forkchoice —
               // the CL called the wrong method entirely.
-              if code == InvalidAttrs then {
+              if code == InvalidAttrs then
                 // If head is unknown (syncing), return SYNCING payload status without the
                 // attrs error — validation presupposes a known head. Hive's 'Invalid
                 // PayloadAttributes, Missing BeaconRoot, Syncing=True' expects no error.
@@ -342,12 +331,11 @@ class EngineApiController(
                   case _ =>
                     JsonRpcResponse("2.0", None, Some(JsonRpcError(code, msg, None)), reqId(request))
                 }
-              } else {
+              else
                 IO.pure(
                   JsonRpcResponse("2.0", None, Some(JsonRpcError(code, msg, None)), reqId(request))
                 )
-              }
-            } else {
+            else
               engineApiService.forkchoiceUpdated(fcs, payloadAttrs).map {
                 case Right(response) =>
                   JsonRpcResponse("2.0", Some(encodeForkchoiceUpdatedResponse(response)), None, reqId(request))
@@ -363,16 +351,12 @@ class EngineApiController(
                   // Invalid forkchoice state (e.g. unknown safe/finalized hash) → -38002
                   JsonRpcResponse("2.0", None, Some(JsonRpcError(-38002, errorMsg, None)), reqId(request))
               }
-            }
-        }
       case _ =>
         IO.pure(
           JsonRpcResponse("2.0", None, Some(JsonRpcError.InvalidParams("missing fork choice state")), reqId(request))
         )
-    }
-  }
 
-  private def handleExchangeCapabilities(request: JsonRpcRequest): IO[JsonRpcResponse] = {
+  private def handleExchangeCapabilities(request: JsonRpcRequest): IO[JsonRpcResponse] =
     val clCapabilities = request.params
       .flatMap(_.arr.headOption)
       .collect { case JArray(items) => items.collect { case JString(s) => s } }
@@ -381,13 +365,11 @@ class EngineApiController(
     engineApiService.exchangeCapabilities(clCapabilities).map { supported =>
       JsonRpcResponse("2.0", Some(JArray(supported.map(JString(_)).toList)), None, reqId(request))
     }
-  }
 
-  private def handleGetPayload(request: JsonRpcRequest, version: Int): IO[JsonRpcResponse] = {
-    val payloadIdHex = request.params match {
+  private def handleGetPayload(request: JsonRpcRequest, version: Int): IO[JsonRpcResponse] =
+    val payloadIdHex = request.params match
       case Some(JArray(List(JString(id)))) => id
       case _                               => ""
-    }
     val payloadId = hexToByteString(payloadIdHex)
     engineApiService.getPayload(payloadId).map {
       case Right(block) =>
@@ -400,15 +382,14 @@ class EngineApiController(
         val isCancunPayload = cfg.isCancunTimestamp(ts)
         val isShanghaiPayload = cfg.isShanghaiTimestamp(ts)
         val isOsakaPayload = cfg.isOsakaTimestamp(ts)
-        val forkError: Option[String] = version match {
+        val forkError: Option[String] = version match
           case 2 if isCancunPayload   => Some("getPayloadV2 cannot return a Cancun payload; use V3")
           case 3 if !isCancunPayload  => Some("getPayloadV3 can only return Cancun-or-later payloads")
           case 1 if isShanghaiPayload => Some("getPayloadV1 cannot return a Shanghai-or-later payload; use V2")
           case 4 if isOsakaPayload    => Some("getPayloadV4 cannot return an Osaka-or-later payload; use V5")
           case 5 if !isOsakaPayload   => Some("getPayloadV5 can only return Osaka-or-later payloads")
           case _                      => None
-        }
-        forkError match {
+        forkError match
           case Some(msg) =>
             JsonRpcResponse("2.0", None, Some(JsonRpcError(UnsupportedFork, msg, None)), reqId(request))
           case None =>
@@ -418,15 +399,14 @@ class EngineApiController(
             // blockValue depends on receipts (effectiveGasPrice per tx). Fetch once so V2/V3/V4 share.
             lazy val receipts = engineApiService.getPayloadReceipts(payloadId)
             lazy val blockValueHex = computeBlockValue(block, receipts)
-            lazy val blobsBundleJson: JObject = {
+            lazy val blobsBundleJson: JObject =
               val bundle = engineApiService.getPayloadBlobsBundle(payloadId)
               JObject(
                 "commitments" -> JArray(bundle.commitments.toList.map(c => JString(byteStringToHex(c)))),
                 "proofs" -> JArray(bundle.proofs.toList.map(p => JString(byteStringToHex(p)))),
                 "blobs" -> JArray(bundle.blobs.toList.map(b => JString(byteStringToHex(b))))
               )
-            }
-            val result: JValue = version match {
+            val result: JValue = version match
               case 1 => payload
               case 2 =>
                 JObject(
@@ -453,14 +433,13 @@ class EngineApiController(
                 )
               case _ => // V5+: BlobsBundleV2 (EIP-7594 cell proofs) + executionRequests
                 val executionRequests = engineApiService.getPayloadExecutionRequests(payloadId)
-                val blobsBundleV2Json: JObject = {
+                val blobsBundleV2Json: JObject =
                   val bundle = engineApiService.getPayloadBlobsBundle(payloadId)
                   JObject(
                     "commitments" -> JArray(bundle.commitments.toList.map(c => JString(byteStringToHex(c)))),
                     "proofs" -> JArray(bundle.cellProofsPerBlob.flatten.toList.map(p => JString(byteStringToHex(p)))),
                     "blobs" -> JArray(bundle.blobs.toList.map(b => JString(byteStringToHex(b))))
                   )
-                }
                 JObject(
                   "executionPayload" -> payload,
                   "blockValue" -> JString(blockValueHex),
@@ -470,13 +449,10 @@ class EngineApiController(
                     executionRequests.toList.map(r => JString(byteStringToHex(r)))
                   )
                 )
-            }
             JsonRpcResponse("2.0", Some(result), None, reqId(request))
-        }
       case Left(err) =>
         JsonRpcResponse("2.0", None, Some(JsonRpcError(-38001, err, None)), reqId(request))
     }
-  }
 
   /** blockValue = Σ gasUsedByTx_i × (effectiveGasPrice_i − baseFeePerGas). Miner's priority-fee revenue for the block.
     * Per EIP-3675 V2 envelope, this is what the CL reads to pick the highest-value payload across builders.
@@ -490,22 +466,21 @@ class EngineApiController(
   private def computeBlockValue(
       block: Block,
       receipts: Seq[com.chipprbots.ethereum.domain.Receipt]
-  ): String = {
+  ): String =
     import com.chipprbots.ethereum.domain.{
       TransactionWithAccessList,
       TransactionWithDynamicFee,
       BlobTransaction,
       SetCodeTransaction
     }
-    val baseFee = block.header.extraFields match {
+    val baseFee = block.header.extraFields match
       case BlockHeader.HeaderExtraFields.HefPostOlympia(bf)               => bf
       case BlockHeader.HeaderExtraFields.HefPostShanghai(bf, _)           => bf
       case BlockHeader.HeaderExtraFields.HefPostCancun(bf, _, _, _, _)    => bf
       case BlockHeader.HeaderExtraFields.HefPostPrague(bf, _, _, _, _, _) => bf
       case _                                                              => BigInt(0)
-    }
     if receipts.isEmpty then "0x0"
-    else {
+    else
       val txs = block.body.transactionList
       // derive per-tx gas used from cumulative deltas
       val gasUsedPerTx: Seq[BigInt] = receipts
@@ -519,22 +494,19 @@ class EngineApiController(
       val totalPriorityFee: BigInt = txs
         .zip(gasUsedPerTx)
         .map { case (stx, gasUsed) =>
-          val effectiveGasPrice: BigInt = stx.tx match {
+          val effectiveGasPrice: BigInt = stx.tx match
             case t: TransactionWithDynamicFee => (baseFee + t.maxPriorityFeePerGas).min(t.maxFeePerGas)
             case t: BlobTransaction           => (baseFee + t.maxPriorityFeePerGas).min(t.maxFeePerGas)
             case t: SetCodeTransaction        => (baseFee + t.maxPriorityFeePerGas).min(t.maxFeePerGas)
             case t: TransactionWithAccessList => t.gasPrice
             case _                            => stx.tx.gasPrice
-          }
           val priorityPerGas = (effectiveGasPrice - baseFee).max(0)
           gasUsed * priorityPerGas
         }
         .sum
       s"0x${totalPriorityFee.toString(16)}"
-    }
-  }
 
-  private def blockToExecutionPayload(block: Block): JObject = {
+  private def blockToExecutionPayload(block: Block): JObject =
     import block.header
     def hex(bs: ByteString): String = "0x" + org.bouncycastle.util.encoders.Hex.toHexString(bs.toArray)
     def hexQ(n: BigInt): String = s"0x${n.toString(16)}"
@@ -554,13 +526,12 @@ class EngineApiController(
         )
       }.toList)
     }
-    val (baseFee, blobGasUsed, excessBlobGas) = header.extraFields match {
+    val (baseFee, blobGasUsed, excessBlobGas) = header.extraFields match
       case BlockHeader.HeaderExtraFields.HefPostOlympia(bf)                   => (Some(bf), None, None)
       case BlockHeader.HeaderExtraFields.HefPostShanghai(bf, _)               => (Some(bf), None, None)
       case BlockHeader.HeaderExtraFields.HefPostCancun(bf, _, bgu, ebg, _)    => (Some(bf), Some(bgu), Some(ebg))
       case BlockHeader.HeaderExtraFields.HefPostPrague(bf, _, bgu, ebg, _, _) => (Some(bf), Some(bgu), Some(ebg))
       case _                                                                  => (None, None, None)
-    }
     val baseFields = List(
       "parentHash" -> JString(hex(header.parentHash.value)),
       "feeRecipient" -> JString(hex(header.beneficiary)),
@@ -583,9 +554,8 @@ class EngineApiController(
       excessBlobGas.map(v => "excessBlobGas" -> JString(hexQ(v)))
     ).flatten
     JObject(baseFields ++ withdrawalsField ++ blobFields)
-  }
 
-  private def handleGetClientVersion(request: JsonRpcRequest): IO[JsonRpcResponse] = {
+  private def handleGetClientVersion(request: JsonRpcRequest): IO[JsonRpcResponse] =
     // Per execution-apis spec, `commit` MUST be the canonical short git SHA — pure
     // hexadecimal characters. Lighthouse's HTTP client validates this and rejects
     // the response with `InvalidClientVersion("Input must contain only hexadecimal
@@ -606,9 +576,8 @@ class EngineApiController(
       )
     )
     IO.pure(JsonRpcResponse("2.0", Some(clientVersion), None, reqId(request)))
-  }
 
-  private def handleGetBlobs(request: JsonRpcRequest): IO[JsonRpcResponse] = {
+  private def handleGetBlobs(request: JsonRpcRequest): IO[JsonRpcResponse] =
     // engine_getBlobsV1: return null for each requested versioned hash (we don't store blobs)
     // Lighthouse will fall back to fetching blobs from CL peers
     val hashes = request.params
@@ -621,9 +590,8 @@ class EngineApiController(
       .getOrElse(Nil)
     val nullBlobs = hashes.map(_ => JNull)
     IO.pure(JsonRpcResponse("2.0", Some(JArray(nullBlobs)), None, reqId(request)))
-  }
 
-  private def handleGetBlobsV2(request: JsonRpcRequest): IO[JsonRpcResponse] = {
+  private def handleGetBlobsV2(request: JsonRpcRequest): IO[JsonRpcResponse] =
     // engine_getBlobsV2: returns BlobAndProofV2 | null per versioned hash (EIP-7594 / PeerDAS).
     // Fukuii does not index mempool blobs by versioned hash, so null is returned for every entry;
     // the CL (Lighthouse/Prysm) will fall back to fetching cell proofs from CL peers.
@@ -637,9 +605,8 @@ class EngineApiController(
       .getOrElse(Nil)
     val nullEntries = hashes.map(_ => JNull)
     IO.pure(JsonRpcResponse("2.0", Some(JArray(nullEntries)), None, reqId(request)))
-  }
 
-  private def handleGetPayloadBodiesByHash(request: JsonRpcRequest): IO[JsonRpcResponse] = {
+  private def handleGetPayloadBodiesByHash(request: JsonRpcRequest): IO[JsonRpcResponse] =
     val hashes = request.params
       .map(_.arr)
       .getOrElse(Nil)
@@ -653,9 +620,8 @@ class EngineApiController(
       engineApiService.getPayloadBodyByHash(hash).map(encodePayloadBody).getOrElse(JNull)
     }
     IO.pure(JsonRpcResponse("2.0", Some(JArray(bodies)), None, reqId(request)))
-  }
 
-  private def handleGetPayloadBodiesByRange(request: JsonRpcRequest): IO[JsonRpcResponse] = {
+  private def handleGetPayloadBodiesByRange(request: JsonRpcRequest): IO[JsonRpcResponse] =
     val params = request.params.map(_.arr).getOrElse(Nil)
     val start = params.headOption
       .collect {
@@ -672,7 +638,7 @@ class EngineApiController(
       .getOrElse(BigInt(0))
 
     // Spec: start<1 or count<1 → -32602 invalid params.
-    if start < 1 || count < 1 then {
+    if start < 1 || count < 1 then
       IO.pure(
         JsonRpcResponse(
           "2.0",
@@ -681,41 +647,35 @@ class EngineApiController(
           reqId(request)
         )
       )
-    } else {
+    else
       // Spec: truncate the response at the latest known canonical block — do NOT emit
       // trailing nulls for numbers past the tip. Hive's GetPayloadBodiesByRange test
       // checks the array length against min(count, latest-start+1).
       val latest = engineApiService.getLatestBlockNumber
-      if start > latest then {
-        IO.pure(JsonRpcResponse("2.0", Some(JArray(Nil)), None, reqId(request)))
-      } else {
+      if start > latest then IO.pure(JsonRpcResponse("2.0", Some(JArray(Nil)), None, reqId(request)))
+      else
         val effectiveCount = count.min(latest - start + 1).min(1024)
         val bodies = (0L until effectiveCount.toLong).map { offset =>
           engineApiService.getPayloadBodyByNumber(start + offset).map(encodePayloadBody).getOrElse(JNull)
         }.toList
         IO.pure(JsonRpcResponse("2.0", Some(JArray(bodies)), None, reqId(request)))
-      }
-    }
-  }
 
-  private def encodePayloadBody(body: (Seq[ByteString], Option[Seq[org.json4s.JValue]])): JValue = {
+  private def encodePayloadBody(body: (Seq[ByteString], Option[Seq[org.json4s.JValue]])): JValue =
     val (txs, withdrawals) = body
     val txsJson = JArray(txs.map(tx => JString(byteStringToHex(tx))).toList)
     val wsJson = withdrawals.map(ws => JArray(ws.toList)).getOrElse(JNull)
     JObject("transactions" -> txsJson, "withdrawals" -> wsJson)
-  }
 
   // --- JSON encoding/decoding helpers ---
 
-  private def hexToByteString(hex: String): ByteString = {
+  private def hexToByteString(hex: String): ByteString =
     val clean = hex.stripPrefix("0x")
     if clean.isEmpty then ByteString.empty
     else ByteString(org.bouncycastle.util.encoders.Hex.decode(clean))
-  }
 
   private def byteStringToHex(bs: ByteString): String = "0x" + bs.map("%02x".format(_)).mkString
 
-  private def decodeExecutionPayload(json: JObject): ExecutionPayload = {
+  private def decodeExecutionPayload(json: JObject): ExecutionPayload =
     val fields = json.obj.toMap
     ExecutionPayload(
       parentHash = hexToByteString(extractString(fields, "parentHash")),
@@ -743,9 +703,8 @@ class EngineApiController(
       blobGasUsed = fields.get("blobGasUsed").collect { case JString(hex) => BigInt(hex.stripPrefix("0x"), 16) },
       excessBlobGas = fields.get("excessBlobGas").collect { case JString(hex) => BigInt(hex.stripPrefix("0x"), 16) }
     )
-  }
 
-  private def decodeWithdrawal(json: JObject): Withdrawal = {
+  private def decodeWithdrawal(json: JObject): Withdrawal =
     val fields = json.obj.toMap
     Withdrawal(
       index = extractQuantity(fields, "index"),
@@ -753,18 +712,16 @@ class EngineApiController(
       address = Address(extractString(fields, "address")),
       amount = extractQuantity(fields, "amount")
     )
-  }
 
-  private def decodeForkChoiceState(json: JObject): ForkChoiceState = {
+  private def decodeForkChoiceState(json: JObject): ForkChoiceState =
     val fields = json.obj.toMap
     ForkChoiceState(
       headBlockHash = hexToByteString(extractString(fields, "headBlockHash")),
       safeBlockHash = hexToByteString(extractString(fields, "safeBlockHash")),
       finalizedBlockHash = hexToByteString(extractString(fields, "finalizedBlockHash"))
     )
-  }
 
-  private def decodePayloadAttributes(json: JObject): PayloadAttributes = {
+  private def decodePayloadAttributes(json: JObject): PayloadAttributes =
     val fields = json.obj.toMap
     PayloadAttributes(
       timestamp = extractQuantity(fields, "timestamp").toLong,
@@ -775,24 +732,21 @@ class EngineApiController(
       },
       parentBeaconBlockRoot = fields.get("parentBeaconBlockRoot").collect { case JString(hex) => hexToByteString(hex) }
     )
-  }
 
-  private def encodePayloadStatus(status: PayloadStatusV1): JValue = {
+  private def encodePayloadStatus(status: PayloadStatusV1): JValue =
     val fields: List[(String, JValue)] = List(
       "status" -> JString(status.status.value),
       "latestValidHash" -> status.latestValidHash.map(h => JString(byteStringToHex(h))).getOrElse(JNull),
       "validationError" -> status.validationError.map(JString(_)).getOrElse(JNull)
     )
     JObject(fields)
-  }
 
-  private def encodeForkchoiceUpdatedResponse(response: ForkchoiceUpdatedResponse): JValue = {
+  private def encodeForkchoiceUpdatedResponse(response: ForkchoiceUpdatedResponse): JValue =
     val fields: List[(String, JValue)] = List(
       "payloadStatus" -> encodePayloadStatus(response.payloadStatus),
       "payloadId" -> response.payloadId.map(id => JString(byteStringToHex(id))).getOrElse(JNull)
     )
     JObject(fields)
-  }
 
   private def extractString(fields: Map[String, JValue], key: String): String =
     fields
@@ -812,4 +766,3 @@ class EngineApiController(
         case JInt(n) => n
       }
       .getOrElse(BigInt(0))
-}

@@ -20,17 +20,16 @@ import com.chipprbots.ethereum.utils.Logger
   *   - clean files out of given location
   *   - unzip to a given location
   */
-object BootstrapDownload extends Logger {
+object BootstrapDownload extends Logger:
 
   val bufferSize: Int = 4 * 1024
   val leveldbFolderName = "leveldb"
 
-  private def assertAndLog(cond: Boolean, msg: String): Unit = {
+  private def assertAndLog(cond: Boolean, msg: String): Unit =
     if !cond then log.info(msg)
     assert(cond, msg)
-  }
 
-  def cleanOutFolder(pathToDownloadTo: Path): Unit = {
+  def cleanOutFolder(pathToDownloadTo: Path): Unit =
     val leveldbFolder = pathToDownloadTo.toFile
     assertAndLog(leveldbFolder.isDirectory, s"${pathToDownloadTo} must be a folder.")
     assertAndLog(
@@ -38,57 +37,51 @@ object BootstrapDownload extends Logger {
       s"${pathToDownloadTo} must end in a folder named $leveldbFolderName"
     )
     leveldbFolder.listFiles(pathname => !pathname.getName.endsWith(".zip")).foreach(_.delete())
-  }
 
-  def downloadFile(urlToDownloadFrom: String, outFile: File): String = {
+  def downloadFile(urlToDownloadFrom: String, outFile: File): String =
 
     val sha512 = MessageDigest.getInstance("SHA-512")
     val dis = new DigestInputStream(URI.create(urlToDownloadFrom).toURL().openStream(), sha512)
 
-    try {
+    try
       val out = new FileOutputStream(outFile)
-      try {
+      try
         val buffer = new Array[Byte](bufferSize)
 
         Iterator.continually(dis.read(buffer)).takeWhile(_ != -1).foreach(out.write(buffer, 0, _))
-      } finally out.close()
+      finally out.close()
       Hex.toHexString(sha512.digest)
 
-    } finally dis.close()
-  }
+    finally dis.close()
 
-  def unzip(zipFile: File, destination: Path): Unit = {
+  def unzip(zipFile: File, destination: Path): Unit =
 
     val in = new FileInputStream(zipFile)
-    try {
+    try
       val zis = new ZipInputStream(in)
       try
         Iterator.continually(zis.getNextEntry).takeWhile(_ != null).foreach { file =>
-          if !file.isDirectory then {
+          if !file.isDirectory then
             val outPath = destination.resolve(file.getName)
             val outPathParent = outPath.getParent
-            if !outPathParent.toFile.exists() then {
-              outPathParent.toFile.mkdirs()
-            }
+            if !outPathParent.toFile.exists() then outPathParent.toFile.mkdirs()
 
             val outFile = outPath.toFile
             val out = new FileOutputStream(outFile)
-            try {
+            try
               val buffer = new Array[Byte](bufferSize)
               Iterator.continually(zis.read(buffer)).takeWhile(_ != -1).foreach(out.write(buffer, 0, _))
-            } finally out.close()
-          }
+            finally out.close()
         }
       finally zis.close()
-    } finally in.close()
-  }
+    finally in.close()
 
   def deleteDownloadedFile(downloadedFile: File): Unit =
     if downloadedFile.delete() then log.info(s"Downloaded file $downloadedFile successfully deleted")
     else log.info(s"Failed to delete downloaded file $downloadedFile")
 
   // scalastyle:off method.length
-  def main(args: Array[String]): Unit = {
+  def main(args: Array[String]): Unit =
     // download a zip file from a url.
 
     assertAndLog(
@@ -139,6 +132,3 @@ object BootstrapDownload extends Logger {
     deleteDownloadedFile(downloadedFile)
 
     log.info(s"Bootstrap download successful.")
-
-  }
-}

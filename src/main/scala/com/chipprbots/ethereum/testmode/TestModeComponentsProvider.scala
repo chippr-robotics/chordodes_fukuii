@@ -27,11 +27,11 @@ class TestModeComponentsProvider(
     miningConfig: MiningConfig,
     vm: VMImpl,
     node: TestNode
-) {
+):
 
   def getConsensus(
       preimageCache: collection.concurrent.Map[ByteString, UInt256]
-  ): ConsensusAdapter = {
+  ): ConsensusAdapter =
     val consensuz = consensus()
     val blockValidation = new BlockValidation(consensuz, blockchainReader, node.blockQueue)
     val blockExecution =
@@ -56,7 +56,6 @@ class TestModeComponentsProvider(
       blockValidation,
       validationExecutionContext
     )
-  }
 
   /** Clear the internal builder state
     */
@@ -75,4 +74,3 @@ class TestModeComponentsProvider(
       node,
       blockTimestamp
     )
-}

@@ -22,7 +22,7 @@ import com.chipprbots.ethereum.utils.ByteUtils
   *   - New BlockRangeUpdate (0x11) notification message — sent periodically AFTER the initial 7-field STATUS
   *   - All other messages (GetBlockHeaders, BlockHeaders, etc.) unchanged from ETH/68
   */
-object ETH69 {
+object ETH69:
 
   /** ETH/69 Status message.
     *
@@ -37,7 +37,7 @@ object ETH69 {
       earliestBlock: BigInt,
       latestBlock: BigInt,
       latestBlockHash: ByteString
-  ) extends Message {
+  ) extends Message:
     override val code: Int = Codes.StatusCode
     override def toShortString: String = toString
 
@@ -45,12 +45,11 @@ object ETH69 {
       s"ETH69.Status(v=$protocolVersion, net=$networkId, genesis=${genesisHash.take(4).toHex}..., " +
         s"forkId=$forkId, earliest=$earliestBlock, latest=$latestBlock, " +
         s"latestHash=${latestBlockHash.take(4).toHex}...)"
-  }
 
-  object Status {
+  object Status:
     implicit class StatusEnc(val underlyingMsg: Status)
         extends MessageSerializableImplicit[Status](underlyingMsg)
-        with RLPSerializable {
+        with RLPSerializable:
       override def code: Int = Codes.StatusCode
       import msg.*
       // EIP-7642 wire layout: 7 fields, with earliestBlock between forkId and latestBlock.
@@ -66,9 +65,8 @@ object ETH69 {
         RLPValue(ByteUtils.bigIntToUnsignedByteArray(latestBlock)),
         RLPValue(latestBlockHash.toArray[Byte])
       )
-    }
 
-    extension (bytes: Array[Byte]) {
+    extension (bytes: Array[Byte])
 
       /** Decode an ETH/69 STATUS frame.
         *
@@ -88,9 +86,9 @@ object ETH69 {
         * RLPList at index 3, ETH/68 has it at index 5. Scala pattern matching distinguishes them via the type at each
         * position (`RLPList` vs `RLPValue`).
         */
-      def toETH69Status: Status = {
+      def toETH69Status: Status =
         import com.chipprbots.ethereum.forkid.ForkId.*
-        rawDecode(bytes) match {
+        rawDecode(bytes) match
           // (1) Canonical 7-field EIP-7642 shape — geth/besu/reth.
           case RLPList(
                 RLPValue(protocolVersionBytes),
@@ -150,10 +148,6 @@ object ETH69 {
               latestBlockHash = ByteString(latestBlockHashBytes)
             )
           case other => throw new RuntimeException(s"Cannot decode ETH69.Status from: $other")
-        }
-      }
-    }
-  }
 
   /** BlockRangeUpdate notification (0x11). Sent when peer's available block range changes. No request-id. RLP:
     * [earliestBlock, latestBlock, latestBlockHash]
@@ -162,25 +156,23 @@ object ETH69 {
       earliestBlock: BigInt,
       latestBlock: BigInt,
       latestBlockHash: ByteString
-  ) extends Message {
+  ) extends Message:
     override val code: Int = Codes.BlockRangeUpdateCode
     override def toShortString: String = s"BlockRangeUpdate(earliest=$earliestBlock, latest=$latestBlock)"
-  }
 
-  object BlockRangeUpdate {
+  object BlockRangeUpdate:
     implicit class BlockRangeUpdateEnc(val underlyingMsg: BlockRangeUpdate)
         extends MessageSerializableImplicit[BlockRangeUpdate](underlyingMsg)
-        with RLPSerializable {
+        with RLPSerializable:
       override def code: Int = Codes.BlockRangeUpdateCode
       override def toRLPEncodable: RLPEncodeable = RLPList(
         RLPValue(ByteUtils.bigIntToUnsignedByteArray(msg.earliestBlock)),
         RLPValue(ByteUtils.bigIntToUnsignedByteArray(msg.latestBlock)),
         RLPValue(msg.latestBlockHash.toArray[Byte])
       )
-    }
 
-    extension (bytes: Array[Byte]) {
-      def toBlockRangeUpdate: BlockRangeUpdate = rawDecode(bytes) match {
+    extension (bytes: Array[Byte])
+      def toBlockRangeUpdate: BlockRangeUpdate = rawDecode(bytes) match
         case RLPList(
               RLPValue(earliestBlockBytes),
               RLPValue(latestBlockBytes),
@@ -192,7 +184,3 @@ object ETH69 {
             latestBlockHash = ByteString(latestBlockHashBytes)
           )
         case other => throw new RuntimeException(s"Cannot decode BlockRangeUpdate from: $other")
-      }
-    }
-  }
-}

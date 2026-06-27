@@ -6,10 +6,10 @@ import com.chipprbots.ethereum.db.dataSource.RocksDbConfig
 import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource
 import com.chipprbots.ethereum.db.storage.Namespaces
 
-class RocksDbDataSourceIntegrationSuite extends AnyFlatSpec with DataSourceIntegrationTestBehavior {
+class RocksDbDataSourceIntegrationSuite extends AnyFlatSpec with DataSourceIntegrationTestBehavior:
 
   private def createDataSource(dataSourcePath: String) = RocksDbDataSource(
-    new RocksDbConfig {
+    new RocksDbConfig:
       override val createIfMissing: Boolean = true
       override val paranoidChecks: Boolean = true
       override val path: String = dataSourcePath
@@ -19,9 +19,8 @@ class RocksDbDataSourceIntegrationSuite extends AnyFlatSpec with DataSourceInteg
       override val levelCompaction: Boolean = true
       override val blockSize: Long = 16384
       override val blockCacheSize: Long = 33554432
-    },
+    ,
     Namespaces.nsSeq
   )
 
   (it should behave).like(dataSource(createDataSource))
-}

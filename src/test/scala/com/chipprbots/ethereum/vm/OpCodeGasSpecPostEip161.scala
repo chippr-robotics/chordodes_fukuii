@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.vm.Generators.*
 
 import Fixtures.blockchainConfig
 
-class OpCodeGasSpecPostEip161 extends AnyFunSuite with OpCodeTesting with Matchers with ScalaCheckPropertyChecks {
+class OpCodeGasSpecPostEip161 extends AnyFunSuite with OpCodeTesting with Matchers with ScalaCheckPropertyChecks:
 
   override val config: EvmConfig = EvmConfig.PostEIP161ConfigBuilder(blockchainConfig)
 
@@ -54,4 +54,3 @@ class OpCodeGasSpecPostEip161 extends AnyFunSuite with OpCodeTesting with Matche
       }
     }
   }
-}

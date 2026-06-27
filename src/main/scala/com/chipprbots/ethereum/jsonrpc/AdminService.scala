@@ -33,7 +33,7 @@ import com.chipprbots.ethereum.utils.Logger
 import com.chipprbots.ethereum.utils.NodeStatus
 import com.chipprbots.ethereum.utils.ServerStatus
 
-object AdminService {
+object AdminService:
 
   /** Besu alignment: protocols.eth sub-object in admin_nodeInfo. Mirrors Besu's EthProtocolStatus: difficulty (hex),
     * genesis hash (0x-prefixed hex), head hash (0x-prefixed hex), network ID.
@@ -113,7 +113,6 @@ object AdminService {
   case class AdminMaxPeersResponse(success: Boolean)
 
   private val ValidLogLevels = Set("OFF", "ERROR", "WARN", "INFO", "DEBUG", "TRACE", "ALL")
-}
 
 class AdminService(
     nodeStatusHolder: AtomicReference[NodeStatus],
@@ -124,7 +123,7 @@ class AdminService(
     datadir: String,
     blockedIPRegistry: BlockedIPRegistry
 )(implicit scheduler: typed.Scheduler)
-    extends Logger {
+    extends Logger:
   import AdminService.*
 
   implicit private val timeout: Timeout = Timeout(peerManagerTimeout)
@@ -165,10 +164,9 @@ class AdminService(
     val nodeId = Hex.toHexString(status.nodeId)
 
     val genesisHash = "0x" + Hex.toHexString(blockchainReader.genesisHeader.hash.toArray)
-    val (headHash, headNumber) = blockchainReader.getBestBranch match {
+    val (headHash, headNumber) = blockchainReader.getBestBranch match
       case BestBranch(h, n) => (h, n)
       case _                => (org.apache.pekko.util.ByteString.empty, BigInt(0))
-    }
     val headHex = "0x" + Hex.toHexString(headHash.toArray)
     val totalDiff = blockchainReader
       .getChainWeightByHash(com.chipprbots.ethereum.domain.BlockHash(headHash))
@@ -182,7 +180,7 @@ class AdminService(
     )
     val fork = activeForkName(headNumber, blockchainConfig.forkBlockNumbers)
 
-    status.serverStatus match {
+    status.serverStatus match
       case ServerStatus.Listening(address) =>
         val host = Option(address.getAddress)
           .map(com.chipprbots.ethereum.network.getHostName)
@@ -215,7 +213,6 @@ class AdminService(
             activeFork = fork
           )
         )
-    }
   }
 
   /** Besu AdminPeers: streams ethPeers.streamAllPeers() → PeerResult.fromEthPeer. Divergence: Fukuii asks
@@ -245,7 +242,7 @@ class AdminService(
     * PeerManagerActor tracks the maintained set and schedules reconnects on disconnect.
     */
   def addPeer(req: AdminAddPeerRequest): ServiceResponse[AdminAddPeerResponse] =
-    try {
+    try
       val uri = new URI(req.enodeUrl)
       peerManager
         .askForTyped[PeerManagerActor.AddMaintainedPeerResponse](ref => PeerManagerActor.AddMaintainedPeerCmd(uri, ref))
@@ -254,11 +251,10 @@ class AdminService(
           log.error(s"Failed to add peer: ${req.enodeUrl}", ex)
           Right(AdminAddPeerResponse(false))
         }
-    } catch {
+    catch
       case ex: Exception =>
         log.error(s"Failed to parse enode URL: ${req.enodeUrl}", ex)
         IO.pure(Right(AdminAddPeerResponse(false)))
-    }
 
   /** Besu AdminRemovePeer: peerNetwork.removeMaintainedConnectionPeer(peer) → boolean (wasRemoved). Removes from the
     * maintained set (prevents auto-reconnect) AND disconnects the live connection if present. Returns true if a live
@@ -268,10 +264,10 @@ class AdminService(
     peerManager
       .askForTyped[PeerManagerActor.Peers](PeerManagerActor.GetPeersCmd(_))
       .map { peersResult =>
-        try {
+        try
           val uri = new URI(req.enodeUrl)
           val targetNodeId = Option(uri.getUserInfo).map(_.toLowerCase)
-          targetNodeId match {
+          targetNodeId match
             case None           => Right(AdminRemovePeerResponse(false))
             case Some(targetId) =>
               // Always remove from maintained set to prevent auto-reconnect
@@ -279,19 +275,16 @@ class AdminService(
               val matchingPeer = peersResult.peers.keys.find { peer =>
                 peer.nodeId.exists(nid => Hex.toHexString(nid.toArray).toLowerCase == targetId)
               }
-              matchingPeer match {
+              matchingPeer match
                 case Some(peer) =>
                   peerManager ! PeerManagerActor.DisconnectPeerFireAndForgetCmd(peer.id)
                   Right(AdminRemovePeerResponse(true))
                 case None =>
                   Right(AdminRemovePeerResponse(false))
-              }
-          }
-        } catch {
+        catch
           case ex: Exception =>
             log.error(s"Failed to parse enode URL: ${req.enodeUrl}", ex)
             Right(AdminRemovePeerResponse(false))
-        }
       }
       .handleError { ex =>
         log.error(s"Failed to remove peer: ${req.enodeUrl}", ex)
@@ -304,10 +297,9 @@ class AdminService(
     * runtime behaviour (dynamic per-logger level changes via SLF4J) is equivalent.
     */
   def changeLogLevel(req: AdminChangeLogLevelRequest): ServiceResponse[AdminChangeLogLevelResponse] = IO {
-    if !ValidLogLevels.contains(req.level) then {
-      Left(JsonRpcError.InvalidParams(s"Invalid log level: ${req.level}"))
-    } else {
-      try {
+    if !ValidLogLevels.contains(req.level) then Left(JsonRpcError.InvalidParams(s"Invalid log level: ${req.level}"))
+    else
+      try
         val ctx =
           LoggerFactory.getILoggerFactory
             .asInstanceOf[LoggerContext] // interop: SLF4J returns ILoggerFactory; Logback impl is always LoggerContext
@@ -320,25 +312,23 @@ class AdminService(
           logger.setLevel(level)
         }
         Right(AdminChangeLogLevelResponse())
-      } catch {
+      catch
         case ex: Exception =>
           log.error(s"Failed to change log level to ${req.level}", ex)
           Left(JsonRpcError.InternalError)
-      }
-    }
   }
 
   def getDatadir(@unused req: AdminDatadirRequest): ServiceResponse[AdminDatadirResponse] =
     IO.pure(Right(AdminDatadirResponse(datadir)))
 
   def exportChain(req: AdminExportChainRequest): ServiceResponse[AdminExportChainResponse] = IO.blocking {
-    try {
+    try
       val first = req.first.getOrElse(BigInt(0))
       val last = req.last.getOrElse(blockchainReader.getBestBlockNumber)
       val out = new BufferedOutputStream(new FileOutputStream(req.file))
-      try {
+      try
         var i = first
-        while i <= last do {
+        while i <= last do
           blockchainReader.getBlockHeaderByNumber(i).foreach { header =>
             blockchainReader.getBlockByHash(header.hash).foreach { block =>
               val bytes: Array[Byte] = block.toBytes
@@ -348,45 +338,40 @@ class AdminService(
             }
           }
           i += 1
-        }
         out.flush()
         log.info(s"Exported blocks $first to $last to ${req.file}")
         Right(AdminExportChainResponse(true))
-      } finally out.close()
-    } catch {
+      finally out.close()
+    catch
       case ex: Exception =>
         log.error(s"Failed to export chain to ${req.file}", ex)
         Right(AdminExportChainResponse(false))
-    }
   }
 
   def importChain(req: AdminImportChainRequest): ServiceResponse[AdminImportChainResponse] = IO.blocking {
-    try {
+    try
       val in = new FileInputStream(req.file)
-      try {
+      try
         var count = 0
         val lenBuf = new Array[Byte](4)
-        while in.read(lenBuf) == 4 do {
+        while in.read(lenBuf) == 4 do
           val len = ByteBuffer.wrap(lenBuf).getInt
           val blockBytes = new Array[Byte](len)
           var read = 0
-          while read < len do {
+          while read < len do
             val n = in.read(blockBytes, read, len - read)
             if n == -1 then throw new java.io.EOFException("Unexpected end of file")
             read += n
-          }
           val block = blockBytes.toBlock
           log.debug(s"Imported block ${block.header.number}")
           count += 1
-        }
         log.info(s"Imported $count blocks from ${req.file}")
         Right(AdminImportChainResponse(true))
-      } finally in.close()
-    } catch {
+      finally in.close()
+    catch
       case ex: Exception =>
         log.error(s"Failed to import chain from ${req.file}", ex)
         Right(AdminImportChainResponse(false))
-    }
   }
 
   def blockIP(req: AdminBlockIPRequest): ServiceResponse[AdminBlockIPResponse] = IO {
@@ -409,7 +394,7 @@ class AdminService(
     * core-geth node/api.go AddTrustedPeer returning (true, nil).
     */
   def addTrustedPeer(req: AdminAddTrustedPeerRequest): ServiceResponse[AdminAddTrustedPeerResponse] =
-    try {
+    try
       val uri = new URI(req.enodeUrl)
       peerManager
         .askForTyped[PeerManagerActor.AddTrustedPeerResponse](ref => PeerManagerActor.AddTrustedPeerCmd(uri, ref))
@@ -418,17 +403,16 @@ class AdminService(
           log.error(s"Failed to add trusted peer: ${req.enodeUrl}", ex)
           Right(AdminAddTrustedPeerResponse(false))
         }
-    } catch {
+    catch
       case ex: Exception =>
         log.error(s"Failed to parse enode URL: ${req.enodeUrl}", ex)
         IO.pure(Right(AdminAddTrustedPeerResponse(false)))
-    }
 
   /** core-geth admin_removeTrustedPeer: removes from trusted set; does NOT disconnect. Always returns true — mirrors
     * core-geth node/api.go RemoveTrustedPeer returning (true, nil).
     */
   def removeTrustedPeer(req: AdminRemoveTrustedPeerRequest): ServiceResponse[AdminRemoveTrustedPeerResponse] =
-    try {
+    try
       val uri = new URI(req.enodeUrl)
       val targetNodeId = Option(uri.getUserInfo).map(_.toLowerCase).getOrElse("")
       peerManager
@@ -440,11 +424,10 @@ class AdminService(
           log.error(s"Failed to remove trusted peer: ${req.enodeUrl}", ex)
           Right(AdminRemoveTrustedPeerResponse(false))
         }
-    } catch {
+    catch
       case ex: Exception =>
         log.error(s"Failed to parse enode URL: ${req.enodeUrl}", ex)
         IO.pure(Right(AdminRemoveTrustedPeerResponse(false)))
-    }
 
   /** core-geth admin_maxPeers: sets max connected peers at runtime. core-geth reference: eth/api_admin.go MaxPeers —
     * sets handler.maxPeers + p2pServer.MaxPeers.
@@ -457,4 +440,3 @@ class AdminService(
         log.error(s"Failed to set max peers to ${req.maxPeers}", ex)
         Right(AdminMaxPeersResponse(false))
       }
-}

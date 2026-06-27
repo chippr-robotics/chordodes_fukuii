@@ -40,7 +40,7 @@ import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.nodebuilder.Node
 import com.chipprbots.ethereum.utils.ByteStringUtils
 
-object MockedMiner {
+object MockedMiner:
   final val BlockForgerDispatcherId = "fukuii.async.dispatchers.block-forger"
 
   sealed trait Command
@@ -74,7 +74,7 @@ object MockedMiner {
     }
 
   def spawn(node: Node): typed.ActorRef[Command] =
-    node.mining match {
+    node.mining match
       case mining: PoWMining =>
         val blockCreator = new PoWBlockCreator(
           pendingTransactionsManager = node.pendingTransactionsManager,
@@ -96,11 +96,10 @@ object MockedMiner {
         )
       case mining =>
         wrongMiningArgument[PoWMining](mining)
-    }
 
   trait MockedMinerResponse
 
-  object MockedMinerResponses {
+  object MockedMinerResponses:
     case object MinerIsWorking extends MockedMinerResponse
 
     case object MiningOrdered extends MockedMinerResponse
@@ -110,8 +109,6 @@ object MockedMiner {
     case class MiningError(errorMsg: String) extends MockedMinerResponse
 
     case class MinerNotSupported(msg: MockedMinerProtocol) extends MockedMinerResponse
-  }
-}
 
 private class MockedMiner(
     context: ActorContext[Command],
@@ -119,7 +116,7 @@ private class MockedMiner(
     blockCreator: PoWBlockCreator,
     syncEventListener: TypedActorRef[SyncController.Command],
     configBuilder: BlockchainConfigBuilder
-) {
+):
   import configBuilder.*
   // CE3: Using global IORuntime for actor operations
   implicit private val runtime: cats.effect.unsafe.IORuntime = cats.effect.unsafe.IORuntime.global
@@ -137,15 +134,14 @@ private class MockedMiner(
   def waiting(): Behavior[Command] = Behaviors.receiveMessage {
     case Send(StopMining, _) => stopped()
     case Send(mineBlocks: MineBlocks, replyTo) =>
-      mineBlocks.parentBlock match {
+      mineBlocks.parentBlock match
         case Some(parentHash) =>
-          blockchainReader.getBlockByHash(BlockHash(parentHash)) match {
+          blockchainReader.getBlockByHash(BlockHash(parentHash)) match
             case Some(parentBlock) => startMiningBlocks(mineBlocks, parentBlock, replyTo)
             case None =>
               val error = s"Unable to get parent block with hash ${ByteStringUtils.hash2string(parentHash)} for mining"
               replyTo ! MiningError(error)
               Behaviors.same
-          }
         case None =>
           blockchainReader.getBestBlock
             .fold {
@@ -154,7 +150,6 @@ private class MockedMiner(
             } { parentBlock =>
               startMiningBlocks(mineBlocks, parentBlock, replyTo)
             }
-      }
     case _ => Behaviors.same
   }
 
@@ -162,11 +157,10 @@ private class MockedMiner(
       mineBlocks: MineBlocks,
       parentBlock: Block,
       replyTo: typed.ActorRef[MockedMinerResponse]
-  ): Behavior[Command] = {
+  ): Behavior[Command] =
     context.self ! MineBlock
     replyTo ! MiningOrdered
     working(mineBlocks.numBlocks, mineBlocks.withTransactions, parentBlock, None)
-  }
 
   def working(
       numBlocks: Int,
@@ -179,7 +173,7 @@ private class MockedMiner(
       Behaviors.same
 
     case MineBlock =>
-      if numBlocks > 0 then {
+      if numBlocks > 0 then
         context.pipeToSelf(
           blockCreator
             .getBlockForMining(parentBlock, withTransactions, initialWorldStateBeforeExecution)
@@ -189,10 +183,9 @@ private class MockedMiner(
           case Failure(t)      => MiningFailed(t)
         }
         Behaviors.same
-      } else {
+      else
         log.info(s"Mining all mocked blocks successful")
         waiting()
-      }
 
     case MockBlockMined(PendingBlockAndState(pendingBlock, state)) =>
       val minedBlock = pendingBlock.block
@@ -219,4 +212,3 @@ private class MockedMiner(
 
     case _ => Behaviors.same
   }
-}

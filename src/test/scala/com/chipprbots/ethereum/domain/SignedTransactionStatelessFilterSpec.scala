@@ -28,7 +28,7 @@ import com.chipprbots.ethereum.utils.NetworkType
   *     sufficient to pass a London-only check but insufficient to pass a Shanghai check.
   *   - Asserts that the tx is filtered OUT — proving the 3-arg (timestamp-aware) path is used.
   */
-class SignedTransactionStatelessFilterSpec extends AnyFlatSpec with Matchers {
+class SignedTransactionStatelessFilterSpec extends AnyFlatSpec with Matchers:
 
   // Base ETC config from test resources; all ETC-specific forks sit at 1e18 by default.
   private val etcConfig: BlockchainConfig = Config.blockchains.blockchainConfig
@@ -180,4 +180,3 @@ class SignedTransactionStatelessFilterSpec extends AnyFlatSpec with Matchers {
       Seq(makeCallTxWithNonce(BigInt(2).pow(64) - 1))
     ) shouldBe empty
   }
-}

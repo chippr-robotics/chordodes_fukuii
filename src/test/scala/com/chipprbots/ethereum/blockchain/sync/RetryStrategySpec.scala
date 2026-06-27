@@ -8,7 +8,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.testing.Tags.*
 
-class RetryStrategySpec extends AnyFlatSpec with Matchers with ParallelTestExecution {
+class RetryStrategySpec extends AnyFlatSpec with Matchers with ParallelTestExecution:
 
   "RetryStrategy" should "calculate exponential backoff correctly" taggedAs (UnitTest) in {
     val strategy = RetryStrategy(
@@ -179,4 +179,3 @@ class RetryStrategySpec extends AnyFlatSpec with Matchers with ParallelTestExecu
   // Note: totalTimeSpent method removed from tests as it's a trivial calculation
   // (System.currentTimeMillis() - startTime) that doesn't warrant time-dependent testing.
   // The method is tested implicitly through integration tests and production usage.
-}

@@ -33,7 +33,7 @@ class RebuildFrontierBfsMultiSeedSpec
     extends ScalaTestWithActorTestKit()
     with AnyFlatSpecLike
     with Matchers
-    with Eventually {
+    with Eventually:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
@@ -43,21 +43,19 @@ class RebuildFrontierBfsMultiSeedSpec
   /** Build a fixed 3-level account trie: root branch → 2 present branch children, each referencing one missing leaf
     * hash. Frontier (missing) = 2. Every internal node is stored; the two leaf hashes are deliberately absent.
     */
-  private def buildFixture(): (TestMptStorage, ByteString, Int) = {
+  private def buildFixture(): (TestMptStorage, ByteString, Int) =
     val storage = new TestMptStorage()
     val missingA = kec256(ByteString("multiseed-parity-missing-A"))
     val missingB = kec256(ByteString("multiseed-parity-missing-B"))
 
-    val childA = {
+    val childA =
       val c = emptyChildren
       c(4) = HashNode(missingA.toArray)
       BranchNode(c, None)
-    }
-    val childB = {
+    val childB =
       val c = emptyChildren
       c(9) = HashNode(missingB.toArray)
       BranchNode(c, None)
-    }
     storage.putNode(childA)
     storage.putNode(childB)
 
@@ -68,15 +66,13 @@ class RebuildFrontierBfsMultiSeedSpec
     storage.putNode(root)
 
     (storage, ByteString(root.hash), 2)
-  }
 
-  private def pendingTasks(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int = {
+  private def pendingTasks(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int =
     val probe = testKit.createTestProbe[HealingStatistics]()
     coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref)
     probe.expectMessageType[HealingStatistics].pendingTasks
-  }
 
-  private def runSingleSeedWalk(storage: TestMptStorage, root: ByteString): Int = {
+  private def runSingleSeedWalk(storage: TestMptStorage, root: ByteString): Int =
     val coordinator = HealingTrieFixtures.spawnCoordinator(
       stateRoot = root,
       networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]().ref,
@@ -86,7 +82,7 @@ class RebuildFrontierBfsMultiSeedSpec
       snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]().ref,
       healingWriterEcOverride = Some(classicSystem.dispatcher)
     )
-    try {
+    try
       coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(root)
       var observed = -1
       eventually(timeout(5.seconds), interval(100.millis)) {
@@ -94,11 +90,9 @@ class RebuildFrontierBfsMultiSeedSpec
         observed should be > 0
       }
       observed
-    } finally {
+    finally
       testKit.stop(coordinator)
       ()
-    }
-  }
 
   "Single-element multi-seed rebuildFrontierBFS" should
     "discover the identical frontier as the single-seed wrapper over the same trie (byte-parity)" taggedAs UnitTest in {
@@ -124,4 +118,3 @@ class RebuildFrontierBfsMultiSeedSpec
     first shouldBe expectedFrontier
     second shouldBe first
   }
-}

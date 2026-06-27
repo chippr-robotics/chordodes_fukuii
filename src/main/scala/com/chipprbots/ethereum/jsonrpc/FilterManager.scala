@@ -24,7 +24,7 @@ import com.chipprbots.ethereum.transactions.PendingTransactionsManager.PendingTr
 import com.chipprbots.ethereum.utils.FilterConfig
 import com.chipprbots.ethereum.utils.TxPoolConfig
 
-object FilterManager {
+object FilterManager:
 
   // ── Commands ────────────────────────────────────────────────────────────────
 
@@ -52,9 +52,8 @@ object FilterManager {
 
   // ── Filter model ────────────────────────────────────────────────────────────
 
-  sealed trait Filter {
+  sealed trait Filter:
     def id: BigInt
-  }
   case class LogFilter(
       override val id: BigInt,
       fromBlock: Option[BlockParam],
@@ -116,33 +115,30 @@ object FilterManager {
 
     def generateId(): BigInt = BigInt(Random.nextLong()).abs
 
-    def resetTimeout(id: BigInt): Unit = {
+    def resetTimeout(id: BigInt): Unit =
       filterTimeouts.get(id).foreach(_.cancel())
       filterTimeouts += (id -> ctx.scheduleOnce(filterConfig.filterTimeout, ctx.self, FilterTimeout(id)))
-    }
 
-    def addFilterAndSendResponse(filter: Filter, replyTo: ActorRef[NewFilterResponse]): Unit = {
+    def addFilterAndSendResponse(filter: Filter, replyTo: ActorRef[NewFilterResponse]): Unit =
       filters += (filter.id -> filter)
       lastCheckBlocks += (filter.id -> blockchainReader.getBestBlockNumber)
       lastCheckTimestamps += (filter.id -> System.currentTimeMillis())
       resetTimeout(filter.id)
       replyTo ! NewFilterResponse(filter.id)
-    }
 
-    def doUninstallFilter(id: BigInt, replyTo: ActorRef[UninstallFilterResponse.type]): Unit = {
+    def doUninstallFilter(id: BigInt, replyTo: ActorRef[UninstallFilterResponse.type]): Unit =
       filters -= id
       lastCheckBlocks -= id
       lastCheckTimestamps -= id
       filterTimeouts.get(id).foreach(_.cancel())
       filterTimeouts -= id
       replyTo ! UninstallFilterResponse
-    }
 
     def topicsMatch(logTopics: Seq[ByteString], filterTopics: Seq[Seq[ByteString]]): Boolean =
       logTopics.size >= filterTopics.size &&
         filterTopics.zip(logTopics).forall { case (filter, log) => filter.isEmpty || filter.contains(log) }
 
-    def getLogsFromBlock(filter: LogFilter, block: Block, receipts: Seq[Receipt]): Seq[TxLog] = {
+    def getLogsFromBlock(filter: LogFilter, block: Block, receipts: Seq[Receipt]): Seq[TxLog] =
       val bytesToCheckInBloomFilter = filter.address.map(_.map(_.bytes)).getOrElse(Nil) ++ filter.topics.flatten
       var blockLogIndex = 0
       receipts.zipWithIndex.foldLeft(Nil: Seq[TxLog]) { case (logsSoFar, (receipt, txIndex)) =>
@@ -151,7 +147,7 @@ object FilterManager {
               receipt.logsBloomFilter.value,
               bytesToCheckInBloomFilter
             )
-          then {
+          then
             receipt.logs.zipWithIndex
               .map { case (log, localIdx) => (log, blockLogIndex + localIdx) }
               .filter { case (log, _) =>
@@ -172,14 +168,13 @@ object FilterManager {
                   blockTimestamp = Some(BigInt(block.header.unixTimestamp))
                 )
               }
-          } else Nil
+          else Nil
         blockLogIndex += receipt.logs.size
         logsSoFar ++ txLogs
       }
-    }
 
     def resolveBlockNumber(blockParam: BlockParam, bestBlockNumber: BigInt): BigInt =
-      blockParam match {
+      blockParam match
         case BlockParam.WithNumber(blockNumber) => blockNumber
         case BlockParam.WithHash(hash) =>
           blockchainReader.getBlockHeaderByHash(BlockHash(hash)).map(_.number).getOrElse(bestBlockNumber)
@@ -188,23 +183,21 @@ object FilterManager {
         case BlockParam.Safe      => bestBlockNumber
         case BlockParam.Finalized => bestBlockNumber
         case BlockParam.Pending   => bestBlockNumber
-      }
 
-    def getLogs(filter: LogFilter, startingBlockNumber: Option[BigInt] = None): Seq[TxLog] = {
+    def getLogs(filter: LogFilter, startingBlockNumber: Option[BigInt] = None): Seq[TxLog] =
       val bytesToCheckInBloomFilter = filter.address.map(_.map(_.bytes)).getOrElse(Nil) ++ filter.topics.flatten
 
       @tailrec
       def recur(currentBlockNumber: BigInt, toBlockNumber: BigInt, logsSoFar: Seq[TxLog]): Seq[TxLog] =
-        if currentBlockNumber > toBlockNumber then {
-          logsSoFar
-        } else {
-          blockchainReader.getBlockHeaderByNumber(currentBlockNumber) match {
+        if currentBlockNumber > toBlockNumber then logsSoFar
+        else
+          blockchainReader.getBlockHeaderByNumber(currentBlockNumber) match
             case Some(header)
                 if bytesToCheckInBloomFilter.isEmpty || BloomFilter.containsAnyOf(
                   header.logsBloom.value,
                   bytesToCheckInBloomFilter
                 ) =>
-              blockchainReader.getReceiptsByHash(header.hash) match {
+              blockchainReader.getReceiptsByHash(header.hash) match
                 case Some(receipts) =>
                   val bodyOpt = blockchainReader.getBlockBodyByHash(header.hash)
                   val newLogs = bodyOpt.fold(logsSoFar) { body =>
@@ -212,11 +205,8 @@ object FilterManager {
                   }
                   recur(currentBlockNumber + 1, toBlockNumber, newLogs)
                 case None => logsSoFar
-              }
             case Some(_) => recur(currentBlockNumber + 1, toBlockNumber, logsSoFar)
             case None    => logsSoFar
-          }
-        }
 
       val bestBlockNumber = blockchainReader.getBestBlockNumber
       val fromBlockNumber =
@@ -229,22 +219,19 @@ object FilterManager {
       if filter.toBlock.contains(BlockParam.Pending) then
         logs ++ blockGenerator.getPendingBlock.map(p => getLogsFromBlock(filter, p.block, p.receipts)).getOrElse(Nil)
       else logs
-    }
 
-    def getBlockHashesAfter(blockNumber: BigInt): Seq[ByteString] = {
+    def getBlockHashesAfter(blockNumber: BigInt): Seq[ByteString] =
       val bestBlock = blockchainReader.getBestBlockNumber
 
       @tailrec
       def recur(currentBlockNumber: BigInt, hashesSoFar: Seq[ByteString]): Seq[ByteString] =
         if currentBlockNumber > bestBlock then hashesSoFar
         else
-          blockchainReader.getBlockHeaderByNumber(currentBlockNumber) match {
+          blockchainReader.getBlockHeaderByNumber(currentBlockNumber) match
             case Some(header) => recur(currentBlockNumber + 1, hashesSoFar :+ header.hash.value)
             case None         => hashesSoFar
-          }
 
       recur(blockNumber + 1, Nil)
-    }
 
     def getPendingTransactions(): IO[Seq[PendingTransaction]] =
       pendingTransactionsManager
@@ -252,14 +239,13 @@ object FilterManager {
           PendingTransactionsManager.GetPendingTransactionsReq(_)
         )
         .flatMap { response =>
-          keyStore.listAccounts match {
+          keyStore.listAccounts match
             case Right(accounts) =>
               IO.pure(response.pendingTransactions.filter(pt => accounts.contains(pt.stx.senderAddress)))
             case Left(_) => IO.raiseError(new RuntimeException("Cannot get account list"))
-          }
         }
 
-    def doGetFilterLogs(id: BigInt, replyTo: ActorRef[FilterLogs]): Unit = {
+    def doGetFilterLogs(id: BigInt, replyTo: ActorRef[FilterLogs]): Unit =
       val filterOpt = filters.get(id)
       filterOpt.foreach { _ =>
         lastCheckBlocks += (id -> blockchainReader.getBestBlockNumber)
@@ -267,7 +253,7 @@ object FilterManager {
       }
       resetTimeout(id)
 
-      filterOpt match {
+      filterOpt match
         case Some(logFilter: LogFilter) =>
           replyTo ! LogFilterLogs(getLogs(logFilter))
 
@@ -282,10 +268,8 @@ object FilterManager {
 
         case None =>
           replyTo ! LogFilterLogs(Nil)
-      }
-    }
 
-    def doGetFilterChanges(id: BigInt, replyTo: ActorRef[FilterChanges]): Unit = {
+    def doGetFilterChanges(id: BigInt, replyTo: ActorRef[FilterChanges]): Unit =
       val bestBlockNumber = blockchainReader.getBestBlockNumber
       val lastCheckBlock = lastCheckBlocks.getOrElse(id, bestBlockNumber)
       val lastCheckTimestamp = lastCheckTimestamps.getOrElse(id, System.currentTimeMillis())
@@ -297,7 +281,7 @@ object FilterManager {
       }
       resetTimeout(id)
 
-      filterOpt match {
+      filterOpt match
         case Some(logFilter: LogFilter) =>
           replyTo ! LogFilterChanges(getLogs(logFilter, Some(lastCheckBlock + 1)))
 
@@ -315,8 +299,6 @@ object FilterManager {
 
         case None =>
           replyTo ! LogFilterChanges(Nil)
-      }
-    }
 
     Behaviors.receiveMessage {
       case NewLogFilter(fromBlock, toBlock, address, topics, replyTo) =>
@@ -353,4 +335,3 @@ object FilterManager {
         Behaviors.same
     }
   }
-}

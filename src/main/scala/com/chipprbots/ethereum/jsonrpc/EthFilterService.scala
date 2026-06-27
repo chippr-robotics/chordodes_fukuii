@@ -19,7 +19,7 @@ import com.chipprbots.ethereum.jsonrpc.FilterManager.FilterLogs
 import com.chipprbots.ethereum.jsonrpc.FilterManager.LogFilterLogs
 import com.chipprbots.ethereum.utils.*
 
-object EthFilterService {
+object EthFilterService:
   case class NewFilterRequest(filter: Filter)
   case class Filter(
       fromBlock: Option[BlockParam],
@@ -45,18 +45,17 @@ object EthFilterService {
 
   case class GetLogsRequest(filter: Filter)
   case class GetLogsResponse(filterLogs: LogFilterLogs)
-}
 
 class EthFilterService(
     filterManager: ActorRef[FM.Command],
     filterConfig: FilterConfig,
     blockchainReader: com.chipprbots.ethereum.domain.BlockchainReader
-)(implicit system: ActorSystem) {
+)(implicit system: ActorSystem):
   import EthFilterService.*
   given timeout: Timeout = Timeout(filterConfig.filterManagerQueryTimeout)
   given scheduler: Scheduler = system.toTyped.scheduler
 
-  def newFilter(req: NewFilterRequest): ServiceResponse[NewFilterResponse] = {
+  def newFilter(req: NewFilterRequest): ServiceResponse[NewFilterResponse] =
     import req.filter.*
 
     IO.fromFuture(
@@ -68,7 +67,6 @@ class EthFilterService(
     ).map { resp =>
       Right(NewFilterResponse(resp.id))
     }
-  }
 
   def newBlockFilter(@unused req: NewBlockFilterRequest): ServiceResponse[NewFilterResponse] =
     IO.fromFuture(
@@ -103,13 +101,13 @@ class EthFilterService(
       Right(GetFilterLogsResponse(filterLogs))
     }
 
-  def getLogs(req: GetLogsRequest): ServiceResponse[GetLogsResponse] = {
+  def getLogs(req: GetLogsRequest): ServiceResponse[GetLogsResponse] =
     import req.filter.*
 
     // Validate: blockHash cannot be combined with fromBlock/toBlock
     if blockHash.isDefined && (fromBlock.isDefined || toBlock.isDefined) then
       IO.pure(Left(JsonRpcError.InvalidParams("cannot specify both blockHash and fromBlock/toBlock")))
-    else {
+    else
       // Resolve block numbers for range validation
       val bestBlockNum = blockchainReader.getBestBlockNumber
       val fromNum = fromBlock.collect { case BlockParam.WithNumber(n) => n }.getOrElse(BigInt(0))
@@ -119,21 +117,20 @@ class EthFilterService(
       if fromNum > bestBlockNum || toNum > bestBlockNum then
         IO.pure(Left(JsonRpcError.InvalidParams("block range extends beyond current head block")))
       else if fromNum > toNum then IO.pure(Left(JsonRpcError.InvalidParams("invalid block range params")))
-      else {
+      else
         // If blockHash specified, resolve to block number and use as from=to.
         // Returns None when the hash resolves to no block (emit empty logs).
         val resolvedPair: Option[(Option[BlockParam], Option[BlockParam])] =
-          if blockHash.isDefined then {
+          if blockHash.isDefined then
             val blockNum = blockHash.flatMap(h => blockchainReader.getBlockByHash(BlockHash(h)).map(_.header.number))
-            blockNum match {
+            blockNum match
               case Some(n) =>
                 val bp = Some(BlockParam.WithNumber(n))
                 Some((bp, bp))
               case None => None
-            }
-          } else Some((fromBlock, toBlock))
+          else Some((fromBlock, toBlock))
 
-        resolvedPair match {
+        resolvedPair match
           case None =>
             IO.pure(Right(GetLogsResponse(FM.LogFilterLogs(Nil))))
           case Some((resolvedFrom, resolvedTo)) =>
@@ -146,8 +143,3 @@ class EthFilterService(
             ).map { filterLogs =>
               Right(GetLogsResponse(filterLogs))
             }
-        }
-      }
-    }
-  }
-}

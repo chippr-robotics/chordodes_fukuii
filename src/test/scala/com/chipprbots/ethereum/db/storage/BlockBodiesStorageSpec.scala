@@ -15,7 +15,7 @@ class BlockBodiesStorageSpec
     extends AnyWordSpec
     with ScalaCheckPropertyChecks
     with ObjectGenerators
-    with SecureRandomBuilder {
+    with SecureRandomBuilder:
 
   val chainId: Option[BigInt] = Some(BigInt(0x3d))
 
@@ -54,7 +54,7 @@ class BlockBodiesStorageSpec
       }
     }
 
-    def insertBlockBodiesMapping(newBlocks: Seq[ETHPackets.NewBlock]): BlockBodiesStorage = {
+    def insertBlockBodiesMapping(newBlocks: Seq[ETHPackets.NewBlock]): BlockBodiesStorage =
       val storage = new BlockBodiesStorage(EphemDataSource())
 
       val batchUpdates = newBlocks.foldLeft(storage.emptyBatchUpdate) { case (updates, ETHPackets.NewBlock(block, _)) =>
@@ -63,6 +63,4 @@ class BlockBodiesStorageSpec
 
       batchUpdates.commit()
       storage
-    }
   }
-}

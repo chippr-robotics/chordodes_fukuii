@@ -39,7 +39,7 @@ case class AccountTask(
     // Decremented per subtask completion; when 0 the task is ready to forward.
     // Analogous to go-ethereum accountTask.pend (sync.go:316).
     val pend: Int = 0
-) {
+):
 
   /** Check if this task is completed */
   def isComplete: Boolean = done
@@ -48,34 +48,30 @@ case class AccountTask(
   def isPending: Boolean = pending
 
   /** Get the range as a human-readable string */
-  def rangeString: String = {
+  def rangeString: String =
     val nextStr = if next.isEmpty then "0x00..." else next.take(4).toArray.map("%02x".format(_)).mkString
     val lastStr =
       if last == AccountTask.MaxHash32 then "0xFF..." else last.take(4).toArray.map("%02x".format(_)).mkString
     s"[$nextStr...$lastStr]"
-  }
 
   /** Calculate progress based on downloaded accounts */
   def progress: Double =
     if done then 1.0
     else if accounts.isEmpty then 0.0
-    else {
+    else
       // Rough estimate based on account count
       // Typical ranges contain hundreds to thousands of accounts
       math.min(0.9, accounts.size.toDouble / AccountTask.ESTIMATED_ACCOUNTS_FOR_NEAR_COMPLETE)
-    }
 
   /** Remaining keyspace as BigInt. Used by priority dispatching to focus workers on the most-complete range first,
     * ensuring at least some ranges finish before peers stop responding.
     */
-  def remainingKeyspace: BigInt = {
+  def remainingKeyspace: BigInt =
     val nextBig = BigInt(1, next.toArray.padTo(32, 0.toByte))
     val lastBig = BigInt(1, last.toArray.padTo(32, 0.toByte))
     (lastBig - nextBig).max(BigInt(0))
-  }
-}
 
-object AccountTask {
+object AccountTask:
 
   /** Maximum 32-byte hash value (0xFF..FF). */
   val MaxHash32: ByteString = ByteString(Array.fill(32)(0xff.toByte))
@@ -96,10 +92,10 @@ object AccountTask {
     * @return
     *   List of account tasks covering the full account space
     */
-  def createInitialTasks(rootHash: ByteString, concurrency: Int = 16): Seq[AccountTask] = {
+  def createInitialTasks(rootHash: ByteString, concurrency: Int = 16): Seq[AccountTask] =
     require(concurrency > 0, "Concurrency must be positive")
 
-    if concurrency == 1 then {
+    if concurrency == 1 then
       // Single task covers entire range
       val min = bigIntTo32ByteString(BigInt(0))
       Seq(
@@ -111,7 +107,7 @@ object AccountTask {
           rootHash = rootHash
         )
       )
-    } else {
+    else
       // Divide 256-bit space into equal chunks
       val chunkSize = BigInt(2).pow(256) / concurrency
 
@@ -126,8 +122,6 @@ object AccountTask {
           rootHash = rootHash
         )
       }
-    }
-  }
 
   /** Convert BigInt to 32-byte big-endian ByteString
     *
@@ -138,11 +132,9 @@ object AccountTask {
     * @return
     *   32-byte ByteString in big-endian format
     */
-  private def bigIntTo32ByteString(bi: BigInt): ByteString = {
+  private def bigIntTo32ByteString(bi: BigInt): ByteString =
     val bytes = bi.toByteArray
     // BigInt.toByteArray includes a sign bit, so remove it if present
     val unsigned = if bytes.length > 0 && bytes(0) == 0 then bytes.drop(1) else bytes
     // Pad to 32 bytes on the left (big-endian) and take right 32 bytes if too long
     ByteString(Array.fill(32 - unsigned.length.min(32))(0.toByte) ++ unsigned.takeRight(32))
-  }
-}

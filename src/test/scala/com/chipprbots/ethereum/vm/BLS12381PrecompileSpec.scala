@@ -21,7 +21,7 @@ import com.chipprbots.ethereum.vm.PrecompiledContracts.*
   * `libeth_pairings` shared library is absent from the JVM.
   */
 // scalastyle:off line.size.limit
-class BLS12381PrecompileSpec extends AnyFlatSpec with Matchers {
+class BLS12381PrecompileSpec extends AnyFlatSpec with Matchers:
 
   import org.hyperledger.besu.nativelib.bls12_381.LibEthPairings
 
@@ -143,5 +143,4 @@ class BLS12381PrecompileSpec extends AnyFlatSpec with Matchers {
     BlsMapG1.gas(in, etc, eth) shouldBe BigInt(5500)
     BlsMapG2.gas(in, etc, eth) shouldBe BigInt(23800)
   }
-}
 // scalastyle:on line.size.limit

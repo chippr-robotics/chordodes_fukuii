@@ -13,7 +13,7 @@ import org.scalatest.wordspec.AnyWordSpecLike
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.testing.Tags.*
 
-class CacheBasedBlacklistSpec extends AnyWordSpecLike with Matchers with ParallelTestExecution {
+class CacheBasedBlacklistSpec extends AnyWordSpecLike with Matchers with ParallelTestExecution:
   import Blacklist.*
 
   private val peer1 = PeerId("1")
@@ -25,10 +25,9 @@ class CacheBasedBlacklistSpec extends AnyWordSpecLike with Matchers with Paralle
   private val reason = BlacklistReason.ErrorInBlockHeaders
   private val anotherReason = BlacklistReason.BlockBodiesNotMatchingHeaders
 
-  private def withBlacklist(maxElements: Int)(test: CacheBasedBlacklist => Unit): Unit = {
+  private def withBlacklist(maxElements: Int)(test: CacheBasedBlacklist => Unit): Unit =
     val blacklist = CacheBasedBlacklist.empty(maxElements)
     test(blacklist)
-  }
 
   "CacheBasedBlacklist" should {
     "add elements and respect max number of elements" taggedAs (UnitTest) in withBlacklist(3) { blacklist =>
@@ -129,5 +128,3 @@ class CacheBasedBlacklistSpec extends AnyWordSpecLike with Matchers with Paralle
       assert(blacklist.isBlacklisted(peer3) === true)
     }
   }
-
-}

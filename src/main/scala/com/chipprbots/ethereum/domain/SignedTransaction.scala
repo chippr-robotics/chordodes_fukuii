@@ -22,7 +22,7 @@ import com.chipprbots.ethereum.rlp.{encode as rlpEncode, *}
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteUtils
 
-object SignedTransaction {
+object SignedTransaction:
 
   implicit private val ioRuntime: IORuntime = IORuntime.global
 
@@ -55,7 +55,7 @@ object SignedTransaction {
       pointSign: Byte,
       signatureRandom: ByteString,
       signature: ByteString
-  ): SignedTransaction = {
+  ): SignedTransaction =
     val txSignature = ECDSASignature(
       r = ByteUtils.bytesToBigInt(signatureRandom.toArray),
       s = ByteUtils.bytesToBigInt(signature.toArray),
@@ -63,34 +63,30 @@ object SignedTransaction {
       v = BigInt(pointSign & 0xff)
     )
     SignedTransaction(tx, txSignature)
-  }
 
   def sign(
       tx: Transaction,
       keyPair: AsymmetricCipherKeyPair,
       chainId: Option[BigInt]
-  ): SignedTransaction = {
+  ): SignedTransaction =
     val bytes = bytesToSign(tx, chainId)
     val sig = ECDSASignature.sign(bytes, keyPair)
     SignedTransaction(tx, getEthereumSignature(tx, sig, chainId))
-  }
 
   private[domain] def bytesToSign(tx: Transaction, chainId: Option[BigInt]): Array[Byte] =
-    tx match {
+    tx match
       case legacyTransaction: LegacyTransaction => getLegacyBytesToSign(legacyTransaction, chainId)
       case twal: TransactionWithAccessList      => getTWALBytesToSign(twal)
       case twdf: TransactionWithDynamicFee      => getTWDFBytesToSign(twdf)
       case btx: BlobTransaction                 => getBlobTxBytesToSign(btx)
       case sct: SetCodeTransaction              => getSCTBytesToSign(sct)
-    }
 
   private def getLegacyBytesToSign(legacyTransaction: LegacyTransaction, chainIdOpt: Option[BigInt]): Array[Byte] =
-    chainIdOpt match {
+    chainIdOpt match
       case Some(id) =>
         chainSpecificTransactionBytes(legacyTransaction, id)
       case None =>
         generalTransactionBytes(legacyTransaction)
-    }
 
   /** Transaction specific piece of code. This should be moved to the Signer architecture once available.
     *
@@ -110,7 +106,7 @@ object SignedTransaction {
   private def getRawSignature(
       signedTransaction: SignedTransaction
   )(implicit blockchainConfig: BlockchainConfig): ECDSASignature =
-    signedTransaction.tx match {
+    signedTransaction.tx match
       case _: LegacyTransaction =>
         val chainIdOpt = extractChainId(signedTransaction)
         getLegacyTransactionRawSignature(signedTransaction.signature, chainIdOpt)
@@ -125,7 +121,6 @@ object SignedTransaction {
       case _: SetCodeTransaction =>
         // Type-4 uses same y-parity encoding as Type-1/Type-2
         getTWALRawSignature(signedTransaction.signature)
-    }
 
   /** Transaction specific piece of code. This should be moved to the Signer architecture once available.
     *
@@ -141,11 +136,11 @@ object SignedTransaction {
   private def getLegacyTransactionRawSignature(
       ethereumSignature: ECDSASignature,
       chainIdOpt: Option[BigInt]
-  ): ECDSASignature = {
+  ): ECDSASignature =
     // Normalize v to handle negative values (e.g., -98 byte -> 158 unsigned)
     val normalizedV = if ethereumSignature.v < 0 then ethereumSignature.v + 256 else ethereumSignature.v
 
-    chainIdOpt match {
+    chainIdOpt match
       // ignore chainId for unprotected negative y-parity in pre-eip155 signature
       case Some(_) if normalizedV == ECDSASignature.negativePointSign =>
         ethereumSignature.copy(v = BigInt(ECDSASignature.negativePointSign))
@@ -166,8 +161,6 @@ object SignedTransaction {
           s"Unexpected pointSign for LegacyTransaction, chainId: ${chainIdOpt
               .getOrElse("None")}, ethereum.signature.v: ${ethereumSignature.v}, normalized.v: $normalizedV"
         )
-    }
-  }
 
   /** Transaction specific piece of code. This should be moved to the Signer architecture once available.
     *
@@ -179,14 +172,13 @@ object SignedTransaction {
     *   a raw crypto signature, with only 27 or 28 as valid ECDSASignature.v value
     */
   private def getTWALRawSignature(ethereumSignature: ECDSASignature): ECDSASignature =
-    ethereumSignature.v match {
+    ethereumSignature.v match
       case v if v == 0 => ethereumSignature.copy(v = BigInt(ECDSASignature.negativePointSign))
       case v if v == 1 => ethereumSignature.copy(v = BigInt(ECDSASignature.positivePointSign))
       case _ =>
         throw new IllegalStateException(
           s"Unexpected pointSign for TransactionWithAccessList, ethereum.signature.v: ${ethereumSignature.v}"
         )
-    }
 
   /** Transaction specific piece of code. This should be moved to the Signer architecture once available.
     *
@@ -212,7 +204,7 @@ object SignedTransaction {
       rawSignature: ECDSASignature,
       chainIdOpt: Option[BigInt]
   ): ECDSASignature =
-    tx match {
+    tx match
       case _: LegacyTransaction =>
         getLegacyEthereumSignature(rawSignature, chainIdOpt)
       case _: TransactionWithAccessList =>
@@ -226,7 +218,6 @@ object SignedTransaction {
       case _: SetCodeTransaction =>
         // Type-4 uses same y-parity encoding as Type-1/Type-2
         getTWALEthereumSignature(rawSignature)
-    }
 
   /** Transaction specific piece of code. This should be moved to the Signer architecture once available.
     *
@@ -240,7 +231,7 @@ object SignedTransaction {
     *   a legacy transaction specific ECDSASignature, with v chainId-protected if possible
     */
   private def getLegacyEthereumSignature(rawSignature: ECDSASignature, chainIdOpt: Option[BigInt]): ECDSASignature =
-    chainIdOpt match {
+    chainIdOpt match
       case Some(chainId) if rawSignature.v == ECDSASignature.negativePointSign =>
         rawSignature.copy(v = chainId * 2 + EIP155NegativePointSign)
       case Some(chainId) if rawSignature.v == ECDSASignature.positivePointSign =>
@@ -252,7 +243,6 @@ object SignedTransaction {
             + s"raw.signature.v: ${rawSignature.v}, "
             + s"authorized values are ${ECDSASignature.allowedPointSigns.mkString(", ")}"
         )
-    }
 
   /** Transaction specific piece of code. This should be moved to the Signer architecture once available.
     *
@@ -264,7 +254,7 @@ object SignedTransaction {
     *   a transaction-with-access-list specific ECDSASignature
     */
   private def getTWALEthereumSignature(rawSignature: ECDSASignature): ECDSASignature =
-    rawSignature match {
+    rawSignature match
       case ECDSASignature(_, _, v) if v == ECDSASignature.positivePointSign =>
         rawSignature.copy(v = BigInt(ECDSASignature.positiveYParity))
       case ECDSASignature(_, _, v) if v == ECDSASignature.negativePointSign =>
@@ -274,7 +264,6 @@ object SignedTransaction {
           s"Unexpected pointSign. raw.signature.v: ${rawSignature.v}, authorized values are ${ECDSASignature.allowedPointSigns
               .mkString(", ")}"
         )
-    }
 
   def getSender(tx: SignedTransaction)(implicit blockchainConfig: BlockchainConfig): Option[Address] =
     Option(txSenders.getIfPresent(tx.hash)).orElse {
@@ -288,14 +277,14 @@ object SignedTransaction {
       val bytesToSign: Array[Byte] = getBytesToSign(tx)
       val recoveredPublicKey: Option[Array[Byte]] = getRawSignature(tx).publicKey(bytesToSign)
 
-      for {
+      for
         key <- recoveredPublicKey
         addrBytes = crypto.kec256(key).slice(FirstByteOfAddress, LastByteOfAddress)
         if addrBytes.length == Address.Length
-      } yield Address(addrBytes)
+      yield Address(addrBytes)
     }.toOption.flatten
 
-  def retrieveSendersInBackGround(blocks: Seq[BlockBody])(implicit blockchainConfig: BlockchainConfig): Unit = {
+  def retrieveSendersInBackGround(blocks: Seq[BlockBody])(implicit blockchainConfig: BlockchainConfig): Unit =
     val blocktx = blocks
       .collect {
         case block if block.transactionList.nonEmpty => block.transactionList
@@ -304,7 +293,6 @@ object SignedTransaction {
       .grouped(batchSize)
 
     IO.parTraverseN(availableProcessors)(blocktx.toSeq)(calculateSendersForTxs).void.unsafeRunAndForget()(ioRuntime)
-  }
 
   private def calculateSendersForTxs(txs: Seq[SignedTransaction])(implicit
       blockchainConfig: BlockchainConfig
@@ -322,7 +310,7 @@ object SignedTransaction {
     * @return
     *   the transaction payload for Legacy transaction
     */
-  private def generalTransactionBytes(tx: Transaction): Array[Byte] = {
+  private def generalTransactionBytes(tx: Transaction): Array[Byte] =
     val receivingAddressAsArray: Array[Byte] = tx.receivingAddress.map(_.toArray).getOrElse(Array.empty[Byte])
     crypto.kec256(
       rlpEncode(
@@ -336,7 +324,6 @@ object SignedTransaction {
         )
       )
     )
-  }
 
   /** Transaction specific piece of code. This should be moved to the Signer architecture once available.
     *
@@ -347,7 +334,7 @@ object SignedTransaction {
     * @return
     *   the transaction payload for Legacy transaction
     */
-  private def chainSpecificTransactionBytes(tx: Transaction, chainId: BigInt): Array[Byte] = {
+  private def chainSpecificTransactionBytes(tx: Transaction, chainId: BigInt): Array[Byte] =
     val receivingAddressAsArray: Array[Byte] = tx.receivingAddress.map(_.toArray).getOrElse(Array.empty[Byte])
     crypto.kec256(
       rlpEncode(
@@ -364,7 +351,6 @@ object SignedTransaction {
         )
       )
     )
-  }
 
   /** Transaction specific piece of code. This should be moved to the Signer architecture once available.
     *
@@ -373,8 +359,8 @@ object SignedTransaction {
     * @return
     *   Some(chainId) if available, None if not (unprotected signed transaction)
     */
-  private def extractChainId(stx: SignedTransaction)(implicit blockchainConfig: BlockchainConfig): Option[BigInt] = {
-    val chainIdOpt: Option[BigInt] = stx.tx match {
+  private def extractChainId(stx: SignedTransaction)(implicit blockchainConfig: BlockchainConfig): Option[BigInt] =
+    val chainIdOpt: Option[BigInt] = stx.tx match
       case _: LegacyTransaction
           if stx.signature.v == ECDSASignature.negativePointSign || stx.signature.v == ECDSASignature.positivePointSign =>
         None
@@ -386,27 +372,22 @@ object SignedTransaction {
 
         // Only extract chainId if v is >= 35 (valid EIP-155 range)
         // Values < 35 that aren't 27 or 28 are invalid
-        if normalizedV >= EIP155NegativePointSign then {
+        if normalizedV >= EIP155NegativePointSign then
           val chainId = (normalizedV - EIP155NegativePointSign) / 2
           // Validate that extracted chainId matches the blockchain's configured chainId
           // This ensures EIP-155 replay protection works correctly
-          if chainId == blockchainConfig.chainId then {
-            Some(chainId)
-          } else {
+          if chainId == blockchainConfig.chainId then Some(chainId)
+          else
             // ChainId present but does not match local config - reject for replay protection
             None
-          }
-        } else {
+        else
           // Invalid v value (not 27, 28, or >= 35)
           None
-        }
       case twal: TransactionWithAccessList => Some(twal.chainId)
       case twdf: TransactionWithDynamicFee => Some(twdf.chainId)
       case btx: BlobTransaction            => Some(btx.chainId)
       case sct: SetCodeTransaction         => Some(sct.chainId)
-    }
     chainIdOpt
-  }
 
   /** Transaction specific piece of code. This should be moved to the Signer architecture once available.
     *
@@ -418,13 +399,12 @@ object SignedTransaction {
   private def getBytesToSign(
       signedTransaction: SignedTransaction
   )(implicit blockchainConfig: BlockchainConfig): Array[Byte] =
-    signedTransaction.tx match {
+    signedTransaction.tx match
       case _: LegacyTransaction            => getLegacyBytesToSign(signedTransaction)
       case twal: TransactionWithAccessList => getTWALBytesToSign(twal)
       case twdf: TransactionWithDynamicFee => getTWDFBytesToSign(twdf)
       case btx: BlobTransaction            => getBlobTxBytesToSign(btx)
       case sct: SetCodeTransaction         => getSCTBytesToSign(sct)
-    }
 
   /** Transaction specific piece of code. This should be moved to the Signer architecture once available.
     *
@@ -436,13 +416,11 @@ object SignedTransaction {
     */
   private def getLegacyBytesToSign(
       signedTransaction: SignedTransaction
-  )(implicit blockchainConfig: BlockchainConfig): Array[Byte] = {
+  )(implicit blockchainConfig: BlockchainConfig): Array[Byte] =
     val chainIdOpt = extractChainId(signedTransaction)
-    chainIdOpt match {
+    chainIdOpt match
       case None          => generalTransactionBytes(signedTransaction.tx)
       case Some(chainId) => chainSpecificTransactionBytes(signedTransaction.tx, chainId)
-    }
-  }
 
   /** Transaction specific piece of code. This should be moved to the Signer architecture once available.
     *
@@ -452,7 +430,7 @@ object SignedTransaction {
     * @return
     *   the transaction payload to sign for Transaction with access list
     */
-  private def getTWALBytesToSign(tx: TransactionWithAccessList): Array[Byte] = {
+  private def getTWALBytesToSign(tx: TransactionWithAccessList): Array[Byte] =
     import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.accessListItemCodec
     val receivingAddressAsArray: Array[Byte] = tx.receivingAddress.map(_.toArray).getOrElse(Array.empty[Byte])
     crypto.kec256(
@@ -472,9 +450,8 @@ object SignedTransaction {
         )
       )
     )
-  }
 
-  private def getTWDFBytesToSign(tx: TransactionWithDynamicFee): Array[Byte] = {
+  private def getTWDFBytesToSign(tx: TransactionWithDynamicFee): Array[Byte] =
     import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.accessListItemCodec
     val receivingAddressAsArray: Array[Byte] = tx.receivingAddress.map(_.toArray).getOrElse(Array.empty[Byte])
     crypto.kec256(
@@ -495,9 +472,8 @@ object SignedTransaction {
         )
       )
     )
-  }
 
-  private def getBlobTxBytesToSign(tx: BlobTransaction): Array[Byte] = {
+  private def getBlobTxBytesToSign(tx: BlobTransaction): Array[Byte] =
     import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.accessListItemCodec
     val receivingAddressAsArray: Array[Byte] = tx.receivingAddress.map(_.toArray).getOrElse(Array.empty[Byte])
     crypto.kec256(
@@ -520,9 +496,8 @@ object SignedTransaction {
         )
       )
     )
-  }
 
-  private def getSCTBytesToSign(tx: SetCodeTransaction): Array[Byte] = {
+  private def getSCTBytesToSign(tx: SetCodeTransaction): Array[Byte] =
     import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.accessListItemCodec
     import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.setCodeAuthorizationCodec
     val receivingAddressAsArray: Array[Byte] = tx.receivingAddress.map(_.toArray).getOrElse(Array.empty[Byte])
@@ -545,17 +520,14 @@ object SignedTransaction {
         )
       )
     )
-  }
 
-  val byteArraySerializable: ByteArraySerializable[SignedTransaction] = new ByteArraySerializable[SignedTransaction] {
+  val byteArraySerializable: ByteArraySerializable[SignedTransaction] = new ByteArraySerializable[SignedTransaction]:
 
     override def fromBytes(bytes: Array[Byte]): SignedTransaction = bytes.toSignedTransaction
 
     override def toBytes(input: SignedTransaction): Array[Byte] = input.toBytes
-  }
-}
 
-case class SignedTransaction(tx: Transaction, signature: ECDSASignature) {
+case class SignedTransaction(tx: Transaction, signature: ECDSASignature):
 
   def safeSenderIsEqualTo(address: Address)(implicit blockchainConfig: BlockchainConfig): Boolean =
     SignedTransaction.getSender(this).contains(address)
@@ -570,11 +542,10 @@ case class SignedTransaction(tx: Transaction, signature: ECDSASignature) {
     signature.v != ECDSASignature.negativePointSign && signature.v != ECDSASignature.positivePointSign
 
   lazy val hash: TxHash = TxHash(ByteString(kec256(this.toBytes: Array[Byte])))
-}
 
 case class SignedTransactionWithSender(tx: SignedTransaction, senderAddress: Address)
 
-object SignedTransactionWithSender {
+object SignedTransactionWithSender:
 
   /** Validates and recovers senders for a batch of signed transactions. Performs stateless validation (chain ID,
     * intrinsic gas) before expensive ECDSA recovery. Uses parallel ECDSA recovery across all CPU cores for large
@@ -582,18 +553,16 @@ object SignedTransactionWithSender {
     */
   def getSignedTransactions(
       stxs: Seq[SignedTransaction]
-  )(implicit blockchainConfig: BlockchainConfig): Seq[SignedTransactionWithSender] = {
+  )(implicit blockchainConfig: BlockchainConfig): Seq[SignedTransactionWithSender] =
     // Cheap stateless pre-filters before expensive ECDSA recovery
     val validated = getStatelessValidTransactions(stxs)
 
-    if validated.size < 16 then {
+    if validated.size < 16 then
       // Small batch: sequential to avoid overhead
       recoverSenders(validated)
-    } else {
+    else
       // Large batch: parallel ECDSA recovery across all cores
       getSignedTransactionsParallel(validated)
-    }
-  }
 
   /** Same validation as [[getSignedTransactions]], but sender recovery runs on the caller's thread. This is used by
     * upstream batch schedulers that already provide parallelism and need deterministic chunk admission order.
@@ -605,7 +574,7 @@ object SignedTransactionWithSender {
 
   def getStatelessValidTransactions(
       stxs: Seq[SignedTransaction]
-  )(implicit blockchainConfig: BlockchainConfig): Seq[SignedTransaction] = {
+  )(implicit blockchainConfig: BlockchainConfig): Seq[SignedTransaction] =
     import com.chipprbots.ethereum.vm.EvmConfig
     import com.chipprbots.ethereum.utils.NetworkType
     // For ETH chains, apply timestamp-based fork overrides so that EIP-3860 initcode metering
@@ -630,27 +599,23 @@ object SignedTransactionWithSender {
     stxs.filter { stx =>
       val tx = stx.tx
       // 1. Chain ID validation for typed transactions (EIP-2930+)
-      val chainIdValid = tx match {
+      val chainIdValid = tx match
         case twal: TransactionWithAccessList => twal.chainId == blockchainConfig.chainId
         case twdf: TransactionWithDynamicFee => twdf.chainId == blockchainConfig.chainId
         case btx: BlobTransaction            => btx.chainId == blockchainConfig.chainId
         case sct: SetCodeTransaction         => sct.chainId == blockchainConfig.chainId
         case _: LegacyTransaction            => true // validated in getSender
-      }
       if !chainIdValid then false
       else if tx.nonce > eip2681NonceCap then false // EIP-2681 nonce overflow
-      else {
+      else
         // 2. Intrinsic gas validation — reject txs with gas below minimum
-        val authListSize = tx match {
+        val authListSize = tx match
           case sct: SetCodeTransaction => sct.authorizationList.size
           case _                       => 0
-        }
         val intrinsicGas =
           config.calcTransactionIntrinsicGas(tx.payload, tx.isContractInit, Transaction.accessList(tx), authListSize)
         tx.gasLimit >= intrinsicGas
-      }
     }
-  }
 
   private def recoverSenders(
       stxs: Seq[SignedTransaction]
@@ -665,15 +630,13 @@ object SignedTransactionWithSender {
     */
   private def getSignedTransactionsParallel(
       stxs: Seq[SignedTransaction]
-  )(implicit blockchainConfig: BlockchainConfig): Seq[SignedTransactionWithSender] = {
+  )(implicit blockchainConfig: BlockchainConfig): Seq[SignedTransactionWithSender] =
     val batches = stxs.grouped(SignedTransaction.batchSize).toVector
     val parallelism = math.min(Runtime.getRuntime.availableProcessors, batches.size).max(1)
     IO.parTraverseN(parallelism)(batches) { batch =>
       IO(recoverSenders(batch))
     }.map(_.flatten)
       .unsafeRunSync()(IORuntime.global)
-  }
 
   def apply(transaction: LegacyTransaction, signature: ECDSASignature, sender: Address): SignedTransactionWithSender =
     SignedTransactionWithSender(SignedTransaction(transaction, signature), sender)
-}

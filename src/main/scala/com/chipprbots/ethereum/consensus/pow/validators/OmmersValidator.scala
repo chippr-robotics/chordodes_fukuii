@@ -13,7 +13,7 @@ import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
-trait OmmersValidator {
+trait OmmersValidator:
 
   def validate(
       parentHash: ByteString,
@@ -28,7 +28,7 @@ trait OmmersValidator {
       blockNumber: BigInt,
       ommers: Seq[BlockHeader],
       blockchainReader: BlockchainReader
-  )(implicit blockchainConfig: BlockchainConfig): Either[OmmersError, OmmersValid] = {
+  )(implicit blockchainConfig: BlockchainConfig): Either[OmmersError, OmmersValid] =
 
     val getBlockHeaderByHash: ByteString => Option[BlockHeader] =
       (h: ByteString) => blockchainReader.getBlockHeaderByHash(BlockHash(h))
@@ -45,22 +45,17 @@ trait OmmersValidator {
           .reverse
 
     validate(parentHash, blockNumber, ommers, getBlockHeaderByHash, getNBlocksBack)
-  }
 
-}
-
-object OmmersValidator {
+object OmmersValidator:
   sealed trait OmmersError
 
-  object OmmersError {
+  object OmmersError:
     case object OmmersLengthError extends OmmersError
     case class OmmersHeaderError(errors: List[BlockHeaderError]) extends OmmersError
     case object OmmersUsedBeforeError extends OmmersError
     case object OmmerIsAncestorError extends OmmersError
     case object OmmerParentIsNotAncestorError extends OmmersError
     case object OmmersDuplicatedError extends OmmersError
-  }
 
   sealed trait OmmersValid
   case object OmmersValid extends OmmersValid
-}

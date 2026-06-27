@@ -47,7 +47,7 @@ class GraphQLServiceSpec
     with AnyFlatSpecLike
     with Matchers
     with ScalaFutures
-    with MockFactory {
+    with MockFactory:
 
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = Span(10, Seconds), interval = Span(200, Millis))
@@ -55,15 +55,14 @@ class GraphQLServiceSpec
   implicit private val classicActorSystem: ActorSystem = system.toClassic
   implicit val ec: ExecutionContext = classicActorSystem.dispatcher
 
-  "GraphQLService" should "answer { chainID } with the configured chain id as 0x-hex" in new GraphQLTestSetup {
+  "GraphQLService" should "answer { chainID } with the configured chain id as 0x-hex" in new GraphQLTestSetup:
     val (status, body) = service.execute("{ chainID }", None, None).unsafeRunSync()
     status shouldBe 200
     val chainHex: String = body.hcursor.downField("data").downField("chainID").as[String].toOption.get
     chainHex should startWith("0x")
     // Any valid non-negative hex is acceptable here — the fixture's chain id depends on the test chain.
-  }
 
-  it should "answer { block { number hash } } for the latest block" in new GraphQLTestSetup {
+  it should "answer { block { number hash } } for the latest block" in new GraphQLTestSetup:
     blockchainWriter.storeBlock(block).and(blockchainWriter.storeChainWeight(block.header.hash, weight)).commit()
     blockchainWriter.saveBestKnownBlocks(block.hash, block.number)
 
@@ -73,24 +72,21 @@ class GraphQLServiceSpec
     data.downField("number").as[String].toOption.get shouldBe "0x" + block.header.number.toString(16)
     val gotHash: String = data.downField("hash").as[String].toOption.get
     gotHash shouldBe "0x" + block.header.hash.toArray.map("%02x".format(_)).mkString
-  }
 
-  it should "return null for an unknown transaction" in new GraphQLTestSetup {
+  it should "return null for an unknown transaction" in new GraphQLTestSetup:
     val unknown: String = "0x" + ("00" * 32)
     val query: String = s"""{ transaction(hash: \"$unknown\") { hash } }"""
     val (status, body) = service.execute(query, None, None).unsafeRunSync()
     status shouldBe 200
     body.hcursor.downField("data").downField("transaction").focus.get shouldBe Json.Null
-  }
 
-  it should "reject a syntactically invalid query with HTTP 400" in new GraphQLTestSetup {
+  it should "reject a syntactically invalid query with HTTP 400" in new GraphQLTestSetup:
     val (status, body) = service.execute("{ not valid graphql", None, None).unsafeRunSync()
     status shouldBe 400
     val errs: List[Json] = body.hcursor.downField("errors").as[List[Json]].toOption.get
     errs should not be empty
-  }
 
-  it should "reject queries exceeding the configured depth" in new GraphQLTestSetup(maxDepth = 3) {
+  it should "reject queries exceeding the configured depth" in new GraphQLTestSetup(maxDepth = 3):
     blockchainWriter.storeBlock(block).and(blockchainWriter.storeChainWeight(block.header.hash, weight)).commit()
     blockchainWriter.saveBestKnownBlocks(block.hash, block.number)
 
@@ -98,9 +94,8 @@ class GraphQLServiceSpec
       "{ block { parent { parent { parent { parent { number } } } } } }"
     val (status, _) = service.execute(deep, None, None).unsafeRunSync()
     status shouldBe 400
-  }
 
-  it should "serve an introspection query" in new GraphQLTestSetup {
+  it should "serve an introspection query" in new GraphQLTestSetup:
     val introspection =
       """{ __schema { queryType { name } mutationType { name } types { name } } }"""
     val (status, body) = service.execute(introspection, None, None).unsafeRunSync()
@@ -121,10 +116,9 @@ class GraphQLServiceSpec
       .as[String]
       .toOption
       .get shouldBe "Mutation"
-  }
 
   // -------------------------------------------------------------------------
-  abstract class GraphQLTestSetup(val maxDepth: Int = GraphQLSchema.MaxQueryDepth) extends EphemBlockchainTestSetup {
+  abstract class GraphQLTestSetup(val maxDepth: Int = GraphQLSchema.MaxQueryDepth) extends EphemBlockchainTestSetup:
 
     // Mining — needed by resolveBlock(Pending) path. The tests here don't exercise the
     // Pending branch, so the mock's default return is sufficient.
@@ -178,10 +172,10 @@ class GraphQLServiceSpec
     )
     lazy val ethFilterService = new EthFilterService(
       filterManager,
-      new com.chipprbots.ethereum.utils.FilterConfig {
+      new com.chipprbots.ethereum.utils.FilterConfig:
         override val filterTimeout: FiniteDuration = 10.seconds
         override val filterManagerQueryTimeout: FiniteDuration = 2.seconds
-      },
+      ,
       blockchainReader
     )
 
@@ -201,5 +195,3 @@ class GraphQLServiceSpec
 
     val block: Block = Block(Fixtures.Blocks.Block3125369.header, Fixtures.Blocks.Block3125369.body)
     val weight: ChainWeight = ChainWeight.totalDifficultyOnly(block.header.difficulty)
-  }
-}

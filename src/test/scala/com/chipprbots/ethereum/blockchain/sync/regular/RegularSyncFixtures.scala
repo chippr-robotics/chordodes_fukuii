@@ -61,12 +61,13 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 // Fixture classes are wrapped in a trait due to problems with making mocks available inside of them
-trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
+trait RegularSyncFixtures:
+  self: Matchers & AsyncMockFactory =>
   class RegularSyncFixture
       extends TestKitBase
       with EphemBlockchainTestSetup
       with TestSyncConfig
-      with SecureRandomBuilder {
+      with SecureRandomBuilder:
     // Each fixture owns a per-test ActorTestKit (typed). Its system has a custom user guardian that
     // forbids top-level spawning "from the outside" (system.spawn / system.actorOf), so all actor
     // creation routes through testKit.spawn. The Classic system below is the testKit's underlying
@@ -149,7 +150,7 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
     val testBlocks: List[Block] = BlockHelpers.generateChain(20, BlockHelpers.genesis)
     val testBlocksChunked: List[List[Block]] = testBlocks.grouped(syncConfig.blockHeadersPerRequest).toList
 
-    override lazy val consensusAdapter: ConsensusAdapter = {
+    override lazy val consensusAdapter: ConsensusAdapter =
       val adapter = stub[ConsensusAdapter]
       // Per-block path: mined/broadcast blocks via importBlock
       (adapter
@@ -167,7 +168,7 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
         .when(*, *, *)
         .onCall { case (nel: (NonEmptyList[Block] @unchecked), _, _) =>
           def go(remaining: List[Block], acc: List[BlockData]): IO[BlockImportResult] =
-            remaining match {
+            remaining match
               case Nil => IO.pure(BlockImportedToTop(acc.reverse))
               case block :: rest =>
                 importedBlocksSet.add(block)
@@ -179,11 +180,9 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
                     case DuplicateBlock | BlockEnqueued => go(rest, acc)
                     case other                          => IO.pure(other)
                   }
-            }
           go(nel.toList, Nil)
         }
       adapter
-    }
 
     blockchainWriter.save(
       block = BlockHelpers.genesis,
@@ -210,7 +209,7 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
     def getPeerInfo(
         peer: Peer,
         capability: Capability = Capability.ETH68
-    ): PeerInfo = {
+    ): PeerInfo =
       val status =
         RemoteStatus(
           capability,
@@ -226,14 +225,12 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
         maxBlockNumber = 0,
         bestBlockHash = status.bestHash
       )
-    }
 
     def peerByNumber(number: Int): Peer = handshakedPeers.keys.toList.sortBy(_.id.value).apply(number)
 
-    def blockHeadersChunkRequest(fromChunk: Int): PeersClient.Request[ETHGetBlockHeaders] = {
+    def blockHeadersChunkRequest(fromChunk: Int): PeersClient.Request[ETHGetBlockHeaders] =
       val block = testBlocksChunked(fromChunk).headNumberUnsafe
       blockHeadersRequest(block)
-    }
 
     // Builds an EXPECTED request for comparison via `expectMsgEq`. The `replyTo` is a placeholder —
     // `eqInstanceForPeersClientRequest` compares only `message` + `peerSelector`, ignoring `replyTo`.
@@ -306,7 +303,7 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
     def setImportResult(block: Block, result: IO[BlockImportResult]): Unit =
       results(block.header.hash.value) = result
 
-    class PeersClientAutoPilot(blocks: List[Block] = testBlocks) extends AutoPilot {
+    class PeersClientAutoPilot(blocks: List[Block] = testBlocks) extends AutoPilot:
 
       def run(sender: ActorRef, msg: Any): AutoPilot =
         overrides(sender).orElse(defaultHandlers(sender)).apply(msg).getOrElse(defaultAutoPilot)
@@ -344,19 +341,14 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
       }
 
       def defaultAutoPilot: AutoPilot = this
-    }
 
-    implicit class ListOps[T](list: List[T]) {
+    implicit class ListOps[T](list: List[T]):
 
       def get(index: Int): Option[T] =
-        if list.isDefinedAt(index) then {
-          Some(list(index))
-        } else {
-          None
-        }
-    }
+        if list.isDefinedAt(index) then Some(list(index))
+        else None
 
-    implicit class BlocksListOps(blocks: List[Block]) {
+    implicit class BlocksListOps(blocks: List[Block]):
       def headNumberUnsafe: BigInt = blocks.head.number
       def headNumber: Option[BigInt] = blocks.headOption.map(_.number)
       def headers: List[BlockHeader] = blocks.map(_.header)
@@ -367,17 +359,15 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
       def numberAtUnsafe(index: Int): BigInt = numberAt(index).get
       def byHash(hash: ByteString): Option[Block] = blocks.find(_.hash.value == hash)
       def byHashUnsafe(hash: ByteString): Block = byHash(hash).get
-    }
 
-    implicit class TestProbeOps(probe: TestProbe) {
+    implicit class TestProbeOps(probe: TestProbe):
 
       def expectMsgEq[T: Eq](msg: T): T = expectMsgEq(remainingOrDefault, msg)
 
-      def expectMsgEq[T: Eq](max: FiniteDuration, msg: T): T = {
+      def expectMsgEq[T: Eq](max: FiniteDuration, msg: T): T =
         val received = probe.expectMsgClass(max, msg.getClass)
         assert(Eq[T].eqv(received, msg), s"Expected ${msg}, got ${received}")
         received
-      }
 
       def fishForSpecificMessageMatching[T](
           max: FiniteDuration = probe.remainingOrDefault
@@ -394,27 +384,24 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
       def expectMsgAllOfEq[T1: Eq, T2: Eq](msg1: T1, msg2: T2): (T1, T2) =
         expectMsgAllOfEq(remainingOrDefault, msg1, msg2)
 
-      def expectMsgAllOfEq[T1: Eq, T2: Eq](max: FiniteDuration, msg1: T1, msg2: T2): (T1, T2) = {
+      def expectMsgAllOfEq[T1: Eq, T2: Eq](max: FiniteDuration, msg1: T1, msg2: T2): (T1, T2) =
         val received = probe.receiveN(2, max)
         val found1 = received.find(m => Eq[T1].eqv(msg1, m.asInstanceOf[T1]))
         val found2 = received.find(m => Eq[T2].eqv(msg2, m.asInstanceOf[T2]))
 
-        (found1, found2) match {
+        (found1, found2) match
           case (Some(r1), Some(r2)) => (r1.asInstanceOf[T1], r2.asInstanceOf[T2])
           case (None, _) =>
             fail(s"Expected message $msg1 not found in received messages: $received")
           case (_, None) =>
             fail(s"Expected message $msg2 not found in received messages: $received")
-        }
-      }
-    }
 
     // Helper to compare ETH66 messages ignoring requestId (which is dynamically generated
     // for core-geth compatibility). Also handles comparison between ETH65 and ETH66 message
     // versions. Only handles GetBlockHeaders and GetBlockBodies as those are the ETH66
     // message types used in these tests. Other ETH66 request types like GetPooledTransactions,
     // GetNodeData, and GetReceipts are not used in RegularSync tests.
-    private def messagesEqualIgnoringRequestId(x: Message, y: Message): Boolean = (x, y) match {
+    private def messagesEqualIgnoringRequestId(x: Message, y: Message): Boolean = (x, y) match
       // ETH66 to ETH66 comparison
       case (h1: ETHGetBlockHeaders, h2: ETHGetBlockHeaders) =>
         h1.block == h2.block && h1.maxHeaders == h2.maxHeaders && h1.skip == h2.skip && h1.reverse == h2.reverse
@@ -422,35 +409,31 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
         b1.hashes == b2.hashes
 
       case _ => x == y
-    }
 
     implicit def eqInstanceForPeersClientRequest[T <: Message]: Eq[PeersClient.Request[T]] =
       (x, y) => messagesEqualIgnoringRequestId(x.message, y.message) && x.peerSelector == y.peerSelector
 
     def fakeEvaluateBlock(
         block: Block
-    ): IO[BlockImportResult] = {
-      val result: BlockImportResult = if didTryToImportBlock(block) then {
-        DuplicateBlock
-      } else {
-        if importedBlocksSet.isEmpty || bestBlock.isParentOf(block) || importedBlocksSet.exists(_.isParentOf(block))
-        then {
+    ): IO[BlockImportResult] =
+      val result: BlockImportResult =
+        if didTryToImportBlock(block) then DuplicateBlock
+        else if importedBlocksSet.isEmpty || bestBlock.isParentOf(block) || importedBlocksSet.exists(
+            _.isParentOf(block)
+          )
+        then
           importedBlocksSet.add(block)
           BlockImportedToTop(List(BlockData(block, Nil, ChainWeight.totalDifficultyOnly(block.header.difficulty))))
-        } else if block.number > bestBlock.number then {
+        else if block.number > bestBlock.number then
           importedBlocksSet.add(block)
           BlockEnqueued
-        } else {
-          BlockImportFailed("foo")
-        }
-      }
+        else BlockImportFailed("foo")
 
       IO.pure(result)
-    }
 
-    def fakeEvaluateBatch(nel: NonEmptyList[Block]): IO[BlockImportResult] = {
+    def fakeEvaluateBatch(nel: NonEmptyList[Block]): IO[BlockImportResult] =
       def go(remaining: List[Block], acc: List[BlockData]): IO[BlockImportResult] =
-        remaining match {
+        remaining match
           case Nil => IO.pure(BlockImportedToTop(acc.reverse))
           case block :: rest =>
             fakeEvaluateBlock(block).flatMap {
@@ -458,12 +441,10 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
               case DuplicateBlock | BlockEnqueued => go(rest, acc)
               case other                          => IO.pure(other)
             }
-        }
       go(nel.toList, Nil)
-    }
 
-    class FakeBranchResolution extends BranchResolution(stub[BlockchainReader]) {
-      override def resolveBranch(headers: NonEmptyList[BlockHeader]): BranchResolutionResult = {
+    class FakeBranchResolution extends BranchResolution(stub[BlockchainReader]):
+      override def resolveBranch(headers: NonEmptyList[BlockHeader]): BranchResolutionResult =
         val importedHashes = importedBlocksSet.map(_.hash).toSet
 
         if importedBlocksSet.isEmpty || (importedHashes.contains(
@@ -471,11 +452,8 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
           ) && headers.last.number > bestBlock.number)
         then NewBetterBranch(Nil)
         else UnknownBranch
-      }
-    }
-  }
 
-  class OnTopFixture extends RegularSyncFixture {
+  class OnTopFixture extends RegularSyncFixture:
 
     // Override blockHeadersPerRequest = 3 so that the last batch of testBlocks (blocks 19-20)
     // has 2 headers < 3 = no cherry-pick. Without this, the cherry-pick in BlockFetcher bumps
@@ -502,17 +480,14 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
       .evaluateBranchBlock(_: Block)(_: IORuntime, _: BlockchainConfig))
       .when(*, *, *)
       .onCall { (block, _, _) =>
-        if block == newBlock then {
+        if block == newBlock then
           importedNewBlock = true
           IO.pure(
             BlockImportedToTop(List(BlockData(newBlock, Nil, ChainWeight(newBlock.number))))
           )
-        } else {
-          if block == testBlocks.last then {
-            importedLastTestBlock = true
-          }
+        else
+          if block == testBlocks.last then importedLastTestBlock = true
           IO.pure(BlockImportedToTop(Nil))
-        }
       }
 
     (consensusAdapter
@@ -527,26 +502,26 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
     peersClient.setAutoPilot(new PeersClientAutoPilot(testBlocks))
 
     // Set up AutoPilot for ommersPool to respond to GetOmmers messages
-    ommersPool.setAutoPilot(new AutoPilot {
-      def run(sender: ActorRef, msg: Any): AutoPilot = msg match {
-        case OmmersPool.GetOmmers(_, replyTo) =>
-          replyTo ! OmmersPool.Ommers(Seq.empty)
-          this
-        case _ => this
-      }
-    })
+    ommersPool.setAutoPilot(
+      new AutoPilot:
+        def run(sender: ActorRef, msg: Any): AutoPilot = msg match
+          case OmmersPool.GetOmmers(_, replyTo) =>
+            replyTo ! OmmersPool.Ommers(Seq.empty)
+            this
+          case _ => this
+    )
 
     // Set up AutoPilot for pendingTransactionsManager to respond to pending transaction asks.
     // RegularSync/BlockImporter only send fire-and-forget commands (AddUncheckedTransactions,
     // RemoveTransactions); this autopilot handles both Classic and Typed ask variants defensively.
-    pendingTransactionsManager.setAutoPilot(new AutoPilot {
-      def run(sender: ActorRef, msg: Any): AutoPilot = msg match {
-        case PendingTransactionsManager.GetPendingTransactionsReq(replyTo) =>
-          replyTo ! PendingTransactionsManager.PendingTransactionsResponse(Seq.empty)
-          this
-        case _ => this
-      }
-    })
+    pendingTransactionsManager.setAutoPilot(
+      new AutoPilot:
+        def run(sender: ActorRef, msg: Any): AutoPilot = msg match
+          case PendingTransactionsManager.GetPendingTransactionsReq(replyTo) =>
+            replyTo ! PendingTransactionsManager.PendingTransactionsResponse(Seq.empty)
+            this
+          case _ => this
+    )
 
     def waitForSubscription(): Unit =
       blockFetcher = peerEventBus
@@ -565,13 +540,10 @@ trait RegularSyncFixtures { self: Matchers & AsyncMockFactory =>
         peer.id
       )
 
-    def goToTop(): Unit = {
+    def goToTop(): Unit =
       regularSync ! SyncProtocol.Start
 
       waitForSubscription()
       sendLastTestBlockAsTop()
 
       awaitCond(importedLastTestBlock)
-    }
-  }
-}

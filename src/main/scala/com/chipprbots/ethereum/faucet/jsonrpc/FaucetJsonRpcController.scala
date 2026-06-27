@@ -20,7 +20,7 @@ class FaucetJsonRpcController(
     actorSystem: ActorSystem
 ) extends ApisBuilder
     with Logger
-    with JsonRpcBaseController {
+    with JsonRpcBaseController:
 
   implicit override def executionContext: ExecutionContext = actorSystem.dispatcher
 
@@ -45,12 +45,9 @@ class FaucetJsonRpcController(
     case req @ JsonRpcRequest(_, FaucetJsonRpcController.Status, _, _) =>
       handle[StatusRequest, StatusResponse](faucetRpcService.status, req)
   }
-}
 
-object FaucetJsonRpcController {
+object FaucetJsonRpcController:
   private val Prefix = "faucet_"
 
   val SendFunds: String = Prefix + "sendFunds"
   val Status: String = Prefix + "status"
-
-}

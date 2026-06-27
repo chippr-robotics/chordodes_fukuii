@@ -7,18 +7,16 @@ import com.chipprbots.ethereum.domain.StorageKey
 import com.chipprbots.ethereum.domain.TxLogEntry
 import com.chipprbots.ethereum.domain.UInt256
 
-object ProgramState {
+object ProgramState:
   def apply[W <: WorldStateProxy[W, S], S <: Storage[S]](
       vm: VM[W, S],
       context: ProgramContext[W, S],
       env: ExecEnv
-  ): ProgramState[W, S] = {
+  ): ProgramState[W, S] =
     // EIP-3651: Mark COINBASE address as warm at transaction start
-    val coinbaseAddress: Set[Address] = if context.evmConfig.eip3651Enabled then {
-      Set(Address(context.blockHeader.beneficiary))
-    } else {
-      Set.empty[Address]
-    }
+    val coinbaseAddress: Set[Address] =
+      if context.evmConfig.eip3651Enabled then Set(Address(context.blockHeader.beneficiary))
+      else Set.empty[Address]
 
     ProgramState(
       vm = vm,
@@ -35,8 +33,6 @@ object ProgramState {
       accessedStorageKeys = context.warmStorage,
       transientStorage = context.transientStorage
     )
-  }
-}
 
 /** Intermediate state updated with execution of each opcode in the program
   *
@@ -97,7 +93,7 @@ case class ProgramState[W <: WorldStateProxy[W, S], S <: Storage[S]](
     accessedStorageKeys: Set[(Address, StorageKey)],
     transientStorage: Map[(Address, StorageKey), BigInt] = Map.empty,
     opcodeGasCost: BigInt = 0
-) {
+):
 
   def config: EvmConfig = env.evmConfig
 
@@ -190,4 +186,3 @@ case class ProgramState[W <: WorldStateProxy[W, S], S <: Storage[S]](
       accessedStorageKeys,
       transientStorage
     )
-}

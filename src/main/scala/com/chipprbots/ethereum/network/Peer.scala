@@ -12,9 +12,8 @@ import com.chipprbots.ethereum.network.p2p.Message
 
 final case class PeerId(value: String) extends BlacklistId
 
-object PeerId {
+object PeerId:
   def fromRef(ref: typed.ActorRef[PeerActor.Command]): PeerId = PeerId(ref.path.name)
-}
 
 final case class Peer(
     id: PeerId,

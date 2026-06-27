@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.metrics.MetricsContainer
   * Mirrors the pattern established by EngineApiMetrics for the Engine API side. core-geth reference:
   * consensus/ethash/ethash.go hashrate metrics.Meter (lines 579-823)
   */
-object PoWMiningMetrics extends MetricsContainer {
+object PoWMiningMetrics extends MetricsContainer:
 
   private val _workRequestsTotal = new AtomicLong(0)
   private val _blocksMinedTotal = new AtomicLong(0)
@@ -42,15 +42,13 @@ object PoWMiningMetrics extends MetricsContainer {
   def recordGetWork(): Unit =
     _workRequestsTotal.incrementAndGet()
 
-  def recordBlockMined(durationMs: Long): Unit = {
+  def recordBlockMined(durationMs: Long): Unit =
     _blocksMinedTotal.incrementAndGet()
     _lastBlockMinedAt.set(System.currentTimeMillis() / 1000L)
     _lastMiningDurationMs.set(durationMs)
-  }
 
   def recordStaleShare(): Unit =
     _staleSharesTotal.incrementAndGet()
 
   def updateHashrate(hashrate: BigInt): Unit =
     _currentHashrate.set(hashrate.toLong)
-}

@@ -30,10 +30,10 @@ import com.chipprbots.ethereum.testing.Tags.*
   *     dedup).
   *   - DOWNLOAD-RESUME: a complete checkpoint skips the scan entirely and returns the persisted gaps.
   */
-class CombinedRecoveryScannerSpec extends AnyFunSuite {
+class CombinedRecoveryScannerSpec extends AnyFunSuite:
 
   /** A fresh in-memory state + EVM store with helpers to plant present/missing bytecode and storage. */
-  private class Fixture {
+  private class Fixture:
     val ds: EphemDataSource = EphemDataSource()
     val (stateStorage, _, _) = StateStorage.createTestStateStorage(ds)
     val evm = new EvmCodeStorage(ds)
@@ -42,12 +42,11 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite {
     /** Fresh per-shard handle, as production uses (getBackingStorage(pivot)). */
     def handle(): MptStorage = stateStorage.getBackingStorage(0)
 
-    def presentCode(seed: Int): ByteString = {
+    def presentCode(seed: Int): ByteString =
       val code = Array.fill[Byte](8)(seed.toByte)
       val h = ByteString(kec256(code))
       evm.put(h, ByteString(code)).commit()
       h
-    }
     def missingCodeHash(seed: Int): ByteString = ByteString(kec256(Array[Byte](seed.toByte, 0x5a)))
 
     def presentStorageRoot(seed: Int): ByteString =
@@ -76,17 +75,15 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite {
           }
           .getRootHash
       )
-  }
 
   private def acc(storageRoot: TrieRoot, codeHash: CodeHash): Account =
     Account(nonce = UInt256.Zero, storageRoot = storageRoot, codeHash = codeHash)
 
   /** The proven single whole-trie pass (Task #2), used as the equivalence reference. */
-  private def referenceGaps(f: Fixture, stateRoot: ByteString): (Set[ByteString], Set[(ByteString, ByteString)]) = {
+  private def referenceGaps(f: Fixture, stateRoot: ByteString): (Set[ByteString], Set[(ByteString, ByteString)]) =
     val ref = new CombinedRecoveryScan(f.handle(), f.evm)
     ref.scanFrom(stateRoot)
     (ref.missingBytecodes.toSet, ref.missingStorageTries.toSet)
-  }
 
   /** A trie spanning several shards with a mix of present/missing bytecode and storage, every storageRoot unique. */
   private def gappyState(f: Fixture): ByteString =
@@ -229,4 +226,3 @@ class CombinedRecoveryScannerSpec extends AnyFunSuite {
     assert(r.missingBytecodes.isEmpty && r.missingStorageTries.isEmpty)
     assert(app.getRecoveryProgress().isEmpty, "an empty trie must not persist a checkpoint")
   }
-}

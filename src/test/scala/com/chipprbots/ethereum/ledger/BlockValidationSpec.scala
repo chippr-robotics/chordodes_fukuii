@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteStringUtils.*
 
-class BlockValidationSpec extends AnyWordSpec with Matchers with MockFactory {
+class BlockValidationSpec extends AnyWordSpec with Matchers with MockFactory:
   import BlockValidationTestSetup.*
 
   "BlockValidation" should {
@@ -44,15 +44,13 @@ class BlockValidationSpec extends AnyWordSpec with Matchers with MockFactory {
   }
 
   // scalastyle:off magic.number
-  object BlockValidationTestSetup {
-    private val setup = new EphemBlockchainTestSetup {
+  object BlockValidationTestSetup:
+    private val setup = new EphemBlockchainTestSetup:
       override lazy val blockchainReader: BlockchainReader = mock[BlockchainReader]
       override lazy val blockchain: BlockchainImpl = mock[BlockchainImpl]
 
-      override lazy val validators: Mocks.MockValidatorsAlwaysSucceed = new Mocks.MockValidatorsAlwaysSucceed {
+      override lazy val validators: Mocks.MockValidatorsAlwaysSucceed = new Mocks.MockValidatorsAlwaysSucceed:
         override val blockValidator: StdBlockValidator.type = StdBlockValidator
-      }
-    }
 
     implicit val blockchainConfig: BlockchainConfig = setup.blockchainConfig
 
@@ -145,6 +143,3 @@ class BlockValidationSpec extends AnyWordSpec with Matchers with MockFactory {
 
     val stateRootHash: ByteString = block.header.stateRoot.value
     val gasUsed: BigInt = block.header.gasUsed
-
-  }
-}

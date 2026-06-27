@@ -1,5 +1,4 @@
 package com.chipprbots.ethereum.healthcheck
 
-final case class HealthcheckResponse(checks: List[HealthcheckResult]) {
+final case class HealthcheckResponse(checks: List[HealthcheckResult]):
   lazy val isOK: Boolean = checks.forall(_.isOK)
-}

@@ -23,7 +23,7 @@ class StoreOpCodeGasPostConstantinopleSpec
     extends AnyWordSpec
     with ScalaCheckPropertyChecks
     with Matchers
-    with TestSetup {
+    with TestSetup:
 
   val defaultGaspool = 1000000
 
@@ -92,9 +92,8 @@ class StoreOpCodeGasPostConstantinopleSpec
       result.error shouldEqual maybeError
     }
   }
-}
 
-trait TestSetup {
+trait TestSetup:
   val vm = new TestVM
 
   val senderAddr: Address = Address(0xcafebabeL)
@@ -143,7 +142,7 @@ trait TestSetup {
       originalValue: BigInt,
       gaspool: BigInt,
       eipToCheck: EipToCheck
-  ): ProgramState[MockWorldState, MockStorage] = {
+  ): ProgramState[MockWorldState, MockStorage] =
     val newWorld = defaultWorld
       .saveAccount(senderAddr, accountWithCode(assemblyCode))
       .saveCode(senderAddr, assemblyCode)
@@ -153,20 +152,14 @@ trait TestSetup {
     val env = ExecEnv(context, assemblyCode, context.originAddr)
 
     ProgramState(vm, context, env)
-  }
 
-  sealed trait EipToCheck {
+  sealed trait EipToCheck:
     val blockHeader: BlockHeader
     val config: EvmConfig
-  }
-  object EipToCheck {
-    case object EIP1283 extends EipToCheck {
+  object EipToCheck:
+    case object EIP1283 extends EipToCheck:
       override val blockHeader: BlockHeader = prepareBlockHeader(blockchainConfig.constantinopleBlockNumber + 1)
       override val config: EvmConfig = EvmConfig.ConstantinopleConfigBuilder(blockchainConfig)
-    }
-    case object EIP2200 extends EipToCheck {
+    case object EIP2200 extends EipToCheck:
       override val blockHeader: BlockHeader = prepareBlockHeader(blockchainConfig.phoenixBlockNumber + 1)
       override val config: EvmConfig = EvmConfig.PhoenixConfigBuilder(blockchainConfig)
-    }
-  }
-}

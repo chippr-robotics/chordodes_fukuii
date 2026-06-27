@@ -80,7 +80,7 @@ private class AccountRangeCoordinatorImpl(
     accountTrieEcOverride: Option[ExecutionContext] = None,
     storageScheme: StorageScheme = StorageScheme.Hash,
     pathNodeStorage: Option[PathNodeStorage] = None
-) {
+):
 
   import SNAPSyncController.PivotStateUnservable
   import AccountRangeCoordinator.*
@@ -156,21 +156,21 @@ private class AccountRangeCoordinatorImpl(
   private def isPeerSnapless(peer: Peer): Boolean =
     snaplessPeers.contains(peer.id)
 
-  private def markPeerStateless(peer: Peer, reason: String): Unit = {
+  private def markPeerStateless(peer: Peer, reason: String): Unit =
     val isEmptyProofSignal = reason.contains("Missing proof for empty account range")
     // Only empty-proof signals drive strikes; already-confirmed peers stay confirmed
     // (further strikes are noise).
-    if isEmptyProofSignal && !snaplessPeers.contains(peer.id) then {
+    if isEmptyProofSignal && !snaplessPeers.contains(peer.id) then
       val priorStrikes = emptyResponseStrikes.getOrElse(peer.id, 0)
       val strikes = priorStrikes + 1
       emptyResponseStrikes(peer.id) = strikes
 
-      if strikes < EmptyResponseStrikeThreshold then {
+      if strikes < EmptyResponseStrikeThreshold then
         log.info(
           s"Peer ${peer.id.value} empty-proof strike $strikes/$EmptyResponseStrikeThreshold for root " +
             s"${stateRoot.take(4).toHex} (reason: $reason). Still eligible for dispatch."
         )
-      } else {
+      else
         // Threshold reached — promote to confirmed snapless + stateless. Snapless is sticky
         // (root-independent, survives PivotRefreshed per #1197); stateless clears on the next
         // PivotRefreshed.
@@ -188,9 +188,6 @@ private class AccountRangeCoordinatorImpl(
             s"(${statelessPeers.size}/${knownAvailablePeers.size} peers stateless for root ${stateRoot.take(4).toHex})"
         )
         maybeRequestPivotRefresh()
-      }
-    }
-  }
 
   /** Reset the strike counter for a peer that has just produced a useful response (real accounts OR a boundary proof).
     * Cheap to over-invoke; the goal is "any forward progress from this peer wipes prior strikes."
@@ -199,12 +196,12 @@ private class AccountRangeCoordinatorImpl(
     emptyResponseStrikes.remove(peerId)
 
   private def maybeRequestPivotRefresh(): Unit =
-    if !pivotRefreshRequested then {
+    if !pivotRefreshRequested then
       // Snapless peers (no snapshot tree at all) cannot be rescued by a pivot refresh — the
       // refresh would just yield another empty response from the same peer at the new root.
       // Compute "all stateless" against the *non-snapless* subset only (#1197).
       val nonSnapless = knownAvailablePeers.filterNot(p => snaplessPeers.contains(p.id))
-      if nonSnapless.isEmpty && knownAvailablePeers.nonEmpty then {
+      if nonSnapless.isEmpty && knownAvailablePeers.nonEmpty then
         // Every peer in the pool is snapless. A pivot refresh won't recover the SAME peers
         // (they have no snapshot tree regardless of root), but escalating PivotStateUnservable
         // lets the controller take action — e.g. disconnect the snapless peer and wait for a
@@ -223,12 +220,12 @@ private class AccountRangeCoordinatorImpl(
           reason = "all peers snapless (no snapshot tree) for AccountRange root",
           consecutiveEmptyResponses = knownAvailablePeers.size
         )
-      } else {
+      else
         // If all NON-snapless peers are stateless, the current root has aged out of the
         // serve window — pivot refresh might rescue them.
         val allStateless = nonSnapless.nonEmpty &&
           nonSnapless.forall(p => statelessPeers.contains(p.id))
-        if allStateless then {
+        if allStateless then
           // Exponential backoff: don't hammer the controller with rapid refresh requests
           val now = System.currentTimeMillis()
           val backoffMs = math.min(
@@ -236,7 +233,7 @@ private class AccountRangeCoordinatorImpl(
             maxRefreshIntervalMs
           )
           val elapsed = now - lastPivotRefreshTimeMs
-          if lastPivotRefreshTimeMs > 0 && elapsed < backoffMs then {
+          if lastPivotRefreshTimeMs > 0 && elapsed < backoffMs then
             log.info(
               s"All ${statelessPeers.size} peers stateless but backing off pivot refresh " +
                 s"(${elapsed / 1000}s / ${backoffMs / 1000}s elapsed, attempt=${consecutiveUnproductiveRefreshes + 1}). " +
@@ -244,7 +241,7 @@ private class AccountRangeCoordinatorImpl(
             )
             // Schedule a re-check after the remaining backoff period
             ctx.scheduleOnce((backoffMs - elapsed).millis, ctx.self, CheckCompletion)
-          } else {
+          else
             pivotRefreshRequested = true
             lastPivotRefreshTimeMs = now
             consecutiveUnproductiveRefreshes += 1
@@ -257,17 +254,13 @@ private class AccountRangeCoordinatorImpl(
               reason = "all peers stateless for AccountRange root",
               consecutiveEmptyResponses = statelessPeers.size
             )
-          }
-        }
-      }
-    }
 
   // Task management — resume ranges from saved positions (core-geth parity).
   // On restart, each range resumes from its saved `next` position instead of starting from 0x00.
   private val allInitialTasks = AccountTask.createInitialTasks(stateRoot, concurrency)
-  private val (skippedTasks, remainingTasks) = if resumeProgress.nonEmpty then {
+  private val (skippedTasks, remainingTasks) = if resumeProgress.nonEmpty then
     val resumed = allInitialTasks.map { task =>
-      resumeProgress.get(task.last) match {
+      resumeProgress.get(task.last) match
         case Some(savedNext)
             if BigInt(1, savedNext.toArray.padTo(32, 0.toByte)) >=
               BigInt(1, task.last.toArray.padTo(32, 0.toByte)) =>
@@ -289,13 +282,10 @@ private class AccountRangeCoordinatorImpl(
             )
           task
         case None => task
-      }
     }
     val (done, todo) = resumed.partition(_.done)
     (done, todo)
-  } else {
-    (Seq.empty, allInitialTasks)
-  }
+  else (Seq.empty, allInitialTasks)
   // Priority queue: dequeue the task with the SMALLEST remaining keyspace first.
   // This focuses workers on nearly-complete ranges, ensuring at least some ranges
   // finish before peers stop responding (instead of spreading work evenly across all 16).
@@ -356,13 +346,13 @@ private class AccountRangeCoordinatorImpl(
     * @return
     *   number of slots drained
     */
-  private def drainActiveTasks(reason: String, peerFilter: Option[String] = None): Int = {
+  private def drainActiveTasks(reason: String, peerFilter: Option[String] = None): Int =
     val toDrain: Seq[(BigInt, AccountTask, WorkerRef, Peer)] = activeTasks.toSeq.collect {
       case (reqId, (task, worker, peer)) if peerFilter.forall(_ == peer.id.value) =>
         (reqId, task, worker, peer)
     }
     if toDrain.isEmpty then 0
-    else {
+    else
       toDrain.foreach { case (reqId, task, worker, _) =>
         // 1. Cancel the worker's local state FIRST so it leaves `working` and accepts the
         //    next FetchAccountRange. The worker calls requestTracker.completeRequest itself,
@@ -380,8 +370,6 @@ private class AccountRangeCoordinatorImpl(
       }
       log.info(s"Re-queued ${toDrain.size} stale in-flight account requests ($reason)")
       toDrain.size
-    }
-  }
 
   // Statistics
   private var accountsDownloaded: Long = 0
@@ -394,7 +382,7 @@ private class AccountRangeCoordinatorImpl(
   // Cumulative keyspace consumed: incremented each time a task's `next` advances.
   // On restart, derive from restored task positions so progress % and ETA are accurate.
   private var consumedKeyspace: BigInt =
-    if resumeProgress.nonEmpty then {
+    if resumeProgress.nonEmpty then
       val toBI = (bs: ByteString) => BigInt(1, bs.toArray.padTo(32, 0.toByte))
       // Re-create pristine tasks to recover original range starts (keyed by `last` boundary).
       val originalStarts: Map[ByteString, BigInt] =
@@ -403,7 +391,7 @@ private class AccountRangeCoordinatorImpl(
         val orig = originalStarts.getOrElse(task.last, toBI(task.last))
         acc + (toBI(task.next) - orig).max(BigInt(0))
       }
-    } else BigInt(0)
+    else BigInt(0)
 
   // Contract accounts persisted to temp files to avoid unbounded memory growth.
   // On ETC mainnet ~20% of ~67M accounts are contracts — ~13M entries × 64 bytes each
@@ -420,10 +408,9 @@ private class AccountRangeCoordinatorImpl(
   // Unique codeHashes for bytecode download — Bloom filter (~4MB) for dedup + temp file for storage.
   // At handoff, reads ~64MB (2M × 32 bytes) instead of the 4.7GB contractAccountsFile (73.5M × 64 bytes).
   // Bug 20 fix: the original ask-based handoff timed out (5s) and OOMed when reading the full file.
-  implicit private object ByteStringFunnel extends Funnel[ByteString] {
+  implicit private object ByteStringFunnel extends Funnel[ByteString]:
     override def funnel(from: ByteString, into: PrimitiveSink): Unit =
       into.putBytes(from.toArray)
-  }
   private val codeHashBloom: BloomFilter[ByteString] = BloomFilter.create[ByteString](
     ByteStringFunnel,
     3_000_000,
@@ -470,19 +457,17 @@ private class AccountRangeCoordinatorImpl(
       .min(maxResponseBytes)
 
   private def adjustResponseBytesOnSuccess(peer: Peer, requested: BigInt, received: BigInt): Unit =
-    if requested > 0 && received * 10 >= requested * 9 && requested < maxResponseBytes then {
+    if requested > 0 && received * 10 >= requested * 9 && requested < maxResponseBytes then
       val next = (requested.toDouble * increaseFactor).toLong
       peerResponseBytesTarget.update(peer.id.value, BigInt(next).min(maxResponseBytes))
-    }
 
-  private def adjustResponseBytesOnFailure(peer: Peer, reason: String): Unit = {
+  private def adjustResponseBytesOnFailure(peer: Peer, reason: String): Unit =
     val cur = responseBytesTargetFor(peer)
     val next = (cur.toDouble * decreaseFactor).toLong
     peerResponseBytesTarget.update(peer.id.value, BigInt(next).max(minResponseBytes))
     log.debug(
       s"Reducing account responseBytes target for peer ${peer.id.value}: $cur -> ${peerResponseBytesTarget(peer.id.value)} ($reason)"
     )
-  }
 
   // Peer cooldown (best-effort): used for transient errors (timeouts, verification failures).
   private val peerCooldownUntilMs = mutable.Map[String, Long]()
@@ -510,11 +495,10 @@ private class AccountRangeCoordinatorImpl(
   private def isPeerCoolingDown(peer: Peer): Boolean =
     peerCooldownUntilMs.get(peer.id.value).exists(_ > System.currentTimeMillis())
 
-  private def recordPeerCooldown(peer: Peer, reason: String, duration: FiniteDuration): Unit = {
+  private def recordPeerCooldown(peer: Peer, reason: String, duration: FiniteDuration): Unit =
     val until = System.currentTimeMillis() + duration.toMillis
     peerCooldownUntilMs.put(peer.id.value, until)
     log.info(s"[ACCOUNT-COOLDOWN] peer ${peer.id.value.take(8)} cooling ${duration.toSeconds}s: $reason")
-  }
 
   // Pivot refresh backoff: prevents rapid-fire pivot refresh requests when all peers are stateless.
   // Exponential backoff from 60s to 5min.
@@ -550,28 +534,23 @@ private class AccountRangeCoordinatorImpl(
   private[actors] val taskStackTries: mutable.Map[ByteString, SnapTrie] = mutable.Map.empty
 
   /** Equivalent of the Classic `preStart`: invoked once by the behavior factory before the first message. */
-  def onStart(): Unit = {
-    if skippedTasks.nonEmpty then {
+  def onStart(): Unit =
+    if skippedTasks.nonEmpty then
       log.info(
         s"AccountRangeCoordinator starting with $concurrency workers — " +
           s"skipping ${skippedTasks.size}/${allInitialTasks.size} ranges (already completed in previous attempt)"
       )
-    } else {
-      log.info(s"AccountRangeCoordinator starting with $concurrency workers")
-    }
+    else log.info(s"AccountRangeCoordinator starting with $concurrency workers")
     // #1184: schedule the periodic dispatch-stalled detector. Fires every 30 s; the
     // 90 s `noActivityTimeoutMs` ensures we drain stuck slots before the controller's
     // 180 s `Account stall detected` watchdog escalates to a pivot refresh. Timer lifetime is
     // owned by `Behaviors.withTimers` — no manual cancel needed on stop.
     timers.startTimerWithFixedDelay(CheckDispatchStalled, dispatchStallCheckInterval, dispatchStallCheckInterval)
     // If all tasks were already completed, report completion immediately
-    if pendingTasks.isEmpty && activeTasks.isEmpty then {
-      ctx.scheduleOnce(100.millis, ctx.self, CheckCompletion)
-    }
-  }
+    if pendingTasks.isEmpty && activeTasks.isEmpty then ctx.scheduleOnce(100.millis, ctx.self, CheckCompletion)
 
   /** Equivalent of the Classic `postStop`: invoked from the `PostStop` signal handler. */
-  def onStop(): Unit = {
+  def onStop(): Unit =
     // Send final progress snapshot so controller can resume from saved positions on restart
     sendProgressSnapshot()
     // Close and delete temporary files.
@@ -579,27 +558,25 @@ private class AccountRangeCoordinatorImpl(
     // during storage sync (Bug 20 fix: streaming from file to avoid OOM). The controller
     // deletes it after streaming completes.
     try contractAccountsOut.close()
-    catch { case _: Exception => }
+    catch case _: Exception =>
     try contractStorageOut.close()
-    catch { case _: Exception => }
+    catch case _: Exception =>
     try uniqueCodeHashesOut.close()
-    catch { case _: Exception => }
+    catch case _: Exception =>
     try Files.deleteIfExists(contractAccountsFile)
-    catch { case _: Exception => }
+    catch case _: Exception =>
     // contractStorageFile intentionally NOT deleted — controller manages its lifecycle
     // uniqueCodeHashesFile intentionally NOT deleted — controller manages its lifecycle
     // (needed for accounts-complete recovery across process restarts)
     log.info(
       s"AccountRangeCoordinator stopped. Downloaded $accountsDownloaded accounts, identified $contractAccountsCount contracts ($uniqueCodeHashesCount unique codeHashes)"
     )
-  }
 
   /** Collect current task positions and send to controller for resume across restarts. */
-  private def sendProgressSnapshot(): Unit = {
+  private def sendProgressSnapshot(): Unit =
     val allTasks = pendingTasks.iterator ++ activeTasks.values.map(_._1) ++ completedTasks
     val progress: Map[ByteString, ByteString] = allTasks.map(t => t.last -> t.next).toMap
     snapSyncController ! SNAPSyncController.AccountRangeProgressCmd(progress)
-  }
 
   // Typed AccountRangeWorker children (Group W1) STOP on failure by default. The stop is caught by
   // the `WorkerTerminated` command (via `ctx.watchWith`), which removes the dead worker from the
@@ -611,21 +588,20 @@ private class AccountRangeCoordinatorImpl(
     */
   def receive(): Behavior[Command] = Behaviors
     .receiveMessage[Command] { msg =>
-      msg match {
+      msg match
         case StartAccountRangeSync(root) =>
           log.info(s"Starting account range sync for state root ${root.take(8).toHex}")
           // Tasks already initialized in constructor
           Behaviors.same
 
         case AccountRangeResponseMsg(response) =>
-          activeTasks.get(response.requestId) match {
+          activeTasks.get(response.requestId) match
             case None =>
               log.debug(s"Received AccountRange response for unknown or completed request ${response.requestId}")
 
             case Some((_, worker, _)) =>
               // Forward to the specific worker that owns this requestId so it can validate/complete the request.
               worker ! AccountRangeResponseMsg(response)
-          }
           Behaviors.same
 
         case PivotRefreshed(newStateRoot) =>
@@ -688,37 +664,32 @@ private class AccountRangeCoordinatorImpl(
           val evicted = knownAvailablePeers.filter(_.remoteAddress == peer.remoteAddress)
           knownAvailablePeers --= evicted
           evicted.foreach { p =>
-            if p.id != peer.id then {
-              statelessPeers -= p.id
-            }
+            if p.id != peer.id then statelessPeers -= p.id
           }
           // Genuine reconnect (new PeerId from same address, or first-seen peer) gets a clean
           // slate. Bug 24 protection preserved: re-announced same-id peers have wasAlreadyKnown=true
           // and are not cleared, keeping the ~1s SNAPSyncController re-announce from bypassing backoff.
-          if !wasAlreadyKnown then {
+          if !wasAlreadyKnown then
             statelessPeers -= peer.id
             // snaplessPeers is NOT cleared here: same PeerId = same physical node = same lack-of-snapshot.
             // Clearing on reconnect would allow known-snapless ETH-mainnet peers to consume dispatch
             // slots and hash-failure budget before re-accumulating strikes (#1197).
             emptyResponseStrikes.remove(peer.id)
-          }
           knownAvailablePeers += peer
-          if isPeerStateless(peer) then {
+          if isPeerStateless(peer) then
             log.debug(s"Ignoring PeerAvailable(${peer.id.value}) - peer is stateless for current root")
-          } else if isPeerSnapless(peer) then {
+          else if isPeerSnapless(peer) then
             log.debug(s"Ignoring PeerAvailable(${peer.id.value}) - peer is snapless (no snapshot tree)")
-          } else if isPeerCoolingDown(peer) then {
+          else if isPeerCoolingDown(peer) then
             log.debug(s"Ignoring PeerAvailable(${peer.id.value}) - peer is cooling down")
-          } else if pendingTasks.isEmpty then {
-            log.debug("No pending tasks")
-          } else {
+          else if pendingTasks.isEmpty then log.debug("No pending tasks")
+          else
             // Route through the sorted redispatch path so the fairness ordering
             // (least-in-flight first) applies to every dispatch trigger, not just
             // the periodic tryRedispatchPendingTasks calls. Without this, the
             // SNAPSyncController's per-peer PeerAvailable re-announcements drive
             // greedy dispatchIfPossible for a single peer, starving idle peers.
             tryRedispatchPendingTasks()
-          }
           Behaviors.same
 
         case UpdateMaxInFlightPerPeer(newLimit) =>
@@ -751,10 +722,9 @@ private class AccountRangeCoordinatorImpl(
           // leave `working` state cleanly and don't reject redispatch with TaskFailed(0, "Worker
           // busy"). Subsumes the legacy WorkerPeerDisconnected flow.
           val drained = drainActiveTasks(s"peer $peerId unavailable", Some(peerId))
-          if drained > 0 then {
+          if drained > 0 then
             lastDispatchOrResponseMs = System.currentTimeMillis()
             tryRedispatchPendingTasks()
-          }
           Behaviors.same
 
         // Typed worker death watch (was Classic `Terminated`): `ctx.watchWith(worker, WorkerTerminated(worker))`
@@ -795,7 +765,7 @@ private class AccountRangeCoordinatorImpl(
         case CheckDispatchStalled =>
           val now = System.currentTimeMillis()
           val stalled = activeTasks.nonEmpty && (now - lastDispatchOrResponseMs) > noActivityTimeoutMs
-          if stalled then {
+          if stalled then
             pendingButIdleTicks = 0
             val idleSec = (now - lastDispatchOrResponseMs) / 1000
             log.warn(
@@ -808,7 +778,7 @@ private class AccountRangeCoordinatorImpl(
             // next time anyway.
             lastDispatchOrResponseMs = System.currentTimeMillis()
             tryRedispatchPendingTasks()
-          } else if pendingTasks.nonEmpty && activeTasks.isEmpty then {
+          else if pendingTasks.nonEmpty && activeTasks.isEmpty then
             // Tasks are pending but nothing is in-flight — no eligible peers to dispatch to.
             // `lastDispatchOrResponseMs` resets on every drain (peer cycling) so the time-based
             // check above is blind to this condition. Use a tick counter instead.
@@ -825,7 +795,7 @@ private class AccountRangeCoordinatorImpl(
                 (if soonestCooldownSec >= 0 then s" (soonest ready in ${soonestCooldownSec}s)" else "") +
                 s". root=${stateRoot.take(4).toHex}"
             )
-            if pendingButIdleTicks >= 3 then {
+            if pendingButIdleTicks >= 3 then
               // 3 × 30 s = 90 s of consecutive ticks with pending tasks and zero dispatches.
               log.warn(
                 s"[ACCOUNT-STALL] ${pendingTasks.size} tasks pending, no active dispatches for " +
@@ -836,7 +806,7 @@ private class AccountRangeCoordinatorImpl(
               pendingButIdleTicks = 0
               tryRedispatchPendingTasks()
               // If floor revival also couldn't dispatch anything, escalate.
-              if activeTasks.isEmpty && !pivotRefreshRequested then {
+              if activeTasks.isEmpty && !pivotRefreshRequested then
                 pivotRefreshRequested = true
                 lastPivotRefreshTimeMs = System.currentTimeMillis()
                 consecutiveUnproductiveRefreshes += 1
@@ -851,11 +821,7 @@ private class AccountRangeCoordinatorImpl(
                     s"tasks pending but no eligible peers after ${consecutiveUnproductiveRefreshes} stall cycles",
                   consecutiveEmptyResponses = knownAvailablePeers.size
                 )
-              }
-            }
-          } else {
-            pendingButIdleTicks = 0
-          }
+          else pendingButIdleTicks = 0
           Behaviors.same
 
         case TaskComplete(requestId, result) =>
@@ -904,7 +870,7 @@ private class AccountRangeCoordinatorImpl(
           computeKeyspaceEstimate().foreach { est =>
             snapSyncController ! SNAPSyncController.ProgressAccountEstimate(est)
           }
-          if isComplete then {
+          if isComplete then
             log.info("Account range sync complete!")
             log.info(
               s"[SNAP-PROGRESS] ACCOUNT-RANGE 100% — $accountsDownloaded accounts downloaded — COMPLETE"
@@ -936,16 +902,13 @@ private class AccountRangeCoordinatorImpl(
               }(accountTrieEc)
             // Switch to finalizing state so no message can touch the trie during flush.
             finalizing()
-          } else {
-            Behaviors.same
-          }
+          else Behaviors.same
 
         case other =>
           // Defensive catch-all for the non-sealed `Command` trait (Messages.scala package-boundary
           // constraint — Scala 3 forbids sealing across source files). Surfaces any unexpected message.
           log.warn(s"[ACCOUNT-COORD] Unhandled command in receive: $other")
           Behaviors.same
-      }
     }
     .receiveSignal { case (_, org.apache.pekko.actor.typed.PostStop) =>
       // Formerly `postStop`: snapshot progress + close temp files. The recurring stall-check timer
@@ -1052,7 +1015,7 @@ private class AccountRangeCoordinatorImpl(
   private def maxWorkers: Int =
     math.max(concurrency, knownAvailablePeers.count(!isPeerStateless(_))) * maxInFlightPerPeer
 
-  private def createWorker(): WorkerRef = {
+  private def createWorker(): WorkerRef =
     val worker: WorkerRef = ctx.spawnAnonymous(
       Behaviors
         .supervise(
@@ -1071,12 +1034,9 @@ private class AccountRangeCoordinatorImpl(
     idleWorkers += worker
     log.debug(s"Created worker ${worker.path.name}, total workers: ${workers.size}")
     worker
-  }
 
   private def markWorkerIdle(worker: WorkerRef): Unit =
-    if workers.contains(worker) then {
-      idleWorkers += worker
-    }
+    if workers.contains(worker) then idleWorkers += worker
 
   /** Dispatch up to maxInFlightPerPeer tasks to the given peer (pipelining). Mirrors
     * ByteCodeCoordinator.dispatchIfPossible — the proven pattern for SNAP sync.
@@ -1086,56 +1046,51 @@ private class AccountRangeCoordinatorImpl(
     * in turn enqueue more storage / bytecode work) until every signalling downstream has released.
     */
   private def dispatchIfPossible(peer: Peer): Unit =
-    if pendingTasks.nonEmpty && !downstreamBackpressureActive then {
+    if pendingTasks.nonEmpty && !downstreamBackpressureActive then
       var inflight = inFlightForPeer(peer)
       var noWorkerAvailable = false
-      while !noWorkerAvailable && pendingTasks.nonEmpty && inflight < maxInFlightPerPeer do {
+      while !noWorkerAvailable && pendingTasks.nonEmpty && inflight < maxInFlightPerPeer do
         val workerOpt: Option[WorkerRef] =
           idleWorkers.headOption.orElse {
             if workers.size < maxWorkers then Some(createWorker()) else None
           }
 
-        workerOpt match {
+        workerOpt match
           case Some(worker) =>
             dispatchNextTaskToWorker(worker, peer)
             inflight += 1
           case None =>
             noWorkerAvailable = true
-        }
-      }
-    }
 
   /** Internal: record a back-pressure transition from one named downstream and re-engage dispatch once every signalling
     * source has released. ANY-OF semantics: pause while at least one source is engaged; resume only when the set is
     * fully empty.
     */
-  private def applyBackpressureChange(source: String, paused: Boolean): Unit = {
+  private def applyBackpressureChange(source: String, paused: Boolean): Unit =
     val wasActive = downstreamBackpressureActive
     if paused then backpressureSources += source else backpressureSources -= source
     val nowActive = downstreamBackpressureActive
-    if wasActive == nowActive then {
+    if wasActive == nowActive then
       // Either a duplicate transition for the same source or a partial release that left another
       // source still engaged. No state change worth logging at INFO.
       log.debug(
         s"Back-pressure source '$source' set paused=$paused; active sources now: ${backpressureSources.mkString(",")}"
       )
-    } else if nowActive then {
+    else if nowActive then
       log.info(
         s"Downstream back-pressure ENGAGED (source=$source) — pausing new account-range dispatches. " +
           s"${pendingTasks.size} pending, ${activeTasks.size} in flight (will complete normally)."
       )
-    } else {
+    else
       log.info(
         s"Downstream back-pressure RELEASED (source=$source was the last engaged source) — resuming. " +
           s"${pendingTasks.size} pending."
       )
       tryRedispatchPendingTasks()
       knownAvailablePeers.filterNot(isPeerStateless).foreach(dispatchIfPossible)
-    }
-  }
 
   private def dispatchNextTaskToWorker(worker: WorkerRef, peer: Peer): Unit =
-    if pendingTasks.nonEmpty then {
+    if pendingTasks.nonEmpty then
       // Mark worker busy
       idleWorkers -= worker
 
@@ -1149,7 +1104,6 @@ private class AccountRangeCoordinatorImpl(
       // #1184: progress signal — used by CheckDispatchStalled.
       lastDispatchOrResponseMs = System.currentTimeMillis()
       lastDispatchTimeMs.update(peer.id.value, lastDispatchOrResponseMs)
-    }
 
   // How many accounts to insert per chunk before yielding to the actor mailbox.
   // SnapHashTrie inserts are O(depth) memory + O(1) amortised compute (~2-20ms per 2000 accounts).
@@ -1159,7 +1113,7 @@ private class AccountRangeCoordinatorImpl(
       requestId: BigInt,
       result: Either[String, (Int, Seq[(ByteString, Account)], Seq[ByteString])]
   ): Unit =
-    activeTasks.remove(requestId) match {
+    activeTasks.remove(requestId) match
       case None =>
         // Task was drained (PeerUnavailable, pivot refresh) before the worker's response arrived.
         // The response is discarded and the task is already in pendingTasks via drainActiveTasks.
@@ -1171,7 +1125,7 @@ private class AccountRangeCoordinatorImpl(
         // #1184: progress signal — used by CheckDispatchStalled.
         lastDispatchOrResponseMs = System.currentTimeMillis()
         markWorkerIdle(worker)
-        result match {
+        result match
           case Right((accountCount, accounts, proof)) =>
             log.info(
               s"Task completed successfully: $accountCount accounts (responseBytes=${responseBytesTargetFor(peer)})"
@@ -1182,20 +1136,19 @@ private class AccountRangeCoordinatorImpl(
             adjustResponseBytesOnSuccess(peer, responseBytesTargetFor(peer), estimatedBytes)
 
             // Reset pivot refresh backoff on servable-root evidence: real account data or a boundary proof.
-            if accountCount > 0 || proof.nonEmpty then {
+            if accountCount > 0 || proof.nonEmpty then
               consecutiveUnproductiveRefreshes = 0
               // The peer served us a useful response. Wipe any prior empty-proof strikes so
               // a future transient empty doesn't push a known-good peer over the threshold.
               recordPeerSuccess(peer.id)
-            }
 
             var task = task0.copy(pending = false)
 
-            if accountCount == 0 then {
-              if proof.nonEmpty || task.rootHash == ByteString(MerklePatriciaTrie.EmptyRootHash) then {
+            if accountCount == 0 then
+              if proof.nonEmpty || task.rootHash == ByteString(MerklePatriciaTrie.EmptyRootHash) then
                 completeEmptyTaskRange(task, proofNodes = proof.size)
                 tryRedispatchPendingTasks()
-              } else {
+              else
                 // Defensive fallback: the verifier should reject this as a stateless-peer signal.
                 // Use the short proof-less cooldown — the peer is healthy, just doesn't hold a
                 // snapshot at our current pivot. Parking it for 30s gains nothing; a pivot
@@ -1206,8 +1159,7 @@ private class AccountRangeCoordinatorImpl(
                   peerCooldownNoProof
                 )
                 requeueOrEscalate(task, "empty range without proof")
-              }
-            } else {
+            else
               // Real account data → reset requeue budget (transient failures earlier are now resolved).
               task = task.copy(requeueCount = 0)
 
@@ -1234,27 +1186,23 @@ private class AccountRangeCoordinatorImpl(
                 storedSoFar = 0,
                 isTaskRangeComplete = isTaskDone
               )
-            }
 
           case Left(error) =>
             log.warn(s"Task completed with error: $error")
             // Re-queue task for retry
             requeueOrEscalate(task0.copy(pending = false), s"task completed with error: $error")
-        }
-    }
 
   private def updateTaskProgress(task: AccountTask, accounts: Seq[(ByteString, Account)]): (Boolean, AccountTask) =
     // Empty responses are handled before this method. A no-proof empty response is a peer refusal; a proof-only empty
     // response is a valid proof that the requested tail is exhausted.
-    if accounts.isEmpty then {
-      (false, task)
-    } else {
+    if accounts.isEmpty then (false, task)
+    else
       val lastHash = accounts.last._1
-      if isMaxHash(lastHash) then {
+      if isMaxHash(lastHash) then
         // Cannot advance beyond 0xFF..; this must be the end.
         consumedKeyspace += task.remainingKeyspace
         (true, task)
-      } else {
+      else
         val nextStart = incrementHash32(lastHash)
         // Track keyspace consumed: distance from old next to new next
         val oldNext = BigInt(1, task.next.toArray.padTo(32, 0.toByte))
@@ -1264,16 +1212,12 @@ private class AccountRangeCoordinatorImpl(
         val updatedTask = task.copy(next = nextStart)
 
         // If this task has no upper bound, keep going until peer returns empty.
-        if updatedTask.last.isEmpty then {
-          (false, updatedTask)
-        } else {
+        if updatedTask.last.isEmpty then (false, updatedTask)
+        else
           // Treat `last` as an exclusive upper bound.
           (compareUnsigned32(nextStart, updatedTask.last) >= 0, updatedTask)
-        }
-      }
-    }
 
-  private def compareUnsigned32(a: ByteString, b: ByteString): Int = {
+  private def compareUnsigned32(a: ByteString, b: ByteString): Int =
     // Empty is treated as unbounded; callers should handle this before comparing.
     val aa = a.toArray
     val bb = b.toArray
@@ -1282,33 +1226,29 @@ private class AccountRangeCoordinatorImpl(
     val bp = if bb.length == maxLen then bb else Array.fill(maxLen - bb.length)(0.toByte) ++ bb
     var i = 0
     var result = 0
-    while result == 0 && i < maxLen do {
+    while result == 0 && i < maxLen do
       val ai = ap(i) & 0xff
       val bi = bp(i) & 0xff
       if ai != bi then result = ai - bi
       i += 1
-    }
     result
-  }
 
-  private def incrementHash32(hash: ByteString): ByteString = {
+  private def incrementHash32(hash: ByteString): ByteString =
     require(hash.length == 32, s"Expected 32-byte hash, got ${hash.length}")
     val bytes = hash.toArray
     var i = bytes.length - 1
     var carry = 1
-    while i >= 0 && carry != 0 do {
+    while i >= 0 && carry != 0 do
       val sum = (bytes(i) & 0xff) + carry
       bytes(i) = (sum & 0xff).toByte
       carry = if sum > 0xff then 1 else 0
       i -= 1
-    }
     ByteString(bytes)
-  }
 
   private def isMaxHash(hash: ByteString): Boolean =
     hash.length == 32 && hash.forall(b => (b & 0xff) == 0xff)
 
-  private def completeEmptyTaskRange(task: AccountTask, proofNodes: Int): Unit = {
+  private def completeEmptyTaskRange(task: AccountTask, proofNodes: Int): Unit =
     val range = task.rangeString
     consumedKeyspace += task.remainingKeyspace
     completedTasks += task.copy(next = task.last, done = true)
@@ -1318,10 +1258,9 @@ private class AccountRangeCoordinatorImpl(
     )
     sendProgressSnapshot()
     ctx.self ! CheckCompletion
-  }
 
   private def handleTaskFailed(requestId: BigInt, reason: String): Unit =
-    activeTasks.remove(requestId) match {
+    activeTasks.remove(requestId) match
       case None =>
         log.warn(
           s"[ACCOUNT-COORD] TaskFailed for unknown reqId=$requestId (reason: $reason) — task already drained. Ignored."
@@ -1333,26 +1272,22 @@ private class AccountRangeCoordinatorImpl(
         // Only mark peer stateless if the task was using the CURRENT root.
         // After pivot refresh, in-flight requests with the OLD root will fail
         // with "Missing proof" — but this doesn't mean the peer can't serve the NEW root.
-        if task.rootHash == stateRoot then {
-          markPeerStateless(peer, reason)
-        } else {
+        if task.rootHash == stateRoot then markPeerStateless(peer, reason)
+        else
           log.info(
             s"Ignoring failure from stale-root request " +
               s"(task root ${task.rootHash.take(4).toHex} != current ${stateRoot.take(4).toHex})"
           )
-        }
         log.warn(s"Task failed: $reason")
         val failedTask = task.copy(pending = false, rootHash = stateRoot)
 
         // Apply cooldown and reduce byte budget for protocol failures; skip for network-level
         // disconnects since the peer is already gone and will reconnect fresh.
-        if !reason.contains("Missing proof for empty account range") && !reason.contains("Peer disconnected") then {
+        if !reason.contains("Missing proof for empty account range") && !reason.contains("Peer disconnected") then
           recordPeerCooldown(peer, reason, effectivePeerCooldown)
           adjustResponseBytesOnFailure(peer, reason)
-        }
 
         requeueOrEscalate(failedTask, reason)
-    }
 
   /** Re-queue a task or escalate to the controller after too many consecutive requeues.
     *
@@ -1361,10 +1296,10 @@ private class AccountRangeCoordinatorImpl(
     * loop forever. Escalation surfaces the problem as PivotStateUnservable, which the controller already escalates to
     * recordCriticalFailure -> fallbackToFastSync after enough refreshes without progress.
     */
-  private def requeueOrEscalate(task: AccountTask, reason: String): Unit = {
+  private def requeueOrEscalate(task: AccountTask, reason: String): Unit =
     val newCount = task.requeueCount + 1
     com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncMetrics.incrementRequestRetry()
-    if newCount > AccountRangeCoordinator.MaxRequeuesPerTask then {
+    if newCount > AccountRangeCoordinator.MaxRequeuesPerTask then
       log.error(
         s"Account task ${task.rangeString} exhausted requeue budget " +
           s"($newCount > ${AccountRangeCoordinator.MaxRequeuesPerTask}, last reason: $reason). " +
@@ -1377,26 +1312,23 @@ private class AccountRangeCoordinatorImpl(
       // serve window expires, producing a PivotStateUnservable burst (observed ~50 in one log).
       // pivotRefreshRequested is cleared in the PivotRefreshed handler, so each fresh pivot
       // gets a fresh escalation.
-      if !pivotRefreshRequested then {
+      if !pivotRefreshRequested then
         pivotRefreshRequested = true
         snapSyncController ! PivotStateUnservable(
           rootHash = stateRoot,
           reason = s"task ${task.rangeString} hit MaxRequeuesPerTask: $reason",
           consecutiveEmptyResponses = AccountRangeCoordinator.MaxRequeuesPerTask
         )
-      }
-    } else {
+    else
       log.info(
         s"[ACCOUNT-REQUEUE] task ${task.rangeString} requeued " +
           s"($newCount/${AccountRangeCoordinator.MaxRequeuesPerTask}): $reason"
       )
       pendingTasks.enqueue(task.copy(requeueCount = newCount))
-    }
     tryRedispatchPendingTasks()
-  }
 
   private def tryRedispatchPendingTasks(): Unit =
-    if pendingTasks.nonEmpty then {
+    if pendingTasks.nonEmpty then
       var eligiblePeers = knownAvailablePeers
         .filterNot(isPeerStateless)
         .filterNot(isPeerSnapless)
@@ -1408,7 +1340,7 @@ private class AccountRangeCoordinatorImpl(
       // non-empty); on a 1-2 snap-peer pool it is the difference between forward progress and a 30s dead stall. We only
       // override cooldown — confirmed-stateless / snapless peers stay excluded, so we never re-dispatch to a peer that
       // genuinely cannot serve the current root.
-      if eligiblePeers.isEmpty then {
+      if eligiblePeers.isEmpty then
         val cooldownOnlyPeers = knownAvailablePeers
           .filterNot(isPeerStateless)
           .filterNot(isPeerSnapless)
@@ -1425,10 +1357,9 @@ private class AccountRangeCoordinatorImpl(
             )
             eligiblePeers = List(peer)
           }
-      }
       val now = System.currentTimeMillis()
       val shouldLog = now - lastStateLogMs >= StateLogIntervalMs
-      if shouldLog then {
+      if shouldLog then
         lastStateLogMs = now
         log.info(
           s"[ACCOUNT-STATE] pending=${pendingTasks.size} active=${activeTasks.size} " +
@@ -1437,32 +1368,27 @@ private class AccountRangeCoordinatorImpl(
             s"eligible=${eligiblePeers.size} strikes=${emptyResponseStrikes.size} " +
             s"maxInflight=$maxInFlightPerPeer root=${stateRoot.take(4).toHex}"
         )
-      }
-      if eligiblePeers.isEmpty then {
+      if eligiblePeers.isEmpty then
         // Promoted from silent return to INFO so the first occurrence per 30s window
         // is visible. Sharing `shouldLog` with the STATE snapshot above keeps total
         // log volume from this method ≤ 2 lines / 30 s — robust against call-rate spikes.
-        if shouldLog then {
+        if shouldLog then
           val nowMs2 = System.currentTimeMillis()
           val soonestReadySec = peerCooldownUntilMs.values.minOption
             .map(t => math.max(0L, (t - nowMs2) / 1000))
-          val coolingSuffix = soonestReadySec match {
+          val coolingSuffix = soonestReadySec match
             case Some(s) => s" (soonest cooling peer ready in ${s}s)"
             case None    => ""
-          }
           log.info(
             s"[ACCOUNT-REDISPATCH] No eligible peers — ${knownAvailablePeers.size} known, " +
               s"${statelessPeers.size} stateless, ${snaplessPeers.size} snapless, " +
               s"${peerCooldownUntilMs.size} cooling${coolingSuffix}. pending: ${pendingTasks.size}"
           )
-        }
-      } else {
+      else
         for
           peer <- eligiblePeers.sortBy(p => (inFlightForPeer(p), lastDispatchTimeMs.getOrElse(p.id.value, 0L)))
           if pendingTasks.nonEmpty
         do dispatchIfPossible(peer)
-      }
-    }
 
   /** Handle a chunk of account storage, inserting a batch into the per-task SnapHashTrie and yielding back to the actor
     * mailbox between chunks. Nodes batch-flush to RocksDB inside SnapHashTrie at the 8 MiB threshold.
@@ -1473,10 +1399,10 @@ private class AccountRangeCoordinatorImpl(
       totalCount: Int,
       storedSoFar: Int,
       isTaskRangeComplete: Boolean
-  ): Unit = {
+  ): Unit =
     val (chunk, rest) = remaining.splitAt(storeChunkSize)
 
-    try {
+    try
       // Route accounts to this task's per-range StackTrie. Inserts are O(depth) memory + O(1)
       // amortised compute; emitted nodes batch-flush to RocksDB inside SnapHashTrie at the 8 MiB
       // threshold, so we never accumulate a multi-GiB in-memory pivot trie.
@@ -1491,7 +1417,7 @@ private class AccountRangeCoordinatorImpl(
       snapSyncController ! SNAPSyncController.ProgressAccountsSynced(chunk.size.toLong)
 
       // Periodic progress log (every 100K accounts) to show download rate without per-chunk noise
-      if accountsDownloaded - lastProgressLogAt >= ProgressLogInterval then {
+      if accountsDownloaded - lastProgressLogAt >= ProgressLogInterval then
         val elapsed = (System.currentTimeMillis() - startTime) / 1000.0
         val rate = if elapsed > 0 then (accountsDownloaded / elapsed).toLong else 0L
         val pct = (consumedKeyspace * 10000 / totalKeyspace).toDouble / 100.0
@@ -1512,16 +1438,15 @@ private class AccountRangeCoordinatorImpl(
             s"[SNAP-PROGRESS] ACCOUNT-RANGE $m% keyspace covered | $accountsDownloaded accounts | $rate accts/s"
           )
         }
-      }
 
-      if rest.nonEmpty then {
+      if rest.nonEmpty then
         log.debug(s"Stored chunk: $newStored/$totalCount accounts (${rest.size} remaining)")
         // Yield to actor mailbox - other messages (PeerAvailable, responses) process before next chunk
         ctx.self ! StoreAccountChunk(task, rest, totalCount, newStored, isTaskRangeComplete)
-      } else {
+      else
         // Mark task done / re-enqueue BEFORE potentially spawning async flush — so the
         // task tracking is up to date by the time we re-enter `receive` after flushing.
-        if isTaskRangeComplete then {
+        if isTaskRangeComplete then
           completedTasks += task.copy(done = true)
           // On the StackTrie path, the task's per-range StackTrie has accumulated all of
           // this range's accounts; commit it to finalise the right boundary and flush the
@@ -1538,7 +1463,7 @@ private class AccountRangeCoordinatorImpl(
           }
           // Send progress snapshot so controller can resume from saved positions
           sendProgressSnapshot()
-        } else {
+        else
           // Need more requests for the same interval; re-queue with updated `next`.
           pendingTasks.enqueue(task)
           // Trigger immediate redispatch so the re-queued task is picked up without
@@ -1547,20 +1472,16 @@ private class AccountRangeCoordinatorImpl(
           // Persist partial range position so a crash mid-range resumes from here,
           // not the beginning of the range (go-ethereum saveSyncStatus() parity).
           sendProgressSnapshot()
-        }
 
         // Each task's SnapHashTrie batches its emissions and flushes to RocksDB at the 8 MiB
         // threshold (or on task-complete commit). No global flush required.
         log.debug(s"Stored all $totalCount accounts via StackTrie ($accountsDownloaded total)")
         ctx.self ! CheckCompletion
-      }
-    } catch {
+    catch
       case e: Exception =>
         log.error(s"Failed to store account chunk: ${e.getMessage}", e)
         // Re-queue task for retry
         pendingTasks.enqueue(task.copy(pending = false, done = false))
-    }
-  }
 
   /** Get-or-create the per-task [[SnapTrie]] for the StackTrie path. Each task gets its own streaming trie keyed by
     * `task.last` (the end-of-range boundary, unique per task).
@@ -1572,7 +1493,7 @@ private class AccountRangeCoordinatorImpl(
   private def getOrCreateTaskStackTrie(task: AccountTask): SnapTrie =
     taskStackTries.getOrElseUpdate(
       task.last,
-      storageScheme match {
+      storageScheme match
         case StorageScheme.Hash =>
           new SnapHashTrie(batch => mptStorage.storeRawNodes(batch))
         case StorageScheme.Path =>
@@ -1586,7 +1507,6 @@ private class AccountRangeCoordinatorImpl(
             writePath = (path, _, blob) => pns.writeAccountNode(path, blob),
             deleteExact = path => pns.deleteAccountNode(path)
           )
-      }
     )
 
   /** Identify contract accounts (those with non-empty code hash)
@@ -1594,14 +1514,14 @@ private class AccountRangeCoordinatorImpl(
     * @param accounts
     *   Accounts to scan for contracts
     */
-  private def identifyContractAccounts(accounts: Seq[(ByteString, Account)]): Unit = {
+  private def identifyContractAccounts(accounts: Seq[(ByteString, Account)]): Unit =
     val emptyRoot = ByteString(MerklePatriciaTrie.EmptyRootHash)
     val newCodeHashes = mutable.ArrayBuffer.empty[ByteString]
     val newStorageTasks = mutable.ArrayBuffer.empty[StorageTask]
     var count = 0
 
     accounts.foreach { case (accountHash, account) =>
-      if account.codeHash != Account.EmptyCodeHash then {
+      if account.codeHash != Account.EmptyCodeHash then
         // Write 32-byte accountHash + 32-byte codeHash to bytecode file (crash recovery)
         contractAccountsOut.write(accountHash.toArray.padTo(32, 0.toByte), 0, 32)
         contractAccountsOut.write(account.codeHash.value.toArray.padTo(32, 0.toByte), 0, 32)
@@ -1613,21 +1533,18 @@ private class AccountRangeCoordinatorImpl(
         // Track unique codeHashes via Bloom filter + temp file (~4MB RAM vs 200MB HashSet).
         // The Bloom filter has 0.01% FPR — ~200 of 2M hashes may be missed but the
         // recovery scan (Bug 20 hardening) catches any gaps.
-        if !codeHashBloom.mightContain(account.codeHash.value) then {
+        if !codeHashBloom.mightContain(account.codeHash.value) then
           codeHashBloom.put(account.codeHash.value)
           uniqueCodeHashesOut.write(account.codeHash.value.toArray.padTo(32, 0.toByte), 0, 32)
           uniqueCodeHashesCount += 1
           newCodeHashes += account.codeHash.value
-        }
 
         // Collect storage task for inline dispatch (skip contracts with empty storage)
-        if account.storageRoot.value.nonEmpty && account.storageRoot.value != emptyRoot then {
+        if account.storageRoot.value.nonEmpty && account.storageRoot.value != emptyRoot then
           newStorageTasks += StorageTask.createStorageTask(accountHash, account.storageRoot.value)
-        }
-      }
     }
 
-    if count > 0 then {
+    if count > 0 then
       contractAccountsCount += count
       contractStorageCount += count
       // Flush file streams (crash recovery path)
@@ -1637,17 +1554,14 @@ private class AccountRangeCoordinatorImpl(
       log.info(
         s"Identified $count contract accounts (total: $contractAccountsCount, unique codeHashes: $uniqueCodeHashesCount)"
       )
-    }
 
     // Geth-aligned: dispatch contract data inline to controller → bytecode/storage coordinators.
     // This eliminates the 6+ minute gap between account completion and first storage/bytecode request.
-    if newCodeHashes.nonEmpty || newStorageTasks.nonEmpty then {
+    if newCodeHashes.nonEmpty || newStorageTasks.nonEmpty then
       snapSyncController ! SNAPSyncController.IncrementalContractData(
         newCodeHashes.toSeq,
         newStorageTasks.toSeq
       )
-    }
-  }
 
   /** Finalize the trie and ensure all nodes including the root are persisted to storage.
     *
@@ -1657,19 +1571,18 @@ private class AccountRangeCoordinatorImpl(
   private def finalizeTrie(): Either[String, ByteString] =
     // Runs inside a Future on `account-trie-dispatcher` — uses `futureLog` (plain SLF4J), NOT
     // the thread-confined `ctx.log`.
-    try {
+    try
       futureLog.info("Finalizing state trie...")
       // StackTrie path: each task's SnapHashTrie was committed on task-complete in
       // `handleStoreAccountChunk`, flushing its right boundary + remaining batch to
       // RocksDB. Defensively commit any stragglers (should be empty unless a task
       // finished after its `isTaskRangeComplete` branch was missed).
-      if taskStackTries.nonEmpty then {
+      if taskStackTries.nonEmpty then
         futureLog.warn(s"Finalising ${taskStackTries.size} uncommitted task StackTries (unexpected)")
         taskStackTries.values.foreach { trie =>
           val _ = trie.commit()
         }
         taskStackTries.clear()
-      }
       // Use the pivot's claimed root as the "finalized root". With per-task fragments
       // there is no single computed root; healing reconciles the on-disk trie against
       // `stateRoot` regardless.
@@ -1678,11 +1591,10 @@ private class AccountRangeCoordinatorImpl(
           s"Reported root: ${stateRoot.take(8).toArray.map("%02x".format(_)).mkString}..."
       )
       Right(stateRoot)
-    } catch {
+    catch
       case e: Exception =>
         futureLog.error(s"Failed to finalize trie: ${e.getMessage}", e)
         Left(s"Trie finalization error: ${e.getMessage}")
-    }
 
   /** Read all contract account entries from a temporary file. Each entry is 64 bytes: 32-byte key + 32-byte value.
     * Flushes the output stream first to ensure all data is written.
@@ -1691,50 +1603,44 @@ private class AccountRangeCoordinatorImpl(
       filePath: Path,
       out: BufferedOutputStream,
       count: Long
-  ): Seq[(ByteString, ByteString)] = {
+  ): Seq[(ByteString, ByteString)] =
     out.flush()
     if count == 0 then Seq.empty
-    else {
+    else
       val raf = new RandomAccessFile(filePath.toFile, "r")
-      try {
+      try
         val result = new mutable.ArrayBuffer[(ByteString, ByteString)](count.toInt)
         val buf = new Array[Byte](ContractEntrySize)
         var i = 0L
-        while i < count do {
+        while i < count do
           raf.readFully(buf)
           val key = ByteString(java.util.Arrays.copyOfRange(buf, 0, 32))
           val value = ByteString(java.util.Arrays.copyOfRange(buf, 32, 64))
           result += ((key, value))
           i += 1
-        }
         result.toSeq
-      } finally raf.close()
-    }
-  }
+      finally raf.close()
 
   /** Read unique codeHashes from the Bloom-filtered temp file. Each entry is 32 bytes. File size is ~64MB for ~2M
     * unique hashes (vs 4.7GB for 73.5M raw entries).
     */
-  private def readUniqueCodeHashes(): Seq[ByteString] = {
+  private def readUniqueCodeHashes(): Seq[ByteString] =
     uniqueCodeHashesOut.flush()
     if uniqueCodeHashesCount == 0 then Seq.empty
-    else {
+    else
       val raf = new RandomAccessFile(uniqueCodeHashesFile.toFile, "r")
-      try {
+      try
         val result = new mutable.ArrayBuffer[ByteString](uniqueCodeHashesCount.toInt)
         val buf = new Array[Byte](32)
         var i = 0L
-        while i < uniqueCodeHashesCount do {
+        while i < uniqueCodeHashesCount do
           raf.readFully(buf)
           result += ByteString(buf.clone())
           i += 1
-        }
         result.toSeq
-      } finally raf.close()
-    }
-  }
+      finally raf.close()
 
-  private def calculateProgress(): AccountRangeStats = {
+  private def calculateProgress(): AccountRangeStats =
     val total = completedTasks.size + activeTasks.size + pendingTasks.size
     val progress = if total == 0 then 1.0 else completedTasks.size.toDouble / total
     val elapsedMs = System.currentTimeMillis() - startTime
@@ -1749,7 +1655,6 @@ private class AccountRangeCoordinatorImpl(
       elapsedTimeMs = elapsedMs,
       contractAccountsFound = contractAccountsCount
     )
-  }
 
   private def isComplete: Boolean =
     pendingTasks.isEmpty && activeTasks.isEmpty
@@ -1763,22 +1668,21 @@ private class AccountRangeCoordinatorImpl(
     */
   private def computeKeyspaceEstimate(): Option[Long] =
     if accountsDownloaded < 10000 then None // too early for reliable estimate
-    else {
+    else
       val keyspaceSize = BigInt(2).pow(256)
       val nonCompleteTasks = pendingTasks.toSeq ++ activeTasks.values.map(_._1)
-      val remaining = if nonCompleteTasks.isEmpty then {
-        BigInt(0)
-      } else {
-        nonCompleteTasks.foldLeft(BigInt(0)) { case (sum, task) =>
-          val taskEnd = BigInt(1, task.last.toArray)
-          val taskPos = BigInt(1, task.next.toArray)
-          sum + (taskEnd - taskPos).max(0)
-        }
-      }
+      val remaining =
+        if nonCompleteTasks.isEmpty then BigInt(0)
+        else
+          nonCompleteTasks.foldLeft(BigInt(0)) { case (sum, task) =>
+            val taskEnd = BigInt(1, task.last.toArray)
+            val taskPos = BigInt(1, task.next.toArray)
+            sum + (taskEnd - taskPos).max(0)
+          }
 
       val covered = keyspaceSize - remaining
       if covered <= 0 then None
-      else {
+      else
         // Use BigInt arithmetic: estimated = accountsDownloaded * keyspaceSize / covered
         // This avoids Double precision loss when dividing by 2^256.
         val estimatedBig = BigInt(accountsDownloaded) * keyspaceSize / covered
@@ -1786,11 +1690,8 @@ private class AccountRangeCoordinatorImpl(
         // ETC mainnet has ~600M addresses per blockscout; cap at 2B for safety margin
         if estimatedBig <= accountsDownloaded || estimatedBig > BigInt(2000000000L) then None
         else Some(estimatedBig.toLong)
-      }
-    }
-}
 
-object AccountRangeCoordinator {
+object AccountRangeCoordinator:
 
   sealed trait Command
   case class StartAccountRangeSync(stateRoot: ByteString) extends Command
@@ -1912,7 +1813,6 @@ object AccountRangeCoordinator {
         impl.receive()
       }
     }
-}
 
 case class AccountRangeStats(
     accountsDownloaded: Long,

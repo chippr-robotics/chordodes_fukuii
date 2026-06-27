@@ -13,7 +13,7 @@ import com.chipprbots.ethereum.ledger.BlockQueue.Leaf
 import com.chipprbots.ethereum.ledger.BlockQueue.QueuedBlock
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 import com.chipprbots.ethereum.utils.Logger
-object BlockQueue {
+object BlockQueue:
   case class QueuedBlock(block: Block, weight: Option[ChainWeight])
   case class Leaf(hash: ByteString, weight: ChainWeight)
 
@@ -22,13 +22,12 @@ object BlockQueue {
       syncConfig: SyncConfig
   ): BlockQueue =
     new BlockQueue(blockchainReader, syncConfig.maxQueuedBlockNumberAhead, syncConfig.maxQueuedBlockNumberBehind)
-}
 
 class BlockQueue(
     blockchainReader: BlockchainReader,
     val maxQueuedBlockNumberAhead: Int,
     val maxQueuedBlockNumberBehind: Int
-) extends Logger {
+) extends Logger:
 
   // note these two maps make this class thread-unsafe
   private val blocks = new java.util.concurrent.ConcurrentHashMap[BlockHash, QueuedBlock].asScala
@@ -48,12 +47,12 @@ class BlockQueue(
     *   if the newly enqueued block is part of a known branch (rooted somewhere on the main chain), return the leaf hash
     *   and its total difficulty, otherwise None
     */
-  def enqueueBlock(block: Block, bestBlockNumber: BigInt = blockchainReader.getBestBlockNumber): Option[Leaf] = {
+  def enqueueBlock(block: Block, bestBlockNumber: BigInt = blockchainReader.getBestBlockNumber): Option[Leaf] =
     import block.header.*
 
     cleanUp(bestBlockNumber)
 
-    blocks.get(hash) match {
+    blocks.get(hash) match
 
       case Some(_) =>
         log.debug(s"Block (${block.idTag}) already in queue. ")
@@ -66,7 +65,7 @@ class BlockQueue(
       case None =>
         val parentWeight = blockchainReader.getChainWeightByHash(parentHash)
 
-        parentWeight match {
+        parentWeight match
 
           case Some(_) =>
             addBlock(block, parentWeight)
@@ -75,7 +74,7 @@ class BlockQueue(
 
           case None =>
             addBlock(block, parentWeight)
-            findClosestChainedAncestor(block) match {
+            findClosestChainedAncestor(block) match
               case Some(ancestor) =>
                 log.debug(s"Enqueued new block (${block.idTag}) to a rooted sidechain")
                 updateChainWeights(ancestor)
@@ -83,10 +82,6 @@ class BlockQueue(
               case None =>
                 log.debug(s"Enqueued new block (${block.idTag}) with unknown relation to the main chain")
                 None
-            }
-        }
-    }
-  }
 
   def getBlockByHash(hash: BlockHash): Option[Block] =
     blocks.get(hash).map(_.block)
@@ -111,28 +106,25 @@ class BlockQueue(
     * @return
     *   full branch from oldest ancestor to descendant, even if not all of it is removed
     */
-  def getBranch(descendant: BlockHash, dequeue: Boolean): List[Block] = {
+  def getBranch(descendant: BlockHash, dequeue: Boolean): List[Block] =
 
     def recur(hash: BlockHash, childShared: Boolean): List[Block] =
-      blocks.get(hash) match {
+      blocks.get(hash) match
         case Some(QueuedBlock(block, _)) =>
           import block.header.parentHash
 
           val isShared = childShared || parentToChildren.get(hash).exists(_.nonEmpty)
-          if !isShared && dequeue then {
+          if !isShared && dequeue then
             val siblings = parentToChildren.get(parentHash)
             siblings.foreach(sbls => parentToChildren += parentHash -> (sbls - hash))
             blocks -= hash
-          }
 
           block :: recur(parentHash, isShared)
 
         case _ =>
           Nil
-      }
 
     recur(hash = descendant, childShared = false).reverse
-  }
 
   /** Removes a whole subtree begining with the ancestor. To be used when ancestor fails to execute
     * @param ancestor
@@ -148,16 +140,15 @@ class BlockQueue(
 
   /** Clear the BlockQueue
     */
-  def clear(): Unit = {
+  def clear(): Unit =
     blocks.clear()
     parentToChildren.clear()
-  }
 
   /** Removes stale blocks - too old or too young in relation the current best block number
     * @param bestBlockNumber
     *   \- best block number of the main chain
     */
-  private def cleanUp(bestBlockNumber: BigInt): Unit = {
+  private def cleanUp(bestBlockNumber: BigInt): Unit =
     val staleHashes = blocks.values.collect {
       case QueuedBlock(b, _) if isNumberOutOfRange(b.header.number, bestBlockNumber) =>
         b.header.hash
@@ -165,7 +156,6 @@ class BlockQueue(
 
     blocks --= staleHashes
     parentToChildren --= staleHashes
-  }
 
   /** Updates chain weights for a subtree.
     * @param ancestor
@@ -175,7 +165,7 @@ class BlockQueue(
     */
   private def updateChainWeights(ancestor: BlockHash): Option[Leaf] =
     blocks.get(ancestor).flatMap(_.weight).flatMap { weight =>
-      parentToChildren.get(ancestor) match {
+      parentToChildren.get(ancestor) match
 
         case Some(children) if children.nonEmpty =>
           val updatedChildren = children
@@ -188,7 +178,6 @@ class BlockQueue(
 
         case _ =>
           Some(Leaf(ancestor.value, weight))
-      }
     }
 
   /** Find a closest (youngest) chained ancestor. Chained means being part of a known chain, thus having total
@@ -201,7 +190,7 @@ class BlockQueue(
     */
   @tailrec
   private def findClosestChainedAncestor(descendant: Block): Option[BlockHash] =
-    blocks.get(descendant.header.parentHash) match {
+    blocks.get(descendant.header.parentHash) match
       case Some(QueuedBlock(block, Some(_))) =>
         Some(block.header.hash)
 
@@ -210,9 +199,8 @@ class BlockQueue(
 
       case None =>
         None
-    }
 
-  private def addBlock(block: Block, parentWeight: Option[ChainWeight]): Unit = {
+  private def addBlock(block: Block, parentWeight: Option[ChainWeight]): Unit =
     import block.header.*
 
     val weight = parentWeight.map(_.increase(block.header))
@@ -220,10 +208,7 @@ class BlockQueue(
 
     val siblings = parentToChildren.getOrElse(parentHash, Set.empty)
     parentToChildren += parentHash -> (siblings + hash)
-  }
 
   private def isNumberOutOfRange(blockNumber: BigInt, bestBlockNumber: BigInt): Boolean =
     blockNumber - bestBlockNumber > maxQueuedBlockNumberAhead ||
       bestBlockNumber - blockNumber > maxQueuedBlockNumberBehind
-
-}

@@ -16,7 +16,7 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
 
 class TestNode(
     _instanceConfig: com.chipprbots.ethereum.utils.InstanceConfig = com.chipprbots.ethereum.utils.Config
-) extends BaseNode {
+) extends BaseNode:
   override lazy val instanceConfig: com.chipprbots.ethereum.utils.InstanceConfig = _instanceConfig
 
   override lazy val ioRuntime: IORuntime = IORuntime.global
@@ -70,5 +70,3 @@ class TestNode(
 
   val currentSealEngine: AtomicReference[SealEngineType] = new AtomicReference(SealEngineType.NoReward)
   def sealEngine: SealEngineType = currentSealEngine.get()
-
-}

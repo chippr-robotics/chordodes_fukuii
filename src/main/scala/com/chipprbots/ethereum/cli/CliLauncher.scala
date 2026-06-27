@@ -5,16 +5,12 @@ import scala.collection.immutable.ArraySeq
 import org.slf4j.LoggerFactory
 
 //scalastyle:off
-object CliLauncher {
+object CliLauncher:
 
   private val logger = LoggerFactory.getLogger(getClass)
 
-  def main(args: Array[String]): Unit = {
+  def main(args: Array[String]): Unit =
     val arguments: Seq[String] = ArraySeq.unsafeWrapArray(args)
-    CliCommands.api.map(s => logger.info(s)).parse(arguments, sys.env) match {
+    CliCommands.api.map(s => logger.info(s)).parse(arguments, sys.env) match
       case Left(help) => logger.warn(help.toString)
       case Right(_)   => ()
-    }
-  }
-
-}

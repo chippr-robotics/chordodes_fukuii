@@ -17,7 +17,7 @@ import Fixtures.blockchainConfig
   * ETC chain sanity: OlympiaConfigBuilder uses EtcOlympiaOpCodes — no BLOBHASH/BLOBBASEFEE (ETH-only EIPs), CLZ present
   * per ECIP-1121.
   */
-class EvmConfigTimestampForkSpec extends AnyWordSpec with Matchers {
+class EvmConfigTimestampForkSpec extends AnyWordSpec with Matchers:
 
   private val ShanghaiTs: Long = 1_000L
   private val CancunTs: Long = 2_000L
@@ -102,4 +102,3 @@ class EvmConfigTimestampForkSpec extends AnyWordSpec with Matchers {
       }
     }
   }
-}

@@ -22,17 +22,15 @@ import com.chipprbots.ethereum.vm.MockWorldState.TestVM
 
 import Fixtures.blockchainConfig
 
-class OpCodeGasSpecPostMagneto extends OpCodeGasSpecPostEip2929 {
+class OpCodeGasSpecPostMagneto extends OpCodeGasSpecPostEip2929:
   override val config: EvmConfig = EvmConfig.MagnetoConfigBuilder(blockchainConfig)
   override val forkBlockHeight = Fixtures.MagnetoBlockNumber
-}
 
-class OpCodeGasSpecPostBerlin extends OpCodeGasSpecPostEip2929 {
+class OpCodeGasSpecPostBerlin extends OpCodeGasSpecPostEip2929:
   override val config: EvmConfig = EvmConfig.BerlinConfigBuilder(blockchainConfig)
   override val forkBlockHeight = Fixtures.BerlinBlockNumber
-}
 
-trait OpCodeGasSpecPostEip2929 extends AnyFunSuite with OpCodeTesting with Matchers with ScalaCheckPropertyChecks {
+trait OpCodeGasSpecPostEip2929 extends AnyFunSuite with OpCodeTesting with Matchers with ScalaCheckPropertyChecks:
 
   protected def forkBlockHeight: Int
 
@@ -304,4 +302,3 @@ trait OpCodeGasSpecPostEip2929 extends AnyFunSuite with OpCodeTesting with Match
       result.gasUsed shouldEqual gasUsed
     }
   }
-}

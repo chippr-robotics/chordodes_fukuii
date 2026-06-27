@@ -39,23 +39,21 @@ import java.util.concurrent.{Executors, TimeUnit}
   * work, and the very first thing it does is `StartTrieNodeHealing(root)` → the verification pass. Any pruning observed
   * is therefore on the first walk. Harness mirrors [[PrunedHealVerificationSpec]] / [[HealingFrontierResumeSpec]].
   */
-class SubtreeCompleteSeedingSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers {
+class SubtreeCompleteSeedingSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
 
-  private def gaugeValue(name: String): Double = {
+  private def gaugeValue(name: String): Double =
     val gauge = Metrics.get().registry.find(name).gauge()
     if gauge == null then Double.NaN else gauge.value()
-  }
 
   private def emptyChildren: Array[MptNode] = Array.fill[MptNode](16)(NullNode)
 
-  private def deleteRecursively(f: File): Unit = {
+  private def deleteRecursively(f: File): Unit =
     Option(f.listFiles()).foreach(_.foreach(deleteRecursively))
     f.delete()
     ()
-  }
 
   private def awaitStateHealingComplete(
       controller: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
@@ -67,28 +65,24 @@ class SubtreeCompleteSeedingSpec extends ScalaTestWithActorTestKit() with AnyFla
     }
 
   /** Read-counting storage so we can prove a seeded subtree root's bytes are NOT fetched on the first verification. */
-  private class CountingMptStorage extends TestMptStorage {
+  private class CountingMptStorage extends TestMptStorage:
     val reads: mutable.Set[ByteString] = mutable.Set.empty[ByteString]
-    override def get(key: Array[Byte]): MptNode = {
+    override def get(key: Array[Byte]): MptNode =
       reads.synchronized(reads += ByteString(key))
       super.get(key)
-    }
-    override def multiGetNodes(hashes: Seq[Array[Byte]]): Seq[Option[MptNode]] = {
+    override def multiGetNodes(hashes: Seq[Array[Byte]]): Seq[Option[MptNode]] =
       reads.synchronized(hashes.foreach(h => reads += ByteString(h)))
       super.multiGetNodes(hashes)
-    }
-  }
 
-  private def storedLeaf(storage: TestMptStorage, seed: String): ByteString = {
+  private def storedLeaf(storage: TestMptStorage, seed: String): ByteString =
     val leaf = LeafNode(ByteString(Array[Byte](0x01)), ByteString(kec256(ByteString(seed)).toArray))
     storage.putNode(leaf)
     ByteString(leaf.hash)
-  }
 
   /** Build root(branch) with two present subtree children, each a branch over a present leaf. Returns (rootHash,
     * Seq(subtreeRootHash), Seq(grandchildHash)).
     */
-  private def twoPresentSubtrees(storage: TestMptStorage): (ByteString, Seq[ByteString], Seq[ByteString]) = {
+  private def twoPresentSubtrees(storage: TestMptStorage): (ByteString, Seq[ByteString], Seq[ByteString]) =
     val built = (0 until 2).map { i =>
       val grandchild = storedLeaf(storage, s"seed-grandchild-$i")
       val children = emptyChildren
@@ -102,7 +96,6 @@ class SubtreeCompleteSeedingSpec extends ScalaTestWithActorTestKit() with AnyFla
     val root = BranchNode(rootChildren, None)
     storage.putNode(root)
     (ByteString(root.hash), built.map(_._1), built.map(_._2))
-  }
 
   private def withFreshNode(
       stateRoot: ByteString,
@@ -113,12 +106,12 @@ class SubtreeCompleteSeedingSpec extends ScalaTestWithActorTestKit() with AnyFla
           HealingFrontierStorage,
           org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
       ) => Unit
-  ): Unit = {
+  ): Unit =
     val pool = Executors.newSingleThreadExecutor()
     val ec = ExecutionContext.fromExecutorService(pool)
     val dbPath = Files.createTempDirectory("subtree-seeding-rocksdb").toAbsolutePath.toString
     val dataSource = RocksDbDataSource(
-      new RocksDbConfig {
+      new RocksDbConfig:
         override val createIfMissing: Boolean = true
         override val paranoidChecks: Boolean = true
         override val path: String = dbPath
@@ -128,7 +121,7 @@ class SubtreeCompleteSeedingSpec extends ScalaTestWithActorTestKit() with AnyFla
         override val levelCompaction: Boolean = true
         override val blockSize: Long = 16384
         override val blockCacheSize: Long = 33554432
-      },
+      ,
       Namespaces.nsSeq
     )
     val store = new HealingFrontierStorage(dataSource)
@@ -149,14 +142,12 @@ class SubtreeCompleteSeedingSpec extends ScalaTestWithActorTestKit() with AnyFla
       healingWriterEcOverride = Some(ec)
     )
     try body(coordinator, store, controller)
-    finally {
+    finally
       testKit.stop(coordinator)
       pool.shutdown()
       pool.awaitTermination(5, TimeUnit.SECONDS)
       dataSource.destroy()
       deleteRecursively(new File(dbPath))
-    }
-  }
 
   "Fresh-node seeding (T-5, FR-003)" should
     "prune subtrees seeded by SNAP-fragment + heal-closure records on the FIRST verification, with no prior full walk" taggedAs UnitTest in {
@@ -187,4 +178,3 @@ class SubtreeCompleteSeedingSpec extends ScalaTestWithActorTestKit() with AnyFla
         }
       }
     }
-}

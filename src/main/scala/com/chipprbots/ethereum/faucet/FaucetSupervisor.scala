@@ -14,14 +14,13 @@ import com.chipprbots.ethereum.faucet.FaucetHandler.WalletException
 import com.chipprbots.ethereum.faucet.jsonrpc.WalletService
 import com.chipprbots.ethereum.utils.Logger
 
-object FaucetSupervisor {
+object FaucetSupervisor:
   val name = "FaucetSupervisor"
-}
 
 class FaucetSupervisor(walletService: WalletService, config: FaucetConfig, shutdown: () => Unit)(using
     system: ActorSystem,
     runtime: IORuntime
-) extends Logger {
+) extends Logger:
 
   val minBackoff: FiniteDuration = config.supervisor.minBackoff
   val maxBackoff: FiniteDuration = config.supervisor.maxBackoff
@@ -43,4 +42,3 @@ class FaucetSupervisor(walletService: WalletService, config: FaucetConfig, shutd
         ),
       FaucetHandler.name
     )
-}

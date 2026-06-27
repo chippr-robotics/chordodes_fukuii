@@ -6,7 +6,7 @@ import org.bouncycastle.math.ec.ECPoint
 
 import com.chipprbots.ethereum.crypto.*
 
-object AuthResponseMessage {
+object AuthResponseMessage:
 
   private val PublicKeyLength = 64
   private val NonceLength = 32
@@ -20,13 +20,11 @@ object AuthResponseMessage {
       nonce = ByteString(input.slice(PublicKeyLength, PublicKeyLength + NonceLength)),
       knownPeer = input(PublicKeyLength + NonceLength) == 1
     )
-}
 
-case class AuthResponseMessage(ephemeralPublicKey: ECPoint, nonce: ByteString, knownPeer: Boolean) {
+case class AuthResponseMessage(ephemeralPublicKey: ECPoint, nonce: ByteString, knownPeer: Boolean):
 
   lazy val encoded: ByteString = ByteString(
     ephemeralPublicKey.getEncoded(false).drop(1) ++
       nonce ++
       Array(if knownPeer then 1.toByte else 0.toByte)
   )
-}

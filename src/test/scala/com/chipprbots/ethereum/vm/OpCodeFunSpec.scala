@@ -18,7 +18,7 @@ import com.chipprbots.ethereum.vm.Generators.*
 
 import Fixtures.blockchainConfig
 
-class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with ScalaCheckPropertyChecks {
+class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with ScalaCheckPropertyChecks:
 
   import MockWorldState.PS
 
@@ -32,22 +32,19 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
     if stateIn.stack.size < op.delta then stateOut shouldEqual stateIn.withError(StackUnderflow).halt
     else if stateIn.stack.size - op.delta + op.alpha > stateIn.stack.maxSize then
       stateOut shouldEqual stateIn.withError(StackOverflow).halt
-    else {
-      if stateOut.error.isEmpty then {
+    else
+      if stateOut.error.isEmpty then
         val expectedStackSize = stateIn.stack.size - op.delta + op.alpha
         stateOut.stack.size shouldEqual expectedStackSize
 
         val (_, stack1) = stateIn.stack.pop(op.delta)
         val (_, stack2) = stateOut.stack.pop(op.alpha)
         stack1 shouldEqual stack2
-      }
       body
-    }
 
-  def stateWithCode(state: PS, code: ByteString): PS = {
+  def stateWithCode(state: PS, code: ByteString): PS =
     val newProgram = Program(code)
     state.copy(env = state.env.copy(program = newProgram))
-  }
 
   test(STOP) { op =>
     forAll(getProgramStateGen()) { stateIn =>
@@ -299,7 +296,7 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
   }
 
   test(EXTCODECOPY) { op =>
-    val stateGen: Gen[PS] = for {
+    val stateGen: Gen[PS] = for
       extCode <- getByteStringGen(0, 256)
 
       stateIn <- getProgramStateGen(
@@ -315,7 +312,7 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
       world =
         if doSave then stateIn.world.saveAccount(addr, Account.empty().copy(codeHash = CodeHash(hash)))
         else stateIn.world
-    } yield stateIn.withWorld(world)
+    yield stateIn.withWorld(world)
 
     forAll(stateGen) { stateIn =>
       val stateOut = executeOp(op, stateIn)
@@ -334,12 +331,12 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
   }
 
   test(BLOCKHASH) { op =>
-    val stateGen: Gen[PS] = for {
-      stateIn <- getProgramStateGen(
-        stackGen = getStackGen(maxWord = UInt256(512)),
-        blockNumberGen = getUInt256Gen(0, 512)
-      )
-    } yield stateIn
+    val stateGen: Gen[PS] =
+      for stateIn <- getProgramStateGen(
+          stackGen = getStackGen(maxWord = UInt256(512)),
+          blockNumberGen = getUInt256Gen(0, 512)
+        )
+      yield stateIn
 
     forAll(stateGen) { stateIn =>
       val stateOut = executeOp(op, stateIn)
@@ -485,13 +482,13 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
       1 -> getUInt256Gen(Int.MaxValue, UInt256.MaxValue)
     )
 
-    val stateGen = for {
+    val stateGen = for
       codeSize <- Gen.choose(0, 256)
       state <- getProgramStateGen(
         stackGen = getStackGen(valueGen = stackValueGen(codeSize)),
         codeGen = getByteStringGen(codeSize, codeSize, opcodeGen)
       )
-    } yield state
+    yield state
 
     forAll(stateGen) { stateIn =>
       val stateOut = executeOp(op, stateIn)
@@ -560,13 +557,13 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
       1 -> getUInt256Gen(Int.MaxValue, UInt256.MaxValue)
     )
 
-    val stateGen = for {
+    val stateGen = for
       codeSize <- Gen.choose(0, 256)
       state <- getProgramStateGen(
         stackGen = getStackGen(valueGen = stackValueGen(codeSize)),
         codeGen = getByteStringGen(codeSize, codeSize, opcodeGen)
       )
-    } yield state
+    yield state
 
     forAll(stateGen) { stateIn =>
       val stateOut = executeOp(op, stateIn)
@@ -711,11 +708,8 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
         val (Seq(offset, size), _) = stateIn.stack.pop(2)
         val (data, mem1) = stateIn.memory.load(offset, size)
 
-        if size.isZero then {
-          mem1.size shouldBe stateIn.memory.size
-        } else {
-          mem1.size should be >= (offset + size).toInt
-        }
+        if size.isZero then mem1.size shouldBe stateIn.memory.size
+        else mem1.size should be >= (offset + size).toInt
 
         val expectedState = stateIn.withStack(stateOut.stack).withMemory(mem1).withReturnData(data).halt
         stateOut shouldEqual expectedState
@@ -735,15 +729,14 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
       withStackVerification(op, stateIn, stateOut) {
         val (Seq(memOffset, offset, size), _) = stateIn.stack.pop(3)
 
-        if offset + size > stateIn.returnData.size then {
+        if offset + size > stateIn.returnData.size then
           stateOut shouldEqual stateIn.withStack(stateOut.stack).withError(ReturnDataOverflow)
-        } else {
+        else
           val (data, _) = stateIn.memory.load(offset, size)
           val (storedInMem, _) = stateOut.memory.load(memOffset, size)
 
           data shouldEqual storedInMem
           stateOut shouldEqual stateIn.withStack(stateOut.stack).withMemory(stateOut.memory).step()
-        }
       }
     }
   }
@@ -761,11 +754,8 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
         val (Seq(offset, size), _) = stateIn.stack.pop(2)
         val (data, mem1) = stateIn.memory.load(offset, size)
 
-        if size.isZero then {
-          mem1.size shouldBe stateIn.memory.size
-        } else {
-          mem1.size should be >= (offset + size).toInt
-        }
+        if size.isZero then mem1.size shouldBe stateIn.memory.size
+        else mem1.size should be >= (offset + size).toInt
 
         val expectedState = stateIn.withStack(stateOut.stack).withMemory(mem1).revert(data)
         stateOut shouldEqual expectedState
@@ -877,5 +867,3 @@ class OpCodeFunSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
       slice shouldEqual expectedContentFn(bytes)
     }
   }
-
-}

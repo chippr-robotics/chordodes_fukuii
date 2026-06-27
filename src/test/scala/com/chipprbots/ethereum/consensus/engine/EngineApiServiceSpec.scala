@@ -21,7 +21,7 @@ import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.testing.Tags.*
 
 // scalastyle:off magic.number
-class EngineApiServiceSpec extends AnyWordSpec with Matchers {
+class EngineApiServiceSpec extends AnyWordSpec with Matchers:
 
   implicit val ioRuntime: IORuntime = IORuntime.global
 
@@ -137,7 +137,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
   /** End-to-end test: EngineApiService.newPayload with real block execution */
   "EngineApiService.newPayload" should {
 
-    trait EngineApiTestSetup extends EphemBlockchainTestSetup {
+    trait EngineApiTestSetup extends EphemBlockchainTestSetup:
 
       // Use real VM and validators (not mocks) to test actual validation
       override lazy val vm: VMImpl = new VMImpl
@@ -172,7 +172,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       )(blockchainConfig, typedScheduler)
 
       // Build a post-merge genesis block with accounts
-      private val genesisStateRoot = {
+      private val genesisStateRoot =
         val world = InMemoryWorldStateProxy(
           storagesInstance.storages.evmCodeStorage,
           blockchain.getBackingMptStorage(0),
@@ -188,7 +188,6 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
           Account(balance = UInt256(BigInt("1000000000000000000")))
         )
         InMemoryWorldStateProxy.persistState(funded).stateRootHash
-      }
 
       val genesisHeader: BlockHeader = BlockHeader(
         parentHash = BlockHash(ByteString(new Array[Byte](32))),
@@ -214,7 +213,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       storagesInstance.storages.appStateStorage.putBestBlockNumber(0).commit()
 
       /** Build a valid block 1 on top of genesis, execute it to get correct fields */
-      def buildValidBlock1(): (Block, Seq[Receipt]) = {
+      def buildValidBlock1(): (Block, Seq[Receipt]) =
         val emptyWithdrawalsRoot = BlockHeader.EmptyMpt
 
         val headerTemplate = BlockHeader(
@@ -241,7 +240,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         val block = Block(headerTemplate, BlockBody(Nil, Nil, withdrawals = Some(Nil)))
 
         // Execute to compute the correct stateRoot, receiptsRoot, gasUsed
-        blockExec.executeBlockNoValidation(block)(blockchainConfig) match {
+        blockExec.executeBlockNoValidation(block)(blockchainConfig) match
           case Right((receipts, gasUsed, computedStateRoot)) =>
             // Build the correct header with computed values
             val correctHeader = headerTemplate.copy(
@@ -251,10 +250,8 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
             (Block(correctHeader, block.body), receipts)
           case Left(error) =>
             throw new RuntimeException(s"Failed to execute block: ${error.describe}")
-        }
-      }
 
-      def blockToPayload(block: Block): ExecutionPayload = {
+      def blockToPayload(block: Block): ExecutionPayload =
         import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
         import com.chipprbots.ethereum.rlp.encode as rlpEncode
 
@@ -277,10 +274,9 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
           },
           withdrawals = block.body.withdrawals
         )
-      }
 
       /** Create modified payload with random stateRoot, recomputing blockHash */
-      def withModifiedStateRoot(payload: ExecutionPayload): ExecutionPayload = {
+      def withModifiedStateRoot(payload: ExecutionPayload): ExecutionPayload =
         val randomStateRoot = ByteString(kec256(Array[Byte](1, 2, 3, 4)))
         val modified = payload.copy(stateRoot = randomStateRoot)
         // Recompute blockHash from the modified header
@@ -309,10 +305,8 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         )
         // Need to use same txRoot as the original block
         modified.copy(blockHash = header.hash.value)
-      }
-    }
 
-    "return VALID for a correctly constructed empty block" taggedAs UnitTest in new EngineApiTestSetup {
+    "return VALID for a correctly constructed empty block" taggedAs UnitTest in new EngineApiTestSetup:
       val (validBlock, _) = buildValidBlock1()
       val payload: ExecutionPayload = blockToPayload(validBlock)
 
@@ -320,10 +314,9 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
 
       result.status shouldBe Valid
       result.latestValidHash shouldBe Some(validBlock.header.hash)
-    }
 
     "return INVALID with null latestValidHash on hash mismatch (parent known)" taggedAs UnitTest in
-      new EngineApiTestSetup {
+      new EngineApiTestSetup:
         // Per execution-apis PR #338 (Shanghai+): hash mismatch returns INVALID (not
         // INVALID_BLOCK_HASH) with latestValidHash=null. The corruption is in the
         // payload envelope, not attributable to a specific ancestor. Aligns with hive
@@ -336,10 +329,9 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
 
         result.status shouldBe Invalid
         result.latestValidHash shouldBe None
-      }
 
     "return INVALID with null latestValidHash on hash mismatch (parent unknown)" taggedAs UnitTest in
-      new EngineApiTestSetup {
+      new EngineApiTestSetup:
         val (validBlock, _) = buildValidBlock1()
         val payload: ExecutionPayload = blockToPayload(validBlock)
         val badPayload: ExecutionPayload = payload.copy(
@@ -351,9 +343,8 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
 
         result.status shouldBe Invalid
         result.latestValidHash shouldBe None
-      }
 
-    "return INVALID for block with modified stateRoot" taggedAs UnitTest in new EngineApiTestSetup {
+    "return INVALID for block with modified stateRoot" taggedAs UnitTest in new EngineApiTestSetup:
       val (validBlock, _) = buildValidBlock1()
       val payload: ExecutionPayload = blockToPayload(validBlock)
 
@@ -371,10 +362,9 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       result.status shouldBe Invalid
       result.latestValidHash shouldBe Some(genesisHeader.hash)
       result.validationError should not be empty
-    }
 
     "return INVALID when newPayloadV3 expectedBlobVersionedHashes mismatches payload txs" taggedAs UnitTest in
-      new EngineApiTestSetup {
+      new EngineApiTestSetup:
         // EIP-4844 / Engine API V3: the CL passes expectedBlobVersionedHashes as the 2nd param
         // to engine_newPayloadV3; the EL must compare the CL's list against the concatenation
         // of every blob tx's blobVersionedHashes in the payload and reject on mismatch. The
@@ -393,9 +383,8 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
         result.status shouldBe Invalid
         result.latestValidHash shouldBe Some(genesisHeader.hash)
         result.validationError.getOrElse("") should include("INVALID_VERSIONED_HASHES")
-      }
 
-    "return INVALID for block with modified gasUsed" taggedAs UnitTest in new EngineApiTestSetup {
+    "return INVALID for block with modified gasUsed" taggedAs UnitTest in new EngineApiTestSetup:
       val (validBlock, _) = buildValidBlock1()
       val payload: ExecutionPayload = blockToPayload(validBlock)
 
@@ -410,9 +399,8 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       val result: PayloadStatusV1 = engineApi.newPayload(modifiedPayload).unsafeRunSync()
 
       result.status shouldBe Invalid
-    }
 
-    "return ACCEPTED/SYNCING for block with unknown parentHash" taggedAs UnitTest in new EngineApiTestSetup {
+    "return ACCEPTED/SYNCING for block with unknown parentHash" taggedAs UnitTest in new EngineApiTestSetup:
       val (validBlock, _) = buildValidBlock1()
       val payload: ExecutionPayload = blockToPayload(validBlock)
 
@@ -429,9 +417,8 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       // Parent unknown → ACCEPTED (not INVALID, not VALID)
       result.status shouldBe Accepted
       result.latestValidHash shouldBe None
-    }
 
-    "store ACCEPTED blocks by hash only (not by number)" taggedAs UnitTest in new EngineApiTestSetup {
+    "store ACCEPTED blocks by hash only (not by number)" taggedAs UnitTest in new EngineApiTestSetup:
       val (validBlock, _) = buildValidBlock1()
       val payload: ExecutionPayload = blockToPayload(validBlock)
 
@@ -448,9 +435,8 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       blockchainReader.getBlockHeaderByHash(BlockHash(modifiedPayload.blockHash)) shouldBe defined
       // But NOT stored by number
       blockchainReader.getBlockHeaderByNumber(1).map(_.hash) should not be Some(modifiedPayload.blockHash)
-    }
 
-    "return INVALID for block with modified timestamp (header validation)" taggedAs UnitTest in new EngineApiTestSetup {
+    "return INVALID for block with modified timestamp (header validation)" taggedAs UnitTest in new EngineApiTestSetup:
       val (validBlock, _) = buildValidBlock1()
       val payload: ExecutionPayload = blockToPayload(validBlock)
 
@@ -465,9 +451,8 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
 
       result.status shouldBe Invalid
       result.validationError.getOrElse("") should include("timestamp")
-    }
 
-    "return INVALID for block with wrong number (header validation)" taggedAs UnitTest in new EngineApiTestSetup {
+    "return INVALID for block with wrong number (header validation)" taggedAs UnitTest in new EngineApiTestSetup:
       val (validBlock, _) = buildValidBlock1()
       val payload: ExecutionPayload = blockToPayload(validBlock)
 
@@ -482,9 +467,8 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
 
       result.status shouldBe Invalid
       result.validationError.getOrElse("") should include("block number")
-    }
 
-    "not store INVALID blocks in hash storage" taggedAs UnitTest in new EngineApiTestSetup {
+    "not store INVALID blocks in hash storage" taggedAs UnitTest in new EngineApiTestSetup:
       val (validBlock, _) = buildValidBlock1()
       val payload: ExecutionPayload = blockToPayload(validBlock)
 
@@ -500,9 +484,8 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
 
       // The INVALID block should NOT be accessible by hash
       blockchainReader.getBlockHeaderByHash(BlockHash(modifiedPayload.blockHash)) shouldBe None
-    }
 
-    "mark child of INVALID block as INVALID" taggedAs UnitTest in new EngineApiTestSetup {
+    "mark child of INVALID block as INVALID" taggedAs UnitTest in new EngineApiTestSetup:
       val (validBlock, _) = buildValidBlock1()
       val payload: ExecutionPayload = blockToPayload(validBlock)
 
@@ -559,7 +542,6 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       // latestValidHash should propagate from the invalid parent — it should be the genesis hash
       // (the last valid ancestor before the invalid block)
       r2.latestValidHash shouldBe Some(genesisHeader.hash)
-    }
 
     /** Regression for cold-start sync bootstrap (post-merge chains).
       *
@@ -570,7 +552,7 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       * fukuii accepted every newPayload as `ACCEPTED (parent unknown)` but never started actually syncing.
       */
     "publish BeaconHead to ForkChoiceManager listener even when the head is unknown (SYNCING short-circuit)"
-      .taggedAs(UnitTest) in new EngineApiTestSetup {
+      .taggedAs(UnitTest) in new EngineApiTestSetup:
       import org.apache.pekko.testkit.TestProbe
 
       val probe: TestProbe = TestProbe()(classicSystem)
@@ -594,6 +576,4 @@ class EngineApiServiceSpec extends AnyWordSpec with Matchers {
       val beacon: BeaconHead = probe.expectMsgType[ForkChoiceManager.BeaconHead]
       beacon.headHash shouldBe unknownHead
       beacon.knownHeader shouldBe None
-    }
   }
-}

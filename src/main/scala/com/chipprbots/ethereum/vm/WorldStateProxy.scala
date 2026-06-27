@@ -16,7 +16,8 @@ import com.chipprbots.ethereum.rlp.UInt256RLPImplicits.*
   * should be kept in memory and applied only after a transaction completes without errors. This does not forbid mutable
   * caches for DB retrieval operations.
   */
-trait WorldStateProxy[WS <: WorldStateProxy[WS, S], S <: Storage[S]] { self: WS =>
+trait WorldStateProxy[WS <: WorldStateProxy[WS, S], S <: Storage[S]]:
+  self: WS =>
 
   def getAccount(address: Address): Option[Account]
   def saveAccount(address: Address, account: Account): WS
@@ -73,16 +74,15 @@ trait WorldStateProxy[WS <: WorldStateProxy[WS, S], S <: Storage[S]] { self: WS 
       // perhaps as an optimisation we could avoid touching accounts having non-zero nonce or non-empty code
       guaranteedTransfer(from, to, value).touchAccounts(from, to)
 
-  private def guaranteedTransfer(from: Address, to: Address, value: UInt256): WS = {
+  private def guaranteedTransfer(from: Address, to: Address, value: UInt256): WS =
     val debited = getGuaranteedAccount(from).increaseBalance(-value)
     val credited = getAccount(to).getOrElse(getEmptyAccount).increaseBalance(value)
     saveAccount(from, debited).saveAccount(to, credited)
-  }
 
   /** IF EIP-161 is in effect this sets new contract's account initial nonce to 1 over the default value for the given
     * network (usually zero)
     */
-  def initialiseAccount(newAddress: Address): WS = {
+  def initialiseAccount(newAddress: Address): WS =
 
     // Per Eq. 79 from https://ethereum.github.io/yellowpaper/paper.pdf, newly initialised account should have empty codehash
     // and empty storage. It means in event of unlikely address collision existing account will have it code and storage cleared.
@@ -94,16 +94,14 @@ trait WorldStateProxy[WS <: WorldStateProxy[WS, S], S <: Storage[S]] { self: WS 
       else newAccount.copy(nonce = accountStartNonce + 1)
 
     saveAccount(newAddress, accountWithCorrectNonce)
-  }
 
   /** In case of transfer to self, during selfdestruction the ether is actually destroyed see
     * https://github.com/ethereum/wiki/wiki/Subtleties/d5d3583e1b0a53c7c49db2fa670fdd88aa7cabaf#other-operations and
     * https://github.com/ethereum/go-ethereum/blob/ff9a8682323648266d5c73f4f4bce545d91edccb/core/state/statedb.go#L322
     */
-  def removeAllEther(address: Address): WS = {
+  def removeAllEther(address: Address): WS =
     val debited = getGuaranteedAccount(address).copy(balance = 0)
     saveAccount(address, debited).touchAccounts(address)
-  }
 
   /** Creates a new address based on the address and nonce of the creator. YP equation 82
     *
@@ -112,7 +110,7 @@ trait WorldStateProxy[WS <: WorldStateProxy[WS, S], S <: Storage[S]] { self: WS 
     * @return
     *   the new address
     */
-  def createAddress(creatorAddr: Address): Address = {
+  def createAddress(creatorAddr: Address): Address =
     val creatorAccount = getGuaranteedAccount(creatorAddr)
     // Important: Address must be encoded as a single RLP string (20 bytes).
     // If it is treated as a Seq[Byte], it will be encoded as a list of 20 items and produce a different address.
@@ -120,7 +118,6 @@ trait WorldStateProxy[WS <: WorldStateProxy[WS, S], S <: Storage[S]] { self: WS 
       rlp.encode(RLPList(RLPValue(creatorAddr.bytes.toArray), (creatorAccount.nonce - 1).toRLPEncodable))
     )
     Address(hash)
-  }
 
   /** Creates a new address based on the address, salt and init code see
     * https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1014.md
@@ -134,18 +131,16 @@ trait WorldStateProxy[WS <: WorldStateProxy[WS, S], S <: Storage[S]] { self: WS 
     * @return
     *   the new address
     */
-  def create2Address(creatorAddr: Address, salt: UInt256, code: ByteString): Address = {
+  def create2Address(creatorAddr: Address, salt: UInt256, code: ByteString): Address =
     val prefix = 0xff.toByte
     val hash = kec256(ByteString(prefix) ++ creatorAddr.bytes ++ salt.bytes ++ kec256(code))
     Address(hash)
-  }
 
   /** Increase nonce for a guaranteed account - ie. throws an error if this does not exist
     */
-  def increaseNonce(address: Address): WS = {
+  def increaseNonce(address: Address): WS =
     val account = getGuaranteedAccount(address).increaseNonce()
     saveAccount(address, account)
-  }
 
   /** Determines if account of provided address is dead. According to EIP161: An account is considered dead when either
     * it is non-existent or it is empty
@@ -172,4 +167,3 @@ trait WorldStateProxy[WS <: WorldStateProxy[WS, S], S <: Storage[S]] { self: WS 
 
   def isZeroValueTransferToNonExistentAccount(address: Address, value: UInt256): Boolean =
     noEmptyAccounts && value == UInt256(0) && !accountExists(address)
-}

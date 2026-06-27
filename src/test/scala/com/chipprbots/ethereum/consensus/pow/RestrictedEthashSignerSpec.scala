@@ -14,7 +14,7 @@ class RestrictedEthashSignerSpec
     with Matchers
     with ScalaCheckPropertyChecks
     with ObjectGenerators
-    with SecureRandomBuilder {
+    with SecureRandomBuilder:
   "RestrictedEthashSigner" should "sign and validate correct header" taggedAs (UnitTest, ConsensusTest) in {
     forAll(blockHeaderGen, genKey(secureRandom)) { (header, key) =>
       val signedHeader = RestrictedPoWSigner.signHeader(header, key)
@@ -30,5 +30,3 @@ class RestrictedEthashSignerSpec
       assert(!RestrictedPoWSigner.validateSignature(signedHeader, Set(wrongKeyAsBytes)))
     }
   }
-
-}

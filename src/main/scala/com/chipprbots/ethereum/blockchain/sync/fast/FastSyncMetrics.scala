@@ -9,7 +9,7 @@ import com.google.common.util.concurrent.AtomicDouble
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSync.SyncState
 import com.chipprbots.ethereum.metrics.MetricsContainer
 
-object FastSyncMetrics extends MetricsContainer {
+object FastSyncMetrics extends MetricsContainer:
 
   final private val PivotBlockNumberGauge =
     metrics.registry.gauge("fastsync.block.pivotBlock.number.gauge", new AtomicDouble(0d))
@@ -36,13 +36,12 @@ object FastSyncMetrics extends MetricsContainer {
   final private val MptStateDownloadTimer =
     metrics.registry.timer("fastsync.state.downloadState.timer")
 
-  def measure(syncState: SyncState): Unit = {
+  def measure(syncState: SyncState): Unit =
     PivotBlockNumberGauge.set(syncState.pivotBlock.number.toDouble)
     BestFullBlockNumberGauge.set(syncState.lastFullBlockNumber.toDouble)
     BestHeaderNumberGauge.set(syncState.bestBlockHeaderNumber.toDouble)
     MptStateTotalNodesGauge.set(syncState.totalNodesCount)
     MptStateDownloadedNodesGauge.set(syncState.downloadedNodesCount)
-  }
 
   def setFastSyncTotalTimeGauge(time: Double): Unit = FastSyncTotalTimeMinutesGauge.set(time)
 
@@ -54,4 +53,3 @@ object FastSyncMetrics extends MetricsContainer {
 
   def getDownloadedNodes: Long = MptStateDownloadedNodesGauge.get()
   def getTotalNodes: Long = MptStateTotalNodesGauge.get()
-}

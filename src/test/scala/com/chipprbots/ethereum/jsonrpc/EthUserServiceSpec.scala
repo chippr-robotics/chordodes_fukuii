@@ -28,11 +28,11 @@ class EthUserServiceSpec
     with OptionValues
     with MockFactory
     with NormalPatience
-    with TypeCheckedTripleEquals {
+    with TypeCheckedTripleEquals:
 
   implicit val runtime: IORuntime = IORuntime.global
 
-  it should "handle getCode request" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "handle getCode request" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val address: Address = Address(ByteString(Hex.decode("abbb6bebfa05aa13e908eaa492bd7a8343760477")))
     storagesInstance.storages.evmCodeStorage.put(ByteString("code hash"), ByteString("code code code")).commit()
 
@@ -53,9 +53,8 @@ class EthUserServiceSpec
     val response: ServiceResponse[GetCodeResponse] = ethUserService.getCode(GetCodeRequest(address, BlockParam.Latest))
 
     response.unsafeRunSync() shouldEqual Right(GetCodeResponse(ByteString("code code code")))
-  }
 
-  it should "handle getBalance request" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "handle getBalance request" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val address: Address = Address(ByteString(Hex.decode("abbb6bebfa05aa13e908eaa492bd7a8343760477")))
 
     import MerklePatriciaTrie.defaultByteArraySerializable
@@ -76,9 +75,8 @@ class EthUserServiceSpec
       ethUserService.getBalance(GetBalanceRequest(address, BlockParam.Latest))
 
     response.unsafeRunSync() shouldEqual Right(GetBalanceResponse(123))
-  }
 
-  it should "handle MissingNodeException when getting balance" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "handle MissingNodeException when getting balance" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val address: Address = Address(ByteString(Hex.decode("abbb6bebfa05aa13e908eaa492bd7a8343760477")))
 
     val newBlockHeader = blockToRequest.header
@@ -90,8 +88,7 @@ class EthUserServiceSpec
       ethUserService.getBalance(GetBalanceRequest(address, BlockParam.Latest))
 
     response.unsafeRunSync() shouldEqual Left(JsonRpcError.NodeNotFound)
-  }
-  it should "handle getStorageAt request" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "handle getStorageAt request" taggedAs (UnitTest, RPCTest) in new TestSetup:
 
     val address: Address = Address(ByteString(Hex.decode("abbb6bebfa05aa13e908eaa492bd7a8343760477")))
 
@@ -120,9 +117,8 @@ class EthUserServiceSpec
     val response: ServiceResponse[GetStorageAtResponse] =
       ethUserService.getStorageAt(GetStorageAtRequest(address, 333, BlockParam.Latest))
     response.unsafeRunSync().map(v => UInt256(v.value)) shouldEqual Right(UInt256(123))
-  }
 
-  it should "handle get transaction count request" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "handle get transaction count request" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val address: Address = Address(ByteString(Hex.decode("abbb6bebfa05aa13e908eaa492bd7a8343760477")))
 
     import MerklePatriciaTrie.defaultByteArraySerializable
@@ -143,9 +139,8 @@ class EthUserServiceSpec
       ethUserService.getTransactionCount(GetTransactionCountRequest(address, BlockParam.Latest))
 
     response.unsafeRunSync() shouldEqual Right(GetTransactionCountResponse(BigInt(999)))
-  }
 
-  class TestSetup() extends EphemBlockchainTestSetup {
+  class TestSetup() extends EphemBlockchainTestSetup:
     lazy val ethUserService = new EthUserService(
       blockchain,
       blockchainReader,
@@ -154,6 +149,3 @@ class EthUserServiceSpec
       this
     )
     val blockToRequest: Block = Block(Fixtures.Blocks.Block3125369.header, Fixtures.Blocks.Block3125369.body)
-  }
-
-}

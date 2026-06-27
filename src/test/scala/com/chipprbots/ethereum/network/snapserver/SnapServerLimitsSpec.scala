@@ -24,7 +24,7 @@ import com.chipprbots.ethereum.testing.TestMptStorage
 //
 // These tests lock those invariants so a refactor cannot silently revert them.
 
-class SnapServerLimitsSpec extends AnyFlatSpec with Matchers {
+class SnapServerLimitsSpec extends AnyFlatSpec with Matchers:
 
   // ── helpers ──────────────────────────────────────────────────────────────
 
@@ -33,13 +33,12 @@ class SnapServerLimitsSpec extends AnyFlatSpec with Matchers {
 
   private def buildAccountTrie(
       accounts: Seq[(ByteString, Account)]
-  ): (ByteString, TestMptStorage) = {
+  ): (ByteString, TestMptStorage) =
     val storage = new TestMptStorage()
     val trie = accounts.foldLeft(MerklePatriciaTrie[ByteString, Account](storage)) { case (t, (key, account)) =>
       t.put(key, account)
     }
     (ByteString(trie.getRootHash), storage)
-  }
 
   private def simpleAccount(nonce: Int, balance: Int): Account =
     Account(nonce = nonce, balance = balance)
@@ -269,4 +268,3 @@ class SnapServerLimitsSpec extends AnyFlatSpec with Matchers {
     )
     result.nodes shouldBe empty
   }
-}

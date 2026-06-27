@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.vm.MockWorldState.*
 import Fixtures.blockchainConfig
 
 // scalastyle:off magic.number
-object Generators extends ObjectGenerators {
+object Generators extends ObjectGenerators:
   val testStackMaxSize = 32
 
   def getListGen[T](minSize: Int, maxSize: Int, genT: Gen[T]): Gen[List[T]] =
@@ -24,15 +24,14 @@ object Generators extends ObjectGenerators {
   def getByteStringGen(minSize: Int, maxSize: Int, byteGen: Gen[Byte] = Arbitrary.arbitrary[Byte]): Gen[ByteString] =
     getListGen(minSize, maxSize, byteGen).map(l => ByteString(l.toArray))
 
-  def getBigIntGen(min: BigInt = 0, max: BigInt = BigInt(2).pow(256) - 1): Gen[BigInt] = {
+  def getBigIntGen(min: BigInt = 0, max: BigInt = BigInt(2).pow(256) - 1): Gen[BigInt] =
     val mod = max - min
     val nBytes = mod.bitLength / 8 + 1
-    for {
+    for
       _ <- Arbitrary.arbitrary[Byte]
       bytes <- getByteStringGen(nBytes, nBytes)
       bigInt = (if mod > 0 then BigInt(bytes.toArray).abs % mod else BigInt(0)) + min
-    } yield bigInt
-  }
+    yield bigInt
 
   def getUInt256Gen(min: UInt256 = UInt256(0), max: UInt256 = UInt256.MaxValue): Gen[UInt256] =
     getBigIntGen(min.toBigInt, max.toBigInt).map(UInt256(_))
@@ -43,11 +42,11 @@ object Generators extends ObjectGenerators {
       valueGen: Gen[UInt256] = getUInt256Gen(),
       maxSize: Int = testStackMaxSize
   ): Gen[Stack] =
-    for {
+    for
       size <- Gen.choose(minElems, maxElems)
       list <- Gen.listOfN(size, valueGen)
       stack = Stack.empty(maxSize)
-    } yield stack.push(list)
+    yield stack.push(list)
 
   def getStackGen(elems: Int, uint256Gen: Gen[UInt256]): Gen[Stack] =
     getStackGen(minElems = elems, maxElems = elems, uint256Gen)
@@ -86,7 +85,7 @@ object Generators extends ObjectGenerators {
       returnDataGen: Gen[ByteString] = getByteStringGen(0, 0),
       isTopHeader: Boolean = false
   ): Gen[PS] =
-    for {
+    for
       stack <- stackGen
       memory <- memGen
       storage <- storageGen
@@ -128,7 +127,4 @@ object Generators extends ObjectGenerators {
       env = ExecEnv(context, code, ownerAddr)
 
       vm = new TestVM
-
-    } yield ProgramState(vm, context, env).withStack(stack).withMemory(memory).withReturnData(returnData)
-
-}
+    yield ProgramState(vm, context, env).withStack(stack).withMemory(memory).withReturnData(returnData)

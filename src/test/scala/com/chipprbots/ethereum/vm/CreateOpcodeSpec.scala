@@ -19,14 +19,14 @@ import MockWorldState.*
 import Fixtures.blockchainConfig
 
 // scalastyle:off method.length
-class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckPropertyChecks {
+class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckPropertyChecks:
 
   val config: EvmConfig = EvmConfig.ByzantiumConfigBuilder(blockchainConfig)
 
   import config.feeSchedule.*
 
   // scalastyle:off
-  object fxt {
+  object fxt:
     val fakeHeader: BlockHeader =
       BlockFixtures.ValidBlock.header.copy(number = blockchainConfig.constantinopleBlockNumber - 1)
     val addresWithRevert: Address = Address(10)
@@ -181,7 +181,6 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
       warmAddresses = Set.empty,
       warmStorage = Set.empty
     )
-  }
 
   case class CreateResult(
       context: PC = fxt.context,
@@ -190,32 +189,28 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
       opcode: CreateOp,
       salt: UInt256 = UInt256.Zero,
       ownerAddress: Address = fxt.creatorAddr
-  ) {
+  ):
     val vm = new TestVM
     val env: ExecEnv = ExecEnv(context, ByteString.empty, ownerAddress)
 
     val mem: Memory = Memory.empty.store(0, createCode)
-    val stack: Stack = opcode match {
+    val stack: Stack = opcode match
       case CREATE  => Stack.empty().push(Seq[UInt256](createCode.size, 0, value))
       case CREATE2 => Stack.empty().push(Seq[UInt256](salt, createCode.size, 0, value))
-    }
     val stateIn: PS = ProgramState(vm, context, env).withStack(stack).withMemory(mem)
     val stateOut: PS = opcode.execute(stateIn)
 
     val world = stateOut.world
     val returnValue: UInt256 = stateOut.stack.pop()._1
-  }
 
-  def commonBehaviour(opcode: CreateOp): Unit = {
-    def newAccountAddress(code: ByteString = fxt.createCode.code) = opcode match {
+  def commonBehaviour(opcode: CreateOp): Unit =
+    def newAccountAddress(code: ByteString = fxt.createCode.code) = opcode match
       case CREATE  => fxt.initWorld.increaseNonce(fxt.creatorAddr).createAddress(fxt.creatorAddr)
       case CREATE2 => fxt.initWorld.create2Address(fxt.creatorAddr, fxt.salt, code)
-    }
 
-    val withHashCost = opcode match {
+    val withHashCost = opcode match
       case CREATE  => false
       case CREATE2 => true
-    }
 
     "initialization code executes normally" should {
       val result = CreateResult(opcode = opcode)
@@ -506,8 +501,6 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
       }
     }
 
-  }
-
   "CREATE" should {
     behave.like(commonBehaviour(CREATE))
 
@@ -585,5 +578,3 @@ class CreateOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProperty
       }
     }
   }
-
-}

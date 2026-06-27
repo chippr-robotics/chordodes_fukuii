@@ -35,14 +35,14 @@ import com.chipprbots.ethereum.rlp
 import com.chipprbots.ethereum.testing.Tags.*
 
 // SCALA 3 MIGRATION: Fixed by creating manual stub implementation for WalletRpcClient
-class WalletServiceSpec extends AnyFlatSpec with Matchers with MockFactory {
+class WalletServiceSpec extends AnyFlatSpec with Matchers with MockFactory:
 
   implicit val runtime: IORuntime = IORuntime.global
 
   "Wallet Service" should "send a transaction successfully when getNonce and sendTransaction successfully" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
 
     val receivingAddress: Address = Address("0x99")
     val currentNonce = 2
@@ -70,9 +70,7 @@ class WalletServiceSpec extends AnyFlatSpec with Matchers with MockFactory {
 
     res shouldEqual Right(retTxId)
 
-  }
-
-  it should "failure the transaction when get timeout of getNonce" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "failure the transaction when get timeout of getNonce" taggedAs (UnitTest, RPCTest) in new TestSetup:
 
     val timeout: ConnectionError = ConnectionError("timeout")
     walletRpcClient.getNonce.expects(config.walletAddress).returning(IO.pure(Left(timeout)))
@@ -81,17 +79,14 @@ class WalletServiceSpec extends AnyFlatSpec with Matchers with MockFactory {
 
     res shouldEqual Left(timeout)
 
-  }
-
-  it should "get wallet successful" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "get wallet successful" taggedAs (UnitTest, RPCTest) in new TestSetup:
     mockKeyStore.unlockAccount.expects(config.walletAddress, config.walletPassword).returning(Right(wallet))
 
     val res: Either[KeyStoreError, Wallet] = walletService.getWallet.unsafeRunSync()
 
     res shouldEqual Right(wallet)
-  }
 
-  it should "wallet decryption failed" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "wallet decryption failed" taggedAs (UnitTest, RPCTest) in new TestSetup:
     mockKeyStore.unlockAccount
       .expects(config.walletAddress, config.walletPassword)
       .returning(Left(DecryptionFailed))
@@ -99,9 +94,8 @@ class WalletServiceSpec extends AnyFlatSpec with Matchers with MockFactory {
     val res: Either[KeyStoreError, Wallet] = walletService.getWallet.unsafeRunSync()
 
     res shouldEqual Left(DecryptionFailed)
-  }
 
-  trait TestSetup {
+  trait TestSetup:
     val walletKeyPair: AsymmetricCipherKeyPair = generateKeyPair(new SecureRandom)
     val (prvKey, pubKey) = keyPairToByteStrings(walletKeyPair)
     val wallet: Wallet = Wallet(Address(crypto.kec256(pubKey)), prvKey)
@@ -124,6 +118,3 @@ class WalletServiceSpec extends AnyFlatSpec with Matchers with MockFactory {
       )
 
     val walletService = new WalletService(walletRpcClient, mockKeyStore, config)
-  }
-
-}

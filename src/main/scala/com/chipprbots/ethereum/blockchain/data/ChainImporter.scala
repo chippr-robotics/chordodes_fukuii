@@ -23,7 +23,7 @@ class ChainImporter(
     blockchainWriter: BlockchainWriter,
     blockExecution: BlockExecution,
     blockValidation: BlockValidation
-) extends Logger {
+) extends Logger:
 
   /** Import all blocks from an RLP chain file.
     *
@@ -32,12 +32,12 @@ class ChainImporter(
     * @return
     *   (imported, skipped, failed) counts
     */
-  def importChainFile(filePath: String)(implicit blockchainConfig: BlockchainConfig): (Int, Int, Int) = {
+  def importChainFile(filePath: String)(implicit blockchainConfig: BlockchainConfig): (Int, Int, Int) =
     val file = new File(filePath)
-    if !file.exists() then {
+    if !file.exists() then
       log.warn(s"Chain import file not found: $filePath")
       (0, 0, 0)
-    } else {
+    else
       val bytes = readFile(file)
       log.info(s"Chain import: reading ${bytes.length} bytes from $filePath")
 
@@ -45,7 +45,7 @@ class ChainImporter(
       log.info(s"Chain import: decoded ${blocks.size} blocks")
 
       if blocks.isEmpty then (0, 0, 0)
-      else {
+      else
 
         // Log genesis vs first block's expected parent for debugging genesis mismatches
         val genesisOpt = blockchainReader.getBlockHeaderByNumber(0)
@@ -67,12 +67,12 @@ class ChainImporter(
         var skipped = 0
         var failed = 0
 
-        for block <- blocks do {
+        for block <- blocks do
           val blockNum = block.header.number
           val blockHash = block.header.hash
 
           // Skip if already imported
-          val alreadyExists = blockchainReader.getBlockHeaderByNumber(blockNum) match {
+          val alreadyExists = blockchainReader.getBlockHeaderByNumber(blockNum) match
             case Some(existing) if existing.hash == blockHash => true
             case Some(existing) =>
               log.warn(
@@ -81,12 +81,10 @@ class ChainImporter(
               )
               false
             case None => false
-          }
 
-          if alreadyExists then {
-            skipped += 1
-          } else {
-            importBlock(block) match {
+          if alreadyExists then skipped += 1
+          else
+            importBlock(block) match
               case Right(receipts) =>
                 val parentWeight = blockchainReader
                   .getChainWeightByHash(block.header.parentHash)
@@ -102,33 +100,28 @@ class ChainImporter(
                 blockchainReader.recordBlockDifficulty(block.header.difficulty)
                 imported += 1
 
-                if imported % 10 == 0 || blockNum == blocks.last.header.number then {
+                if imported % 10 == 0 || blockNum == blocks.last.header.number then
                   log.info(s"Chain import: block $blockNum imported ($imported/${blocks.size})")
-                }
 
               case Left(error) =>
                 log.error(s"Chain import: block $blockNum failed — $error")
                 failed += 1
-            }
-          }
-        }
 
         log.info(s"Chain import complete: $imported imported, $skipped skipped, $failed failed")
         (imported, skipped, failed)
-      } // else blocks.nonEmpty
-    } // else file.exists
-  }
+      // else blocks.nonEmpty
+    // else file.exists
 
   private def importBlock(block: Block)(implicit blockchainConfig: BlockchainConfig): Either[Any, Seq[Receipt]] =
     // Validate header/body pre-execution (ommers, difficulty, nonce, withdrawals/blob fields, etc.),
     // then execute, then validate post-execution (gasUsed, receiptsRoot, stateRoot).
     // Invalid blocks are rejected and the previous chain head is preserved.
-    blockValidation.validateBlockBeforeExecution(block) match {
+    blockValidation.validateBlockBeforeExecution(block) match
       case Left(err) =>
         Left(s"pre-execution validation failed: $err")
       case Right(_) =>
         blockExecution.executeBlockNoValidation(block).flatMap { case (receipts, gasUsed, stateRootHash) =>
-          blockValidation.validateBlockAfterExecution(block, stateRootHash, receipts, gasUsed) match {
+          blockValidation.validateBlockAfterExecution(block, stateRootHash, receipts, gasUsed) match
             case Left(err) =>
               receipts.zipWithIndex.foreach { case (r, i) =>
                 log.error(s"Chain import: block ${block.header.number} tx[$i] cumulativeGas=${r.cumulativeGasUsed}")
@@ -136,38 +129,32 @@ class ChainImporter(
               Left(s"post-execution validation failed: $err")
             case Right(_) =>
               Right(receipts)
-          }
         }
-    }
 
   /** Decode concatenated RLP-encoded blocks from a byte array. */
-  private def decodeBlocks(data: Array[Byte]): Seq[Block] = {
+  private def decodeBlocks(data: Array[Byte]): Seq[Block] =
     val blocks = scala.collection.mutable.ArrayBuffer.empty[Block]
     var pos = 0
     var aborted = false
 
     while pos < data.length && !aborted do
-      try {
+      try
         val nextPos = nextElementIndex(data, pos)
         val blockBytes = data.slice(pos, nextPos)
         val block = blockBytes.toBlock
         blocks += block
         pos = nextPos
-      } catch {
+      catch
         case e: Exception =>
           log.error(s"Chain import: RLP decode error at byte offset $pos", e)
           aborted = true // stop the loop; return what we decoded so far
-      }
 
     blocks.toSeq
-  }
 
-  private def readFile(file: File): Array[Byte] = {
+  private def readFile(file: File): Array[Byte] =
     val fis = new FileInputStream(file)
-    try {
+    try
       val bytes = new Array[Byte](file.length().toInt)
       fis.read(bytes)
       bytes
-    } finally fis.close()
-  }
-}
+    finally fis.close()

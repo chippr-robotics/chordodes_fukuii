@@ -23,7 +23,7 @@ class TransactionSpec
     with ScalaCheckPropertyChecks
     with ObjectGenerators
     with SecureRandomBuilder
-    with Matchers {
+    with Matchers:
 
   "rlp encoding then decoding transaction" should "give back the initial transaction" taggedAs (UnitTest) in {
 
@@ -47,14 +47,13 @@ class TransactionSpec
 
       val senderKeys = crypto.generateKeyPair(secureRandom)
 
-      val originalSenderAddress = {
+      val originalSenderAddress =
         // You get a public address for your account by taking the last 20 bytes of the Keccak-256 hash of the public key and adding 0x to the beginning.
         ECDSASignature
         val pubKey = pubKeyFromKeyPair(senderKeys)
         val hashedPublickKey = kec256(pubKey)
         val slice = hashedPublickKey.slice(hashedPublickKey.length - 20, hashedPublickKey.length)
         Address(slice)
-      }
 
       val originalSignedTransaction =
         SignedTransaction.sign(originalTransaction, senderKeys, Some(blockchainConfig.chainId))
@@ -169,4 +168,3 @@ class TransactionSpec
     x shouldBe expected
 
   }
-}

@@ -63,21 +63,20 @@ class PeerManagerSpec
     with AnyFlatSpecLike
     with Matchers
     with Eventually
-    with ScalaCheckDrivenPropertyChecks {
+    with ScalaCheckDrivenPropertyChecks:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
   behavior.of("PeerManagerActor")
 
-  it should "try to connect to bootstrap and known nodes on startup" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "try to connect to bootstrap and known nodes on startup" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     start()
     handleInitialNodesDiscovery()
-  }
 
   it should "blacklist peer that sent a status msg with invalid genesisHash" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     start()
     handleInitialNodesDiscovery()
 
@@ -100,9 +99,8 @@ class PeerManagerSpec
       blacklist.keys.size shouldEqual 1
       blacklist.isBlacklisted(PeerAddress(peer.remoteAddress.getHostString)) shouldBe true
     }
-  }
 
-  it should "blacklist peer that fail to establish tcp connection" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "blacklist peer that fail to establish tcp connection" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     start()
     handleInitialNodesDiscovery()
 
@@ -121,9 +119,8 @@ class PeerManagerSpec
     eventually {
       blacklist.keys.size shouldEqual 1
     }
-  }
 
-  it should "retry connections to remaining bootstrap nodes" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "retry connections to remaining bootstrap nodes" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     start()
     handleInitialNodesDiscovery()
 
@@ -139,9 +136,8 @@ class PeerManagerSpec
       peerDiscoveryManager.expectMsgClass(classOf[PeerDiscoveryManager.GetDiscoveredNodesInfoReq])
     }
     req.replyTo ! PeerDiscoveryManager.DiscoveredNodesInfo(bootstrapNodes)
-  }
 
-  it should "replace lost connections with random nodes" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "replace lost connections with random nodes" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     start()
     handleInitialNodesDiscovery()
 
@@ -159,9 +155,8 @@ class PeerManagerSpec
     randomReq.asInstanceOf[PeerDiscoveryManager.GetRandomNodeInfoReq].replyTo ! PeerDiscoveryManager.RandomNodeInfo(
       bootstrapNodes.head
     )
-  }
 
-  it should "publish disconnect messages from peers" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "publish disconnect messages from peers" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     start()
     handleInitialNodesDiscovery()
 
@@ -175,12 +170,11 @@ class PeerManagerSpec
       case PublishCmd(PeerDisconnected(id)) => id == PeerId(probe.ref.path.name)
       case _                                => false
     }
-  }
 
   it should "not handle the connection from a peer that's already connected" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     start()
     handleInitialNodesDiscovery()
 
@@ -192,9 +186,8 @@ class PeerManagerSpec
     peerManager ! PeerManagerActor.HandlePeerConnectionCmd(connection.ref, new InetSocketAddress("127.0.0.1", 30340))
 
     watcher.expectMsgClass(classOf[Terminated])
-  }
 
-  it should "handle pending and handshaked incoming peers" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "handle pending and handshaked incoming peers" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     start()
     handleInitialNodesDiscovery()
 
@@ -266,9 +259,8 @@ class PeerManagerSpec
     statsRequest.replyTo ! PeerStatisticsActor.StatsForAll(Map.empty)
     // There's only one connection that can be pruned.
     probe2.expectMsg(PeerActor.DisconnectPeer(Disconnect.Reasons.TooManyPeers))
-  }
 
-  it should "handle common message about getting peers" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "handle common message about getting peers" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     start()
     handleInitialNodesDiscovery()
 
@@ -277,9 +269,8 @@ class PeerManagerSpec
     peerManager ! PeerManagerActor.GetPeersCmd(requestSender.ref)
     // With peer status caching, GetPeers returns immediately from cache — no actor asks needed
     requestSender.expectMsgClass(classOf[Peers])
-  }
 
-  it should "handle common message about sending message to peer" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "handle common message about sending message to peer" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     start()
     handleInitialNodesDiscovery()
 
@@ -293,9 +284,8 @@ class PeerManagerSpec
 
     peerManager ! PeerManagerActor.SendMessageCmd(block, PeerId(probe.ref.path.name))
     probe.expectMsg(PeerActor.SendMessage(block))
-  }
 
-  it should "disconnect from incoming peers already handshaked" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "disconnect from incoming peers already handshaked" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     start()
     handleInitialNodesDiscovery()
 
@@ -332,12 +322,11 @@ class PeerManagerSpec
     peerAsIncomingProbe.reply(PeerEvent.PeerHandshakeSuccessful(peerAsIncoming, initialPeerInfo))
 
     peerAsIncomingProbe.expectMsg(PeerActor.DisconnectPeer(Disconnect.Reasons.AlreadyConnected))
-  }
 
   it should "disconnect from outgoing peer if, while it was pending, the same peer hanshaked as incoming" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     start()
     handleInitialNodesDiscovery()
 
@@ -374,7 +363,6 @@ class PeerManagerSpec
       PeerEvent.PeerHandshakeSuccessful(peerAsOutgoing.copy(nodeId = Some(nodeId)), initialPeerInfo)
     )
     peerAsOutgoingProbe.expectMsg(PeerActor.DisconnectPeer(Disconnect.Reasons.AlreadyConnected))
-  }
 
   // ── Suite 5: NB-8 — 5s reconnect + inbound-suppression (Fix-C) ──────────────────────────────
 
@@ -383,7 +371,7 @@ class PeerManagerSpec
   it should "schedule a 5s reconnect when a maintained peer's outgoing connection terminates" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val hexNodeId: String = "aa" * 64 // 64-byte node ID as 128-char hex
     val nodeIdBytes: ByteString = ByteString(Hex.decode(hexNodeId))
     val maintainedUri = new URI(s"enode://$hexNodeId@127.0.0.5:30303")
@@ -422,12 +410,11 @@ class PeerManagerSpec
 
     // connectWith should have created a second peer and sent ConnectTo(maintainedUri)
     createdPeers(1).probe.expectMsgType[ConnectTo](3.seconds).uri shouldBe maintainedUri
-  }
 
   it should "suppress the 5s reconnect when an inbound from the same nodeId fills the slot before the timer fires" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val hexNodeId: String = "bb" * 64
     val nodeIdBytes: ByteString = ByteString(Hex.decode(hexNodeId))
     val maintainedUri = new URI(s"enode://$hexNodeId@127.0.0.5:30303")
@@ -479,7 +466,6 @@ class PeerManagerSpec
 
     // No third peer should have been created
     createdPeers.size shouldBe 2
-  }
 
   // ── Suite 6: Static/maintained peer collision fixes (RC1/RC2/RC3) ──────────────────────────────
 
@@ -488,7 +474,7 @@ class PeerManagerSpec
   it should "not blacklist a maintained peer when PeerClosedConnection arrives while the outbound is pre-handshake (RC1)" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val hexNodeId: String = "cc" * 64
     val maintainedUri = new URI(s"enode://$hexNodeId@127.0.0.6:30303")
 
@@ -505,12 +491,11 @@ class PeerManagerSpec
     eventually {
       blacklist.isBlacklisted(PeerAddress("127.0.0.6")) shouldBe false
     }
-  }
 
   it should "not schedule a pre-handshake reconnect when the inbound from the same maintained nodeId is already handshaked (RC2)" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val hexNodeId: String = "dd" * 64
     val nodeIdBytes: ByteString = ByteString(Hex.decode(hexNodeId))
     val maintainedUri = new URI(s"enode://$hexNodeId@127.0.0.7:30303")
@@ -547,12 +532,11 @@ class PeerManagerSpec
     // Advance past the pre-handshake retry delay — no reconnect timer should have been scheduled
     testScheduler.timePasses(peerConfiguration.connectRetryDelay + 1.second)
     createdPeers.size shouldBe 2
-  }
 
   it should "block a ConnectToPeer for a maintained peer when an inbound from the same host is in incomingPendingPeers (RC3)" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val hexNodeId: String = "ee" * 64
     val maintainedUri = new URI(s"enode://$hexNodeId@127.0.0.8:30303")
     val maintainedHost = "127.0.0.8"
@@ -581,7 +565,6 @@ class PeerManagerSpec
     // Fire the retry timer → connectWith sees hasIncomingPendingFromHost(maintainedHost) = true → blocked
     testScheduler.timePasses(peerConfiguration.connectRetryDelay + 1.second)
     createdPeers.size shouldBe 2
-  }
 
   // ── Suite 7: Inbound-wins tiebreaker (Fix-A — run-17 issue A) ─────────────────────────────────
 
@@ -590,7 +573,7 @@ class PeerManagerSpec
   it should "drop the outbound and keep the inbound when a maintained peer's inbound handshakes while outbound is already handshaked" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val hexNodeId: String = "ff" * 64
     val nodeIdBytes: ByteString = ByteString(Hex.decode(hexNodeId))
     val maintainedUri = new URI(s"enode://$hexNodeId@127.0.0.9:30303")
@@ -644,7 +627,6 @@ class PeerManagerSpec
     createdPeers(0).probe.ref ! PoisonPill
     testScheduler.timePasses(peerConfiguration.connectRetryDelay + 1.second)
     createdPeers.size shouldBe 2
-  }
 
   // Regression for Issue 6: when a maintained peer's outbound actor terminates after
   // inbound-wins, PMA used to publish Publish(PeerDisconnected(peerId)) unconditionally.
@@ -654,7 +636,7 @@ class PeerManagerSpec
   it should "not publish PeerDisconnected when the terminated outbound's nodeId is still alive via the inbound winner (DUPLICATE_TERMINATED)" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val hexNodeId: String = "ff" * 64
     val nodeIdBytes: ByteString = ByteString(Hex.decode(hexNodeId))
     val maintainedUri = new URI(s"enode://$hexNodeId@127.0.0.9:30303")
@@ -714,29 +696,24 @@ class PeerManagerSpec
     // No reconnect is scheduled (winner still alive) — createdPeers stays at 2
     testScheduler.timePasses(6000.millis)
     createdPeers.size shouldBe 2
-  }
 
   behavior.of("outgoingConnectionDemand")
 
   it should "try to connect to at least min-outgoing-peers but no more than max-outgoing-peers" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new ConnectedPeersFixture {
+  ) in new ConnectedPeersFixture:
     forAll { (connectedPeers: ConnectedPeers) =>
       val demand = PeerManagerActor.outgoingConnectionDemand(connectedPeers, peerConfiguration)
       demand shouldBe >=(0)
-      if connectedPeers.outgoingHandshakedPeersCount >= peerConfiguration.minOutgoingPeers then {
-        demand shouldBe 0
-      } else {
-        connectedPeers.outgoingPeersCount + demand shouldBe peerConfiguration.maxOutgoingPeers
-      }
+      if connectedPeers.outgoingHandshakedPeersCount >= peerConfiguration.minOutgoingPeers then demand shouldBe 0
+      else connectedPeers.outgoingPeersCount + demand shouldBe peerConfiguration.maxOutgoingPeers
     }
-  }
 
   it should "try to connect to discovered nodes if there's an outgoing demand: new nodes first, retried last" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     start()
     val discoveredNodes: Set[Node] = Set(
       "enode://111bd28d5b2c1378d748383fd83ff59572967c317c3063a9f475a26ad3f1517642a164338fb5268d4e32ea1cc48e663bd627dec572f1d201c7198518e5a506b1@88.99.216.30:45834?discport=45834",
@@ -784,14 +761,13 @@ class PeerManagerSpec
     probe3.expectMsgClass(classOf[PeerActor.ConnectTo])
 
     eventually(blacklist.keys.size shouldEqual 0)
-  }
 
   behavior.of("numberOfIncomingConnectionsToPrune")
 
   it should "try to prune incoming connections down to the minimum allowed number" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new ConnectedPeersFixture {
+  ) in new ConnectedPeersFixture:
     forAll { (connectedPeers: ConnectedPeers) =>
       val numPeersToPrune = PeerManagerActor.numberOfIncomingConnectionsToPrune(connectedPeers, peerConfiguration)
       numPeersToPrune shouldBe >=(0)
@@ -800,13 +776,9 @@ class PeerManagerSpec
       val minIncomingPeers = peerConfiguration.maxIncomingPeers - peerConfiguration.pruneIncomingPeers
       minIncomingPeers shouldBe >=(0)
 
-      if connectedPeers.incomingHandshakedPeersCount <= minIncomingPeers then {
-        numPeersToPrune shouldBe 0
-      } else {
-        connectedPeers.incomingHandshakedPeersCount - numPeersToPrune shouldBe minIncomingPeers
-      }
+      if connectedPeers.incomingHandshakedPeersCount <= minIncomingPeers then numPeersToPrune shouldBe 0
+      else connectedPeers.incomingHandshakedPeersCount - numPeersToPrune shouldBe minIncomingPeers
     }
-  }
 
   behavior.of("ConnectedPeers.prunePeers")
 
@@ -814,7 +786,7 @@ class PeerManagerSpec
   it should "prune peers which are old enough, protecting against repeated forced pruning" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new ConnectedPeersFixture {
+  ) in new ConnectedPeersFixture:
     forAll { (connectedPeers: ConnectedPeers) =>
       val numPeersToPrune = PeerManagerActor.numberOfIncomingConnectionsToPrune(connectedPeers, peerConfiguration)
 
@@ -897,13 +869,12 @@ class PeerManagerSpec
         }
       }
     }
-  }
 
   it should "not prune again until the pruned peers are disconnected and new ones connect" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new ConnectedPeersFixture {
-    val data: Gen[(ConnectedPeers, List[Peer])] = for {
+  ) in new ConnectedPeersFixture:
+    val data: Gen[(ConnectedPeers, List[Peer])] = for
       connectedPeers <- arbitrary[ConnectedPeers]
       _ <- Gen.choose(0, peerConfiguration.pruneIncomingPeers)
       // Top up to max with new connections
@@ -911,7 +882,7 @@ class PeerManagerSpec
         peerConfiguration.maxIncomingPeers - connectedPeers.incomingHandshakedPeersCount,
         genIncomingPeer
       )
-    } yield (connectedPeers, newIncoming)
+    yield (connectedPeers, newIncoming)
 
     forAll(data) { case (connectedPeers, newIncoming) =>
       val numPeersToPrune0 = PeerManagerActor.numberOfIncomingConnectionsToPrune(connectedPeers, peerConfiguration)
@@ -942,7 +913,6 @@ class PeerManagerSpec
         PeerManagerActor.numberOfIncomingConnectionsToPrune(replenished, peerConfiguration) shouldBe >(0)
       }
     }
-  }
 
   behavior.of("prunePriority")
 
@@ -970,7 +940,7 @@ class PeerManagerSpec
     priority(PeerId("Dave")) shouldBe 0.0
   }
 
-  trait ConnectedPeersFixture {
+  trait ConnectedPeersFixture:
     case class TestConfig(
         minOutgoingPeers: Int = 10,
         maxOutgoingPeers: Int = 30,
@@ -986,9 +956,7 @@ class PeerManagerSpec
       genConnectedPeers(peerConfiguration.maxIncomingPeers, peerConfiguration.maxOutgoingPeers)
     }
 
-  }
-
-  trait TestSetup {
+  trait TestSetup:
     def testScheduler: ExplicitlyTriggeredScheduler =
       classicSystem.scheduler.asInstanceOf[ExplicitlyTriggeredScheduler]
 
@@ -1014,13 +982,12 @@ class PeerManagerSpec
         org.apache.pekko.actor.typed.scaladsl.ActorContext[PeerManagerActor.Command],
         InetSocketAddress,
         Boolean
-    ) => typed.ActorRef[PeerActor.Command] = { (_, address, isIncoming) =>
+    ) => typed.ActorRef[PeerActor.Command] = (_, address, isIncoming) =>
       val peerProbe = TestProbe()
       val tp = TestPeer(Peer(PeerId(""), address, peerProbe.ref.toTyped[PeerActor.Command], isIncoming), peerProbe)
       createdPeers :+= tp
       createdPeerQueue.offer(tp)
       peerProbe.ref.toTyped[PeerActor.Command]
-    }
 
     val port = 30340
     val incomingConnection1: TestProbe = TestProbe()
@@ -1078,21 +1045,18 @@ class PeerManagerSpec
         typed.DispatcherSelector.fromConfig(org.apache.pekko.testkit.CallingThreadDispatcher.Id)
       )
 
-    def start(): Unit = {
+    def start(): Unit =
       peerEventBus.expectMsgType[SubscribeCmd].to shouldBe PeerHandshaked
 
       peerManager ! PeerManagerActor.StartConnectingCmd
-    }
 
-    def handleInitialNodesDiscovery(): Unit = {
+    def handleInitialNodesDiscovery(): Unit =
       testScheduler.timePasses(6000.millis) // wait for bootstrap nodes scan
 
       val req = peerDiscoveryManager.expectMsgClass(classOf[PeerDiscoveryManager.GetDiscoveredNodesInfoReq])
       req.replyTo ! PeerDiscoveryManager.DiscoveredNodesInfo(bootstrapNodes)
       val knownReq = knownNodesManager.expectMsgType[KnownNodesManager.GetKnownNodesReq]
       knownReq.replyTo ! KnownNodesManager.KnownNodes(knownNodes)
-    }
-  }
 
   // ── Regression tests for blacklistDurationForDisconnect ────────────────────
   // Sepolia 2026-05-13: when SNAP-syncing from genesis, ~40+ peers per minute were
@@ -1153,12 +1117,12 @@ class PeerManagerSpec
   }
 
   implicit val arbPeer: Arbitrary[Peer] = Arbitrary {
-    for {
+    for
       ip <- Gen.listOfN(4, Gen.choose(0, 255)).map(_.mkString("."))
       port <- Gen.choose(10000, 60000)
       incoming <- arbitrary[Boolean]
       ageMillis <- Gen.choose(0, 24 * 60 * 60 * 1000)
-    } yield Peer(
+    yield Peer(
       PeerId.fromRef(TestProbe().ref.toTyped[PeerActor.Command]),
       remoteAddress = new InetSocketAddress(ip, port),
       ref = TestProbe().ref.toTyped[PeerActor.Command],
@@ -1175,7 +1139,7 @@ class PeerManagerSpec
       maxIncomingPeers: Int,
       maxOutgoingPeers: Int
   ): Gen[ConnectedPeers] =
-    for {
+    for
       numIncoming <- Gen.choose(0, maxIncomingPeers)
       numOutgoing <- Gen.choose(0, maxOutgoingPeers)
       incoming <- Gen.listOfN(numIncoming, genIncomingPeer)
@@ -1184,6 +1148,4 @@ class PeerManagerSpec
       numHandshaked <- Gen.choose(0.75, 1.0).map(_ * (numIncoming + numOutgoing)).map(_.toInt)
       handshaked <- Gen.pick(numHandshaked, incoming ++ outgoing)
       connections1 = handshaked.foldLeft(connections0)(_.promotePeerToHandshaked(_))
-    } yield connections1
-
-}
+    yield connections1

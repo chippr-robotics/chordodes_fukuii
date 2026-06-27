@@ -16,7 +16,7 @@ import com.chipprbots.ethereum.utils.Picklers.given
   * the block header
   */
 class BlockHeadersStorage(val dataSource: DataSource)
-    extends TransactionalKeyValueStorage[BlockHeaderHash, BlockHeader] {
+    extends TransactionalKeyValueStorage[BlockHeaderHash, BlockHeader]:
 
   override val namespace: IndexedSeq[Byte] = Namespaces.HeaderNamespace
 
@@ -29,8 +29,6 @@ class BlockHeadersStorage(val dataSource: DataSource)
 
   override def valueDeserializer: IndexedSeq[Byte] => BlockHeader =
     byteSequenceToBuffer.andThen(Unpickle[BlockHeader].fromBytes)
-}
 
-object BlockHeadersStorage {
+object BlockHeadersStorage:
   type BlockHeaderHash = ByteString
-}

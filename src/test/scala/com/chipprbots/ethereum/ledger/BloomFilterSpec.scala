@@ -12,7 +12,7 @@ import com.chipprbots.ethereum.domain.Receipt
 import com.chipprbots.ethereum.domain.TxLogEntry
 import com.chipprbots.ethereum.testing.Tags.*
 
-class BloomFilterSpec extends AnyFlatSpec with Matchers {
+class BloomFilterSpec extends AnyFlatSpec with Matchers:
 
   it should "properly create the bloom filter for without logs" taggedAs (UnitTest, StateTest) in {
     val obtained = BloomFilter.create(receiptWithoutLogs.logs)
@@ -135,4 +135,3 @@ class BloomFilterSpec extends AnyFlatSpec with Matchers {
       )
     )
   )
-}

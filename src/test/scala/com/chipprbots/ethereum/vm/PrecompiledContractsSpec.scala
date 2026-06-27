@@ -22,15 +22,11 @@ import com.chipprbots.ethereum.vm.PrecompiledContracts.ModExp
 import MockWorldState.*
 import Fixtures.blockchainConfig
 
-class PrecompiledContractsSpec
-    extends AnyFunSuite
-    with Matchers
-    with ScalaCheckPropertyChecks
-    with SecureRandomBuilder {
+class PrecompiledContractsSpec extends AnyFunSuite with Matchers with ScalaCheckPropertyChecks with SecureRandomBuilder:
 
   val vm = new TestVM
 
-  def buildContext(recipient: Address, inputData: ByteString, gas: UInt256 = 1000000, blockNumber: BigInt = 0): PC = {
+  def buildContext(recipient: Address, inputData: ByteString, gas: UInt256 = 1000000, blockNumber: BigInt = 0): PC =
     val origin = Address(0xcafebabe)
 
     val fakeHeader = BlockFixtures.ValidBlock.header.copy(
@@ -62,7 +58,6 @@ class PrecompiledContractsSpec
       warmAddresses = Set.empty,
       warmStorage = Set.empty
     )
-  }
 
   test("ECDSARECOVER", UnitTest, VMTest) {
     val keyPair = generateKeyPair(secureRandom)
@@ -462,5 +457,3 @@ class PrecompiledContractsSpec
       result.returnData shouldEqual ByteString(Hex.decode(expectedResult))
     }
   }
-
-}

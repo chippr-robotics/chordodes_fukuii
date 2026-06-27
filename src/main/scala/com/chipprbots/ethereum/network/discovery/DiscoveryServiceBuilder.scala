@@ -33,7 +33,7 @@ import com.chipprbots.ethereum.utils.Logger
 import com.chipprbots.ethereum.utils.NodeStatus
 import com.chipprbots.ethereum.utils.ServerStatus
 
-trait DiscoveryServiceBuilder extends Logger {
+trait DiscoveryServiceBuilder extends Logger:
 
   def discoveryServiceResource(
       discoveryConfig: DiscoveryConfig,
@@ -41,7 +41,7 @@ trait DiscoveryServiceBuilder extends Logger {
       nodeStatusHolder: AtomicReference[NodeStatus],
       knownNodesStorage: KnownNodesStorage,
       forkIdTag: Option[ForkIdTag] = None
-  )(implicit scheduler: IORuntime): Resource[IO, v4.DiscoveryService] = {
+  )(implicit scheduler: IORuntime): Resource[IO, v4.DiscoveryService] =
 
     given sigalg: SigAlg = new Secp256k1SigAlg()
     val keyPair = nodeStatusHolder.get.key
@@ -72,13 +72,12 @@ trait DiscoveryServiceBuilder extends Logger {
         v4.Packet.pack(dummyPing, privateKey).toOption.foreach { packet =>
           val _ = v4.Packet.unpack(packet)
         }
-      catch {
+      catch
         case scala.util.control.NonFatal(ex) =>
           log.warn(s"discv4 codec warmup failed (non-fatal): ${ex.getMessage}")
-      }
     }
 
-    val resource = for {
+    val resource = for
       host <- Resource.eval {
         getExternalAddress(discoveryConfig)
       }
@@ -171,19 +170,18 @@ trait DiscoveryServiceBuilder extends Logger {
       _ <- Resource.eval {
         setDiscoveryStatus(nodeStatusHolder, ServerStatus.Listening(udpConfig.bindAddress))
       }
-    } yield service
+    yield service
 
     resource
       .onFinalize {
         setDiscoveryStatus(nodeStatusHolder, ServerStatus.NotListening)
       }
-  }
 
   private def makeDiscoveryConfig(
       discoveryConfig: DiscoveryConfig,
       knownNodesStorage: KnownNodesStorage
   ): IO[v4.DiscoveryConfig] =
-    for {
+    for
       reusedKnownNodes <-
         if discoveryConfig.reuseKnownNodes then IO(knownNodesStorage.getKnownNodes.map(Node.fromUri))
         else IO.pure(Set.empty[Node])
@@ -210,10 +208,10 @@ trait DiscoveryServiceBuilder extends Logger {
         kademliaAlpha = discoveryConfig.kademliaAlpha,
         knownPeers = knownPeers
       )
-    } yield config
+    yield config
 
   private def getExternalAddress(discoveryConfig: DiscoveryConfig): IO[InetAddress] =
-    discoveryConfig.host match {
+    discoveryConfig.host match
       case Some(host) =>
         IO(InetAddress.getByName(host))
 
@@ -228,7 +226,7 @@ trait DiscoveryServiceBuilder extends Logger {
               .map(_.trim)
               .filter(h => h.nonEmpty && h != "0.0.0.0" && h != "::")
 
-            fallbackHostOpt match {
+            fallbackHostOpt match
               case Some(host) =>
                 IO(InetAddress.getByName(host)).flatTap { addr =>
                   IO(
@@ -247,9 +245,7 @@ trait DiscoveryServiceBuilder extends Logger {
                     )
                   )
                 }
-            }
         }
-    }
 
   private def makeUdpConfig(
       discoveryConfig: DiscoveryConfig,
@@ -280,7 +276,7 @@ trait DiscoveryServiceBuilder extends Logger {
       sigalg: SigAlg,
       runtime: IORuntime
   ): Resource[IO, v4.DiscoveryNetwork[InetMultiAddress]] =
-    for {
+    for
       peerGroup <- StaticUDPPeerGroup[v4.Packet](udpConfig)
       // Now that the peer group exists, populate the outbound sender so the v5
       // sync responder can send post-handshake ping-backs through this UDP
@@ -318,7 +314,7 @@ trait DiscoveryServiceBuilder extends Logger {
           pingDedup = pingDedup
         )
       }
-    } yield network
+    yield network
 
   /** Build the v5 synchronous responder. Wires:
     *   - [[v5.Discv5SyncResponder]] for inbound packet handling on the netty event-loop thread (sub-300ms hive
@@ -346,7 +342,7 @@ trait DiscoveryServiceBuilder extends Logger {
   )(implicit
       sigalg: SigAlg,
       runtime: IORuntime
-  ): StaticUDPPeerGroup.SyncResponder = {
+  ): StaticUDPPeerGroup.SyncResponder =
     import V5RLPCodecs.codecFromRLPCodec
     given v5PayloadCodec: Codec[v5.Payload] = V5RLPCodecs.payloadCodec
     given v5EnrCodec: Codec[EthereumNodeRecord] = codecFromRLPCodec(using V5RLPCodecs.enrRLPCodec)
@@ -354,10 +350,10 @@ trait DiscoveryServiceBuilder extends Logger {
     val localPubBytes = localNode.id.value.bytes
     val localNodeId = v5.Session.nodeIdFromPublicKey(localPubBytes)
 
-    val handler = new v5.Discv5SyncResponder.Handler {
+    val handler = new v5.Discv5SyncResponder.Handler:
       def localEnr: EthereumNodeRecord = enrRef.get
       def localEnrSeq: Long = enrRef.get.content.seq
-      def findNodes(distances: List[Int]): List[EthereumNodeRecord] = {
+      def findNodes(distances: List[Int]): List[EthereumNodeRecord] =
         // Pull every distance the peer asked about from the bystander table;
         // distance=0 yields the local ENR explicitly.
         val builder = List.newBuilder[EthereumNodeRecord]
@@ -366,8 +362,6 @@ trait DiscoveryServiceBuilder extends Logger {
           else builder ++= bystanders.atDistance(localNodeId, d)
         }
         builder.result()
-      }
-    }
 
     val responder = v5.Discv5SyncResponder(
       privateKey = privateKey,
@@ -379,7 +373,6 @@ trait DiscoveryServiceBuilder extends Logger {
       outboundSenderRef = outboundSenderRef
     )
     V5DemuxResponder(responder, queue = None)
-  }
 
   private def makeDiscoveryService(
       privateKey: PrivateKey,
@@ -402,4 +395,3 @@ trait DiscoveryServiceBuilder extends Logger {
       enrollInBackground = true,
       tags = forkIdTag.toList
     )
-}

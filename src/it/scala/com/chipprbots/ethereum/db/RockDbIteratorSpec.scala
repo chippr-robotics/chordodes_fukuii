@@ -25,16 +25,15 @@ import com.chipprbots.ethereum.db.storage.Namespaces
 import com.chipprbots.ethereum.db.storage.NodeStorage
 import com.chipprbots.ethereum.testing.Tags.*
 
-class RockDbIteratorSpec extends FlatSpecBase with ResourceFixtures with Matchers {
+class RockDbIteratorSpec extends FlatSpecBase with ResourceFixtures with Matchers:
   type Fixture = RocksDbDataSource
 
   override def fixtureResource: Resource[IO, RocksDbDataSource] = RockDbIteratorSpec.buildRockDbResource()
 
-  def genRandomArray(): Array[Byte] = {
+  def genRandomArray(): Array[Byte] =
     val arr = new Array[Byte](32)
     Random.nextBytes(arr)
     arr
-  }
 
   def genRandomByteString(): ByteString =
     ByteString.fromArrayUnsafe(genRandomArray())
@@ -51,7 +50,7 @@ class RockDbIteratorSpec extends FlatSpecBase with ResourceFixtures with Matcher
   it should "cancel ongoing iteration" taggedAs (IntegrationTest, DatabaseTest, SlowTest) in testCaseT { db =>
     val largeNum = 1000000
     val finishMark = 20000
-    for {
+    for
       counter <- Ref.of[IO, Int](0)
       cancelMark <- Deferred[IO, Unit]
       _ <- writeNValuesToDb(largeNum, db, Namespaces.NodeNamespace)
@@ -59,10 +58,10 @@ class RockDbIteratorSpec extends FlatSpecBase with ResourceFixtures with Matcher
         .iterate(Namespaces.NodeNamespace)
         .map(_.toOption.get)
         .evalMap { _ =>
-          for {
+          for
             cur <- counter.updateAndGet(i => i + 1)
             _ <- if cur == finishMark then cancelMark.complete(()) else IO.unit
-          } yield ()
+          yield ()
         }
         .compile
         .drain
@@ -73,12 +72,12 @@ class RockDbIteratorSpec extends FlatSpecBase with ResourceFixtures with Matcher
       // iterators needs to be closed before closing db.
       _ <- fib.cancel
       finalCounter <- counter.get
-    } yield assert(finalCounter < largeNum)
+    yield assert(finalCounter < largeNum)
   }
 
   it should "read all key values in db" taggedAs (IntegrationTest, DatabaseTest, SlowTest) in testCaseT { db =>
     val largeNum = 100000
-    for {
+    for
       counter <- Ref.of[IO, Int](0)
       _ <- writeNValuesToDb(largeNum, db, Namespaces.NodeNamespace)
       _ <- db
@@ -90,7 +89,7 @@ class RockDbIteratorSpec extends FlatSpecBase with ResourceFixtures with Matcher
         .compile
         .drain
       finalCounter <- counter.get
-    } yield assert(finalCounter == largeNum)
+    yield assert(finalCounter == largeNum)
   }
 
   it should "iterate over keys and values from different namespaces" taggedAs (
@@ -104,7 +103,7 @@ class RockDbIteratorSpec extends FlatSpecBase with ResourceFixtures with Matcher
     val nodeStorage = new NodeStorage(db)
     val nodeKeyValues = (20 to 30).map(i => (ByteString(i.toByte), ByteString(i.toByte).toArray)).toList
 
-    for {
+    for
       _ <- IO(codeStorage.update(Seq(), codeKeyValues).commit())
       _ <- IO(nodeStorage.update(Seq(), nodeKeyValues))
       result <- (
@@ -112,15 +111,14 @@ class RockDbIteratorSpec extends FlatSpecBase with ResourceFixtures with Matcher
         nodeStorage.storageContent.map(_.toOption.get).map(_._1).compile.toList
       ).parTupled
       (codeResult, nodeResult) = result
-    } yield {
+    yield
       codeResult shouldEqual codeKeyValues.map(_._1)
       nodeResult shouldEqual nodeKeyValues.map(_._1)
-    }
   }
 
   it should "iterate over keys and values " taggedAs (IntegrationTest, DatabaseTest, SlowTest) in testCaseT { db =>
     val keyValues = (1 to 100).map(i => (ByteString(i.toByte), ByteString(i.toByte))).toList
-    for {
+    for
       _ <- IO(
         db.update(
           Seq(
@@ -129,11 +127,10 @@ class RockDbIteratorSpec extends FlatSpecBase with ResourceFixtures with Matcher
         )
       )
       elems <- db.iterate(Namespaces.NodeNamespace).map(_.toOption.get).compile.toList
-    } yield {
+    yield
       val deserialized = elems.map { case (bytes, bytes1) => (ByteString(bytes), ByteString(bytes1)) }
       assert(elems.size == keyValues.size)
       assert(keyValues == deserialized)
-    }
   }
 
   it should "return empty list when iterating empty db" taggedAs (
@@ -141,15 +138,13 @@ class RockDbIteratorSpec extends FlatSpecBase with ResourceFixtures with Matcher
     DatabaseTest,
     SlowTest
   ) in testCaseT { db =>
-    for {
-      elems <- db.iterate().compile.toList
-    } yield assert(elems.isEmpty)
+    for elems <- db.iterate().compile.toList
+    yield assert(elems.isEmpty)
   }
-}
 
-object RockDbIteratorSpec {
+object RockDbIteratorSpec:
   def getRockDbTestConfig(dbPath: String): RocksDbConfig =
-    new RocksDbConfig {
+    new RocksDbConfig:
       override val createIfMissing: Boolean = true
       override val paranoidChecks: Boolean = false
       override val path: String = dbPath
@@ -159,7 +154,6 @@ object RockDbIteratorSpec {
       override val levelCompaction: Boolean = true
       override val blockSize: Long = 16384
       override val blockCacheSize: Long = 33554432
-    }
 
   def buildRockDbResource(): Resource[IO, RocksDbDataSource] =
     Resource.make {
@@ -168,4 +162,3 @@ object RockDbIteratorSpec {
         RocksDbDataSource(getRockDbTestConfig(tempDir.toAbsolutePath.toString), Namespaces.nsSeq)
       }
     }(db => IO(db.destroy()))
-}

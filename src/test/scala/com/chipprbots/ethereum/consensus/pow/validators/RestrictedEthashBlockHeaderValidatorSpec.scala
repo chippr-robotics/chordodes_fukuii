@@ -29,36 +29,33 @@ class RestrictedEthashBlockHeaderValidatorSpec
     extends AnyFlatSpec
     with Matchers
     with ScalaCheckPropertyChecks
-    with SecureRandomBuilder {
+    with SecureRandomBuilder:
 
   "RestrictedEthashBlockHeaderValidatorSpec" should "correctly validate header if allowed list is empty" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val validationResult: Either[BlockHeaderError, BlockHeaderValid] =
       RestrictedEthashBlockHeaderValidator.validate(validHeader, validParent)(createBlockchainConfig(Set()))
     assert(validationResult == Right(BlockHeaderValid))
-  }
 
   it should "fail validation of header with too long extra data field" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val tooLongExtraData: BlockHeader = validHeader.copy(extraData =
       ByteString.fromArrayUnsafe(new Array[Byte](RestrictedEthashBlockHeaderValidator.ExtraDataMaxSize + 1))
     )
     val validationResult: Either[BlockHeaderError, BlockHeaderValid] =
       RestrictedEthashBlockHeaderValidator.validate(tooLongExtraData, validParent)(createBlockchainConfig(Set()))
     assert(validationResult == Left(RestrictedPoWHeaderExtraDataError))
-  }
 
-  it should "correctly validate header with valid key" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
+  it should "correctly validate header with valid key" taggedAs (UnitTest, ConsensusTest) in new TestSetup:
     val validationResult: Either[BlockHeaderError, BlockHeaderValid] =
       RestrictedEthashBlockHeaderValidator.validate(validHeader, validParent)(createBlockchainConfig(Set(validKey)))
     assert(validationResult == Right(BlockHeaderValid))
-  }
 
-  it should "fail to validate header with invalid key" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
+  it should "fail to validate header with invalid key" taggedAs (UnitTest, ConsensusTest) in new TestSetup:
     val allowedKey: AsymmetricCipherKeyPair = crypto.generateKeyPair(secureRandom)
     val keyBytes: ByteString = crypto.keyPairToByteStrings(allowedKey)._2
 
@@ -66,9 +63,8 @@ class RestrictedEthashBlockHeaderValidatorSpec
     val validationResult: Either[BlockHeaderError, BlockHeaderValid] =
       RestrictedEthashBlockHeaderValidator.validate(validHeader, validParent)(createBlockchainConfig(Set(keyBytes)))
     assert(validationResult == Left(RestrictedPoWHeaderExtraDataError))
-  }
 
-  it should "fail to validate header re-signed by valid signer" taggedAs (UnitTest, ConsensusTest) in new TestSetup {
+  it should "fail to validate header re-signed by valid signer" taggedAs (UnitTest, ConsensusTest) in new TestSetup:
     val allowedKey: AsymmetricCipherKeyPair = crypto.generateKeyPair(secureRandom)
     val keyBytes: ByteString = crypto.keyPairToByteStrings(allowedKey)._2
 
@@ -81,9 +77,8 @@ class RestrictedEthashBlockHeaderValidatorSpec
         createBlockchainConfig(Set(keyBytes, validKey))
       )
     assert(validationResult == Left(HeaderPoWError))
-  }
 
-  trait TestSetup {
+  trait TestSetup:
     val validKey: ByteString = ByteStringUtils.string2hash(
       "69f6b54223c0d699c91f1f649e11dc52cb05910896b80c50137cd74a54d90782b69128d3ad5a9ba8c26e338891e33a46e317a3eeaabbf62e70a6b33ec57e00e6"
     )
@@ -169,5 +164,3 @@ class RestrictedEthashBlockHeaderValidatorSpec
         BlockHash(ByteStringUtils.string2hash("311575b0d0550f5c8858636621c66172c2633f0a6d6d7f7a254c5be9fcc998a5")),
       nonce = ByteStringUtils.string2hash("b841838f136f2bed")
     )
-  }
-}

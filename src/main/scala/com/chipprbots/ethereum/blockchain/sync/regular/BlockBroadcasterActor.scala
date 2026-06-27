@@ -16,7 +16,7 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent
 import com.chipprbots.ethereum.network.PeerEventBusActor.PeerEvent.PeerDisconnected
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
-object BlockBroadcasterActor {
+object BlockBroadcasterActor:
   sealed trait BroadcasterMsg
   case class BroadcastBlock(block: BlockToBroadcast) extends BroadcasterMsg
   case class BroadcastBlocks(blocks: List[BlockToBroadcast]) extends BroadcasterMsg
@@ -84,8 +84,6 @@ object BlockBroadcasterActor {
         blocks.foreach(broadcast.broadcastBlock(_, peerListHelper.handshakedPeers))
         Behaviors.same
     }
-
-}
 
 // Logger name anchor — never instantiated
 final private class BlockBroadcasterImpl

@@ -19,7 +19,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   * ETH61-67 decoders were removed when Fukuii retired pre-ETH68 capability negotiation. This spec replaces the old
   * per-version decoder tests with ETH68/ETH69-only coverage.
   */
-class MessageDecodersSpec extends AnyFlatSpec with Matchers with SecureRandomBuilder {
+class MessageDecodersSpec extends AnyFlatSpec with Matchers with SecureRandomBuilder:
 
   def decode: Capability => MessageDecoder = EthereumMessageDecoder.ethMessageDecoder
 
@@ -78,4 +78,3 @@ class MessageDecodersSpec extends AnyFlatSpec with Matchers with SecureRandomBui
   it should "return error for unknown message code in ETH68" taggedAs (UnitTest, NetworkTest) in {
     decode(Capability.ETH68).fromBytes(0xff, Array.emptyByteArray) shouldBe a[Left[?, ?]]
   }
-}

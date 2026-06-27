@@ -6,7 +6,7 @@ import com.chipprbots.ethereum.consensus.validators.BlockHeaderValidatorSkeleton
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
-object PoWBlockHeaderValidator extends BlockHeaderValidatorSkeleton {
+object PoWBlockHeaderValidator extends BlockHeaderValidatorSkeleton:
 
   /** A hook where even more mining-specific validation can take place. For example, PoW validation is done here.
     */
@@ -14,4 +14,3 @@ object PoWBlockHeaderValidator extends BlockHeaderValidatorSkeleton {
       blockHeader: BlockHeader
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
     EthashBlockHeaderValidator.validateHeader(blockHeader)
-}

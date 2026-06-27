@@ -2,7 +2,7 @@ package com.chipprbots.ethereum.common
 
 /** Interface to represent a key-value structure
   */
-trait SimpleMap[K, V, T <: SimpleMap[K, V, T]] {
+trait SimpleMap[K, V, T <: SimpleMap[K, V, T]]:
 
   /** This function obtains the value asociated with the key passed, if there exists one.
     *
@@ -61,5 +61,3 @@ trait SimpleMap[K, V, T <: SimpleMap[K, V, T]] {
     *   the new DataSource after the removals and insertions were done.
     */
   def update(toRemove: Seq[K], toUpsert: Seq[(K, V)]): T
-
-}

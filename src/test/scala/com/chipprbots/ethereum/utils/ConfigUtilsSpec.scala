@@ -4,7 +4,7 @@ import com.typesafe.config.ConfigFactory
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-class ConfigUtilsSpec extends AnyWordSpec with Matchers {
+class ConfigUtilsSpec extends AnyWordSpec with Matchers:
   "keys" should {
     "return top-level keys of given config instance" in {
       val config = ConfigFactory.parseString("""{
@@ -19,4 +19,3 @@ class ConfigUtilsSpec extends AnyWordSpec with Matchers {
       ConfigUtils.keys(config) shouldBe Set("foo", "baz")
     }
   }
-}

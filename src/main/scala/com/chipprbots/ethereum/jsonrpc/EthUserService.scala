@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie.MissingNodeException
 import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 
-object EthUserService {
+object EthUserService:
   case class GetStorageAtRequest(address: Address, position: BigInt, block: BlockParam)
   case class GetStorageAtResponse(value: ByteString)
   case class GetCodeRequest(address: Address, block: BlockParam)
@@ -22,7 +22,6 @@ object EthUserService {
   case class GetTransactionCountResponse(value: BigInt)
   case class GetStorageRootRequest(address: Address, block: BlockParam)
   case class GetStorageRootResponse(storageRoot: ByteString)
-}
 
 class EthUserService(
     val blockchain: Blockchain,
@@ -30,7 +29,7 @@ class EthUserService(
     val mining: Mining,
     evmCodeStorage: EvmCodeStorage,
     configBuilder: BlockchainConfigBuilder
-) extends ResolveBlock {
+) extends ResolveBlock:
   import configBuilder.*
   import EthUserService.*
 
@@ -86,5 +85,3 @@ class EthUserService(
     }.recover { case _: MissingNodeException =>
       Left(JsonRpcError.NodeNotFound)
     }
-
-}

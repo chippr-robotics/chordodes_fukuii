@@ -64,10 +64,10 @@ final class CombinedRecoveryScanner(
     // crash-after-persist and assert resume). Production leaves both as no-ops.
     onShardScanStart: Int => Unit = _ => (),
     onShardPersisted: Int => Unit = _ => ()
-) {
+):
 
   /** Walk the not-yet-completed shards, persisting resumable progress as it goes, and return the merged gap set. */
-  def run(): RecoveryScanResult = {
+  def run(): RecoveryScanResult =
     val shards = ShardEnumerator.enumShards(scanRoot, storageForShard(), shardDepth)
     val shardCount = shards.length
 
@@ -95,11 +95,10 @@ final class CombinedRecoveryScanner(
     val accountsScanned = new java.util.concurrent.atomic.AtomicLong(0L)
     val contractsFound = new java.util.concurrent.atomic.AtomicLong(0L)
     val missingStorageCount = new java.util.concurrent.atomic.AtomicLong(accStorage.size.toLong)
-    val onAccount: Boolean => Unit = { isContract =>
+    val onAccount: Boolean => Unit = isContract =>
       val n = accountsScanned.incrementAndGet()
       if isContract then contractsFound.incrementAndGet()
       if n % 100000 == 0 then RecoveryMetrics.setStorageScanProgress(n, contractsFound.get(), missingStorageCount.get())
-    }
 
     // Merge one shard's gaps (cross-shard dedup) and atomically persist completion + accumulated gaps. Serialized so
     // the shared accumulators/dedup-sets and the single-key write are consistent under parallel walks.
@@ -122,24 +121,19 @@ final class CombinedRecoveryScanner(
       onShardPersisted(completed.size)
     }
 
-    def scanOne(idx: Int): Unit = {
+    def scanOne(idx: Int): Unit =
       onShardScanStart(idx)
       val scan = new CombinedRecoveryScan(storageForShard(), evmCodeStorage, onAccount)
       scan.scanShard(shards(idx).root, shards(idx).pathPrefix)
       mergeAndPersist(idx, scan)
-    }
 
-    if concurrency <= 1 then {
-      remaining.foreach(scanOne)
-    } else {
+    if concurrency <= 1 then remaining.foreach(scanOne)
+    else
       val pool = Executors.newFixedThreadPool(math.min(concurrency, remaining.size))
       given ec: ExecutionContext = ExecutionContext.fromExecutorService(pool)
       try Await.result(Future.sequence(remaining.map(idx => Future(scanOne(idx)))), Duration.Inf)
       finally pool.shutdown()
-    }
 
     // Final progress publish so the dashboard reflects the completed totals.
     RecoveryMetrics.setStorageScanProgress(accountsScanned.get(), contractsFound.get(), missingStorageCount.get())
     RecoveryScanResult(accBytecodes.toVector, accStorage.toVector)
-  }
-}

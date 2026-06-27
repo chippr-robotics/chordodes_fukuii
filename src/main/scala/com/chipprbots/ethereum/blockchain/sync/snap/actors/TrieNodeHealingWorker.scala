@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.blockchain.sync.snap.*
   * back. Pekko Typed leaf actor (Group W1). `coordinator` is a typed ref (§8k-A). The idle watchdog uses a Typed
   * `TimerScheduler` rather than `system.scheduler.scheduleOnce`.
   */
-object TrieNodeHealingWorker {
+object TrieNodeHealingWorker:
 
   import TrieNodeHealingCoordinator.*
 
@@ -43,14 +43,13 @@ object TrieNodeHealingWorker {
       currentRequestId: Option[BigInt]
   ): Behavior[Command] =
     Behaviors.receive[Command] { (_, msg) =>
-      msg match {
+      msg match
         case FetchTrieNodes(_, peer) =>
           // Request work from coordinator by notifying it of peer availability
           coordinator ! HealingPeerAvailable(peer)
           timers.startSingleTimer(HealingCheckIdle, 30.seconds)
           working(coordinator, timers, currentRequestId)
         case _ => Behaviors.same
-      }
     }
 
   private def working(
@@ -59,7 +58,7 @@ object TrieNodeHealingWorker {
       currentRequestId: Option[BigInt]
   ): Behavior[Command] =
     Behaviors.receive[Command] { (context, msg) =>
-      msg match {
+      msg match
         case TrieNodesResponseMsg(response) =>
           // Forward response to coordinator for processing
           coordinator ! TrieNodesResponseMsg(response)
@@ -67,21 +66,18 @@ object TrieNodeHealingWorker {
 
         case HealingCheckIdle =>
           // If still working after timeout, go back to idle
-          if currentRequestId.isEmpty then {
+          if currentRequestId.isEmpty then
             context.log.debug("[HEALING-WORKER] idle check: no active request — worker idle, awaiting assignment")
             idle(coordinator, timers, currentRequestId = None)
-          } else Behaviors.same
+          else Behaviors.same
 
         case HealingRequestTimeout(requestId) =>
-          currentRequestId match {
+          currentRequestId match
             case Some(reqId) if reqId == requestId =>
               context.log.warn(s"Healing request $requestId timed out")
               coordinator ! HealingTaskFailed(requestId, "Timeout")
               idle(coordinator, timers, currentRequestId = None)
             case _ => Behaviors.same
-          }
 
         case _: FetchTrieNodes => Behaviors.same // busy; ignore (matches Classic behaviour)
-      }
     }
-}

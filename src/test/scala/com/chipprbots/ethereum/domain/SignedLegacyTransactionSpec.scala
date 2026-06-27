@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.Hex
 import com.chipprbots.ethereum.vm.Generators
 
-class SignedLegacyTransactionSpec extends AnyFlatSpec with SignedTransactionBehavior with ScalaCheckPropertyChecks {
+class SignedLegacyTransactionSpec extends AnyFlatSpec with SignedTransactionBehavior with ScalaCheckPropertyChecks:
 
   private def allowedPointSigns(chainId: BigInt) = Set(chainId * 2 + 35, chainId * 2 + 36)
 
@@ -118,4 +118,3 @@ class SignedLegacyTransactionSpec extends AnyFlatSpec with SignedTransactionBeha
 
     Hex.toHexString(encodedSignedTransaction) shouldEqual expectedSignedTransaction
   }
-}

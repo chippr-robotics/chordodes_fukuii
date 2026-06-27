@@ -8,7 +8,7 @@ import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.vm.EvmConfig
 
-object StdSignedTransactionValidator extends SignedTransactionValidator {
+object StdSignedTransactionValidator extends SignedTransactionValidator:
 
   val secp256k1n: BigInt = BigInt("115792089237316195423570985008687907852837564279074904382605163141518161494337")
 
@@ -37,7 +37,7 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
       upfrontGasCost: UInt256,
       accumGasUsed: BigInt
   )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] =
-    for {
+    for
       _ <- validateOlympiaTxTypes(stx, blockHeader)
       _ <- validateBlobTransactionSupport(stx, blockHeader)
       _ <- checkSyntacticValidity(stx)
@@ -50,7 +50,7 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
       _ <- validateMaxFeePerBlobGas(stx, blockHeader)
       _ <- validateAccountHasEnoughGasToPayUpfrontCost(senderAccount.balance, upfrontGasCost)
       _ <- validateBlockHasEnoughGasLimitForTx(stx, accumGasUsed, blockHeader.gasLimit)
-    } yield SignedTransactionValid
+    yield SignedTransactionValid
 
   /** EIP-4844 Type-3 (blob) transactions require Cancun activation. ETC never activates Cancun, so blob transactions
     * are always rejected on ETC networks.
@@ -68,7 +68,7 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
     else if blockHeader.number >= blockchainConfig.forkBlockNumbers.olympiaBlockNumber then
       Right(SignedTransactionValid)
     else
-      stx.tx match {
+      stx.tx match
         case _: TransactionWithDynamicFee =>
           Left(
             SignedTransactionError.TransactionSyntaxError(
@@ -82,13 +82,12 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
             )
           )
         case _ => Right(SignedTransactionValid)
-      }
 
   private def validateBlobTransactionSupport(
       stx: SignedTransaction,
       blockHeader: BlockHeader
   )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] =
-    stx.tx match {
+    stx.tx match
       case _: BlobTransaction if !blockchainConfig.isCancunTimestamp(blockHeader.unixTimestamp) =>
         Left(
           SignedTransactionError.TransactionSyntaxError(
@@ -96,7 +95,6 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
           )
         )
       case _ => Right(SignedTransactionValid)
-    }
 
   /** EIP-1559: reject txs whose maxFeePerGas cannot cover the block's baseFee, and reject txs where
     * maxPriorityFeePerGas > maxFeePerGas. Applies to all dynamic-fee transaction variants (type 2 / 3 / 4). Legacy and
@@ -105,8 +103,8 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
   private def validateMaxFeeAgainstBaseFee(
       stx: SignedTransaction,
       blockHeader: BlockHeader
-  ): Either[SignedTransactionError, SignedTransactionValid] = {
-    val feeFields: Option[(BigInt, BigInt)] = stx.tx match {
+  ): Either[SignedTransactionError, SignedTransactionValid] =
+    val feeFields: Option[(BigInt, BigInt)] = stx.tx match
       case dyn: com.chipprbots.ethereum.domain.TransactionWithDynamicFee =>
         Some((dyn.maxFeePerGas, dyn.maxPriorityFeePerGas))
       case bt: com.chipprbots.ethereum.domain.BlobTransaction =>
@@ -114,8 +112,7 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
       case sct: com.chipprbots.ethereum.domain.SetCodeTransaction =>
         Some((sct.maxFeePerGas, sct.maxPriorityFeePerGas))
       case _ => None
-    }
-    feeFields match {
+    feeFields match
       case None => Right(SignedTransactionValid)
       case Some((maxFee, prio)) =>
         val baseFee = blockHeader.baseFee.getOrElse(BigInt(0))
@@ -127,8 +124,6 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
             )
           )
         else Right(SignedTransactionValid)
-    }
-  }
 
   /** EIP-4844: reject blob transactions whose maxFeePerBlobGas < blobBaseFee(block.excessBlobGas). go-ethereum rejects
     * with ErrMaxFeePerBlobGas. Only runs when Cancun is active (blob txs are already rejected pre-Cancun by
@@ -138,7 +133,7 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
       stx: SignedTransaction,
       blockHeader: BlockHeader
   )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] =
-    stx.tx match {
+    stx.tx match
       case bt: BlobTransaction if blockchainConfig.isCancunTimestamp(blockHeader.unixTimestamp) =>
         val excessBlobGas = blockHeader.excessBlobGas.getOrElse(BigInt(0))
         val blobBaseFee = BlobGasUtils.getBlobGasPrice(excessBlobGas, blockHeader.unixTimestamp, blockchainConfig)
@@ -146,7 +141,6 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
           Left(TransactionMaxFeePerBlobGasTooLow(bt.maxFeePerBlobGas, blobBaseFee))
         else Right(SignedTransactionValid)
       case _ => Right(SignedTransactionValid)
-    }
 
   /** Validates if the transaction is syntactically valid (lengths of the transaction fields are correct)
     *
@@ -155,7 +149,7 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
     * @return
     *   Either the validated transaction or TransactionSyntaxError if an error was detected
     */
-  private def checkSyntacticValidity(stx: SignedTransaction): Either[SignedTransactionError, SignedTransactionValid] = {
+  private def checkSyntacticValidity(stx: SignedTransaction): Either[SignedTransactionError, SignedTransactionValid] =
     import LegacyTransaction.*
     import stx.*
     import stx.tx.*
@@ -176,7 +170,6 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
     else if signature.r > maxR then Left(TransactionSyntaxError(s"Invalid signatureRandom: ${signature.r} > $maxR"))
     else if signature.s > maxS then Left(TransactionSyntaxError(s"Invalid signature: ${signature.s} > $maxS"))
     else Right(SignedTransactionValid)
-  }
 
   /** Validates if the transaction signature is valid as stated in appendix F in YP
     *
@@ -190,7 +183,7 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
   private def validateSignature(
       stx: SignedTransaction,
       blockNumber: BigInt
-  )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] = {
+  )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] =
     val r = stx.signature.r
     val s = stx.signature.s
 
@@ -201,7 +194,7 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
     val validS = s > 0 && s < (if beforeHomestead then secp256k1n else secp256k1n / 2)
 
     // Validate signing schema based on transaction type
-    val validSigningSchema = stx.tx match {
+    val validSigningSchema = stx.tx match
       case _: SetCodeTransaction =>
         // EIP-7702 Type-4 transactions use y-parity (0 or 1) for v
         stx.signature.v == ECDSASignature.negativeYParity || stx.signature.v == ECDSASignature.positiveYParity
@@ -220,19 +213,17 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
         // 1. Unprotected signatures (v = 27 or 28)
         // 2. EIP-155 protected signatures (v = chainId * 2 + 35 or chainId * 2 + 36)
         val isUnprotected = v == ECDSASignature.negativePointSign || v == ECDSASignature.positivePointSign
-        val isEIP155Protected = if v >= 35 then {
+        val isEIP155Protected = if v >= 35 then
           // Check if v corresponds to valid EIP-155 format: v = chainId * 2 + 35 + {0,1}
           val chainIdFromV = (v - 35) / 2
           v == chainIdFromV * 2 + 35 || v == chainIdFromV * 2 + 36
-        } else false
+        else false
 
         if beforeEIP155 then isUnprotected
         else isUnprotected || isEIP155Protected
-    }
 
     if validR && validS && validSigningSchema then Right(SignedTransactionValid)
     else Left(TransactionSignatureError)
-  }
 
   /** Validates if the transaction nonce matches current sender account's nonce
     *
@@ -263,20 +254,16 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
       stx: SignedTransaction,
       blockHeaderNumber: BigInt,
       blockHeaderTimestamp: Long
-  )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] = {
+  )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] =
     import stx.tx
-    if tx.isContractInit then {
+    if tx.isContractInit then
       val config = EvmConfig.forBlock(blockHeaderNumber, blockHeaderTimestamp, blockchainConfig)
-      config.maxInitCodeSize match {
+      config.maxInitCodeSize match
         case Some(maxSize) if config.eip3860Enabled && tx.payload.size > maxSize =>
           Left(TransactionInitCodeSizeError(tx.payload.size, maxSize))
         case _ =>
           Right(SignedTransactionValid)
-      }
-    } else {
-      Right(SignedTransactionValid)
-    }
-  }
+    else Right(SignedTransactionValid)
 
   /** Validates the gas limit is no smaller than the intrinsic gas used by the transaction.
     *
@@ -291,18 +278,16 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
       stx: SignedTransaction,
       blockHeaderNumber: BigInt,
       blockHeaderTimestamp: Long
-  )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] = {
+  )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] =
     import stx.tx
     val config = EvmConfig.forBlock(blockHeaderNumber, blockHeaderTimestamp, blockchainConfig)
-    val authListSize = tx match {
+    val authListSize = tx match
       case sct: SetCodeTransaction => sct.authorizationList.size
       case _                       => 0
-    }
     val txIntrinsicGas =
       config.calcTransactionIntrinsicGas(tx.payload, tx.isContractInit, Transaction.accessList(tx), authListSize)
     if stx.tx.gasLimit >= txIntrinsicGas then Right(SignedTransactionValid)
     else Left(TransactionNotEnoughGasForIntrinsicError(stx.tx.gasLimit, txIntrinsicGas))
-  }
 
   /** Validates the sender account balance contains at least the cost required in up-front payment.
     *
@@ -327,7 +312,7 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
       stx: SignedTransaction,
       blockHeaderNumber: BigInt,
       blockHeaderTimestamp: Long
-  )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] = {
+  )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] =
     val isEth = blockchainConfig.networkType == com.chipprbots.ethereum.utils.NetworkType.ETH
     // EIP-7825 gas cap: ETC enables at Olympia (ECIP-1121 block-based). ETH enables at Osaka
     // timestamp (per execution-specs — Prague does NOT include EIP-7825). On ETH chains hive
@@ -337,7 +322,6 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
     if (isOlympiaActivated || isOsakaActivated) && stx.tx.gasLimit > TxGasLimitCap then
       Left(TransactionGasLimitExceedsCap(stx.tx.gasLimit, TxGasLimitCap))
     else Right(SignedTransactionValid)
-  }
 
   /** The sum of the transaction’s gas limit and the gas utilised in this block prior must be no greater than the
     * block’s gasLimit
@@ -358,4 +342,3 @@ object StdSignedTransactionValidator extends SignedTransactionValidator {
   ): Either[SignedTransactionError, SignedTransactionValid] =
     if stx.tx.gasLimit + accumGasUsed <= blockGasLimit then Right(SignedTransactionValid)
     else Left(TransactionGasLimitTooBigError(stx.tx.gasLimit, accumGasUsed, blockGasLimit))
-}

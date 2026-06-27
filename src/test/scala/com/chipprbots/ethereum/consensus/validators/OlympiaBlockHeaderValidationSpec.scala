@@ -31,7 +31,7 @@ class OlympiaBlockHeaderValidationSpec
     extends AnyWordSpec
     with Matchers
     with BlockchainConfigBuilder
-    with com.chipprbots.ethereum.TestInstanceConfigProvider {
+    with com.chipprbots.ethereum.TestInstanceConfigProvider:
 
   private val olympiaBlock: BigInt = BigInt(100)
 
@@ -182,5 +182,4 @@ class OlympiaBlockHeaderValidationSpec
       }
     }
   }
-}
 // scalastyle:on magic.number

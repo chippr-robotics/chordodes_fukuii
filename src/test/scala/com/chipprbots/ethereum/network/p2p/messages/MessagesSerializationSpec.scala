@@ -24,7 +24,7 @@ import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.*
   * ETH61-67 serialization tests removed with those protocol files. ETH68 is Fukuii's minimum supported version
   * (EIP-4938).
   */
-class MessagesSerializationSpec extends AnyWordSpec with Matchers {
+class MessagesSerializationSpec extends AnyWordSpec with Matchers:
 
   val version: Capability = Capability.ETH68
 
@@ -183,4 +183,3 @@ class MessagesSerializationSpec extends AnyWordSpec with Matchers {
 
   private def messageDecoder(v: Capability) =
     NetworkMessageDecoder.orElse(EthereumMessageDecoder.ethMessageDecoder(v))
-}

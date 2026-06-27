@@ -23,7 +23,7 @@ import com.chipprbots.ethereum.testing.Tags.*
 // These tests lock that guard so a refactor to MESSConfig cannot silently extend/shrink the
 // active window and accidentally reject valid reorgs (or accept invalid ones) outside the window.
 
-class MESSIntegrationSpec extends AnyFlatSpec with Matchers {
+class MESSIntegrationSpec extends AnyFlatSpec with Matchers:
 
   // ETC mainnet ECBP-1100 canonical block numbers
   private val MessActivation = BigInt(11_380_000)
@@ -273,4 +273,3 @@ class MESSIntegrationSpec extends AnyFlatSpec with Matchers {
     rejectsWith1xReorg(OlympiaBlock) shouldBe true
     rejectsWith1xReorg(OlympiaBlock + BigInt(5_000_000)) shouldBe true
   }
-}

@@ -26,7 +26,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   * Verifies that the wire layer + sync responder + codec compose correctly over real UDP. Lives in fukuii main (not
   * scalanet) because it exercises the production V5RLPCodecs that lives here.
   */
-class Discv5IntegrationSpec extends AnyFlatSpec with Matchers {
+class Discv5IntegrationSpec extends AnyFlatSpec with Matchers:
 
   import DefaultCodecs.given
   implicit val sigalg: SigAlg = new Secp256k1SigAlg
@@ -34,27 +34,25 @@ class Discv5IntegrationSpec extends AnyFlatSpec with Matchers {
   // v4 codec needed for StaticUDPPeerGroup type — even though we won't use v4 here.
   implicit val v4PacketCodec: Codec[v4.Packet] = v4.Packet.packetCodec(allowDecodeOverMaxPacketSize = true)
 
-  private def makeNode(privateKey: com.chipprbots.scalanet.discovery.crypto.PrivateKey, port: Int): ScNode = {
+  private def makeNode(privateKey: com.chipprbots.scalanet.discovery.crypto.PrivateKey, port: Int): ScNode =
     val pub = sigalg.toPublicKey(privateKey)
     ScNode(
       id = pub,
       address = ScNode.Address(InetAddress.getLoopbackAddress, udpPort = port, tcpPort = port)
     )
-  }
 
   private def buildResponder(
       privateKey: com.chipprbots.scalanet.discovery.crypto.PrivateKey,
       localNode: ScNode
-  ): StaticUDPPeerGroup.SyncResponder = {
+  ): StaticUDPPeerGroup.SyncResponder =
     val localNodeId = v5.Session.nodeIdFromPublicKey(localNode.id.value.bytes)
     val initialEnr = EthereumNodeRecord.fromNode(localNode, privateKey, seq = 1).require
     val enrRef = new AtomicReference[EthereumNodeRecord](initialEnr)
-    val handler = new v5.Discv5SyncResponder.Handler {
+    val handler = new v5.Discv5SyncResponder.Handler:
       def localEnr: EthereumNodeRecord = enrRef.get
       def localEnrSeq: Long = enrRef.get.content.seq
       def findNodes(distances: List[Int]): List[EthereumNodeRecord] =
         if distances.contains(0) then List(enrRef.get) else Nil
-    }
     v5.Discv5SyncResponder(
       privateKey = privateKey,
       localNodeId = localNodeId,
@@ -63,7 +61,6 @@ class Discv5IntegrationSpec extends AnyFlatSpec with Matchers {
       challenges = new v5.Discv5SyncResponder.ChallengeCache(),
       bystanders = new v5.Discv5SyncResponder.BystanderEnrTable()
     )
-  }
 
   behavior.of("Discv5 end-to-end")
 
@@ -87,12 +84,11 @@ class Discv5IntegrationSpec extends AnyFlatSpec with Matchers {
     val nodeB = makeNode(privB, 30303)
     val initialEnrB = EthereumNodeRecord.fromNode(nodeB, privB, seq = 1).require
     val enrRefB = new AtomicReference[EthereumNodeRecord](initialEnrB)
-    val handlerB = new v5.Discv5SyncResponder.Handler {
+    val handlerB = new v5.Discv5SyncResponder.Handler:
       def localEnr: EthereumNodeRecord = enrRefB.get
       def localEnrSeq: Long = enrRefB.get.content.seq
       def findNodes(distances: List[Int]): List[EthereumNodeRecord] =
         if distances.contains(0) then List(enrRefB.get) else Nil
-    }
     val sessionsB = new v5.Session.SessionCache()
     sessionsB.put(
       v5.Session.SessionId(nodeIdA, sender),
@@ -129,10 +125,9 @@ class Discv5IntegrationSpec extends AnyFlatSpec with Matchers {
 
     // B sync-respond
     val result = responderB(sender, incoming)
-    val replyBits = result match {
+    val replyBits = result match
       case StaticUDPPeerGroup.SyncResult.Reply(b) => b
       case other                                  => fail(s"expected Reply, got $other")
-    }
 
     // A: decode the reply.
     val replyPkt = v5.Packet.decode(replyBits.toByteVector, nodeIdA).require
@@ -190,9 +185,7 @@ class Discv5IntegrationSpec extends AnyFlatSpec with Matchers {
       messageCiphertext = ByteVector.fromValidHex("aa" * 32)
     )
     val incomingBytes = v5.Packet.encode(msgPkt, nodeIdLocal).require.bits
-    chain(sender, incomingBytes) match {
+    chain(sender, incomingBytes) match
       case StaticUDPPeerGroup.SyncResult.Reply(_) => succeed
       case other                                  => fail(s"expected v5 Reply, got $other")
-    }
   }
-}

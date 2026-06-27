@@ -16,16 +16,15 @@ import com.chipprbots.ethereum.testing.Tags.*
   * geth's `framework.go` rejects requests with `len(reqId) > 8` via `ErrInvalidReqID`; that's what makes hive's
   * `PingLargeRequestID` test pass.
   */
-class V5RLPCodecsSpec extends AnyFlatSpec with Matchers {
+class V5RLPCodecsSpec extends AnyFlatSpec with Matchers:
 
   import V5RLPCodecs.given
 
   private val codec: Codec[Payload] = summon[Codec[Payload]]
 
-  private def roundTrip(payload: Payload): Payload = {
+  private def roundTrip(payload: Payload): Payload =
     val encoded = codec.encode(payload).require
     codec.decodeValue(encoded).require
-  }
 
   // ---- Per-payload round-trips --------------------------------------------
 
@@ -156,4 +155,3 @@ class V5RLPCodecsSpec extends AnyFlatSpec with Matchers {
     rt.requestId.size shouldBe 1L
     rt.requestId shouldBe ByteVector.fromValidHex("ab")
   }
-}

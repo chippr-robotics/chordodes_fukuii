@@ -33,7 +33,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   *     underestimate (gap contribution at 580 TH << actual ~3300 TH avg) → New formula: ~6% underestimate for
   *     rising-difficulty gap; < 0.01% for constant-difficulty
   */
-class ETH69OscillationChainWeightSpec extends AnyFlatSpec with Matchers {
+class ETH69OscillationChainWeightSpec extends AnyFlatSpec with Matchers:
 
   /** Mirrors the Tier 3 POW_SCALING formula in BlockchainReader.resolveETH69ChainWeight. Must stay in sync with:
     * ourBestTD + ourCurrentDiff * gap * 9999 / 10000
@@ -43,10 +43,9 @@ class ETH69OscillationChainWeightSpec extends AnyFlatSpec with Matchers {
       ourCurrentDiff: BigInt,
       latestBlock: BigInt,
       ourBestNum: BigInt
-  ): BigInt = {
+  ): BigInt =
     val gap = (latestBlock - ourBestNum).max(BigInt(0))
     ourBestTD + ourCurrentDiff * gap * 9999 / 10000
-  }
 
   /** Old historical-average formula — kept as a reference baseline for improvement tests. */
   private def historicalAvgEstimate(ourBestTD: BigInt, latestBlock: BigInt, ourBestNum: BigInt): BigInt =
@@ -67,13 +66,12 @@ class ETH69OscillationChainWeightSpec extends AnyFlatSpec with Matchers {
       difficultyHistory: Seq[BigInt],
       latestBlock: BigInt,
       ourBestNum: BigInt
-  ): BigInt = {
+  ): BigInt =
     val sorted = difficultyHistory.sorted
     val mid = sorted.length / 2
     val median = (sorted(mid - 1) + sorted(mid)) / 2
     val gap = (latestBlock - ourBestNum).max(BigInt(0))
     ourBestTD + median * gap
-  }
 
   // -------------------------------------------------------------------------
   // ETH/68 era — wire provides totalDifficulty directly
@@ -381,5 +379,4 @@ class ETH69OscillationChainWeightSpec extends AnyFlatSpec with Matchers {
     median should be > lowD
     median should be < highD
   }
-}
 // scalastyle:on magic.number

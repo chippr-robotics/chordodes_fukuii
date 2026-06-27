@@ -26,7 +26,7 @@ class TrieNodeHealingCoordinatorSpec
     extends ScalaTestWithActorTestKit()
     with AnyFlatSpecLike
     with Matchers
-    with Eventually {
+    with Eventually:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
@@ -261,12 +261,11 @@ class TrieNodeHealingCoordinatorSpec
   // ========================================
 
   /** Synthesize a unique (pathset, hash) so the dedup set doesn't drop our nodes. */
-  private def fakeHashedNode(seed: Int): (Seq[ByteString], ByteString) = {
+  private def fakeHashedNode(seed: Int): (Seq[ByteString], ByteString) =
     val hash = kec256(ByteString(s"healing-node-$seed"))
     // pathset is a Seq[ByteString]; for queueing we just need something distinct.
     val path = ByteString(ByteBuffer.allocate(4).putInt(seed).array())
     (Seq(path), hash)
-  }
 
   it should "absorb a large QueueMissingNodes payload without timing out" taggedAs UnitTest in {
     // The previous immutable-Seq pendingTasks was O(n) per `:+`. Queueing 50,000 nodes via
@@ -415,20 +414,16 @@ class TrieNodeHealingCoordinatorSpec
     var healingStagnatedSent = false
 
     // Simulate 3 consecutive HEAL-PULSE ticks with zero new nodes healed
-    for _ <- 1 to MaxConsecutiveStagnations do {
+    for _ <- 1 to MaxConsecutiveStagnations do
       val recentHealed = 0 // no progress
       val pendingTasksNonEmpty = true
 
-      if recentHealed == 0 && pendingTasksNonEmpty then {
+      if recentHealed == 0 && pendingTasksNonEmpty then
         consecutiveStagnations += 1
-        if consecutiveStagnations >= MaxConsecutiveStagnations then {
+        if consecutiveStagnations >= MaxConsecutiveStagnations then
           healingStagnatedSent = true // → snapSyncController ! HealingStagnated(...)
           consecutiveStagnations = 0
-        }
-      } else if recentHealed > 0 then {
-        consecutiveStagnations = 0
-      }
-    }
+      else if recentHealed > 0 then consecutiveStagnations = 0
 
     healingStagnatedSent shouldBe true
     consecutiveStagnations shouldBe 0 // reset after escalation
@@ -476,16 +471,13 @@ class TrieNodeHealingCoordinatorSpec
     var stagnatedSignals = 0
 
     def tick(recentHealed: Int, hasPending: Boolean): Unit =
-      if !pivotRefreshRequested && recentHealed == 0 && hasPending then {
+      if !pivotRefreshRequested && recentHealed == 0 && hasPending then
         consecutiveStagnations += 1
-        if consecutiveStagnations >= MaxConsecutiveStagnations then {
+        if consecutiveStagnations >= MaxConsecutiveStagnations then
           stagnatedSignals += 1
           pivotRefreshRequested = true
           consecutiveStagnations = 0
-        }
-      } else if recentHealed > 0 then {
-        consecutiveStagnations = 0
-      }
+      else if recentHealed > 0 then consecutiveStagnations = 0
 
     // First escalation
     for _ <- 1 to MaxConsecutiveStagnations do tick(0, hasPending = true)
@@ -504,16 +496,13 @@ class TrieNodeHealingCoordinatorSpec
     var stagnatedSignals = 0
 
     def tick(recentHealed: Int, hasPending: Boolean): Unit =
-      if !pivotRefreshRequested && recentHealed == 0 && hasPending then {
+      if !pivotRefreshRequested && recentHealed == 0 && hasPending then
         consecutiveStagnations += 1
-        if consecutiveStagnations >= MaxConsecutiveStagnations then {
+        if consecutiveStagnations >= MaxConsecutiveStagnations then
           stagnatedSignals += 1
           pivotRefreshRequested = true
           consecutiveStagnations = 0
-        }
-      } else if recentHealed > 0 then {
-        consecutiveStagnations = 0
-      }
+      else if recentHealed > 0 then consecutiveStagnations = 0
 
     // First escalation
     for _ <- 1 to MaxConsecutiveStagnations do tick(0, hasPending = true)
@@ -727,7 +716,7 @@ class TrieNodeHealingCoordinatorSpec
       frontierLowWater = 0,
       frontierBackpressureMaxWaitMs = 800L
     )
-    try {
+    try
       // Pre-load the backlog ABOVE the high-water mark with no peers, so it can never drain below
       // low-water — the walk's emit gate will block until the safety timeout fires.
       coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(
@@ -746,10 +735,9 @@ class TrieNodeHealingCoordinatorSpec
         coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(statusProbe.ref)
         statusProbe.receiveMessage(2.seconds).pendingTasks shouldBe 4
       }
-    } finally {
+    finally
       testKit.stop(coordinator)
       pool.shutdownNow()
-    }
   }
 
   it should "traverse multiple BFS levels and find frontier nodes deep in the trie" taggedAs UnitTest in {
@@ -957,7 +945,7 @@ class TrieNodeHealingCoordinatorSpec
 
     // A drive helper: run a cfg=1 walk over a fresh copy of the multi-node fixture and return the
     // frontier size. Each call gets its own fixture+coordinator so the runs are independent.
-    def frontierSizeWithCfg1(readerEc: Option[scala.concurrent.ExecutionContext]): Int = {
+    def frontierSizeWithCfg1(readerEc: Option[scala.concurrent.ExecutionContext]): Int =
       val fx = HealingTrieFixtures.multiNodeWithSharedAncestor()
       val coordinator = HealingTrieFixtures.spawnCoordinator(
         stateRoot = fx.rootHash,
@@ -979,21 +967,19 @@ class TrieNodeHealingCoordinatorSpec
       }
       testKit.stop(coordinator)
       observed
-    }
 
     // Reference run (no reader EC) and a run WITH a reader EC must agree, and both must equal the
     // fixture's known missing-node count.
     val pool = Executors.newFixedThreadPool(2)
     val readerEc = scala.concurrent.ExecutionContext.fromExecutorService(pool)
-    try {
+    try
       val reference = frontierSizeWithCfg1(None)
       val withReader = frontierSizeWithCfg1(Some(readerEc))
       reference shouldBe 2
       withReader shouldBe reference
-    } finally {
+    finally
       pool.shutdownNow()
       ()
-    }
   }
 
   // ── T029 / T031 (US3): no Await-on-same-pool deadlock + shared-ancestor under concurrency ─────
@@ -1039,7 +1025,7 @@ class TrieNodeHealingCoordinatorSpec
       frontierLowWater = 100000
     )
 
-    try {
+    try
       coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(fx.rootHash)
 
       // No deadlock: the full frontier lands within a generous-but-bounded timeout. If the parallel
@@ -1048,12 +1034,11 @@ class TrieNodeHealingCoordinatorSpec
         coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(statusProbe.ref)
         statusProbe.receiveMessage(3.seconds).pendingTasks shouldBe fx.expectedFrontier
       }
-    } finally {
+    finally
       testKit.stop(coordinator)
       readerPool.shutdownNow()
       writerPool.shutdownNow()
       ()
-    }
   }
 
   it should "still discover a missing node behind a shared ancestor with parallel readers configured (T031)" taggedAs UnitTest in {
@@ -1084,17 +1069,16 @@ class TrieNodeHealingCoordinatorSpec
       healingReservedCores = 2
     )
 
-    try {
+    try
       coordinator ! TrieNodeHealingCoordinator.StartTrieNodeHealing(fx.rootHash)
       eventually(timeout(5.seconds), interval(100.millis)) {
         coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(statusProbe.ref)
         statusProbe.receiveMessage(2.seconds).pendingTasks shouldBe 1
       }
-    } finally {
+    finally
       testKit.stop(coordinator)
       readerPool.shutdownNow()
       ()
-    }
   }
 
   // ── T026 (US3): effective-parallelism formula ────────────────────────────────────────────────
@@ -1221,4 +1205,3 @@ class TrieNodeHealingCoordinatorSpec
     // The unservable handoff must NEVER fire on a present root.
     snapSyncController.expectNoMessage(300.millis)
   }
-}

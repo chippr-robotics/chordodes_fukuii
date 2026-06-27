@@ -46,21 +46,20 @@ class TrieNodeHealingScopeCaptureSpec
     extends ScalaTestWithActorTestKit()
     with AnyFlatSpecLike
     with Matchers
-    with Eventually {
+    with Eventually:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
 
-  private def gaugeValue(name: String): Double = {
+  private def gaugeValue(name: String): Double =
     val gauge = Metrics.get().registry.find(name).gauge()
     if gauge == null then Double.NaN else gauge.value()
-  }
 
   /** Build a storage-trie leaf so the heal site's `discoverMissingChildren` takes the no-children `case _` arm
     * (`pathset.size > 1`), keeping `isComplete` true after the response. Returns the (storage-trie pathset, hash, raw
     * encoded bytes) such that `kec256(encoded) == hash`, exactly what `handleResponse` matches on.
     */
-  private def healableNode(seed: Int): (Seq[ByteString], ByteString, ByteString) = {
+  private def healableNode(seed: Int): (Seq[ByteString], ByteString, ByteString) =
     val value = ByteString(kec256(ByteString(s"scope-capture-value-$seed")).toArray)
     val leaf = LeafNode(ByteString(Array[Byte](0x01)), value)
     val encoded = MptTraversals.encodeNode(leaf)
@@ -68,19 +67,16 @@ class TrieNodeHealingScopeCaptureSpec
     val accountHash = kec256(ByteString(s"scope-capture-account-$seed"))
     val compactStoragePath = ByteString(Array[Byte](0x20, seed.toByte))
     (Seq(accountHash, compactStoragePath), hash, ByteString(encoded))
-  }
 
-  private def deleteRecursively(f: File): Unit = {
+  private def deleteRecursively(f: File): Unit =
     Option(f.listFiles()).foreach(_.foreach(deleteRecursively))
     f.delete()
     ()
-  }
 
-  private def pendingTasks(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int = {
+  private def pendingTasks(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int =
     val probe = testKit.createTestProbe[HealingStatistics]()
     coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref)
     probe.expectMessageType[HealingStatistics].pendingTasks
-  }
 
   /** Wait for StateHealingComplete, ignoring the interleaved ProgressNodesHealed progress messages the controller probe
     * also receives from `handleResponse`.
@@ -106,12 +102,12 @@ class TrieNodeHealingScopeCaptureSpec
           HealingFrontierStorage,
           org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
       ) => Unit
-  ): Unit = {
+  ): Unit =
     val pool = Executors.newSingleThreadExecutor()
     val ec = ExecutionContext.fromExecutorService(pool)
     val dbPath = Files.createTempDirectory("scope-capture-rocksdb").toAbsolutePath.toString
     val dataSource = RocksDbDataSource(
-      new RocksDbConfig {
+      new RocksDbConfig:
         override val createIfMissing: Boolean = true
         override val paranoidChecks: Boolean = true
         override val path: String = dbPath
@@ -121,7 +117,7 @@ class TrieNodeHealingScopeCaptureSpec
         override val levelCompaction: Boolean = true
         override val blockSize: Long = 16384
         override val blockCacheSize: Long = 33554432
-      },
+      ,
       Namespaces.nsSeq
     )
     val store = new HealingFrontierStorage(dataSource)
@@ -139,14 +135,12 @@ class TrieNodeHealingScopeCaptureSpec
       healingWriterEcOverride = Some(ec)
     )
     try body(coordinator, store, controllerProbe)
-    finally {
+    finally
       testKit.stop(coordinator)
       pool.shutdown()
       pool.awaitTermination(5, TimeUnit.SECONDS)
       dataSource.destroy()
       deleteRecursively(new File(dbPath))
-    }
-  }
 
   "Scoped heal verification scope capture" should
     "capture exactly the N healed nodes as scoped seeds (no skip)" taggedAs UnitTest in {
@@ -214,4 +208,3 @@ class TrieNodeHealingScopeCaptureSpec
       eventually(timeout(5.seconds), interval(100.millis))(pendingTasks(coordinator) shouldBe 0)
     }
   }
-}

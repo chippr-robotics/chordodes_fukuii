@@ -55,7 +55,7 @@ import com.chipprbots.ethereum.rlp.RLPList
   * block/state access logic. See `/src/main/resources/graphql/schema.graphql` for the canonical SDL this schema
   * matches.
   */
-object GraphQLSchema {
+object GraphQLSchema:
 
   // Guard: we don't want a caller to request billions of blocks in one query.
   val MaxBlocksPerRange: Int = 1024
@@ -77,25 +77,22 @@ object GraphQLSchema {
   private def rlpEncodeHeader(h: BlockHeader): ByteString =
     ByteString(rlp.encode(BlockHeaderEnc(h).toRLPEncodable))
 
-  private def rlpEncodeBlock(b: Block): ByteString = {
+  private def rlpEncodeBlock(b: Block): ByteString =
     import com.chipprbots.ethereum.domain.Block.BlockEnc
     ByteString(rlp.encode(BlockEnc(b).toRLPEncodable))
-  }
 
-  private def rlpEncodeReceipt(r: Receipt): ByteString = {
+  private def rlpEncodeReceipt(r: Receipt): ByteString =
     import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs.*
     ByteString(r.toBytes)
-  }
 
-  private def rlpEncodeTransaction(stx: SignedTransaction): ByteString = {
+  private def rlpEncodeTransaction(stx: SignedTransaction): ByteString =
     import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.SignedTransactionEnc
     ByteString(SignedTransactionEnc(stx).toBytes)
-  }
 
   /** Compute the CREATE-contract address for a sender + nonce. Matches
     * [[com.chipprbots.ethereum.jsonrpc.TransactionReceiptResponse]]'s formula.
     */
-  private def createContractAddress(sender: Address, nonce: BigInt): Address = {
+  private def createContractAddress(sender: Address, nonce: BigInt): Address =
     import com.chipprbots.ethereum.rlp.RLPImplicitConversions.toEncodeable
     import com.chipprbots.ethereum.rlp.RLPImplicits.byteStringEncDec
     import com.chipprbots.ethereum.rlp.UInt256RLPImplicits.*
@@ -103,50 +100,43 @@ object GraphQLSchema {
       rlp.encode(RLPList(toEncodeable(sender.bytes), UInt256(nonce).toRLPEncodable))
     )
     Address(hash)
-  }
 
-  private def txType(tx: Transaction): Long = tx match {
+  private def txType(tx: Transaction): Long = tx match
     case _: LegacyTransaction         => 0L
     case _: TransactionWithAccessList => 1L
     case _: TransactionWithDynamicFee => 2L
     case _: BlobTransaction           => 3L
     case _: SetCodeTransaction        => 4L
-  }
 
-  private def txAccessList(tx: Transaction): Option[List[AccessListItem]] = tx match {
+  private def txAccessList(tx: Transaction): Option[List[AccessListItem]] = tx match
     case t: TransactionWithAccessList => Some(t.accessList)
     case t: TransactionWithDynamicFee => Some(t.accessList)
     case t: BlobTransaction           => Some(t.accessList)
     case t: SetCodeTransaction        => Some(t.accessList)
     case _: LegacyTransaction         => None
-  }
 
-  private def txBlobVersionedHashes(tx: Transaction): Option[List[ByteString]] = tx match {
+  private def txBlobVersionedHashes(tx: Transaction): Option[List[ByteString]] = tx match
     case t: BlobTransaction => Some(t.blobVersionedHashes.map(_.value))
     case _                  => None
-  }
 
-  private def txMaxFeePerGas(tx: Transaction): Option[BigInt] = tx match {
+  private def txMaxFeePerGas(tx: Transaction): Option[BigInt] = tx match
     case t: TransactionWithDynamicFee => Some(t.maxFeePerGas)
     case t: BlobTransaction           => Some(t.maxFeePerGas)
     case t: SetCodeTransaction        => Some(t.maxFeePerGas)
     case _                            => None
-  }
 
-  private def txMaxPriorityFeePerGas(tx: Transaction): Option[BigInt] = tx match {
+  private def txMaxPriorityFeePerGas(tx: Transaction): Option[BigInt] = tx match
     case t: TransactionWithDynamicFee => Some(t.maxPriorityFeePerGas)
     case t: BlobTransaction           => Some(t.maxPriorityFeePerGas)
     case t: SetCodeTransaction        => Some(t.maxPriorityFeePerGas)
     case _                            => None
-  }
 
-  private def txMaxFeePerBlobGas(tx: Transaction): Option[BigInt] = tx match {
+  private def txMaxFeePerBlobGas(tx: Transaction): Option[BigInt] = tx match
     case t: BlobTransaction => Some(t.maxFeePerBlobGas)
     case _                  => None
-  }
 
   private def effectiveTip(tx: Transaction, baseFee: Option[BigInt]): BigInt =
-    tx match {
+    tx match
       case t: TransactionWithDynamicFee =>
         val bf = baseFee.getOrElse(BigInt(0))
         t.maxPriorityFeePerGas.min(t.maxFeePerGas - bf).max(BigInt(0))
@@ -157,30 +147,27 @@ object GraphQLSchema {
         val bf = baseFee.getOrElse(BigInt(0))
         t.maxPriorityFeePerGas.min(t.maxFeePerGas - bf).max(BigInt(0))
       case other => other.gasPrice - baseFee.getOrElse(BigInt(0))
-    }
 
   /** `null` for pre-Byzantium receipts (which store a state root instead of a status byte — see EIP-658). Hive test 30
     * expects `status: null` for a Frontier-era transaction.
     */
   private def txStatus(r: Receipt): Option[Long] =
-    r.postTransactionStateHash match {
+    r.postTransactionStateHash match
       case SuccessOutcome => Some(1L)
       case FailureOutcome => Some(0L)
       case HashOutcome(_) => None
-    }
 
   private def receiptBundle(ctx: GraphQLContext, gtx: GTransaction): Option[GReceiptBundle] =
-    for {
+    for
       info <- gtx.blockInfo
       receipts <- ctx.blockchainReader.getReceiptsByHash(info.block.header.hash)
       receipt <- receipts.lift(info.txIndex)
-    } yield {
+    yield
       val gasUsed =
         if info.txIndex == 0 then receipt.cumulativeGasUsed
         else receipt.cumulativeGasUsed - receipts(info.txIndex - 1).cumulativeGasUsed
       val baseLogIndex = receipts.take(info.txIndex).map(_.logs.size).sum
       GReceiptBundle(info.block, info.txIndex, receipt, gasUsed, receipt.cumulativeGasUsed, baseLogIndex)
-    }
 
   private def worldStateAt(ctx: GraphQLContext, blockNumber: BigInt): Option[InMemoryWorldStateProxy] =
     ctx.blockchainReader.getBlockByNumber(ctx.blockchainReader.getBestBranch, blockNumber).map { b =>
@@ -214,7 +201,7 @@ object GraphQLSchema {
       log: TxLogEntry,
       addresses: Seq[ByteString],
       topics: Seq[Seq[ByteString]]
-  ): Boolean = {
+  ): Boolean =
     val addrOk = addresses.isEmpty || addresses.exists(_ == log.loggerAddress.bytes)
     val topicsOk = topics.isEmpty || {
       topics.zipWithIndex.forall { case (allowed, idx) =>
@@ -222,13 +209,11 @@ object GraphQLSchema {
       }
     }
     addrOk && topicsOk
-  }
 
   // Build a GBlock wrapper, fetching total difficulty if available.
-  private def buildGBlock(ctx: GraphQLContext, block: Block): GBlock = {
+  private def buildGBlock(ctx: GraphQLContext, block: Block): GBlock =
     val td = ctx.blockchainReader.getChainWeightByHash(block.header.hash).map(_.totalDifficulty)
     GBlock(block, td)
-  }
 
   // ---------------------------------------------------------------------------
   // Input types
@@ -282,7 +267,7 @@ object GraphQLSchema {
   private val RawDataArg: Argument[ByteString] = Argument("data", BytesType)
 
   // Convert a CallData input map to EthInfoService.CallTx.
-  private def toCallTx(m: Map[String, Any]): EthInfoService.CallTx = {
+  private def toCallTx(m: Map[String, Any]): EthInfoService.CallTx =
     val from = m.get("from").flatMap(asOption[ByteString])
     val toRaw = m.get("to").flatMap(asOption[ByteString])
     val gas = m.get("gas").flatMap(asOption[Long]).map(BigInt(_))
@@ -311,15 +296,13 @@ object GraphQLSchema {
       data = data,
       gasPriceExplicit = m.get("gasPrice").flatMap(asOption[BigInt]).isDefined
     )
-  }
 
   // cast: dynamic GraphQL argument map returns Any; callers supply the expected type A
-  private def asOption[A](v: Any): Option[A] = v match {
+  private def asOption[A](v: Any): Option[A] = v match
     case null    => None
     case None    => None
     case Some(x) => Some(x.asInstanceOf[A])
     case other   => Some(other.asInstanceOf[A])
-  }
 
   // ---------------------------------------------------------------------------
   // CallResult / AccessTuple / Withdrawal
@@ -398,20 +381,19 @@ object GraphQLSchema {
         Field(
           "code",
           BytesType,
-          resolve = { c =>
+          resolve = c =>
             worldStateAt(c.ctx, c.value.blockNumber)
               .map(_.getCode(Address(c.value.address)))
               .getOrElse(ByteString.empty)
-          }
         ),
         Field(
           "storage",
           Bytes32Type,
           arguments = List(SlotArg),
-          resolve = { c =>
+          resolve = c =>
             val slotBytes = c.arg(SlotArg)
             val slotBigInt = BigInt(1, slotBytes.toArray[Byte])
-            resolveAccount(c.ctx, c.value.address, c.value.blockNumber) match {
+            resolveAccount(c.ctx, c.value.address, c.value.blockNumber) match
               case Some(acct) =>
                 val v = c.ctx.blockchain.getAccountStorageAt(
                   acct.storageRoot.value,
@@ -426,8 +408,6 @@ object GraphQLSchema {
                 ByteString(padded)
               case None =>
                 ByteString(new Array[Byte](32))
-            }
-          }
         )
       )
   )
@@ -440,9 +420,7 @@ object GraphQLSchema {
     try
       ctx.blockchainReader
         .getAccount(ctx.blockchainReader.getBestBranch, Address(address), blockNumber)
-    catch {
-      case _: MissingNodeException => None
-    }
+    catch case _: MissingNodeException => None
 
   // ---------------------------------------------------------------------------
   // Log
@@ -457,16 +435,14 @@ object GraphQLSchema {
           "account",
           AccountType,
           arguments = List(BlockNumberArg),
-          resolve = { c =>
-            val blockNum = c.arg(BlockNumberArg) match {
+          resolve = c =>
+            val blockNum = c.arg(BlockNumberArg) match
               case Some(n) => BigInt(n)
               case None =>
                 c.value.parent.blockInfo
                   .map(_.block.header.number)
                   .getOrElse(c.ctx.blockchainReader.getBestBlockNumber)
-            }
             GAccount(c.value.log.loggerAddress.bytes, blockNum)
-          }
         ),
         Field("topics", ListType(Bytes32Type), resolve = _.value.log.logTopics),
         Field("data", BytesType, resolve = _.value.log.data),
@@ -489,32 +465,28 @@ object GraphQLSchema {
           "from",
           AccountType,
           arguments = List(BlockNumberArg),
-          resolve = { c =>
-            val blockNum = c.arg(BlockNumberArg) match {
+          resolve = c =>
+            val blockNum = c.arg(BlockNumberArg) match
               case Some(n) => BigInt(n)
               case None =>
                 c.value.blockInfo.map(_.block.header.number).getOrElse(c.ctx.blockchainReader.getBestBlockNumber)
-            }
             val sender = SignedTransaction.getSender(c.value.stx).getOrElse(Address(0))
             GAccount(sender.bytes, blockNum)
-          }
         ),
         Field(
           "to",
           OptionType(AccountType),
           arguments = List(BlockNumberArg),
-          resolve = { c =>
+          resolve = c =>
             c.value.stx.tx.receivingAddress.map { addr =>
-              val blockNum = c.arg(BlockNumberArg) match {
+              val blockNum = c.arg(BlockNumberArg) match
                 case Some(n) => BigInt(n)
                 case None =>
                   c.value.blockInfo
                     .map(_.block.header.number)
                     .getOrElse(c.ctx.blockchainReader.getBestBlockNumber)
-              }
               GAccount(addr.bytes, blockNum)
             }
-          }
         ),
         Field("value", BigIntType, resolve = _.value.stx.tx.value),
         Field("gasPrice", BigIntType, resolve = _.value.stx.tx.gasPrice),
@@ -554,47 +526,44 @@ object GraphQLSchema {
           "blobGasUsed",
           OptionType(LongType),
           resolve = c =>
-            c.value.stx.tx match {
+            c.value.stx.tx match
               case bt: BlobTransaction =>
                 Some((BigInt(bt.blobVersionedHashes.size) * BlobGasUtils.GAS_PER_BLOB).toLong)
               case _ => None
-            }
         ),
         Field(
           "blobGasPrice",
           OptionType(BigIntType),
           resolve = c =>
-            for {
+            for
               bi <- c.value.blockInfo
               ebg <- bi.block.header.excessBlobGas
-            } yield BlobGasUtils.getBlobGasPrice(ebg, bi.block.header.unixTimestamp, c.ctx.blockchainConfig)
+            yield BlobGasUtils.getBlobGasPrice(ebg, bi.block.header.unixTimestamp, c.ctx.blockchainConfig)
         ),
         Field(
           "createdContract",
           OptionType(AccountType),
           arguments = List(BlockNumberArg),
-          resolve = { c =>
+          resolve = c =>
             c.value.blockInfo.flatMap { bi =>
-              if c.value.stx.tx.isContractInit then {
+              if c.value.stx.tx.isContractInit then
                 SignedTransaction.getSender(c.value.stx).map { sender =>
                   val createdAddress = createContractAddress(sender, c.value.stx.tx.nonce)
                   val blockNum = c.arg(BlockNumberArg).map(BigInt(_)).getOrElse(bi.block.header.number)
                   GAccount(createdAddress.bytes, blockNum)
                 }
-              } else None
+              else None
             }
-          }
         ),
         Field(
           "logs",
           OptionType(ListType(LogType)),
-          resolve = { c =>
+          resolve = c =>
             receiptBundle(c.ctx, c.value).map { rb =>
               rb.receipt.logs.zipWithIndex.map { case (log, i) =>
                 GLog(c.value, rb.baseLogIndex + i, log)
               }
             }
-          }
         ),
         Field("r", BigIntType, resolve = _.value.stx.signature.r),
         Field("s", BigIntType, resolve = _.value.stx.signature.s),
@@ -655,7 +624,7 @@ object GraphQLSchema {
         Field(
           "nextBaseFeePerGas",
           OptionType(BigIntType),
-          resolve = { c =>
+          resolve = c =>
             c.value.header.baseFee.map { _ =>
               // Best-effort: fetch next block's baseFee if known; otherwise use current.
               c.ctx.blockchainReader
@@ -664,7 +633,6 @@ object GraphQLSchema {
                 .orElse(c.value.header.baseFee)
                 .get
             }
-          }
         ),
         Field("timestamp", LongType, resolve = _.value.header.unixTimestamp),
         Field("logsBloom", BytesType, resolve = _.value.header.logsBloom.value),
@@ -683,53 +651,49 @@ object GraphQLSchema {
         Field(
           "ommers",
           OptionType(ListType(OptionType(BlockType))),
-          resolve = { c =>
+          resolve = c =>
             Some(c.value.block.body.uncleNodesList.map { uncleHeader =>
               // Uncle blocks don't have a body stored; wrap the header in a Block with an empty body.
               val emptyBody = com.chipprbots.ethereum.domain.BlockBody.empty
               Some(GBlock(Block(uncleHeader, emptyBody), None))
             })
-          }
         ),
         Field(
           "ommerAt",
           OptionType(BlockType),
           arguments = List(IndexArg),
-          resolve = { c =>
+          resolve = c =>
             val idx = c.arg(IndexArg).toInt
             val uncles = c.value.block.body.uncleNodesList
-            if idx >= 0 && idx < uncles.size then {
+            if idx >= 0 && idx < uncles.size then
               val emptyBody = com.chipprbots.ethereum.domain.BlockBody.empty
               Some(GBlock(Block(uncles(idx), emptyBody), None))
-            } else None
-          }
+            else None
         ),
         Field("ommerHash", Bytes32Type, resolve = _.value.header.ommersHash.value),
         Field(
           "transactions",
           OptionType(ListType(TransactionType)),
-          resolve = { c =>
+          resolve = c =>
             Some(c.value.block.body.transactionList.zipWithIndex.map { case (stx, i) =>
               GTransaction(stx, Some(GTxBlockInfo(c.value.block, i)))
             })
-          }
         ),
         Field(
           "transactionAt",
           OptionType(TransactionType),
           arguments = List(IndexArg),
-          resolve = { c =>
+          resolve = c =>
             val idx = c.arg(IndexArg).toInt
             val txs = c.value.block.body.transactionList
             if idx >= 0 && idx < txs.size then Some(GTransaction(txs(idx), Some(GTxBlockInfo(c.value.block, idx))))
             else None
-          }
         ),
         Field(
           "logs",
           ListType(LogType),
           arguments = List(BlockFilterArg),
-          resolve = { c =>
+          resolve = c =>
             val filter = c.arg(BlockFilterArg)
             val addresses: Seq[ByteString] =
               filter.get("addresses").flatMap(asOption[Vector[ByteString]]).getOrElse(Vector.empty)
@@ -746,7 +710,7 @@ object GraphQLSchema {
             receipts.zipWithIndex.foreach { case (r, txIdx) =>
               val stxOpt = txs.lift(txIdx)
               r.logs.zipWithIndex.foreach { case (log, lIdx) =>
-                if logMatches(log, addresses, topics) then {
+                if logMatches(log, addresses, topics) then
                   stxOpt.foreach { stx =>
                     out += GLog(
                       GTransaction(stx, Some(GTxBlockInfo(c.value.block, txIdx))),
@@ -754,12 +718,10 @@ object GraphQLSchema {
                       log
                     )
                   }
-                }
               }
               baseLogIndex += r.logs.size
             }
             out.toSeq
-          }
         ),
         Field(
           "account",
@@ -771,15 +733,15 @@ object GraphQLSchema {
           "call",
           OptionType(CallResultType),
           arguments = List(CallDataArg),
-          resolve = { c =>
+          resolve = c =>
             val callTx = toCallTx(c.arg(CallDataArg))
             val req = EthInfoService.CallRequest(callTx, BlockParam.WithNumber(c.value.number))
             val io = c.ctx.ethInfoService.call(req)
             val estGasIo = c.ctx.ethInfoService.estimateGas(req)
-            val fut: Future[Option[GCallResult]] = (for {
+            val fut: Future[Option[GCallResult]] = (for
               callE <- io
               gasE <- estGasIo
-            } yield (callE, gasE) match {
+            yield (callE, gasE) match
               case (Right(resp), Right(gasResp)) =>
                 Some(GCallResult(resp.returnData, gasResp.gas.toLong, 1L))
               case (Right(resp), Left(_)) =>
@@ -787,15 +749,14 @@ object GraphQLSchema {
               case (Left(err), _) if err.code == 3 => // execution reverted
                 Some(GCallResult(ByteString.empty, 0L, 0L))
               case _ => None
-            }).unsafeToFuture()
+            ).unsafeToFuture()
             fut
-          }
         ),
         Field(
           "estimateGas",
           LongType,
           arguments = List(CallDataArg),
-          resolve = { c =>
+          resolve = c =>
             val callTx = toCallTx(c.arg(CallDataArg))
             val req = EthInfoService.CallRequest(callTx, BlockParam.WithNumber(c.value.number))
             c.ctx.ethInfoService
@@ -805,7 +766,6 @@ object GraphQLSchema {
                 case Left(_)  => 0L
               }
               .unsafeToFuture()
-          }
         ),
         Field("rawHeader", BytesType, resolve = c => rlpEncodeHeader(c.value.header)),
         Field("raw", BytesType, resolve = c => rlpEncodeBlock(c.value.block)),
@@ -863,26 +823,25 @@ object GraphQLSchema {
           "call",
           OptionType(CallResultType),
           arguments = List(CallDataArg),
-          resolve = { c =>
+          resolve = c =>
             val callTx = toCallTx(c.arg(CallDataArg))
             val req = EthInfoService.CallRequest(callTx, BlockParam.Pending)
-            val fut = (for {
+            val fut = (for
               callE <- c.ctx.ethInfoService.call(req)
               gasE <- c.ctx.ethInfoService.estimateGas(req)
-            } yield (callE, gasE) match {
+            yield (callE, gasE) match
               case (Right(resp), Right(gasResp))   => Some(GCallResult(resp.returnData, gasResp.gas.toLong, 1L))
               case (Right(resp), Left(_))          => Some(GCallResult(resp.returnData, 0L, 1L))
               case (Left(err), _) if err.code == 3 => Some(GCallResult(ByteString.empty, 0L, 0L))
               case _                               => None
-            }).unsafeToFuture()
+            ).unsafeToFuture()
             fut
-          }
         ),
         Field(
           "estimateGas",
           LongType,
           arguments = List(CallDataArg),
-          resolve = { c =>
+          resolve = c =>
             val callTx = toCallTx(c.arg(CallDataArg))
             val req = EthInfoService.CallRequest(callTx, BlockParam.Pending)
             c.ctx.ethInfoService
@@ -892,7 +851,6 @@ object GraphQLSchema {
                 case Left(_)  => 0L
               }
               .unsafeToFuture()
-          }
         )
       )
   )
@@ -908,9 +866,9 @@ object GraphQLSchema {
         "block",
         OptionType(BlockType),
         arguments = List(NumberArg, HashArg),
-        resolve = { c =>
+        resolve = c =>
           val reader = c.ctx.blockchainReader
-          (c.arg(NumberArg), c.arg(HashArg)) match {
+          (c.arg(NumberArg), c.arg(HashArg)) match
             case (Some(_), Some(_)) =>
               // Hive test 18 (wrongParams): both `number` and `hash` provided — Invalid params.
               throw GraphQLDataFetchingError.invalidParams("block")
@@ -923,34 +881,30 @@ object GraphQLSchema {
               val blockOpt = reader
                 .getBlockByNumber(reader.getBestBranch, bn)
                 .orElse {
-                  for {
+                  for
                     header <- reader.getBlockHeaderByNumber(bn)
                     body <- reader.getBlockBodyByHash(header.hash)
-                  } yield Block(header, body)
+                  yield Block(header, body)
                 }
-              blockOpt match {
+              blockOpt match
                 case Some(b) => Some(buildGBlock(c.ctx, b))
                 case None    =>
                   // Hive test 17: numeric block that doesn't exist yields "Block number N was not found".
                   throw GraphQLDataFetchingError.notFound("block", s"Block number $bn was not found")
-              }
             case (None, Some(h)) =>
-              reader.getBlockByHash(BlockHash(h)) match {
+              reader.getBlockByHash(BlockHash(h)) match
                 case Some(b) => Some(buildGBlock(c.ctx, b))
                 case None =>
                   val hex = "0x" + h.toArray.map("%02x".format(_)).mkString
                   throw GraphQLDataFetchingError.notFound("block", s"Block hash $hex was not found")
-              }
             case (None, None) =>
               reader.getBestBlock.map(b => buildGBlock(c.ctx, b))
-          }
-        }
       ),
       Field(
         "blocks",
         ListType(BlockType),
         arguments = List(FromArg, ToArg),
-        resolve = { c =>
+        resolve = c =>
           val reader = c.ctx.blockchainReader
           val best = reader.getBestBlockNumber
           val from = c.arg(FromArg).map(BigInt(_)).getOrElse(BigInt(0))
@@ -961,23 +915,22 @@ object GraphQLSchema {
           (0 until count).flatMap { i =>
             reader.getBlockByNumber(reader.getBestBranch, from + i).map(b => buildGBlock(c.ctx, b))
           }
-        }
       ),
       Field("pending", PendingType, resolve = _ => GPending),
       Field(
         "transaction",
         OptionType(TransactionType),
         arguments = List(TxHashArg),
-        resolve = { c =>
+        resolve = c =>
           val hash = c.arg(TxHashArg)
           val fut = c.ctx.ethTxService
             .getTransactionByHash(com.chipprbots.ethereum.jsonrpc.EthTxService.GetTransactionByHashRequest(hash))
             .flatMap {
               case Right(resp) =>
-                resp.txResponse match {
+                resp.txResponse match
                   case None => cats.effect.IO.pure(None)
                   case Some(tr) =>
-                    (tr.blockHash, tr.transactionIndex) match {
+                    (tr.blockHash, tr.transactionIndex) match
                       case (Some(bh), Some(idx)) =>
                         cats.effect.IO.pure(
                           c.ctx.blockchainReader.getBlockByHash(BlockHash(bh)).flatMap { b =>
@@ -988,7 +941,7 @@ object GraphQLSchema {
                         )
                       case _ =>
                         // Pending tx — compose getRawTransactionByHash in IO before the edge
-                        c.ctx.blockchainReader.getBestBlock match {
+                        c.ctx.blockchainReader.getBestBlock match
                           case None => cats.effect.IO.pure(None)
                           case Some(_) =>
                             c.ctx.ethTxService
@@ -999,20 +952,16 @@ object GraphQLSchema {
                                 case Right(r) => r.transactionResponse.map(stx => GTransaction(stx, None))
                                 case Left(_)  => None
                               }
-                        }
-                    }
-                }
               case Left(_) => cats.effect.IO.pure(None)
             }
             .unsafeToFuture()
           fut
-        }
       ),
       Field(
         "logs",
         ListType(LogType),
         arguments = List(FilterArg),
-        resolve = { c =>
+        resolve = c =>
           val m = c.arg(FilterArg)
           val fromBlock = m.get("fromBlock").flatMap(asOption[Long]).map(BigInt(_))
           val toBlock = m.get("toBlock").flatMap(asOption[Long]).map(BigInt(_))
@@ -1028,7 +977,7 @@ object GraphQLSchema {
           val from = fromBlock.getOrElse(best)
           val to = toBlock.getOrElse(best)
           val out = scala.collection.mutable.ArrayBuffer.empty[GLog]
-          if to >= from then {
+          if to >= from then
             val maxBlocks = (to - from + 1).min(MaxBlocksPerRange).toInt
             (0 until maxBlocks).foreach { i =>
               reader.getBlockByNumber(reader.getBestBranch, from + i).foreach { block =>
@@ -1038,7 +987,7 @@ object GraphQLSchema {
                 receipts.zipWithIndex.foreach { case (r, txIdx) =>
                   val stxOpt = txs.lift(txIdx)
                   r.logs.zipWithIndex.foreach { case (log, lIdx) =>
-                    if logMatches(log, addrs, topics) then {
+                    if logMatches(log, addrs, topics) then
                       stxOpt.foreach { stx =>
                         out += GLog(
                           GTransaction(stx, Some(GTxBlockInfo(block, txIdx))),
@@ -1046,15 +995,12 @@ object GraphQLSchema {
                           log
                         )
                       }
-                    }
                   }
                   baseLogIndex += r.logs.size
                 }
               }
             }
-          }
           out.toSeq
-        }
       ),
       Field(
         "gasPrice",
@@ -1121,7 +1067,7 @@ object GraphQLSchema {
         "sendRawTransaction",
         Bytes32Type,
         arguments = List(RawDataArg),
-        resolve = { c =>
+        resolve = c =>
           import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
 
           val raw = c.arg(RawDataArg)
@@ -1130,7 +1076,7 @@ object GraphQLSchema {
           // the distinction between decode/signature errors (Invalid params, -32602) and
           // per-sender validity errors (Nonce too low, -32001).
           val parsed = scala.util.Try(raw.toArray.toSignedTransactionWithSidecar).toOption
-          parsed match {
+          parsed match
             case None =>
               throw GraphQLDataFetchingError.invalidParams("sendRawTransaction")
             case Some((stx, _)) =>
@@ -1146,9 +1092,7 @@ object GraphQLSchema {
                     .getAccount(reader.getBestBranch, sender, bestNum)
                     .map(_.nonce.toBigInt)
                     .getOrElse(c.ctx.blockchainConfig.accountStartNonce.toBigInt)
-                catch {
-                  case _: MissingNodeException => c.ctx.blockchainConfig.accountStartNonce.toBigInt
-                }
+                catch case _: MissingNodeException => c.ctx.blockchainConfig.accountStartNonce.toBigInt
 
               if stx.tx.nonce < currentNonce then throw GraphQLDataFetchingError.nonceTooLow("sendRawTransaction")
 
@@ -1188,8 +1132,6 @@ object GraphQLSchema {
                     cats.effect.IO.raiseError(GraphQLDataFetchingError.invalidParams("sendRawTransaction"))
                 }
               io.unsafeToFuture()
-          }
-        }
       )
     )
   )
@@ -1203,7 +1145,6 @@ object GraphQLSchema {
     mutation = Some(MutationType),
     additionalTypes = List(AccessTupleType, WithdrawalType, SyncStateType, CallResultType)
   )
-}
 
 /** User-facing error thrown from resolvers. Sangria renders these without the stack trace and exposes the message to
   * the GraphQL client.
@@ -1222,19 +1163,17 @@ final case class GraphQLDataFetchingError(
     errorCode: Option[Int] = None,
     errorMessage: Option[String] = None
 ) extends Exception(s"Exception while fetching data (/$fieldPath) : $reason")
-    with sangria.execution.UserFacingError {
+    with sangria.execution.UserFacingError:
 
   /** Convenience: the full "Exception while fetching data (...)" message. */
   def message: String = getMessage
-}
 
-object GraphQLDataFetchingError {
+object GraphQLDataFetchingError:
 
   /** JSON-RPC error codes that hive testcases expect to flow through `extensions.errorCode`. */
-  object Codes {
+  object Codes:
     val InvalidParams: Int = -32602
     val NonceTooLow: Int = -32001
-  }
 
   /** "Invalid params" — EIP-1474 / JSON-RPC -32602. Used when the query mixes incompatible args (e.g. both `number` and
     * `hash` on `block`) or when a numeric arg is out of range.
@@ -1262,4 +1201,3 @@ object GraphQLDataFetchingError {
       errorCode = Some(Codes.NonceTooLow),
       errorMessage = Some("Nonce too low")
     )
-}

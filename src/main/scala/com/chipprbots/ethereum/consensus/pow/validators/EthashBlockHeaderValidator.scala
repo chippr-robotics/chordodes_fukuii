@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
 
 /** A block header validator for Ethash.
   */
-object EthashBlockHeaderValidator {
+object EthashBlockHeaderValidator:
   final val MaxPowCaches: Int = 2 // maximum number of epochs for which PoW cache is stored in memory
 
   case class PowCacheData(epoch: Long, cache: Array[Int], dagSize: Long)
@@ -34,13 +34,13 @@ object EthashBlockHeaderValidator {
     */
   def validateHeader(
       blockHeader: BlockHeader
-  )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] = {
+  )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
     import EthashUtils.*
 
-    def getPowCacheData(epoch: Long, seed: ByteString): PowCacheData = {
+    def getPowCacheData(epoch: Long, seed: ByteString): PowCacheData =
       var result: PowCacheData = null
       powCaches.updateAndGet { cache =>
-        cache.find(_.epoch == epoch) match {
+        cache.find(_.epoch == epoch) match
           case Some(pcd) =>
             result = pcd
             cache
@@ -49,10 +49,8 @@ object EthashBlockHeaderValidator {
               PowCacheData(epoch, cache = EthashUtils.makeCache(epoch, seed), dagSize = EthashUtils.dagSize(epoch))
             result = data
             (data :: cache).take(MaxPowCaches)
-        }
       }
       result
-    }
 
     val epoch =
       EthashUtils.epoch(blockHeader.number.toLong, blockchainConfig.forkBlockNumbers.ecip1099BlockNumber.toLong)
@@ -69,5 +67,3 @@ object EthashBlockHeaderValidator {
     if proofOfWork.mixHash == blockHeader.mixHash.value && checkDifficulty(blockHeader.difficulty.toLong, proofOfWork)
     then Right(BlockHeaderValid)
     else Left(HeaderPoWError)
-  }
-}

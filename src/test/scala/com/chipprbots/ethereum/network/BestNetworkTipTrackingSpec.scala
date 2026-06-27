@@ -30,13 +30,13 @@ import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 
 // scalastyle:off magic.number
-class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
+class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers:
 
   // ─── T1.1 ─────────────────────────────────────────────────────────────────
   "NPA bestNetworkTip" should "select the higher TD when two ETH68 peers connect" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     expectInitialSubscriptions()
 
     // peer1 with td=100, peer2 with td=200 (no block number yet — ETH68 STATUS)
@@ -49,13 +49,12 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
     peersInfoHolder ! CalibrateChainWeightNowCmd
 
     calibrationTarget.expectMsg(SyncProtocol.CalibrateChainWeightFromPeer(BigInt(200), BigInt(0)))
-  }
 
   // ─── T1.2 ─────────────────────────────────────────────────────────────────
   it should "prefer NewBlock (exact TD + blockNum) over STATUS-only TD" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     expectInitialSubscriptions()
     setupNewPeer(peer1, mkInfo(Capability.ETH68, td = BigInt(150), blockNum = 0))
 
@@ -70,10 +69,9 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
     peersInfoHolder ! CalibrateChainWeightNowCmd
 
     calibrationTarget.expectMsg(SyncProtocol.CalibrateChainWeightFromPeer(BigInt(300), BigInt(1000)))
-  }
 
   // ─── T1.3 ─────────────────────────────────────────────────────────────────
-  it should "retain bestNetworkTip after peer disconnect" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "retain bestNetworkTip after peer disconnect" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     expectInitialSubscriptions()
     setupNewPeer(peer1, mkInfo(Capability.ETH68, td = BigInt(500), blockNum = 0))
 
@@ -87,10 +85,9 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
 
     // TD must still be forwarded despite disconnect — bestNetworkTip is persistent
     calibrationTarget.expectMsg(SyncProtocol.CalibrateChainWeightFromPeer(BigInt(500), BigInt(0)))
-  }
 
   // ─── T1.4 ─────────────────────────────────────────────────────────────────
-  it should "forward sentinel (0, 0) when no peers ever connected" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "forward sentinel (0, 0) when no peers ever connected" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     expectInitialSubscriptions()
 
     peersInfoHolder ! RegisterChainWeightCalibrationTargetCmd(
@@ -99,13 +96,12 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
     peersInfoHolder ! CalibrateChainWeightNowCmd
 
     calibrationTarget.expectMsg(SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0)))
-  }
 
   // ─── T1.5 ─────────────────────────────────────────────────────────────────
   it should "forward sentinel (0, 0) for pure ETH69 network (no TD in STATUS)" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     expectInitialSubscriptions()
 
     // ETH69 peers don't carry TD in STATUS — NPA must not update bestNetworkTip for them
@@ -118,13 +114,12 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
     peersInfoHolder ! CalibrateChainWeightNowCmd
 
     calibrationTarget.expectMsg(SyncProtocol.CalibrateChainWeightFromPeer(BigInt(0), BigInt(0)))
-  }
 
   // ─── T1.6 ─────────────────────────────────────────────────────────────────
   it should "not downgrade bestNetworkTip when a lower-TD NewBlock arrives" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     expectInitialSubscriptions()
     setupNewPeer(peer1, mkInfo(Capability.ETH68, td = BigInt(1000), blockNum = BigInt(5000)))
 
@@ -144,11 +139,10 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
     peersInfoHolder ! CalibrateChainWeightNowCmd
 
     calibrationTarget.expectMsg(SyncProtocol.CalibrateChainWeightFromPeer(BigInt(1500), BigInt(5000)))
-  }
 
   // ─── Test setup ───────────────────────────────────────────────────────────
 
-  trait TestSetup extends EphemBlockchainTestSetup {
+  trait TestSetup extends EphemBlockchainTestSetup:
     implicit override lazy val classicSystem: ActorSystem = ActorSystem("BestNetworkTipTrackingSpec_System")
 
     blockchainWriter.storeBlockHeader(Fixtures.Blocks.Genesis.header).commit()
@@ -192,7 +186,7 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
         nodeId = Some(fakeNodeId)
       )
 
-    def mkInfo(cap: Capability, td: BigInt, blockNum: BigInt): PeerInfo = {
+    def mkInfo(cap: Capability, td: BigInt, blockNum: BigInt): PeerInfo =
       val status = RemoteStatus(
         capability = cap,
         networkId = 1,
@@ -207,9 +201,8 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
         maxBlockNumber = blockNum,
         bestBlockHash = status.bestHash
       )
-    }
 
-    def setupNewPeer(peer: Peer, info: PeerInfo): Unit = {
+    def setupNewPeer(peer: Peer, info: PeerInfo): Unit =
       peersInfoHolder ! PeerEventCmd(PeerHandshakeSuccessful(peer, info))
       // Each peer generates two peerEventBus Subscribe messages:
       //   1. PeerDisconnectedClassifier — so NPA can observe this peer's disconnect
@@ -218,9 +211,8 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
       peerEventBus.expectMsgType[SubscribeCmd] // per-peer MessageClassifier
       // ETH68 non-genesis peers also fire a GetBlockHeaders probe via peerManager.
       // We use bestHash == genesisHash in mkInfo so no probe fires; nothing to drain here.
-    }
 
-    def expectInitialSubscriptions(): Unit = {
+    def expectInitialSubscriptions(): Unit =
       peerEventBus.expectMsgType[SubscribeCmd].to shouldBe PeerHandshaked
       peerEventBus.expectMsgType[SubscribeCmd].to shouldBe MessageClassifier(
         Set(
@@ -231,7 +223,4 @@ class BestNetworkTipTrackingSpec extends AnyFlatSpec with Matchers {
         ),
         PeerSelector.AllPeers
       )
-    }
-  }
-}
 // scalastyle:on magic.number

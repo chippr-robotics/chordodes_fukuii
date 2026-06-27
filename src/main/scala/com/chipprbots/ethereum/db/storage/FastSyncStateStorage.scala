@@ -18,14 +18,11 @@ import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
 import com.chipprbots.ethereum.utils.ByteUtils.compactPickledBytes
 
-object FastSyncStateStorage {
+object FastSyncStateStorage:
 
   val syncStateKey: String = "fast-sync-state"
 
-}
-
-class FastSyncStateStorage(val dataSource: DataSource)
-    extends KeyValueStorage[String, SyncState, FastSyncStateStorage] {
+class FastSyncStateStorage(val dataSource: DataSource) extends KeyValueStorage[String, SyncState, FastSyncStateStorage]:
   type T = FastSyncStateStorage
 
   import FastSyncStateStorage.*
@@ -74,5 +71,3 @@ class FastSyncStateStorage(val dataSource: DataSource)
   def getSyncState(): Option[SyncState] = get(syncStateKey)
 
   def purge(): FastSyncStateStorage = remove(syncStateKey)
-
-}

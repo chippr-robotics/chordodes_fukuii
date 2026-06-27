@@ -36,7 +36,7 @@ import com.chipprbots.ethereum.transactions.TransactionHistoryService.ExtendedTr
 import com.chipprbots.ethereum.transactions.TransactionHistoryService.MinedTransactionData
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
-class FukuiiServiceSpec extends ScalaTestWithActorTestKit with FreeSpecBase with SpecFixtures {
+class FukuiiServiceSpec extends ScalaTestWithActorTestKit with FreeSpecBase with SpecFixtures:
 
   implicit private val classicActorSystem: ActorSystem = system.toClassic
 
@@ -48,7 +48,7 @@ class FukuiiServiceSpec extends ScalaTestWithActorTestKit with FreeSpecBase with
       with FukuiiServiceBuilder
       with JSONRpcConfigBuilder
       with ApisBuilder
-      with SyncControllerRefBuilder {
+      with SyncControllerRefBuilder:
     lazy val pendingTransactionsManagerProbe: TestProbe = TestProbe()
     override lazy val pendingTransactionsManager: org.apache.pekko.actor.typed.ActorRef[
       com.chipprbots.ethereum.transactions.PendingTransactionsManager.Command
@@ -66,12 +66,11 @@ class FukuiiServiceSpec extends ScalaTestWithActorTestKit with FreeSpecBase with
       syncController,
       classicActorSystem.toTyped.scheduler
     )
-  }
   def createFixture() = new Fixture
 
   "Fukuii Service" - {
     "should get account's transaction history" in {
-      class TxHistoryFixture extends Fixture {
+      class TxHistoryFixture extends Fixture:
         val fakeTransaction: SignedTransactionWithSender = SignedTransactionWithSender(
           LegacyTransaction(
             nonce = 0,
@@ -102,13 +101,11 @@ class FukuiiServiceSpec extends ScalaTestWithActorTestKit with FreeSpecBase with
             pendingTransactionsManager,
             txPoolConfig.getTransactionFromPoolTimeout,
             classicActorSystem.toTyped.scheduler
-          ) {
+          ):
             override def getAccountTransactions(account: Address, fromBlocks: NumericRange[BigInt])(implicit
                 blockchainConfig: BlockchainConfig
             ): IO[List[ExtendedTransactionData]] =
               IO.pure(expectedResponse)
-          }
-      }
 
       customTestCaseM(new TxHistoryFixture) { fixture =>
         import fixture.*
@@ -129,4 +126,3 @@ class FukuiiServiceSpec extends ScalaTestWithActorTestKit with FreeSpecBase with
         .map(result => assert(result.isLeft))
     }
   }
-}

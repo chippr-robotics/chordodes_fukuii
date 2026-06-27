@@ -25,10 +25,10 @@ import com.chipprbots.ethereum.transactions.TransactionHistoryService.ExtendedTr
 import com.chipprbots.ethereum.transactions.TransactionHistoryService.MinedTransactionData
 import com.chipprbots.ethereum.utils.Config
 
-class FukuiiJRCSpec extends FreeSpecBase with SpecFixtures with AsyncMockFactory with JRCMatchers {
+class FukuiiJRCSpec extends FreeSpecBase with SpecFixtures with AsyncMockFactory with JRCMatchers:
   import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers.formats
 
-  class Fixture extends ApisBuilder {
+  class Fixture extends ApisBuilder:
     def config: JsonRpcConfig = JsonRpcConfig(Config.config, available)
 
     val web3Service: Web3Service = mock[Web3Service]
@@ -94,7 +94,6 @@ class FukuiiJRCSpec extends FreeSpecBase with SpecFixtures with AsyncMockFactory
         testSystem
       )
 
-  }
   def createFixture() = new Fixture
 
   "Fukuii JRC" - {
@@ -167,9 +166,7 @@ class FukuiiJRCSpec extends FreeSpecBase with SpecFixtures with AsyncMockFactory
         )
       )
 
-      for {
-        response <- jsonRpcController.handleRequest(request)
-      } yield response should haveObjectResult("transactions" -> JArray(expectedTxs.toList))
+      for response <- jsonRpcController.handleRequest(request)
+      yield response should haveObjectResult("transactions" -> JArray(expectedTxs.toList))
     }
   }
-}

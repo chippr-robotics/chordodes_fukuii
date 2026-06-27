@@ -1,8 +1,8 @@
 package com.chipprbots.ethereum.utils
 import org.scalacheck.Gen
 
-object GenOps {
-  implicit class GenOps[T](gen: Gen[T]) {
+object GenOps:
+  implicit class GenOps[T](gen: Gen[T]):
     def pickValue: T =
       Iterator
         .continually(gen)
@@ -11,5 +11,3 @@ object GenOps {
           value
         }
         .get
-  }
-}

@@ -34,7 +34,7 @@ import com.chipprbots.ethereum.utils.Config
   *     SyncController for a recent root and, on receiving one, sends `StoragePivotRefreshed` to the coordinator instead
   *     of abandoning — so the resync can't get permanently wedged on a stale pivot. Bounded + falls back to abandon.
   */
-class StorageRecoveryActorSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers with Eventually {
+class StorageRecoveryActorSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers with Eventually:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
@@ -49,7 +49,7 @@ class StorageRecoveryActorSpec extends ScalaTestWithActorTestKit() with AnyFlatS
   private def pivotUnservable(): StorageRecoveryActor.PivotUnservable =
     StorageRecoveryActor.PivotUnservable(fakeStateRoot, "test", 0)
 
-  private def newStorages(): (StateStorage, AppStateStorage, FlatSlotStorage) = {
+  private def newStorages(): (StateStorage, AppStateStorage, FlatSlotStorage) =
     val ds = EphemDataSource()
     val nodeStorage = new NodeStorage(ds)
     val appStateStorage = new AppStateStorage(ds)
@@ -63,7 +63,6 @@ class StorageRecoveryActorSpec extends ScalaTestWithActorTestKit() with AnyFlatS
       )
     )
     (stateStorage, appStateStorage, flatSlots)
-  }
 
   /** Spin up a recovery actor already in its `downloading` state (via the preloaded-missing hook), wired to the given
     * probes. Returns the actor plus the storages so the test can assert the done-flag.
@@ -74,7 +73,7 @@ class StorageRecoveryActorSpec extends ScalaTestWithActorTestKit() with AnyFlatS
       coordinator: TestProbe,
       abandonAfter: FiniteDuration,
       maxRolls: Int = 8
-  ): (org.apache.pekko.actor.typed.ActorRef[StorageRecoveryActor.Command], AppStateStorage) = {
+  ): (org.apache.pekko.actor.typed.ActorRef[StorageRecoveryActor.Command], AppStateStorage) =
     val networkPeerManager = TestProbe(s"npm_$testLabel")
     val (stateStorage, appStateStorage, flatSlots) = newStorages()
     val actor = testKit
@@ -96,7 +95,6 @@ class StorageRecoveryActorSpec extends ScalaTestWithActorTestKit() with AnyFlatS
     // The actor enters `downloading` and immediately hands the missing list to the coordinator.
     coordinator.expectMsgType[actors.StorageRangeCoordinator.AddStorageTasks](2.seconds)
     (actor, appStateStorage)
-  }
 
   "StorageRecoveryActor" should
     "abandon and commit recovery-done after PivotStateUnservable when no recent root is available" taggedAs (
@@ -206,4 +204,3 @@ class StorageRecoveryActorSpec extends ScalaTestWithActorTestKit() with AnyFlatS
     appStateStorage.isStorageRecoveryDone() shouldBe false
     testKit.stop(actor)
   }
-}

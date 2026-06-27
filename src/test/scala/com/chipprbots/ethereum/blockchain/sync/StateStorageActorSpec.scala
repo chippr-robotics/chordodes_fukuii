@@ -21,7 +21,7 @@ class StateStorageActorSpec
     with BeforeAndAfterAll
     with Matchers
     with Eventually
-    with NormalPatience {
+    with NormalPatience:
 
   private val testKit = ActorTestKit("FastSyncStateActorSpec_System")
 
@@ -45,4 +45,3 @@ class StateStorageActorSpec
       probe.expectMessage(Some(expected))
     }
   }
-}

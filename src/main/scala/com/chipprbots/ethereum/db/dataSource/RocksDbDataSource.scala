@@ -27,7 +27,7 @@ class RocksDbDataSource(
     private var handles: Map[Namespace, ColumnFamilyHandle],
     private var statistics: Option[Statistics] = None
 ) extends DataSource
-    with Logger {
+    with Logger:
 
   @volatile
   private var isClosed = false
@@ -60,13 +60,13 @@ class RocksDbDataSource(
     * @return
     *   the value associated with the passed key.
     */
-  override def get(namespace: Namespace, key: Key): Option[Value] = {
+  override def get(namespace: Namespace, key: Key): Option[Value] =
     dbLock.readLock().lock()
-    try {
+    try
       assureNotClosed()
       val byteArray = db.get(handles(namespace), readOptions, key.toArray)
       Option(ArraySeq.unsafeWrapArray(byteArray))
-    } catch {
+    catch
       case error: RocksDbDataSourceClosedException =>
         throw error
       case NonFatal(error) =>
@@ -74,8 +74,7 @@ class RocksDbDataSource(
           s"Not found associated value to a namespace: $namespace and a key: $key",
           error
         )
-    } finally dbLock.readLock().unlock()
-  }
+    finally dbLock.readLock().unlock()
 
   /** This function obtains the associated value to a key, if there exists one. It assumes that caller already properly
     * serialized key. Useful when caller knows some pattern in data to avoid generic serialization.
@@ -85,38 +84,36 @@ class RocksDbDataSource(
     * @return
     *   the value associated with the passed key.
     */
-  override def getOptimized(namespace: Namespace, key: Array[Byte]): Option[Array[Byte]] = {
+  override def getOptimized(namespace: Namespace, key: Array[Byte]): Option[Array[Byte]] =
     dbLock.readLock().lock()
-    try {
+    try
       assureNotClosed()
       Option(db.get(handles(namespace), readOptions, key))
-    } catch {
+    catch
       case error: RocksDbDataSourceClosedException =>
         throw error
       case NonFatal(error) =>
         throw RocksDbDataSourceException(s"Not found associated value to a key: $key", error)
-    } finally dbLock.readLock().unlock()
-  }
+    finally dbLock.readLock().unlock()
 
   /** Batch point-lookup via a single JNI call. Amortises per-call overhead and bloom-filter evaluation across the
     * batch; up to 16 keys per branch node in the healing DFS. Null entries in the result list indicate a cache miss.
     */
-  override def multiGetOptimized(namespace: Namespace, keys: Seq[Array[Byte]]): Seq[Option[Array[Byte]]] = {
+  override def multiGetOptimized(namespace: Namespace, keys: Seq[Array[Byte]]): Seq[Option[Array[Byte]]] =
     if keys.isEmpty then return Seq.empty
     import scala.jdk.CollectionConverters.*
     dbLock.readLock().lock()
-    try {
+    try
       assureNotClosed()
       val handle = handles(namespace)
       val cfList = java.util.Collections.nCopies(keys.size, handle)
       val keyList = keys.asJava
       db.multiGetAsList(cfList, keyList).asScala.map(Option(_)).toSeq
-    } catch {
+    catch
       case error: RocksDbDataSourceClosedException => throw error
       case NonFatal(error) =>
         throw RocksDbDataSourceException(s"multiGetOptimized failed for namespace $namespace", error)
-    } finally dbLock.readLock().unlock()
-  }
+    finally dbLock.readLock().unlock()
 
   override def update(dataSourceUpdates: Seq[DataUpdate]): Unit =
     doWrite(dataSourceUpdates, sync = false)
@@ -128,20 +125,19 @@ class RocksDbDataSource(
   override def updateSync(dataSourceUpdates: Seq[DataUpdate]): Unit =
     doWrite(dataSourceUpdates, sync = true)
 
-  override def deleteRange(namespace: Namespace, fromKey: Array[Byte], toKeyExclusive: Array[Byte]): Unit = {
+  override def deleteRange(namespace: Namespace, fromKey: Array[Byte], toKeyExclusive: Array[Byte]): Unit =
     dbLock.writeLock().lock()
-    try {
+    try
       assureNotClosed()
       // One native range tombstone for the whole interval — O(1) write, lazily reclaimed by
       // compaction. Never expand a range into per-key deletes here (see DataSource.deleteRange).
       db.deleteRange(handles(namespace), fromKey, toKeyExclusive)
-    } catch {
+    catch
       case error: RocksDbDataSourceClosedException =>
         throw error
       case NonFatal(error) =>
         throw RocksDbDataSourceException(s"DataSource error while deleting range", error)
-    } finally dbLock.writeLock().unlock()
-  }
+    finally dbLock.writeLock().unlock()
 
   /** Forward range scan via a single seek+next over a bounded `[fromKey, toKeyExclusive)` window. Uses
     * `scanReadOptions` (fillCache=false) so a large queue scan does not evict the hot block cache. Drains the window
@@ -153,30 +149,28 @@ class RocksDbDataSource(
       namespace: Namespace,
       fromKey: Array[Byte],
       toKeyExclusive: Array[Byte]
-  ): Iterator[(Array[Byte], Array[Byte])] = {
+  ): Iterator[(Array[Byte], Array[Byte])] =
     dbLock.readLock().lock()
-    try {
+    try
       assureNotClosed()
       val it = db.newIterator(handles(namespace), scanReadOptions)
-      try {
+      try
         val buf = scala.collection.mutable.ArrayBuffer.empty[(Array[Byte], Array[Byte])]
         it.seek(fromKey)
-        while it.isValid && java.util.Arrays.compareUnsigned(it.key(), toKeyExclusive) < 0 do {
+        while it.isValid && java.util.Arrays.compareUnsigned(it.key(), toKeyExclusive) < 0 do
           buf += ((it.key(), it.value()))
           it.next()
-        }
         buf.iterator
-      } finally it.close()
-    } catch {
+      finally it.close()
+    catch
       case error: RocksDbDataSourceClosedException => throw error
       case NonFatal(error) =>
         throw RocksDbDataSourceException(s"scanRange failed for namespace $namespace", error)
-    } finally dbLock.readLock().unlock()
-  }
+    finally dbLock.readLock().unlock()
 
-  private def doWrite(dataSourceUpdates: Seq[DataUpdate], sync: Boolean): Unit = {
+  private def doWrite(dataSourceUpdates: Seq[DataUpdate], sync: Boolean): Unit =
     dbLock.writeLock().lock()
-    try {
+    try
       assureNotClosed()
       withResources(new WriteOptions().setSync(sync)) { writeOptions =>
         withResources(new WriteBatch()) { batch =>
@@ -196,24 +190,22 @@ class RocksDbDataSource(
           db.write(writeOptions, batch)
         }
       }
-    } catch {
+    catch
       case error: RocksDbDataSourceClosedException =>
         throw error
       case NonFatal(error) =>
         throw RocksDbDataSourceException(s"DataSource not updated", error)
-    } finally dbLock.writeLock().unlock()
-  }
+    finally dbLock.writeLock().unlock()
 
   /** ReadOptions for range scans with fillCache=false to avoid polluting the block cache. Mirrors Besu's
     * BonsaiWorldStateKeyValueStorage tailing iterator behaviour for flat DB walks. Regular point reads use the default
     * readOptions with cache enabled.
     */
-  private lazy val scanReadOptions: ReadOptions = {
+  private lazy val scanReadOptions: ReadOptions =
     val opts = new ReadOptions()
     opts.setVerifyChecksums(rocksDbConfig.verifyChecksums)
     opts.setFillCache(false)
     opts
-  }
 
   /** Seek-based range scan starting from startKey (inclusive). Uses fillCache=false to avoid evicting hot data from the
     * block cache during large sequential scans (mirrors Besu's streamFromKey pattern).
@@ -224,7 +216,7 @@ class RocksDbDataSource(
   def seekFrom(
       namespace: Namespace,
       startKey: Array[Byte]
-  ): Stream[IO, Either[IterationError, (Array[Byte], Array[Byte])]] = {
+  ): Stream[IO, Either[IterationError, (Array[Byte], Array[Byte])]] =
     val iterResource = Resource.fromAutoCloseable(
       IO(db.newIterator(handles(namespace), scanReadOptions))
     )
@@ -232,18 +224,17 @@ class RocksDbDataSource(
       Stream
         .eval(IO(it.seek(startKey)))
         .flatMap { _ =>
-          Stream.repeatEval(for {
+          Stream.repeatEval(for
             isValid <- IO(it.isValid)
             item <- if isValid then IO(Right((it.key(), it.value()))) else IO.raiseError(IterationFinished)
             _ <- IO(it.next())
-          } yield item)
+          yield item)
         }
         .handleErrorWith {
           case IterationFinished => Stream.empty
           case ex                => Stream.emit(Left(IterationError(ex)))
         }
     }
-  }
 
   /** Synchronous forward scan of values in [fromKey, toKeyExcl) within namespace.
     *
@@ -276,7 +267,7 @@ class RocksDbDataSource(
       fromKey: Array[Byte],
       toKeyExcl: Array[Byte]
   ): Iterator[Array[Byte]] =
-    new Iterator[Array[Byte]] {
+    new Iterator[Array[Byte]]:
       // Bounds per-batch memory independently of total range size, preserving the O(chunk) laziness contract.
       private val refillBatchSize = 4096
       private val buffer = scala.collection.mutable.ArrayDeque.empty[Array[Byte]]
@@ -289,46 +280,40 @@ class RocksDbDataSource(
         * close it. Mirrors `scanRange`: readLock + assureNotClosed for the whole batch, native iterator closed in a
         * `finally`, read lock released in a `finally`. Sets `exhausted` when the batch ends the range.
         */
-      private def refill(): Unit = {
+      private def refill(): Unit =
         dbLock.readLock().lock()
-        try {
+        try
           assureNotClosed()
           val it = db.newIterator(handles(namespace), scanReadOptions)
-          try {
+          try
             if lastKey == null then it.seek(fromKey)
-            else {
+            else
               // Resume strictly after the last key returned. Keys are unique, so seek+skip is exact.
               it.seek(lastKey)
               if it.isValid && java.util.Arrays.equals(it.key(), lastKey) then it.next()
-            }
             var taken = 0
             while taken < refillBatchSize && it.isValid && java.util.Arrays.compareUnsigned(it.key(), toKeyExcl) < 0
-            do {
+            do
               lastKey = it.key()
               buffer += it.value()
               it.next()
               taken += 1
-            }
             // End of range reached within this batch (either no more valid keys or the next key is >= toKeyExcl).
             if taken < refillBatchSize then exhausted = true
-          } finally it.close()
-        } catch {
+          finally it.close()
+        catch
           case error: RocksDbDataSourceClosedException => throw error
           case NonFatal(error) =>
             throw RocksDbDataSourceException(s"iterateSyncRange failed for namespace $namespace", error)
-        } finally dbLock.readLock().unlock()
-      }
+        finally dbLock.readLock().unlock()
 
-      def hasNext: Boolean = {
+      def hasNext: Boolean =
         if buffer.isEmpty && !exhausted then refill()
         buffer.nonEmpty
-      }
 
-      def next(): Array[Byte] = {
+      def next(): Array[Byte] =
         if !hasNext then throw new NoSuchElementException("iterateSyncRange exhausted")
         buffer.removeHead()
-      }
-    }
 
   private def dbIterator: Resource[IO, RocksIterator] =
     Resource.fromAutoCloseable(IO(db.newIterator()))
@@ -340,11 +325,11 @@ class RocksDbDataSource(
     Stream
       .eval(IO(it.seekToFirst()))
       .flatMap { _ =>
-        Stream.repeatEval(for {
+        Stream.repeatEval(for
           isValid <- IO(it.isValid)
           item <- if isValid then IO(Right((it.key(), it.value()))) else IO.raiseError(IterationFinished)
           _ <- IO(it.next())
-        } yield item)
+        yield item)
       }
       .handleErrorWith {
         case IterationFinished => Stream.empty
@@ -360,7 +345,7 @@ class RocksDbDataSource(
   /** This function is used only for tests. This function updates the DataSource by deleting all the (key-value) pairs
     * in it.
     */
-  override def clear(): Unit = {
+  override def clear(): Unit =
     destroy()
     log.debug(s"About to create new DataSource for path: ${rocksDbConfig.path}")
     val (newDb, handles, readOptions, dbOptions, cfOptions, statistics) = createDB(rocksDbConfig, nameSpaces.tail)
@@ -374,7 +359,6 @@ class RocksDbDataSource(
     this.cfOptions = cfOptions
     this.statistics = statistics
     this.isClosed = false
-  }
 
   def approximateKeyCount(namespace: Namespace): Long =
     handles
@@ -394,10 +378,10 @@ class RocksDbDataSource(
     * DataSource — specifically `DefaultStorages` or any test fixture that calls `dataSource.clear()` while holding a
     * `CachedNodeStorage` over the same source. See M4 note in `storage-rocksdb.md` for the full rationale.
     */
-  override def close(): Unit = {
+  override def close(): Unit =
     log.info(s"About to close DataSource in path: ${rocksDbConfig.path}")
     dbLock.writeLock().lock()
-    try {
+    try
       assureNotClosed()
       isClosed = true
       // There is specific order for closing rocksdb with column families descibed in
@@ -414,26 +398,23 @@ class RocksDbDataSource(
       statistics.foreach(_.close())
       statistics = None
       log.info(s"DataSource closed successfully in the path: ${rocksDbConfig.path}")
-    } catch {
+    catch
       case error: RocksDbDataSourceClosedException =>
         throw error
       case NonFatal(error) =>
         throw RocksDbDataSourceException(s"Not closed the DataSource properly", error)
-    } finally dbLock.writeLock().unlock()
-  }
+    finally dbLock.writeLock().unlock()
 
   /** This function is used only for tests. This function closes the DataSource, if it is not yet closed, and deletes
     * all the files used by it.
     */
   override def destroy(): Unit =
     try
-      if !isClosed then {
-        close()
-      }
+      if !isClosed then close()
     finally destroyDB()
 
   protected def destroyDB(): Unit =
-    try {
+    try
       import rocksDbConfig.*
       val tableCfg = new BlockBasedTableConfig()
         .setBlockSize(blockSize)
@@ -455,19 +436,14 @@ class RocksDbDataSource(
       log.debug(s"About to destroy DataSource in path: $path")
       RocksDB.destroyDB(path, options)
       options.close()
-    } catch {
+    catch
       case NonFatal(error) =>
         throw RocksDbDataSourceException(s"Not destroyed the DataSource properly", error)
-    }
 
   private def assureNotClosed(): Unit =
-    if isClosed then {
-      throw RocksDbDataSourceClosedException(s"This ${getClass.getSimpleName} has been closed")
-    }
+    if isClosed then throw RocksDbDataSourceClosedException(s"This ${getClass.getSimpleName} has been closed")
 
-}
-
-trait RocksDbConfig {
+trait RocksDbConfig:
   val createIfMissing: Boolean
   val paranoidChecks: Boolean
   val path: String
@@ -488,9 +464,8 @@ trait RocksDbConfig {
   // existing implementors (tests, alternate configs) compile unchanged; statistics add ~1-2% read overhead
   // and are only worth enabling to diagnose a slow heal walk.
   val enableStatistics: Boolean = false
-}
 
-object RocksDbDataSource extends Logger {
+object RocksDbDataSource extends Logger:
   case object IterationFinished extends RuntimeException
   case class IterationError(ex: Throwable)
 
@@ -498,22 +473,19 @@ object RocksDbDataSource extends Logger {
   case class RocksDbDataSourceException(message: String, cause: Throwable) extends RuntimeException(message, cause)
 
   // Helper to create exception without cause
-  object RocksDbDataSourceException {
+  object RocksDbDataSourceException:
     def apply(message: String): RocksDbDataSourceException =
       new RocksDbDataSourceException(message, null)
-  }
 
   // Load RocksDB native library once per JVM
   private lazy val libraryLoaded: Unit =
-    try
-      RocksDB.loadLibrary()
-    catch {
+    try RocksDB.loadLibrary()
+    catch
       case NonFatal(error) =>
         throw RocksDbDataSourceException(
           s"Failed to load RocksDB native library. Ensure rocksdbjni is in classpath and native libraries are accessible: ${error.getMessage}",
           error
         )
-    }
 
   /** The rocksdb implementation acquires a lock from the operating system to prevent misuse
     */
@@ -523,7 +495,7 @@ object RocksDbDataSource extends Logger {
   private def createDB(
       rocksDbConfig: RocksDbConfig,
       namespaces: Seq[Namespace]
-  ): (RocksDB, mutable.Buffer[ColumnFamilyHandle], ReadOptions, DBOptions, ColumnFamilyOptions, Option[Statistics]) = {
+  ): (RocksDB, mutable.Buffer[ColumnFamilyHandle], ReadOptions, DBOptions, ColumnFamilyOptions, Option[Statistics]) =
     import rocksDbConfig.*
     import scala.jdk.CollectionConverters.*
     import java.nio.file.{Files, Paths, Path as JPath}
@@ -532,7 +504,7 @@ object RocksDbDataSource extends Logger {
     libraryLoaded
 
     RocksDbDataSource.dbLock.writeLock().lock()
-    try {
+    try
       // Validate and prepare database path
       val dbPath: JPath = Paths.get(path)
       val pathExists = Files.exists(dbPath)
@@ -540,25 +512,22 @@ object RocksDbDataSource extends Logger {
       log.debug(s"Initializing RocksDB at path: $path (exists: $pathExists, createIfMissing: $createIfMissing)")
 
       // Validate path before attempting to open database
-      if !pathExists && !createIfMissing then {
+      if !pathExists && !createIfMissing then
         throw RocksDbDataSourceException(
           s"Database path does not exist and createIfMissing is false: $path"
         )
-      }
 
       // Create directory if needed
-      if !pathExists && createIfMissing then {
-        try {
+      if !pathExists && createIfMissing then
+        try
           Files.createDirectories(dbPath)
           log.debug(s"Created database directory: $path")
-        } catch {
+        catch
           case NonFatal(error) =>
             throw RocksDbDataSourceException(
               s"Failed to create database directory at $path: ${error.getMessage}",
               error
             )
-        }
-      }
 
       val readOptions = new ReadOptions().setVerifyChecksums(rocksDbConfig.verifyChecksums)
 
@@ -590,12 +559,12 @@ object RocksDbDataSource extends Logger {
       // become observable. Off by default (~1-2% read overhead). The handle is returned so close()
       // can release it. EXCEPT_DETAILED_TIMERS keeps the cheaper tickers without the per-op histograms.
       val statistics: Option[Statistics] =
-        if rocksDbConfig.enableStatistics then {
+        if rocksDbConfig.enableStatistics then
           val stats = new Statistics()
           stats.setStatsLevel(StatsLevel.EXCEPT_DETAILED_TIMERS)
           options.setStatistics(stats)
           Some(stats)
-        } else None
+        else None
 
       val cfOpts =
         new ColumnFamilyOptions()
@@ -614,9 +583,8 @@ object RocksDbDataSource extends Logger {
       log.debug(s"Opening RocksDB with ${cfDescriptors.size} column families at path: $path")
 
       val db =
-        try
-          RocksDB.open(options, path, cfDescriptors.asJava, columnFamilyHandleList.asJava)
-        catch {
+        try RocksDB.open(options, path, cfDescriptors.asJava, columnFamilyHandleList.asJava)
+        catch
           case error: RocksDBException =>
             throw RocksDbDataSourceException(
               s"RocksDB failed to open database at path: $path - ${error.getMessage}",
@@ -627,7 +595,6 @@ object RocksDbDataSource extends Logger {
               s"Unexpected error opening RocksDB at path: $path - ${error.getMessage}",
               error
             )
-        }
 
       log.info(s"Successfully opened RocksDB at path: $path with ${columnFamilyHandleList.size} column family handles")
 
@@ -639,7 +606,7 @@ object RocksDbDataSource extends Logger {
         cfOpts,
         statistics
       )
-    } catch {
+    catch
       case error: RocksDbDataSourceException =>
         // Re-throw our exception without additional logging (caller will log if needed)
         throw error
@@ -647,10 +614,9 @@ object RocksDbDataSource extends Logger {
         val errorMsg = s"Unexpected error creating RocksDB DataSource at path: $path - ${error.getMessage}"
         log.error(errorMsg, error)
         throw RocksDbDataSourceException(errorMsg, error)
-    } finally RocksDbDataSource.dbLock.writeLock().unlock()
-  }
+    finally RocksDbDataSource.dbLock.writeLock().unlock()
 
-  def apply(rocksDbConfig: RocksDbConfig, namespaces: Seq[Namespace]): RocksDbDataSource = {
+  def apply(rocksDbConfig: RocksDbConfig, namespaces: Seq[Namespace]): RocksDbDataSource =
     val allNameSpaces = Seq(RocksDB.DEFAULT_COLUMN_FAMILY.toIndexedSeq) ++ namespaces
     val (db, handles, readOptions, dbOptions, cfOptions, statistics) = createDB(rocksDbConfig, namespaces)
     assert(allNameSpaces.size == handles.size)
@@ -658,5 +624,3 @@ object RocksDbDataSource extends Logger {
     // This assert ensures that we do not have duplicated namespaces
     assert(handlesMap.size == handles.size)
     new RocksDbDataSource(db, rocksDbConfig, readOptions, dbOptions, cfOptions, allNameSpaces, handlesMap, statistics)
-  }
-}

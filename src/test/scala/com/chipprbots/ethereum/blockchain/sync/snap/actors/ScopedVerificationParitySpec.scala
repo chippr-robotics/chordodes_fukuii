@@ -40,39 +40,35 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   * never recomputes or rewrites the state root — it is a pure local read — so the only observable is the marker + the
   * signal, which must match across the config flip.
   */
-class ScopedVerificationParitySpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers {
+class ScopedVerificationParitySpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
 
-  private def gaugeValue(name: String): Double = {
+  private def gaugeValue(name: String): Double =
     val gauge = Metrics.get().registry.find(name).gauge()
     if gauge == null then Double.NaN else gauge.value()
-  }
 
   /** A present, complete root: a childless leaf in storage so a FULL-ROOT verification walk from it finds 0 missing and
     * completes. Returns (rootHash, storage-with-root).
     */
-  private def storedRoot(storage: TestMptStorage): ByteString = {
+  private def storedRoot(storage: TestMptStorage): ByteString =
     val leaf = LeafNode(ByteString(Array[Byte](0x01)), ByteString(Array[Byte](0x02)))
     storage.putNode(leaf)
     ByteString(leaf.hash)
-  }
 
   /** A clean storage-trie leaf to heal (no children). Returns (pathset, hash, encoded). */
-  private def cleanLeaf(seed: Int): (Seq[ByteString], ByteString, ByteString) = {
+  private def cleanLeaf(seed: Int): (Seq[ByteString], ByteString, ByteString) =
     val leaf = LeafNode(ByteString(Array[Byte](0x01)), ByteString(kec256(ByteString(s"parity-leaf-$seed")).toArray))
     val encoded = MptTraversals.encodeNode(leaf)
     val hash = kec256(ByteString(encoded))
     val accountHash = kec256(ByteString(s"parity-account-$seed"))
     (Seq(accountHash, ByteString(Array[Byte](0x20, seed.toByte))), hash, ByteString(encoded))
-  }
 
-  private def deleteRecursively(f: File): Unit = {
+  private def deleteRecursively(f: File): Unit =
     Option(f.listFiles()).foreach(_.foreach(deleteRecursively))
     f.delete()
     ()
-  }
 
   private def awaitStateHealingComplete(
       controller: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
@@ -86,12 +82,12 @@ class ScopedVerificationParitySpec extends ScalaTestWithActorTestKit() with AnyF
   /** Drive the same healed state to completion with the given `scopedHealVerification` setting; return the marker bytes
     * observed via `isComplete` after completion (true ⇒ the 0x01 sentinel is present at the CF `g` key).
     */
-  private def runToCompletion(scoped: Boolean): Boolean = {
+  private def runToCompletion(scoped: Boolean): Boolean =
     val pool = Executors.newSingleThreadExecutor()
     val ec = ExecutionContext.fromExecutorService(pool)
     val dbPath = Files.createTempDirectory("scoped-parity-rocksdb").toAbsolutePath.toString
     val dataSource = RocksDbDataSource(
-      new RocksDbConfig {
+      new RocksDbConfig:
         override val createIfMissing: Boolean = true
         override val paranoidChecks: Boolean = true
         override val path: String = dbPath
@@ -101,7 +97,7 @@ class ScopedVerificationParitySpec extends ScalaTestWithActorTestKit() with AnyF
         override val levelCompaction: Boolean = true
         override val blockSize: Long = 16384
         override val blockCacheSize: Long = 33554432
-      },
+      ,
       Namespaces.nsSeq
     )
     val store = new HealingFrontierStorage(dataSource)
@@ -122,7 +118,7 @@ class ScopedVerificationParitySpec extends ScalaTestWithActorTestKit() with AnyF
       healingWriterEcOverride = Some(ec),
       scopedHealVerification = scoped
     )
-    try {
+    try
       val peer = PeerTestHelpers.createTestPeer(s"parity-peer-$scoped", testKit.createTestProbe[Any]().ref.toClassic)
       coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
       coordinator ! TrieNodeHealingCoordinator.HealingPeerAvailable(peer)
@@ -136,14 +132,12 @@ class ScopedVerificationParitySpec extends ScalaTestWithActorTestKit() with AnyF
       // The state root is unchanged by verification (a pure local read); assert the invariant explicitly.
       root shouldBe storedRoot(new TestMptStorage())
       store.isComplete
-    } finally {
+    finally
       testKit.stop(coordinator)
       pool.shutdown()
       pool.awaitTermination(5, TimeUnit.SECONDS)
       dataSource.destroy()
       deleteRecursively(new File(dbPath))
-    }
-  }
 
   "Scoped vs full-root completion" should
     "reach an identical completion (StateHealingComplete + marker set) under both config settings (FR-007)" taggedAs UnitTest in {
@@ -155,4 +149,3 @@ class ScopedVerificationParitySpec extends ScalaTestWithActorTestKit() with AnyF
       fullRootMarker shouldBe true
       scopedMarker shouldBe fullRootMarker
     }
-}

@@ -16,14 +16,13 @@ import com.chipprbots.ethereum.security.SecureRandomBuilder
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.ByteUtils
 
-class AuthInitiateMessageSpec extends AnyFlatSpec with Matchers with SecureRandomBuilder {
+class AuthInitiateMessageSpec extends AnyFlatSpec with Matchers with SecureRandomBuilder:
 
   "AuthInitiateMessage" should "encode and decode itself" taggedAs (UnitTest, NetworkTest) in {
-    val keyPair = {
+    val keyPair =
       val generator = new ECKeyPairGenerator
       generator.init(new ECKeyGenerationParameters(curve, secureRandom))
       generator.generateKeyPair()
-    }
 
     val nonce = ByteUtils.randomBytes(AuthHandshaker.NonceSize)
 
@@ -64,5 +63,3 @@ class AuthInitiateMessageSpec extends AnyFlatSpec with Matchers with SecureRando
 
     decoded shouldBe expectedMsg
   }
-
-}

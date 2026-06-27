@@ -61,7 +61,7 @@ class SyncControllerSpec
     with BeforeAndAfter
     with MockFactory
     with Eventually
-    with LongPatience {
+    with LongPatience:
 
   "SyncController" should "download pivot block and request block headers" taggedAs (
     UnitTest,
@@ -146,8 +146,8 @@ class SyncControllerSpec
   }
 
   it should "handle blocks that fail validation" taggedAs (UnitTest, SyncTest) in withTestSetup(
-    validators = new Mocks.MockValidatorsAlwaysSucceed {
-      override val blockHeaderValidator: BlockHeaderValidator = new BlockHeaderValidator {
+    validators = new Mocks.MockValidatorsAlwaysSucceed:
+      override val blockHeaderValidator: BlockHeaderValidator = new BlockHeaderValidator:
         override def validate(
             blockHeader: BlockHeader,
             getBlockHeaderByHash: GetBlockHeaderByHash
@@ -162,8 +162,6 @@ class SyncControllerSpec
             blockchainConfig: BlockchainConfig
         ): Either[BlockHeaderError, BlockHeaderValid] =
           Right(BlockHeaderValid)
-      }
-    }
   ) { testSetup =>
     import testSetup.*
     startWithState(
@@ -202,25 +200,20 @@ class SyncControllerSpec
     UnitTest,
     SyncTest
   ) in withTestSetup(
-    validators = new Mocks.MockValidatorsAlwaysSucceed {
-      override val blockHeaderValidator: BlockHeaderValidator = new BlockHeaderValidator {
+    validators = new Mocks.MockValidatorsAlwaysSucceed:
+      override val blockHeaderValidator: BlockHeaderValidator = new BlockHeaderValidator:
         val invalidBlockNNumber = 399510
         override def validate(
             blockHeader: BlockHeader,
             getBlockHeaderByHash: GetBlockHeaderByHash
         )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
-          if blockHeader.number == invalidBlockNNumber then {
-            Left(HeaderParentNotFoundError)
-          } else {
-            Right(BlockHeaderValid)
-          }
+          if blockHeader.number == invalidBlockNNumber then Left(HeaderParentNotFoundError)
+          else Right(BlockHeaderValid)
 
         override def validateHeaderOnly(blockHeader: BlockHeader)(implicit
             blockchainConfig: BlockchainConfig
         ): Either[BlockHeaderError, BlockHeaderValid] =
           Right(BlockHeaderValid)
-      }
-    }
   ) { testSetup =>
     import testSetup.*
     startWithState(defaultStateBeforeNodeRestart)
@@ -279,7 +272,7 @@ class SyncControllerSpec
         fast.toTyped[FastSync.Command] ! FastSync.WrappedPrhResult(futureResult)
       )
 
-      try {
+      try
         eventually {
           someTimePasses()
           storagesInstance.storages.fastSyncStateStorage.getSyncState().get.pivotBlock shouldBe defaultPivotBlockHeader
@@ -290,28 +283,23 @@ class SyncControllerSpec
           someTimePasses()
           assert(storagesInstance.storages.appStateStorage.isFastSyncDone())
         }
-      } finally injectionTask.cancel()
+      finally injectionTask.cancel()
   }
 
   it should "update pivot block if pivot fail" taggedAs (UnitTest, SyncTest) in withTestSetup(
-    new Mocks.MockValidatorsAlwaysSucceed {
-      override val blockHeaderValidator: BlockHeaderValidator = new BlockHeaderValidator {
+    new Mocks.MockValidatorsAlwaysSucceed:
+      override val blockHeaderValidator: BlockHeaderValidator = new BlockHeaderValidator:
         override def validate(
             blockHeader: BlockHeader,
             getBlockHeaderByHash: GetBlockHeaderByHash
         )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
-          if blockHeader.number != 399500 + 10 then {
-            Right(BlockHeaderValid)
-          } else {
-            Left(HeaderParentNotFoundError)
-          }
+          if blockHeader.number != 399500 + 10 then Right(BlockHeaderValid)
+          else Left(HeaderParentNotFoundError)
 
         override def validateHeaderOnly(blockHeader: BlockHeader)(implicit
             blockchainConfig: BlockchainConfig
         ): Either[BlockHeaderError, BlockHeaderValid] =
           Right(BlockHeaderValid)
-      }
-    }
   ) { testSetup =>
     import testSetup.*
     startWithState(defaultStateBeforeNodeRestart)
@@ -560,15 +548,13 @@ class SyncControllerSpec
       needBytecode: Boolean = true,
       needStorage: Boolean = true,
       withStateRoot: Boolean = true
-  ): Unit = {
+  ): Unit =
     appState.snapSyncDone().commit()
     if !needBytecode then appState.bytecodeRecoveryDone().commit()
     if !needStorage then appState.storageRecoveryDone().commit()
-    if withStateRoot then {
+    if withStateRoot then
       appState.putSnapSyncStateRoot(recoveryFakeStateRoot).commit()
       appState.putSnapSyncPivotBlock(BigInt(100)).commit()
-    }
-  }
 
   it should "transition to regular sync after both bytecode and storage recovery complete" taggedAs (
     UnitTest,
@@ -774,7 +760,7 @@ class SyncControllerSpec
       _validators: Validators = new Mocks.MockValidatorsAlwaysSucceed
   ) extends EphemBlockchainTestSetup
       with TestSyncPeers
-      with TestSyncConfig {
+      with TestSyncConfig:
 
     @volatile
     var stateDownloadStarted = false
@@ -869,7 +855,7 @@ class SyncControllerSpec
         bodies: Map[ByteString, BlockBody],
         receipts: Map[ByteString, Seq[Receipt]]
     )
-    object BlockchainData {
+    object BlockchainData:
       def apply(headers: Seq[BlockHeader]): BlockchainData =
         // assumes headers are correct chain
         headers.foldLeft(new BlockchainData(Map.empty, Map.empty, Map.empty)) { (state, header) =>
@@ -879,7 +865,6 @@ class SyncControllerSpec
             receipts = state.receipts + (header.hash.value -> Seq.empty)
           )
         }
-    }
     // scalastyle:off method.length
     case class SyncStateAutoPilot(
         handshakedPeers: HandshakedPeers,
@@ -890,9 +875,9 @@ class SyncControllerSpec
         onlyPivot: Boolean,
         failedNodeRequest: Boolean,
         autoPilotProbeRef: ActorRef
-    ) extends AutoPilot {
+    ) extends AutoPilot:
       override def run(sender: ActorRef, msg: Any): AutoPilot =
-        msg match {
+        msg match
           case NetworkPeerManagerActor.GetHandshakedPeers =>
             sender ! handshakedPeers
             this
@@ -926,63 +911,57 @@ class SyncControllerSpec
             val underlyingMessage = msg.underlyingMsg
             val requestId = underlyingMessage.requestId
             val requestedBlockNumber = underlyingMessage.block.swap.toOption.get
-            if requestedBlockNumber == pivotHeader.number then {
+            if requestedBlockNumber == pivotHeader.number then
               // pivot block
               sender ! MessageFromPeer(ETHPackets.BlockHeaders(requestId, Seq(pivotHeader)), peer)
-            } else {
+            else
               val headers = generateBlockHeaders66(underlyingMessage, blockchainData)
               sender ! MessageFromPeer(ETHPackets.BlockHeaders(requestId, headers), peer)
-            }
             this
 
           // Handle ETH68/69 GetReceipts (with requestId)
           case SendMessageCmd(msg: ETHPackets.GetReceipts.GetReceiptsEnc, peer) if !onlyPivot =>
             val requestId = msg.underlyingMsg.requestId
-            if failedReceiptsTries > 0 then {
+            if failedReceiptsTries > 0 then
               sender ! MessageFromPeer(ETHPackets.Receipts68(requestId, RLPList()), peer)
               this.copy(failedReceiptsTries = failedReceiptsTries - 1)
-            } else {
+            else
               val rec = msg.underlyingMsg.blockHashes.flatMap(h => blockchainData.receipts.get(h))
               // For empty receipts, create an RLPList with empty receipt sequences
               val receiptsRlp = RLPList(rec.map(_ => RLPList())*)
               sender ! MessageFromPeer(ETHPackets.Receipts68(requestId, receiptsRlp), peer)
               this
-            }
 
           case SendMessageCmd(msg: ETHPackets.GetBlockBodies.GetBlockBodiesEnc, peer) if !onlyPivot =>
             val requestId = msg.underlyingMsg.requestId
-            if failedBodiesTries > 0 then {
+            if failedBodiesTries > 0 then
               sender ! MessageFromPeer(ETHPackets.BlockBodies(requestId, Seq.empty), peer)
               this.copy(failedBodiesTries = failedBodiesTries - 1)
-            } else {
+            else
               val bod = msg.underlyingMsg.hashes.flatMap(h => blockchainData.bodies.get(h))
               sender ! MessageFromPeer(ETHPackets.BlockBodies(requestId, bod), peer)
               this
-            }
 
           case SendMessageCmd(msg: GetBlockBodiesEnc, peer) if !onlyPivot =>
             val requestId = msg.underlyingMsg.requestId
-            if failedBodiesTries > 0 then {
+            if failedBodiesTries > 0 then
               sender ! MessageFromPeer(BlockBodies(requestId, Seq.empty), peer)
               this.copy(failedBodiesTries = failedBodiesTries - 1)
-            } else {
+            else
               val bod = msg.underlyingMsg.hashes.flatMap(h => blockchainData.bodies.get(h))
               sender ! MessageFromPeer(BlockBodies(requestId, bod), peer)
               this
-            }
 
           // Handle GetNodeData (EIP-4938: rejected in ETH68, but still handled for legacy)
           case SendMessageCmd(_: ETHPackets.GetNodeData.GetNodeDataEnc, peer) if !onlyPivot =>
             stateDownloadStarted = true
-            if !failedNodeRequest then {
+            if !failedNodeRequest then
               sender ! MessageFromPeer(
                 ETHPackets.NodeData(Seq(ByteString(defaultStateMptLeafWithAccount.toArray))),
                 peer
               )
-            }
-            if !failedNodeRequest then {
+            if !failedNodeRequest then
               sender ! MessageFromPeer(ETH63NodeData(Seq(defaultStateMptLeafWithAccount)), peer)
-            }
             this
 
           case SendMessageCmd(_, _) =>
@@ -991,7 +970,6 @@ class SyncControllerSpec
           case AutoPilotUpdateData(peers, pivot, data, failedReceipts, failedBodies, onlyPivot, failedNode) =>
             sender ! DataUpdated
             this.copy(peers, pivot, data, failedReceipts, failedBodies, onlyPivot, failedNode)
-        }
 
       def updateAutoPilot(
           handshakedPeers: HandshakedPeers,
@@ -1001,7 +979,7 @@ class SyncControllerSpec
           failedBodiesTries: Int = 0,
           onlyPivot: Boolean = false,
           failedNodeRequest: Boolean = false
-      ): Unit = {
+      ): Unit =
         val sender = TestProbe()
         autoPilotProbeRef.tell(
           AutoPilotUpdateData(
@@ -1016,13 +994,11 @@ class SyncControllerSpec
           sender.ref
         )
         sender.expectMsg(DataUpdated)
-      }
-    }
 
     private def generateBlockHeaders66(
         underlyingMessage: ETHPackets.GetBlockHeaders,
         blockchainData: BlockchainData
-    ): Seq[BlockHeader] = {
+    ): Seq[BlockHeader] =
       val start = underlyingMessage.block.swap.toOption.get
       val stop = start + underlyingMessage.maxHeaders * (underlyingMessage.skip + 1)
 
@@ -1030,7 +1006,6 @@ class SyncControllerSpec
         .flatMap(i => blockchainData.headers.get(i))
         .zipWithIndex
         .collect { case (header, index) if index % (underlyingMessage.skip + 1) == 0 => header }
-    }
 
     // scalastyle:off method.length parameter.number
     def setupAutoPilot(
@@ -1042,7 +1017,7 @@ class SyncControllerSpec
         failedBodiesTries: Int = 0,
         onlyPivot: Boolean = false,
         failedNodeRequest: Boolean = false
-    ): SyncStateAutoPilot = {
+    ): SyncStateAutoPilot =
       val autopilot = SyncStateAutoPilot(
         handshakedPeers,
         pivotHeader,
@@ -1055,7 +1030,6 @@ class SyncControllerSpec
       )
       testProbe.setAutoPilot(autopilot)
       autopilot
-    }
 
     case class AutoPilotUpdateData(
         handshakedPeers: HandshakedPeers,
@@ -1103,7 +1077,7 @@ class SyncControllerSpec
       nextBlockToFullyValidate = beforeRestartPivot.number + syncConfig.fastSyncBlockValidationX
     )
 
-    def getHeaders(from: BigInt, number: BigInt): Seq[BlockHeader] = {
+    def getHeaders(from: BigInt, number: BigInt): Seq[BlockHeader] =
       val headers = (from until from + number).toSeq.map { nr =>
         defaultPivotBlockHeader.copy(number = nr)
       }
@@ -1114,17 +1088,15 @@ class SyncControllerSpec
           result: Seq[BlockHeader] = Seq.empty
       ): Seq[BlockHeader] =
         if headers.isEmpty then result
-        else {
+        else
           val header = headers.head
           val newHeader = header.copy(parentHash = BlockHash(parenthash))
           val newHash = newHeader.hash.value
           genChain(newHash, headers.tail, result :+ newHeader)
-        }
 
       val first = headers.head
 
       first +: genChain(first.hash.value, headers.tail)
-    }
 
     def startWithState(state: SyncState): Unit =
       storagesInstance.storages.fastSyncStateStorage.putSyncState(state)
@@ -1139,22 +1111,17 @@ class SyncControllerSpec
 
     def cleanup(): Unit =
       Await.result(system.terminate(), 10.seconds)
-  }
 
-  def withTestSetup(validators: Validators = new Mocks.MockValidatorsAlwaysSucceed)(test: TestSetup => Any): Unit = {
+  def withTestSetup(validators: Validators = new Mocks.MockValidatorsAlwaysSucceed)(test: TestSetup => Any): Unit =
     val testSetup = new TestSetup(validators)
     try test(testSetup)
     finally testSetup.cleanup()
-  }
 
-  def withRecoveryTestSetup()(test: TestSetup => Any): Unit = {
-    val testSetup = new TestSetup() {
+  def withRecoveryTestSetup()(test: TestSetup => Any): Unit =
+    val testSetup = new TestSetup():
       override def defaultSyncConfig: SyncConfig = super.defaultSyncConfig.copy(
         doSnapSync = true,
         doFastSync = false
       )
-    }
     try test(testSetup)
     finally testSetup.cleanup()
-  }
-}

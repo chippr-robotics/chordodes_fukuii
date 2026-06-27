@@ -31,7 +31,7 @@ class ChainDownloaderSpec
     with Matchers
     with Eventually
     with org.scalamock.scalatest.MockFactory
-    with TestSyncConfig {
+    with TestSyncConfig:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
@@ -122,19 +122,18 @@ class ChainDownloaderSpec
     */
   private def expectProgress(
       downloader: TypedActorRef[ChainDownloader.Command]
-  ): ChainDownloader.Progress = {
+  ): ChainDownloader.Progress =
     val probe = TestProbe()
     val typedProbe: TypedActorRef[ChainDownloader.Progress] = probe.ref.toTyped[ChainDownloader.Progress]
     downloader ! ChainDownloader.GetProgress(typedProbe)
     probe.expectMsgType[ChainDownloader.Progress](3.seconds)
-  }
 
   /** Spawn a Typed ChainDownloader (converted to a Classic ref for `!`). `findBestStoredHeader` probes block 1; mocking
     * it as missing makes the binary search return 0 immediately, leaving the actor in `downloading` with empty queues —
     * no real blockchain or peer infrastructure required. `peersScanInterval` is 1h in TestSyncConfig, so the periodic
     * peer scan never fires during a test (the immediate startup poll lands harmlessly on a fresh probe).
     */
-  private def newDownloader(): (TypedActorRef[ChainDownloader.Command], AppStateStorage, TestProbe) = {
+  private def newDownloader(): (TypedActorRef[ChainDownloader.Command], AppStateStorage, TestProbe) =
     val blockchainReader = mock[BlockchainReader]
     val blockchainWriter = mock[BlockchainWriter]
     val appStateStorage = new AppStateStorage(EphemDataSource())
@@ -163,5 +162,3 @@ class ChainDownloaderSpec
       )
 
     (downloader, appStateStorage, networkPeerManager)
-  }
-}

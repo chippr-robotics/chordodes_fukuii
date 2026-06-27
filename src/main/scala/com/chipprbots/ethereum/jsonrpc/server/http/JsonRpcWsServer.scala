@@ -55,7 +55,7 @@ class JsonRpcWsServer(
     subscriptionManager: ActorRef[SubscriptionManager.Command],
     config: JsonRpcWsServer.JsonRpcWsServerConfig
 )(implicit system: ActorSystem)
-    extends Logger {
+    extends Logger:
 
   given mat: Materializer = Materializer(system)
   given ec: ExecutionContext = system.dispatcher
@@ -70,15 +70,14 @@ class JsonRpcWsServer(
       handleWebSocketMessages(buildWsFlow())
     }
 
-  def run(): Unit = {
+  def run(): Unit =
     val bindingF = Http(system).newServerAt(config.interface, config.port).bind(route)
     bindingF.onComplete {
       case Success(b)  => log.info(s"JSON RPC WS server listening on ${b.localAddress}")
       case Failure(ex) => log.error("Cannot start JSON RPC WS server", ex)
     }
-  }
 
-  private def buildWsFlow(): Flow[Message, Message, Any] = {
+  private def buildWsFlow(): Flow[Message, Message, Any] =
     val connId = UUID.randomUUID().toString
 
     // Outbound queue: SubscriptionManager pushes JSON strings here
@@ -105,40 +104,37 @@ class JsonRpcWsServer(
         doneFuture.onComplete(_ => subscriptionManager ! ConnectionClosed(connId))
         mat
       }
-  }
 
   private def handleWsMessage(
       text: String,
       connId: String,
       queue: org.apache.pekko.stream.scaladsl.SourceQueueWithComplete[String]
-  ): Unit = {
+  ): Unit =
     def sendResponse(json: String): Unit = queue.offer(json)
 
-    def errorResponse(id: JValue, code: Int, message: String): String = {
+    def errorResponse(id: JValue, code: Int, message: String): String =
       val resp = JObject(
         "jsonrpc" -> JString("2.0"),
         "id" -> id,
         "error" -> JObject("code" -> JInt(code), "message" -> JString(message))
       )
       compact(render(resp))
-    }
 
     val parsed =
       try Some(parse(text))
-      catch { case _: Exception => None }
-    parsed match {
+      catch case _: Exception => None
+    parsed match
       case None =>
         sendResponse(errorResponse(JNull, -32700, "Parse error"))
 
       case Some(json) =>
         val id = (json \ "id").toOption.getOrElse(JNull)
-        val method = (json \ "method") match {
+        val method = (json \ "method") match
           case JString(m) => m
           case _          => ""
-        }
         val params = (json \ "params").toOption
 
-        method match {
+        method match
           case "eth_subscribe" =>
             val subType = params.flatMap {
               case JArray(JString(t) :: _) => Some(t)
@@ -148,7 +144,7 @@ class JsonRpcWsServer(
               case JArray(_ :: p :: _) => Some(p)
               case _                   => None
             }
-            subType match {
+            subType match
               case None =>
                 sendResponse(errorResponse(id, -32602, "Invalid params: missing subscription type"))
               case Some(t) =>
@@ -171,17 +167,16 @@ class JsonRpcWsServer(
                     case SubscribeResponse(Left(err)) =>
                       sendResponse(errorResponse(id, -32602, err))
                   }
-            }
 
           case "eth_unsubscribe" =>
             val subIdOpt = params.flatMap {
               case JArray(JString(s) :: _) =>
                 val hex = s.stripPrefix("0x").stripPrefix("0X")
                 try Some(java.lang.Long.parseLong(hex, 16))
-                catch { case _: Exception => None }
+                catch case _: Exception => None
               case _ => None
             }
-            subIdOpt match {
+            subIdOpt match
               case None =>
                 sendResponse(errorResponse(id, -32602, "Invalid params: missing subscription id"))
               case Some(subId) =>
@@ -199,7 +194,6 @@ class JsonRpcWsServer(
                       )
                     )
                 }
-            }
 
           case "" =>
             sendResponse(errorResponse(id, -32600, "Invalid request"))
@@ -207,38 +201,27 @@ class JsonRpcWsServer(
           case _ =>
             // All other JSON-RPC methods: delegate to standard controller
             val requestOpt =
-              try
-                Some(json.extract[JsonRpcRequest])
-              catch { case _: Exception => None }
-            requestOpt match {
+              try Some(json.extract[JsonRpcRequest])
+              catch case _: Exception => None
+            requestOpt match
               case None =>
                 sendResponse(errorResponse(id, -32600, "Invalid request"))
               case Some(req) =>
                 jsonRpcController.handleRequest(req).unsafeToFuture().foreach { resp =>
                   sendResponse(Serialization.write(resp))
                 }
-            }
-        }
-    }
-  }
-}
 
-object JsonRpcWsServer {
+object JsonRpcWsServer:
 
-  trait JsonRpcWsServerConfig {
+  trait JsonRpcWsServerConfig:
     val enabled: Boolean
     val interface: String
     val port: Int
-  }
 
-  object JsonRpcWsServerConfig {
-    def apply(fukuiiConfig: com.typesafe.config.Config): JsonRpcWsServerConfig = {
+  object JsonRpcWsServerConfig:
+    def apply(fukuiiConfig: com.typesafe.config.Config): JsonRpcWsServerConfig =
       val wsConfig = fukuiiConfig.getConfig("network.rpc.ws")
-      new JsonRpcWsServerConfig {
+      new JsonRpcWsServerConfig:
         override val enabled: Boolean = wsConfig.getBoolean("enabled")
         override val interface: String = wsConfig.getString("interface")
         override val port: Int = wsConfig.getInt("port")
-      }
-    }
-  }
-}

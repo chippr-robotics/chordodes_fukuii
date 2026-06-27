@@ -10,7 +10,7 @@ import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
   *   - Test conversion to domain objects
   *   - Initial state setup
   */
-class SimpleEthereumTest extends EthereumTestsSpec {
+class SimpleEthereumTest extends EthereumTestsSpec:
 
   "EthereumTestsAdapter" should "parse SimpleTx test file" taggedAs (IntegrationTest, EthereumTest, SlowTest) in {
     val testFile = "/ethereum-tests/SimpleTx.json"
@@ -45,7 +45,7 @@ class SimpleEthereumTest extends EthereumTestsSpec {
 
       val result = setupTestState(test)
 
-      result match {
+      result match
         case Right(world) =>
           info(s"  Successfully created world state")
           info(s"  State root: ${world.stateRootHash.toHex}")
@@ -61,7 +61,6 @@ class SimpleEthereumTest extends EthereumTestsSpec {
 
         case Left(error) =>
           fail(s"Failed to set up initial state: $error")
-      }
     }
   }
 
@@ -105,7 +104,7 @@ class SimpleEthereumTest extends EthereumTestsSpec {
 
       val result = executeTest(test)
 
-      result match {
+      result match
         case Right(executionResult) =>
           info(s"  ✓ Test executed successfully")
           info(s"  Network: ${executionResult.network}")
@@ -117,7 +116,5 @@ class SimpleEthereumTest extends EthereumTestsSpec {
 
         case Left(error) =>
           fail(s"Failed to execute test: $error")
-      }
     }
   }
-}

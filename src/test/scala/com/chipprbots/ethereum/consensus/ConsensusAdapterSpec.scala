@@ -41,11 +41,7 @@ import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
-class ConsensusAdapterSpec
-    extends AnyFlatSpec
-    with Matchers
-    with ScalaFutures
-    with org.scalamock.scalatest.MockFactory {
+class ConsensusAdapterSpec extends AnyFlatSpec with Matchers with ScalaFutures with org.scalamock.scalatest.MockFactory:
 
   implicit override val patienceConfig: PatienceConfig =
     PatienceConfig(timeout = scaled(2 seconds), interval = scaled(1 second))
@@ -53,7 +49,7 @@ class ConsensusAdapterSpec
   "ConsensusAdapter" should "ignore duplicated block" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new ImportBlockTestSetupImpl {
+  ) in new ImportBlockTestSetupImpl:
     val block1: Block = getBlock()
     val block2: Block = getBlock()
 
@@ -66,12 +62,11 @@ class ConsensusAdapterSpec
     setBestBlock(bestBlock)
 
     whenReady(consensusAdapter.evaluateBranchBlock(block2).unsafeToFuture())(_ shouldEqual DuplicateBlock)
-  }
 
   it should "import a block to the top of the main chain" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new ImportBlockTestSetupImpl {
+  ) in new ImportBlockTestSetupImpl:
     val block: Block = getBlock(6, parent = bestBlock.header.hash.value)
     val difficulty: BigInt = block.header.difficulty
     val hash: ByteString = block.header.hash.value
@@ -100,12 +95,11 @@ class ConsensusAdapterSpec
     whenReady(blockImportNotFailingAfterExecValidation.evaluateBranchBlock(block).unsafeToFuture()) {
       _ shouldEqual BlockImportedToTop(List(blockData))
     }
-  }
 
   it should "handle exec error when importing to top" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new ImportBlockTestSetupImpl {
+  ) in new ImportBlockTestSetupImpl:
     val block: Block = getBlock(6, parent = bestBlock.header.hash.value)
 
     setBlockExists(block, inChain = false, inQueue = false)
@@ -138,12 +132,11 @@ class ConsensusAdapterSpec
         "MPTError(com.chipprbots.ethereum.mpt.MerklePatriciaTrie$MPTException: Invalid Node)"
       )
     )
-  }
 
   it should "handle no best block available error when importing to top" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new ImportBlockTestSetupImpl {
+  ) in new ImportBlockTestSetupImpl:
     val block: Block = getBlock(6, parent = bestBlock.header.hash.value)
 
     setBlockExists(block, inChain = false, inQueue = false)
@@ -157,12 +150,11 @@ class ConsensusAdapterSpec
     whenReady(consensusAdapter.evaluateBranchBlock(block).unsafeToFuture())(
       _ shouldBe BlockImportFailed("Couldn't find the current best block header")
     )
-  }
 
   it should "handle total difficulty error when importing to top by logging and continuing" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new ImportBlockTestSetupImpl {
+  ) in new ImportBlockTestSetupImpl:
     val block: Block = getBlock(6, parent = bestBlock.header.hash.value)
 
     setBlockExists(block, inChain = false, inQueue = false)
@@ -176,21 +168,19 @@ class ConsensusAdapterSpec
     // The code should continue processing and call block validation, not return early
     // Since chain weight is None, processing may continue but won't succeed fully
     whenReady(consensusAdapter.evaluateBranchBlock(block).unsafeToFuture()) { result =>
-      result match {
+      result match
         case BlockImportFailed(error) =>
           // Should NOT be the old immediate failure message from returnNoTotalDifficulty
           (error should not).startWith("Couldn't get total difficulty for current best block")
         case BlockEnqueued => // Also acceptable - block was enqueued for later processing
         case _             => // Other results are also acceptable
-      }
     }
-  }
 
   // scalastyle:off magic.number
   it should "reorganise chain when a newly enqueued block forms a better branch" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new EphemBlockchain {
+  ) in new EphemBlockchain:
     val block1: Block = getBlock(bestNum - 2)
     val newBlock2: Block = getBlock(bestNum - 1, difficulty = 101, parent = block1.header.hash.value)
     val newBlock3: Block = getBlock(bestNum, difficulty = 105, parent = newBlock2.header.hash.value)
@@ -238,9 +228,8 @@ class ConsensusAdapterSpec
 
     blockQueue.isQueued(oldBlock2.header.hash) shouldBe true
     blockQueue.isQueued(oldBlock3.header.hash) shouldBe true
-  }
 
-  it should "handle error when trying to reorganise chain" taggedAs (UnitTest, ConsensusTest) in new EphemBlockchain {
+  it should "handle error when trying to reorganise chain" taggedAs (UnitTest, ConsensusTest) in new EphemBlockchain:
     val block1: Block = getBlock(bestNum - 2)
     val newBlock2: Block = getBlock(bestNum - 1, difficulty = 101, parent = block1.header.hash.value)
     val newBlock3: Block = getBlock(bestNum, difficulty = 105, parent = newBlock2.header.hash.value)
@@ -289,12 +278,10 @@ class ConsensusAdapterSpec
 
     blockQueue.isQueued(newBlock2.header.hash) shouldBe true
     blockQueue.isQueued(newBlock3.header.hash) shouldBe false
-  }
 
-  it should "report an orphaned block" taggedAs (UnitTest, ConsensusTest) in new ImportBlockTestSetupImpl {
-    override lazy val validators: MockValidatorsAlwaysSucceed = new Mocks.MockValidatorsAlwaysSucceed {
+  it should "report an orphaned block" taggedAs (UnitTest, ConsensusTest) in new ImportBlockTestSetupImpl:
+    override lazy val validators: MockValidatorsAlwaysSucceed = new Mocks.MockValidatorsAlwaysSucceed:
       override val blockHeaderValidator: BlockHeaderValidator = mock[BlockHeaderValidator]
-    }
 
     val newBlock: Block = getBlock(number = bestNum + 1)
     setBlockExists(newBlock, inChain = false, inQueue = false)
@@ -309,12 +296,10 @@ class ConsensusAdapterSpec
     whenReady(consensusAdapter.evaluateBranchBlock(newBlock).unsafeToFuture())(
       _ shouldEqual BlockImportFailed("UNKNOWN_PARENT: parent header not found")
     )
-  }
 
-  it should "validate blocks prior to import" taggedAs (UnitTest, ConsensusTest) in new ImportBlockTestSetupImpl {
-    override lazy val validators: MockValidatorsAlwaysSucceed = new Mocks.MockValidatorsAlwaysSucceed {
+  it should "validate blocks prior to import" taggedAs (UnitTest, ConsensusTest) in new ImportBlockTestSetupImpl:
+    override lazy val validators: MockValidatorsAlwaysSucceed = new Mocks.MockValidatorsAlwaysSucceed:
       override val blockHeaderValidator: BlockHeaderValidator = mock[BlockHeaderValidator]
-    }
 
     val newBlock: Block = getBlock(number = bestNum + 1)
     setBlockExists(newBlock, inChain = false, inQueue = false)
@@ -329,21 +314,19 @@ class ConsensusAdapterSpec
     whenReady(consensusAdapter.evaluateBranchBlock(newBlock).unsafeToFuture()) {
       _ shouldEqual BlockImportFailed(HeaderDifficultyError.toString)
     }
-  }
 
   it should "correctly handle importing genesis block" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new ImportBlockTestSetupImpl {
+  ) in new ImportBlockTestSetupImpl:
     val genesisBlock: Block = Block(genesisHeader, BlockBody.empty)
 
     setBestBlock(genesisBlock)
     setBlockExists(genesisBlock, inChain = true, inQueue = true)
 
     whenReady(failConsensus.evaluateBranchBlock(genesisBlock).unsafeToFuture())(_ shouldEqual DuplicateBlock)
-  }
 
-  it should "correctly import block with ommers and ancestor taggedAs (UnitTest, ConsensusTest) in block queue " in new OmmersTestSetup {
+  it should "correctly import block with ommers and ancestor taggedAs (UnitTest, ConsensusTest) in block queue " in new OmmersTestSetup:
     val ancestorForValidation: Block = getBlock(0, difficulty = 1)
     val ancestorForValidation1: Block = getBlock(difficulty = 2, parent = ancestorForValidation.header.hash.value)
     val ancestorForValidation2: Block = getBlock(2, difficulty = 3, parent = ancestorForValidation1.header.hash.value)
@@ -396,12 +379,11 @@ class ConsensusAdapterSpec
     blockchainWriter.save(blockData3.block, blockData3.receipts, blockData3.weight, saveAsBestBlock = true)
 
     blockchainReader.getBestBlock.get shouldEqual newBlock3WithOmmer
-  }
 
   it should "dequeue blocks where there is an execution error" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new EphemBlockchain {
+  ) in new EphemBlockchain:
     val mockExecution: BlockExecution = mock[BlockExecution]
 
     val currentBestBlock: Block = getBlock(bestNum - 2)
@@ -428,12 +410,11 @@ class ConsensusAdapterSpec
       blockQueue.isQueued(newBlock1.hash) shouldBe false
       blockQueue.isQueued(newBlock2.hash) shouldBe false
     }
-  }
 
   it should "dequeue blocks that are children of a failing block when all blocks are failing" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new EphemBlockchain {
+  ) in new EphemBlockchain:
     val mockExecution: BlockExecution = mock[BlockExecution]
 
     val currentBestBlock: Block = getBlock(bestNum)
@@ -466,9 +447,8 @@ class ConsensusAdapterSpec
       blockQueue.isQueued(newBlock2.hash) shouldBe false
       blockQueue.isQueued(newBlock2bis.hash) shouldBe false
     }
-  }
 
-  it should "dequeue blocks that are children of a failing block taggedAs (UnitTest, ConsensusTest) in case of partial execution" in new EphemBlockchain {
+  it should "dequeue blocks that are children of a failing block taggedAs (UnitTest, ConsensusTest) in case of partial execution" in new EphemBlockchain:
     val mockExecution: BlockExecution = mock[BlockExecution]
 
     val currentBestBlock: Block = getBlock(bestNum)
@@ -505,9 +485,8 @@ class ConsensusAdapterSpec
       blockQueue.isQueued(newBlock3.hash) shouldBe false
       blockQueue.isQueued(newBlock3bis.hash) shouldBe false
     }
-  }
 
-  it should "dequeue blocks that are children of a failing block taggedAs (UnitTest, ConsensusTest) in case of partial execution during a reorganisation" in new EphemBlockchain {
+  it should "dequeue blocks that are children of a failing block taggedAs (UnitTest, ConsensusTest) in case of partial execution during a reorganisation" in new EphemBlockchain:
     val mockExecution: BlockExecution = mock[BlockExecution]
 
     val currentBestBlock: Block = getBlock(bestNum)
@@ -542,9 +521,8 @@ class ConsensusAdapterSpec
       blockQueue.isQueued(newBlock3.hash) shouldBe false
       blockQueue.isQueued(newBlock3bis.hash) shouldBe false
     }
-  }
 
-  class ImportBlockTestSetupImpl extends TestSetupWithVmAndValidators with MockBlockchain {
+  class ImportBlockTestSetupImpl extends TestSetupWithVmAndValidators with MockBlockchain:
     // Provide mock implementations - these are created in the test class context which has MockFactory
     override lazy val mockBlockchainReader: BlockchainReader = mock[BlockchainReader]
     override lazy val mockBlockchainWriter: BlockchainWriter = mock[BlockchainWriter]
@@ -555,18 +533,16 @@ class ConsensusAdapterSpec
     (() => blockchainReader.getBestBranch).expects().anyNumberOfTimes().returning(EmptyBranch)
 
     // Helper methods implementation (have MockFactory context here)
-    override def setBlockExists(block: Block, inChain: Boolean, inQueue: Boolean): CallHandler1[BlockHash, Boolean] = {
+    override def setBlockExists(block: Block, inChain: Boolean, inQueue: Boolean): CallHandler1[BlockHash, Boolean] =
       blockchainReader.getBlockByHash
         .expects(block.header.hash)
         .anyNumberOfTimes()
         .returning(Some(block).filter(_ => inChain))
       blockQueue.isQueued.expects(block.header.hash).anyNumberOfTimes().returning(inQueue)
-    }
 
-    override def setBestBlock(block: Block): CallHandler0[BigInt] = {
+    override def setBestBlock(block: Block): CallHandler0[BigInt] =
       (() => blockchainReader.getBestBlock).expects().anyNumberOfTimes().returning(Some(block))
       (() => blockchainReader.getBestBlockNumber).expects().anyNumberOfTimes().returning(block.header.number)
-    }
 
     override def setBestBlockNumber(num: BigInt): CallHandler0[BigInt] =
       (() => blockchainReader.getBestBlockNumber).expects().returning(num)
@@ -602,6 +578,3 @@ class ConsensusAdapterSpec
 
     override def setGenesisHeader(header: BlockHeader): Unit =
       (() => blockchainReader.genesisHeader).expects().returning(header)
-  }
-
-}

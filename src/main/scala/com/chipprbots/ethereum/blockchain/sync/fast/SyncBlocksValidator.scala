@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
-trait SyncBlocksValidator {
+trait SyncBlocksValidator:
 
   import SyncBlocksValidator.*
   import BlockBodyValidationResult.*
@@ -47,10 +47,9 @@ trait SyncBlocksValidator {
   def validateHeaderOnly(blockHeader: BlockHeader)(implicit
       blockchainConfig: BlockchainConfig
   ): Either[BlockHeaderError, BlockHeaderValid] =
-    BlockHeader.validateFieldCount(blockHeader, blockchainConfig) match {
+    BlockHeader.validateFieldCount(blockHeader, blockchainConfig) match
       case Left(msg) => Left(HeaderUnexpectedError(msg))
       case Right(_)  => validators.blockHeaderValidator.validateHeaderOnly(blockHeader)
-    }
 
   def checkHeadersChain(headers: Seq[BlockHeader]): Boolean =
     if headers.length > 1 then
@@ -58,13 +57,10 @@ trait SyncBlocksValidator {
         parent.hash == child.parentHash && parent.number + 1 == child.number
       }
     else true
-}
 
-object SyncBlocksValidator {
+object SyncBlocksValidator:
   sealed trait BlockBodyValidationResult
-  object BlockBodyValidationResult {
+  object BlockBodyValidationResult:
     case object Valid extends BlockBodyValidationResult
     case object Invalid extends BlockBodyValidationResult
     case object DbError extends BlockBodyValidationResult
-  }
-}

@@ -9,7 +9,7 @@ import com.chipprbots.ethereum.vm.Fixtures.blockchainConfig
 import com.chipprbots.ethereum.vm.MockWorldState.*
 
 // scalastyle:off object.name
-class StaticCallOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckPropertyChecks {
+class StaticCallOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckPropertyChecks:
 
   val config: EvmConfig = EvmConfig.ByzantiumConfigBuilder(blockchainConfig)
   val startState: MockWorldState = MockWorldState(touchedAccounts = Set.empty, noEmptyAccountsCond = true)
@@ -80,4 +80,3 @@ class StaticCallOpcodeSpec extends AnyWordSpec with Matchers with ScalaCheckProp
     }
 
   }
-}

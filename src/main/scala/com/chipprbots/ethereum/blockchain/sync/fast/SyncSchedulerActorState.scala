@@ -26,7 +26,7 @@ case class SyncSchedulerActorState(
     nodesToProcess: Queue[RequestResult],
     processing: Boolean,
     restartRequested: Option[TypedActorRef[SyncStateSchedulerActorResponse]]
-) {
+):
   def hasRemainingPendingRequests: Boolean = currentSchedulerState.numberOfPendingRequests > 0
   def isProcessing: Boolean = processing
   def restartHasBeenRequested: Boolean = restartRequested.isDefined
@@ -59,7 +59,7 @@ case class SyncSchedulerActorState(
   def assignTasksToPeers(
       freePeers: NonEmptyList[Peer],
       nodesPerPeer: Int
-  ): (Seq[PeerRequest], SyncSchedulerActorState) = {
+  ): (Seq[PeerRequest], SyncSchedulerActorState) =
     val retryQueue = currentDownloaderState.nonDownloadedNodes
     val maxNewNodes = ((freePeers.size * nodesPerPeer) - retryQueue.size).max(0)
     val (newNodes, newState) = currentSchedulerState.getMissingHashes(maxNewNodes)
@@ -80,7 +80,6 @@ case class SyncSchedulerActorState(
       req.copy(pathInfo = pathInfo)
     }
     (enrichedRequests, copy(currentSchedulerState = newState, currentDownloaderState = newDownloaderState))
-  }
 
   def getRequestToProcess: Option[(RequestResult, SyncSchedulerActorState)] =
     nodesToProcess.dequeueOption.map { case (result, restOfResults) =>
@@ -103,9 +102,8 @@ case class SyncSchedulerActorState(
        | Number of not requested hashes: ${currentStats.notRequestedHashes},
        | Number of active peer requests: ${currentDownloaderState.activeRequests.size}
                         """.stripMargin
-}
 
-object SyncSchedulerActorState {
+object SyncSchedulerActorState:
   def initial(
       initialSchedulerState: SchedulerState,
       initialStats: ProcessingStatistics,
@@ -124,5 +122,3 @@ object SyncSchedulerActorState {
       processing = false,
       restartRequested = None
     )
-
-}

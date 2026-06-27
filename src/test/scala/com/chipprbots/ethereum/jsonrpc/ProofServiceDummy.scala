@@ -9,7 +9,7 @@ import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofRequest
 import com.chipprbots.ethereum.jsonrpc.ProofService.GetProofResponse
 import com.chipprbots.ethereum.jsonrpc.ProofService.ProofAccount
 
-object ProofServiceDummy extends ProofService {
+object ProofServiceDummy extends ProofService:
 
   val EmptyAddress: Address = Address(Account.EmptyCodeHash.value)
   val EmptyProofAccount: ProofAccount = ProofAccount(
@@ -25,4 +25,3 @@ object ProofServiceDummy extends ProofService {
 
   override def getProof(req: GetProofRequest): ServiceResponse[GetProofResponse] =
     IO.pure(Right(EmptyProofResponse))
-}

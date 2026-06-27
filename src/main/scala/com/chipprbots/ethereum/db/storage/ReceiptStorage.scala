@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.utils.ByteUtils.compactPickledBytes
 /** This class is used to store the Receipts, by using: Key: hash of the block to which the list of receipts belong
   * Value: the list of receipts
   */
-class ReceiptStorage(val dataSource: DataSource) extends TransactionalKeyValueStorage[BlockHash, Seq[Receipt]] {
+class ReceiptStorage(val dataSource: DataSource) extends TransactionalKeyValueStorage[BlockHash, Seq[Receipt]]:
 
   import ReceiptStorage.{given, *}
 
@@ -29,9 +29,8 @@ class ReceiptStorage(val dataSource: DataSource) extends TransactionalKeyValueSt
 
   override def valueDeserializer: IndexedSeq[Byte] => ReceiptSeq =
     byteSequenceToBuffer.andThen(Unpickle[Seq[Receipt]].fromBytes)
-}
 
-object ReceiptStorage {
+object ReceiptStorage:
   type BlockHash = ByteString
   type ReceiptSeq = Seq[Receipt]
 
@@ -99,4 +98,3 @@ object ReceiptStorage {
     .addConcreteType[Type02Receipt]
     .addConcreteType[Type03Receipt]
     .addConcreteType[Type04Receipt]
-}

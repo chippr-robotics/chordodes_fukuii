@@ -32,23 +32,22 @@ class ForkIdTag(
     genesisHash: () => ByteString,
     blockchainConfig: BlockchainConfig,
     currentBestBlock: () => BigInt
-) extends KeyValueTag {
+) extends KeyValueTag:
 
   private val ethKey: ByteVector = EthereumNodeRecord.Keys.key("eth")
 
-  override def toAttr: Option[(ByteVector, ByteVector)] = {
+  override def toAttr: Option[(ByteVector, ByteVector)] =
     val forkId = ForkId.create(genesisHash(), blockchainConfig)(currentBestBlock())
     Some(ethKey -> ByteVector(encode(forkId.toRLPEncodable)))
-  }
 
-  override def toFilter: KeyValueTag.EnrFilter = { enr =>
-    enr.content.attrs.get(ethKey) match {
+  override def toFilter: KeyValueTag.EnrFilter = enr =>
+    enr.content.attrs.get(ethKey) match
       case None => Right(()) // no eth key — pre-EIP-2124 node, accept optimistically
       case Some(ethBytes) =>
         Try {
           val rlp = rawDecode(ethBytes.toArray)
           decode[ForkId](rlp)
-        }.toEither.left.map(e => s"ENR eth key: cannot decode ForkId: ${e.getMessage}") match {
+        }.toEither.left.map(e => s"ENR eth key: cannot decode ForkId: ${e.getMessage}") match
           case Left(err) => Left(err)
           case Right(remoteForkId) =>
             import ForkIdValidator.syncIoLogger
@@ -57,11 +56,6 @@ class ForkIdTag(
                 currentBestBlock(),
                 remoteForkId
               )
-              .unsafeRunSync() match {
+              .unsafeRunSync() match
               case Connect => Right(())
               case other   => Left(s"ENR fork ID incompatible ($other): $remoteForkId")
-            }
-        }
-    }
-  }
-}

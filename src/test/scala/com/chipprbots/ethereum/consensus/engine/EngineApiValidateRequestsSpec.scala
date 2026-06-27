@@ -24,7 +24,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   * These checks return -32602 (InvalidParams) at the RPC boundary, not a PayloadStatus INVALID. Only active for Prague+
   * timestamps.
   */
-class EngineApiValidateRequestsSpec extends AnyWordSpec with Matchers {
+class EngineApiValidateRequestsSpec extends AnyWordSpec with Matchers:
 
   implicit val ioRuntime: IORuntime = IORuntime.global
 
@@ -74,10 +74,9 @@ class EngineApiValidateRequestsSpec extends AnyWordSpec with Matchers {
     )
 
   private def stubService: EngineApiService =
-    new EngineApiService(null, null, null, null, None)(null, null) {
+    new EngineApiService(null, null, null, null, None)(null, null):
       override def newPayload(payload: ExecutionPayload): IO[PayloadStatusV1] =
         IO.pure(PayloadStatusV1(PayloadStatus.Syncing, latestValidHash = None, validationError = None))
-    }
 
   "engine_newPayloadV4 validateRequests" should {
 
@@ -171,4 +170,3 @@ class EngineApiValidateRequestsSpec extends AnyWordSpec with Matchers {
       response.error.map(_.code) shouldBe Some(-38005)
     }
   }
-}

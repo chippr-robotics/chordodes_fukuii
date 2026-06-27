@@ -23,7 +23,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   * Timestamps used are far-future sentinels from src/test/resources/application.conf: prague-timestamp = 9999999998
   * osaka-timestamp = 9999999999
   */
-class EngineApiNewPayloadV4Spec extends AnyWordSpec with Matchers {
+class EngineApiNewPayloadV4Spec extends AnyWordSpec with Matchers:
 
   implicit val ioRuntime: IORuntime = IORuntime.global
 
@@ -74,10 +74,9 @@ class EngineApiNewPayloadV4Spec extends AnyWordSpec with Matchers {
     )
 
   private def stubService: EngineApiService =
-    new EngineApiService(null, null, null, null, None)(null, null) {
+    new EngineApiService(null, null, null, null, None)(null, null):
       override def newPayload(payload: ExecutionPayload): IO[PayloadStatusV1] =
         IO.pure(PayloadStatusV1(PayloadStatus.Syncing, latestValidHash = None, validationError = None))
-    }
 
   "engine_newPayloadV4" should {
 
@@ -98,4 +97,3 @@ class EngineApiNewPayloadV4Spec extends AnyWordSpec with Matchers {
       response.result shouldBe None
     }
   }
-}

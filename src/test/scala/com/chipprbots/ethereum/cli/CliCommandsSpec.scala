@@ -8,7 +8,7 @@ import com.chipprbots.ethereum.keystore.EncryptedKeyJsonCodec
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.ByteStringUtils
 
-class CliCommandsSpec extends AnyFlatSpec with Matchers with EitherValues {
+class CliCommandsSpec extends AnyFlatSpec with Matchers with EitherValues:
 
   import CliCommands.*
   import Fixture.*
@@ -101,10 +101,10 @@ class CliCommandsSpec extends AnyFlatSpec with Matchers with EitherValues {
   it should "encrypt private key (without passphrase)" taggedAs (UnitTest) in {
     val json = api.parse(Seq(encryptKeyCommand, privateKey)).value
 
-    val decrypted = (for {
+    val decrypted = (for
       encrypted <- EncryptedKeyJsonCodec.fromJson(json)
       decrypted <- encrypted.decrypt("")
-    } yield decrypted).value
+    yield decrypted).value
 
     ByteStringUtils.hash2string(decrypted) shouldBe privateKey
   }
@@ -113,16 +113,15 @@ class CliCommandsSpec extends AnyFlatSpec with Matchers with EitherValues {
     val pass = "pass"
     val json = api.parse(Seq(encryptKeyCommand, argument(passphraseOption, Some(pass)), privateKey)).value
 
-    val decrypted = (for {
+    val decrypted = (for
       encrypted <- EncryptedKeyJsonCodec.fromJson(json)
       decrypted <- encrypted.decrypt(pass)
-    } yield decrypted).value
+    yield decrypted).value
 
     ByteStringUtils.hash2string(decrypted) shouldBe privateKey
   }
-}
 
-object Fixture {
+object Fixture:
 
   def argument(name: String, value: Option[Any] = None): String = s"--$name${value.fold("")(v => s"=${v.toString}")}"
 
@@ -135,5 +134,3 @@ object Fixture {
   val address3 = "604542f9a9fb55d3e8004ff122f662f88eb32b4a"
 
   val requestedBalance = 42
-
-}

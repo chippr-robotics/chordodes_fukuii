@@ -6,8 +6,7 @@ import com.chipprbots.ethereum.domain.SignedTransaction
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
 import com.chipprbots.ethereum.rlp
 
-object RawTransactionCodec {
+object RawTransactionCodec:
 
   def asRawTransaction(e: SignedTransaction): ByteString =
     ByteString(rlp.encode(e.toRLPEncodable))
-}

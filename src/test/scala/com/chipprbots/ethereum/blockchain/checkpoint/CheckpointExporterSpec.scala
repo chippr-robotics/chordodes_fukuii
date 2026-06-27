@@ -36,11 +36,11 @@ class CheckpointExporterSpec
     with Matchers
     with EitherValues
     with OptionValues
-    with BeforeAndAfterEach {
+    with BeforeAndAfterEach:
 
   "CheckpointExporter" should {
 
-    "round-trip a small state through export → import yielding identical trie nodes" taggedAs UnitTest in new Setup {
+    "round-trip a small state through export → import yielding identical trie nodes" taggedAs UnitTest in new Setup:
       // Bytecodes referenced by accounts
       val codeA: ByteString = ByteString("contract-A-bytecode")
       val codeB: ByteString = ByteString("contract-B-bytecode-longer-for-variety")
@@ -148,9 +148,8 @@ class CheckpointExporterSpec
       targetReader.getChainWeightByHash(header.hash).value shouldBe weight
       targetStorages.storages.appStateStorage.getBestBlockNumber() shouldBe header.number
       targetStorages.storages.appStateStorage.isSnapSyncDone() shouldBe true
-    }
 
-    "fail cleanly when the requested block is missing" taggedAs UnitTest in new Setup {
+    "fail cleanly when the requested block is missing" taggedAs UnitTest in new Setup:
       val exporter = new CheckpointExporter(
         sourceStorages.storages.stateStorage,
         sourceStorages.storages.evmCodeStorage,
@@ -160,13 +159,12 @@ class CheckpointExporterSpec
       val r: Either[ExportError, ExportResult] =
         exporter.exportArchive(blockNumber = 9999, output = tmpRoot.resolve("nope.checkpoint"))
       r shouldBe Left(CheckpointExporter.NoSuchBlock(9999))
-    }
 
     // Regression for Bug 33 — exporter must unwrap ReferenceCountNodeStorage wrapper bytes.
     // Reading raw nodeStorage bytes on a BasicPruning chain surfaces the ref-count metadata,
     // which fails to decode as an MPT node. Exporter now goes through StateStorage so the
     // wrapper is transparent.
-    "round-trip state stored under BasicPruning (ref-counted) without MPT decode failure" taggedAs UnitTest in new BasicPruningSetup {
+    "round-trip state stored under BasicPruning (ref-counted) without MPT decode failure" taggedAs UnitTest in new BasicPruningSetup:
       val codeA: ByteString = ByteString("contract-A-bytecode")
       val codeAHash: ByteString = crypto.kec256(codeA)
       sourceStorages.storages.evmCodeStorage.put(codeAHash, codeA).commit()
@@ -217,7 +215,6 @@ class CheckpointExporterSpec
       importedTrie.get(crypto.kec256(addr1)).value.balance shouldBe UInt256(100)
       importedTrie.get(crypto.kec256(addr2)).value.nonce shouldBe UInt256(1)
       targetStorages.storages.evmCodeStorage.get(codeAHash).map(_.toArray.toSeq) shouldBe Some(codeA.toArray.toSeq)
-    }
   }
 
   private var tmpRoot: java.nio.file.Path = uninitialized
@@ -225,26 +222,24 @@ class CheckpointExporterSpec
   override def beforeEach(): Unit =
     tmpRoot = Files.createTempDirectory("checkpoint-exporter-spec")
 
-  override def afterEach(): Unit = {
+  override def afterEach(): Unit =
     import scala.jdk.CollectionConverters.*
     val walk = Files.walk(tmpRoot)
     try walk.iterator.asScala.toSeq.reverse.foreach(p => Files.deleteIfExists(p))
     finally walk.close()
-  }
 
-  private trait Setup extends EphemBlockchainTestSetup {
+  private trait Setup extends EphemBlockchainTestSetup:
     val sourceStorages = getNewStorages
     val targetStorages = getNewStorages
     val sourceWriter: BlockchainWriter = BlockchainWriter(sourceStorages.storages)
     val targetWriter: BlockchainWriter = BlockchainWriter(targetStorages.storages)
     val sourceReader: BlockchainReader = BlockchainReader(sourceStorages.storages)
     val targetReader: BlockchainReader = BlockchainReader(targetStorages.storages)
-  }
 
   /** Source uses BasicPruning so trie nodes go through ReferenceCountNodeStorage's ref-count wrapping — the path that
     * exposed Bug 33. Target stays ArchivePruning (matches the default `Setup`).
     */
-  private trait BasicPruningSetup extends EphemBlockchainTestSetup {
+  private trait BasicPruningSetup extends EphemBlockchainTestSetup:
     import com.chipprbots.ethereum.db.components.EphemDataSourceComponent
     import com.chipprbots.ethereum.db.components.Storages
     import com.chipprbots.ethereum.db.storage.pruning.BasicPruning
@@ -253,9 +248,8 @@ class CheckpointExporterSpec
 
     trait BasicPruningConfigBuilder
         extends PruningConfigBuilder
-        with com.chipprbots.ethereum.TestInstanceConfigProvider {
+        with com.chipprbots.ethereum.TestInstanceConfigProvider:
       override val pruningMode: PruningMode = BasicPruning(history = 1000)
-    }
 
     val sourceStorages: EphemDataSourceComponent & BasicPruningConfigBuilder & Storages.DefaultStorages =
       new EphemDataSourceComponent
@@ -268,5 +262,3 @@ class CheckpointExporterSpec
     val targetWriter: BlockchainWriter = BlockchainWriter(targetStorages.storages)
     val sourceReader: BlockchainReader = BlockchainReader(sourceStorages.storages)
     val targetReader: BlockchainReader = BlockchainReader(targetStorages.storages)
-  }
-}

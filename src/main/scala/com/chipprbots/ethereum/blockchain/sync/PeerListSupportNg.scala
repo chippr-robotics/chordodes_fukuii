@@ -9,6 +9,5 @@ import com.chipprbots.ethereum.network.Peer
   * was removed in CAPSTONE Phase 2d: every actor that once mixed it in is now Typed and composes [[PeerListHelper]]
   * instead. Only the `PeerWithInfo` data class survives, still referenced widely.
   */
-object PeerListSupportNg {
+object PeerListSupportNg:
   final case class PeerWithInfo(peer: Peer, peerInfo: PeerInfo)
-}

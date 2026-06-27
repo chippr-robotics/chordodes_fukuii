@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.blockchain.sync.regular.BlockImporter
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.testing.Tags.*
 
-class BlockFetcherStateSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike with Matchers {
+class BlockFetcherStateSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike with Matchers:
 
   lazy val validators = new MockValidatorsAlwaysSucceed
 
@@ -117,4 +117,3 @@ class BlockFetcherStateSpec extends ScalaTestWithActorTestKit with AnyWordSpecLi
       }
     }
   }
-}

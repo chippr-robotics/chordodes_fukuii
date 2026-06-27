@@ -32,17 +32,16 @@ class EthashBlockHeaderValidatorSpec
     with ScalaCheckPropertyChecks
     with ObjectGenerators
     with MockFactory
-    with SuperSlow {
+    with SuperSlow:
 
   val ExtraDataSizeLimit = 20
 
   implicit val blockchainConfig: BlockchainConfig = createBlockchainConfig()
 
   "BlockHeaderValidator" should "validate correctly formed BlockHeaders" taggedAs (UnitTest, ConsensusTest) in {
-    PoWBlockHeaderValidator.validate(validBlockHeader, validParent.header) match {
+    PoWBlockHeaderValidator.validate(validBlockHeader, validParent.header) match
       case Right(_) => succeed
       case _        => fail()
-    }
   }
 
   it should "return a failure if created based on invalid extra data" taggedAs (UnitTest, ConsensusTest) in {
@@ -76,11 +75,10 @@ class EthashBlockHeaderValidatorSpec
     }.toSeq.flatten
 
     forAll(cases) { (blockHeader, parentBlock, supportsDaoFork, valid) =>
-      PoWBlockHeaderValidator.validate(blockHeader, parentBlock.header)(createBlockchainConfig(supportsDaoFork)) match {
+      PoWBlockHeaderValidator.validate(blockHeader, parentBlock.header)(createBlockchainConfig(supportsDaoFork)) match
         case Right(_)                      => assert(valid)
         case Left(DaoHeaderExtraDataError) => assert(!valid)
         case _                             => fail()
-      }
     }
   }
 
@@ -88,11 +86,10 @@ class EthashBlockHeaderValidatorSpec
     forAll(longGen) { timestamp =>
       val blockHeader = validBlockHeader.copy(unixTimestamp = timestamp)
       val validateResult = PoWBlockHeaderValidator.validate(blockHeader, validParent.header)
-      timestamp match {
+      timestamp match
         case t if t <= validParentBlockHeader.unixTimestamp => assert(validateResult == Left(HeaderTimestampError))
         case validBlockHeader.unixTimestamp                 => assert(validateResult == Right(BlockHeaderValid))
         case _                                              => assert(validateResult == Left(HeaderDifficultyError))
-      }
     }
   }
 
@@ -169,7 +166,7 @@ class EthashBlockHeaderValidatorSpec
     PoWBlockHeaderValidator.validate(blockHeaderWithInvalidNonceAndMixHash, parent.header) shouldBe Left(HeaderPoWError)
   }
 
-  it should "validate correctly a block whose parent is taggedAs (UnitTest, ConsensusTest) in storage" in new EphemBlockchainTestSetup {
+  it should "validate correctly a block whose parent is taggedAs (UnitTest, ConsensusTest) in storage" in new EphemBlockchainTestSetup:
     blockchainWriter
       .storeBlockHeader(validParentBlockHeader)
       .and(blockchainWriter.storeBlockBody(validParentBlockHeader.hash, validParentBlockBody))
@@ -177,37 +174,32 @@ class EthashBlockHeaderValidatorSpec
     PoWBlockHeaderValidator.validate(
       validBlockHeader,
       ((h: ByteString) => blockchainReader.getBlockHeaderByHash(BlockHash(h)))
-    ) match {
+    ) match
       case Right(_) => succeed
       case _        => fail()
-    }
-  }
 
-  it should "return a failure if the parent's header is not taggedAs (UnitTest, ConsensusTest) in storage" in new EphemBlockchainTestSetup {
+  it should "return a failure if the parent's header is not taggedAs (UnitTest, ConsensusTest) in storage" in new EphemBlockchainTestSetup:
     PoWBlockHeaderValidator.validate(
       validBlockHeader,
       ((h: ByteString) => blockchainReader.getBlockHeaderByHash(BlockHash(h)))
-    ) match {
+    ) match
       case Left(HeaderParentNotFoundError) => succeed
       case _                               => fail()
-    }
-  }
 
   it should "properly validate a block after difficulty bomb pause" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new EphemBlockchainTestSetup {
+  ) in new EphemBlockchainTestSetup:
     val parent: Block = Block(pausedDifficultyBombBlockParent, parentBody)
 
     val res: Either[BlockHeaderError, BlockHeaderValid] =
       PoWBlockHeaderValidator.validate(pausedDifficultyBombBlock, parent.header)
     res shouldBe Right(BlockHeaderValid)
-  }
 
   it should "properly calculate the difficulty after difficulty bomb resume (with reward reduction)" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new EphemBlockchainTestSetup {
+  ) in new EphemBlockchainTestSetup:
     val parentHeader: BlockHeader =
       validParentBlockHeader.copy(number = 5000101, unixTimestamp = 1513175023, difficulty = BigInt("22627021745803"))
     val parent: Block = Block(parentHeader, parentBody)
@@ -219,12 +211,11 @@ class EthashBlockHeaderValidatorSpec
     val expected: BigInt = BigInt("22638070358408")
 
     difficulty shouldBe expected
-  }
 
   it should "properly calculate the difficulty after difficulty defuse" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new EphemBlockchainTestSetup {
+  ) in new EphemBlockchainTestSetup:
     val parentHeader: BlockHeader =
       validParentBlockHeader.copy(number = 5899999, unixTimestamp = 1525176000, difficulty = BigInt("22627021745803"))
     val parent: Block = Block(parentHeader, parentBody)
@@ -236,12 +227,11 @@ class EthashBlockHeaderValidatorSpec
     val blockDifficultyWihtoutBomb: BigInt = BigInt("22638070096264")
 
     difficulty shouldBe blockDifficultyWihtoutBomb
-  }
 
   it should "properly calculate a block after block reward reduction (without uncles)" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new EphemBlockchainTestSetup {
+  ) in new EphemBlockchainTestSetup:
     val parent: Block = Block(afterRewardReductionParentBlockHeader, parentBody)
 
     val blockNumber: BigInt = afterRewardReductionBlockHeader.number
@@ -256,12 +246,11 @@ class EthashBlockHeaderValidatorSpec
     BigInt("3484099629090779")
 
     difficulty shouldBe afterRewardReductionBlockHeader.difficulty
-  }
 
   it should "properly calculate the difficulty after muir glacier delay" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new EphemBlockchainTestSetup {
+  ) in new EphemBlockchainTestSetup:
     val blockchainConfigWithoutDifficultyBombRemoval: BlockchainConfig =
       EthashBlockHeaderValidatorSpec.this.blockchainConfig.withUpdatedForkBlocks(
         _.copy(
@@ -289,15 +278,13 @@ class EthashBlockHeaderValidatorSpec
     val blockDifficultyWihtoutBomb: BigInt = BigInt("22638070096265")
 
     difficulty shouldBe blockDifficultyWihtoutBomb
-  }
 
-  object BlockValidatorWithPowMocked extends BlockHeaderValidatorSkeleton() {
+  object BlockValidatorWithPowMocked extends BlockHeaderValidatorSkeleton():
 
     override def validateEvenMore(blockHeader: BlockHeader)(implicit
         blockchainConfig: BlockchainConfig
     ): Either[BlockHeaderError, BlockHeaderValid] =
       Right(BlockHeaderValid)
-  }
 
   val parentBody: BlockBody = BlockBody.empty
 
@@ -418,7 +405,7 @@ class EthashBlockHeaderValidatorSpec
   val validParentBlockBody: BlockBody = BlockBody(Seq.empty, Seq.empty)
   val validParent: Block = Block(validParentBlockHeader, validParentBlockBody)
 
-  def createBlockchainConfig(supportsDaoFork: Boolean = false): BlockchainConfig = {
+  def createBlockchainConfig(supportsDaoFork: Boolean = false): BlockchainConfig =
     import Fixtures.Blocks.*
     BlockchainConfig(
       forkBlockNumbers = ForkBlockNumbers.Empty.copy(
@@ -433,7 +420,7 @@ class EthashBlockHeaderValidatorSpec
         muirGlacierBlockNumber = 9200000,
         eip106BlockNumber = 0
       ),
-      daoForkConfig = Some(new DaoForkConfig {
+      daoForkConfig = Some(new DaoForkConfig:
         override val blockExtraData: Option[ByteString] =
           if supportsDaoFork then Some(ProDaoForkBlock.header.extraData) else None
         override val range: Int = 10
@@ -443,7 +430,7 @@ class EthashBlockHeaderValidatorSpec
         override val forkBlockNumber: BigInt = DaoForkBlock.header.number
         override val refundContract: Option[Address] = None
         override val includeOnForkIdList: Boolean = false
-      }),
+      ),
       // unused
       maxCodeSize = None,
       chainId = 0x3d,
@@ -456,7 +443,6 @@ class EthashBlockHeaderValidatorSpec
       gasTieBreaker = false,
       ethCompatibleStorage = true
     )
-  }
 
   val ProDaoBlock1920008Header: BlockHeader = BlockHeader(
     parentHash = BlockHash(ByteString(Hex.decode("05c45c9671ee31736b9f37ee98faa72c89e314059ecff3257206e6ab498eb9d1"))),
@@ -526,4 +512,3 @@ class EthashBlockHeaderValidatorSpec
     mixHash = BlockHash(ByteString(Hex.decode("8f86617d6422c26a89b8b349b160973ca44f90326e758f1ef669c4046741dd06"))),
     nonce = ByteString(Hex.decode("c7de19e00a8c3e32"))
   )
-}

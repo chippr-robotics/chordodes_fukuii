@@ -21,7 +21,7 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
   * fake Ethash seals), the pre-merge branch falls back to [[MockedPowBlockHeaderValidator]] so synthetic test chains
   * pass the header check without a real Ethash seal.
   */
-object TransitionBlockHeaderValidator extends BlockHeaderValidator {
+object TransitionBlockHeaderValidator extends BlockHeaderValidator:
 
   private def poWValidator: BlockHeaderValidator =
     if java.lang.Boolean.getBoolean("fukuii.mining.skip-pow-validation") then MockedPowBlockHeaderValidator
@@ -39,4 +39,3 @@ object TransitionBlockHeaderValidator extends BlockHeaderValidator {
   ): Either[BlockHeaderError, BlockHeaderValid] =
     if blockHeader.difficulty == 0 then PoSBlockHeaderValidator.validateHeaderOnly(blockHeader)
     else poWValidator.validateHeaderOnly(blockHeader)
-}

@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.network.p2p.messages.SNAP.TrieNodes
 import com.chipprbots.ethereum.testing.PeerTestHelpers
 import com.chipprbots.ethereum.testing.Tags.*
 
-class TrieNodeHealingWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
+class TrieNodeHealingWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
@@ -32,13 +32,12 @@ class TrieNodeHealingWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSp
 
   private def makeWorker(
       coordinator: TestProbe[TrieNodeHealingCoordinator.Command]
-  ): org.apache.pekko.actor.typed.ActorRef[TrieNodeHealingWorker.Command] = {
+  ): org.apache.pekko.actor.typed.ActorRef[TrieNodeHealingWorker.Command] =
     val networkPeerManager = ClassicTestProbe()
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     testKit.spawn(
       TrieNodeHealingWorker(coordinator.ref, networkPeerManager.ref, requestTracker)
     )
-  }
 
   "TrieNodeHealingWorker" should "announce peer availability to coordinator on FetchTrieNodes" taggedAs UnitTest in {
     val coordinator = makeCoordinatorProbe()
@@ -115,4 +114,3 @@ class TrieNodeHealingWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSp
     worker ! TrieNodeHealingCoordinator.FetchTrieNodes(makeHealingTask(), peer)
     coordinator.expectMessage(1.second, TrieNodeHealingCoordinator.HealingPeerAvailable(peer))
   }
-}

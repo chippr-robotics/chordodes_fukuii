@@ -19,28 +19,26 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
 
-class BlockRewardSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks with MockFactory {
+class BlockRewardSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks with MockFactory:
 
-  it should "pay to the miner if no ommers included" taggedAs (UnitTest, StateTest) in new TestSetup {
+  it should "pay to the miner if no ommers included" taggedAs (UnitTest, StateTest) in new TestSetup:
     val block: Block = sampleBlock(validAccountAddress, Seq(validAccountAddress2, validAccountAddress3))
     val afterRewardWorldState: InMemoryWorldStateProxy = mining.blockPreparator.payBlockReward(block, worldState)
     val beforeExecutionBalance: BigInt = worldState.getGuaranteedAccount(Address(block.header.beneficiary)).balance
     afterRewardWorldState
       .getGuaranteedAccount(Address(block.header.beneficiary))
       .balance shouldEqual (beforeExecutionBalance + minerTwoOmmersReward)
-  }
 
   // scalastyle:off magic.number
-  it should "be paid to the miner even if the account doesn't exist" taggedAs (UnitTest, StateTest) in new TestSetup {
+  it should "be paid to the miner even if the account doesn't exist" taggedAs (UnitTest, StateTest) in new TestSetup:
     val block: Block = sampleBlock(Address(0xdeadbeef))
     val afterRewardWorldState: InMemoryWorldStateProxy = mining.blockPreparator.payBlockReward(block, worldState)
     val expectedRewardAsBigInt: BigInt =
       mining.blockPreparator.blockRewardCalculator.calculateMiningReward(block.header.number, 0)
     val expectedReward: UInt256 = UInt256(expectedRewardAsBigInt)
     afterRewardWorldState.getGuaranteedAccount(Address(block.header.beneficiary)).balance shouldEqual expectedReward
-  }
 
-  it should "be paid if ommers are included in block" taggedAs (UnitTest, StateTest) in new TestSetup {
+  it should "be paid if ommers are included in block" taggedAs (UnitTest, StateTest) in new TestSetup:
     val block: Block = sampleBlock(validAccountAddress, Seq(validAccountAddress2, validAccountAddress3))
     val afterRewardWorldState: InMemoryWorldStateProxy = mining.blockPreparator.payBlockReward(block, worldState)
 
@@ -60,9 +58,8 @@ class BlockRewardSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyC
       .balance shouldEqual (beforeExecutionBalance1 + minerTwoOmmersReward)
     uncleBalance1 shouldEqual (beforeExecutionBalance2 + ommerFiveBlocksDifferenceReward)
     uncleBalance2 shouldEqual (beforeExecutionBalance3 + ommerFiveBlocksDifferenceReward)
-  }
 
-  it should "be paid if ommers are included in block even if accounts don't exist" in new TestSetup {
+  it should "be paid if ommers are included in block even if accounts don't exist" in new TestSetup:
     val block: Block = sampleBlock(Address(0xdeadbeef), Seq(Address(0x1111), Address(0x2222)))
     val afterRewardWorldState: InMemoryWorldStateProxy = mining.blockPreparator.payBlockReward(block, worldState)
     afterRewardWorldState
@@ -74,9 +71,8 @@ class BlockRewardSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyC
     afterRewardWorldState
       .getGuaranteedAccount(Address(block.body.uncleNodesList(1).beneficiary))
       .balance shouldEqual ommerFiveBlocksDifferenceReward
-  }
 
-  it should "be calculated correctly after byzantium fork" in new TestSetup {
+  it should "be calculated correctly after byzantium fork" in new TestSetup:
     val block: Block = sampleBlockAfterByzantium(validAccountAddress)
     val afterRewardWorldState: InMemoryWorldStateProxy = mining.blockPreparator.payBlockReward(block, worldState)
     val address: Address = Address(block.header.beneficiary)
@@ -84,9 +80,8 @@ class BlockRewardSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyC
     afterRewardWorldState
       .getGuaranteedAccount(address)
       .balance shouldEqual beforeExecutionBalance + afterByzantiumNewBlockReward
-  }
 
-  it should "be calculated correctly if ommers are included in block after byzantium fork " in new TestSetup {
+  it should "be calculated correctly if ommers are included in block after byzantium fork " in new TestSetup:
     val block: Block = sampleBlockAfterByzantium(validAccountAddress4, Seq(validAccountAddress5, validAccountAddress6))
 
     val minerAddress: Address = Address(block.header.beneficiary)
@@ -113,10 +108,9 @@ class BlockRewardSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyC
     afterRewardWorldState
       .getGuaranteedAccount(ommer2Address)
       .balance shouldEqual (beforeExecutionBalance3 + ommersRewards)
-  }
 
   // scalastyle:off magic.number
-  trait TestSetup extends EphemBlockchainTestSetup {
+  trait TestSetup extends EphemBlockchainTestSetup:
     // + cake overrides
     override lazy val vm: VMImpl = new MockVM()
 
@@ -173,7 +167,7 @@ class BlockRewardSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyC
         )
       )
 
-    def sampleBlockAfterByzantium(minerAddress: Address, ommerMiners: Seq[Address] = Nil): Block = {
+    def sampleBlockAfterByzantium(minerAddress: Address, ommerMiners: Seq[Address] = Nil): Block =
       val baseBlockNumber = forkBlockNumbers.byzantiumBlockNumber
       Block(
         header = Fixtures.Blocks.Genesis.header.copy(beneficiary = minerAddress.bytes, number = baseBlockNumber),
@@ -183,6 +177,3 @@ class BlockRewardSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyC
           }
         )
       )
-    }
-  }
-}

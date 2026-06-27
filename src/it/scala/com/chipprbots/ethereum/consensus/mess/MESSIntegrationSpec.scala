@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.domain.TrieRoot
   * Tests the polynomial antigravity curve and reorg rejection logic using realistic blockchain scenarios. Verifies
   * cross-client consistency with core-geth and Besu.
   */
-class MESSIntegrationSpec extends AnyFlatSpec with Matchers {
+class MESSIntegrationSpec extends AnyFlatSpec with Matchers:
 
   def createHeader(
       number: BigInt,
@@ -157,4 +157,3 @@ class MESSIntegrationSpec extends AnyFlatSpec with Matchers {
     // Negative-equivalent: polynomial should handle zero gracefully
     ArtificialFinality.polynomialV(BigInt(0)) shouldBe BigInt(128)
   }
-}

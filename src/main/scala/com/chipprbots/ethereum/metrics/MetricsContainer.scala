@@ -10,6 +10,5 @@ package com.chipprbots.ethereum.metrics
   * per chain for per-chain observability until the registry-per-instance refactor lands. See `Metrics.configure` for
   * the WARN that fires when a second instance is registered.
   */
-trait MetricsContainer {
+trait MetricsContainer:
   final lazy val metrics: Metrics = Metrics.get()
-}

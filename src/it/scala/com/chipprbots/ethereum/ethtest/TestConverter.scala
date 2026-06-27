@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
   *
   * Handles hex string parsing and mapping to strongly-typed domain objects.
   */
-object TestConverter {
+object TestConverter:
 
   /** Convert ethereum/tests AccountState to internal Account
     *
@@ -22,16 +22,15 @@ object TestConverter {
     * @return
     *   Internal Account object
     */
-  def toAccount(address: String, state: AccountState): Account = {
+  def toAccount(address: String, state: AccountState): Account =
     val _ = Address(ByteString(parseHex(address)))
     val balance = UInt256(parseBigInt(state.balance))
     val nonce = UInt256(parseBigInt(state.nonce))
-    val _ = if state.code.isEmpty || state.code == "0x" then {
-      Account.EmptyCodeHash
-    } else {
-      // Code hash will be computed when storing
-      ByteString(parseHex(state.code))
-    }
+    val _ =
+      if state.code.isEmpty || state.code == "0x" then Account.EmptyCodeHash
+      else
+        // Code hash will be computed when storing
+        ByteString(parseHex(state.code))
 
     Account(
       nonce = nonce,
@@ -39,7 +38,6 @@ object TestConverter {
       storageRoot = Account.EmptyStorageRootHash, // Will be computed from storage
       codeHash = Account.EmptyCodeHash // Placeholder, actual code stored separately
     )
-  }
 
   /** Convert ethereum/tests TestBlockHeader to internal BlockHeader
     *
@@ -48,7 +46,7 @@ object TestConverter {
     * @return
     *   Internal BlockHeader object
     */
-  def toBlockHeader(testHeader: TestBlockHeader): BlockHeader = {
+  def toBlockHeader(testHeader: TestBlockHeader): BlockHeader =
     import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields.*
 
     // Post-merge header fields. Defaults are applied when a fixture omits a field so
@@ -92,7 +90,6 @@ object TestConverter {
       nonce = ByteString(parseHex(testHeader.nonce)),
       extraFields = extraFields
     )
-  }
 
   /** Convert ethereum/tests TestWithdrawal to internal Withdrawal (EIP-4895).
     *
@@ -116,7 +113,7 @@ object TestConverter {
     * @return
     *   Internal SignedTransaction object
     */
-  def toTransaction(testTx: TestTransaction): SignedTransaction = {
+  def toTransaction(testTx: TestTransaction): SignedTransaction =
     // Parse signature components
     val v = parseBigInt(testTx.v).toByte
     val r = ByteString(parseHex(testTx.r))
@@ -145,7 +142,7 @@ object TestConverter {
       }
 
     // Determine transaction type and create appropriate transaction object
-    val tx: Transaction = testTx.txType match {
+    val tx: Transaction = testTx.txType match
       case Some("0x01") | Some("0x1") =>
         // EIP-2930: Transaction with access list
         val chainId = testTx.chainId.map(parseBigInt).getOrElse(BigInt(1))
@@ -206,10 +203,8 @@ object TestConverter {
           value = value,
           payload = payload
         )
-    }
 
     SignedTransaction(tx, v, r, s)
-  }
 
   /** Map network name to fork block numbers
     *
@@ -221,10 +216,10 @@ object TestConverter {
     * @return
     *   BlockchainConfig with appropriate fork configuration
     */
-  def networkToConfig(network: String, baseConfig: BlockchainConfig): BlockchainConfig = {
+  def networkToConfig(network: String, baseConfig: BlockchainConfig): BlockchainConfig =
     import com.chipprbots.ethereum.utils.ForkBlockNumbers
 
-    val forks = network.toLowerCase match {
+    val forks = network.toLowerCase match
       case "frontier" =>
         ForkBlockNumbers.Empty.copy(frontierBlockNumber = 0)
       case "homestead" =>
@@ -386,7 +381,6 @@ object TestConverter {
       case _ =>
         // Default to Frontier for unknown networks
         ForkBlockNumbers.Empty.copy(frontierBlockNumber = 0)
-    }
 
     // These vectors target the ETH execution path (chainId=1, timestamp fork dispatch).
     // The base config defaults to networkType=ETC; force ETH so the ETC-Olympia
@@ -398,7 +392,7 @@ object TestConverter {
       forkBlockNumbers = forks,
       networkType = com.chipprbots.ethereum.utils.NetworkType.ETH
     )
-    network.toLowerCase match {
+    network.toLowerCase match
       case "shanghai" =>
         configWithForks.copy(
           forkTimestamps = com.chipprbots.ethereum.utils.ForkTimestamps(shanghaiTimestamp = Some(0L))
@@ -428,21 +422,14 @@ object TestConverter {
           )
         )
       case _ => configWithForks
-    }
-  }
 
   /** Parse hex string to byte array, handling "0x" prefix */
-  private def parseHex(hex: String): Array[Byte] = {
+  private def parseHex(hex: String): Array[Byte] =
     val cleaned = if hex.startsWith("0x") then hex.substring(2) else hex
     if cleaned.isEmpty then Array.empty[Byte]
     else Hex.decode(cleaned)
-  }
 
   /** Parse hex or decimal string to BigInt */
   private def parseBigInt(value: String): BigInt =
-    if value.startsWith("0x") then {
-      BigInt(value.substring(2), 16)
-    } else {
-      BigInt(value)
-    }
-}
+    if value.startsWith("0x") then BigInt(value.substring(2), 16)
+    else BigInt(value)

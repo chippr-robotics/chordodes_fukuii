@@ -57,7 +57,7 @@ case class BlockchainConfig(
     networkType: NetworkType = NetworkType.ETC,
     terminalTotalDifficulty: Option[BigInt] = None,
     forkTimestamps: ForkTimestamps = ForkTimestamps()
-) {
+):
   def isPoS(totalDifficulty: BigInt): Boolean =
     terminalTotalDifficulty.exists(ttd => totalDifficulty >= ttd)
 
@@ -85,7 +85,6 @@ case class BlockchainConfig(
 
   def withUpdatedForkBlocks(update: (ForkBlockNumbers) => ForkBlockNumbers): BlockchainConfig =
     copy(forkBlockNumbers = update(forkBlockNumbers))
-}
 
 case class ForkBlockNumbers(
     frontierBlockNumber: BigInt,
@@ -123,7 +122,7 @@ case class ForkBlockNumbers(
     // regardless of operator config. None → fall back to miningConfig.gasLimitTarget.
     spiralGasTarget: Option[BigInt] = None,
     olympiaGasTarget: Option[BigInt] = None
-) {
+):
   def all: List[BigInt] = this.productIterator.toList.collect { case i: BigInt =>
     i
   }
@@ -137,9 +136,8 @@ case class ForkBlockNumbers(
     if blockNumber >= olympiaBlockNumber then olympiaGasTarget
     else if blockNumber >= spiralBlockNumber then spiralGasTarget
     else None
-}
 
-object ForkBlockNumbers {
+object ForkBlockNumbers:
   val Empty: ForkBlockNumbers = ForkBlockNumbers(
     frontierBlockNumber = 0,
     homesteadBlockNumber = Long.MaxValue,
@@ -167,12 +165,11 @@ object ForkBlockNumbers {
     olympiaBlockNumber = Long.MaxValue,
     mergeNetsplitBlockNumber = Long.MaxValue
   )
-}
 
-object BlockchainConfig {
+object BlockchainConfig:
 
   // scalastyle:off method.length
-  def fromRawConfig(blockchainConfig: TypesafeConfig): BlockchainConfig = {
+  def fromRawConfig(blockchainConfig: TypesafeConfig): BlockchainConfig =
     val powTargetTime: Option[Long] =
       ConfigUtils
         .getOptionalValue(blockchainConfig, _.getDuration, "pow-target-time")
@@ -210,10 +207,9 @@ object BlockchainConfig {
     val daoForkConfig = Try(blockchainConfig.getConfig("dao")).toOption.map(DaoForkConfig(_))
     val accountStartNonce: UInt256 = UInt256(BigInt(blockchainConfig.getString("account-start-nonce")))
 
-    val chainId: BigInt = {
+    val chainId: BigInt =
       val s = blockchainConfig.getString("chain-id")
       parseHexOrDecNumber(s)
-    }
 
     val networkId: Long = Try(blockchainConfig.getLong("network-id")).getOrElse {
       Try(BigInt(blockchainConfig.getString("network-id")).toLong).getOrElse(1L)
@@ -334,13 +330,10 @@ object BlockchainConfig {
       terminalTotalDifficulty = terminalTotalDifficulty,
       forkTimestamps = forkTimestamps
     )
-  }
   // scalastyle:on method.length
-  private def readPubKeySet(blockchainConfig: TypesafeConfig, path: String): Set[ByteString] = {
+  private def readPubKeySet(blockchainConfig: TypesafeConfig, path: String): Set[ByteString] =
     val keys: Seq[String] = ConfigUtils
       .getOptionalValue(blockchainConfig, _.getStringList, path)
       .map(_.asScala.toSeq)
       .getOrElse(Nil)
     keys.map(ByteStringUtils.string2hash).toSet
-  }
-}

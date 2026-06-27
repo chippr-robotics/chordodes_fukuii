@@ -20,9 +20,9 @@ import com.chipprbots.ethereum.testing.Tags.*
   * require(doTransfer) — fires when doTransfer=false (covered by C2 test) L2 — VM.call(): throw
   * IllegalArgumentException — fires when recipientAddr=None
   */
-class VMTracerSpec extends AnyFreeSpec with Matchers {
+class VMTracerSpec extends AnyFreeSpec with Matchers:
 
-  private class CountingTracer extends ExecutionTracer {
+  private class CountingTracer extends ExecutionTracer:
     var enterCount = 0
     var exitCount = 0
 
@@ -39,7 +39,6 @@ class VMTracerSpec extends AnyFreeSpec with Matchers {
       exitCount += 1
 
     override def getResult: org.json4s.JValue = org.json4s.JNull
-  }
 
   private val senderAddr = Address(0xcafebabeL)
   private val senderAcc = Account(nonce = 1, balance = 1000000)
@@ -174,4 +173,3 @@ class VMTracerSpec extends AnyFreeSpec with Matchers {
       tracer.exitCount shouldBe 1
     }
   }
-}

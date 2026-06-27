@@ -15,7 +15,7 @@ class BlockValidation(
     mining: Mining,
     blockchainReader: BlockchainReader,
     blockQueue: BlockQueue
-) {
+):
 
   def validateBlockBeforeExecution(
       block: Block
@@ -31,13 +31,12 @@ class BlockValidation(
       .getBlockHeaderByHash(BlockHash(hash))
       .orElse(blockQueue.getBlockByHash(BlockHash(hash)).map(_.header))
 
-  private def getNBlocksBackFromChainOrQueue(hash: ByteString, n: Int): List[Block] = {
+  private def getNBlocksBackFromChainOrQueue(hash: ByteString, n: Int): List[Block] =
     val queuedBlocks = blockQueue.getBranch(BlockHash(hash), dequeue = false).takeRight(n)
-    if queuedBlocks.length == n then {
-      queuedBlocks
-    } else {
+    if queuedBlocks.length == n then queuedBlocks
+    else
       val chainedBlockHash = queuedBlocks.headOption.map(_.header.parentHash).getOrElse(BlockHash(hash))
-      blockchainReader.getBlockByHash(chainedBlockHash) match {
+      blockchainReader.getBlockByHash(chainedBlockHash) match
         case None =>
           // The in memory blocks aren't connected to the db ones, we don't have n blocks to return so we return none
           Nil
@@ -54,9 +53,6 @@ class BlockValidation(
             .collect { case Some(block) => block }
             .toList
           (remainingBlocks :+ highestBlockInStorage) ::: queuedBlocks
-      }
-    }
-  }
 
   def validateBlockAfterExecution(
       block: Block,
@@ -70,4 +66,3 @@ class BlockValidation(
       receipts = receipts,
       gasUsed = gasUsed
     )
-}

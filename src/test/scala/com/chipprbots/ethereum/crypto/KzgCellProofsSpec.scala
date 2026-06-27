@@ -12,19 +12,17 @@ import com.chipprbots.ethereum.testing.Tags.*
   * Loads the KZG trusted setup (same resource as KzgPointEvaluationSpec) and verifies that computeCellsAndKzgProofs
   * returns CELLS_PER_EXT_BLOB (128) cells and proofs per blob, each of the expected byte length.
   */
-class KzgCellProofsSpec extends AnyFunSuite with BeforeAndAfterAll with Matchers {
+class KzgCellProofsSpec extends AnyFunSuite with BeforeAndAfterAll with Matchers:
 
   override def beforeAll(): Unit =
-    try {
+    try
       CKZG4844JNI.loadNativeLibrary()
       CKZG4844JNI.loadTrustedSetupFromResource("/trusted_setup.txt", classOf[CKZG4844JNI], 0L)
-    } catch {
-      case _: Exception => () // already loaded by a prior test class in the same JVM
-    }
+    catch case _: Exception => () // already loaded by a prior test class in the same JVM
 
   override def afterAll(): Unit =
     try CKZG4844JNI.freeTrustedSetup()
-    catch { case _: Exception => () }
+    catch case _: Exception => ()
 
   // A zero-filled blob: all 4096 field elements are 0, which is a valid BLS12-381 field element.
   private lazy val zeroBlobBytes: Array[Byte] = Array.fill[Byte](CKZG4844JNI.BYTES_PER_BLOB)(0)
@@ -52,4 +50,3 @@ class KzgCellProofsSpec extends AnyFunSuite with BeforeAndAfterAll with Matchers
   test("CELLS_PER_EXT_BLOB constant is 128", UnitTest, CryptoTest) {
     KzgCellProofs.CELLS_PER_EXT_BLOB shouldBe 128
   }
-}

@@ -7,11 +7,10 @@ import com.chipprbots.ethereum.db.storage.pruning.PruningMode
 import com.chipprbots.ethereum.ledger.VMImpl
 import com.chipprbots.ethereum.nodebuilder.PruningConfigBuilder
 
-trait EphemBlockchainTestSetup extends ScenarioSetup {
+trait EphemBlockchainTestSetup extends ScenarioSetup:
 
-  trait LocalPruningConfigBuilder extends PruningConfigBuilder with com.chipprbots.ethereum.TestInstanceConfigProvider {
+  trait LocalPruningConfigBuilder extends PruningConfigBuilder with com.chipprbots.ethereum.TestInstanceConfigProvider:
     override val pruningMode: PruningMode = ArchivePruning
-  }
 
   // + cake overrides
   override lazy val vm: VMImpl = new VMImpl
@@ -27,4 +26,3 @@ trait EphemBlockchainTestSetup extends ScenarioSetup {
       with LocalPruningConfigBuilder
       with Storages.DefaultStorages
       with com.chipprbots.ethereum.TestInstanceConfigProvider
-}

@@ -19,7 +19,7 @@ class StxLedger(
     evmCodeStorage: EvmCodeStorage,
     blockPreparator: BlockPreparator,
     configBuilder: BlockchainConfigBuilder
-) {
+):
   import configBuilder.*
 
   def simulateTransaction(
@@ -37,7 +37,7 @@ class StxLedger(
       blockHeader: BlockHeader,
       world: Option[InMemoryWorldStateProxy],
       tracer: Option[ExecutionTracer]
-  ): TxResult = {
+  ): TxResult =
     val tx = stx.tx
 
     val world1 = world.getOrElse(
@@ -54,18 +54,15 @@ class StxLedger(
 
     val senderAddress = stx.senderAddress
     val world2 =
-      if world1.getAccount(senderAddress).isEmpty then {
+      if world1.getAccount(senderAddress).isEmpty then
         world1.saveAccount(senderAddress, Account.empty(blockchainConfig.accountStartNonce))
-      } else {
-        world1
-      }
+      else world1
 
     val worldForTx = blockPreparator.updateSenderAccountBeforeExecution(tx, senderAddress, world2)
     val result = blockPreparator.runVM(tx, senderAddress, blockHeader, worldForTx, tracer)
     val totalGasToRefund = blockPreparator.calcTotalGasToRefund(tx, result, blockHeader.number)
 
     TxResult(result.world, tx.tx.gasLimit - totalGasToRefund, result.logs, result.returnData, result.error)
-  }
 
   /** Like [[simulateTransaction]] but attaches a tracer and fires the tx-level lifecycle hooks.
     *
@@ -79,7 +76,7 @@ class StxLedger(
       blockHeader: BlockHeader,
       world: Option[InMemoryWorldStateProxy],
       tracer: ExecutionTracer
-  ): TxResult = {
+  ): TxResult =
     val tx = stx.tx
 
     val world1 = world.getOrElse(
@@ -108,7 +105,6 @@ class StxLedger(
     tracer.onTxEnd(gasUsed, result.returnData, result.error.map(_.toString))
 
     TxResult(result.world, gasUsed, result.logs, result.returnData, result.error)
-  }
 
   /** Advances a world state through prior transactions in a block to reach the state just before transaction at
     * [[txIndex]]. Used by [[DebugTracingService]] and [[TraceService]] for historical trace replay.
@@ -132,7 +128,7 @@ class StxLedger(
       txs: Seq[SignedTransactionWithSender],
       txIndex: Int,
       parentStateRoot: org.apache.pekko.util.ByteString
-  ): InMemoryWorldStateProxy = {
+  ): InMemoryWorldStateProxy =
     val world0 = InMemoryWorldStateProxy(
       evmCodeStorage = evmCodeStorage,
       mptStorage = blockchain.getReadOnlyMptStorage(),
@@ -145,20 +141,18 @@ class StxLedger(
     (0 until txIndex).foldLeft(world0) { (world, i) =>
       simulateTransaction(txs(i), blockHeader, Some(world)).worldState
     }
-  }
 
   def binarySearchGasEstimation(
       stx: SignedTransactionWithSender,
       blockHeader: BlockHeader,
       world: Option[InMemoryWorldStateProxy]
-  ): BigInt = {
+  ): BigInt =
     val lowLimit = EvmConfig.forBlock(blockHeader.number, blockchainConfig).feeSchedule.G_transaction
     val tx = stx.tx
     val highLimit = tx.tx.gasLimit
 
-    if highLimit < lowLimit then {
-      highLimit
-    } else {
+    if highLimit < lowLimit then highLimit
+    else
       StxLedger.binaryChop(lowLimit, highLimit) { gasLimit =>
         simulateTransaction(
           stx.copy(tx = tx.copy(tx = Transaction.withGasLimit(gasLimit)(tx.tx))),
@@ -166,11 +160,8 @@ class StxLedger(
           world
         ).vmError
       }
-    }
-  }
-}
 
-object StxLedger {
+object StxLedger:
 
   /** Function finds minimal value in some interval for which provided function do not return error If searched value is
     * not in provided interval, function returns maximum value of searched interval
@@ -184,15 +175,12 @@ object StxLedger {
     *   minimal value for which provided function do not return error
     */
   @tailrec
-  private[ledger] def binaryChop[Err](min: BigInt, max: BigInt)(f: BigInt => Option[Err]): BigInt = {
+  private[ledger] def binaryChop[Err](min: BigInt, max: BigInt)(f: BigInt => Option[Err]): BigInt =
     assert(min <= max)
 
     if min == max then max
-    else {
+    else
       val mid = min + (max - min) / 2
       val possibleError = f(mid)
       if possibleError.isEmpty then binaryChop(min, mid)(f)
       else binaryChop(mid + 1, max)(f)
-    }
-  }
-}

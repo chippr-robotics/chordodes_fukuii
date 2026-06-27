@@ -10,7 +10,7 @@ import com.chipprbots.ethereum.forkid.ForkId.*
 import com.chipprbots.ethereum.rlp.*
 import com.chipprbots.ethereum.utils.Config.*
 
-class ForkIdSpec extends AnyWordSpec with Matchers {
+class ForkIdSpec extends AnyWordSpec with Matchers:
 
   val config = blockchains
 
@@ -132,8 +132,6 @@ class ForkIdSpec extends AnyWordSpec with Matchers {
     }
   }
 
-  private def roundTrip(forkId: ForkId, hex: String) = {
+  private def roundTrip(forkId: ForkId, hex: String) =
     encode(forkId.toRLPEncodable) shouldBe Hex.decode(hex)
     decode[ForkId](Hex.decode(hex)) shouldBe forkId
-  }
-}

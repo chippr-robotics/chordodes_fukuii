@@ -35,14 +35,13 @@ class DecoupledHealObservabilitySpec
     extends ScalaTestWithActorTestKit()
     with AnyFlatSpecLike
     with Matchers
-    with Eventually {
+    with Eventually:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
-  private def gaugeValue(name: String): Double = {
+  private def gaugeValue(name: String): Double =
     val gauge = Metrics.get().registry.find(name).gauge()
     if gauge == null then Double.NaN else gauge.value()
-  }
 
   private def getTrieNodesOf(send: NetworkPeerManagerActor.SendMessageCmd): SNAP.GetTrieNodes =
     send.message.underlyingMsg.asInstanceOf[SNAP.GetTrieNodes]
@@ -51,16 +50,14 @@ class DecoupledHealObservabilitySpec
     * into a Long. Replicated here so a gauge observation can be tied to a specific, distinct root value (the gauges are
     * global singletons; matching the exact short label proves THIS coordinator wrote it).
     */
-  private def shortRootLabel(root: ByteString): Long = {
+  private def shortRootLabel(root: ByteString): Long =
     var acc = 0L
     val n = root.length.min(8)
     var i = 0
-    while i < n do {
+    while i < n do
       acc = (acc << 8) | (root(i) & 0xffL)
       i += 1
-    }
     acc
-  }
 
   private def buildCoordinator(
       stateRoot: ByteString,
@@ -68,7 +65,7 @@ class DecoupledHealObservabilitySpec
   ): (
       ActorRef[TrieNodeHealingCoordinator.Command],
       org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[NetworkPeerManagerActor.Command]
-  ) = {
+  ) =
     val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val coordinator = HealingTrieFixtures.spawnCoordinator(
       stateRoot = stateRoot,
@@ -81,7 +78,6 @@ class DecoupledHealObservabilitySpec
       decoupledHealServeRoot = decoupled
     )
     (coordinator, networkPeerManager)
-  }
 
   // ── T-7 (on): engagement signal + observability gauges emitted ────────────────────────────────
 
@@ -132,4 +128,3 @@ class DecoupledHealObservabilitySpec
       val send = networkPeerManager.expectMessageType[NetworkPeerManagerActor.SendMessageCmd]
       getTrieNodesOf(send).rootHash shouldBe stateRoot
     }
-}

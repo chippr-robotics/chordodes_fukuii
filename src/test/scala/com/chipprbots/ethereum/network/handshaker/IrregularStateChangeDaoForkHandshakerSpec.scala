@@ -32,12 +32,12 @@ import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.*
 import com.chipprbots.ethereum.utils.ByteStringUtils.*
 
-class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matchers {
+class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matchers:
 
   it should "correctly connect during an ETH68 handshake if no fork resolver is used" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new LocalPeerETH63Setup with RemotePeerETH63Setup {
+  ) in new LocalPeerETH63Setup with RemotePeerETH63Setup:
 
     initHandshakerWithoutResolver.nextMessage.map(_.messageToSend) shouldBe Right(localHello: HelloEnc)
     val handshakerAfterHelloOpt: Option[Handshaker[PeerInfo]] = initHandshakerWithoutResolver.applyMessage(remoteHello)
@@ -47,7 +47,7 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
       handshakerAfterHelloOpt.get.applyMessage(remoteStatusMsg)
     assert(handshakerAfterStatusOpt.isDefined)
 
-    handshakerAfterStatusOpt.get.nextMessage match {
+    handshakerAfterStatusOpt.get.nextMessage match
       case Left(
             HandshakeSuccess(
               PeerInfo(
@@ -65,13 +65,11 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
         currentMaxBlockNumber shouldBe 0
         forkAccepted shouldBe true
       case _ => fail()
-    }
-  }
 
   it should "send ETH68 status with updated total difficulty on block advance" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new LocalPeerETH63Setup with RemotePeerETH63Setup {
+  ) in new LocalPeerETH63Setup with RemotePeerETH63Setup:
 
     val newChainWeight: ChainWeight = ChainWeight.zero.increase(genesisBlock.header).increase(firstBlock.header)
 
@@ -88,19 +86,17 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
     val handshakerAfterStatusOpt: Option[Handshaker[PeerInfo]] =
       handshakerAfterHelloOpt.get.applyMessage(remoteStatusMsg)
     assert(handshakerAfterStatusOpt.isDefined)
-    handshakerAfterStatusOpt.get.nextMessage match {
+    handshakerAfterStatusOpt.get.nextMessage match
       case Left(HandshakeSuccess(peerInfo)) =>
         peerInfo.remoteStatus.capability shouldBe localStatus.capability
 
       case other =>
         fail(s"Invalid handshaker state: $other")
-    }
-  }
 
   it should "connect correctly after validating fork id when peer supports ETH68" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new LocalPeerETH64Setup with RemotePeerETH64Setup {
+  ) in new LocalPeerETH64Setup with RemotePeerETH64Setup:
 
     val newChainWeight: ChainWeight = ChainWeight.zero.increase(genesisBlock.header).increase(firstBlock.header)
 
@@ -125,19 +121,17 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
       handshakerAfterHelloOpt.get.applyMessage(remoteStatusMsg)
     assert(handshakerAfterStatusOpt.isDefined)
 
-    handshakerAfterStatusOpt.get.nextMessage match {
+    handshakerAfterStatusOpt.get.nextMessage match
       case Left(HandshakeSuccess(peerInfo)) =>
         peerInfo.remoteStatus.capability shouldBe localStatus.capability
 
       case other =>
         fail(s"Invalid handshaker state: $other")
-    }
-  }
 
   it should "disconnect from a useless peer after validating fork id when peer supports ETH68" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new LocalPeerETH64Setup with RemotePeerETH64Setup {
+  ) in new LocalPeerETH64Setup with RemotePeerETH64Setup:
 
     val newChainWeight: ChainWeight = ChainWeight.zero.increase(genesisBlock.header).increase(firstBlock.header)
 
@@ -168,18 +162,15 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
       handshakerAfterHelloOpt.get.applyMessage(newRemoteStatusMsg)
     assert(handshakerAfterStatusOpt.isDefined)
 
-    handshakerAfterStatusOpt.get.nextMessage match {
+    handshakerAfterStatusOpt.get.nextMessage match
       case Left(HandshakeFailure(Disconnect.Reasons.UselessPeer)) => succeed
       case other =>
         fail(s"Invalid handshaker state: $other")
-    }
-
-  }
 
   it should "skip fork block exchange for ETH64+ when ForkId validation passes (EIP-2124 compliance)" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new LocalPeerETH64Setup with RemotePeerETH64Setup {
+  ) in new LocalPeerETH64Setup with RemotePeerETH64Setup:
     // This test verifies the EIP-2124 fix: for ETH64+ protocols with ForkId in status,
     // we should skip the fork block exchange and go directly to connected state
     // even if a fork resolver is configured.
@@ -202,7 +193,7 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
 
     // Verify we go directly to HandshakeSuccess without fork block exchange
     // Per EIP-2124, ForkId validation in ETH64+ replaces the fork block exchange
-    handshakerAfterStatusOpt.get.nextMessage match {
+    handshakerAfterStatusOpt.get.nextMessage match
       case Left(HandshakeSuccess(peerInfo)) =>
         peerInfo.remoteStatus.capability shouldBe localStatus.capability
         peerInfo.forkAccepted shouldBe true
@@ -214,13 +205,11 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
         // This would fail before the fix - we would incorrectly transition to
         // EtcForkBlockExchangeState and send GetBlockHeaders
         fail(s"Expected direct HandshakeSuccess but got NextMessage(${nextMsg.messageToSend})")
-    }
-  }
 
   it should "set supportsSnap=false for ETH69 peers when snap/1 is absent from Hello" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new RemotePeerETH69Setup {
+  ) in new RemotePeerETH69Setup:
     // ETH/69 and SNAP/1 are independent protocols. A peer can negotiate ETH/69
     // without advertising snap/1 in Hello. supportsSnap must reflect actual capabilities.
     // remoteHello has only Capability.ETH69, no SNAP1
@@ -232,7 +221,7 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
       handshakerAfterHelloOpt.get.applyMessage(remoteStatusMsg)
     assert(handshakerAfterStatusOpt.isDefined)
 
-    handshakerAfterStatusOpt.get.nextMessage match {
+    handshakerAfterStatusOpt.get.nextMessage match
       case Left(HandshakeSuccess(peerInfo)) =>
         peerInfo.remoteStatus.supportsSnap shouldBe false
         peerInfo.remoteStatus.capability shouldBe Capability.ETH69
@@ -241,13 +230,11 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
         fail(s"Expected HandshakeSuccess but got HandshakeFailure($reason)")
       case Right(nextMsg) =>
         fail(s"Expected HandshakeSuccess but got next message: ${nextMsg.messageToSend}")
-    }
-  }
 
   it should "set supportsSnap=true for ETH69 peers when snap/1 is present in Hello" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new RemotePeerETH69Setup {
+  ) in new RemotePeerETH69Setup:
     val helloWithSnap: Hello = remoteHello.copy(capabilities = Seq(Capability.ETH69, Capability.SNAP1))
     val handshakerAfterHelloOpt: Option[Handshaker[PeerInfo]] =
       initHandshakerWithoutResolver.applyMessage(helloWithSnap)
@@ -257,7 +244,7 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
       handshakerAfterHelloOpt.get.applyMessage(remoteStatusMsg)
     assert(handshakerAfterStatusOpt.isDefined)
 
-    handshakerAfterStatusOpt.get.nextMessage match {
+    handshakerAfterStatusOpt.get.nextMessage match
       case Left(HandshakeSuccess(peerInfo)) =>
         peerInfo.remoteStatus.supportsSnap shouldBe true
         peerInfo.remoteStatus.capability shouldBe Capability.ETH69
@@ -266,31 +253,27 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
         fail(s"Expected HandshakeSuccess but got HandshakeFailure($reason)")
       case Right(nextMsg) =>
         fail(s"Expected HandshakeSuccess but got next message: ${nextMsg.messageToSend}")
-    }
-  }
 
-  it should "fail if a timeout happened during hello exchange" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "fail if a timeout happened during hello exchange" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     val handshakerAfterTimeout = initHandshakerWithoutResolver.processTimeout
     handshakerAfterTimeout.nextMessage.map(_.messageToSend) shouldBe Left(
       HandshakeFailure(Disconnect.Reasons.TimeoutOnReceivingAMessage)
     )
-  }
 
   it should "fail if a timeout happened during status exchange" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new RemotePeerETH63Setup {
+  ) in new RemotePeerETH63Setup:
     val handshakerAfterHelloOpt: Option[Handshaker[PeerInfo]] = initHandshakerWithResolver.applyMessage(remoteHello)
     val handshakerAfterTimeout = handshakerAfterHelloOpt.get.processTimeout
     handshakerAfterTimeout.nextMessage.map(_.messageToSend) shouldBe Left(
       HandshakeFailure(Disconnect.Reasons.TimeoutOnReceivingAMessage)
     )
-  }
 
   it should "fail if a status msg is received with invalid network id" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new LocalPeerETH63Setup with RemotePeerETH63Setup {
+  ) in new LocalPeerETH63Setup with RemotePeerETH63Setup:
     val wrongNetworkId: Long = localStatus.networkId + 1
 
     val handshakerAfterHelloOpt: Option[Handshaker[PeerInfo]] = initHandshakerWithResolver.applyMessage(remoteHello)
@@ -299,12 +282,11 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
     handshakerAfterStatusOpt.get.nextMessage.map(_.messageToSend) shouldBe Left(
       HandshakeFailure(Disconnect.Reasons.UselessPeer)
     )
-  }
 
   it should "fail if a status msg is received with invalid genesisHash" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new LocalPeerETH63Setup with RemotePeerETH63Setup {
+  ) in new LocalPeerETH63Setup with RemotePeerETH63Setup:
     val wrongGenesisHash: ByteString =
       concatByteStrings((localStatus.genesisHash.head + 1).toByte, localStatus.genesisHash.tail)
 
@@ -314,24 +296,22 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
     handshakerAfterStatusOpt.get.nextMessage.map(_.messageToSend) shouldBe Left(
       HandshakeFailure(Disconnect.Reasons.UselessPeer)
     )
-  }
 
   it should "fail if the remote peer doesn't support ETH68+" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new RemotePeerETH63Setup {
+  ) in new RemotePeerETH63Setup:
     val handshakerAfterHelloOpt: Option[Handshaker[PeerInfo]] =
       initHandshakerWithResolver.applyMessage(remoteHello.copy(capabilities = Nil))
     assert(handshakerAfterHelloOpt.isDefined)
     handshakerAfterHelloOpt.get.nextMessage.leftSide shouldBe Left(
       HandshakeFailure(Disconnect.Reasons.IncompatibleP2pProtocolVersion)
     )
-  }
 
   it should "use actual block number for ETH68 ForkId (core-geth alignment)" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new LocalPeerETH64Setup with RemotePeerETH64Setup {
+  ) in new LocalPeerETH64Setup with RemotePeerETH64Setup:
     // ALIGNMENT WITH CORE-GETH: ForkId should always use the actual current block number
     // Core-geth implementation (eth/handler.go):
     //   head = h.chain.CurrentHeader()
@@ -355,9 +335,9 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
 
     // The status message should use the actual block number for ForkId calculation
     // This matches core-geth behavior where ForkId and bestHash use the same block
-    handshakerAfterHelloOpt.get.nextMessage match {
+    handshakerAfterHelloOpt.get.nextMessage match
       case Right(nextMsg) =>
-        nextMsg.messageToSend match {
+        nextMsg.messageToSend match
           case statusEnc: ETHPackets.Status68.Status68.Status68Enc =>
             val statusMsg = statusEnc.underlyingMsg
             // Best block should be the low block
@@ -367,28 +347,24 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
             statusMsg.forkId shouldBe expectedForkId
           case other =>
             fail(s"Expected ETHPackets.Status68.Status68Enc message but got: $other")
-        }
       case other =>
         fail(s"Expected status message but got: $other")
-    }
 
     val handshakerAfterStatusOpt: Option[Handshaker[PeerInfo]] =
       handshakerAfterHelloOpt.get.applyMessage(remoteStatusMsg)
     assert(handshakerAfterStatusOpt.isDefined)
 
     // Should successfully connect
-    handshakerAfterStatusOpt.get.nextMessage match {
+    handshakerAfterStatusOpt.get.nextMessage match
       case Left(HandshakeSuccess(peerInfo)) =>
         peerInfo.remoteStatus.capability shouldBe localStatus.capability
       case other =>
         fail(s"Expected successful handshake but got: $other")
-    }
-  }
 
   it should "use actual block number for ForkId at high block numbers (core-geth alignment)" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new LocalPeerETH64Setup with RemotePeerETH64Setup {
+  ) in new LocalPeerETH64Setup with RemotePeerETH64Setup:
     // ALIGNMENT WITH CORE-GETH: ForkId should always use the actual current block number
     // This test verifies the behavior at high block numbers matches core-geth.
 
@@ -404,9 +380,9 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
 
     // The status message should use the actual block number for ForkId
     // This matches core-geth behavior where ForkId and bestHash use the same block
-    handshakerAfterHelloOpt.get.nextMessage match {
+    handshakerAfterHelloOpt.get.nextMessage match
       case Right(nextMsg) =>
-        nextMsg.messageToSend match {
+        nextMsg.messageToSend match
           case statusEnc: ETHPackets.Status68.Status68.Status68Enc =>
             val statusMsg = statusEnc.underlyingMsg
             statusMsg.bestHash shouldBe highBlock.header.hash.value
@@ -415,13 +391,10 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
             statusMsg.forkId shouldBe expectedForkId
           case other =>
             fail(s"Expected ETHPackets.Status68.Status68Enc message but got: $other")
-        }
       case other =>
         fail(s"Expected status message but got: $other")
-    }
-  }
 
-  trait TestSetup extends SecureRandomBuilder with EphemBlockchainTestSetup {
+  trait TestSetup extends SecureRandomBuilder with EphemBlockchainTestSetup:
 
     val genesisBlock: Block = Block(
       Fixtures.Blocks.Genesis.header,
@@ -443,7 +416,7 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
 
     class MockNetworkHandshakerConfiguration(
         @scala.annotation.unused pv: List[Capability] = Config.supportedCapabilities
-    ) extends NetworkHandshakerConfiguration {
+    ) extends NetworkHandshakerConfiguration:
       override val forkResolverOpt: Option[ForkResolver] = None
       override val nodeStatusHolder: AtomicReference[NodeStatus] = TestSetup.this.nodeStatusHolder
       override val peerConfiguration: PeerConfiguration = Config.Network.peer
@@ -451,14 +424,12 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
       override val appStateStorage: AppStateStorage = TestSetup.this.storagesInstance.storages.appStateStorage
       override val blockchainReader: BlockchainReader = TestSetup.this.blockchainReader
       override val blockchainConfig: BlockchainConfig = TestSetup.this.blockchainConfig
-    }
 
     val networkHandshakerConfigurationWithResolver: MockNetworkHandshakerConfiguration =
-      new MockNetworkHandshakerConfiguration {
+      new MockNetworkHandshakerConfiguration:
         override val forkResolverOpt: Option[ForkResolver] = Some(
           new ForkResolver.IrregularStateChangeDaoForkResolver(blockchainConfig.daoForkConfig.get)
         )
-      }
 
     val initHandshakerWithoutResolver: NetworkHandshaker = NetworkHandshaker(
       new MockNetworkHandshakerConfiguration(List(Capability.ETH68, Capability.ETH69))
@@ -468,9 +439,8 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
 
     val firstBlock: Block =
       genesisBlock.copy(header = genesisBlock.header.copy(parentHash = genesisBlock.header.hash, number = 1))
-  }
 
-  trait LocalPeerSetup extends TestSetup {
+  trait LocalPeerSetup extends TestSetup:
     val localHello: Hello = Hello(
       p2pVersion = HelloExchangeState.P2pVersion,
       clientId = Config.clientId,
@@ -481,11 +451,10 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
 
     val localGetBlockHeadersRequest: GetBlockHeaders =
       GetBlockHeaders(BigInt(0), Left(forkBlockHeader.number), maxHeaders = 1, skip = 0, reverse = false)
-  }
 
   // Formerly LocalPeerETH63Setup — updated to ETH68 since ETH62-67 are retired
   // Formerly LocalPeerETH63Setup — updated to ETH68 since ETH62-67 are retired
-  trait LocalPeerETH63Setup extends LocalPeerSetup {
+  trait LocalPeerETH63Setup extends LocalPeerSetup:
     val localStatusMsg: ETHPackets.Status68.Status68 = ETHPackets.Status68.Status68(
       protocolVersion = Capability.ETH68.version,
       networkId = Config.Network.peer.networkId,
@@ -503,9 +472,8 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
       false,
       List.empty
     )
-  }
 
-  trait LocalPeerETH64Setup extends LocalPeerSetup {
+  trait LocalPeerETH64Setup extends LocalPeerSetup:
     val localStatusMsg: ETHPackets.Status68.Status68 = ETHPackets.Status68.Status68(
       protocolVersion = Capability.ETH68.version,
       networkId = Config.Network.peer.networkId,
@@ -523,19 +491,17 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
       false,
       List.empty
     )
-  }
 
-  trait RemotePeerSetup extends TestSetup {
+  trait RemotePeerSetup extends TestSetup:
     val remoteNodeStatus: NodeStatus = NodeStatus(
       key = generateKeyPair(secureRandom),
       serverStatus = ServerStatus.NotListening,
       discoveryStatus = ServerStatus.NotListening
     )
     val remotePort = 8545
-  }
 
   // Formerly RemotePeerETH63Setup — updated to ETH68 since ETH62-67 are retired
-  trait RemotePeerETH63Setup extends RemotePeerSetup {
+  trait RemotePeerETH63Setup extends RemotePeerSetup:
     val remoteHello: Hello = Hello(
       p2pVersion = HelloExchangeState.P2pVersion,
       clientId = "remote-peer",
@@ -563,10 +529,9 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
       Seq(Capability.ETH68).toList,
       remoteClientId = "remote-peer"
     )
-  }
 
   // RemotePeerETH64Setup: updated to ETH68 (ETH64 retired)
-  trait RemotePeerETH64Setup extends RemotePeerSetup {
+  trait RemotePeerETH64Setup extends RemotePeerSetup:
     val remoteHello: Hello = Hello(
       p2pVersion = HelloExchangeState.P2pVersion,
       clientId = "remote-peer",
@@ -594,9 +559,8 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
       List.empty,
       remoteClientId = "remote-peer"
     )
-  }
 
-  trait RemotePeerETH69Setup extends RemotePeerSetup {
+  trait RemotePeerETH69Setup extends RemotePeerSetup:
     // ETH/69 peers never advertise snap/1 in Hello — snap is implicit per EIP-7642.
     val remoteHello: Hello = Hello(
       p2pVersion = HelloExchangeState.P2pVersion,
@@ -615,5 +579,3 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
       latestBlock = BigInt(1000000),
       latestBlockHash = genesisBlock.header.hash.value
     )
-  }
-}

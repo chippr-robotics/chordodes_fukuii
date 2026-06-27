@@ -19,10 +19,10 @@ import com.chipprbots.ethereum.rlp.RLPImplicits.given
 import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.testing.Tags.*
 
-class BlockHeaderSpec extends AnyFreeSpec with Matchers with ScalaCheckPropertyChecks with ObjectGenerators {
+class BlockHeaderSpec extends AnyFreeSpec with Matchers with ScalaCheckPropertyChecks with ObjectGenerators:
 
   "Block header encoding" - {
-    "without nonce should be compatible with EthereumJ blocks" in new TestSetup {
+    "without nonce should be compatible with EthereumJ blocks" in new TestSetup:
       // Expected values obtained using EthereumJ
       val obtainedBlock1EncodedWithoutNonce: String = Hex.toHexString(BlockHeader.getEncodedWithoutNonce(block1))
       val expectedBlock1EncodedWithoutNonce =
@@ -33,7 +33,6 @@ class BlockHeaderSpec extends AnyFreeSpec with Matchers with ScalaCheckPropertyC
       val expectedBlock2EncodedWithoutNonce =
         "f901e6a0677a5fb51d52321b03552e3c667f602cc489d15fc1d7824445aee6d94a9db2e7a01dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d493479495f484419881c6e9b6de7fb3f8ad03763bd49a89a0cddeeb071e2f69ad765406fb7c96c0cd42ddfc6ec54535822b564906f9e38e44a056e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421a056e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421b9010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000830f1869138407da55238084589e0ab898d783010507846765746887676f312e372e33856c696e7578"
       assert(obtainedBlock2EncodedWithoutNonce == expectedBlock2EncodedWithoutNonce)
-    }
 
     "should be symmetric with decoding" in {
       forAll(blockHeaderGen) { blockHeader =>
@@ -128,7 +127,7 @@ class BlockHeaderSpec extends AnyFreeSpec with Matchers with ScalaCheckPropertyC
     }
   }
 
-  trait TestSetup {
+  trait TestSetup:
     val block1: BlockHeader = BlockHeader(
       parentHash =
         BlockHash(ByteString(Hex.decode("d882d5c210bab4cb7ef0b9f3dc2130cb680959afcd9a8f9bf83ee6f13e2f9da3"))),
@@ -172,6 +171,3 @@ class BlockHeaderSpec extends AnyFreeSpec with Matchers with ScalaCheckPropertyC
       mixHash = BlockHash(ByteString(Hex.decode("7f9ac1ddeafff0f926ed9887b8cf7d50c3f919d902e618b957022c46c8b404a6"))),
       nonce = ByteString(Hex.decode("3fc7bc671f7cee70"))
     )
-  }
-
-}

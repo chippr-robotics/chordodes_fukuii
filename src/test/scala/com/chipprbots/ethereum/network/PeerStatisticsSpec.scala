@@ -16,7 +16,7 @@ import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlockHashes.Ne
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.MockClock
 
-class PeerStatisticsSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
+class PeerStatisticsSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers:
 
   import PeerStatisticsActor.*
 
@@ -25,35 +25,30 @@ class PeerStatisticsSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
     system.classicSystem
 
   val TICK: Long = 50
-  val mockClock: MockClock = new MockClock(0L) {
-    override def millis(): Long = {
+  val mockClock: MockClock = new MockClock(0L):
+    override def millis(): Long =
       windByMillis(TICK)
       super.millis()
-    }
-  }
 
   behavior.of("PeerStatisticsActor")
 
-  it should "subscribe to peer events" taggedAs (UnitTest, NetworkTest) in new Fixture {
+  it should "subscribe to peer events" taggedAs (UnitTest, NetworkTest) in new Fixture:
     // Subscriptions are sent to the Classic bus via the message adapter; the payloads are unchanged.
     peerEventBus.expectMsgType[SubscribeCmd].to shouldBe PeerStatisticsActor.MessageSubscriptionClassifier
     peerEventBus.expectMsgType[SubscribeCmd].to shouldBe SubscriptionClassifier.PeerDisconnectedClassifier(
       PeerSelector.AllPeers
     )
-  }
 
-  it should "initially return default stats for unknown peers" taggedAs (UnitTest, NetworkTest) in new Fixture {
+  it should "initially return default stats for unknown peers" taggedAs (UnitTest, NetworkTest) in new Fixture:
     val peerId: PeerId = PeerId("Alice")
     peerStatistics ! GetStatsForPeer(1.minute, peerId, statsForPeerProbe.ref)
     statsForPeerProbe.expectMessage(StatsForPeer(peerId, PeerStat.empty))
-  }
 
-  it should "initially return default stats when there are no peers" taggedAs (UnitTest, NetworkTest) in new Fixture {
+  it should "initially return default stats when there are no peers" taggedAs (UnitTest, NetworkTest) in new Fixture:
     peerStatistics ! GetStatsForAll(1.minute, statsForAllProbe.ref)
     statsForAllProbe.expectMessage(StatsForAll(Map.empty))
-  }
 
-  it should "count received messages" taggedAs (UnitTest, NetworkTest) in new Fixture {
+  it should "count received messages" taggedAs (UnitTest, NetworkTest) in new Fixture:
     val alice: PeerId = PeerId("Alice")
     val bob: PeerId = PeerId("Bob")
     peerStatistics ! PeerStatisticsActor.PeerMessageReceived(NewBlockHashes(Seq.empty), alice)
@@ -66,18 +61,17 @@ class PeerStatisticsSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
 
     val statA: PeerStat = stats.stats(alice)
     statA.responsesReceived shouldBe 2
-    val difference: Option[Long] = for {
+    val difference: Option[Long] = for
       first <- statA.firstSeenTimeMillis
       last <- statA.lastSeenTimeMillis
-    } yield last - first
+    yield last - first
     assert(difference.exists(_ >= TICK))
 
     val statB: PeerStat = stats.stats(bob)
     statB.responsesReceived shouldBe 1
     statB.lastSeenTimeMillis shouldBe statB.firstSeenTimeMillis
-  }
 
-  trait Fixture {
+  trait Fixture:
     val statsForAllProbe: TypedTestProbe[StatsForAll] = testKit.createTestProbe[StatsForAll]()
     val statsForPeerProbe: TypedTestProbe[StatsForPeer] = testKit.createTestProbe[StatsForPeer]()
 
@@ -90,5 +84,3 @@ class PeerStatisticsSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike 
           slotCount = 30
         )(mockClock)
       )
-  }
-}

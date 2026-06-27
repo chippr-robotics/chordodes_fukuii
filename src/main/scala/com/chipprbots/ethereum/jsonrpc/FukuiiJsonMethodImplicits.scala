@@ -20,8 +20,8 @@ import com.chipprbots.ethereum.transactions.TransactionHistoryService.ExtendedTr
 
 import JsonEncoder.OptionToNull.*
 
-object FukuiiJsonMethodImplicits extends JsonMethodsImplicits {
-  given extendedTransactionDataJsonEncoder: JsonEncoder[ExtendedTransactionData] = extendedTxData => {
+object FukuiiJsonMethodImplicits extends JsonMethodsImplicits:
+  given extendedTransactionDataJsonEncoder: JsonEncoder[ExtendedTransactionData] = extendedTxData =>
     val asTxResponse = TransactionResponse(
       extendedTxData.stx,
       extendedTxData.minedTransactionData.map(_.header),
@@ -37,24 +37,21 @@ object FukuiiJsonMethodImplicits extends JsonMethodsImplicits {
     )
 
     Merge.merge(encodedTxResponse, encodedExtension)
-  }
 
   given fukuii_getAccountTransactions: JsonMethodCodec[GetAccountTransactionsRequest, GetAccountTransactionsResponse] =
-    new JsonMethodDecoder[GetAccountTransactionsRequest] with JsonEncoder[GetAccountTransactionsResponse] {
+    new JsonMethodDecoder[GetAccountTransactionsRequest] with JsonEncoder[GetAccountTransactionsResponse]:
       def decodeJson(params: Option[JArray]): Either[JsonRpcError, GetAccountTransactionsRequest] =
-        params match {
+        params match
           case Some(JArray(JString(addrJson) :: fromBlockJson :: toBlockJson :: Nil)) =>
-            for {
+            for
               addr <- extractAddress(addrJson)
               fromBlock <- extractQuantity(fromBlockJson)
               toBlock <- extractQuantity(toBlockJson)
-            } yield GetAccountTransactionsRequest(addr, fromBlock to toBlock)
+            yield GetAccountTransactionsRequest(addr, fromBlock to toBlock)
           case _ => Left(InvalidParams())
-        }
 
       override def encodeJson(t: GetAccountTransactionsResponse): JValue =
         JObject("transactions" -> t.transactions.jsonEncoded)
-    }
 
   given fukuii_resetFastSync_decoder: JsonMethodDecoder[ResetFastSyncRequest] =
     new NoParamsMethodDecoder(ResetFastSyncRequest())
@@ -69,4 +66,3 @@ object FukuiiJsonMethodImplicits extends JsonMethodsImplicits {
       "started" -> t.started.jsonEncoded,
       "cooldownUntilMillis" -> t.cooldownUntilMillis.jsonEncoded
     )
-}

@@ -30,7 +30,7 @@ import com.chipprbots.ethereum.utils.Config
   *
   * See https://github.com/ethereum/tests for test repository structure.
   */
-abstract class EthereumTestsSpec extends AnyFlatSpec with Matchers {
+abstract class EthereumTestsSpec extends AnyFlatSpec with Matchers:
 
   given IORuntime = IORuntime.global
 
@@ -52,17 +52,15 @@ abstract class EthereumTestsSpec extends AnyFlatSpec with Matchers {
     * @return
     *   Either an error message or the execution result
     */
-  protected def runSingleTest(resourcePath: String, testName: String): Either[String, TestExecutionResult] = {
+  protected def runSingleTest(resourcePath: String, testName: String): Either[String, TestExecutionResult] =
     val suite = loadTestSuite(resourcePath)
-    suite.tests.get(testName) match {
+    suite.tests.get(testName) match
       case Some(test) => executeTest(test)
       case None =>
         Left(
           s"Test '$testName' not found in $resourcePath. " +
             s"Available tests: ${suite.tests.keys.toList.sorted.mkString(", ")}"
         )
-    }
-  }
 
   /** Debugging utility: run every test in a suite loaded from an arbitrary filesystem path.
     *
@@ -77,44 +75,38 @@ abstract class EthereumTestsSpec extends AnyFlatSpec with Matchers {
     * @return
     *   One (testName, result) pair per test case in the file, in suite order
     */
-  protected def runTestFile(filePath: String): Seq[(String, Either[String, TestExecutionResult])] = {
+  protected def runTestFile(filePath: String): Seq[(String, Either[String, TestExecutionResult])] =
     val source = Source.fromFile(filePath)
     val jsonString =
       try source.mkString
       finally source.close()
 
-    parse(jsonString) match {
+    parse(jsonString) match
       case Left(error) =>
         Seq(filePath -> Left(s"Failed to parse JSON at $filePath: ${error.getMessage}"))
       case Right(json) =>
-        json.as[BlockchainTestSuite] match {
+        json.as[BlockchainTestSuite] match
           case Left(error) =>
             Seq(filePath -> Left(s"Failed to decode test suite at $filePath: ${error.getMessage}"))
           case Right(suite) =>
             suite.tests.toSeq.map { case (testName, test) => testName -> executeTest(test) }
-        }
-    }
-  }
 
   /** Load a test suite from a resource path */
-  def loadTestSuite(resourcePath: String): BlockchainTestSuite = {
+  def loadTestSuite(resourcePath: String): BlockchainTestSuite =
     val suiteIO = EthereumTestsAdapter.loadTestSuite(resourcePath)
     suiteIO.unsafeRunSync()
-  }
 
   /** Set up initial state for a test */
   def setupTestState(test: BlockchainTest): Either[String, InMemoryWorldStateProxy] =
     EthereumTestExecutor.setupInitialStateForTest(test)
 
   /** Parse address from hex string */
-  def parseAddress(hex: String): com.chipprbots.ethereum.domain.Address = {
+  def parseAddress(hex: String): com.chipprbots.ethereum.domain.Address =
     import org.apache.pekko.util.ByteString
     val cleaned = if hex.startsWith("0x") then hex.substring(2) else hex
     val bytes = org.bouncycastle.util.encoders.Hex.decode(cleaned)
     com.chipprbots.ethereum.domain.Address(ByteString(bytes))
-  }
 
   /** Execute a complete test including block execution and post-state validation */
   def executeTest(test: BlockchainTest): Either[String, TestExecutionResult] =
     EthereumTestExecutor.executeTest(test, baseBlockchainConfig)
-}

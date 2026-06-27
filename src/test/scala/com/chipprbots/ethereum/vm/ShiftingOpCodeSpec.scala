@@ -21,7 +21,7 @@ import com.chipprbots.ethereum.vm.MockWorldState.PC
 import com.chipprbots.ethereum.vm.MockWorldState.TestVM
 
 // scalastyle:off magic.number
-class ShiftingOpCodeSpec extends AnyWordSpec with Matchers with ScalaCheckPropertyChecks {
+class ShiftingOpCodeSpec extends AnyWordSpec with Matchers with ScalaCheckPropertyChecks:
 
   val array_0x01: Array[Byte] = Array(1.toByte)
   val array_0x00: Array[Byte] = Array(0.toByte)
@@ -124,37 +124,34 @@ class ShiftingOpCodeSpec extends AnyWordSpec with Matchers with ScalaCheckProper
 
       SHLTable.foreach { case (index, assemblyCode, arg1, arg2, expectedResult) =>
         s"execute $index test case for SHL opcode: arg=${Hex.toHexString(arg1.toArray)}, " +
-          s"shift=${arg2.toHexString} with expected result ${Hex.toHexString(expectedResult)}" in new TestSetup {
+          s"shift=${arg2.toHexString} with expected result ${Hex.toHexString(expectedResult)}" in new TestSetup:
             val state: ProgramState[MockWorldState, MockStorage] = prepareProgramState(assemblyCode, arg1, arg2)
 
             val result: ProgramState[MockWorldState, MockStorage] = SHL.execute(state)
             result.stack.pop()._1 shouldBe UInt256(expectedResult)
-          }
       }
 
       SHRTable.foreach { case (index, assemblyCode, arg1, arg2, expectedResult) =>
         s"execute $index test case for SHR opcode: arg=${Hex.toHexString(arg1.toArray)}, " +
-          s"shift=${arg2.toHexString} with expected result ${Hex.toHexString(expectedResult)}" in new TestSetup {
+          s"shift=${arg2.toHexString} with expected result ${Hex.toHexString(expectedResult)}" in new TestSetup:
             val state: ProgramState[MockWorldState, MockStorage] = prepareProgramState(assemblyCode, arg1, arg2)
 
             val result: ProgramState[MockWorldState, MockStorage] = SHR.execute(state)
             result.stack.pop()._1 shouldBe UInt256(expectedResult)
-          }
       }
 
       SARTable.foreach { case (index, assemblyCode, arg1, arg2, expectedResult) =>
         s"execute $index test case fo SAR opcode: arg=${Hex.toHexString(arg1.toArray)}, " +
-          s"shift=${arg2.toHexString} with expected result ${Hex.toHexString(expectedResult)}" in new TestSetup {
+          s"shift=${arg2.toHexString} with expected result ${Hex.toHexString(expectedResult)}" in new TestSetup:
             val state: ProgramState[MockWorldState, MockStorage] = prepareProgramState(assemblyCode, arg1, arg2)
 
             val result: ProgramState[MockWorldState, MockStorage] = SAR.execute(state)
             result.stack.pop()._1 shouldBe UInt256(expectedResult)
-          }
       }
     }
   }
 
-  trait TestSetup {
+  trait TestSetup:
     val config: EvmConfig = EvmConfig.ConstantinopleConfigBuilder(blockchainConfig)
     val vm = new TestVM
 
@@ -198,7 +195,7 @@ class ShiftingOpCodeSpec extends AnyWordSpec with Matchers with ScalaCheckProper
         assemblyCode: ByteString,
         arg1: ByteString,
         arg2: Int
-    ): ProgramState[MockWorldState, MockStorage] = {
+    ): ProgramState[MockWorldState, MockStorage] =
       val newWorld = defaultWorld
         .saveAccount(senderAddr, accountWithCode(assemblyCode))
         .saveCode(senderAddr, assemblyCode)
@@ -212,7 +209,3 @@ class ShiftingOpCodeSpec extends AnyWordSpec with Matchers with ScalaCheckProper
       ProgramState(vm, context, env)
         .withStack(Stack.empty().push(initStack))
         .withMemory(initMemory)
-    }
-  }
-
-}

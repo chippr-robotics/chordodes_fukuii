@@ -42,7 +42,7 @@ case class TestModeWorldStateProxy(
       touchedAccounts,
       noEmptyAccountsCond,
       ethCompatibleStorage
-    ) {
+    ):
 
   override def saveAccount(address: Address, account: Account): TestModeWorldStateProxy =
     copy(accountsStateTrie = accountsStateTrie.put(address, account))
@@ -69,13 +69,11 @@ case class TestModeWorldStateProxy(
   override def saveCode(address: Address, code: ByteString): TestModeWorldStateProxy =
     copy(accountCodes = accountCodes + (address -> code))
 
-  override def saveStorage(address: Address, storage: InMemoryWorldStateProxyStorage): TestModeWorldStateProxy = {
+  override def saveStorage(address: Address, storage: InMemoryWorldStateProxyStorage): TestModeWorldStateProxy =
     storage.wrapped.cache.foreach { case (key, _) => saveStoragePreimage(UInt256(key)) }
     copy(contractStorages = contractStorages + (address -> storage.wrapped))
-  }
-}
 
-object TestModeWorldStateProxy {
+object TestModeWorldStateProxy:
   def apply(
       evmCodeStorage: EvmCodeStorage,
       nodesKeyValueStorage: MptStorage,
@@ -110,4 +108,3 @@ object TestModeWorldStateProxy {
         accountsStorage
       )(Address.hashedAddressEncoder, accountSerializer)
     )
-}

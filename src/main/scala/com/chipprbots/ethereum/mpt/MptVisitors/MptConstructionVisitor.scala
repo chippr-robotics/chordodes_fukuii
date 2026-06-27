@@ -9,7 +9,7 @@ import com.chipprbots.ethereum.mpt.LeafNode
 import com.chipprbots.ethereum.mpt.MptNode
 import com.chipprbots.ethereum.mpt.NullNode
 
-class MptConstructionVisitor(source: MptStorage) extends MptVisitor[MptNode] {
+class MptConstructionVisitor(source: MptStorage) extends MptVisitor[MptNode]:
 
   def visitLeaf(leaf: LeafNode): MptNode =
     leaf
@@ -24,9 +24,8 @@ class MptConstructionVisitor(source: MptStorage) extends MptVisitor[MptNode] {
     new MptExtensionVisitor(extension, source)
 
   override def visitBranch(value: BranchNode): BranchVisitor[MptNode] = new MptBranchVisitor(value, source)
-}
 
-class MptBranchVisitor(branchNode: BranchNode, source: MptStorage) extends BranchVisitor[MptNode] {
+class MptBranchVisitor(branchNode: BranchNode, source: MptStorage) extends BranchVisitor[MptNode]:
   var resolvedChildren: List[MptNode] = List.empty
 
   override def visitChild(child: => MptNode): Unit =
@@ -38,9 +37,8 @@ class MptBranchVisitor(branchNode: BranchNode, source: MptStorage) extends Branc
 
   override def done(): MptNode =
     branchNode.copy(children = resolvedChildren.reverse.toArray)
-}
 
-class MptExtensionVisitor(extensionNode: ExtensionNode, source: MptStorage) extends ExtensionVisitor[MptNode] {
+class MptExtensionVisitor(extensionNode: ExtensionNode, source: MptStorage) extends ExtensionVisitor[MptNode]:
   var resolvedNext = extensionNode.next
 
   override def visitNext(): MptVisitor[MptNode] = new MptConstructionVisitor(source)
@@ -50,4 +48,3 @@ class MptExtensionVisitor(extensionNode: ExtensionNode, source: MptStorage) exte
 
   override def done(): MptNode =
     extensionNode.copy(next = resolvedNext)
-}

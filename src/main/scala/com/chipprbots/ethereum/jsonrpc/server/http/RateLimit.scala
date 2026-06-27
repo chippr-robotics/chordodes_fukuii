@@ -20,38 +20,34 @@ import com.chipprbots.ethereum.jsonrpc.JsonRpcError
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers
 import com.chipprbots.ethereum.jsonrpc.server.http.JsonRpcHttpServer.RateLimitConfig
 
-class RateLimit(config: RateLimitConfig) extends Directive0 with Json4sSupport {
+class RateLimit(config: RateLimitConfig) extends Directive0 with Json4sSupport:
 
   implicit override val serialization: Serialization = native.Serialization
   implicit override val formats: Formats = DefaultFormats + JsonSerializers.RpcErrorJsonSerializer
 
   private lazy val minInterval = config.minRequestInterval.toSeconds
 
-  private lazy val lru = {
+  private lazy val lru =
     val nanoDuration = config.minRequestInterval.toNanos
     val javaDuration = Duration.ofNanos(nanoDuration)
-    val ticker: Ticker = new Ticker {
+    val ticker: Ticker = new Ticker:
       override def read(): Long = getCurrentTimeNanos
-    }
     CacheBuilder
       .newBuilder()
       .weakKeys()
       .expireAfterAccess(javaDuration)
       .ticker(ticker)
       .build[RemoteAddress, NotUsed]()
-  }
 
-  private def isBelowRateLimit(ip: RemoteAddress): Boolean = {
+  private def isBelowRateLimit(ip: RemoteAddress): Boolean =
     var exists = true
     lru.get(
       ip,
-      () => {
+      () =>
         exists = false
         NotUsed
-      }
     )
     exists
-  }
 
   // Override this to test
   protected def getCurrentTimeNanos: Long = System.nanoTime()
@@ -62,15 +58,11 @@ class RateLimit(config: RateLimitConfig) extends Directive0 with Json4sSupport {
   //   2) no LRU is created unless config.enabled is true
   //   3) cache is accessed only once (using get)
   override def tapply(f: Unit => Route): Route =
-    if config.enabled then {
+    if config.enabled then
       extractClientIP { ip =>
-        if isBelowRateLimit(ip) then {
+        if isBelowRateLimit(ip) then
           val err = JsonRpcError.RateLimitError(minInterval)
           complete((StatusCodes.TooManyRequests, err))
-        } else {
-          f.apply(())
-        }
+        else f.apply(())
       }
-    } else f.apply(())
-
-}
+    else f.apply(())

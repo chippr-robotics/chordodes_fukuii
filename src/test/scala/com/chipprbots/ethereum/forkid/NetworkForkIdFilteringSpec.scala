@@ -24,7 +24,7 @@ import com.chipprbots.ethereum.utils.Config.*
   *   1. Mordor's forkId is rejected by ETC mainnet's ForkIdTag (and vice versa) 2. ETH forkIds are rejected by ETC
   *      mainnet's ForkIdTag 3. The Olympia fork signal state machine transitions correctly through all three states
   */
-class NetworkForkIdFilteringSpec extends AnyWordSpec with Matchers {
+class NetworkForkIdFilteringSpec extends AnyWordSpec with Matchers:
 
   private val config = blockchains
   private val etcConf = config.blockchains("etc")
@@ -162,4 +162,3 @@ class NetworkForkIdFilteringSpec extends AnyWordSpec with Matchers {
       tag.toFilter(enrWith(spiralWithOlympiaPending)) shouldBe Right(())
     }
   }
-}

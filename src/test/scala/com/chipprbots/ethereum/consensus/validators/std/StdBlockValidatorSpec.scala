@@ -10,7 +10,7 @@ import com.chipprbots.ethereum.consensus.validators.std.StdBlockValidator.*
 import com.chipprbots.ethereum.domain.*
 import com.chipprbots.ethereum.testing.Tags.*
 
-class StdBlockValidatorSpec extends AnyFlatSpec with Matchers {
+class StdBlockValidatorSpec extends AnyFlatSpec with Matchers:
 
   "Block based on valid data" should "pass validation" taggedAs (UnitTest, ConsensusTest) in {
     val block = Block(validBlockHeader, validBlockBody)
@@ -18,61 +18,54 @@ class StdBlockValidatorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "correctly handle the case where a block has no receipts" taggedAs (UnitTest, ConsensusTest) in {
-    StdBlockValidator.validate(blockWithOutReceipts, Nil) match {
+    StdBlockValidator.validate(blockWithOutReceipts, Nil) match
       case Right(_) => succeed
       case _        => fail()
-    }
   }
 
   "Invalid block" should "return a failure if created based on invalid transactions header" taggedAs (
     UnitTest,
     ConsensusTest
   ) in {
-    StdBlockValidator.validate(Block(wrongTransactionsRootHeader, validBlockBody), validReceipts) match {
+    StdBlockValidator.validate(Block(wrongTransactionsRootHeader, validBlockBody), validReceipts) match
       case Left(BlockTransactionsHashError) => succeed
       case _                                => fail()
-    }
   }
 
   it should "return a failure if created based on invalid ommers header" taggedAs (UnitTest, ConsensusTest) in {
-    StdBlockValidator.validate(Block(wrongOmmersHashHeader, validBlockBody), validReceipts) match {
+    StdBlockValidator.validate(Block(wrongOmmersHashHeader, validBlockBody), validReceipts) match
       case Left(BlockOmmersHashError) => succeed
       case _                          => fail()
-    }
   }
 
   it should "return a failure if created based on invalid receipts header" taggedAs (UnitTest, ConsensusTest) in {
-    StdBlockValidator.validate(Block(wrongReceiptsHeader, validBlockBody), validReceipts) match {
+    StdBlockValidator.validate(Block(wrongReceiptsHeader, validBlockBody), validReceipts) match
       case Left(BlockReceiptsHashError) => succeed
       case _                            => fail()
-    }
   }
 
   it should "return a failure if created based on invalid log bloom header" taggedAs (UnitTest, ConsensusTest) in {
-    StdBlockValidator.validate(Block(wrongLogBloomBlockHeader, validBlockBody), validReceipts) match {
+    StdBlockValidator.validate(Block(wrongLogBloomBlockHeader, validBlockBody), validReceipts) match
       case Left(BlockLogBloomError) => succeed
       case _                        => fail()
-    }
   }
 
   it should "return a failure if a block body doesn't corresponds to a block header due to wrong tx hash" taggedAs (
     UnitTest,
     ConsensusTest
   ) in {
-    StdBlockValidator.validateHeaderAndBody(wrongTransactionsRootHeader, validBlockBody) match {
+    StdBlockValidator.validateHeaderAndBody(wrongTransactionsRootHeader, validBlockBody) match
       case Left(BlockTransactionsHashError) => succeed
       case _                                => fail()
-    }
   }
 
   it should "return a failure if a block body doesn't corresponds to a block header due to wrong ommers hash" taggedAs (
     UnitTest,
     ConsensusTest
   ) in {
-    StdBlockValidator.validateHeaderAndBody(wrongOmmersHashHeader, validBlockBody) match {
+    StdBlockValidator.validateHeaderAndBody(wrongOmmersHashHeader, validBlockBody) match
       case Left(BlockOmmersHashError) => succeed
       case _                          => fail()
-    }
   }
 
   val validBlockHeader: BlockHeader = BlockHeader(
@@ -204,5 +197,3 @@ class StdBlockValidatorSpec extends AnyFlatSpec with Matchers {
     validBlockHeader.copy(receiptsRoot = Account.EmptyStorageRootHash, logsBloom = BloomFilter.Empty),
     validBlockBody
   )
-
-}

@@ -45,14 +45,14 @@ class FaucetRpcServiceSpec
     with ScalaFutures
     with OptionValues
     with MockFactory
-    with TypeCheckedTripleEquals {
+    with TypeCheckedTripleEquals:
 
   implicit val runtime: IORuntime = IORuntime.global
 
   "FaucetRpcService" should "answer txHash correctly when the wallet is available and the requested send funds be successfully" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val address: Address = Address("0x00")
     val request: SendFundsRequest = SendFundsRequest(address)
     val txHash: ByteString = ByteString(Hex.decode("112233"))
@@ -61,16 +61,14 @@ class FaucetRpcServiceSpec
     val cmd: SendFunds = handlerProbe.expectMessageType[Command.SendFunds]
     cmd.replyTo ! TransactionSent(txHash)
 
-    future.futureValue match {
+    future.futureValue match
       case Left(error)     => fail(s"failure with error: $error")
       case Right(response) => response.txId shouldBe txHash
-    }
-  }
 
   it should "answer WalletRpcClientError when the wallet is available and the requested send funds be failure" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val address: Address = Address("0x00")
     val request: SendFundsRequest = SendFundsRequest(address)
     val clientError = "Parser error"
@@ -79,16 +77,14 @@ class FaucetRpcServiceSpec
     val cmd: SendFunds = handlerProbe.expectMessageType[Command.SendFunds]
     cmd.replyTo ! WalletRpcClientError(clientError)
 
-    future.futureValue match {
+    future.futureValue match
       case Right(_)    => fail()
       case Left(error) => error shouldBe JsonRpcError.LogicError(s"Faucet error: $clientError")
-    }
-  }
 
   it should "answer FaucetIsUnavailable when tried to send funds and the wallet is unavailable" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val address: Address = Address("0x00")
     val request: SendFundsRequest = SendFundsRequest(address)
 
@@ -96,70 +92,60 @@ class FaucetRpcServiceSpec
     val cmd: SendFunds = handlerProbe.expectMessageType[Command.SendFunds]
     cmd.replyTo ! FaucetIsUnavailable
 
-    future.futureValue match {
+    future.futureValue match
       case Right(_) => fail()
       case Left(error) =>
         error shouldBe JsonRpcError.LogicError("Faucet is unavailable: Please try again in a few more seconds")
-    }
-  }
 
   it should "answer FaucetIsUnavailable when tried to get status and the wallet is unavailable" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val future: Future[Either[JsonRpcError, FaucetDomain.StatusResponse]] =
       faucetRpcService.status(StatusRequest()).unsafeToFuture()
     val cmd: Status = handlerProbe.expectMessageType[Command.Status]
     cmd.replyTo ! FaucetIsUnavailable
 
-    future.futureValue match {
+    future.futureValue match
       case Right(_) => fail()
       case Left(error) =>
         error shouldBe JsonRpcError.LogicError("Faucet is unavailable: Please try again in a few more seconds")
-    }
-  }
 
   it should "answer WalletAvailable when tried to get status and the wallet is available" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val future: Future[Either[JsonRpcError, FaucetDomain.StatusResponse]] =
       faucetRpcService.status(StatusRequest()).unsafeToFuture()
     val cmd: Status = handlerProbe.expectMessageType[Command.Status]
     cmd.replyTo ! StatusResponse(WalletAvailable)
 
-    future.futureValue match {
+    future.futureValue match
       case Left(error)     => fail(s"failure with error: $error")
       case Right(response) => response shouldBe FaucetDomain.StatusResponse(WalletAvailable)
-    }
-  }
 
   it should "answer internal error when tried to send funds but the Faucet Handler is disable" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val address: Address = Address("0x00")
     val request: SendFundsRequest = SendFundsRequest(address)
 
-    faucetRpcServiceWithoutFaucetHandler.sendFunds(request).unsafeToFuture().futureValue match {
+    faucetRpcServiceWithoutFaucetHandler.sendFunds(request).unsafeToFuture().futureValue match
       case Right(_) => fail()
       case Left(error) =>
         error shouldBe JsonRpcError.InternalError
-    }
-  }
 
   it should "answer internal error when tried to get status but the Faucet Handler is disable" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
-    faucetRpcServiceWithoutFaucetHandler.status(StatusRequest()).unsafeToFuture().futureValue match {
+  ) in new TestSetup:
+    faucetRpcServiceWithoutFaucetHandler.status(StatusRequest()).unsafeToFuture().futureValue match
       case Right(_) => fail()
       case Left(error) =>
         error shouldBe JsonRpcError.InternalError
-    }
-  }
 
-  class TestSetup {
+  class TestSetup:
     implicit val classicSystem: ClassicSystem = FaucetRpcServiceSpec.this.system.toClassic
 
     val config: FaucetConfig = FaucetConfig(
@@ -184,5 +170,3 @@ class FaucetRpcServiceSpec
     val silentProbe: TestProbe[Command] = testKit.createTestProbe[FaucetHandler.Command]()
     val faucetRpcServiceWithoutFaucetHandler: FaucetRpcService =
       new FaucetRpcService(shortTimeoutConfig, silentProbe.ref)
-  }
-}

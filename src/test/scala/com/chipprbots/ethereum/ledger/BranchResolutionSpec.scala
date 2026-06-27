@@ -34,41 +34,37 @@ class BranchResolutionSpec
     with ObjectGenerators
     with ScalaFutures
     with ScalaCheckPropertyChecks
-    with org.scalamock.scalatest.MockFactory {
+    with org.scalamock.scalatest.MockFactory:
 
   "BranchResolution" should {
 
-    "check if headers are from chain" taggedAs (UnitTest, StateTest) in new BlockchainSetup {
+    "check if headers are from chain" taggedAs (UnitTest, StateTest) in new BlockchainSetup:
       val branchResolution = new BranchResolution(blockchainReader)
       val parent: BlockHeader = defaultBlockHeader.copy(number = 1)
       val child: BlockHeader = defaultBlockHeader.copy(number = 2, parentHash = parent.hash)
       branchResolution.doHeadersFormChain(NonEmptyList.of(parent, child)) shouldBe true
-    }
 
-    "check if headers are not from chain" taggedAs (UnitTest, StateTest) in new BlockchainSetup {
+    "check if headers are not from chain" taggedAs (UnitTest, StateTest) in new BlockchainSetup:
       val branchResolution = new BranchResolution(blockchainReader)
       val parent: BlockHeader = defaultBlockHeader.copy(number = 1)
       val otherParent: BlockHeader = defaultBlockHeader.copy(number = 3)
       val child: BlockHeader = defaultBlockHeader.copy(number = 2, parentHash = parent.hash)
       branchResolution.doHeadersFormChain(NonEmptyList.of(otherParent, child)) shouldBe false
-    }
 
-    "report an invalid branch when headers do not form a chain" in new BranchResolutionTestSetupImpl {
+    "report an invalid branch when headers do not form a chain" in new BranchResolutionTestSetupImpl:
       val headers: NonEmptyList[BlockHeader] = getChainHeadersNel(1, 10).reverse
       branchResolution.resolveBranch(headers) shouldEqual InvalidBranch
-    }
 
-    "report an unknown branch in the parent of the first header is unknown" in new BranchResolutionTestSetupImpl {
+    "report an unknown branch in the parent of the first header is unknown" in new BranchResolutionTestSetupImpl:
       val headers: NonEmptyList[BlockHeader] = getChainHeadersNel(5, 10)
 
       setGenesisHeader(genesisHeader) // Check genesis block
       setHeaderInChain(headers.head.parentHash.value, result = false)
 
       branchResolution.resolveBranch(headers) shouldEqual UnknownBranch
-    }
 
     "report new better branch found when headers form a branch of higher chain weight than corresponding known headers" in
-      new BranchResolutionTestSetupImpl {
+      new BranchResolutionTestSetupImpl:
         val headers: NonEmptyList[BlockHeader] = getChainHeadersNel(1, 10)
 
         setBestBlockNumber(10)
@@ -79,10 +75,9 @@ class BranchResolutionSpec
         oldBlocks.map(b => setBlockByNumber(b.header.number, Some(b)))
 
         branchResolution.resolveBranch(headers) shouldEqual NewBetterBranch(oldBlocks)
-      }
 
     "report no need for a chain switch the headers do not have chain weight greater than currently known branch" in
-      new BranchResolutionTestSetupImpl {
+      new BranchResolutionTestSetupImpl:
         val headers: NonEmptyList[BlockHeader] = getChainHeadersNel(1, 10)
 
         setBestBlockNumber(10)
@@ -93,9 +88,8 @@ class BranchResolutionSpec
         oldBlocks.map(b => setBlockByNumber(b.header.number, Some(b)))
 
         branchResolution.resolveBranch(headers) shouldEqual NoChainSwitch
-      }
 
-    "correctly handle a branch that goes up to the genesis block" in new BranchResolutionTestSetupImpl {
+    "correctly handle a branch that goes up to the genesis block" in new BranchResolutionTestSetupImpl:
       val headers: NonEmptyList[BlockHeader] = genesisHeader :: getChainHeadersNel(1, 10, genesisHeader.hash.value)
 
       setHeaderInChain(genesisHeader.parentHash.value, result = false)
@@ -108,9 +102,8 @@ class BranchResolutionSpec
       oldBlocks.foreach(b => setBlockByNumber(b.header.number, Some(b)))
 
       branchResolution.resolveBranch(headers) shouldEqual NewBetterBranch(oldBlocks)
-    }
 
-    "report an unknown branch if the included genesis header is different than ours" in new BranchResolutionTestSetupImpl {
+    "report an unknown branch if the included genesis header is different than ours" in new BranchResolutionTestSetupImpl:
       val differentGenesis: BlockHeader = genesisHeader.copy(extraData = ByteString("I'm different ;("))
       val headers: NonEmptyList[BlockHeader] =
         differentGenesis :: getChainHeadersNel(1, 10, differentGenesis.hash.value)
@@ -119,9 +112,8 @@ class BranchResolutionSpec
       setGenesisHeader(genesisHeader)
 
       branchResolution.resolveBranch(headers) shouldEqual UnknownBranch
-    }
 
-    "not include common prefix as result when finding a new better branch" in new BranchResolutionTestSetupImpl {
+    "not include common prefix as result when finding a new better branch" in new BranchResolutionTestSetupImpl:
       val headers: NonEmptyList[BlockHeader] = getChainHeadersNel(1, 10)
       val commonParent: BlockHeader = headers.toList(1)
 
@@ -137,9 +129,8 @@ class BranchResolutionSpec
 
       branchResolution.resolveBranch(headers) shouldEqual NewBetterBranch(oldBlocks)
       assert(oldBlocks.map(_.header.number) == List[BigInt](3, 4, 5, 6, 7, 8))
-    }
 
-    "report a new better branch with higher chain weight even if its shorter than the current " in new BranchResolutionTestSetupImpl {
+    "report a new better branch with higher chain weight even if its shorter than the current " in new BranchResolutionTestSetupImpl:
       val commonParent: Block = getBlock(1, parent = genesisHeader.hash.value)
       val parentWeight: ChainWeight = ChainWeight.zero.increase(commonParent.header)
       val longerBranchLowerWeight: List[Block] = getChain(2, 10, commonParent.hash.value, difficulty = 100)
@@ -153,7 +144,6 @@ class BranchResolutionSpec
       branchResolution.resolveBranch(shorterBranchHigherWeight.map(_.header)) shouldEqual NewBetterBranch(
         longerBranchLowerWeight
       )
-    }
 
   }
 
@@ -173,7 +163,7 @@ class BranchResolutionSpec
     "accept a branch with higher TD when no MESS config is set" taggedAs (
       UnitTest,
       StateTest
-    ) in new BranchResolutionTestSetupImpl {
+    ) in new BranchResolutionTestSetupImpl:
       val commonParentHash: ByteString = randomHash()
       val oldBlock: Block = getBlock(number = 10, difficulty = 100, parent = commonParentHash)
       val newHeader: BlockHeader = getBlock(number = 10, difficulty = 200, parent = commonParentHash).header
@@ -185,7 +175,6 @@ class BranchResolutionSpec
 
       // No messConfig set — MESS never fires
       branchResolution.resolveBranch(NonEmptyList.one(newHeader)) shouldEqual NewBetterBranch(List(oldBlock))
-    }
   }
 
   "BranchResolution with MESS enabled (ETC / Mordor)" should {
@@ -193,7 +182,7 @@ class BranchResolutionSpec
     "reject a reorg when proposed subchain TD is below the antigravity threshold" taggedAs (
       UnitTest,
       StateTest
-    ) in new MessTestSetup {
+    ) in new MessTestSetup:
       setBestBlockNumber(10)
       setChainWeightByHash(commonParentHash, ChainWeight.zero)
       setBlockByNumber(10, Some(oldBlock))
@@ -203,12 +192,11 @@ class BranchResolutionSpec
       // proposedTD=200 → got=25600 < want=34100 → REJECT
       val newHeader: BlockHeader = getBlock(number = 10, difficulty = 200, parent = commonParentHash).header
       branchResolution.compareBranch(NonEmptyList.one(newHeader)) shouldEqual NoChainSwitch
-    }
 
     "accept a reorg when proposed subchain TD meets the antigravity threshold" taggedAs (
       UnitTest,
       StateTest
-    ) in new MessTestSetup {
+    ) in new MessTestSetup:
       setBestBlockNumber(10)
       setChainWeightByHash(commonParentHash, ChainWeight.zero)
       setBlockByNumber(10, Some(oldBlock))
@@ -218,12 +206,11 @@ class BranchResolutionSpec
       // proposedTD=500 → got=64000 > want=34100 → ACCEPT
       val newHeader: BlockHeader = getBlock(number = 10, difficulty = 500, parent = commonParentHash).header
       branchResolution.compareBranch(NonEmptyList.one(newHeader)) shouldEqual NewBetterBranch(List(oldBlock))
-    }
 
     "not activate when block number is below the activation window" taggedAs (
       UnitTest,
       StateTest
-    ) in new MessTestSetup {
+    ) in new MessTestSetup:
       setBestBlockNumber(5)
       setChainWeightByHash(commonParentHash, ChainWeight.zero)
       val earlyBlock: Block = Block(oldBlock.header.copy(number = 5), oldBlock.body)
@@ -241,12 +228,11 @@ class BranchResolutionSpec
       // proposedTD=200 would be rejected IF MESS were active, but it isn't
       val newHeader: BlockHeader = getBlock(number = 5, difficulty = 200, parent = commonParentHash).header
       branchResolution.compareBranch(NonEmptyList.one(newHeader)) shouldEqual NewBetterBranch(List(earlyBlock))
-    }
 
     "not activate when block number is in the Spiral deactivation window" taggedAs (
       UnitTest,
       StateTest
-    ) in new MessTestSetup {
+    ) in new MessTestSetup:
       // ETC mainnet: MESS deactivated at block 19,250,000 (Spiral fork)
       val deactivatedConfig: MESSConfig = MESSConfig(
         enabled = true,
@@ -265,9 +251,8 @@ class BranchResolutionSpec
       val newHeader: BlockHeader =
         getBlock(number = BigInt(20_000_000), difficulty = 200, parent = commonParentHash).header
       branchResolution.compareBranch(NonEmptyList.one(newHeader)) shouldEqual NewBetterBranch(List(deactivatedBlock))
-    }
 
-    "reactivate in the Olympia window" taggedAs (UnitTest, StateTest) in new MessTestSetup {
+    "reactivate in the Olympia window" taggedAs (UnitTest, StateTest) in new MessTestSetup:
       val olympiaConfig: MESSConfig = MESSConfig(
         enabled = true,
         activationBlock = Some(BigInt(11_380_000)),
@@ -289,9 +274,8 @@ class BranchResolutionSpec
       val newHeader: BlockHeader =
         getBlock(number = BigInt(25_000_001), difficulty = 200, parent = commonParentHash).header
       branchResolution.compareBranch(NonEmptyList.one(newHeader)) shouldEqual NoChainSwitch
-    }
 
-    "not activate when enabled = false" taggedAs (UnitTest, StateTest) in new MessTestSetup {
+    "not activate when enabled = false" taggedAs (UnitTest, StateTest) in new MessTestSetup:
       setBestBlockNumber(10)
       setChainWeightByHash(commonParentHash, ChainWeight.zero)
       setBlockByNumber(10, Some(oldBlock))
@@ -300,12 +284,11 @@ class BranchResolutionSpec
       // enabled=false → MESS never fires regardless of TD ratio
       val newHeader: BlockHeader = getBlock(number = 10, difficulty = 200, parent = commonParentHash).header
       branchResolution.compareBranch(NonEmptyList.one(newHeader)) shouldEqual NewBetterBranch(List(oldBlock))
-    }
 
     "accept a small reorg (≤ 2 blocks) without requiring MESS log output" taggedAs (
       UnitTest,
       StateTest
-    ) in new MessTestSetup {
+    ) in new MessTestSetup:
       // 1-block reorg: currentHead.number - commonAncestorNumber = 10 - 9 = 1 ≤ 2
       // MESS increments accepted counter but does NOT emit an info log for trivial reorgs
       setBestBlockNumber(10)
@@ -317,7 +300,6 @@ class BranchResolutionSpec
       // proposedTD=500 → passes MESS → accepted (1-block reorg, no log)
       val newHeader: BlockHeader = getBlock(number = 10, difficulty = 500, parent = commonParentHash).header
       branchResolution.compareBranch(NonEmptyList.one(newHeader)) shouldEqual NewBetterBranch(List(oldBlock))
-    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -334,7 +316,7 @@ class BranchResolutionSpec
     "accept a chain extension with zero-difficulty blocks (ETH post-merge sync)" taggedAs (
       UnitTest,
       StateTest
-    ) in new BranchResolutionTestSetupImpl {
+    ) in new BranchResolutionTestSetupImpl:
       val parentHash: ByteString = randomHash()
       // Best block is 5; new header extends at 6 — no old blocks displaced
       val newHeader: BlockHeader =
@@ -350,12 +332,11 @@ class BranchResolutionSpec
       // getBlockByNumber is NOT called — range (6 to 5) is empty
 
       branchResolution.resolveBranch(NonEmptyList.one(newHeader)) shouldEqual NewBetterBranch(Nil)
-    }
 
     "not switch chain when a zero-difficulty branch conflicts with existing canonical blocks" taggedAs (
       UnitTest,
       StateTest
-    ) in new BranchResolutionTestSetupImpl {
+    ) in new BranchResolutionTestSetupImpl:
       val parentHash: ByteString = randomHash()
       val existingBlock: Block = getBlock(number = 10, difficulty = 0, parent = parentHash)
       val competingHeader: BlockHeader = getBlock(number = 10, difficulty = 0, parent = parentHash).header
@@ -368,10 +349,9 @@ class BranchResolutionSpec
       setBlockByNumber(10, Some(existingBlock))
 
       branchResolution.resolveBranch(NonEmptyList.one(competingHeader)) shouldEqual NoChainSwitch
-    }
   }
 
-  class BranchResolutionTestSetupImpl extends TestSetupWithVmAndValidators with MockBlockchain {
+  class BranchResolutionTestSetupImpl extends TestSetupWithVmAndValidators with MockBlockchain:
     // Provide mock implementations - these are created in the test class context which has MockFactory
     override lazy val mockBlockchainReader: BlockchainReader = mock[BlockchainReader]
     override lazy val mockBlockchainWriter: BlockchainWriter = mock[BlockchainWriter]
@@ -384,18 +364,16 @@ class BranchResolutionSpec
     val branchResolution = new BranchResolution(blockchainReader)
 
     // Helper methods implementation (have MockFactory context here)
-    override def setBlockExists(block: Block, inChain: Boolean, inQueue: Boolean): CallHandler1[BlockHash, Boolean] = {
+    override def setBlockExists(block: Block, inChain: Boolean, inQueue: Boolean): CallHandler1[BlockHash, Boolean] =
       blockchainReader.getBlockByHash
         .expects(block.header.hash)
         .anyNumberOfTimes()
         .returning(Some(block).filter(_ => inChain))
       blockQueue.isQueued.expects(block.header.hash).anyNumberOfTimes().returning(inQueue)
-    }
 
-    override def setBestBlock(block: Block): CallHandler0[BigInt] = {
+    override def setBestBlock(block: Block): CallHandler0[BigInt] =
       (() => blockchainReader.getBestBlock).expects().anyNumberOfTimes().returning(Some(block))
       (() => blockchainReader.getBestBlockNumber).expects().anyNumberOfTimes().returning(block.header.number)
-    }
 
     override def setBestBlockNumber(num: BigInt): CallHandler0[BigInt] =
       (() => blockchainReader.getBestBlockNumber).expects().returning(num)
@@ -431,14 +409,13 @@ class BranchResolutionSpec
 
     override def setGenesisHeader(header: BlockHeader): Unit =
       (() => blockchainReader.genesisHeader).expects().returning(header)
-  }
 
   /** Shared setup for MESS and PoS branch-resolution tests.
     *
     * Pre-constructs a single old block at height 10 with a specific timestamp so that timeDelta = 3600s when the mock
     * ancestor header returns ts=1000. polynomialV(3600) = 341 → want = 341 × 100 = 34100.
     */
-  class MessTestSetup extends BranchResolutionTestSetupImpl {
+  class MessTestSetup extends BranchResolutionTestSetupImpl:
 
     /** Hash of the common ancestor block (parent of `oldBlock`). */
     val commonParentHash: ByteString = randomHash()
@@ -450,10 +427,9 @@ class BranchResolutionSpec
     val headTs: Long = 4600L
 
     /** Single canonical block at height 10 with difficulty=100 and a controlled timestamp. */
-    val oldBlock: Block = {
+    val oldBlock: Block =
       val b = getBlock(number = 10, difficulty = 100, parent = commonParentHash)
       Block(b.header.copy(unixTimestamp = headTs), b.body)
-    }
 
     /** Standard ETC/Mordor MESS config: active from block 10, no deactivation. */
     val ETCMessConfig: MESSConfig = MESSConfig(
@@ -468,6 +444,3 @@ class BranchResolutionSpec
       blockchainReader.getBlockHeaderByHash
         .expects(BlockHash(commonParentHash))
         .returning(Some(defaultHeader.copy(number = 9, unixTimestamp = ts)))
-  }
-
-}

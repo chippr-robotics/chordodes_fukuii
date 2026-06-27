@@ -9,7 +9,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.domain.Address
 
-class CallTracerSpec extends AnyFreeSpec with Matchers {
+class CallTracerSpec extends AnyFreeSpec with Matchers:
 
   private val from = Address(0x1234)
   private val to = Address(0x5678)
@@ -174,4 +174,3 @@ class CallTracerSpec extends AnyFreeSpec with Matchers {
       (calls(1) \ "calls") shouldBe JNothing
     }
   }
-}

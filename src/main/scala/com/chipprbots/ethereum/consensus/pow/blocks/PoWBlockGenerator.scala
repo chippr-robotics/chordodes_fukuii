@@ -17,14 +17,13 @@ import com.chipprbots.ethereum.ledger.InMemoryWorldStateProxy
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 /** Internal API, used for testing (especially mocks) */
-trait PoWBlockGenerator extends TestBlockGenerator {
+trait PoWBlockGenerator extends TestBlockGenerator:
   type X = Ommers
 
   /** An empty `X` */
   def emptyX: Ommers
 
   def getPrepared(powHeaderHash: ByteString): Option[PendingBlock]
-}
 
 class PoWBlockGeneratorImpl(
     evmCodeStorage: EvmCodeStorage,
@@ -39,7 +38,7 @@ class PoWBlockGeneratorImpl(
       difficultyCalc,
       blockTimestampProvider
     )
-    with PoWBlockGenerator {
+    with PoWBlockGenerator:
 
   protected def newBlockBody(transactions: Seq[SignedTransaction], x: Ommers): BlockBody =
     BlockBody(transactions, x)
@@ -59,12 +58,13 @@ class PoWBlockGeneratorImpl(
   def getPrepared(powHeaderHash: ByteString): Option[PendingBlock] =
     MiningMetrics.MinedBlockEvaluationTimer.record { () =>
       cache
-        .getAndUpdate(new UnaryOperator[List[PendingBlockAndState]] {
-          override def apply(t: List[PendingBlockAndState]): List[PendingBlockAndState] =
-            t.filterNot(pbs =>
-              ByteString(kec256(BlockHeader.getEncodedWithoutNonce(pbs.pendingBlock.block.header))) == powHeaderHash
-            )
-        })
+        .getAndUpdate(
+          new UnaryOperator[List[PendingBlockAndState]]:
+            override def apply(t: List[PendingBlockAndState]): List[PendingBlockAndState] =
+              t.filterNot(pbs =>
+                ByteString(kec256(BlockHeader.getEncodedWithoutNonce(pbs.pendingBlock.block.header))) == powHeaderHash
+              )
+        )
         .find { pbs =>
           ByteString(kec256(BlockHeader.getEncodedWithoutNonce(pbs.pendingBlock.block.header))) == powHeaderHash
         }
@@ -83,11 +83,10 @@ class PoWBlockGeneratorImpl(
       val blockNumber = pHeader.number + 1
       val parentHash = pHeader.hash
 
-      val ommers = validators.ommersValidator.validate(parentHash.value, blockNumber, x, blockchainReader) match {
+      val ommers = validators.ommersValidator.validate(parentHash.value, blockNumber, x, blockchainReader) match
         case Left(_)  => emptyX
         case Right(_) => x
 
-      }
       val prepared = prepareBlock(
         evmCodeStorage,
         parent,
@@ -116,4 +115,3 @@ class PoWBlockGeneratorImpl(
       difficultyCalc,
       blockTimestampProvider
     )
-}

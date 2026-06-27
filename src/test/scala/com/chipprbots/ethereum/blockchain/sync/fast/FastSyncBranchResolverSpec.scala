@@ -25,7 +25,7 @@ import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.testing.Tags.*
 
-class FastSyncBranchResolverSpec extends AnyWordSpec with Matchers with MockFactory with ParallelTestExecution {
+class FastSyncBranchResolverSpec extends AnyWordSpec with Matchers with MockFactory with ParallelTestExecution:
 
   import Fixtures.Blocks.ValidBlock
 
@@ -64,10 +64,9 @@ class FastSyncBranchResolverSpec extends AnyWordSpec with Matchers with MockFact
         mockedBlockchain.removeBlock.expects(headers(98).hash).returning(())
       }
 
-      val resolver = new FastSyncBranchResolver {
+      val resolver = new FastSyncBranchResolver:
         override val blockchain: Blockchain = mockedBlockchain
         override val blockchainReader: BlockchainReader = mockedBlockchainReader
-      }
       resolver.discardBlocksAfter(97)
     }
   }
@@ -210,10 +209,9 @@ class FastSyncBranchResolverSpec extends AnyWordSpec with Matchers with MockFact
         ours(req1 - 1).header,
         peer(req1).header,
         initialSearchState
-      ) match {
+      ) match
         case ContinueBinarySearch(searchState) => searchState
         case _                                 => fail()
-      }
       assert(s1 === SearchState(5, 10, dummyPeer))
 
       val req2 = BinarySearchSupport.blockHeaderNumberToRequest(s1.minBlockNumber, s1.maxBlockNumber)
@@ -225,10 +223,9 @@ class FastSyncBranchResolverSpec extends AnyWordSpec with Matchers with MockFact
         ours(req2 - 1).header,
         peer(req2).header,
         s1
-      ) match {
+      ) match
         case ContinueBinarySearch(searchState) => searchState
         case _                                 => fail()
-      }
       assert(s2 === SearchState(5, 6, dummyPeer))
 
       val req3 = BinarySearchSupport.blockHeaderNumberToRequest(s2.minBlockNumber, s2.maxBlockNumber)
@@ -241,10 +238,9 @@ class FastSyncBranchResolverSpec extends AnyWordSpec with Matchers with MockFact
         ours(req3 - 1).header,
         peer(req3).header,
         s2
-      ) match {
+      ) match
         case ContinueBinarySearch(searchState) => searchState
         case _                                 => fail()
-      }
       assert(s3 === SearchState(6, 6, dummyPeer))
 
       val req4 = BinarySearchSupport.blockHeaderNumberToRequest(s3.minBlockNumber, s3.maxBlockNumber)
@@ -256,10 +252,9 @@ class FastSyncBranchResolverSpec extends AnyWordSpec with Matchers with MockFact
         ours(req4 - 1).header,
         peer(req4).header,
         s3
-      ) match {
+      ) match
         case BinarySearchCompleted(highestHeader) => highestHeader
         case _                                    => fail()
-      }
       assert(res === BigInt(6))
     }
     "complete search with no match" taggedAs (UnitTest) in {
@@ -292,10 +287,9 @@ class FastSyncBranchResolverSpec extends AnyWordSpec with Matchers with MockFact
         ours(req1 - 1).header,
         peer(req1).header,
         initialSearchState
-      ) match {
+      ) match
         case ContinueBinarySearch(searchState) => searchState
         case _                                 => fail()
-      }
       assert(s1 === SearchState(1, 3, dummyPeer))
 
       val req2 = BinarySearchSupport.blockHeaderNumberToRequest(s1.minBlockNumber, s1.maxBlockNumber)
@@ -307,10 +301,9 @@ class FastSyncBranchResolverSpec extends AnyWordSpec with Matchers with MockFact
         ours(req2 - 1).header,
         peer(req2).header,
         s1
-      ) match {
+      ) match
         case ContinueBinarySearch(searchState) => searchState
         case _                                 => fail()
-      }
       assert(s2 === SearchState(1, 1, dummyPeer))
 
       val req3 = BinarySearchSupport.blockHeaderNumberToRequest(s2.minBlockNumber, s2.maxBlockNumber)
@@ -327,5 +320,3 @@ class FastSyncBranchResolverSpec extends AnyWordSpec with Matchers with MockFact
       assert(res === NoCommonBlock)
     }
   }
-
-}

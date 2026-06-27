@@ -6,7 +6,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.testing.Tags.*
 
-class ConfigSpec extends AnyFlatSpec with Matchers {
+class ConfigSpec extends AnyFlatSpec with Matchers:
   "clientId" should "by default come from VersionInfo" taggedAs (UnitTest) in {
     Config.clientId shouldBe VersionInfo.nodeName()
   }
@@ -37,4 +37,3 @@ class ConfigSpec extends AnyFlatSpec with Matchers {
     peerConfig.hasPath("p2p-version") shouldBe false
     p2pVersion shouldBe 5
   }
-}

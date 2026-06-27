@@ -22,7 +22,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   * (`twoIdenticalIndex`, `differentValidatorToTheSameAddress`, etc.) explicitly exercise this — they ship blocks with
   * non-monotonic / duplicate indices and `expectException: None`, expecting the block to be accepted.
   */
-class StdBlockValidatorWithdrawalsSpec extends AnyFlatSpec with Matchers with ParallelTestExecution {
+class StdBlockValidatorWithdrawalsSpec extends AnyFlatSpec with Matchers with ParallelTestExecution:
 
   // Pre-Shanghai header (no withdrawalsRoot). Transactions + ommers roots are correct for
   // Fixtures.Blocks.ValidBlock.body, so the earlier checks in validateHeaderAndBody pass.
@@ -77,4 +77,3 @@ class StdBlockValidatorWithdrawalsSpec extends AnyFlatSpec with Matchers with Pa
     )
     StdBlockValidator.validateHeaderAndBody(headerWithEmptyRoot, body) shouldBe Right(BlockValid)
   }
-}

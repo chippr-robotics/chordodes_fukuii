@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.jsonrpc.NetService.*
   *
   * Usage: assign the `*Fn` var for each method that the test exercises. Unassigned methods raise NotImplementedError.
   */
-class TestNetService extends NetServiceAPI {
+class TestNetService extends NetServiceAPI:
 
   var versionFn: VersionRequest => ServiceResponse[VersionResponse] =
     _ => IO.raiseError(new NotImplementedError("TestNetService.version not configured"))
@@ -59,4 +59,3 @@ class TestNetService extends NetServiceAPI {
   )
   override def removeFromBlacklist(req: RemoveFromBlacklistRequest): ServiceResponse[RemoveFromBlacklistResponse] =
     removeFromBlacklistFn(req)
-}

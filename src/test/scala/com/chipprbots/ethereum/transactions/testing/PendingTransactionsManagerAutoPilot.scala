@@ -10,12 +10,12 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 
 case class PendingTransactionsManagerAutoPilot(pendingTransactions: Set[PendingTransaction] = Set.empty)
-    extends AutoPilot {
+    extends AutoPilot:
 
   implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
 
   def run(sender: ActorRef, msg: Any): AutoPilot =
-    msg match {
+    msg match
       case AddUncheckedTransactions(transactions) =>
         val validTxs = SignedTransactionWithSender.getSignedTransactions(transactions)
         this.addTransactions(validTxs.toSet)
@@ -48,16 +48,13 @@ case class PendingTransactionsManagerAutoPilot(pendingTransactions: Set[PendingT
 
       case ClearPendingTransactions =>
         copy(pendingTransactions = Set.empty)
-    }
 
-  def addTransactions(signedTransactions: Set[SignedTransactionWithSender]): PendingTransactionsManagerAutoPilot = {
+  def addTransactions(signedTransactions: Set[SignedTransactionWithSender]): PendingTransactionsManagerAutoPilot =
     val timestamp = System.currentTimeMillis()
     val stxs = pendingTransactions.map(_.stx)
     val transactionsToAdd = signedTransactions.diff(stxs).map(tx => PendingTransaction(tx, timestamp))
 
     copy(pendingTransactions ++ transactionsToAdd)
-  }
 
   def removeTransactions(hashes: Set[ByteString]): PendingTransactionsManagerAutoPilot =
     copy(pendingTransactions.filterNot(ptx => hashes.contains(ptx.stx.tx.hash.value)))
-}

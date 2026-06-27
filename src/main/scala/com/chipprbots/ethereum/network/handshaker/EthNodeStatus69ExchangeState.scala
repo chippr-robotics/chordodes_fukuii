@@ -30,7 +30,7 @@ case class EthNodeStatus69ExchangeState(
     supportsSnap: Boolean = false,
     peerCapabilities: List[Capability] = List.empty,
     clientId: String = ""
-) extends NodeStatusExchangeState[ETHPackets.Status69.Status69] {
+) extends NodeStatusExchangeState[ETHPackets.Status69.Status69]:
 
   import ETHPackets.Status69.Status69.* // toBytes for createStatusMsg
   import handshakerConfiguration.*
@@ -69,7 +69,7 @@ case class EthNodeStatus69ExchangeState(
       earliestBlock: BigInt,
       latestBlock: BigInt,
       latestBlockHash: org.apache.pekko.util.ByteString
-  ): HandshakerState[PeerInfo] = {
+  ): HandshakerState[PeerInfo] =
     import ForkIdValidator.syncIoLogger
     log.debug(
       "ETH69_STATUS: Received - protocolVersion={}, networkId={}, genesis={}, forkId={}, earliest={}, latest={}, latestHash={}",
@@ -84,30 +84,29 @@ case class EthNodeStatus69ExchangeState(
 
     val localGenesisHash = blockchainReader.genesisHeader.hash.value
 
-    if networkId != peerConfiguration.networkId then {
+    if networkId != peerConfiguration.networkId then
       log.debug(
         "ETH69_STATUS: NetworkId mismatch! Local: {}, Remote: {} - disconnecting",
         peerConfiguration.networkId,
         networkId
       )
       DisconnectedState[PeerInfo](Disconnect.Reasons.UselessPeer)
-    } else if genesisHash != localGenesisHash then {
+    else if genesisHash != localGenesisHash then
       log.debug(
         "ETH69_STATUS: Genesis hash mismatch! Local: {}, Remote: {} - disconnecting",
         localGenesisHash,
         genesisHash
       )
       DisconnectedState[PeerInfo](Disconnect.Reasons.UselessPeer)
-    } else {
-      (for {
-        validationResult <-
+    else
+      (for validationResult <-
           ForkIdValidator.validatePeer[SyncIO](blockchainReader.genesisHeader.hash.value, blockchainConfig)(
             blockchainReader.getBestBlockNumber,
             forkId
           )
-      } yield {
+      yield
         log.debug("ETH69_STATUS: ForkId validation result: {}", validationResult)
-        validationResult match {
+        validationResult match
           case Connect =>
             log.info("ETH69_STATUS: ForkId validation passed - accepting peer")
             val (resolvedChainWeight, resolvedSource) = blockchainReader.resolveETH69ChainWeight(
@@ -139,12 +138,9 @@ case class EthNodeStatus69ExchangeState(
           case other =>
             log.debug("ETH69_STATUS: ForkId validation failed: {} - disconnecting", other)
             DisconnectedState[PeerInfo](Disconnect.Reasons.UselessPeer)
-        }
-      }).unsafeRunSync()
-    }
-  }
+      ).unsafeRunSync()
 
-  override protected def createStatusMsg(): MessageSerializable = {
+  override protected def createStatusMsg(): MessageSerializable =
     val bestBlockHeader = getBestBlockHeader()
     val bestBlockNumber = blockchainReader.getBestBlockNumber
     val genesisHash = blockchainReader.genesisHeader.hash.value
@@ -176,5 +172,3 @@ case class EthNodeStatus69ExchangeState(
     )
 
     status
-  }
-}

@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.jsonrpc.serialization.JsonEncoder
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder.NoParamsMethodDecoder
 
-object FaucetMethodsImplicits extends JsonMethodsImplicits {
+object FaucetMethodsImplicits extends JsonMethodsImplicits:
 
   given sendFundsRequestDecoder: JsonMethodDecoder[SendFundsRequest] = {
     case Some(JArray((input: JString) :: Nil)) => extractAddress(input).map(SendFundsRequest.apply)
@@ -29,4 +29,3 @@ object FaucetMethodsImplicits extends JsonMethodsImplicits {
     JObject(
       "status" -> JString(t.status.toString)
     )
-}

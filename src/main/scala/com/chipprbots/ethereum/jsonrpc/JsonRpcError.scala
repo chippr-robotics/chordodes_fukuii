@@ -13,7 +13,7 @@ case class JsonRpcError(code: Int, message: String, data: Option[JValue])
 
 // scalastyle:off magic.number
 // scalastyle:off public.methods.have.type
-object JsonRpcError extends JsonMethodsImplicits {
+object JsonRpcError extends JsonMethodsImplicits:
 
   def apply[T: JsonEncoder](code: Int, message: String, data: T): JsonRpcError =
     JsonRpcError(code, message, Some(JsonEncoder[T].encodeJson(data)))
@@ -68,7 +68,7 @@ object JsonRpcError extends JsonMethodsImplicits {
 
   // Custom errors based on proposal https://eth.wiki/json-rpc/json-rpc-error-codes-improvement-proposal
   sealed abstract class EthCustomError private (val code: Int, val message: String)
-  object EthCustomError {
+  object EthCustomError:
     given ethCustomErrorEncoder: JsonEncoder[EthCustomError] = err =>
       JObject("code" -> JInt(err.code), "message" -> JString(err.message))
 
@@ -78,5 +78,3 @@ object JsonRpcError extends JsonMethodsImplicits {
     case object GasLimitExceeded extends EthCustomError(103, "Gas limit exceeded")
     case object Rejected extends EthCustomError(104, "Rejected")
     case object EtherTooLow extends EthCustomError(105, "Ether too low")
-  }
-}

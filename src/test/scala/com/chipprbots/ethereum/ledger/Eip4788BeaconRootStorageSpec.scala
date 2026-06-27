@@ -27,12 +27,12 @@ import com.chipprbots.ethereum.utils.ForkTimestamps
   * the root entry), wrap-around when the timestamp index crosses the 8191-slot boundary, the pre-Cancun guard, and the
   * contract-deployment check (code + nonce=1) required by §ETH-T4-C.
   */
-class Eip4788BeaconRootStorageSpec extends AnyFlatSpec with Matchers {
+class Eip4788BeaconRootStorageSpec extends AnyFlatSpec with Matchers:
 
   private val CancunTs: Long = 100L
   private val Buf: BigInt = BeaconRootHistoryBufferLength // 8191
 
-  trait TestSetup extends EphemBlockchainTestSetup {
+  trait TestSetup extends EphemBlockchainTestSetup:
     override lazy val vm: VMImpl = new Mocks.MockVM()
 
     implicit override lazy val blockchainConfig: BlockchainConfig =
@@ -88,14 +88,13 @@ class Eip4788BeaconRootStorageSpec extends AnyFlatSpec with Matchers {
 
     def runBlock(block: Block, world: InMemoryWorldStateProxy = emptyWorld): InMemoryWorldStateProxy =
       exec.executeBlockTransactions(block, world).toOption.get.worldState
-  }
 
   // Case 1 — First post-Cancun block: timestamp slot and root slot
   "EIP-4788 beacon root storage" should
     "write timestamp and beacon root to the correct ring-buffer slots on the first post-Cancun block" taggedAs (
       UnitTest,
       ConsensusTest
-    ) in new TestSetup {
+    ) in new TestSetup:
       val ts: Long = CancunTs
       val beaconRoot: ByteString = ByteString(Array.fill(32)(0xab.toByte))
       val world: InMemoryWorldStateProxy = runBlock(makeBlock(beaconRoot, ts))
@@ -106,13 +105,12 @@ class Eip4788BeaconRootStorageSpec extends AnyFlatSpec with Matchers {
 
       storage.load(timestampIdx) shouldBe BigInt(ts)
       storage.load(rootIdx) shouldBe UInt256(beaconRoot).toBigInt
-    }
 
   // Case 2 — Pre-Cancun block: no storage written, contract absent
   it should "NOT write any storage slots for a block without parentBeaconBlockRoot" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val preCancunBlock = Block(
       header = Fixtures.Blocks.ValidBlock.header.copy(
         unixTimestamp = CancunTs,
@@ -131,13 +129,12 @@ class Eip4788BeaconRootStorageSpec extends AnyFlatSpec with Matchers {
     storage.load(timestampIdx) shouldBe BigInt(0)
     storage.load(rootIdx) shouldBe BigInt(0)
     world.getCode(BeaconRootContractAddress) shouldBe ByteString.empty
-  }
 
   // Case 3 — Wrap-around: slot 8190 then slot 0 (new values overwrite, old slot retained)
   it should "overwrite slot 0 when the timestamp index wraps from 8190 to 0" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     // timestamp_A % 8191 = 8190  (last slot before wrap)
     val tsA: Long = 8190L
     // timestamp_B % 8191 = 0     (wraps to slot 0)
@@ -163,17 +160,14 @@ class Eip4788BeaconRootStorageSpec extends AnyFlatSpec with Matchers {
     // Slot 8190 retains block A's values (not overwritten by block B)
     storage.load(slotA_ts) shouldBe BigInt(tsA)
     storage.load(slotA_root) shouldBe UInt256(rootA).toBigInt
-  }
 
   // Case 4 — §ETH-T4-C contract deployment: code present and nonce=1 after first Cancun block
   it should "deploy the beacon roots contract with the EIP-4788 bytecode and nonce=1" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val world: InMemoryWorldStateProxy =
       runBlock(makeBlock(ByteString(Array.fill(32)(0xcc.toByte))))
 
     world.getCode(BeaconRootContractAddress) shouldBe BeaconRootsCode
     world.getAccount(BeaconRootContractAddress).map(_.nonce) shouldBe Some(UInt256(1))
-  }
-}

@@ -44,9 +44,9 @@ import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.RLPxConfigurat
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 
-class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
+class BlockchainHostActorSpec extends AnyFlatSpec with Matchers:
 
-  it should "return Receipts for block hashes" taggedAs (UnitTest) in new TestSetup {
+  it should "return Receipts for block hashes" taggedAs (UnitTest) in new TestSetup:
     peerEventBus.expectMsgType[SubscribeCmd].to shouldBe MessageClassifier(
       Set(
         Codes.GetPooledTransactionsCode,
@@ -87,9 +87,8 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
         peerId
       )
     )
-  }
 
-  it should "return BlockBodies for block hashes" taggedAs (UnitTest) in new TestSetup {
+  it should "return BlockBodies for block hashes" taggedAs (UnitTest) in new TestSetup:
     // given
     val blockBodiesHashes: Seq[ByteString] = Seq(
       ByteString(Hex.decode("a218e2c611f21232d857e3c8cecdcdf1f65f25a4477f98f6f47e4063807f2308")),
@@ -112,9 +111,8 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
     networkPeerManager.expectMsg(
       NetworkPeerManagerActor.SendMessageCmd(ETHPackets.BlockBodies(BigInt(0), blockBodies), peerId)
     )
-  }
 
-  it should "return block headers by block number" taggedAs (UnitTest) in new TestSetup {
+  it should "return block headers by block number" taggedAs (UnitTest) in new TestSetup:
     // given
     val firstHeader: BlockHeader = baseBlockHeader.copy(number = 3)
     val secondHeader: BlockHeader = baseBlockHeader.copy(number = 4)
@@ -135,11 +133,10 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
     networkPeerManager.expectMsg(
       NetworkPeerManagerActor.SendMessageCmd(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
     )
-  }
 
   it should "return block headers by block number when response is shorter then what was requested" taggedAs (
     UnitTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     // given
     val firstHeader: BlockHeader = baseBlockHeader.copy(number = 3)
     val secondHeader: BlockHeader = baseBlockHeader.copy(number = 4)
@@ -158,9 +155,8 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
     networkPeerManager.expectMsg(
       NetworkPeerManagerActor.SendMessageCmd(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
     )
-  }
 
-  it should "return block headers by block number in reverse order" taggedAs (UnitTest) in new TestSetup {
+  it should "return block headers by block number in reverse order" taggedAs (UnitTest) in new TestSetup:
     // given
     val firstHeader: BlockHeader = baseBlockHeader.copy(number = 3)
     val secondHeader: BlockHeader = baseBlockHeader.copy(number = 2)
@@ -180,9 +176,8 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
     networkPeerManager.expectMsg(
       NetworkPeerManagerActor.SendMessageCmd(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
     )
-  }
 
-  it should "return block headers by block hash" taggedAs (UnitTest) in new TestSetup {
+  it should "return block headers by block hash" taggedAs (UnitTest) in new TestSetup:
     // given
     val firstHeader: BlockHeader = baseBlockHeader.copy(number = 3)
     val secondHeader: BlockHeader = baseBlockHeader.copy(number = 4)
@@ -203,9 +198,8 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
     networkPeerManager.expectMsg(
       NetworkPeerManagerActor.SendMessageCmd(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
     )
-  }
 
-  it should "return block headers by block hash when skipping headers" taggedAs (UnitTest) in new TestSetup {
+  it should "return block headers by block hash when skipping headers" taggedAs (UnitTest) in new TestSetup:
     // given
     val firstHeader: BlockHeader = baseBlockHeader.copy(number = 3)
     val secondHeader: BlockHeader = baseBlockHeader.copy(number = 5)
@@ -230,11 +224,10 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
     networkPeerManager.expectMsg(
       NetworkPeerManagerActor.SendMessageCmd(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
     )
-  }
 
   it should "return block headers in reverse when there are skipped blocks" taggedAs (
     UnitTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     // given
     val firstHeader: BlockHeader = baseBlockHeader.copy(number = 3)
     val secondHeader: BlockHeader = baseBlockHeader.copy(number = 1)
@@ -253,11 +246,10 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
     networkPeerManager.expectMsg(
       NetworkPeerManagerActor.SendMessageCmd(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
     )
-  }
 
   it should "return block headers in reverse when there are skipped blocks and we are asking for blocks before genesis" taggedAs (
     UnitTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     // given
     val firstHeader: BlockHeader = baseBlockHeader.copy(number = 3)
     val secondHeader: BlockHeader = baseBlockHeader.copy(number = 1)
@@ -276,11 +268,10 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
     networkPeerManager.expectMsg(
       NetworkPeerManagerActor.SendMessageCmd(BlockHeaders(BigInt(0), Seq(firstHeader, secondHeader)), peerId)
     )
-  }
 
   it should "return block headers in reverse when there are skipped blocks ending at genesis" taggedAs (
     UnitTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     // given
     val firstHeader: BlockHeader = baseBlockHeader.copy(number = 4)
     val secondHeader: BlockHeader = baseBlockHeader.copy(number = 2)
@@ -302,9 +293,8 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
         peerId
       )
     )
-  }
 
-  it should "return evm code for hash" taggedAs (UnitTest) in new TestSetup {
+  it should "return evm code for hash" taggedAs (UnitTest) in new TestSetup:
     // given
     val fakeEvmCode: ByteString = ByteString(Hex.decode("ffddaaffddaaffddaaffddaaffddaa"))
     val evmCodeHash: ByteString = ByteString(crypto.kec256(fakeEvmCode.toArray[Byte]))
@@ -316,9 +306,8 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
 
     // then
     networkPeerManager.expectMsg(NetworkPeerManagerActor.SendMessageCmd(NodeData(Seq(fakeEvmCode)), peerId))
-  }
 
-  it should "return mptNode for hash" taggedAs (UnitTest) in new TestSetup {
+  it should "return mptNode for hash" taggedAs (UnitTest) in new TestSetup:
     // given
     val exampleNibbles: ByteString = ByteString(HexPrefix.bytesToNibbles(Hex.decode("ffddaa")))
     val exampleHash: ByteString = ByteString(Hex.decode("ab" * 32))
@@ -337,24 +326,21 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
 
     // then
     networkPeerManager.expectMsg(NetworkPeerManagerActor.SendMessageCmd(NodeData(Seq(extensionNode.toBytes)), peerId))
-  }
 
-  trait TestSetup extends EphemBlockchainTestSetup {
+  trait TestSetup extends EphemBlockchainTestSetup:
     implicit override lazy val classicSystem: ActorSystem = ActorSystem("BlockchainHostActor_System")
 
     blockchainWriter.storeBlockHeader(Fixtures.Blocks.Genesis.header).commit()
 
-    val peerConf: PeerConfiguration = new PeerConfiguration {
-      override val fastSyncHostConfiguration: FastSyncHostConfiguration = new FastSyncHostConfiguration {
+    val peerConf: PeerConfiguration = new PeerConfiguration:
+      override val fastSyncHostConfiguration: FastSyncHostConfiguration = new FastSyncHostConfiguration:
         val maxBlocksHeadersPerMessage: Int = 200
         val maxBlocksBodiesPerMessage: Int = 200
         val maxReceiptsPerMessage: Int = 200
         val maxMptComponentsPerMessage: Int = 200
-      }
-      override val rlpxConfiguration: RLPxConfiguration = new RLPxConfiguration {
+      override val rlpxConfiguration: RLPxConfiguration = new RLPxConfiguration:
         override val waitForTcpAckTimeout: FiniteDuration = Timeouts.normalTimeout
         override val waitForHandshakeTimeout: FiniteDuration = Timeouts.normalTimeout
-      }
       override val waitForHelloTimeout: FiniteDuration = 30 seconds
       override val waitForStatusTimeout: FiniteDuration = 30 seconds
       override val waitForChainCheckTimeout: FiniteDuration = 15 seconds
@@ -376,7 +362,6 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
       override val longBlacklistDuration: FiniteDuration = 3.minutes
       override val statSlotDuration: FiniteDuration = 1.minute
       override val statSlotCount: Int = 30
-    }
 
     val baseBlockHeader = Fixtures.Blocks.Block3125369.header
     val baseBlockBody: BlockBody = BlockBody(Nil, Nil)
@@ -399,6 +384,3 @@ class BlockchainHostActorSpec extends AnyFlatSpec with Matchers {
         ),
         s"blockchain-host-${System.nanoTime()}"
       )
-  }
-
-}

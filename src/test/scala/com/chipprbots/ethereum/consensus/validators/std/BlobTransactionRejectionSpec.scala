@@ -21,7 +21,7 @@ import com.chipprbots.ethereum.utils.ForkTimestamps
   * ETC does not support EIP-4844 (no Cancun timestamp configured). Blob transactions must be rejected at the validator
   * layer before any other checks, regardless of block height or the validity of the transaction's other fields.
   */
-class BlobTransactionRejectionSpec extends AnyFlatSpec with Matchers {
+class BlobTransactionRejectionSpec extends AnyFlatSpec with Matchers:
 
   implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
 
@@ -77,26 +77,23 @@ class BlobTransactionRejectionSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "return TYPE_3_TX_NOT_SUPPORTED error for blob tx on ETC mainnet" taggedAs (UnitTest, ConsensusTest) in {
-    validate(signedBlobTx) match {
+    validate(signedBlobTx) match
       case Left(TransactionSyntaxError(msg)) => msg should include("TYPE_3_TX_NOT_SUPPORTED")
       case other                             => fail(s"Expected TransactionSyntaxError, got: $other")
-    }
   }
 
   it should "reject blob tx at low block numbers on ETC (pre-Spiral)" taggedAs (UnitTest, ConsensusTest) in {
     val earlyHeader = etcBlockHeader.copy(number = BigInt(1_000_000))
-    validate(signedBlobTx, earlyHeader) match {
+    validate(signedBlobTx, earlyHeader) match
       case Left(TransactionSyntaxError(msg)) => msg should include("TYPE_3_TX_NOT_SUPPORTED")
       case other                             => fail(s"Expected TransactionSyntaxError, got: $other")
-    }
   }
 
   it should "reject blob tx at block 0 (genesis) on ETC" taggedAs (UnitTest, ConsensusTest) in {
     val genesisHeader = etcBlockHeader.copy(number = BigInt(0))
-    validate(signedBlobTx, genesisHeader) match {
+    validate(signedBlobTx, genesisHeader) match
       case Left(TransactionSyntaxError(msg)) => msg should include("TYPE_3_TX_NOT_SUPPORTED")
       case other                             => fail(s"Expected TransactionSyntaxError, got: $other")
-    }
   }
 
   // ── Cancun-active config (ETH post-Cancun analogue) ────────────────────────
@@ -111,11 +108,10 @@ class BlobTransactionRejectionSpec extends AnyFlatSpec with Matchers {
       forkTimestamps = blockchainConfig.forkTimestamps.copy(cancunTimestamp = Some(0L))
     )
     val cancunHeader = etcBlockHeader.copy(unixTimestamp = 1_000_000_000L)
-    validate(signedBlobTx, cancunHeader)(cancunCfg) match {
+    validate(signedBlobTx, cancunHeader)(cancunCfg) match
       case Left(TransactionSyntaxError(msg)) if msg.contains("TYPE_3_TX_NOT_SUPPORTED") =>
         fail("Blob tx should not be rejected for type when Cancun is active")
       case _ => succeed // Any other result (including other errors) is acceptable
-    }
   }
 
   // ── Legacy and Type-2 txs are unaffected ───────────────────────────────────
@@ -135,10 +131,8 @@ class BlobTransactionRejectionSpec extends AnyFlatSpec with Matchers {
       signatureRandom = validR,
       signature = validS
     )
-    validate(signedLegacy) match {
+    validate(signedLegacy) match
       case Left(TransactionSyntaxError(msg)) if msg.contains("TYPE_3_TX_NOT_SUPPORTED") =>
         fail("Legacy tx incorrectly rejected as blob")
       case _ => succeed
-    }
   }
-}

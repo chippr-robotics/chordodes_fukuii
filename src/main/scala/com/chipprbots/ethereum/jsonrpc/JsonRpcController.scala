@@ -62,7 +62,7 @@ case class JsonRpcController(
     actorSystem: ActorSystem
 ) extends ApisBuilder
     with Logger
-    with JsonRpcBaseController {
+    with JsonRpcBaseController:
 
   implicit override def executionContext: ExecutionContext = actorSystem.dispatcher
 
@@ -303,7 +303,7 @@ case class JsonRpcController(
     // debug_trace* methods routed to DebugTracingService via handleDebugTracingRequest.
   }
 
-  private def handleDebugTracingRequest: PartialFunction[JsonRpcRequest, IO[JsonRpcResponse]] = {
+  private def handleDebugTracingRequest: PartialFunction[JsonRpcRequest, IO[JsonRpcResponse]] =
     import DebugTracingService.{
       TraceTransactionRequest as DTxReq,
       TraceTransactionResponse as DTxResp,
@@ -348,12 +348,11 @@ case class JsonRpcController(
           req
         )(dChain, dChain)
     }: PartialFunction[JsonRpcRequest, IO[JsonRpcResponse]])
-  }
 
   private def handleTraceRequest: PartialFunction[JsonRpcRequest, IO[JsonRpcResponse]] =
     handleTraceRequestImpl
 
-  private def handleTraceRequestImpl: PartialFunction[JsonRpcRequest, IO[JsonRpcResponse]] = {
+  private def handleTraceRequestImpl: PartialFunction[JsonRpcRequest, IO[JsonRpcResponse]] =
     // Use explicit implicits to sidestep the ambiguity with DebugTracingService types
     val tTx = TraceJsonMethodsImplicits.trace_transaction
     val tBlock = TraceJsonMethodsImplicits.trace_block
@@ -397,13 +396,11 @@ case class JsonRpcController(
           tFilter
         )
     }
-  }
 
   private def handleTestRequest: PartialFunction[JsonRpcRequest, IO[JsonRpcResponse]] =
-    testServiceOpt match {
+    testServiceOpt match
       case Some(testService) => handleTestRequest(testService)
       case None              => PartialFunction.empty
-    }
 
   private def handleTestRequest(testService: TestService): PartialFunction[JsonRpcRequest, IO[JsonRpcResponse]] = {
     case req @ JsonRpcRequest(_, "test_setChainParams", _, _) =>
@@ -549,4 +546,3 @@ case class JsonRpcController(
       val result = enabledApis.map(_ -> "1.0").toMap
       IO(JsonRpcResponse("2.0", Some(result), None, req.id))
   }
-}

@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory
 final class CheckpointDownloader(
     httpClient: HttpClient = CheckpointDownloader.defaultHttpClient,
     progressLogIntervalBytes: Long = CheckpointDownloader.DefaultProgressLogInterval
-) {
+):
   import CheckpointDownloader.*
   private val log = LoggerFactory.getLogger(getClass)
 
@@ -41,10 +41,10 @@ final class CheckpointDownloader(
     * On any failure the `.tmp` is left in place so the next attempt can resume.
     */
   def download(url: String, target: Path): Either[DownloadError, Unit] =
-    if Files.exists(target) then {
+    if Files.exists(target) then
       log.info("[CHECKPOINT DOWNLOAD] target {} already exists; skipping fetch", target)
       Right(())
-    } else {
+    else
       val tmpPath = target.resolveSibling(target.getFileName.toString + ".tmp")
       Files.createDirectories(target.getParent)
 
@@ -58,42 +58,39 @@ final class CheckpointDownloader(
               StandardOpenOption.WRITE
             )
           )
-        catch {
-          case e: IOException => Left(IoError(s"open tmp: ${e.getMessage}"))
-        }
+        catch case e: IOException => Left(IoError(s"open tmp: ${e.getMessage}"))
 
-      tmpChannelResult match {
+      tmpChannelResult match
         case Left(err) => Left(err)
         case Right(tmpChannel) =>
           var lockOpt: Option[FileLock] = None
-          try {
+          try
             try lockOpt = Option(tmpChannel.tryLock())
-            catch { case _: OverlappingFileLockException => () }
+            catch case _: OverlappingFileLockException => ()
 
-            if lockOpt.isEmpty then {
+            if lockOpt.isEmpty then
               log.warn("[CHECKPOINT DOWNLOAD] another process holds {}; refusing to start", tmpPath)
               Left(AlreadyDownloading)
-            } else {
+            else
               val resumeFrom = tmpChannel.size()
-              doDownload(url, tmpChannel, resumeFrom) match {
+              doDownload(url, tmpChannel, resumeFrom) match
                 case Left(e)           => Left(e)
                 case Right(totalBytes) =>
                   // Best-effort flush — file lock release on close is enough but make data hits disk first.
                   tmpChannel.force(true)
 
                   val moveResult =
-                    try {
+                    try
                       Files.move(tmpPath, target, StandardCopyOption.ATOMIC_MOVE)
                       Right(())
-                    } catch {
+                    catch
                       case _: java.nio.file.AtomicMoveNotSupportedException =>
                         Files.move(tmpPath, target, StandardCopyOption.REPLACE_EXISTING)
                         Right(())
                       case e: IOException =>
                         Left(IoError(s"rename tmp -> final: ${e.getMessage}"))
-                    }
 
-                  moveResult match {
+                  moveResult match
                     case Left(err) => Left(err)
                     case Right(_) =>
                       log.info(
@@ -102,42 +99,34 @@ final class CheckpointDownloader(
                         target
                       )
                       Right(())
-                  }
-              }
-            }
-          } finally {
+          finally
             lockOpt.foreach(l =>
               try l.release()
-              catch { case _: Throwable => () }
+              catch case _: Throwable => ()
             )
             try tmpChannel.close()
-            catch { case _: Throwable => () }
-          }
-      }
-    }
+            catch case _: Throwable => ()
 
   /** Perform the HTTP GET, appending to `tmpChannel`. Returns total bytes in the completed file. */
   private def doDownload(
       url: String,
       tmpChannel: FileChannel,
       resumeFrom: Long
-  ): Either[DownloadError, Long] = {
+  ): Either[DownloadError, Long] =
     val builder = HttpRequest
       .newBuilder()
       .uri(URI.create(url))
       .timeout(Duration.ofMinutes(30))
       .GET()
-    if resumeFrom > 0 then {
+    if resumeFrom > 0 then
       log.info("[CHECKPOINT DOWNLOAD] resuming from byte {} for {}", resumeFrom, url)
       builder.header("Range", s"bytes=$resumeFrom-")
-    } else {
-      log.info("[CHECKPOINT DOWNLOAD] fetching {}", url)
-    }
+    else log.info("[CHECKPOINT DOWNLOAD] fetching {}", url)
     val request = builder.build()
 
     val responseResult: Either[DownloadError, HttpResponse[java.io.InputStream]] =
       try Right(httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream()))
-      catch {
+      catch
         case e: java.net.http.HttpConnectTimeoutException =>
           Left(HttpError(0, s"connect timeout: ${e.getMessage}"))
         case e: java.net.http.HttpTimeoutException =>
@@ -147,72 +136,59 @@ final class CheckpointDownloader(
         case e: InterruptedException =>
           Thread.currentThread().interrupt()
           Left(HttpError(0, s"interrupted: ${e.getMessage}"))
-      }
 
-    responseResult match {
+    responseResult match
       case Left(err) => Left(err)
       case Right(response) =>
         val status = response.statusCode()
         val rangeOk = resumeFrom > 0 && status == 206
         val fullOk = resumeFrom == 0 && (status == 200 || status == 206)
-        if !rangeOk && !fullOk then {
+        if !rangeOk && !fullOk then
           // 200 to a Range request means server ignored the range — start over from byte 0.
-          if resumeFrom > 0 && status == 200 then {
+          if resumeFrom > 0 && status == 200 then
             log.warn(
               "[CHECKPOINT DOWNLOAD] server ignored Range header (status 200); restarting download from scratch"
             )
             tmpChannel.truncate(0)
             tmpChannel.position(0)
             readBodyInto(response.body(), tmpChannel, alreadyWritten = 0)
-          } else {
+          else
             val errBody =
-              try
-                new String(response.body().readNBytes(1024), "UTF-8")
-              catch { case _: Throwable => "" }
+              try new String(response.body().readNBytes(1024), "UTF-8")
+              catch case _: Throwable => ""
             Left(HttpError(status, errBody))
-          }
-        } else {
+        else
           tmpChannel.position(resumeFrom)
           readBodyInto(response.body(), tmpChannel, alreadyWritten = resumeFrom)
-        }
-    }
-  }
 
   private def readBodyInto(
       body: java.io.InputStream,
       tmpChannel: FileChannel,
       alreadyWritten: Long
-  ): Either[DownloadError, Long] = {
+  ): Either[DownloadError, Long] =
     val out: OutputStream = Channels.newOutputStream(tmpChannel)
     val buf = new Array[Byte](64 * 1024)
     var total = alreadyWritten
     var nextLogAt = alreadyWritten + progressLogIntervalBytes
-    try {
+    try
       var n = body.read(buf)
-      while n >= 0 do {
-        if n > 0 then {
+      while n >= 0 do
+        if n > 0 then
           out.write(buf, 0, n)
           total += n
-          if total >= nextLogAt then {
+          if total >= nextLogAt then
             log.info("[CHECKPOINT DOWNLOAD] {} MiB written", total / (1024 * 1024))
             nextLogAt = total + progressLogIntervalBytes
-          }
-        }
         n = body.read(buf)
-      }
       Right(total)
-    } catch {
-      case e: IOException => Left(IoError(s"body read: ${e.getMessage}"))
-    } finally {
+    catch case e: IOException => Left(IoError(s"body read: ${e.getMessage}"))
+    finally
       try out.flush()
-      catch { case _: Throwable => () }
+      catch case _: Throwable => ()
       try body.close()
-      catch { case _: Throwable => () }
-    }
-  }
-}
+      catch case _: Throwable => ()
 
-object CheckpointDownloader {
+object CheckpointDownloader:
   val DefaultProgressLogInterval: Long = 100L * 1024 * 1024 // log every 100 MiB
 
   lazy val defaultHttpClient: HttpClient =
@@ -226,4 +202,3 @@ object CheckpointDownloader {
   final case class HttpError(status: Int, message: String) extends DownloadError
   final case class IoError(reason: String) extends DownloadError
   case object AlreadyDownloading extends DownloadError
-}

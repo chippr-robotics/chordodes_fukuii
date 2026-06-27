@@ -13,17 +13,16 @@ import com.chipprbots.ethereum.rlp.decode as rlpDecode
 import com.chipprbots.ethereum.rlp.encode as rlpEncode
 import com.chipprbots.ethereum.testing.Tags.*
 
-class TransactionalKeyValueStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ObjectGenerators {
+class TransactionalKeyValueStorageSuite extends AnyFunSuite with ScalaCheckPropertyChecks with ObjectGenerators:
   val iterationsNumber = 100
 
-  object IntStorage {
+  object IntStorage:
     val intNamespace: IndexedSeq[Byte] = IndexedSeq[Byte]('i'.toByte)
     val intSerializer: Int => IndexedSeq[Byte] = (i: Int) => rlpEncode(i).toIndexedSeq
     val intDeserializer: IndexedSeq[Byte] => Int =
       (encodedInt: IndexedSeq[Byte]) => rlpDecode[Int](encodedInt.toArray)
-  }
 
-  class IntStorage(val dataSource: DataSource) extends TransactionalKeyValueStorage[Int, Int] {
+  class IntStorage(val dataSource: DataSource) extends TransactionalKeyValueStorage[Int, Int]:
     import IntStorage.*
 
     override val namespace: IndexedSeq[Byte] = intNamespace
@@ -31,14 +30,13 @@ class TransactionalKeyValueStorageSuite extends AnyFunSuite with ScalaCheckPrope
     override def keyDeserializer: IndexedSeq[Byte] => Int = intDeserializer
     override def valueSerializer: Int => IndexedSeq[Byte] = intSerializer
     override def valueDeserializer: IndexedSeq[Byte] => Int = intDeserializer
-  }
 
   def newIntStorage(): IntStorage = new IntStorage(EphemDataSource())
 
-  val dataGenerator: Gen[(List[Int], List[Int])] = for {
+  val dataGenerator: Gen[(List[Int], List[Int])] = for
     intsInStorage <- Gen.nonEmptyListOf(intGen)
     intsNotInStorage <- Gen.nonEmptyListOf(intGen.suchThat(value => !intsInStorage.contains(value)))
-  } yield (intsInStorage, intsNotInStorage)
+  yield (intsInStorage, intsNotInStorage)
 
   test("Get ints from KeyValueStorage", UnitTest, DatabaseTest) {
     forAll(dataGenerator) { case (intsInStorage, intsNotInStorage) =>
@@ -128,4 +126,3 @@ class TransactionalKeyValueStorageSuite extends AnyFunSuite with ScalaCheckPrope
       }
     }
   }
-}

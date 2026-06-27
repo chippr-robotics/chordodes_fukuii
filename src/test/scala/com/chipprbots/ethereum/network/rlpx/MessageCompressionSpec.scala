@@ -13,7 +13,7 @@ import org.xerial.snappy.Snappy
 import com.chipprbots.ethereum.domain.Block.*
 import com.chipprbots.ethereum.testing.Tags.*
 
-class MessageCompressionSpec extends AnyFlatSpec with Matchers with MockFactory {
+class MessageCompressionSpec extends AnyFlatSpec with Matchers with MockFactory:
 
   it should "decode block compressed by go" taggedAs (UnitTest, NetworkTest) in {
     val testURL = getClass.getResource("/block.go.snappy")
@@ -37,4 +37,3 @@ class MessageCompressionSpec extends AnyFlatSpec with Matchers with MockFactory 
       Hex.decode("bd64134a158aa767120725614026cc5e614dd67a2cbbcdf72823c97981a08620")
     )
   }
-}

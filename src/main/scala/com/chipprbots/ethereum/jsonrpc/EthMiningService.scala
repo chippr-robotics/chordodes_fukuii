@@ -40,7 +40,7 @@ import com.chipprbots.ethereum.nodebuilder.BlockchainConfigBuilder
 import com.chipprbots.ethereum.ommers.OmmersPool
 import com.chipprbots.ethereum.transactions.TransactionPicker
 
-object EthMiningService {
+object EthMiningService:
 
   case class GetMiningRequest()
   case class GetMiningResponse(isMining: Boolean)
@@ -76,7 +76,6 @@ object EthMiningService {
 
   case class SetEtherbaseRequest(address: Address)
   case class SetEtherbaseResponse(success: Boolean)
-}
 
 class EthMiningService(
     blockchainReader: BlockchainReader,
@@ -91,7 +90,7 @@ class EthMiningService(
     configBuilder: BlockchainConfigBuilder,
     coinbaseProvider: CoinbaseProvider,
     system: ActorSystem
-) extends TransactionPicker {
+) extends TransactionPicker:
   override lazy val scheduler: Scheduler = system.toTyped.scheduler
   import configBuilder.*
   import EthMiningService.*
@@ -114,7 +113,7 @@ class EthMiningService(
     mining.ifEthash { ethash =>
       PoWMiningMetrics.recordGetWork()
       reportActive()
-      blockchainReader.getBestBlock match {
+      blockchainReader.getBestBlock match
         case Some(block) =>
           (getOmmersFromPool(block.hash.value), getTransactionsFromPool).parMapN { case (ommers, pendingTxs) =>
             val blockGenerator = ethash.blockGenerator
@@ -135,30 +134,28 @@ class EthMiningService(
             val blockNumber = pb.block.header.number
             val workResponse = GetWorkResponse(powHeaderHash, dagSeed, target, blockNumber)
             val notifyUrls = ethash.config.generic.notifyUrls
-            if notifyUrls.nonEmpty then {
+            if notifyUrls.nonEmpty then
               WorkNotifier.notify(
                 notifyUrls,
                 WorkNotifier.WorkPackage(powHeaderHash, dagSeed, target, blockNumber)
               )(system)
-            }
             Right(workResponse)
           }
         case None =>
           log.error("Getting current best block failed")
           IO.pure(Left(JsonRpcError.InternalError))
-      }
     }(IO.pure(Left(JsonRpcError.MiningIsNotEthash)))
 
   def submitWork(req: SubmitWorkRequest): ServiceResponse[SubmitWorkResponse] =
     mining.ifEthash[ServiceResponse[SubmitWorkResponse]] { ethash =>
       reportActive()
       IO {
-        ethash.blockGenerator.getPrepared(req.powHeaderHash) match {
+        ethash.blockGenerator.getPrepared(req.powHeaderHash) match
           case Some(pendingBlock) =>
             val bestBlockNum = blockchainReader.getBestBlockNumber
             val staleThreshold = ethash.config.generic.staleThreshold
             // core-geth reference: consensus/ethash/sealer.go staleThreshold check
-            if bestBlockNum - pendingBlock.block.header.number > staleThreshold then {
+            if bestBlockNum - pendingBlock.block.header.number > staleThreshold then
               log.debug(
                 "Rejecting stale work submission for block {}, current best {}, threshold {}",
                 pendingBlock.block.header.number,
@@ -167,7 +164,7 @@ class EthMiningService(
               )
               PoWMiningMetrics.recordStaleShare()
               Right(SubmitWorkResponse(false))
-            } else {
+            else
               import pendingBlock.*
               syncingController ! SyncController.WrappedSyncProtocol(
                 SyncProtocol.MinedBlock(
@@ -176,10 +173,8 @@ class EthMiningService(
               )
               PoWMiningMetrics.recordBlockMined(0L) // duration tracked at coordinator level
               Right(SubmitWorkResponse(true))
-            }
           case _ =>
             Right(SubmitWorkResponse(false))
-        }
       }
     }(IO.pure(Left(JsonRpcError.MiningIsNotEthash)))
 
@@ -265,10 +260,9 @@ class EthMiningService(
       Duration.between(reported.toInstant, now.toInstant).toMillis < jsonRpcConfig.minerActiveTimeout.toMillis
     }
 
-  private def reportActive(): Option[Date] = {
+  private def reportActive(): Option[Date] =
     val now = new Date()
     lastActive.updateAndGet(_ => Some(now))
-  }
 
   private def getOmmersFromPool(parentBlockHash: ByteString): IO[OmmersPool.Ommers] =
     mining.ifEthash { ethash =>
@@ -289,4 +283,3 @@ class EthMiningService(
     mining.ifEthash[ServiceResponse[Res]](_ => IO.pure(Right(f(req))))(
       IO.pure(Left(JsonRpcError.MiningIsNotEthash))
     )
-}

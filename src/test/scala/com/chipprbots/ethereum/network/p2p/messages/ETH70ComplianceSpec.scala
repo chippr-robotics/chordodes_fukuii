@@ -20,7 +20,7 @@ import com.chipprbots.ethereum.utils.ByteUtils
   *
   * Run before every JAR build targeted at live peer testing.
   */
-class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
+class ETH70ComplianceSpec extends AnyWordSpec with Matchers:
 
   private def decoder(cap: Capability) =
     NetworkMessageDecoder.orElse(EthereumMessageDecoder.ethMessageDecoder(cap))
@@ -59,16 +59,14 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
         )
         val encoded = msg.toBytes
         import com.chipprbots.ethereum.rlp.*
-        rawDecode(encoded) match {
+        rawDecode(encoded) match
           case rlpList: RLPList =>
             rlpList.items.size shouldEqual 7
             // Field index 2 should be genesisHash, NOT a BigInt TD
-            rlpList.items(2) match {
+            rlpList.items(2) match
               case RLPValue(bytes) => bytes.length shouldEqual 7 // "genesis".getBytes
               case _               => fail("Field at index 2 should be genesisHash RLPValue, not TD")
-            }
           case _ => fail("Expected 7-field RLPList for Status70")
-        }
       }
 
       "field ordering matches EIP-7706: [v, netId, genesis, forkId, earliest, latest, latestHash]" taggedAs UnitTest in {
@@ -85,13 +83,12 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
           latestHash
         )
         val encoded = msg.toBytes
-        decoder(Capability.ETH70).fromBytes(Codes.StatusCode, encoded) match {
+        decoder(Capability.ETH70).fromBytes(Codes.StatusCode, encoded) match
           case Right(s: ETHPackets.Status70.Status70) =>
             s.genesisHash shouldEqual genesisHash
             s.latestBlock shouldEqual latestBlock
             s.latestBlockHash shouldEqual latestHash
           case other => fail(s"Expected Status70, got $other")
-        }
       }
     }
   }
@@ -114,7 +111,7 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
           forkId = ForkId(0xbe46d57cL, None)
         )
         val decoded = decoder(Capability.ETH70).fromBytes(Codes.StatusCode, eth68Shaped.toBytes)
-        decoded match {
+        decoded match
           case Right(s: ETHPackets.Status70.Status70) =>
             s.protocolVersion shouldEqual 70
             s.networkId shouldEqual 7L
@@ -124,7 +121,6 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
             s.latestBlock shouldEqual BigInt(0)
             s.latestBlockHash shouldEqual ByteString.empty
           case other => fail(s"Expected stub Status70 decode, got $other")
-        }
       }
     }
 
@@ -144,7 +140,7 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
         val i = rawDecode(canonical.toBytes).asInstanceOf[RLPList].items
         val legacyBytes = encode(RLPList(i(0), i(1), i(2), i(3), i(5), i(6)))
         val decoded = decoder(Capability.ETH70).fromBytes(Codes.StatusCode, legacyBytes)
-        decoded match {
+        decoded match
           case Right(s: ETHPackets.Status70.Status70) =>
             s.networkId shouldEqual 7L
             s.genesisHash shouldEqual ByteString.empty
@@ -153,7 +149,6 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
             s.latestBlock shouldEqual BigInt(0)
             s.latestBlockHash shouldEqual ByteString.empty
           case other => fail(s"Expected stub Status70 decode, got $other")
-        }
       }
     }
 
@@ -174,7 +169,7 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
         val eightFieldBytes =
           encode(RLPList(i(0), i(1), i(2), i(3), i(4), i(5), i(6), RLPValue(BigInt(99).toByteArray)))
         val decoded = decoder(Capability.ETH70).fromBytes(Codes.StatusCode, eightFieldBytes)
-        decoded match {
+        decoded match
           case Right(s: ETHPackets.Status70.Status70) =>
             s.networkId shouldEqual 1L
             s.genesisHash shouldEqual ByteString.empty
@@ -183,7 +178,6 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
             s.latestBlock shouldEqual BigInt(0)
             s.latestBlockHash shouldEqual ByteString.empty
           case other => fail(s"Expected stub Status70 decode, got $other")
-        }
       }
     }
 
@@ -210,13 +204,12 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
           blockHashes = Seq(ByteString(Array.fill(32)(0xde.toByte)))
         )
         val encoded = msg.toBytes
-        decoder(Capability.ETH70).fromBytes(Codes.GetReceiptsCode, encoded) match {
+        decoder(Capability.ETH70).fromBytes(Codes.GetReceiptsCode, encoded) match
           case Right(r: ETHPackets.GetReceipts70) =>
             r.requestId shouldEqual BigInt(10)
             r.firstBlockReceiptIndex shouldEqual 0L
             r.blockHashes.size shouldEqual 1
           case other => fail(s"Expected GetReceipts70, got $other")
-        }
       }
 
       "round-trip with firstBlockReceiptIndex > 0 (resume after partial)" taggedAs UnitTest in {
@@ -229,20 +222,19 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
           )
         )
         val encoded = msg.toBytes
-        decoder(Capability.ETH70).fromBytes(Codes.GetReceiptsCode, encoded) match {
+        decoder(Capability.ETH70).fromBytes(Codes.GetReceiptsCode, encoded) match
           case Right(r: ETHPackets.GetReceipts70) =>
             r.requestId shouldEqual BigInt(11)
             r.firstBlockReceiptIndex shouldEqual 42L
             r.blockHashes.size shouldEqual 2
           case other => fail(s"Expected GetReceipts70, got $other")
-        }
       }
 
       "include firstBlockReceiptIndex as second RLP field (before hashes)" taggedAs UnitTest in {
         import com.chipprbots.ethereum.rlp.*
         val msg = ETHPackets.GetReceipts70(BigInt(5), 7L, Seq(ByteString(Array.fill(32)(0xff.toByte))))
         val encoded = msg.toBytes
-        rawDecode(encoded) match {
+        rawDecode(encoded) match
           case RLPList(
                 RLPValue(_), // requestId
                 RLPValue(resumeBytes), // firstBlockReceiptIndex
@@ -250,7 +242,6 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
               ) =>
             ByteUtils.bytesToBigInt(resumeBytes).toLong shouldEqual 7L
           case other => fail(s"Expected 3-field RLPList [reqId, firstIdx, hashes], got $other")
-        }
       }
     }
   }
@@ -269,12 +260,11 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
           receiptsForBlocks = RLPList()
         )
         val encoded = msg.toBytes
-        decoder(Capability.ETH70).fromBytes(Codes.ReceiptsCode, encoded) match {
+        decoder(Capability.ETH70).fromBytes(Codes.ReceiptsCode, encoded) match
           case Right(r: ETHPackets.Receipts70) =>
             r.requestId shouldEqual BigInt(20)
             r.lastBlockIncomplete shouldBe false
           case other => fail(s"Expected Receipts70, got $other")
-        }
       }
 
       "round-trip with lastBlockIncomplete=true (server hit 2 MiB limit)" taggedAs UnitTest in {
@@ -285,19 +275,18 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
           receiptsForBlocks = RLPList()
         )
         val encoded = msg.toBytes
-        decoder(Capability.ETH70).fromBytes(Codes.ReceiptsCode, encoded) match {
+        decoder(Capability.ETH70).fromBytes(Codes.ReceiptsCode, encoded) match
           case Right(r: ETHPackets.Receipts70) =>
             r.requestId shouldEqual BigInt(21)
             r.lastBlockIncomplete shouldBe true
           case other => fail(s"Expected Receipts70, got $other")
-        }
       }
 
       "include lastBlockIncomplete as second RLP field (before receipts list)" taggedAs UnitTest in {
         import com.chipprbots.ethereum.rlp.*
         val msg = ETHPackets.Receipts70(BigInt(9), lastBlockIncomplete = true, RLPList())
         val encoded = msg.toBytes
-        rawDecode(encoded) match {
+        rawDecode(encoded) match
           case RLPList(
                 RLPValue(_), // requestId
                 RLPValue(flagBytes), // lastBlockIncomplete
@@ -306,7 +295,6 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
             // lastBlockIncomplete=true encodes as 0x01
             flagBytes.headOption.map(_ & 0xff) shouldEqual Some(1)
           case other => fail(s"Expected 3-field RLPList [reqId, incomplete, blocks], got $other")
-        }
       }
 
       "carry bloom-absent 3-field receipts (EIP-7642 — same as ETH69)" taggedAs UnitTest in {
@@ -330,13 +318,12 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
         hasBloom shouldBe false
 
         // And the receipt inside should have 3 fields (no bloom field)
-        decoder(Capability.ETH70).fromBytes(Codes.ReceiptsCode, wireBytes) match {
+        decoder(Capability.ETH70).fromBytes(Codes.ReceiptsCode, wireBytes) match
           case Right(r: ETHPackets.Receipts70) =>
             val blockReceipts = r.receiptsForBlocks.items.head.asInstanceOf[RLPList]
             val innerReceipt = blockReceipts.items.head.asInstanceOf[RLPList]
             innerReceipt.items.size shouldEqual 3
           case other => fail(s"Expected Receipts70, got $other")
-        }
       }
 
       // go-ethereum reference: eth/protocols/eth/handler_test.go TestGetBlockPartialReceipts —
@@ -358,14 +345,13 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
         val msg = ETHPackets.Receipts70(BigInt(30), lastBlockIncomplete = false, receiptsForBlocks)
         val encoded = msg.toBytes
 
-        decoder(Capability.ETH70).fromBytes(Codes.ReceiptsCode, encoded) match {
+        decoder(Capability.ETH70).fromBytes(Codes.ReceiptsCode, encoded) match
           case Right(r: ETHPackets.Receipts70) =>
             r.requestId shouldEqual BigInt(30)
             r.lastBlockIncomplete shouldBe false
             r.receiptsForBlocks.items.size shouldEqual 2
             r.receiptsForBlocks.items(1).asInstanceOf[RLPList].items shouldBe empty
           case other => fail(s"Expected Receipts70, got $other")
-        }
       }
 
       // go-ethereum reference: eth/protocols/eth/handler_test.go TestGetBlockPartialReceipts —
@@ -379,13 +365,12 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
         )
         val encoded = msg.toBytes
 
-        decoder(Capability.ETH70).fromBytes(Codes.GetReceiptsCode, encoded) match {
+        decoder(Capability.ETH70).fromBytes(Codes.GetReceiptsCode, encoded) match
           case Right(r: ETHPackets.GetReceipts70) =>
             r.requestId shouldEqual BigInt(31)
             r.firstBlockReceiptIndex shouldEqual 0L
             r.blockHashes shouldBe empty
           case other => fail(s"Expected GetReceipts70, got $other")
-        }
       }
     }
   }
@@ -401,12 +386,11 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
       "return ETH70's own GetReceipts70 type (not GetReceipts69)" taggedAs UnitTest in {
         val msg = ETHPackets.GetReceipts70(BigInt(1), 0L, Seq(ByteString(Array.fill(32)(0xde.toByte))))
         val encoded = msg.toBytes
-        decoder(Capability.ETH70).fromBytes(Codes.GetReceiptsCode, encoded) match {
+        decoder(Capability.ETH70).fromBytes(Codes.GetReceiptsCode, encoded) match
           case Right(_: ETHPackets.GetReceipts70) => succeed
           case Right(_: ETHPackets.GetReceipts69) =>
             fail("ETH70 decoder returned a GetReceipts69 — self-containment violation")
           case other => fail(s"Expected GetReceipts70, got $other")
-        }
       }
     }
 
@@ -415,12 +399,11 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
         import com.chipprbots.ethereum.rlp.*
         val msg = ETHPackets.Receipts70(BigInt(1), lastBlockIncomplete = false, RLPList())
         val encoded = msg.toBytes
-        decoder(Capability.ETH70).fromBytes(Codes.ReceiptsCode, encoded) match {
+        decoder(Capability.ETH70).fromBytes(Codes.ReceiptsCode, encoded) match
           case Right(_: ETHPackets.Receipts70) => succeed
           case Right(_: ETHPackets.Receipts69) =>
             fail("ETH70 decoder returned a Receipts69 — self-containment violation")
           case other => fail(s"Expected Receipts70, got $other")
-        }
       }
     }
 
@@ -437,13 +420,11 @@ class ETH70ComplianceSpec extends AnyWordSpec with Matchers {
           ByteString("hash")
         )
         val encoded = msg.toBytes
-        decoder(Capability.ETH70).fromBytes(Codes.StatusCode, encoded) match {
+        decoder(Capability.ETH70).fromBytes(Codes.StatusCode, encoded) match
           case Right(_: ETHPackets.Status70.Status70) => succeed
           case Right(_: ETHPackets.Status69.Status69) =>
             fail("ETH70 decoder returned a Status69 — self-containment violation")
           case other => fail(s"Expected Status70, got $other")
-        }
       }
     }
   }
-}

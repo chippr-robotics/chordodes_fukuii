@@ -26,7 +26,7 @@ import com.chipprbots.ethereum.transactions.TransactionHistoryService.ExtendedTr
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 
-object FukuiiService {
+object FukuiiService:
   case class GetAccountTransactionsRequest(address: Address, blocksRange: NumericRange[BigInt])
   case class GetAccountTransactionsResponse(transactions: List[ExtendedTransactionData])
 
@@ -35,13 +35,12 @@ object FukuiiService {
 
   case class RestartFastSyncRequest()
   case class RestartFastSyncResponse(started: Boolean, cooldownUntilMillis: Long)
-}
 class FukuiiService(
     transactionHistoryService: TransactionHistoryService,
     jsonRpcConfig: JsonRpcConfig,
     syncController: TypedActorRef[SyncController.Command],
     scheduler: Scheduler
-) {
+):
 
   import com.chipprbots.ethereum.jsonrpc.AkkaTaskOps.*
   given timeout: Timeout = Timeout(10.seconds)
@@ -52,7 +51,7 @@ class FukuiiService(
   def getAccountTransactions(
       request: GetAccountTransactionsRequest
   ): ServiceResponse[GetAccountTransactionsResponse] =
-    if request.blocksRange.length > jsonRpcConfig.accountTransactionsMaxBlocks then {
+    if request.blocksRange.length > jsonRpcConfig.accountTransactionsMaxBlocks then
       IO.pure(
         Left(
           JsonRpcError.InvalidParams(
@@ -61,11 +60,10 @@ class FukuiiService(
           )
         )
       )
-    } else {
+    else
       transactionHistoryService
         .getAccountTransactions(request.address, request.blocksRange)
         .map(GetAccountTransactionsResponse(_).asRight)
-    }
 
   def resetFastSync(@unused request: ResetFastSyncRequest): ServiceResponse[ResetFastSyncResponse] =
     syncController
@@ -80,4 +78,3 @@ class FukuiiService(
         SyncController.WrappedSyncProtocol(SyncProtocol.RestartFastSync(replyTo))
       )
       .map(resp => Right(RestartFastSyncResponse(resp.started, resp.cooldownUntilMillis)))
-}

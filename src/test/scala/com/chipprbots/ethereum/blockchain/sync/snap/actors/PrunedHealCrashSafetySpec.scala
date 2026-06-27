@@ -43,18 +43,17 @@ import java.util.concurrent.{Executors, TimeUnit}
   * mirrors [[TrieNodeHealingScopedVerificationSpec]]. Deterministic: `awaitAssert` / `fishForMessage`, no
   * `Thread.sleep`.
   */
-class PrunedHealCrashSafetySpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers with Eventually {
+class PrunedHealCrashSafetySpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers with Eventually:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
 
   private def emptyChildren: Array[MptNode] = Array.fill[MptNode](16)(NullNode)
 
-  private def deleteRecursively(f: File): Unit = {
+  private def deleteRecursively(f: File): Unit =
     Option(f.listFiles()).foreach(_.foreach(deleteRecursively))
     f.delete()
     ()
-  }
 
   private def awaitStateHealingComplete(
       controller: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
@@ -65,32 +64,31 @@ class PrunedHealCrashSafetySpec extends ScalaTestWithActorTestKit() with AnyFlat
       case _                                         => FishingOutcomes.continueAndIgnore
     }
 
-  private def openFrontier(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int = {
+  private def openFrontier(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int =
     val probe = testKit.createTestProbe[HealingStatistics]()
     coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref)
     val stats = probe.expectMessageType[HealingStatistics]
     stats.pendingTasks + stats.activeTasks
-  }
 
   /** True iff the node's bytes are durable in `mptStorage` (a `get` that does not throw). */
   private def nodeInStorage(storage: TestMptStorage, hash: ByteString): Boolean =
-    try { storage.get(hash.toArray); true }
-    catch { case _: Throwable => false }
+    try
+      storage.get(hash.toArray); true
+    catch case _: Throwable => false
 
   /** A clean storage-trie leaf (no children → genuine zero-missing closure ⇒ a subtree-complete candidate). */
-  private def cleanLeaf(seed: Int): (Seq[ByteString], ByteString, ByteString) = {
+  private def cleanLeaf(seed: Int): (Seq[ByteString], ByteString, ByteString) =
     val leaf =
       LeafNode(ByteString(Array[Byte](0x01)), ByteString(kec256(ByteString(s"crash-clean-leaf-$seed")).toArray))
     val encoded = MptTraversals.encodeNode(leaf)
     val hash = kec256(ByteString(encoded))
     val accountHash = kec256(ByteString(s"crash-clean-account-$seed"))
     (Seq(accountHash, ByteString(Array[Byte](0x20, seed.toByte))), hash, ByteString(encoded))
-  }
 
   /** A storage-trie BRANCH whose only child is MISSING (not in storage). Healing it commits X's bytes but does NOT
     * close X's subtree (a child remains missing). Returns (pathset, hash, encoded, missingChildHash).
     */
-  private def branchWithMissingChild(seed: Int): (Seq[ByteString], ByteString, ByteString, ByteString) = {
+  private def branchWithMissingChild(seed: Int): (Seq[ByteString], ByteString, ByteString, ByteString) =
     val missingChild = kec256(ByteString(s"crash-gap-missing-child-$seed"))
     val children = emptyChildren
     children(3) = HashNode(missingChild.toArray)
@@ -99,7 +97,6 @@ class PrunedHealCrashSafetySpec extends ScalaTestWithActorTestKit() with AnyFlat
     val hash = kec256(ByteString(encoded))
     val accountHash = kec256(ByteString(s"crash-gap-account-$seed"))
     (Seq(accountHash, ByteString(Array[Byte](0x20, seed.toByte))), hash, ByteString(encoded), missingChild)
-  }
 
   private def withFixture(
       stateRoot: ByteString,
@@ -110,12 +107,12 @@ class PrunedHealCrashSafetySpec extends ScalaTestWithActorTestKit() with AnyFlat
           HealingFrontierStorage,
           org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
       ) => Unit
-  ): Unit = {
+  ): Unit =
     val pool = Executors.newSingleThreadExecutor()
     val ec = ExecutionContext.fromExecutorService(pool)
     val dbPath = Files.createTempDirectory("pruned-crash-rocksdb").toAbsolutePath.toString
     val dataSource = RocksDbDataSource(
-      new RocksDbConfig {
+      new RocksDbConfig:
         override val createIfMissing: Boolean = true
         override val paranoidChecks: Boolean = true
         override val path: String = dbPath
@@ -125,7 +122,7 @@ class PrunedHealCrashSafetySpec extends ScalaTestWithActorTestKit() with AnyFlat
         override val levelCompaction: Boolean = true
         override val blockSize: Long = 16384
         override val blockCacheSize: Long = 33554432
-      },
+      ,
       Namespaces.nsSeq
     )
     val store = new HealingFrontierStorage(dataSource)
@@ -143,20 +140,17 @@ class PrunedHealCrashSafetySpec extends ScalaTestWithActorTestKit() with AnyFlat
       healingWriterEcOverride = Some(ec)
     )
     try body(coordinator, store, controller)
-    finally {
+    finally
       testKit.stop(coordinator)
       pool.shutdown()
       pool.awaitTermination(5, TimeUnit.SECONDS)
       dataSource.destroy()
       deleteRecursively(new File(dbPath))
-    }
-  }
 
-  private def storedRoot(storage: TestMptStorage): ByteString = {
+  private def storedRoot(storage: TestMptStorage): ByteString =
     val leaf = LeafNode(ByteString(Array[Byte](0x01)), ByteString(Array[Byte](0x02)))
     storage.putNode(leaf)
     ByteString(leaf.hash)
-  }
 
   // ── T-3: record written only after the subtree's bytes are durable ──────────────────────────────
 
@@ -252,4 +246,3 @@ class PrunedHealCrashSafetySpec extends ScalaTestWithActorTestKit() with AnyFlat
       // account leaf's storageRoot — is itself recorded subtree-complete) plus the genuine zero-missing root record
       // at the completion chokepoint. This spec proves the heal-side (C3b) arm of the guard deterministically.
     }
-}

@@ -35,7 +35,7 @@ import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect
 import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 
-object NetworkPeerManagerActor {
+object NetworkPeerManagerActor:
 
   // =========================================================================
   // Command ADT — internal Typed dispatch protocol.
@@ -176,7 +176,7 @@ object NetworkPeerManagerActor {
       mptStorageOpt: Option[com.chipprbots.ethereum.db.storage.MptStorage],
       blockchainReader: Option[com.chipprbots.ethereum.domain.BlockchainReader],
       isPoWChain: Boolean
-  ) {
+  ):
 
     private val log = ctx.log
 
@@ -274,7 +274,7 @@ object NetworkPeerManagerActor {
           Behaviors.same
 
         case CalibrateChainWeightNowCmd =>
-          chainWeightCalibrationTarget match {
+          chainWeightCalibrationTarget match
             case None =>
               log.warn("TIMED_CALIBRATION: no calibration target registered — CalibrateChainWeightNow dropped")
             case Some(target) =>
@@ -292,7 +292,6 @@ object NetworkPeerManagerActor {
                 )
               target ! com.chipprbots.ethereum.blockchain.sync.SyncProtocol
                 .CalibrateChainWeightFromPeer(td, blockNum)
-          }
           Behaviors.same
 
         // ── Wire protocol ─────────────────────────────────────────────────────
@@ -359,21 +358,19 @@ object NetworkPeerManagerActor {
           peersWithInfo.foreach { case (peerId, PeerWithInfo(peer, peerInfo)) =>
             if peerInfo.isAtGenesis then {
               // Genesis peers are block 0 by definition — nothing to refresh.
-            } else {
+            } else
               val recentlySignaled = peerInfo.remoteStatus.capability == Capability.ETH69 &&
                 lastBlockSignalMs.get(peerId).exists(t => now - t < refreshStaleAfterMs)
-              if !recentlySignaled then {
+              if !recentlySignaled then
                 // Archive-node detection: track consecutive probes with no maxBlockNumber advancement.
-                if peerInfo.remoteStatus.capability == Capability.ETH69 then {
-                  lastProbeMaxBlock.get(peerId) match {
+                if peerInfo.remoteStatus.capability == Capability.ETH69 then
+                  lastProbeMaxBlock.get(peerId) match
                     case Some(prev) if peerInfo.maxBlockNumber <= prev =>
                       consecutiveUnchangedProbes(peerId) = consecutiveUnchangedProbes.getOrElse(peerId, 0) + 1
                     case Some(_) =>
                       consecutiveUnchangedProbes.remove(peerId)
                     case None => ()
-                  }
                   lastProbeMaxBlock(peerId) = peerInfo.maxBlockNumber
-                }
                 val bestHash = peerInfo.remoteStatus.bestHash
                 val probe: MessageSerializable =
                   ETHPackets.GetBlockHeaders(ETHPackets.nextRequestId, Right(bestHash), 1, 0, reverse = false)
@@ -385,8 +382,6 @@ object NetworkPeerManagerActor {
                 )
                 peerManagerActor ! PeerManagerActor.SendMessageCmd(probe, peer.id)
                 probed += 1
-              }
-            }
           }
           if probed > 0 then
             log.debug(s"BEST_BLOCK_REPROBE: probed $probed/${peersWithInfo.size} peers for current head")
@@ -394,19 +389,19 @@ object NetworkPeerManagerActor {
           // One-shot: once our chain tip advances past genesis, re-evaluate ETH69 peers that are
           // still at COLD_START (TD=0 because ourBestNum was 0 when they connected).
           var updatedPeers = peersWithInfo
-          if !coldStartCompleted then {
+          if !coldStartCompleted then
             blockchainReader.foreach { reader =>
-              if reader.getBestBlockNumber > 0 then {
+              if reader.getBestBlockNumber > 0 then
                 coldStartCompleted = true
                 var refreshCount = 0
                 peersWithInfo.foreach { case (peerId, PeerWithInfo(_, peerInfo)) =>
-                  if peerInfo.remoteStatus.capability == Capability.ETH69 && peerInfo.maxBlockNumber > 0 then {
+                  if peerInfo.remoteStatus.capability == Capability.ETH69 && peerInfo.maxBlockNumber > 0 then
                     val (cw, source) = reader.resolveETH69ChainWeight(
                       peerInfo.bestBlockHash,
                       peerInfo.maxBlockNumber,
                       isPoWChain
                     )
-                    if source != "COLD_START" then {
+                    if source != "COLD_START" then
                       log.info(
                         "ETH69_COLD_START_RESOLVED: peer={} newTD={} source={}",
                         peerId,
@@ -418,42 +413,37 @@ object NetworkPeerManagerActor {
                         updatedPeers(peerId).copy(peerInfo = peerInfo.withChainWeight(cw))
                       )
                       refreshCount += 1
-                    }
-                  }
                 }
                 if refreshCount > 0 then
                   log.info("ETH69_COLD_START_RESOLVED: chain weights refreshed for {} ETH69 peers", refreshCount)
-              }
             }
-          }
           if updatedPeers ne peersWithInfo then handleMessages(updatedPeers)
           else Behaviors.same
 
         case CheckLaggingPeersTick =>
-          lastKnownClHead match {
+          lastKnownClHead match
             case None =>
               // Pre-merge chain or CL hasn't connected yet — no authoritative tip to anchor on.
               ()
             case Some(clHead) =>
               val now = System.currentTimeMillis()
               val poolSize = peersWithInfo.size
-              if poolSize <= LaggingPeerMinPoolFloor then {
+              if poolSize <= LaggingPeerMinPoolFloor then
                 log.debug(
                   s"LAGGING_PEER_CHECK: pool=$poolSize <= floor=$LaggingPeerMinPoolFloor — skipping eviction sweep"
                 )
-              } else {
+              else
                 val laggingFloor = clHead - LaggingPeerLagThreshold
                 val candidates = peersWithInfo.iterator
                   .flatMap { case (peerId, PeerWithInfo(peer, peerInfo)) =>
-                    if peerInfo.maxBlockNumber > 0 && peerInfo.maxBlockNumber < laggingFloor then {
+                    if peerInfo.maxBlockNumber > 0 && peerInfo.maxBlockNumber < laggingFloor then
                       val firstSeen = laggingPeerSince.getOrElseUpdate(peerId, now)
                       val laggedFor = now - firstSeen
                       if laggedFor >= LaggingPeerEvictAfter.toMillis then Some((peerId, peer, peerInfo, laggedFor))
                       else None
-                    } else {
+                    else
                       laggingPeerSince.remove(peerId)
                       None
-                    }
                   }
                   .take(LaggingPeerMaxEvictionsPerCycle)
                   .toList
@@ -483,8 +473,6 @@ object NetworkPeerManagerActor {
                   )
                   laggingPeerSince.remove(peerId)
                 }
-              }
-          }
           Behaviors.same
 
         // ── SNAP server requests — matched BEFORE the general MessageFromPeer guard ──
@@ -513,7 +501,7 @@ object NetworkPeerManagerActor {
         case PeerEventCmd(MessageFromPeer(message, peerId)) if peersWithInfo.contains(peerId) =>
           // Route SNAP protocol responses (from peers we're syncing from) to SNAPSyncController.
           // Messages are wrapped in Command ADT so the Typed SSC mailbox accepts them.
-          message match {
+          message match
             case msg: AccountRange =>
               log.debug("Routing AccountRange to SNAPSyncController from peer {}", peerId)
               snapSyncControllerOpt.foreach(
@@ -535,11 +523,9 @@ object NetworkPeerManagerActor {
                 _ ! com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController.TrieNodesResponse(msg)
               )
             case _ => // ETH protocol messages — no special routing needed
-          }
-
           // Track per-peer block-height signals so the periodic re-probe can skip ETH/69 peers
           // that are actively pushing BlockRangeUpdate.
-          message match {
+          message match
             case bru: ETHPackets.BlockRangeUpdate =>
               log.info(
                 "ETH69_BRU_RECEIVED: peer={} earliest={} latest={} latestHash={}",
@@ -552,8 +538,6 @@ object NetworkPeerManagerActor {
             case _: ETHPackets.BlockHeaders | _: ETHPackets.NewBlock | _: NewBlockHashes =>
               lastBlockSignalMs(peerId) = System.currentTimeMillis()
             case _ => // not a block-height signal
-          }
-
           val newPeersWithInfo = updatePeersWithInfo(peersWithInfo, peerId, message, handleReceivedMessage)
           NetworkMetrics.ReceivedMessagesCounter.increment()
           handleMessages(newPeersWithInfo)
@@ -564,13 +548,13 @@ object NetworkPeerManagerActor {
           handlePeerHandshakeSuccessful(peer, peerInfo, peersWithInfo)
 
         case PeerEventCmd(PeerDisconnected(peerId)) =>
-          if !peersWithInfo.contains(peerId) then {
+          if !peersWithInfo.contains(peerId) then
             log.debug(
               "PEER_DISCONNECTED_IGNORED: {} not in peersWithInfo — likely suppressed duplicate or already removed",
               peerId
             )
             Behaviors.same
-          } else if pendingInboundWinsDisconnects.contains(peerId) then {
+          else if pendingInboundWinsDisconnects.contains(peerId) then
             // The outbound PeerActor that PMA closed after inbound-wins is dying. peersWithInfo already
             // holds the live inbound entry — do not evict.
             pendingInboundWinsDisconnects -= peerId
@@ -579,7 +563,7 @@ object NetworkPeerManagerActor {
               peerId
             )
             Behaviors.same
-          } else {
+          else
             val pw = peersWithInfo(peerId)
             log.info(
               s"PEER_DISCONNECTED: ${peerId.value} " +
@@ -598,7 +582,6 @@ object NetworkPeerManagerActor {
             consecutiveUnchangedProbes.remove(peerId)
             lastProbeMaxBlock.remove(peerId)
             handleMessages(peersWithInfo - peerId)
-          }
 
         case PeerEventCmd(_) =>
           Behaviors.same
@@ -608,7 +591,7 @@ object NetworkPeerManagerActor {
         peer: Peer,
         peerInfo: PeerInfo,
         peersWithInfo: PeersWithInfo
-    ): Behavior[Command] = {
+    ): Behavior[Command] =
       val chainInfoDisplay =
         if peerInfo.remoteStatus.capability == com.chipprbots.ethereum.network.p2p.messages.Capability.ETH69 then
           s"latestBlock=${peerInfo.remoteStatus.latestBlock.getOrElse("?")} TD=${peerInfo.remoteStatus.chainWeight.totalDifficulty} (ETH/69, TD from local DB or block-number proxy)"
@@ -624,9 +607,9 @@ object NetworkPeerManagerActor {
       )
 
       // Track best ETH68 peer TD for timed calibration (CalibrateChainWeightNow).
-      if peerInfo.remoteStatus.capability != com.chipprbots.ethereum.network.p2p.messages.Capability.ETH69 then {
+      if peerInfo.remoteStatus.capability != com.chipprbots.ethereum.network.p2p.messages.Capability.ETH69 then
         val peerTD = peerInfo.remoteStatus.chainWeight.totalDifficulty
-        if bestNetworkTip.forall { case (best, _) => peerTD > best } then {
+        if bestNetworkTip.forall { case (best, _) => peerTD > best } then
           val prevTD = bestNetworkTip.map(_._1).getOrElse(BigInt(0))
           bestNetworkTip = Some((peerTD, peerInfo.maxBlockNumber))
           log.debug(
@@ -635,8 +618,6 @@ object NetworkPeerManagerActor {
             peerInfo.maxBlockNumber,
             prevTD
           )
-        }
-      }
 
       // PEER-CHAIN-DIVERGE / TD-PROXY-GAP checks
       blockchainReader.foreach { reader =>
@@ -653,13 +634,13 @@ object NetworkPeerManagerActor {
               )
           }
         }
-        if peerInfo.remoteStatus.capability != com.chipprbots.ethereum.network.p2p.messages.Capability.ETH69 then {
+        if peerInfo.remoteStatus.capability != com.chipprbots.ethereum.network.p2p.messages.Capability.ETH69 then
           val peerTD = peerInfo.remoteStatus.chainWeight.totalDifficulty
           reader.getBestBlock.foreach { ourBest =>
             reader.getChainWeightByHash(ourBest.header.hash).foreach { ourWeight =>
-              if peerTD > ourWeight.totalDifficulty then {
+              if peerTD > ourWeight.totalDifficulty then
                 val ratio = peerTD / ourWeight.totalDifficulty
-                if ratio > BigInt(10_000) then {
+                if ratio > BigInt(10_000) then
                   // TD-PROXY-GAP: stored TD is a genesis proxy from SNAP finalization.
                   chainWeightCalibrationTarget.foreach { target =>
                     target ! com.chipprbots.ethereum.blockchain.sync.SyncProtocol
@@ -687,7 +668,7 @@ object NetworkPeerManagerActor {
                     ),
                     LaggingPeerBlacklistOverrideDelay
                   )
-                } else
+                else
                   log.warn(
                     "TD-DIVERGE: Peer {} TD={} > our TD={} at block {}. We may be on a lighter fork or behind.",
                     peer.id,
@@ -695,18 +676,16 @@ object NetworkPeerManagerActor {
                     ourWeight.totalDifficulty,
                     ourBest.header.number
                   )
-              }
             }
           }
-        }
       }
 
-      if peersWithInfo.contains(peer.id) then {
+      if peersWithInfo.contains(peer.id) then
         val old = peersWithInfo(peer.id)
         val newIsInbound = peer.incomingConnection
         val existingIsOutbound = !old.peer.incomingConnection
 
-        if newIsInbound && existingIsOutbound then {
+        if newIsInbound && existingIsOutbound then
           // Inbound-wins: swap peersWithInfo to the live inbound ref.
           pendingInboundWinsDisconnects += peer.id
           log.info(
@@ -716,7 +695,7 @@ object NetworkPeerManagerActor {
             peer.remoteAddress
           )
           handleMessages(peersWithInfo + (peer.id -> PeerWithInfo(peer, peerInfo)))
-        } else {
+        else
           // Keep the EXISTING entry — don't overwrite with the duplicate.
           log.warn(
             s"DUPLICATE_HANDSHAKE_DROPPED: ${peer.id} already in peersWithInfo " +
@@ -725,15 +704,14 @@ object NetworkPeerManagerActor {
               s"keeping existing entry, duplicate will be dropped by PeerManagerActor"
           )
           Behaviors.same
-        }
-      } else {
+      else
         peerEventBusActor ! SubscribeCmd(PeerDisconnectedClassifier(PeerSelector.WithId(peer.id)), eventAdapter)
         peerEventBusActor ! SubscribeCmd(
           MessageClassifier(msgCodesWithInfo, PeerSelector.WithId(peer.id)),
           eventAdapter
         )
         // Besu-style eager best-block probe.
-        if peerInfo.remoteStatus.capability != Capability.ETH69 && !peerInfo.isAtGenesis then {
+        if peerInfo.remoteStatus.capability != Capability.ETH69 && !peerInfo.isAtGenesis then
           val bestHash = peerInfo.remoteStatus.bestHash
           val probe: MessageSerializable =
             ETHPackets.GetBlockHeaders(ETHPackets.nextRequestId, Right(bestHash), 1, 0, reverse = false)
@@ -744,7 +722,7 @@ object NetworkPeerManagerActor {
             ByteStringUtils.hash2string(bestHash)
           )
           peerManagerActor ! PeerManagerActor.SendMessageCmd(probe, peer.id)
-        } else if peerInfo.remoteStatus.capability == Capability.ETH69 then {
+        else if peerInfo.remoteStatus.capability == Capability.ETH69 then
           // ETH/69 (EIP-7642): announce our block range immediately after STATUS.
           val bestInfo = appStateStorage.getBestBlockInfo()
           val bru = ETH69.BlockRangeUpdate(BigInt(0), bestInfo.number, bestInfo.hash)
@@ -755,12 +733,9 @@ object NetworkPeerManagerActor {
             bestInfo.hash
           )
           peerManagerActor ! PeerManagerActor.SendMessageCmd(bru, peer.id)
-        }
         NetworkMetrics.registerAddHandshakedPeer(peer)
         PeerTelemetry.registerPeer(peer, peerInfo)
         handleMessages(peersWithInfo + (peer.id -> PeerWithInfo(peer, peerInfo)))
-      }
-    }
 
     private def peerHasUpdatedBestBlock(@annotation.unused peerInfo: PeerInfo): Boolean =
       // All handshaked peers are usable. go-ethereum has no equivalent gate (eth/peerset.go all()
@@ -775,18 +750,18 @@ object NetworkPeerManagerActor {
         message: Message,
         messageHandler: (Message, PeerWithInfo) => PeerInfo
     ): PeersWithInfo =
-      if peers.contains(peerId) then {
+      if peers.contains(peerId) then
         val peerWithInfo = peers(peerId)
         val newPeerInfo = messageHandler(message, peerWithInfo)
         peers + (peerId -> peerWithInfo.copy(peerInfo = newPeerInfo))
-      } else peers
+      else peers
 
     private def handleSentMessage(@annotation.unused _message: Message, initialPeerWithInfo: PeerWithInfo): PeerInfo =
       initialPeerWithInfo.peerInfo
 
-    private def handleReceivedMessage(message: Message, initialPeerWithInfo: PeerWithInfo): PeerInfo = {
+    private def handleReceivedMessage(message: Message, initialPeerWithInfo: PeerWithInfo): PeerInfo =
       // Log non-empty BlockHeaders at debug; count empty responses for 60s summary
-      message match {
+      message match
         case m: ETHPackets.BlockHeaders =>
           if m.headers.nonEmpty then
             log.debug(
@@ -802,7 +777,7 @@ object NetworkPeerManagerActor {
           // and block number — more precise than ETH68 STATUS.
           val newBlockTD = m.totalDifficulty
           val newBlockNum = m.block.header.number
-          if bestNetworkTip.forall { case (best, _) => newBlockTD > best } then {
+          if bestNetworkTip.forall { case (best, _) => newBlockTD > best } then
             val prevTD = bestNetworkTip.map(_._1).getOrElse(BigInt(0))
             bestNetworkTip = Some((newBlockTD, newBlockNum))
             log.debug(
@@ -811,17 +786,13 @@ object NetworkPeerManagerActor {
               newBlockNum,
               prevTD
             )
-          }
         case _ => // Don't log other message types
-      }
-
       updateChainWeight(message)
         .andThen(updateForkAccepted(message, initialPeerWithInfo.peer))
         .andThen(updateMaxBlock(message, initialPeerWithInfo.peer.id))(initialPeerWithInfo.peerInfo)
-    }
 
     private def updateChainWeight(message: Message)(initialPeerInfo: PeerInfo): PeerInfo =
-      message match {
+      message match
         case newBlock: ETHPackets.NewBlock =>
           val prevTD = initialPeerInfo.chainWeight.totalDifficulty
           val actualTD = newBlock.totalDifficulty
@@ -837,35 +808,31 @@ object NetworkPeerManagerActor {
           )
           initialPeerInfo.copy(chainWeight = ChainWeight.totalDifficultyOnly(newBlock.totalDifficulty))
         case _ => initialPeerInfo
-      }
 
     private def updateForkAccepted(message: Message, peer: Peer)(initialPeerInfo: PeerInfo): PeerInfo =
-      message match {
+      message match
         case ETHPackets.BlockHeaders(_, blockHeaders) =>
           val newPeerInfoOpt: Option[PeerInfo] =
-            for {
+            for
               forkResolver <- forkResolverOpt
               forkBlockHeader <- blockHeaders.find(_.number == forkResolver.forkBlockNumber)
-            } yield {
+            yield
               val newFork = forkResolver.recognizeFork(forkBlockHeader)
               log.debug("Received fork block header with fork: {}", newFork)
 
-              if !forkResolver.isAccepted(newFork) then {
+              if !forkResolver.isAccepted(newFork) then
                 log.debug("Peer is not running the accepted fork, disconnecting")
                 peer.ref ! DisconnectPeer(Disconnect.Reasons.UselessPeer)
                 initialPeerInfo
-              } else initialPeerInfo.withForkAccepted(true)
-            }
+              else initialPeerInfo.withForkAccepted(true)
           newPeerInfoOpt.getOrElse(initialPeerInfo)
 
         case _ => initialPeerInfo
-      }
 
-    private def updateMaxBlock(message: Message, peerId: PeerId)(initialPeerInfo: PeerInfo): PeerInfo = {
+    private def updateMaxBlock(message: Message, peerId: PeerId)(initialPeerInfo: PeerInfo): PeerInfo =
       def update(ns: Seq[(BigInt, ByteString)]): PeerInfo =
-        if ns.isEmpty then {
-          initialPeerInfo
-        } else {
+        if ns.isEmpty then initialPeerInfo
+        else
           val (maxBlockNumber, maxBlockHash) = ns.maxBy(_._1)
           if maxBlockNumber > appStateStorage.getEstimatedHighestBlock() then
             appStateStorage.putEstimatedHighestBlock(maxBlockNumber).commit()
@@ -878,14 +845,14 @@ object NetworkPeerManagerActor {
           // For ETH/69 peers: re-resolve chainWeight via 3-tier.
           // Archive/static peers (maxBlockNumber unchanged across N probes) are exempt from
           // the monotonic guard so a Tier3 overestimate at handshake can be corrected down.
-          blockchainReader match {
+          blockchainReader match
             case Some(reader) if updated.remoteStatus.capability == Capability.ETH69 =>
               val (cw, source) = reader.resolveETH69ChainWeight(maxBlockHash, maxBlockNumber, isPoWChain)
               val isImprovement = cw.totalDifficulty > updated.chainWeight.totalDifficulty
               val isPeerStatic =
                 consecutiveUnchangedProbes.getOrElse(peerId, 0) >= StaticPeerProbeThreshold
               val shouldUpdate = (isImprovement || isPeerStatic) && source != "COLD_START"
-              if shouldUpdate then {
+              if shouldUpdate then
                 log.info(
                   "ETH69_CHAINWEIGHT_REFRESH: blockNum={} newTD={} prevTD={} source={} static={}",
                   maxBlockNumber,
@@ -895,12 +862,10 @@ object NetworkPeerManagerActor {
                   isPeerStatic
                 )
                 updated.withChainWeight(cw)
-              } else updated
+              else updated
             case _ => updated
-          }
-        }
 
-      message match {
+      message match
         case m: ETHPackets.BlockHeaders =>
           update(m.headers.map(header => (header.number, header.hash.value)))
         case m: ETHPackets.NewBlock =>
@@ -910,8 +875,6 @@ object NetworkPeerManagerActor {
         case m: ETHPackets.BlockRangeUpdate =>
           update(Seq((m.latestBlock, m.latestBlockHash)))
         case _ => initialPeerInfo
-      }
-    }
 
     /** Handle incoming GetAccountRange request from a peer (server-side) */
     private def handleGetAccountRange(
@@ -921,13 +884,13 @@ object NetworkPeerManagerActor {
         // sends GetAccountRange immediately after RLPx hello, before ETH-status exchange).
         // Reserved for future per-peer rate limiting.
         @annotation.unused peerWithInfo: Option[PeerWithInfo]
-    ): Unit = {
+    ): Unit =
       log.debug(
         s"Received GetAccountRange request from peer $peerId: requestId=${msg.requestId}, root=${msg.rootHash.take(4).toHex}, start=${msg.startingHash.take(4).toHex}, limit=${msg.limitHash.take(4).toHex}, bytes=${msg.responseBytes}"
       )
       val response: AccountRange =
         try
-          mptStorageOpt match {
+          mptStorageOpt match
             case Some(storage) if isStateRootFresh(msg.rootHash) =>
               com.chipprbots.ethereum.network.snapserver.SnapServer.serveAccountRange(
                 requestId = msg.requestId,
@@ -939,14 +902,12 @@ object NetworkPeerManagerActor {
               )
             case _ =>
               AccountRange(msg.requestId, Seq.empty, Seq.empty)
-          }
-        catch {
+        catch
           case t: Throwable =>
             log.error(
               s"serveAccountRange threw for peer $peerId (requestId=${msg.requestId}): ${t.getClass.getName}: ${t.getMessage}"
             )
             AccountRange(msg.requestId, Seq.empty, Seq.empty)
-        }
       peerManagerActor ! PeerManagerActor.SendMessageCmd(response, peerId)
       log.debug(
         "SNAP-SERVE: GetAccountRange peer={} accounts={} proofs={}",
@@ -954,31 +915,26 @@ object NetworkPeerManagerActor {
         response.accounts.size,
         response.proof.size
       )
-    }
 
-    private def refreshFreshRootCache(reader: com.chipprbots.ethereum.domain.BlockchainReader): Unit = {
+    private def refreshFreshRootCache(reader: com.chipprbots.ethereum.domain.BlockchainReader): Unit =
       val tip = reader.getBestBlockNumber
-      if tip != freshRootCacheTip then {
+      if tip != freshRootCacheTip then
         val window = BigInt(128)
         val from = (tip - window).max(BigInt(0))
         val newCache = scala.collection.mutable.Set.empty[ByteString]
         var n = tip
-        while n >= from do {
+        while n >= from do
           reader.getBlockHeaderByNumber(n).foreach(h => newCache += h.stateRoot.value)
           n = n - 1
-        }
         freshRootCache = newCache
         freshRootCacheTip = tip
-      }
-    }
 
     /** Per SNAP/1: nodes only need to serve state for "recent" roots — geth uses a 128-block window. */
-    private def isStateRootFresh(rootHash: ByteString): Boolean = blockchainReader match {
+    private def isStateRootFresh(rootHash: ByteString): Boolean = blockchainReader match
       case None => true
       case Some(reader) =>
         refreshFreshRootCache(reader)
         freshRootCache.contains(rootHash)
-    }
 
     /** Handle incoming GetStorageRanges request from a peer (server-side) */
     private def handleGetStorageRanges(
@@ -988,62 +944,54 @@ object NetworkPeerManagerActor {
         // sends GetStorageRanges immediately after RLPx hello, before ETH-status exchange).
         // Reserved for future per-peer rate limiting.
         @annotation.unused peerWithInfo: Option[PeerWithInfo]
-    ): Unit = {
+    ): Unit =
       log.debug(
         s"Received GetStorageRanges request from peer $peerId: requestId=${msg.requestId}, root=${msg.rootHash.take(4).toHex}, accounts=${msg.accountHashes.size}, start=${msg.startingHash.take(4).toHex}, limit=${msg.limitHash.take(4).toHex}, bytes=${msg.responseBytes}"
       )
-      val response = mptStorageOpt match {
+      val response = mptStorageOpt match
         case Some(storage) =>
           import com.chipprbots.ethereum.network.snapserver.SnapServer
           import com.chipprbots.ethereum.mpt.{MerklePatriciaTrie, NullNode}
           val stateRootNodeOpt: Option[com.chipprbots.ethereum.mpt.MptNode] =
             try
               if msg.rootHash.toArray.sameElements(MerklePatriciaTrie.EmptyRootHash) then None
-              else {
+              else
                 val node = storage.get(msg.rootHash.toArray)
                 if node == NullNode then None else Some(node)
-              }
-            catch {
+            catch
               case e: Throwable =>
                 log.warn("MPT traversal error in handleGetStorageRanges (state root load): {}", e.getMessage)
                 None
-            }
-          val accountRoot: ByteString => Option[ByteString] = { accountHash =>
+          val accountRoot: ByteString => Option[ByteString] = accountHash =>
             val nibbles = SnapServer.hashToNibbles(accountHash)
             try
               stateRootNodeOpt.flatMap { rootNode =>
-                def find(node: com.chipprbots.ethereum.mpt.MptNode, rem: Array[Byte]): Option[ByteString] = {
-                  val resolved = node match {
+                def find(node: com.chipprbots.ethereum.mpt.MptNode, rem: Array[Byte]): Option[ByteString] =
+                  val resolved = node match
                     case h: com.chipprbots.ethereum.mpt.HashNode => storage.get(h.hashNode)
                     case other                                   => other
-                  }
-                  resolved match {
+                  resolved match
                     case com.chipprbots.ethereum.mpt.LeafNode(key, value, _, _, _) =>
-                      if rem.sameElements(key.toArray) then {
+                      if rem.sameElements(key.toArray) then
                         val acct = value.toArray.toAccount
                         Some(acct.storageRoot.value)
-                      } else None
+                      else None
                     case com.chipprbots.ethereum.mpt.ExtensionNode(sk, next, _, _, _) =>
                       if rem.length >= sk.length && rem.take(sk.length).sameElements(sk.toArray) then
                         find(next, rem.drop(sk.length))
                       else None
                     case com.chipprbots.ethereum.mpt.BranchNode(children, _, _, _, _) =>
                       if rem.isEmpty then None
-                      else {
+                      else
                         val ch = children(rem(0) & 0x0f)
                         if ch == NullNode then None else find(ch, rem.drop(1))
-                      }
                     case _ => None
-                  }
-                }
                 find(rootNode, nibbles)
               }
-            catch {
+            catch
               case e: Throwable =>
                 log.warn("MPT traversal error in handleGetStorageRanges: {}", e.getMessage)
                 None
-            }
-          }
           try
             SnapServer.serveStorageRanges(
               requestId = msg.requestId,
@@ -1055,16 +1003,14 @@ object NetworkPeerManagerActor {
               storage = storage,
               accountRoot = accountRoot
             )
-          catch {
+          catch
             case t: Throwable =>
               log.error(
                 s"serveStorageRanges threw for peer $peerId (requestId=${msg.requestId}): ${t.getClass.getName}: ${t.getMessage}"
               )
               StorageRanges(msg.requestId, Seq.empty, Seq.empty)
-          }
         case None =>
           StorageRanges(msg.requestId, Seq.empty, Seq.empty)
-      }
       peerManagerActor ! PeerManagerActor.SendMessageCmd(response, peerId)
       log.debug(
         "SNAP-SERVE: GetStorageRanges peer={} slots={} proofs={}",
@@ -1072,7 +1018,6 @@ object NetworkPeerManagerActor {
         response.slots.size,
         response.proof.size
       )
-    }
 
     /** Handle incoming GetTrieNodes request from a peer (server-side) */
     private def handleGetTrieNodes(
@@ -1082,13 +1027,13 @@ object NetworkPeerManagerActor {
         // sends GetTrieNodes immediately after RLPx hello, before ETH-status exchange).
         // Reserved for future per-peer rate limiting.
         @annotation.unused peerWithInfo: Option[PeerWithInfo]
-    ): Unit = {
+    ): Unit =
       log.debug(
         s"Received GetTrieNodes request from peer $peerId: requestId=${msg.requestId}, root=${msg.rootHash.take(4).toHex}, paths=${msg.paths.size}, bytes=${msg.responseBytes}"
       )
       val response: TrieNodes =
         try
-          mptStorageOpt match {
+          mptStorageOpt match
             case Some(storage) =>
               com.chipprbots.ethereum.network.snapserver.SnapServer.serveTrieNodes(
                 requestId = msg.requestId,
@@ -1099,21 +1044,18 @@ object NetworkPeerManagerActor {
               )
             case None =>
               TrieNodes(msg.requestId, Seq.empty)
-          }
-        catch {
+        catch
           case t: Throwable =>
             log.error(
               s"serveTrieNodes threw for peer $peerId (requestId=${msg.requestId}): ${t.getClass.getName}: ${t.getMessage}"
             )
             TrieNodes(msg.requestId, Seq.empty)
-        }
       peerManagerActor ! PeerManagerActor.SendMessageCmd(response, peerId)
       log.debug(
         "SNAP-SERVE: GetTrieNodes peer={} nodes={}",
         peerId,
         response.nodes.size
       )
-    }
 
     /** Handle incoming GetByteCodes request from a peer (server-side) */
     private def handleGetByteCodes(
@@ -1123,13 +1065,13 @@ object NetworkPeerManagerActor {
         // sends GetByteCodes immediately after RLPx hello, before ETH-status exchange).
         // Reserved for future per-peer rate limiting.
         @annotation.unused peerWithInfo: Option[PeerWithInfo]
-    ): Unit = {
+    ): Unit =
       log.debug(
         s"Received GetByteCodes request from peer $peerId: requestId=${msg.requestId}, hashes=${msg.hashes.size}, bytes=${msg.responseBytes}"
       )
       val response: ByteCodes =
         try
-          evmCodeStorageOpt match {
+          evmCodeStorageOpt match
             case Some(storage) =>
               com.chipprbots.ethereum.network.snapserver.SnapServer.serveByteCodes(
                 requestId = msg.requestId,
@@ -1139,22 +1081,18 @@ object NetworkPeerManagerActor {
               )
             case None =>
               ByteCodes(msg.requestId, Seq.empty)
-          }
-        catch {
+        catch
           case t: Throwable =>
             log.error(
               s"serveByteCodes threw for peer $peerId (requestId=${msg.requestId}): ${t.getClass.getName}: ${t.getMessage}"
             )
             ByteCodes(msg.requestId, Seq.empty)
-        }
       peerManagerActor ! PeerManagerActor.SendMessageCmd(response, peerId)
       log.debug(
         "SNAP-SERVE: GetByteCodes peer={} codes={}",
         peerId,
         response.codes.size
       )
-    }
-  }
   // scalastyle:on number.of.methods
 
   // =========================================================================
@@ -1192,7 +1130,7 @@ object NetworkPeerManagerActor {
       capabilities: List[Capability] = List.empty,
       latestBlock: Option[BigInt] = None,
       remoteClientId: String = ""
-  ) {
+  ):
     override def toString: String =
       s"RemoteStatus { " +
         s"capability: $capability, " +
@@ -1205,9 +1143,8 @@ object NetworkPeerManagerActor {
         s"latestBlock: $latestBlock, " +
         s"remoteClientId: $remoteClientId" +
         s"}"
-  }
 
-  object RemoteStatus {
+  object RemoteStatus:
     def apply(
         status: ETHPackets.Status68.Status68,
         negotiatedCapability: Capability,
@@ -1257,7 +1194,6 @@ object NetworkPeerManagerActor {
         latestBlock = Some(status.latestBlock),
         remoteClientId = remoteClientId
       )
-  }
 
   case class PeerInfo(
       remoteStatus: RemoteStatus,
@@ -1265,7 +1201,7 @@ object NetworkPeerManagerActor {
       forkAccepted: Boolean,
       maxBlockNumber: BigInt,
       bestBlockHash: ByteString
-  ) extends HandshakeResult {
+  ) extends HandshakeResult:
 
     def withForkAccepted(forkAccepted: Boolean): PeerInfo = copy(forkAccepted = forkAccepted)
 
@@ -1286,10 +1222,9 @@ object NetworkPeerManagerActor {
         s" bestBlockHash: ${ByteStringUtils.hash2string(bestBlockHash)}," +
         s" handshakeStatus: $remoteStatus" +
         s" }"
-  }
 
-  object PeerInfo {
-    def apply(remoteStatus: RemoteStatus, forkAccepted: Boolean): PeerInfo = {
+  object PeerInfo:
+    def apply(remoteStatus: RemoteStatus, forkAccepted: Boolean): PeerInfo =
       val initialMaxBlock: BigInt =
         if remoteStatus.capability == com.chipprbots.ethereum.network.p2p.messages.Capability.ETH69 then
           remoteStatus.latestBlock.getOrElse(BigInt(0))
@@ -1301,14 +1236,12 @@ object NetworkPeerManagerActor {
         initialMaxBlock,
         remoteStatus.bestHash
       )
-    }
 
     def withForkAccepted(remoteStatus: RemoteStatus): PeerInfo =
       PeerInfo(remoteStatus, forkAccepted = true)
 
     def withNotForkAccepted(remoteStatus: RemoteStatus): PeerInfo =
       PeerInfo(remoteStatus, forkAccepted = false)
-  }
 
   private[network] case class PeerWithInfo(peer: Peer, peerInfo: PeerInfo)
 
@@ -1366,5 +1299,3 @@ object NetworkPeerManagerActor {
 
   /** Unconditional timed calibration: sent by SyncController 30s after startRegularSync. */
   case object CalibrateChainWeightNow
-
-}

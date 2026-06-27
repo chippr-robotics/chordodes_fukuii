@@ -31,55 +31,50 @@ class QaJRCSpec
     with PatienceConfiguration
     with NormalPatience
     with JsonMethodsImplicits
-    with org.scalamock.scalatest.MockFactory {
+    with org.scalamock.scalatest.MockFactory:
 
   implicit val runtime: IORuntime = IORuntime.global
 
   "QaJRC" should {
     "request block mining and return valid response with correct message" when {
-      "mining ordered" in new TestSetup {
+      "mining ordered" in new TestSetup:
         mockSuccessfulMineBlocksBehaviour(MockedMinerResponses.MiningOrdered)
 
         val response: JsonRpcResponse = jsonRpcController.handleRequest(mineBlocksRpcRequest).unsafeRunSync()
 
         response should haveObjectResult(responseType(MiningOrdered), nullMessage)
-      }
 
-      "miner is working" in new TestSetup {
+      "miner is working" in new TestSetup:
         mockSuccessfulMineBlocksBehaviour(MockedMinerResponses.MinerIsWorking)
 
         val response: JsonRpcResponse = jsonRpcController.handleRequest(mineBlocksRpcRequest).unsafeRunSync()
 
         response should haveObjectResult(responseType(MinerIsWorking), nullMessage)
-      }
 
-      "miner doesn't exist" in new TestSetup {
+      "miner doesn't exist" in new TestSetup:
         mockSuccessfulMineBlocksBehaviour(MockedMinerResponses.MinerNotExist)
 
         val response: JsonRpcResponse = jsonRpcController.handleRequest(mineBlocksRpcRequest).unsafeRunSync()
 
         response should haveObjectResult(responseType(MinerNotExist), nullMessage)
-      }
 
-      "miner not support current msg" in new TestSetup {
+      "miner not support current msg" in new TestSetup:
         mockSuccessfulMineBlocksBehaviour(MockedMinerResponses.MinerNotSupported(MineBlocks(1, true)))
 
         val response: JsonRpcResponse = jsonRpcController.handleRequest(mineBlocksRpcRequest).unsafeRunSync()
 
         response should haveObjectResult(responseType(MinerNotSupport), msg("MineBlocks(1,true,None)"))
-      }
 
-      "miner return error" in new TestSetup {
+      "miner return error" in new TestSetup:
         mockSuccessfulMineBlocksBehaviour(MockedMinerResponses.MiningError("error"))
 
         val response: JsonRpcResponse = jsonRpcController.handleRequest(mineBlocksRpcRequest).unsafeRunSync()
 
         response should haveObjectResult(responseType(MiningError), msg("error"))
-      }
     }
 
     "request block mining and return InternalError" when {
-      "communication with miner failed" in new TestSetup {
+      "communication with miner failed" in new TestSetup:
         qaService.mineBlocks
           .expects(mineBlocksReq)
           .returning(IO.raiseError(new ClassCastException("error")))
@@ -87,7 +82,6 @@ class QaJRCSpec
         val response: JsonRpcResponse = jsonRpcController.handleRequest(mineBlocksRpcRequest).unsafeRunSync()
 
         response should haveError(JsonRpcError.InternalError)
-      }
     }
 
   }
@@ -99,7 +93,7 @@ class QaJRCSpec
       with ByteGenerators
       with BlockchainConfigBuilder
       with ApisBuilder
-      with com.chipprbots.ethereum.TestInstanceConfigProvider {
+      with com.chipprbots.ethereum.TestInstanceConfigProvider:
     def config: JsonRpcConfig = JsonRpcConfig(Config.config, available)
 
     val appStateStorage: AppStateStorage = mock[AppStateStorage]
@@ -196,5 +190,3 @@ class QaJRCSpec
         .returning(IO.pure(Right(MineBlocksResponse(resp))))
 
     val fakeChainId: Byte = 42.toByte
-  }
-}

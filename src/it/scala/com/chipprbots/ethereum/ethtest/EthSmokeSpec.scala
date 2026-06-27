@@ -11,13 +11,12 @@ import com.chipprbots.ethereum.testing.Tags.*
   * vectors are not present in the classpath (they live in the CI-only `ets/tests` submodule), so they are intentionally
   * not referenced here.
   */
-class EthSmokeSpec extends EthereumTestsSpec {
+class EthSmokeSpec extends EthereumTestsSpec:
 
   private def smoke(path: String, name: String): Unit =
-    runSingleTest(path, name) match {
+    runSingleTest(path, name) match
       case Right(_)    => info(s"  ✓ $name")
       case Left(error) => fail(s"$name failed: $error")
-    }
 
   "EthSmoke" should "execute Berlin SimpleTx" taggedAs EthSmoke in {
     smoke("/ethereum-tests/SimpleTx.json", "SimpleTx_Berlin")
@@ -123,4 +122,3 @@ class EthSmokeSpec extends EthereumTestsSpec {
       "BlockchainTests/ValidBlocks/bcEIP4844-blobtransactions/blockWithAllTransactionTypes.json::blockWithAllTransactionTypes_Prague"
     )
   }
-}

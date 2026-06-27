@@ -12,29 +12,27 @@ import com.chipprbots.ethereum.jsonrpc.JsonRpcError.InvalidParams
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonEncoder
 import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder
 
-object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
+object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits:
   implicit override val formats: org.json4s.Formats = org.json4s.DefaultFormats
 
   given eth_simulateV1: (JsonMethodDecoder[EthSimulateRequest] & JsonEncoder[EthSimulateResponse]) =
-    new JsonMethodDecoder[EthSimulateRequest] with JsonEncoder[EthSimulateResponse] {
+    new JsonMethodDecoder[EthSimulateRequest] with JsonEncoder[EthSimulateResponse]:
 
       override def decodeJson(params: Option[JArray]): Either[JsonRpcError, EthSimulateRequest] =
-        params match {
+        params match
           case Some(JArray((payload: JObject) :: rest)) =>
-            val blockTag = rest match {
+            val blockTag = rest match
               case (bt: JValue) :: _ => extractBlockParam(bt).getOrElse(BlockParam.Latest)
               case _                 => BlockParam.Latest
-            }
             decodePayload(payload, blockTag)
           case _ => Left(InvalidParams("expected [payload, blockTag]"))
-        }
 
-      private def decodePayload(obj: JObject, blockTag: BlockParam): Either[JsonRpcError, EthSimulateRequest] = {
+      private def decodePayload(obj: JObject, blockTag: BlockParam): Either[JsonRpcError, EthSimulateRequest] =
         val validation = (obj \ "validation").extractOpt[Boolean].getOrElse(false)
         val returnFullTxs = (obj \ "returnFullTransactions").extractOpt[Boolean].getOrElse(false)
         val traceTransfers = (obj \ "traceTransfers").extractOpt[Boolean].getOrElse(false)
 
-        val blockStateCalls = (obj \ "blockStateCalls") match {
+        val blockStateCalls = (obj \ "blockStateCalls") match
           case JArray(items) =>
             val parsed = items.map {
               case bsc: JObject => decodeBlockStateCall(bsc)
@@ -44,35 +42,30 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
             Right(parsed.collect { case Right(v) => v })
           case JNothing | JNull => Right(Seq.empty)
           case _                => Left(InvalidParams("blockStateCalls must be array"))
-        }
 
         blockStateCalls.map { bscs =>
           EthSimulateRequest(bscs, validation, returnFullTxs, traceTransfers, blockTag)
         }
-      }
 
-      private def decodeBlockStateCall(obj: JObject): Either[JsonRpcError, BlockStateCall] = {
-        val blockOverrides = (obj \ "blockOverrides") match {
+      private def decodeBlockStateCall(obj: JObject): Either[JsonRpcError, BlockStateCall] =
+        val blockOverrides = (obj \ "blockOverrides") match
           case bo: JObject => Some(decodeBlockOverrides(bo))
           case _           => None
-        }
 
-        val stateOverrides = (obj \ "stateOverrides") match {
+        val stateOverrides = (obj \ "stateOverrides") match
           case JObject(fields) =>
             val parsed = fields.map {
               case (addrHex, value: JObject) =>
-                extractAddress(JString(addrHex)) match {
+                extractAddress(JString(addrHex)) match
                   case Right(addr) => Right((addr, decodeStateOverride(value)))
                   case Left(_)     => Left(InvalidParams(s"invalid address: $addrHex"))
-                }
               case (k, _) => Left(InvalidParams(s"invalid state override entry: $k"))
             }
             if parsed.exists(_.isLeft) then return parsed.collectFirst { case Left(e) => Left(e) }.get
             Some(parsed.collect { case Right((k, v)) => (k, v) }.toMap)
           case _ => None
-        }
 
-        val calls = (obj \ "calls") match {
+        val calls = (obj \ "calls") match
           case JArray(items) =>
             val parsed = items.map {
               case c: JObject => decodeSimulateCall(c)
@@ -81,10 +74,8 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
             if parsed.exists(_.isLeft) then return parsed.collectFirst { case Left(e) => Left(e) }.get
             Some(parsed.collect { case Right(v) => v })
           case _ => None
-        }
 
         Right(BlockStateCall(blockOverrides, stateOverrides, calls))
-      }
 
       private def decodeBlockOverrides(obj: JObject): BlockOverrides =
         BlockOverrides(
@@ -109,23 +100,19 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
             .flatMap(s => extractAddress(JString(s)).toOption)
         )
 
-      private def decodeStorageMap(obj: JObject, field: String): Option[Map[BigInt, BigInt]] = {
-        def hexToBigInt(hex: String): BigInt = {
+      private def decodeStorageMap(obj: JObject, field: String): Option[Map[BigInt, BigInt]] =
+        def hexToBigInt(hex: String): BigInt =
           val clean = hex.stripPrefix("0x").stripPrefix("0X")
           if clean.isEmpty then BigInt(0)
-          else {
+          else
             val padded = if clean.length % 2 != 0 then "0" + clean else clean
             BigInt(1, org.bouncycastle.util.encoders.Hex.decode(padded))
-          }
-        }
-        (obj \ field) match {
+        (obj \ field) match
           case JObject(fields) =>
             Some(fields.collect { case (keyHex, JString(valueHex)) =>
               (hexToBigInt(keyHex), hexToBigInt(valueHex))
             }.toMap)
           case _ => None
-        }
-      }
 
       private def decodeSimulateCall(obj: JObject): Either[JsonRpcError, SimulateCall] =
         Right(
@@ -140,7 +127,7 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
             maxPriorityFeePerGas = optQty(obj, "maxPriorityFeePerGas"),
             gasPrice = optQty(obj, "gasPrice"),
             maxFeePerBlobGas = optQty(obj, "maxFeePerBlobGas"),
-            blobVersionedHashes = (obj \ "blobVersionedHashes") match {
+            blobVersionedHashes = (obj \ "blobVersionedHashes") match
               case JArray(items) =>
                 Some(items.flatMap {
                   case JString(s) =>
@@ -148,7 +135,7 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
                   case _ => None
                 })
               case _ => None
-            },
+            ,
             `type` = optQty(obj, "type")
           )
         )
@@ -157,10 +144,9 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
         (obj \ field).extractOpt[String].flatMap { s =>
           val hex = s.stripPrefix("0x").stripPrefix("0X")
           if hex.isEmpty then Some(BigInt(0))
-          else {
+          else
             val padded = if hex.length % 2 != 0 then "0" + hex else hex
             scala.util.Try(BigInt(1, org.bouncycastle.util.encoders.Hex.decode(padded))).toOption
-          }
         }
 
       private def optBytes(obj: JObject, field: String): Option[ByteString] =
@@ -172,7 +158,7 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
       override def encodeJson(t: EthSimulateResponse): JValue =
         JArray(t.blocks.map(b => encodeSimulatedBlock(b, t.returnFullTransactions)).toList)
 
-      private def encodeSimulatedBlock(block: SimulateBlockResult, returnFullTxs: Boolean): JValue = {
+      private def encodeSimulatedBlock(block: SimulateBlockResult, returnFullTxs: Boolean): JValue =
         val h = block.header
         val blockHash = h.hash.value
 
@@ -211,44 +197,40 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
           baseFeeField ::: blobFields ::: baseHeaderFields ::: beaconField ::: requestsField ::: withdrawalsRootField
 
         // Transactions: hashes or full objects depending on returnFullTransactions flag
-        val txField = if returnFullTxs then {
-          "transactions" -> JArray(block.transactions.zipWithIndex.map { case (tx, idx) =>
-            val sender =
-              if idx < block.senders.size then block.senders(idx) else com.chipprbots.ethereum.domain.Address(0)
-            encodeSimulatedTxFull(tx, idx, h, sender)
-          }.toList)
-        } else {
-          "transactions" -> JArray(block.transactions.map(tx => encodeAsHex(tx.hash.value)).toList)
-        }
+        val txField =
+          if returnFullTxs then
+            "transactions" -> JArray(block.transactions.zipWithIndex.map { case (tx, idx) =>
+              val sender =
+                if idx < block.senders.size then block.senders(idx) else com.chipprbots.ethereum.domain.Address(0)
+              encodeSimulatedTxFull(tx, idx, h, sender)
+            }.toList)
+          else "transactions" -> JArray(block.transactions.map(tx => encodeAsHex(tx.hash.value)).toList)
 
         // Per-call results
         val callsField = "calls" -> JArray(block.calls.map(encodeCallResult(_, blockHash, h)).toList)
 
         JObject(headerFields :+ txField :+ callsField)
-      }
 
       private def encodeSimulatedTxFull(
           stx: com.chipprbots.ethereum.domain.SignedTransaction,
           txIdx: Int,
           header: com.chipprbots.ethereum.domain.BlockHeader,
           senderAddr: com.chipprbots.ethereum.domain.Address
-      ): JValue = {
+      ): JValue =
         val tx = stx.tx
         val blockHash = header.hash.value
-        val txType = tx match {
+        val txType = tx match
           case _: com.chipprbots.ethereum.domain.LegacyTransaction         => BigInt(0)
           case _: com.chipprbots.ethereum.domain.TransactionWithAccessList => BigInt(1)
           case _: com.chipprbots.ethereum.domain.TransactionWithDynamicFee => BigInt(2)
           case _: com.chipprbots.ethereum.domain.BlobTransaction           => BigInt(3)
           case _: com.chipprbots.ethereum.domain.SetCodeTransaction        => BigInt(4)
-        }
-        val chainId: Option[BigInt] = tx match {
+        val chainId: Option[BigInt] = tx match
           case t: com.chipprbots.ethereum.domain.BlobTransaction           => Some(t.chainId)
           case t: com.chipprbots.ethereum.domain.SetCodeTransaction        => Some(t.chainId)
           case t: com.chipprbots.ethereum.domain.TransactionWithDynamicFee => Some(t.chainId)
           case t: com.chipprbots.ethereum.domain.TransactionWithAccessList => Some(t.chainId)
           case _ => Some(com.chipprbots.ethereum.utils.Config.blockchains.blockchainConfig.chainId)
-        }
         val sender = senderAddr.bytes
         val effectiveGasPrice = com.chipprbots.ethereum.domain.Transaction.effectiveGasPrice(tx, header.baseFee)
         val baseFields = List(
@@ -271,7 +253,7 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
           "yParity" -> encodeAsHex(BigInt(0))
         )
         val chainIdField = chainId.map(c => "chainId" -> encodeAsHex(c)).toList
-        val maxFeeFields = tx match {
+        val maxFeeFields = tx match
           case t: com.chipprbots.ethereum.domain.BlobTransaction =>
             List(
               "maxFeePerGas" -> encodeAsHex(t.maxFeePerGas),
@@ -283,29 +265,25 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
               "maxPriorityFeePerGas" -> encodeAsHex(t.maxPriorityFeePerGas)
             )
           case _ => Nil
-        }
-        val accessListField = tx match {
+        val accessListField = tx match
           case _: com.chipprbots.ethereum.domain.BlobTransaction           => List("accessList" -> JArray(Nil))
           case _: com.chipprbots.ethereum.domain.TransactionWithDynamicFee => List("accessList" -> JArray(Nil))
           case _: com.chipprbots.ethereum.domain.TransactionWithAccessList => List("accessList" -> JArray(Nil))
           case _                                                           => Nil
-        }
-        val blobFields = tx match {
+        val blobFields = tx match
           case t: com.chipprbots.ethereum.domain.BlobTransaction =>
             List(
               "maxFeePerBlobGas" -> encodeAsHex(t.maxFeePerBlobGas),
               "blobVersionedHashes" -> JArray(t.blobVersionedHashes.map(h => encodeAsHex(h.value)).toList)
             )
           case _ => Nil
-        }
         JObject(baseFields ::: chainIdField ::: maxFeeFields ::: accessListField ::: blobFields)
-      }
 
       private def encodeCallResult(
           cr: SimulateCallResult,
           blockHash: ByteString,
           @annotation.unused _header: BlockHeader
-      ): JValue = {
+      ): JValue =
         val baseFields = List(
           "returnData" -> encodeAsHex(cr.returnData),
           "gasUsed" -> encodeAsHex(cr.gasUsed),
@@ -313,11 +291,10 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
           "status" -> encodeAsHex(cr.status)
         )
 
-        val logsField = if cr.error.isEmpty then {
-          List("logs" -> JArray(cr.logs.map(log => encodeSimulateTxLog(log, blockHash)).toList))
-        } else {
-          List("logs" -> JArray(Nil))
-        }
+        val logsField =
+          if cr.error.isEmpty then
+            List("logs" -> JArray(cr.logs.map(log => encodeSimulateTxLog(log, blockHash)).toList))
+          else List("logs" -> JArray(Nil))
 
         val errorField = cr.error.map { err =>
           val errFields = List(
@@ -328,7 +305,6 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
         }.toList
 
         JObject(baseFields ::: logsField ::: errorField)
-      }
 
       private def encodeSimulateTxLog(log: FilterManager.TxLog, blockHash: ByteString): JValue =
         JObject(
@@ -343,5 +319,3 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits {
           "transactionHash" -> encodeAsHex(log.transactionHash),
           "transactionIndex" -> encodeAsHex(log.transactionIndex)
         )
-    }
-}

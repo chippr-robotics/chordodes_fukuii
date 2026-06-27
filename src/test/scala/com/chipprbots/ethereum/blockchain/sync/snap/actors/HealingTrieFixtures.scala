@@ -42,7 +42,7 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   * as [[HashNode]] references are read back as `HashNode`s and the walk follows them by hash — exactly the production
   * path where intermediate children are stored separately and referenced by 32-byte hash.
   */
-object HealingTrieFixtures {
+object HealingTrieFixtures:
 
   /** Test-only spawn shim for the now-Typed [[TrieNodeHealingCoordinator]] (Group S3). The coordinator's production
     * factory is `apply(...): Behavior[Command]`; these specs spawn it through an [[ActorTestKit]] supplied by
@@ -129,11 +129,10 @@ object HealingTrieFixtures {
 
   private def emptyChildren: Array[MptNode] = Array.fill[MptNode](16)(NullNode)
 
-  private def branchWith(slots: (Int, MptNode)*): BranchNode = {
+  private def branchWith(slots: (Int, MptNode)*): BranchNode =
     val children = emptyChildren
     slots.foreach { case (i, child) => children(i) = child }
     BranchNode(children, None)
-  }
 
   /** Build the canonical shared-ancestor fixture (T003).
     *
@@ -156,7 +155,7 @@ object HealingTrieFixtures {
     *   when true the shared ancestor is an [[ExtensionNode]] (`next` = the missing grandchild) instead of a
     *   [[BranchNode]], exercising the extension de-dup arm of `rebuildFrontierBFS`. Default false (branch).
     */
-  def sharedAncestor(sharedIsExtension: Boolean = false): SharedAncestorFixture = {
+  def sharedAncestor(sharedIsExtension: Boolean = false): SharedAncestorFixture =
     val storage = new TestMptStorage()
 
     // The single deliberately-missing node: a hash referenced by `shared` but never stored.
@@ -185,7 +184,6 @@ object HealingTrieFixtures {
       missingNodeHash = missingGrandchildHash,
       sharedAncestorHash = sharedHash
     )
-  }
 
   /** A wider shared-ancestor fixture for the concurrency path (T031): the root fans out to `fanout` parents (a level
     * wide enough that a parallel walk can split it into sub-ranges), every one of which references the SAME shared
@@ -197,7 +195,7 @@ object HealingTrieFixtures {
     * @param fanout
     *   number of distinct parents pointing at the shared ancestor (each at a distinct root slot; capped at 16).
     */
-  def wideSharedAncestor(fanout: Int = 8): SharedAncestorFixture = {
+  def wideSharedAncestor(fanout: Int = 8): SharedAncestorFixture =
     val storage = new TestMptStorage()
     val width = math.min(math.max(fanout, 2), 16)
 
@@ -225,7 +223,6 @@ object HealingTrieFixtures {
       missingNodeHash = missingGrandchildHash,
       sharedAncestorHash = sharedHash
     )
-  }
 
   /** A small fixed multi-node trie with several missing frontier nodes and at least one shared ancestor, used by the
     * serial-equivalence test (T027): the walk over it must emit the same frontier set regardless of whether a reader EC
@@ -234,7 +231,7 @@ object HealingTrieFixtures {
     * Shape: root → 3 present parents; parent0 and parent1 both reference one shared present branch (de-dup), which has
     * a missing child; parent2 has its own missing child. Two distinct missing nodes total.
     */
-  def multiNodeWithSharedAncestor(): MultiNodeFixture = {
+  def multiNodeWithSharedAncestor(): MultiNodeFixture =
     val storage = new TestMptStorage()
 
     val sharedMissing = seedHash("heal-fixture-multinode/shared-missing")
@@ -263,7 +260,6 @@ object HealingTrieFixtures {
       rootHash = ByteString(root.hash),
       missingNodeHashes = Set(sharedMissing, directMissing)
     )
-  }
 
   /** A stored multi-node trie plus the full set of deliberately-missing frontier hashes. */
   final case class MultiNodeFixture(
@@ -298,7 +294,7 @@ object HealingTrieFixtures {
     * `childrenPerL3 = 13` ⇒ 4096 × 13 = 53,248 frontier nodes, just over the 50,000 chunk threshold. Internal nodes
     * total 1 + 16 + 256 + 4096 = 4369 small `BranchNode`s — heavy but bounded, and deterministic (fixed-byte hashes).
     */
-  def wideFrontierLevel(childrenPerL3: Int = 13): WideLevelFixture = {
+  def wideFrontierLevel(childrenPerL3: Int = 13): WideLevelFixture =
     val storage = new TestMptStorage()
     val perL3 = math.min(math.max(childrenPerL3, 1), 16)
     var missingCount = 0
@@ -345,15 +341,12 @@ object HealingTrieFixtures {
     storage.putNode(root)
 
     WideLevelFixture(storage = storage, rootHash = ByteString(root.hash), expectedFrontier = missingCount)
-  }
 
   /** A childless present leaf root: the trivial trie used to take the restart (resume/DFS) branch without any walk
     * discovering anything. Mirrors `HealingFrontierResumeSpec.storedRoot`. Returns `(storage, rootHash)`.
     */
-  def childlessLeafRoot(): (TestMptStorage, ByteString) = {
+  def childlessLeafRoot(): (TestMptStorage, ByteString) =
     val storage = new TestMptStorage()
     val leaf = LeafNode(ByteString(1), ByteString(1))
     storage.putNode(leaf)
     (storage, ByteString(leaf.hash))
-  }
-}

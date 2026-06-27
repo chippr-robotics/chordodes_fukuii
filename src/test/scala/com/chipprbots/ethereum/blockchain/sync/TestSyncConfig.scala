@@ -5,7 +5,7 @@ import scala.concurrent.duration.*
 import com.chipprbots.ethereum.nodebuilder.SyncConfigBuilder
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
-trait TestSyncConfig extends SyncConfigBuilder with com.chipprbots.ethereum.TestInstanceConfigProvider {
+trait TestSyncConfig extends SyncConfigBuilder with com.chipprbots.ethereum.TestInstanceConfigProvider:
   def defaultSyncConfig: SyncConfig = SyncConfig(
     doFastSync = false,
     doSnapSync = false,
@@ -63,4 +63,3 @@ trait TestSyncConfig extends SyncConfigBuilder with com.chipprbots.ethereum.Test
   )
 
   override lazy val syncConfig: SyncConfig = defaultSyncConfig
-}

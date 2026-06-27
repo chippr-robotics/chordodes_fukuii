@@ -13,22 +13,20 @@ import com.chipprbots.ethereum.faucet.jsonrpc.WalletService
 import com.chipprbots.ethereum.keystore.KeyStore.KeyStoreError
 import com.chipprbots.ethereum.keystore.Wallet
 
-object FaucetHandler {
+object FaucetHandler:
 
   sealed trait Command
-  object Command {
+  object Command:
     case class Status(replyTo: ActorRef[FaucetHandlerResponse]) extends Command
     private[faucet] case object Initialize extends Command
     case class SendFunds(address: Address, replyTo: ActorRef[FaucetHandlerResponse]) extends Command
-  }
 
   sealed trait FaucetHandlerResponse
-  object FaucetHandlerResponse {
+  object FaucetHandlerResponse:
     case class StatusResponse(status: FaucetStatus) extends FaucetHandlerResponse
     case object FaucetIsUnavailable extends FaucetHandlerResponse
     case class WalletRpcClientError(error: String) extends FaucetHandlerResponse
     case class TransactionSent(txHash: ByteString) extends FaucetHandlerResponse
-  }
 
   class WalletException(keyStoreError: KeyStoreError) extends RuntimeException(keyStoreError.toString)
 
@@ -51,14 +49,14 @@ object FaucetHandler {
       runtime: IORuntime
   ): Behavior[Command] =
     Behaviors.receive { (ctx, msg) =>
-      msg match {
+      msg match
         case Command.Status(replyTo) =>
           replyTo ! FaucetHandlerResponse.StatusResponse(FaucetStatus.FaucetUnavailable)
           Behaviors.same
 
         case Command.Initialize =>
           ctx.log.info("Initialization called (faucet unavailable)")
-          walletService.getWallet.unsafeRunSync() match {
+          walletService.getWallet.unsafeRunSync() match
             case Left(error) =>
               ctx.log.debug(s"Couldn't initialize wallet - error: $error")
               shutdown()
@@ -66,7 +64,6 @@ object FaucetHandler {
             case Right(wallet) =>
               ctx.log.info("Faucet initialization succeeded")
               available(walletService, wallet, config)
-          }
 
         case Command.SendFunds(addressTo, replyTo) =>
           ctx.log.info(
@@ -75,14 +72,13 @@ object FaucetHandler {
           )
           replyTo ! FaucetHandlerResponse.FaucetIsUnavailable
           Behaviors.same
-      }
     }
 
   private def available(walletService: WalletService, wallet: Wallet, config: FaucetConfig)(using
       runtime: IORuntime
   ): Behavior[Command] =
     Behaviors.receive { (ctx, msg) =>
-      msg match {
+      msg match
         case Command.Status(replyTo) =>
           replyTo ! FaucetHandlerResponse.StatusResponse(WalletAvailable)
           Behaviors.same
@@ -104,6 +100,4 @@ object FaucetHandler {
             }
             .unsafeRunAndForget()
           Behaviors.same
-      }
     }
-}

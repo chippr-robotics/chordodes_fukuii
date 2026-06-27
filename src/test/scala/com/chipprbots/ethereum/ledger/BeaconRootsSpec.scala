@@ -27,11 +27,11 @@ import com.chipprbots.ethereum.utils.ForkTimestamps
   * written correctly, redeployment is skipped on subsequent blocks, and the contract is absent before Cancun
   * activation.
   */
-class BeaconRootsSpec extends AnyFlatSpec with Matchers {
+class BeaconRootsSpec extends AnyFlatSpec with Matchers:
 
   private val CancunTs: Long = 1_000L
 
-  trait TestSetup extends EphemBlockchainTestSetup {
+  trait TestSetup extends EphemBlockchainTestSetup:
     override lazy val vm: VMImpl = new Mocks.MockVM()
 
     implicit override lazy val blockchainConfig: BlockchainConfig =
@@ -87,23 +87,21 @@ class BeaconRootsSpec extends AnyFlatSpec with Matchers {
 
     def runBlock(block: Block, world: InMemoryWorldStateProxy = emptyWorld): InMemoryWorldStateProxy =
       exec.executeBlockTransactions(block, world).toOption.get.worldState
-  }
 
   "EIP-4788 beacon roots" should "deploy contract code and set nonce=1 on the first Cancun block" taggedAs (
     EthereumTest,
     ConsensusTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val world: InMemoryWorldStateProxy =
       runBlock(makeBlock(ByteString(Array.fill(32)(0xab.toByte))))
 
     world.getCode(BeaconRootContractAddress) shouldBe BeaconRootsCode
     world.getAccount(BeaconRootContractAddress).map(_.nonce) shouldBe Some(UInt256(1))
-  }
 
   it should "write the timestamp and beacon root to the ring-buffer storage slots" taggedAs (
     EthereumTest,
     ConsensusTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val beaconRoot: ByteString = ByteString(Array.fill(32)(0xcd.toByte))
     val world: InMemoryWorldStateProxy = runBlock(makeBlock(beaconRoot, CancunTs))
 
@@ -112,12 +110,11 @@ class BeaconRootsSpec extends AnyFlatSpec with Matchers {
     val storage = world.getStorage(BeaconRootContractAddress)
     storage.load(timestampIdx) shouldBe BigInt(CancunTs)
     storage.load(rootIdx) shouldBe UInt256(beaconRoot).toBigInt
-  }
 
   it should "not redeploy the contract code on subsequent Cancun blocks" taggedAs (
     EthereumTest,
     ConsensusTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val root1: ByteString = ByteString(Array.fill(32)(0x11.toByte))
     val root2: ByteString = ByteString(Array.fill(32)(0x22.toByte))
 
@@ -126,12 +123,11 @@ class BeaconRootsSpec extends AnyFlatSpec with Matchers {
 
     world2.getCode(BeaconRootContractAddress) shouldBe BeaconRootsCode
     world2.getAccount(BeaconRootContractAddress).map(_.nonce) shouldBe Some(UInt256(1))
-  }
 
   it should "NOT deploy the contract for blocks where parentBeaconBlockRoot is absent" taggedAs (
     EthereumTest,
     ConsensusTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     // A block without parentBeaconBlockRoot (e.g. ETC or pre-Cancun) — the pattern guard fires None.
     val block = Block(
       header = Fixtures.Blocks.ValidBlock.header.copy(
@@ -146,7 +142,6 @@ class BeaconRootsSpec extends AnyFlatSpec with Matchers {
 
     world.getCode(BeaconRootContractAddress) shouldBe ByteString.empty
     world.getAccount(BeaconRootContractAddress) shouldBe None
-  }
 
   "BeaconRootsCode" should "start with the CALLER opcode (0x33) per EIP-4788 spec" taggedAs (
     EthereumTest,
@@ -155,4 +150,3 @@ class BeaconRootsSpec extends AnyFlatSpec with Matchers {
     BeaconRootsCode should not be empty
     BeaconRootsCode.head shouldBe 0x33.toByte
   }
-}

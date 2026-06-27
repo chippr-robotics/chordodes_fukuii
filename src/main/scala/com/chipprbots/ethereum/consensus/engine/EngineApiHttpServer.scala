@@ -40,7 +40,7 @@ class EngineApiHttpServer(
     controller: EngineApiController,
     jwtAuth: JwtAuthenticator,
     config: EngineApiHttpServer.Config
-) extends Logger {
+) extends Logger:
 
   // Dedicated ActorSystem isolated from the main node's peer-management dispatchers.
   // Loads `engine-api-system.conf` from the classpath which overrides only
@@ -83,11 +83,11 @@ class EngineApiHttpServer(
     compute = engineCompute,
     blocking = engineBlocking,
     scheduler = engineScheduler,
-    shutdown = () => {
+    shutdown = () =>
       shutdownScheduler()
       shutdownBlocking()
       engineComputeService.shutdown()
-    },
+    ,
     config = cats.effect.unsafe.IORuntimeConfig()
   )
 
@@ -100,9 +100,9 @@ class EngineApiHttpServer(
       jwtAuth.authenticate { _ =>
         entity(as[String]) { body =>
           val response =
-            try {
+            try
               val json = parse(body)
-              json match {
+              json match
                 case JArray(requests) =>
                   // Batch request
                   val responses = requests.map { reqJson =>
@@ -125,8 +125,7 @@ class EngineApiHttpServer(
                       entity = HttpEntity(ContentTypes.`application/json`, """{"error":"Invalid JSON"}""")
                     )
                   )
-              }
-            } catch {
+            catch
               case e: Exception =>
                 log.error(s"Engine API parse error: ${e.getMessage}")
                 Future.successful(
@@ -135,37 +134,34 @@ class EngineApiHttpServer(
                     entity = HttpEntity(ContentTypes.`application/json`, s"""{"error":"${e.getMessage}"}""")
                   )
                 )
-            }
           complete(response)
         }
       }
     }
 
-  private def processRequest(json: JValue): Future[JsonRpcResponse] = {
+  private def processRequest(json: JValue): Future[JsonRpcResponse] =
     val method = (json \ "method").extractOpt[String].getOrElse("unknown")
-    try {
+    try
       log.debug(s"Engine API request: method=$method")
       val request = JsonRpcRequest(
         jsonrpc = (json \ "jsonrpc").extractOpt[String].getOrElse("2.0"),
         method = (json \ "method").extract[String],
-        params = (json \ "params") match {
+        params = (json \ "params") match
           case arr: JArray => Some(arr)
           case _           => None
-        },
+        ,
         id = (json \ "id").extractOpt[JValue]
       )
       controller.handleRequest(request).unsafeToFuture().recover { case e: Exception =>
         log.error(s"Engine API handler error: ${e.getMessage}")
         JsonRpcResponse("2.0", None, Some(JsonRpcError.InternalError), request.id.getOrElse(JNull))
       }
-    } catch {
+    catch
       case e: Exception =>
         log.error(s"Engine API request decode error for method=$method: ${e.getMessage}", e)
         Future.successful(JsonRpcResponse("2.0", None, Some(JsonRpcError.InternalError), JNull))
-    }
-  }
 
-  private def responseToJson(resp: JsonRpcResponse): JValue = {
+  private def responseToJson(resp: JsonRpcResponse): JValue =
     val resultField: List[(String, JValue)] = resp.result.map(r => "result" -> r).toList
     val errorField: List[(String, JValue)] = resp.error.map { e =>
       "error" -> JObject(
@@ -176,9 +172,8 @@ class EngineApiHttpServer(
     val fields: List[(String, JValue)] =
       ("jsonrpc" -> JString(resp.jsonrpc)) :: resultField ::: errorField ::: List("id" -> resp.id)
     JObject(fields)
-  }
 
-  def start(): Future[Http.ServerBinding] = {
+  def start(): Future[Http.ServerBinding] =
     val bindFuture = Http().newServerAt(config.interface, config.port).bind(route)
     bindFuture.foreach { binding =>
       bindingOpt = Some(binding)
@@ -188,13 +183,12 @@ class EngineApiHttpServer(
       )
     }
     bindFuture
-  }
 
   /** Unbinds the server and terminates the dedicated ActorSystem. Caller should `Await` if shutdown ordering matters
     * (e.g. before the main node's ActorSystem terminates).
     */
-  def stop(): Future[Unit] = {
-    val terminate = bindingOpt match {
+  def stop(): Future[Unit] =
+    val terminate = bindingOpt match
       case Some(binding) =>
         binding.unbind().flatMap { _ =>
           bindingOpt = None
@@ -204,27 +198,21 @@ class EngineApiHttpServer(
       case None =>
         // Server never started; still tear down the system to free resources.
         system.terminate().map(_ => ())
-    }
     terminate.map { _ =>
       // Shut down the dedicated IORuntime pools after the ActorSystem is gone so any
       // in-flight handler IOs have already drained.
       ioRuntime.shutdown()
     }(scala.concurrent.ExecutionContext.parasitic)
-  }
 
   /** Synchronous shutdown convenience for shutdown hooks that don't have an ec available. */
   def stopSync(timeout: FiniteDuration = 10.seconds): Unit =
     try Await.result(stop(), timeout)
-    catch {
-      case _: Exception => ()
-    }
-}
+    catch case _: Exception => ()
 
-object EngineApiHttpServer {
+object EngineApiHttpServer:
   case class Config(
       enabled: Boolean = false,
       interface: String = "localhost",
       port: Int = 8551,
       jwtSecretPath: Option[String] = None
   )
-}

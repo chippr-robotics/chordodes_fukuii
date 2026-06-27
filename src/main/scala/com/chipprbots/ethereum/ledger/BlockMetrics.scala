@@ -6,7 +6,7 @@ import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.metrics.MetricsContainer
 
-case object BlockMetrics extends MetricsContainer {
+case object BlockMetrics extends MetricsContainer:
 
   final private val BlockNumberGauge =
     metrics.registry.gauge("sync.block.number.gauge", new AtomicDouble(0d))
@@ -32,7 +32,7 @@ case object BlockMetrics extends MetricsContainer {
   final private val MessGravityGauge =
     metrics.registry.gauge("chain.mess.gravity.gauge", new AtomicDouble(0d))
 
-  def measure(block: Block, getBlockByHashFn: BlockHash => Option[Block]): Unit = {
+  def measure(block: Block, getBlockByHashFn: BlockHash => Option[Block]): Unit =
     BlockNumberGauge.set(block.number.toDouble)
     BlockGasLimitGauge.set(block.header.gasLimit.toDouble)
     BlockGasUsedGauge.set(block.header.gasUsed.toDouble)
@@ -40,17 +40,13 @@ case object BlockMetrics extends MetricsContainer {
     BlockTransactionsGauge.set(block.body.numberOfTxs)
     BlockUnclesGauge.set(block.body.numberOfUncles)
 
-    getBlockByHashFn(block.header.parentHash) match {
+    getBlockByHashFn(block.header.parentHash) match
       case Some(parentBlock) =>
         val timeBetweenBlocksInSeconds: Long =
           block.header.unixTimestamp - parentBlock.header.unixTimestamp
         TimeBetweenParentGauge.set(timeBetweenBlocksInSeconds.toDouble)
       case None => ()
-    }
-  }
 
   def incrementMessRejected(): Unit = MessRejectedCounter.increment()
   def incrementMessAccepted(): Unit = MessAcceptedCounter.increment()
   def setMessGravity(ratio: Double): Unit = MessGravityGauge.set(ratio)
-
-}

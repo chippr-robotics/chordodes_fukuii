@@ -13,11 +13,9 @@ import com.chipprbots.ethereum.jsonrpc.serialization.JsonMethodDecoder.NoParamsM
 /** JSON codecs for non-tracing debug_* methods. `debug_trace*` codecs live in [[DebugTracingJsonMethodsImplicits]]
   * against the [[com.chipprbots.ethereum.vm.ExecutionTracer]] services.
   */
-object DebugJsonMethodsImplicits extends JsonMethodsImplicits {
+object DebugJsonMethodsImplicits extends JsonMethodsImplicits:
 
   given debug_listPeersInfo: JsonMethodCodec[ListPeersInfoRequest, ListPeersInfoResponse] =
-    new NoParamsMethodDecoder(ListPeersInfoRequest()) with JsonEncoder[ListPeersInfoResponse] {
+    new NoParamsMethodDecoder(ListPeersInfoRequest()) with JsonEncoder[ListPeersInfoResponse]:
       def encodeJson(t: ListPeersInfoResponse): JValue =
         JArray(t.peers.map(a => JString(a.toString)))
-    }
-}

@@ -41,20 +41,19 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
 // The test takes several minutes to complete due to DAG generation and actual PoW mining.
 // Marked as @Ignore for regular CI runs - run manually with: sbt "testOnly *EthashMinerSpec"
 @org.scalatest.Ignore
-class EthashMinerSpec extends AnyFlatSpec with Matchers with org.scalamock.scalatest.MockFactory {
+class EthashMinerSpec extends AnyFlatSpec with Matchers with org.scalamock.scalatest.MockFactory:
 
-  "EthashMiner actor" should "mine valid blocks" taggedAs (UnitTest, ConsensusTest, SlowTest) in new TestSetup {
+  "EthashMiner actor" should "mine valid blocks" taggedAs (UnitTest, ConsensusTest, SlowTest) in new TestSetup:
     val parentBlock: Block = origin
     setBlockForMining(origin)
 
     executeTest(parentBlock)
-  }
 
   it should "mine valid block on the end and beginning of the new epoch" taggedAs (
     UnitTest,
     ConsensusTest,
     SlowTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val epochLength: Int = EthashUtils.EPOCH_LENGTH_BEFORE_ECIP_1099
     val parent29998: Int = epochLength - 2 // 29998, mined block will be 29999 (last block of the epoch)
     val parentBlock29998: Block = origin.copy(header = origin.header.copy(number = parent29998))
@@ -65,9 +64,8 @@ class EthashMinerSpec extends AnyFlatSpec with Matchers with org.scalamock.scala
     val parentBlock29999: Block = origin.copy(header = origin.header.copy(number = parent29999))
     setBlockForMining(parentBlock29999)
     executeTest(parentBlock29999)
-  }
 
-  it should "mine valid blocks on the end of the epoch" taggedAs (UnitTest, ConsensusTest, SlowTest) in new TestSetup {
+  it should "mine valid blocks on the end of the epoch" taggedAs (UnitTest, ConsensusTest, SlowTest) in new TestSetup:
     val epochLength: Int = EthashUtils.EPOCH_LENGTH_BEFORE_ECIP_1099
     val parentBlockNumber: Int =
       2 * epochLength - 2 // 59998, mined block will be 59999 (last block of the current epoch)
@@ -75,9 +73,8 @@ class EthashMinerSpec extends AnyFlatSpec with Matchers with org.scalamock.scala
     setBlockForMining(parentBlock)
 
     executeTest(parentBlock)
-  }
 
-  class TestSetup extends MinerSpecSetup with Eventually with MiningPatience {
+  class TestSetup extends MinerSpecSetup with Eventually with MiningPatience:
     import scala.concurrent.ExecutionContext.Implicits.global
 
     // Implement abstract mock members - created in test class with MockFactory context
@@ -169,11 +166,10 @@ class EthashMinerSpec extends AnyFlatSpec with Matchers with org.scalamock.scala
         .returns(IO.pure(Right(SubmitHashRateResponse(true))))
         .atLeastOnce()
 
-    protected def executeTest(parentBlock: Block): Unit = {
+    protected def executeTest(parentBlock: Block): Unit =
       prepareMocks()
       val minedBlock = startMining(parentBlock)
       checkAssertions(minedBlock, parentBlock)
-    }
 
     def startMining(parentBlock: Block): Block =
       eventually {
@@ -185,10 +181,7 @@ class EthashMinerSpec extends AnyFlatSpec with Matchers with org.scalamock.scala
         minedBlock
       }
 
-    private def checkAssertions(minedBlock: Block, parentBlock: Block): Unit = {
+    private def checkAssertions(minedBlock: Block, parentBlock: Block): Unit =
       minedBlock.body.transactionList shouldBe Seq(txToMine)
       minedBlock.header.nonce.length shouldBe 8
       PoWBlockHeaderValidator.validate(minedBlock.header, parentBlock.header) shouldBe Right(BlockHeaderValid)
-    }
-  }
-}

@@ -26,11 +26,11 @@ import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Ping.PingEnc
 import com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Pong
 import com.chipprbots.ethereum.testing.Tags.*
 
-class PeerRequestHandlerSpec extends ScalaTestWithActorTestKit(ManualTime.config) with AnyFlatSpecLike with Matchers {
+class PeerRequestHandlerSpec extends ScalaTestWithActorTestKit(ManualTime.config) with AnyFlatSpecLike with Matchers:
 
   val manualTime: ManualTime = ManualTime()
 
-  trait Fixtures {
+  trait Fixtures:
     val peerId: PeerId = PeerId("test-peer-1")
     val otherPeerId: PeerId = PeerId("other-peer")
     val peerActorProbe: TestProbe = TestProbe()(testKit.system.toClassic)
@@ -60,24 +60,22 @@ class PeerRequestHandlerSpec extends ScalaTestWithActorTestKit(ManualTime.config
         ),
         s"prh-${java.util.UUID.randomUUID()}"
       )
-  }
 
   "PeerRequestHandler" should "send SendMessageCmd (not SendMessage) to networkPeerManager on startup" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new Fixtures {
+  ) in new Fixtures:
     val npmProbe = TestProbe()(testKit.system.toClassic)
     spawnPRH(npmProbe)
 
     val sent = npmProbe.expectMsgType[NetworkPeerManagerActor.SendMessageCmd]
     sent.peerId shouldEqual peerId
     npmProbe.expectNoMessage(100.millis)
-  }
 
   it should "reply ResponseReceived when a matching response arrives via PEB" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new Fixtures {
+  ) in new Fixtures:
     val npmProbe = TestProbe()(testKit.system.toClassic)
     spawnPRH(npmProbe)
     npmProbe.expectMsgType[NetworkPeerManagerActor.SendMessageCmd]
@@ -85,9 +83,8 @@ class PeerRequestHandlerSpec extends ScalaTestWithActorTestKit(ManualTime.config
     peerEventBus ! PublishCmd(MessageFromPeer(Pong(), peerId))
 
     replyTo.expectMessageType[PeerRequestHandler.ResponseReceived[Pong]]
-  }
 
-  it should "reply RequestFailed when the response timer fires" taggedAs (UnitTest, NetworkTest) in new Fixtures {
+  it should "reply RequestFailed when the response timer fires" taggedAs (UnitTest, NetworkTest) in new Fixtures:
     val npmProbe = TestProbe()(testKit.system.toClassic)
     spawnPRH(npmProbe, timeout = 2.seconds)
     npmProbe.expectMsgType[NetworkPeerManagerActor.SendMessageCmd]
@@ -95,12 +92,11 @@ class PeerRequestHandlerSpec extends ScalaTestWithActorTestKit(ManualTime.config
     manualTime.timePasses(3.seconds)
 
     replyTo.expectMessage(PeerRequestHandler.RequestFailed(peer, "request timeout"))
-  }
 
   it should "reply RequestFailed when the peer disconnects before the response arrives" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new Fixtures {
+  ) in new Fixtures:
     val npmProbe = TestProbe()(testKit.system.toClassic)
     spawnPRH(npmProbe)
     npmProbe.expectMsgType[NetworkPeerManagerActor.SendMessageCmd]
@@ -108,9 +104,8 @@ class PeerRequestHandlerSpec extends ScalaTestWithActorTestKit(ManualTime.config
     peerEventBus ! PublishCmd(PeerDisconnected(peerId))
 
     replyTo.expectMessage(PeerRequestHandler.RequestFailed(peer, "connection closed"))
-  }
 
-  it should "ignore a response from a different peer" taggedAs (UnitTest, NetworkTest) in new Fixtures {
+  it should "ignore a response from a different peer" taggedAs (UnitTest, NetworkTest) in new Fixtures:
     val npmProbe = TestProbe()(testKit.system.toClassic)
     spawnPRH(npmProbe)
     npmProbe.expectMsgType[NetworkPeerManagerActor.SendMessageCmd]
@@ -122,14 +117,11 @@ class PeerRequestHandlerSpec extends ScalaTestWithActorTestKit(ManualTime.config
     // Correct peer responds
     peerEventBus ! PublishCmd(MessageFromPeer(Pong(), peerId))
     replyTo.expectMessageType[PeerRequestHandler.ResponseReceived[Pong]]
-  }
 
-  it should "ignore a disconnect event for a different peer" taggedAs (UnitTest, NetworkTest) in new Fixtures {
+  it should "ignore a disconnect event for a different peer" taggedAs (UnitTest, NetworkTest) in new Fixtures:
     val npmProbe = TestProbe()(testKit.system.toClassic)
     spawnPRH(npmProbe)
     npmProbe.expectMsgType[NetworkPeerManagerActor.SendMessageCmd]
 
     peerEventBus ! PublishCmd(PeerDisconnected(otherPeerId))
     replyTo.expectNoMessage(200.millis)
-  }
-}

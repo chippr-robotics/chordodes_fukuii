@@ -20,7 +20,7 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteUtils
 import com.chipprbots.ethereum.utils.Logger
 
-class EthashDAGManager(blockCreator: PoWBlockCreator) extends Logger {
+class EthashDAGManager(blockCreator: PoWBlockCreator) extends Logger:
   var currentEpoch: Option[Long] = None
   var currentEpochDagSize: Option[Long] = None
   var currentEpochDag: Option[Array[Array[Int]]] = None
@@ -28,7 +28,7 @@ class EthashDAGManager(blockCreator: PoWBlockCreator) extends Logger {
   def calculateDagSize(blockNumber: Long, epoch: Long)(implicit
       blockchainConfig: BlockchainConfig
   ): (Array[Array[Int]], Long) =
-    (currentEpoch, currentEpochDag, currentEpochDagSize) match {
+    (currentEpoch, currentEpochDag, currentEpochDagSize) match
       case (Some(`epoch`), Some(dag), Some(dagSize)) => (dag, dagSize)
       case _ =>
         val seed =
@@ -37,18 +37,16 @@ class EthashDAGManager(blockCreator: PoWBlockCreator) extends Logger {
         val dagNumHashes = (dagSize / EthashUtils.HASH_BYTES).toInt
         val dag =
           if !dagFile(seed).exists() then generateDagAndSaveToFile(epoch, dagNumHashes, seed)
-          else {
+          else
             val res = loadDagFromFile(seed, dagNumHashes)
             res.failed.foreach { ex =>
               log.error("Cannot read DAG from file", ex)
             }
             res.getOrElse(generateDagAndSaveToFile(epoch, dagNumHashes, seed))
-          }
         currentEpoch = Some(epoch)
         currentEpochDag = Some(dag)
         currentEpochDagSize = Some(dagSize)
         (dag, dagSize)
-    }
 
   private def dagFile(seed: ByteString): File =
     new File(
@@ -56,7 +54,7 @@ class EthashDAGManager(blockCreator: PoWBlockCreator) extends Logger {
           .toHexString(seed.take(8).toArray[Byte])}"
     )
 
-  private def generateDagAndSaveToFile(epoch: Long, dagNumHashes: Int, seed: ByteString): Array[Array[Int]] = {
+  private def generateDagAndSaveToFile(epoch: Long, dagNumHashes: Int, seed: ByteString): Array[Array[Int]] =
     val file = dagFile(seed)
     if file.exists() then file.delete()
     file.getParentFile.mkdirs()
@@ -78,34 +76,29 @@ class EthashDAGManager(blockCreator: PoWBlockCreator) extends Logger {
       }
     }
 
-    written match {
+    written match
       case Success(_)  => res
       case Failure(ex) =>
         // Delete the partial/corrupt DAG file so the next run regenerates from scratch.
         log.error("Failed to generate DAG file, removing partial output", ex)
         if file.exists() then file.delete()
         throw ex
-    }
-  }
 
   private def loadDagFromFile(seed: ByteString, dagNumHashes: Int): Try[Array[Array[Int]]] =
     Using(new FileInputStream(dagFile(seed).getAbsolutePath)) { inputStream =>
       val prefix = new Array[Byte](8)
-      if inputStream.read(prefix) != 8 || ByteString(prefix) != DagFilePrefix then {
+      if inputStream.read(prefix) != 8 || ByteString(prefix) != DagFilePrefix then
         Failure(new RuntimeException("Invalid DAG file prefix"))
-      } else {
+      else
         val buffer = new Array[Byte](64) // scalastyle:ignore magic.number
         val res = new Array[Array[Int]](dagNumHashes)
         var index = 0
 
-        while inputStream.read(buffer) > 0 do {
+        while inputStream.read(buffer) > 0 do
           if index % 100000 == 0 then log.info(s"Loading DAG from file ${((index / res.length.toDouble) * 100).toInt}%")
           res(index) = ByteUtils.bytesToInts(buffer, bigEndian = false)
           index += 1
-        }
 
         if index == dagNumHashes then Success(res)
         else Failure(new RuntimeException("DAG file ended unexpectedly"))
-      }
     }.flatten
-}

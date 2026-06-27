@@ -40,7 +40,7 @@ class SubscriptionManagerSpec
     with AnyFlatSpecLike
     with Matchers
     with ScalaFutures
-    with NormalPatience {
+    with NormalPatience:
 
   implicit val mat: Materializer = Materializer(testKit.system.classicSystem)
   implicit val formats: org.json4s.Formats = org.json4s.DefaultFormats
@@ -66,13 +66,12 @@ class SubscriptionManagerSpec
       ActorRef[org.apache.pekko.actor.typed.pubsub.Topic.Command[
         NewBlockImported
       ]]
-  ) = {
+  ) =
     val blockTopic = makeBlockTopic()
     val mgr = testKit.spawn(
       SubscriptionManager(new EphemBlockchainTestSetup {}.blockchainReader, makePendingTxTopic(), blockTopic)
     )
     (mgr, blockTopic)
-  }
 
   /** Returns a preMaterialized queue + source pair. */
   def makeQueue(): (SourceQueueWithComplete[String], Source[String, NotUsed]) = Source
@@ -90,17 +89,15 @@ class SubscriptionManagerSpec
       connId: String,
       subType: String,
       params: Option[JValue] = None
-  ): SubscribeResponse = {
+  ): SubscribeResponse =
     val probe = testKit.createTestProbe[SubscribeResponse]()
     mgr ! Subscribe(connId, subType, params, probe.ref)
     probe.receiveMessage(5.seconds)
-  }
 
-  def unsubscribe(mgr: ActorRef[SubscriptionManager.Command], connId: String, subId: Long): UnsubscribeResponse = {
+  def unsubscribe(mgr: ActorRef[SubscriptionManager.Command], connId: String, subId: Long): UnsubscribeResponse =
     val probe = testKit.createTestProbe[UnsubscribeResponse]()
     mgr ! Unsubscribe(connId, subId, probe.ref)
     probe.receiveMessage(5.seconds)
-  }
 
   // ── connection lifecycle ───────────────────────────────────────────────────
 
@@ -250,4 +247,3 @@ class SubscriptionManagerSpec
     val messages2 = source2.take(1).completionTimeout(50.millis).runWith(Sink.seq)(mat)
     intercept[Exception](Await.result(messages2, 200.millis))
   }
-}

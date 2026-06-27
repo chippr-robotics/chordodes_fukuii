@@ -6,12 +6,11 @@ import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.UInt256
 import org.apache.pekko.util.ByteString
 
-object MockWorldState {
+object MockWorldState:
   type TestVM = VM[MockWorldState, MockStorage]
   type PS = ProgramState[MockWorldState, MockStorage]
   type PC = ProgramContext[MockWorldState, MockStorage]
   type PR = ProgramResult[MockWorldState, MockStorage]
-}
 
 case class MockWorldState(
     accounts: Map[Address, Account] = Map(),
@@ -20,7 +19,7 @@ case class MockWorldState(
     numberOfHashes: UInt256 = 0,
     touchedAccounts: Set[Address] = Set.empty,
     noEmptyAccountsCond: Boolean = false
-) extends WorldStateProxy[MockWorldState, MockStorage] {
+) extends WorldStateProxy[MockWorldState, MockStorage]:
 
   def getAccount(address: Address): Option[Account] =
     accounts.get(address)
@@ -67,4 +66,3 @@ case class MockWorldState(
     if world.touchedAccounts.contains(ripmdContractAddress) then
       copy(touchedAccounts = touchedAccounts + ripmdContractAddress)
     else this
-}

@@ -21,7 +21,7 @@ import com.chipprbots.ethereum.network.p2p.Message
 import com.chipprbots.ethereum.network.p2p.MessageSerializable
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets
 
-object PeerRequestHandler {
+object PeerRequestHandler:
 
   // ---- Shared result types ----
 
@@ -54,10 +54,9 @@ object PeerRequestHandler {
       Behaviors.withTimers { timers =>
         val startTime = System.currentTimeMillis()
 
-        val expectedRequestId: Option[BigInt] = requestMsg match {
+        val expectedRequestId: Option[BigInt] = requestMsg match
           case hasId: ETHPackets.HasRequestId => Some(hasId.requestId)
           case _                              => None
-        }
 
         // Single adapter for all PeerEvent subtypes. Two registrations for the same type `T`
         // in Pekko's `internalMessageAdapter` overwrite each other (filterNot + prepend on
@@ -83,16 +82,15 @@ object PeerRequestHandler {
 
         def timeTakenSoFar(): Long = System.currentTimeMillis() - startTime
 
-        def cleanup(): Unit = {
+        def cleanup(): Unit =
           timers.cancel("timeout")
           peerEventBus ! UnsubscribeAllCmd(peerEventAdapter)
-        }
 
         Behaviors.receiveMessage {
           case MessageFromPeerCmd(msg) =>
-            msg match {
+            msg match
               case responseMsg: ResponseMsg =>
-                (expectedRequestId, responseMsg) match {
+                (expectedRequestId, responseMsg) match
                   case (Some(expected), hasId: ETHPackets.HasRequestId) if hasId.requestId != expected =>
                     ctx.log.debug(
                       "PEER_REQUEST_STALE: peer={}, expected requestId={}, got={} — ignoring",
@@ -106,10 +104,8 @@ object PeerRequestHandler {
                     cleanup()
                     replyTo ! ResponseReceived(peer, responseMsg, elapsed)
                     Behaviors.stopped
-                }
               case _ =>
                 Behaviors.same
-            }
 
           case TimeoutCmd =>
             val elapsed = timeTakenSoFar()
@@ -141,4 +137,3 @@ object PeerRequestHandler {
         }
       }
     }
-}

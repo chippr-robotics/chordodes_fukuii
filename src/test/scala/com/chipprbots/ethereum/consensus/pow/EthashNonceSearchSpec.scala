@@ -13,7 +13,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   * Cache generation is a shared lazy val (~1-5s); individual hashimotoLight calls are fast. All tests operate on epoch
   * 0 (Mordor genesis epoch) to avoid generating multiple caches.
   */
-class EthashNonceSearchSpec extends AnyFlatSpec with Matchers {
+class EthashNonceSearchSpec extends AnyFlatSpec with Matchers:
 
   private val ecip1099Block: Long = 2_520_000L
   private val epoch0: Long = EthashUtils.epoch(0L, ecip1099Block)
@@ -65,4 +65,3 @@ class EthashNonceSearchSpec extends AnyFlatSpec with Matchers {
     val pow = EthashUtils.hashimotoLight(hash, nonce, epoch0FullSize, epoch0Cache)
     pow.mixHash shouldBe ByteString(Hex.decode("5bb43c0772e58084b221c8e0c859a45950c103c712c5b8f11d9566ee078a4501"))
   }
-}

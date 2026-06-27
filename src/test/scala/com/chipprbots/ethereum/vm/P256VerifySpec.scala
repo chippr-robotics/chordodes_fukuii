@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.vm.PrecompiledContracts.P256Verify
   * vectors. Covers valid signature, invalid signature, short input, degenerate r/s values, and an off-curve public key.
   */
 // scalastyle:off line.size.limit
-class P256VerifySpec extends AnyFlatSpec with Matchers {
+class P256VerifySpec extends AnyFlatSpec with Matchers:
 
   private def h(s: String): ByteString = ByteString(Hex.decode(s))
 
@@ -74,5 +74,4 @@ class P256VerifySpec extends AnyFlatSpec with Matchers {
     )
     P256Verify.exec(input) shouldBe Some(failure32)
   }
-}
 // scalastyle:on line.size.limit

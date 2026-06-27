@@ -13,7 +13,7 @@ import com.chipprbots.ethereum.utils.Config
   * `INCORRECT_EXCESS_BLOB_GAS` because excess is computed against the 6-blob Prague target rather than the active 8
   * (BPO1) or 12 (BPO2) blob target.
   */
-class BlobGasBpoScheduleSpec extends AnyFlatSpec with Matchers with ParallelTestExecution {
+class BlobGasBpoScheduleSpec extends AnyFlatSpec with Matchers with ParallelTestExecution:
 
   private val baseConfig: BlockchainConfig = Config.blockchains.blockchainConfig
 
@@ -174,4 +174,3 @@ class BlobGasBpoScheduleSpec extends AnyFlatSpec with Matchers with ParallelTest
     cfg.isBpo2Timestamp(bpo2Ts - 1) shouldBe false
     cfg.isBpo2Timestamp(bpo2Ts) shouldBe true
   }
-}

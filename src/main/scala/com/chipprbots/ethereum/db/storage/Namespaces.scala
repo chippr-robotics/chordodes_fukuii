@@ -1,6 +1,6 @@
 package com.chipprbots.ethereum.db.storage
 
-object Namespaces {
+object Namespaces:
   val ReceiptsNamespace: IndexedSeq[Byte] = IndexedSeq[Byte]('r'.toByte)
   val HeaderNamespace: IndexedSeq[Byte] = IndexedSeq[Byte]('h'.toByte)
   val BodyNamespace: IndexedSeq[Byte] = IndexedSeq[Byte]('b'.toByte)
@@ -49,4 +49,3 @@ object Namespaces {
     StateTriePathNamespace,
     StorageTriePathNamespace
   )
-}

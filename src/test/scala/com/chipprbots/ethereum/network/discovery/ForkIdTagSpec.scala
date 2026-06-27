@@ -16,7 +16,7 @@ import com.chipprbots.ethereum.rlp.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config.*
 
-class ForkIdTagSpec extends AnyWordSpec with Matchers {
+class ForkIdTagSpec extends AnyWordSpec with Matchers:
 
   val config = blockchains
   val etcConf: BlockchainConfig = config.blockchains("etc")
@@ -96,4 +96,3 @@ class ForkIdTagSpec extends AnyWordSpec with Matchers {
       makeTag(20000000).toFilter(enr) shouldBe a[Left[?, ?]]
     }
   }
-}

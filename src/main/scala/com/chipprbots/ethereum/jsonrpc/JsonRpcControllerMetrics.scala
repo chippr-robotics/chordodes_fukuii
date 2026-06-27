@@ -6,7 +6,7 @@ import io.micrometer.core.instrument.Counter
 
 import com.chipprbots.ethereum.metrics.MetricsContainer
 
-case object JsonRpcControllerMetrics extends MetricsContainer {
+case object JsonRpcControllerMetrics extends MetricsContainer:
 
   /** Counts attempts to call non-existing methods.
     */
@@ -22,4 +22,3 @@ case object JsonRpcControllerMetrics extends MetricsContainer {
 
   def recordMethodTime(method: String, time: Duration): Unit =
     metrics.timer("json.rpc.methods.timer", "method", method).record(time)
-}

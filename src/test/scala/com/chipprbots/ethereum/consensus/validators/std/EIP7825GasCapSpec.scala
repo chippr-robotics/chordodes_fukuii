@@ -22,7 +22,7 @@ class EIP7825GasCapSpec
     extends AnyFlatSpec
     with Matchers
     with BlockchainConfigBuilder
-    with com.chipprbots.ethereum.TestInstanceConfigProvider {
+    with com.chipprbots.ethereum.TestInstanceConfigProvider:
 
   val olympiaBlock: BigInt = 10
 
@@ -39,7 +39,7 @@ class EIP7825GasCapSpec
   val senderAddress: Address = Address(senderKeys)
   val senderAccount: Account = Account(nonce = 0, balance = UInt256(BigInt("1000000000000000000000")))
 
-  def makeTx(gasLimit: BigInt): SignedTransaction = {
+  def makeTx(gasLimit: BigInt): SignedTransaction =
     val tx = LegacyTransaction(
       nonce = 0,
       gasPrice = BigInt(1),
@@ -49,9 +49,8 @@ class EIP7825GasCapSpec
       payload = ByteString.empty
     )
     SignedTransaction.sign(tx, senderKeys, Some(config.chainId))
-  }
 
-  def makeHeader(number: BigInt): BlockHeader = {
+  def makeHeader(number: BigInt): BlockHeader =
     val extraFields = if number >= olympiaBlock then HefPostOlympia(BigInt(1000000000)) else HefEmpty
     Fixtures.Blocks.ValidBlock.header.copy(
       number = number,
@@ -59,7 +58,6 @@ class EIP7825GasCapSpec
       gasUsed = 0,
       extraFields = extraFields
     )
-  }
 
   "EIP-7825" should "reject tx with gas > 2^24 post-Olympia" taggedAs (OlympiaTest, ConsensusTest) in {
     val stx = makeTx(BigInt(16_777_217))
@@ -92,4 +90,3 @@ class EIP7825GasCapSpec
   "TxGasLimitCap constant" should "be 2^24 (16,777,216)" taggedAs (OlympiaTest, ConsensusTest) in {
     StdSignedTransactionValidator.TxGasLimitCap shouldBe BigInt(16_777_216)
   }
-}

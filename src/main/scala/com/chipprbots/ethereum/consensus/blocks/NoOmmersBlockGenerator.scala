@@ -19,7 +19,7 @@ abstract class NoOmmersBlockGenerator(
       miningConfig,
       difficultyCalc,
       blockTimestampProvider
-    ) {
+    ):
 
   type X = Nil.type
 
@@ -64,4 +64,3 @@ abstract class NoOmmersBlockGenerator(
 
       prepared
     }
-}

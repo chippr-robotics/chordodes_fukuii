@@ -45,9 +45,9 @@ class RLPxConnectionHandlerSpec
     with AnyFlatSpecLike
     with WithActorSystemShutDown
     with Matchers
-    with MockFactory {
+    with MockFactory:
 
-  it should "write messages send to TCP connection" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "write messages send to TCP connection" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     mockMessageCodec.encodeMessageHandler = Some(_ => ByteString("ping encoded"))
 
     setupIncomingRLPxConnection()
@@ -55,12 +55,10 @@ class RLPxConnectionHandlerSpec
     rlpxConnection ! RLPxConnectionHandler.SendMessage(Ping())
     connection.expectMsg(Tcp.Write(ByteString("ping encoded"), RLPxConnectionHandler.Ack))
 
-  }
-
   it should "write messages to TCP connection once all previous ACK were received" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     mockMessageCodec.encodeMessageHandler = Some(_ => ByteString("ping encoded"))
 
     setupIncomingRLPxConnection()
@@ -76,12 +74,11 @@ class RLPxConnectionHandlerSpec
     connection.expectMsg(Tcp.Write(ByteString("ping encoded"), RLPxConnectionHandler.Ack))
     connection.reply(RLPxConnectionHandler.Ack)
     connection.expectNoMessage()
-  }
 
   it should "accummulate messages and write them when receiving ACKs" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     mockMessageCodec.encodeMessageHandler = Some(_ => ByteString("ping encoded"))
 
     setupIncomingRLPxConnection()
@@ -104,9 +101,8 @@ class RLPxConnectionHandlerSpec
     connection.reply(RLPxConnectionHandler.Ack)
     connection.expectMsg(Tcp.Write(ByteString("ping encoded"), RLPxConnectionHandler.Ack))
     connection.expectNoMessage()
-  }
 
-  it should "close the connection when Ack timeout happens" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "close the connection when Ack timeout happens" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     mockMessageCodec.encodeMessageHandler = Some(_ => ByteString("ping encoded"))
 
     setupIncomingRLPxConnection()
@@ -122,9 +118,8 @@ class RLPxConnectionHandlerSpec
       rlpxConnection,
       max = rlpxConfiguration.waitForTcpAckTimeout + Timeouts.normalTimeout
     )
-  }
 
-  it should "ignore timeout of old messages" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "ignore timeout of old messages" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     mockMessageCodec.encodeMessageHandler = Some(_ => ByteString("ping encoded"))
 
     setupIncomingRLPxConnection()
@@ -146,12 +141,11 @@ class RLPxConnectionHandlerSpec
     rlpxConnection ! RLPxConnectionHandler.SendMessage(Ping())
     connection.reply(RLPxConnectionHandler.Ack)
     connection.expectMsg(Tcp.Write(ByteString("ping encoded"), RLPxConnectionHandler.Ack))
-  }
 
   it should "close the connection if the AuthHandshake init message's MAC is invalid" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     // Incomming connection arrives
     rlpxConnection ! RLPxConnectionHandler.HandleConnection(connection.ref)
     connection.expectMsgClass(classOf[Tcp.Register])
@@ -165,12 +159,11 @@ class RLPxConnectionHandlerSpec
     bridge ! Tcp.Received(data)
     rlpxConnectionParent.expectMsg(RLPxConnectionHandler.ConnectionFailed)
     rlpxConnectionParent.expectTerminated(rlpxConnection)
-  }
 
   it should "close the connection if the AuthHandshake response message's MAC is invalid" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     // Outgoing connection request arrives
     rlpxConnection ! RLPxConnectionHandler.ConnectTo(uri)
     tcpActorProbe.expectMsg(Tcp.Connect(inetAddress))
@@ -192,9 +185,8 @@ class RLPxConnectionHandlerSpec
     outboundBridge ! Tcp.Received(data)
     rlpxConnectionParent.expectMsg(RLPxConnectionHandler.ConnectionFailed)
     rlpxConnectionParent.expectTerminated(rlpxConnection)
-  }
 
-  it should "handle SendMessage gracefully during shutdown without dead letters" in new TestSetup {
+  it should "handle SendMessage gracefully during shutdown without dead letters" in new TestSetup:
     // Start setting up connection
     rlpxConnection ! RLPxConnectionHandler.HandleConnection(connection.ref)
     connection.expectMsgClass(classOf[Tcp.Register])
@@ -216,12 +208,11 @@ class RLPxConnectionHandlerSpec
     // The actor should gracefully handle the message and terminate without dead letters
     rlpxConnectionParent.expectMsg(RLPxConnectionHandler.ConnectionFailed)
     rlpxConnectionParent.expectTerminated(rlpxConnection, max = Timeouts.normalTimeout)
-  }
 
   it should "handle late Hello message after handshake without compression" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     // Setup a mock that will capture what gets encoded
     var encodedMessages: List[ByteString] = Nil
     mockMessageCodec.encodeMessageHandler = Some { msg =>
@@ -263,7 +254,6 @@ class RLPxConnectionHandlerSpec
     // This time encodeMessage should have been called
     encodedMessages should not be empty
     encodedMessages.head.utf8String should include("Ping")
-  }
 
   // ── #1189: ETH/SNAP wire-id offsets follow alphabetical capability-name order ──
   // Per devp2p RLPx (https://github.com/ethereum/devp2p/blob/master/rlpx.md#message-id-based-multiplexing),
@@ -369,13 +359,12 @@ class RLPxConnectionHandlerSpec
 
   // SCALA 3 MIGRATION: Cannot use self-type constraint with `new TestSetup` in Scala 3.
   // Using lazy val for mocks ensures they're created when accessed within MockFactory context.
-  trait TestSetup extends SecureRandomBuilder {
+  trait TestSetup extends SecureRandomBuilder:
 
     // Mock parameters for RLPxConnectionHandler
-    val mockMessageDecoder: MessageDecoder = new MessageDecoder {
+    val mockMessageDecoder: MessageDecoder = new MessageDecoder:
       override def fromBytes(`type`: Int, payload: Array[Byte]): Either[DecodingError, Message] =
         throw new Exception("Mock message decoder fails to decode all messages")
-    }
     val protocolVersion = Capability.ETH63
 
     // SCALA 3 MIGRATION: Using configurable test double instead of mock because
@@ -398,7 +387,7 @@ class RLPxConnectionHandlerSpec
           5L, // remotePeer2PeerVersion
           "test-client",
           defaultCompressionPolicy
-        ) {
+        ):
       var encodeMessageHandler: Option[MessageSerializable => ByteString] = None
       var readMessagesHandler: Option[
         ByteString => Seq[Either[MessageDecoder.DecodingError, com.chipprbots.ethereum.network.p2p.Message]]
@@ -411,7 +400,6 @@ class RLPxConnectionHandlerSpec
           data: ByteString
       ): Seq[Either[MessageDecoder.DecodingError, com.chipprbots.ethereum.network.p2p.Message]] =
         readMessagesHandler.getOrElse(super.readMessages)(data)
-    }
 
     lazy val mockMessageCodec: ConfigurableMessageCodec = new ConfigurableMessageCodec()
 
@@ -428,7 +416,7 @@ class RLPxConnectionHandlerSpec
           initiatePacketOpt = None,
           responsePacketOpt = None,
           remotePubKeyOpt = None
-        ) {
+        ):
       var initiateHandler: Option[URI => (ByteString, AuthHandshaker)] = None
       var handleInitialMessageHandler: Option[ByteString => (ByteString, AuthHandshakeResult)] = None
       var handleInitialMessageV4Handler: Option[ByteString => (ByteString, AuthHandshakeResult)] = None
@@ -459,27 +447,23 @@ class RLPxConnectionHandlerSpec
         handleResponseMessageV4Handler
           .map(_(data))
           .getOrElse(super.handleResponseMessageV4(data, peerLabel))
-    }
 
-    object ConfigurableAuthHandshaker {
-      private def generateKeyPairHelper(): AsymmetricCipherKeyPair = {
+    object ConfigurableAuthHandshaker:
+      private def generateKeyPairHelper(): AsymmetricCipherKeyPair =
         import java.security.SecureRandom
         import com.chipprbots.ethereum.crypto.generateKeyPair
         generateKeyPair(new SecureRandom())
-      }
-    }
 
     val uri = new URI(
       "enode://18a551bee469c2e02de660ab01dede06503c986f6b8520cb5a65ad122df88b17b285e3fef09a40a0d44f99e014f8616cf1ebc2e094f96c6e09e2f390f5d34857@47.90.36.129:30303"
     )
     val inetAddress = new InetSocketAddress(uri.getHost, uri.getPort)
 
-    val rlpxConfiguration: RLPxConfiguration = new RLPxConfiguration {
+    val rlpxConfiguration: RLPxConfiguration = new RLPxConfiguration:
       override val waitForTcpAckTimeout: FiniteDuration = Timeouts.normalTimeout
 
       // unused
       override val waitForHandshakeTimeout: FiniteDuration = Timeouts.veryLongTimeout
-    }
 
     lazy val tcpActorProbe: TestProbe = TestProbe()
     lazy val rlpxConnectionParent: TestProbe = TestProbe()
@@ -502,7 +486,7 @@ class RLPxConnectionHandlerSpec
     rlpxConnectionParent.watch(rlpxConnection)
 
     // Setup for RLPxConnection, after it the RLPxConnectionHandler is in a handshaked state
-    def setupIncomingRLPxConnection(): Unit = {
+    def setupIncomingRLPxConnection(): Unit =
       // Start setting up connection
       rlpxConnection ! RLPxConnectionHandler.HandleConnection(connection.ref)
       connection.expectMsgClass(classOf[Tcp.Register])
@@ -548,6 +532,3 @@ class RLPxConnectionHandlerSpec
 
       // Connection fully established
       rlpxConnectionParent.expectMsgClass(classOf[RLPxConnectionHandler.ConnectionEstablished])
-    }
-  }
-}

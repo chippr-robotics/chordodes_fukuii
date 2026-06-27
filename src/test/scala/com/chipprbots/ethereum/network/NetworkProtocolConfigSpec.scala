@@ -21,7 +21,7 @@ import com.chipprbots.ethereum.utils.InstanceConfig
   *   - ETC global defaults yield [ETH68, ETH69, SNAP1] only
   *   - Startup validation does not abort on misconfigured combinations
   */
-class NetworkProtocolConfigSpec extends AnyFlatSpec with Matchers with ParallelTestExecution {
+class NetworkProtocolConfigSpec extends AnyFlatSpec with Matchers with ParallelTestExecution:
 
   // ── NetworkProtocolConfig.default ─────────────────────────────────────────
 
@@ -160,4 +160,3 @@ class NetworkProtocolConfigSpec extends AnyFlatSpec with Matchers with ParallelT
       ConfigFactory.load().getConfig("fukuii").withValue(path, ConfigValueFactory.fromAnyRef(value)),
       "test-override"
     )
-}

@@ -22,7 +22,7 @@ import com.chipprbots.ethereum.jsonrpc.McpService.*
 import com.chipprbots.ethereum.network.PeerManagerActor
 import com.chipprbots.ethereum.utils.*
 
-class McpServiceSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike with Matchers {
+class McpServiceSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike with Matchers:
 
   implicit private val classicActorSystem: ActorSystem = system.toClassic
   implicit override val timeout: Timeout = Timeout(3.seconds)
@@ -166,4 +166,3 @@ class McpServiceSpec extends ScalaTestWithActorTestKit with AnyWordSpecLike with
       result.description.get should include("Unknown prompt")
     }
   }
-}

@@ -10,7 +10,7 @@ import com.chipprbots.ethereum.domain.UInt256.*
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.Generators.*
 
-class UInt256Spec extends AnyFunSuite with ScalaCheckPropertyChecks {
+class UInt256Spec extends AnyFunSuite with ScalaCheckPropertyChecks:
 
   val Modulus: BigInt = UInt256.MaxValue.toBigInt + 1
   val MaxSignedValue: BigInt = Modulus / 2 - 1
@@ -347,4 +347,3 @@ class UInt256Spec extends AnyFunSuite with ScalaCheckPropertyChecks {
       assert(x.byteSize === byteSize)
     }
   }
-}

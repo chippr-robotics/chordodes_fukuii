@@ -16,7 +16,7 @@ import com.chipprbots.ethereum.network.PeerEventBusActor.SubscriptionClassifier.
 import com.chipprbots.ethereum.network.handshaker.Handshaker.HandshakeResult
 import com.chipprbots.ethereum.network.p2p.Message
 
-object PeerEventBusActor {
+object PeerEventBusActor:
 
   /** Handle subscription to the peer event bus via Akka Streams.
     *
@@ -43,42 +43,36 @@ object PeerEventBusActor {
         NotUsed
       }
 
-  sealed trait PeerSelector {
+  sealed trait PeerSelector:
     def contains(peerId: PeerId): Boolean
-  }
 
-  object PeerSelector {
+  object PeerSelector:
 
-    case object AllPeers extends PeerSelector {
+    case object AllPeers extends PeerSelector:
       override def contains(p: PeerId): Boolean = true
-    }
 
-    case class WithId(peerId: PeerId) extends PeerSelector {
+    case class WithId(peerId: PeerId) extends PeerSelector:
       override def contains(p: PeerId): Boolean = p == peerId
-    }
-  }
 
   sealed trait SubscriptionClassifier
 
-  object SubscriptionClassifier {
+  object SubscriptionClassifier:
     case class MessageClassifier(messageCodes: Set[Int], peerSelector: PeerSelector) extends SubscriptionClassifier
     case class PeerDisconnectedClassifier(peerSelector: PeerSelector) extends SubscriptionClassifier
     case object PeerHandshaked extends SubscriptionClassifier
     case object MaintainedPeersClassifier extends SubscriptionClassifier
-  }
 
   sealed trait PeerEvent
 
-  object PeerEvent {
+  object PeerEvent:
     case class MessageFromPeer(message: Message, peerId: PeerId) extends PeerEvent
     case class PeerDisconnected(peerId: PeerId) extends PeerEvent
     case class PeerHandshakeSuccessful[R <: HandshakeResult](peer: Peer, handshakeResult: R) extends PeerEvent
     case class MaintainedPeersChanged(nodeIds: Set[String]) extends PeerEvent
-  }
 
   case class Subscription(subscriber: TypedActorRef[PeerEvent], classifier: SubscriptionClassifier)
 
-  class PeerEventBus {
+  class PeerEventBus:
 
     private var messageSubscriptions: Map[(TypedActorRef[PeerEvent], PeerSelector), Set[Int]] = Map.empty
     private var connectionSubscriptions: Seq[Subscription] = Nil
@@ -91,10 +85,9 @@ object PeerEventBusActor {
       * @return
       *   true if successful and false if not (because it was already subscribed to that Classifier, or otherwise)
       */
-    def subscribe(subscriber: TypedActorRef[PeerEvent], to: SubscriptionClassifier): Boolean = to match {
+    def subscribe(subscriber: TypedActorRef[PeerEvent], to: SubscriptionClassifier): Boolean = to match
       case msgClassifier: MessageClassifier => subscribeToMessageReceived(subscriber, msgClassifier)
       case _                                => subscribeToConnectionEvent(subscriber, to)
-    }
 
     /** Unsubscribes the subscriber from a requested event
       *
@@ -104,24 +97,22 @@ object PeerEventBusActor {
       * @return
       *   true if successful and false if not (because it wasn't subscribed to that Classifier, or otherwise)
       */
-    def unsubscribe(subscriber: TypedActorRef[PeerEvent], from: SubscriptionClassifier): Boolean = from match {
+    def unsubscribe(subscriber: TypedActorRef[PeerEvent], from: SubscriptionClassifier): Boolean = from match
       case msgClassifier: MessageClassifier => unsubscribeFromMessageReceived(subscriber, msgClassifier)
       case _                                => unsubscribeFromConnectionEvent(subscriber, from)
-    }
 
     /** Unsubscribes the subscriber from all events it was subscribed
       *
       * @param subscriber
       */
-    def unsubscribe(subscriber: TypedActorRef[PeerEvent]): Unit = {
+    def unsubscribe(subscriber: TypedActorRef[PeerEvent]): Unit =
       messageSubscriptions = messageSubscriptions.filter { case ((sub, _), _) =>
         sub != subscriber
       }
       connectionSubscriptions = connectionSubscriptions.filterNot(_.subscriber == subscriber)
-    }
 
-    def publish(event: PeerEvent): Unit = {
-      val interestedSubscribers = event match {
+    def publish(event: PeerEvent): Unit =
+      val interestedSubscribers = event match
         case MessageFromPeer(message, peerId) =>
           messageSubscriptions
             .flatMap { sub =>
@@ -145,9 +136,7 @@ object PeerEventBusActor {
           connectionSubscriptions.collect { case Subscription(subscriber, MaintainedPeersClassifier) =>
             subscriber
           }
-      }
       interestedSubscribers.foreach(_ ! event)
-    }
 
     /** Subscribes the subscriber to a requested message received event
       *
@@ -157,18 +146,15 @@ object PeerEventBusActor {
       * @return
       *   true if successful and false if not (because it was already subscribed to that Classifier, or otherwise)
       */
-    private def subscribeToMessageReceived(subscriber: TypedActorRef[PeerEvent], to: MessageClassifier): Boolean = {
-      val newSubscriptions = messageSubscriptions.get((subscriber, to.peerSelector)) match {
+    private def subscribeToMessageReceived(subscriber: TypedActorRef[PeerEvent], to: MessageClassifier): Boolean =
+      val newSubscriptions = messageSubscriptions.get((subscriber, to.peerSelector)) match
         case Some(messageCodes) =>
           messageSubscriptions + ((subscriber, to.peerSelector) -> (messageCodes ++ to.messageCodes))
         case None => messageSubscriptions + ((subscriber, to.peerSelector) -> to.messageCodes)
-      }
       if newSubscriptions == messageSubscriptions then false
-      else {
+      else
         messageSubscriptions = newSubscriptions
         true
-      }
-    }
 
     /** Subscribes the subscriber to a requested connection event (new peer handshaked or peer disconnected)
       *
@@ -181,15 +167,12 @@ object PeerEventBusActor {
     private def subscribeToConnectionEvent(
         subscriber: TypedActorRef[PeerEvent],
         to: SubscriptionClassifier
-    ): Boolean = {
+    ): Boolean =
       val subscription = Subscription(subscriber, to)
-      if connectionSubscriptions.contains(subscription) then {
-        false
-      } else {
+      if connectionSubscriptions.contains(subscription) then false
+      else
         connectionSubscriptions = connectionSubscriptions :+ subscription
         true
-      }
-    }
 
     /** Unsubscribes the subscriber from a requested received message event event
       *
@@ -203,12 +186,11 @@ object PeerEventBusActor {
       messageSubscriptions.get((subscriber, from.peerSelector)).exists { messageCodes =>
         val newMessageCodes = messageCodes -- from.messageCodes
         if messageCodes == newMessageCodes then false
-        else {
+        else
           if newMessageCodes.isEmpty then
             messageSubscriptions = messageSubscriptions - ((subscriber, from.peerSelector))
           else messageSubscriptions = messageSubscriptions + ((subscriber, from.peerSelector) -> newMessageCodes)
           true
-        }
       }
 
     /** Unsubscribes the subscriber from a requested event
@@ -222,25 +204,19 @@ object PeerEventBusActor {
     private def unsubscribeFromConnectionEvent(
         subscriber: TypedActorRef[PeerEvent],
         from: SubscriptionClassifier
-    ): Boolean = {
+    ): Boolean =
       val subscription = Subscription(subscriber, from)
-      if connectionSubscriptions.contains(subscription) then {
+      if connectionSubscriptions.contains(subscription) then
         connectionSubscriptions = connectionSubscriptions.filterNot(_ == subscription)
         true
-      } else {
-        false
-      }
-    }
-
-  }
+      else false
 
   case class Subscribe(to: SubscriptionClassifier)
 
-  object Unsubscribe {
+  object Unsubscribe:
     def apply(): Unsubscribe = Unsubscribe(None)
 
     def apply(from: SubscriptionClassifier): Unsubscribe = Unsubscribe(Some(from))
-  }
 
   case class Unsubscribe(from: Option[SubscriptionClassifier] = None)
 
@@ -300,4 +276,3 @@ object PeerEventBusActor {
           Behaviors.same
       }
     }
-}

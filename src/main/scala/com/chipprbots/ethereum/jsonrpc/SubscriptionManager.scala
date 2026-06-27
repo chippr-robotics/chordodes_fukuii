@@ -34,14 +34,13 @@ import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
   * Connection lifecycle: RegisterConnection → Subscribe/Unsubscribe (0..N) → ConnectionClosed. All subscriptions for a
   * closed connection are automatically cleaned up.
   */
-object SubscriptionManager {
+object SubscriptionManager:
 
   // ── Subscription model ───────────────────────────────────────────────────
 
-  sealed trait Subscription {
+  sealed trait Subscription:
     def subscriptionId: Long
     def connectionId: String
-  }
 
   case class NewHeadsSubscription(
       subscriptionId: Long,
@@ -108,7 +107,7 @@ object SubscriptionManager {
     // ---- subscription builders ----
 
     def buildSubscription(id: Long, msg: Subscribe): Either[String, Subscription] =
-      msg.subType match {
+      msg.subType match
         case "newHeads" =>
           val includeTx = msg.params
             .collect { case JObject(fields) =>
@@ -118,7 +117,7 @@ object SubscriptionManager {
           Right(NewHeadsSubscription(id, msg.connId, includeTx))
 
         case "logs" =>
-          val (address, topics) = msg.params match {
+          val (address, topics) = msg.params match
             case Some(JObject(fields)) =>
               val addr = fields.collectFirst { case JField("address", v) => parseAddresses(v) }.flatten
               val tops = fields
@@ -126,7 +125,6 @@ object SubscriptionManager {
                 .getOrElse(Seq.empty)
               (addr, tops)
             case _ => (None, Seq.empty)
-          }
           Right(LogsSubscription(id, msg.connId, address, topics))
 
         case "newPendingTransactions" =>
@@ -142,13 +140,11 @@ object SubscriptionManager {
 
         case other =>
           Left(s"Unknown subscription type: $other")
-      }
 
-    def parseAddresses(v: JValue): Option[Seq[Address]] = v match {
+    def parseAddresses(v: JValue): Option[Seq[Address]] = v match
       case JString(s)   => Some(Seq(Address(ByteString(hexToBytes(s)))))
       case JArray(vals) => Some(vals.collect { case JString(s) => Address(ByteString(hexToBytes(s))) })
       case _            => None
-    }
 
     def parseTopics(ts: List[JValue]): Seq[Seq[ByteString]] =
       ts.map {
@@ -157,18 +153,17 @@ object SubscriptionManager {
         case _          => Seq.empty
       }
 
-    def hexToBytes(hex: String): Array[Byte] = {
+    def hexToBytes(hex: String): Array[Byte] =
       val h = if hex.startsWith("0x") || hex.startsWith("0X") then hex.drop(2) else hex
       val padded = if h.length % 2 != 0 then "0" + h else h
       padded.grouped(2).map(b => Integer.parseInt(b, 16).toByte).toArray
-    }
 
     // ---- push helpers ----
 
     def push(connId: String, json: String): Unit =
       connections.get(connId).foreach(_.offer(json))
 
-    def subscriptionEnvelope(subId: Long, result: JValue): String = {
+    def subscriptionEnvelope(subId: Long, result: JValue): String =
       val hex = "0x" + subId.toHexString
       val json = JObject(
         "jsonrpc" -> JString("2.0"),
@@ -176,7 +171,6 @@ object SubscriptionManager {
         "params" -> JObject("subscription" -> JString(hex), "result" -> result)
       )
       compact(render(json))
-    }
 
     // ---- newHeads ----
 
@@ -186,7 +180,7 @@ object SubscriptionManager {
         push(sub.connectionId, subscriptionEnvelope(sub.subscriptionId, result))
       }
 
-    def blockHeaderJson(block: Block, includeTransactions: Boolean): JValue = {
+    def blockHeaderJson(block: Block, includeTransactions: Boolean): JValue =
       val h = block.header
       val base = JObject(
         "number" -> JString("0x" + h.number.toString(16)),
@@ -214,11 +208,10 @@ object SubscriptionManager {
           )
         )
       else base
-    }
 
     // ---- logs ----
 
-    def notifyLogs(block: Block): Unit = {
+    def notifyLogs(block: Block): Unit =
       val logSubs = subscriptions.values.collect { case s: LogsSubscription => s }
       if logSubs.isEmpty then return
 
@@ -228,7 +221,7 @@ object SubscriptionManager {
         receipt.logs.zipWithIndex.foreach { case (log, localIdx) =>
           val globalIdx = blockLogIndex + localIdx
           logSubs.foreach { sub =>
-            if logMatchesSubscription(log, sub) then {
+            if logMatchesSubscription(log, sub) then
               val tx = block.body.transactionList(txIndex)
               val logJson = JObject(
                 "removed" -> JBool(false),
@@ -242,21 +235,18 @@ object SubscriptionManager {
                 "topics" -> JArray(log.logTopics.map(t => JString("0x" + t.toHex)).toList)
               )
               push(sub.connectionId, subscriptionEnvelope(sub.subscriptionId, logJson))
-            }
           }
         }
         blockLogIndex += receipt.logs.size
       }
-    }
 
-    def logMatchesSubscription(log: TxLogEntry, sub: LogsSubscription): Boolean = {
+    def logMatchesSubscription(log: TxLogEntry, sub: LogsSubscription): Boolean =
       val addrMatch = sub.address.forall(addrs => addrs.contains(log.loggerAddress))
       val topicMatch = log.logTopics.size >= sub.topics.size &&
         sub.topics.zip(log.logTopics).forall { case (filter, logTopic) =>
           filter.isEmpty || filter.contains(logTopic)
         }
       addrMatch && topicMatch
-    }
 
     // ---- pending transactions ----
 
@@ -268,7 +258,7 @@ object SubscriptionManager {
         push(sub.connectionId, subscriptionEnvelope(sub.subscriptionId, result))
       }
 
-    def pendingTxJson(stx: SignedTransactionWithSender): JValue = {
+    def pendingTxJson(stx: SignedTransactionWithSender): JValue =
       val tx = stx.tx.tx
       JObject(
         "hash" -> JString("0x" + stx.tx.hash.toHex),
@@ -280,7 +270,6 @@ object SubscriptionManager {
         "gasPrice" -> JString("0x" + tx.gasPrice.toString(16)),
         "input" -> JString("0x" + tx.payload.toHex)
       )
-    }
 
     Behaviors
       .receiveMessage[Command] {
@@ -297,13 +286,12 @@ object SubscriptionManager {
 
         case msg: Subscribe =>
           val id = counter.incrementAndGet()
-          buildSubscription(id, msg) match {
+          buildSubscription(id, msg) match
             case Right(sub) =>
               subscriptions += (id -> sub)
               msg.replyTo ! SubscribeResponse(Right(id))
             case Left(err) =>
               msg.replyTo ! SubscribeResponse(Left(err))
-          }
           Behaviors.same
 
         case Unsubscribe(connId, subId, replyTo) =>
@@ -327,4 +315,3 @@ object SubscriptionManager {
         Behaviors.same
       }
   }
-}

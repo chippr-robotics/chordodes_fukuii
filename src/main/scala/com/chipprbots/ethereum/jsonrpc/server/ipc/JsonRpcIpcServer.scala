@@ -28,42 +28,38 @@ import com.chipprbots.ethereum.jsonrpc.serialization.JsonSerializers
 import com.chipprbots.ethereum.jsonrpc.server.ipc.JsonRpcIpcServer.JsonRpcIpcServerConfig
 import com.chipprbots.ethereum.utils.Logger
 
-class JsonRpcIpcServer(jsonRpcController: JsonRpcController, config: JsonRpcIpcServerConfig) extends Logger {
+class JsonRpcIpcServer(jsonRpcController: JsonRpcController, config: JsonRpcIpcServerConfig) extends Logger:
 
   given runtime: IORuntime = IORuntime.global
 
   // None until run() assigns; close() is a no-op when None.
   var serverSocket: Option[ServerSocket] = None
 
-  def run(): Unit = {
+  def run(): Unit =
     log.info(s"Starting IPC server: ${config.socketFile}")
 
     removeSocketFile()
 
     val socket = new UnixDomainServerSocket(config.socketFile)
     serverSocket = Some(socket)
-    new Thread {
+    new Thread:
       override def run(): Unit =
-        while !socket.isClosed do {
+        while !socket.isClosed do
           val clientSocket = socket.accept()
           // Note: consider using a thread pool to limit the number of connections/requests
           new ClientThread(jsonRpcController, clientSocket).start()
-        }
-    }.start()
-  }
+    .start()
 
-  def close(): Unit = {
+  def close(): Unit =
     serverSocket.foreach(s => Try(s.close()))
     serverSocket = None
     removeSocketFile()
-  }
 
-  private def removeSocketFile(): Unit = {
+  private def removeSocketFile(): Unit =
     val socketFile = new File(config.socketFile)
     if socketFile.exists() then socketFile.delete()
-  }
 
-  class ClientThread(jsonRpcController: JsonRpcController, clientSocket: Socket) extends Thread {
+  class ClientThread(jsonRpcController: JsonRpcController, clientSocket: Socket) extends Thread:
 
     native.Serialization
     implicit private val formats: Formats = JsonSerializers.formats
@@ -75,36 +71,31 @@ class JsonRpcIpcServer(jsonRpcController: JsonRpcController, config: JsonRpcIpcS
 
     private var running = true
 
-    override def run(): Unit = {
+    override def run(): Unit =
       while running do handleNextRequest()
       clientSocket.close()
-    }
 
     @tailrec
-    private def readNextMessage(accum: String = ""): Option[JValue] = {
+    private def readNextMessage(accum: String = ""): Option[JValue] =
       val buff = new Array[Char](32)
-      if in.read(buff) == -1 then {
-        None
-      } else {
+      if in.read(buff) == -1 then None
+      else
         val newData = new String(buff.takeWhile(c => c != '\n' && c.toByte != 0x0))
         val dataSoFar = accum ++ newData
-        parseOpt(dataSoFar) match {
+        parseOpt(dataSoFar) match
           case Some(json) => Some(json)
           case None       => readNextMessage(dataSoFar)
-        }
-      }
-    }
 
     private def handleNextRequest(): Unit =
-      readNextMessage() match {
+      readNextMessage() match
         case Some(nextMsgJson) =>
           val request = nextMsgJson.extract[JsonRpcRequest]
           val responseF = jsonRpcController.handleRequest(request)
-          try {
+          try
             val response = responseF.timeout(awaitTimeout).unsafeRunSync()
             out.write((Serialization.write(response) + '\n').getBytes())
             out.flush()
-          } catch {
+          catch
             case _: TimeoutException =>
               // Send JSON-RPC error response for timeout
               val errorResponse = JsonRpcResponse(
@@ -115,30 +106,20 @@ class JsonRpcIpcServer(jsonRpcController: JsonRpcController, config: JsonRpcIpcS
               )
               out.write((Serialization.write(errorResponse) + '\n').getBytes())
               out.flush()
-          }
         case None =>
           running = false
-      }
 
-  }
-}
-
-object JsonRpcIpcServer {
-  trait JsonRpcIpcServerConfig {
+object JsonRpcIpcServer:
+  trait JsonRpcIpcServerConfig:
     val enabled: Boolean
     val socketFile: String
-  }
 
-  object JsonRpcIpcServerConfig {
+  object JsonRpcIpcServerConfig:
     import com.typesafe.config.Config as TypesafeConfig
 
-    def apply(fukuiiConfig: TypesafeConfig): JsonRpcIpcServerConfig = {
+    def apply(fukuiiConfig: TypesafeConfig): JsonRpcIpcServerConfig =
       val rpcIpcConfig = fukuiiConfig.getConfig("network.rpc.ipc")
 
-      new JsonRpcIpcServerConfig {
+      new JsonRpcIpcServerConfig:
         override val enabled: Boolean = rpcIpcConfig.getBoolean("enabled")
         override val socketFile: String = rpcIpcConfig.getString("socket-file")
-      }
-    }
-  }
-}

@@ -14,7 +14,8 @@ import com.chipprbots.ethereum.network.PeerActor
 import com.chipprbots.ethereum.network.PeerId
 import com.chipprbots.ethereum.network.p2p.messages.Capability
 
-trait TestSyncPeers { self: TestSyncConfig =>
+trait TestSyncPeers:
+  self: TestSyncConfig =>
   implicit def system: ActorSystem
 
   val peer1TestProbe: TestProbe = TestProbe("peer1")(system)
@@ -77,4 +78,3 @@ trait TestSyncPeers { self: TestSyncConfig =>
       bestBlockHash = peer1Status.bestHash
     )
   )
-}

@@ -6,7 +6,7 @@ import scala.util.Try
   *
   * Usage: -Dfukuii.trace.block=35554 -Dfukuii.trace.tx=0xdeadbeef...
   */
-object DebugTrace {
+object DebugTrace:
 
   private def optBigInt(key: String): Option[BigInt] =
     sys.props
@@ -35,4 +35,3 @@ object DebugTrace {
   def enabledForTx(blockNumber: BigInt, txHashHex: String): Boolean =
     if !enabledForBlock(blockNumber) then false
     else traceTxHashLower.forall(_ == txHashHex.stripPrefix("0x").toLowerCase)
-}

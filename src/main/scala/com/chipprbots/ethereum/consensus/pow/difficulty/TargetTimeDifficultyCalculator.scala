@@ -4,7 +4,7 @@ import com.chipprbots.ethereum.consensus.difficulty.DifficultyCalculator
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
-class TargetTimeDifficultyCalculator(powTargetTime: Long) extends DifficultyCalculator {
+class TargetTimeDifficultyCalculator(powTargetTime: Long) extends DifficultyCalculator:
 
   import DifficultyCalculator.*
 
@@ -19,12 +19,10 @@ class TargetTimeDifficultyCalculator(powTargetTime: Long) extends DifficultyCalc
 
   def calculateDifficulty(blockNumber: BigInt, blockTimestamp: Long, parentHeader: BlockHeader)(implicit
       blockchainConfig: BlockchainConfig
-  ): BigInt = {
+  ): BigInt =
     val timestampDiff = blockTimestamp - parentHeader.unixTimestamp
 
     val x: BigInt = parentHeader.difficulty / DifficultyBoundDivision
     val c: BigInt = math.max(1 - (timestampDiff / lowerBoundExpectedRatio), FrontierTimestampDiffLimit)
 
     MinimumDifficulty.max(parentHeader.difficulty + x * c)
-  }
-}

@@ -21,18 +21,17 @@ import com.chipprbots.ethereum.testing.Tags.*
   * Fukuii does not index mempool blobs by versioned hash, so null is returned per entry. The CL falls back to CL-peer
   * gossip for missing blobs. The suite also verifies that engine_getBlobsV2 is advertised in exchangeCapabilities.
   */
-class EngineApiGetBlobsV2Spec extends AnyWordSpec with Matchers {
+class EngineApiGetBlobsV2Spec extends AnyWordSpec with Matchers:
 
   implicit val ioRuntime: IORuntime = IORuntime.global
 
   private val stubService: EngineApiService =
-    new EngineApiService(null, null, null, null, None)(null, null) {
+    new EngineApiService(null, null, null, null, None)(null, null):
       override def getPayload(payloadId: ByteString): IO[Either[String, com.chipprbots.ethereum.domain.Block]] =
         IO.pure(Left("stub"))
       override def getPayloadReceipts(payloadId: ByteString) = Nil
       override def getPayloadBlobsBundle(payloadId: ByteString) = BlobsBundleData(Nil, Nil, Nil, Nil)
       override def getPayloadExecutionRequests(payloadId: ByteString) = Nil
-    }
 
   private def controller: EngineApiController = new EngineApiController(stubService)
 
@@ -87,4 +86,3 @@ class EngineApiGetBlobsV2Spec extends AnyWordSpec with Matchers {
       capabilities should contain("engine_getBlobsV2")
     }
   }
-}

@@ -11,17 +11,17 @@ import com.chipprbots.ethereum.rlp.RLPList
 import com.chipprbots.ethereum.testing.Tags.*
 import org.apache.pekko.util.ByteString
 
-class ETHPacketsRoundTripSpec extends AnyWordSpec with Matchers with ScalaCheckPropertyChecks with ObjectGenerators {
+class ETHPacketsRoundTripSpec extends AnyWordSpec with Matchers with ScalaCheckPropertyChecks with ObjectGenerators:
 
   private val hash32Gen: Gen[ByteString] = byteStringOfLengthNGen(32)
   private val reqIdGen: Gen[BigInt] = Gen.choose(0L, Long.MaxValue).map(BigInt(_))
   private val blockNumGen: Gen[BigInt] = Gen.choose(0L, Long.MaxValue).map(BigInt(_))
   private val netIdGen: Gen[Long] = Gen.choose(1L, 1000L)
   private val protoVerGen: Gen[Int] = Gen.choose(68, 70)
-  private val forkIdGen: Gen[ForkId] = for {
+  private val forkIdGen: Gen[ForkId] = for
     hash <- Gen.choose(0L, 0xffffffffL)
     next <- Gen.option(Gen.choose(1_000_000L, 50_000_000L).map(BigInt(_)))
-  } yield ForkId(BigInt(hash), next)
+  yield ForkId(BigInt(hash), next)
 
   "ETHPackets codec" when {
 
@@ -29,14 +29,14 @@ class ETHPacketsRoundTripSpec extends AnyWordSpec with Matchers with ScalaCheckP
       "round-trip forAll" taggedAs UnitTest in {
         import ETHPackets.Status68.Status68
         import ETHPackets.Status68.Status68.*
-        val gen = for {
+        val gen = for
           pv <- protoVerGen
           net <- netIdGen
           td <- bigIntGen
           bh <- hash32Gen
           gh <- hash32Gen
           fi <- forkIdGen
-        } yield Status68(pv, net, td, bh, gh, fi)
+        yield Status68(pv, net, td, bh, gh, fi)
         forAll(gen)(msg => msg.toBytes.toStatus68 shouldBe msg)
       }
     }
@@ -45,7 +45,7 @@ class ETHPacketsRoundTripSpec extends AnyWordSpec with Matchers with ScalaCheckP
       "round-trip forAll" taggedAs UnitTest in {
         import ETHPackets.Status69.Status69
         import ETHPackets.Status69.Status69.*
-        val gen = for {
+        val gen = for
           pv <- protoVerGen
           net <- netIdGen
           gh <- hash32Gen
@@ -53,7 +53,7 @@ class ETHPacketsRoundTripSpec extends AnyWordSpec with Matchers with ScalaCheckP
           earliest <- blockNumGen
           latest <- blockNumGen
           lh <- hash32Gen
-        } yield Status69(pv, net, gh, fi, earliest, latest, lh)
+        yield Status69(pv, net, gh, fi, earliest, latest, lh)
         forAll(gen)(msg => msg.toBytes.toStatus69 shouldBe msg)
       }
     }
@@ -62,7 +62,7 @@ class ETHPacketsRoundTripSpec extends AnyWordSpec with Matchers with ScalaCheckP
       "round-trip forAll" taggedAs UnitTest in {
         import ETHPackets.Status70.Status70
         import ETHPackets.Status70.Status70.*
-        val gen = for {
+        val gen = for
           pv <- protoVerGen
           net <- netIdGen
           gh <- hash32Gen
@@ -70,7 +70,7 @@ class ETHPacketsRoundTripSpec extends AnyWordSpec with Matchers with ScalaCheckP
           earliest <- blockNumGen
           latest <- blockNumGen
           lh <- hash32Gen
-        } yield Status70(pv, net, gh, fi, earliest, latest, lh)
+        yield Status70(pv, net, gh, fi, earliest, latest, lh)
         forAll(gen)(msg => msg.toBytes.toStatus70 shouldBe msg)
       }
     }
@@ -79,10 +79,10 @@ class ETHPacketsRoundTripSpec extends AnyWordSpec with Matchers with ScalaCheckP
       "round-trip forAll" taggedAs UnitTest in {
         import ETHPackets.NewBlockHashes.{BlockHash, NewBlockHashes}
         import ETHPackets.NewBlockHashes.NewBlockHashes.*
-        val blockHashGen = for {
+        val blockHashGen = for
           h <- hash32Gen
           n <- blockNumGen
-        } yield BlockHash(h, n)
+        yield BlockHash(h, n)
         forAll(Gen.listOf(blockHashGen)) { hashes =>
           NewBlockHashes(hashes).toBytes.toNewBlockHashes shouldBe NewBlockHashes(hashes)
         }
@@ -92,13 +92,13 @@ class ETHPacketsRoundTripSpec extends AnyWordSpec with Matchers with ScalaCheckP
     "GetBlockHeaders by block number" should {
       "round-trip forAll" taggedAs UnitTest in {
         import ETHPackets.GetBlockHeaders.*
-        val gen = for {
+        val gen = for
           reqId <- reqIdGen
           blockNum <- blockNumGen
           maxH <- Gen.choose(1L, 1024L).map(BigInt(_))
           skip <- Gen.choose(0L, 100L).map(BigInt(_))
           reverse <- Gen.oneOf(true, false)
-        } yield ETHPackets.GetBlockHeaders(reqId, Left(blockNum), maxH, skip, reverse)
+        yield ETHPackets.GetBlockHeaders(reqId, Left(blockNum), maxH, skip, reverse)
         forAll(gen)(msg => msg.toBytes.toGetBlockHeaders shouldBe msg)
       }
     }
@@ -106,13 +106,13 @@ class ETHPacketsRoundTripSpec extends AnyWordSpec with Matchers with ScalaCheckP
     "GetBlockHeaders by block hash" should {
       "round-trip forAll" taggedAs UnitTest in {
         import ETHPackets.GetBlockHeaders.*
-        val gen = for {
+        val gen = for
           reqId <- reqIdGen
           hash <- hash32Gen
           maxH <- Gen.choose(1L, 1024L).map(BigInt(_))
           skip <- Gen.choose(0L, 100L).map(BigInt(_))
           reverse <- Gen.oneOf(true, false)
-        } yield ETHPackets.GetBlockHeaders(reqId, Right(hash), maxH, skip, reverse)
+        yield ETHPackets.GetBlockHeaders(reqId, Right(hash), maxH, skip, reverse)
         forAll(gen)(msg => msg.toBytes.toGetBlockHeaders shouldBe msg)
       }
     }
@@ -150,12 +150,12 @@ class ETHPacketsRoundTripSpec extends AnyWordSpec with Matchers with ScalaCheckP
     "NewPooledTransactionHashes" should {
       "round-trip forAll" taggedAs UnitTest in {
         import ETHPackets.NewPooledTransactionHashes.*
-        val gen = for {
+        val gen = for
           n <- Gen.choose(0, 20)
           types <- Gen.listOfN(n, Gen.choose(0, 4).map(_.toByte))
           sizes <- Gen.listOfN(n, Gen.choose(0L, 1_000_000L).map(BigInt(_)))
           hashes <- Gen.listOfN(n, hash32Gen)
-        } yield (types, sizes, hashes)
+        yield (types, sizes, hashes)
         forAll(gen) { case (types, sizes, hashes) =>
           val msg = ETHPackets.NewPooledTransactionHashes(types, sizes, hashes)
           msg.toBytes.toNewPooledTransactionHashes shouldBe msg
@@ -245,4 +245,3 @@ class ETHPacketsRoundTripSpec extends AnyWordSpec with Matchers with ScalaCheckP
       }
     }
   }
-}

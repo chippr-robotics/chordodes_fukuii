@@ -9,12 +9,11 @@ import Fixtures.blockchainConfig
 
 /** Tests for EIP-3529: Reduction in refunds https://eips.ethereum.org/EIPS/eip-3529
   */
-class Eip3529SpecPostMystique extends Eip3529Spec {
+class Eip3529SpecPostMystique extends Eip3529Spec:
   override val config: EvmConfig = EvmConfig.MystiqueConfigBuilder(blockchainConfig)
   override val forkBlockHeight = Fixtures.MystiqueBlockNumber
-}
 
-trait Eip3529Spec extends AnyFunSuite with Matchers {
+trait Eip3529Spec extends AnyFunSuite with Matchers:
 
   protected def forkBlockHeight: Int
   protected def config: EvmConfig
@@ -39,4 +38,3 @@ trait Eip3529Spec extends AnyFunSuite with Matchers {
     val phoenixFork = blockchainConfig.etcForkForBlockNumber(Fixtures.PhoenixBlockNumber)
     BlockchainConfigForEvm.isEip3529Enabled(phoenixFork) shouldBe false
   }
-}

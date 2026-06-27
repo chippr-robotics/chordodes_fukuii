@@ -20,18 +20,16 @@ class BlockchainWriter(
     receiptStorage: ReceiptStorage,
     chainWeightStorage: ChainWeightStorage,
     appStateStorage: AppStateStorage
-) extends Logger {
+) extends Logger:
 
-  def save(block: Block, receipts: Seq[Receipt], weight: ChainWeight, saveAsBestBlock: Boolean): Unit = {
-    val updateBestBlocks = if saveAsBestBlock then {
+  def save(block: Block, receipts: Seq[Receipt], weight: ChainWeight, saveAsBestBlock: Boolean): Unit =
+    val updateBestBlocks = if saveAsBestBlock then
       log.debug(
         "New best known block number - {}",
         block.header.number
       )
       appStateStorage.putBestBlockInfo(BlockInfo(block.header.hash.value, block.header.number))
-    } else {
-      appStateStorage.emptyBatchUpdate
-    }
+    else appStateStorage.emptyBatchUpdate
 
     log.debug("Saving new block {} to database", block.idTag)
     storeBlock(block)
@@ -39,7 +37,6 @@ class BlockchainWriter(
       .and(storeChainWeight(block.header.hash, weight))
       .and(updateBestBlocks)
       .commit()
-  }
 
   def storeReceipts(blockHash: BlockHash, receipts: Seq[Receipt]): DataSourceBatchUpdate =
     receiptStorage.put(blockHash.value, receipts)
@@ -73,10 +70,9 @@ class BlockchainWriter(
       .remove(blockHash.value)
       .and(blockBodiesStorage.remove(blockHash.value))
 
-  def storeBlockHeader(blockHeader: BlockHeader): DataSourceBatchUpdate = {
+  def storeBlockHeader(blockHeader: BlockHeader): DataSourceBatchUpdate =
     val hash = blockHeader.hash
     blockHeadersStorage.put(hash.value, blockHeader).and(saveBlockNumberMapping(blockHeader.number, hash))
-  }
 
   def storeBlockBody(blockHash: BlockHash, blockBody: BlockBody): DataSourceBatchUpdate =
     blockBodiesStorage.put(blockHash.value, blockBody).and(saveTxsLocations(blockHash, blockBody))
@@ -97,12 +93,11 @@ class BlockchainWriter(
     * No-op if `currentBest <= targetNumber`.
     */
   def setCanonicalChainHead(targetNumber: BigInt, targetHash: BlockHash, currentBest: BigInt): Unit =
-    if currentBest > targetNumber then {
+    if currentBest > targetNumber then
       val batch = ((targetNumber + 1) to currentBest).foldLeft(blockNumberMappingStorage.emptyBatchUpdate) { (acc, n) =>
         acc.and(blockNumberMappingStorage.remove(n))
       }
       batch.and(appStateStorage.putBestBlockInfo(BlockInfo(targetHash.value, targetNumber))).commit()
-    }
 
   /** Promote a block previously stored by hash only (sidechain) to the canonical chain. Walks back from `headHash`
     * along parent pointers until it meets the current canonical chain (i.e. finds a header whose number→hash mapping
@@ -117,43 +112,37 @@ class BlockchainWriter(
   def promoteBranchToCanonical(
       headHash: BlockHash,
       reader: com.chipprbots.ethereum.domain.BlockchainReader
-  ): Unit = {
+  ): Unit =
     var cursor: Option[BlockHash] = Some(headHash)
     val buf = scala.collection.mutable.ListBuffer.empty[(BigInt, BlockHash)]
-    while cursor.isDefined do {
+    while cursor.isDefined do
       val hash = cursor.get
-      reader.getBlockHeaderByHash(hash) match {
+      reader.getBlockHeaderByHash(hash) match
         case None => cursor = None
         case Some(header) =>
           val canonicalHashAtNumber = reader.getBlockHeaderByNumber(header.number).map(_.hash)
-          if canonicalHashAtNumber.contains(hash) then {
+          if canonicalHashAtNumber.contains(hash) then
             // reached existing canonical ancestor — stop
             cursor = None
-          } else {
+          else
             buf += ((header.number, hash))
             if header.number == 0 then cursor = None
             else cursor = Some(header.parentHash)
-          }
-      }
-    }
-    if buf.nonEmpty then {
+    if buf.nonEmpty then
       // Rewrite number→hash AND tx-location for every block on the newly canonical branch.
       // Without the tx-location rewrite, eth_getTransactionReceipt returns the old (now
       // sidechain) block via the stale mapping — hive's 'Transaction Re-Org, Re-Org to
       // Different Block' checks that the receipt reflects the new canonical block.
       val batch = buf.foldLeft(blockNumberMappingStorage.emptyBatchUpdate) { case (acc, (num, hash)) =>
         val withNumberMapping = acc.and(blockNumberMappingStorage.put(num, hash.value))
-        reader.getBlockBodyByHash(hash) match {
+        reader.getBlockBodyByHash(hash) match
           case Some(body) =>
             body.transactionList.zipWithIndex.foldLeft(withNumberMapping) { case (a, (tx, idx)) =>
               a.and(transactionMappingStorage.put(tx.hash.value, TransactionLocation(hash.value, idx)))
             }
           case None => withNumberMapping
-        }
       }
       batch.commit()
-    }
-  }
 
   private def saveBlockNumberMapping(number: BigInt, hash: BlockHash): DataSourceBatchUpdate =
     blockNumberMappingStorage.put(number, hash.value)
@@ -163,9 +152,8 @@ class BlockchainWriter(
       case (updates, (tx, index)) =>
         updates.and(transactionMappingStorage.put(tx.hash.value, TransactionLocation(blockHash.value, index)))
     }
-}
 
-object BlockchainWriter {
+object BlockchainWriter:
   def apply(storages: BlockchainStorages): BlockchainWriter =
     new BlockchainWriter(
       storages.blockHeadersStorage,
@@ -176,4 +164,3 @@ object BlockchainWriter {
       storages.chainWeightStorage,
       storages.appStateStorage
     )
-}

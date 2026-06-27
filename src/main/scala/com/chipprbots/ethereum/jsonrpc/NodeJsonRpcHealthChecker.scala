@@ -29,7 +29,7 @@ class NodeJsonRpcHealthChecker(
     config: JsonRpcHealthConfig,
     asyncConfig: AsyncConfig,
     scheduler: Scheduler
-) extends JsonRpcHealthChecker {
+) extends JsonRpcHealthChecker:
 
   given askTimeout: Timeout = asyncConfig.askTimeout
   private given typedScheduler: Scheduler = scheduler
@@ -89,7 +89,7 @@ class NodeJsonRpcHealthChecker(
         case _                                                   => "SYNCED"
       })
 
-  override def healthCheck: IO[HealthcheckResponse] = {
+  override def healthCheck: IO[HealthcheckResponse] =
     val responseTask = List(
       peerCountHC,
       storedBlockHC,
@@ -102,9 +102,8 @@ class NodeJsonRpcHealthChecker(
       .map(HealthcheckResponse.apply)
 
     handleResponse(responseTask)
-  }
 
-  override def readinessCheck(): IO[HealthcheckResponse] = {
+  override def readinessCheck(): IO[HealthcheckResponse] =
     // Readiness checks: DB opened (storedBlock exists), peers > 0, tip advancing (updateStatus)
     val responseTask = List(
       peerCountHC,
@@ -115,16 +114,14 @@ class NodeJsonRpcHealthChecker(
       .map(HealthcheckResponse.apply)
 
     handleResponse(responseTask)
-  }
 
   private def blockNumberHasChanged(newBestFetchingBlock: BigInt) =
-    previousBestFetchingBlock match {
+    previousBestFetchingBlock match
       case Some((firstSeenAt, value)) if value == newBestFetchingBlock =>
         Instant.now().minus(config.noUpdateDurationThreshold).isBefore(firstSeenAt)
       case _ =>
         previousBestFetchingBlock = Some((Instant.now(), newBestFetchingBlock))
         true
-    }
 
   /** Try to fetch best block number from the sync controller or fallback to ethBlocksService */
   private def getBestKnownBlockTask =
@@ -153,16 +150,12 @@ class NodeJsonRpcHealthChecker(
   private def isConsideredSyncing(progress: Progress) =
     progress.target - progress.current > config.syncingStatusThreshold
 
-}
-
-object NodeJsonRpcHealthChecker {
+object NodeJsonRpcHealthChecker:
   case class JsonRpcHealthConfig(noUpdateDurationThreshold: Duration, syncingStatusThreshold: Int)
 
-  object JsonRpcHealthConfig {
+  object JsonRpcHealthConfig:
     def apply(rpcConfig: TypesafeConfig): JsonRpcHealthConfig =
       JsonRpcHealthConfig(
         noUpdateDurationThreshold = rpcConfig.getDuration("health.no-update-duration-threshold"),
         syncingStatusThreshold = rpcConfig.getInt("health.syncing-status-threshold")
       )
-  }
-}

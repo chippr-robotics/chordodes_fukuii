@@ -39,7 +39,7 @@ class GenesisDataLoader(
     blockchainWriter: BlockchainWriter,
     evmCodeStorage: com.chipprbots.ethereum.db.storage.EvmCodeStorage,
     stateStorage: StateStorage
-) extends Logger {
+) extends Logger:
 
   private val bloomLength = 512
   private val hashLength = 64
@@ -49,11 +49,11 @@ class GenesisDataLoader(
 
   private val emptyTrieRootHash = ByteString(crypto.kec256(rlp.encode(Array.empty[Byte])))
 
-  def loadGenesisData()(implicit blockchainConfig: BlockchainConfig): Unit = {
+  def loadGenesisData()(implicit blockchainConfig: BlockchainConfig): Unit =
     log.debug("Loading genesis data")
 
     val genesisJson = blockchainConfig.customGenesisJsonOpt.getOrElse {
-      blockchainConfig.customGenesisFileOpt match {
+      blockchainConfig.customGenesisFileOpt match
         case Some(customGenesisFile) =>
           log.debug(s"Trying to load custom genesis data from file: $customGenesisFile")
 
@@ -61,7 +61,7 @@ class GenesisDataLoader(
             log.debug(s"Cannot load custom genesis data from file: $customGenesisFile")
             log.debug(s"Trying to load from resources: $customGenesisFile")
             Try(Source.fromResource(customGenesisFile))
-          } match {
+          } match
             case Success(customGenesis) =>
               log.info(s"Using custom genesis data from: $customGenesisFile")
               try customGenesis.getLines().mkString
@@ -69,36 +69,31 @@ class GenesisDataLoader(
             case Failure(ex) =>
               log.error(s"Cannot load custom genesis data from: $customGenesisFile", ex)
               throw ex
-          }
         case None =>
           log.info("Using default genesis data")
           val src = Source.fromResource("blockchain/default-genesis.json")
           try src.getLines().mkString
           finally src.close()
-      }
     }
 
-    loadGenesisData(genesisJson) match {
+    loadGenesisData(genesisJson) match
       case Success(_) =>
         log.info("Genesis data successfully loaded")
       case Failure(ex) =>
         log.error("Unable to load genesis data", ex)
         throw ex
-    }
-  }
 
-  private def loadGenesisData(genesisJson: String)(implicit blockchainConfig: BlockchainConfig): Try[Unit] = {
+  private def loadGenesisData(genesisJson: String)(implicit blockchainConfig: BlockchainConfig): Try[Unit] =
     import org.json4s.native.JsonMethods.parse
     import GenesisDataLoader.JsonSerializers.GenesisAccountSerializer
     given formats: Formats =
       DefaultFormats + ByteStringJsonSerializer + UInt256JsonSerializer + GenesisAccountSerializer
-    for {
+    for
       genesisData <- Try(Extraction.extract[GenesisData](parse(genesisJson)))
       _ <- loadGenesisData(genesisData)
-    } yield ()
-  }
+    yield ()
 
-  def loadGenesisData(genesisData: GenesisData)(implicit blockchainConfig: BlockchainConfig): Try[Unit] = {
+  def loadGenesisData(genesisData: GenesisData)(implicit blockchainConfig: BlockchainConfig): Try[Unit] =
 
     val storage = stateStorage.getReadOnlyStorage
     val initalRootHash = MerklePatriciaTrie.EmptyRootHash
@@ -108,7 +103,7 @@ class GenesisDataLoader(
 
     log.debug(s"Prepared genesis header: $header")
 
-    blockchainReader.getBlockHeaderByNumber(0) match {
+    blockchainReader.getBlockHeaderByNumber(0) match
       case Some(existingGenesisHeader) if existingGenesisHeader.hash == header.hash =>
         log.debug("Genesis data already in the database")
         Success(())
@@ -129,12 +124,10 @@ class GenesisDataLoader(
           saveAsBestBlock = true
         )
         Success(())
-    }
-  }
 
   private def getGenesisStateRoot(genesisData: GenesisData, initalRootHash: Array[Byte], storage: MptStorage)(implicit
       blockchainConfig: BlockchainConfig
-  ) = {
+  ) =
     import MerklePatriciaTrie.defaultByteArraySerializable
 
     genesisData.alloc.zipWithIndex.foldLeft(initalRootHash) { case (rootHash, ((address, genesisAccount), _)) =>
@@ -164,13 +157,12 @@ class GenesisDataLoader(
         .getRootHash
       stateRoot
     }
-  }
 
   /** Compute the storage MPT root for a genesis account AND persist its trie nodes so the EVM can read them at runtime.
     * Previously this used an ephemeral DataSource, causing every genesis-deployed contract with storage to throw
     * MPTException on first SLOAD.
     */
-  private def computeStorageRootHash(storage: Map[UInt256, UInt256], sharedStorage: MptStorage): ByteString = {
+  private def computeStorageRootHash(storage: Map[UInt256, UInt256], sharedStorage: MptStorage): ByteString =
     val emptyTrie = EthereumUInt256Mpt.storageMpt(
       ByteString(MerklePatriciaTrie.EmptyRootHash),
       sharedStorage
@@ -182,11 +174,10 @@ class GenesisDataLoader(
     }
 
     ByteString(storageTrie.getRootHash)
-  }
 
   private def prepareHeader(genesisData: GenesisData, stateMptRootHash: Array[Byte])(implicit
       blockchainConfig: BlockchainConfig
-  ) = {
+  ) =
     // Determine the fork era for the genesis block based on the genesis timestamp (0)
     val genesisTimestamp = BigInt(genesisData.timestamp.replace("0x", ""), 16).toLong
     val baseFee = genesisData.baseFeePerGas
@@ -195,7 +186,7 @@ class GenesisDataLoader(
     // Empty trie root = keccak256(RLP("")) = keccak256(0x80) — NOT keccak of empty list
     val emptyWithdrawalsRoot = ByteString(crypto.kec256(rlp.encode(RLPValue(Array.empty[Byte]))))
 
-    val extraFields = if blockchainConfig.isPragueTimestamp(genesisTimestamp) then {
+    val extraFields = if blockchainConfig.isPragueTimestamp(genesisTimestamp) then
       val emptyRequestsHash = ByteString(java.security.MessageDigest.getInstance("SHA-256").digest(Array.empty[Byte]))
       BlockHeader.HeaderExtraFields.HefPostPrague(
         baseFee,
@@ -205,7 +196,7 @@ class GenesisDataLoader(
         zeros(hashLength),
         emptyRequestsHash
       )
-    } else if blockchainConfig.isCancunTimestamp(genesisTimestamp) then {
+    else if blockchainConfig.isCancunTimestamp(genesisTimestamp) then
       BlockHeader.HeaderExtraFields.HefPostCancun(
         baseFee,
         emptyWithdrawalsRoot,
@@ -213,13 +204,11 @@ class GenesisDataLoader(
         parseOptQuantity(genesisData.excessBlobGas),
         zeros(hashLength)
       )
-    } else if blockchainConfig.isShanghaiTimestamp(genesisTimestamp) then {
+    else if blockchainConfig.isShanghaiTimestamp(genesisTimestamp) then
       BlockHeader.HeaderExtraFields.HefPostShanghai(baseFee, emptyWithdrawalsRoot)
-    } else if blockchainConfig.forkBlockNumbers.olympiaBlockNumber == 0 then {
+    else if blockchainConfig.forkBlockNumbers.olympiaBlockNumber == 0 then
       BlockHeader.HeaderExtraFields.HefPostOlympia(baseFee)
-    } else {
-      BlockHeader.HeaderExtraFields.HefEmpty
-    }
+    else BlockHeader.HeaderExtraFields.HefEmpty
 
     BlockHeader(
       parentHash = BlockHash(zeros(hashLength)),
@@ -239,7 +228,6 @@ class GenesisDataLoader(
       nonce = padToEightBytes(genesisData.nonce),
       extraFields = extraFields
     )
-  }
 
   /** Ethereum block header nonce is always 8 bytes (uint64). Pad short nonces with leading zeros. */
   private def padToEightBytes(bs: ByteString): ByteString =
@@ -247,33 +235,28 @@ class GenesisDataLoader(
     else ByteString(new Array[Byte](8 - bs.length) ++ bs.toArray)
 
   /** Parse an optional hex-prefixed quantity (per eth_getBlockByNumber spec). */
-  private def parseOptQuantity(v: Option[String]): BigInt = v match {
+  private def parseOptQuantity(v: Option[String]): BigInt = v match
     case Some(s) =>
       val stripped = s.replace("0x", "")
       if stripped.isEmpty then BigInt(0) else BigInt(stripped, 16)
     case None => BigInt(0)
-  }
 
   private def zeros(length: Int) =
     ByteString(Hex.decode(List.fill(length)("0").mkString))
 
-}
+object GenesisDataLoader:
+  object JsonSerializers:
 
-object GenesisDataLoader {
-  object JsonSerializers {
-
-    def deserializeByteString(jv: JValue): ByteString = jv match {
+    def deserializeByteString(jv: JValue): ByteString = jv match
       case JString(s) =>
         val noPrefix = s.replace("0x", "")
         val inp =
           if noPrefix.length % 2 == 0 then noPrefix
           else "0" ++ noPrefix
-        Try(ByteString(Hex.decode(inp))) match {
+        Try(ByteString(Hex.decode(inp))) match
           case Success(bs) => bs
           case Failure(_)  => throw new RuntimeException("Cannot parse hex string: " + s)
-        }
       case other => throw new RuntimeException("Expected hex string, but got: " + other)
-    }
 
     object ByteStringJsonSerializer
         extends CustomSerializer[ByteString](_ =>
@@ -283,30 +266,25 @@ object GenesisDataLoader {
           )
         )
 
-    def deserializeUint256String(jv: JValue): UInt256 = jv match {
+    def deserializeUint256String(jv: JValue): UInt256 = jv match
       case JString(s) =>
-        val parsed = if s.startsWith("0x") || s.startsWith("0X") then {
-          Try(UInt256(BigInt(s.substring(2), 16)))
-        } else {
-          Try(UInt256(BigInt(s)))
-        }
-        parsed match {
+        val parsed =
+          if s.startsWith("0x") || s.startsWith("0X") then Try(UInt256(BigInt(s.substring(2), 16)))
+          else Try(UInt256(BigInt(s)))
+        parsed match
           case Failure(_)     => throw new RuntimeException("Cannot parse numeric string: " + s)
           case Success(value) => value
-        }
       case other => throw new RuntimeException("Expected hex string, but got: " + other)
-    }
 
     object UInt256JsonSerializer
         extends CustomSerializer[UInt256](_ => ({ case jv => deserializeUint256String(jv) }, PartialFunction.empty))
 
-    private def parseStorageMap(jv: JValue): Option[Map[UInt256, UInt256]] = jv match {
+    private def parseStorageMap(jv: JValue): Option[Map[UInt256, UInt256]] = jv match
       case JObject(fields) if fields.nonEmpty =>
         Some(fields.map { case (key, value) =>
           deserializeUint256String(JString(key)) -> deserializeUint256String(value)
         }.toMap)
       case _ => None
-    }
 
     object GenesisAccountSerializer
         extends CustomSerializer[GenesisAccount](_ =>
@@ -324,7 +302,5 @@ object GenesisDataLoader {
             PartialFunction.empty
           )
         )
-  }
-}
 
 object Implicits extends JsonMethodsImplicits

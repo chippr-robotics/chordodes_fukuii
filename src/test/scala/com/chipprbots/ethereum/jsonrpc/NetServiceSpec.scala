@@ -32,11 +32,11 @@ import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.NodeStatus
 import com.chipprbots.ethereum.utils.ServerStatus
 
-class NetServiceSpec extends AnyFlatSpec with Matchers with ScalaFutures with NormalPatience with SecureRandomBuilder {
+class NetServiceSpec extends AnyFlatSpec with Matchers with ScalaFutures with NormalPatience with SecureRandomBuilder:
 
   implicit val runtime: IORuntime = IORuntime.global
 
-  "NetService" should "return handshaked peer count" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  "NetService" should "return handshaked peer count" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val resF: Future[Either[JsonRpcError, PeerCountResponse]] = netService
       .peerCount(PeerCountRequest())
       .unsafeToFuture()
@@ -51,17 +51,14 @@ class NetServiceSpec extends AnyFlatSpec with Matchers with ScalaFutures with No
     )
 
     resF.futureValue shouldBe Right(PeerCountResponse(2))
-  }
 
-  it should "return listening response" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "return listening response" taggedAs (UnitTest, RPCTest) in new TestSetup:
     netService.listening(ListeningRequest()).unsafeRunSync() shouldBe Right(ListeningResponse(true))
-  }
 
-  it should "return version response" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "return version response" taggedAs (UnitTest, RPCTest) in new TestSetup:
     netService.version(VersionRequest()).unsafeRunSync() shouldBe Right(VersionResponse("42"))
-  }
 
-  it should "return node info with enode when listening" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "return node info with enode when listening" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val response: Either[JsonRpcError, NodeInfoResponse] = netService.nodeInfo(NodeInfoRequest()).unsafeRunSync()
     response.isRight shouldBe true
     val info = response.toOption.get
@@ -72,9 +69,8 @@ class NetServiceSpec extends AnyFlatSpec with Matchers with ScalaFutures with No
     info.enode.get should include(expectedId)
     info.listenAddr shouldBe defined
     info.listenAddr.get should include(":9000")
-  }
 
-  it should "report not listening when server is offline" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "report not listening when server is offline" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val current: NodeStatus = nodeStatusRef.get()
     nodeStatusRef.set(current.copy(serverStatus = ServerStatus.NotListening))
 
@@ -88,10 +84,9 @@ class NetServiceSpec extends AnyFlatSpec with Matchers with ScalaFutures with No
         listening = false
       )
     )
-  }
 
   // Enhanced peer management tests
-  it should "list all peers with detailed information" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "list all peers with detailed information" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val resF: Future[Either[JsonRpcError, ListPeersResponse]] = netService
       .listPeers(ListPeersRequest())
       .unsafeToFuture()
@@ -121,9 +116,8 @@ class NetServiceSpec extends AnyFlatSpec with Matchers with ScalaFutures with No
     peers should have size 2
     peers.exists(_.id == "peer1") shouldBe true
     peers.exists(_.incomingConnection == true) shouldBe true
-  }
 
-  it should "disconnect a peer by id" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "disconnect a peer by id" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val resF: Future[Either[JsonRpcError, DisconnectPeerResponse]] = netService
       .disconnectPeer(DisconnectPeerRequest("peer1"))
       .unsafeToFuture()
@@ -132,9 +126,8 @@ class NetServiceSpec extends AnyFlatSpec with Matchers with ScalaFutures with No
     dcCmd.replyTo ! PeerManagerActor.DisconnectPeerResponse(disconnected = true)
 
     resF.futureValue shouldBe Right(DisconnectPeerResponse(success = true))
-  }
 
-  it should "handle disconnect peer failure" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "handle disconnect peer failure" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val resF: Future[Either[JsonRpcError, DisconnectPeerResponse]] = netService
       .disconnectPeer(DisconnectPeerRequest("nonexistent"))
       .unsafeToFuture()
@@ -143,9 +136,8 @@ class NetServiceSpec extends AnyFlatSpec with Matchers with ScalaFutures with No
     dcCmd2.replyTo ! PeerManagerActor.DisconnectPeerResponse(disconnected = false)
 
     resF.futureValue shouldBe Right(DisconnectPeerResponse(success = false))
-  }
 
-  it should "connect to a new peer" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "connect to a new peer" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val uri = "enode://abcd1234@192.168.1.100:30303"
     val result: Either[JsonRpcError, ConnectToPeerResponse] =
       netService.connectToPeer(ConnectToPeerRequest(uri)).unsafeRunSync()
@@ -153,18 +145,16 @@ class NetServiceSpec extends AnyFlatSpec with Matchers with ScalaFutures with No
     result.isRight shouldBe true
     result.toOption.get.success shouldBe true
     peerManager.expectMsgClass(classOf[PeerManagerActor.ConnectToPeerCmd])
-  }
 
-  it should "reject invalid peer URI" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "reject invalid peer URI" taggedAs (UnitTest, RPCTest) in new TestSetup:
     // Using a URI with invalid characters that will throw URISyntaxException
     val result: Either[JsonRpcError, ConnectToPeerResponse] =
       netService.connectToPeer(ConnectToPeerRequest("enode://not valid uri")).unsafeRunSync()
 
     result.isLeft shouldBe true
-  }
 
   // Blacklist management tests
-  it should "list blacklisted peers" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "list blacklisted peers" taggedAs (UnitTest, RPCTest) in new TestSetup:
     // Note: Directly adding to blacklist here since we're testing the listing functionality
     // which queries the blacklist directly. The add/remove operations are tested separately.
     import com.chipprbots.ethereum.blockchain.sync.Blacklist.BlacklistReason
@@ -179,9 +169,8 @@ class NetServiceSpec extends AnyFlatSpec with Matchers with ScalaFutures with No
     blacklistedPeers should have size 2
     blacklistedPeers.exists(_.id == "192.168.1.100") shouldBe true
     blacklistedPeers.exists(_.id == "192.168.1.101") shouldBe true
-  }
 
-  it should "add peer to blacklist with custom duration" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "add peer to blacklist with custom duration" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val resF: Future[Either[JsonRpcError, AddToBlacklistResponse]] = netService
       .addToBlacklist(AddToBlacklistRequest("192.168.1.200", Some(300), "Test reason"))
       .unsafeToFuture()
@@ -190,9 +179,8 @@ class NetServiceSpec extends AnyFlatSpec with Matchers with ScalaFutures with No
     ablCmd.replyTo ! PeerManagerActor.AddToBlacklistResponse(added = true)
 
     resF.futureValue shouldBe Right(AddToBlacklistResponse(added = true))
-  }
 
-  it should "add peer to permanent blacklist when duration is None" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "add peer to permanent blacklist when duration is None" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val resF: Future[Either[JsonRpcError, AddToBlacklistResponse]] = netService
       .addToBlacklist(AddToBlacklistRequest("192.168.1.201", None, "Permanent ban"))
       .unsafeToFuture()
@@ -201,9 +189,8 @@ class NetServiceSpec extends AnyFlatSpec with Matchers with ScalaFutures with No
     ablCmd2.replyTo ! PeerManagerActor.AddToBlacklistResponse(added = true)
 
     resF.futureValue shouldBe Right(AddToBlacklistResponse(added = true))
-  }
 
-  it should "remove peer from blacklist" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "remove peer from blacklist" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val resF: Future[Either[JsonRpcError, RemoveFromBlacklistResponse]] = netService
       .removeFromBlacklist(RemoveFromBlacklistRequest("192.168.1.100"))
       .unsafeToFuture()
@@ -212,9 +199,8 @@ class NetServiceSpec extends AnyFlatSpec with Matchers with ScalaFutures with No
     rblCmd.replyTo ! PeerManagerActor.RemoveFromBlacklistResponse(removed = true)
 
     resF.futureValue shouldBe Right(RemoveFromBlacklistResponse(removed = true))
-  }
 
-  trait TestSetup {
+  trait TestSetup:
     implicit val system: ActorSystem = ActorSystem("Testsystem")
     implicit val scheduler: typed.Scheduler = system.toTyped.scheduler
 
@@ -241,5 +227,3 @@ class NetServiceSpec extends AnyFlatSpec with Matchers with ScalaFutures with No
         blacklist,
         NetServiceConfig(5.seconds)
       )
-  }
-}

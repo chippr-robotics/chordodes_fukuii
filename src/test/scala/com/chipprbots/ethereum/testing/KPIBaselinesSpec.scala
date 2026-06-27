@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   * @see
   *   [[KPIBaselines]]
   */
-class KPIBaselinesSpec extends AnyFlatSpec with Matchers {
+class KPIBaselinesSpec extends AnyFlatSpec with Matchers:
 
   "KPIBaselines" should "have a valid baseline date" taggedAs (UnitTest) in {
     KPIBaselines.baselineDate should not be empty
@@ -199,4 +199,3 @@ class KPIBaselinesSpec extends AnyFlatSpec with Matchers {
     summary should include("Ethereum/Tests Compliance")
     summary should include("Memory Baselines")
   }
-}

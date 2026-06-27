@@ -9,13 +9,12 @@ case class PeerStat(
     firstSeenTimeMillis: Option[Long],
     lastSeenTimeMillis: Option[Long]
 )
-object PeerStat {
+object PeerStat:
   val empty: PeerStat = PeerStat(0, 0, None, None)
 
-  private def mergeOpt[A, B](x: A, y: A)(f: A => Option[B])(g: (B, B) => B): Option[B] = {
+  private def mergeOpt[A, B](x: A, y: A)(f: A => Option[B])(g: (B, B) => B): Option[B] =
     val (mx, my) = (f(x), f(y))
     (mx, my).mapN(g).orElse(mx).orElse(my)
-  }
 
   given monoid: Monoid[PeerStat] =
     Monoid.instance(
@@ -28,4 +27,3 @@ object PeerStat {
           lastSeenTimeMillis = mergeOpt(a, b)(_.lastSeenTimeMillis)(math.max)
         )
     )
-}

@@ -10,7 +10,7 @@ import com.chipprbots.ethereum.rlp.RLPValue
 
 /** Trie elements
   */
-sealed abstract class MptNode {
+sealed abstract class MptNode:
   val cachedHash: Option[Array[Byte]]
   val cachedRlpEncoded: Option[Array[Byte]]
 
@@ -38,16 +38,13 @@ sealed abstract class MptNode {
     17 + util.Arrays.hashCode(hash)
 
   def isNew: Boolean = parsedRlp.isEmpty
-}
 
-object MptNode {
+object MptNode:
   val MaxEncodedNodeLength = 32
-}
 
-object Node {
+object Node:
   def hashFn(input: Array[Byte]): Array[Byte] =
     crypto.kec256(input, 0, input.length)
-}
 
 case class LeafNode(
     key: ByteString,
@@ -55,12 +52,10 @@ case class LeafNode(
     cachedHash: Option[Array[Byte]] = None,
     cachedRlpEncoded: Option[Array[Byte]] = None,
     parsedRlp: Option[RLPEncodeable] = None
-) extends MptNode {
+) extends MptNode:
   def withCachedHash(cachedHash: Array[Byte]): MptNode = copy(cachedHash = Some(cachedHash))
 
   def withCachedRlpEncoded(cachedEncode: Array[Byte]): MptNode = copy(cachedRlpEncoded = Some(cachedEncode))
-
-}
 
 case class ExtensionNode(
     sharedKey: ByteString,
@@ -68,12 +63,10 @@ case class ExtensionNode(
     cachedHash: Option[Array[Byte]] = None,
     cachedRlpEncoded: Option[Array[Byte]] = None,
     parsedRlp: Option[RLPEncodeable] = None
-) extends MptNode {
+) extends MptNode:
   def withCachedHash(cachedHash: Array[Byte]): MptNode = copy(cachedHash = Some(cachedHash))
 
   def withCachedRlpEncoded(cachedEncode: Array[Byte]): MptNode = copy(cachedRlpEncoded = Some(cachedEncode))
-
-}
 
 case class BranchNode(
     children: Array[MptNode],
@@ -81,7 +74,7 @@ case class BranchNode(
     cachedHash: Option[Array[Byte]] = None,
     cachedRlpEncoded: Option[Array[Byte]] = None,
     parsedRlp: Option[RLPEncodeable] = None
-) extends MptNode {
+) extends MptNode:
   def withCachedHash(cachedHash: Array[Byte]): MptNode = copy(cachedHash = Some(cachedHash))
 
   def withCachedRlpEncoded(cachedEncode: Array[Byte]): MptNode = copy(cachedRlpEncoded = Some(cachedEncode))
@@ -97,24 +90,20 @@ case class BranchNode(
     * @return
     *   a new BranchNode.
     */
-  def updateChild(childIndex: Int, childNode: MptNode): BranchNode = {
+  def updateChild(childIndex: Int, childNode: MptNode): BranchNode =
     val updatedChildren = util.Arrays.copyOf(children, BranchNode.numberOfChildren)
     updatedChildren(childIndex) = childNode
     BranchNode(updatedChildren, terminator)
-  }
 
-}
-
-case class HashNode(hashNode: Array[Byte]) extends MptNode {
+case class HashNode(hashNode: Array[Byte]) extends MptNode:
   val cachedHash: Option[Array[Byte]] = Some(hashNode)
   val cachedRlpEncoded: Option[Array[Byte]] = Some(hashNode)
   def withCachedHash(cachedHash: Array[Byte]): MptNode = copy()
 
   def withCachedRlpEncoded(cachedEncode: Array[Byte]): MptNode = copy()
   val parsedRlp: Option[RLPEncodeable] = Some(RLPValue(hashNode))
-}
 
-case object NullNode extends MptNode {
+case object NullNode extends MptNode:
   import MerklePatriciaTrie.*
   val cachedHash: Option[Array[Byte]] = Some(EmptyRootHash)
   val cachedRlpEncoded: Option[Array[Byte]] = Some(EmptyEncoded)
@@ -124,9 +113,8 @@ case object NullNode extends MptNode {
 
   override def isNull: Boolean = true
   val parsedRlp: Option[RLPEncodeable] = Some(RLPValue(Array.empty[Byte]))
-}
 
-object ExtensionNode {
+object ExtensionNode:
 
   /** This function creates a new ExtensionNode with next parameter as its node pointer
     *
@@ -137,13 +125,11 @@ object ExtensionNode {
     * @return
     *   a new BranchNode.
     */
-  def apply(sharedKey: ByteString, next: MptNode): ExtensionNode = {
+  def apply(sharedKey: ByteString, next: MptNode): ExtensionNode =
     val nextNode = next
     new ExtensionNode(sharedKey, nextNode)
-  }
-}
 
-object BranchNode {
+object BranchNode:
   val numberOfChildren = 16
   private val emptyChildren: Array[MptNode] = Array.fill(numberOfChildren)(NullNode)
 
@@ -170,9 +156,7 @@ object BranchNode {
     * @return
     *   a new BranchNode.
     */
-  def withSingleChild(position: Byte, child: MptNode, terminator: Option[Array[Byte]]): BranchNode = {
+  def withSingleChild(position: Byte, child: MptNode, terminator: Option[Array[Byte]]): BranchNode =
     val emptyCopy = util.Arrays.copyOf(emptyChildren, numberOfChildren)
     emptyCopy(position) = child
     BranchNode(emptyCopy, terminator.map(e => ByteString(e)))
-  }
-}

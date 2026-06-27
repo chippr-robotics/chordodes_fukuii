@@ -6,12 +6,11 @@ import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.domain.UInt256
 
-object Memory {
+object Memory:
 
   def empty: Memory = new Memory(ByteString())
 
   private def zeros(size: Int): ByteString = ByteString(Array.fill[Byte](size)(0))
-}
 
 /** Volatile memory with 256 bit address space. Every mutating operation on a Memory returns a new updated copy of it.
   *
@@ -19,7 +18,7 @@ object Memory {
   * https://solidity.readthedocs.io/en/latest/frequently-asked-questions.html#what-is-the-memory-keyword-what-does-it-do
   * https://github.com/ethereum/go-ethereum/blob/master/core/vm/memory.go
   */
-class Memory private (private val underlying: ByteString) {
+class Memory private (private val underlying: ByteString):
 
   import Memory.zeros
 
@@ -32,12 +31,12 @@ class Memory private (private val underlying: ByteString) {
   /** Stores data at the given offset. The memory is automatically expanded to accommodate new data - filling empty
     * regions with zeroes if necessary - hence an OOM error may be thrown.
     */
-  def store(offset: UInt256, data: ByteString): Memory = {
+  def store(offset: UInt256, data: ByteString): Memory =
     val idx: Int = offset.toInt
 
     val newUnderlying: ByteString =
       if data.isEmpty then underlying
-      else {
+      else
         val currentLength = underlying.length
         val dataLength = data.length
         val newMaxLength = idx + dataLength
@@ -48,30 +47,25 @@ class Memory private (private val underlying: ByteString) {
         val newData = new Array[Byte](newLen)
 
         var i = 0
-        while i < currentLength do {
+        while i < currentLength do
           newData(i) = underlying(i)
           i += 1
-        }
 
         var u = 0
         i = idx
-        while u < dataLength do {
+        while u < dataLength do
           newData(i) = data(u)
           i += 1
           u += 1
-        }
 
         // It is safe to call unsafe as newData array won't be modified.
         ByteString.fromArrayUnsafe(newData)
-      }
 
     new Memory(newUnderlying)
-  }
 
   def load(offset: UInt256): (UInt256, Memory) =
-    doLoad(offset, UInt256.Size) match {
+    doLoad(offset, UInt256.Size) match
       case (bs, memory) => (UInt256(bs), memory)
-    }
 
   def load(offset: UInt256, size: UInt256): (ByteString, Memory) = doLoad(offset, size.toInt)
 
@@ -80,7 +74,7 @@ class Memory private (private val underlying: ByteString) {
     */
   private def doLoad(offset: UInt256, size: Int): (ByteString, Memory) =
     if size <= 0 then (ByteString.empty, this)
-    else {
+    else
       val start: Int = offset.toInt
       val end: Int = start + size
 
@@ -89,20 +83,17 @@ class Memory private (private val underlying: ByteString) {
         else underlying ++ zeros(end - underlying.size)
 
       (newUnderlying.slice(start, end), new Memory(newUnderlying))
-    }
 
   /** This function will expand the Memory size as if storing data given the `offset` and `size`. If the memory is
     * already initialised at that region it will not be modified, otherwise it will be filled with zeroes. This is
     * required to satisfy memory expansion semantics for *CALL* opcodes.
     */
-  def expand(offset: UInt256, size: UInt256): Memory = {
+  def expand(offset: UInt256, size: UInt256): Memory =
     val totalSize = (offset + size).toInt
     if this.size >= totalSize || size.isZero then this
-    else {
+    else
       val fill = zeros(totalSize - this.size)
       new Memory(underlying ++ fill)
-    }
-  }
 
   /** @return
     *   memory size in bytes
@@ -110,13 +101,10 @@ class Memory private (private val underlying: ByteString) {
   def size: Int = underlying.size
 
   override def equals(that: Any): Boolean = // §3h: FORGE-confirmed — java.lang.Object.equals signature is fixed by JVM
-    that match {
+    that match
       case that: Memory => this.underlying.equals(that.underlying)
       case _            => false
-    }
 
   override def hashCode: Int = underlying.hashCode()
 
   override def toString: String = s"${this.getClass.getSimpleName}(${Hex.toHexString(underlying.toArray[Byte])})"
-
-}

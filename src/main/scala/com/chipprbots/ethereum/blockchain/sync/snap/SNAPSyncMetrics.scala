@@ -21,7 +21,7 @@ import com.chipprbots.ethereum.metrics.MetricsContainer
   *
   * Metrics are exposed via Prometheus endpoint and can be visualized in Grafana.
   */
-object SNAPSyncMetrics extends MetricsContainer {
+object SNAPSyncMetrics extends MetricsContainer:
 
   // ===== Sync Phase Metrics =====
 
@@ -385,10 +385,10 @@ object SNAPSyncMetrics extends MetricsContainer {
   def setPhaseTime(seconds: Double): Unit = PhaseTimeSecondsGauge.set(seconds)
 
   /** Record full sync progress from SyncProgress object */
-  def measure(progress: SyncProgress): Unit = {
+  def measure(progress: SyncProgress): Unit =
     // Phase
     import SNAPSyncController.SyncPhase.*
-    val phaseValue = progress.phase match {
+    val phaseValue = progress.phase match
       case Idle                    => 0
       case AccountRangeSync        => 1
       case ByteCodeAndStorageSync  => 3
@@ -397,7 +397,6 @@ object SNAPSyncMetrics extends MetricsContainer {
       case ChainDownloadCompletion => 7
       case Completed               => 8
       case Dormant                 => 9
-    }
     setCurrentPhase(phaseValue)
 
     // Accounts
@@ -429,7 +428,6 @@ object SNAPSyncMetrics extends MetricsContainer {
 
     val phaseSeconds = (System.currentTimeMillis() - progress.phaseStartTime) / 1000.0
     setPhaseTime(phaseSeconds)
-  }
 
   // ===== Timers for Download Operations =====
 
@@ -512,4 +510,3 @@ object SNAPSyncMetrics extends MetricsContainer {
   def setAccountActivePeers(count: Int): Unit = AccountActivePeersGauge.set(count.toLong)
   def setStorageActivePeers(count: Int): Unit = StorageActivePeersGauge.set(count.toLong)
   def setByteCodeActivePeers(count: Int): Unit = ByteCodeActivePeersGauge.set(count.toLong)
-}

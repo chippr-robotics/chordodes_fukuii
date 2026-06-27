@@ -20,7 +20,7 @@ import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.db.storage.KnownNodesStorage
 
-object PeerDiscoveryManager {
+object PeerDiscoveryManager:
 
   private type RandomNodes = Stream[IO, Node]
   private type Discovery = (v4.DiscoveryService, RandomNodes)
@@ -58,15 +58,14 @@ object PeerDiscoveryManager {
 
       val alreadyDiscoveredNodes: Vector[Node] =
         if !discoveryConfig.reuseKnownNodes then Vector.empty
-        else {
+        else
           val bootstrapNodes: Set[Node] = discoveryConfig.bootstrapNodes
           val knownNodes: Set[Node] =
             if !discoveryConfig.discoveryEnabled then Set.empty
             else knownNodesStorage.getKnownNodes.map(Node.fromUri)
           (bootstrapNodes ++ knownNodes).filterNot(n => n.id == localNodeId).toVector
-        }
 
-      val discoveryResources: Resource[IO, (v4.DiscoveryService, RandomNodes)] = for {
+      val discoveryResources: Resource[IO, (v4.DiscoveryService, RandomNodes)] = for
         service <- discoveryServiceResource
         // Derive a random-nodes stream: repeatedly pull random lookups, metered to avoid
         // saturating the discv4 server when getRandomNodes returns empty (IO.defer ensures
@@ -77,9 +76,9 @@ object PeerDiscoveryManager {
           .flatMap(ns => Stream.emits(ns.toList))
           .map(toNode)
           .filter(n => n.id != localNodeId)
-      } yield (service, randomNodes)
+      yield (service, randomNodes)
 
-      def startDiscoveryService(): Unit = {
+      def startDiscoveryService(): Unit =
         given IORuntime = runtime
         discoveryResources.allocated
           .unsafeToFuture()
@@ -87,9 +86,8 @@ object PeerDiscoveryManager {
             case Failure(ex)     => ctx.self ! StartAttempt(Left(ex))
             case Success(result) => ctx.self ! StartAttempt(Right(result))
           }(runtime.compute)
-      }
 
-      def stopDiscoveryService(release: IO[Unit]): Unit = {
+      def stopDiscoveryService(release: IO[Unit]): Unit =
         given IORuntime = runtime
         release
           .unsafeToFuture()
@@ -97,14 +95,13 @@ object PeerDiscoveryManager {
             case Failure(ex) => ctx.self ! StopAttempt(Left(ex))
             case Success(_)  => ctx.self ! StopAttempt(Right(()))
           }(runtime.compute)
-      }
 
       def sendDiscoveredNodesInfo(
           maybeService: Option[v4.DiscoveryService],
           replyTo: ActorRef[DiscoveredNodesInfo]
-      ): Unit = {
+      ): Unit =
         given IORuntime = runtime
-        val task: IO[DiscoveredNodesInfo] = {
+        val task: IO[DiscoveredNodesInfo] =
           val base: IO[Set[Node]] = maybeService.fold(IO.pure(Set.empty[Node])) {
             _.getNodes.map(_.map(toNode))
           }
@@ -113,7 +110,6 @@ object PeerDiscoveryManager {
             .map(_.filterNot(n => n.id == localNodeId))
             .flatTap(nodes => IO(log.debug("Discovered nodes snapshot ({} total) sent", nodes.size.toString)))
             .map(DiscoveredNodesInfo(_))
-        }
         task.attempt
           .unsafeToFuture()
           .onComplete {
@@ -121,12 +117,11 @@ object PeerDiscoveryManager {
             case Success(Left(ex))      => log.error("Failed to get discovered nodes: {}", ex.getMessage)
             case Failure(ex)            => log.error("Unexpected failure getting discovered nodes: {}", ex.getMessage)
           }(runtime.compute)
-      }
 
       def sendRandomNodeInfo(
           randomNodes: RandomNodes,
           replyTo: ActorRef[RandomNodeInfo]
-      ): Unit = {
+      ): Unit =
         given IORuntime = runtime
         val task: IO[RandomNodeInfo] =
           randomNodes.take(1).compile.lastOrError.flatMap { node =>
@@ -140,7 +135,6 @@ object PeerDiscoveryManager {
             case Success(Left(ex))      => log.error("Failed to get random node: {}", ex.getMessage)
             case Failure(ex)            => log.error("Unexpected failure getting random node: {}", ex.getMessage)
           }(runtime.compute)
-      }
 
       // The service hasn't been started yet; serves static known nodes only.
       def init(): Behavior[Command] = Behaviors.receiveMessage {
@@ -153,14 +147,13 @@ object PeerDiscoveryManager {
           Behaviors.same
 
         case Start =>
-          if discoveryConfig.discoveryEnabled then {
+          if discoveryConfig.discoveryEnabled then
             ctx.log.info("Starting peer discovery...")
             startDiscoveryService()
             starting()
-          } else {
+          else
             ctx.log.info("Peer discovery is disabled.")
             Behaviors.same
-          }
 
         case Stop | _: StartAttempt | _: StopAttempt =>
           Behaviors.same
@@ -264,8 +257,6 @@ object PeerDiscoveryManager {
       udpPort = enode.address.udpPort
     )
 
-  private def formatNodeForLogs(node: Node): String = {
+  private def formatNodeForLogs(node: Node): String =
     val id = Hex.toHexString(node.id.take(6).toArray)
     s"${com.chipprbots.ethereum.network.getHostName(node.addr)}:${node.tcpPort}/$id"
-  }
-}

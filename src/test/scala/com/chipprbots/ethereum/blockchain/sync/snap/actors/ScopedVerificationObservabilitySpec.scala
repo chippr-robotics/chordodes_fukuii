@@ -40,35 +40,31 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   * are made through the static gauge registry — the gauge is moved on the same code path that emits the log and is a
   * stronger, deterministic signal than the log text.
   */
-class ScopedVerificationObservabilitySpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers {
+class ScopedVerificationObservabilitySpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
 
-  private def gaugeValue(name: String): Double = {
+  private def gaugeValue(name: String): Double =
     val gauge = Metrics.get().registry.find(name).gauge()
     if gauge == null then Double.NaN else gauge.value()
-  }
 
-  private def storedRoot(storage: TestMptStorage): ByteString = {
+  private def storedRoot(storage: TestMptStorage): ByteString =
     val leaf = LeafNode(ByteString(Array[Byte](0x01)), ByteString(Array[Byte](0x02)))
     storage.putNode(leaf)
     ByteString(leaf.hash)
-  }
 
-  private def cleanLeaf(seed: Int): (Seq[ByteString], ByteString, ByteString) = {
+  private def cleanLeaf(seed: Int): (Seq[ByteString], ByteString, ByteString) =
     val leaf = LeafNode(ByteString(Array[Byte](0x01)), ByteString(kec256(ByteString(s"obs-leaf-$seed")).toArray))
     val encoded = MptTraversals.encodeNode(leaf)
     val hash = kec256(ByteString(encoded))
     val accountHash = kec256(ByteString(s"obs-account-$seed"))
     (Seq(accountHash, ByteString(Array[Byte](0x20, seed.toByte))), hash, ByteString(encoded))
-  }
 
-  private def deleteRecursively(f: File): Unit = {
+  private def deleteRecursively(f: File): Unit =
     Option(f.listFiles()).foreach(_.foreach(deleteRecursively))
     f.delete()
     ()
-  }
 
   private def awaitStateHealingComplete(
       controller: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
@@ -87,12 +83,12 @@ class ScopedVerificationObservabilitySpec extends ScalaTestWithActorTestKit() wi
           HealingFrontierStorage,
           org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
       ) => Unit
-  ): Unit = {
+  ): Unit =
     val pool = Executors.newSingleThreadExecutor()
     val ec = ExecutionContext.fromExecutorService(pool)
     val dbPath = Files.createTempDirectory("scoped-obs-rocksdb").toAbsolutePath.toString
     val dataSource = RocksDbDataSource(
-      new RocksDbConfig {
+      new RocksDbConfig:
         override val createIfMissing: Boolean = true
         override val paranoidChecks: Boolean = true
         override val path: String = dbPath
@@ -102,7 +98,7 @@ class ScopedVerificationObservabilitySpec extends ScalaTestWithActorTestKit() wi
         override val levelCompaction: Boolean = true
         override val blockSize: Long = 16384
         override val blockCacheSize: Long = 33554432
-      },
+      ,
       Namespaces.nsSeq
     )
     val store = new HealingFrontierStorage(dataSource)
@@ -123,16 +119,14 @@ class ScopedVerificationObservabilitySpec extends ScalaTestWithActorTestKit() wi
       scopedHealVerification = scoped
     )
     try body(coordinator, store, controller)
-    finally {
+    finally
       testKit.stop(coordinator)
       pool.shutdown()
       pool.awaitTermination(5, TimeUnit.SECONDS)
       dataSource.destroy()
       deleteRecursively(new File(dbPath))
-    }
-  }
 
-  private def driveHeal(coordinator: ActorRef[TrieNodeHealingCoordinator.Command], peerName: String): Int = {
+  private def driveHeal(coordinator: ActorRef[TrieNodeHealingCoordinator.Command], peerName: String): Int =
     val nodes = (0 until 3).map(cleanLeaf)
     val peer = PeerTestHelpers.createTestPeer(peerName, testKit.createTestProbe[Any]().ref.toClassic)
     coordinator ! TrieNodeHealingCoordinator.QueueMissingNodes(nodes.map { case (ps, h, _) => (ps, h) })
@@ -141,7 +135,6 @@ class ScopedVerificationObservabilitySpec extends ScalaTestWithActorTestKit() wi
       SNAP.TrieNodes(requestId = 1, nodes = nodes.map(_._3))
     )
     nodes.size
-  }
 
   // S3 (Pekko Typed migration): the coordinator now logs via `context.log` (SLF4J), so its INFO lines no longer flow
   // through Pekko's `TestEventListener` event stream — `EventFilter.intercept` can no longer observe them. The
@@ -169,4 +162,3 @@ class ScopedVerificationObservabilitySpec extends ScalaTestWithActorTestKit() wi
       gaugeValue("snapsync.healing.scoped_verification.gauge") shouldBe 0.0 +- 1e-9
     }
   }
-}

@@ -4,7 +4,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import sangria.renderer.SchemaRenderer
 
-class GraphQLSchemaSpec extends AnyFlatSpec with Matchers {
+class GraphQLSchemaSpec extends AnyFlatSpec with Matchers:
 
   "GraphQLSchema" should "build a valid Sangria Schema" in {
     // Construction alone exercises schema validation — Sangria throws on bad shapes.
@@ -71,4 +71,3 @@ class GraphQLSchemaSpec extends AnyFlatSpec with Matchers {
     val sdl = SchemaRenderer.renderSchema(GraphQLSchema.schema)
     sdl should include("blobVersionedHashes: [Bytes32!]")
   }
-}

@@ -30,7 +30,7 @@ import encoding.*
   * Storing snapshot info this way allows for easy construction of snapshot key (based on a block number and number of
   * snapshots) and therefore, fast access to each snapshot individually.
   */
-class ReferenceCountNodeStorage(nodeStorage: NodesStorage, bn: BigInt) extends NodesKeyValueStorage {
+class ReferenceCountNodeStorage(nodeStorage: NodesStorage, bn: BigInt) extends NodesKeyValueStorage:
 
   import ReferenceCountNodeStorage.*
 
@@ -46,7 +46,7 @@ class ReferenceCountNodeStorage(nodeStorage: NodesStorage, bn: BigInt) extends N
   override def multiGet(keys: Seq[NodeHash]): Seq[Option[NodeEncoded]] =
     nodeStorage.multiGet(keys).map(_.map(node => storedNodeFromBytes(node).nodeEncoded.toArray))
 
-  def update(toRemove: Seq[NodeHash], toUpsert: Seq[(NodeHash, NodeEncoded)]): ReferenceCountNodeStorage = {
+  def update(toRemove: Seq[NodeHash], toUpsert: Seq[(NodeHash, NodeEncoded)]): ReferenceCountNodeStorage =
 
     val deathRowKey = drRowKey(bn)
 
@@ -56,20 +56,17 @@ class ReferenceCountNodeStorage(nodeStorage: NodesStorage, bn: BigInt) extends N
     val upsertChanges = prepareUpsertChanges(toUpsert, bn)
     val changes = prepareRemovalChanges(toRemove, upsertChanges, bn)
 
-    val (toUpsertUpdated, snapshots) = {
+    val (toUpsertUpdated, snapshots) =
       // Use List prepend (O(1)) instead of Seq append (O(n)) to avoid O(n²) for large node sets
       val (upsertRevAcc, snapshotRevAcc) =
         changes.foldLeft((List.empty[(NodeHash, NodeEncoded)], List.empty[StoredNodeSnapshot])) {
           case ((upsertAcc, snapshotAcc), (key, (storedNode, theSnapshot))) =>
             // if after update number references drop to zero mark node as possible for deletion after x blocks
-            if storedNode.references == 0 then {
-              currentDeathRow = currentDeathRow ++ key
-            }
+            if storedNode.references == 0 then currentDeathRow = currentDeathRow ++ key
 
             ((key -> storedNodeToBytes(storedNode)) :: upsertAcc, theSnapshot :: snapshotAcc)
         }
       (upsertRevAcc.reverse, snapshotRevAcc.reverse)
-    }
 
     val snapshotToSave: Seq[(NodeHash, Array[Byte])] = getSnapshotsToSave(bn, snapshots)
 
@@ -79,7 +76,6 @@ class ReferenceCountNodeStorage(nodeStorage: NodesStorage, bn: BigInt) extends N
 
     nodeStorage.updateCond(Nil, deathRow ++ toUpsertUpdated ++ snapshotToSave, inMemory = true)
     this
-  }
 
   override def persist(): Unit = {}
 
@@ -111,7 +107,7 @@ class ReferenceCountNodeStorage(nodeStorage: NodesStorage, bn: BigInt) extends N
       blockNumber: BigInt,
       snapshots: Seq[StoredNodeSnapshot]
   ): Seq[(NodeHash, Array[Byte])] =
-    if snapshots.nonEmpty then {
+    if snapshots.nonEmpty then
       // If not empty, snapshots will be stored indexed by block number and index
       val snapshotCountKey = getSnapshotsCountKey(blockNumber)
       val getSnapshotKeyFn = getSnapshotKey(blockNumber)(_)
@@ -122,7 +118,7 @@ class ReferenceCountNodeStorage(nodeStorage: NodesStorage, bn: BigInt) extends N
       }
       // Save snapshots and latest snapshot index
       (snapshotCountKey -> snapshotsCountToBytes(blockNumberSnapshotsCount + snapshotsToSave.size)) +: snapshotsToSave
-    } else Nil
+    else Nil
 
   private def getFromChangesOrStorage(
       nodeKey: NodeHash,
@@ -131,9 +127,8 @@ class ReferenceCountNodeStorage(nodeStorage: NodesStorage, bn: BigInt) extends N
     storedNodes
       .get(nodeKey)
       .orElse(nodeStorage.get(nodeKey).map(storedNodeFromBytes).map(sn => sn -> StoredNodeSnapshot(nodeKey, Some(sn))))
-}
 
-object ReferenceCountNodeStorage extends PruneSupport with Logger {
+object ReferenceCountNodeStorage extends PruneSupport with Logger:
 
   val nodeKeyLength = 32
 
@@ -155,7 +150,7 @@ object ReferenceCountNodeStorage extends PruneSupport with Logger {
     * @param nodeStorage
     *   NodeStorage
     */
-  override def prune(blockNumber: BigInt, nodeStorage: NodesStorage, inMemory: Boolean): Unit = {
+  override def prune(blockNumber: BigInt, nodeStorage: NodesStorage, inMemory: Boolean): Unit =
     log.debug(s"Pruning block $blockNumber")
 
     withSnapshotCount(blockNumber, nodeStorage) { (snapshotsCountKey, snapshotCount) =>
@@ -166,7 +161,6 @@ object ReferenceCountNodeStorage extends PruneSupport with Logger {
     }
 
     log.debug(s"Pruned block $blockNumber")
-  }
 
   /** Looks for the StoredNode snapshots based on block number and saves (or deletes) them
     *
@@ -194,20 +188,17 @@ object ReferenceCountNodeStorage extends PruneSupport with Logger {
 
   private def withSnapshotCount(blockNumber: BigInt, nodeStorage: NodesStorage)(
       f: (ByteString, BigInt) => Unit
-  ): Unit = {
+  ): Unit =
     val snapshotsCountKey = getSnapshotsCountKey(blockNumber)
     // Look for snapshot count for given block number
     val maybeSnapshotCount = nodeStorage.get(snapshotsCountKey).map(snapshotsCountFromBytes)
-    maybeSnapshotCount match {
+    maybeSnapshotCount match
       case Some(snapshotCount) => f(snapshotsCountKey, snapshotCount)
       case None                => ()
-    }
-  }
 
-  private def snapshotKeysUpTo(blockNumber: BigInt, snapshotCount: BigInt): Seq[ByteString] = {
+  private def snapshotKeysUpTo(blockNumber: BigInt, snapshotCount: BigInt): Seq[ByteString] =
     val getSnapshotKeyFn = getSnapshotKey(blockNumber)(_)
     (BigInt(0) until snapshotCount).map(snapshotIndex => getSnapshotKeyFn(snapshotIndex))
-  }
 
   /** Within death row of this block, it looks for Nodes that are not longer being used in order to remove them from DB.
     * To do so, it checks if nodes marked in death row have still reference count equal to 0 and are not used by future
@@ -221,19 +212,18 @@ object ReferenceCountNodeStorage extends PruneSupport with Logger {
       blockNumber: BigInt,
       deadRowKey: ByteString,
       nodeStorage: NodesStorage
-  ): Seq[NodeHash] = {
+  ): Seq[NodeHash] =
     var nodesToRemove = List.empty[NodeHash]
     val deathRow = getDeathRow(deadRowKey, nodeStorage).grouped(nodeKeyLength)
 
     deathRow.foreach { key =>
-      for {
+      for
         node <- nodeStorage.get(key).map(storedNodeFromBytes)
         if node.references == 0 && node.lastUsedByBlock <= blockNumber
-      } yield nodesToRemove = key :: nodesToRemove
+      yield nodesToRemove = key :: nodesToRemove
     }
 
     nodesToRemove
-  }
 
   /** Wrapper of MptNode in order to store number of references it has.
     *
@@ -245,17 +235,15 @@ object ReferenceCountNodeStorage extends PruneSupport with Logger {
     * @param lastUsedByBlock
     *   Block Number where this node was last used
     */
-  case class StoredNode(nodeEncoded: ByteString, references: Int, lastUsedByBlock: BigInt) {
+  case class StoredNode(nodeEncoded: ByteString, references: Int, lastUsedByBlock: BigInt):
     def incrementReferences(amount: Int, blockNumber: BigInt): StoredNode =
       copy(references = references + amount, lastUsedByBlock = blockNumber)
 
     def decrementReferences(amount: Int, blockNumber: BigInt): StoredNode =
       copy(references = references - amount, lastUsedByBlock = blockNumber)
-  }
 
-  object StoredNode {
+  object StoredNode:
     def withoutReferences(nodeEncoded: Array[Byte]): StoredNode = new StoredNode(ByteString(nodeEncoded), 0, 0)
-  }
 
   /** Key to be used to store BlockNumber -> Snapshots Count
     *
@@ -286,5 +274,3 @@ object ReferenceCountNodeStorage extends PruneSupport with Logger {
     *   Stored node that can be rolledback. If None, it means that node wasn't previously in the DB
     */
   case class StoredNodeSnapshot(nodeKey: NodeHash, storedNode: Option[StoredNode])
-
-}

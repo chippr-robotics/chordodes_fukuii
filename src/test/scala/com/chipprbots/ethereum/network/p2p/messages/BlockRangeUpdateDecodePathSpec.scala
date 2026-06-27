@@ -53,7 +53,7 @@ import com.chipprbots.ethereum.utils.Config
 class BlockRangeUpdateDecodePathSpec
     extends ScalaTestWithActorTestKit(ConfigFactory.load())
     with AnyWordSpecLike
-    with Matchers {
+    with Matchers:
 
   // ─── shared fixtures ────────────────────────────────────────────────────────
 
@@ -157,7 +157,7 @@ class BlockRangeUpdateDecodePathSpec
     "forward GotNewBlock to supervisor with latestBlock when a valid BlockRangeUpdate raises knownTop" taggedAs (
       UnitTest,
       SyncTest
-    ) in new FetcherSetup {
+    ) in new FetcherSetup:
       startFetcher()
       fetcher ! AdaptedMessageFromEventBus(
         BlockRangeUpdate(earliestBlock = BigInt(0), latestBlock = BigInt(200), latestBlockHash = validHash),
@@ -165,12 +165,11 @@ class BlockRangeUpdateDecodePathSpec
       )
       // withPossibleNewTopAt(200) sets knownTop=200; GotNewBlock is the only supervisor message from the BRU handler.
       supervisor.expectMsg(SyncProtocol.ProgressProtocol.GotNewBlock(BigInt(200)))
-    }
   }
 
   // ─── FetcherSetup ────────────────────────────────────────────────────────────
 
-  trait FetcherSetup extends TestSyncConfig {
+  trait FetcherSetup extends TestSyncConfig:
     val peersClient: TestProbe = TestProbe()(testKit.system.classicSystem)
     val peerEventBus: TestProbe = TestProbe()(testKit.system.classicSystem)
     val supervisor: TestProbe = TestProbe()(testKit.system.classicSystem)
@@ -189,9 +188,6 @@ class BlockRangeUpdateDecodePathSpec
       s"bru-fetcher-${UUID.randomUUID()}"
     )
 
-    def startFetcher(fromBlock: BigInt = 0): Unit = {
+    def startFetcher(fromBlock: BigInt = 0): Unit =
       fetcher ! BlockFetcher.Start(importer.ref.toTyped[BlockImporter.Command], fromBlock)
       peerEventBus.expectMsgType[SubscribeCmd]
-    }
-  }
-}

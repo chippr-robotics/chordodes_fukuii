@@ -66,14 +66,14 @@ class PeerActorSpec
     )
     with AnyFlatSpecLike
     with WithActorSystemShutDown
-    with Matchers {
+    with Matchers:
 
   val remoteNodeKey: AsymmetricCipherKeyPair = generateKeyPair(new SecureRandom)
   val remoteNodeId: ByteString = ByteString(remoteNodeKey.getPublic.asInstanceOf[ECPublicKeyParameters].toNodeId)
 
   val blockchainConfig = Config.blockchains.blockchainConfig
 
-  "PeerActor" should "create rlpx connection and send hello message" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  "PeerActor" should "create rlpx connection and send hello message" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     peer ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
 
     rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
@@ -82,9 +82,8 @@ class PeerActorSpec
     rlpxConnection.expectMsgPF() { case RLPxConnectionHandler.SendMessage(_: HelloEnc) =>
       ()
     }
-  }
 
-  it should "retry failed rlpx connection" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "retry failed rlpx connection" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     peer ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
 
     rlpxConnection.watch(peer)
@@ -96,10 +95,9 @@ class PeerActorSpec
     }
 
     rlpxConnection.expectMsgClass(classOf[Terminated])
-  }
 
   it should "try to reconnect on broken rlpx connection" taggedAs (UnitTest, NetworkTest) in new NodeStatusSetup
-    with HandshakerSetup {
+    with HandshakerSetup:
     implicit override lazy val classicSystem: ActorSystem =
       ActorSystem("PeerActorSpec_System", ConfigFactory.load("explicit-scheduler"))
     override def protocol: Capability = Capability.ETH63
@@ -115,10 +113,10 @@ class PeerActorSpec
       PropsAdapter(
         PeerActor.apply(
           new InetSocketAddress("127.0.0.1", 0),
-          _ => {
+          _ =>
             rlpxConnection = TestProbe()
             rlpxConnection.ref.toTyped[RLPxConnectionHandler.Command]
-          },
+          ,
           peerConf,
           peerMessageBus,
           knownNodesManager.ref,
@@ -141,9 +139,8 @@ class PeerActorSpec
     peer.unwatch(rlpxConnection.ref)
     testScheduler.timePasses(2.seconds)
     rlpxConnection.expectMsgClass(classOf[RLPxConnectionHandler.ConnectTo])
-  }
 
-  it should "successfully connect to ETC peer" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "successfully connect to ETC peer" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     val uri = new URI(s"enode://${Hex.toHexString(remoteNodeId.toArray[Byte])}@localhost:9000")
     val completeUri = new URI(s"enode://${Hex.toHexString(remoteNodeId.toArray[Byte])}@127.0.0.1:9000?discport=9000")
 
@@ -167,9 +164,8 @@ class PeerActorSpec
 
     knownNodesManager.expectMsg(KnownNodesManager.AddKnownNode(completeUri))
     knownNodesManager.expectNoMessage()
-  }
 
-  it should "fail handshake with peer that has a wrong genesis hash" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "fail handshake with peer that has a wrong genesis hash" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     val uri = new URI(s"enode://${Hex.toHexString(remoteNodeId.toArray[Byte])}@localhost:9000")
     peer ! PeerActor.ConnectTo(uri)
 
@@ -182,9 +178,8 @@ class PeerActorSpec
     )
 
     rlpxConnection.expectMsgPF() { case RLPxConnectionHandler.SendMessage(_: DisconnectEnc) => () }
-  }
 
-  it should "successfully connect to ETH peer with protocol 68" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "successfully connect to ETH peer with protocol 68" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     override def protocol: Capability = Capability.ETH68
     val uri = new URI(s"enode://${Hex.toHexString(remoteNodeId.toArray[Byte])}@localhost:9000")
     val completeUri = new URI(s"enode://${Hex.toHexString(remoteNodeId.toArray[Byte])}@127.0.0.1:9000?discport=9000")
@@ -230,9 +225,8 @@ class PeerActorSpec
 
     knownNodesManager.expectMsg(KnownNodesManager.AddKnownNode(completeUri))
     knownNodesManager.expectNoMessage()
-  }
 
-  it should "successfully connect to and IPv6 peer" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "successfully connect to and IPv6 peer" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     val uri = new URI(s"enode://${Hex.toHexString(remoteNodeId.toArray[Byte])}@[::]:9000")
     val completeUri =
       new URI(s"enode://${Hex.toHexString(remoteNodeId.toArray[Byte])}@[0:0:0:0:0:0:0:0]:9000?discport=9000")
@@ -255,9 +249,8 @@ class PeerActorSpec
 
     knownNodesManager.expectMsg(KnownNodesManager.AddKnownNode(completeUri))
     knownNodesManager.expectNoMessage()
-  }
 
-  it should "disconnect from non-ETC peer" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "disconnect from non-ETC peer" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     // ETH68+: ForkId validation detects non-ETC peers. A wrong genesis hash causes
     // immediate Disconnect(UselessPeer) at Status validation (ETH mainnet shares the
     // same genesis as ETC, but a clearly-wrong hash is sufficient for this test).
@@ -272,12 +265,11 @@ class PeerActorSpec
     )
 
     rlpxConnection.expectMsg(RLPxConnectionHandler.SendMessage(Disconnect(Disconnect.Reasons.UselessPeer)))
-  }
 
   it should "disconnect from non-ETC peer (when node is before fork)" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     // ETH68+: even when our node is at genesis (before the fork), a wrong genesis hash
     // from a non-ETC peer triggers Disconnect(UselessPeer) at the Status validation step.
     peer ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
@@ -291,9 +283,8 @@ class PeerActorSpec
     )
 
     rlpxConnection.expectMsg(RLPxConnectionHandler.SendMessage(Disconnect(Disconnect.Reasons.UselessPeer)))
-  }
 
-  it should "disconnect on Hello timeout" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "disconnect on Hello timeout" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     val connection: TestProbe = TestProbe()
 
     peer ! PeerActor.HandleConnection(connection.ref, new InetSocketAddress("localhost", 9000))
@@ -307,12 +298,10 @@ class PeerActorSpec
       RLPxConnectionHandler.SendMessage(Disconnect(Disconnect.Reasons.TimeoutOnReceivingAMessage))
     )
 
-  }
-
   it should "be fully connected and respond to pings after ETH68 handshake (replaces ETH63 fork-block exchange)" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     // ETH68+: ForkId validation replaces the ETH63 fork-block exchange. After the Status
     // exchange completes, the peer is immediately in Handshaked state.
     saveEtcChainAtDaoFork()
@@ -335,9 +324,8 @@ class PeerActorSpec
     // And responds to pings normally
     rlpxConnection.send(peer, RLPxConnectionHandler.MessageReceived(Ping()))
     rlpxConnection.expectMsg(RLPxConnectionHandler.SendMessage(Pong()))
-  }
 
-  it should "stash disconnect message until handshaked" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "stash disconnect message until handshaked" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     saveEtcChainAtDaoFork()
 
     peer ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
@@ -354,9 +342,8 @@ class PeerActorSpec
     // disconnect fires immediately — no fork-block exchange step.
 
     rlpxConnection.expectMsg(RLPxConnectionHandler.SendMessage(Disconnect(Disconnect.Reasons.TooManyPeers)))
-  }
 
-  it should "stay connected to pre fork peer" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "stay connected to pre fork peer" taggedAs (UnitTest, NetworkTest) in new TestSetup:
 
     val remoteStatus: RemoteStatus = RemoteStatus(
       capability = Capability.ETH63,
@@ -388,9 +375,8 @@ class PeerActorSpec
 
     rlpxConnection.send(peerActor, RLPxConnectionHandler.MessageReceived(Ping()))
     rlpxConnection.expectMsgPF() { case RLPxConnectionHandler.SendMessage(_: PongEnc) => () }
-  }
 
-  it should "disconnect gracefully after handshake" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "disconnect gracefully after handshake" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     saveEtcChainAtDaoFork()
 
     peer ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
@@ -421,12 +407,11 @@ class PeerActorSpec
     testScheduler.timePasses(peerConf.disconnectPoisonPillTimeout)
 
     manager.expectTerminated(peer)
-  }
 
   it should "stop when Disconnect(AlreadyConnected) is received during handshake" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     // 8k-H removed context.toClassic.parent sends; PeerActor now stops immediately
     // on pre-handshake Disconnect. Verify via death-watch instead of parent message.
     val watcherProbe: TestProbe = TestProbe()
@@ -455,9 +440,8 @@ class PeerActorSpec
     rlpxConnection.send(peerUnderTest, RLPxConnectionHandler.MessageReceived(Disconnect(Reasons.AlreadyConnected)))
 
     watcherProbe.expectTerminated(peerUnderTest, 3.seconds)
-  }
 
-  trait BlockUtils {
+  trait BlockUtils:
 
     val blockBody = new BlockBody(Seq(), Seq())
 
@@ -473,9 +457,8 @@ class PeerActorSpec
         receiptsRoot = TrieRoot(ByteString("fork")),
         logsBloom = BloomFilter(ByteString("block"))
       )
-  }
 
-  trait NodeStatusSetup extends SecureRandomBuilder with EphemBlockchainTestSetup {
+  trait NodeStatusSetup extends SecureRandomBuilder with EphemBlockchainTestSetup:
     override lazy val nodeKey: AsymmetricCipherKeyPair = crypto.generateKeyPair(secureRandom)
 
     val nodeStatus: NodeStatus =
@@ -490,17 +473,15 @@ class PeerActorSpec
 
     val daoForkBlockNumber = 1920000
 
-    val peerConf: PeerConfiguration = new PeerConfiguration {
-      override val fastSyncHostConfiguration: FastSyncHostConfiguration = new FastSyncHostConfiguration {
+    val peerConf: PeerConfiguration = new PeerConfiguration:
+      override val fastSyncHostConfiguration: FastSyncHostConfiguration = new FastSyncHostConfiguration:
         val maxBlocksHeadersPerMessage: Int = 200
         val maxBlocksBodiesPerMessage: Int = 200
         val maxReceiptsPerMessage: Int = 200
         val maxMptComponentsPerMessage: Int = 200
-      }
-      override val rlpxConfiguration: RLPxConfiguration = new RLPxConfiguration {
+      override val rlpxConfiguration: RLPxConfiguration = new RLPxConfiguration:
         override val waitForTcpAckTimeout: FiniteDuration = Timeouts.normalTimeout
         override val waitForHandshakeTimeout: FiniteDuration = Timeouts.normalTimeout
-      }
       override val waitForHelloTimeout: FiniteDuration = 3 seconds
       override val waitForStatusTimeout: FiniteDuration = 30 seconds
       override val waitForChainCheckTimeout: FiniteDuration = 15 seconds
@@ -522,14 +503,12 @@ class PeerActorSpec
       override val longBlacklistDuration: FiniteDuration = 3.minutes
       override val statSlotDuration: FiniteDuration = 1.minute
       override val statSlotCount: Int = 30
-    }
 
-  }
-
-  trait HandshakerSetup extends NodeStatusSetup { self =>
+  trait HandshakerSetup extends NodeStatusSetup:
+    self =>
     def protocol: Capability
 
-    val handshakerConfiguration: NetworkHandshakerConfiguration = new NetworkHandshakerConfiguration {
+    val handshakerConfiguration: NetworkHandshakerConfiguration = new NetworkHandshakerConfiguration:
       override val forkResolverOpt: Option[ForkResolver] = Some(
         new ForkResolver.IrregularStateChangeDaoForkResolver(self.blockchainConfig.daoForkConfig.get)
       )
@@ -539,12 +518,10 @@ class PeerActorSpec
       override val blockchainReader: BlockchainReader = self.blockchainReader
       override val appStateStorage: AppStateStorage = self.storagesInstance.storages.appStateStorage
       override val blockchainConfig: BlockchainConfig = self.blockchainConfig
-    }
 
     val handshaker: NetworkHandshaker = NetworkHandshaker(handshakerConfiguration)
-  }
 
-  trait TestSetup extends NodeStatusSetup with BlockUtils with HandshakerSetup {
+  trait TestSetup extends NodeStatusSetup with BlockUtils with HandshakerSetup:
     override def protocol: Capability = Capability.ETH63
 
     // Override classicSystem to use the explicit scheduler from TestKit
@@ -583,18 +560,16 @@ class PeerActorSpec
       }
 
     /** Advance our chain to the DAO fork block so ForkId validation succeeds for ETC mainnet peers. */
-    def saveEtcChainAtDaoFork(): Unit = {
+    def saveEtcChainAtDaoFork(): Unit =
       val daoForkChainWeight = ChainWeight.totalDifficultyOnly(daoForkBlockChainTotalDifficulty)
       blockchainWriter.save(Fixtures.Blocks.DaoForkBlock.block, Seq.empty, daoForkChainWeight, saveAsBestBlock = true)
-    }
 
     /** Canonical ETH68 handshake with the test's local chain state. */
-    def eth68Handshake(remoteHello: Hello, remoteStatus: Status): Unit = {
+    def eth68Handshake(remoteHello: Hello, remoteStatus: Status): Unit =
       rlpxConnection.expectMsgPF() { case RLPxConnectionHandler.SendMessage(_: HelloEnc) => () }
       rlpxConnection.send(peer, RLPxConnectionHandler.MessageReceived(remoteHello))
       expectStatusMessage()
       rlpxConnection.send(peer, RLPxConnectionHandler.MessageReceived(remoteStatus))
-    }
 
     /** Build a valid ETC mainnet ETH68 Status for the remote peer. */
     def etcStatus68(networkId: Long = peerConf.networkId, genesisHash: ByteString = this.genesisHash): Status =
@@ -606,6 +581,3 @@ class PeerActorSpec
         genesisHash = genesisHash,
         forkId = ForkId.create(this.genesisHash, handshakerConfiguration.blockchainConfig)(daoForkBlockNumber)
       )
-  }
-
-}

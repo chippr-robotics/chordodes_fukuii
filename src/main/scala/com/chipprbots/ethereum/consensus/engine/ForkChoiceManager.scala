@@ -23,7 +23,7 @@ import com.chipprbots.ethereum.utils.Logger
 class ForkChoiceManager(
     blockchainReader: BlockchainReader,
     blockchainWriter: BlockchainWriter
-) extends Logger {
+) extends Logger:
 
   private val currentState: AtomicReference[Option[ForkChoiceState]] =
     new AtomicReference(None)
@@ -60,7 +60,7 @@ class ForkChoiceManager(
     * @return
     *   Right(()) if valid, Left(error) if head block is unknown
     */
-  def applyForkChoiceState(newState: ForkChoiceState): Either[String, Unit] = {
+  def applyForkChoiceState(newState: ForkChoiceState): Either[String, Unit] =
     val maybeHeader = blockchainReader.getBlockHeaderByHash(BlockHash(newState.headBlockHash))
 
     // Publish to the listener regardless of head-known status — SNAP needs the
@@ -68,10 +68,10 @@ class ForkChoiceManager(
     // is fire-and-forget; the rest of this method's behavior is unchanged.
     publishBeaconHead(newState.headBlockHash, maybeHeader)
 
-    if maybeHeader.isEmpty then {
+    if maybeHeader.isEmpty then
       log.info(s"Fork choice head ${newState.headBlockHash} not known yet (SYNCING)")
       Left("SYNCING")
-    } else {
+    else
       log.info(
         s"Fork choice updated: head=${newState.headBlockHash}, " +
           s"safe=${newState.safeBlockHash}, finalized=${newState.finalizedBlockHash}"
@@ -86,8 +86,6 @@ class ForkChoiceManager(
       }
 
       Right(())
-    }
-  }
 
   /** Clear fork choice state (e.g., on shutdown or mode switch). */
   def clear(): Unit = currentState.set(None)
@@ -96,9 +94,8 @@ class ForkChoiceManager(
     listenerRef.get().foreach { ref =>
       ref ! ForkChoiceManager.BeaconHead(headHash, knownHeader)
     }
-}
 
-object ForkChoiceManager {
+object ForkChoiceManager:
 
   /** Notification sent by [[ForkChoiceManager]] to its registered listener whenever the CL pushes a fork choice via
     * engine_forkchoiceUpdated. Carries both the head hash (always) and the locally-stored header (when we already have
@@ -106,4 +103,3 @@ object ForkChoiceManager {
     * post-merge initial-sync case where the EL is far behind the CL.
     */
   final case class BeaconHead(headHash: ByteString, knownHeader: Option[BlockHeader])
-}

@@ -13,7 +13,7 @@ import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.txExecTest.util.FixtureProvider
 import com.chipprbots.ethereum.utils.Config
 
-class ContractTest extends AnyFlatSpec with Matchers {
+class ContractTest extends AnyFlatSpec with Matchers:
   val blockchainConfig = Config.blockchains.blockchainConfig
   val syncConfig: Config.SyncConfig = Config.SyncConfig(Config.config)
   val noErrors: ResultOfATypeInvocation[Right[?, Seq[Receipt]]] = a[Right[?, Seq[Receipt]]]
@@ -30,7 +30,7 @@ class ContractTest extends AnyFlatSpec with Matchers {
   //
   // To fix: Regenerate fixture with correct account codeHash values or wait until all other
   // tests are passing before addressing this legacy fixture issue.
-  ignore should "execute and validate" taggedAs (IntegrationTest, VMTest, SlowTest) in new ScenarioSetup {
+  ignore should "execute and validate" taggedAs (IntegrationTest, VMTest, SlowTest) in new ScenarioSetup:
     val fixtures: FixtureProvider.Fixture = FixtureProvider.loadFixtures("/txExecTest/purchaseContract")
     override val testBlockchainStorages: BlockchainStorages = FixtureProvider.prepareStorages(2, fixtures)
 
@@ -54,5 +54,3 @@ class ContractTest extends AnyFlatSpec with Matchers {
     // execute contract call
     // execute contract that pays 2 accounts
     blockExecution.executeAndValidateBlock(fixtures.blockByNumber(3)) shouldBe noErrors
-  }
-}

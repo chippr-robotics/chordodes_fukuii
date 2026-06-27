@@ -36,7 +36,7 @@ import com.chipprbots.ethereum.utils.Hex
   * @param onlyTopCall
   *   when true, only capture the top-level call (skip sub-calls)
   */
-class CallTracer(onlyTopCall: Boolean = false) extends ExecutionTracer {
+class CallTracer(onlyTopCall: Boolean = false) extends ExecutionTracer:
 
   private case class CallFrame(
       opCode: String,
@@ -55,7 +55,7 @@ class CallTracer(onlyTopCall: Boolean = false) extends ExecutionTracer {
   private val callStack = mutable.Stack[CallFrame]()
   private var rootFrame: Option[CallFrame] = None
 
-  override def onTxStart(from: Address, to: Option[Address], gas: BigInt, value: BigInt, input: ByteString): Unit = {
+  override def onTxStart(from: Address, to: Option[Address], gas: BigInt, value: BigInt, input: ByteString): Unit =
     val opCode = if to.isDefined then "CALL" else "CREATE"
     val frame = CallFrame(
       opCode = opCode,
@@ -67,18 +67,15 @@ class CallTracer(onlyTopCall: Boolean = false) extends ExecutionTracer {
     )
     callStack.push(frame)
     rootFrame = Some(frame)
-  }
 
   override def onTxEnd(gasUsed: BigInt, output: ByteString, error: Option[String]): Unit =
-    if callStack.nonEmpty then {
+    if callStack.nonEmpty then
       val frame = callStack.pop()
       frame.gasUsed = gasUsed
       frame.output = output
       frame.error = error
-      if error.exists(_.contains("execution reverted")) && output.length >= 4 then {
+      if error.exists(_.contains("execution reverted")) && output.length >= 4 then
         frame.revertReason = parseRevertReason(output)
-      }
-    }
 
   override def onCallEnter(
       opCode: String,
@@ -87,7 +84,7 @@ class CallTracer(onlyTopCall: Boolean = false) extends ExecutionTracer {
       gas: BigInt,
       value: BigInt,
       input: ByteString
-  ): Unit = {
+  ): Unit =
     if onlyTopCall then return
 
     val frame = CallFrame(
@@ -99,9 +96,8 @@ class CallTracer(onlyTopCall: Boolean = false) extends ExecutionTracer {
       input = input
     )
     callStack.push(frame)
-  }
 
-  override def onCallExit(gasUsed: BigInt, output: ByteString, error: Option[String]): Unit = {
+  override def onCallExit(gasUsed: BigInt, output: ByteString, error: Option[String]): Unit =
     if onlyTopCall then return
     if callStack.size <= 1 then return // don't pop the root frame
 
@@ -109,30 +105,24 @@ class CallTracer(onlyTopCall: Boolean = false) extends ExecutionTracer {
     frame.gasUsed = gasUsed
     frame.output = output
     frame.error = error
-    if error.exists(_.contains("execution reverted")) && output.length >= 4 then {
+    if error.exists(_.contains("execution reverted")) && output.length >= 4 then
       frame.revertReason = parseRevertReason(output)
-    }
 
-    if callStack.nonEmpty then {
-      callStack.top.calls += frame
-    }
-  }
+    if callStack.nonEmpty then callStack.top.calls += frame
 
-  override def getResult: JValue = rootFrame match {
+  override def getResult: JValue = rootFrame match
     case Some(frame) => encodeFrame(frame)
     case None        => JNull
-  }
 
-  private def encodeFrame(frame: CallFrame): JValue = {
+  private def encodeFrame(frame: CallFrame): JValue =
     var obj: JObject = ("type" -> frame.opCode) ~
       ("from" -> encodeAddress(frame.from)) ~
       ("to" -> encodeAddress(frame.to)) ~
       ("gas" -> JString("0x" + frame.gas.toString(16))) ~
       ("gasUsed" -> JString("0x" + frame.gasUsed.toString(16)))
 
-    if frame.opCode == "CALL" || frame.opCode == "CREATE" || frame.opCode == "CREATE2" then {
+    if frame.opCode == "CALL" || frame.opCode == "CREATE" || frame.opCode == "CREATE2" then
       obj = obj ~ ("value" -> encodeHex(frame.value))
-    }
 
     obj = obj ~
       ("input" -> encodeHexBytes(frame.input)) ~
@@ -141,12 +131,9 @@ class CallTracer(onlyTopCall: Boolean = false) extends ExecutionTracer {
     frame.error.foreach(e => obj = obj ~ ("error" -> JString(e)))
     frame.revertReason.foreach(r => obj = obj ~ ("revertReason" -> JString(r)))
 
-    if frame.calls.nonEmpty then {
-      obj = obj ~ ("calls" -> JArray(frame.calls.toList.map(encodeFrame)))
-    }
+    if frame.calls.nonEmpty then obj = obj ~ ("calls" -> JArray(frame.calls.toList.map(encodeFrame)))
 
     obj
-  }
 
   private def encodeAddress(addr: Address): JString =
     JString("0x" + Hex.toHexString(addr.bytes.toArray))
@@ -160,17 +147,13 @@ class CallTracer(onlyTopCall: Boolean = false) extends ExecutionTracer {
 
   /** Parse Solidity revert reason from ABI-encoded error data. Format: 0x08c379a0 + offset + length + utf8 string
     */
-  private def parseRevertReason(data: ByteString): Option[String] = {
+  private def parseRevertReason(data: ByteString): Option[String] =
     if data.length < 68 then return None
     val selector = data.take(4)
     if selector != ByteString(0x08, 0xc3, 0x79, 0xa0) then return None
-    try {
+    try
       val offset = BigInt(1, data.slice(4, 36).toArray).toInt
       val length = BigInt(1, data.slice(36 + offset, 68 + offset).toArray).toInt
       if data.length < 68 + offset + length then return None
       Some(new String(data.slice(68 + offset, 68 + offset + length).toArray, "UTF-8"))
-    } catch {
-      case _: Exception => None
-    }
-  }
-}
+    catch case _: Exception => None

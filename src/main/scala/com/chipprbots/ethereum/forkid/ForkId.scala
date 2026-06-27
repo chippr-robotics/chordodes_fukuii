@@ -13,18 +13,16 @@ import com.chipprbots.ethereum.utils.Hex
 import RLPImplicitConversions.*
 import RLPImplicits.given
 
-case class ForkId(hash: BigInt, next: Option[BigInt]) {
+case class ForkId(hash: BigInt, next: Option[BigInt]):
 
-  def nextDisplay: String = next match {
+  def nextDisplay: String = next match
     case None    => "None"
     case Some(n) => ForkId.knownSentinels.get(n).fold(n.toString)(name => s"$n ($name)")
-  }
 
   override def toString(): String =
     s"ForkId(0x${Hex.toHexString(hash.toUnsignedByteArray)}, next=${nextDisplay})"
-}
 
-object ForkId {
+object ForkId:
 
   val knownSentinels: Map[BigInt, String] = Map(
     BigInt("1000000000000000000") -> "Olympia"
@@ -36,7 +34,7 @@ object ForkId {
   /** EIP-2124 + EIP-6122: ForkId computation with both block number and timestamp. Block-number forks are compared
     * against `head`, timestamp forks against `headTimestamp`.
     */
-  def create(genesisHash: ByteString, config: BlockchainConfig)(head: BigInt, headTimestamp: Long): ForkId = {
+  def create(genesisHash: ByteString, config: BlockchainConfig)(head: BigInt, headTimestamp: Long): ForkId =
     val crc = new CRC32()
     crc.update(genesisHash.asByteBuffer)
 
@@ -48,13 +46,10 @@ object ForkId {
 
     val next = allForks.find { case (fork, isTimestamp) =>
       val passed = if isTimestamp then fork <= BigInt(headTimestamp) else fork <= head
-      if passed then {
-        crc.update(bigIntToBytes(fork, 8))
-      }
+      if passed then crc.update(bigIntToBytes(fork, 8))
       !passed
     }
     new ForkId(crc.getValue(), next.map(_._1))
-  }
 
   // Long.MaxValue is the in-code fallback when a fork config key is missing
   // (BlockchainConfig.fromRawConfig and ForkBlockNumbers.Empty). It must be filtered
@@ -70,7 +65,7 @@ object ForkId {
   def gatherForks(config: BlockchainConfig): List[BigInt] =
     (gatherBlockForks(config) ++ gatherTimestampForks(config)).distinct.sorted
 
-  def gatherBlockForks(config: BlockchainConfig): List[BigInt] = {
+  def gatherBlockForks(config: BlockchainConfig): List[BigInt] =
     val maybeDaoBlock: Option[BigInt] = config.daoForkConfig.flatMap { daoConf =>
       if daoConf.includeOnForkIdList then Some(daoConf.forkBlockNumber)
       else None
@@ -83,7 +78,6 @@ object ForkId {
     val olympiaNext =
       if config.forkBlockNumbers.olympiaBlockNumber == olympiaSentinel then List(olympiaSentinel) else Nil
     realForks ++ olympiaNext
-  }
 
   /** EIP-6122: Timestamp-based forks for post-Merge chains. */
   def gatherTimestampForks(config: BlockchainConfig): List[BigInt] =
@@ -96,22 +90,17 @@ object ForkId {
       config.forkTimestamps.bpo2Timestamp.map(BigInt(_))
     ).flatten.filterNot(_ == 0).distinct.sorted
 
-  extension (forkId: ForkId) {
-    def toRLPEncodable: RLPEncodeable = {
+  extension (forkId: ForkId)
+    def toRLPEncodable: RLPEncodeable =
       import com.chipprbots.ethereum.utils.ByteUtils.*
       val hash: Array[Byte] = bigIntToBytes(forkId.hash, 4).takeRight(4)
       val next: Array[Byte] = bigIntToUnsignedByteArray(forkId.next.getOrElse(BigInt(0))).takeRight(8)
       RLPList(hash, next)
-    }
-  }
 
-  implicit val forkIdEnc: RLPDecoder[ForkId] = new RLPDecoder[ForkId] {
+  implicit val forkIdEnc: RLPDecoder[ForkId] = new RLPDecoder[ForkId]:
 
-    def decode(rlp: RLPEncodeable): ForkId = rlp match {
+    def decode(rlp: RLPEncodeable): ForkId = rlp match
       case RLPList(hash, next) =>
         val i = bigIntFromEncodeable(next)
         ForkId(bigIntFromEncodeable(hash), if i == 0 then None else Some(i))
       case _ => throw new RuntimeException("Error when decoding ForkId")
-    }
-  }
-}

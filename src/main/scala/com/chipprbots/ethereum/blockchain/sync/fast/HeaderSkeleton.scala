@@ -38,7 +38,7 @@ final case class HeaderSkeleton(
     maxSkeletonHeaders: Int,
     private val skeletonHeaders: Seq[BlockHeader] = Seq.empty,
     private val batches: Map[BigInt, Seq[BlockHeader]] = Map.empty
-) {
+):
 
   private val remainingBlocks: BigInt = to - from + 1
 
@@ -57,10 +57,9 @@ final case class HeaderSkeleton(
   /** Maximum number of blocks to be downloaded at once. This is the total number of skeleton headers that the skeleton
     * contains.
     */
-  val limit: BigInt = {
+  val limit: BigInt =
     val remainingSkeletonHeaders = remainingBlocks / batchSize
     remainingSkeletonHeaders.min(maxSkeletonHeaders)
-  }
 
   val lastSkeletonHeaderNumber: BigInt = from + (batchSize * limit) - 1
 
@@ -68,10 +67,10 @@ final case class HeaderSkeleton(
     firstSkeletonHeaderNumber to lastSkeletonHeaderNumber by batchSize
 
   def validateAndSetSkeletonHeaders(headers: Seq[BlockHeader]): Either[HeaderSkeletonError, HeaderSkeleton] =
-    for {
+    for
       _ <- checkSkeletonHeadersTotal(headers)
       _ <- checkSkeletonHeaderNumbers(headers)
-    } yield copy(skeletonHeaders = headers)
+    yield copy(skeletonHeaders = headers)
 
   /** Use this method to update this state with the downloaded skeleton
     * @param headers
@@ -80,21 +79,20 @@ final case class HeaderSkeleton(
     *   Either the updated structure if the validation succeeded or an error
     */
   def setSkeletonHeaders(headers: Seq[BlockHeader]): Either[HeaderSkeletonError, HeaderSkeleton] =
-    for {
+    for
       _ <- checkSkeletonHeadersTotal(headers)
       _ <- checkSkeletonHeaderNumbers(headers)
-    } yield copy(skeletonHeaders = headers)
+    yield copy(skeletonHeaders = headers)
 
   private def checkSkeletonHeadersTotal(headers: Seq[BlockHeader]): Either[HeaderSkeletonError, Unit] =
     Either.cond(headers.size == limit, (), InvalidTotalHeaders(headers.size, limit.toInt))
 
-  private def checkSkeletonHeaderNumbers(headers: Seq[BlockHeader]): Either[HeaderSkeletonError, Unit] = {
+  private def checkSkeletonHeaderNumbers(headers: Seq[BlockHeader]): Either[HeaderSkeletonError, Unit] =
     val downloadedHeaderNumbers = headers.map(_.number)
     val isValid = downloadedHeaderNumbers.zip(skeletonHeaderNumbers).forall {
       case (downloadedHeaderNumber, skeletonNumber) => downloadedHeaderNumber == skeletonNumber
     }
     Either.cond(isValid, (), InvalidHeaderNumber(downloadedHeaderNumbers, skeletonHeaderNumbers))
-  }
 
   /** An ordered sequence with the numbers of the first block of each batch
     */
@@ -107,22 +105,21 @@ final case class HeaderSkeleton(
     *   Either the updated structure if the validation succeeded or an error
     */
   def addBatch(batchHeaders: Seq[BlockHeader]): Either[HeaderSkeletonError, HeaderSkeleton] =
-    for {
+    for
       skeletonHeader <- findSkeletonHeader(batchHeaders)
       _ <- checkSkeletonParentHash(batchHeaders, skeletonHeader)
       batchStartingNumber <- findBatchStartingNumber(batchHeaders)
-    } yield copy(batches = batches + (batchStartingNumber -> batchHeaders))
+    yield copy(batches = batches + (batchStartingNumber -> batchHeaders))
 
   private def findSkeletonHeader(batchHeaders: Seq[BlockHeader]): Either[HeaderBatchError, BlockHeader] =
-    batchHeaders.lastOption match {
+    batchHeaders.lastOption match
       case Some(header) =>
-        for {
+        for
           byNumber <- findSkeletonHeaderByNumber(header)
           byHash <- Either.cond(byNumber.hash == header.hash, byNumber, InvalidBatchHash(header, byNumber))
-        } yield byHash
+        yield byHash
       case None =>
         Left(EmptyDownloadedBatch(skeletonHeaderNumbers))
-    }
 
   private def findSkeletonHeaderByNumber(header: BlockHeader): Either[InvalidBatchLastNumber, BlockHeader] =
     skeletonHeaders
@@ -133,21 +130,19 @@ final case class HeaderSkeleton(
       batchHeaders: Seq[BlockHeader],
       skeletonHeader: BlockHeader
   ): Either[HeaderBatchError, Unit] =
-    batchHeaders.dropRight(1).lastOption match {
+    batchHeaders.dropRight(1).lastOption match
       case Some(penultimateBatchHeader) if penultimateBatchHeader.hash != skeletonHeader.parentHash =>
         Left(InvalidPenultimateHeader(penultimateBatchHeader, skeletonHeader))
       case _ =>
         Right(())
-    }
 
   private def findBatchStartingNumber(batchHeaders: Seq[BlockHeader]): Either[HeaderBatchError, BigInt] =
-    batchHeaders.headOption.map(_.number) match {
+    batchHeaders.headOption.map(_.number) match
       case Some(firstBatchHeader) =>
         val found = batchStartingHeaderNumbers.find(_ == firstBatchHeader)
         found.toRight(InvalidBatchFirstNumber(firstBatchHeader, batchStartingHeaderNumbers))
       case None =>
         Left(EmptyDownloadedBatch(skeletonHeaderNumbers))
-    }
 
   private val isFull: Boolean = batchStartingHeaderNumbers.forall(batches.contains)
 
@@ -156,43 +151,31 @@ final case class HeaderSkeleton(
   val fullChain: Option[Seq[BlockHeader]] =
     if isFull then Some(batchStartingHeaderNumbers.flatMap(batches.apply))
     else None
-}
 
-object HeaderSkeleton {
+object HeaderSkeleton:
 
-  sealed trait HeaderSkeletonError {
+  sealed trait HeaderSkeletonError:
     def msg: String
-  }
-  final case class NoCurrentHeaderSkeleton(downloaded: Int, expected: Int) extends HeaderSkeletonError {
+  final case class NoCurrentHeaderSkeleton(downloaded: Int, expected: Int) extends HeaderSkeletonError:
     override def msg: String = s"Invalid downloaded total headers. Expected $expected but was $downloaded"
-  }
-  final case class InvalidTotalHeaders(downloaded: Int, expected: Int) extends HeaderSkeletonError {
+  final case class InvalidTotalHeaders(downloaded: Int, expected: Int) extends HeaderSkeletonError:
     override def msg: String = s"Invalid downloaded total headers. Expected $expected but was $downloaded"
-  }
-  final case class InvalidHeaderNumber(downloaded: Seq[BigInt], expected: Seq[BigInt]) extends HeaderSkeletonError {
+  final case class InvalidHeaderNumber(downloaded: Seq[BigInt], expected: Seq[BigInt]) extends HeaderSkeletonError:
     override def msg: String =
       s"Invalid sequence of skeleton headers. Expected [${expected.mkString(",")}] but was [${downloaded.mkString(",")}]"
-  }
 
   sealed trait HeaderBatchError extends HeaderSkeletonError
-  final case class InvalidBatchLastNumber(downloaded: BigInt, expected: Seq[BigInt]) extends HeaderBatchError {
+  final case class InvalidBatchLastNumber(downloaded: BigInt, expected: Seq[BigInt]) extends HeaderBatchError:
     override def msg: String = s"Invalid batch last number. $downloaded wasn't found in [${expected.mkString(",")}]"
-  }
-  final case class InvalidBatchHash(downloaded: BlockHeader, expected: BlockHeader) extends HeaderBatchError {
+  final case class InvalidBatchHash(downloaded: BlockHeader, expected: BlockHeader) extends HeaderBatchError:
     override def msg: String = s"Invalid batch last block hash. Expected $expected but was $downloaded"
-  }
-  final case class EmptyDownloadedBatch(expected: Seq[BigInt]) extends HeaderBatchError {
+  final case class EmptyDownloadedBatch(expected: Seq[BigInt]) extends HeaderBatchError:
     override def msg: String = s"Downloaded empty headers batch. Expected [${expected.mkString(",")}]"
-  }
   final case class InvalidPenultimateHeader(penultimateBatchHeader: BlockHeader, skeletonHeader: BlockHeader)
-      extends HeaderBatchError {
+      extends HeaderBatchError:
     override def msg: String =
       s"Invalid batch penultimate header. $penultimateBatchHeader isn't parent of $skeletonHeader"
-  }
-  final case class InvalidBatchFirstNumber(downloaded: BigInt, expected: Seq[BigInt]) extends HeaderBatchError {
+  final case class InvalidBatchFirstNumber(downloaded: BigInt, expected: Seq[BigInt]) extends HeaderBatchError:
     override def msg: String = s"Invalid batch first number. $downloaded wasn't found in [${expected.mkString(",")}]"
-  }
-  final case class InvalidDownloadedChain(downloaded: Seq[BlockHeader]) extends HeaderBatchError {
+  final case class InvalidDownloadedChain(downloaded: Seq[BlockHeader]) extends HeaderBatchError:
     override def msg: String = s"Invalid downloaded batch: ${downloaded.map(h => h.number -> h.hash).mkString(", ")}"
-  }
-}

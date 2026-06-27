@@ -11,7 +11,7 @@ import io.prometheus.metrics.model.registry.PrometheusRegistry
 import com.chipprbots.ethereum.utils.Logger
 import com.chipprbots.ethereum.utils.LoggingUtils.getClassName
 
-object MeterRegistryBuilder extends Logger {
+object MeterRegistryBuilder extends Logger:
 
   final private val StdMetricsClock = Clock.SYSTEM
 
@@ -21,7 +21,7 @@ object MeterRegistryBuilder extends Logger {
   /** Build our meter registry consist in:
     *   1. Create each Meter registry 2. Config the resultant composition
     */
-  def build(metricsPrefix: String): MeterRegistry = {
+  def build(metricsPrefix: String): MeterRegistry =
 
     val jmxMeterRegistry = new JmxMeterRegistry(new AppJmxConfig, StdMetricsClock)
 
@@ -46,12 +46,11 @@ object MeterRegistryBuilder extends Logger {
     // e.g. those coming from `JvmMemoryMetrics`.
     registry
       .config()
-      .meterFilter(new MeterFilter {
-        override def map(id: Meter.Id): Meter.Id =
-          id.withName(MetricsUtils.mkNameWithPrefix(metricsPrefix)(id.getName))
-      })
+      .meterFilter(
+        new MeterFilter:
+          override def map(id: Meter.Id): Meter.Id =
+            id.withName(MetricsUtils.mkNameWithPrefix(metricsPrefix)(id.getName))
+      )
       .onMeterAdded(onMeterAdded)
 
     registry
-  }
-}

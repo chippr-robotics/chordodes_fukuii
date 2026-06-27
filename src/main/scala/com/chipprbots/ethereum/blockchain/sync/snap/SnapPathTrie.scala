@@ -52,7 +52,7 @@ final class SnapPathTrie(
     val skipLeftBoundary: Boolean,
     writePath: (Array[Byte], ByteString, Array[Byte]) => Unit,
     deleteExact: Array[Byte] => Unit
-) extends SnapTrie {
+) extends SnapTrie:
 
   // Path of the first node committed by StackTrie; marks the left-boundary anchor. Null until first emission.
   private var first: Array[Byte] = null
@@ -84,48 +84,42 @@ final class SnapPathTrie(
     * itself is retained — it is a complete, valid leaf or branch that healing can use as an anchor. Discards all
     * in-memory [[StackTrie]] state without triggering further [[onTrieNode]] callbacks.
     */
-  override def reset(): Unit = {
+  override def reset(): Unit =
     deleteRightBoundary()
     stackTrie.reset()
-  }
 
   // ---- internals ----
 
-  private def onTrieNode(path: Array[Byte], hash: ByteString, blob: Array[Byte]): Unit = {
+  private def onTrieNode(path: Array[Byte], hash: ByteString, blob: Array[Byte]): Unit =
     // ---- left-boundary filter ----
     // Skip nodes that are on the left boundary of a resumed range.  A node is "on the left boundary" if it is the
     // first node ever emitted (first == null) or if its path is a prefix of (i.e., is an ancestor of) the first node.
     // go-ethereum equivalent: pathTrie.onTrieNode, condition `t.skipLeftBoundary && (t.first == nil || HasPrefix(t.first, path))`
-    if skipLeft then {
-      if first == null then {
+    if skipLeft then
+      if first == null then
         // Record the left-boundary anchor (deep-copy: StackTrie reuses buffers).
         first = path.clone()
         // Delete any stale ancestor stubs at depths 0 .. len-1 left by the prior interrupted run.
         // (Depth len = the first node itself; it's a sibling anchor, not an ancestor stub.)
         var i = 0
-        while i < first.length do {
+        while i < first.length do
           deleteExact(first.slice(0, i))
           i += 1
-        }
-      }
       // Skip writing if `path` is a prefix of `first` (path is an ancestor of first, or IS first).
       if hasPrefix(first, path) then return
       // This node is not on the left boundary — disable the filter for all subsequent callbacks.
       skipLeft = false
-    }
 
     // ---- extension-gap cleanup ----
     // If `path` is a strict prefix of `last` with a gap > 1 nibble, StackTrie is finalising an extension node that
     // spans that gap. Intermediate path slots at depths (len(path)+1 .. len(last)−1) may hold stale nodes from a
     // prior run; delete them.
     // go-ethereum equivalent: `last != nil && HasPrefix(last, path) && len(last)-len(path) > 1`
-    if last != null && hasPrefix(last, path) && last.length - path.length > 1 then {
+    if last != null && hasPrefix(last, path) && last.length - path.length > 1 then
       var i = path.length + 1
-      while i < last.length do {
+      while i < last.length do
         deleteExact(last.slice(0, i))
         i += 1
-      }
-    }
 
     // ---- write ----
     // Deep-copy: StackTrie reuses its internal path/blob buffers across callbacks.
@@ -134,21 +128,18 @@ final class SnapPathTrie(
     // Update `last` (reuse the existing allocation if lengths match to avoid GC churn).
     last =
       if last == null || last.length != path.length then path.clone()
-      else { System.arraycopy(path, 0, last, 0, path.length); last }
-  }
+      else
+        System.arraycopy(path, 0, last, 0, path.length); last
 
   /** Delete ancestor paths of `last` at depths 0 through `len(last)−1`. */
   private def deleteRightBoundary(): Unit =
-    if last != null then {
+    if last != null then
       var i = 0
-      while i < last.length do {
+      while i < last.length do
         deleteExact(last.slice(0, i))
         i += 1
-      }
-    }
 
   /** True iff `array` has `prefix` as a leading byte prefix (i.e. `prefix` is a prefix of `array`). */
   private def hasPrefix(array: Array[Byte], prefix: Array[Byte]): Boolean =
     prefix.length <= array.length &&
       java.util.Arrays.equals(array, 0, prefix.length, prefix, 0, prefix.length)
-}

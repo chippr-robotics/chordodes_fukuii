@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   * branches are exercised: optimistic SNAP (no peers yet), SNAP downgrade (too few snap-capable peers), confirmed SNAP
   * (≥ 3 snap peers), fast-only, and regular.
   */
-class SyncStartupStrategySpec extends AnyFunSuite with ParallelTestExecution with TestSyncConfig {
+class SyncStartupStrategySpec extends AnyFunSuite with ParallelTestExecution with TestSyncConfig:
 
   import SyncController.SyncMode
   import SyncController.selectSyncMode
@@ -44,4 +44,3 @@ class SyncStartupStrategySpec extends AnyFunSuite with ParallelTestExecution wit
   test("returns Regular when neither snap nor fast is enabled", UnitTest, SyncTest) {
     assert(selectSyncMode(5, 5, 0L, regularCfg) == SyncMode.Regular)
   }
-}

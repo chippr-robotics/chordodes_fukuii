@@ -28,7 +28,7 @@ final class StdValidators(
     val blockValidator: BlockValidator,
     val blockHeaderValidator: BlockHeaderValidator,
     val signedTransactionValidator: SignedTransactionValidator
-) extends Validators {
+) extends Validators:
 
   def validateBlockBeforeExecution(
       block: Block,
@@ -55,26 +55,24 @@ final class StdValidators(
       receipts = receipts,
       gasUsed = gasUsed
     )
-}
 
-object StdValidators {
+object StdValidators:
   def validateBlockBeforeExecution(
       self: Validators,
       block: Block,
       getBlockHeaderByHash: GetBlockHeaderByHash,
       @unused getNBlocksBack: GetNBlocksBack
-  )(implicit blockchainConfig: BlockchainConfig): Either[ValidationBeforeExecError, BlockExecutionSuccess] = {
+  )(implicit blockchainConfig: BlockchainConfig): Either[ValidationBeforeExecError, BlockExecutionSuccess] =
 
     val header = block.header
     val body = block.body
 
-    val result = for {
+    val result = for
       _ <- self.blockHeaderValidator.validate(header, getBlockHeaderByHash)
       _ <- self.blockValidator.validateHeaderAndBody(header, body)
-    } yield BlockExecutionSuccess
+    yield BlockExecutionSuccess
 
     result.left.map(ValidationBeforeExecError.apply)
-  }
 
   def validateBlockAfterExecution(
       self: Validators,
@@ -82,7 +80,7 @@ object StdValidators {
       stateRootHash: ByteString,
       receipts: Seq[Receipt],
       gasUsed: BigInt
-  ): Either[BlockExecutionError, BlockExecutionSuccess] = {
+  ): Either[BlockExecutionError, BlockExecutionSuccess] =
 
     val header = block.header
     val blockAndReceiptsValidation = self.blockValidator.validateBlockAndReceipts(header, receipts)
@@ -92,11 +90,7 @@ object StdValidators {
     else if header.stateRoot.value != stateRootHash then
       Left(ValidationAfterExecError(s"Block has invalid state root hash, expected ${Hex
           .toHexString(header.stateRoot.toArray)} but got ${Hex.toHexString(stateRootHash.toArray)}"))
-    else {
-      blockAndReceiptsValidation match {
+    else
+      blockAndReceiptsValidation match
         case Left(err) => Left(ValidationAfterExecError(err.toString))
         case _         => Right(BlockExecutionSuccess)
-      }
-    }
-  }
-}

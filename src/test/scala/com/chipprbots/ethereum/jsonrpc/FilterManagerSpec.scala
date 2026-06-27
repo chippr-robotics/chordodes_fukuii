@@ -45,11 +45,11 @@ class FilterManagerSpec
     with Matchers
     with ScalaFutures
     with NormalPatience
-    with org.scalamock.scalatest.MockFactory {
+    with org.scalamock.scalatest.MockFactory:
 
   val manualTime: ManualTime = ManualTime()
 
-  "FilterManager" should "handle log filter logs and changes" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  "FilterManager" should "handle log filter logs and changes" taggedAs (UnitTest, RPCTest) in new TestSetup:
 
     val address: Address = Address("0x1234")
     val topics: Seq[Seq[ByteString]] = Seq(Seq(), Seq(ByteString(Hex.decode("4567"))))
@@ -222,9 +222,8 @@ class FilterManagerSpec
     val changesResp2: LogFilterChanges = changesProbe2.expectMessageType[LogFilterChanges]
 
     changesResp2.logs.size shouldBe 1
-  }
 
-  it should "handle pending block filter" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "handle pending block filter" taggedAs (UnitTest, RPCTest) in new TestSetup:
 
     val address: Address = Address("0x1234")
     val topics: Seq[Seq[ByteString]] = Seq(Seq(), Seq(ByteString(Hex.decode("4567"))))
@@ -355,9 +354,8 @@ class FilterManagerSpec
       topics = logs2.head.logTopics,
       blockTimestamp = Some(block2.header.unixTimestamp)
     )
-  }
 
-  it should "handle block filter" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "handle block filter" taggedAs (UnitTest, RPCTest) in new TestSetup:
 
     (() => blockchainReader.getBestBlockNumber).expects().returning(3).twice()
 
@@ -391,9 +389,8 @@ class FilterManagerSpec
     val getChangesRes: BlockFilterChanges = changesProbe.expectMessageType[BlockFilterChanges]
 
     getChangesRes.blockHashes shouldBe Seq(bh4.hash, bh5.hash, bh6.hash)
-  }
 
-  it should "handle pending transactions filter" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "handle pending transactions filter" taggedAs (UnitTest, RPCTest) in new TestSetup:
 
     (() => blockchainReader.getBestBlockNumber).expects().returning(3).twice()
 
@@ -427,9 +424,8 @@ class FilterManagerSpec
 
     val getLogsRes: PendingTransactionFilterLogs = logsProbe.expectMessageType[PendingTransactionFilterLogs]
     getLogsRes.txHashes shouldBe pendingTxs.map(_.tx.hash)
-  }
 
-  it should "timeout unused filter" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "timeout unused filter" taggedAs (UnitTest, RPCTest) in new TestSetup:
 
     (() => blockchainReader.getBestBlockNumber).expects().returning(3).twice()
 
@@ -475,21 +471,18 @@ class FilterManagerSpec
     ptmProbe.expectNoMessage()
 
     logsProbe2.expectMessage(LogFilterLogs(Nil))
-  }
 
-  class TestSetup extends SecureRandomBuilder {
+  class TestSetup extends SecureRandomBuilder:
 
-    val filterConfig: FilterConfig = new FilterConfig {
+    val filterConfig: FilterConfig = new FilterConfig:
       override val filterTimeout: FiniteDuration = Timeouts.longTimeout
       override val filterManagerQueryTimeout: FiniteDuration = Timeouts.longTimeout
-    }
 
-    val txPoolConfig: TxPoolConfig = new TxPoolConfig {
+    val txPoolConfig: TxPoolConfig = new TxPoolConfig:
       override val txPoolSize: Int = 30
       override val pendingTxManagerQueryTimeout: FiniteDuration = Timeouts.longTimeout
       override val transactionTimeout: FiniteDuration = Timeouts.normalTimeout
       override val getTransactionFromPoolTimeout: FiniteDuration = Timeouts.normalTimeout
-    }
 
     val keyPair: AsymmetricCipherKeyPair = generateKeyPair(secureRandom)
 
@@ -537,5 +530,3 @@ class FilterManagerSpec
       mixHash = BlockHash(ByteString(Hex.decode("c6d695926546d3d679199303a6d1fc983fe3f09f44396619a24c4271830a7b95"))),
       nonce = ByteString(Hex.decode("62bc3dca012c1b27"))
     )
-  }
-}

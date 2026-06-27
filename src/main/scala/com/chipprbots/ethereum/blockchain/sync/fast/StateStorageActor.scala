@@ -24,7 +24,7 @@ import com.chipprbots.ethereum.db.storage.FastSyncStateStorage
   * `Future` becomes `context.pipeToSelf` wrapping the result in `PersistDone`. FastSync (still Classic) is the parent
   * and spawns this via the Classic->Typed adapter, holding the ref as Classic.
   */
-object StateStorageActor {
+object StateStorageActor:
 
   sealed trait Command
 
@@ -50,19 +50,18 @@ object StateStorageActor {
 
   private def idle(storage: FastSyncStateStorage): Behavior[Command] =
     Behaviors.receive { (context, message) =>
-      message match {
+      message match
         // begin saving of the state to the storage and become busy
         case Persist(state) => persistState(context, storage, state)
         case GetStorage(reply) =>
           reply ! storage.getSyncState()
           Behaviors.same
         case _ => Behaviors.same
-      }
     }
 
   private def busy(storage: FastSyncStateStorage, stateToPersist: Option[SyncState]): Behavior[Command] =
     Behaviors.receive { (context, message) =>
-      message match {
+      message match
         // update state waiting to be persisted later. we only keep newest state
         case Persist(state) => busy(storage, Some(state))
         // exception was thrown during persisting of a state. push
@@ -76,14 +75,13 @@ object StateStorageActor {
           reply ! storage.getSyncState()
           Behaviors.same
         case Init(_) => Behaviors.unhandled // Init only valid in initial behavior; unexpected here
-      }
     }
 
   private def persistState(
       context: ActorContext[Command],
       storage: FastSyncStateStorage,
       syncState: SyncState
-  ): Behavior[Command] = {
+  ): Behavior[Command] =
     given runtime: IORuntime = IORuntime.global
 
     // `context.log` is strictly confined to the actor thread in Pekko Typed; the IO below runs on the IO runtime, so we
@@ -92,21 +90,16 @@ object StateStorageActor {
 
     val persistingQueues: IO[Try[FastSyncStateStorage]] = IO {
       lazy val result = Try(storage.putSyncState(syncState))
-      if log.isDebugEnabled then {
+      if log.isDebugEnabled then
         val now = System.currentTimeMillis()
         result
         val end = System.currentTimeMillis()
         log.debug(s"Saving snapshot of a fast sync took ${end - now} ms")
         result
-      } else {
-        result
-      }
+      else result
     }
     context.pipeToSelf(persistingQueues.unsafeToFuture()) {
       case Success(t) => PersistDone(t)
       case Failure(e) => PersistDone(Failure(e))
     }
     busy(storage, None)
-  }
-
-}

@@ -43,7 +43,7 @@ import org.scalatest.Tag
   * @see
   *   ADR-015 for ethereum/tests integration
   */
-object Tags {
+object Tags:
 
   // ===== Tier 1: Essential Tests (Target: < 5 minutes) =====
 
@@ -245,4 +245,3 @@ object Tags {
     *   `EthSmokeSpec` and the `testEthSmoke` sbt target
     */
   object EthSmoke extends Tag("EthSmoke")
-}

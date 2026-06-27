@@ -16,7 +16,7 @@ import Fixtures.blockchainConfig
 
 /** Tests for EIP-3651: Warm COINBASE https://eips.ethereum.org/EIPS/eip-3651
   */
-class Eip3651Spec extends AnyWordSpec with Matchers {
+class Eip3651Spec extends AnyWordSpec with Matchers:
 
   // Config without EIP-3651 (using Mystique as base)
   val configPreEip3651: EvmConfig = EvmConfig.MystiqueConfigBuilder(blockchainConfig)
@@ -24,7 +24,7 @@ class Eip3651Spec extends AnyWordSpec with Matchers {
   // Config with EIP-3651 enabled
   val configWithEip3651: EvmConfig = configPreEip3651.copy(eip3651Enabled = true)
 
-  object fxt {
+  object fxt:
     val coinbaseAddr: Address = Address(0xc014ba5e) // COINBASE address
     val callerAddr: Address = Address(0xca11e4)
     val otherAddr: Address = Address(0x0de4)
@@ -45,7 +45,7 @@ class Eip3651Spec extends AnyWordSpec with Matchers {
         config: EvmConfig,
         startGas: BigInt = 1000000,
         warmAddresses: Set[Address] = Set.empty
-    ): ProgramContext[MockWorldState, MockStorage] = {
+    ): ProgramContext[MockWorldState, MockStorage] =
       val world = createWorld(code)
       ProgramContext(
         callerAddr = callerAddr,
@@ -66,7 +66,6 @@ class Eip3651Spec extends AnyWordSpec with Matchers {
         warmAddresses = warmAddresses,
         warmStorage = Set.empty
       )
-    }
 
     // Code that reads COINBASE address and checks its balance
     // COINBASE BALANCE
@@ -76,14 +75,13 @@ class Eip3651Spec extends AnyWordSpec with Matchers {
       STOP
     )
 
-    def createWorld(code: ByteString = codeReadCoinbaseBalance.code): MockWorldState = {
+    def createWorld(code: ByteString = codeReadCoinbaseBalance.code): MockWorldState =
       val world = MockWorldState()
         .saveAccount(coinbaseAddr, Account(balance = UInt256(1000)))
         .saveAccount(callerAddr, Account(balance = UInt256(1000), nonce = 1))
         .saveAccount(otherAddr, Account(balance = UInt256(1000)))
         .saveCode(callerAddr, code)
       world
-    }
 
     // Code that calls EXTCODESIZE on COINBASE
     val codeReadCoinbaseCodeSize: Assembly = Assembly(
@@ -106,7 +104,6 @@ class Eip3651Spec extends AnyWordSpec with Matchers {
       BALANCE,
       STOP
     )
-  }
 
   import fxt.*
 
@@ -319,4 +316,3 @@ class Eip3651Spec extends AnyWordSpec with Matchers {
       }
     }
   }
-}

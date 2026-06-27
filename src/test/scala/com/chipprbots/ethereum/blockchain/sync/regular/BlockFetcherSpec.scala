@@ -50,14 +50,14 @@ class BlockFetcherSpec
     extends ScalaTestWithActorTestKit(ConfigFactory.load())
     with AnyFreeSpecLike
     with Matchers
-    with SecureRandomBuilder {
+    with SecureRandomBuilder:
 
   "BlockFetcher" - {
 
     "should not requests headers upon invalidation while a request is already in progress, should resume after response" taggedAs (
       UnitTest,
       SyncTest
-    ) in new TestSetup {
+    ) in new TestSetup:
       startFetcher()
 
       handleFirstBlockBatch()
@@ -90,9 +90,8 @@ class BlockFetcherSpec
         case PeersClient.Request(msg: ETHPackets.GetBlockHeaders, _, _, _) if msg.block == Left(1) => ()
       }
       testKit.stop(blockFetcher)
-    }
 
-    "should not requests headers upon invalidation while a request is already in progress, should resume after failure in response" in new TestSetup {
+    "should not requests headers upon invalidation while a request is already in progress, should resume after failure in response" in new TestSetup:
       startFetcher()
 
       handleFirstBlockBatch()
@@ -118,9 +117,8 @@ class BlockFetcherSpec
         case PeersClient.Request(msg: ETHPackets.GetBlockHeaders, _, _, _) if msg.block == Left(1) => ()
       }
       testKit.stop(blockFetcher)
-    }
 
-    "should not enqueue requested blocks if the received bodies do not match" in new TestSetup {
+    "should not enqueue requested blocks if the received bodies do not match" in new TestSetup:
 
       // Important: Here we are forcing the mismatch between request headers and received bodies
       override lazy val validators = new MockValidatorsFailingOnBlockBodies
@@ -141,9 +139,8 @@ class BlockFetcherSpec
       importer.send(blockFetcher.toClassic, PickBlocks(syncConfig.blocksBatchSize, importer.ref.toTyped[FetchResponse]))
       importer.expectNoMessage(100.millis)
       testKit.stop(blockFetcher)
-    }
 
-    "should be able to handle block bodies received in several parts" in new TestSetup {
+    "should be able to handle block bodies received in several parts" in new TestSetup:
 
       startFetcher()
 
@@ -181,9 +178,8 @@ class BlockFetcherSpec
         blocks.map(_.hash).toList shouldEqual firstBlocksBatch.map(_.hash)
       }
       testKit.stop(blockFetcher)
-    }
 
-    "should stop requesting, without blacklist the peer, in case empty bodies are received" in new TestSetup {
+    "should stop requesting, without blacklist the peer, in case empty bodies are received" in new TestSetup:
 
       startFetcher()
 
@@ -215,9 +211,8 @@ class BlockFetcherSpec
         blocks.map(_.hash).toList shouldEqual subChain1.map(_.hash)
       }
       testKit.stop(blockFetcher)
-    }
 
-    "should ensure blocks passed to importer are always forming chain" in new TestSetup {
+    "should ensure blocks passed to importer are always forming chain" in new TestSetup:
       startFetcher()
 
       triggerFetching()
@@ -270,19 +265,16 @@ class BlockFetcherSpec
         assert(HeadersSeq.areChain(headers))
       }
       testKit.stop(blockFetcher)
-    }
 
     // BF-1A: ETH/69 head-following via BlockRangeUpdate
-    "should include BlockRangeUpdateCode in peer event subscription" taggedAs (UnitTest, SyncTest) in new TestSetup {
+    "should include BlockRangeUpdateCode in peer event subscription" taggedAs (UnitTest, SyncTest) in new TestSetup:
       blockFetcher ! BlockFetcher.Start(importer.ref.toTyped[BlockImporter.Command], 0)
       val sub = peerEventBus.expectMsgType[SubscribeCmd]
-      sub.to match {
+      sub.to match
         case MessageClassifier(codes, _) =>
           codes should contain(Codes.BlockRangeUpdateCode)
         case _ => fail("Expected MessageClassifier subscription")
-      }
       testKit.stop(blockFetcher)
-    }
 
     // BF-1A: GetBlockHeaders(block=Left(1)) originates from the initial Start dispatch (nextDispatchBlock=1),
     // not from the BRU handler. Real BRU decode-path coverage (malformed disconnect + withPossibleNewTopAt
@@ -290,7 +282,7 @@ class BlockFetcherSpec
     "should request headers when BlockRangeUpdate announces a new chain tip" taggedAs (
       UnitTest,
       SyncTest
-    ) in new TestSetup {
+    ) in new TestSetup:
       startFetcher()
       // ETH/69 peer announces latest block at 100; fetcher should immediately request headers
       val update: BlockRangeUpdate =
@@ -300,10 +292,9 @@ class BlockFetcherSpec
         case PeersClient.Request(msg: ETHPackets.GetBlockHeaders, _, _, _) if msg.block == Left(1) => ()
       }
       testKit.stop(blockFetcher)
-    }
 
     // BF-1B: PrintStatus heartbeat probes for next block when on top
-    "should probe for the next block via PrintStatus when isOnTop" taggedAs (UnitTest, SyncTest) in new TestSetup {
+    "should probe for the next block via PrintStatus when isOnTop" taggedAs (UnitTest, SyncTest) in new TestSetup:
       // Start from block 5; knownTop initialises to 6 so fetcher immediately requests block 6
       startFetcher(fromBlock = 5)
       // Consume the initial GetBlockHeaders(6) request triggered by fetchBlocks at Start
@@ -335,13 +326,12 @@ class BlockFetcherSpec
         case PeersClient.Request(msg: ETHPackets.GetBlockHeaders, _, _, _) if msg.block == Left(BigInt(7)) => true
       }
       testKit.stop(blockFetcher)
-    }
 
     // BF-2: partial header batch still advances nextBlockToFetch correctly
     "should fetch the next window after a partial header batch response" taggedAs (
       UnitTest,
       SyncTest
-    ) in new TestSetup {
+    ) in new TestSetup:
       startFetcher()
       // Trigger to set knownTop=1000 (high, so fetcher knows more blocks exist)
       triggerFetching(1000)
@@ -357,9 +347,8 @@ class BlockFetcherSpec
         case PeersClient.Request(msg: ETHPackets.GetBlockHeaders, _, _, _) if msg.block == Left(6) => true
       }
       testKit.stop(blockFetcher)
-    }
 
-    "should properly handle a request timeout" in new TestSetup {
+    "should properly handle a request timeout" in new TestSetup:
       override lazy val syncConfig: SyncConfig = defaultSyncConfig.copy(
         // Small timeout on ask pattern for testing it here
         peerResponseTimeout = 1.seconds
@@ -379,10 +368,9 @@ class BlockFetcherSpec
         case PeersClient.Request(msg: ETHPackets.GetBlockHeaders, _, _, _) if msg.block == Left(1) => ()
       }
       testKit.stop(blockFetcher)
-    }
   }
 
-  trait TestSetup extends TestSyncConfig {
+  trait TestSetup extends TestSyncConfig:
     val peersClient: TestProbe = TestProbe()(testKit.system.classicSystem)
     val peerEventBus: TestProbe = TestProbe()(testKit.system.classicSystem)
     val importer: TestProbe = TestProbe()(testKit.system.classicSystem)
@@ -413,24 +401,22 @@ class BlockFetcherSpec
       s"blockFetcher-${UUID.randomUUID()}"
     )
 
-    def startFetcher(fromBlock: BigInt = 0): Unit = {
+    def startFetcher(fromBlock: BigInt = 0): Unit =
       blockFetcher ! BlockFetcher.Start(importer.ref.toTyped[BlockImporter.Command], fromBlock)
 
       peerEventBus.expectMsgType[SubscribeCmd].to shouldBe MessageClassifier(
         Set(Codes.NewBlockCode, Codes.NewBlockHashesCode, Codes.BlockHeadersCode, Codes.BlockRangeUpdateCode),
         PeerSelector.AllPeers
       )
-    }
 
     // Sending a far away block as a NewBlock message
     // Currently BlockFetcher only downloads first block-headers-per-request blocks without this
-    def triggerFetching(startingNumber: BigInt = 1000): Unit = {
+    def triggerFetching(startingNumber: BigInt = 1000): Unit =
       val farAwayBlockTotalDifficulty = 100000
       val farAwayBlock =
         Block(FixtureBlocks.ValidBlock.header.copy(number = startingNumber), FixtureBlocks.ValidBlock.body)
 
       blockFetcher ! AdaptedMessageFromEventBus(NewBlock(farAwayBlock, farAwayBlockTotalDifficulty), fakePeer.id)
-    }
 
     val firstBlocksBatch: List[Block] =
       BlockHelpers.generateChain(syncConfig.blockHeadersPerRequest, FixtureBlocks.Genesis.block)
@@ -442,7 +428,7 @@ class BlockFetcherSpec
     var prefetchHeadersSender: Option[ActorRef[PeersClient.ResponseMessage]] = None
     var pendingBodiesSender: Option[ActorRef[PeersClient.ResponseMessage]] = None
 
-    def handleFirstBlockBatchHeaders(): Unit = {
+    def handleFirstBlockBatchHeaders(): Unit =
       val (requestId, headersReplyTo) = peersClient.expectMsgPF() {
         case PeersClient.Request(msg: ETHPackets.GetBlockHeaders, _, _, replyTo) if msg.block == Left(1) =>
           (msg.requestId, replyTo)
@@ -460,14 +446,12 @@ class BlockFetcherSpec
       }
       classifyNext()
       classifyNext()
-    }
 
-    def handleFirstBlockBatchBodies(): Unit = {
+    def handleFirstBlockBatchBodies(): Unit =
       val replyTo = pendingBodiesSender.getOrElse(
         fail("Expected GetBlockBodies reply address captured by handleFirstBlockBatchHeaders")
       )
       replyTo ! PeersClient.Response(fakePeer, ETHPackets.BlockBodies(BigInt(0), firstBlocksBatch.map(_.body)))
-    }
 
     /** Synchronise on BlockFetcher having finished processing the bodies response. expectNoMessage drains the
       * peersClient mailbox for the given window, guaranteeing the actor has processed the bodies reply before the
@@ -475,9 +459,6 @@ class BlockFetcherSpec
       */
     def awaitBodiesProcessed(): Unit = peersClient.expectNoMessage(1.second)
 
-    def handleFirstBlockBatch(): Unit = {
+    def handleFirstBlockBatch(): Unit =
       handleFirstBlockBatchHeaders()
       handleFirstBlockBatchBodies()
-    }
-  }
-}

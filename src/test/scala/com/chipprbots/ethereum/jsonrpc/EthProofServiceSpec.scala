@@ -41,11 +41,11 @@ class EthProofServiceSpec
     with MockFactory
     with NormalPatience
     with TypeCheckedTripleEquals
-    with DiffMatcher {
+    with DiffMatcher:
 
   implicit val runtime: IORuntime = IORuntime.global
 
-  "EthProofService" should "handle getStorageAt request" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  "EthProofService" should "handle getStorageAt request" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val request: GetProofRequest = GetProofRequest(address, storageKeys, blockNumber)
     val result: cats.effect.IO[Either[JsonRpcError, GetProofResponse]] = ethGetProof.getProof(request)
 
@@ -86,30 +86,28 @@ class EthProofServiceSpec
     givenResult.storageProof.map(_.proof).foreach { p =>
       p should not be empty
     }
-  }
 
   "EthProofService" should "return an error when the proof is requested for non-existing account" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val wrongAddress: Address = Address(666)
     val result: Either[JsonRpcError, GetProofResponse] =
       fetchProof(wrongAddress, storageKeys, blockNumber).unsafeRunSync()
     result.isLeft shouldBe true
     result.fold(l => l.message should include("No account found for Address"), r => r)
-  }
 
   "EthProofService" should "return the proof with empty value for non-existing storage key" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val wrongStorageKey: Seq[StorageProofKey] = Seq(StorageProofKey(321))
     val result: Either[JsonRpcError, GetProofResponse] =
       fetchProof(address, wrongStorageKey, blockNumber).unsafeRunSync()
     result.isRight shouldBe true
     result.fold(
       l => l,
-      r => {
+      r =>
         val accountProof = r.proofAccount
         val accProofAddr = accountProof.address; accProofAddr shouldBe address
         accountProof.accountProof.foreach { p =>
@@ -127,20 +125,18 @@ class EthProofServiceSpec
           v.proof.nonEmpty shouldBe true
           v.value shouldBe BigInt(0)
         }
-      }
     )
-  }
 
   "EthProofService" should "return the proof and value for existing storage key" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val storageKey: Seq[StorageProofKey] = Seq(StorageProofKey(key))
     val result: Either[JsonRpcError, GetProofResponse] = fetchProof(address, storageKey, blockNumber).unsafeRunSync()
     result.isRight shouldBe true
     result.fold(
       l => l,
-      r => {
+      r =>
         val accountProof = r.proofAccount
         val accProofAddr = accountProof.address; accProofAddr shouldBe address
         accountProof.accountProof.foreach { p =>
@@ -158,21 +154,19 @@ class EthProofServiceSpec
           v.proof.nonEmpty shouldBe true
           v.value shouldBe BigInt(value)
         }
-      }
     )
-  }
 
   "EthProofService" should "return the proof and value for multiple existing storage keys" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val storageKey: Seq[StorageProofKey] = Seq(StorageProofKey(key), StorageProofKey(key2))
     val expectedValueStorageKey: Seq[BigInt] = Seq(BigInt(value), BigInt(value2))
     val result: Either[JsonRpcError, GetProofResponse] = fetchProof(address, storageKey, blockNumber).unsafeRunSync()
     result.isRight shouldBe true
     result.fold(
       l => l,
-      r => {
+      r =>
         val accountProof = r.proofAccount
         val accProofAddr = accountProof.address; accProofAddr shouldBe address
         accountProof.accountProof.foreach { p =>
@@ -191,14 +185,12 @@ class EthProofServiceSpec
           v.proof.nonEmpty shouldBe true
           expectedValueStorageKey should contain(v.value)
         }
-      }
     )
-  }
 
   "EthProofService" should "return the proof for all storage keys provided, but value should be returned only for the existing ones" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val wrongStorageKey: StorageProofKey = StorageProofKey(321)
     val storageKey: Seq[StorageProofKey] = Seq(StorageProofKey(key), StorageProofKey(key2)) :+ wrongStorageKey
     val expectedValueStorageKey: Seq[BigInt] = Seq(BigInt(value), BigInt(value2), BigInt(0))
@@ -206,7 +198,7 @@ class EthProofServiceSpec
     result.isRight shouldBe true
     result.fold(
       l => l,
-      r => {
+      r =>
         val accountProof = r.proofAccount
         val accProofAddr = accountProof.address; accProofAddr shouldBe address
         accountProof.accountProof.foreach { p =>
@@ -222,19 +214,17 @@ class EthProofServiceSpec
         accountProof.storageHash shouldBe account.storageRoot.value
         accountProof.storageProof.size shouldBe 3
         expectedValueStorageKey.forall(accountProof.storageProof.map(_.value).contains) shouldBe true
-      }
     )
-  }
 
   "EthProofService" should "return account proof and account details, with empty storage proof" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val result: Either[JsonRpcError, GetProofResponse] = fetchProof(address, Seq.empty, blockNumber).unsafeRunSync()
     result.isRight shouldBe true
     result.fold(
       l => l,
-      r => {
+      r =>
         val accountProof = r.proofAccount
         val accProofAddr = accountProof.address; accProofAddr shouldBe address
         accountProof.accountProof.foreach { p =>
@@ -249,11 +239,9 @@ class EthProofServiceSpec
         accountProof.nonce shouldBe UInt256(nonce)
         accountProof.storageHash shouldBe account.storageRoot.value
         accountProof.storageProof.size shouldBe 0
-      }
     )
-  }
 
-  class TestSetup() extends EphemBlockchainTestSetup with ApisBuilder {
+  class TestSetup() extends EphemBlockchainTestSetup with ApisBuilder:
     val blockGenerator: PoWBlockGenerator = mock[PoWBlockGenerator]
     val address: Address = Address(ByteString(Hex.decode("abbb6bebfa05aa13e908eaa492bd7a8343760477")))
     val balance: UInt256 = UInt256(0)
@@ -304,11 +292,10 @@ class EthProofServiceSpec
         address: Address,
         storageKeys: Seq[StorageProofKey],
         blockNumber: BlockParam
-    ): ServiceResponse[ProofService.GetProofResponse] = {
+    ): ServiceResponse[ProofService.GetProofResponse] =
       val request = GetProofRequest(address, storageKeys, blockNumber)
       val retrievedAccountProof: ServiceResponse[ProofService.GetProofResponse] = ethGetProof.getProof(request)
       retrievedAccountProof
-    }
 
     val ethUserService = new EthUserService(
       blockchain,
@@ -317,5 +304,3 @@ class EthProofServiceSpec
       storagesInstance.storages.evmCodeStorage,
       this
     )
-  }
-}

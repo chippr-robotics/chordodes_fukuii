@@ -18,19 +18,17 @@ import com.chipprbots.ethereum.testing.Tags.*
   *
   * Test vectors from go-ethereum: core/vm/testdata/precompiles/pointEvaluation.json
   */
-class KzgPointEvaluationSpec extends AnyFunSuite with BeforeAndAfterAll with Matchers {
+class KzgPointEvaluationSpec extends AnyFunSuite with BeforeAndAfterAll with Matchers:
 
   override def beforeAll(): Unit =
-    try {
+    try
       CKZG4844JNI.loadNativeLibrary()
       CKZG4844JNI.loadTrustedSetupFromResource("/trusted_setup.txt", classOf[CKZG4844JNI], 0L)
-    } catch {
-      case _: Exception => () // already loaded by a prior test class in the same JVM
-    }
+    catch case _: Exception => () // already loaded by a prior test class in the same JVM
 
   override def afterAll(): Unit =
     try CKZG4844JNI.freeTrustedSetup()
-    catch { case _: Exception => () }
+    catch case _: Exception => ()
 
   // go-ethereum pointEvaluation1 vector (192 bytes = 384 hex chars)
   private val validInput = ByteString(
@@ -75,4 +73,3 @@ class KzgPointEvaluationSpec extends AnyFunSuite with BeforeAndAfterAll with Mat
     val result = PrecompiledContracts.KzgPointEvaluation.exec(ByteString(badVersion))
     result shouldBe None
   }
-}

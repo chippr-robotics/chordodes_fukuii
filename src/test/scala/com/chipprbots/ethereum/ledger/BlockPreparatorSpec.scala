@@ -37,12 +37,12 @@ import com.chipprbots.ethereum.vm.StackOverflow
 import com.chipprbots.ethereum.vm.StackUnderflow
 
 // scalastyle:off magic.number
-class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPropertyChecks {
+class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPropertyChecks:
 
   "BlockPreparator" should {
 
     "correctly change the nonce" when {
-      "executing a tx that results in contract creation" taggedAs (UnitTest, StateTest) in new TestSetup {
+      "executing a tx that results in contract creation" taggedAs (UnitTest, StateTest) in new TestSetup:
 
         val tx: LegacyTransaction =
           defaultTx.copy(
@@ -65,9 +65,8 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
             .worldState
 
         postTxWorld.getGuaranteedAccount(originAddress).nonce shouldBe UInt256(initialOriginNonce + 1)
-      }
 
-      "executing a tx that results in a message call" taggedAs (UnitTest, StateTest) in new TestSetup {
+      "executing a tx that results in a message call" taggedAs (UnitTest, StateTest) in new TestSetup:
 
         val tx: LegacyTransaction = defaultTx.copy(
           gasPrice = defaultGasPrice,
@@ -89,11 +88,10 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
             .worldState
 
         postTxWorld.getGuaranteedAccount(originAddress).nonce shouldBe UInt256(initialOriginNonce + 1)
-      }
     }
 
     "properly assign stateRootHash" when {
-      "before byzantium block (exclusive)" taggedAs (UnitTest, StateTest) in new TestSetup {
+      "before byzantium block (exclusive)" taggedAs (UnitTest, StateTest) in new TestSetup:
 
         val tx: LegacyTransaction = defaultTx.copy(
           gasPrice = defaultGasPrice,
@@ -115,9 +113,8 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
         result.map { br =>
           br.receipts.last.postTransactionStateHash shouldBe a[HashOutcome]
         }
-      }
 
-      "after byzantium block (inclusive) if operation is a success" taggedAs (UnitTest, StateTest) in new TestSetup {
+      "after byzantium block (inclusive) if operation is a success" taggedAs (UnitTest, StateTest) in new TestSetup:
 
         val tx: LegacyTransaction = defaultTx.copy(
           gasPrice = defaultGasPrice,
@@ -137,9 +134,8 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
 
         result shouldBe a[Right[?, BlockResult]]
         result.map(_.receipts.last.postTransactionStateHash shouldBe SuccessOutcome)
-      }
 
-      "after byzantium block (inclusive) if operation is a failure" taggedAs (UnitTest, StateTest) in new TestSetup {
+      "after byzantium block (inclusive) if operation is a failure" taggedAs (UnitTest, StateTest) in new TestSetup:
 
         val defaultsLogs: Seq[TxLogEntry] = Seq(defaultLog)
 
@@ -169,13 +165,12 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
 
         result shouldBe a[Right[?, BlockResult]]
         result.map(_.receipts.last.postTransactionStateHash shouldBe FailureOutcome)
-      }
     }
 
     "correctly calculate the total gas refund to be returned to the sender and paying for gas to the miner" taggedAs (
       UnitTest,
       StateTest
-    ) in new TestSetup {
+    ) in new TestSetup:
 
       val table: TableFor4[BigInt, BigInt, Option[ProgramError], BigInt] =
         Table[BigInt, BigInt, Option[ProgramError], BigInt](
@@ -220,11 +215,10 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
         postTxWorld.getBalance(originAddress) shouldEqual (initialOriginBalance - balanceDelta)
         postTxWorld.getBalance(minerAddress) shouldEqual (initialMinerBalance + balanceDelta)
       }
-    }
 
   }
 
-  "clear logs only if vm execution results in an error" taggedAs (UnitTest, StateTest) in new TestSetup {
+  "clear logs only if vm execution results in an error" taggedAs (UnitTest, StateTest) in new TestSetup:
 
     val defaultsLogs: Seq[TxLogEntry] = Seq(defaultLog)
 
@@ -260,9 +254,8 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
 
       txResult.logs.size shouldBe logsSize
     }
-  }
 
-  "create sender account if it does not exists" taggedAs (UnitTest, StateTest) in new TestSetup {
+  "create sender account if it does not exists" taggedAs (UnitTest, StateTest) in new TestSetup:
 
     val inputData: ByteString = ByteString("the payload")
 
@@ -286,21 +279,20 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
 
     result shouldBe a[Right[?, BlockResult]]
     result.map(br => br.worldState.getAccount(newAccountAddress)) shouldBe Right(Some(Account(nonce = 1)))
-  }
 
   "remember executed transaction in case of many failures in the middle" taggedAs (
     UnitTest,
     StateTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val newAccountKeyPair: AsymmetricCipherKeyPair = generateKeyPair(secureRandom)
     Address(kec256(newAccountKeyPair.getPublic.asInstanceOf[ECPublicKeyParameters].getQ.getEncoded(false).tail))
 
     override lazy val vm: VMImpl =
       new MockVM((pc: PC) => createResult(pc, defaultGasLimit, defaultGasLimit, 0, None, returnData = ByteString.empty))
 
-    override lazy val validators: MockValidatorsAlwaysSucceed = new Mocks.MockValidatorsAlwaysSucceed {
+    override lazy val validators: MockValidatorsAlwaysSucceed = new Mocks.MockValidatorsAlwaysSucceed:
       override val signedTransactionValidator: SignedTransactionValidator =
-        new SignedTransactionValidator {
+        new SignedTransactionValidator:
           def validate(
               stx: SignedTransaction,
               senderAccount: Account,
@@ -308,13 +300,8 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
               upfrontGasCost: UInt256,
               accumGasUsed: BigInt
           )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] =
-            if stx.tx.receivingAddress.contains(Address(42)) then {
-              Right(SignedTransactionValid)
-            } else {
-              Left(TransactionSignatureError)
-            }
-        }
-    }
+            if stx.tx.receivingAddress.contains(Address(42)) then Right(SignedTransactionValid)
+            else Left(TransactionSignatureError)
 
     val tx1: LegacyTransaction = defaultTx.copy(gasPrice = 42, receivingAddress = Some(Address(42)))
     val tx2: LegacyTransaction = defaultTx.copy(gasPrice = 43, receivingAddress = Some(Address(43)))
@@ -331,19 +318,19 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
       defaultBlockHeader
     )
 
-    result match { case (_, executedTxs) => executedTxs shouldBe Seq(stx1, stx4) }
-  }
+    result match
+      case (_, executedTxs) => executedTxs shouldBe Seq(stx1, stx4)
 
-  "produce empty block if all txs fail" taggedAs (UnitTest, StateTest) in new TestSetup {
+  "produce empty block if all txs fail" taggedAs (UnitTest, StateTest) in new TestSetup:
     val newAccountKeyPair: AsymmetricCipherKeyPair = generateKeyPair(secureRandom)
     Address(kec256(newAccountKeyPair.getPublic.asInstanceOf[ECPublicKeyParameters].getQ.getEncoded(false).tail))
 
     override lazy val vm =
       new MockVM((pc: PC) => createResult(pc, defaultGasLimit, defaultGasLimit, 0, None, returnData = ByteString.empty))
 
-    override lazy val validators: Mocks.MockValidatorsAlwaysSucceed = new Mocks.MockValidatorsAlwaysSucceed {
+    override lazy val validators: Mocks.MockValidatorsAlwaysSucceed = new Mocks.MockValidatorsAlwaysSucceed:
       override val signedTransactionValidator: SignedTransactionValidator =
-        new SignedTransactionValidator {
+        new SignedTransactionValidator:
           def validate(
               stx: SignedTransaction,
               senderAccount: Account,
@@ -352,8 +339,6 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
               accumGasUsed: BigInt
           )(implicit blockchainConfig: BlockchainConfig): Either[SignedTransactionError, SignedTransactionValid] =
             Left(TransactionSignatureError)
-        }
-    }
 
     val tx1: LegacyTransaction = defaultTx.copy(gasPrice = 42, receivingAddress = Some(Address(42)))
     val tx2: LegacyTransaction = defaultTx.copy(gasPrice = 42, receivingAddress = Some(Address(42)))
@@ -363,11 +348,11 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
     val result: (BlockResult, Seq[SignedTransaction]) =
       mining.blockPreparator.executePreparedTransactions(Seq(stx1, stx2), initialWorld, defaultBlockHeader)
 
-    result match { case (_, executedTxs) => executedTxs shouldBe Seq.empty }
-  }
+    result match
+      case (_, executedTxs) => executedTxs shouldBe Seq.empty
 
   // migrated from old LedgerSpec
-  "properly assign stateRootHash before byzantium block (exclusive)" in new TestSetup {
+  "properly assign stateRootHash before byzantium block (exclusive)" in new TestSetup:
 
     val tx: LegacyTransaction = defaultTx.copy(
       gasPrice = defaultGasPrice,
@@ -386,9 +371,8 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
     result.map { br =>
       br.receipts.last.postTransactionStateHash shouldBe a[HashOutcome]
     }
-  }
 
-  "properly assign stateRootHash after byzantium block (inclusive) if operation is a success" in new TestSetup {
+  "properly assign stateRootHash after byzantium block (inclusive) if operation is a success" in new TestSetup:
 
     val tx: LegacyTransaction = defaultTx.copy(
       gasPrice = defaultGasPrice,
@@ -408,9 +392,8 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
 
     result shouldBe a[Right[?, BlockResult]]
     result.map(_.receipts.last.postTransactionStateHash shouldBe SuccessOutcome)
-  }
 
-  "properly assign stateRootHash after byzantium block (inclusive) if operation is a failure" in new TestSetup {
+  "properly assign stateRootHash after byzantium block (inclusive) if operation is a failure" in new TestSetup:
 
     val defaultsLogs: Seq[TxLogEntry] = Seq(defaultLog)
 
@@ -437,7 +420,6 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
 
     result shouldBe a[Right[?, BlockResult]]
     result.map(_.receipts.last.postTransactionStateHash shouldBe FailureOutcome)
-  }
 
   "deductBlobGas" should {
     // Verifies that deductBlobGas routes through BlobGasUtils.getBlobGasPrice, which covers
@@ -446,7 +428,7 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
     "burn the correct blob gas cost matching BlobGasUtils for a Prague block" taggedAs (
       UnitTest,
       ConsensusTest
-    ) in new TestSetup {
+    ) in new TestSetup:
       implicit val pragueConfig: BlockchainConfig = blockchainConfig.copy(
         forkTimestamps = blockchainConfig.forkTimestamps.copy(
           cancunTimestamp = Some(0L),
@@ -492,6 +474,4 @@ class BlockPreparatorSpec extends AnyWordSpec with Matchers with ScalaCheckPrope
       val actualBalance = resultWorld.getGuaranteedAccount(originAddress).balance
 
       actualBalance shouldBe UInt256(senderBalance.toBigInt - expectedBurned)
-    }
   }
-}

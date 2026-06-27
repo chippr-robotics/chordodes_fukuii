@@ -6,14 +6,13 @@ import com.chipprbots.ethereum.utils.Logger
 
 /** A [[MiningBuilder]] that builds a [[TestMining]]
   */
-trait TestMiningBuilder { self: StdMiningBuilder =>
+trait TestMiningBuilder:
+  self: StdMiningBuilder =>
   protected def buildTestMining(): TestMining =
-    buildMining() match {
+    buildMining() match
       case tm: TestMining => tm
       case other =>
         throw new RuntimeException(s"buildMining() returned ${other.getClass.getName}, expected TestMining")
-    }
-}
 
 /** A standard [[TestMiningBuilder]] cake. */
 trait StdTestMiningBuilder

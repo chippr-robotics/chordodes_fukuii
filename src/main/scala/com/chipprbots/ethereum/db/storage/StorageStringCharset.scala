@@ -2,6 +2,5 @@ package com.chipprbots.ethereum.db.storage
 
 import java.nio.charset.Charset
 
-object StorageStringCharset {
+object StorageStringCharset:
   val UTF8Charset: Charset = Charset.forName("UTF-8")
-}

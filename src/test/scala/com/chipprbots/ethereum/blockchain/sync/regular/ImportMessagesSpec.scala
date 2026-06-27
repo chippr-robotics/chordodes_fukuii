@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   *
   * Verifies: reorg log levels (core-geth vocabulary), field presence, large-reorg threshold, importedToTheTop fields.
   */
-class ImportMessagesSpec extends AnyWordSpec with Matchers {
+class ImportMessagesSpec extends AnyWordSpec with Matchers:
 
   private val testPeer: PeerId = PeerId("test-peer")
 
@@ -119,4 +119,3 @@ class ImportMessagesSpec extends AnyWordSpec with Matchers {
       level shouldBe WarningLevel
     }
   }
-}

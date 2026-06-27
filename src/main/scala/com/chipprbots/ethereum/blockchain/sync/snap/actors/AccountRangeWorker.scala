@@ -26,7 +26,7 @@ import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
   * Pekko Typed leaf actor (Group W1). `coordinator` is a typed ref (§8k-A). `networkPeerManager` is a typed ref
   * (§8k-B11).
   */
-object AccountRangeWorker {
+object AccountRangeWorker:
 
   import AccountRangeCoordinator.*
 
@@ -62,7 +62,7 @@ object AccountRangeWorker {
   ): Behavior[Command] =
     Behaviors
       .receive[Command] { (context, msg) =>
-        msg match {
+        msg match
           case _: WorkerRequestCancelled  => Behaviors.same // #1184: idempotent — already idle, nothing to clear
           case _: WorkerPeerDisconnected  => Behaviors.same // No current task, nothing to do
           case _: AccountRangeResponseMsg => Behaviors.same // stale response while idle; ignore
@@ -105,7 +105,6 @@ object AccountRangeWorker {
             networkPeerManager ! NetworkPeerManagerActor.SendMessageCmd(messageSerializable, peer.id)
 
             working(coordinator, networkPeerManager, requestTracker, Some((task, peer, requestId, expectedRoot)))
-        }
       }
       .receiveSignal(postStopSignal(currentTask))
 
@@ -114,14 +113,14 @@ object AccountRangeWorker {
       networkPeerManager: ActorRef[com.chipprbots.ethereum.network.NetworkPeerManagerActor.Command],
       requestTracker: SNAPRequestTracker,
       currentTask: Option[(AccountTask, Peer, BigInt, ByteString)]
-  ): Behavior[Command] = {
+  ): Behavior[Command] =
     def goIdle: Behavior[Command] = idle(coordinator, networkPeerManager, requestTracker, currentTask = None)
 
     Behaviors
       .receive[Command] { (context, msg) =>
-        msg match {
+        msg match
           case AccountRangeResponseMsg(response) =>
-            currentTask match {
+            currentTask match
               case Some((task, _, reqId, expectedRoot)) if response.requestId == reqId =>
                 context.log.debug(
                   s"Received AccountRange: reqId=$reqId range=${task.rangeString} " +
@@ -160,7 +159,7 @@ object AccountRangeWorker {
                         endHash = endHash
                       )
                     }
-                  catch {
+                  catch
                     case ex: Throwable =>
                       // Catch Throwable (not just Exception) so that StackOverflowError and other JVM
                       // Errors don't escape to the actor system. Under Pekko's Resume supervisor strategy
@@ -170,9 +169,8 @@ object AccountRangeWorker {
                         s"[WORKER] Proof verification threw for reqId=$reqId range=${task.rangeString}: ${ex.getClass.getSimpleName}: ${ex.getMessage}"
                       )
                       Left(s"proof verification exception: ${ex.getClass.getSimpleName}: ${ex.getMessage}")
-                  }
 
-                proofOk match {
+                proofOk match
                   case Left(error) =>
                     val errorStr = error.toString
                     // Root mismatch during a pivot transition is expected — the peer is serving the new
@@ -191,7 +189,6 @@ object AccountRangeWorker {
                   case Right(_) =>
                     context.log.debug(s"Successfully received $accountCount accounts")
                     coordinator ! TaskComplete(reqId, Right((accountCount, response.accounts, response.proof)))
-                }
 
                 // Return to idle state for potential reuse
                 goIdle
@@ -199,10 +196,9 @@ object AccountRangeWorker {
               case _ =>
                 context.log.warn(s"Received response for wrong request ID: ${response.requestId}")
                 Behaviors.same
-            }
 
           case RequestTimeout(reqId) =>
-            currentTask match {
+            currentTask match
               case Some((_, _, currentReqId, _)) if currentReqId == reqId =>
                 context.log.warn(s"Request $reqId timed out")
                 coordinator ! TaskFailed(reqId, "Request timeout")
@@ -211,39 +207,34 @@ object AccountRangeWorker {
               case _ =>
                 context.log.debug(s"Timeout for old or unknown request $reqId")
                 Behaviors.same
-            }
 
           case WorkerPeerDisconnected(peerId) =>
-            currentTask match {
+            currentTask match
               case Some((_, peer, reqId, _)) if peer.id.value == peerId =>
                 context.log.debug(s"Peer $peerId disconnected — re-queuing task immediately (reqId=$reqId)")
                 requestTracker.completeRequest(reqId, 0)
                 coordinator ! TaskFailed(reqId, "Peer disconnected")
                 goIdle
               case _ => Behaviors.same // Different peer or no task; ignore
-            }
 
           case WorkerRequestCancelled(reqId) =>
             // #1184: coordinator drained `activeTasks` and is owning the re-queue itself —
             // we just clear local state. Do NOT send TaskFailed (coordinator already re-queued).
             // Match existing tracker-ownership contract: worker owns its tracker entry.
             // Idempotent: SNAPRequestTracker.completeRequest is safe on already-removed ids.
-            currentTask match {
+            currentTask match
               case Some((_, _, currentReqId, _)) if currentReqId == reqId =>
                 context.log.debug(s"Worker request $reqId cancelled by coordinator — clearing state")
                 requestTracker.completeRequest(reqId, 0)
                 goIdle
               case _ => Behaviors.same // Different reqId or no current task; ignore
-            }
 
           case _: FetchAccountRange =>
             context.log.warn("Worker is busy, cannot accept new task")
             coordinator ! TaskFailed(0, "Worker busy")
             Behaviors.same
-        }
       }
       .receiveSignal(postStopSignal(currentTask))
-  }
 
   private def postStopSignal(
       currentTask: Option[(AccountTask, Peer, BigInt, ByteString)]
@@ -256,4 +247,3 @@ object AccountRangeWorker {
       context.log.info(s"[WORKER] AccountRangeWorker ${context.self.path.name} stopped$taskDesc")
       Behaviors.same
   }
-}

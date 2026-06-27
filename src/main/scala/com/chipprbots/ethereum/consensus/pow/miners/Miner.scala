@@ -19,7 +19,7 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.Logger
 
-trait Miner extends Logger {
+trait Miner extends Logger:
   def processMining(bestBlock: Block)(implicit
       blockchainConfig: BlockchainConfig
   ): Future[CoordinatorProtocol]
@@ -29,7 +29,7 @@ trait Miner extends Logger {
       syncController: TypedActorRef[SyncController.Command],
       block: Block
   ): CoordinatorProtocol =
-    miningResult match {
+    miningResult match
       case MiningSuccessful(_, mixHash, nonce) =>
         log.info(
           "Mining successful with {} and nonce {}",
@@ -46,10 +46,7 @@ trait Miner extends Logger {
       case _ =>
         log.info("Mining unsuccessful")
         PoWMiningCoordinator.MiningUnsuccessful
-    }
 
-  def submitHashRate(ethMiningService: EthMiningService, time: Long, mineResult: MiningResult): Unit = {
+  def submitHashRate(ethMiningService: EthMiningService, time: Long, mineResult: MiningResult): Unit =
     val hashRate = if time > 0 then (mineResult.triedHashes.toLong * 1000000000) / time else Long.MaxValue
     ethMiningService.submitHashRate(SubmitHashRateRequest(hashRate, ByteString("fukuii-miner")))
-  }
-}

@@ -15,15 +15,14 @@ final case class EthashConfig(
     mineRounds: Int
 )
 
-object EthashConfig {
-  object Keys {
+object EthashConfig:
+  object Keys:
     final val OmmersPoolSize = "ommers-pool-size"
     final val OmmerPoolQueryTimeout = "ommer-pool-query-timeout"
     final val EthashDir = "ethash-dir"
     final val MineRounds = "mine-rounds"
-  }
 
-  def apply(fukuiiConfig: TypesafeConfig): EthashConfig = {
+  def apply(fukuiiConfig: TypesafeConfig): EthashConfig =
     val miningConfig = fukuiiConfig.getConfig(Protocol.Names.PoW)
 
     val ommersPoolSize = miningConfig.getInt(Keys.OmmersPoolSize)
@@ -37,5 +36,3 @@ object EthashConfig {
       ethashDir = ethashDir,
       mineRounds = mineRounds
     )
-  }
-}

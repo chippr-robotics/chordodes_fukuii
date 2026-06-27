@@ -25,12 +25,12 @@ class BlockchainSpec
     extends AnyFlatSpec
     with Matchers
     with ScalaCheckPropertyChecks
-    with org.scalamock.scalatest.MockFactory {
+    with org.scalamock.scalatest.MockFactory:
 
   "Blockchain" should "be able to store a block and return it if queried by hash" taggedAs (
     UnitTest,
     StateTest
-  ) in new EphemBlockchainTestSetup {
+  ) in new EphemBlockchainTestSetup:
     val validBlock = Fixtures.Blocks.ValidBlock.block
     blockchainWriter.storeBlock(validBlock).commit()
     val block: Option[Block] = blockchainReader.getBlockByHash(validBlock.header.hash)
@@ -42,12 +42,11 @@ class BlockchainSpec
     val blockBody: Option[BlockBody] = blockchainReader.getBlockBodyByHash(validBlock.header.hash)
     blockBody.isDefined should ===(true)
     validBlock.body should ===(blockBody.get)
-  }
 
   it should "be able to store a block and retrieve it by number" taggedAs (
     UnitTest,
     StateTest
-  ) in new EphemBlockchainTestSetup {
+  ) in new EphemBlockchainTestSetup:
     val validBlock = Fixtures.Blocks.ValidBlock.block
     blockchainWriter.storeBlock(validBlock).commit()
     blockchainWriter.saveBestKnownBlocks(validBlock.hash, validBlock.number)
@@ -55,9 +54,8 @@ class BlockchainSpec
       blockchainReader.getBlockByNumber(blockchainReader.getBestBranch, validBlock.header.number)
     block.isDefined should ===(true)
     validBlock should ===(block.get)
-  }
 
-  it should "be able to do strict check of block existence taggedAs (UnitTest, StateTest) in the chain" in new EphemBlockchainTestSetup {
+  it should "be able to do strict check of block existence taggedAs (UnitTest, StateTest) in the chain" in new EphemBlockchainTestSetup:
     val validBlock = Fixtures.Blocks.ValidBlock.block
     blockchainWriter.save(
       validBlock.copy(header = validBlock.header.copy(number = validBlock.number - 1)),
@@ -70,30 +68,27 @@ class BlockchainSpec
     // simulation of node restart
     blockchainWriter.saveBestKnownBlocks(validBlock.header.parentHash, validBlock.header.number - 1)
     blockchainReader.isInChain(blockchainReader.getBestBranch, validBlock.hash) should ===(false)
-  }
 
   it should "be able to query a stored blockHeader by it's number" taggedAs (
     UnitTest,
     StateTest
-  ) in new EphemBlockchainTestSetup {
+  ) in new EphemBlockchainTestSetup:
     val validHeader = Fixtures.Blocks.ValidBlock.header
     blockchainWriter.storeBlockHeader(validHeader).commit()
     val header: Option[BlockHeader] = blockchainReader.getBlockHeaderByNumber(validHeader.number)
     header.isDefined should ===(true)
     validHeader should ===(header.get)
-  }
 
-  it should "not return a value if not stored" taggedAs (UnitTest, StateTest) in new EphemBlockchainTestSetup {
+  it should "not return a value if not stored" taggedAs (UnitTest, StateTest) in new EphemBlockchainTestSetup:
     blockchainReader
       .getBlockByNumber(blockchainReader.getBestBranch, Fixtures.Blocks.ValidBlock.header.number) shouldBe None
     blockchainReader.getBlockByHash(Fixtures.Blocks.ValidBlock.header.hash) shouldBe None
-  }
 
   it should "return an account given an address and a block number" taggedAs (
     UnitTest,
     StateTest,
     MPTTest
-  ) in new EphemBlockchainTestSetup {
+  ) in new EphemBlockchainTestSetup:
     val address: Address = Address(42)
     val account: Account = Account.empty(UInt256(7))
 
@@ -112,9 +107,8 @@ class BlockchainSpec
     val retrievedAccount: Option[Account] =
       blockchainReader.getAccount(blockchainReader.getBestBranch, address, headerWithAcc.number)
     retrievedAccount shouldEqual Some(account)
-  }
 
-  it should "return correct account proof" taggedAs (UnitTest, StateTest, MPTTest) in new EphemBlockchainTestSetup {
+  it should "return correct account proof" taggedAs (UnitTest, StateTest, MPTTest) in new EphemBlockchainTestSetup:
     val address: Address = Address(42)
     val account: Account = Account.empty(UInt256(7))
 
@@ -146,7 +140,6 @@ class BlockchainSpec
     retrievedAccountProof.map { proof =>
       MptProofVerifier.verifyProof(mptWithAcc.getRootHash, address, proof) shouldBe ValidProof
     }
-  }
 
   // TODO: MerklePatriciaTrie.getProof(absentKey) currently returns Vector() instead of the
   // walked-path proof-of-absence that EIP-1186 requires. Test was DisabledTest under
@@ -157,7 +150,7 @@ class BlockchainSpec
     UnitTest,
     StateTest,
     MPTTest
-  ) in new EphemBlockchainTestSetup {
+  ) in new EphemBlockchainTestSetup:
     val emptyMpt: MerklePatriciaTrie[Address, Account] = MerklePatriciaTrie[Address, Account](
       storagesInstance.storages.stateStorage.getBackingStorage(0)
     )
@@ -180,17 +173,15 @@ class BlockchainSpec
     retrievedAccountProofWrong shouldBe defined
     val proof = retrievedAccountProofWrong.get
     proof should not be empty
-    proof.last match {
+    proof.last match
       case _: LeafNode => succeed
       case other       => fail(s"Expected terminal LeafNode in proof-of-absence, got $other")
-    }
     mptWithAcc.get(wrongAddress) shouldBe None
-  }
 
   it should "return correct best block number after saving and rolling back blocks" taggedAs (
     UnitTest,
     StateTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     forAll(intGen(min = 1, max = maxNumberBlocksToImport)) { numberBlocksToImport =>
       val testSetup = newSetup()
       import testSetup.*
@@ -234,23 +225,21 @@ class BlockchainSpec
 
       blockchainReaderWithStubPersisting.getBestBlockNumber shouldBe numberBlocksToKeep
     }
-  }
 
-  trait TestSetup {
+  trait TestSetup:
     val maxNumberBlocksToImport: Int = 30
 
-    trait StubPersistingBlockchainSetup {
+    trait StubPersistingBlockchainSetup:
       def stubStateStorage: StateStorage
       def blockchainStoragesWithStubPersisting: BlockchainStorages
       def blockchainReaderWithStubPersisting: BlockchainReader
       def blockchainWriterWithStubPersisting: BlockchainWriter
       def blockchainWithStubPersisting: BlockchainImpl
-    }
 
     def newSetup(): StubPersistingBlockchainSetup =
-      new StubPersistingBlockchainSetup with EphemBlockchainTestSetup {
+      new StubPersistingBlockchainSetup with EphemBlockchainTestSetup:
         override val stubStateStorage: StateStorage = stub[StateStorage]
-        override val blockchainStoragesWithStubPersisting: BlockchainStorages = new BlockchainStorages {
+        override val blockchainStoragesWithStubPersisting: BlockchainStorages = new BlockchainStorages:
           val blockHeadersStorage = storagesInstance.storages.blockHeadersStorage
           val blockBodiesStorage = storagesInstance.storages.blockBodiesStorage
           val blockNumberMappingStorage = storagesInstance.storages.blockNumberMappingStorage
@@ -260,7 +249,6 @@ class BlockchainSpec
           val transactionMappingStorage = storagesInstance.storages.transactionMappingStorage
           val appStateStorage = storagesInstance.storages.appStateStorage
           val stateStorage = stubStateStorage
-        }
         override val blockchainReaderWithStubPersisting: BlockchainReader =
           BlockchainReader(blockchainStoragesWithStubPersisting)
         override val blockchainWriterWithStubPersisting: BlockchainWriter =
@@ -272,7 +260,3 @@ class BlockchainSpec
           )
 
         blockchainWriterWithStubPersisting.storeBlock(Fixtures.Blocks.Genesis.block)
-      }
-
-  }
-}

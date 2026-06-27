@@ -11,7 +11,7 @@ class EthashEpochBoundarySpec
     extends AnyFlatSpec
     with Matchers
     with ScalaCheckPropertyChecks
-    with ParallelTestExecution {
+    with ParallelTestExecution:
 
   import com.chipprbots.ethereum.consensus.pow.EthashUtils.*
 
@@ -131,4 +131,3 @@ class EthashEpochBoundarySpec
     // Epoch approximately halves (83 → 42), keeping DAG manageable
     epoch(mordorEcip1099Block, mordorEcip1099Block) should be < epoch(mordorEcip1099Block - 1, mordorEcip1099Block)
   }
-}

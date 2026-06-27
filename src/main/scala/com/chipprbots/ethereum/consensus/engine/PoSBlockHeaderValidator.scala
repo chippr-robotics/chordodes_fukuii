@@ -12,20 +12,20 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
 /** Post-merge block header validator. Skips PoW (Ethash) validation entirely. Enforces: difficulty=0, nonce=0, empty
   * ommers. Validates withdrawalsRoot (Shanghai+) and blob gas fields (Cancun+).
   */
-object PoSBlockHeaderValidator extends BlockHeaderValidatorSkeleton {
+object PoSBlockHeaderValidator extends BlockHeaderValidatorSkeleton:
 
   private val EmptyNonce: ByteString = ByteString(Array.fill[Byte](8)(0))
 
   override protected def validateEvenMore(
       blockHeader: BlockHeader
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
-    for {
+    for
       _ <- validatePoSDifficulty(blockHeader)
       _ <- validatePoSNonce(blockHeader)
       _ <- validatePoSOmmers(blockHeader)
       _ <- validateWithdrawalsRoot(blockHeader)
       _ <- validateBlobGasFields(blockHeader)
-    } yield BlockHeaderValid
+    yield BlockHeaderValid
 
   private def validatePoSDifficulty(
       blockHeader: BlockHeader
@@ -47,29 +47,20 @@ object PoSBlockHeaderValidator extends BlockHeaderValidatorSkeleton {
 
   private def validateWithdrawalsRoot(
       blockHeader: BlockHeader
-  )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] = {
+  )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
     val isShanghaiActive = blockchainConfig.isShanghaiTimestamp(blockHeader.unixTimestamp)
-    if isShanghaiActive then {
-      blockHeader.withdrawalsRoot match {
+    if isShanghaiActive then
+      blockHeader.withdrawalsRoot match
         case Some(_) => Right(BlockHeaderValid)
         case None    => Left(MissingWithdrawalsRootError)
-      }
-    } else {
-      Right(BlockHeaderValid)
-    }
-  }
+    else Right(BlockHeaderValid)
 
   private def validateBlobGasFields(
       blockHeader: BlockHeader
-  )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] = {
+  )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
     val isCancunActive = blockchainConfig.isCancunTimestamp(blockHeader.unixTimestamp)
-    if isCancunActive then {
-      (blockHeader.blobGasUsed, blockHeader.excessBlobGas, blockHeader.parentBeaconBlockRoot) match {
+    if isCancunActive then
+      (blockHeader.blobGasUsed, blockHeader.excessBlobGas, blockHeader.parentBeaconBlockRoot) match
         case (Some(_), Some(_), Some(_)) => Right(BlockHeaderValid)
         case _                           => Left(MissingBlobGasFieldsError)
-      }
-    } else {
-      Right(BlockHeaderValid)
-    }
-  }
-}
+    else Right(BlockHeaderValid)

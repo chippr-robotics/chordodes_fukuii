@@ -3,20 +3,19 @@ package com.chipprbots.ethereum.network
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.utils.DaoForkConfig
 
-trait ForkResolver {
+trait ForkResolver:
   type Fork <: ForkResolver.Fork
 
   def forkBlockNumber: BigInt
   def recognizeFork(blockHeader: BlockHeader): Fork
   def isAccepted(fork: Fork): Boolean
-}
 
-object ForkResolver {
+object ForkResolver:
 
   trait Fork
 
   // ETC-specific: DAO irregular state change at block 1,920,000 — ETC rejected it (original chain), ETH mainnet accepted it.
-  class IrregularStateChangeDaoForkResolver(daoForkConfig: DaoForkConfig) extends ForkResolver {
+  class IrregularStateChangeDaoForkResolver(daoForkConfig: DaoForkConfig) extends ForkResolver:
     sealed trait Fork extends ForkResolver.Fork
     case object AcceptedFork extends Fork
     case object RejectedFork extends Fork
@@ -28,6 +27,3 @@ object ForkResolver {
       else RejectedFork
 
     override def isAccepted(fork: Fork): Boolean = fork == AcceptedFork
-  }
-
-}

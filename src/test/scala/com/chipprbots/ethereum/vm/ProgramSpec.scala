@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.testing.Tags.*
 
 import Generators.*
 
-class ProgramSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks {
+class ProgramSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks:
 
   val CodeSize = Byte.MaxValue
   val PositionsSize = 10
@@ -76,4 +76,3 @@ class ProgramSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyCheck
     val program = Program(code)
     program.validJumpDestinations shouldBe (0 to CodeSize).toSet
   }
-}

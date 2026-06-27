@@ -39,7 +39,7 @@ import com.chipprbots.ethereum.utils.ByteStringUtils
 /** BlockchainHost actor is in charge of replying to the peer's requests for blockchain data, which includes both node
   * and block data.
   */
-object BlockchainHostActor {
+object BlockchainHostActor:
 
   sealed trait Command
   final private[sync] case class PeerEventReceived(ev: PeerEvent) extends Command
@@ -78,7 +78,7 @@ object BlockchainHostActor {
         txHashes: Seq[ByteString],
         requestIdOpt: Option[BigInt],
         peerId: com.chipprbots.ethereum.network.PeerId
-    ): Unit = {
+    ): Unit =
       val hashSet = txHashes.toSet
       import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
       pendingTransactionsManager
@@ -89,14 +89,12 @@ object BlockchainHostActor {
             .filter(tx => hashSet.contains(tx.hash.value))
           // Include blob tx sidecar bytes for EIP-4844 network wrapping in PooledTransactions
           val matchingBlobBytes = response.blobTxNetworkBytes.filter { case (hash, _) => hashSet.contains(hash) }
-          val responseMsg: MessageSerializable = requestIdOpt match {
+          val responseMsg: MessageSerializable = requestIdOpt match
             case Some(requestId) =>
               ETHPackets.PooledTransactions(requestId, matchingTxs, blobTxRawBytes = matchingBlobBytes)
             case None => ETHPackets.PooledTransactions(0, matchingTxs) // requestId=0 for no-requestId case
-          }
           networkPeerManagerActor ! NetworkPeerManagerActor.SendMessageCmd(responseMsg, peerId)
         }
-    }
 
     /** Handles requests for node data, which includes both mpt nodes and evm code (both requested by hash). Both types
       * of node data are requested by the same GetNodeData message
@@ -106,7 +104,7 @@ object BlockchainHostActor {
       * @return
       *   message response if message is a request for node data or None if not
       */
-    def handleEvmCodeMptFastDownload(message: Message): Option[MessageSerializable] = message match {
+    def handleEvmCodeMptFastDownload(message: Message): Option[MessageSerializable] = message match
       case GetNodeData(mptElementsHashes) =>
         val hashesRequested =
           mptElementsHashes.take(peerConfiguration.fastSyncHostConfiguration.maxMptComponentsPerMessage)
@@ -122,7 +120,6 @@ object BlockchainHostActor {
         Some(NodeData(nodeData))
 
       case _ => None
-    }
 
     /** Handles request for block data, which includes receipts, block bodies and headers (all requested by hash)
       *
@@ -131,7 +128,7 @@ object BlockchainHostActor {
       * @return
       *   message response if message is a request for block data or None if not
       */
-    def handleBlockFastDownload(message: Message): Option[MessageSerializable] = message match {
+    def handleBlockFastDownload(message: Message): Option[MessageSerializable] = message match
       // ETH68 GetReceipts — bloom-inclusive response
       case ETHPackets.GetReceipts(requestId, blockHashes) =>
         import ETHPackets.ReceiptBloomEnc
@@ -171,7 +168,7 @@ object BlockchainHostActor {
             .foldLeft((Vector.empty[RLPList], false, 0L, false)) {
               case (acc @ (_, _, _, true), _) => acc // already truncated mid-block — skip remaining
               case ((lists, _, cumBytes, false), (hash, blockIdx)) =>
-                blockchainReader.getReceiptsByHash(BlockHash(hash)) match {
+                blockchainReader.getReceiptsByHash(BlockHash(hash)) match
                   case None => (lists, false, cumBytes, false) // unknown block — skip silently
                   case Some(receipts) =>
                     val toServe = if blockIdx == 0 then receipts.drop(firstBlockReceiptIndex.toInt) else receipts
@@ -187,7 +184,6 @@ object BlockchainHostActor {
                       }
                     val blockRLP = RLPList(fittingEncs.map(e => e)*)
                     (lists :+ blockRLP, incomplete, newBytes, incomplete)
-                }
             }
 
         val receiptsRLP = RLPList(blockReceiptLists*)
@@ -218,8 +214,6 @@ object BlockchainHostActor {
 
       case _ => None
 
-    }
-
     /** Common logic for handling GetBlockHeaders requests from both ETH62 and ETH66+ protocols
       *
       * @param block
@@ -241,20 +235,18 @@ object BlockchainHostActor {
         skip: BigInt,
         reverse: Boolean,
         requestIdOpt: Option[BigInt]
-    ): Option[MessageSerializable] = {
+    ): Option[MessageSerializable] =
       val blockNumber =
         block.fold(a => Some(a), b => blockchainReader.getBlockHeaderByHash(BlockHash(b)).map(_.number))
 
-      blockNumber match {
+      blockNumber match
         case Some(startBlockNumber) if startBlockNumber >= 0 && maxHeaders >= 0 && skip >= 0 =>
           val headersCount: BigInt =
             maxHeaders.min(peerConfiguration.fastSyncHostConfiguration.maxBlocksHeadersPerMessage)
 
-          val range = if reverse then {
-            startBlockNumber to (startBlockNumber - (skip + 1) * headersCount + 1) by -(skip + 1)
-          } else {
-            startBlockNumber to (startBlockNumber + (skip + 1) * headersCount - 1) by (skip + 1)
-          }
+          val range =
+            if reverse then startBlockNumber to (startBlockNumber - (skip + 1) * headersCount + 1) by -(skip + 1)
+            else startBlockNumber to (startBlockNumber + (skip + 1) * headersCount - 1) by (skip + 1)
 
           // Stop at first missing header (contiguous prefix — matches Besu EthServer.java break behavior)
           val blockHeaders: Seq[BlockHeader] =
@@ -288,13 +280,11 @@ object BlockchainHostActor {
           )
           val requestId = requestIdOpt.getOrElse(BigInt(0))
           Some(ETHPackets.BlockHeaders(requestId, Seq.empty))
-      }
-    }
 
     Behaviors.receiveMessage {
       case PeerEventReceived(MessageFromPeer(message, peerId)) =>
         // Handle GetPooledTransactions asynchronously (requires ask to PendingTransactionsManager)
-        message match {
+        message match
           case ETHPackets.GetPooledTransactions(requestId, txHashes) =>
             handleGetPooledTransactions(txHashes, Some(requestId), peerId)
           case _ =>
@@ -303,7 +293,7 @@ object BlockchainHostActor {
               networkPeerManagerActor ! NetworkPeerManagerActor.SendMessageCmd(response, peerId)
               // BLOCK-SERVE: INFO log so we can see which peers are requesting our chain
               // data — useful for detecting when we're serving from an orphan fork.
-              val reqLabel = message match {
+              val reqLabel = message match
                 case ETHPackets.GetBlockHeaders(_, block, max, _, _) =>
                   s"GetBlockHeaders(start=${block.fold(_.toString, h => ByteStringUtils.hash2string(h).take(8))} max=$max)"
                 case ETHPackets.GetBlockBodies(_, hashes) => s"GetBlockBodies(${hashes.size})"
@@ -312,15 +302,11 @@ object BlockchainHostActor {
                 case ETHPackets.GetReceipts70(_, firstIdx, hashes) =>
                   s"GetReceipts70(${hashes.size} firstIdx=$firstIdx)"
                 case other => other.getClass.getSimpleName
-              }
               context.log.debug("BLOCK-SERVE: peer={} req={}", peerId, reqLabel)
             }
-        }
         Behaviors.same
 
       case PeerEventReceived(_) =>
         Behaviors.same
     }
   }
-
-}

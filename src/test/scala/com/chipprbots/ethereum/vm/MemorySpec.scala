@@ -12,7 +12,7 @@ import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.vm.Generators.*
 
-class MemorySpec extends AnyFunSuite with ScalaCheckPropertyChecks with Matchers {
+class MemorySpec extends AnyFunSuite with ScalaCheckPropertyChecks with Matchers:
 
   def zeros(size: Int): ByteString =
     if size <= 0 then ByteString()
@@ -194,4 +194,3 @@ class MemorySpec extends AnyFunSuite with ScalaCheckPropertyChecks with Matchers
       (updatedMem.size - initMem.size) shouldEqual expectedDelta
     }
   }
-}

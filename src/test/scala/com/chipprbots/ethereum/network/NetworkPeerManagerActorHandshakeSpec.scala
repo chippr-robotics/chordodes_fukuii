@@ -34,7 +34,7 @@ import com.chipprbots.ethereum.testing.Tags.*
 // observe Subscribe / Unsubscribe messages sent to the peerEventBus TestProbe rather
 // than inspecting internal state. This means the tests are robust to internal
 // refactors while still covering the critical paths.
-class NetworkPeerManagerActorHandshakeSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
+class NetworkPeerManagerActorHandshakeSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
@@ -58,7 +58,7 @@ class NetworkPeerManagerActorHandshakeSpec extends ScalaTestWithActorTestKit wit
 
   // ── helpers ──────────────────────────────────────────────────────────────────
 
-  private def newNpma(): (ActorRef, TestProbe, TestProbe) = {
+  private def newNpma(): (ActorRef, TestProbe, TestProbe) =
     val pm = TestProbe()
     val bus = TestProbe()
     val ref = testKit
@@ -74,16 +74,14 @@ class NetworkPeerManagerActorHandshakeSpec extends ScalaTestWithActorTestKit wit
       )
       .toClassic
     (ref, pm, bus)
-  }
 
   // NPMA sends two Subscribes to peerEventBusActor at construction:
   //   1. Subscribe(PeerHandshaked)
   //   2. Subscribe(MessageClassifier(SNAP request codes, AllPeers))
   // Drain them before running per-test assertions.
-  private def drainInitialSubscriptions(bus: TestProbe): Unit = {
+  private def drainInitialSubscriptions(bus: TestProbe): Unit =
     bus.expectMsgType[SubscribeCmd]
     bus.expectMsgType[SubscribeCmd]
-  }
 
   private def outboundPeer(): Peer =
     Peer(peerId, outboundAddr, TestProbe().ref, incomingConnection = false, nodeId = Some(nodeIdBytes))
@@ -219,4 +217,3 @@ class NetworkPeerManagerActorHandshakeSpec extends ScalaTestWithActorTestKit wit
     npma ! PeerEventCmd(PeerDisconnected(peerId))
     bus.expectNoMessage(200.millis)
   }
-}

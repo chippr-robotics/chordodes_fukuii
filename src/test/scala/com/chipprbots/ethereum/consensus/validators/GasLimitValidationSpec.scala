@@ -27,22 +27,20 @@ import com.chipprbots.ethereum.utils.MonetaryPolicyConfig
   *
   * Reference: Besu implicit gas limit tests + fukuii validateGasLimit() at BlockHeaderValidatorSkeleton.scala:204-217
   */
-class GasLimitValidationSpec extends AnyFlatSpec with Matchers {
+class GasLimitValidationSpec extends AnyFlatSpec with Matchers:
 
   // Use a validator that mocks PoW and difficulty so we can test gas limit in isolation
-  private object GasLimitTestValidator extends BlockHeaderValidatorSkeleton() {
+  private object GasLimitTestValidator extends BlockHeaderValidatorSkeleton():
     // Always return parent's difficulty so validateDifficulty passes
-    override protected def difficulty: DifficultyCalculator = new DifficultyCalculator {
+    override protected def difficulty: DifficultyCalculator = new DifficultyCalculator:
       def calculateDifficulty(blockNumber: BigInt, blockTimestamp: Long, parent: BlockHeader)(implicit
           blockchainConfig: BlockchainConfig
       ): BigInt = parent.difficulty
-    }
 
     override protected def validateEvenMore(blockHeader: BlockHeader)(implicit
         blockchainConfig: BlockchainConfig
     ): Either[BlockHeaderError, BlockHeaderValid] =
       Right(BlockHeaderValid)
-  }
 
   implicit private val blockchainConfig: BlockchainConfig = BlockchainConfig(
     forkBlockNumbers = ForkBlockNumbers.Empty.copy(
@@ -226,10 +224,9 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers {
   // Parent at 8M for Spiral-epoch tests — bound = 8M/1024 = 7812.
   private val spiralParent = parentHeader.copy(gasLimit = 8_000_000, number = 100)
 
-  private def validateEtc(child: BlockHeader): Either[BlockHeaderError, BlockHeaderValid] = {
+  private def validateEtc(child: BlockHeader): Either[BlockHeaderError, BlockHeaderValid] =
     implicit val cfg: BlockchainConfig = etcBlockchainConfig
     GasLimitTestValidator.validate(child, spiralParent)
-  }
 
   it should "accept (SHOULD) peer block 1 below Spiral gas limit target — block still valid" taggedAs (
     UnitTest,
@@ -271,10 +268,9 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers {
     extraFields = HefPostOlympia(BigInt(1_000_000_000))
   )
 
-  private def validateEtcOlympia(child: BlockHeader): Either[BlockHeaderError, BlockHeaderValid] = {
+  private def validateEtcOlympia(child: BlockHeader): Either[BlockHeaderError, BlockHeaderValid] =
     implicit val cfg: BlockchainConfig = etcBlockchainConfig
     GasLimitTestValidator.validate(child, olympiaParent)
-  }
 
   it should "accept (SHOULD) peer block 1 below Olympia gas limit target — block still valid" taggedAs (
     UnitTest,
@@ -313,5 +309,4 @@ class GasLimitValidationSpec extends AnyFlatSpec with Matchers {
     // Default blockchainConfig has no spiralGasTarget / olympiaGasTarget → no warning, Right
     validate(childWithGasLimit(1024000)) shouldBe Right(BlockHeaderValid)
   }
-}
 // scalastyle:on magic.number

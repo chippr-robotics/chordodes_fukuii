@@ -28,7 +28,7 @@ final case class NetworkProtocolConfig(
     snap2: Boolean = false
 )
 
-object NetworkProtocolConfig {
+object NetworkProtocolConfig:
 
   /** Parse from a `network.protocols` HOCON sub-config. All six keys must be present. */
   def fromConfig(c: TypesafeConfig): NetworkProtocolConfig =
@@ -45,4 +45,3 @@ object NetworkProtocolConfig {
     * available.
     */
   val default: NetworkProtocolConfig = NetworkProtocolConfig()
-}

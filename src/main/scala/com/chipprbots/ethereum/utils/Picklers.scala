@@ -27,7 +27,7 @@ import com.chipprbots.ethereum.domain.TransactionWithDynamicFee
 import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.domain.Withdrawal
 
-object Picklers {
+object Picklers:
   given byteStringPickler: Pickler[ByteString] =
     transformPickler[ByteString, Array[Byte]](ByteString(_))(_.toArray[Byte])
   given bloomFilterPickler: Pickler[BloomFilter] =
@@ -88,4 +88,3 @@ object Picklers {
     transformPickler[BlockBody, (Seq[SignedTransaction], Seq[BlockHeader], Option[Seq[Withdrawal]])] {
       case (stx, nodes, ws) => BlockBody(stx, nodes, ws)
     }(blockBody => (blockBody.transactionList, blockBody.uncleNodesList, blockBody.withdrawals))
-}

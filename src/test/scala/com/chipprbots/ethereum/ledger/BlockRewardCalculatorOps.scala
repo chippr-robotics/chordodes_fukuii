@@ -1,12 +1,9 @@
 package com.chipprbots.ethereum.ledger
 
-object BlockRewardCalculatorOps {
+object BlockRewardCalculatorOps:
 
-  implicit class BlockRewardCalculatorWithMinerReward(calculator: BlockRewardCalculator) {
-    def calculateMiningReward(blockNumber: BigInt, numberOfOmmers: Int): BigInt = {
+  implicit class BlockRewardCalculatorWithMinerReward(calculator: BlockRewardCalculator):
+    def calculateMiningReward(blockNumber: BigInt, numberOfOmmers: Int): BigInt =
       val rewardForBlock = calculator.calculateMiningRewardForBlock(blockNumber)
       val rewardForOmmers = calculator.calculateMiningRewardForOmmers(blockNumber, numberOfOmmers)
       rewardForBlock + rewardForOmmers
-    }
-  }
-}

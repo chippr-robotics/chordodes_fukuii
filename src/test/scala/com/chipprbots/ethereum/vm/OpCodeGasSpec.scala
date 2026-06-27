@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.vm.Generators.*
 
 import Fixtures.blockchainConfig
 
-class OpCodeGasSpec extends AnyFunSuite with OpCodeTesting with Matchers with ScalaCheckPropertyChecks {
+class OpCodeGasSpec extends AnyFunSuite with OpCodeTesting with Matchers with ScalaCheckPropertyChecks:
 
   override val config: EvmConfig = EvmConfig.PhoenixConfigBuilder(blockchainConfig)
 
@@ -105,10 +105,9 @@ class OpCodeGasSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
     forAll(uint, uint, uint) { (memSize, offset, dataSize) =>
       val memNeeded: UInt256 = if dataSize > 0 then offset + dataSize else 0
 
-      def c(ms: UInt256): BigInt = {
+      def c(ms: UInt256): BigInt =
         val a = wordsForBytes(ms)
         G_memory * a + a * a / 512
-      }
 
       val expectedCost: BigInt =
         if memNeeded > EvmConfig.MaxMemory then UInt256.MaxValue / 2
@@ -467,9 +466,7 @@ class OpCodeGasSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
 
       verifyGas(expectedGas, stateIn, stateOut)
 
-      if expectedGas <= stateIn.gas then {
-        stateOut.gasRefund shouldEqual (stateIn.gasRefund + expectedRefund)
-      }
+      if expectedGas <= stateIn.gas then stateOut.gasRefund shouldEqual (stateIn.gasRefund + expectedRefund)
     }
   }
 
@@ -581,4 +578,3 @@ class OpCodeGasSpec extends AnyFunSuite with OpCodeTesting with Matchers with Sc
   }
 
   verifyAllOpCodesRegistered(except = CREATE, CREATE2, CALL, CALLCODE, DELEGATECALL, STATICCALL, INVALID)
-}

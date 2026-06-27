@@ -27,7 +27,7 @@ import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestMptStorage
 import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 
-class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers {
+class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   private val statusProbe = testKit.createTestProbe[StorageRangeCoordinator.SyncStatistics]()
@@ -90,7 +90,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       maxInFlightRequests: Int = 8,
       backpressureHighWatermark: Int = 100000,
       backpressureLowWatermark: Int = 50000
-  ): (StorageRangeCoordinatorImpl, BehaviorTestKit[StorageRangeCoordinator.Command]) = {
+  ): (StorageRangeCoordinatorImpl, BehaviorTestKit[StorageRangeCoordinator.Command]) =
     var captured: StorageRangeCoordinatorImpl = null
     val behavior = Behaviors.setup[StorageRangeCoordinator.Command] { ctx =>
       Behaviors.withTimers { timers =>
@@ -116,7 +116,6 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     }
     val kit = BehaviorTestKit(behavior)
     (captured, kit)
-  }
 
   "StorageRangeCoordinator" should "initialize correctly" taggedAs UnitTest in {
     val stateRoot = kec256(ByteString("test-state-root"))
@@ -550,7 +549,7 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       StorageRangeCoordinatorImpl,
       BehaviorTestKit[StorageRangeCoordinator.Command],
       org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
-  ) = {
+  ) =
     val controller = testKit.createTestProbe[SNAPSyncController.Command]()
     // `parasitic` runs the flush Future + its onComplete callback inline, so the resulting
     // `FlatBatchFlushComplete` is already in the BehaviorTestKit self-inbox when the staging call returns.
@@ -563,24 +562,21 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
       flatBatchEcOverride = Some(scala.concurrent.ExecutionContext.parasitic)
     )
     (impl, kit, controller)
-  }
 
   /** Helper: synthesize an account-hash + slots payload of `slotsPerAccount` entries. */
   private def fakeContract(
       seed: Int,
       slotsPerAccount: Int
-  ): (ByteString, mutable.ArrayBuffer[(ByteString, ByteString)]) = {
+  ): (ByteString, mutable.ArrayBuffer[(ByteString, ByteString)]) =
     val accountHash = kec256(ByteString(s"acct-$seed"))
     val slots = mutable.ArrayBuffer.empty[(ByteString, ByteString)]
     var i = 0
-    while i < slotsPerAccount do {
+    while i < slotsPerAccount do
       val slotHash = kec256(ByteString(s"slot-$seed-$i"))
       val slotValue = ByteString(s"value-$seed-$i".getBytes)
       slots += ((slotHash, slotValue))
       i += 1
-    }
     (accountHash, slots)
-  }
 
   // Drain all self-sent Commands sitting in the BehaviorTestKit's self-inbox (e.g. FlatBatchFlushComplete
   // produced by the parasitic flush, plus chained StorageCheckCompletion ticks), processing each on the Impl.
@@ -969,4 +965,3 @@ class StorageRangeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFl
     // After commit, all nodes have been emitted to the accumulator.
     accumulated.nonEmpty shouldBe true
   }
-}

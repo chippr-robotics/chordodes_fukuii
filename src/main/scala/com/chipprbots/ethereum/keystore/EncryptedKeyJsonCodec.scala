@@ -17,7 +17,7 @@ import org.json4s.native.JsonMethods.*
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.keystore.EncryptedKey.*
 
-object EncryptedKeyJsonCodec {
+object EncryptedKeyJsonCodec:
 
   private val byteStringSerializer = new CustomSerializer[ByteString](_ =>
     (
@@ -31,7 +31,7 @@ object EncryptedKeyJsonCodec {
   private def asHex(bs: ByteString): String =
     Hex.toHexString(bs.toArray)
 
-  def toJson(encKey: EncryptedKey): String = {
+  def toJson(encKey: EncryptedKey): String =
     import encKey.*
     import cryptoSpec.*
 
@@ -48,7 +48,6 @@ object EncryptedKeyJsonCodec {
         ))
 
     pretty(render(json))
-  }
 
   def fromJson(jsonStr: String): Either[String, EncryptedKey] = Try {
     val json = parse(jsonStr).transformField { case JField(k, v) => JField(k.toLowerCase, v) }
@@ -70,7 +69,7 @@ object EncryptedKeyJsonCodec {
   }.fold(ex => Left(ex.toString), encKey => Right(encKey))
 
   private def encodeKdf(kdfParams: KdfParams): JObject =
-    kdfParams match {
+    kdfParams match
       case ScryptParams(_, _, _, _, _) =>
         ("kdf" -> Scrypt) ~
           ("kdfparams" -> Extraction.decompose(kdfParams))
@@ -78,17 +77,12 @@ object EncryptedKeyJsonCodec {
       case Pbkdf2Params(_, _, _, _) =>
         ("kdf" -> Pbkdf2) ~
           ("kdfparams" -> Extraction.decompose(kdfParams))
-    }
 
-  private def extractKdf(crypto: JValue): KdfParams = {
+  private def extractKdf(crypto: JValue): KdfParams =
     val kdf = (crypto \ "kdf").extract[String]
-    kdf.toLowerCase match {
+    kdf.toLowerCase match
       case Scrypt =>
         (crypto \ "kdfparams").extract[ScryptParams]
 
       case Pbkdf2 =>
         (crypto \ "kdfparams").extract[Pbkdf2Params]
-    }
-  }
-
-}

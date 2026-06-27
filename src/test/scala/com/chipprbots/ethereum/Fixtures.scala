@@ -6,11 +6,11 @@ import org.bouncycastle.util.encoders.Hex
 
 import com.chipprbots.ethereum.domain.*
 
-object Fixtures {
+object Fixtures:
 
-  object Blocks {
+  object Blocks:
 
-    trait FixtureBlock {
+    trait FixtureBlock:
       val header: BlockHeader
       val body: BlockBody
       val transactionHashes: Seq[ByteString]
@@ -18,17 +18,15 @@ object Fixtures {
 
       def number: BigInt = header.number
       def block: Block = Block(header, body)
-    }
 
-    object ValidBlock extends FixtureBlock {
+    object ValidBlock extends FixtureBlock:
       // Arbitrary taken Block 3125369
       override val header: BlockHeader = Block3125369.header
       override val body: BlockBody = Block3125369.body
       override val transactionHashes: Seq[ByteString] = Block3125369.transactionHashes
       override val size: Long = Block3125369.size
-    }
 
-    object Block3125369 extends FixtureBlock {
+    object Block3125369 extends FixtureBlock:
       val header: BlockHeader = BlockHeader(
         parentHash =
           BlockHash(ByteString(Hex.decode("8345d132564b3660aa5f27c9415310634b50dbc92579c65a0825d9a255227a71"))),
@@ -122,9 +120,8 @@ object Fixtures {
       )
 
       val size = 1000L
-    }
 
-    object Genesis extends FixtureBlock {
+    object Genesis extends FixtureBlock:
       val header: BlockHeader = BlockHeader(
         parentHash =
           BlockHash(ByteString(Hex.decode("0000000000000000000000000000000000000000000000000000000000000000"))),
@@ -155,9 +152,8 @@ object Fixtures {
       )
       override val transactionHashes: Seq[ByteString] = Seq()
       override val size: Long = 540
-    }
 
-    object DaoForkBlock extends FixtureBlock {
+    object DaoForkBlock extends FixtureBlock:
       override val header: BlockHeader = BlockHeader(
         parentHash =
           BlockHash(ByteString(Hex.decode("a218e2c611f21232d857e3c8cecdcdf1f65f25a4477f98f6f47e4063807f2308"))),
@@ -250,9 +246,8 @@ object Fixtures {
         ByteString(Hex.decode("2a5177e6d6cea40594c7d4b0115dcd087443be3ec2fa81db3c21946a5e51cea9"))
       )
       override val size: Long = 978L
-    }
 
-    object ProDaoForkBlock extends FixtureBlock {
+    object ProDaoForkBlock extends FixtureBlock:
       override val header: BlockHeader = BlockHeader(
         parentHash =
           BlockHash(ByteString(Hex.decode("a218e2c611f21232d857e3c8cecdcdf1f65f25a4477f98f6f47e4063807f2308"))),
@@ -344,9 +339,8 @@ object Fixtures {
         ByteString(Hex.decode("2a5177e6d6cea40594c7d4b0115dcd087443be3ec2fa81db3c21946a5e51cea9"))
       )
       override val size: Long = 976
-    }
 
-    object DaoParentBlock extends FixtureBlock {
+    object DaoParentBlock extends FixtureBlock:
       override val header: BlockHeader = BlockHeader(
         parentHash =
           BlockHash(ByteString(Hex.decode("505ffd21f4cbf2c5c34fa84cd8c92525f3a719b7ad18852bffddad601035f5f4"))),
@@ -372,8 +366,3 @@ object Fixtures {
       override val body: BlockBody = BlockBody.empty
       override val transactionHashes: Seq[ByteString] = Seq.empty
       override val size: Long = 540 // Approximate size of an empty block with the above header
-    }
-
-  }
-
-}

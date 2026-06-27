@@ -6,7 +6,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import com.chipprbots.ethereum.testing.Tags.*
 
-class HeaderSkeletonSpec extends AnyWordSpec with Matchers with ParallelTestExecution {
+class HeaderSkeletonSpec extends AnyWordSpec with Matchers with ParallelTestExecution:
 
   // [] <- skeleton boundary
   // *x* <- skeleton header
@@ -42,5 +42,3 @@ class HeaderSkeletonSpec extends AnyWordSpec with Matchers with ParallelTestExec
       assert(skeleton.limit === BigInt(1))
     }
   }
-
-}

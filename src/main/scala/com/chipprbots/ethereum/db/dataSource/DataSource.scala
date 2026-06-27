@@ -6,7 +6,7 @@ import fs2.Stream
 
 import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource.IterationError
 
-trait DataSource {
+trait DataSource:
   import DataSource.*
 
   /** This function obtains the associated value to a key. It requires the (key-value) pair to be in the DataSource
@@ -106,10 +106,7 @@ trait DataSource {
     */
   def iterate(namespace: Namespace): Stream[IO, Either[IterationError, (Array[Byte], Array[Byte])]]
 
-}
-
-object DataSource {
+object DataSource:
   type Key = IndexedSeq[Byte]
   type Value = IndexedSeq[Byte]
   type Namespace = IndexedSeq[Byte]
-}

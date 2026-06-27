@@ -10,6 +10,6 @@ import org.scalamock.scalatest.MockFactory
   *
   * Usage: Mix this trait into test specs that use JsonRpcControllerFixture.
   */
-trait JsonRpcControllerTestSupport { self: MockFactory =>
+trait JsonRpcControllerTestSupport:
+  self: MockFactory =>
   implicit protected def mockFactoryProvider: MockFactory = this
-}

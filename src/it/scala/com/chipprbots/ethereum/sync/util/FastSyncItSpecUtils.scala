@@ -23,10 +23,10 @@ import com.chipprbots.ethereum.mpt.MptTraversals
 import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils.*
 import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils.FakePeerCustomConfig.defaultConfig
 import com.chipprbots.ethereum.utils.ByteUtils
-object FastSyncItSpecUtils {
+object FastSyncItSpecUtils:
 
   class FakePeer(peerName: String, fakePeerCustomConfig: FakePeerCustomConfig)
-      extends CommonFakePeer(peerName, fakePeerCustomConfig) {
+      extends CommonFakePeer(peerName, fakePeerCustomConfig):
 
     lazy val validators = new MockValidatorsAlwaysSucceed
 
@@ -73,12 +73,11 @@ object FastSyncItSpecUtils {
         )
       }.toOption
 
-    def containsExpectedDataUpToAccountAtBlock(n: BigInt, blockNumber: BigInt): Boolean = {
+    def containsExpectedDataUpToAccountAtBlock(n: BigInt, blockNumber: BigInt): Boolean =
       @tailrec
       def go(i: BigInt): Boolean =
-        if i >= n then {
-          true
-        } else {
+        if i >= n then true
+        else
           val expectedBalance = i
           val accountAddress = Address(i)
           val accountExpectedCode = ByteString(i.toByteArray)
@@ -95,15 +94,10 @@ object FastSyncItSpecUtils {
 
           val dataIsCorrect =
             account.balance.toBigInt == expectedBalance && code == accountExpectedCode && haveAllStoredData
-          if dataIsCorrect then {
-            go(i + 1)
-          } else {
-            false
-          }
-        }
+          if dataIsCorrect then go(i + 1)
+          else false
 
       go(0)
-    }
 
     def startWithState(): IO[Unit] =
       IO {
@@ -125,15 +119,13 @@ object FastSyncItSpecUtils {
         storagesInstance.storages.fastSyncStateStorage.putSyncState(syncState)
       }.map(_ => ())
 
-  }
-
-  object FakePeer {
+  object FakePeer:
 
     def startFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCustomConfig): IO[FakePeer] =
-      for {
+      for
         peer <- IO(new FakePeer(peerName, fakePeerCustomConfig))
         _ <- peer.startPeer()
-      } yield peer
+      yield peer
 
     def start1FakePeerRes(
         fakePeerCustomConfig: FakePeerCustomConfig = defaultConfig,
@@ -149,21 +141,21 @@ object FastSyncItSpecUtils {
         fakePeerCustomConfig1: FakePeerCustomConfig = defaultConfig,
         fakePeerCustomConfig2: FakePeerCustomConfig = defaultConfig
     ): Resource[IO, (FakePeer, FakePeer)] =
-      for {
+      for
         peer1 <- start1FakePeerRes(fakePeerCustomConfig1, "Peer1")
         peer2 <- start1FakePeerRes(fakePeerCustomConfig2, "Peer2")
-      } yield (peer1, peer2)
+      yield (peer1, peer2)
 
     def start3FakePeersRes(
         fakePeerCustomConfig1: FakePeerCustomConfig = defaultConfig,
         fakePeerCustomConfig2: FakePeerCustomConfig = defaultConfig,
         fakePeerCustomConfig3: FakePeerCustomConfig = defaultConfig
     ): Resource[IO, (FakePeer, FakePeer, FakePeer)] =
-      for {
+      for
         peer1 <- start1FakePeerRes(fakePeerCustomConfig1, "Peer1")
         peer2 <- start1FakePeerRes(fakePeerCustomConfig2, "Peer2")
         peer3 <- start1FakePeerRes(fakePeerCustomConfig3, "Peer3")
-      } yield (peer1, peer2, peer3)
+      yield (peer1, peer2, peer3)
 
     def start4FakePeersRes(
         fakePeerCustomConfig1: FakePeerCustomConfig = defaultConfig,
@@ -171,11 +163,9 @@ object FastSyncItSpecUtils {
         fakePeerCustomConfig3: FakePeerCustomConfig = defaultConfig,
         fakePeerCustomConfig4: FakePeerCustomConfig = defaultConfig
     ): Resource[IO, (FakePeer, FakePeer, FakePeer, FakePeer)] =
-      for {
+      for
         peer1 <- start1FakePeerRes(fakePeerCustomConfig1, "Peer1")
         peer2 <- start1FakePeerRes(fakePeerCustomConfig2, "Peer2")
         peer3 <- start1FakePeerRes(fakePeerCustomConfig3, "Peer3")
         peer4 <- start1FakePeerRes(fakePeerCustomConfig4, "Peer3")
-      } yield (peer1, peer2, peer3, peer4)
-  }
-}
+      yield (peer1, peer2, peer3, peer4)

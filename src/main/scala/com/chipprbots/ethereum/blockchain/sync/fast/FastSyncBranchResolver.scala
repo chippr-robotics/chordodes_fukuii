@@ -8,7 +8,7 @@ import com.chipprbots.ethereum.domain.BlockchainReader
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.utils.Logger
 
-trait FastSyncBranchResolver {
+trait FastSyncBranchResolver:
 
   import FastSyncBranchResolver.*
 
@@ -18,18 +18,15 @@ trait FastSyncBranchResolver {
   def discardBlocksAfter(lastValidBlock: BigInt): Unit =
     discardBlocks(lastValidBlock, blockchainReader.getBestBlockNumber)
 
-  private def discardBlocks(fromBlock: BigInt, toBlock: BigInt): Unit = {
+  private def discardBlocks(fromBlock: BigInt, toBlock: BigInt): Unit =
     val blocksToBeRemoved = childOf(fromBlock).to(toBlock).reverse.toList
     blocksToBeRemoved.foreach { toBeRemoved =>
       blockchainReader
         .getBlockHeaderByNumber(toBeRemoved)
         .foreach(header => blockchain.removeBlock(header.hash))
     }
-  }
 
-}
-
-object FastSyncBranchResolver {
+object FastSyncBranchResolver:
 
   /** Stores the current search state for binary search. Meaning we know the first common block lies between
     * minBlockNumber and maxBlockNumber.
@@ -38,12 +35,11 @@ object FastSyncBranchResolver {
 
   def parentOf(blockHeaderNumber: BigInt): BigInt = blockHeaderNumber - 1
   def childOf(blockHeaderNumber: BigInt): BigInt = blockHeaderNumber + 1
-}
 
 /** Attempt to find last common block within recent blocks by looking for a parent/child relationship between our block
   * headers and remote peer's block headers.
   */
-class RecentBlocksSearch(blockchainReader: BlockchainReader) {
+class RecentBlocksSearch(blockchainReader: BlockchainReader):
 
   /** Find the highest common block by trying to find a block so that our block n is the parent of remote candidate
     * block n + 1
@@ -51,7 +47,7 @@ class RecentBlocksSearch(blockchainReader: BlockchainReader) {
   def getHighestCommonBlock(
       candidateHeaders: Seq[BlockHeader],
       bestBlockNumber: BigInt
-  ): Option[BigInt] = {
+  ): Option[BigInt] =
     def isParent(potentialParent: BigInt, childCandidate: BlockHeader): Boolean =
       blockchainReader.getBlockHeaderByNumber(potentialParent).exists(_.isParentOf(childCandidate))
     NonEmptyList.fromList(candidateHeaders.reverse.toList).flatMap { remoteHeaders =>
@@ -62,11 +58,8 @@ class RecentBlocksSearch(blockchainReader: BlockchainReader) {
           case (childCandidate, parent) if isParent(parent, childCandidate) => parent
         }
     }
-  }
 
-}
-
-object BinarySearchSupport extends Logger {
+object BinarySearchSupport extends Logger:
   import FastSyncBranchResolver.*
 
   sealed trait BinarySearchResult
@@ -87,7 +80,7 @@ object BinarySearchSupport extends Logger {
       parentBlockHeader: BlockHeader,
       childBlockHeader: BlockHeader,
       searchState: SearchState
-  ): BinarySearchResult = {
+  ): BinarySearchResult =
     val childNum = childBlockHeader.number
     val parentNum = parentBlockHeader.number
     val min = searchState.minBlockNumber
@@ -102,15 +95,11 @@ object BinarySearchSupport extends Logger {
 
     if parentBlockHeader
         .isParentOf(childBlockHeader)
-    then { // chains are still aligned but there might be an even better block
+    then // chains are still aligned but there might be an even better block
       if parentNum == max then BinarySearchCompleted(parentNum)
       else if parentNum == min && childNum == max then ContinueBinarySearch(searchState.copy(minBlockNumber = childNum))
       else ContinueBinarySearch(searchState.copy(minBlockNumber = parentNum))
-    } else { // no parent/child -> chains have diverged before parent block
-      if min == 1 && max <= 2 then NoCommonBlock
-      else if min == max then BinarySearchCompleted(parentOf(parentNum))
-      else ContinueBinarySearch(searchState.copy(maxBlockNumber = parentOf(parentNum).max(1)))
-    }
-  }
-
-}
+    else // no parent/child -> chains have diverged before parent block
+    if min == 1 && max <= 2 then NoCommonBlock
+    else if min == max then BinarySearchCompleted(parentOf(parentNum))
+    else ContinueBinarySearch(searchState.copy(maxBlockNumber = parentOf(parentNum).max(1)))

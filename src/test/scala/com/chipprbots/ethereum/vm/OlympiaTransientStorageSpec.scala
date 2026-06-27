@@ -20,12 +20,12 @@ import Fixtures.blockchainConfig
   * TSTORE: pop key and value from stack, store in transient storage scoped to (address, key) TLOAD: pop key from stack,
   * push value from transient storage (or 0 if not set) Transient storage is cleared at end of transaction.
   */
-class OlympiaTransientStorageSpec extends AnyWordSpec with Matchers {
+class OlympiaTransientStorageSpec extends AnyWordSpec with Matchers:
 
   val configPreOlympia: EvmConfig = EvmConfig.SpiralConfigBuilder(blockchainConfig)
   val configOlympia: EvmConfig = EvmConfig.OlympiaConfigBuilder(blockchainConfig)
 
-  object fxt {
+  object fxt:
     val ownerAddr: Address = Address(0xcafe)
     val callerAddr: Address = Address(0xca11)
     val otherAddr: Address = Address(0xbeef)
@@ -140,7 +140,7 @@ class OlympiaTransientStorageSpec extends AnyWordSpec with Matchers {
         startGas: BigInt = 1000000,
         staticCtx: Boolean = false,
         transientStorage: Map[(Address, StorageKey), BigInt] = Map.empty
-    ): ProgramContext[MockWorldState, MockStorage] = {
+    ): ProgramContext[MockWorldState, MockStorage] =
       val world = MockWorldState()
         .saveAccount(ownerAddr, Account(balance = UInt256(1000), nonce = 1))
         .saveCode(ownerAddr, code)
@@ -166,8 +166,6 @@ class OlympiaTransientStorageSpec extends AnyWordSpec with Matchers {
         warmStorage = Set.empty,
         transientStorage = transientStorage
       )
-    }
-  }
 
   import fxt.*
 
@@ -344,4 +342,3 @@ class OlympiaTransientStorageSpec extends AnyWordSpec with Matchers {
       }
     }
   }
-}

@@ -19,7 +19,7 @@ import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
   * via the typed→classic adapter. Busy-state back-pressure is provided by a `Behaviors.withStash` buffer (replacing the
   * Classic `Stash` mixin).
   */
-object ByteCodeWorker {
+object ByteCodeWorker:
 
   import ByteCodeCoordinator.*
 
@@ -50,7 +50,7 @@ object ByteCodeWorker {
       stash: StashBuffer[Command]
   ): Behavior[Command] =
     Behaviors.receive[Command] { (context, msg) =>
-      msg match {
+      msg match
         case ByteCodeWorkerFetchTask(task, peer, requestId, maxResponseSize) =>
           val request = GetByteCodes(
             requestId = requestId,
@@ -83,7 +83,6 @@ object ByteCodeWorker {
           working(coordinator, networkPeerManager, requestTracker, stash, (task, peer, requestId))
 
         case _ => Behaviors.same // responses/timeouts/releases while idle: nothing to do
-      }
     }
 
   private def working(
@@ -92,42 +91,40 @@ object ByteCodeWorker {
       requestTracker: SNAPRequestTracker,
       stash: StashBuffer[Command],
       currentTask: (ByteCodeTask, Peer, BigInt)
-  ): Behavior[Command] = {
+  ): Behavior[Command] =
     val (_, _, requestId) = currentTask
     def goIdle: Behavior[Command] =
       stash.unstashAll(idle(coordinator, networkPeerManager, requestTracker, stash))
 
     Behaviors.receive[Command] { (context, msg) =>
-      msg match {
+      msg match
         case ByteCodesResponseMsg(response) =>
-          if response.requestId == requestId then {
+          if response.requestId == requestId then
             // IMPORTANT: mark the request complete so SNAPRequestTracker doesn't fire a timeout.
             requestTracker.completeRequest(requestId, response.codes.size.max(1))
             context.log.debug(s"Received bytecodes response for request $requestId")
             coordinator ! ByteCodesResponseMsg(response)
             goIdle
-          } else {
+          else
             context.log.debug("Received response for wrong or old request")
             Behaviors.same
-          }
 
         case ByteCodeRequestTimeout(reqId) =>
-          if reqId == requestId then {
+          if reqId == requestId then
             // RequestTracker already removed this request when firing the callback; this is defensive.
             requestTracker.completeRequest(requestId)
             context.log.warn(s"Bytecode request $requestId timed out")
             coordinator ! ByteCodeTaskFailed(requestId, "Timeout")
             goIdle
-          } else Behaviors.same
+          else Behaviors.same
 
         case ByteCodeWorkerRelease(reqId) =>
-          if reqId == requestId then {
+          if reqId == requestId then
             requestTracker.completeRequest(requestId)
             goIdle
-          } else {
+          else
             context.log.debug(s"ByteCodeWorkerRelease for unknown request $reqId, ignoring")
             Behaviors.same
-          }
 
         case task: ByteCodeWorkerFetchTask =>
           // Important: never drop tasks. Coordinator may already have recorded this request as active.
@@ -135,7 +132,4 @@ object ByteCodeWorker {
           Behaviors.same
 
         case _: FetchByteCodes => Behaviors.same // legacy message, not used by this worker
-      }
     }
-  }
-}

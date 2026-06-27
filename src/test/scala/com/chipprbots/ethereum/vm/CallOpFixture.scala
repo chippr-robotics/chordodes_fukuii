@@ -12,7 +12,7 @@ import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.utils.ByteStringUtils.*
 import com.chipprbots.ethereum.vm.MockWorldState.*
 
-class CallOpFixture(val config: EvmConfig, val startState: MockWorldState) {
+class CallOpFixture(val config: EvmConfig, val startState: MockWorldState):
   import config.feeSchedule.*
 
   val ownerAddr: Address = Address(0xcafebabe)
@@ -112,13 +112,12 @@ class CallOpFixture(val config: EvmConfig, val startState: MockWorldState) {
 
   val initialBalance: UInt256 = UInt256(1000)
 
-  val requiredGas: BigInt = {
+  val requiredGas: BigInt =
     val storageCost = 3 * G_sset
     val memCost = config.calcMemCost(0, 0, 32)
     val copyCost = G_copy * wordsForBytes(32)
 
     extCode.linearConstGas(config) + storageCost + memCost + copyCost
-  }
 
   val gasMargin = 13
 
@@ -196,7 +195,7 @@ class CallOpFixture(val config: EvmConfig, val startState: MockWorldState) {
       outOffset: UInt256 = inputData.size,
       outSize: UInt256 = inputData.size / 2,
       toAlreadyAccessed: Boolean = false
-  ) extends CallResult {
+  ) extends CallResult:
 
     val vm = new TestVM
 
@@ -219,10 +218,8 @@ class CallOpFixture(val config: EvmConfig, val startState: MockWorldState) {
 
     val ownStorage: MockStorage = world.getStorage(env.ownerAddr)
     val extStorage: MockStorage = world.getStorage(to)
-  }
-}
 
-protected[vm] trait CallResult {
+protected[vm] trait CallResult:
   def inputData: ByteString
   def stateOut: PS
   def world: MockWorldState
@@ -233,4 +230,3 @@ protected[vm] trait CallResult {
   def outOffset: UInt256
   def outSize: UInt256
   def value: UInt256
-}

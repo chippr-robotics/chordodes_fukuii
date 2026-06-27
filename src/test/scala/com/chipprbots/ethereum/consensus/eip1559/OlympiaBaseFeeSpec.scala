@@ -22,7 +22,7 @@ class OlympiaBaseFeeSpec
     with Matchers
     with BlockchainConfigBuilder
     with com.chipprbots.ethereum.TestInstanceConfigProvider
-    with ParallelTestExecution {
+    with ParallelTestExecution:
 
   private val olympiaBlock: BigInt = BigInt(100)
 
@@ -126,4 +126,3 @@ class OlympiaBaseFeeSpec
       }
     }
   }
-}

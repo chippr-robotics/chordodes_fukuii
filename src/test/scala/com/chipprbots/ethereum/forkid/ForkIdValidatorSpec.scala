@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.utils.Config.*
 import ForkIdValidationResult.*
 import ForkIdValidator.*
 
-class ForkIdValidatorSpec extends AnyWordSpec with Matchers {
+class ForkIdValidatorSpec extends AnyWordSpec with Matchers:
 
   implicit val runtime: IORuntime = IORuntime.global
 
@@ -103,4 +103,3 @@ class ForkIdValidatorSpec extends AnyWordSpec with Matchers {
       validatePeer(7279999, ForkId(0xa00bc324L, Some(7279999L))) shouldBe ErrLocalIncompatibleOrStale
     }
   }
-}

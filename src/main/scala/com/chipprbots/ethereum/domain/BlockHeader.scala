@@ -36,7 +36,7 @@ case class BlockHeader(
     mixHash: BlockHash,
     nonce: ByteString,
     extraFields: HeaderExtraFields = HeaderExtraFields.HefEmpty
-) {
+):
 
   def withAdditionalExtraData(additionalBytes: ByteString): BlockHeader =
     copy(extraData = extraData ++ additionalBytes)
@@ -44,43 +44,37 @@ case class BlockHeader(
   def dropRightNExtraDataBytes(n: Int): BlockHeader =
     copy(extraData = extraData.dropRight(n))
 
-  val baseFee: Option[BigInt] = extraFields match {
+  val baseFee: Option[BigInt] = extraFields match
     case HefPostOlympia(fee)               => Some(fee)
     case HefPostShanghai(fee, _)           => Some(fee)
     case HefPostCancun(fee, _, _, _, _)    => Some(fee)
     case HefPostPrague(fee, _, _, _, _, _) => Some(fee)
     case _                                 => None
-  }
 
-  val withdrawalsRoot: Option[ByteString] = extraFields match {
+  val withdrawalsRoot: Option[ByteString] = extraFields match
     case HefPostShanghai(_, wr)           => Some(wr)
     case HefPostCancun(_, wr, _, _, _)    => Some(wr)
     case HefPostPrague(_, wr, _, _, _, _) => Some(wr)
     case _                                => None
-  }
 
-  val blobGasUsed: Option[BigInt] = extraFields match {
+  val blobGasUsed: Option[BigInt] = extraFields match
     case HefPostCancun(_, _, bgu, _, _)    => Some(bgu)
     case HefPostPrague(_, _, bgu, _, _, _) => Some(bgu)
     case _                                 => None
-  }
 
-  val excessBlobGas: Option[BigInt] = extraFields match {
+  val excessBlobGas: Option[BigInt] = extraFields match
     case HefPostCancun(_, _, _, ebg, _)    => Some(ebg)
     case HefPostPrague(_, _, _, ebg, _, _) => Some(ebg)
     case _                                 => None
-  }
 
-  val parentBeaconBlockRoot: Option[BlockHash] = extraFields match {
+  val parentBeaconBlockRoot: Option[BlockHash] = extraFields match
     case HefPostCancun(_, _, _, _, pbbr)    => Some(BlockHash(pbbr))
     case HefPostPrague(_, _, _, _, pbbr, _) => Some(BlockHash(pbbr))
     case _                                  => None
-  }
 
-  val requestsHash: Option[ByteString] = extraFields match {
+  val requestsHash: Option[ByteString] = extraFields match
     case HefPostPrague(_, _, _, _, _, rh) => Some(rh)
     case _                                => None
-  }
 
   def isPoS: Boolean = difficulty == 0 && baseFee.isDefined
   def isPoW: Boolean = !isPoS
@@ -120,9 +114,8 @@ case class BlockHeader(
 
   def idTag: String =
     s"$number: $hashAsHexString"
-}
 
-object BlockHeader {
+object BlockHeader:
 
   /** Empty MPT root hash. Data type is irrelevant */
   val EmptyMpt: ByteString = ByteString(crypto.kec256(rlp.encode(Array.empty[Byte])))
@@ -138,27 +131,24 @@ object BlockHeader {
     * @return
     *   rlp.encode( [blockHeader.parentHash, ..., blockHeader.extraData] )
     */
-  def getEncodedWithoutNonce(blockHeader: BlockHeader): Array[Byte] = {
-    val rlpList: RLPList = blockHeader.toRLPEncodable match {
+  def getEncodedWithoutNonce(blockHeader: BlockHeader): Array[Byte] =
+    val rlpList: RLPList = blockHeader.toRLPEncodable match
       case rl: RLPList => rl
       case _           => throw new RuntimeException("BlockHeader.toRLPEncodable did not return RLPList")
-    }
 
     val numberOfPowFields = 2
-    val numberOfExtraFields = blockHeader.extraFields match {
+    val numberOfExtraFields = blockHeader.extraFields match
       case HefPostPrague(_, _, _, _, _, _) => 6
       case HefPostCancun(_, _, _, _, _)    => 5
       case HefPostShanghai(_, _)           => 2
       case HefPostOlympia(_)               => 1
       case HefEmpty                        => 0
-    }
 
     val baseFields = rlpList.items.dropRight(numberOfPowFields + numberOfExtraFields)
     val extraFieldsEncoded = rlpList.items.takeRight(numberOfExtraFields)
 
     val rlpItemsWithoutNonce = baseFields ++ extraFieldsEncoded
     rlpEncode(RLPList(rlpItemsWithoutNonce*))
-  }
 
   /** Structural check: a decoded header's ExtraFields shape must be consistent with the fork timestamps active at its
     * timestamp. ETC has no timestamp forks; this check is a no-op for ETC chains. Intended as an early, cheap gate
@@ -179,7 +169,7 @@ object BlockHeader {
     else Right(())
 
   sealed trait HeaderExtraFields
-  object HeaderExtraFields {
+  object HeaderExtraFields:
     case object HefEmpty extends HeaderExtraFields
     case class HefPostOlympia(baseFee: BigInt) extends HeaderExtraFields
 
@@ -204,10 +194,8 @@ object BlockHeader {
         parentBeaconBlockRoot: ByteString,
         requestsHash: ByteString
     ) extends HeaderExtraFields
-  }
-}
 
-object BlockHeaderImplicits {
+object BlockHeaderImplicits:
 
   import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
   import com.chipprbots.ethereum.rlp.RLPValue
@@ -215,8 +203,8 @@ object BlockHeaderImplicits {
 
   import BlockHeader.HeaderExtraFields.*
 
-  implicit class BlockHeaderEnc(blockHeader: BlockHeader) extends RLPSerializable {
-    override def toRLPEncodable: RLPEncodeable = {
+  implicit class BlockHeaderEnc(blockHeader: BlockHeader) extends RLPSerializable:
+    override def toRLPEncodable: RLPEncodeable =
       import blockHeader.*
 
       val baseItems: Seq[RLPEncodeable] = Seq(
@@ -237,7 +225,7 @@ object BlockHeaderImplicits {
         RLPValue(nonce.toArray)
       )
 
-      val extraItems: Seq[RLPEncodeable] = extraFields match {
+      val extraItems: Seq[RLPEncodeable] = extraFields match
         case HefPostPrague(bf, wr, bgu, ebg, pbbr, rh) =>
           Seq(
             RLPValue(ByteUtils.bigIntToUnsignedByteArray(bf)),
@@ -264,19 +252,15 @@ object BlockHeaderImplicits {
           Seq(RLPValue(ByteUtils.bigIntToUnsignedByteArray(bf)))
         case HefEmpty =>
           Seq.empty
-      }
 
       RLPList((baseItems ++ extraItems)*)
-    }
-  }
 
-  implicit class BlockHeaderByteArrayDec(val bytes: Array[Byte]) extends AnyVal {
+  implicit class BlockHeaderByteArrayDec(val bytes: Array[Byte]) extends AnyVal:
     def toBlockHeader: BlockHeader = BlockHeaderDec(rawDecode(bytes)).toBlockHeader
-  }
 
-  implicit class BlockHeaderDec(val rlpEncodeable: RLPEncodeable) extends AnyVal {
+  implicit class BlockHeaderDec(val rlpEncodeable: RLPEncodeable) extends AnyVal:
     def toBlockHeader: BlockHeader =
-      rlpEncodeable match {
+      rlpEncodeable match
         case rlpList: RLPList =>
           val items = rlpList.items
           if items.length < 15 then
@@ -300,7 +284,7 @@ object BlockHeaderImplicits {
             nonce = byteStringFromEncodeable(items(14))
           )
 
-          items.length match {
+          items.length match
             case 15 => base // HefEmpty
             case 16 => base.copy(extraFields = HefPostOlympia(bigIntFromEncodeable(items(15))))
             case 17 =>
@@ -333,10 +317,6 @@ object BlockHeaderImplicits {
               )
             case n =>
               throw new Exception(s"BlockHeader cannot be decoded: unexpected item count $n")
-          }
 
         case _ =>
           throw new Exception("BlockHeader cannot be decoded: not an RLPList")
-      }
-  }
-}

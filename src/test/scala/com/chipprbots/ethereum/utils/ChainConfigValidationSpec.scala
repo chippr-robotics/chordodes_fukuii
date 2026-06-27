@@ -12,7 +12,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   *
   * Reference: Besu's GenesisConfigClassicTest (18 tests validating config parsing)
   */
-class ChainConfigValidationSpec extends AnyFlatSpec with Matchers {
+class ChainConfigValidationSpec extends AnyFlatSpec with Matchers:
 
   // Load the full application config (includes blockchains.conf which includes chain configs)
   private val fullConfig = ConfigFactory.load()
@@ -127,7 +127,6 @@ class ChainConfigValidationSpec extends AnyFlatSpec with Matchers {
     mordorConfig.forkBlockNumbers.difficultyBombContinueBlockNumber shouldBe 0
     mordorConfig.forkBlockNumbers.difficultyBombRemovalBlockNumber shouldBe 0
   }
-}
 
 // scalastyle:on magic.number
 
@@ -140,7 +139,7 @@ class ChainConfigValidationSpec extends AnyFlatSpec with Matchers {
   *
   * On Mordor there is no DAO config at all.
   */
-class ETCDaoExclusionSpec extends AnyFlatSpec with Matchers {
+class ETCDaoExclusionSpec extends AnyFlatSpec with Matchers:
 
   private val fullConfig = ConfigFactory.load()
   private val etcConfig = BlockchainConfig.fromRawConfig(fullConfig.getConfig("fukuii.blockchains.etc"))
@@ -175,7 +174,6 @@ class ETCDaoExclusionSpec extends AnyFlatSpec with Matchers {
   "Mordor DAO config" should "be absent (Mordor has no DAO fork)" taggedAs (UnitTest, ConsensusTest) in {
     mordorConfig.daoForkConfig shouldBe None
   }
-}
 // scalastyle:on magic.number
 
 // scalastyle:off magic.number
@@ -186,7 +184,7 @@ class ETCDaoExclusionSpec extends AnyFlatSpec with Matchers {
   * Reference: PR #1200 — all.classic.blockd.info went stale (0 enodes); switched to all.classic.etcdisco.net (296
   * enodes). The failure was silent: TXT record still exists, so DnsDiscovery returned empty set with no log.
   */
-class EtcDiscoveryConfigSpec extends AnyFlatSpec with Matchers {
+class EtcDiscoveryConfigSpec extends AnyFlatSpec with Matchers:
 
   private val fullConfig = ConfigFactory.load()
   private val etcConfig = BlockchainConfig.fromRawConfig(fullConfig.getConfig("fukuii.blockchains.etc"))
@@ -229,5 +227,4 @@ class EtcDiscoveryConfigSpec extends AnyFlatSpec with Matchers {
   it should "have at least 10 static bootstrap nodes" taggedAs (UnitTest, NetworkTest) in {
     mordorConfig.bootstrapNodes.size should be >= 10
   }
-}
 // scalastyle:on magic.number

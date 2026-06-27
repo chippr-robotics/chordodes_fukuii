@@ -18,7 +18,7 @@ import com.chipprbots.ethereum.ledger.BlockExecutionError.ValidationBeforeExecEr
 import com.chipprbots.ethereum.ledger.BlockExecutionSuccess
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
-trait ValidatorsExecutor extends Validators {
+trait ValidatorsExecutor extends Validators:
   def ommersValidator: OmmersValidator
 
   def validateBlockBeforeExecution(
@@ -50,16 +50,14 @@ trait ValidatorsExecutor extends Validators {
       receipts = receipts,
       gasUsed = gasUsed
     )
-}
 
-object ValidatorsExecutor {
-  def apply(protocol: Protocol): ValidatorsExecutor = {
-    val blockHeaderValidator: BlockHeaderValidator = protocol match {
+object ValidatorsExecutor:
+  def apply(protocol: Protocol): ValidatorsExecutor =
+    val blockHeaderValidator: BlockHeaderValidator = protocol match
       case Protocol.MockedPow     => MockedPowBlockHeaderValidator
       case Protocol.PoW           => PoWBlockHeaderValidator
       case Protocol.RestrictedPoW => RestrictedEthashBlockHeaderValidator
       case Protocol.EngineApi     => TransitionBlockHeaderValidator
-    }
 
     new StdValidatorsExecutor(
       StdBlockValidator,
@@ -67,7 +65,6 @@ object ValidatorsExecutor {
       StdSignedTransactionValidator,
       new StdOmmersValidator(blockHeaderValidator)
     )
-  }
 
   // Created only for testing purposes, shouldn't be used in production code.
   // Connected with: https://github.com/ethereum/tests/issues/480
@@ -86,12 +83,12 @@ object ValidatorsExecutor {
       getNBlocksBack: GetNBlocksBack
   )(implicit
       blockchainConfig: BlockchainConfig
-  ): Either[BlockExecutionError.ValidationBeforeExecError, BlockExecutionSuccess] = {
+  ): Either[BlockExecutionError.ValidationBeforeExecError, BlockExecutionSuccess] =
 
     val header = block.header
     val body = block.body
 
-    val result = for {
+    val result = for
       _ <- self.blockHeaderValidator.validate(header, getBlockHeaderByHash)
       _ <- self.blockValidator.validateHeaderAndBody(header, body)
       _ <- self.ommersValidator.validate(
@@ -101,10 +98,9 @@ object ValidatorsExecutor {
         getBlockHeaderByHash,
         getNBlocksBack
       )
-    } yield BlockExecutionSuccess
+    yield BlockExecutionSuccess
 
     result.left.map(ValidationBeforeExecError.apply)
-  }
 
   def validateBlockAfterExecution(
       self: ValidatorsExecutor,
@@ -120,4 +116,3 @@ object ValidatorsExecutor {
       receipts = receipts,
       gasUsed = gasUsed
     )
-}

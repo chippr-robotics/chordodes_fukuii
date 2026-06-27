@@ -19,7 +19,7 @@ import com.chipprbots.ethereum.network.p2p.messages.SNAP.*
 import com.chipprbots.ethereum.testing.PeerTestHelpers.*
 import com.chipprbots.ethereum.testing.Tags.*
 
-class SNAPRequestTrackerSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers with Eventually {
+class SNAPRequestTrackerSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers with Eventually:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
@@ -329,4 +329,3 @@ class SNAPRequestTrackerSpec extends ScalaTestWithActorTestKit() with AnyFlatSpe
     // are demonstrably faster than the default.
     converged should be <= initial
   }
-}

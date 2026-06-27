@@ -11,7 +11,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   * Note: These tests focus on the API and basic functionality. Actual log suppression behavior depends on Logback
   * configuration and is best tested through integration tests.
   */
-class TuiLogSuppressorSpec extends AnyFlatSpec with Matchers {
+class TuiLogSuppressorSpec extends AnyFlatSpec with Matchers:
 
   "TuiLogSuppressor" should "be created via factory method" taggedAs (UnitTest) in {
     val suppressor = TuiLogSuppressor()
@@ -75,4 +75,3 @@ class TuiLogSuppressorSpec extends AnyFlatSpec with Matchers {
     suppressor.restoreConsoleLogs()
     suppressor.isConsoleSuppressed shouldBe false
   }
-}

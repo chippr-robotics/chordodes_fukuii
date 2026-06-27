@@ -34,7 +34,7 @@ import com.chipprbots.ethereum.vm.SHR
   *
   * ECIP-1099 (epoch doubling) and ECBP-1100 (MESS) have no opcode markers and are covered separately.
   */
-class ETCForkComplianceSpec extends AnyFlatSpec with Matchers {
+class ETCForkComplianceSpec extends AnyFlatSpec with Matchers:
 
   private val fullConfig = ConfigFactory.load()
   private val etcConfig = BlockchainConfig.fromRawConfig(fullConfig.getConfig("fukuii.blockchains.etc"))
@@ -189,5 +189,4 @@ class ETCForkComplianceSpec extends AnyFlatSpec with Matchers {
   it should "return 63 on Mordor after Phoenix" taggedAs (UnitTest, ConsensusTest) in {
     mordorConfig.chainId shouldBe 63
   }
-}
 // scalastyle:on magic.number

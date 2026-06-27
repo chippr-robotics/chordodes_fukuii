@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.rlp.rawDecode
   * @param body
   *   Block body
   */
-case class Block(header: BlockHeader, body: BlockBody) {
+case class Block(header: BlockHeader, body: BlockBody):
   override def toString: String =
     s"Block { header: $header, body: $body }"
 
@@ -27,24 +27,22 @@ case class Block(header: BlockHeader, body: BlockBody) {
   def hash: BlockHash = header.hash
 
   def isParentOf(child: Block): Boolean = header.isParentOf(child.header)
-}
 
-object Block {
+object Block:
 
-  implicit class BlockEnc(val obj: Block) extends RLPSerializable {
+  implicit class BlockEnc(val obj: Block) extends RLPSerializable:
     import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
     import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
     import com.chipprbots.ethereum.rlp.RLPImplicits.given
 
-    override def toRLPEncodable: RLPEncodeable = {
+    override def toRLPEncodable: RLPEncodeable =
       // EIP-2718: typed transactions in block body must be RLP byte strings
       val txItems = obj.body.transactionList.map { stx =>
-        stx.toRLPEncodable match {
+        stx.toRLPEncodable match
           case p: com.chipprbots.ethereum.rlp.PrefixedRLPEncodable =>
             // Typed tx: encode as raw bytes, wrap in RLPValue for proper string encoding
             com.chipprbots.ethereum.rlp.RLPValue(com.chipprbots.ethereum.rlp.encode(p))
           case other => other
-        }
       }
       val base = Seq(
         obj.header.toRLPEncodable,
@@ -52,7 +50,7 @@ object Block {
         RLPList(obj.body.uncleNodesList.map(_.toRLPEncodable)*)
       )
       // Shanghai+ blocks include withdrawals as 4th item
-      val withWithdrawals = obj.body.withdrawals match {
+      val withWithdrawals = obj.body.withdrawals match
         case Some(ws) =>
           base :+ RLPList(ws.map { w =>
             RLPList(
@@ -63,15 +61,12 @@ object Block {
             )
           }*)
         case None => base
-      }
       RLPList(withWithdrawals*)
-    }
-  }
 
-  implicit class BlockDec(val bytes: Array[Byte]) extends AnyVal {
+  implicit class BlockDec(val bytes: Array[Byte]) extends AnyVal:
     import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.SignedTransactions.*
     import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.TypedTransaction.*
-    def toBlock: Block = rawDecode(bytes) match {
+    def toBlock: Block = rawDecode(bytes) match
       case RLPList(header: RLPList, stx: RLPList, uncles: RLPList) =>
         val decodedHeader = header.toBlockHeader
         // EIP-4895: a header that declares a withdrawalsRoot must be paired with a
@@ -88,22 +83,18 @@ object Block {
         )
       // Shanghai+ blocks include withdrawals as 4th item
       case rlpList: RLPList if rlpList.items.size >= 4 =>
-        val header = rlpList.items(0) match {
+        val header = rlpList.items(0) match
           case rl: RLPList => rl
           case _           => throw new RuntimeException("Cannot decode block: expected RLPList at index 0 (header)")
-        }
-        val stx = rlpList.items(1) match {
+        val stx = rlpList.items(1) match
           case rl: RLPList => rl
           case _ => throw new RuntimeException("Cannot decode block: expected RLPList at index 1 (transactions)")
-        }
-        val uncles = rlpList.items(2) match {
+        val uncles = rlpList.items(2) match
           case rl: RLPList => rl
           case _           => throw new RuntimeException("Cannot decode block: expected RLPList at index 2 (uncles)")
-        }
-        val withdrawalsRlp = rlpList.items(3) match {
+        val withdrawalsRlp = rlpList.items(3) match
           case rl: RLPList => rl
           case _ => throw new RuntimeException("Cannot decode block: expected RLPList at index 3 (withdrawals)")
-        }
         import com.chipprbots.ethereum.rlp.RLPImplicitConversions.*
         val ws = withdrawalsRlp.items.collect { case w: RLPList =>
           val idx: BigInt = bigIntFromEncodeable(w.items(0))
@@ -121,8 +112,5 @@ object Block {
           )
         )
       case _ => throw new RuntimeException("Cannot decode block")
-    }
-  }
 
   def size(block: Block): Long = (block.toBytes: Array[Byte]).length
-}

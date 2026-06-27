@@ -9,7 +9,7 @@ import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.UInt256
 import com.chipprbots.ethereum.rlp.UInt256RLPImplicits.*
 
-class UInt256RlpEncodingSpec extends AnyFunSuite {
+class UInt256RlpEncodingSpec extends AnyFunSuite:
 
   test("UInt256.Zero RLP encodes as empty (0x80)") {
     val encoded = encode(UInt256.Zero.toRLPEncodable)
@@ -28,4 +28,3 @@ class UInt256RlpEncodingSpec extends AnyFunSuite {
 
     assert(created == Address("0x2fae8af94cdc68452042ccfc2abf25a9120fdb2e"))
   }
-}

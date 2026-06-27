@@ -24,12 +24,12 @@ import com.chipprbots.ethereum.testing.Tags.*
   * with one datasource, closes it — which flushes the memtable to SST on shutdown — then reopens a fresh datasource
   * over the same path so every read is served from SST through the block cache.
   */
-class RocksDbDataSourceSpec extends AnyFlatSpec with Matchers {
+class RocksDbDataSourceSpec extends AnyFlatSpec with Matchers:
 
   private val Ns: DataSource.Namespace = Namespaces.NodeNamespace
 
   private def config(dbPath: String, statisticsEnabled: Boolean): RocksDbConfig =
-    new RocksDbConfig {
+    new RocksDbConfig:
       override val createIfMissing: Boolean = true
       override val paranoidChecks: Boolean = true
       override val path: String = dbPath
@@ -40,7 +40,6 @@ class RocksDbDataSourceSpec extends AnyFlatSpec with Matchers {
       override val blockSize: Long = 16384
       override val blockCacheSize: Long = 33554432
       override val enableStatistics: Boolean = statisticsEnabled
-    }
 
   private def key(i: Int): Key = ArraySeq.unsafeWrapArray(Array.fill(32)(i.toByte))
   // 256-byte values so that 2000 entries (~512KB) exceed the 16KB block size and span many data blocks.
@@ -48,19 +47,16 @@ class RocksDbDataSourceSpec extends AnyFlatSpec with Matchers {
 
   private val N = 2000
 
-  private def cacheActivity(stats: (Long, Long, Long, Long)): Long = {
+  private def cacheActivity(stats: (Long, Long, Long, Long)): Long =
     val (hit, miss, idxHit, idxMiss) = stats
     hit + miss + idxHit + idxMiss
-  }
 
-  private def withTempDir(test: String => Unit): Unit = {
+  private def withTempDir(test: String => Unit): Unit =
     val dbPath = Files.createTempDirectory("rocksdb-stats-test").toAbsolutePath.toString
     try test(dbPath)
-    finally {
+    finally
       val dir = new File(dbPath)
       !dir.exists() || dir.delete()
-    }
-  }
 
   "RocksDbDataSource with statistics enabled" should "advance the block-cache tickers on SST-served reads" taggedAs (
     UnitTest,
@@ -73,7 +69,7 @@ class RocksDbDataSourceSpec extends AnyFlatSpec with Matchers {
 
     // 2) Reopen fresh: every read is now served from SST through the block cache.
     val reader = RocksDbDataSource(config(dbPath, statisticsEnabled = true), Namespaces.nsSeq)
-    try {
+    try
       reader.cacheStats should not be empty
       val before = reader.cacheStats.get
 
@@ -86,7 +82,7 @@ class RocksDbDataSourceSpec extends AnyFlatSpec with Matchers {
       cacheActivity(after) should be > cacheActivity(before)
       miss should be > 0L
       hit should be > 0L
-    } finally reader.destroy()
+    finally reader.destroy()
   }
 
   "RocksDbDataSource with statistics disabled (default)" should "report cacheStats == None" taggedAs (
@@ -94,12 +90,12 @@ class RocksDbDataSourceSpec extends AnyFlatSpec with Matchers {
     DatabaseTest
   ) in withTempDir { dbPath =>
     val ds = RocksDbDataSource(config(dbPath, statisticsEnabled = false), Namespaces.nsSeq)
-    try {
+    try
       ds.cacheStats shouldBe None
       ds.update(Seq(DataSourceUpdate(Ns, Nil, Seq(key(1) -> value(1)))))
       ds.get(Ns, key(1)) should not be empty
       ds.cacheStats shouldBe None
-    } finally ds.destroy()
+    finally ds.destroy()
   }
 
   it should "close() cleanly with statistics enabled (handle released, no error)" taggedAs (
@@ -112,4 +108,3 @@ class RocksDbDataSourceSpec extends AnyFlatSpec with Matchers {
     // After close the statistics handle is released; cacheStats reads None rather than touching a freed handle.
     ds.cacheStats shouldBe None
   }
-}

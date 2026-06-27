@@ -30,7 +30,7 @@ abstract class BlockGeneratorSkeleton(
     miningConfig: MiningConfig,
     difficultyCalc: DifficultyCalculator,
     _blockTimestampProvider: BlockTimestampProvider = DefaultBlockTimestampProvider
-) extends TestBlockGenerator {
+) extends TestBlockGenerator:
 
   protected val headerExtraData = miningConfig.headerExtraData
 
@@ -86,7 +86,7 @@ abstract class BlockGeneratorSkeleton(
       blockPreparator: BlockPreparator,
       x: X,
       initialWorldStateBeforeExecution: Option[InMemoryWorldStateProxy]
-  )(implicit blockchainConfig: BlockchainConfig): PendingBlockAndState = {
+  )(implicit blockchainConfig: BlockchainConfig): PendingBlockAndState =
 
     val blockTimestamp = blockTimestampProvider.getEpochSecond
     val header = prepareHeader(blockNumber, parent, beneficiary, blockTimestamp, x)
@@ -98,7 +98,7 @@ abstract class BlockGeneratorSkeleton(
     val body = newBlockBody(transactionsForBlock, x)
     val block = Block(header, body)
 
-    blockPreparator.prepareBlock(evmCodeStorage, block, parent.header, initialWorldStateBeforeExecution) match {
+    blockPreparator.prepareBlock(evmCodeStorage, block, parent.header, initialWorldStateBeforeExecution) match
       case PreparedBlock(prepareBlock, BlockResult(_, gasUsed, receipts, _), stateRoot, updatedWorld) =>
         val receiptsLogs: Seq[Array[Byte]] =
           BloomFilter.Empty.toArray +: receipts.map(_.logsBloomFilter.toArray)
@@ -121,15 +121,13 @@ abstract class BlockGeneratorSkeleton(
           ),
           updatedWorld
         )
-    }
-  }
 
   protected def prepareTransactions(
       transactions: Seq[SignedTransaction],
       blockGasLimit: BigInt,
       blockBaseFee: BigInt = BigInt(0),
       blockNumber: BigInt = BigInt(0)
-  )(implicit blockchainConfig: BlockchainConfig): Seq[SignedTransaction] = {
+  )(implicit blockchainConfig: BlockchainConfig): Seq[SignedTransaction] =
 
     // ECIP-1122: filter out txs with effectiveTip < minTip before sorting — but only from
     // Olympia. Pre-Olympia ETC has no base fee; legacy txs are priced by gasPrice alone, and
@@ -159,11 +157,8 @@ abstract class BlockGeneratorSkeleton(
           .sortBy(-_.tx.gasPrice)
           .sortBy(_.tx.nonce)
           .foldLeft(Seq.empty[SignedTransaction]) { case (txs, tx) =>
-            if txs.exists(_.tx.nonce == tx.tx.nonce) then {
-              txs
-            } else {
-              txs :+ tx
-            }
+            if txs.exists(_.tx.nonce == tx.tx.nonce) then txs
+            else txs :+ tx
           }
           .takeWhile(_.tx.gasLimit <= blockGasLimit)
         ordered.headOption.map(_.tx.gasPrice -> ordered)
@@ -181,7 +176,6 @@ abstract class BlockGeneratorSkeleton(
       .map { case (_, stx) => stx }
 
     transactionsForBlock
-  }
 
   /** Calculates the gas limit for the next block, converging toward the target at ±1/1024 per block.
     *
@@ -195,24 +189,24 @@ abstract class BlockGeneratorSkeleton(
     */
   protected def calculateGasLimit(parentGas: BigInt, blockNumber: BigInt)(implicit
       blockchainConfig: BlockchainConfig
-  ): BigInt = {
+  ): BigInt =
     val target = blockchainConfig.forkBlockNumbers
       .gasLimitAdjustmentStartAt(blockNumber)
       .getOrElse(miningConfig.gasLimitTarget)
     val delta = parentGas / BlockHeaderValidator.GasLimitBoundDivisor - 1
-    if parentGas < target then { val n = parentGas + delta; if n > target then target else n }
-    else if parentGas > target then { val n = parentGas - delta; if n < target then target else n }
+    if parentGas < target then
+      val n = parentGas + delta; if n > target then target else n
+    else if parentGas > target then
+      val n = parentGas - delta; if n < target then target else n
     else parentGas
-  }
 
-  protected def buildMpt[K](entities: Seq[K], vSerializable: ByteArraySerializable[K]): ByteString = {
+  protected def buildMpt[K](entities: Seq[K], vSerializable: ByteArraySerializable[K]): ByteString =
     val stateStorage = StateStorage.getReadOnlyStorage(EphemDataSource())
     val mpt = MerklePatriciaTrie[Int, K](
       source = stateStorage
     )(intByteArraySerializable, vSerializable)
     val hash = entities.zipWithIndex.foldLeft(mpt) { case (trie, (value, key)) => trie.put(key, value) }.getRootHash
     ByteString(hash)
-  }
 
   def blockTimestampProvider: BlockTimestampProvider = _blockTimestampProvider
 
@@ -221,9 +215,7 @@ abstract class BlockGeneratorSkeleton(
   def getPendingBlock: Option[PendingBlock] =
     getPendingBlockAndState.map(_.pendingBlock)
 
-  def getPendingBlockAndState: Option[PendingBlockAndState] = {
+  def getPendingBlockAndState: Option[PendingBlockAndState] =
     val pendingBlocks = cache.get()
     if pendingBlocks.isEmpty then None
     else Some(pendingBlocks.maxBy(_.pendingBlock.block.header.unixTimestamp))
-  }
-}

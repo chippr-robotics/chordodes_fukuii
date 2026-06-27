@@ -48,7 +48,7 @@ import com.chipprbots.ethereum.utils.ByteStringUtils
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
 // scalastyle:off number.of.methods
-object SyncStateSchedulerActor {
+object SyncStateSchedulerActor:
 
   sealed trait Command
 
@@ -197,7 +197,7 @@ object SyncStateSchedulerActor {
       replyTo: TypedActorRef[SyncStateSchedulerActorResponse],
       statsReplyTo: TypedActorRef[StateSyncStats],
       peerListHelper: PeerListHelper
-  ) {
+  ):
 
     implicit private val ioRuntime: IORuntime = IORuntime.global
 
@@ -226,7 +226,7 @@ object SyncStateSchedulerActor {
     private val _ = sync.loadFilterFromBlockchain.attempt
       .flatMap { result =>
         IO {
-          result match {
+          result match
             case Left(ex) =>
               fiberLog.error(
                 "Unexpected error while loading bloom filter. Starting state sync with empty bloom filter " +
@@ -237,13 +237,12 @@ object SyncStateSchedulerActor {
             case Right(value) =>
               fiberLog.info("Bloom filter loading finished")
               ctx.self ! BloomFilterResult(value)
-          }
         }
       }
       .start
       .unsafeRunSync()(ioRuntime)
 
-    private def handleCommon(message: Command): Option[Behavior[Command]] = message match {
+    private def handleCommon(message: Command): Option[Behavior[Command]] = message match
       case ScanPeers =>
         networkPeerManager ! NetworkPeerManagerActor.GetHandshakedPeersCmd(handshakedPeersAdapter)
         Some(Behaviors.same)
@@ -264,13 +263,12 @@ object SyncStateSchedulerActor {
         ctx.self ! RestartRequestedCmd(replyTo)
         Some(Behaviors.same)
       case _ => None
-    }
 
     /** Initial behavior: wait for the bloom filter IO fiber to complete, buffering any early command. */
     def waitingForBloomFilterToLoad(lastCmd: Option[Command]): Behavior[Command] =
       Behaviors.receiveMessage { message =>
         handleCommon(message).getOrElse {
-          message match {
+          message match
             case BloomFilterResult(result) =>
               ctx.log.debug(
                 "Loaded {} already known elements from storage to bloom filter the error while loading was {}",
@@ -278,7 +276,7 @@ object SyncStateSchedulerActor {
                 result.error
               )
               val initStats = ProcessingStatistics().addSaved(result.writtenElements)
-              lastCmd match {
+              lastCmd match
                 case Some(StartSyncingToCmd(root, bn, replyTo)) =>
                   startSyncing(root, bn, initStats, replyTo)
                 case Some(RestartRequestedCmd(replyTo)) =>
@@ -286,20 +284,18 @@ object SyncStateSchedulerActor {
                   idle(initStats)
                 case _ =>
                   idle(initStats)
-              }
             case cmd: StartSyncingToCmd =>
               waitingForBloomFilterToLoad(Some(cmd))
             case cmd: RestartRequestedCmd =>
               waitingForBloomFilterToLoad(Some(cmd))
             case _ => Behaviors.same
-          }
         }
       }
 
     def idle(processingStatistics: ProcessingStatistics): Behavior[Command] =
       Behaviors.receiveMessage { message =>
         handleCommon(message).getOrElse {
-          message match {
+          message match
             case StartSyncingToCmd(root, bn, replyTo) =>
               startSyncing(root, bn, processingStatistics, replyTo)
             case RestartRequestedCmd(replyTo) =>
@@ -310,7 +306,6 @@ object SyncStateSchedulerActor {
               ctx.log.info("Waiting for target block to start the state sync")
               Behaviors.same
             case _ => Behaviors.same
-          }
         }
       }
 
@@ -319,12 +314,12 @@ object SyncStateSchedulerActor {
         bn: BigInt,
         initialStats: ProcessingStatistics,
         initiator: TypedActorRef[SyncStateSchedulerActorResponse]
-    ): Behavior[Command] = {
+    ): Behavior[Command] =
       timers.startTimerAtFixedRate(PrintInfoKey, PrintInfo, 30.seconds)
       currentStateRoot = root.value
       consecutiveUselessResponses = 0
       ctx.log.info("Starting state sync to root {} on block {}", ByteStringUtils.hash2string(root.value), bn)
-      sync.initState(root.value) match {
+      sync.initState(root.value) match
         case None =>
           ctx.log.info(
             "Empty state root {} — nothing to sync, completing immediately.",
@@ -338,51 +333,44 @@ object SyncStateSchedulerActor {
           )
           ctx.self ! Sync
           nextBehavior
-      }
-    }
 
-    private def finalizeSync(state: SyncSchedulerActorState): Behavior[Command] = {
+    private def finalizeSync(state: SyncSchedulerActorState): Behavior[Command] =
       val memBatch = state.currentSchedulerState.memBatch
-      if memBatch.nonEmpty then {
+      if memBatch.nonEmpty then
         ctx.log.debug("Persisting {} elements to blockchain and finalizing the state sync", memBatch.size)
         val finalState = sync.persistBatch(state.currentSchedulerState, state.targetBlock)
         reportStats(state.statsInitiator, state.currentStats.addSaved(memBatch.size), finalState)
-      } else {
-        ctx.log.info("Finalizing the state sync")
-      }
+      else ctx.log.info("Finalizing the state sync")
       state.syncInitiator ! StateSyncFinished
       idle(ProcessingStatistics())
-    }
 
     private def handleRestart(
         currentState: SchedulerState,
         currentStats: ProcessingStatistics,
         targetBlock: BigInt,
         restartRequester: TypedActorRef[SyncStateSchedulerActorResponse]
-    ): Behavior[Command] = {
+    ): Behavior[Command] =
       ctx.log.debug("Starting request sequence")
       sync.persistBatch(currentState, targetBlock)
       restartRequester ! WaitingForNewTargetBlock
       idle(currentStats.addSaved(currentState.memBatch.size))
-    }
 
     /** Check if a peer supports GetNodeData on the negotiated protocol. GetNodeData is available in ETH63-67 but
       * removed in ETH68 (EIP-4938). Only the negotiated (connection-level) capability matters.
       */
-    private def supportsGetNodeData(capability: Capability): Boolean = capability match {
+    private def supportsGetNodeData(capability: Capability): Boolean = capability match
       case Capability.ETH63 | Capability.ETH64 | Capability.ETH65 | Capability.ETH66 | Capability.ETH67 => true
       case Capability.ETH68                                                                             => false
       case Capability.ETH69                                                                             => false
       case Capability.ETH70                                                                             => false
       case Capability.SNAP1                                                                             => false
-    }
 
     private def peerUsesSnap(peer: Peer): Boolean =
       peerListHelper.handshakedPeers.get(peer.id).exists { pwi =>
         !supportsGetNodeData(pwi.peerInfo.remoteStatus.capability) && pwi.peerInfo.remoteStatus.supportsSnap
       }
 
-    private def getFreePeers(state: DownloaderState): List[Peer] = {
+    private def getFreePeers(state: DownloaderState): List[Peer] =
       val freePeers = peerListHelper.peersToDownloadFrom.collect {
         case (_, PeerWithInfo(peer, peerInfo))
             if !state.activeRequests.contains(peer.id) &&
@@ -390,18 +378,16 @@ object SyncStateSchedulerActor {
           peer
       }.toList
 
-      if freePeers.isEmpty && peerListHelper.peersToDownloadFrom.nonEmpty then {
+      if freePeers.isEmpty && peerListHelper.peersToDownloadFrom.nonEmpty then
         ctx.log.debug(
           "No free peers for state download ({} total, {} with active requests)",
           peerListHelper.peersToDownloadFrom.size,
           state.activeRequests.size
         )
-      }
       freePeers
-    }
 
     /** Spawns a PeerRequestHandler child, registers a death-watch, and tracks the ref. */
-    private def requestNodes(request: PeerRequest): Unit = {
+    private def requestNodes(request: PeerRequest): Unit =
       val useSnap = peerUsesSnap(request.peer)
       ctx.log.debug(
         "Requesting {} nodes from peer {} via {}",
@@ -409,18 +395,16 @@ object SyncStateSchedulerActor {
         request.peer.id,
         if useSnap then "GetTrieNodes" else "GetNodeData"
       )
-      val handler = if useSnap && currentStateRoot.nonEmpty then {
+      val handler = if useSnap && currentStateRoot.nonEmpty then
         val paths: Seq[Seq[ByteString]] = request.nodes.toList.map { hash =>
-          request.pathInfo.get(hash) match {
+          request.pathInfo.get(hash) match
             case Some((nibblePath, accountHashOpt)) =>
               val compactPath = ByteString(HexPrefix.encode(nibblePath.toArray, isLeaf = false))
-              accountHashOpt match {
+              accountHashOpt match
                 case Some(acctHash) => Seq(acctHash, compactPath)
                 case None           => Seq(compactPath)
-              }
             case None =>
               Seq(ByteString(HexPrefix.encode(Array.empty[Byte], isLeaf = false)))
-          }
         }
         ctx.spawnAnonymous(
           PeerRequestHandler.behavior[GetTrieNodes, TrieNodes](
@@ -438,7 +422,7 @@ object SyncStateSchedulerActor {
             replyTo = prhResultAdapter
           )
         )
-      } else {
+      else
         ctx.spawnAnonymous(
           PeerRequestHandler.behavior[GetNodeData, NodeData](
             request.peer,
@@ -450,19 +434,17 @@ object SyncStateSchedulerActor {
             replyTo = prhResultAdapter
           )
         )
-      }
       ctx.watchWith(handler, RequestTerminated(request.peer))
       activeHandlers = activeHandlers.updated(request.peer.id, handler)
-    }
 
     private def processNodes(
         currentState: SyncSchedulerActorState,
         requestResult: RequestResult
     ): ProcessingResult =
-      requestResult match {
+      requestResult match
         case RequestData(nodeData, from) =>
           val (resp, newDownloaderState) = currentState.currentDownloaderState.handleRequestSuccess(from, nodeData)
-          resp match {
+          resp match
             case UnrequestedResponse =>
               ProcessingResult(Left(DownloaderError(newDownloaderState, from, None)))
             case NoUsefulDataInResponse =>
@@ -472,22 +454,19 @@ object SyncStateSchedulerActor {
                 )
               )
             case UsefulData(responses) =>
-              sync.processResponses(currentState.currentSchedulerState, responses) match {
+              sync.processResponses(currentState.currentSchedulerState, responses) match
                 case Left(value) =>
                   ProcessingResult(Left(Critical(value)))
                 case Right((newState, stats)) =>
                   ProcessingResult(
                     Right(ProcessingSuccess(newState, newDownloaderState, currentState.currentStats.addStats(stats)))
                   )
-              }
-          }
         case RequestFailed(from, reason) =>
           fiberLog.debug("Processing failed request from {}. Failure reason {}", from.id.toString, reason)
           val newDownloaderState = currentState.currentDownloaderState.handleRequestFailure(from)
           ProcessingResult(
             Left(DownloaderError(newDownloaderState, from, Some(BlacklistReason.FastSyncRequestFailed(reason))))
           )
-      }
 
     /** Offloads processNodes to the IORuntime compute pool and delivers the result back via the actor mailbox. */
     private def pipeProcess(state: SyncSchedulerActorState, result: RequestResult): Unit =
@@ -499,7 +478,7 @@ object SyncStateSchedulerActor {
     def syncing(currentState: SyncSchedulerActorState): Behavior[Command] =
       Behaviors.receiveMessage { message =>
         handleCommon(message).getOrElse {
-          message match {
+          message match
 
             // === PRH result forwarding: unwatch + self-dispatch as wrapped RequestResult ===
 
@@ -536,7 +515,7 @@ object SyncStateSchedulerActor {
 
             case Sync if currentState.hasRemainingPendingRequests && !currentState.restartHasBeenRequested =>
               val freePeers = getFreePeers(currentState.currentDownloaderState)
-              (currentState.getRequestToProcess, NonEmptyList.fromList(freePeers)) match {
+              (currentState.getRequestToProcess, NonEmptyList.fromList(freePeers)) match
                 case (Some((nodes, newState)), Some(peers)) =>
                   ctx.log.debug(
                     "Got {} peer responses remaining to process, and there are {} idle peers available",
@@ -571,11 +550,9 @@ object SyncStateSchedulerActor {
                       "{} active requests in flight",
                     currentState.activePeerRequests.size
                   )
-                  if currentState.activePeerRequests.isEmpty then {
+                  if currentState.activePeerRequests.isEmpty then
                     timers.startSingleTimer(SyncKey, Sync, syncConfig.syncRetryInterval)
-                  }
                   syncing(currentState.finishProcessing)
-              }
 
             case Sync if currentState.hasRemainingPendingRequests && currentState.restartHasBeenRequested =>
               currentState.restartRequested.fold[Behavior[Command]](Behaviors.same) { restartRequester =>
@@ -592,40 +569,38 @@ object SyncStateSchedulerActor {
 
             case WrappedRequestData(nodeData, from) =>
               val result = RequestData(nodeData, from)
-              if currentState.isProcessing then {
+              if currentState.isProcessing then
                 ctx.log.debug(
                   "Response received while processing. Enqueuing for import later. Current response queue size: {}",
                   currentState.nodesToProcess.size + 1
                 )
                 syncing(currentState.withNewRequestResult(result))
-              } else {
+              else
                 ctx.log.debug("Response received while idle. Initiating response processing")
                 val newState = currentState.initProcessing
                 pipeProcess(newState, result)
                 syncing(newState)
-              }
 
             case WrappedRequestFailed(from, reason) =>
               val result = RequestFailed(from, reason)
-              if currentState.isProcessing then {
+              if currentState.isProcessing then
                 ctx.log.debug(
                   "Response received while processing. Enqueuing for import later. Current response queue size: {}",
                   currentState.nodesToProcess.size + 1
                 )
                 syncing(currentState.withNewRequestResult(result))
-              } else {
+              else
                 ctx.log.debug("Response received while idle. Initiating response processing")
                 val newState = currentState.initProcessing
                 pipeProcess(newState, result)
                 syncing(newState)
-              }
 
             case RestartRequestedCmd(replyTo) =>
               ctx.log.debug("Received restart request")
-              if currentState.isProcessing then {
+              if currentState.isProcessing then
                 ctx.log.debug("Received restart while processing. Scheduling it after the task finishes")
                 syncing(currentState.withRestartRequested(replyTo))
-              } else {
+              else
                 ctx.log.debug("Received restart while idle.")
                 handleRestart(
                   currentState.currentSchedulerState,
@@ -633,7 +608,6 @@ object SyncStateSchedulerActor {
                   currentState.targetBlock,
                   replyTo
                 )
-              }
 
             case ProcessingResult(Right(ProcessingSuccess(newState, newDownloaderState, newStats))) =>
               consecutiveUselessResponses = 0
@@ -642,15 +616,13 @@ object SyncStateSchedulerActor {
                 newState.numberOfPendingRequests,
                 newState.numberOfMissingHashes
               )
-              val (newState1, newStats1) = if newState.memBatch.size >= syncConfig.stateSyncPersistBatchSize then {
+              val (newState1, newStats1) = if newState.memBatch.size >= syncConfig.stateSyncPersistBatchSize then
                 ctx.log.debug(
                   "Current membatch size is {}, persisting nodes to database",
                   newState.memBatch.size
                 )
                 (sync.persistBatch(newState, currentState.targetBlock), newStats.addSaved(newState.memBatch.size))
-              } else {
-                (newState, newStats)
-              }
+              else (newState, newStats)
               reportStats(currentState.statsInitiator, newStats1, newState1)
               val nextBehavior =
                 syncing(currentState.withNewProcessingResults(newState1, newDownloaderState, newStats1))
@@ -659,7 +631,7 @@ object SyncStateSchedulerActor {
 
             case ProcessingResult(Left(err)) =>
               ctx.log.debug("Received error result")
-              err match {
+              err match
                 case Critical(er) =>
                   ctx.log.error("Critical error while state syncing {}, stopping state sync", er)
                   Behaviors.stopped
@@ -669,11 +641,11 @@ object SyncStateSchedulerActor {
                   blacklistWithReason.foreach(
                     peerListHelper.blacklistIfHandshaked(peer.id, syncConfig.blacklistDuration, _)
                   )
-                  blacklistWithReason match {
+                  blacklistWithReason match
                     case Some(InvalidStateResponse(_)) =>
                       consecutiveUselessResponses += 1
                       if consecutiveUselessResponses >= UselessResponseThreshold && !currentState.restartHasBeenRequested
-                      then {
+                      then
                         ctx.log.warn(
                           "{} consecutive useless responses — state root likely stale. Triggering self-restart.",
                           consecutiveUselessResponses
@@ -685,25 +657,19 @@ object SyncStateSchedulerActor {
                           currentState.targetBlock,
                           replyTo
                         )
-                      } else {
+                      else
                         ctx.self ! Sync
                         syncing(currentState.withNewDownloaderState(newDownloaderState))
-                      }
 
                     case _ =>
                       ctx.self ! Sync
                       syncing(currentState.withNewDownloaderState(newDownloaderState))
-                  }
-              }
 
             case PrintInfo =>
               ctx.log.info("{}", currentState)
               Behaviors.same
 
             case _ => Behaviors.same
-          }
         }
       }
-  }
   // scalastyle:on cyclomatic.complexity method.length
-}

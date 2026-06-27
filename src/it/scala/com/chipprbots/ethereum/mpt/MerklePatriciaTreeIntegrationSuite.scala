@@ -19,19 +19,17 @@ class MerklePatriciaTreeIntegrationSuite
     with ScalaCheckPropertyChecks
     with ObjectGenerators
     with Logger
-    with PersistentStorage {
+    with PersistentStorage:
 
   val KeySize: Int = 32 + 1 /* Hash size + prefix */
 
-  implicit val intByteArraySerializable: ByteArraySerializable[Int] = new ByteArraySerializable[Int] {
-    override def toBytes(input: Int): Array[Byte] = {
+  implicit val intByteArraySerializable: ByteArraySerializable[Int] = new ByteArraySerializable[Int]:
+    override def toBytes(input: Int): Array[Byte] =
       val b: ByteBuffer = ByteBuffer.allocate(4)
       b.putInt(input)
       b.array
-    }
 
     override def fromBytes(bytes: Array[Byte]): Int = ByteBuffer.wrap(bytes).getInt()
-  }
 
   def md5(bytes: Array[Byte]): Array[Byte] =
     MessageDigest.getInstance("MD5").digest(bytes)
@@ -146,4 +144,3 @@ class MerklePatriciaTreeIntegrationSuite
       log.debug("Time taken(ms): " + (System.currentTimeMillis - start))
     }
   }
-}

@@ -34,7 +34,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   * Tests queue reserve/unreserve/deliver lifecycle, expireStale, and the dispatchTo() dispatch loop. No actor
   * choreography — all assertions are deterministic.
   */
-class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
+class ConcurrentFetchSpec extends AnyFlatSpec with Matchers:
 
   import Helpers.*
 
@@ -126,10 +126,9 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
 
     val wrongId = req.requestId + 999
     val resp = BlockHeaders(wrongId, Seq.empty)
-    q.deliver(peer1, resp, 50L) match {
+    q.deliver(peer1, resp, 50L) match
       case DeliveryResult.Invalid(_) => succeed
       case other                     => fail(s"Expected Invalid, got $other")
-    }
   }
 
   it should "expire stale in-flight requests and return items to the queue" taggedAs UnitTest in {
@@ -338,7 +337,7 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
-  private object Helpers {
+  private object Helpers:
     implicit val system: ActorSystem = ActorSystem("ConcurrentFetch_System")
 
     val peer1: PeerWithInfo = mkPeer("peer-1")
@@ -358,7 +357,7 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
       genesisHash = hash32
     )
 
-    def mkPeer(id: String): PeerWithInfo = {
+    def mkPeer(id: String): PeerWithInfo =
       val peer =
         Peer(PeerId(id), new InetSocketAddress("127.0.0.1", 30303), TestProbe().ref.toTyped[PeerActor.Command], false)
       val peerInfo = PeerInfo(
@@ -369,7 +368,6 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
         bestBlockHash = hash32
       )
       PeerWithInfo(peer, peerInfo)
-    }
 
     val stubHeader: BlockHeader = BlockHeader(
       parentHash = BlockHash(hash32),
@@ -388,5 +386,3 @@ class ConcurrentFetchSpec extends AnyFlatSpec with Matchers {
       mixHash = BlockHash(hash32),
       nonce = nonce8
     )
-  }
-}

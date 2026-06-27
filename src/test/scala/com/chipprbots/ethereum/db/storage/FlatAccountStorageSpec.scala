@@ -14,22 +14,20 @@ import com.chipprbots.ethereum.testing.Tags.*
   * Verified against Besu BonsaiFullFlatDbStrategy.getFlatAccount: storage.get(ACCOUNT_INFO_STATE,
   * accountHash.getBytes()) → RLP(account)
   */
-class FlatAccountStorageSpec extends AnyFlatSpec with Matchers {
+class FlatAccountStorageSpec extends AnyFlatSpec with Matchers:
 
-  "FlatAccountStorage" should "store and retrieve an account by hash" taggedAs UnitTest in new TestSetup {
+  "FlatAccountStorage" should "store and retrieve an account by hash" taggedAs UnitTest in new TestSetup:
     val hash: ByteString = ByteString(Array.fill(32)(0xaa.toByte))
     val rlpAccount: ByteString = ByteString(Array.fill(64)(0x01.toByte))
 
     storage.put(hash, rlpAccount).commit()
     storage.getAccount(hash) shouldBe Some(rlpAccount)
-  }
 
-  it should "return None for missing hash" taggedAs UnitTest in new TestSetup {
+  it should "return None for missing hash" taggedAs UnitTest in new TestSetup:
     val hash: ByteString = ByteString(Array.fill(32)(0xbb.toByte))
     storage.getAccount(hash) shouldBe None
-  }
 
-  it should "store multiple accounts in batch" taggedAs UnitTest in new TestSetup {
+  it should "store multiple accounts in batch" taggedAs UnitTest in new TestSetup:
     val accounts: IndexedSeq[(ByteString, ByteString)] = (1 to 5).map { i =>
       ByteString(Array.fill(32)(i.toByte)) -> ByteString(Array.fill(64)(i.toByte))
     }
@@ -39,9 +37,8 @@ class FlatAccountStorageSpec extends AnyFlatSpec with Matchers {
     accounts.foreach { case (hash, expected) =>
       storage.getAccount(hash) shouldBe Some(expected)
     }
-  }
 
-  it should "overwrite existing account on re-put" taggedAs UnitTest in new TestSetup {
+  it should "overwrite existing account on re-put" taggedAs UnitTest in new TestSetup:
     val hash: ByteString = ByteString(Array.fill(32)(0xcc.toByte))
     val v1: ByteString = ByteString(Array.fill(64)(0x01.toByte))
     val v2: ByteString = ByteString(Array.fill(64)(0x02.toByte))
@@ -51,9 +48,8 @@ class FlatAccountStorageSpec extends AnyFlatSpec with Matchers {
 
     storage.put(hash, v2).commit()
     storage.getAccount(hash) shouldBe Some(v2)
-  }
 
-  it should "return Stream.empty from seekFrom with non-RocksDB backend" taggedAs UnitTest in new TestSetup {
+  it should "return Stream.empty from seekFrom with non-RocksDB backend" taggedAs UnitTest in new TestSetup:
     import cats.effect.unsafe.IORuntime
     implicit val runtime: IORuntime = IORuntime.global
 
@@ -65,10 +61,7 @@ class FlatAccountStorageSpec extends AnyFlatSpec with Matchers {
     val results: Vector[Either[IterationError, (ByteString, ByteString)]] =
       storage.seekFrom(ByteString(Array.fill(32)(0x00.toByte))).compile.toVector.unsafeRunSync()
     results shouldBe empty
-  }
 
-  trait TestSetup {
+  trait TestSetup:
     val dataSource: EphemDataSource = EphemDataSource()
     val storage = new FlatAccountStorage(dataSource)
-  }
-}

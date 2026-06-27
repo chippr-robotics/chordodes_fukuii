@@ -17,11 +17,11 @@ import com.chipprbots.ethereum.ommers.OmmersPool.Command
 import com.chipprbots.ethereum.ommers.OmmersPool.GetOmmers
 import com.chipprbots.ethereum.ommers.OmmersPool.Ommers
 
-class OmmersPoolSpec extends ScalaTestWithActorTestKit with AnyFreeSpecLike with Matchers with MockFactory {
+class OmmersPoolSpec extends ScalaTestWithActorTestKit with AnyFreeSpecLike with Matchers with MockFactory:
 
   "OmmersPool" - {
 
-    "should not return ommers if there is no any" in new TestSetup {
+    "should not return ommers if there is no any" in new TestSetup:
 
       /** 00 --> 11 --> 21 --> [31] (chain1) \-> 14 (chain4) [] new block, reference! () ommer given the new block
         */
@@ -37,11 +37,10 @@ class OmmersPoolSpec extends ScalaTestWithActorTestKit with AnyFreeSpecLike with
 
       ommersPool ! GetOmmers(block3Chain1.parentHash.value, ommersProbe.ref)
       ommersProbe.expectMessage(Timeouts.normalTimeout, OmmersPool.Ommers(Seq.empty))
-    }
 
     "should return ommers properly" - {
 
-      "in case of a chain with less length than the generation limit" in new TestSetup {
+      "in case of a chain with less length than the generation limit" in new TestSetup:
 
         /** 00 --> (11) --> 21 --> 31 (chain1) \ \ \-> 33 (chain3) \ \--> 22 --> 32 (chain2) \-> [14] (chain4) [] new
           * block, reference! () ommer given the new block
@@ -61,9 +60,8 @@ class OmmersPoolSpec extends ScalaTestWithActorTestKit with AnyFreeSpecLike with
 
         ommersPool ! GetOmmers(block1Chain4.parentHash.value, ommersProbe.ref)
         ommersProbe.expectMessage(Timeouts.normalTimeout, OmmersPool.Ommers(Seq(block1Chain1)))
-      }
 
-      "despite of start losing older ommers candidates" in new TestSetup {
+      "despite of start losing older ommers candidates" in new TestSetup:
 
         /** XX --> (11) --> 21 --> 31 (chain1) \ \ \-> 33 (chain3) \ \--> 22 --> 32 (chain2) \--> 14 ---> [24] (chain4)
           * \-> (15) (chain5) [] new block, reference! () ommer given the new block XX removed block
@@ -88,9 +86,8 @@ class OmmersPoolSpec extends ScalaTestWithActorTestKit with AnyFreeSpecLike with
 
         ommersPool ! GetOmmers(block2Chain4.parentHash.value, ommersProbe.ref)
         ommersProbe.expectMessage(Timeouts.normalTimeout, OmmersPool.Ommers(Seq(block1Chain5, block1Chain1)))
-      }
 
-      "by respecting size and generation limits" in new TestSetup {
+      "by respecting size and generation limits" in new TestSetup:
 
         /** 00 --> 11 --> 21 --> [31] (chain1) \ \ \-> (33) (chain3) \ \--> (22) --> 32 (chain2) \-> 14 (chain4) [] new
           * block, reference! () ommer given the new block
@@ -110,14 +107,13 @@ class OmmersPoolSpec extends ScalaTestWithActorTestKit with AnyFreeSpecLike with
 
         ommersPool ! GetOmmers(block3Chain1.parentHash.value, ommersProbe.ref)
         ommersProbe.expectMessage(Timeouts.normalTimeout, OmmersPool.Ommers(Seq(block2Chain2, block3Chain3)))
-      }
 
     }
   }
 
   // SCALA 3 MIGRATION: Cannot use self-type constraint with `new TestSetup` in Scala 3.
   // Using lazy val for mock ensures it's created when accessed within MockFactory context.
-  trait TestSetup {
+  trait TestSetup:
 
     // In order to support all the blocks for the given scenarios
     val ommersPoolSize: Int = 8
@@ -159,5 +155,3 @@ class OmmersPoolSpec extends ScalaTestWithActorTestKit with AnyFreeSpecLike with
       testKit.spawn(
         OmmersPool(blockchainReader, ommersPoolSize, ommerGenerationLimit, returnedOmmerSizeLimit)
       )
-  }
-}

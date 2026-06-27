@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.jsonrpc.JsonRpcError
 import com.chipprbots.ethereum.testmode.EthTransactionResponse
 
-object JsonSerializers {
+object JsonSerializers:
 
   given formats: Formats =
     DefaultFormats + UnformattedDataJsonSerializer + QuantitiesSerializer +
@@ -115,4 +115,3 @@ object JsonSerializers {
         }
       )
     )
-}

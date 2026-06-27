@@ -20,7 +20,7 @@ import org.scalatest.time.Span
 
 import com.chipprbots.ethereum.testing.Tags.*
 
-class WorkNotifierSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers with Eventually {
+class WorkNotifierSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers with Eventually:
 
   implicit private val classicActorSystem: org.apache.pekko.actor.ActorSystem = system.toClassic
 
@@ -114,4 +114,3 @@ class WorkNotifierSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike wi
     // If we reach here without exception, the test passes
     succeed
   }
-}

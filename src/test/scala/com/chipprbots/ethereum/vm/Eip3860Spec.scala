@@ -22,7 +22,7 @@ import com.chipprbots.ethereum.utils.Config
   * EIP-3860 introduces:
   *   1. Maximum initcode size of 49152 bytes (2 * MAX_CODE_SIZE) 2. Gas cost of 2 per 32-byte word of initcode
   */
-class Eip3860Spec extends AnyWordSpec with Matchers {
+class Eip3860Spec extends AnyWordSpec with Matchers:
 
   val blockchainConfig = Fixtures.blockchainConfig
   val fullBlockchainConfig = Config.blockchains.blockchainConfig
@@ -34,7 +34,7 @@ class Eip3860Spec extends AnyWordSpec with Matchers {
   val MaxInitCodeSize: Int = MaxCodeSize * 2 // 49152 bytes
   val InitCodeWordCost = 2 // Gas per 32-byte word
 
-  object fxt {
+  object fxt:
     val fakeHeaderPreSpiral: BlockHeader =
       BlockFixtures.ValidBlock.header.copy(number = Fixtures.MystiqueBlockNumber)
     val fakeHeaderSpiral: BlockHeader =
@@ -81,16 +81,14 @@ class Eip3860Spec extends AnyWordSpec with Matchers {
     )
 
     // Create init code of specific size (padding with JUMPDEST opcodes)
-    def initCodeOfSize(size: Int): ByteString = {
+    def initCodeOfSize(size: Int): ByteString =
       // Simple init code: PUSH1 0 PUSH1 0 RETURN
       val returnCode = Assembly(PUSH1, 0, PUSH1, 0, RETURN).code
       val padding = ByteString(Array.fill(size - returnCode.size)(JUMPDEST.code))
       padding ++ returnCode
-    }
 
     val world: MockWorldState =
       MockWorldState().saveAccount(creatorAddr, Account.empty().increaseBalance(UInt256(1000000)))
-  }
 
   "EIP-3860" when {
     "testing maxInitCodeSize calculation" should {
@@ -262,4 +260,3 @@ class Eip3860Spec extends AnyWordSpec with Matchers {
       }
     }
   }
-}

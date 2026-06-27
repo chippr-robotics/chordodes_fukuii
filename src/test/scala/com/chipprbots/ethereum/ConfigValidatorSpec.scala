@@ -7,7 +7,7 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.testing.Tags.*
 
 // scalastyle:off magic.number
-class ConfigValidatorSpec extends AnyFlatSpec with Matchers {
+class ConfigValidatorSpec extends AnyFlatSpec with Matchers:
 
   /** Minimal valid config with no port conflicts and consistent sync settings. */
   private val baseConfig: String =
@@ -102,5 +102,4 @@ class ConfigValidatorSpec extends AnyFlatSpec with Matchers {
     )
     errors.length should be >= 2
   }
-}
 // scalastyle:on magic.number

@@ -15,7 +15,7 @@ import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 
-class LegacyTransactionSpec extends AnyFlatSpec with Matchers {
+class LegacyTransactionSpec extends AnyFlatSpec with Matchers:
 
   implicit val blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
 
@@ -127,5 +127,3 @@ class LegacyTransactionSpec extends AnyFlatSpec with Matchers {
       ByteString(Hex.decode("a1e4380a3b1f749673e270229993ee55f35663b4"))
     )
   }
-
-}

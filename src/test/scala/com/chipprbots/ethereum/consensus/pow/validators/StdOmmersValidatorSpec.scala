@@ -18,29 +18,25 @@ import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.testing.Tags.*
 
-class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks with ObjectGenerators {
+class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks with ObjectGenerators:
 
-  it should "validate correctly a valid list of ommers" taggedAs (UnitTest, ConsensusTest) in new BlockUtils {
-    ommersValidator.validate(ommersBlockParentHash, ommersBlockNumber, ommers, blockchainReader) match {
+  it should "validate correctly a valid list of ommers" taggedAs (UnitTest, ConsensusTest) in new BlockUtils:
+    ommersValidator.validate(ommersBlockParentHash, ommersBlockNumber, ommers, blockchainReader) match
       case Right(_)  => succeed
       case Left(err) => fail(s"Unexpected validation error: $err")
-    }
-  }
 
-  it should "report failure if the list of ommers is too big" taggedAs (UnitTest, ConsensusTest) in new BlockUtils {
+  it should "report failure if the list of ommers is too big" taggedAs (UnitTest, ConsensusTest) in new BlockUtils:
     ommersValidator.validate(
       ommersBlockParentHash,
       ommersBlockNumber,
       Seq(ommer1, ommer2, ommer2),
       blockchainReader
-    ) match {
+    ) match
       case Left(OmmersLengthError) => succeed
       case Left(err)               => fail(s"Unexpected validation error: $err")
       case Right(_)                => fail("Unexpected validation success")
-    }
-  }
 
-  it should "report failure if there is an invalid header taggedAs (UnitTest, ConsensusTest) in the list of ommers" in new BlockUtils {
+  it should "report failure if there is an invalid header taggedAs (UnitTest, ConsensusTest) in the list of ommers" in new BlockUtils:
     val invalidOmmer1: BlockHeader = ommer1.copy(number = ommer1.number + 1)
 
     ommersValidator.validate(
@@ -48,49 +44,43 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
       ommersBlockNumber,
       Seq(invalidOmmer1, ommer2),
       blockchainReader
-    ) match {
+    ) match
       case Left(OmmersHeaderError(List(_))) => succeed
       case Left(err)                        => fail(s"Unexpected validation error: $err")
       case Right(_)                         => fail("Unexpected validation success")
-    }
-  }
 
   it should "report failure if there is an ommer that was previously used" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new BlockUtils {
+  ) in new BlockUtils:
     ommersValidator.validate(
       ommersBlockParentHash,
       ommersBlockNumber,
       Seq(block93.body.uncleNodesList.head, ommer2),
       blockchainReader
-    ) match {
+    ) match
       case Left(OmmersUsedBeforeError) => succeed
       case Left(err)                   => fail(s"Unexpected validation error: $err")
       case Right(_)                    => fail("Unexpected validation success")
-    }
-  }
 
   it should "report failure if there is an ommer which is also an ancestor" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new BlockUtils {
+  ) in new BlockUtils:
     ommersValidator.validate(
       ommersBlockParentHash,
       ommersBlockNumber,
       Seq(ommer1, block92.header),
       blockchainReader
-    ) match {
+    ) match
       case Left(OmmerIsAncestorError) => succeed
       case Left(err)                  => fail(s"Unexpected validation error: $err")
       case Right(_)                   => fail("Unexpected validation success")
-    }
-  }
 
   it should "report failure if there is an ommer which that is not parent of an ancestor" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new BlockUtils {
+  ) in new BlockUtils:
     val getNBlocksBack: (ByteString, Int) => List[Block] =
       (_, n) =>
         ((ommersBlockNumber - n) until ommersBlockNumber).toList
@@ -101,16 +91,14 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
       ommersBlockNumber,
       Seq(ommer1, ommerInvalidBranch),
       getNBlocksBack
-    ) match {
+    ) match
       case Left(OmmerParentIsNotAncestorError) => succeed
       case err                                 => fail(err.toString)
-    }
-  }
 
   it should "report failure if getNBlocksBack returns an empty list of ancestors" taggedAs (
     UnitTest,
     ConsensusTest
-  ) in new BlockUtils {
+  ) in new BlockUtils:
     val getNBlocksBack: (ByteString, Int) => List[Block] = (_, _) => List.empty
 
     ommersValidator.validateOmmersAncestors(
@@ -118,39 +106,33 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
       ommersBlockNumber,
       Seq(ommer1, ommerInvalidBranch),
       getNBlocksBack
-    ) match {
+    ) match
       case Left(OmmerParentIsNotAncestorError) => succeed
       case err                                 => fail(err.toString)
-    }
-  }
 
-  it should "report failure if there is an ommer that is too old" taggedAs (UnitTest, ConsensusTest) in new BlockUtils {
+  it should "report failure if there is an ommer that is too old" taggedAs (UnitTest, ConsensusTest) in new BlockUtils:
     ommersValidator.validate(
       ommersBlockParentHash,
       ommersBlockNumber,
       Seq(ommer1, block90.header),
       blockchainReader
-    ) match {
+    ) match
       case Left(OmmerParentIsNotAncestorError) => succeed
       case err                                 => fail(err.toString)
-    }
-  }
 
-  it should "report failure if there is a duplicated ommer taggedAs (UnitTest, ConsensusTest) in the ommers list" in new BlockUtils {
+  it should "report failure if there is a duplicated ommer taggedAs (UnitTest, ConsensusTest) in the ommers list" in new BlockUtils:
     ommersValidator.validate(
       ommersBlockParentHash,
       ommersBlockNumber,
       Seq(ommer1, ommer1),
       blockchainReader
-    ) match {
+    ) match
       case Left(OmmersDuplicatedError) => succeed
       case Left(err)                   => fail(s"Unexpected validation error: $err")
       case Right(_)                    => fail("Unexpected validation success")
-    }
-  }
 
   // scalastyle:off magic.number
-  trait BlockUtils extends EphemBlockchainTestSetup {
+  trait BlockUtils extends EphemBlockchainTestSetup:
 
     val ommersValidator = new StdOmmersValidator(PoWBlockHeaderValidator)
 
@@ -569,6 +551,3 @@ class StdOmmersValidatorSpec extends AnyFlatSpec with Matchers with ScalaCheckPr
       .and(blockchainWriter.storeBlock(block96))
       .commit()
     blockchainWriter.saveBestKnownBlocks(block96.hash, block96.number)
-
-  }
-}

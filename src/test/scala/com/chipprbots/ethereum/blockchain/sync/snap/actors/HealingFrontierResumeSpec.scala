@@ -41,7 +41,7 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   * fixture stops the actor (await termination) AND drains that EC before destroying the DataSource, so an in-flight
   * `loadAll` can never `newIterator` on a freed column-family handle (native SIGSEGV).
   */
-class HealingFrontierResumeSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers with Eventually {
+class HealingFrontierResumeSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers with Eventually:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
@@ -52,17 +52,15 @@ class HealingFrontierResumeSpec extends ScalaTestWithActorTestKit() with AnyFlat
   /** A trivially-present root node so `StartTrieNodeHealing` takes the restart (resume/DFS) branch. A childless leaf ⇒
     * the fallback DFS discovers nothing ⇒ pendingTasks stays 0 unless resume populated it.
     */
-  private def storedRoot(storage: TestMptStorage): ByteString = {
+  private def storedRoot(storage: TestMptStorage): ByteString =
     val leaf = LeafNode(ByteString(1), ByteString(1))
     storage.putNode(leaf)
     ByteString(leaf.hash)
-  }
 
-  private def deleteRecursively(f: File): Unit = {
+  private def deleteRecursively(f: File): Unit =
     Option(f.listFiles()).foreach(_.foreach(deleteRecursively))
     f.delete()
     ()
-  }
 
   /** Owns the RocksDB store, a dedicated single-thread EC for the coordinator's resume/flush `Future`s, and the
     * coordinator actor. Tears down in the only safe order: stop actor → drain EC (resume `loadAll` finished) → destroy
@@ -80,12 +78,12 @@ class HealingFrontierResumeSpec extends ScalaTestWithActorTestKit() with AnyFlat
           HealingFrontierStorage,
           org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
       ) => Unit
-  ): Unit = {
+  ): Unit =
     val pool = Executors.newSingleThreadExecutor()
     val ec = ExecutionContext.fromExecutorService(pool)
     val dbPath = Files.createTempDirectory("healing-frontier-resume-rocksdb").toAbsolutePath.toString
     val dataSource = RocksDbDataSource(
-      new RocksDbConfig {
+      new RocksDbConfig:
         override val createIfMissing: Boolean = true
         override val paranoidChecks: Boolean = true
         override val path: String = dbPath
@@ -95,7 +93,7 @@ class HealingFrontierResumeSpec extends ScalaTestWithActorTestKit() with AnyFlat
         override val levelCompaction: Boolean = true
         override val blockSize: Long = 16384
         override val blockCacheSize: Long = 33554432
-      },
+      ,
       Namespaces.nsSeq
     )
     val store = new HealingFrontierStorage(dataSource)
@@ -116,7 +114,7 @@ class HealingFrontierResumeSpec extends ScalaTestWithActorTestKit() with AnyFlat
       healingWriterEcOverride = Some(ec)
     )
     try body(coordinator, root, store, controllerProbe)
-    finally {
+    finally
       // 1) No more actor-thread RocksDB ops. 2) Drain the EC so the resume `loadAll` iterator is closed.
       testKit.stop(coordinator)
       pool.shutdown()
@@ -124,17 +122,14 @@ class HealingFrontierResumeSpec extends ScalaTestWithActorTestKit() with AnyFlat
       // 3) Now nothing references the store — safe to free the native handles.
       dataSource.destroy()
       deleteRecursively(new File(dbPath))
-    }
-  }
 
-  private def pendingTasks(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int = {
+  private def pendingTasks(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int =
     // Dedicated probe per query: the shared ImplicitSender inbox steals replies across tests when
     // the suite runs with test parallelism — one test's awaitAssert can consume another test's
     // HealingStatistics (observed as a deterministic-looking "0 was not equal to 7").
     val probe = testKit.createTestProbe[HealingStatistics]()
     coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref)
     probe.expectMessageType[HealingStatistics].pendingTasks
-  }
 
   "TrieNodeHealingCoordinator (Layer 2)" should
     "resume from a COMPLETE persisted frontier and skip the full-state DFS" taggedAs UnitTest in {
@@ -230,4 +225,3 @@ class HealingFrontierResumeSpec extends ScalaTestWithActorTestKit() with AnyFlat
       coordinator ! TrieNodeHealingCoordinator.HealingPivotRefreshed(kec256(ByteString("a-genuinely-different-root")))
       eventually(timeout(2.seconds), interval(100.millis))(store.isComplete shouldBe false)
     }
-}

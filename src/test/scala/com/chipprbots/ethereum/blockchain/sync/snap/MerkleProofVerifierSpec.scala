@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.mpt.byteStringSerializer
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestMptStorage
 
-class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers {
+class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers:
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -26,20 +26,18 @@ class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers {
       trie: MerklePatriciaTrie[K, V],
       firstKey: K,
       lastKey: K
-  ): Seq[ByteString] = {
+  ): Seq[ByteString] =
     val firstProof = trie.getProof(firstKey).getOrElse(Vector.empty)
     val lastProof = trie.getProof(lastKey).getOrElse(Vector.empty)
     (firstProof ++ lastProof)
       .distinctBy(node => ByteString(node.hash))
       .map(node => ByteString(MptTraversals.encodeNode(node)))
-  }
 
   /** Compute the storage root from a set of ordered (k, v) pairs using SnapHashTrie. */
-  private def computeStorageRoot(slots: Seq[(ByteString, ByteString)]): ByteString = {
+  private def computeStorageRoot(slots: Seq[(ByteString, ByteString)]): ByteString =
     val t = new SnapHashTrie(_ => ())
     slots.foreach { case (k, v) => t.update(k.toArray, v.toArray) }
     t.commit()
-  }
 
   // ── Zero-leaf / empty-proof edge cases ──────────────────────────────────────
 
@@ -344,10 +342,9 @@ class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers {
       endHash = MaxKey
     )
     // Must not throw; either outcome acceptable
-    result match {
+    result match
       case Right(_)    => succeed
       case Left(error) => error should not be empty
-    }
   }
 
   it should "accept bloated proof with extra irrelevant nodes without crashing" taggedAs UnitTest in {
@@ -365,10 +362,9 @@ class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers {
       startHash = key,
       endHash = key
     )
-    result match {
+    result match
       case Right(_)    => succeed
       case Left(error) => error should not be empty
-    }
   }
 
   // ── Empty-value / zero-account edge cases ────────────────────────────────────
@@ -480,4 +476,3 @@ class MerkleProofVerifierSpec extends AnyFlatSpec with Matchers {
     // Should fail — either due to hash mismatch or SnapHashTrie rejecting empty value
     result shouldBe a[Left[?, ?]]
   }
-}

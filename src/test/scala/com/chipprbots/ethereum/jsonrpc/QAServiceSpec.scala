@@ -22,7 +22,7 @@ class QAServiceSpec
     with FlatSpecBase
     with SpecFixtures
     with ByteGenerators
-    with AsyncMockFactory {
+    with AsyncMockFactory:
 
   "QAService" should "send msg to miner and return miner's response" taggedAs (UnitTest, RPCTest) in testCaseM[IO] {
     fixture =>
@@ -47,10 +47,9 @@ class QAServiceSpec
     qaService.mineBlocks(mineBlocksReq).map(_ shouldBe Left(JsonRpcError.InternalError))
   }
 
-  class Fixture extends BlockchainConfigBuilder with com.chipprbots.ethereum.TestInstanceConfigProvider {
-    protected trait TestMining extends Mining {
+  class Fixture extends BlockchainConfigBuilder with com.chipprbots.ethereum.TestInstanceConfigProvider:
+    protected trait TestMining extends Mining:
       override type Config = EthashConfig
-    }
 
     lazy val testMining: TestMining = mock[TestMining]
 
@@ -62,7 +61,5 @@ class QAServiceSpec
     lazy val mineBlocksMsg: MineBlocks =
       MineBlocks(mineBlocksReq.numBlocks, mineBlocksReq.withTransactions, mineBlocksReq.parentBlock)
     val fakeChainId: Byte = 42.toByte
-  }
 
   def createFixture(): Fixture = new Fixture
-}

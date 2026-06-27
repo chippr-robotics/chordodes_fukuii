@@ -13,15 +13,14 @@ import com.chipprbots.ethereum.utils.NodeCacheConfig
 // `shouldPersist` are actor-context-only. The backing TrieMap provides lock-free concurrent reads
 // and writes; multi-key updates are individually atomic (non-transactional cache misses are
 // acceptable — the storage layer is the source of truth).
-class MapCache[K, V](val cache: mutable.Map[K, V], config: NodeCacheConfig) extends Cache[K, V] {
+class MapCache[K, V](val cache: mutable.Map[K, V], config: NodeCacheConfig) extends Cache[K, V]:
 
   private val lastClear = new AtomicLong(System.nanoTime())
 
-  override def update(toRemove: Seq[K], toUpsert: Seq[(K, V)]): Cache[K, V] = {
+  override def update(toRemove: Seq[K], toUpsert: Seq[(K, V)]): Cache[K, V] =
     toRemove.foreach(key => cache -= key)
     toUpsert.foreach(element => cache += element._1 -> element._2)
     this
-  }
 
   override def getValues: Seq[(K, V)] =
     cache.toSeq
@@ -29,10 +28,9 @@ class MapCache[K, V](val cache: mutable.Map[K, V], config: NodeCacheConfig) exte
   override def get(key: K): Option[V] =
     cache.get(key)
 
-  override def clear(): Unit = {
+  override def clear(): Unit =
     lastClear.getAndSet(System.nanoTime())
     cache.clear()
-  }
 
   override def shouldPersist: Boolean =
     cache.size > config.maxSize || isTimeToClear
@@ -42,9 +40,8 @@ class MapCache[K, V](val cache: mutable.Map[K, V], config: NodeCacheConfig) exte
       lastClear.get(),
       TimeUnit.NANOSECONDS
     ) >= config.maxHoldTime
-}
 
-object MapCache {
+object MapCache:
 
   def getMap[K, V]: mutable.Map[K, V] = TrieMap.empty[K, V]
 
@@ -59,4 +56,3 @@ object MapCache {
       maxHoldTime: FiniteDuration = FiniteDuration(5, TimeUnit.MINUTES)
   ): Cache[K, V] =
     createCache[K, V](TestCacheConfig(maxSize, maxHoldTime))
-}

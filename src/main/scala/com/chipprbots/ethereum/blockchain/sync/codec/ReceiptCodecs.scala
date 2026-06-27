@@ -20,12 +20,12 @@ import com.chipprbots.ethereum.utils.ByteUtils
   *
   * Usage: `import com.chipprbots.ethereum.blockchain.sync.codec.ReceiptCodecs._`
   */
-object ReceiptCodecs {
+object ReceiptCodecs:
 
   // ── TxLogEntry ───────────────────────────────────────────────────────────────
 
-  extension (logEntry: TxLogEntry) {
-    def toRLPEncodable: RLPEncodeable = {
+  extension (logEntry: TxLogEntry)
+    def toRLPEncodable: RLPEncodeable =
       import logEntry.*
       val topicsRLP = logTopics.map(t => RLPValue(t.toArray[Byte]))
       RLPList(
@@ -33,70 +33,58 @@ object ReceiptCodecs {
         RLPList(topicsRLP*),
         RLPValue(data.toArray[Byte])
       )
-    }
-  }
 
-  extension (rlp: RLPEncodeable) {
-    def toTxLogEntry: TxLogEntry = rlp match {
+  extension (rlp: RLPEncodeable)
+    def toTxLogEntry: TxLogEntry = rlp match
       case RLPList(RLPValue(loggerAddressBytes), logTopics: RLPList, RLPValue(dataBytes)) =>
         TxLogEntry(Address(ByteString(loggerAddressBytes)), fromRlpList[ByteString](logTopics), ByteString(dataBytes))
       case _ => throw new RuntimeException("Cannot decode TransactionLog")
-    }
-  }
 
   // ── Receipt ──────────────────────────────────────────────────────────────────
 
-  extension (receipt: Receipt) {
-    def toRLPEncodable: RLPEncodeable = {
+  extension (receipt: Receipt)
+    def toRLPEncodable: RLPEncodeable =
       import receipt.*
-      val stateHash: RLPEncodeable = postTransactionStateHash match {
+      val stateHash: RLPEncodeable = postTransactionStateHash match
         case HashOutcome(hash) => RLPValue(hash.toArray[Byte])
         case SuccessOutcome    => 1.toByte
         case _                 => 0.toByte
-      }
       val legacyRLPReceipt = RLPList(
         stateHash,
         cumulativeGasUsed,
         RLPValue(logsBloomFilter.toArray),
         RLPList(logs.map(_.toRLPEncodable)*)
       )
-      receipt match {
+      receipt match
         case _: LegacyReceipt      => legacyRLPReceipt
         case _: Type01Receipt      => PrefixedRLPEncodable(Transaction.Type01, legacyRLPReceipt)
         case _: Type02Receipt      => PrefixedRLPEncodable(Transaction.Type02, legacyRLPReceipt)
         case _: Type03Receipt      => PrefixedRLPEncodable(Transaction.Type03, legacyRLPReceipt)
         case _: Type04Receipt      => PrefixedRLPEncodable(Transaction.Type04, legacyRLPReceipt)
         case _: TypedLegacyReceipt => legacyRLPReceipt
-      }
-    }
     def toBytes: Array[Byte] = encode(receipt.toRLPEncodable)
-  }
 
-  extension (receipts: Seq[Receipt]) {
+  extension (receipts: Seq[Receipt])
     def toRLPEncodable: RLPEncodeable = RLPList(receipts.map(_.toRLPEncodable)*)
     def toBytes: Array[Byte] = encode(receipts.toRLPEncodable)
-  }
 
-  extension (bytes: Array[Byte]) {
-    def toReceipt: Receipt = {
+  extension (bytes: Array[Byte])
+    def toReceipt: Receipt =
       if bytes.isEmpty then throw new RuntimeException("Cannot decode Receipt: empty byte array")
       val first = bytes(0)
-      (first match {
+      (first match
         case txType if txType.isValidTransactionType && bytes.length > 1 =>
           PrefixedRLPEncodable(txType, rawDecode(bytes.tail))
         case _ => rawDecode(bytes)
-      }).toReceipt
-    }
+      ).toReceipt
 
-    def toReceipts: Seq[Receipt] = rawDecode(bytes) match {
+    def toReceipts: Seq[Receipt] = rawDecode(bytes) match
       case RLPList(items*) => items.toTypedRLPEncodables.map(_.toReceipt)
       case other =>
         throw new RuntimeException(s"Cannot decode Receipts: expected RLPList, got ${other.getClass.getSimpleName}")
-    }
-  }
 
-  extension (rlpEncodeable: RLPEncodeable) {
-    def toLegacyReceipt: LegacyReceipt = rlpEncodeable match {
+  extension (rlpEncodeable: RLPEncodeable)
+    def toLegacyReceipt: LegacyReceipt = rlpEncodeable match
       // 4-field: ETH68 bloom-inclusive  [stateHash, gasUsed, logsBloom, logs]
       case RLPList(
             postTransactionStateHash,
@@ -104,11 +92,10 @@ object ReceiptCodecs {
             RLPValue(logsBloomFilterBytes),
             logs: RLPList
           ) =>
-        val stateHash = postTransactionStateHash match {
+        val stateHash = postTransactionStateHash match
           case RLPValue(bytes) if bytes.length > 1                     => HashOutcome(ByteString(bytes))
           case RLPValue(bytes) if bytes.length == 1 && bytes.head == 1 => SuccessOutcome
           case _                                                       => FailureOutcome
-        }
         LegacyReceipt(
           stateHash,
           ByteUtils.bytesToBigInt(cumulativeGasUsedBytes),
@@ -123,11 +110,10 @@ object ReceiptCodecs {
             RLPValue(cumulativeGasUsedBytes),
             logs: RLPList
           ) =>
-        val stateHash = postTransactionStateHash match {
+        val stateHash = postTransactionStateHash match
           case RLPValue(bytes) if bytes.length > 1                     => HashOutcome(ByteString(bytes))
           case RLPValue(bytes) if bytes.length == 1 && bytes.head == 1 => SuccessOutcome
           case _                                                       => FailureOutcome
-        }
         LegacyReceipt(
           stateHash,
           ByteUtils.bytesToBigInt(cumulativeGasUsedBytes),
@@ -140,18 +126,15 @@ object ReceiptCodecs {
         rawDecode(bytes.tail).toLegacyReceipt
       case other =>
         throw new RuntimeException(s"Cannot decode Receipt: expected RLPList, got ${other.getClass.getSimpleName}")
-    }
 
-    def toReceipt: Receipt = {
-      def decodeTypedReceiptFromBytes(bytes: Array[Byte]): Receipt = {
+    def toReceipt: Receipt =
+      def decodeTypedReceiptFromBytes(bytes: Array[Byte]): Receipt =
         val txType = bytes.head
         val payload = rawDecode(bytes.tail)
-        txType match {
+        txType match
           case Transaction.Type01 => Type01Receipt(payload.toLegacyReceipt)
           case other              => throw new RuntimeException(s"Unsupported typed receipt type: $other")
-        }
-      }
-      rlpEncodeable match {
+      rlpEncodeable match
         case PrefixedRLPEncodable(Transaction.Type04, legacyReceipt) => Type04Receipt(legacyReceipt.toLegacyReceipt)
         case PrefixedRLPEncodable(Transaction.Type03, legacyReceipt) => Type03Receipt(legacyReceipt.toLegacyReceipt)
         case PrefixedRLPEncodable(Transaction.Type02, legacyReceipt) => Type02Receipt(legacyReceipt.toLegacyReceipt)
@@ -159,7 +142,3 @@ object ReceiptCodecs {
         case RLPValue(bytes) if bytes.nonEmpty && bytes.head.isValidTransactionType && bytes.length > 1 =>
           decodeTypedReceiptFromBytes(bytes)
         case other => other.toLegacyReceipt
-      }
-    }
-  }
-}

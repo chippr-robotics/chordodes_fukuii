@@ -27,11 +27,11 @@ import com.chipprbots.ethereum.utils.Config.SyncConfig
   * deployed at the activation block, storage is absent before activation, and the 8191-slot wrap-around works
   * correctly.
   */
-class BlockHashHistorySpec extends AnyFlatSpec with Matchers {
+class BlockHashHistorySpec extends AnyFlatSpec with Matchers:
 
   private val Window: BigInt = HistoryServeWindow
 
-  trait TestSetup extends EphemBlockchainTestSetup {
+  trait TestSetup extends EphemBlockchainTestSetup:
     override lazy val vm: VMImpl = new Mocks.MockVM()
 
     val olympiaBlock: BigInt = 10
@@ -81,23 +81,21 @@ class BlockHashHistorySpec extends AnyFlatSpec with Matchers {
 
     def runBlock(block: Block, world: InMemoryWorldStateProxy = emptyWorld): InMemoryWorldStateProxy =
       exec.executeBlockTransactions(block, world).toOption.get.worldState
-  }
 
   "EIP-2935 block hash history" should "store parent hash at the correct slot for the Olympia activation block" taggedAs (
     OlympiaTest,
     ConsensusTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val parentHash: ByteString = ByteString(Array.fill(32)(0xab.toByte))
     val world: InMemoryWorldStateProxy = runBlock(makeBlock(olympiaBlock, parentHash))
 
     val slot: BigInt = (olympiaBlock - 1) % Window
     world.getStorage(HistoryStorageAddress).load(slot) shouldBe UInt256(parentHash).toBigInt
-  }
 
   it should "deploy the history contract and write the slot when processing a post-activation block on a fresh world" taggedAs (
     OlympiaTest,
     ConsensusTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     // emptyWorld has no account at HistoryStorageAddress — simulates executing block N+1
     // without having first processed the activation block in this world instance.
     // Before the fix this threw IllegalStateException at getGuaranteedAccount inside getStorage.
@@ -107,20 +105,18 @@ class BlockHashHistorySpec extends AnyFlatSpec with Matchers {
     world.getCode(HistoryStorageAddress) shouldBe HistoryStorageCode
     val slot: BigInt = olympiaBlock % Window // (olympiaBlock + 1 - 1) % Window
     world.getStorage(HistoryStorageAddress).load(slot) shouldBe UInt256(parentHash).toBigInt
-  }
 
   it should "deploy the history storage contract code at the Olympia activation block" taggedAs (
     OlympiaTest,
     ConsensusTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val world: InMemoryWorldStateProxy = runBlock(makeBlock(olympiaBlock, ByteString(Array.fill(32)(0x01.toByte))))
     world.getCode(HistoryStorageAddress) shouldBe HistoryStorageCode
-  }
 
   it should "wrap around the 8191-slot window: block N and block N+8191 share the same slot" taggedAs (
     OlympiaTest,
     ConsensusTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val hashA: ByteString = ByteString(Array.fill(32)(0xaa.toByte))
     val hashB: ByteString = ByteString(Array.fill(32)(0xbb.toByte))
 
@@ -129,12 +125,11 @@ class BlockHashHistorySpec extends AnyFlatSpec with Matchers {
 
     val slot: BigInt = (olympiaBlock - 1) % Window
     world2.getStorage(HistoryStorageAddress).load(slot) shouldBe UInt256(hashB).toBigInt
-  }
 
   it should "NOT write history storage for blocks before Olympia activation" taggedAs (
     OlympiaTest,
     ConsensusTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val world: InMemoryWorldStateProxy = runBlock(
       makeBlock(olympiaBlock - 1, ByteString(Array.fill(32)(0xdd.toByte)), isOlympia = false)
     )
@@ -142,7 +137,6 @@ class BlockHashHistorySpec extends AnyFlatSpec with Matchers {
     val slot: BigInt = (olympiaBlock - 2) % Window
     world.getStorage(HistoryStorageAddress).load(slot) shouldBe BigInt(0)
     world.getCode(HistoryStorageAddress) shouldBe ByteString.empty
-  }
 
   "HistoryStorageCode" should "start with the CALLER opcode (0x33) per EIP-2935 spec" taggedAs (
     OlympiaTest,
@@ -151,4 +145,3 @@ class BlockHashHistorySpec extends AnyFlatSpec with Matchers {
     HistoryStorageCode should not be empty
     HistoryStorageCode.head shouldBe 0x33.toByte
   }
-}

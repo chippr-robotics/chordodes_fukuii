@@ -31,7 +31,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   * @see
   *   Issue: E2E testing - test driven development for resolving p2p handshake, block exchange or storage issues
   */
-class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll {
+class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll:
   implicit val testRuntime: IORuntime = IORuntime.global
 
   override def afterAll(): Unit = {
@@ -41,14 +41,14 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
   def updateStateAtBlock(
       blockNumber: Int
   )(currentBlockNumber: BigInt, world: InMemoryWorldStateProxy): InMemoryWorldStateProxy =
-    if currentBlockNumber == blockNumber then {
+    if currentBlockNumber == blockNumber then
       val accountAddress = Address(currentBlockNumber.toByteArray)
       val account = Account(
         nonce = 1,
         balance = UInt256(currentBlockNumber * BigInt(1000000000))
       )
       InMemoryWorldStateProxy.persistState(world.saveAccount(accountAddress, account))
-    } else world
+    else world
 
   "E2E Fast Sync" should "successfully sync blockchain headers without state" taggedAs (
     IntegrationTest,
@@ -58,7 +58,7 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
     FakePeer.start3FakePeersRes()
   ) { case (peer1, peer2, peer3) =>
     val blockNumber = 500
-    for {
+    for
       // Peers 2 and 3 have blockchain
       _ <- peer2.importBlocksUntil(blockNumber)(IdentityUpdate)
       _ <- peer3.importBlocksUntil(blockNumber)(IdentityUpdate)
@@ -67,7 +67,7 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
       _ <- peer1.connectToPeers(Set(peer2.node, peer3.node))
       _ <- peer1.startFastSync().delayBy(50.milliseconds)
       _ <- peer1.waitForFastSyncFinish()
-    } yield {
+    yield
       val expectedBlockNumber = blockNumber - peer1.testSyncConfig.pivotBlockOffset
       val actualBlockNumber = peer1.blockchainReader.getBestBlockNumber
 
@@ -76,7 +76,6 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
       // Verify headers are downloaded
       val peer1BestBlock = peer1.blockchainReader.getBestBlock
       peer1BestBlock shouldBe defined
-    }
   }
 
   it should "successfully sync blockchain with state nodes" taggedAs (
@@ -90,7 +89,7 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
     val blockNumber = 800
     val stateBlockNumber = 400
 
-    for {
+    for
       // Create blockchain with state at specific block
       _ <- peer2.importBlocksUntil(blockNumber)(updateStateAtBlock(stateBlockNumber))
       _ <- peer3.importBlocksUntil(blockNumber)(updateStateAtBlock(stateBlockNumber))
@@ -99,7 +98,7 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
       _ <- peer1.connectToPeers(Set(peer2.node, peer3.node))
       _ <- peer1.startFastSync().delayBy(50.milliseconds)
       _ <- peer1.waitForFastSyncFinish()
-    } yield {
+    yield
       // Verify state was downloaded correctly
       val trie = peer1.getBestBlockTrie()
       trie shouldBe defined
@@ -111,7 +110,6 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
       // Verify block number
       val expectedBlockNumber = blockNumber - peer1.testSyncConfig.pivotBlockOffset
       peer1.blockchainReader.getBestBlockNumber shouldBe expectedBlockNumber
-    }
   }
 
   it should "handle state synchronization from multiple peers" taggedAs (
@@ -129,7 +127,7 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
     val blockNumber = 1000
     val stateBlockNumber = 500
 
-    for {
+    for
       // Multiple peers have the same state
       _ <- peer2.importBlocksUntil(blockNumber)(updateStateAtBlock(stateBlockNumber))
       _ <- peer3.importBlocksUntil(blockNumber)(updateStateAtBlock(stateBlockNumber))
@@ -139,14 +137,13 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
       _ <- peer1.connectToPeers(Set(peer2.node, peer3.node, peer4.node))
       _ <- peer1.startFastSync().delayBy(50.milliseconds)
       _ <- peer1.waitForFastSyncFinish()
-    } yield {
+    yield
       // Verify successful sync
       val trie = peer1.getBestBlockTrie()
       trie shouldBe defined
 
       val hasExpectedData = peer1.containsExpectedDataUpToAccountAtBlock(blockNumber, stateBlockNumber)
       hasExpectedData shouldBe true
-    }
   }
 
   it should "verify pivot block selection is correct" taggedAs (
@@ -159,14 +156,14 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
     val blockNumber = 600
     val pivotOffset = peer1.testSyncConfig.pivotBlockOffset
 
-    for {
+    for
       _ <- peer2.importBlocksUntil(blockNumber)(IdentityUpdate)
       _ <- peer3.importBlocksUntil(blockNumber)(IdentityUpdate)
 
       _ <- peer1.connectToPeers(Set(peer2.node, peer3.node))
       _ <- peer1.startFastSync().delayBy(50.milliseconds)
       _ <- peer1.waitForFastSyncFinish()
-    } yield {
+    yield
       val expectedPivotBlock = blockNumber - pivotOffset
       val actualBestBlock = peer1.blockchainReader.getBestBlockNumber
 
@@ -176,7 +173,6 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
       // Verify the pivot block exists and is valid
       val pivotBlock = peer1.blockchainReader.getBlockByNumber(peer1.blockchainReader.getBestBranch, actualBestBlock)
       pivotBlock shouldBe defined
-    }
   }
 
   it should "handle incomplete state downloads gracefully" taggedAs (
@@ -190,7 +186,7 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
     val blockNumber = 700
     val stateBlockNumber = 350
 
-    for {
+    for
       // Only one peer has complete state initially
       _ <- peer2.importBlocksUntil(blockNumber)(updateStateAtBlock(stateBlockNumber))
       _ <- peer3.importBlocksUntil(blockNumber)(IdentityUpdate) // No state
@@ -198,11 +194,10 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
       _ <- peer1.connectToPeers(Set(peer2.node, peer3.node))
       _ <- peer1.startFastSync().delayBy(50.milliseconds)
       _ <- peer1.waitForFastSyncFinish()
-    } yield {
+    yield
       // Should still succeed with at least one peer having state
       val trie = peer1.getBestBlockTrie()
       trie shouldBe defined
-    }
   }
 
   it should "maintain chain integrity during fast sync" taggedAs (
@@ -215,32 +210,29 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
   ) { case (peer1, peer2, peer3) =>
     val blockNumber = 900
 
-    for {
+    for
       _ <- peer2.importBlocksUntil(blockNumber)(IdentityUpdate)
       _ <- peer3.importBlocksUntil(blockNumber)(IdentityUpdate)
 
       _ <- peer1.connectToPeers(Set(peer2.node, peer3.node))
       _ <- peer1.startFastSync().delayBy(50.milliseconds)
       _ <- peer1.waitForFastSyncFinish()
-    } yield {
+    yield
       val bestBlockNumber = peer1.blockchainReader.getBestBlockNumber
 
       // Verify chain continuity - all blocks should be linked
-      for i <- 1 to bestBlockNumber.toInt do {
+      for i <- 1 to bestBlockNumber.toInt do
         val block = peer1.blockchainReader.getBlockByNumber(peer1.blockchainReader.getBestBranch, i)
         block shouldBe defined
 
-        if i > 1 then {
+        if i > 1 then
           val prevBlock = peer1.blockchainReader.getBlockByNumber(peer1.blockchainReader.getBestBranch, i - 1)
           prevBlock shouldBe defined
           // Use getOrElse with meaningful error message instead of .get
           val currentBlock = block.getOrElse(fail(s"Block at height $i should be defined"))
           val previousBlock = prevBlock.getOrElse(fail(s"Block at height ${i - 1} should be defined"))
           currentBlock.header.parentHash shouldBe previousBlock.hash
-        }
-      }
       succeed
-    }
   }
 
   it should "calculate total difficulty correctly during fast sync" taggedAs (
@@ -252,14 +244,14 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
   ) { case (peer1, peer2, peer3) =>
     val blockNumber = 500
 
-    for {
+    for
       _ <- peer2.importBlocksUntil(blockNumber)(IdentityUpdate)
       _ <- peer3.importBlocksUntil(blockNumber)(IdentityUpdate)
 
       _ <- peer1.connectToPeers(Set(peer2.node, peer3.node))
       _ <- peer1.startFastSync().delayBy(50.milliseconds)
       _ <- peer1.waitForFastSyncFinish()
-    } yield {
+    yield
       // Use getOrElse with meaningful error messages instead of .get
       val peer1BestBlock = peer1.blockchainReader.getBestBlock
         .getOrElse(
@@ -275,7 +267,6 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
 
       // Total difficulty should match at the same block
       peer1Difficulty shouldBe peer2DifficultyAtSameBlock
-    }
   }
 
   it should "transition from fast sync successfully" taggedAs (
@@ -287,7 +278,7 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
   ) { case (peer1, peer2, peer3) =>
     val blockNumber = 600
 
-    for {
+    for
       // Initial state
       _ <- peer2.importBlocksUntil(blockNumber)(IdentityUpdate)
       _ <- peer3.importBlocksUntil(blockNumber)(IdentityUpdate)
@@ -296,7 +287,7 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
       _ <- peer1.connectToPeers(Set(peer2.node, peer3.node))
       _ <- peer1.startFastSync().delayBy(50.milliseconds)
       _ <- peer1.waitForFastSyncFinish()
-    } yield {
+    yield
       // Verify fast sync completed successfully
       val peer1BestBlock = peer1.blockchainReader.getBestBlock
       peer1BestBlock shouldBe defined
@@ -304,7 +295,6 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
       // Verify we're close to the target
       val expectedBlock = blockNumber - peer1.testSyncConfig.pivotBlockOffset
       peer1.blockchainReader.getBestBlockNumber shouldBe expectedBlock
-    }
   }
 
   it should "handle state nodes with complex account structures" taggedAs (
@@ -318,7 +308,7 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
     val blockNumber = 1000
 
     def updateComplexState(currentBlockNumber: BigInt, world: InMemoryWorldStateProxy): InMemoryWorldStateProxy =
-      if currentBlockNumber % 100 == 0 && currentBlockNumber > 0 then {
+      if currentBlockNumber % 100 == 0 && currentBlockNumber > 0 then
         val accountAddress = Address(currentBlockNumber.toByteArray)
         val account = Account(
           nonce = UInt256(currentBlockNumber),
@@ -327,9 +317,9 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
           codeHash = Account.EmptyCodeHash
         )
         InMemoryWorldStateProxy.persistState(world.saveAccount(accountAddress, account))
-      } else world
+      else world
 
-    for {
+    for
       // Create blockchain with multiple state snapshots
       _ <- peer2.importBlocksUntil(blockNumber)(updateComplexState)
       _ <- peer3.importBlocksUntil(blockNumber)(updateComplexState)
@@ -337,14 +327,13 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
       _ <- peer1.connectToPeers(Set(peer2.node, peer3.node))
       _ <- peer1.startFastSync().delayBy(50.milliseconds)
       _ <- peer1.waitForFastSyncFinish()
-    } yield {
+    yield
       val trie = peer1.getBestBlockTrie()
       trie shouldBe defined
 
       // Verify state was downloaded
       val bestBlock = peer1.blockchainReader.getBestBlock
       bestBlock shouldBe defined
-    }
   }
 
   it should "recover from peer disconnection during state download" taggedAs (
@@ -358,7 +347,7 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
     val blockNumber = 800
     val stateBlockNumber = 400
 
-    for {
+    for
       // Multiple peers have state
       _ <- peer2.importBlocksUntil(blockNumber)(updateStateAtBlock(stateBlockNumber))
       _ <- peer3.importBlocksUntil(blockNumber)(updateStateAtBlock(stateBlockNumber))
@@ -370,13 +359,12 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
 
       // Even if some peers disconnect, sync should complete with remaining peers
       _ <- peer1.waitForFastSyncFinish()
-    } yield {
+    yield
       val trie = peer1.getBestBlockTrie()
       trie shouldBe defined
 
       val hasExpectedData = peer1.containsExpectedDataUpToAccountAtBlock(blockNumber, stateBlockNumber)
       hasExpectedData shouldBe true
-    }
   }
 
   it should "validate downloaded state against pivot block state root" taggedAs (
@@ -390,14 +378,14 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
     val blockNumber = 600
     val stateBlockNumber = 300
 
-    for {
+    for
       _ <- peer2.importBlocksUntil(blockNumber)(updateStateAtBlock(stateBlockNumber))
       _ <- peer3.importBlocksUntil(blockNumber)(updateStateAtBlock(stateBlockNumber))
 
       _ <- peer1.connectToPeers(Set(peer2.node, peer3.node))
       _ <- peer1.startFastSync().delayBy(50.milliseconds)
       _ <- peer1.waitForFastSyncFinish()
-    } yield {
+    yield
       // Use getOrElse with meaningful error messages instead of .get
       val peer1BestBlock = peer1.blockchainReader.getBestBlock
         .getOrElse(
@@ -411,6 +399,4 @@ class E2EFastSyncSpec extends FlatSpecBase with Matchers with BeforeAndAfterAll 
 
       // State roots should match
       peer1BestBlock.header.stateRoot shouldBe peer2SameBlock.header.stateRoot
-    }
   }
-}

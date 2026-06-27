@@ -23,7 +23,7 @@ import com.chipprbots.ethereum.db.storage.StateStorage
   * through `pipeToSelf`. A scan failure (or an empty trie) emits empty gap sets — recovery then proceeds straight to
   * regular sync, which fetches any residue on-demand.
   */
-object CombinedRecoveryScanActor {
+object CombinedRecoveryScanActor:
 
   // Not marked private so the return type of `apply` doesn't leak a private type;
   // ScanDone (the only subtype) remains private so no caller can construct a Command.
@@ -80,4 +80,3 @@ object CombinedRecoveryScanActor {
         Behaviors.stopped
       }
     }
-}

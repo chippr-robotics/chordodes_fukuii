@@ -29,7 +29,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   * Timestamps used here are far-future sentinels declared in the test application.conf: prague-timestamp = 9999999998
   * osaka-timestamp = 9999999999
   */
-class EngineApiGetPayloadV5Spec extends AnyWordSpec with Matchers {
+class EngineApiGetPayloadV5Spec extends AnyWordSpec with Matchers:
 
   implicit val ioRuntime: IORuntime = IORuntime.global
 
@@ -37,7 +37,7 @@ class EngineApiGetPayloadV5Spec extends AnyWordSpec with Matchers {
   private val PragueTs: Long = 9999999998L
   private val OsakaTs: Long = 9999999999L
 
-  private def makeBlock(timestamp: Long): Block = {
+  private def makeBlock(timestamp: Long): Block =
     val header = BlockHeader(
       parentHash = BlockHash(ByteString(new Array[Byte](32))),
       ommersHash = BlockHash(BlockHeader.EmptyOmmers),
@@ -64,16 +64,14 @@ class EngineApiGetPayloadV5Spec extends AnyWordSpec with Matchers {
       )
     )
     Block(header, BlockBody(Nil, Nil, withdrawals = Some(Nil)))
-  }
 
   private def stubService(block: Block): EngineApiService =
-    new EngineApiService(null, null, null, null, None)(null, null) {
+    new EngineApiService(null, null, null, null, None)(null, null):
       override def getPayload(payloadId: ByteString): IO[Either[String, Block]] =
         IO.pure(Right(block))
       override def getPayloadReceipts(payloadId: ByteString) = Nil
       override def getPayloadBlobsBundle(payloadId: ByteString) = BlobsBundleData(Nil, Nil, Nil, Nil)
       override def getPayloadExecutionRequests(payloadId: ByteString) = Nil
-    }
 
   private def getPayloadRequest(method: String): JsonRpcRequest =
     JsonRpcRequest("2.0", method, Some(JArray(List(JString("0x0000000000000001")))), Some(JInt(1)))
@@ -113,4 +111,3 @@ class EngineApiGetPayloadV5Spec extends AnyWordSpec with Matchers {
       (envelope \ "executionRequests").shouldBe(JArray(Nil))
     }
   }
-}

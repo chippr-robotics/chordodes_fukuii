@@ -40,7 +40,7 @@ import com.chipprbots.ethereum.vm.ProgramError
 import com.chipprbots.ethereum.vm.ProgramResult
 
 // scalastyle:off magic.number
-trait TestSetup extends SecureRandomBuilder with EphemBlockchainTestSetup {
+trait TestSetup extends SecureRandomBuilder with EphemBlockchainTestSetup:
   // + cake overrides
 
   val prep: BlockPreparator = mining.blockPreparator
@@ -147,7 +147,7 @@ trait TestSetup extends SecureRandomBuilder with EphemBlockchainTestSetup {
   def applyChanges(
       stateRootHash: ByteString,
       changes: Seq[(Address, Changes)]
-  ): ByteString = {
+  ): ByteString =
     val initialWorld = InMemoryWorldStateProxy(
       storagesInstance.storages.evmCodeStorage,
       blockchain.getBackingMptStorage(-1),
@@ -159,7 +159,7 @@ trait TestSetup extends SecureRandomBuilder with EphemBlockchainTestSetup {
     )
 
     val newWorld = changes.foldLeft[InMemoryWorldStateProxy](initialWorld) { case (recWorld, (address, change)) =>
-      change match {
+      change match
         case UpdateBalance(balanceIncrease) =>
           val accountWithBalanceIncrease =
             recWorld.getAccount(address).getOrElse(Account.empty()).increaseBalance(balanceIncrease)
@@ -169,14 +169,10 @@ trait TestSetup extends SecureRandomBuilder with EphemBlockchainTestSetup {
           recWorld.saveAccount(address, accountWithNonceIncrease)
         case DeleteAccount =>
           recWorld.deleteAccount(address)
-      }
     }
     InMemoryWorldStateProxy.persistState(newWorld).stateRootHash
-  }
 
-}
-
-trait BlockchainSetup extends TestSetup {
+trait BlockchainSetup extends TestSetup:
   val blockchainStorages = storagesInstance.storages
 
   val validBlockParentHeader: BlockHeader = defaultBlockHeader.copy(stateRoot = TrieRoot(initialWorld.stateRootHash))
@@ -206,11 +202,10 @@ trait BlockchainSetup extends TestSetup {
   )
   val validStxSignedByOrigin: SignedTransaction =
     SignedTransaction.sign(validTx, originKeyPair, Some(blockchainConfig.chainId))
-}
 
 // SCALA 3 MIGRATION: Cannot use self-type constraint with anonymous instantiation in Scala 3.
 // The implementing class must extend MockFactory and provide mock implementations.
-trait DaoForkTestSetup extends TestSetup {
+trait DaoForkTestSetup extends TestSetup:
 
   // Abstract members - to be provided by implementing class that has MockFactory context
   def testBlockchainReader: BlockchainReader
@@ -234,7 +229,7 @@ trait DaoForkTestSetup extends TestSetup {
       ethCompatibleStorage = true
     )
 
-  val supportDaoForkConfig: DaoForkConfig = new DaoForkConfig {
+  val supportDaoForkConfig: DaoForkConfig = new DaoForkConfig:
     override val blockExtraData: Option[ByteString] = Some(ByteString("refund extra data"))
     override val range: Int = 10
     override val drainList: Seq[Address] = Seq(Address(1), Address(2), Address(3))
@@ -242,7 +237,6 @@ trait DaoForkTestSetup extends TestSetup {
     override val forkBlockNumber: BigInt = proDaoBlock.header.number
     override val refundContract: Option[Address] = Some(Address(4))
     override val includeOnForkIdList: Boolean = false
-  }
 
   val proDaoBlockchainConfig: BlockchainConfig = blockchainConfig
     .withUpdatedForkBlocks(
@@ -269,9 +263,8 @@ trait DaoForkTestSetup extends TestSetup {
 
   // Abstract method for setting up expectations - to be implemented by class with MockFactory context
   def setupDaoForkExpectations(): Unit
-}
 
-trait BinarySimulationChopSetup {
+trait BinarySimulationChopSetup:
   sealed trait TxError
   case object TxError extends TxError
 
@@ -283,9 +276,8 @@ trait BinarySimulationChopSetup {
 
   val mockTransaction: BigInt => BigInt => Option[TxError] =
     minimalWorkingGas => gasLimit => if gasLimit >= minimalWorkingGas then None else Some(TxError)
-}
 
-trait TestSetupWithVmAndValidators extends EphemBlockchainTestSetup {
+trait TestSetupWithVmAndValidators extends EphemBlockchainTestSetup:
   // + cake overrides
   override lazy val vm: VMImpl = new VMImpl
 
@@ -325,12 +317,10 @@ trait TestSetupWithVmAndValidators extends EphemBlockchainTestSetup {
     )
 
   def getChain(from: BigInt, to: BigInt, parent: ByteString = randomHash(), difficulty: BigInt = 100): List[Block] =
-    if from > to then {
-      Nil
-    } else {
+    if from > to then Nil
+    else
       val block = getBlock(number = from, difficulty = difficulty, parent = parent)
       block :: getChain(from + 1, to, block.header.hash.value, difficulty)
-    }
 
   def getChainNel(
       from: BigInt,
@@ -356,8 +346,8 @@ trait TestSetupWithVmAndValidators extends EphemBlockchainTestSetup {
 
   val execError: ValidationAfterExecError = ValidationAfterExecError("error")
 
-  object FailHeaderValidation extends Mocks.MockValidatorsAlwaysSucceed {
-    override val blockHeaderValidator: BlockHeaderValidator = new BlockHeaderValidator {
+  object FailHeaderValidation extends Mocks.MockValidatorsAlwaysSucceed:
+    override val blockHeaderValidator: BlockHeaderValidator = new BlockHeaderValidator:
       override def validate(
           blockHeader: BlockHeader,
           getBlockHeaderByHash: GetBlockHeaderByHash
@@ -369,10 +359,8 @@ trait TestSetupWithVmAndValidators extends EphemBlockchainTestSetup {
           blockchainConfig: BlockchainConfig
       ): Either[BlockHeaderError, BlockHeaderValid] =
         Left(HeaderParentNotFoundError)
-    }
-  }
 
-  object NotFailAfterExecValidation extends Mocks.MockValidatorsAlwaysSucceed {
+  object NotFailAfterExecValidation extends Mocks.MockValidatorsAlwaysSucceed:
     override def validateBlockAfterExecution(
         block: Block,
         stateRootHash: ByteString,
@@ -381,11 +369,10 @@ trait TestSetupWithVmAndValidators extends EphemBlockchainTestSetup {
     )(implicit blockchainConfig: BlockchainConfig): Either[BlockExecutionError, BlockExecutionSuccess] = Right(
       BlockExecutionSuccess
     )
-  }
 
   lazy val failConsensus: ConsensusAdapter = mkConsensus(validators = FailHeaderValidation)
 
-  lazy val blockImportNotFailingAfterExecValidation: ConsensusAdapter = {
+  lazy val blockImportNotFailingAfterExecValidation: ConsensusAdapter =
     val testMining = mining.withValidators(NotFailAfterExecValidation).withVM(new Mocks.MockVM())
     val blockValidation = new BlockValidation(testMining, blockchainReader, blockQueue)
     val consensus = new ConsensusImpl(
@@ -398,11 +385,11 @@ trait TestSetupWithVmAndValidators extends EphemBlockchainTestSetup {
         storagesInstance.storages.evmCodeStorage,
         testMining.blockPreparator,
         blockValidation
-      ) {
+      ):
         override def executeAndValidateBlock(
             block: Block,
             alreadyValidated: Boolean = false
-        )(implicit blockchainConfig: BlockchainConfig): Either[BlockExecutionError, Seq[Receipt]] = {
+        )(implicit blockchainConfig: BlockchainConfig): Either[BlockExecutionError, Seq[Receipt]] =
           val emptyWorld = InMemoryWorldStateProxy(
             storagesInstance.storages.evmCodeStorage,
             blockchain.getBackingMptStorage(-1),
@@ -413,8 +400,6 @@ trait TestSetupWithVmAndValidators extends EphemBlockchainTestSetup {
             ethCompatibleStorage = true
           )
           Right(BlockResult(emptyWorld).receipts)
-        }
-      }
     )
     new ConsensusAdapter(
       consensus,
@@ -426,12 +411,10 @@ trait TestSetupWithVmAndValidators extends EphemBlockchainTestSetup {
       // Tests are typically run in isolation, so contention and performance concerns are minimal.
       ioRuntime
     )
-  }
-}
 
 // SCALA 3 MIGRATION: Cannot use self-type constraint with anonymous instantiation in Scala 3.
 // The implementing class must extend MockFactory and create mocks as lazy vals.
-trait MockBlockchain {
+trait MockBlockchain:
   self: TestSetupWithVmAndValidators =>
 
   // These will be implemented by mixing in concrete implementations from test class
@@ -458,21 +441,17 @@ trait MockBlockchain {
   def setHeaderInChain(hash: ByteString, result: Boolean = true): Any
   def setBlockByNumber(number: BigInt, block: Option[Block]): Any
   def setGenesisHeader(header: BlockHeader): Unit
-}
 
-trait EphemBlockchain extends TestSetupWithVmAndValidators {
+trait EphemBlockchain extends TestSetupWithVmAndValidators:
   override lazy val blockQueue: BlockQueue = BlockQueue(blockchainReader, SyncConfig(Config.config))
 
   def blockImportWithMockedBlockExecution(blockExecutionMock: BlockExecution): ConsensusAdapter =
     mkConsensus(blockExecutionOpt = Some(blockExecutionMock))
-}
 
-trait OmmersTestSetup extends EphemBlockchain {
-  object OmmerValidation extends Mocks.MockValidatorsAlwaysSucceed {
+trait OmmersTestSetup extends EphemBlockchain:
+  object OmmerValidation extends Mocks.MockValidatorsAlwaysSucceed:
     override val ommersValidator: OmmersValidator =
       new StdOmmersValidator(blockHeaderValidator)
-  }
 
   override def blockImportWithMockedBlockExecution(blockExecutionMock: BlockExecution): ConsensusAdapter =
     mkConsensus(validators = OmmerValidation, blockExecutionOpt = Some(blockExecutionMock))
-}

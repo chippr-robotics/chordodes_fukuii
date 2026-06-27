@@ -9,7 +9,7 @@ import com.chipprbots.ethereum.db.dataSource.EphemDataSource
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.testing.Tags.*
 
-class BlockHeadersStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with ObjectGenerators {
+class BlockHeadersStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with ObjectGenerators:
 
   "BlockHeadersStorage" should {
 
@@ -54,5 +54,3 @@ class BlockHeadersStorageSpec extends AnyWordSpec with ScalaCheckPropertyChecks 
 
   def checkIfIsInStorage(headers: List[BlockHeader], totalStorage: BlockHeadersStorage): Unit =
     headers.foreach(header => assert(totalStorage.get(header.hash.value).contains(header)))
-
-}

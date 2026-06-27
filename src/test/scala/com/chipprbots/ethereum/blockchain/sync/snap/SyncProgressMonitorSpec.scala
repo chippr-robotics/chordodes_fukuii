@@ -7,7 +7,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.testing.Tags.*
 
-class SyncProgressMonitorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
+class SyncProgressMonitorSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers:
 
   private val classicScheduler: org.apache.pekko.actor.Scheduler = system.classicSystem.scheduler
 
@@ -64,4 +64,3 @@ class SyncProgressMonitorSpec extends ScalaTestWithActorTestKit with AnyFlatSpec
 
     percentDouble shouldBe 52.395 +- 0.01
   }
-}

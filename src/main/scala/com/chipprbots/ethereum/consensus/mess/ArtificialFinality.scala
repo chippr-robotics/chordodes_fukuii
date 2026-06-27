@@ -18,7 +18,7 @@ package com.chipprbots.ethereum.consensus.mess
   * @see
   *   [[https://github.com/ethereumclassic/ECIPs/issues/374#issuecomment-694156719 Polynomial specification]]
   */
-object ArtificialFinality {
+object ArtificialFinality:
 
   /** CURVE_FUNCTION_DENOMINATOR = 128 */
   private val Denominator: BigInt = 128
@@ -42,7 +42,7 @@ object ArtificialFinality {
     * @return
     *   numerator value (denominator is always 128)
     */
-  def polynomialV(timeDelta: BigInt): BigInt = {
+  def polynomialV(timeDelta: BigInt): BigInt =
     val x = if timeDelta > Xcap then Xcap else timeDelta
 
     // 3 * x^2
@@ -56,7 +56,6 @@ object ArtificialFinality {
 
     // DENOMINATOR + result
     Denominator + result
-  }
 
   /** Check if a proposed reorg should be rejected by MESS.
     *
@@ -75,7 +74,7 @@ object ArtificialFinality {
       timeDeltaSeconds: Long,
       localSubchainTD: BigInt,
       proposedSubchainTD: BigInt
-  ): Boolean = {
+  ): Boolean =
     val eq = polynomialV(BigInt(timeDeltaSeconds))
 
     // want = polynomialV(timeDelta) * localSubchainTD
@@ -86,5 +85,3 @@ object ArtificialFinality {
 
     // Reject if got < want (proposed chain doesn't meet the antigravity threshold)
     got < want
-  }
-}

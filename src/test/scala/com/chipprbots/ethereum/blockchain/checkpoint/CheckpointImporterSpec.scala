@@ -21,11 +21,11 @@ import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.domain.appstate.BlockInfo
 import com.chipprbots.ethereum.testing.Tags.UnitTest
 
-class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues with OptionValues {
+class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues with OptionValues:
 
   "CheckpointImporter" should {
 
-    "import a single-account archive end-to-end" taggedAs UnitTest in new Setup {
+    "import a single-account archive end-to-end" taggedAs UnitTest in new Setup:
       val header = checkpointHeader
       val nodes: Seq[(ByteString, Array[Byte])] = Seq(
         (hash("rootNode"), Array.fill[Byte](48)(0xab.toByte)),
@@ -73,9 +73,8 @@ class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues
       bytecodes.foreach { case (h, code) =>
         freshStorage.storages.evmCodeStorage.get(h).map(_.toArray.toSeq) shouldBe Some(code.toSeq)
       }
-    }
 
-    "reject an archive with a mismatched chainId" taggedAs UnitTest in new Setup {
+    "reject an archive with a mismatched chainId" taggedAs UnitTest in new Setup:
       val header = checkpointHeader
       val bytes: Array[Byte] = encodeArchive(header, Nil, Nil)
 
@@ -93,9 +92,8 @@ class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues
       // Best block must remain at 0 on rejection
       freshStorage.storages.appStateStorage.getBestBlockNumber() shouldBe 0
       freshStorage.storages.appStateStorage.isSnapSyncDone() shouldBe false
-    }
 
-    "reject a corrupted archive without committing state" taggedAs UnitTest in new Setup {
+    "reject a corrupted archive without committing state" taggedAs UnitTest in new Setup:
       val header = checkpointHeader
       val nodes: Seq[(ByteString, Array[Byte])] = Seq((hash("n1"), Array.fill[Byte](32)(0x11)))
       val bytes: Array[Byte] = encodeArchive(header, nodes, Nil)
@@ -114,11 +112,10 @@ class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues
       // Phase flags must remain unset on failure (we want the next start to be able to retry)
       freshStorage.storages.appStateStorage.isSnapSyncDone() shouldBe false
       freshStorage.storages.appStateStorage.getBestBlockNumber() shouldBe 0
-    }
 
     // Regression for Bug 35 — operator-supplied output path without `.gz` extension
     // shouldn't break the import. importFromFile sniffs the gzip magic bytes.
-    "import a gzipped archive even when the file path lacks .gz extension" taggedAs UnitTest in new Setup {
+    "import a gzipped archive even when the file path lacks .gz extension" taggedAs UnitTest in new Setup:
       import java.nio.file.Files
       import java.util.zip.GZIPOutputStream
 
@@ -128,7 +125,7 @@ class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues
 
       // Write the archive to a temp file WITH gzip compression but WITHOUT .gz suffix
       val tmp: Path = Files.createTempFile("checkpoint-bug35", ".checkpoint")
-      try {
+      try
         val out = new GZIPOutputStream(Files.newOutputStream(tmp))
         try out.write(bytes)
         finally out.close()
@@ -142,11 +139,10 @@ class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues
         val result = importer.importFromFile(tmp, Some(checkpointChainId)).value
         result.blockNumber shouldBe header.blockHeader.number
         result.nodesImported shouldBe nodes.length
-      } finally Files.deleteIfExists(tmp)
-    }
+      finally Files.deleteIfExists(tmp)
   }
 
-  private trait Setup extends EphemBlockchainTestSetup {
+  private trait Setup extends EphemBlockchainTestSetup:
     val checkpointChainId: Long = 61L
     val freshStorage = getNewStorages
     val writer: BlockchainWriter = BlockchainWriter(freshStorage.storages)
@@ -166,7 +162,7 @@ class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues
         header: CheckpointArchive.Header,
         nodes: Seq[(ByteString, Array[Byte])],
         bytecodes: Seq[(ByteString, Array[Byte])]
-    ): Array[Byte] = {
+    ): Array[Byte] =
       val baos = new ByteArrayOutputStream()
       val w = new CheckpointArchive.Writer(baos)
       w.writeHeader(header)
@@ -174,7 +170,3 @@ class CheckpointImporterSpec extends AnyWordSpec with Matchers with EitherValues
       bytecodes.foreach { case (h, b) => w.writeBytecode(h, b) }
       w.finish()
       baos.toByteArray
-    }
-
-  }
-}

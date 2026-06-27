@@ -17,7 +17,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   * (Seq[ByteString]) for lazy decoding. The ETH68 message decoder rejects GetNodeData/NodeData (EIP-4938). These tests
   * verify the raw encode/decode round-trip only.
   */
-class NodeDataSpec extends AnyFlatSpec with Matchers {
+class NodeDataSpec extends AnyFlatSpec with Matchers:
 
   val exampleHash: ByteString = ByteString(kec256(Hex.decode("ab" * 32)))
   val exampleValue: ByteString = ByteString(Hex.decode("abcdee"))
@@ -47,4 +47,3 @@ class NodeDataSpec extends AnyFlatSpec with Matchers {
     decoded.values should have size 3
     decoded.values should equal(multiNode.values)
   }
-}

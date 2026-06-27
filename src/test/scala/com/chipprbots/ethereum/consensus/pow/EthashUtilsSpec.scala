@@ -12,7 +12,7 @@ import com.chipprbots.ethereum.SuperSlow
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.ByteStringUtils
 
-class EthashUtilsSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks with SuperSlow {
+class EthashUtilsSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks with SuperSlow:
 
   import com.chipprbots.ethereum.consensus.pow.EthashUtils.*
 
@@ -151,4 +151,3 @@ class EthashUtilsSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyC
       }
     }
   }
-}

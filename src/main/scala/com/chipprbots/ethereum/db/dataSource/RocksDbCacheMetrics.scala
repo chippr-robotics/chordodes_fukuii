@@ -23,7 +23,7 @@ import com.chipprbots.ethereum.utils.Logger
   *
   * Mirrors the closure-poll-gauge pattern of `EngineApiMetrics` / `PoWMiningMetrics`.
   */
-object RocksDbCacheMetrics extends MetricsContainer with Logger {
+object RocksDbCacheMetrics extends MetricsContainer with Logger:
 
   private val registered = new AtomicBoolean(false)
 
@@ -36,9 +36,9 @@ object RocksDbCacheMetrics extends MetricsContainer with Logger {
     *   the production state DataSource; only `RocksDbDataSource` exposes `cacheStats`.
     */
   def register(dataSource: DataSource): Unit =
-    dataSource match {
+    dataSource match
       case rdb: RocksDbDataSource =>
-        if registered.compareAndSet(false, true) then {
+        if registered.compareAndSet(false, true) then
           // hit
           val _ = metrics.gauge(
             "db.rocksdb.block_cache.hit",
@@ -53,12 +53,11 @@ object RocksDbCacheMetrics extends MetricsContainer with Logger {
           val _ = metrics.gauge(
             "db.rocksdb.block_cache.hit_rate",
             () =>
-              rdb.cacheStats match {
+              rdb.cacheStats match
                 case Some((hit, miss, _, _)) =>
                   val total = hit + miss
                   if total <= 0L then 0.0 else hit.toDouble / total.toDouble
                 case None => 0.0
-              }
           )
           // index_filter hit / miss
           val _ = metrics.gauge(
@@ -73,9 +72,6 @@ object RocksDbCacheMetrics extends MetricsContainer with Logger {
             "RocksDB block-cache metrics registered (app_db_rocksdb_block_cache_* / index_filter_*); " +
               "values populated only when db.rocksdb.enable-statistics = true"
           )
-        }
       case _ =>
         // Not a RocksDbDataSource (e.g. EphemDataSource) — no cacheStats to poll; skip silently.
         ()
-    }
-}

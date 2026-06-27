@@ -21,7 +21,7 @@ import com.chipprbots.ethereum.utils.MonetaryPolicyConfig
   * Mordor testnet production config (from mordor-chain.conf): eraDuration=2,000,000, reductionRate=0.20,
   * firstEraBlockReward=5 ETC, byzantium=10^18 (disabled)
   */
-class ECIP1017EmissionScheduleSpec extends AnyFlatSpec with Matchers {
+class ECIP1017EmissionScheduleSpec extends AnyFlatSpec with Matchers:
 
   // Production configs matching etc-chain.conf and mordor-chain.conf exactly.
   // byzantium and constantinople are set to the sentinel (10^18) so they never activate.
@@ -157,4 +157,3 @@ class ECIP1017EmissionScheduleSpec extends AnyFlatSpec with Matchers {
     // Both should pay 3.2 ETC.
     etcCalc.calculateMiningRewardForBlock(10000001) shouldBe mordorCalc.calculateMiningRewardForBlock(4000001)
   }
-}

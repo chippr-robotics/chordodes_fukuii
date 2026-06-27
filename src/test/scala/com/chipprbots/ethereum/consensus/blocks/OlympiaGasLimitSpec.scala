@@ -32,7 +32,7 @@ class OlympiaGasLimitSpec
     extends AnyFlatSpec
     with Matchers
     with BlockchainConfigBuilder
-    with com.chipprbots.ethereum.TestInstanceConfigProvider {
+    with com.chipprbots.ethereum.TestInstanceConfigProvider:
 
   private val OlympiaTestBlock: BigInt = BigInt(100)
 
@@ -57,12 +57,11 @@ class OlympiaGasLimitSpec
           staleThreshold = 7,
           recommitInterval = 0.seconds
         ),
-        new DifficultyCalculator {
+        new DifficultyCalculator:
           def calculateDifficulty(blockNumber: BigInt, blockTimestamp: Long, parent: BlockHeader)(implicit
               blockchainConfig: BlockchainConfig
           ): BigInt = BigInt(1)
-        }
-      ) {
+      ):
     type X = Ommers
     override protected def newBlockBody(transactions: Seq[SignedTransaction], x: Ommers): BlockBody =
       BlockBody(transactions, Nil)
@@ -89,7 +88,6 @@ class OlympiaGasLimitSpec
     def calcGasLimit(parentGas: BigInt, blockNumber: BigInt = BigInt(0))(implicit
         bc: BlockchainConfig
     ): BigInt = calculateGasLimit(parentGas, blockNumber)
-  }
 
   "Olympia gas limit (EIP-7935)" should "converge from pre-Olympia 8M to 60M target" taggedAs (
     OlympiaTest,
@@ -100,10 +98,9 @@ class OlympiaGasLimitSpec
     val threshold = OlympiaGasTarget * 99 / 100
 
     var blocks = 0
-    while limit < threshold && blocks < 200_000 do {
+    while limit < threshold && blocks < 200_000 do
       limit = gen.calcGasLimit(limit, OlympiaTestBlock + blocks)
       blocks += 1
-    }
     limit should be >= threshold
     // Must match core-geth: 2,055 blocks
     blocks shouldBe 2055
@@ -162,5 +159,4 @@ class OlympiaGasLimitSpec
     limit should be <= OlympiaGasTarget * 105 / 100
     info(s"70/30 split equilibrium: $limit (${(limit.toDouble / OlympiaGasTarget.toDouble * 100).round}% of 60M)")
   }
-}
 // scalastyle:on magic.number

@@ -23,7 +23,7 @@ import com.chipprbots.ethereum.transactions.PendingTransactionsManager.ProperSig
 import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 
-object SignedTransactionsFilterActor {
+object SignedTransactionsFilterActor:
 
   sealed trait Command
 
@@ -69,10 +69,9 @@ object SignedTransactionsFilterActor {
     val peerMsgAdapter: ActorRef[PeerEvent] =
       context.messageAdapter[PeerEvent] {
         case msg: MessageFromPeer =>
-          msg.message match {
+          msg.message match
             case txs: SignedTransactions => PeerSignedTransactions(txs, msg.peerId)
             case _                       => PeerSignedTransactions(SignedTransactions(Nil), msg.peerId)
-          }
         case e => throw new MatchError(s"unexpected PeerEvent from bus: $e")
       }
 
@@ -99,7 +98,7 @@ object SignedTransactionsFilterActor {
         }
         .unsafeRunAndForget()
 
-    def recoverLargeBatch(newTransactions: Seq[SignedTransaction], peerId: PeerId): Unit = {
+    def recoverLargeBatch(newTransactions: Seq[SignedTransaction], peerId: PeerId): Unit =
       val chunks = newTransactions
         .grouped(recoveryChunkSize)
         .zipWithIndex
@@ -129,14 +128,13 @@ object SignedTransactionsFilterActor {
         }
       }.void
         .unsafeRunAndForget()
-    }
 
     def flushRecoveredChunks(recoveryId: Long): Unit =
       recoveries.get(recoveryId).foreach { initialState =>
         var state = initialState
         var keepGoing = true
         while keepGoing do
-          state.bufferedChunks.get(state.nextChunkToEmit) match {
+          state.bufferedChunks.get(state.nextChunkToEmit) match
             case Some(transactions) =>
               if transactions.nonEmpty then
                 pendingTransactionsManager ! ProperSignedTransactions(transactions, state.peerId)
@@ -146,7 +144,6 @@ object SignedTransactionsFilterActor {
               )
             case None =>
               keepGoing = false
-          }
 
         if state.nextChunkToEmit >= state.totalChunks then recoveries -= recoveryId
         else recoveries = recoveries.updated(recoveryId, state)
@@ -154,13 +151,11 @@ object SignedTransactionsFilterActor {
 
     Behaviors.receiveMessage {
       case PeerSignedTransactions(SignedTransactions(newTransactions), peerId) =>
-        if newTransactions.size >= chunkedRecoveryThreshold then {
+        if newTransactions.size >= chunkedRecoveryThreshold then
           val statelessValid = SignedTransactionWithSender.getStatelessValidTransactions(newTransactions)
           if statelessValid.nonEmpty then pendingTransactionsManager ! AnnounceTransactions(statelessValid, peerId)
           recoverLargeBatch(statelessValid, peerId)
-        } else {
-          recoverSmallBatch(newTransactions, peerId)
-        }
+        else recoverSmallBatch(newTransactions, peerId)
         Behaviors.same
 
       case RecoveredChunk(recoveryId, chunkIndex, transactions) =>
@@ -179,4 +174,3 @@ object SignedTransactionsFilterActor {
         Behaviors.same
     }
   }
-}

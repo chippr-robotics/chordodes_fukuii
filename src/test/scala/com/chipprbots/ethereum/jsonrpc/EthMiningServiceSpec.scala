@@ -67,12 +67,12 @@ class EthMiningServiceSpec
     with Matchers
     with ScalaFutures
     with Eventually
-    with org.scalamock.scalatest.MockFactory {
+    with org.scalamock.scalatest.MockFactory:
 
   implicit val runtime: IORuntime = IORuntime.global
   implicit private val classicActorSystem: ActorSystem = system.toClassic
 
-  "MiningServiceSpec" should "return if node is mining base on getWork" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  "MiningServiceSpec" should "return if node is mining base on getWork" taggedAs (UnitTest, RPCTest) in new TestSetup:
 
     ethMiningService.getMining(GetMiningRequest()).unsafeRunSync() shouldEqual Right(GetMiningResponse(false))
 
@@ -106,9 +106,8 @@ class EthMiningServiceSpec
     val response: ServiceResponse[GetMiningResponse] = ethMiningService.getMining(GetMiningRequest())
 
     response.unsafeRunSync() shouldEqual Right(GetMiningResponse(true))
-  }
 
-  it should "return if node is mining base on submitWork" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "return if node is mining base on submitWork" taggedAs (UnitTest, RPCTest) in new TestSetup:
 
     ethMiningService.getMining(GetMiningRequest()).unsafeRunSync() shouldEqual Right(GetMiningResponse(false))
 
@@ -122,9 +121,8 @@ class EthMiningServiceSpec
     val response: ServiceResponse[GetMiningResponse] = ethMiningService.getMining(GetMiningRequest())
 
     response.unsafeRunSync() shouldEqual Right(GetMiningResponse(true))
-  }
 
-  it should "return if node is mining base on submitHashRate" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "return if node is mining base on submitHashRate" taggedAs (UnitTest, RPCTest) in new TestSetup:
 
     ethMiningService.getMining(GetMiningRequest()).unsafeRunSync() shouldEqual Right(GetMiningResponse(false))
     ethMiningService.submitHashRate(SubmitHashRateRequest(42, ByteString("id")))
@@ -132,9 +130,8 @@ class EthMiningServiceSpec
     val response: ServiceResponse[GetMiningResponse] = ethMiningService.getMining(GetMiningRequest())
 
     response.unsafeRunSync() shouldEqual Right(GetMiningResponse(true))
-  }
 
-  it should "return if node is mining after time out" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "return if node is mining after time out" taggedAs (UnitTest, RPCTest) in new TestSetup:
 
     (blockGenerator
       .generateBlock(
@@ -168,9 +165,8 @@ class EthMiningServiceSpec
       val response: ServiceResponse[GetMiningResponse] = ethMiningService.getMining(GetMiningRequest())
       response.unsafeRunSync() shouldEqual Right(GetMiningResponse(false))
     }
-  }
 
-  it should "return requested work" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "return requested work" taggedAs (UnitTest, RPCTest) in new TestSetup:
 
     (blockGenerator
       .generateBlock(
@@ -201,12 +197,11 @@ class EthMiningServiceSpec
     val response: Either[JsonRpcError, GetWorkResponse] = Await.result(workFuture, 10.seconds)
 
     response shouldEqual Right(GetWorkResponse(powHash, seedHash, target, block.header.number))
-  }
 
   it should "generate and submit work when generating block for mining with restricted ethash generator" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val testMining: TestMining = buildTestMining()
     override lazy val restrictedGenerator = new RestrictedPoWBlockGeneratorImpl(
       evmCodeStorage = storagesInstance.storages.evmCodeStorage,
@@ -236,9 +231,8 @@ class EthMiningServiceSpec
       SubmitWorkRequest(ByteString("nonce"), responseData.powHeaderHash, ByteString(Hex.decode("01" * 32)))
     val response1: Either[JsonRpcError, SubmitWorkResponse] = ethMiningService.submitWork(submitRequest).unsafeRunSync()
     response1 shouldEqual Right(SubmitWorkResponse(true))
-  }
 
-  it should "accept submitted correct PoW" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "accept submitted correct PoW" taggedAs (UnitTest, RPCTest) in new TestSetup:
 
     val headerHash: ByteString = ByteString(Hex.decode("01" * 32))
 
@@ -248,9 +242,8 @@ class EthMiningServiceSpec
 
     val response: ServiceResponse[SubmitWorkResponse] = ethMiningService.submitWork(req)
     response.unsafeRunSync() shouldEqual Right(SubmitWorkResponse(true))
-  }
 
-  it should "reject submitted correct PoW when header is no longer taggedAs (UnitTest, RPCTest) in cache" in new TestSetup {
+  it should "reject submitted correct PoW when header is no longer taggedAs (UnitTest, RPCTest) in cache" in new TestSetup:
 
     val headerHash: ByteString = ByteString(Hex.decode("01" * 32))
 
@@ -260,15 +253,13 @@ class EthMiningServiceSpec
 
     val response: ServiceResponse[SubmitWorkResponse] = ethMiningService.submitWork(req)
     response.unsafeRunSync() shouldEqual Right(SubmitWorkResponse(false))
-  }
 
-  it should "return correct coinbase" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "return correct coinbase" taggedAs (UnitTest, RPCTest) in new TestSetup:
 
     val response: ServiceResponse[GetCoinbaseResponse] = ethMiningService.getCoinbase(GetCoinbaseRequest())
     response.unsafeRunSync() shouldEqual Right(GetCoinbaseResponse(miningConfig.coinbase))
-  }
 
-  it should "accept and report hashrate" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "accept and report hashrate" taggedAs (UnitTest, RPCTest) in new TestSetup:
 
     val rate: BigInt = 42
     val id: ByteString = ByteString("id")
@@ -282,12 +273,11 @@ class EthMiningServiceSpec
 
     val response: ServiceResponse[GetHashRateResponse] = ethMiningService.getHashRate(GetHashRateRequest())
     response.unsafeRunSync() shouldEqual Right(GetHashRateResponse(rate))
-  }
 
   it should "combine hashrates from many miners and remove timed out rates" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
 
     val rate: BigInt = 42
     val id1: ByteString = ByteString("id1")
@@ -313,19 +303,16 @@ class EthMiningServiceSpec
       val response: ServiceResponse[GetHashRateResponse] = ethMiningService.getHashRate(GetHashRateRequest())
       response.unsafeRunSync() shouldEqual Right(GetHashRateResponse(rate))
     }
-  }
 
-  it should "start mining via RPC" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "start mining via RPC" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val response: ServiceResponse[StartMinerResponse] = ethMiningService.startMiner(StartMinerRequest())
     response.unsafeRunSync() shouldEqual Right(StartMinerResponse(true))
-  }
 
-  it should "stop mining via RPC" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "stop mining via RPC" taggedAs (UnitTest, RPCTest) in new TestSetup:
     val response: ServiceResponse[StopMinerResponse] = ethMiningService.stopMiner(StopMinerRequest())
     response.unsafeRunSync() shouldEqual Right(StopMinerResponse(true))
-  }
 
-  it should "return detailed miner status" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "return detailed miner status" taggedAs (UnitTest, RPCTest) in new TestSetup:
     // Initially not mining
     val response1: ServiceResponse[GetMinerStatusResponse] = ethMiningService.getMinerStatus(GetMinerStatusRequest())
     val status1: Either[JsonRpcError, GetMinerStatusResponse] = response1.unsafeRunSync()
@@ -341,10 +328,9 @@ class EthMiningServiceSpec
     status2 shouldBe Symbol("right")
     status2.toOption.get.isMining shouldBe true
     status2.toOption.get.hashRate shouldEqual BigInt(100)
-  }
 
   // core-geth alignment: GetWork returns 4-element array including block number (work[3])
-  it should "return a 4-element GetWorkResponse including blockNumber" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "return a 4-element GetWorkResponse including blockNumber" taggedAs (UnitTest, RPCTest) in new TestSetup:
     (blockGenerator
       .generateBlock(
         _: Block,
@@ -376,11 +362,10 @@ class EthMiningServiceSpec
     workResponse.powHeaderHash should not be empty
     workResponse.dagSeed should not be empty
     workResponse.target should not be empty
-  }
 
   // core-geth alignment: submitWork rejects shares older than staleThreshold blocks
   it should "reject submitWork when submission is beyond stale threshold" taggedAs (UnitTest, RPCTest) in
-    new TestSetup {
+    new TestSetup:
       override lazy val miningConfig: MiningConfig = MiningConfigs.miningConfig.copy(staleThreshold = 0)
 
       // Save both blocks so best = block.number (1)
@@ -397,13 +382,12 @@ class EthMiningServiceSpec
         .unsafeRunSync()
 
       result shouldEqual Right(SubmitWorkResponse(false))
-    }
 
   // core-geth alignment: submitWork accepts shares within staleThreshold window
   it should "accept submitWork when submission is within stale threshold" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     // Save parentBlock so best = 0; pending block is at number 1 (ahead of best — not stale)
     blockchainWriter.save(parentBlock, Nil, ChainWeight.totalDifficultyOnly(parentBlock.header.difficulty), true)
 
@@ -420,9 +404,8 @@ class EthMiningServiceSpec
     // SyncController Behavior[Command] boundary. The TestProbe therefore receives the wrapper, not the raw MinedBlock.
     val wrapped = syncingController.expectMsgType[SyncController.WrappedSyncProtocol]
     wrapped.msg shouldBe a[SyncProtocol.MinedBlock]
-  }
 
-  it should "set and get the etherbase address" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "set and get the etherbase address" taggedAs (UnitTest, RPCTest) in new TestSetup:
     // Get initial coinbase
     val response1: ServiceResponse[GetCoinbaseResponse] = ethMiningService.getCoinbase(GetCoinbaseRequest())
     response1.unsafeRunSync() shouldEqual Right(GetCoinbaseResponse(miningConfig.coinbase))
@@ -442,9 +425,8 @@ class EthMiningServiceSpec
     val status: Either[JsonRpcError, GetMinerStatusResponse] = statusResponse.unsafeRunSync()
     status shouldBe Symbol("right")
     status.toOption.get.coinbase shouldEqual testEtherbaseAddress
-  }
 
-  it should "use updated etherbase in block generation" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "use updated etherbase in block generation" taggedAs (UnitTest, RPCTest) in new TestSetup:
     // Set new etherbase
     ethMiningService.setEtherbase(EthMiningService.SetEtherbaseRequest(testEtherbaseAddress)).unsafeRunSync()
 
@@ -479,10 +461,9 @@ class EthMiningServiceSpec
     val response: Either[JsonRpcError, GetWorkResponse] = Await.result(workFuture, 10.seconds)
 
     response shouldBe Symbol("right")
-  }
 
   // NOTE TestSetup uses Ethash consensus; check `consensusConfig`.
-  class TestSetup(implicit system: ActorSystem) extends EphemBlockchainTestSetup with ApisBuilder {
+  class TestSetup(implicit system: ActorSystem) extends EphemBlockchainTestSetup with ApisBuilder:
     val blockGenerator: PoWBlockGenerator = mock[PoWBlockGenerator]
     override lazy val mining: TestMining = buildTestMining().withBlockGenerator(blockGenerator)
     override lazy val miningConfig = MiningConfigs.miningConfig
@@ -513,7 +494,7 @@ class EthMiningServiceSpec
 
     // Override jsonRpcConfig to use shorter timeout for tests
     val baseJsonRpcConfig: JsonRpcConfig = JsonRpcConfig(Config.config, available)
-    val jsonRpcConfig: JsonRpcConfig = new JsonRpcConfig {
+    val jsonRpcConfig: JsonRpcConfig = new JsonRpcConfig:
       override def apis: Seq[String] = baseJsonRpcConfig.apis
       override def accountTransactionsMaxBlocks: Int = baseJsonRpcConfig.accountTransactionsMaxBlocks
       override def minerActiveTimeout: FiniteDuration = TestSetup.this.minerActiveTimeout
@@ -521,7 +502,6 @@ class EthMiningServiceSpec
       override def wsServerConfig: JsonRpcWsServerConfig = baseJsonRpcConfig.wsServerConfig
       override def ipcServerConfig: JsonRpcIpcServerConfig = baseJsonRpcConfig.ipcServerConfig
       override def healthConfig: JsonRpcHealthConfig = baseJsonRpcConfig.healthConfig
-    }
 
     override lazy val coinbaseProvider = new CoinbaseProvider(miningConfig.coinbase)
 
@@ -601,5 +581,3 @@ class EthMiningServiceSpec
       noEmptyAccounts = false,
       ethCompatibleStorage = true
     )
-  }
-}

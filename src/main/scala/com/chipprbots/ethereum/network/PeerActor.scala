@@ -51,7 +51,7 @@ import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler.RLPxConfigurat
   * Escalate` (Classic) maps to spawning the child with no `Behaviors.supervise` wrapper plus a `watchWith` death watch
   * — any unhandled child exception escalates to (terminates) this actor implicitly.
   */
-object PeerActor {
+object PeerActor:
 
   // =========================================================================
   // Command ADT — intentionally NOT sealed.
@@ -91,10 +91,9 @@ object PeerActor {
       ref: ActorRef[RLPxConnectionHandler.Command],
       remoteAddress: InetSocketAddress,
       uriOpt: Option[URI]
-  ) {
+  ):
     def sendMessage(message: MessageSerializable): Unit =
       ref ! RLPxConnectionHandler.SendMessage(message)
-  }
 
   final case class IncomingConnectionHandshakeSuccess(peer: Peer)
 
@@ -104,13 +103,12 @@ object PeerActor {
 
   sealed trait Status
 
-  object Status {
+  object Status:
     case object Idle extends Status
     case object Connecting extends Status
     final case class Handshaking(numRetries: Int) extends Status
     case object Handshaked extends Status
     case object Disconnected extends Status
-  }
 
   // =========================================================================
   // Factories
@@ -177,7 +175,7 @@ object PeerActor {
       authHandshaker: AuthHandshaker,
       rlpxConfiguration: RLPxConfiguration,
       capabilities: List[Capability]
-  ): ActorContext[Command] => ActorRef[RLPxConnectionHandler.Command] = { ctx =>
+  ): ActorContext[Command] => ActorRef[RLPxConnectionHandler.Command] = ctx =>
     // RLPxConnectionHandler: default stop intentional — connection-scoped leaf actor,
     // restart would re-handshake from scratch; the PeerActor wrapper handles reconnect.
     ctx.spawn(
@@ -191,7 +189,6 @@ object PeerActor {
       ),
       "rlpx-connection"
     )
-  }
 
   // =========================================================================
   // Behaviour implementation
@@ -208,7 +205,7 @@ object PeerActor {
       initHandshaker: Handshaker[R],
       stash: StashBuffer[Command],
       context: ActorContext[Command]
-  ) {
+  ):
 
     private val log = context.log
 
@@ -219,18 +216,16 @@ object PeerActor {
     // createRlpxConnection lifecycle (the RLPx child stops itself on failure, freeing the "rlpx-connection" name
     // for a subsequent reconnect). watchWith maps the child's termination to a RlpxTerminated command; the absence
     // of a Behaviors.supervise wrapper means any unhandled child exception escalates to (terminates) this actor.
-    private def newRlpxConnection(remoteAddress: InetSocketAddress, uriOpt: Option[URI]): RLPxConnection = {
+    private def newRlpxConnection(remoteAddress: InetSocketAddress, uriOpt: Option[URI]): RLPxConnection =
       val rlpxRef = rlpxConnectionFactory(context)
       context.watchWith(rlpxRef, RlpxTerminated(rlpxRef))
       RLPxConnection(rlpxRef, remoteAddress, uriOpt)
-    }
 
-    private def modifyOutGoingUri(remoteNodeId: ByteString, rlpxConnection: RLPxConnection, uri: URI): URI = {
+    private def modifyOutGoingUri(remoteNodeId: ByteString, rlpxConnection: RLPxConnection, uri: URI): URI =
       val host = getHostName(rlpxConnection.remoteAddress.getAddress)
       val port = rlpxConnection.remoteAddress.getPort
       val query = Option(uri.getQuery).getOrElse(s"discport=$port")
       new URI(s"enode://${Hex.toHexString(remoteNodeId.toArray)}@$host:$port?$query")
-    }
 
     // -----------------------------------------------------------------------
     // State 1: waitingForInitialCommand
@@ -278,7 +273,7 @@ object PeerActor {
 
         case RLPxConnectionHandler.ConnectionFailed =>
           log.debug("Failed to establish RLPx connection")
-          rlpxConnection.uriOpt match {
+          rlpxConnection.uriOpt match
             case Some(uri) if numRetries < peerConfiguration.connectMaxRetries =>
               scheduleConnectRetry(uri, numRetries)
             case Some(uri) =>
@@ -287,7 +282,6 @@ object PeerActor {
             case None =>
               log.debug("Connection was initiated by remote peer, not attempting to reconnect")
               Behaviors.stopped
-          }
 
         case RlpxTerminated(ref) if ref == rlpxConnection.ref =>
           handleTerminated(rlpxConnection, numRetries)
@@ -327,18 +321,17 @@ object PeerActor {
 
         case RLPxConnectionHandler.InitialHelloReceived(msg, _) =>
           handshaker.respondToRequest(msg).foreach(msgToSend => rlpxConnection.sendMessage(msgToSend))
-          handshaker.applyMessage(msg) match {
+          handshaker.applyMessage(msg) match
             case Some(newHandshaker) =>
               timeout.cancel()
               processHandshakerNextMessage(newHandshaker, remoteNodeId, rlpxConnection, numRetries)
             case None =>
               Behaviors.same
-          }
 
         case RLPxConnectionHandler.MessageReceived(msg) =>
           log.debug("Message received: {} from peer {}", msg, peerAddress)
           handshaker.respondToRequest(msg).foreach(msgToSend => rlpxConnection.sendMessage(msgToSend))
-          handshaker.applyMessage(msg) match {
+          handshaker.applyMessage(msg) match
             case Some(newHandshaker) =>
               timeout.cancel()
               processHandshakerNextMessage(newHandshaker, remoteNodeId, rlpxConnection, numRetries)
@@ -346,7 +339,6 @@ object PeerActor {
               log.debug("Stashing message during handshake: {}", msg.getClass.getSimpleName)
               stash.stash(RLPxConnectionHandler.MessageReceived(msg))
               Behaviors.same
-          }
 
         case ResponseTimeout =>
           timeout.cancel()
@@ -373,7 +365,7 @@ object PeerActor {
         rlpxConnection: RLPxConnection,
         numRetries: Int
     ): Behavior[Command] =
-      handshaker.nextMessage match {
+      handshaker.nextMessage match
         case Right(NextMessage(msgToSend, timeoutTime)) =>
           rlpxConnection.sendMessage(msgToSend)
           val newTimeout = schedule(timeoutTime, ResponseTimeout)
@@ -394,17 +386,15 @@ object PeerActor {
           )
           rlpxConnection.uriOpt.foreach(uri => knownNodesManager ! KnownNodesManager.RemoveKnownNode(uri))
           disconnectFromPeer(rlpxConnection, reason)
-      }
 
     // -----------------------------------------------------------------------
     // State 4: waitingForRetry (former scheduleConnectRetry inline become)
     // -----------------------------------------------------------------------
 
-    private def scheduleConnectRetry(uri: URI, numRetries: Int): Behavior[Command] = {
+    private def scheduleConnectRetry(uri: URI, numRetries: Int): Behavior[Command] =
       log.debug("Scheduling connection retry in {}", peerConfiguration.connectRetryDelay)
       schedule(peerConfiguration.connectRetryDelay, RetryConnectionTimeout)
       waitingForRetry(uri, numRetries)
-    }
 
     private def waitingForRetry(uri: URI, numRetries: Int): Behavior[Command] =
       Behaviors.receiveMessage {
@@ -418,23 +408,21 @@ object PeerActor {
         case _ => Behaviors.same
       }
 
-    private def reconnect(uri: URI, numRetries: Int): Behavior[Command] = {
+    private def reconnect(uri: URI, numRetries: Int): Behavior[Command] =
       log.debug("Trying to reconnect")
       val address = new InetSocketAddress(uri.getHost, uri.getPort)
       val newConnection = newRlpxConnection(address, Some(uri))
       newConnection.ref ! RLPxConnectionHandler.ConnectTo(uri)
       waitingForConnectionResult(newConnection, numRetries)
-    }
 
     // -----------------------------------------------------------------------
     // State 5: disconnected
     // -----------------------------------------------------------------------
 
-    private def disconnectFromPeer(rlpxConnection: RLPxConnection, reason: Int): Behavior[Command] = {
+    private def disconnectFromPeer(rlpxConnection: RLPxConnection, reason: Int): Behavior[Command] =
       rlpxConnection.sendMessage(Disconnect(reason))
       schedule(peerConfiguration.disconnectPoisonPillTimeout, StopActor)
       disconnected()
-    }
 
     private def disconnected(): Behavior[Command] =
       Behaviors.receiveMessage {
@@ -449,9 +437,9 @@ object PeerActor {
     // Shared transitions
     // -----------------------------------------------------------------------
 
-    private def handleTerminated(rlpxConnection: RLPxConnection, numRetries: Int): Behavior[Command] = {
+    private def handleTerminated(rlpxConnection: RLPxConnection, numRetries: Int): Behavior[Command] =
       rlpxConnection.uriOpt.foreach(uri => log.debug(s"Underlying rlpx connection with peer ${uri.getUserInfo} closed"))
-      rlpxConnection.uriOpt match {
+      rlpxConnection.uriOpt match
         case Some(uri) if numRetries < peerConfiguration.connectMaxRetries =>
           scheduleConnectRetry(uri, numRetries + 1)
         case Some(uri) =>
@@ -464,42 +452,36 @@ object PeerActor {
           Behaviors.stopped
         case None =>
           Behaviors.stopped
-      }
-    }
 
     private def handleDisconnect(
         rlpxConnection: RLPxConnection,
         d: Disconnect,
         status: Status
-    ): Behavior[Command] = {
+    ): Behavior[Command] =
       import Disconnect.Reasons.*
       log.info(
         s"DISCONNECT_DEBUG: Received disconnect from ${peerAddress.getHostString}:${peerAddress.getPort} - reason code: 0x${d.reason.toHexString} (${Disconnect
             .reasonToString(d.reason)}), status: $status"
       )
-      if d.reason == Other then {
+      if d.reason == Other then
         log.info(
           s"DISCONNECT_DEBUG: Subprotocol disconnect (0x10) from ${peerAddress.getHostString}:${peerAddress.getPort}. " +
             s"This typically indicates: ForkId mismatch, malformed message, or protocol incompatibility. " +
             s"Check peer logs or enable debug logging for RLP bytes."
         )
-      }
-      d.reason match {
+      d.reason match
         case IncompatibleP2pProtocolVersion | UselessPeer | NullNodeIdentityReceived | UnexpectedIdentity |
             IdentityTheSame | Other =>
           rlpxConnection.uriOpt.foreach(uri => knownNodesManager ! KnownNodesManager.RemoveKnownNode(uri))
         case _ => // nothing
-      }
       log.debug(s"Received {}. Closing connection with peer ${peerAddress.getHostString}:${peerAddress.getPort}", d)
-      status match {
+      status match
         case Handshaked =>
           // graceful stop — let the Disconnect wire message flush before stopping
           schedule(peerConfiguration.disconnectPoisonPillTimeout, StopActor)
           disconnected()
         case _ =>
           Behaviors.stopped
-      }
-    }
 
     // -----------------------------------------------------------------------
     // State 6: handshaked
@@ -538,12 +520,12 @@ object PeerActor {
           Behaviors.same
 
         case RLPxConnectionHandler.MessageReceived(message) =>
-          message match {
+          message match
             case bru: com.chipprbots.ethereum.network.p2p.messages.ETHPackets.BlockRangeUpdate =>
               if bru.earliestBlock > bru.latestBlock || bru.latestBlockHash == org.apache.pekko.util.ByteString(
                   new Array[Byte](32)
                 )
-              then {
+              then
                 log.warn(
                   "Invalid BlockRangeUpdate from peer {}: earliest={} > latest={} — disconnecting",
                   peerId,
@@ -554,16 +536,14 @@ object PeerActor {
                   rlpxConnection,
                   com.chipprbots.ethereum.network.p2p.messages.WireProtocol.Disconnect.Reasons.BreachOfProtocol
                 )
-              } else {
+              else
                 MessageLogger.logMessage(peerId, message)
                 peerEventBus ! PublishCmd(MessageFromPeer(message, peerId))
                 Behaviors.same
-              }
             case _ =>
               MessageLogger.logMessage(peerId, message)
               peerEventBus ! PublishCmd(MessageFromPeer(message, peerId))
               Behaviors.same
-          }
 
         case DisconnectPeer(reason) =>
           disconnectFromPeer(rlpxConnection, reason)
@@ -581,15 +561,8 @@ object PeerActor {
     }
 
     // The actor logs incoming messages, which can be quite verbose even for DEBUG mode.
-    object MessageLogger {
+    object MessageLogger:
       def logMessage(peerId: PeerId, message: Message): Unit =
-        if log.isTraceEnabled then {
-          log.trace(s"Received message: {} from $peerId", message)
-        } else {
-          log.debug(s"Received message: {} from $peerId", message.toShortString)
-        }
-    }
-  }
+        if log.isTraceEnabled then log.trace(s"Received message: {} from $peerId", message)
+        else log.debug(s"Received message: {} from $peerId", message.toShortString)
   // scalastyle:on number.of.methods
-
-}

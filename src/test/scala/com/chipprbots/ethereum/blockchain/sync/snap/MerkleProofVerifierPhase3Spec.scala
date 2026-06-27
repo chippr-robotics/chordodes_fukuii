@@ -25,7 +25,7 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   * (O(N×depth) allocation cascade, ~7m for 8000 leaves) and PASS after the architectural fix. Groups 3–10 verify
   * correctness contracts that must hold both before and after the fix.
   */
-class MerkleProofVerifierPhase3Spec extends AnyFlatSpec with Matchers {
+class MerkleProofVerifierPhase3Spec extends AnyFlatSpec with Matchers:
 
   // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -46,7 +46,7 @@ class MerkleProofVerifierPhase3Spec extends AnyFlatSpec with Matchers {
       .sortBy { case (k, _) => BigInt(1, k.toArray) }
 
   /** Keys uniformly spaced across 2^256. Avoids clustering; exercises extension nodes throughout the trie. */
-  private def buildUniformAccounts(n: Int): Seq[(ByteString, Account)] = {
+  private def buildUniformAccounts(n: Int): Seq[(ByteString, Account)] =
     val step = BigInt(2).pow(256) / n
     (0 until n)
       .map { i =>
@@ -58,14 +58,12 @@ class MerkleProofVerifierPhase3Spec extends AnyFlatSpec with Matchers {
         ByteString(keyBytes) -> Account(nonce = i.toLong, balance = i.toLong)
       }
       .sortBy { case (k, _) => BigInt(1, k.toArray) }
-  }
 
   /** Build an MPT from accounts; return the trie and root hash. */
-  private def buildMpt(accounts: Seq[(ByteString, Account)]): (MerklePatriciaTrie[ByteString, Account], ByteString) = {
+  private def buildMpt(accounts: Seq[(ByteString, Account)]): (MerklePatriciaTrie[ByteString, Account], ByteString) =
     val storage = new TestMptStorage()
     val trie = accounts.foldLeft(MerklePatriciaTrie[ByteString, Account](storage)) { case (t, (k, a)) => t.put(k, a) }
     trie -> ByteString(trie.getRootHash)
-  }
 
   /** Generate boundary proof (path(root→firstKey) ∪ path(root→lastKey)), encoded as RLP bytes.
     *
@@ -76,26 +74,24 @@ class MerkleProofVerifierPhase3Spec extends AnyFlatSpec with Matchers {
       trie: MerklePatriciaTrie[ByteString, Account],
       firstKey: ByteString,
       lastKey: ByteString
-  ): Seq[ByteString] = {
+  ): Seq[ByteString] =
     val firstNodes = trie.getProof(firstKey).getOrElse(Vector.empty)
     val lastNodes = trie.getProof(lastKey).getOrElse(Vector.empty)
     (firstNodes ++ lastNodes)
       .distinctBy(node => ByteString(node.hash))
       .map(node => ByteString(MptTraversals.encodeNode(node)))
-  }
 
   /** Run block in an isolated thread; return None if it exceeds timeoutMs. Prevents the test suite from hanging when
     * Phase 3 stalls.
     */
-  private def runWithTimeout[T](timeoutMs: Long)(block: => T): Option[T] = {
+  private def runWithTimeout[T](timeoutMs: Long)(block: => T): Option[T] =
     val ex = Executors.newSingleThreadExecutor()
-    try {
+    try
       val callable: Callable[T] = () => block
       val f: JFuture[T] = ex.submit(callable)
       try Some(f.get(timeoutMs, TimeUnit.MILLISECONDS))
-      catch { case _: java.util.concurrent.TimeoutException => f.cancel(true); None }
-    } finally ex.shutdown()
-  }
+      catch case _: java.util.concurrent.TimeoutException => f.cancel(true); None
+    finally ex.shutdown()
 
   // ── Shared large fixtures (built once, reused across groups 1-2) ─────────────
 
@@ -603,4 +599,3 @@ class MerkleProofVerifierPhase3Spec extends AnyFlatSpec with Matchers {
       ms1000 should be < (ms100 * 25L).max(5000L)
     }
   }
-}

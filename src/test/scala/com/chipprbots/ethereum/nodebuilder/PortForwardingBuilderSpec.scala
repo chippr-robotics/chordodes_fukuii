@@ -33,7 +33,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   *   1. Cleanup function is properly stored and invoked on shutdown
   *   1. Multiple allocations (the bug) are prevented
   */
-class PortForwardingBuilderSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEach with ScalaFutures {
+class PortForwardingBuilderSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEach with ScalaFutures:
 
   implicit val ec: ExecutionContext = ExecutionContext.global
   implicit override val patienceConfig: PatienceConfig =
@@ -42,30 +42,25 @@ class PortForwardingBuilderSpec extends AnyFlatSpec with Matchers with BeforeAnd
   // Track all builders created during tests for cleanup
   private var testBuilders: List[TestPortForwardingBuilder] = List.empty
 
-  override def afterEach(): Unit = {
+  override def afterEach(): Unit =
     // Ensure all port forwarding resources are cleaned up after each test
     // This is defensive cleanup - if stopPortForwarding fails, the test already
     // made assertions about the state, so we don't need to fail here
     testBuilders.foreach { builder =>
-      try
-        builder.stopPortForwarding().futureValue
-      catch {
-        case NonFatal(_) => // Ignore non-fatal cleanup errors (already stopped, timeout, etc.)
-      }
+      try builder.stopPortForwarding().futureValue
+      catch case NonFatal(_) => () // Ignore non-fatal cleanup errors (already stopped, timeout, etc.)
     }
     testBuilders = List.empty
     super.afterEach()
-  }
 
   private def createTestBuilder(
       allocationCount: AtomicInteger,
       cleanupCount: AtomicInteger,
       simulateDelay: Long = 0
-  ): TestPortForwardingBuilder = {
+  ): TestPortForwardingBuilder =
     val builder = new TestPortForwardingBuilder(allocationCount, cleanupCount, simulateDelay)
     testBuilders = builder :: testBuilders
     builder
-  }
 
   behavior.of("PortForwardingBuilder")
 
@@ -253,7 +248,7 @@ class PortForwardingBuilderSpec extends AnyFlatSpec with Matchers with BeforeAnd
   ) extends PortForwardingBuilder
       with DiscoveryConfigBuilder
       with ActorSystemBuilder
-      with com.chipprbots.ethereum.TestInstanceConfigProvider {
+      with com.chipprbots.ethereum.TestInstanceConfigProvider:
 
     implicit override lazy val ioRuntime: IORuntime = IORuntime.global
 
@@ -287,5 +282,3 @@ class PortForwardingBuilderSpec extends AnyFlatSpec with Matchers with BeforeAnd
           }
         }
       }
-  }
-}

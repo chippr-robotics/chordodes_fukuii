@@ -7,7 +7,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import com.chipprbots.ethereum.network.discovery.NodeParser
 import com.chipprbots.ethereum.testing.Tags.*
 
-class NodeParserSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks {
+class NodeParserSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks:
 
   it should "correctly parse IPv4 nodes" taggedAs (UnitTest, NetworkTest) in {
     val testVectors = Table[String, Boolean, Boolean](
@@ -106,5 +106,3 @@ class NodeParserSpec extends AnyFlatSpec with Matchers with ScalaCheckPropertyCh
         node.toOption.get.toUri.toString shouldBe maybeExpectedOutput.get + "?discport=30303"
     }
   }
-
-}

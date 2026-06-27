@@ -8,7 +8,7 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.testing.Tags.*
 
-class ByteCodeTaskSpec extends AnyFlatSpec with Matchers {
+class ByteCodeTaskSpec extends AnyFlatSpec with Matchers:
 
   "ByteCodeTask" should "create tasks from contract accounts" taggedAs UnitTest in {
     val contractAccount1 = (ByteString("account1"), kec256(ByteString("code1")))
@@ -85,4 +85,3 @@ class ByteCodeTaskSpec extends AnyFlatSpec with Matchers {
     task.codeHashes.size shouldBe 2
     task.accountHashes.size shouldBe 0
   }
-}

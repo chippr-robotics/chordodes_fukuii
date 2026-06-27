@@ -8,7 +8,7 @@ import org.scalatest.matchers.should.Matchers
 import com.chipprbots.ethereum.crypto.kec256
 import com.chipprbots.ethereum.testing.Tags.*
 
-class StorageTaskSpec extends AnyFlatSpec with Matchers {
+class StorageTaskSpec extends AnyFlatSpec with Matchers:
 
   private val accountHash = kec256(ByteString("account"))
   private val storageRoot = kec256(ByteString("storage-root"))
@@ -172,4 +172,3 @@ class StorageTaskSpec extends AnyFlatSpec with Matchers {
     val task = StorageTask.createStorageTask(accountHash, storageRoot)
     noException should be thrownBy task.accountString
   }
-}

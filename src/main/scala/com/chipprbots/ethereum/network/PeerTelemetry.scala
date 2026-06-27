@@ -29,7 +29,7 @@ import com.chipprbots.ethereum.utils.Logger
   *
   * All registry interaction is wrapped so a telemetry hiccup can never take down [[NetworkPeerManagerActor]].
   */
-case object PeerTelemetry extends MetricsContainer with Logger {
+case object PeerTelemetry extends MetricsContainer with Logger:
 
   final private val InfoMetricName = "network.peer.info"
   final private val BestBlockMetricName = "network.peer.best_block"
@@ -42,7 +42,7 @@ case object PeerTelemetry extends MetricsContainer with Logger {
 
   /** Publish (or refresh) the telemetry series for a freshly handshaked peer. Idempotent per peer. */
   def registerPeer(peer: Peer, peerInfo: PeerInfo): Unit =
-    try {
+    try
       val status = peerInfo.remoteStatus
       val address = remoteAddressLabel(peer.remoteAddress)
       val client = normalizeClient(status.remoteClientId)
@@ -93,45 +93,38 @@ case object PeerTelemetry extends MetricsContainer with Logger {
         status.supportsSnap,
         bestBlock.toLong
       )
-    } catch {
+    catch
       case t: Throwable =>
         log.warn(s"PEER_TELEMETRY_ADD failed for ${peer.id.value}: ${t.getMessage}")
-    }
 
   /** Drop the telemetry series for a disconnected peer so its labels stop being scraped. */
   def deregisterPeer(peerId: PeerId): Unit =
-    try {
+    try
       removeMeter(infoMeters, peerId)
       removeMeter(bestBlockMeters, peerId)
-    } catch {
+    catch
       case t: Throwable =>
         log.warn(s"PEER_TELEMETRY_REMOVE failed for ${peerId.value}: ${t.getMessage}")
-    }
 
   /** Number of peers currently carrying an info series. Test/observability hook. */
   def trackedPeerCount: Int = infoMeters.size
 
-  private def removeMeter(map: ConcurrentHashMap[PeerId, Meter], peerId: PeerId): Unit = {
+  private def removeMeter(map: ConcurrentHashMap[PeerId, Meter], peerId: PeerId): Unit =
     val existing = map.remove(peerId)
-    if existing != null then {
+    if existing != null then
       val _ = metrics.registry.remove(existing)
-    }
-  }
 
   /** Numeric ip:port, avoiding any reverse-DNS so the geo exporter sees the raw address. */
-  private def remoteAddressLabel(addr: InetSocketAddress): String = {
+  private def remoteAddressLabel(addr: InetSocketAddress): String =
     val host = Option(addr.getAddress).map(_.getHostAddress).getOrElse(addr.getHostString)
     s"$host:${addr.getPort}"
-  }
 
   /** "eth/68" style; falls back to the raw enum name for any non-ETH family. */
-  private def capabilityLabel(cap: Capability): String = {
-    val family = cap.name match {
+  private def capabilityLabel(cap: Capability): String =
+    val family = cap.name match
       case ProtocolFamily.ETH  => "eth"
       case ProtocolFamily.SNAP => "snap"
-    }
     s"$family/${cap.version.toInt}"
-  }
 
   private def normalizeClient(raw: String): String =
     Option(raw).map(_.trim).filter(_.nonEmpty).getOrElse("unknown")
@@ -139,4 +132,3 @@ case object PeerTelemetry extends MetricsContainer with Logger {
   /** Software name only — first segment before the version, e.g. "CoreGeth/v1.12.20-..." -> "CoreGeth". */
   private def clientName(client: String): String =
     client.split('/').headOption.map(_.trim).filter(_.nonEmpty).getOrElse(client)
-}

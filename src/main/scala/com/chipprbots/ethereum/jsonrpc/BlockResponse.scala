@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.utils.ByteStringUtils
  * this trait has been introduced to deal with ETS requirements and discrepancies between fukuii and the spec
  * it should be considered a band-aid solution and replaced with something robust and non-intrusive
  */
-trait BaseBlockResponse {
+trait BaseBlockResponse:
   def number: BigInt
   def hash: Option[ByteString]
   def parentHash: ByteString
@@ -35,7 +35,6 @@ trait BaseBlockResponse {
   def mixHash: ByteString
   def transactions: Either[Seq[ByteString], Seq[BaseTransactionResponse]]
   def uncles: Seq[ByteString]
-}
 
 //scalastyle:off method.length
 case class BlockResponse(
@@ -70,7 +69,7 @@ case class BlockResponse(
     requestsHash: Option[ByteString]
 ) extends BaseBlockResponse
 
-object BlockResponse {
+object BlockResponse:
 
   val NotAvailable = "N/A"
 
@@ -79,7 +78,7 @@ object BlockResponse {
       weight: Option[ChainWeight] = None,
       fullTxs: Boolean = false,
       pendingBlock: Boolean = false
-  ): BlockResponse = {
+  ): BlockResponse =
     val transactions =
       if fullTxs then
         Right(block.body.transactionList.zipWithIndex.map { case (stx, transactionIndex) =>
@@ -140,7 +139,6 @@ object BlockResponse {
       parentBeaconBlockRoot = block.header.parentBeaconBlockRoot.map(_.value),
       requestsHash = block.header.requestsHash
     )
-  }
 
   def apply(blockHeader: BlockHeader, weight: Option[ChainWeight], pendingBlock: Boolean): BlockResponse =
     BlockResponse(
@@ -148,5 +146,3 @@ object BlockResponse {
       weight = weight,
       pendingBlock = pendingBlock
     )
-
-}

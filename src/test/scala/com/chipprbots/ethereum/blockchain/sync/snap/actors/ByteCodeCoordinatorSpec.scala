@@ -20,7 +20,7 @@ import com.chipprbots.ethereum.testing.PeerTestHelpers
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.testing.TestEvmCodeStorage
 
-class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers with Eventually {
+class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers with Eventually:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   private val statusProbe = testKit.createTestProbe[ByteCodeCoordinator.ByteCodeProgress]()
@@ -70,7 +70,7 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
   // which is unavailable on the Typed coordinator.
   private def resolveWorkerChild(
       coordinator: org.apache.pekko.actor.typed.ActorRef[?]
-  ): org.apache.pekko.actor.typed.ActorRef[ByteCodeCoordinator.WorkerMessage] = {
+  ): org.apache.pekko.actor.typed.ActorRef[ByteCodeCoordinator.WorkerMessage] =
     import scala.concurrent.Await
     Await
       .result(
@@ -78,7 +78,6 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
         3.seconds
       )
       .toTyped[ByteCodeCoordinator.WorkerMessage]
-  }
 
   "ByteCodeCoordinator" should "initialize with empty task queue" taggedAs UnitTest in {
     val evmCodeStorage = new TestEvmCodeStorage()
@@ -858,4 +857,3 @@ class ByteCodeCoordinatorSpec extends ScalaTestWithActorTestKit() with AnyFlatSp
     coordinator ! ByteCodeCoordinator.ByteCodeCheckCompletion
     snapSyncController.expectNoMessage(500.millis)
   }
-}

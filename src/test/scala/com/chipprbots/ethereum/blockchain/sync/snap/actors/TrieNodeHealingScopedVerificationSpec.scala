@@ -49,31 +49,29 @@ class TrieNodeHealingScopedVerificationSpec
     extends ScalaTestWithActorTestKit()
     with AnyFlatSpecLike
     with Matchers
-    with Eventually {
+    with Eventually:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
 
-  private def gaugeValue(name: String): Double = {
+  private def gaugeValue(name: String): Double =
     val gauge = Metrics.get().registry.find(name).gauge()
     if gauge == null then Double.NaN else gauge.value()
-  }
 
   private def emptyChildren: Array[MptNode] = Array.fill[MptNode](16)(NullNode)
 
   /** A clean storage-trie leaf (no children → scoped walk emits no frontier). Returns (pathset, hash, encoded). */
-  private def cleanLeaf(seed: Int): (Seq[ByteString], ByteString, ByteString) = {
+  private def cleanLeaf(seed: Int): (Seq[ByteString], ByteString, ByteString) =
     val leaf = LeafNode(ByteString(Array[Byte](0x01)), ByteString(kec256(ByteString(s"clean-leaf-$seed")).toArray))
     val encoded = MptTraversals.encodeNode(leaf)
     val hash = kec256(ByteString(encoded))
     val accountHash = kec256(ByteString(s"clean-leaf-account-$seed"))
     (Seq(accountHash, ByteString(Array[Byte](0x20, seed.toByte))), hash, ByteString(encoded))
-  }
 
   /** A storage-trie BRANCH node whose only child is a MISSING hash (not in storage). Healing it leaves a gap below the
     * healed node that the scoped walk must surface. Returns (pathset, hash, encoded, missingChildHash).
     */
-  private def branchWithMissingChild(seed: Int): (Seq[ByteString], ByteString, ByteString, ByteString) = {
+  private def branchWithMissingChild(seed: Int): (Seq[ByteString], ByteString, ByteString, ByteString) =
     val missingChild = kec256(ByteString(s"gap-below-missing-child-$seed"))
     val children = emptyChildren
     children(3) = HashNode(missingChild.toArray)
@@ -82,13 +80,11 @@ class TrieNodeHealingScopedVerificationSpec
     val hash = kec256(ByteString(encoded))
     val accountHash = kec256(ByteString(s"gap-below-account-$seed"))
     (Seq(accountHash, ByteString(Array[Byte](0x20, seed.toByte))), hash, ByteString(encoded), missingChild)
-  }
 
-  private def deleteRecursively(f: File): Unit = {
+  private def deleteRecursively(f: File): Unit =
     Option(f.listFiles()).foreach(_.foreach(deleteRecursively))
     f.delete()
     ()
-  }
 
   /** The OPEN frontier = pending (queued) + active (in-flight). A missing descendant discovered inline at the heal site
     * is enqueued to `pendingTasks`, then — because the heal response was non-empty so the peer stays eligible — the
@@ -97,12 +93,11 @@ class TrieNodeHealingScopedVerificationSpec
     * non-deterministic pipelining detail; the FR-006 invariant is that it stays in the open frontier (pending OR
     * active), keeping the round open (`isComplete == false`) so no completion is declared while the gap is unhealed.
     */
-  private def openFrontier(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int = {
+  private def openFrontier(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int =
     val probe = testKit.createTestProbe[HealingStatistics]()
     coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref)
     val stats = probe.expectMessageType[HealingStatistics]
     stats.pendingTasks + stats.activeTasks
-  }
 
   /** Wait for StateHealingComplete, ignoring interleaved ProgressNodesHealed messages. */
   private def awaitStateHealingComplete(
@@ -118,18 +113,17 @@ class TrieNodeHealingScopedVerificationSpec
   private def assertNoCompletion(
       controller: org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command],
       window: FiniteDuration
-  ): Unit = {
+  ): Unit =
     val completionReceived =
-      try {
+      try
         controller.fishForMessage(window) {
           case SNAPSyncController.StateHealingComplete => FishingOutcomes.complete
           case _                                       => FishingOutcomes.continueAndIgnore
         }
         true
-      } catch { case _: AssertionError => false }
+      catch case _: AssertionError => false
     if completionReceived then
       fail("StateHealingComplete was declared while a healed node still had a missing descendant (FR-006)")
-  }
 
   private def withMarkerCompleteFixture(
       stateRoot: ByteString,
@@ -140,12 +134,12 @@ class TrieNodeHealingScopedVerificationSpec
           HealingFrontierStorage,
           org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
       ) => Unit
-  ): Unit = {
+  ): Unit =
     val pool = Executors.newSingleThreadExecutor()
     val ec = ExecutionContext.fromExecutorService(pool)
     val dbPath = Files.createTempDirectory("scoped-verify-rocksdb").toAbsolutePath.toString
     val dataSource = RocksDbDataSource(
-      new RocksDbConfig {
+      new RocksDbConfig:
         override val createIfMissing: Boolean = true
         override val paranoidChecks: Boolean = true
         override val path: String = dbPath
@@ -155,7 +149,7 @@ class TrieNodeHealingScopedVerificationSpec
         override val levelCompaction: Boolean = true
         override val blockSize: Long = 16384
         override val blockCacheSize: Long = 33554432
-      },
+      ,
       Namespaces.nsSeq
     )
     val store = new HealingFrontierStorage(dataSource)
@@ -173,14 +167,12 @@ class TrieNodeHealingScopedVerificationSpec
       healingWriterEcOverride = Some(ec)
     )
     try body(coordinator, store, controllerProbe)
-    finally {
+    finally
       testKit.stop(coordinator)
       pool.shutdown()
       pool.awaitTermination(5, TimeUnit.SECONDS)
       dataSource.destroy()
       deleteRecursively(new File(dbPath))
-    }
-  }
 
   // ── T010 (V2): scoped completion ──────────────────────────────────────────────────────────────
 
@@ -234,4 +226,3 @@ class TrieNodeHealingScopedVerificationSpec
         missingChild.length shouldBe 32 // sanity: the gap hash is a real keccak-256 child reference
       }
     }
-}

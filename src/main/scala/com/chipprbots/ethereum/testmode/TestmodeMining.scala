@@ -46,7 +46,7 @@ class TestmodeMining(
     node: TestNode,
     blockTimestamp: Long = 0
 ) // var, because it can be modified by test_ RPC endpoints
-    extends Mining {
+    extends Mining:
 
   override type Config = AnyRef
   override def protocol: Protocol = Protocol.PoW
@@ -54,8 +54,8 @@ class TestmodeMining(
 
   override def difficultyCalculator: DifficultyCalculator = DifficultyCalculator
 
-  class TestValidators extends Validators {
-    override def blockHeaderValidator: BlockHeaderValidator = new BlockHeaderValidator {
+  class TestValidators extends Validators:
+    override def blockHeaderValidator: BlockHeaderValidator = new BlockHeaderValidator:
       override def validate(
           blockHeader: BlockHeader,
           getBlockHeaderByHash: GetBlockHeaderByHash
@@ -67,7 +67,6 @@ class TestmodeMining(
           blockchainConfig: BlockchainConfig
       ): Either[BlockHeaderError, BlockHeaderValid] =
         Right(BlockHeaderValid)
-    }
     override def signedTransactionValidator: SignedTransactionValidator = StdSignedTransactionValidator
     override def validateBlockBeforeExecution(
         block: Block,
@@ -84,7 +83,7 @@ class TestmodeMining(
     )(implicit blockchainConfig: BlockchainConfig): Either[BlockExecutionError, BlockExecutionSuccess] = Right(
       BlockExecutionSuccess
     )
-    override def blockValidator: BlockValidator = new BlockValidator {
+    override def blockValidator: BlockValidator = new BlockValidator:
       override def validateBlockAndReceipts(
           blockHeader: BlockHeader,
           receipts: Seq[Receipt]
@@ -93,8 +92,6 @@ class TestmodeMining(
           blockHeader: BlockHeader,
           blockBody: BlockBody
       ): Either[StdBlockValidator.BlockError, StdBlockValidator.BlockValid] = Right(StdBlockValidator.BlockValid)
-    }
-  }
 
   override def validators: Validators = ValidatorsExecutor.apply(Protocol.MockedPow)
 
@@ -103,17 +100,15 @@ class TestmodeMining(
     signedTxValidator = validators.signedTransactionValidator,
     blockchain = blockchain,
     blockchainReader = blockchainReader
-  ) {
+  ):
     override def payBlockReward(block: Block, worldStateProxy: InMemoryWorldStateProxy)(implicit
         blockchainConfig: BlockchainConfig
     ): InMemoryWorldStateProxy =
-      node.sealEngine match {
+      node.sealEngine match
         case SealEngineType.NoProof =>
           super.payBlockReward(block, worldStateProxy)
         case SealEngineType.NoReward =>
           worldStateProxy
-      }
-  }
 
   override def blockGenerator: NoOmmersBlockGenerator =
     new NoOmmersBlockGenerator(
@@ -121,13 +116,10 @@ class TestmodeMining(
       miningConfig,
       blockPreparator,
       difficultyCalculator,
-      new BlockTimestampProvider {
+      new BlockTimestampProvider:
         override def getEpochSecond: Long = blockTimestamp
-      }
-    ) {
+    ):
       override def withBlockTimestampProvider(blockTimestampProvider: BlockTimestampProvider): TestBlockGenerator = this
-
-    }
 
   override def startProtocol(node: Node): Unit = {}
   override def stopProtocol(): Unit = {}
@@ -139,4 +131,3 @@ class TestmodeMining(
   /** Sends msg to the internal miner
     */
   override def sendMiner(msg: MinerProtocol): Unit = {}
-}

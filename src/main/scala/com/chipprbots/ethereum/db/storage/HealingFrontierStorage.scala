@@ -25,7 +25,7 @@ import com.chipprbots.ethereum.rlp.RLPImplicits.given
   *   - clear (delete the outstanding set) on force-complete / pivot-refresh.
   */
 class HealingFrontierStorage(val dataSource: DataSource)
-    extends TransactionalKeyValueStorage[ByteString, Seq[ByteString]] {
+    extends TransactionalKeyValueStorage[ByteString, Seq[ByteString]]:
 
   val namespace: IndexedSeq[Byte] = Namespaces.HealingFrontierNamespace
 
@@ -109,9 +109,8 @@ class HealingFrontierStorage(val dataSource: DataSource)
             .collect { case (Some(_), h) => h }
         }
         .toSet
-}
 
-object HealingFrontierStorage {
+object HealingFrontierStorage:
 
   /** Reserved sentinel key for the completeness marker. 21 bytes — deliberately NOT 32, so it can never collide with a
     * keccak-256 node hash, and `loadAll` filters it out of the frontier.
@@ -145,4 +144,3 @@ object HealingFrontierStorage {
     */
   def isSubtreeCompleteKey(key: ByteString): Boolean =
     key.length == 33 && key.head == SubtreeCompletePrefix
-}

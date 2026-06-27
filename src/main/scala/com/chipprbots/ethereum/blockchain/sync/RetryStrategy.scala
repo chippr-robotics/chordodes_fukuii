@@ -23,7 +23,7 @@ final case class RetryStrategy(
     maxDelay: FiniteDuration = 30.seconds,
     multiplier: Double = 2.0,
     jitterFactor: Double = 0.2
-) {
+):
   require(multiplier >= 1.0, "Multiplier must be >= 1.0")
   require(jitterFactor >= 0.0 && jitterFactor <= 1.0, "Jitter factor must be between 0.0 and 1.0")
 
@@ -32,7 +32,7 @@ final case class RetryStrategy(
     * Formula: min(initialDelay * multiplier^attempt, maxDelay) + jitter. Jitter is random value between 0 and (delay *
     * jitterFactor)
     */
-  def nextDelay(attempt: Int): FiniteDuration = {
+  def nextDelay(attempt: Int): FiniteDuration =
     require(attempt >= 0, "Attempt must be non-negative")
 
     val baseDelay = math.min(
@@ -46,7 +46,6 @@ final case class RetryStrategy(
       else 0
 
     (baseDelay.toLong + jitterMs).millis
-  }
 
   /** Calculate total time spent after N attempts */
   def totalTime(attempts: Int): FiniteDuration =
@@ -66,9 +65,8 @@ final case class RetryStrategy(
 
   def withJitterFactor(factor: Double): RetryStrategy =
     copy(jitterFactor = factor)
-}
 
-object RetryStrategy {
+object RetryStrategy:
 
   /** Default retry strategy for sync operations */
   val default: RetryStrategy = RetryStrategy()
@@ -94,7 +92,6 @@ object RetryStrategy {
     multiplier = 3.0,
     jitterFactor = 0.5
   )
-}
 
 /** Retry state tracker for individual operations */
 final case class RetryState(
@@ -102,20 +99,19 @@ final case class RetryState(
     strategy: RetryStrategy = RetryStrategy.default,
     firstAttemptTime: Option[Long] = None,
     lastAttemptTime: Option[Long] = None
-) {
+):
 
   /** Get next delay for current attempt */
   def nextDelay: FiniteDuration = strategy.nextDelay(attempt)
 
   /** Record a retry attempt */
-  def recordAttempt: RetryState = {
+  def recordAttempt: RetryState =
     val now = System.currentTimeMillis()
     copy(
       attempt = attempt + 1,
       firstAttemptTime = firstAttemptTime.orElse(Some(now)),
       lastAttemptTime = Some(now)
     )
-  }
 
   /** Reset retry state (e.g., after success) */
   def reset: RetryState = RetryState(0, strategy, None, None)
@@ -125,9 +121,7 @@ final case class RetryState(
 
   /** Get total time spent retrying */
   def totalTimeSpent: FiniteDuration =
-    firstAttemptTime match {
+    firstAttemptTime match
       case None => 0.millis
       case Some(startTime) =>
         (System.currentTimeMillis() - startTime).millis
-    }
-}

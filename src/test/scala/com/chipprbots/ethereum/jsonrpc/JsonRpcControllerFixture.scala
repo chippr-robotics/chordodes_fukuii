@@ -53,14 +53,13 @@ import com.chipprbots.ethereum.utils.FilterConfig
 /** Factory for creating JsonRpcControllerFixture instances with mocks. This is needed because in Scala 3, MockFactory
   * requires TestSuite self-type, which anonymous classes created by 'new' don't satisfy.
   */
-object JsonRpcControllerFixture {
+object JsonRpcControllerFixture:
   def apply()(implicit
       system: ActorSystem,
       mockFactory: org.scalamock.scalatest.MockFactory,
       actorTestKit: ActorTestKit
   ): JsonRpcControllerFixture =
     new JsonRpcControllerFixture()(system, mockFactory, actorTestKit)
-}
 
 class JsonRpcControllerFixture(implicit
     system: ActorSystem,
@@ -68,7 +67,7 @@ class JsonRpcControllerFixture(implicit
     actorTestKit: ActorTestKit
 ) extends EphemBlockchainTestSetup
     with JsonMethodsImplicits
-    with ApisBuilder {
+    with ApisBuilder:
 
   // Import all mockFactory members to enable mock creation and expectations
   import mockFactory.*
@@ -91,7 +90,7 @@ class JsonRpcControllerFixture(implicit
     * Tests that need to feed a particular `generateBlock` result call `blockGenerator.setGenerateBlockResult(...)` or
     * assign to `blockGenerator.generateBlockFn` directly.
     */
-  class StubPoWBlockGenerator extends PoWBlockGenerator {
+  class StubPoWBlockGenerator extends PoWBlockGenerator:
     @volatile var generateBlockFn: (
         Block,
         Seq[SignedTransaction],
@@ -127,31 +126,28 @@ class JsonRpcControllerFixture(implicit
         beneficiary: Address,
         x: Ommers,
         initialWorldStateBeforeExecution: Option[InMemoryWorldStateProxy]
-    )(implicit blockchainConfig: BlockchainConfig): PendingBlockAndState = {
+    )(implicit blockchainConfig: BlockchainConfig): PendingBlockAndState =
       val result =
         generateBlockFn(parent, transactions, beneficiary, x, initialWorldStateBeforeExecution, blockchainConfig)
       prepared = result :: prepared
       result
-    }
 
     override def blockTimestampProvider: BlockTimestampProvider = DefaultBlockTimestampProvider
 
     override def withBlockTimestampProvider(blockTimestampProvider: BlockTimestampProvider): PoWBlockGenerator = this
-  }
 
   val blockGenerator: StubPoWBlockGenerator = new StubPoWBlockGenerator
 
   val syncingController: TestProbe = TestProbe()
 
   override lazy val stxLedger: StxLedger = mock[StxLedger]
-  override lazy val validators: ValidatorsExecutor = {
+  override lazy val validators: ValidatorsExecutor =
     val v = mock[ValidatorsExecutor]
     (() => v.signedTransactionValidator)
       .expects()
       .returns(null)
       .anyNumberOfTimes()
     v
-  }
 
   override lazy val mining: TestMining = buildTestMining()
     .withValidators(validators)
@@ -170,10 +166,9 @@ class JsonRpcControllerFixture(implicit
   // Increased timeout for CI environments where actor-based tests may be slower
   val getTransactionFromPoolTimeout: FiniteDuration = 60.seconds
 
-  val filterConfig: FilterConfig = new FilterConfig {
+  val filterConfig: FilterConfig = new FilterConfig:
     override val filterTimeout: FiniteDuration = Timeouts.normalTimeout
     override val filterManagerQueryTimeout: FiniteDuration = Timeouts.normalTimeout
-  }
 
   val appStateStorage: AppStateStorage = mock[AppStateStorage]
   val web3Service = new Web3Service
@@ -309,4 +304,3 @@ class JsonRpcControllerFixture(implicit
     noEmptyAccounts = false,
     ethCompatibleStorage = true
   )
-}

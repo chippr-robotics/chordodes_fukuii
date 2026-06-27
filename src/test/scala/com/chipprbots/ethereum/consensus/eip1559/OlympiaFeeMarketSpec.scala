@@ -30,7 +30,7 @@ class OlympiaFeeMarketSpec
     extends AnyWordSpec
     with Matchers
     with BlockchainConfigBuilder
-    with com.chipprbots.ethereum.TestInstanceConfigProvider {
+    with com.chipprbots.ethereum.TestInstanceConfigProvider:
 
   private val olympiaBlock: BigInt = BigInt(100)
 
@@ -213,11 +213,10 @@ class OlympiaFeeMarketSpec
         OlympiaTest
       ) in {
         var fee = InitialBaseFee
-        for _ <- 1 to 100 do {
+        for _ <- 1 to 100 do
           val emptyParent = olympiaParent(gasLimit = BigInt(30_000_000), gasUsed = 0, baseFee = fee)
           fee = BaseFeeCalculator.calcBaseFee(emptyParent, config)
           fee should be >= InitialBaseFee
-        }
       }
     }
 
@@ -278,5 +277,4 @@ class OlympiaFeeMarketSpec
       }
     }
   }
-}
 // scalastyle:on magic.number

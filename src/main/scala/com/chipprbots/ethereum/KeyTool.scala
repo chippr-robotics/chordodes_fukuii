@@ -1,6 +1,5 @@
 package com.chipprbots.ethereum
 
-object KeyTool {
+object KeyTool:
 
   def main(args: Array[String]): Unit = sun.security.tools.keytool.Main.main(args)
-}

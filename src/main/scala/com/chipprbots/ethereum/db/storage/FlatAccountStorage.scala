@@ -29,7 +29,7 @@ import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource.IterationError
   * The MPT-based state trie is still maintained for Merkle proof generation and state root computation. Flat storage is
   * a read/write optimisation layer.
   */
-class FlatAccountStorage(val dataSource: DataSource) extends TransactionalKeyValueStorage[ByteString, ByteString] {
+class FlatAccountStorage(val dataSource: DataSource) extends TransactionalKeyValueStorage[ByteString, ByteString]:
   val namespace: IndexedSeq[Byte] = Namespaces.FlatAccountNamespace
   def keySerializer: ByteString => IndexedSeq[Byte] = identity
   def keyDeserializer: IndexedSeq[Byte] => ByteString = k => ByteString.fromArrayUnsafe(k.toArray)
@@ -58,7 +58,7 @@ class FlatAccountStorage(val dataSource: DataSource) extends TransactionalKeyVal
     * Requires the underlying DataSource to be a RocksDbDataSource.
     */
   def seekFrom(startHash: ByteString): Stream[IO, Either[IterationError, (ByteString, ByteString)]] =
-    dataSource match {
+    dataSource match
       case rdb: RocksDbDataSource =>
         rdb.seekFrom(namespace, startHash.toArray).map { result =>
           result.map { case (key, value) =>
@@ -67,16 +67,13 @@ class FlatAccountStorage(val dataSource: DataSource) extends TransactionalKeyVal
         }
       case _ =>
         Stream.empty
-    }
 
   def approximateKeyCount(): Long =
-    dataSource match {
+    dataSource match
       case rdb: RocksDbDataSource => rdb.approximateKeyCount(namespace)
       case _                      => 0L
-    }
 
   override def storageContent: Stream[IO, Either[IterationError, (ByteString, ByteString)]] =
     dataSource.iterate(namespace).map { result =>
       result.map { case (key, value) => (ByteString.fromArrayUnsafe(key), ByteString.fromArrayUnsafe(value)) }
     }
-}

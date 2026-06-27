@@ -9,7 +9,7 @@ import com.chipprbots.ethereum.forkid.ForkId
 import com.chipprbots.ethereum.network.p2p.EthereumMessageDecoder
 import com.chipprbots.ethereum.network.p2p.NetworkMessageDecoder
 
-class ETH68MessagesSpec extends AnyWordSpec with Matchers {
+class ETH68MessagesSpec extends AnyWordSpec with Matchers:
 
   "ETH68" when {
     val version = Capability.ETH68
@@ -75,12 +75,10 @@ class ETH68MessagesSpec extends AnyWordSpec with Matchers {
     }
   }
 
-  def verify[T](msg: T, encode: T => Array[Byte], code: Int, version: Capability): Unit = {
+  def verify[T](msg: T, encode: T => Array[Byte], code: Int, version: Capability): Unit =
     val encoded = encode(msg)
     val decoded = messageDecoder(version).fromBytes(code, encoded)
     decoded shouldEqual Right(msg)
-  }
 
   private def messageDecoder(version: Capability) =
     NetworkMessageDecoder.orElse(EthereumMessageDecoder.ethMessageDecoder(version))
-}

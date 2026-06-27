@@ -36,7 +36,7 @@ class PeerListHelper(
     peerDisconnectedAdapter: TypedActorRef[PeerEvent],
     log: Logger,
     sharedRateTracker: Option[PeerRateTracker] = None
-) {
+):
 
   private val bigIntReverseOrdering: Ordering[BigInt] = Ordering[BigInt].reverse
 
@@ -59,27 +59,23 @@ class PeerListHelper(
   protected def maintainedNodeIdHexes: Set[String] = Set.empty
 
   /** Handle `NetworkPeerManagerActor.HandshakedPeers` — refresh the peer map and tune the rate tracker. */
-  def handleHandshakedPeers(handshaked: Map[Peer, PeerInfo]): Unit = {
+  def handleHandshakedPeers(handshaked: Map[Peer, PeerInfo]): Unit =
     updatePeers(handshaked)
     ethRateTracker.tune()
-  }
 
   /** Handle `PeerDisconnected` — drop the peer and unsubscribe from its disconnect events. */
   def handlePeerDisconnected(peerId: PeerId): Unit = removePeerById(peerId)
 
-  def peersToDownloadFrom: Map[PeerId, PeerWithInfo] = {
+  def peersToDownloadFrom: Map[PeerId, PeerWithInfo] =
     val available = peers
       .filter { case (_, p) => p.peerInfo.forkAccepted }
       .filterNot { case (peerId, _) =>
         val isBlacklisted = blacklist.isBlacklisted(peerId)
-        if isBlacklisted then {
-          log.debug("Peer {} is blacklisted and excluded from download peers", peerId)
-        }
+        if isBlacklisted then log.debug("Peer {} is blacklisted and excluded from download peers", peerId)
         isBlacklisted
       }
     log.debug("peersToDownloadFrom: {} available out of {} handshaked peers", available.size, peers.size)
     available
-  }
 
   def getPeerById(peerId: PeerId): Option[Peer] = peers.get(peerId).map(_.peer)
 
@@ -93,18 +89,17 @@ class PeerListHelper(
       .headOption
 
   def blacklistIfHandshaked(peerId: PeerId, duration: FiniteDuration, reason: BlacklistReason): Unit =
-    peers.get(peerId) match {
+    peers.get(peerId) match
       case Some(peerWithInfo) =>
         val isMaintained = peerWithInfo.peer.nodeId.exists { nodeId =>
           maintainedNodeIdHexes.contains(Hex.toHexString(nodeId.toArray))
         }
-        val skipBlacklist = isMaintained && (reason match {
+        val skipBlacklist = isMaintained && (reason match
           case _: BlacklistReason.RegularSyncRequestFailed => false
           case _                                           => true
-        })
-        if skipBlacklist then {
-          log.debug("Skipping blacklist for maintained peer {} (reason: {})", peerId, reason)
-        } else {
+        )
+        if skipBlacklist then log.debug("Skipping blacklist for maintained peer {} (reason: {})", peerId, reason)
+        else
           if isMaintained then log.warn("Blacklisting maintained peer {} (will reconnect). Reason: {}", peerId, reason)
           else
             log.debug(
@@ -115,18 +110,16 @@ class PeerListHelper(
               reason
             )
           blacklist.add(peerId, duration, reason)
-        }
       case None =>
         log.debug("Attempted to blacklist non-handshaked peer {}", peerId)
-    }
 
-  private def updatePeers(handshaked: Map[Peer, PeerInfo]): Unit = {
+  private def updatePeers(handshaked: Map[Peer, PeerInfo]): Unit =
     val updated = handshaked.map { case (peer, peerInfo) =>
       (peer.id, PeerWithInfo(peer, peerInfo))
     }
 
     val newPeers = updated.filterNot(p => peers.keySet.contains(p._1))
-    if newPeers.nonEmpty then {
+    if newPeers.nonEmpty then
       log.debug("Adding {} new handshaked peers", newPeers.size)
       newPeers.foreach { case (peerId, peerWithInfo) =>
         log.debug(
@@ -142,11 +135,8 @@ class PeerListHelper(
           peerDisconnectedAdapter
         )
       }
-    }
 
-    if peers.size != updated.size then {
-      log.debug("Handshaked peers changed: {} -> {} peers", peers.size, updated.size)
-    }
+    if peers.size != updated.size then log.debug("Handshaked peers changed: {} -> {} peers", peers.size, updated.size)
 
     val newPeerIds = updated.keySet -- peers.keySet
     val removedPeerIds = peers.keySet -- updated.keySet
@@ -155,13 +145,12 @@ class PeerListHelper(
 
     peers = updated
     onPeerListUpdated(updated.values)
-  }
 
   /** Called after `handshakedPeers` is refreshed. No-op by default; subclasses may override. */
   protected def onPeerListUpdated(currentPeers: Iterable[PeerWithInfo]): Unit = ()
 
   private def removePeerById(peerId: PeerId): Unit =
-    if peers.keySet.contains(peerId) then {
+    if peers.keySet.contains(peerId) then
       val peerInfo = peers(peerId)
       log.debug("Removing disconnected peer {} ({})", peerId, peerInfo.peer.remoteAddress)
       peerEventBus ! UnsubscribeCmd(
@@ -173,8 +162,4 @@ class PeerListHelper(
       log.debug("Removed peer {} from blacklist", peerId)
       peers = peers - peerId
       log.debug("Remaining handshaked peers: {}", peers.size)
-    } else {
-      log.debug("Attempted to remove non-existent peer {}", peerId)
-    }
-
-}
+    else log.debug("Attempted to remove non-existent peer {}", peerId)

@@ -10,7 +10,7 @@ import com.chipprbots.ethereum.mpt.*
   *
   * Used by BytecodeRecoveryActor (Bug 20 hardening) to scan for missing bytecodes.
   */
-class LeafWalkVisitor(storage: MptStorage, onLeaf: LeafNode => Unit) extends MptVisitor[Unit] {
+class LeafWalkVisitor(storage: MptStorage, onLeaf: LeafNode => Unit) extends MptVisitor[Unit]:
 
   override def visitLeaf(leaf: LeafNode): Unit =
     onLeaf(leaf)
@@ -25,17 +25,14 @@ class LeafWalkVisitor(storage: MptStorage, onLeaf: LeafNode => Unit) extends Mpt
 
   override def visitBranch(branch: BranchNode): BranchVisitor[Unit] =
     new LeafWalkBranchVisitor(storage, onLeaf)
-}
 
-private class LeafWalkBranchVisitor(storage: MptStorage, onLeaf: LeafNode => Unit) extends BranchVisitor[Unit] {
+private class LeafWalkBranchVisitor(storage: MptStorage, onLeaf: LeafNode => Unit) extends BranchVisitor[Unit]:
   override def visitChild(): MptVisitor[Unit] = new LeafWalkVisitor(storage, onLeaf)
   override def visitChild(child: => Unit): Unit = child // force evaluation (triggers traversal)
   override def visitTerminator(term: Option[ByteString]): Unit = ()
   override def done(): Unit = ()
-}
 
-private class LeafWalkExtensionVisitor(storage: MptStorage, onLeaf: LeafNode => Unit) extends ExtensionVisitor[Unit] {
+private class LeafWalkExtensionVisitor(storage: MptStorage, onLeaf: LeafNode => Unit) extends ExtensionVisitor[Unit]:
   override def visitNext(): MptVisitor[Unit] = new LeafWalkVisitor(storage, onLeaf)
   override def visitNext(value: => Unit): Unit = value // force evaluation
   override def done(): Unit = ()
-}

@@ -32,7 +32,7 @@ import com.chipprbots.ethereum.testing.TestMptStorage
   *   - T-6 (FR-008/SC-006, C3): with the feature off, the `GetTrieNodes` always carries `rootHash == stateRoot` and a
   *     `HealingServeRootRefresh` is ignored — byte-identical to the coupled path.
   */
-class DecoupledHealServeRootSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers {
+class DecoupledHealServeRootSpec extends ScalaTestWithActorTestKit() with AnyFlatSpecLike with Matchers:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
   implicit private val actorTestKit: org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit = testKit
@@ -43,11 +43,10 @@ class DecoupledHealServeRootSpec extends ScalaTestWithActorTestKit() with AnyFla
   private def getTrieNodesOf(send: NetworkPeerManagerActor.SendMessageCmd): SNAP.GetTrieNodes =
     send.message.underlyingMsg.asInstanceOf[SNAP.GetTrieNodes]
 
-  private def pendingTasks(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int = {
+  private def pendingTasks(coordinator: ActorRef[TrieNodeHealingCoordinator.Command]): Int =
     val probe = testKit.createTestProbe[HealingStatistics]()
     coordinator ! TrieNodeHealingCoordinator.HealingGetProgress(probe.ref)
     probe.expectMessageType[HealingStatistics].pendingTasks
-  }
 
   /** Build a coordinator with the given decoupling flag, returning (coordinator, networkPeerManager probe,
     * snapSyncController probe). The walk root is the supplied `stateRoot`.
@@ -59,7 +58,7 @@ class DecoupledHealServeRootSpec extends ScalaTestWithActorTestKit() with AnyFla
       ActorRef[TrieNodeHealingCoordinator.Command],
       org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[NetworkPeerManagerActor.Command],
       org.apache.pekko.actor.testkit.typed.scaladsl.TestProbe[SNAPSyncController.Command]
-  ) = {
+  ) =
     val networkPeerManager = testKit.createTestProbe[NetworkPeerManagerActor.Command]()
     val snapSyncController = testKit.createTestProbe[SNAPSyncController.Command]()
     val coordinator = HealingTrieFixtures.spawnCoordinator(
@@ -73,7 +72,6 @@ class DecoupledHealServeRootSpec extends ScalaTestWithActorTestKit() with AnyFla
       decoupledHealServeRoot = decoupled
     )
     (coordinator, networkPeerManager, snapSyncController)
-  }
 
   // ── T-1: decoupled fetch targets the serve root, walk seeds the walk root ─────────────────────
 
@@ -160,4 +158,3 @@ class DecoupledHealServeRootSpec extends ScalaTestWithActorTestKit() with AnyFla
       request.rootHash shouldBe stateRoot
       request.rootHash should not be serveRoot
     }
-}

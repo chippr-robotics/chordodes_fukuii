@@ -40,12 +40,12 @@ import com.chipprbots.ethereum.network.rlpx.RLPxConnectionHandler
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 
-class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers {
+class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers:
 
   it should "succeed in establishing connection if the handshake is always successful" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
 
     import DefaultValues.*
 
@@ -59,12 +59,11 @@ class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers {
 
     // Test that the handshake succeeded
     expectStatus(peerActorHandshakeSucceeds, StatusResponse(Handshaked))
-  }
 
   it should "fail in establishing connection if the handshake always fails" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
 
     import DefaultValues.*
 
@@ -79,12 +78,10 @@ class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers {
     // Test that the handshake failed
     rlpxConnectionProbe.expectMsg(RLPxConnectionHandler.SendMessage(Disconnect(defaultReasonDisconnect)))
 
-  }
-
   it should "succeed in establishing connection in simple Hello exchange" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
 
     import DefaultValues.*
 
@@ -100,12 +97,11 @@ class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers {
 
     // Test that the handshake succeeded
     expectStatus(peerActorHandshakeRequiresHello, StatusResponse(Handshaked))
-  }
 
   it should "fail in establishing connection in simple Hello exchange if timeout happened" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
 
     import DefaultValues.*
 
@@ -121,12 +117,11 @@ class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers {
 
     // Test that the handshake failed
     rlpxConnectionProbe.expectMsg(RLPxConnectionHandler.SendMessage(Disconnect(defaultReasonDisconnect)))
-  }
 
   it should "fail in establishing connection in simple Hello exchange if a Status message was received" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
 
     import DefaultValues.*
 
@@ -142,9 +137,8 @@ class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers {
 
     // Test that the handshake failed
     rlpxConnectionProbe.expectMsg(RLPxConnectionHandler.SendMessage(Disconnect(defaultReasonDisconnect)))
-  }
 
-  it should "ignore unhandled message while establishing connection" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "ignore unhandled message while establishing connection" taggedAs (UnitTest, NetworkTest) in new TestSetup:
 
     import DefaultValues.*
 
@@ -163,9 +157,8 @@ class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers {
 
     // Test that the handshake succeeded
     expectStatus(peerActorHandshakeRequiresHello, StatusResponse(Handshaked))
-  }
 
-  trait TestSetup extends EphemBlockchainTestSetup {
+  trait TestSetup extends EphemBlockchainTestSetup:
     implicit override lazy val classicSystem: ActorSystem =
       ActorSystem("PeerActorSpec_System", ConfigFactory.load("explicit-scheduler"))
 
@@ -192,14 +185,12 @@ class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers {
       )
     )
 
-    def expectStatus(peer: TestActorRef[Nothing], expected: StatusResponse): Unit = {
+    def expectStatus(peer: TestActorRef[Nothing], expected: StatusResponse): Unit =
       val statusProbe: TestProbe = TestProbe()(classicSystem)
       peer ! GetStatus(statusProbe.ref.toTyped[StatusResponse])
       statusProbe.expectMsg(expected)
-    }
-  }
 
-  object DefaultValues {
+  object DefaultValues:
     val defaultStatusMsg: Status = Status(
       protocolVersion = Capability.ETH63.version,
       networkId = 1,
@@ -230,21 +221,18 @@ class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers {
       nodeId = ByteString.empty
     )
     val defaultTimeout = Timeouts.normalTimeout
-  }
 
   case class MockHandshakerRequiresHello private (handshakerState: HandshakerState[PeerInfo])
-      extends Handshaker[PeerInfo] {
+      extends Handshaker[PeerInfo]:
     override def copy(newState: HandshakerState[PeerInfo]): Handshaker[PeerInfo] = new MockHandshakerRequiresHello(
       newState
     )
-  }
 
-  object MockHandshakerRequiresHello {
+  object MockHandshakerRequiresHello:
     def apply(): MockHandshakerRequiresHello =
       new MockHandshakerRequiresHello(MockHelloExchangeState)
-  }
 
-  case object MockHelloExchangeState extends InProgressState[PeerInfo] {
+  case object MockHelloExchangeState extends InProgressState[PeerInfo]:
 
     import DefaultValues.*
 
@@ -256,6 +244,3 @@ class PeerActorHandshakingSpec extends AnyFlatSpec with Matchers {
     }
 
     def processTimeout: HandshakerState[PeerInfo] = DisconnectedState(defaultReasonDisconnect)
-  }
-
-}

@@ -17,12 +17,12 @@ import com.chipprbots.ethereum.network.KnownNodesManager.KnownNodes
 import com.chipprbots.ethereum.network.KnownNodesManager.KnownNodesManagerConfig
 import com.chipprbots.ethereum.testing.Tags.*
 
-class KnownNodesManagerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
+class KnownNodesManagerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers:
 
   "KnownNodesManager" should "keep a list of nodes and persist changes" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     knownNodesManager ! KnownNodesManager.GetKnownNodesReq(client.ref)
     client.expectMessage(KnownNodes(Set.empty))
 
@@ -48,9 +48,8 @@ class KnownNodesManagerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     client.expectMessage(KnownNodes(Set(uri(2), uri(3))))
 
     knownNodesStorage.getKnownNodes shouldBe Set(uri(2), uri(3))
-  }
 
-  it should "respect max nodes limit" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "respect max nodes limit" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     knownNodesManager ! KnownNodesManager.GetKnownNodesReq(client.ref)
     client.expectMessage(KnownNodes(Set.empty))
 
@@ -64,9 +63,8 @@ class KnownNodesManagerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
     client.expectMessageType[KnownNodes]
 
     knownNodesStorage.getKnownNodes.size shouldBe 5
-  }
 
-  trait TestSetup {
+  trait TestSetup:
     private val setup: EphemBlockchainTestSetup = new EphemBlockchainTestSetup {}
     val knownNodesStorage: KnownNodesStorage = setup.storagesInstance.storages.knownNodesStorage
 
@@ -78,6 +76,3 @@ class KnownNodesManagerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLi
 
     val knownNodesManager: ActorRef[KnownNodesManager.Command] =
       testKit.spawn(KnownNodesManager(config, knownNodesStorage))
-  }
-
-}

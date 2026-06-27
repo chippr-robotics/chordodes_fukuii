@@ -13,15 +13,15 @@ import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource
 import com.chipprbots.ethereum.testing.Tags.*
 
 /** Tests for [[SnapSyncProgressStorage]] — SNAP download cursor persistence (account + storage cursors). */
-class SnapSyncProgressStorageSpec extends AnyFlatSpec with Matchers {
+class SnapSyncProgressStorageSpec extends AnyFlatSpec with Matchers:
 
   private def root(i: Int): ByteString = ByteString(Array.fill(32)(i.toByte))
   private def cursor(i: Int): String = "0" * (64 - i.toString.length) + i.toString
 
-  private def withStorage(test: SnapSyncProgressStorage => Unit): Unit = {
+  private def withStorage(test: SnapSyncProgressStorage => Unit): Unit =
     val dbPath = Files.createTempDirectory("snap-progress-rocksdb").toAbsolutePath.toString
     val dataSource = RocksDbDataSource(
-      new RocksDbConfig {
+      new RocksDbConfig:
         override val createIfMissing: Boolean = true
         override val paranoidChecks: Boolean = true
         override val path: String = dbPath
@@ -31,16 +31,14 @@ class SnapSyncProgressStorageSpec extends AnyFlatSpec with Matchers {
         override val levelCompaction: Boolean = true
         override val blockSize: Long = 16384
         override val blockCacheSize: Long = 33554432
-      },
+      ,
       Namespaces.nsSeq
     )
     try test(new SnapSyncProgressStorage(dataSource))
-    finally {
+    finally
       dataSource.destroy()
       val dir = new File(dbPath)
       if dir.exists() then dir.delete()
-    }
-  }
 
   "SnapSyncProgressStorage" should "round-trip a progress entry through writeProgress/readProgress" taggedAs UnitTest in
     withStorage { storage =>
@@ -109,4 +107,3 @@ class SnapSyncProgressStorageSpec extends AnyFlatSpec with Matchers {
 
       storage.readProgress(stateRoot) shouldBe Some(updated)
     }
-}

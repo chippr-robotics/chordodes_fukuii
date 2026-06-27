@@ -22,7 +22,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   * mixed together. Making it `implicit lazy val` ensures it's initialized only when first accessed, avoiding null
   * pointer exceptions.
   */
-class IORuntimeInitializationSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
+class IORuntimeInitializationSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers:
 
   behavior.of("IORuntime initialization in NodeBuilder traits")
 
@@ -33,24 +33,19 @@ class IORuntimeInitializationSpec extends ScalaTestWithActorTestKit with AnyFlat
     @volatile var peerDiscoveryBuilderAccessed = false
     @volatile var portForwardingBuilderAccessed = false
 
-    trait TestPeerDiscoveryManagerBuilder {
-      implicit lazy val ioRuntime: IORuntime = {
+    trait TestPeerDiscoveryManagerBuilder:
+      implicit lazy val ioRuntime: IORuntime =
         peerDiscoveryBuilderAccessed = true
         IORuntime.global
-      }
-    }
 
-    trait TestPortForwardingBuilder {
-      implicit lazy val ioRuntime: IORuntime = {
+    trait TestPortForwardingBuilder:
+      implicit lazy val ioRuntime: IORuntime =
         portForwardingBuilderAccessed = true
         IORuntime.global
-      }
-    }
 
-    trait TestNode extends TestPeerDiscoveryManagerBuilder with TestPortForwardingBuilder {
+    trait TestNode extends TestPeerDiscoveryManagerBuilder with TestPortForwardingBuilder:
       // This override simulates the Node trait's override
       implicit override lazy val ioRuntime: IORuntime = IORuntime.global
-    }
 
     val node = new TestNode {}
 
@@ -68,11 +63,10 @@ class IORuntimeInitializationSpec extends ScalaTestWithActorTestKit with AnyFlat
 
   it should "have IORuntime available when accessed from mixed traits" taggedAs (UnitTest) in {
     // This test validates that the IORuntime is available during lazy val initialization
-    trait TestBuilderWithRuntime {
+    trait TestBuilderWithRuntime:
       implicit lazy val ioRuntime: IORuntime = IORuntime.global
 
       def getRuntimeForTest: IORuntime = ioRuntime
-    }
 
     val builder = new TestBuilderWithRuntime {}
 
@@ -84,21 +78,17 @@ class IORuntimeInitializationSpec extends ScalaTestWithActorTestKit with AnyFlat
 
   it should "properly initialize IORuntime with multiple trait overrides" taggedAs (UnitTest) in {
     // This test simulates the actual Node trait structure with multiple overrides
-    trait Base {
+    trait Base:
       implicit lazy val ioRuntime: IORuntime = IORuntime.global
-    }
 
-    trait Override1 extends Base {
+    trait Override1 extends Base:
       implicit override lazy val ioRuntime: IORuntime = IORuntime.global
-    }
 
-    trait Override2 extends Base {
+    trait Override2 extends Base:
       implicit override lazy val ioRuntime: IORuntime = IORuntime.global
-    }
 
-    trait Final extends Override1 with Override2 {
+    trait Final extends Override1 with Override2:
       implicit override lazy val ioRuntime: IORuntime = IORuntime.global
-    }
 
     val node = new Final {}
 
@@ -113,22 +103,21 @@ class IORuntimeInitializationSpec extends ScalaTestWithActorTestKit with AnyFlat
     // in extreme race conditions, but the final value is always consistent
     @volatile var initCount = 0
 
-    trait TestRuntime {
-      implicit lazy val ioRuntime: IORuntime = {
+    trait TestRuntime:
+      implicit lazy val ioRuntime: IORuntime =
         initCount += 1
         IO.sleep(10.millis).unsafeRunSync()(IORuntime.global) // Simulate some initialization work
         IORuntime.global
-      }
-    }
 
     val runtime = new TestRuntime {}
 
     // Access from multiple threads
     val threads = (1 to 5).map { _ =>
-      new Thread(new Runnable {
-        def run(): Unit =
-          runtime.ioRuntime should not be null
-      })
+      new Thread(
+        new Runnable:
+          def run(): Unit =
+            runtime.ioRuntime should not be null
+      )
     }
 
     threads.foreach(_.start())
@@ -146,19 +135,15 @@ class IORuntimeInitializationSpec extends ScalaTestWithActorTestKit with AnyFlat
     // This test documents the problem: non-lazy vals can be null during mixed trait initialization
     val eagerInitOrder = scala.collection.mutable.ListBuffer[String]()
 
-    trait EagerBase {
-      implicit val ioRuntime: IORuntime = {
+    trait EagerBase:
+      implicit val ioRuntime: IORuntime =
         eagerInitOrder += "Base"
         IORuntime.global
-      }
-    }
 
-    trait EagerOverride extends EagerBase {
-      implicit override val ioRuntime: IORuntime = {
+    trait EagerOverride extends EagerBase:
+      implicit override val ioRuntime: IORuntime =
         eagerInitOrder += "Override"
         IORuntime.global
-      }
-    }
 
     val node = new EagerOverride {}
 
@@ -169,4 +154,3 @@ class IORuntimeInitializationSpec extends ScalaTestWithActorTestKit with AnyFlat
     // Document that both were initialized (eager initialization)
     eagerInitOrder should not be empty
   }
-}

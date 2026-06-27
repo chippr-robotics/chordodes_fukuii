@@ -27,10 +27,10 @@ class CachedNodeStorageSpec
     with ScalaCheckPropertyChecks
     with ObjectGenerators
     with Eventually
-    with NormalPatience {
+    with NormalPatience:
   val iterations = 10
 
-  "CachedNodeStorage" should "not update dataSource until persist" taggedAs (UnitTest, DatabaseTest) in new TestSetup {
+  "CachedNodeStorage" should "not update dataSource until persist" taggedAs (UnitTest, DatabaseTest) in new TestSetup:
     forAll(keyValueByteStringGen(kvSize)) { keyvalues =>
       cachedNodeStorage.update(Nil, keyvalues)
     }
@@ -38,15 +38,12 @@ class CachedNodeStorageSpec
 
     val cachedValuesSize = cachedNodeStorage.cache.getValues.size
 
-    if cachedNodeStorage.persist() then {
+    if cachedNodeStorage.persist() then
       cachedNodeStorage.cache.getValues shouldBe empty
       dataSource.storage.size shouldEqual cachedValuesSize
-    } else {
-      dataSource.storage shouldBe empty
-    }
-  }
+    else dataSource.storage shouldBe empty
 
-  it should "persist elements to underlying data source when full" taggedAs (UnitTest, DatabaseTest) in new TestSetup {
+  it should "persist elements to underlying data source when full" taggedAs (UnitTest, DatabaseTest) in new TestSetup:
     forAll(keyValueByteStringGen(kvSize)) { keyvalues =>
       cachedNodeStorage.update(Nil, keyvalues)
 
@@ -54,12 +51,11 @@ class CachedNodeStorageSpec
 
       keyvalues.foreach(elem => assert(cachedNodeStorage.get(elem._1).get.sameElements(elem._2)))
     }
-  }
 
   it should "persist elements to underlying data source when not cleared for long time" taggedAs (
     UnitTest,
     DatabaseTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val key: ByteString = ByteString(1)
     val value: Array[Byte] = Array(1.toByte)
     val cachedNodeStorageTiming = new CachedNodeStorage(nodeStorage, mapCacheTime)
@@ -68,9 +64,8 @@ class CachedNodeStorageSpec
       cachedNodeStorageTiming.persist() shouldEqual true
       dataSource.storage.nonEmpty shouldBe true
     }
-  }
 
-  trait TestSetup {
+  trait TestSetup:
     val dataSource: EphemDataSource = EphemDataSource()
     val nodeStorage = new NodeStorage(dataSource)
     val underLying: mutable.Map[NodeHash, NodeEncoded] = MapCache.getMap[NodeHash, NodeEncoded]
@@ -82,15 +77,10 @@ class CachedNodeStorageSpec
 
     val kvSize = 64
 
-    object testCapacityCacheConfig extends NodeCacheConfig {
+    object testCapacityCacheConfig extends NodeCacheConfig:
       override val maxSize = 30
       override val maxHoldTime: FiniteDuration = FiniteDuration(10, TimeUnit.MINUTES)
-    }
 
-    object testTimeCacheConfig extends NodeCacheConfig {
+    object testTimeCacheConfig extends NodeCacheConfig:
       override val maxSize = 30
       override val maxHoldTime: FiniteDuration = FiniteDuration(1, TimeUnit.SECONDS)
-    }
-
-  }
-}

@@ -19,9 +19,9 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.ForkBlockNumbers
 import com.chipprbots.ethereum.utils.MonetaryPolicyConfig
 
-class ForksTest extends AnyFlatSpec with Matchers {
+class ForksTest extends AnyFlatSpec with Matchers:
 
-  trait TestSetup extends ScenarioSetup {
+  trait TestSetup extends ScenarioSetup:
     implicit override lazy val blockchainConfig: BlockchainConfig = BlockchainConfig(
       forkBlockNumbers = ForkBlockNumbers.Empty.copy(
         frontierBlockNumber = 0,
@@ -44,9 +44,8 @@ class ForksTest extends AnyFlatSpec with Matchers {
       ethCompatibleStorage = true
     )
     val noErrors: ResultOfATypeInvocation[Right[?, Seq[Receipt]]] = a[Right[?, Seq[Receipt]]]
-  }
 
-  "Ledger" should "execute blocks with respect to forks" taggedAs (IntegrationTest, VMTest, SlowTest) in new TestSetup {
+  "Ledger" should "execute blocks with respect to forks" taggedAs (IntegrationTest, VMTest, SlowTest) in new TestSetup:
     val fixtures: FixtureProvider.Fixture = FixtureProvider.loadFixtures("/txExecTest/forksTest")
 
     val startBlock = 1
@@ -72,6 +71,3 @@ class ForksTest extends AnyFlatSpec with Matchers {
         )
       blockExecution.executeAndValidateBlock(fixtures.blockByNumber(blockToExecute)) shouldBe noErrors
     }
-  }
-
-}

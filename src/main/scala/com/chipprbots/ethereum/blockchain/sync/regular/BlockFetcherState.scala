@@ -78,7 +78,7 @@ case class BlockFetcherState(
     // is called, so waitingHeaders always grows monotonically even when slot responses arrive
     // out of sequence. Cleared by clearQueues() on any invalidation.
     responseBuffer: SortedMap[BigInt, Seq[BlockHeader]] = SortedMap.empty
-) {
+):
 
   def isFetching: Boolean = isFetchingHeaders || isFetchingBodies
 
@@ -148,7 +148,7 @@ case class BlockFetcherState(
     * (or lastBlock+1 if waitingHeaders is empty). Returns the drained headers and the new state with those entries
     * removed from the buffer.
     */
-  def drainOrderedHeaders: (Seq[BlockHeader], BlockFetcherState) = {
+  def drainOrderedHeaders: (Seq[BlockHeader], BlockFetcherState) =
     val nextExpected = waitingHeaders.lastOption
       .map(_.number + 1)
       .orElse(readyBlocks.lastOption.map(_.number + 1))
@@ -160,16 +160,14 @@ case class BlockFetcherState(
         buf: SortedMap[BigInt, Seq[BlockHeader]],
         acc: Seq[BlockHeader]
     ): (Seq[BlockHeader], SortedMap[BigInt, Seq[BlockHeader]]) =
-      buf.headOption match {
+      buf.headOption match
         case Some((startNr, hdrs)) if startNr == expected =>
           val nextEnd = hdrs.lastOption.map(_.number + 1).getOrElse(expected)
           collect(nextEnd, buf.tail, acc ++ hdrs)
         case _ => (acc, buf)
-      }
 
     val (drained, newBuf) = collect(nextExpected, responseBuffer, Seq.empty)
     (drained, copy(responseBuffer = newBuf))
-  }
 
   /** True when enough independent peers have rejected the current queue state to conclude our waitingHeaders /
     * readyBlocks tip is stale (e.g. orphaned after a tip reorg, or seeded wrong at the fast-sync → regular-sync
@@ -181,9 +179,8 @@ case class BlockFetcherState(
   /** Validates received headers consistency and their compatibility with the state
     */
   private def validatedHeaders(headers: Seq[BlockHeader]): Either[ValidationErrors, Seq[BlockHeader]] =
-    if headers.isEmpty then {
-      Right(headers)
-    } else {
+    if headers.isEmpty then Right(headers)
+    else
       headers
         .asRight[ValidationErrors]
         .ensure(HeadersNotFormingSeq)(HeadersSeq.areChain)
@@ -191,13 +188,11 @@ case class BlockFetcherState(
         .ensure(HeadersNotMatchingWaitingHeaders)(headers =>
           (waitingHeaders.lastOption, headers.headOption).mapN(_.isParentOf(_)).getOrElse(true)
         )
-    }
 
   private def checkConsistencyWithReadyBlocks(headers: Seq[BlockHeader]): Boolean =
-    (readyBlocks, headers) match {
+    (readyBlocks, headers) match
       case (_ :+ last, head +: _) if waitingHeaders.isEmpty => last.header.isParentOf(head)
       case _                                                => true
-    }
 
   def validateNewBlockHashes(hashes: Seq[BlockHash]): Either[String, Seq[BlockHash]] =
     hashes
@@ -224,7 +219,7 @@ case class BlockFetcherState(
       respondedBodies: Seq[BlockBody],
       matchedBlocks: Seq[Block] = Nil
   ): Option[Seq[Block]] =
-    (requestedHeaders, respondedBodies) match {
+    (requestedHeaders, respondedBodies) match
       case (Seq(), _ +: _) => None
       case (_, Seq())      => Some(matchedBlocks)
       case (header +: remainingHeaders, body +: remainingBodies) =>
@@ -232,7 +227,6 @@ case class BlockFetcherState(
         if doMatch then
           bodiesAreOrderedSubsetOfRequested(remainingHeaders, remainingBodies, matchedBlocks :+ Block(header, body))
         else bodiesAreOrderedSubsetOfRequested(remainingHeaders, respondedBodies, matchedBlocks)
-    }
 
   /** If blocks is empty collection - headers in queue are removed as the cause is:
     *   - the headers are from rejected fork and therefore it won't be possible to resolve blocks for them
@@ -255,13 +249,13 @@ case class BlockFetcherState(
   def enqueueRequestedBlock(block: Block, fromPeer: PeerId): BlockFetcherState =
     waitingHeaders.dequeueOption
       .map { case (waitingHeader, waitingHeadersTail) =>
-        if waitingHeader.hash == block.hash then {
+        if waitingHeader.hash == block.hash then
           enqueueReadyBlock(block, fromPeer)
             .withPossibleNewTopAt(block.number)
             .copy(
               waitingHeaders = waitingHeadersTail
             )
-        } else this
+        else this
       }
       .getOrElse(this)
 
@@ -270,18 +264,16 @@ case class BlockFetcherState(
       .copy(readyBlocks = readyBlocks.enqueue(block))
 
   def pickBlocks(amount: Int): Option[(NonEmptyList[Block], BlockFetcherState)] =
-    if readyBlocks.nonEmpty then {
+    if readyBlocks.nonEmpty then
       val (picked, rest) = readyBlocks.splitAt(amount)
       Some((NonEmptyList(picked.head, picked.tail.toList), copy(readyBlocks = rest, lastBlock = picked.last.number)))
-    } else {
-      None
-    }
+    else None
 
   /** Returns all the ready blocks but only if it includes blocks with number:
     *   - lower = min(from, atLeastWith)
     *   - upper = max(from, atLeastWith)
     */
-  def strictPickBlocks(from: BigInt, atLeastWith: BigInt): Option[(NonEmptyList[Block], BlockFetcherState)] = {
+  def strictPickBlocks(from: BigInt, atLeastWith: BigInt): Option[(NonEmptyList[Block], BlockFetcherState)] =
     val lower = from.min(atLeastWith)
     val upper = from.max(atLeastWith)
 
@@ -292,9 +284,8 @@ case class BlockFetcherState(
       .map(blocks =>
         (NonEmptyList(blocks.head, blocks.tail.toList), copy(readyBlocks = Queue(), lastBlock = blocks.last.number))
       )
-  }
 
-  def clearQueues(): BlockFetcherState = {
+  def clearQueues(): BlockFetcherState =
     // We can't start completely from scratch as requests could be in progress; keep special
     // track of them so their responses are discarded rather than applied to the new state.
     // Move all live in-flight headers to the "ignore" bucket; new dispatches are blocked
@@ -312,11 +303,10 @@ case class BlockFetcherState(
       nextDispatchBlock = lastBlock + 1,
       fetchingBodiesState = newFetchingBodiesState
     )
-  }
 
   def invalidateBlocksFrom(nr: BigInt): (Option[PeerId], BlockFetcherState) = invalidateBlocksFrom(nr, Some(nr))
 
-  def invalidateBlocksFrom(nr: BigInt, toBlacklist: Option[BigInt]): (Option[PeerId], BlockFetcherState) = {
+  def invalidateBlocksFrom(nr: BigInt, toBlacklist: Option[BigInt]): (Option[PeerId], BlockFetcherState) =
     val newLastBlock = (nr - 2).max(0)
     (
       toBlacklist.flatMap(blockProviders.get),
@@ -330,7 +320,6 @@ case class BlockFetcherState(
           blockProviders = blockProviders - nr
         )
     )
-  }
 
   def exists(hash: ByteString): Boolean = existsInReadyBlocks(hash) || existsInWaitingHeaders(hash)
 
@@ -343,11 +332,8 @@ case class BlockFetcherState(
   def withKnownTopAt(nr: BigInt): BlockFetcherState = copy(knownTop = nr)
 
   def withPossibleNewTopAt(nr: BigInt): BlockFetcherState =
-    if nr > knownTop then {
-      withKnownTopAt(nr)
-    } else {
-      this
-    }
+    if nr > knownTop then withKnownTopAt(nr)
+    else this
   def withPossibleNewTopAt(nr: Option[BigInt]): BlockFetcherState = nr.map(withPossibleNewTopAt).getOrElse(this)
 
   def withPeerForBlocks(peerId: PeerId, blocks: Seq[BigInt]): BlockFetcherState =
@@ -386,9 +372,8 @@ case class BlockFetcherState(
     "first block" -> readyBlocks.headOption.map(_.number),
     "last block" -> lastBlock
   )
-}
 
-object BlockFetcherState {
+object BlockFetcherState:
   case class StateNodeFetcher(hash: ByteString, replyTo: ActorRef[FetchResponse])
 
   // Maximum number of concurrent in-flight header requests per sync session.
@@ -427,16 +412,11 @@ object BlockFetcherState {
     */
   case object AwaitingBodiesToBeIgnored extends FetchingBodiesState
 
-  sealed trait ValidationErrors {
+  sealed trait ValidationErrors:
     def description: String
-  }
-  case object HeadersNotFormingSeq extends ValidationErrors {
+  case object HeadersNotFormingSeq extends ValidationErrors:
     val description = "Given headers should form a sequence without gaps"
-  }
-  case object HeadersNotMatchingReadyBlocks extends ValidationErrors {
+  case object HeadersNotMatchingReadyBlocks extends ValidationErrors:
     val description = "Given headers should form a sequence with ready blocks"
-  }
-  case object HeadersNotMatchingWaitingHeaders extends ValidationErrors {
+  case object HeadersNotMatchingWaitingHeaders extends ValidationErrors:
     val description = "Given headers should form a chain with waiting headers"
-  }
-}

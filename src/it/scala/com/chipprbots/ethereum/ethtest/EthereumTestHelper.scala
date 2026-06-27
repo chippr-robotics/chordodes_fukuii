@@ -19,7 +19,7 @@ import com.chipprbots.ethereum.utils.BlockchainConfig
 import com.chipprbots.ethereum.utils.Config
 
 /** Helper for executing blocks with the test infrastructure */
-class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup {
+class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup:
 
   implicit override lazy val blockchainConfig: BlockchainConfig = bc
 
@@ -28,7 +28,7 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup {
     createEmptyStorages()
 
   private def createEmptyStorages(): BlockchainStorages =
-    new BlockchainStorages with AppCaches with EphemDataSourceComponent {
+    new BlockchainStorages with AppCaches with EphemDataSourceComponent:
       override val receiptStorage: ReceiptStorage = new ReceiptStorage(this.dataSource)
       override val evmCodeStorage: EvmCodeStorage = new EvmCodeStorage(this.dataSource)
       override val blockHeadersStorage: BlockHeadersStorage = new BlockHeadersStorage(this.dataSource)
@@ -49,7 +49,6 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup {
             Some(CachedReferenceCountedStorage.saveOnlyNotificationHandler(nodeStorage))
           )
         )
-    }
 
   /** Setup initial state and execute blocks using the same storage instance
     *
@@ -61,8 +60,8 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup {
       blocks: Seq[TestBlock],
       genesisBlockHeader: Option[TestBlockHeader]
   ): Either[String, InMemoryWorldStateProxy] =
-    try {
-      if blocks.isEmpty then {
+    try
+      if blocks.isEmpty then
         return Right(
           InMemoryWorldStateProxy(
             evmCodeStorage = testBlockchainStorages.evmCodeStorage,
@@ -74,7 +73,6 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup {
             ethCompatibleStorage = blockchainConfig.ethCompatibleStorage
           )
         )
-      }
 
       // Get the first block's number to determine which storage to use
       val _ = parseBigInt(blocks.head.blockHeader.number)
@@ -110,9 +108,7 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup {
         world = world.saveAccount(address, account)
 
         // Save code if present
-        if code.nonEmpty then {
-          world = world.saveCode(address, code)
-        }
+        if code.nonEmpty then world = world.saveCode(address, code)
 
         // Save storage if present
         accountState.storage.foreach { case (keyHex, valueHex) =>
@@ -129,10 +125,9 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup {
 
       // Step 2: Execute blocks using the same storage
       executeBlocksWithInitialState(blocks, persistedWorld, genesisBlockHeader)
-    } catch {
+    catch
       case e: Exception =>
         Left(s"Failed to setup and execute test: ${e.getMessage}\n${e.getStackTrace.take(10).mkString("\n")}")
-    }
 
   /** Execute blocks and return final world state */
   private def executeBlocksWithInitialState(
@@ -140,13 +135,11 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup {
       initialWorld: InMemoryWorldStateProxy,
       genesisBlockHeader: Option[TestBlockHeader]
   ): Either[String, InMemoryWorldStateProxy] =
-    try {
-      if blocks.isEmpty then {
-        return Right(initialWorld)
-      }
+    try
+      if blocks.isEmpty then return Right(initialWorld)
 
       // Create the parent block (genesis) either from the test or synthesize one
-      val genesisHeader = genesisBlockHeader match {
+      val genesisHeader = genesisBlockHeader match
         case Some(testGenesis) =>
           // Use the provided genesis block header from the test
           TestConverter.toBlockHeader(testGenesis)
@@ -160,7 +153,6 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup {
             stateRoot = initialWorld.stateRootHash,
             testBlock = firstTestBlock
           )
-      }
 
       // Store the genesis/parent block
       val genesisBlock = Block(genesisHeader, BlockBody(Seq.empty, Seq.empty))
@@ -191,7 +183,7 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup {
         // Execute the block (use given instance explicitly)
         val result = blockExecution.executeAndValidateBlock(block)(using bc)
 
-        result match {
+        result match
           case Right(receiptList) =>
             // Store the executed block
             testBlockchainStorages.blockHeadersStorage.put(block.header.hash.value, block.header).commit()
@@ -208,7 +200,6 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup {
 
           case Left(execError) =>
             throw new RuntimeException(s"Block execution failed: $execError")
-        }
       }
 
       // Extract the final world state from the blockchain after execution
@@ -230,10 +221,9 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup {
       )
 
       Right(finalWorld)
-    } catch {
+    catch
       case e: Exception =>
         Left(s"Failed to execute blocks: ${e.getMessage}\n${e.getStackTrace.take(10).mkString("\n")}")
-    }
 
   private def createParentBlockHeader(
       blockNumber: BigInt,
@@ -261,7 +251,7 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup {
       nonce = ByteString(Array.fill(8)(0.toByte))
     )
 
-  private def convertTestBlockToBlock(testBlock: TestBlock): Block = {
+  private def convertTestBlockToBlock(testBlock: TestBlock): Block =
     val header = TestConverter.toBlockHeader(testBlock.blockHeader)
     val transactions = testBlock.transactions.map(TestConverter.toTransaction)
     val uncles = testBlock.uncleHeaders.map(TestConverter.toBlockHeader)
@@ -271,18 +261,12 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup {
     val withdrawals = testBlock.withdrawals.map(_.map(TestConverter.toWithdrawal))
 
     Block(header, BlockBody(transactions, uncles, withdrawals))
-  }
 
-  private def parseHex(hex: String): Array[Byte] = {
+  private def parseHex(hex: String): Array[Byte] =
     val cleaned = if hex.startsWith("0x") then hex.substring(2) else hex
     if cleaned.isEmpty then Array.empty[Byte]
     else org.bouncycastle.util.encoders.Hex.decode(cleaned)
-  }
 
   private def parseBigInt(value: String): BigInt =
-    if value.startsWith("0x") then {
-      BigInt(value.substring(2), 16)
-    } else {
-      BigInt(value)
-    }
-}
+    if value.startsWith("0x") then BigInt(value.substring(2), 16)
+    else BigInt(value)

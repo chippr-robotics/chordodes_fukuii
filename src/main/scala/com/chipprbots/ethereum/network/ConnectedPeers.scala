@@ -13,7 +13,7 @@ case class ConnectedPeers(
     private val handshakedPeers: Map[PeerId, Peer],
     private val pruningPeers: Map[PeerId, Peer],
     private val lastPruneTimestamp: Long
-) {
+):
 
   lazy val peers: Map[PeerId, Peer] = outgoingPendingPeers ++ handshakedPeers
 
@@ -68,7 +68,7 @@ case class ConnectedPeers(
         handshakedPeers = handshakedPeers + (peerAfterHandshake.id -> peerAfterHandshake)
       )
 
-  def removeTerminatedPeer(peerRef: typed.ActorRef[PeerActor.Command]): (Iterable[PeerId], ConnectedPeers) = {
+  def removeTerminatedPeer(peerRef: typed.ActorRef[PeerActor.Command]): (Iterable[PeerId], ConnectedPeers) =
     val peersId = allPeers.collect { case (id, peer) if peer.ref == peerRef => id }
 
     (
@@ -81,7 +81,6 @@ case class ConnectedPeers(
         lastPruneTimestamp = lastPruneTimestamp
       )
     )
-  }
 
   def prunePeers(
       minAge: FiniteDuration,
@@ -90,12 +89,12 @@ case class ConnectedPeers(
       incoming: Boolean = true,
       currentTimeMillis: Long = System.currentTimeMillis,
       excludedNodeIds: Set[ByteString] = Set.empty
-  ): (Seq[Peer], ConnectedPeers) = {
+  ): (Seq[Peer], ConnectedPeers) =
     val ageThreshold = currentTimeMillis - minAge.toMillis
-    if lastPruneTimestamp > ageThreshold || numPeers == 0 then {
+    if lastPruneTimestamp > ageThreshold || numPeers == 0 then
       // Protect against hostile takeovers by limiting the frequency of pruning.
       (Seq.empty, this)
-    } else {
+    else
       val candidates = handshakedPeers.values.filter(canPrune(incoming, ageThreshold, excludedNodeIds)).toSeq
 
       val toPrune = candidates.sortBy(peer => priority(peer.id)).take(numPeers)
@@ -108,8 +107,6 @@ case class ConnectedPeers(
       )
 
       (toPrune, pruned)
-    }
-  }
 
   private def canPrune(incoming: Boolean, minCreateTimeMillis: Long, excludedNodeIds: Set[ByteString])(
       peer: Peer
@@ -118,8 +115,6 @@ case class ConnectedPeers(
       peer.createTimeMillis <= minCreateTimeMillis &&
       !pruningPeers.contains(peer.id) &&
       peer.nodeId.forall(nid => !excludedNodeIds.contains(nid))
-}
 
-object ConnectedPeers {
+object ConnectedPeers:
   def empty: ConnectedPeers = ConnectedPeers(Map.empty, Map.empty, Map.empty, Map.empty, 0L)
-}

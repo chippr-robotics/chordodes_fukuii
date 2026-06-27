@@ -11,13 +11,12 @@ import com.chipprbots.ethereum.testing.Tags.*
   * meter name is the literal series string with no `app.` prefix. This test pushes a value through each new setter and
   * reads it back from the registry to confirm the wiring.
   */
-class SNAPSyncMetricsSpec extends AnyFlatSpec with Matchers {
+class SNAPSyncMetricsSpec extends AnyFlatSpec with Matchers:
 
-  private def gaugeValue(name: String): Double = {
+  private def gaugeValue(name: String): Double =
     val gauge = Metrics.get().registry.find(name).gauge()
     gauge should not be null
     gauge.value()
-  }
 
   "SNAPSyncMetrics" should "round-trip the new healing-walk phase/GC/inflation gauges via the registry" taggedAs UnitTest in {
     // Touch the object so the gauges are registered before we read them.
@@ -43,4 +42,3 @@ class SNAPSyncMetricsSpec extends AnyFlatSpec with Matchers {
     SNAPSyncMetrics.setHealingInflationRatio(3.5)
     gaugeValue("snapsync.healing.inflation_ratio.gauge") shouldBe 3.5 +- 1e-9
   }
-}

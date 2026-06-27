@@ -38,52 +38,47 @@ class EthBlocksServiceSpec
     with OptionValues
     with MockFactory
     with NormalPatience
-    with TypeCheckedTripleEquals {
+    with TypeCheckedTripleEquals:
 
   implicit val runtime: IORuntime = IORuntime.global
 
   "EthBlocksService" should "answer eth_blockNumber with the latest block number" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     val bestBlockNumber = 10
     blockchainWriter.saveBestKnownBlocks(BlockHash(ByteString.empty), bestBlockNumber)
 
     val response: BestBlockNumberResponse =
       ethBlocksService.bestBlockNumber(BestBlockNumberRequest()).unsafeRunSync().toOption.get
     response.bestBlockNumber shouldEqual bestBlockNumber
-  }
 
-  it should "answer eth_getBlockTransactionCountByHash with None when the requested block isn't taggedAs (UnitTest, RPCTest) in the blockchain" in new TestSetup {
+  it should "answer eth_getBlockTransactionCountByHash with None when the requested block isn't taggedAs (UnitTest, RPCTest) in the blockchain" in new TestSetup:
     val request: TxCountByBlockHashRequest = TxCountByBlockHashRequest(blockToRequestHash)
     val response: TxCountByBlockHashResponse =
       ethBlocksService.getBlockTransactionCountByHash(request).unsafeRunSync().toOption.get
     response.txsQuantity shouldBe None
-  }
 
-  it should "answer eth_getBlockTransactionCountByHash with the block has no tx when the requested block is taggedAs (UnitTest, RPCTest) in the blockchain and has no tx" in new TestSetup {
+  it should "answer eth_getBlockTransactionCountByHash with the block has no tx when the requested block is taggedAs (UnitTest, RPCTest) in the blockchain and has no tx" in new TestSetup:
     blockchainWriter.storeBlock(blockToRequest.copy(body = BlockBody(Nil, Nil))).commit()
     val request: TxCountByBlockHashRequest = TxCountByBlockHashRequest(blockToRequestHash)
     val response: TxCountByBlockHashResponse =
       ethBlocksService.getBlockTransactionCountByHash(request).unsafeRunSync().toOption.get
     response.txsQuantity shouldBe Some(0)
-  }
 
-  it should "answer eth_getBlockTransactionCountByHash correctly when the requested block is taggedAs (UnitTest, RPCTest) in the blockchain and has some tx" in new TestSetup {
+  it should "answer eth_getBlockTransactionCountByHash correctly when the requested block is taggedAs (UnitTest, RPCTest) in the blockchain and has some tx" in new TestSetup:
     blockchainWriter.storeBlock(blockToRequest).commit()
     val request: TxCountByBlockHashRequest = TxCountByBlockHashRequest(blockToRequestHash)
     val response: TxCountByBlockHashResponse =
       ethBlocksService.getBlockTransactionCountByHash(request).unsafeRunSync().toOption.get
     response.txsQuantity shouldBe Some(blockToRequest.body.transactionList.size)
-  }
 
-  it should "answer eth_getBlockByHash with None when the requested block isn't taggedAs (UnitTest, RPCTest) in the blockchain" in new TestSetup {
+  it should "answer eth_getBlockByHash with None when the requested block isn't taggedAs (UnitTest, RPCTest) in the blockchain" in new TestSetup:
     val request: BlockByBlockHashRequest = BlockByBlockHashRequest(blockToRequestHash, fullTxs = true)
     val response: BlockByBlockHashResponse = ethBlocksService.getByBlockHash(request).unsafeRunSync().toOption.get
     response.blockResponse shouldBe None
-  }
 
-  it should "answer eth_getBlockByHash with the block response correctly when it's chain weight is taggedAs (UnitTest, RPCTest) in blockchain" in new TestSetup {
+  it should "answer eth_getBlockByHash with the block response correctly when it's chain weight is taggedAs (UnitTest, RPCTest) in blockchain" in new TestSetup:
     blockchainWriter
       .storeBlock(blockToRequest)
       .and(blockchainWriter.storeChainWeight(BlockHash(blockToRequestHash), blockWeight))
@@ -102,9 +97,8 @@ class EthBlocksServiceSpec
     )
     response.blockResponse.get.totalDifficulty shouldBe Some(blockWeight.totalDifficulty)
     response.blockResponse.get.transactions.toOption shouldBe Some(stxResponses)
-  }
 
-  it should "answer eth_getBlockByHash with the block response correctly when it's chain weight is not taggedAs (UnitTest, RPCTest) in blockchain" in new TestSetup {
+  it should "answer eth_getBlockByHash with the block response correctly when it's chain weight is not taggedAs (UnitTest, RPCTest) in blockchain" in new TestSetup:
     blockchainWriter.storeBlock(blockToRequest).commit()
 
     val request: BlockByBlockHashRequest = BlockByBlockHashRequest(blockToRequestHash, fullTxs = true)
@@ -118,12 +112,11 @@ class EthBlocksServiceSpec
     response.blockResponse shouldBe Some(BlockResponse(blockToRequest, fullTxs = true))
     response.blockResponse.get.totalDifficulty shouldBe None
     response.blockResponse.get.transactions.toOption shouldBe Some(stxResponses)
-  }
 
   it should "answer eth_getBlockByHash with the block response correctly when the txs should be hashed" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     blockchainWriter
       .storeBlock(blockToRequest)
       .and(blockchainWriter.storeChainWeight(BlockHash(blockToRequestHash), blockWeight))
@@ -138,12 +131,11 @@ class EthBlocksServiceSpec
     )
     response.blockResponse.get.totalDifficulty shouldBe Some(blockWeight.totalDifficulty)
     response.blockResponse.get.transactions.left.toOption shouldBe Some(blockToRequest.body.transactionList.map(_.hash))
-  }
 
   it should "answer eth_getBlockByNumber with the correct block when the pending block is requested" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     (() => blockGenerator.getPendingBlockAndState)
       .expects()
       .returns(Some(PendingBlockAndState(PendingBlock(blockToRequest, Nil), fakeWorld)))
@@ -158,12 +150,11 @@ class EthBlocksServiceSpec
     blockResponse.nonce shouldBe None
     blockResponse.miner shouldBe None
     blockResponse.number shouldBe blockToRequest.header.number
-  }
 
   it should "answer eth_getBlockByNumber with the latest block pending block is requested and there are no pending ones" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     blockchainWriter
       .storeBlock(blockToRequest)
       .and(blockchainWriter.storeChainWeight(BlockHash(blockToRequestHash), blockWeight))
@@ -175,16 +166,14 @@ class EthBlocksServiceSpec
     val request: BlockByNumberRequest = BlockByNumberRequest(BlockParam.Pending, fullTxs = true)
     val response: BlockByNumberResponse = ethBlocksService.getBlockByNumber(request).unsafeRunSync().toOption.get
     response.blockResponse.get.hash.get shouldEqual blockToRequest.header.hash
-  }
 
-  it should "answer eth_getBlockByNumber with None when the requested block isn't taggedAs (UnitTest, RPCTest) in the blockchain" in new TestSetup {
+  it should "answer eth_getBlockByNumber with None when the requested block isn't taggedAs (UnitTest, RPCTest) in the blockchain" in new TestSetup:
     val request: BlockByNumberRequest =
       BlockByNumberRequest(BlockParam.WithNumber(blockToRequestNumber), fullTxs = true)
     val response: BlockByNumberResponse = ethBlocksService.getBlockByNumber(request).unsafeRunSync().toOption.get
     response.blockResponse shouldBe None
-  }
 
-  it should "answer eth_getBlockByNumber with the block response correctly when it's chain weight is taggedAs (UnitTest, RPCTest) in blockchain" in new TestSetup {
+  it should "answer eth_getBlockByNumber with the block response correctly when it's chain weight is taggedAs (UnitTest, RPCTest) in blockchain" in new TestSetup:
     blockchainWriter
       .storeBlock(blockToRequest)
       .and(blockchainWriter.storeChainWeight(BlockHash(blockToRequestHash), blockWeight))
@@ -205,9 +194,8 @@ class EthBlocksServiceSpec
     )
     response.blockResponse.get.totalDifficulty shouldBe Some(blockWeight.totalDifficulty)
     response.blockResponse.get.transactions.toOption shouldBe Some(stxResponses)
-  }
 
-  it should "answer eth_getBlockByNumber with the block response correctly when it's chain weight is not taggedAs (UnitTest, RPCTest) in blockchain" in new TestSetup {
+  it should "answer eth_getBlockByNumber with the block response correctly when it's chain weight is not taggedAs (UnitTest, RPCTest) in blockchain" in new TestSetup:
     blockchainWriter.storeBlock(blockToRequest).commit()
     blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
 
@@ -223,12 +211,11 @@ class EthBlocksServiceSpec
     response.blockResponse shouldBe Some(BlockResponse(blockToRequest, fullTxs = true))
     response.blockResponse.get.totalDifficulty shouldBe None
     response.blockResponse.get.transactions.toOption shouldBe Some(stxResponses)
-  }
 
   it should "answer eth_getBlockByNumber with the block response correctly when the txs should be hashed" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     blockchainWriter
       .storeBlock(blockToRequest)
       .and(blockchainWriter.storeChainWeight(BlockHash(blockToRequestHash), blockWeight))
@@ -245,9 +232,8 @@ class EthBlocksServiceSpec
     )
     response.blockResponse.get.totalDifficulty shouldBe Some(blockWeight.totalDifficulty)
     response.blockResponse.get.transactions.left.toOption shouldBe Some(blockToRequest.body.transactionList.map(_.hash))
-  }
 
-  it should "get transaction count by block number" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "get transaction count by block number" taggedAs (UnitTest, RPCTest) in new TestSetup:
     blockchainWriter.storeBlock(blockToRequest).commit()
     blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
 
@@ -259,9 +245,8 @@ class EthBlocksServiceSpec
     response.unsafeRunSync() shouldEqual Right(
       GetBlockTransactionCountByNumberResponse(blockToRequest.body.transactionList.size)
     )
-  }
 
-  it should "get transaction count by latest block number" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "get transaction count by latest block number" taggedAs (UnitTest, RPCTest) in new TestSetup:
     blockchainWriter.storeBlock(blockToRequest).commit()
     blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.header.number)
 
@@ -271,21 +256,19 @@ class EthBlocksServiceSpec
     response.unsafeRunSync() shouldEqual Right(
       GetBlockTransactionCountByNumberResponse(blockToRequest.body.transactionList.size)
     )
-  }
 
-  it should "answer eth_getUncleByBlockHashAndIndex with None when the requested block isn't taggedAs (UnitTest, RPCTest) in the blockchain" in new TestSetup {
+  it should "answer eth_getUncleByBlockHashAndIndex with None when the requested block isn't taggedAs (UnitTest, RPCTest) in the blockchain" in new TestSetup:
     val uncleIndexToRequest = 0
     val request: UncleByBlockHashAndIndexRequest =
       UncleByBlockHashAndIndexRequest(blockToRequestHash, uncleIndexToRequest)
     val response: UncleByBlockHashAndIndexResponse =
       ethBlocksService.getUncleByBlockHashAndIndex(request).unsafeRunSync().toOption.get
     response.uncleBlockResponse shouldBe None
-  }
 
   it should "answer eth_getUncleByBlockHashAndIndex with None when there's no uncle" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     blockchainWriter.storeBlock(blockToRequest).commit()
     blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
 
@@ -296,9 +279,8 @@ class EthBlocksServiceSpec
       ethBlocksService.getUncleByBlockHashAndIndex(request).unsafeRunSync().toOption.get
 
     response.uncleBlockResponse shouldBe None
-  }
 
-  it should "answer eth_getUncleByBlockHashAndIndex with None when there's no uncle taggedAs (UnitTest, RPCTest) in the requested index" in new TestSetup {
+  it should "answer eth_getUncleByBlockHashAndIndex with None when there's no uncle taggedAs (UnitTest, RPCTest) in the requested index" in new TestSetup:
     blockchainWriter.storeBlock(blockToRequestWithUncles).commit()
     blockchainWriter.saveBestKnownBlocks(blockToRequestWithUncles.hash, blockToRequestWithUncles.number)
 
@@ -320,12 +302,11 @@ class EthBlocksServiceSpec
 
     response1.uncleBlockResponse shouldBe None
     response2.uncleBlockResponse shouldBe None
-  }
 
   it should "answer eth_getUncleByBlockHashAndIndex correctly when the requested index has one but there's no chain weight for it" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     blockchainWriter.storeBlock(blockToRequestWithUncles).commit()
 
     val uncleIndexToRequest = 0
@@ -338,12 +319,11 @@ class EthBlocksServiceSpec
     response.uncleBlockResponse.get.totalDifficulty shouldBe None
     response.uncleBlockResponse.get.transactions shouldBe Left(Nil)
     response.uncleBlockResponse.get.uncles shouldBe Nil
-  }
 
   it should "anwer eth_getUncleByBlockHashAndIndex correctly when the requested index has one and there's chain weight for it" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     blockchainWriter
       .storeBlock(blockToRequestWithUncles)
       .and(blockchainWriter.storeChainWeight(uncle.hash, uncleWeight))
@@ -359,21 +339,19 @@ class EthBlocksServiceSpec
     response.uncleBlockResponse.get.totalDifficulty shouldBe Some(uncleWeight.totalDifficulty)
     response.uncleBlockResponse.get.transactions shouldBe Left(Nil)
     response.uncleBlockResponse.get.uncles shouldBe Nil
-  }
 
-  it should "answer eth_getUncleByBlockNumberAndIndex with None when the requested block isn't taggedAs (UnitTest, RPCTest) in the blockchain" in new TestSetup {
+  it should "answer eth_getUncleByBlockNumberAndIndex with None when the requested block isn't taggedAs (UnitTest, RPCTest) in the blockchain" in new TestSetup:
     val uncleIndexToRequest = 0
     val request: UncleByBlockNumberAndIndexRequest =
       UncleByBlockNumberAndIndexRequest(BlockParam.WithNumber(blockToRequestNumber), uncleIndexToRequest)
     val response: UncleByBlockNumberAndIndexResponse =
       ethBlocksService.getUncleByBlockNumberAndIndex(request).unsafeRunSync().toOption.get
     response.uncleBlockResponse shouldBe None
-  }
 
   it should "answer eth_getUncleByBlockNumberAndIndex with None when there's no uncle" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
 
     blockchainWriter.storeBlock(blockToRequest).commit()
 
@@ -384,9 +362,8 @@ class EthBlocksServiceSpec
       ethBlocksService.getUncleByBlockNumberAndIndex(request).unsafeRunSync().toOption.get
 
     response.uncleBlockResponse shouldBe None
-  }
 
-  it should "answer eth_getUncleByBlockNumberAndIndex with None when there's no uncle taggedAs (UnitTest, RPCTest) in the requested index" in new TestSetup {
+  it should "answer eth_getUncleByBlockNumberAndIndex with None when there's no uncle taggedAs (UnitTest, RPCTest) in the requested index" in new TestSetup:
 
     blockchainWriter.storeBlock(blockToRequestWithUncles).commit()
 
@@ -408,12 +385,11 @@ class EthBlocksServiceSpec
 
     response1.uncleBlockResponse shouldBe None
     response2.uncleBlockResponse shouldBe None
-  }
 
   it should "answer eth_getUncleByBlockNumberAndIndex correctly when the requested index has one but there's no chain weight for it" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     blockchainWriter.storeBlock(blockToRequestWithUncles).commit()
     blockchainWriter.saveBestKnownBlocks(blockToRequestWithUncles.hash, blockToRequestWithUncles.number)
 
@@ -427,12 +403,11 @@ class EthBlocksServiceSpec
     response.uncleBlockResponse.get.totalDifficulty shouldBe None
     response.uncleBlockResponse.get.transactions shouldBe Left(Nil)
     response.uncleBlockResponse.get.uncles shouldBe Nil
-  }
 
   it should "answer eth_getUncleByBlockNumberAndIndex correctly when the requested index has one and there's chain weight for it" taggedAs (
     UnitTest,
     RPCTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     blockchainWriter
       .storeBlock(blockToRequestWithUncles)
       .and(blockchainWriter.storeChainWeight(uncle.hash, uncleWeight))
@@ -449,9 +424,8 @@ class EthBlocksServiceSpec
     response.uncleBlockResponse.get.totalDifficulty shouldBe Some(uncleWeight.totalDifficulty)
     response.uncleBlockResponse.get.transactions shouldBe Left(Nil)
     response.uncleBlockResponse.get.uncles shouldBe Nil
-  }
 
-  it should "get uncle count by block number" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "get uncle count by block number" taggedAs (UnitTest, RPCTest) in new TestSetup:
     blockchainWriter.storeBlock(blockToRequest).commit()
     blockchainWriter.saveBestKnownBlocks(blockToRequest.hash, blockToRequest.number)
 
@@ -461,9 +435,8 @@ class EthBlocksServiceSpec
     response.unsafeRunSync() shouldEqual Right(
       GetUncleCountByBlockNumberResponse(blockToRequest.body.uncleNodesList.size)
     )
-  }
 
-  it should "get uncle count by block hash" taggedAs (UnitTest, RPCTest) in new TestSetup {
+  it should "get uncle count by block hash" taggedAs (UnitTest, RPCTest) in new TestSetup:
     blockchainWriter.storeBlock(blockToRequest).commit()
 
     val response: ServiceResponse[GetUncleCountByBlockHashResponse] =
@@ -472,9 +445,8 @@ class EthBlocksServiceSpec
     response.unsafeRunSync() shouldEqual Right(
       GetUncleCountByBlockHashResponse(blockToRequest.body.uncleNodesList.size)
     )
-  }
 
-  class TestSetup() extends EphemBlockchainTestSetup {
+  class TestSetup() extends EphemBlockchainTestSetup:
     val blockGenerator: PoWBlockGenerator = mock[PoWBlockGenerator]
     val appStateStorage: AppStateStorage = mock[AppStateStorage]
 
@@ -506,5 +478,3 @@ class EthBlocksServiceSpec
       noEmptyAccounts = false,
       ethCompatibleStorage = true
     )
-  }
-}

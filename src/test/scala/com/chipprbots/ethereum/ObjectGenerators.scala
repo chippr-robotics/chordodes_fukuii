@@ -24,7 +24,7 @@ import com.chipprbots.ethereum.mpt.MptTraversals
 import com.chipprbots.ethereum.network.p2p.messages.ETHPackets.NewBlock
 
 // scalastyle:off number.of.methods
-trait ObjectGenerators {
+trait ObjectGenerators:
 
   def byteGen: Gen[Byte] = Gen.choose(Byte.MinValue, Byte.MaxValue)
 
@@ -51,31 +51,31 @@ trait ObjectGenerators {
   def seqByteStringOfNItemsGen(n: Int): Gen[Seq[ByteString]] = Gen.listOf(byteStringOfLengthNGen(n))
 
   def hexPrefixDecodeParametersGen(): Gen[(Array[Byte], Boolean)] =
-    for {
+    for
       aByteList <- Gen.nonEmptyListOf(Arbitrary.arbitrary[Byte])
       t <- Arbitrary.arbitrary[Boolean]
-    } yield (aByteList.toArray, t)
+    yield (aByteList.toArray, t)
 
   def keyValueListGen(minValue: Int = Int.MinValue, maxValue: Int = Int.MaxValue): Gen[List[(Int, Int)]] =
-    for {
+    for
       values <- Gen.chooseNum(minValue, maxValue)
       aKeyList <- Gen.nonEmptyListOf(values).map(_.distinct)
-    } yield aKeyList.zip(aKeyList)
+    yield aKeyList.zip(aKeyList)
 
   def keyValueByteStringGen(size: Int): Gen[List[(ByteString, Array[Byte])]] =
-    for {
+    for
       byteStringList <- Gen.nonEmptyListOf(byteStringOfLengthNGen(size))
       arrayList <- Gen.nonEmptyListOf(byteArrayOfNItemsGen(size))
-    } yield byteStringList.zip(arrayList)
+    yield byteStringList.zip(arrayList)
 
   def receiptGen: Gen[Receipt] =
     Gen.oneOf(legacyReceiptGen, type01ReceiptGen)
 
-  def legacyReceiptGen: Gen[LegacyReceipt] = for {
+  def legacyReceiptGen: Gen[LegacyReceipt] = for
     postTransactionStateHash <- byteArrayOfNItemsGen(32)
     cumulativeGasUsed <- bigIntGen
     logsBloomFilter <- byteArrayOfNItemsGen(256)
-  } yield LegacyReceipt.withHashOutcome(
+  yield LegacyReceipt.withHashOutcome(
     postTransactionStateHash = ByteString(postTransactionStateHash),
     cumulativeGasUsed = cumulativeGasUsed,
     logsBloomFilter = BloomFilter(ByteString(logsBloomFilter)),
@@ -86,21 +86,21 @@ trait ObjectGenerators {
 
   def addressGen: Gen[Address] = byteArrayOfNItemsGen(20).map(Address(_))
 
-  def accessListItemGen: Gen[AccessListItem] = for {
+  def accessListItemGen: Gen[AccessListItem] = for
     address <- addressGen
     storageKeys <- Gen.listOf(bigIntGen.map(StorageKey(_)))
-  } yield AccessListItem(address, storageKeys)
+  yield AccessListItem(address, storageKeys)
 
-  def setCodeAuthorizationGen: Gen[SetCodeAuthorization] = for {
+  def setCodeAuthorizationGen: Gen[SetCodeAuthorization] = for
     chainId <- bigIntGen
     address <- addressGen
     nonce <- bigIntGen
     v <- Gen.choose(BigInt(0), BigInt(1))
     r <- bigIntGen
     s <- bigIntGen
-  } yield SetCodeAuthorization(chainId, address, nonce, v, r, s)
+  yield SetCodeAuthorization(chainId, address, nonce, v, r, s)
 
-  def setCodeTransactionGen: Gen[SetCodeTransaction] = for {
+  def setCodeTransactionGen: Gen[SetCodeTransaction] = for
     chainId <- bigIntGen
     nonce <- bigIntGen
     maxPriorityFeePerGas <- bigIntGen
@@ -111,7 +111,7 @@ trait ObjectGenerators {
     payload <- byteStringOfLengthNGen(256)
     accessList <- Gen.listOf(accessListItemGen)
     authorizationList <- Gen.listOfN(2, setCodeAuthorizationGen)
-  } yield SetCodeTransaction(
+  yield SetCodeTransaction(
     chainId,
     nonce,
     maxPriorityFeePerGas,
@@ -127,14 +127,14 @@ trait ObjectGenerators {
   def transactionGen: Gen[Transaction] =
     Gen.oneOf(legacyTransactionGen, typedTransactionGen, dynamicFeeTransactionGen, setCodeTransactionGen)
 
-  def legacyTransactionGen: Gen[LegacyTransaction] = for {
+  def legacyTransactionGen: Gen[LegacyTransaction] = for
     nonce <- bigIntGen
     gasPrice <- bigIntGen
     gasLimit <- bigIntGen
     receivingAddress <- addressGen
     value <- bigIntGen
     payload <- byteStringOfLengthNGen(256)
-  } yield LegacyTransaction(
+  yield LegacyTransaction(
     nonce,
     gasPrice,
     gasLimit,
@@ -143,7 +143,7 @@ trait ObjectGenerators {
     payload
   )
 
-  def typedTransactionGen: Gen[TransactionWithAccessList] = for {
+  def typedTransactionGen: Gen[TransactionWithAccessList] = for
     chainId <- bigIntGen
     nonce <- bigIntGen
     gasPrice <- bigIntGen
@@ -152,7 +152,7 @@ trait ObjectGenerators {
     value <- bigIntGen
     payload <- byteStringOfLengthNGen(256)
     accessList <- Gen.listOf(accessListItemGen)
-  } yield TransactionWithAccessList(
+  yield TransactionWithAccessList(
     chainId,
     nonce,
     gasPrice,
@@ -163,7 +163,7 @@ trait ObjectGenerators {
     accessList
   )
 
-  def dynamicFeeTransactionGen: Gen[TransactionWithDynamicFee] = for {
+  def dynamicFeeTransactionGen: Gen[TransactionWithDynamicFee] = for
     chainId <- bigIntGen
     nonce <- bigIntGen
     maxPriorityFeePerGas <- bigIntGen
@@ -173,7 +173,7 @@ trait ObjectGenerators {
     value <- bigIntGen
     payload <- byteStringOfLengthNGen(256)
     accessList <- Gen.listOf(accessListItemGen)
-  } yield TransactionWithDynamicFee(
+  yield TransactionWithDynamicFee(
     chainId,
     nonce,
     maxPriorityFeePerGas,
@@ -187,44 +187,40 @@ trait ObjectGenerators {
 
   def receiptsGen(n: Int): Gen[Seq[Seq[Receipt]]] = Gen.listOfN(n, Gen.listOf(receiptGen))
 
-  def branchNodeGen: Gen[BranchNode] = for {
+  def branchNodeGen: Gen[BranchNode] = for
     children <- Gen
       .listOfN(16, byteStringOfLengthNGen(32))
       .map(childrenList => childrenList.map(child => HashNode(child.toArray[Byte])))
     terminator <- byteStringOfLengthNGen(32)
-  } yield {
+  yield
     val branchNode = BranchNode(children.toArray, Some(terminator))
     val asRlp = MptTraversals.encode(branchNode)
     branchNode.copy(parsedRlp = Some(asRlp))
-  }
 
-  def extensionNodeGen: Gen[ExtensionNode] = for {
+  def extensionNodeGen: Gen[ExtensionNode] = for
     keyNibbles <- byteArrayOfNItemsGen(32)
     value <- byteStringOfLengthNGen(32)
-  } yield {
+  yield
     val extNode = ExtensionNode(ByteString(bytesToNibbles(keyNibbles)), HashNode(value.toArray[Byte]))
     val asRlp = MptTraversals.encode(extNode)
     extNode.copy(parsedRlp = Some(asRlp))
-  }
 
-  def leafNodeGen: Gen[LeafNode] = for {
+  def leafNodeGen: Gen[LeafNode] = for
     keyNibbles <- byteArrayOfNItemsGen(32)
     value <- byteStringOfLengthNGen(32)
-  } yield {
+  yield
     val leafNode = LeafNode(ByteString(bytesToNibbles(keyNibbles)), value)
     val asRlp = MptTraversals.encode(leafNode)
     leafNode.copy(parsedRlp = Some(asRlp))
-  }
 
   def nodeGen: Gen[MptNode] = Gen.choose(0, 2).flatMap { i =>
-    i match {
+    i match
       case 0 => branchNodeGen
       case 1 => extensionNodeGen
       case 2 => leafNodeGen
-    }
   }
 
-  def signedTxSeqGen(length: Int, secureRandom: SecureRandom, chainId: Option[BigInt]): Gen[Seq[SignedTransaction]] = {
+  def signedTxSeqGen(length: Int, secureRandom: SecureRandom, chainId: Option[BigInt]): Gen[Seq[SignedTransaction]] =
     val senderKeys = crypto.generateKeyPair(secureRandom)
     val txsSeqGen = Gen.listOfN(length, transactionGen)
     txsSeqGen.map { txs =>
@@ -232,33 +228,30 @@ trait ObjectGenerators {
         SignedTransaction.sign(tx, senderKeys, chainId)
       }
     }
-  }
 
-  def signedTxGen(secureRandom: SecureRandom, chainId: Option[BigInt]): Gen[SignedTransaction] = {
+  def signedTxGen(secureRandom: SecureRandom, chainId: Option[BigInt]): Gen[SignedTransaction] =
     val senderKeys = crypto.generateKeyPair(secureRandom)
-    for {
-      tx <- transactionGen
-    } yield SignedTransaction.sign(tx, senderKeys, chainId)
-  }
+    for tx <- transactionGen
+    yield SignedTransaction.sign(tx, senderKeys, chainId)
 
   def genKey(rnd: SecureRandom): Gen[AsymmetricCipherKeyPair] =
     Gen.resultOf { (_: Unit) =>
       crypto.generateKeyPair(rnd)
     }
 
-  def newBlockGen(secureRandom: SecureRandom, chainId: Option[BigInt]): Gen[NewBlock] = for {
+  def newBlockGen(secureRandom: SecureRandom, chainId: Option[BigInt]): Gen[NewBlock] = for
     blockHeader <- blockHeaderGen
     stxs <- signedTxSeqGen(10, secureRandom, chainId)
     uncles <- seqBlockHeaderGen
     td <- bigIntGen
-  } yield NewBlock(Block(blockHeader, BlockBody(stxs, uncles)), td)
+  yield NewBlock(Block(blockHeader, BlockBody(stxs, uncles)), td)
 
   def extraFieldsGen: Gen[HeaderExtraFields] = Gen.oneOf(
     Gen.const(HefEmpty),
     bigIntGen.map(baseFee => HefPostOlympia(baseFee))
   )
 
-  def blockHeaderGen: Gen[BlockHeader] = for {
+  def blockHeaderGen: Gen[BlockHeader] = for
     parentHash <- byteStringOfLengthNGen(32)
     ommersHash <- byteStringOfLengthNGen(32)
     beneficiary <- byteStringOfLengthNGen(20)
@@ -274,7 +267,7 @@ trait ObjectGenerators {
     extraData <- byteStringOfLengthNGen(8)
     mixHash <- byteStringOfLengthNGen(8)
     nonce <- byteStringOfLengthNGen(8)
-  } yield BlockHeader(
+  yield BlockHeader(
     parentHash = BlockHash(parentHash),
     ommersHash = BlockHash(ommersHash),
     beneficiary = beneficiary,
@@ -295,34 +288,33 @@ trait ObjectGenerators {
   def seqBlockHeaderGen: Gen[Seq[BlockHeader]] = Gen.listOf(blockHeaderGen)
 
   def fakeSignatureGen: Gen[ECDSASignature] =
-    for {
+    for
       r <- bigIntGen
       s <- bigIntGen
       v <- byteGen
-    } yield ECDSASignature(r, s, BigInt(v & 0xff)) // Convert signed byte to unsigned (0-255) for RLP compatibility
+    yield ECDSASignature(r, s, BigInt(v & 0xff)) // Convert signed byte to unsigned (0-255) for RLP compatibility
 
-  def listOfNodes(min: Int, max: Int): Gen[Seq[MptNode]] = for {
+  def listOfNodes(min: Int, max: Int): Gen[Seq[MptNode]] = for
     size <- intGen(min, max)
     nodes <- Gen.listOfN(size, nodeGen)
-  } yield nodes
+  yield nodes
 
-  def genMptNodeData: Gen[MptNodeData] = for {
+  def genMptNodeData: Gen[MptNodeData] = for
     receivingAddress <- addressGen
     code <- byteStringOfLengthNGen(10)
     storageSize <- intGen(1, 100)
     storage <- Gen.listOfN(storageSize, intGen(1, 5000))
     storageAsBigInts = storage.distinct.map(s => (BigInt(s), BigInt(s)))
     value <- intGen(0, 2000)
-  } yield MptNodeData(receivingAddress, Some(code), storageAsBigInts, value)
+  yield MptNodeData(receivingAddress, Some(code), storageAsBigInts, value)
 
-  def genMultipleNodeData(max: Int): Gen[List[MptNodeData]] = for {
+  def genMultipleNodeData(max: Int): Gen[List[MptNodeData]] = for
     n <- intGen(1, max)
     list <- Gen.listOfN(n, genMptNodeData)
-  } yield list
+  yield list
 
-  val chainWeightGen: Gen[ChainWeight] = for {
-    td <- bigIntGen
-  } yield ChainWeight.totalDifficultyOnly(td)
-}
+  val chainWeightGen: Gen[ChainWeight] =
+    for td <- bigIntGen
+    yield ChainWeight.totalDifficultyOnly(td)
 
 object ObjectGenerators extends ObjectGenerators

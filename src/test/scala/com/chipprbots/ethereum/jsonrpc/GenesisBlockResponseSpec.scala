@@ -19,7 +19,7 @@ import com.chipprbots.ethereum.jsonrpc.EthBlocksJsonMethodsImplicits.given
 /** Test to verify that genesis block is serialized correctly:
   *   1. mixHash field should be present
   */
-class GenesisBlockResponseSpec extends AnyFlatSpec with Matchers {
+class GenesisBlockResponseSpec extends AnyFlatSpec with Matchers:
 
   "BlockResponse for genesis block" should "include mixHash field" in {
     val genesisHeader = BlockHeader(
@@ -89,4 +89,3 @@ class GenesisBlockResponseSpec extends AnyFlatSpec with Matchers {
     // This verifies that the hash calculation is correct
     genesisHeader.hash.value.length shouldBe 32 // Hash should be 32 bytes
   }
-}

@@ -35,7 +35,7 @@ class JsonRpcControllerPersonalSpec
     with JsonRpcControllerTestSupport
     with ScalaCheckPropertyChecks
     with ScalaFutures
-    with Eventually {
+    with Eventually:
 
   implicit val runtime: IORuntime = IORuntime.global
   implicit private val classicActorSystem: ActorSystem = system.toClassic
@@ -44,7 +44,7 @@ class JsonRpcControllerPersonalSpec
   implicit val formats: Formats = DefaultFormats.preservingEmptyValues + OptionNoneToJNullSerializer +
     QuantitiesSerializer + UnformattedDataJsonSerializer
 
-  it should "personal_importRawKey" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
+  it should "personal_importRawKey" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture:
     val key = "0x7a44789ed3cd85861c0bbf9693c7e1de1862dd4396c390147ecf1275099c6e6f"
     val addr: Address = Address("0x00000000000000000000000000000000000000ff")
     val pass = "aaa"
@@ -56,9 +56,8 @@ class JsonRpcControllerPersonalSpec
     val response: JsonRpcResponse = jsonRpcController.handleRequest(rpcRequest).unsafeRunSync()
 
     response should haveStringResult(addr.toString)
-  }
 
-  it should "personal_newAccount" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
+  it should "personal_newAccount" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture:
     val addr: Address = Address("0x00000000000000000000000000000000000000ff")
     val pass = "aaa"
 
@@ -69,9 +68,8 @@ class JsonRpcControllerPersonalSpec
     val response: JsonRpcResponse = jsonRpcController.handleRequest(rpcRequest).unsafeRunSync()
 
     response should haveStringResult(addr.toString)
-  }
 
-  it should "personal_listAccounts" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
+  it should "personal_listAccounts" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture:
     val addresses: List[Address] = List(34, 12391, 123).map(Address(_))
 
     personalService.listAccountsFn = _ => IO.pure(Right(ListAccountsResponse(addresses)))
@@ -80,9 +78,8 @@ class JsonRpcControllerPersonalSpec
     val response: JsonRpcResponse = jsonRpcController.handleRequest(rpcRequest).unsafeRunSync()
 
     response should haveResult(JArray(addresses.map(a => JString(a.toString))))
-  }
 
-  it should "personal_unlockAccount" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
+  it should "personal_unlockAccount" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture:
     val address: Address = Address(42)
     val pass = "aaa"
     val params: List[JString] = JString(address.toString) :: JString(pass) :: Nil
@@ -93,12 +90,11 @@ class JsonRpcControllerPersonalSpec
     val response: JsonRpcResponse = jsonRpcController.handleRequest(rpcRequest).unsafeRunSync()
 
     response should haveBooleanResult(true)
-  }
 
   it should "personal_unlockAccount for specified duration" taggedAs (
     UnitTest,
     RPCTest
-  ) in new JsonRpcControllerFixture {
+  ) in new JsonRpcControllerFixture:
     val address: Address = Address(42)
     val pass = "aaa"
     val dur = "0x1"
@@ -110,12 +106,11 @@ class JsonRpcControllerPersonalSpec
     val response: JsonRpcResponse = jsonRpcController.handleRequest(rpcRequest).unsafeRunSync()
 
     response should haveBooleanResult(true)
-  }
 
   it should "personal_unlockAccount should handle possible duration errors" taggedAs (
     UnitTest,
     RPCTest
-  ) in new JsonRpcControllerFixture {
+  ) in new JsonRpcControllerFixture:
     val address: Address = Address(42)
     val pass = "aaa"
     val dur = "alksjdfh"
@@ -133,12 +128,11 @@ class JsonRpcControllerPersonalSpec
     response2 should haveError(
       JsonRpcError(-32602, "Duration should be an number of seconds, less than 2^31 - 1", None)
     )
-  }
 
   it should "personal_unlockAccount should handle null passed as a duration for compatibility with Parity and web3j" taggedAs (
     UnitTest,
     RPCTest
-  ) in new JsonRpcControllerFixture {
+  ) in new JsonRpcControllerFixture:
     val address: Address = Address(42)
     val pass = "aaa"
     val params: List[JValue] = JString(address.toString) :: JString(pass) :: JNull :: Nil
@@ -149,9 +143,8 @@ class JsonRpcControllerPersonalSpec
     val response: JsonRpcResponse = jsonRpcController.handleRequest(rpcRequest).unsafeRunSync()
 
     response should haveBooleanResult(true)
-  }
 
-  it should "personal_lockAccount" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
+  it should "personal_lockAccount" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture:
     val address: Address = Address(42)
     val params: List[JString] = JString(address.toString) :: Nil
 
@@ -161,9 +154,8 @@ class JsonRpcControllerPersonalSpec
     val response: JsonRpcResponse = jsonRpcController.handleRequest(rpcRequest).unsafeRunSync()
 
     response should haveBooleanResult(true)
-  }
 
-  it should "personal_sendTransaction" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
+  it should "personal_sendTransaction" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture:
     val params: List[JValue] = JObject(
       "from" -> Address(42).toString,
       "to" -> Address(123).toString,
@@ -178,9 +170,8 @@ class JsonRpcControllerPersonalSpec
     val response: JsonRpcResponse = jsonRpcController.handleRequest(rpcRequest).unsafeRunSync()
 
     response should haveResult(JString(s"0x${Hex.toHexString(txHash.toArray)}"))
-  }
 
-  it should "personal_sign" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
+  it should "personal_sign" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture:
 
     personalService.signFn = _ => IO.pure(Right(SignResponse(sig)))
 
@@ -197,9 +188,8 @@ class JsonRpcControllerPersonalSpec
     response should haveStringResult(
       "0xa3f20717a250c2b0b729b7e5becbff67fdaef7e0699da4de7ca5895b02a170a12d887fd3b17bfdce3481f10bea41f45ba9f709d39ce8325427b57afcfc994cee1b"
     )
-  }
 
-  it should "personal_ecRecover" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture {
+  it should "personal_ecRecover" taggedAs (UnitTest, RPCTest) in new JsonRpcControllerFixture:
 
     personalService.ecRecoverFn = _ =>
       IO.pure(
@@ -218,5 +208,3 @@ class JsonRpcControllerPersonalSpec
 
     val response: JsonRpcResponse = jsonRpcController.handleRequest(request).unsafeRunSync()
     response should haveStringResult("0x9b2055d370f73ec7d8a03e965129118dc8f5bf83")
-  }
-}

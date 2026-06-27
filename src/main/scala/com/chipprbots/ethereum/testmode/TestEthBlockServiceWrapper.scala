@@ -29,7 +29,7 @@ class TestEthBlockServiceWrapper(
     mining: Mining,
     blockQueue: BlockQueue
 ) extends EthBlocksService(blockchain, blockchainReader, mining, blockQueue)
-    with Logger {
+    with Logger:
 
   /** Implements the eth_getBlockByHash method that fetches a requested block.
     *
@@ -52,14 +52,14 @@ class TestEthBlockServiceWrapper(
           Left(JsonRpcError.LogicError(s"missing hash for block $baseBlockResponse"))
 
         case BlockByBlockHashResponse(Some(baseBlockResponse)) =>
-          val ethResponseOpt = for {
+          val ethResponseOpt = for
             hash <- baseBlockResponse.hash
             fullBlock <- blockchainReader
               .getBlockByHash(BlockHash(hash))
               .orElse(blockQueue.getBlockByHash(BlockHash(hash)))
-          } yield toEthResponse(fullBlock, baseBlockResponse)
+          yield toEthResponse(fullBlock, baseBlockResponse)
 
-          ethResponseOpt match {
+          ethResponseOpt match
             case None =>
               val hashHex = baseBlockResponse.hash.map(_.toHex).getOrElse("unknown")
               Left(
@@ -67,7 +67,6 @@ class TestEthBlockServiceWrapper(
               )
             case Some(_) =>
               Right(BlockByBlockHashResponse(ethResponseOpt))
-          }
       }
     )
 
@@ -85,10 +84,10 @@ class TestEthBlockServiceWrapper(
     .map(
       _.map { blockByBlockResponse =>
         val bestBranch = blockchainReader.getBestBranch
-        val response = for {
+        val response = for
           blockResp <- blockByBlockResponse.blockResponse
           fullBlock <- blockchainReader.getBlockByNumber(bestBranch, blockResp.number)
-        } yield toEthResponse(fullBlock, blockResp)
+        yield toEthResponse(fullBlock, blockResp)
         BlockByNumberResponse(response)
       }
     )
@@ -124,7 +123,6 @@ class TestEthBlockServiceWrapper(
       EthTransactionResponse(tx = TransactionData(stx, Some(block.header), Some(transactionIndex)))
     }
   }
-}
 
 case class EthBlockResponse(
     number: BigInt,
@@ -166,7 +164,7 @@ final case class EthTransactionResponse(
     v: BigInt
 ) extends BaseTransactionResponse
 
-object EthTransactionResponse {
+object EthTransactionResponse:
 
   given blockchainConfig: BlockchainConfig = Config.blockchains.blockchainConfig
 
@@ -194,4 +192,3 @@ object EthTransactionResponse {
       s = stx.signature.s,
       v = stx.signature.v
     )
-}

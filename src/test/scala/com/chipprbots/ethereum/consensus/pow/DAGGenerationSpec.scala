@@ -14,7 +14,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   * determinism, ECIP-1099 epoch halving at the Mordor boundary, and end-to-end cache correctness via block 100 cross-
   * verification.
   */
-class DAGGenerationSpec extends AnyFlatSpec with Matchers {
+class DAGGenerationSpec extends AnyFlatSpec with Matchers:
 
   import EthashUtils.*
 
@@ -60,4 +60,3 @@ class DAGGenerationSpec extends AnyFlatSpec with Matchers {
     val pow = EthashUtils.hashimotoLight(hash, nonce, fullSize, epoch0Cache)
     pow.mixHash shouldBe ByteString(Hex.decode("5bb43c0772e58084b221c8e0c859a45950c103c712c5b8f11d9566ee078a4501"))
   }
-}

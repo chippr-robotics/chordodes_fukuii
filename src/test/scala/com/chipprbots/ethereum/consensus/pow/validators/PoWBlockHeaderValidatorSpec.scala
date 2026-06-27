@@ -14,15 +14,14 @@ import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 
-class PoWBlockHeaderValidatorSpec extends AnyFlatSpecLike with Matchers {
+class PoWBlockHeaderValidatorSpec extends AnyFlatSpecLike with Matchers:
   import PoWBlockHeaderValidatorSpec.*
 
   "PoWBlockHeaderValidator" should "validate Ethash block headers" taggedAs (UnitTest, ConsensusTest, SlowTest) in {
     PoWBlockHeaderValidator.validateEvenMore(validEthashBlockHeader)(blockchainConfig) shouldBe Right(BlockHeaderValid)
   }
-}
 
-object PoWBlockHeaderValidatorSpec {
+object PoWBlockHeaderValidatorSpec:
   val blockchainConfig = Config.blockchains.blockchainConfig
 
   val validEthashBlockHeader: BlockHeader = BlockHeader(
@@ -43,4 +42,3 @@ object PoWBlockHeaderValidatorSpec {
     mixHash = BlockHash(ByteString(Hex.decode("6bc729364c9b682cfa923ba9480367ebdfa2a9bca2a652fe975e8d5958f696dd"))),
     nonce = ByteString(Hex.decode("797a8f3a494f937b"))
   )
-}

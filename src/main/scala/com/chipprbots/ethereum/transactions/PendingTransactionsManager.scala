@@ -34,14 +34,13 @@ import com.chipprbots.ethereum.utils.ByteStringUtils.ByteStringOps
 import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.TxPoolConfig
 
-object PendingTransactionsManager {
+object PendingTransactionsManager:
 
   sealed trait Command
 
   case class AddTransactions(signedTransactions: Set[SignedTransactionWithSender]) extends Command
-  object AddTransactions {
+  object AddTransactions:
     def apply(txs: SignedTransactionWithSender*): AddTransactions = AddTransactions(txs.toSet)
-  }
 
   case class AddUncheckedTransactions(signedTransactions: Seq[SignedTransaction]) extends Command
 
@@ -141,14 +140,14 @@ object PendingTransactionsManager {
       .newBuilder()
       .expireAfterWrite(txPoolConfig.transactionTimeout._1, txPoolConfig.transactionTimeout._2)
       .maximumSize(txPoolConfig.txPoolSize)
-      .removalListener(new com.google.common.cache.RemovalListener[ByteString, PendingTransaction] {
-        def onRemoval(notification: RemovalNotification[ByteString, PendingTransaction]): Unit =
-          if notification.wasEvicted() then {
-            context.log.debug("Evicting transaction: {} due to {}", notification.getKey.toHex, notification.getCause)
-            knownTransactions = knownTransactions.filterNot(_._1 == notification.getKey)
-            blobTxNetworkBytes -= notification.getKey
-          }
-      })
+      .removalListener(
+        new com.google.common.cache.RemovalListener[ByteString, PendingTransaction]:
+          def onRemoval(notification: RemovalNotification[ByteString, PendingTransaction]): Unit =
+            if notification.wasEvicted() then
+              context.log.debug("Evicting transaction: {} due to {}", notification.getKey.toHex, notification.getCause)
+              knownTransactions = knownTransactions.filterNot(_._1 == notification.getKey)
+              blobTxNetworkBytes -= notification.getKey
+      )
       .build()
 
     /** Locally-cached set of connected peers, updated reactively via PeerHandshakeSuccessful/PeerDisconnected.
@@ -169,31 +168,28 @@ object PendingTransactionsManager {
     var pendingAnnouncements: Map[ByteString, (Byte, BigInt, PeerId)] = Map.empty
 
     /** Announce transaction hashes to connected peers via NewPooledTransactionHashes. */
-    def notifyPeersOfTransactions(txs: Seq[SignedTransaction], peers: Seq[Peer]): Unit = {
+    def notifyPeersOfTransactions(txs: Seq[SignedTransaction], peers: Seq[Peer]): Unit =
       if txs.isEmpty || peers.isEmpty then return
       import com.chipprbots.ethereum.domain.*
 
       val txSeq = txs.groupBy(_.hash).values.map(_.head).toSeq
       peers.foreach { peer =>
         val txsToNotify = txSeq.filterNot(stx => isTxKnown(stx, peer.id))
-        if txsToNotify.nonEmpty then {
+        if txsToNotify.nonEmpty then
           val hashes = txsToNotify.map(_.hash.value)
           val types = txsToNotify.map { stx =>
-            stx.tx match {
+            stx.tx match
               case _: LegacyTransaction         => 0.toByte
               case _: TransactionWithAccessList => Transaction.Type01
               case _: TransactionWithDynamicFee => Transaction.Type02
               case _: BlobTransaction           => Transaction.Type03
               case _: SetCodeTransaction        => Transaction.Type04
-            }
           }
           val sizes = txsToNotify.map(stx => BigInt(SignedTransaction.byteArraySerializable.toBytes(stx).length))
           val announcement = ETHPackets.NewPooledTransactionHashes(types, sizes, hashes)
           networkPeerManager ! NetworkPeerManagerActor.SendMessageCmd(announcement, peer.id)
           txsToNotify.foreach(stx => setTxKnown(stx, peer.id))
-        }
       }
-    }
 
     /** Update pendingNonces high-water mark for accepted transactions. */
     def updatePendingNonces(txs: Iterable[SignedTransactionWithSender]): Unit =
@@ -206,13 +202,12 @@ object PendingTransactionsManager {
     /** Validate transactions against the current chain state. Rejects: stale nonces, insufficient balance for value +
       * gas. Returns only transactions that pass state validation.
       */
-    def validateAgainstState(txs: Set[SignedTransactionWithSender]): Set[SignedTransactionWithSender] = {
+    def validateAgainstState(txs: Set[SignedTransactionWithSender]): Set[SignedTransactionWithSender] =
       // 1. Always apply pending nonce check first (no MPT state needed, immune to race conditions)
       val afterPendingNonceCheck = txs.filter { stx =>
-        pendingNonces.get(stx.senderAddress) match {
+        pendingNonces.get(stx.senderAddress) match
           case Some(nextExpected) => stx.tx.tx.nonce >= nextExpected
           case None               => true
-        }
       }
 
       // 2. ECIP-1122: reject if effectiveTip < minTip.
@@ -226,7 +221,7 @@ object PendingTransactionsManager {
       val afterTipCheck = afterPendingNonceCheck.filter { stx =>
         val effectiveTip =
           com.chipprbots.ethereum.domain.Transaction.effectiveGasPrice(stx.tx.tx, Some(currentBaseFee)) - currentBaseFee
-        if effectiveTip < effectiveMinTip then {
+        if effectiveTip < effectiveMinTip then
           context.log.debug(
             "Rejecting tx {} from {}: effectiveTip {} < minTip {}",
             stx.tx.hash.toHex,
@@ -235,17 +230,17 @@ object PendingTransactionsManager {
             effectiveMinTip
           )
           false
-        } else true
+        else true
       }
 
       if blockchainReader == null || stateStorage == null then return afterTipCheck
-      try {
+      try
         import com.chipprbots.ethereum.domain.Account
         import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
         import MerklePatriciaTrie.defaultByteArraySerializable
 
         val bestBlockOpt = blockchainReader.getBestBlock
-        bestBlockOpt match {
+        bestBlockOpt match
           case Some(bestBlock) =>
             val mptStorage = stateStorage.getReadOnlyStorage
             val stateTrie = MerklePatriciaTrie[Array[Byte], Account](bestBlock.header.stateRoot.toArray, mptStorage)(
@@ -274,23 +269,19 @@ object PendingTransactionsManager {
           case None =>
             // No best block — only accept txs from senders we've already seen
             afterTipCheck.filter(stx => pendingNonces.contains(stx.senderAddress))
-        }
-      } catch {
+      catch
         case _: Exception =>
           // MPT failed — only accept txs from senders with established pending nonces
           // (unknown senders can't be validated without state)
           afterTipCheck.filter(stx => pendingNonces.contains(stx.senderAddress))
-      }
-    }
 
     def isTxKnown(signedTransaction: SignedTransaction, peerId: PeerId): Boolean =
       knownTransactions.getOrElse(signedTransaction.hash.value, Set.empty).contains(peerId)
 
-    def setTxKnown(signedTransaction: SignedTransaction, peerId: PeerId): Unit = {
+    def setTxKnown(signedTransaction: SignedTransaction, peerId: PeerId): Unit =
       val currentPeers = knownTransactions.getOrElse(signedTransaction.hash.value, Set.empty)
       val newPeers = currentPeers + peerId
       knownTransactions += (signedTransaction.hash.value -> newPeers)
-    }
 
     // scalastyle:off method.length
     Behaviors.receiveMessage {
@@ -327,16 +318,13 @@ object PendingTransactionsManager {
         )
         // Validate against chain state (nonce, balance) before adding to pool
         val transactionsToAdd = validateAgainstState(newTxs)
-        if transactionsToAdd.nonEmpty then {
+        if transactionsToAdd.nonEmpty then
           val timestamp = System.currentTimeMillis()
           transactionsToAdd.foreach(t => pendingTransactions.put(t.tx.hash.value, PendingTransaction(t, timestamp)))
           updatePendingNonces(transactionsToAdd)
           transactionsToAdd.foreach(t => pendingTxTopic ! Topic.Publish(NewPendingTransaction(t)))
           val peers = connectedPeers.values.toSeq
-          if peers.nonEmpty then {
-            context.self ! NotifyPeers(transactionsToAdd.toSeq, peers)
-          }
-        }
+          if peers.nonEmpty then context.self ! NotifyPeers(transactionsToAdd.toSeq, peers)
         Behaviors.same
 
       case AddOrOverrideTransaction(newStx, blobRawBytesOpt) =>
@@ -364,9 +352,7 @@ object PendingTransactionsManager {
         updatePendingNonces(Seq(newPendingTx))
         pendingTxTopic ! Topic.Publish(NewPendingTransaction(newPendingTx))
         val peers = connectedPeers.values.toSeq
-        if peers.nonEmpty then {
-          context.self ! NotifyPeers(Seq(newPendingTx), peers)
-        }
+        if peers.nonEmpty then context.self ! NotifyPeers(Seq(newPendingTx), peers)
         Behaviors.same
 
       case NotifyPeers(signedTransactions, peers) =>
@@ -390,7 +376,7 @@ object PendingTransactionsManager {
               .MessageFromPeer(msg: ETHPackets.NewPooledTransactionHashes, peerId)
           ) =>
         val unknownHashes = msg.hashes.filterNot(h => pendingTransactions.asMap().containsKey(h))
-        if unknownHashes.nonEmpty then {
+        if unknownHashes.nonEmpty then
           // Track announced types/sizes for validation when PooledTransactions arrives
           msg.hashes.zip(msg.types).zip(msg.sizes).foreach { case ((hash, txType), size) =>
             pendingAnnouncements = pendingAnnouncements.updated(hash, (txType, size, peerId))
@@ -400,7 +386,6 @@ object PendingTransactionsManager {
             ETHPackets.GetPooledTransactions(requestId, unknownHashes),
             peerId
           )
-        }
         Behaviors.same
 
       // ETH66+ PooledTransactions response — add received txs to pool
@@ -412,40 +397,37 @@ object PendingTransactionsManager {
         import com.chipprbots.ethereum.domain.*
         val announcementViolation = msg.txs.zipWithIndex.exists { case (stx, idx) =>
           pendingAnnouncements.get(stx.hash.value).exists { case (announcedType, announcedSize, _) =>
-            val actualType: Byte = stx.tx match {
+            val actualType: Byte = stx.tx match
               case _: LegacyTransaction         => 0.toByte
               case _: TransactionWithAccessList => Transaction.Type01
               case _: TransactionWithDynamicFee => Transaction.Type02
               case _: BlobTransaction           => Transaction.Type03
               case _: SetCodeTransaction        => Transaction.Type04
-            }
             val typeMismatch = actualType != announcedType
             // Use original wire size (from PooledTransactions decode) for accurate comparison
-            val sizeMismatch = if idx < msg.originalSizes.size then {
-              BigInt(msg.originalSizes(idx)) != announcedSize
-            } else false
+            val sizeMismatch =
+              if idx < msg.originalSizes.size then BigInt(msg.originalSizes(idx)) != announcedSize
+              else false
             typeMismatch || sizeMismatch
           }
         }
         // Clean up announcements for received txs
         msg.txs.foreach(stx => pendingAnnouncements -= stx.hash.value)
-        if announcementViolation then {
+        if announcementViolation then
           context.log.debug(
             "PooledTransactions from peer {} has type/size mismatch with announcement — disconnecting",
             peerId
           )
           peerManager ! PeerManagerActor.DisconnectPeerFireAndForgetCmd(peerId)
-        } else {
+        else
           // Store blob tx sidecar bytes for PooledTransactions responses
           msg.blobTxRawBytes.foreach { case (hash, rawBytes) =>
             blobTxNetworkBytes += (hash -> rawBytes)
           }
           val validTxs = SignedTransactionWithSender.getSignedTransactions(msg.txs)
-          if validTxs.nonEmpty then {
+          if validTxs.nonEmpty then
             context.self ! AddTransactions(validTxs.toSet)
             validTxs.foreach(stx => setTxKnown(stx.tx, peerId))
-          }
-        }
         Behaviors.same
 
       case GetPendingTransactionsReq(replyTo) =>
@@ -482,4 +464,3 @@ object PendingTransactionsManager {
     }
     // scalastyle:on method.length
   }
-}

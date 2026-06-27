@@ -27,7 +27,7 @@ import com.chipprbots.ethereum.testing.Tags.*
   * ETH68 uses Receipts68 (requestId + raw RLP) — decoded lazily by FastSync. ETH63.Receipts (domain-decoded) was
   * removed with ETH63 deletion.
   */
-class ReceiptsSpec extends AnyFlatSpec with Matchers {
+class ReceiptsSpec extends AnyFlatSpec with Matchers:
 
   val exampleHash: ByteString = ByteString(kec256((0 until 32).map(_ => 1: Byte).toArray))
   val exampleLogsBloom: ByteString = ByteString((0 until 256).map(_ => 1: Byte).toArray)
@@ -118,4 +118,3 @@ class ReceiptsSpec extends AnyFlatSpec with Matchers {
       .fromBytes(Codes.ReceiptsCode, msg.toBytes)
     roundTripped.map(_.asInstanceOf[Receipts68].toBytes.toSeq) shouldBe Right(msg.toBytes.toSeq)
   }
-}

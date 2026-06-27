@@ -41,9 +41,9 @@ import com.chipprbots.ethereum.sync.util.SyncCommonItSpecUtils.FakePeerCustomCon
 import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import com.chipprbots.ethereum.utils.*
 
-object RegularSyncItSpecUtils {
+object RegularSyncItSpecUtils:
 
-  class ValidatorsExecutorAlwaysSucceed extends MockValidatorsAlwaysSucceed {
+  class ValidatorsExecutorAlwaysSucceed extends MockValidatorsAlwaysSucceed:
     override def validateBlockAfterExecution(
         block: Block,
         stateRootHash: ByteString,
@@ -52,14 +52,13 @@ object RegularSyncItSpecUtils {
     )(implicit blockchainConfig: BlockchainConfig): Either[BlockExecutionError, BlockExecutionSuccess] = Right(
       BlockExecutionSuccess
     )
-  }
 
   object ValidatorsExecutorAlwaysSucceed extends ValidatorsExecutorAlwaysSucceed
 
   class FakePeer(peerName: String, fakePeerCustomConfig: FakePeerCustomConfig)
-      extends CommonFakePeer(peerName, fakePeerCustomConfig) {
+      extends CommonFakePeer(peerName, fakePeerCustomConfig):
 
-    def buildEthashMining(): pow.PoWMining = {
+    def buildEthashMining(): pow.PoWMining =
       val miningConfig: MiningConfig = MiningConfig(Config.config)
       val specificConfig: EthashConfig = pow.EthashConfig(config)
       val fullConfig = FullMiningConfig(miningConfig, specificConfig)
@@ -75,7 +74,6 @@ object RegularSyncItSpecUtils {
           NoAdditionalPoWData
         )
       mining
-    }
 
     lazy val peersClient: typed.ActorRef[PeersClient.Command] =
       system.spawn(
@@ -219,13 +217,13 @@ object RegularSyncItSpecUtils {
     def broadcastBlock(
         blockNumber: Option[Int] = None
     )(updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy): IO[Unit] =
-      IO(blockNumber match {
+      IO(blockNumber match
         case Some(bNumber) =>
           blockchainReader
             .getBlockByNumber(blockchainReader.getBestBranch, bNumber)
             .getOrElse(throw new RuntimeException(s"block by number: $bNumber doesn't exist"))
         case None => blockchainReader.getBestBlock.get
-      }).flatMap { block =>
+      ).flatMap { block =>
         IO {
           val currentWeight = blockchainReader
             .getChainWeightByHash(block.hash)
@@ -236,7 +234,7 @@ object RegularSyncItSpecUtils {
         }
       }
 
-    def waitForRegularSyncLoadLastBlock(blockNumber: BigInt): IO[Boolean] = {
+    def waitForRegularSyncLoadLastBlock(blockNumber: BigInt): IO[Boolean] =
       // Scale timeout based on block number - larger syncs need more time
       // Use minimum 90 retries, but add 1 retry per 20 blocks for large syncs
       val baseRetries = 90
@@ -245,7 +243,6 @@ object RegularSyncItSpecUtils {
       retryUntilWithDelay(IO(blockchainReader.getBestBlockNumber == blockNumber), 1.second, maxRetries)(isDone =>
         isDone
       )
-    }
 
     def mineNewBlock(
         plusDifficulty: BigInt = 0
@@ -263,11 +260,11 @@ object RegularSyncItSpecUtils {
     def mineNewBlocks(delay: FiniteDuration, nBlocks: Int)(
         updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy
     ): IO[Unit] =
-      if nBlocks > 0 then {
+      if nBlocks > 0 then
         mineNewBlock()(updateWorldForBlock)
           .delayBy(delay)
           .flatMap(_ => mineNewBlocks(delay, nBlocks - 1)(updateWorldForBlock))
-      } else IO(())
+      else IO(())
 
     private def getMptForBlock(block: Block) =
       InMemoryWorldStateProxy(
@@ -290,7 +287,7 @@ object RegularSyncItSpecUtils {
         plusDifficulty: BigInt = 0
     )(
         updateWorldForBlock: (BigInt, InMemoryWorldStateProxy) => InMemoryWorldStateProxy
-    ): (Block, ChainWeight, InMemoryWorldStateProxy) = {
+    ): (Block, ChainWeight, InMemoryWorldStateProxy) =
       val newBlockNumber = parent.header.number + 1
       val newWorld = updateWorldForBlock(newBlockNumber, parentWorld)
       val newBlock = parent.copy(header =
@@ -303,16 +300,14 @@ object RegularSyncItSpecUtils {
       )
       val newWeight = parentWeight.increase(newBlock.header)
       (newBlock, newWeight, parentWorld)
-    }
-  }
 
-  object FakePeer {
+  object FakePeer:
 
     def startFakePeer(peerName: String, fakePeerCustomConfig: FakePeerCustomConfig): IO[FakePeer] =
-      for {
+      for
         peer <- IO(new FakePeer(peerName, fakePeerCustomConfig))
         _ <- peer.startPeer()
-      } yield peer
+      yield peer
 
     def start1FakePeerRes(
         fakePeerCustomConfig: FakePeerCustomConfig = defaultConfig,
@@ -328,10 +323,7 @@ object RegularSyncItSpecUtils {
         fakePeerCustomConfig1: FakePeerCustomConfig = defaultConfig,
         fakePeerCustomConfig2: FakePeerCustomConfig = defaultConfig
     ): Resource[IO, (FakePeer, FakePeer)] =
-      for {
+      for
         peer1 <- start1FakePeerRes(fakePeerCustomConfig1, "Peer1")
         peer2 <- start1FakePeerRes(fakePeerCustomConfig2, "Peer2")
-      } yield (peer1, peer2)
-
-  }
-}
+      yield (peer1, peer2)

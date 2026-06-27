@@ -27,7 +27,7 @@ case class EthNodeStatus68ExchangeState(
     supportsSnap: Boolean = false,
     peerCapabilities: List[Capability] = List.empty,
     clientId: String = ""
-) extends NodeStatusExchangeState[ETHPackets.Status68.Status68] {
+) extends NodeStatusExchangeState[ETHPackets.Status68.Status68]:
 
   import ETHPackets.Status68.Status68.* // toBytes for createStatusMsg
   import handshakerConfiguration.*
@@ -52,7 +52,7 @@ case class EthNodeStatus68ExchangeState(
       bestHash: org.apache.pekko.util.ByteString,
       genesisHash: org.apache.pekko.util.ByteString,
       forkId: ForkId
-  ): HandshakerState[PeerInfo] = {
+  ): HandshakerState[PeerInfo] =
     import ForkIdValidator.syncIoLogger
     log.debug(
       "ETH{}_STATUS: Received - totalDifficulty={}, networkId={}, bestHash={}, genesisHash={}, forkId={}",
@@ -78,7 +78,7 @@ case class EthNodeStatus68ExchangeState(
       localForkId
     )
 
-    if networkId != peerConfiguration.networkId then {
+    if networkId != peerConfiguration.networkId then
       log.debug(
         "ETH{}_STATUS: NetworkId mismatch - local={}, remote={} - disconnecting",
         protocolVersion,
@@ -86,7 +86,7 @@ case class EthNodeStatus68ExchangeState(
         networkId
       )
       DisconnectedState[PeerInfo](Disconnect.Reasons.UselessPeer)
-    } else if genesisHash != localGenesisHash then {
+    else if genesisHash != localGenesisHash then
       log.debug(
         "ETH{}_STATUS: Genesis mismatch - local={}, remote={} - disconnecting",
         protocolVersion,
@@ -94,16 +94,15 @@ case class EthNodeStatus68ExchangeState(
         genesisHash
       )
       DisconnectedState[PeerInfo](Disconnect.Reasons.UselessPeer)
-    } else {
-      (for {
-        validationResult <-
+    else
+      (for validationResult <-
           ForkIdValidator.validatePeer[SyncIO](blockchainReader.genesisHeader.hash.value, blockchainConfig)(
             blockchainReader.getBestBlockNumber,
             forkId
           )
-      } yield {
+      yield
         log.debug("STATUS_EXCHANGE: ForkId validation result: {}", validationResult)
-        validationResult match {
+        validationResult match
           case Connect =>
             log.info(
               "ETH{}_STATUS: Accepted - totalDifficulty={}, latestBlock={} (forkId ok)",
@@ -133,12 +132,9 @@ case class EthNodeStatus68ExchangeState(
               forkId
             )
             DisconnectedState[PeerInfo](Disconnect.Reasons.UselessPeer)
-        }
-      }).unsafeRunSync()
-    }
-  }
+      ).unsafeRunSync()
 
-  override protected def createStatusMsg(): MessageSerializable = {
+  override protected def createStatusMsg(): MessageSerializable =
     val bestBlockHeader = getBestBlockHeader()
     val bestBlockNumber = blockchainReader.getBestBlockNumber
 
@@ -198,7 +194,7 @@ case class EthNodeStatus68ExchangeState(
       forkId
     )
 
-    if log.underlying.isDebugEnabled() then {
+    if log.underlying.isDebugEnabled() then
       val encodedBytes = status.toBytes
       val hexBytes = org.bouncycastle.util.encoders.Hex.toHexString(encodedBytes)
       log.debug(
@@ -206,9 +202,5 @@ case class EthNodeStatus68ExchangeState(
         encodedBytes.length,
         if hexBytes.length > 200 then hexBytes.take(200) + "..." else hexBytes
       )
-    }
 
     status
-  }
-
-}

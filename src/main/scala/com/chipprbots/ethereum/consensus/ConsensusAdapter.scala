@@ -39,10 +39,10 @@ class ConsensusAdapter(
     blockQueue: BlockQueue,
     blockValidation: BlockValidation,
     validationScheduler: IORuntime
-) extends Logger {
+) extends Logger:
   def evaluateBranchBlock(
       block: Block
-  )(implicit blockExecutionScheduler: IORuntime, blockchainConfig: BlockchainConfig): IO[BlockImportResult] = {
+  )(implicit blockExecutionScheduler: IORuntime, blockchainConfig: BlockchainConfig): IO[BlockImportResult] =
     // Resolve the best block's header without requiring its body. Prefer the
     // full-block lookup (so the existing mock-based tests keep working) and fall
     // back to header-only when the body isn't persisted — exactly the state right
@@ -51,30 +51,28 @@ class ConsensusAdapter(
     // forever with `BlockImportFailed("Couldn't find the current best block")`.
     val bestHeaderOpt =
       blockchainReader.getBestBlock.map(_.header).orElse(blockchainReader.getBestBlockHeader)
-    bestHeaderOpt match {
+    bestHeaderOpt match
       case Some(bestHeader) =>
-        if isBlockADuplicate(block.header, bestHeader.number) then {
+        if isBlockADuplicate(block.header, bestHeader.number) then
           log.debug("Ignoring duplicated block: {}", block.idTag)
           IO.pure(DuplicateBlock)
-        } else {
+        else
           // If chain weight lookup fails, treat it as recoverable: log and continue.
-          if blockchainReader.getChainWeightByHash(bestHeader.hash).isEmpty then {
+          if blockchainReader.getChainWeightByHash(bestHeader.hash).isEmpty then
             log.warn(
               "Total chain weight for current best block {} is missing — continuing import (test harness may not provide chain weight)",
               bestHeader.hashAsHexString
             )
-          }
 
           // Skip pre-validation when the block directly extends the current best block.
           // During sequential sync, each block's parent was just saved by the previous iteration.
           // doBlockPreValidation runs on a different thread pool (validationScheduler) which can
           // race with the storage write, causing intermittent HeaderParentNotFoundError.
           // The consensus.evaluateBranch will validate blocks during execution.
-          val validated = if bestHeader.hash == block.header.parentHash then {
-            IO.pure(Right(BlockExecutionSuccess): Either[ValidationBeforeExecError, BlockExecutionSuccess])
-          } else {
-            doBlockPreValidation(block)
-          }
+          val validated =
+            if bestHeader.hash == block.header.parentHash then
+              IO.pure(Right(BlockExecutionSuccess): Either[ValidationBeforeExecError, BlockExecutionSuccess])
+            else doBlockPreValidation(block)
           validated.flatMap {
             case Left(error) =>
               IO.pure(BlockImportFailed(error.describe))
@@ -83,12 +81,9 @@ class ConsensusAdapter(
                 .map(forwardAndTranslateConsensusResult) // a new branch was created so we give it to consensus
                 .getOrElse(IO.pure(BlockEnqueued)) // the block was not rooted so it was simply enqueued
           }
-        }
       case None =>
         log.error("Couldn't find the current best block header")
         IO.pure(BlockImportFailed("Couldn't find the current best block header"))
-    }
-  }
 
   def evaluateBranch(blocks: NonEmptyList[Block])(implicit
       blockExecutionScheduler: IORuntime,
@@ -148,15 +143,13 @@ class ConsensusAdapter(
       }
       .evalOn(validationScheduler.compute)
 
-  private def isBlockADuplicate(block: BlockHeader, currentBestBlockNumber: BigInt): Boolean = {
+  private def isBlockADuplicate(block: BlockHeader, currentBestBlockNumber: BigInt): Boolean =
     val hash = block.hash
     (blockchainReader.getBlockByHash(hash).isDefined && block.number <= currentBestBlockNumber) ||
     blockQueue.isQueued(hash)
-  }
 
   private def enqueueAndGetBranch(block: Block, bestBlockNumber: BigInt): Option[NonEmptyList[Block]] =
     blockQueue
       .enqueueBlock(block, bestBlockNumber)
       .map(topBlock => blockQueue.getBranch(BlockHash(topBlock.hash), dequeue = true))
       .flatMap(NonEmptyList.fromList)
-}

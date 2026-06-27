@@ -25,7 +25,7 @@ import com.chipprbots.ethereum.utils.Logger
 
 class FaucetRpcService(config: FaucetConfig, handler: ActorRef[FaucetHandler.Command])(implicit
     system: ActorSystem
-) extends Logger {
+) extends Logger:
 
   given actorTimeout: Timeout = Timeout(config.actorCommunicationMargin + config.rpcClient.timeout)
   given scheduler: Scheduler = system.toTyped.scheduler
@@ -66,4 +66,3 @@ class FaucetRpcService(config: FaucetConfig, handler: ActorRef[FaucetHandler.Com
     log.debug(s"process failure: $other")
     Left(JsonRpcError.InternalError)
   }
-}

@@ -42,9 +42,9 @@ import com.chipprbots.ethereum.blockchain.sync.snap.SNAPSyncController
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.Config
 
-class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
+class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers:
 
-  it should "start with the peers initial info as provided" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "start with the peers initial info as provided" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     expectInitialSubscriptions()
     setupNewPeer(peer1, peer1Probe, peer1Info)
     setupNewPeer(peer2, peer2Probe, peer2Info)
@@ -60,9 +60,8 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     // GetHandshakedPeers should work properly
     peersInfoHolder ! GetHandshakedPeersCmd(requestSender.ref)
     requestSender.expectMsg(HandshakedPeers(Map(peer1 -> peer1Info, peer2 -> peer2Info)))
-  }
 
-  it should "update max peer when receiving new block (ETH68)" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "update max peer when receiving new block (ETH68)" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     expectInitialSubscriptions()
     setupNewPeer(peer1, peer1Probe, peer1Info)
 
@@ -84,9 +83,8 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
       .withBestBlockData(initialPeerInfo.maxBlockNumber + 4, firstHeader.hash.value)
       .withChainWeight(newBlockWeight)
     requestSender.expectMsg(PeerInfoResponse(Some(expectedPeerInfo)))
-  }
 
-  it should "update max peer when receiving block header" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "update max peer when receiving block header" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     expectInitialSubscriptions()
     setupNewPeer(peer1, peer1Probe, peer1Info)
 
@@ -104,9 +102,8 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     requestSender.expectMsg(
       PeerInfoResponse(Some(peer1Info.withBestBlockData(initialPeerInfo.maxBlockNumber + 4, firstHeader.hash.value)))
     )
-  }
 
-  it should "update max peer when receiving new block hashes" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "update max peer when receiving new block hashes" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     expectInitialSubscriptions()
     setupNewPeer(peer1, peer1Probe, peer1Info)
 
@@ -122,12 +119,11 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     requestSender.expectMsg(
       PeerInfoResponse(Some(peer1Info.withBestBlockData(peer1Info.maxBlockNumber + 5, secondBlockHash.hash)))
     )
-  }
 
   it should "update max peer block when receiving ETH69 BlockRangeUpdate" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     // ETH/69 peers send BlockRangeUpdate instead of NewBlock to announce their chain tip.
     // NetworkPeerManagerActor must update peerInfo.maxBlockNumber from BlockRangeUpdate.latestBlock.
     // The inbound decoder produces ETHPackets.BlockRangeUpdate (not ETH69.BlockRangeUpdate).
@@ -148,12 +144,11 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     requestSender.expectMsg(
       PeerInfoResponse(Some(peer1Info.withBestBlockData(newLatestBlock, newLatestBlockHash)))
     )
-  }
 
   it should "ignore ETH69 BlockRangeUpdate when latestBlock is not higher than current" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     expectInitialSubscriptions()
     setupNewPeer(peer1, peer1Probe, peer1Info)
 
@@ -171,12 +166,11 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     peersInfoHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
     // maxBlockNumber should remain unchanged
     requestSender.expectMsg(PeerInfoResponse(Some(peer1Info)))
-  }
 
   it should "update the peer total difficulty when receiving a NewBlock" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     expectInitialSubscriptions()
     setupNewPeer(peer1, peer1Probe, peer1Info)
 
@@ -191,9 +185,8 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     requestSender.expectMsg(
       PeerInfoResponse(Some(peer1Info.withChainWeight(ChainWeight.totalDifficultyOnly(newBlock.totalDifficulty))))
     )
-  }
 
-  it should "update the fork accepted when receiving the fork block" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "update the fork accepted when receiving the fork block" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     expectInitialSubscriptions()
     setupNewPeer(peer1, peer1Probe, peer1Info)
 
@@ -206,9 +199,8 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     // then
     peersInfoHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
     requestSender.expectMsg(PeerInfoResponse(Some(peer1Info.withForkAccepted(true))))
-  }
 
-  it should "disconnect from a peer with different fork block" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "disconnect from a peer with different fork block" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     expectInitialSubscriptions()
     setupNewPeer(peer1, peer1Probe, peer1Info)
 
@@ -223,9 +215,8 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     peersInfoHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
     requestSender.expectMsg(PeerInfoResponse(Some(peer1Info)))
     peer1Probe.expectMsg(DisconnectPeer(Disconnect.Reasons.UselessPeer))
-  }
 
-  it should "remove peers information when a peers is disconnected" taggedAs (UnitTest, NetworkTest) in new TestSetup {
+  it should "remove peers information when a peers is disconnected" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     expectInitialSubscriptions()
 
     setupNewPeer(peer1, peer1Probe, peer1Info)
@@ -258,12 +249,11 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     // GetHandshakedPeers should work properly
     peersInfoHolder ! GetHandshakedPeersCmd(requestSender.ref)
     requestSender.expectMsg(HandshakedPeers(Map.empty))
-  }
 
   it should "provide handshaked peers only with best block number determined" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     expectInitialSubscriptions()
     // Freshly handshaked peer without best block determined
     setupNewPeer(freshPeer, freshPeerProbe, freshPeerInfo.copy(maxBlockNumber = 0))
@@ -284,12 +274,11 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     requestSender.expectMsg(
       HandshakedPeers(Map(freshPeer -> freshPeerInfo.withBestBlockData(newMaxBlock, firstHeader.hash.value)))
     )
-  }
 
   it should "provide handshaked peers only with best block number determined even if peers best block is its genesis" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     expectInitialSubscriptions()
 
     val genesisInfo: PeerInfo = createGenesisPeerInfo()
@@ -309,12 +298,11 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     // receiving best block does not change a thing, as peer best block is it genesis
     peersInfoHolder ! GetHandshakedPeersCmd(requestSender.ref)
     requestSender.expectMsg(HandshakedPeers(Map(freshPeer -> genesisInfo)))
-  }
 
   it should "skip GetBlockHeaders request when peer is at genesis to avoid disconnect" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     expectInitialSubscriptions()
 
     // Create a peer at genesis (bestHash == genesisHash)
@@ -353,12 +341,11 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     // Verify peer is still added to handshaked peers
     peersInfoHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
     requestSender.expectMsg(PeerInfoResponse(Some(genesisInfo)))
-  }
 
   it should "send a best-block probe (GetBlockHeaders by bestHash) after handshake on ETH/64-/68" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     expectInitialSubscriptions()
 
     // peer1Info is built with capability = ETH63 above; override to ETH68 (modern peer)
@@ -384,12 +371,11 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     gbh.maxHeaders shouldBe BigInt(1)
     gbh.skip shouldBe BigInt(0)
     gbh.reverse shouldBe false
-  }
 
   it should "skip the best-block probe on ETH/69 (number is in STATUS)" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     expectInitialSubscriptions()
 
     val eth69Status: RemoteStatus = peer1Info.remoteStatus.copy(capability = Capability.ETH69)
@@ -404,12 +390,11 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     // but a BlockRangeUpdate is sent immediately so the remote peer knows our chain range.
     peerManager.expectMsgClass(classOf[PeerManagerActor.SendMessageCmd])
     peerManager.expectNoMessage(100.millis)
-  }
 
   it should "discover peer block number from probe response on ETH/64-/68" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     expectInitialSubscriptions()
 
     // ETH/68 peer with no known block number yet.
@@ -427,12 +412,11 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     peersInfoHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
     val resp: PeerInfoResponse = requestSender.expectMsgType[PeerInfoResponse]
     resp.peerInfo.map(_.maxBlockNumber) shouldBe Some(BigInt(24463116))
-  }
 
   it should "route SNAP protocol messages to registered SNAPSyncController" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetupWithSnapSync {
+  ) in new TestSetupWithSnapSync:
     expectInitialSubscriptions()
 
     // Register SNAP sync controller
@@ -477,12 +461,11 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     snapSyncController.expectMsg(SNAPSyncController.StorageRangesResponse(storageRanges))
     snapSyncController.expectMsg(SNAPSyncController.TrieNodesResponse(trieNodes))
     snapSyncController.expectMsg(SNAPSyncController.ByteCodesResponse(byteCodes))
-  }
 
   it should "handle SNAP messages gracefully when SNAPSyncController is not registered" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetup {
+  ) in new TestSetup:
     expectInitialSubscriptions()
 
     // Setup a peer without registering SNAP sync controller
@@ -504,9 +487,8 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     // Peer info should still be updated normally
     peersInfoHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
     requestSender.expectMsg(PeerInfoResponse(Some(peer1Info)))
-  }
 
-  trait TestSetup extends EphemBlockchainTestSetup {
+  trait TestSetup extends EphemBlockchainTestSetup:
     implicit override lazy val classicSystem: ActorSystem = ActorSystem("PeersInfoHolderSpec_System")
 
     blockchainWriter.storeBlockHeader(Fixtures.Blocks.Genesis.header).commit()
@@ -534,7 +516,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     // Sets both bestHash and genesisHash to ensure isAtGenesis() returns true.
     // In production, genesisHash should already be set correctly from handshake,
     // but we explicitly set both here for test clarity and to avoid test brittleness.
-    def createGenesisPeerInfo(basePeerInfo: PeerInfo = initialPeerInfo): PeerInfo = {
+    def createGenesisPeerInfo(basePeerInfo: PeerInfo = initialPeerInfo): PeerInfo =
       val genesisHash = Fixtures.Blocks.Genesis.header.hash.value
       val genesisStatus: RemoteStatus = basePeerInfo.remoteStatus.copy(
         bestHash = genesisHash,
@@ -545,7 +527,6 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
         maxBlockNumber = Fixtures.Blocks.Genesis.header.number,
         bestBlockHash = genesisHash
       )
-    }
 
     val fakeNodeId: ByteString = ByteString()
 
@@ -593,7 +574,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     // — which fire GetAccountRange immediately after Hello, before PeerHandshakeSuccessful
     // — still reach the handler. Tests that expect the initial subscriptions must
     // consume both.
-    def expectInitialSubscriptions(): Unit = {
+    def expectInitialSubscriptions(): Unit =
       peerEventBus.expectMsgType[SubscribeCmd].to shouldBe PeerHandshaked
       peerEventBus.expectMsgType[SubscribeCmd].to shouldBe MessageClassifier(
         Set(
@@ -604,9 +585,8 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
         ),
         PeerSelector.AllPeers
       )
-    }
 
-    def setupNewPeer(peer: Peer, peerProbe: TestProbe, peerInfo: PeerInfo): Unit = {
+    def setupNewPeer(peer: Peer, peerProbe: TestProbe, peerInfo: PeerInfo): Unit =
 
       peersInfoHolder ! PeerEventCmd(PeerHandshakeSuccessful(peer, peerInfo))
 
@@ -641,22 +621,18 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
       peerProbe.expectNoMessage(100.millis)
       val nonGenesis = peerInfo.remoteStatus.bestHash != peerInfo.remoteStatus.genesisHash
       val notEth69 = peerInfo.remoteStatus.capability != Capability.ETH69
-      if nonGenesis && notEth69 then {
+      if nonGenesis && notEth69 then
         val probe = peerManager.expectMsgClass(classOf[PeerManagerActor.SendMessageCmd])
         probe.peerId shouldBe peer.id
         probe.message.code shouldBe Codes.GetBlockHeadersCode
-      }
-    }
-  }
 
-  trait TestSetupWithSnapSync extends TestSetup {
+  trait TestSetupWithSnapSync extends TestSetup:
     val snapSyncController: TestProbe = TestProbe()
-  }
 
   // Data helpers for archive-node detection tests.
   // Does NOT override peersInfoHolder — call newReaderHolder() in each test after
   // consuming the main actor's initial subscriptions to avoid double-actor confusion.
-  trait TestSetupWithReader extends TestSetup {
+  trait TestSetupWithReader extends TestSetup:
     // A block header with a distinct hash (modified extraData) at the same block number.
     // Its hash → actualTD is stored in the test DB so DB_LOOKUP returns a low TD.
     val archiveProbeBlock: BlockHeader = baseBlockHeader.copy(
@@ -699,7 +675,7 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
         peer: Peer,
         peerProbe: TestProbe,
         peerInfo: PeerInfo
-    ): Unit = {
+    ): Unit =
       holder ! PeerEventCmd(PeerHandshakeSuccessful(peer, peerInfo))
       peerEventBus.expectMsgType[SubscribeCmd].to shouldBe PeerDisconnectedClassifier(
         PeerSelector.WithId(peer.id)
@@ -727,13 +703,11 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
       // bleed into subsequent peerManager expectations.
       if peerInfo.remoteStatus.capability == Capability.ETH69 then
         peerManager.expectMsgClass(classOf[PeerManagerActor.SendMessageCmd])
-    }
-  }
 
   it should "ETH69 archive peer: correct inflated Tier3 chainWeight after 3 consecutive unchanged probes" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetupWithReader {
+  ) in new TestSetupWithReader:
     // Drain peersInfoHolder (no blockchainReader) initial subscriptions.
     expectInitialSubscriptions()
     // Create the actor WITH blockchainReader and drain its initial subscriptions.
@@ -751,10 +725,9 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     // = true and skip counter tracking (BlockSignalStaleAfter = 150s production value).
     // Consuming the probe from peerManager is sufficient — the counter is tracked at TICK time,
     // not at response time.
-    def tick(): Unit = {
+    def tick(): Unit =
       readerHolder ! RefreshPeerBestBlocksTick
       peerManager.expectMsgClass(classOf[PeerManagerActor.SendMessageCmd])
-    }
 
     // Tick 1: seeds lastProbeMaxBlock; counter stays 0 (first tick → case None → no increment).
     tick()
@@ -775,12 +748,11 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
 
     readerHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
     requestSender.expectMsgType[PeerInfoResponse].peerInfo.get.chainWeight.totalDifficulty shouldBe actualTD
-  }
 
   it should "ETH69 mining peer: active block signal suppresses tick probes — monotonic guard stays active" taggedAs (
     UnitTest,
     NetworkTest
-  ) in new TestSetupWithReader {
+  ) in new TestSetupWithReader:
     // Drain peersInfoHolder initial subscriptions, then create and drain the reader actor.
     expectInitialSubscriptions()
     val readerHolder = newReaderHolder()
@@ -819,6 +791,3 @@ class NetworkPeerManagerSpec extends AnyFlatSpec with Matchers {
     // counter = 0 < StaticPeerProbeThreshold (3); monotonic guard remains active — no correction.
     readerHolder ! PeerInfoRequestCmd(peer1.id, requestSender.ref)
     requestSender.expectMsgType[PeerInfoResponse].peerInfo.get.chainWeight.totalDifficulty shouldBe inflatedTD
-  }
-
-}

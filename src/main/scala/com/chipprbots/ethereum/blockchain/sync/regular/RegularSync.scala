@@ -29,11 +29,11 @@ import com.chipprbots.ethereum.transactions.PendingTransactionsManager
 import com.chipprbots.ethereum.blockchain.sync.WormToBrainBar
 import com.chipprbots.ethereum.utils.Config.SyncConfig
 
-object RegularSync {
+object RegularSync:
   type Command = SyncProtocol.RegularSyncCommand
 
   private val FetcherStatusKey = "RegularSyncFetcherStatus"
-  private val PrintStatusKey   = "RegularSyncPrintStatus"
+  private val PrintStatusKey = "RegularSyncPrintStatus"
 
   // Epoch counter for BlockFetcher/BlockImporter re-spawns. Pekko requires a unique child name
   // before the old child's Terminated signal is processed; appending the epoch avoids
@@ -92,7 +92,7 @@ object RegularSync {
         // BlockFetcherStopped when it terminates. Re-called on each re-spawn (RF-2 Option A).
         // The epoch suffix avoids InvalidActorNameException: Pekko requires a unique child name
         // until the previous child's Terminated signal is fully processed.
-        def spawnFetcher(epoch: Int): TypedActorRef[BlockFetcher.FetchCommand] = {
+        def spawnFetcher(epoch: Int): TypedActorRef[BlockFetcher.FetchCommand] =
           // BlockFetcher uses AbstractBehavior and spawns children (HeadersFetcher, BodiesFetcher,
           // StateNodeFetcher) in its constructor. Pekko restart would re-run the constructor and
           // ghost the old children. Default stop-on-failure is intentional; RegularSync re-spawns
@@ -103,7 +103,6 @@ object RegularSync {
           )
           ctx.watchWith(f, SyncProtocol.BlockFetcherStopped)
           f
-        }
 
         def spawnImporter(
             fetcher: TypedActorRef[BlockFetcher.FetchCommand],
@@ -139,8 +138,8 @@ object RegularSync {
             s"block-importer-$epoch"
           )
 
-        val initialEpoch    = spawnEpoch.getAndIncrement()
-        val initialFetcher  = spawnFetcher(initialEpoch)
+        val initialEpoch = spawnEpoch.getAndIncrement()
+        val initialFetcher = spawnFetcher(initialEpoch)
         val initialImporter = spawnImporter(initialFetcher, initialEpoch)
 
         timers.startTimerWithFixedDelay(
@@ -156,12 +155,11 @@ object RegularSync {
           initialImporter,
           supervisor,
           ctx,
-          respawn = () => {
+          respawn = () =>
             val epoch = spawnEpoch.getAndIncrement()
-            val f     = spawnFetcher(epoch)
-            val i     = spawnImporter(f, epoch)
+            val f = spawnFetcher(epoch)
+            val i = spawnImporter(f, epoch)
             (f, i)
-          }
         )
       }
     }
@@ -217,9 +215,7 @@ object RegularSync {
         val newState = progressState.copy(currentBlock = blockNumber)
         RegularSyncMetrics.setCurrentBlock(blockNumber)
         RegularSyncMetrics.incrementBlocksImported()
-        if internally then {
-          fetcher ! InternalLastBlockImport(blockNumber)
-        }
+        if internally then fetcher ! InternalLastBlockImport(blockNumber)
         running(newState, fetcher, importer, supervisor, ctx, respawn)
 
       case msg: SyncProtocol.RegularSyncStuck =>
@@ -287,15 +283,10 @@ object RegularSync {
       bestKnownNetworkBlock: BigInt,
       lastPrintBlock: BigInt = BigInt(0),
       lastPrintTimeMs: Long = 0L
-  ) {
+  ):
     def toStatus: SyncProtocol.Status =
-      if startedFetching && bestKnownNetworkBlock != 0 && currentBlock < bestKnownNetworkBlock then {
+      if startedFetching && bestKnownNetworkBlock != 0 && currentBlock < bestKnownNetworkBlock then
         Status.Syncing(initialBlock, Progress(currentBlock, bestKnownNetworkBlock), None)
-      } else if startedFetching && bestKnownNetworkBlock != 0 && currentBlock >= bestKnownNetworkBlock then {
+      else if startedFetching && bestKnownNetworkBlock != 0 && currentBlock >= bestKnownNetworkBlock then
         Status.SyncDone
-      } else {
-        Status.NotSyncing
-      }
-  }
-
-}
+      else Status.NotSyncing

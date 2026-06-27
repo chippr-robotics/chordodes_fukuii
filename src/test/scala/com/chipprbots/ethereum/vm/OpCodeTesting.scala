@@ -5,7 +5,7 @@ import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.vm.MockWorldState.PS
 
-trait OpCodeTesting extends AnyFunSuiteLike {
+trait OpCodeTesting extends AnyFunSuiteLike:
   matchers: Matchers =>
 
   val config: EvmConfig
@@ -43,10 +43,7 @@ trait OpCodeTesting extends AnyFunSuiteLike {
         case RevertOccurs       => ()
         case ReturnDataOverflow => ()
       }.isEmpty
-    then {
+    then
       // Found error that is neither an InvalidJump nor RevertOccurs
       fail(s"Unexpected ${stateOut.error.get} error")
-    } else {
-      stateOut.gas shouldEqual (stateIn.gas - expectedGas)
-    }
-}
+    else stateOut.gas shouldEqual (stateIn.gas - expectedGas)

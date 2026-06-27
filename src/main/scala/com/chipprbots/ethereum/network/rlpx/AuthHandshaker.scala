@@ -36,16 +36,15 @@ class Secrets(
     val ingressMac: KeccakDigest
 )
 
-object AuthHandshaker {
+object AuthHandshaker:
   private val log = LoggerFactory.getLogger(classOf[AuthHandshaker])
   private val MaxLoggedBytes = 512
 
-  private def toLoggableHex(bytes: ByteString): String = {
+  private def toLoggableHex(bytes: ByteString): String =
     val arr = bytes.toArray[Byte]
     val truncated = if arr.length <= MaxLoggedBytes then arr else arr.take(MaxLoggedBytes)
     val hex = Hex.toHexString(truncated)
     if arr.length > MaxLoggedBytes then s"$hex...(+${arr.length - MaxLoggedBytes} bytes)" else hex
-  }
 
   val InitiatePacketLength: Int = AuthInitiateMessage.EncodedLength + ECIESCoder.OverheadSize
   val ResponsePacketLength: Int = AuthResponseMessage.EncodedLength + ECIESCoder.OverheadSize
@@ -56,11 +55,9 @@ object AuthHandshaker {
   val MinPadding = 100
   val MaxPadding = 300
 
-  def apply(nodeKey: AsymmetricCipherKeyPair, secureRandom: SecureRandom): AuthHandshaker = {
+  def apply(nodeKey: AsymmetricCipherKeyPair, secureRandom: SecureRandom): AuthHandshaker =
     val nonce = secureRandomByteArray(secureRandom, NonceSize)
     AuthHandshaker(nodeKey, ByteString(nonce), generateKeyPair(secureRandom), secureRandom)
-  }
-}
 
 // Implements scala.reflect.Selectable so tests using structural access work on Scala 3.
 // This mirrors Scala 2 reflective behavior required by some tests/mocks.
@@ -73,11 +70,11 @@ case class AuthHandshaker(
     initiatePacketOpt: Option[ByteString] = None,
     responsePacketOpt: Option[ByteString] = None,
     remotePubKeyOpt: Option[ECPoint] = None
-) extends scala.reflect.Selectable {
+) extends scala.reflect.Selectable:
 
   import AuthHandshaker.*
 
-  def initiate(uri: URI): (ByteString, AuthHandshaker) = {
+  def initiate(uri: URI): (ByteString, AuthHandshaker) =
     val remotePubKey = publicKeyFromNodeId(uri.getUserInfo)
     val message = createAuthInitiateMessageV4(remotePubKey)
     val encoded: Array[Byte] = message.toBytes
@@ -88,9 +85,8 @@ case class AuthHandshaker(
     val packet = ByteString(sizePrefix ++ encryptedPayload)
 
     (packet, copy(isInitiator = true, initiatePacketOpt = Some(packet), remotePubKeyOpt = Some(remotePubKey)))
-  }
 
-  def handleResponseMessage(data: ByteString): AuthHandshakeResult = {
+  def handleResponseMessage(data: ByteString): AuthHandshakeResult =
     val plaintext = ECIESCoder.decrypt(
       nodeKey.getPrivate.asInstanceOf[ECPrivateKeyParameters].getD,
       data.toArray
@@ -98,9 +94,8 @@ case class AuthHandshaker(
     val message = AuthResponseMessage.decode(plaintext)
 
     copy(responsePacketOpt = Some(data)).finalizeHandshake(message.ephemeralPublicKey, message.nonce)
-  }
 
-  def handleResponseMessageV4(data: ByteString, peerLabel: => String = "unknown"): AuthHandshakeResult = {
+  def handleResponseMessageV4(data: ByteString, peerLabel: => String = "unknown"): AuthHandshakeResult =
     val sizeBytes = data.take(2)
     val encryptedPayload = data.drop(2)
 
@@ -113,7 +108,7 @@ case class AuthHandshaker(
 
     val message =
       try rlp.decode[AuthResponseMessageV4](plaintext)
-      catch {
+      catch
         case ex: Throwable =>
           AuthHandshaker.log.warn(
             "[RLPx] AUTH_RESPONSE_DECODE_FAILED peer={} sizePrefix={} cipherLen={} plaintextLen={} plaintextHex={}",
@@ -125,12 +120,10 @@ case class AuthHandshaker(
             ex
           )
           throw ex
-      }
 
     copy(responsePacketOpt = Some(data)).finalizeHandshake(message.ephemeralPublicKey, message.nonce)
-  }
 
-  def handleInitialMessage(data: ByteString): (ByteString, AuthHandshakeResult) = {
+  def handleInitialMessage(data: ByteString): (ByteString, AuthHandshakeResult) =
     val plaintext = ECIESCoder.decrypt(
       nodeKey.getPrivate.asInstanceOf[ECPrivateKeyParameters].getD,
       data.toArray
@@ -138,7 +131,7 @@ case class AuthHandshaker(
 
     val message =
       try AuthInitiateMessage.decode(plaintext)
-      catch {
+      catch
         case ex: Throwable =>
           // Log at ERROR to ensure the diagnostic is visible even in environments where WARNs
           // from this logger are not reliably surfaced in docker compose output.
@@ -151,7 +144,6 @@ case class AuthHandshaker(
             ex
           )
           throw ex
-      }
 
     val response = AuthResponseMessage(
       ephemeralPublicKey =
@@ -172,9 +164,8 @@ case class AuthHandshaker(
     ).finalizeHandshake(remoteEphemeralKey, message.nonce)
 
     (encryptedPacket, handshakeResult)
-  }
 
-  def handleInitialMessageV4(data: ByteString, peerLabel: => String = "unknown"): (ByteString, AuthHandshakeResult) = {
+  def handleInitialMessageV4(data: ByteString, peerLabel: => String = "unknown"): (ByteString, AuthHandshakeResult) =
     val sizeBytes = data.take(2)
     val encryptedPayload = data.drop(2)
 
@@ -187,7 +178,7 @@ case class AuthHandshaker(
 
     val message =
       try plaintext.toAuthInitiateMessageV4
-      catch {
+      catch
         case ex: Throwable =>
           // Log at ERROR to ensure the plaintextHex diagnostic is visible in docker compose logs.
           AuthHandshaker.log.error(
@@ -200,7 +191,6 @@ case class AuthHandshaker(
             ex
           )
           throw ex
-      }
 
     val response = AuthResponseMessageV4(
       ephemeralPublicKey =
@@ -222,9 +212,8 @@ case class AuthHandshaker(
         .finalizeHandshake(remoteEphemeralKey, message.nonce)
 
     (packet, handshakeResult)
-  }
 
-  private def extractEphemeralKey(signature: ECDSASignature, nonce: ByteString, publicKey: ECPoint): ECPoint = {
+  private def extractEphemeralKey(signature: ECDSASignature, nonce: ByteString, publicKey: ECPoint): ECPoint =
     val agreement = new ECDHBasicAgreement
     agreement.init(nodeKey.getPrivate)
     val sharedSecret = agreement.calculateAgreement(new ECPublicKeyParameters(publicKey, curve))
@@ -239,14 +228,12 @@ case class AuthHandshaker(
       )
 
     decodeAndValidatePoint(ECDSASignature.UncompressedIndicator +: signaturePubBytes)
-  }
 
-  private def createAuthInitiateMessageV4(remotePubKey: ECPoint) = {
-    val sharedSecret = {
+  private def createAuthInitiateMessageV4(remotePubKey: ECPoint) =
+    val sharedSecret =
       val agreement = new ECDHBasicAgreement
       agreement.init(nodeKey.getPrivate)
       bigIntegerToBytes(agreement.calculateAgreement(new ECPublicKeyParameters(remotePubKey, curve)), NonceSize)
-    }
 
     val publicKey =
       nodeKey.getPublic.asInstanceOf[ECPublicKeyParameters].getQ // interop: BC API returns CipherParameters
@@ -255,19 +242,17 @@ case class AuthHandshaker(
     val signature = ECDSASignature.sign(messageToSign, ephemeralKey)
 
     AuthInitiateMessageV4(signature, publicKey, nonce, ProtocolVersion)
-  }
 
-  private def finalizeHandshake(remoteEphemeralKey: ECPoint, remoteNonce: ByteString): AuthHandshakeResult = {
-    val successOpt = for {
+  private def finalizeHandshake(remoteEphemeralKey: ECPoint, remoteNonce: ByteString): AuthHandshakeResult =
+    val successOpt = for
       initiatePacket <- initiatePacketOpt
       responsePacket <- responsePacketOpt
       remotePubKey <- remotePubKeyOpt
-    } yield {
-      val secretScalar = {
+    yield
+      val secretScalar =
         val agreement = new ECDHBasicAgreement
         agreement.init(ephemeralKey.getPrivate)
         agreement.calculateAgreement(new ECPublicKeyParameters(remoteEphemeralKey, curve))
-      }
 
       val agreedSecret = bigIntegerToBytes(secretScalar, SecretSize)
 
@@ -291,10 +276,8 @@ case class AuthHandshaker(
         ),
         remotePubKey = ByteString(remotePubKey.getEncoded(false).tail)
       )
-    }
 
     successOpt.getOrElse(AuthHandshakeError)
-  }
 
   private def macSecretSetup(
       agreedSecret: Array[Byte],
@@ -303,7 +286,7 @@ case class AuthHandshaker(
       initiateNonce: ByteString,
       responsePacket: ByteString,
       responseNonce: ByteString
-  ) = {
+  ) =
     val macSecret = kec256(agreedSecret, aesSecret)
 
     val mac1 = new KeccakDigest(MacSize)
@@ -322,6 +305,3 @@ case class AuthHandshaker(
 
     if isInitiator then (mac1, mac2)
     else (mac2, mac1)
-  }
-
-}

@@ -40,7 +40,7 @@ class BodiesSliceFetcher(
     batchGen: Long,
     context: ActorContext[BodiesSliceFetcher.SliceCommand]
 ) extends AbstractBehavior[BodiesSliceFetcher.SliceCommand](context)
-    with FetchRequest[BodiesSliceFetcher.SliceCommand] {
+    with FetchRequest[BodiesSliceFetcher.SliceCommand]:
 
   import BodiesSliceFetcher.*
 
@@ -51,7 +51,7 @@ class BodiesSliceFetcher(
   override def makeAdaptedMessage[T <: Message](peer: Peer, msg: T): SliceCommand = AdaptedMessage(peer, msg)
 
   override def onMessage(message: SliceCommand): Behavior[SliceCommand] =
-    message match {
+    message match
       case FetchSlice(hashes, triedPeers, retryCount) =>
         requestSlice(hashes, triedPeers, retryCount)
         Behaviors.same
@@ -73,9 +73,8 @@ class BodiesSliceFetcher(
       case other =>
         log.warn("[RegularSync][slice] unhandled message: {}", other.getClass.getSimpleName)
         Behaviors.unhandled
-    }
 
-  private def requestSlice(hashes: Seq[ByteString], triedPeers: Set[PeerId], retryCount: Int): Unit = {
+  private def requestSlice(hashes: Seq[ByteString], triedPeers: Set[PeerId], retryCount: Int): Unit =
     val msg = ETHPackets.GetBlockBodies(ETHPackets.nextRequestId, hashes)
     val peerSelector = if triedPeers.nonEmpty then ExcludingPeers(triedPeers) else BestPeer
     val fallback: SliceCommand = RetrySliceRequest(None, hashes, triedPeers, retryCount)
@@ -86,10 +85,8 @@ class BodiesSliceFetcher(
         log.warn("[RegularSync][slice] request threw: {}", ex.getMessage)
         RetrySliceRequest(None, hashes, triedPeers, retryCount)
     }
-  }
-}
 
-object BodiesSliceFetcher {
+object BodiesSliceFetcher:
 
   def apply(
       peersClient: ActorRef[PeersClient.Command],
@@ -112,4 +109,3 @@ object BodiesSliceFetcher {
       retryCount: Int
   ) extends SliceCommand
   final private[regular] case class AdaptedMessage[T <: Message](peer: Peer, msg: T) extends SliceCommand
-}

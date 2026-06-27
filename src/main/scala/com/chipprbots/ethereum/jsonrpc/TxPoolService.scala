@@ -30,7 +30,7 @@ import com.chipprbots.ethereum.utils.TxPoolConfig
   * Note: Fukuii has no queued pool (transactions with nonce gaps are dropped). All geth-compat methods return queued:
   * empty/0, matching Besu's behaviour on a pending-only pool.
   */
-object TxPoolService {
+object TxPoolService:
   // ── Besu methods ──────────────────────────────────────────────────────────
 
   case class TxPoolBesuTransactionsRequest()
@@ -89,14 +89,13 @@ object TxPoolService {
       pending: Map[String, Map[String, String]],
       queued: Map[String, Map[String, String]]
   )
-}
 
 class TxPoolService(
     override val pendingTransactionsManager: ActorRef[PendingTransactionsManager.Command],
     override val getTransactionFromPoolTimeout: FiniteDuration,
     txPoolConfig: TxPoolConfig,
     override val scheduler: Scheduler
-) extends TransactionPicker {
+) extends TransactionPicker:
   import TxPoolService.*
 
   /** txpool_besuTransactions — returns all pending transactions.
@@ -146,10 +145,9 @@ class TxPoolService(
       val filtered =
         if filters.isEmpty then resp.pendingTransactions
         else resp.pendingTransactions.filter(pt => applyFilters(pt, filters))
-      val txs = req.limit match {
+      val txs = req.limit match
         case Some(n) => filtered.take(n)
         case None    => filtered
-      }
       Right(TxPoolBesuPendingTransactionsResponse(txs.map(pt => TransactionResponse(pt.stx.tx))))
     }
 
@@ -161,15 +159,14 @@ class TxPoolService(
     filters.forall { f =>
       val tx = pt.stx.tx.tx
       val from = pt.stx.senderAddress
-      f.field match {
+      f.field match
         case "from" =>
           f.predicate == Eq && Address(f.value) == from
         case "to" =>
-          f.predicate match {
+          f.predicate match
             case Action => tx.isContractInit
             case Eq     => tx.receivingAddress.contains(Address(f.value))
             case _      => false
-          }
         case "gas" =>
           compareNumerically(tx.gasLimit, f.predicate, BigInt(f.value.stripPrefix("0x"), 16))
         case "gasPrice" =>
@@ -182,16 +179,14 @@ class TxPoolService(
             else BigInt(f.value)
           compareNumerically(tx.nonce, f.predicate, n)
         case _ => true
-      }
     }
 
   private def compareNumerically(a: BigInt, pred: TxPoolFilterPredicate, b: BigInt): Boolean =
-    pred match {
+    pred match
       case Eq => a == b
       case Gt => a > b
       case Lt => a < b
       case _  => false
-    }
 
   // ── Geth-compatible methods ────────────────────────────────────────────────
 
@@ -239,15 +234,13 @@ class TxPoolService(
         .map { case (sender, pts) =>
           sender -> pts.map { pt =>
             val tx = pt.stx.tx.tx
-            val summary = tx.receivingAddress match {
+            val summary = tx.receivingAddress match
               case Some(to) =>
                 s"${to}: ${tx.value} wei + ${tx.gasLimit} gas × ${tx.gasPrice} wei"
               case None =>
                 s"contract creation: ${tx.value} wei + ${tx.gasLimit} gas × ${tx.gasPrice} wei"
-            }
             tx.nonce.toString -> summary
           }.toMap
         }
       Right(TxPoolInspectResponse(pending, Map.empty))
     }
-}

@@ -19,7 +19,7 @@ import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetAccountRange.GetAcco
 import com.chipprbots.ethereum.testing.PeerTestHelpers
 import com.chipprbots.ethereum.testing.Tags.*
 
-class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers {
+class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecLike with Matchers:
 
   implicit private val classicSystem: org.apache.pekko.actor.ActorSystem = system.classicSystem
 
@@ -35,20 +35,18 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
   private def makeTask(root: ByteString = dummyRoot): AccountTask =
     AccountTask(next = zeroHash, last = maxHash, rootHash = root)
 
-  private def proofOnlyRange(): (ByteString, Seq[ByteString]) = {
+  private def proofOnlyRange(): (ByteString, Seq[ByteString]) =
     val proofNode = LeafNode(ByteString(0x01.toByte), ByteString("value"))
     ByteString(proofNode.hash) -> Seq(ByteString(MptTraversals.encodeNode(proofNode)))
-  }
 
   private def makeWorker(
       coordinator: TestProbe[AccountRangeCoordinator.Command],
       networkPeerManager: TestProbe[NetworkPeerManagerActor.Command]
-  ): org.apache.pekko.actor.typed.ActorRef[AccountRangeWorker.Command] = {
+  ): org.apache.pekko.actor.typed.ActorRef[AccountRangeWorker.Command] =
     val requestTracker = new SNAPRequestTracker()(classicSystem.scheduler)
     testKit.spawn(
       AccountRangeWorker(coordinator.ref, networkPeerManager.ref, requestTracker)
     )
-  }
 
   "AccountRangeWorker" should "send GetAccountRange to peer via NetworkPeerManager on FetchAccountRange" taggedAs UnitTest in {
     val coordinator = makeCoordinatorProbe()
@@ -233,4 +231,3 @@ class AccountRangeWorkerSpec extends ScalaTestWithActorTestKit with AnyFlatSpecL
     )
     coordinator.expectNoMessage(200.millis)
   }
-}
