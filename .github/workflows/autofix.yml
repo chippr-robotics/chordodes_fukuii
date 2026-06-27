@@ -84,7 +84,10 @@ jobs:
           sudo apt-get install sbt
 
       - name: Apply scalafmt
-        run: sbt scalafmtAll scalafmtSbt
+        # Use sbt's quoted multi-command syntax. The bare `sbt scalafmtAll scalafmtSbt`
+        # form is mis-parsed by sbt (it reads the two space-separated tasks as one
+        # selector and fails with "Expected '/'"), which had this job red on every PR.
+        run: sbt "scalafmtAll; scalafmtSbt"
         env:
           FUKUII_DEV: true
 
