@@ -43,6 +43,7 @@ Active sprint plan: `/home/dev/.claude/plans/we-are-working-on-noble-whisper.md`
 | §R3 | Jackson ecosystem gate research | — | 2026-06 | completed/DEFERRED-BACKLOG.md |
 | §R5 | EventStream pub/sub topology map | — | 2026-06 | completed/DEFERRED-BACKLOG.md |
 | §R6 | Opaque type domain analysis (`.local/docs/opaque-type-domain-analysis.md`) | docs only | 2026-06-25 | completed/DEFERRED-BACKLOG.md |
+| §8b L1–H2 | Opaque types (ByteString/BigInt): TxHash, BloomFilter, BlobVersionedHash, StorageKey A/B/C, CodeHash, BlockHash, TrieRoot | `dc17d24ef` `d8a9f3905` `cb29e34aa` `c7c394a4c` `9ea57b007` `328508bd3` `c98b61064` `7fb117918` `29cbe38e0` | 2026-06-25–26 | completed/DEFERRED-BACKLOG.md |
 | §R8 | Memory/resource retention audit | — | 2026-06 | completed/DEFERRED-BACKLOG.md |
 | §R9 | IO threading model audit | — | 2026-06 | completed/DEFERRED-BACKLOG.md |
 | §R10 | ETH/Sepolia assumption audit (10 threads, all complete) | multiple | 2026-06-24–25 | completed/DEFERRED-BACKLOG.md |
@@ -541,257 +542,266 @@ git commit -m "feat(7c-E3): restartWithBackoff for SyncStateSchedulerActor (boun
 
 ### 8b — Opaque Types for Domain Value Concepts
 
-**R6 research complete** — see `.local/docs/opaque-type-domain-analysis.md` (2026-06-25).
-Scale: 2,276 `BigInt` usages / 204 files · 2,305 `ByteString` usages / 243 files.
+**L1–L3, M1–M4, H1–H2 DONE** — commits `dc17d24ef`/`d8a9f3905`/`cb29e34aa`/`c7c394a4c`/`9ea57b007`/`328508bd3`/`c98b61064`/`7fb117918`/`29cbe38e0`. Detail: `completed/DEFERRED-BACKLOG.md §8b`.
 
-**Tiered candidate summary:**
+**Remaining HIGH tier (H3–H8):** Gate on H2 met. FORGE + BEACON required for all.
 
-| Tier | Candidate | Raw type | Files | Gate |
-|------|-----------|----------|-------|------|
-| LOW | `TxHash` | `ByteString` | 23 | None |
-| LOW | `BloomFilter` | `ByteString` | ~30 | None |
-| LOW | `BlobVersionedHash` | `ByteString` | ~15 | None (ETH-only) |
-| MEDIUM | `StorageKey` Phase A (AccessListItem only) | `BigInt` | 7 | None |
-| MEDIUM | `CodeHash` | `ByteString` | 32 | FORGE + BEACON advisory |
-| MEDIUM | `StorageKey` Phase B (ProgramState/EVM) | `BigInt` | ~12 | FORGE + BEACON |
-| MEDIUM | `StorageKey` Phase C (transientStorage) | `BigInt` | ~5 | FORGE + BEACON advisory |
-| HIGH | `BlockHash` | `ByteString` | ~50 | FORGE + BEACON |
-| HIGH | `TrieRoot` | `ByteString` | ~25 | FORGE + BEACON |
-| HIGH | `Difficulty` | `BigInt` | ~24 | FORGE + BEACON |
-| HIGH | `TotalDifficulty` | `BigInt` | ~26 | FORGE + BEACON |
-| HIGH | `GasAmount` | `BigInt` | ~39 | FORGE + BEACON |
-| HIGH | `GasPrice` | `BigInt` | ~25 | FORGE + BEACON |
-| HIGH | `BlockNumber` | `BigInt` | ~124 | FORGE + BEACON (fork dispatch) |
-| HIGH | `ChainId` | `BigInt` | ~27 | FORGE + BEACON (signing) |
+| Candidate | Raw type | Files | Gate |
+|-----------|----------|-------|------|
+| `Difficulty` (H3) | `BigInt` | ~24 | FORGE + BEACON |
+| `TotalDifficulty` (H4) | `BigInt` | ~26 | FORGE + BEACON; gate: H3 |
+| `GasAmount` (H5) | `BigInt` | ~39 | FORGE + BEACON; gate: H4 |
+| `GasPrice` (H6) | `BigInt` | ~25 | FORGE + BEACON; gate: H5 |
+| `BlockNumber` (H7) | `BigInt` | ~124 | FORGE + BEACON; gate: H6 — largest, fork dispatch |
+| `ChainId` (H8) | `BigInt` | ~27 | FORGE + BEACON; gate: H7 — signing layer, last |
 
 **Caveats:**
 - `UInt256` and `Address` are hand-rolled wrappers — do not introduce competing types.
 - `ECDSASignature(r, s, v: BigInt)` — crypto domain, leave as-is.
-- HIGH tier deferred until LOW/MEDIUM establishes RLP `.xmap` pattern.
 
 ---
 
-#### §8b-L1 — `TxHash`: ByteString → opaque type
+#### §8b-H3 — `Difficulty`: BigInt → opaque type
 
-**Files:** `domain/TxHash.scala` (new), `SignedTransaction.scala`, `jsonrpc/` (~23 files)
-**Agent:** MITHRIL | **Gate:** None.
-
-**Prompt:**
-```
-Use the MITHRIL agent. Introduce `opaque type TxHash = ByteString` in `src/main/`.
-
-Context: R6 analysis confirmed `TxHash` crosses no consensus paths and has no RLP
-serialization at the field level — the hash is computed, not decoded from wire bytes.
-Reference: `.local/docs/opaque-type-domain-analysis.md` §1.
-
-Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/TxHash.scala`:
-```scala
-opaque type TxHash = ByteString
-object TxHash:
-  def apply(bs: ByteString): TxHash = bs
-  def fromBytes(bs: ByteString): TxHash = bs
-  extension (th: TxHash)
-    def value: ByteString = th
-    def toHexString: String = th.map("%02x".format(_)).mkString("0x", "", "")
-```
-Step 2 — Update `SignedTransaction.scala`: `def hash: ByteString` → `TxHash`; wrap result: `TxHash(kec256(...))`.
-Step 3 — Update `txSenders` cache key type: `Cache[ByteString, Address]` → `Cache[TxHash, Address]`.
-Step 4 — Update all `jsonrpc/` callers: where return value flows into an API response field typed `ByteString`, call `.value` to unwrap.
-Step 5 — `sbt compile-all` — must be clean.
-Step 6 — `sbt "testOnly *SignedTransaction* *TransactionPool*"`.
-Step 7 — `git commit -m "feat(8b-L1): introduce TxHash opaque type (ByteString) — 23 call sites"`
-```
-
----
-
-#### §8b-L2 — `BloomFilter`: ByteString → opaque type
-
-**Files:** `domain/BloomFilter.scala` (new), `BlockHeader.scala`, `Receipt.scala`, jsonrpc response types (~30 files)
-**Agent:** MITHRIL | **Gate:** None.
+**Files:** `domain/Difficulty.scala` (new), `BlockHeader.scala`, Ethash mining layer, difficulty calculator (~24 files)
+**Agent:** MITHRIL + FORGE + BEACON | **Gate:** H2 done ✅.
 
 **Prompt:**
 ```
-Use the MITHRIL agent. Introduce `opaque type BloomFilter = ByteString` in `src/main/`.
+Use MITHRIL to implement `opaque type Difficulty = BigInt`, then ask FORGE and BEACON to review before committing.
 
-Context: `logsBloom` is a fixed 256-byte field on `BlockHeader` and `Receipt`. Never used in
-consensus validation (Ethash, fork dispatch, MESS). One-line RLP derivation via `.xmap`.
-Reference: `.local/docs/opaque-type-domain-analysis.md` §2.
+Context: `BlockHeader.difficulty` is PoW-specific on ETC. Post-merge ETH stores the field as prevRandao — not used for PoW. Cross-chain field on BlockHeader. ~24 files.
+Reference: `.local/docs/opaque-type-domain-analysis.md` §8b-H3.
 
-Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/BloomFilter.scala`:
-```scala
-opaque type BloomFilter = ByteString
-object BloomFilter:
-  val Empty: BloomFilter = ByteString(new Array[Byte](256))
-  def apply(bs: ByteString): BloomFilter = bs
-  extension (bf: BloomFilter) def value: ByteString = bf
-  given rlpCodec: RLPCodec[BloomFilter] = summon[RLPCodec[ByteString]].xmap(BloomFilter.apply, _.value)
-```
-Step 2 — Update `BlockHeader.scala`: `logsBloom: ByteString` → `BloomFilter`. Wrap/unwrap at codec boundary.
-Step 3 — Update `Receipt.scala`: same pattern.
-Step 4 — Update jsonrpc response types: call `.value.toHexString` instead of `.toHexString`.
-Step 5 — `sbt compile-all` — must be clean.
-Step 6 — `sbt "testOnly *BlockHeader* *Receipt*"`.
-Step 7 — `git commit -m "feat(8b-L2): introduce BloomFilter opaque type (ByteString) — ~30 sites"`
-```
+Pre-flight: confirm `sbt compile-all` is clean.
 
----
+Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/Difficulty.scala`:
+  opaque type Difficulty = BigInt
+  object Difficulty:
+    val Zero: Difficulty = BigInt(0)
+    def apply(v: BigInt): Difficulty = v
+    extension (d: Difficulty)
+      def value: BigInt = d
+      def +(other: Difficulty): Difficulty = d + other
+      def compare(other: Difficulty): Int = d.compare(other)
+    given rlpCodec: RLPCodec[Difficulty] = summon[RLPCodec[BigInt]].xmap(Difficulty.apply, _.value)
+    given Ordering[Difficulty] = Ordering.by(_.value)
 
-#### §8b-L3 — `BlobVersionedHash`: ByteString → opaque type
-
-**Files:** `domain/BlobVersionedHash.scala` (new), `Transaction.scala` (`BlobTransaction`), `ETHPackets.scala`, jsonrpc blob response types (~15 files)
-**Agent:** MITHRIL | **Gate:** None (ETH-only, no consensus path).
-
-**Prompt:**
-```
-Use the MITHRIL agent. Introduce `opaque type BlobVersionedHash = ByteString` in `src/main/`.
-
-Context: `blobVersionedHashes: List[ByteString]` in `BlobTransaction` is EIP-4844 specific and
-ETH-only. ~15 files. Reference: `.local/docs/opaque-type-domain-analysis.md` §3.
-
-Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/BlobVersionedHash.scala`:
-```scala
-opaque type BlobVersionedHash = ByteString
-object BlobVersionedHash:
-  def apply(bs: ByteString): BlobVersionedHash = bs
-  extension (bvh: BlobVersionedHash) def value: ByteString = bvh
-  given rlpCodec: RLPCodec[BlobVersionedHash] = summon[RLPCodec[ByteString]].xmap(BlobVersionedHash.apply, _.value)
-```
-Step 2 — Update `Transaction.scala` `BlobTransaction`: `blobVersionedHashes: List[ByteString]` → `List[BlobVersionedHash]`.
-Step 3 — Update `ETHPackets.scala` codec: wrap at decode, `h.value.toArray` at encode.
-Step 4 — Update jsonrpc blob response fields.
-Step 5 — `sbt compile-all` — must be clean.
-Step 6 — `sbt "testOnly *BlobTransaction* *ETH*"`.
-Step 7 — `git commit -m "feat(8b-L3): introduce BlobVersionedHash opaque type (ByteString) — ~15 sites"`
-```
-
----
-
-#### §8b-M1 — `StorageKey` Phase A: AccessListItem (no EVM touch)
-
-**Files:** `domain/StorageKey.scala` (new), `Transaction.scala` (`AccessListItem`), `ETHPackets.scala` EIP-2930 codec (~7 files)
-**Agent:** MITHRIL | **Gate:** None for Phase A.
-
-**Prompt:**
-```
-Use the MITHRIL agent. Introduce `opaque type StorageKey = BigInt` — Phase A only
-(AccessListItem; do NOT touch ProgramState or EthereumUInt256Mpt in this pass).
-
-Context: `AccessListItem.storageKeys: List[BigInt]` is EIP-2929/2930. Phase A is safe because
-AccessListItem is never read inside the EVM opcode dispatcher directly.
-Reference: `.local/docs/opaque-type-domain-analysis.md` §4 Phase A.
-
-Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/StorageKey.scala`:
-```scala
-opaque type StorageKey = BigInt
-object StorageKey:
-  def apply(v: BigInt): StorageKey = v
-  extension (sk: StorageKey) def value: BigInt = sk
-  given rlpCodec: RLPCodec[StorageKey] = summon[RLPCodec[BigInt]].xmap(StorageKey.apply, _.value)
-```
-Step 2 — Update `Transaction.scala` `AccessListItem`: `storageKeys: List[BigInt]` → `List[StorageKey]`.
-Step 3 — Update `ETHPackets.scala` EIP-2930/EIP-1559 typed tx codecs: wrap at decode, `.value` at encode.
-Step 4 — Check other AccessListItem callers. STOP if you reach `ProgramState.scala` or `EthereumUInt256Mpt` — those are Phase B.
-Step 5 — `sbt compile-all` — must be clean.
-Step 6 — `sbt "testOnly *Transaction* *AccessList*"`.
-Step 7 — `git commit -m "feat(8b-M1): StorageKey opaque type Phase A — AccessListItem only, ~7 files"`
-```
-
----
-
-#### §8b-M2 — `CodeHash`: ByteString → opaque type (FORGE + BEACON advisory)
-
-**Files:** `domain/CodeHash.scala` (new), `Account.scala`, `BlockchainReader.scala`, state trie layer (~32 files)
-**Agent:** MITHRIL + FORGE advisory + BEACON advisory | **Gate:** FORGE + BEACON — EIP-161 and EIP-684 are consensus paths on both chains.
-
-**Prompt:**
-```
-Use MITHRIL to implement `opaque type CodeHash = ByteString`, then ask FORGE and
-BEACON to review before committing.
-
-Context: `Account.codeHash` and `Account.EmptyCodeHash` are used in EIP-161 empty-account checks
-and EIP-684 collision detection on BOTH ETC and ETH. The opaque wrapper preserves runtime `==`.
-Reference: `.local/docs/opaque-type-domain-analysis.md` §5.
-
-Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/CodeHash.scala`:
-```scala
-opaque type CodeHash = ByteString
-object CodeHash:
-  val Empty: CodeHash = ByteString(new Array[Byte](32))  // kec256(ByteString.empty)
-  def apply(bs: ByteString): CodeHash = bs
-  extension (ch: CodeHash)
-    def value: ByteString = ch
-    def isEmpty: Boolean = ch == Empty
-  given rlpCodec: RLPCodec[CodeHash] = summon[RLPCodec[ByteString]].xmap(CodeHash.apply, _.value)
-```
-Step 2 — Update `Account.scala`: `codeHash: ByteString` → `CodeHash`. `EmptyCodeHash` → `val EmptyCodeHash: CodeHash = CodeHash.Empty`. Wrap/unwrap at codec boundary only.
-Step 3 — Update all sites referencing `Account.codeHash` or `Account.EmptyCodeHash`. EIP-161/684 `==` checks: still work through opaque type — no change needed.
+Step 2 — Update `BlockHeader.scala`: `difficulty: BigInt` → `Difficulty`. Use `sbt compile` between files (BlockHeader has 50+ dependents).
+Step 3 — Update Ethash mining + difficulty-bomb/adjustment sites. Wrap return values with `Difficulty(...)`, unwrap with `.value` at arithmetic boundaries.
 Step 4 — `sbt compile-all` — must be clean.
-Step 5 — FORGE review: confirm EIP-161/684 semantics preserved on ETC, no byte encoding altered.
-Step 5b — BEACON review: confirm EIP-161/684 semantics preserved on ETH.
-Step 6 (after FORGE + BEACON confirm) — `sbt "testOnly *Account* *State*"`.
-Step 7 — `git commit -m "feat(8b-M2): CodeHash opaque type (ByteString) — Account + EIP-161/684 sites, FORGE+BEACON reviewed"`
+Step 5 — FORGE review: confirm ETC Ethash difficulty calculation semantics preserved (ECIP-1099, bomb removal).
+Step 6 — BEACON review: confirm ETH post-merge `difficulty=0` / prevRandao not broken.
+Step 7 — `sbt "testOnly *BlockHeader* *Ethash* *Difficulty*"`.
+Step 8 — `git commit -m "feat(8b-H3): Difficulty opaque type (BigInt) — BlockHeader + Ethash sites, FORGE+BEACON reviewed"`
 ```
 
 ---
 
-#### §8b-M3 — `StorageKey` Phase B: ProgramState / EVM (FORGE + BEACON gate)
+#### §8b-H4 — `TotalDifficulty`: BigInt → opaque type
 
-**Files:** `ProgramState.scala`, `EthereumUInt256Mpt.scala`, EVM opcode warm-storage sites
-**Agent:** FORGE + BEACON | **Gate:** FORGE + BEACON — `ProgramState.addAccessedStorageKey` flows through EVM opcode dispatcher for both ETC and ETH.
-**Prerequisite:** §8b-M1 committed.
-
-**Prompt:**
-```
-Use the FORGE agent for ETC EVM paths, then BEACON agent for ETH EVM paths. Extend `StorageKey`
-opaque type from §8b-M1 into `ProgramState` and the EVM storage layer (Phase B).
-
-Pre-flight:
-1. Confirm §8b-M1 committed: `grep "opaque type StorageKey" src/main/scala/.../StorageKey.scala`
-2. Confirm `sbt compile-all` is clean.
-
-Step 1 — Update `ProgramState.scala`: `addAccessedStorageKey(address: Address, key: BigInt)` → `key: StorageKey`. At call sites wrap with `StorageKey(bigInt)`.
-Step 2 — Update `EthereumUInt256Mpt`: only if key is clearly a storage slot.
-Step 3 — Verify EVM SLOAD/SSTORE opcode sites: `grep -rn "addAccessedStorageKey\|isStorageKeyWarm" src/main/ --include="*.scala"`.
-Step 4 — `sbt compile-all` — must be clean.
-Step 5 — `sbt testVM` — EVM opcode tests must pass.
-Step 6 — `sbt "testOnly *ProgramState* *EthereumUInt256Mpt*"`.
-Step 7 — `git commit -m "feat(8b-M3): StorageKey Phase B — ProgramState + EVM warm-storage check, FORGE+BEACON reviewed"`
-```
-
----
-
-#### §8b-M4 — `StorageKey` Phase C: transientStorage type consistency (FORGE + BEACON advisory)
-
-**Files:** `ProgramState.scala`, `ProgramContext.scala`, `ProgramResult.scala`, `OpCode.scala` (TLOAD/TSTORE sites)
-**Agent:** MITHRIL + FORGE advisory + BEACON advisory | **Gate:** §8b-M3 committed.
-**Origin:** BEACON M3 post-commit review finding — `transientStorage: Map[(Address, BigInt), BigInt]` intentionally left as `BigInt` in M3 (EIP-1153 is not EIP-2929 warm-tracked). This prompt applies `StorageKey` for slot-key type consistency.
+**Files:** `domain/TotalDifficulty.scala` (new), `ChainWeight.scala`, `BlockchainReader.scala`, MESS weight sites (~26 files)
+**Agent:** MITHRIL + FORGE + BEACON | **Gate:** H3 committed.
 
 **Prompt:**
 ```
-Use MITHRIL to extend `StorageKey` opaque type into the EIP-1153 transient storage maps (Phase C).
-Then ask FORGE and BEACON for advisory confirmation.
+Use MITHRIL to implement `opaque type TotalDifficulty = BigInt`, then ask FORGE and BEACON to review before committing.
 
-Pre-flight: confirm §8b-M3 committed.
+Context: `ChainWeight.totalDifficulty` drives MESS (Modified Exponential Subjective Scoring) on ETC — consensus-critical for ETC chain-selection. ETH stores TD for historical sync only.
+Reference: `.local/docs/opaque-type-domain-analysis.md` §8b-H4.
 
-Step 1 — Update `ProgramState.scala`: `transientStorage: Map[(Address, BigInt), BigInt]` → `Map[(Address, StorageKey), BigInt]`. In `getTransientStorage`/`setTransientStorage` wrap the raw `BigInt` key with `StorageKey(storageKey)` at the boundary.
-Step 2 — Update `ProgramContext.scala`: same field rename.
-Step 3 — Update `ProgramResult.scala`: same field rename.
-Step 4 — Update TLOAD/TSTORE opcode sites in `OpCode.scala`: wrap slot key with `StorageKey(offset.toBigInt)`.
+Pre-flight: confirm H3 committed — `grep "opaque type Difficulty" src/main/scala/.../Difficulty.scala`.
+
+Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/TotalDifficulty.scala`:
+  opaque type TotalDifficulty = BigInt
+  object TotalDifficulty:
+    val Zero: TotalDifficulty = BigInt(0)
+    def apply(v: BigInt): TotalDifficulty = v
+    extension (td: TotalDifficulty)
+      def value: BigInt = td
+      def +(d: Difficulty): TotalDifficulty = td + d.value
+      def compare(other: TotalDifficulty): Int = td.compare(other)
+    given rlpCodec: RLPCodec[TotalDifficulty] = summon[RLPCodec[BigInt]].xmap(TotalDifficulty.apply, _.value)
+    given Ordering[TotalDifficulty] = Ordering.by(_.value)
+
+Step 2 — Update `ChainWeight.scala`: `totalDifficulty: BigInt` → `TotalDifficulty`. MESS comparisons go through `Ordering[TotalDifficulty]`.
+Step 3 — Update `BlockchainReader.scala`: TD retrieval sites — wrap with `TotalDifficulty(...)`.
+Step 4 — Check all MESS callers: `grep -rn "totalDifficulty\|ChainWeight" src/main/ --include="*.scala"`.
 Step 5 — `sbt compile-all` — must be clean.
-Step 6 — FORGE advisory: confirm TLOAD/TSTORE dispatch on ETC is semantically unchanged.
-Step 7 — BEACON advisory: confirm TLOAD/TSTORE dispatch on ETH (EIP-1153) is semantically unchanged.
-Step 8 — `sbt "testOnly *OpCode* *ProgramState* *VM*"`.
-Step 9 — `git commit -m "feat(8b-M4): StorageKey Phase C — transientStorage type consistency (TLOAD/TSTORE), FORGE+BEACON advisory"`
+Step 6 — FORGE review: confirm MESS weight comparison semantics preserved (critical for ETC chain selection).
+Step 7 — BEACON review: confirm ETH total-difficulty storage + terminal TD semantics unchanged.
+Step 8 — `sbt "testOnly *ChainWeight* *MESS* *BlockchainReader*"`.
+Step 9 — `git commit -m "feat(8b-H4): TotalDifficulty opaque type (BigInt) — ChainWeight + MESS sites, FORGE+BEACON reviewed"`
 ```
 
 ---
 
-#### §8b-H1 through §8b-H8 — High-tier opaque types (deferred until LOW/MEDIUM proven)
+#### §8b-H5 — `GasAmount`: BigInt → opaque type
 
-**Gate:** §8b-L1/L2/L3 and §8b-M1 committed and CI green (establishes RLP `.xmap` pattern in CI).
-**Candidates in sequence:** `BlockHash` (H1, ~50 files) → `TrieRoot` (H2, ~25 files) → `Difficulty` (H3, ~24 files) → `TotalDifficulty` (H4, ~26 files) → `GasAmount` (H5, ~39 files) → `GasPrice` (H6, ~25 files) → `BlockNumber` (H7, ~124 files, largest) → `ChainId` (H8, ~27 files, most dangerous — sign last).
+**Files:** `domain/GasAmount.scala` (new), `BlockHeader.scala` (gasLimit/gasUsed), `Transaction.scala` (gasLimit) (~39 files). VM `ProgramState` gas counter NOT in scope.
+**Agent:** MITHRIL + FORGE + BEACON | **Gate:** H4 committed.
 
-Each requires FORGE + BEACON review. Full prompts available in `completed/DEFERRED-BACKLOG.md §8b-H1–H8` (captured from prior session context).
+**Prompt:**
+```
+Use MITHRIL to implement `opaque type GasAmount = BigInt` for gasLimit/gasUsed fields, then ask FORGE and BEACON to review before committing.
+
+Context: `gasLimit`/`gasUsed` on BlockHeader and `gasLimit` on Transaction are consensus-critical. EIP-1559 adjusts gasTarget on ETH (gasLimit/2); ETC uses a fixed gas model. STOP at `ProgramState.scala` — VM gas counter stays as BigInt.
+Reference: `.local/docs/opaque-type-domain-analysis.md` §8b-H5.
+
+Pre-flight: confirm H4 committed.
+
+Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/GasAmount.scala`:
+  opaque type GasAmount = BigInt
+  object GasAmount:
+    val Zero: GasAmount = BigInt(0)
+    def apply(v: BigInt): GasAmount = v
+    extension (g: GasAmount)
+      def value: BigInt = g
+      def +(other: GasAmount): GasAmount = g + other
+      def -(other: GasAmount): GasAmount = g - other
+      def <(other: GasAmount): Boolean = g < other
+      def <=(other: GasAmount): Boolean = g <= other
+      def compare(other: GasAmount): Int = g.compare(other)
+    given rlpCodec: RLPCodec[GasAmount] = summon[RLPCodec[BigInt]].xmap(GasAmount.apply, _.value)
+    given Ordering[GasAmount] = Ordering.by(_.value)
+
+Step 2 — Update `BlockHeader.scala`: `gasLimit: BigInt` and `gasUsed: BigInt` → `GasAmount`. Use `sbt compile` between files.
+Step 3 — Update `Transaction.scala`: `gasLimit: BigInt` → `GasAmount`.
+Step 4 — STOP: do not touch `ProgramState.scala` — VM gas counter stays BigInt.
+Step 5 — `sbt compile-all` — must be clean.
+Step 6 — FORGE review: confirm ETC block gas limit and transaction gas semantics unchanged.
+Step 7 — BEACON review: confirm ETH EIP-1559 gasTarget computation (`gasLimit / 2`) still correct after wrapping.
+Step 8 — `sbt "testOnly *BlockHeader* *Transaction* *Gas*"`.
+Step 9 — `git commit -m "feat(8b-H5): GasAmount opaque type (BigInt) — BlockHeader.gasLimit/gasUsed + Transaction.gasLimit, FORGE+BEACON reviewed"`
+```
+
+---
+
+#### §8b-H6 — `GasPrice`: BigInt → opaque type
+
+**Files:** `domain/GasPrice.scala` (new), `Transaction.scala` (gasPrice/maxFeePerGas/maxPriorityFeePerGas), `BlockHeader.baseFeePerGas`, fee-calculation sites (~25 files)
+**Agent:** MITHRIL + FORGE + BEACON | **Gate:** H5 committed.
+
+**Prompt:**
+```
+Use MITHRIL to implement `opaque type GasPrice = BigInt` for gas price and EIP-1559 fee fields, then ask FORGE and BEACON to review before committing.
+
+Context: `gasPrice` (legacy/EIP-2930), `maxFeePerGas`/`maxPriorityFeePerGas` (EIP-1559 ETH), `BlockHeader.baseFeePerGas` (EIP-1559 ETH). ETC uses legacy gasPrice only. Fee burn on ETH is consensus-critical.
+Reference: `.local/docs/opaque-type-domain-analysis.md` §8b-H6.
+
+Pre-flight: confirm H5 committed.
+
+Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/GasPrice.scala`:
+  opaque type GasPrice = BigInt
+  object GasPrice:
+    val Zero: GasPrice = BigInt(0)
+    def apply(v: BigInt): GasPrice = v
+    extension (gp: GasPrice)
+      def value: BigInt = gp
+      def *(units: GasAmount): BigInt = gp * units.value   // fee = price * units → raw BigInt
+      def compare(other: GasPrice): Int = gp.compare(other)
+      def min(other: GasPrice): GasPrice = if gp <= other then gp else other
+    given rlpCodec: RLPCodec[GasPrice] = summon[RLPCodec[BigInt]].xmap(GasPrice.apply, _.value)
+    given Ordering[GasPrice] = Ordering.by(_.value)
+
+Step 2 — Update `Transaction.scala`: `gasPrice`, `maxFeePerGas`, `maxPriorityFeePerGas` → `GasPrice`. Also `BlockHeader.baseFeePerGas: Option[BigInt]` → `Option[GasPrice]`.
+Step 3 — Update fee-calculation sites: `fee = gasPrice * gasUsed` → use extension `*(units: GasAmount): BigInt`.
+Step 4 — `sbt compile-all` — must be clean.
+Step 5 — FORGE review: confirm ETC legacy transaction fee unchanged; `baseFeePerGas` is `None` on ETC.
+Step 6 — BEACON review: confirm ETH EIP-1559 baseFee burn byte-perfect: `baseFeePerGas.value * gasUsed.value`.
+Step 7 — `sbt "testOnly *Transaction* *GasPrice* *BaseFee*"`.
+Step 8 — `git commit -m "feat(8b-H6): GasPrice opaque type (BigInt) — Transaction fee fields + BlockHeader.baseFeePerGas, FORGE+BEACON reviewed"`
+```
+
+---
+
+#### §8b-H7 — `BlockNumber`: BigInt → opaque type
+
+**Files:** `domain/BlockNumber.scala` (new), `BlockHeader.scala` (number field), all fork-dispatch sites (~124 files — largest sweep)
+**Agent:** MITHRIL + FORGE + BEACON | **Gate:** H6 committed. **Largest sweep — use `sbt compile` between every file.**
+
+**Prompt:**
+```
+Use MITHRIL to implement `opaque type BlockNumber = BigInt`, then ask FORGE and BEACON to review before committing. Largest §8b sweep (~124 files) — use `sbt compile` between every file; `sbt compile-all` only at the end.
+
+Context: `BlockHeader.number` and ETC `forBlock(blockNumber: BigInt)` fork-dispatch calls are consensus-critical. DO NOT change `forBlock()`/`forTimestamp()` signatures — wrap only the stored `number` field; pass `.value` at fork-dispatch call sites.
+Reference: `.local/docs/opaque-type-domain-analysis.md` §8b-H7.
+
+Pre-flight: confirm H6 committed. Read §8b-H7 in analysis doc for the full 124-file site inventory.
+
+Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/BlockNumber.scala`:
+  opaque type BlockNumber = BigInt
+  object BlockNumber:
+    val Genesis: BlockNumber = BigInt(0)
+    def apply(v: BigInt): BlockNumber = v
+    def apply(v: Long): BlockNumber = BigInt(v)
+    extension (bn: BlockNumber)
+      def value: BigInt = bn
+      def toLong: Long = bn.toLong
+      def +(n: Long): BlockNumber = bn + n
+      def -(n: Long): BlockNumber = bn - n
+      def compare(other: BlockNumber): Int = bn.compare(other)
+      def <(other: BlockNumber): Boolean = bn < other
+      def <=(other: BlockNumber): Boolean = bn <= other
+      def >(other: BlockNumber): Boolean = bn > other
+    given rlpCodec: RLPCodec[BlockNumber] = summon[RLPCodec[BigInt]].xmap(BlockNumber.apply, _.value)
+    given Ordering[BlockNumber] = Ordering.by(_.value)
+
+Step 2 — Update `BlockHeader.scala`: `number: BigInt` → `BlockNumber`.
+Step 3 — Fix callers in batches (`sbt compile` after each batch):
+  Batch A: `domain/` files
+  Batch B: `blockchain/` storage + reader
+  Batch C: `sync/` files
+  Batch D: `network/` files
+  Batch E: `jsonrpc/` files
+  Batch F: fork-config files — pass `.value` into `forBlock(bn.value)`, do NOT change dispatch signatures
+Step 4 — `sbt compile-all` — must be clean.
+Step 5 — FORGE review: confirm ETC `forBlock(bn.value)` dispatch receives a BigInt — semantics preserved.
+Step 6 — BEACON review: confirm ETH BlockHeader.number field encoding unchanged.
+Step 7 — `sbt "testOnly *BlockHeader* *Block*"`.
+Step 8 — `sbt testVM testCrypto` — VM opcode block-number reads.
+Step 9 — `git commit -m "feat(8b-H7): BlockNumber opaque type (BigInt) — BlockHeader + all callers (~124 files), FORGE+BEACON reviewed"`
+```
+
+---
+
+#### §8b-H8 — `ChainId`: BigInt → opaque type
+
+**Files:** `domain/ChainId.scala` (new), `Transaction.scala` (EIP-155 signing), `ECDSASignature.scala`, fork-config chain-ID fields (~27 files)
+**Agent:** MITHRIL + FORGE + BEACON | **Gate:** H7 committed. **HIGHEST RISK — signing layer. Both FORGE and BEACON sign-off mandatory before commit.**
+
+**Prompt:**
+```
+Use MITHRIL to implement `opaque type ChainId = BigInt`, then get mandatory FORGE AND BEACON review before committing. Touching the signing layer — a byte-encoding mismatch invalidates all transactions.
+
+Context: EIP-155 recovery: `v = 2 * chainId + 35 or 36`. ETC chainId=61, ETH chainId=1/11155111.
+Reference: `.local/docs/opaque-type-domain-analysis.md` §8b-H8.
+
+Pre-flight: confirm H7 committed. Read `ECDSASignature.scala` + Transaction EIP-155 signing paths in full before touching any file.
+
+Step 1 — Create `src/main/scala/com/chipprbots/ethereum/domain/ChainId.scala`:
+  opaque type ChainId = BigInt
+  object ChainId:
+    val ETC: ChainId = BigInt(61)
+    val ETH: ChainId = BigInt(1)
+    val Mordor: ChainId = BigInt(63)
+    val Sepolia: ChainId = BigInt(11155111)
+    def apply(v: BigInt): ChainId = v
+    extension (cid: ChainId)
+      def value: BigInt = cid
+      def recoveryV(isOdd: Boolean): BigInt = 2 * cid + (if isOdd then 36 else 35)  // EIP-155
+    given rlpCodec: RLPCodec[ChainId] = summon[RLPCodec[BigInt]].xmap(ChainId.apply, _.value)
+
+Step 2 — Update fork config chain-ID fields: wrap with `ChainId(...)`.
+Step 3 — Update `ECDSASignature.scala`: EIP-155 `v` computation — use `chainId.recoveryV(isOdd)`. Verify `2 * 61 + 35 = 157` / `2 * 61 + 36 = 158` unchanged with a unit test.
+Step 4 — Update `Transaction.scala`: `chainId: Option[BigInt]` → `Option[ChainId]`. Unwrap with `.value` into arithmetic only.
+Step 5 — `sbt compile-all` — must be clean.
+Step 6 — FORGE review (mandatory): verify ETC EIP-155 signing (chainId=61): v=157 or 158. Recovery computation byte-identical.
+Step 7 — BEACON review (mandatory): verify ETH EIP-155 and EIP-2718 typed tx chainId encoding unchanged.
+Step 8 — `sbt "testOnly *Transaction* *ECDSA* *ChainId* *Sign*"`.
+Step 9 — `sbt testVM testCrypto` — full crypto stack.
+Step 10 — `git commit -m "feat(8b-H8): ChainId opaque type (BigInt) — EIP-155 signing layer, FORGE+BEACON reviewed"`
+```
 
 ---
 
@@ -827,6 +837,34 @@ See `completed/DEFERRED-BACKLOG.md §8c` for full M2/L1/L2/L3 context.
 6. BEACON reviews and clears 2 remaining ETH Engine API sites — `EngineApiController.scala:96` + `:226` (S3-D). Both are early-`return IO.pure(...)` decode-error guards; removing the `return` requires wrapping ~90 lines into the `Right`/`else` branch. Gated on a focused BEACON pass.
 7. Wave 3 SNAP1 migration sprint clears SNAPSyncController 36 sites (gated on NET2)
 8. After all above: run `sbt scalafixAll` → 0 violations → ratchet locked.
+
+---
+
+#### §8e-S3-D — EngineApiController 2 remaining early-return sites (BEACON)
+
+**Files:** `consensus/engine/EngineApiController.scala:96` + `:226`
+**Agent:** BEACON | **Gate:** None — unblocked, ~30 min, parallel-safe.
+
+**Prompt:**
+```
+Use the BEACON agent to clear 2 remaining `noReturns` violations in `consensus/engine/EngineApiController.scala`.
+
+Context: Both are early-`return IO.pure(Left(...))` decode-error guards. BEACON previously reviewed 3 ETH Engine API sites (`d78177bda`). These 2 remained because removing `return` requires wrapping the remaining ~90 lines of each method body into a `Right` else branch.
+
+Step 1 — Read `EngineApiController.scala` lines :80–:150 (site at :96) and :210–:280 (site at :226) to understand each guard's structure.
+Step 2 — BEACON: confirm the refactored guard preserves semantics — same Left payload on decode error, same IO chain on success.
+Step 3 — Apply refactoring for each site:
+  Before: if (bad) return IO.pure(Left(ErrorMsg)); rest_of_method
+  After:  if (bad) IO.pure(Left(ErrorMsg)) else { rest_of_method }
+  (or for-comprehension if the structure fits — BEACON decides)
+Step 4 — `sbt compile-all` — must be clean.
+Step 5 — `sbt "testOnly *EngineApi*"`.
+Step 6 — `git commit -m "fix(8e-S3-D): remove early-return guards in EngineApiController — BEACON reviewed"`
+Step 7 — Verify: `grep -c "return" src/main/.../EngineApiController.scala` drops by 2.
+Step 8 — `sbt scalafixAll` — confirm these 2 sites no longer block the ratchet.
+```
+
+---
 
 **Other rules to evaluate enabling (unblocked, lower priority):**
 ```
@@ -882,7 +920,7 @@ ExplicitResultTypes      # explicit return types on public defs (enable graduall
 | **Network/sync Pekko** | Part 2: S3→S4/S7→NET2→SNAP1→SNAP2→ROOT→CAPSTONE (see SPRINT-QUEUE.md) | scala3-cleanup-june merged |
 | **→ CAPSTONE** | Root flip: `ActorSystem[Nothing]`, bridge/adapter removal, `Behavior[Any]` narrowing | All actors Typed |
 | **7c — Supervision** | §7c-P0 → §7c-D → §7c-A → §7c-B → §7c-C/E | CAPSTONE + 7a ✅ |
-| **8b — Opaque types** | LOW tier first → MEDIUM → HIGH (in tier order) | Part 3a done |
+| **8b — Opaque types (H3–H8)** | Difficulty → TotalDifficulty → GasAmount → GasPrice → BlockNumber → ChainId | Gate met (H2 done) |
 | **8i — RLP derivation** | Replace handwritten product-type RLP codecs | Part 3a + R7 done |
 | **3a — implicit→given** | 198 files, 522 declarations (scalafix GivenUsing) | After Pekko migration |
 | **4e Jackson 3** | json4s 4.2.0-M5 gate | json4s M5 release |

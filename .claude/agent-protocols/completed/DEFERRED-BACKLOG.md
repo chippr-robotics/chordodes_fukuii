@@ -2568,11 +2568,11 @@ Added `forAll { msg => decode(encode(msg)) == msg }` property-based round-trip t
 
 ---
 
-## §R11 — ETC-Only Artifact Sweep (A/B/C complete) ✅ 2026-06-26
+## §R11 — ETC-Only Artifact Sweep ✅ 2026-06-26 (ALL COMPLETE)
 
-**Agent:** main session (A/C) · HERALD (B)
+**Agent:** main session (A/C) · HERALD (B) · BEACON (D/E)
 **Branch:** `scala3-cleanup-june`
-**Commits:** `e0cebcd72` (A) · `6b2b41e49` + `d1a7073bf` (B + B-followup) · `6be73300f` (C)
+**Commits:** `e0cebcd72` (A) · `6b2b41e49` + `d1a7073bf` (B + B-followup) · `6be73300f` (C) · `2277555c7` + `e701281a0` (D) · `9591ff9e1` (E)
 
 ### §R11-A — Memory + Local Doc Bias Sweep ✅ `e0cebcd72`
 
@@ -2616,8 +2616,36 @@ shared-chain code paths (vm/, domain/, EVM opcodes, consensus/).
 - §8b-M1 gate text: "Phase B requires FORGE" → "Phase B requires FORGE + BEACON"
 - §8b-M1 prompt: "(FORGE gate)" → "(FORGE + BEACON gate)"
 
-**Remaining (D/E open):**
-- §R11-D — BEACON: PoS skill gap audit + write CL-setup/engine-API/Sepolia-sync/PoS-health skills
-- §R11-E — BEACON: ETH mainnet `ops/barad-dur/eth/` deployment parity
+### §R11-D — PoS Skill Gap: Audit + Authoring ✅ `2277555c7` + `e701281a0`
 
-**Cross-refs:** `working-docs/DEFERRED-BACKLOG.md Part 16 (D+E still open)`, `modernization-log/` (no log entry — pure docs sweep)
+Audited `fukuii/.claude/skills/` for PoS coverage gaps. Existing dual-chain skills annotated
+with `**ETH/Sepolia:**` divergence notes. Four new PoS-specific skills written by BEACON.
+
+**`2277555c7` (partial — CL setup + Engine API debug):**
+- `fukuii-cl-setup.md` — pairing fukuii EL with Prysm/Lighthouse; JWT auth, Engine API URL,
+  startup order, verification (`curl` → 401), common "execution layer not available" failure
+- `fukuii-engine-api-debug.md` — JWT 401 (clock skew, wrong path), `forkchoiceUpdated` timeout,
+  `newPayload` INVALID (sync gap), SYNCING status, `exchangeCapabilities` version mismatch,
+  EL-vs-CL bug isolation heuristic
+
+**`e701281a0` (completion — Sepolia sync + PoS health + skill index):**
+- `fukuii-sepolia-sync.md` — Sepolia sync from scratch; pre/post-merge phase split (EL peers
+  before 15537393, CL-driven after); `eth_syncing` verification; blob transaction handling;
+  troubleshooting stall by phase
+- `fukuii-pos-node-health.md` — CL↔EL Engine API liveness check, `eth_syncing` via `cast rpc`,
+  attestation participation, blob gossip peer count, Engine API latency target (<2s)
+- README skill index updated: PoS skills added to the operational skill table
+
+### §R11-E — ETH Mainnet Deployment Parity ✅ `9591ff9e1`
+
+Created `ops/barad-dur/eth/` mirroring the existing `ops/barad-dur/sepolia/` structure.
+
+**`9591ff9e1` additions:**
+- `ops/barad-dur/eth/docker-compose.yml` — `fukuii-eth` (EL) + `lighthouse-eth` (CL) services;
+  JWT shared at `/app/jwt/jwt.hex`; `mem_limit: 8g` (ETH mainnet state larger than Sepolia);
+  ports assigned from next available block after Sepolia
+- `ops/barad-dur/eth/fukuii-conf/eth.conf` — `include classpath("eth.conf")` + barad-dur overrides
+- `ops/barad-dur/eth/fukuii-conf/static-nodes.json` — empty array `[]` (ETH uses DNS discovery)
+- `ARCHITECTURE.md` barad-dur tree updated: `eth/` row added alongside `sepolia/`
+
+**Cross-refs:** `working-docs/DEFERRED-BACKLOG.md Part 16 (DONE)`, `modernization-log/` (no entry — docs/ops sweep, not code modernization)
