@@ -3,6 +3,8 @@ package com.chipprbots.ethereum.blockchain.sync.snap
 import org.apache.pekko.actor.{Actor, ActorLogging, ActorRef, Props, Scheduler, Cancellable}
 import org.apache.pekko.util.ByteString
 
+import cats.effect.unsafe.IORuntime
+
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
 import scala.collection.mutable
@@ -24,6 +26,7 @@ import com.chipprbots.ethereum.db.storage.{
   StateStorage
 }
 import com.chipprbots.ethereum.domain.{Block, BlockBody, BlockHeader, BlockchainReader, BlockchainWriter, ChainWeight}
+import com.chipprbots.ethereum.mpt.StackTrie
 import com.chipprbots.ethereum.network.p2p.messages.{Capability, SNAP}
 import com.chipprbots.ethereum.network.p2p.messages.SNAP._
 import com.chipprbots.ethereum.utils.Hex
@@ -4495,6 +4498,59 @@ class SNAPSyncController(
       // from the pivot.
       blockchainReader.getBlockHeaderByNumber(pivot) match {
         case Some(pivotHeader) =>
+          // Spec 008 US1 (Decision 4 / C3) — local-merkleize finalize gate, layered ADDITIVELY
+          // BEFORE the existing anchor guard below (which stays byte-untouched). When
+          // `flatAccountMerkleize` is on AND the flat-account store actually holds retained leaves,
+          // recompute the state root LOCALLY from those leaves via one ascending StackTrie pass and
+          // require it to equal `pivotHeader.stateRoot`. This makes completion safe-by-construction:
+          // a wrong/absent root can NEVER be finalized, so enabling the feature only ever yields the
+          // same verified root or a fail-closed non-finalize (SC-003/SC-004).
+          //
+          // Empty-store guard: if no leaves were retained (feature off during download, deferred-
+          // merkleization path, or a resume that didn't write), the gate is SKIPPED and finalize
+          // falls through to the byte-identical legacy anchor guard. So the legacy path is untouched
+          // whenever the feature didn't actually retain a flat set.
+          //
+          // Fail-closed (FR-003/FR-004): on mismatch OR any merkleization/seek error we do NOT
+          // finalize, do NOT partial-commit (we `break()` BEFORE any storeBlock/snapSyncDone write),
+          // and escalate via `HealingImpossible` — the SAME established primitive the anchor guard
+          // uses. SyncController poison-pills us and restarts SNAP with a fresh pivot. On a real
+          // advancing sync (without US3's freeze+re-fetch) the retained leaves form a mosaic across
+          // pivots, so this gate is EXPECTED to fail closed — that is the intended safety property;
+          // completion under pivot advance lands in US3.
+          if (snapSyncConfig.flatAccountMerkleize && flatAccountStorage.approximateKeyCount() > 0L) {
+            computeLocalStateRoot(flatAccountStorage) match {
+              case Right(computedRoot) if computedRoot == pivotHeader.stateRoot =>
+                log.info(
+                  "[FLAT-MERKLEIZE] Local finalize gate PASSED: computedRoot={} == pivotHeader.stateRoot={} " +
+                    "at pivot={}. Proceeding to finalize on the self-verified root.",
+                  computedRoot.toHex,
+                  pivotHeader.stateRoot.toHex,
+                  pivot
+                )
+              case Right(computedRoot) =>
+                log.error(
+                  "[FLAT-MERKLEIZE] Local finalize gate FAILED (mismatch — failing closed): computedRoot={} != " +
+                    "pivotHeader.stateRoot={} at pivot={}. NOT finalizing; escalating to SyncController for SNAP " +
+                    "restart with a fresh pivot. (Expected on an advancing sync until US3 freeze+re-fetch lands.)",
+                  computedRoot.toHex,
+                  pivotHeader.stateRoot.toHex,
+                  pivot
+                )
+                context.parent ! SyncProtocol.HealingImpossible
+                break()
+              case Left(err) =>
+                log.error(
+                  "[FLAT-MERKLEIZE] Local finalize gate FAILED (error — failing closed): {} at pivot={}. " +
+                    "NOT finalizing; escalating to SyncController for SNAP restart with a fresh pivot.",
+                  err,
+                  pivot
+                )
+                context.parent ! SyncProtocol.HealingImpossible
+                break()
+            }
+          }
+
           // A5: Root match guard — snapStateRoot must equal pivotHeader.stateRoot before
           // marking sync done. Mirrors Besu SnapWorldDownloadState.saveWorldState() implicit
           // verification. If they diverge (BUG-008 class), restart SNAP rather than committing
@@ -4709,6 +4765,70 @@ class SNAPSyncController(
 }
 
 object SNAPSyncController {
+
+  /** The 32-byte all-zero seek origin — the lowest possible keccak key, so `seekFrom` walks the FULL account keyspace
+    * in strictly-ascending order.
+    */
+  private val SeekFromOrigin: ByteString = ByteString(new Array[Byte](32))
+
+  /** Spec 008 US1 (C3) — local finalize-time state-root merkleization.
+    *
+    * Streams every retained account leaf from `flatAccountStorage` in strictly-ascending 32-byte key order
+    * (`seekFrom(0x00..00)`) into ONE [[StackTrie]] — for each `(accountHash, accountRLP)`, `update(accountHash,
+    * accountRLP)`. The account's `storageRoot` is taken DIRECTLY off the leaf RLP (research Decision 1): the leaf bytes
+    * are fed verbatim, so whatever `storageRoot` the leaf carries is what the trie commits to. We never re-derive
+    * `storageRoot` from `FlatSlotStorage` for the root number.
+    *
+    * The single ascending pass is byte-exact: `StackTrie` is a faithful go-ethereum `stacktrie.go` port, and feeding it
+    * the SAME `(key, value)` bytes the production [[com.chipprbots.ethereum.mpt.MerklePatriciaTrie]] consumes
+    * (`HexPrefix.bytesToNibbles(key)` over the 32-byte hash; the raw RLP leaf as value) yields THE canonical MPT state
+    * root. The legacy inline path already computes this — just fragmented across 16 per-task tries; this unfragments it
+    * into one root.
+    *
+    * Fail-closed (FR-004): returns `Left(msg)` — never a partial or fabricated root — if the store is empty (nothing to
+    * merkleize), a `seekFrom` iteration error surfaces, or `StackTrie.update`/`hash` throws (e.g. a non-ascending key,
+    * which would indicate store corruption). The caller MUST NOT finalize on a `Left`.
+    *
+    * Pure and deterministic: no actor state, no clock, no RNG — fully unit-testable against a real RocksDB-backed
+    * `FlatAccountStorage` (US1 T011/T012). Streams (folds each leaf into the trie) rather than materializing the whole
+    * keyspace, so memory stays O(trie depth) even at 86M-account ETC-mainnet scale.
+    */
+  def computeLocalStateRoot(flatAccountStorage: FlatAccountStorage): Either[String, ByteString] = {
+    val stackTrie = new StackTrie((_, _, _) => ()) // root hash only; we don't persist nodes here
+    var count: Long = 0L
+    var failure: Option[String] = None
+    try
+      flatAccountStorage
+        .seekFrom(SeekFromOrigin)
+        .compile
+        .fold(()) { (_, item) =>
+          if (failure.isEmpty) {
+            item match {
+              case Right((accountHash, accountRLP)) =>
+                stackTrie.update(accountHash.toArray, accountRLP.toArray)
+                count += 1L
+              case Left(err) =>
+                failure = Some(s"flat-account seek iteration error: $err")
+            }
+          }
+        }
+        .unsafeRunSync()(IORuntime.global)
+    catch {
+      case scala.util.control.NonFatal(ex) =>
+        return Left(s"local merkleization failed after $count leaves: ${ex.getClass.getSimpleName}: ${ex.getMessage}")
+    }
+    failure match {
+      case Some(msg) => Left(msg)
+      case None =>
+        if (count == 0L) Left("flat-account store is empty — nothing to merkleize (fail closed)")
+        else
+          try Right(stackTrie.hash())
+          catch {
+            case scala.util.control.NonFatal(ex) =>
+              Left(s"StackTrie.hash() failed over $count leaves: ${ex.getClass.getSimpleName}: ${ex.getMessage}")
+          }
+    }
+  }
 
   sealed trait SyncPhase
   case object Idle extends SyncPhase
