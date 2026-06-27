@@ -3,6 +3,7 @@ package com.chipprbots.ethereum.blockchain.sync
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.SupervisorStrategy
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
@@ -218,19 +219,25 @@ object StorageRecoveryActor {
                   val requestTracker = new snap.SNAPRequestTracker()(ctx.system.classicSystem.scheduler)
                   val mptStorage = stateStorage.getBackingStorage(pivotBlockNumber)
                   ctx.spawn(
-                    actors.StorageRangeCoordinator(
-                      stateRoot = stateRoot,
-                      networkPeerManager = networkPeerManager,
-                      requestTracker = requestTracker,
-                      mptStorage = mptStorage,
-                      flatSlotStorage = flatSlotStorage,
-                      maxAccountsPerBatch = snapSyncConfig.storageBatchSize,
-                      maxInFlightRequests = snapSyncConfig.storageConcurrency,
-                      requestTimeout = snapSyncConfig.timeout,
-                      snapSyncController = srcAdapter,
-                      initialResponseBytes = snapSyncConfig.storageInitialResponseBytes,
-                      minResponseBytes = snapSyncConfig.storageMinResponseBytes
-                    ),
+                    Behaviors
+                      .supervise(
+                        actors.StorageRangeCoordinator(
+                          stateRoot = stateRoot,
+                          networkPeerManager = networkPeerManager,
+                          requestTracker = requestTracker,
+                          mptStorage = mptStorage,
+                          flatSlotStorage = flatSlotStorage,
+                          maxAccountsPerBatch = snapSyncConfig.storageBatchSize,
+                          maxInFlightRequests = snapSyncConfig.storageConcurrency,
+                          requestTimeout = snapSyncConfig.timeout,
+                          snapSyncController = srcAdapter,
+                          initialResponseBytes = snapSyncConfig.storageInitialResponseBytes,
+                          minResponseBytes = snapSyncConfig.storageMinResponseBytes
+                        )
+                      )
+                      .onFailure[Throwable](
+                        SupervisorStrategy.restartWithBackoff(1.second, 10.seconds, 0.2).withMaxRestarts(3)
+                      ),
                     "storage-recovery-coordinator",
                     org.apache.pekko.actor.typed.DispatcherSelector.fromConfig("sync-dispatcher")
                   )

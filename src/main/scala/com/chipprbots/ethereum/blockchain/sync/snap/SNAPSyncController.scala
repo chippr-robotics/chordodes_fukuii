@@ -4,6 +4,7 @@ import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.PostStop
+import org.apache.pekko.actor.typed.SupervisorStrategy
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
@@ -2350,13 +2351,19 @@ private class SNAPSyncControllerImpl(
               if !bytecodeAlreadyDone then {
                 bytecodeCoordinator = Some(
                   ctx.spawn(
-                    actors.ByteCodeCoordinator(
-                      evmCodeStorage = evmCodeStorage,
-                      networkPeerManager = networkPeerManager,
-                      requestTracker = requestTracker,
-                      batchSize = ByteCodeTask.DEFAULT_BATCH_SIZE,
-                      snapSyncController = ctx.self
-                    ),
+                    Behaviors
+                      .supervise(
+                        actors.ByteCodeCoordinator(
+                          evmCodeStorage = evmCodeStorage,
+                          networkPeerManager = networkPeerManager,
+                          requestTracker = requestTracker,
+                          batchSize = ByteCodeTask.DEFAULT_BATCH_SIZE,
+                          snapSyncController = ctx.self
+                        )
+                      )
+                      .onFailure[Throwable](
+                        SupervisorStrategy.restartWithBackoff(1.second, 10.seconds, 0.2).withMaxRestarts(3)
+                      ),
                     s"bytecode-coordinator-$coordinatorGeneration",
                     org.apache.pekko.actor.typed.DispatcherSelector.fromConfig("sync-dispatcher")
                   )
@@ -2369,25 +2376,31 @@ private class SNAPSyncControllerImpl(
                 forceCompleteStorageSent = false
                 storageRangeCoordinator = Some(
                   ctx.spawn(
-                    actors.StorageRangeCoordinator(
-                      stateRoot = rootBs,
-                      networkPeerManager = networkPeerManager,
-                      requestTracker = requestTracker,
-                      mptStorage = storage,
-                      flatSlotStorage = flatSlotStorage,
-                      maxAccountsPerBatch = snapSyncConfig.storageBatchSize,
-                      maxInFlightRequests = snapSyncConfig.storageConcurrency,
-                      requestTimeout = snapSyncConfig.timeout,
-                      snapSyncController = ctx.self,
-                      initialMaxInFlightPerPeer = 3, // Recovery: accounts done, storage gets 3 of 5 per-peer budget
-                      initialResponseBytes = snapSyncConfig.storageInitialResponseBytes,
-                      minResponseBytes = snapSyncConfig.storageMinResponseBytes,
-                      deferredMerkleization = snapSyncConfig.deferredMerkleization,
-                      maxConcurrentStorageAccounts = snapSyncConfig.maxConcurrentStorageAccounts,
-                      snapProgressStorage = Some(snapProgressStorage),
-                      storageScheme = snapSyncConfig.storageScheme,
-                      pathNodeStorage = pathNodeStorageOpt
-                    ),
+                    Behaviors
+                      .supervise(
+                        actors.StorageRangeCoordinator(
+                          stateRoot = rootBs,
+                          networkPeerManager = networkPeerManager,
+                          requestTracker = requestTracker,
+                          mptStorage = storage,
+                          flatSlotStorage = flatSlotStorage,
+                          maxAccountsPerBatch = snapSyncConfig.storageBatchSize,
+                          maxInFlightRequests = snapSyncConfig.storageConcurrency,
+                          requestTimeout = snapSyncConfig.timeout,
+                          snapSyncController = ctx.self,
+                          initialMaxInFlightPerPeer = 3, // Recovery: accounts done, storage gets 3 of 5 per-peer budget
+                          initialResponseBytes = snapSyncConfig.storageInitialResponseBytes,
+                          minResponseBytes = snapSyncConfig.storageMinResponseBytes,
+                          deferredMerkleization = snapSyncConfig.deferredMerkleization,
+                          maxConcurrentStorageAccounts = snapSyncConfig.maxConcurrentStorageAccounts,
+                          snapProgressStorage = Some(snapProgressStorage),
+                          storageScheme = snapSyncConfig.storageScheme,
+                          pathNodeStorage = pathNodeStorageOpt
+                        )
+                      )
+                      .onFailure[Throwable](
+                        SupervisorStrategy.restartWithBackoff(1.second, 10.seconds, 0.2).withMaxRestarts(3)
+                      ),
                     s"storage-range-coordinator-$coordinatorGeneration",
                     org.apache.pekko.actor.typed.DispatcherSelector.fromConfig("sync-dispatcher")
                   )
@@ -3375,21 +3388,27 @@ private class SNAPSyncControllerImpl(
 
     accountRangeCoordinator = Some(
       ctx.spawn(
-        actors.AccountRangeCoordinator(
-          stateRoot = rootHash.value,
-          networkPeerManager = networkPeerManager,
-          requestTracker = requestTracker,
-          mptStorage = storage,
-          concurrency = effectiveConcurrency,
-          snapSyncController = ctx.self,
-          resumeProgress = resumeProgress,
-          initialMaxInFlightPerPeer =
-            5, // Full per-peer budget during AccountRangeSync (storage+bytecode deferred to 0)
-          initialResponseBytes = snapSyncConfig.accountInitialResponseBytes,
-          minResponseBytes = snapSyncConfig.accountMinResponseBytes,
-          storageScheme = snapSyncConfig.storageScheme,
-          pathNodeStorage = pathNodeStorageOpt
-        ),
+        Behaviors
+          .supervise(
+            actors.AccountRangeCoordinator(
+              stateRoot = rootHash.value,
+              networkPeerManager = networkPeerManager,
+              requestTracker = requestTracker,
+              mptStorage = storage,
+              concurrency = effectiveConcurrency,
+              snapSyncController = ctx.self,
+              resumeProgress = resumeProgress,
+              initialMaxInFlightPerPeer =
+                5, // Full per-peer budget during AccountRangeSync (storage+bytecode deferred to 0)
+              initialResponseBytes = snapSyncConfig.accountInitialResponseBytes,
+              minResponseBytes = snapSyncConfig.accountMinResponseBytes,
+              storageScheme = snapSyncConfig.storageScheme,
+              pathNodeStorage = pathNodeStorageOpt
+            )
+          )
+          .onFailure[Throwable](
+            SupervisorStrategy.restartWithBackoff(1.second, 10.seconds, 0.2).withMaxRestarts(3)
+          ),
         s"account-range-coordinator-$coordinatorGeneration",
         org.apache.pekko.actor.typed.DispatcherSelector.fromConfig("sync-dispatcher")
       )
@@ -3413,13 +3432,19 @@ private class SNAPSyncControllerImpl(
     if bytecodeCoordinator.isEmpty then {
       bytecodeCoordinator = Some(
         ctx.spawn(
-          actors.ByteCodeCoordinator(
-            evmCodeStorage = evmCodeStorage,
-            networkPeerManager = networkPeerManager,
-            requestTracker = requestTracker,
-            batchSize = ByteCodeTask.DEFAULT_BATCH_SIZE,
-            snapSyncController = ctx.self
-          ),
+          Behaviors
+            .supervise(
+              actors.ByteCodeCoordinator(
+                evmCodeStorage = evmCodeStorage,
+                networkPeerManager = networkPeerManager,
+                requestTracker = requestTracker,
+                batchSize = ByteCodeTask.DEFAULT_BATCH_SIZE,
+                snapSyncController = ctx.self
+              )
+            )
+            .onFailure[Throwable](
+              SupervisorStrategy.restartWithBackoff(1.second, 10.seconds, 0.2).withMaxRestarts(3)
+            ),
           s"bytecode-coordinator-$coordinatorGeneration",
           org.apache.pekko.actor.typed.DispatcherSelector.fromConfig("sync-dispatcher")
         )
@@ -3436,33 +3461,39 @@ private class SNAPSyncControllerImpl(
       forceCompleteStorageSent = false
       storageRangeCoordinator = Some(
         ctx.spawn(
-          actors.StorageRangeCoordinator(
-            stateRoot = rootHash.value,
-            networkPeerManager = networkPeerManager,
-            requestTracker = requestTracker,
-            mptStorage = storage,
-            flatSlotStorage = flatSlotStorage,
-            maxAccountsPerBatch = snapSyncConfig.storageBatchSize,
-            maxInFlightRequests = snapSyncConfig.storageConcurrency,
-            requestTimeout = snapSyncConfig.timeout,
-            snapSyncController = ctx.self,
-            // 2-per-peer during AccountRangeSync. Original design used 0 here to defer storage
-            // dispatch until accounts completed (prevents stale-root timeouts triggering false
-            // pivot refreshes). That assumption breaks on huge chains like sepolia: account
-            // ranges never complete within a pivot serve window, so storage never gets a
-            // non-zero budget and the queue grows unbounded until OOM. PR #1237's strike-counted
-            // stateless detection + PR #1241's backpressure-release-on-pivot now make stale-root
-            // timeouts a recoverable event rather than a failure cascade. Bump default ensures
-            // storage can drain concurrently with account.
-            initialMaxInFlightPerPeer = 2,
-            initialResponseBytes = snapSyncConfig.storageInitialResponseBytes,
-            minResponseBytes = snapSyncConfig.storageMinResponseBytes,
-            deferredMerkleization = snapSyncConfig.deferredMerkleization,
-            maxConcurrentStorageAccounts = snapSyncConfig.maxConcurrentStorageAccounts,
-            snapProgressStorage = Some(snapProgressStorage),
-            storageScheme = snapSyncConfig.storageScheme,
-            pathNodeStorage = pathNodeStorageOpt
-          ),
+          Behaviors
+            .supervise(
+              actors.StorageRangeCoordinator(
+                stateRoot = rootHash.value,
+                networkPeerManager = networkPeerManager,
+                requestTracker = requestTracker,
+                mptStorage = storage,
+                flatSlotStorage = flatSlotStorage,
+                maxAccountsPerBatch = snapSyncConfig.storageBatchSize,
+                maxInFlightRequests = snapSyncConfig.storageConcurrency,
+                requestTimeout = snapSyncConfig.timeout,
+                snapSyncController = ctx.self,
+                // 2-per-peer during AccountRangeSync. Original design used 0 here to defer storage
+                // dispatch until accounts completed (prevents stale-root timeouts triggering false
+                // pivot refreshes). That assumption breaks on huge chains like sepolia: account
+                // ranges never complete within a pivot serve window, so storage never gets a
+                // non-zero budget and the queue grows unbounded until OOM. PR #1237's strike-counted
+                // stateless detection + PR #1241's backpressure-release-on-pivot now make stale-root
+                // timeouts a recoverable event rather than a failure cascade. Bump default ensures
+                // storage can drain concurrently with account.
+                initialMaxInFlightPerPeer = 2,
+                initialResponseBytes = snapSyncConfig.storageInitialResponseBytes,
+                minResponseBytes = snapSyncConfig.storageMinResponseBytes,
+                deferredMerkleization = snapSyncConfig.deferredMerkleization,
+                maxConcurrentStorageAccounts = snapSyncConfig.maxConcurrentStorageAccounts,
+                snapProgressStorage = Some(snapProgressStorage),
+                storageScheme = snapSyncConfig.storageScheme,
+                pathNodeStorage = pathNodeStorageOpt
+              )
+            )
+            .onFailure[Throwable](
+              SupervisorStrategy.restartWithBackoff(1.second, 10.seconds, 0.2).withMaxRestarts(3)
+            ),
           s"storage-range-coordinator-$coordinatorGeneration",
           org.apache.pekko.actor.typed.DispatcherSelector.fromConfig("sync-dispatcher")
         )
@@ -3624,29 +3655,35 @@ private class SNAPSyncControllerImpl(
 
         trieNodeHealingCoordinator = Some(
           ctx.spawn(
-            actors.TrieNodeHealingCoordinator(
-              stateRoot = root.value,
-              networkPeerManager = networkPeerManager,
-              requestTracker = requestTracker,
-              mptStorage = storage,
-              batchSize = snapSyncConfig.healingBatchSize,
-              snapSyncController = ctx.self,
-              concurrency = snapSyncConfig.healingConcurrency,
-              visitedCap = snapSyncConfig.healingVisitedCap,
-              healingFrontierStorage = healingFrontierStorageOpt,
-              traversalParallelism = snapSyncConfig.healingTraversalParallelism,
-              healingMinParallelism = snapSyncConfig.healingMinParallelism,
-              healingReservedCores = snapSyncConfig.healingReservedCores,
-              bfsQueueStorageOpt = Some(bfsQueueStorage),
-              storageScheme = snapSyncConfig.storageScheme,
-              pathNodeStorageOpt = pathNodeStorageOpt,
-              frontierHighWater = snapSyncConfig.healingFrontierHighWater,
-              frontierLowWater = snapSyncConfig.healingFrontierLowWater,
-              scopedHealVerification = snapSyncConfig.scopedHealVerification,
-              scopedHealMaxPaths = snapSyncConfig.scopedHealMaxPaths,
-              decoupledHealServeRoot = snapSyncConfig.decoupledHealServeRoot,
-              decoupledHealMaxAttemptsNoRefresh = snapSyncConfig.decoupledHealMaxAttemptsNoRefresh
-            ),
+            Behaviors
+              .supervise(
+                actors.TrieNodeHealingCoordinator(
+                  stateRoot = root.value,
+                  networkPeerManager = networkPeerManager,
+                  requestTracker = requestTracker,
+                  mptStorage = storage,
+                  batchSize = snapSyncConfig.healingBatchSize,
+                  snapSyncController = ctx.self,
+                  concurrency = snapSyncConfig.healingConcurrency,
+                  visitedCap = snapSyncConfig.healingVisitedCap,
+                  healingFrontierStorage = healingFrontierStorageOpt,
+                  traversalParallelism = snapSyncConfig.healingTraversalParallelism,
+                  healingMinParallelism = snapSyncConfig.healingMinParallelism,
+                  healingReservedCores = snapSyncConfig.healingReservedCores,
+                  bfsQueueStorageOpt = Some(bfsQueueStorage),
+                  storageScheme = snapSyncConfig.storageScheme,
+                  pathNodeStorageOpt = pathNodeStorageOpt,
+                  frontierHighWater = snapSyncConfig.healingFrontierHighWater,
+                  frontierLowWater = snapSyncConfig.healingFrontierLowWater,
+                  scopedHealVerification = snapSyncConfig.scopedHealVerification,
+                  scopedHealMaxPaths = snapSyncConfig.scopedHealMaxPaths,
+                  decoupledHealServeRoot = snapSyncConfig.decoupledHealServeRoot,
+                  decoupledHealMaxAttemptsNoRefresh = snapSyncConfig.decoupledHealMaxAttemptsNoRefresh
+                )
+              )
+              .onFailure[Throwable](
+                SupervisorStrategy.restartWithBackoff(1.second, 10.seconds, 0.2).withMaxRestarts(3)
+              ),
             s"trie-node-healing-coordinator-$coordinatorGeneration",
             org.apache.pekko.actor.typed.DispatcherSelector.fromConfig("sync-dispatcher")
           )
@@ -3692,29 +3729,35 @@ private class SNAPSyncControllerImpl(
           val storage = getOrCreateMptStorage(pivotBlock.getOrElse(BigInt(0)))
           trieNodeHealingCoordinator = Some(
             ctx.spawn(
-              actors.TrieNodeHealingCoordinator(
-                stateRoot = root.value,
-                networkPeerManager = networkPeerManager,
-                requestTracker = requestTracker,
-                mptStorage = storage,
-                batchSize = snapSyncConfig.healingBatchSize,
-                snapSyncController = ctx.self,
-                concurrency = snapSyncConfig.healingConcurrency,
-                visitedCap = snapSyncConfig.healingVisitedCap,
-                healingFrontierStorage = healingFrontierStorageOpt,
-                traversalParallelism = snapSyncConfig.healingTraversalParallelism,
-                healingMinParallelism = snapSyncConfig.healingMinParallelism,
-                healingReservedCores = snapSyncConfig.healingReservedCores,
-                bfsQueueStorageOpt = Some(bfsQueueStorage),
-                storageScheme = snapSyncConfig.storageScheme,
-                pathNodeStorageOpt = pathNodeStorageOpt,
-                frontierHighWater = snapSyncConfig.healingFrontierHighWater,
-                frontierLowWater = snapSyncConfig.healingFrontierLowWater,
-                scopedHealVerification = snapSyncConfig.scopedHealVerification,
-                scopedHealMaxPaths = snapSyncConfig.scopedHealMaxPaths,
-                decoupledHealServeRoot = snapSyncConfig.decoupledHealServeRoot,
-                decoupledHealMaxAttemptsNoRefresh = snapSyncConfig.decoupledHealMaxAttemptsNoRefresh
-              ),
+              Behaviors
+                .supervise(
+                  actors.TrieNodeHealingCoordinator(
+                    stateRoot = root.value,
+                    networkPeerManager = networkPeerManager,
+                    requestTracker = requestTracker,
+                    mptStorage = storage,
+                    batchSize = snapSyncConfig.healingBatchSize,
+                    snapSyncController = ctx.self,
+                    concurrency = snapSyncConfig.healingConcurrency,
+                    visitedCap = snapSyncConfig.healingVisitedCap,
+                    healingFrontierStorage = healingFrontierStorageOpt,
+                    traversalParallelism = snapSyncConfig.healingTraversalParallelism,
+                    healingMinParallelism = snapSyncConfig.healingMinParallelism,
+                    healingReservedCores = snapSyncConfig.healingReservedCores,
+                    bfsQueueStorageOpt = Some(bfsQueueStorage),
+                    storageScheme = snapSyncConfig.storageScheme,
+                    pathNodeStorageOpt = pathNodeStorageOpt,
+                    frontierHighWater = snapSyncConfig.healingFrontierHighWater,
+                    frontierLowWater = snapSyncConfig.healingFrontierLowWater,
+                    scopedHealVerification = snapSyncConfig.scopedHealVerification,
+                    scopedHealMaxPaths = snapSyncConfig.scopedHealMaxPaths,
+                    decoupledHealServeRoot = snapSyncConfig.decoupledHealServeRoot,
+                    decoupledHealMaxAttemptsNoRefresh = snapSyncConfig.decoupledHealMaxAttemptsNoRefresh
+                  )
+                )
+                .onFailure[Throwable](
+                  SupervisorStrategy.restartWithBackoff(1.second, 10.seconds, 0.2).withMaxRestarts(3)
+                ),
               s"trie-node-healing-coordinator-$coordinatorGeneration",
               org.apache.pekko.actor.typed.DispatcherSelector.fromConfig("sync-dispatcher")
             )

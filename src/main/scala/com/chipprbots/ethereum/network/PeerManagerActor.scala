@@ -9,6 +9,7 @@ import org.apache.pekko.actor.PoisonPill
 import org.apache.pekko.actor.Scheduler
 import org.apache.pekko.actor.typed
 import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.SupervisorStrategy
 import org.apache.pekko.actor.typed.scaladsl.ActorContext as TypedActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
@@ -1035,15 +1036,21 @@ object PeerManagerActor {
       // Spawn PeerActor as a Typed child. The child's path name is the sanitized address — identical to the prior
       // `ctx.actorOf(PeerActor.props, id)`, so PeerId.fromRef is preserved.
       val behavior: Behavior[PeerActor.Command] =
-        PeerActor.apply(
-          address,
-          PeerActor.rlpxConnectionFactory(authHandshaker, config.rlpxConfiguration, capabilities),
-          config,
-          eventBus,
-          knownNodesManager,
-          incomingConnection,
-          initHandshaker = handshaker
-        )
+        Behaviors
+          .supervise(
+            PeerActor.apply(
+              address,
+              PeerActor.rlpxConnectionFactory(authHandshaker, config.rlpxConfiguration, capabilities),
+              config,
+              eventBus,
+              knownNodesManager,
+              incomingConnection,
+              initHandshaker = handshaker
+            )
+          )
+          .onFailure[Throwable](
+            SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2).withMaxRestarts(3)
+          )
       ctx.spawn(behavior, id)
   }
 

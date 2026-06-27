@@ -1,9 +1,12 @@
 package com.chipprbots.ethereum.nodebuilder
 
 import org.apache.pekko.actor.typed.ActorSystem
+import org.apache.pekko.actor.typed.SupervisorStrategy
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.util.ByteString
 
 import scala.concurrent.Await
+import scala.concurrent.duration.*
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Failure
 import scala.util.Success
@@ -214,13 +217,17 @@ abstract class BaseNode extends Node {
     if Config.Db.periodicConsistencyCheck then
       periodicConsistencyCheckSystem = Some(
         ActorSystem(
-          PeriodicConsistencyCheck.start(
-            storagesInstance.storages.appStateStorage,
-            storagesInstance.storages.blockNumberMappingStorage,
-            storagesInstance.storages.blockHeadersStorage,
-            shutdown,
-            engineApiConfig.enabled
-          ),
+          Behaviors
+            .supervise(
+              PeriodicConsistencyCheck.start(
+                storagesInstance.storages.appStateStorage,
+                storagesInstance.storages.blockNumberMappingStorage,
+                storagesInstance.storages.blockHeadersStorage,
+                shutdown,
+                engineApiConfig.enabled
+              )
+            )
+            .onFailure[Throwable](SupervisorStrategy.restart.withLimit(3, 1.minute)),
           s"PeriodicDBConsistencyCheck_${instanceConfig.instanceId}"
         )
       )

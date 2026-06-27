@@ -3,6 +3,7 @@ package com.chipprbots.ethereum.blockchain.sync
 import org.apache.pekko.actor.ActorRef
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.SupervisorStrategy
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
@@ -193,13 +194,19 @@ object BytecodeRecoveryActor {
                 case None =>
                   val requestTracker = new snap.SNAPRequestTracker()(ctx.system.classicSystem.scheduler)
                   ctx.spawn(
-                    snap.actors.ByteCodeCoordinator(
-                      evmCodeStorage = evmCodeStorage,
-                      networkPeerManager = networkPeerManager,
-                      requestTracker = requestTracker,
-                      batchSize = snap.ByteCodeTask.DEFAULT_BATCH_SIZE,
-                      snapSyncController = bccAdapter
-                    ),
+                    Behaviors
+                      .supervise(
+                        snap.actors.ByteCodeCoordinator(
+                          evmCodeStorage = evmCodeStorage,
+                          networkPeerManager = networkPeerManager,
+                          requestTracker = requestTracker,
+                          batchSize = snap.ByteCodeTask.DEFAULT_BATCH_SIZE,
+                          snapSyncController = bccAdapter
+                        )
+                      )
+                      .onFailure[Throwable](
+                        SupervisorStrategy.restartWithBackoff(1.second, 10.seconds, 0.2).withMaxRestarts(3)
+                      ),
                     "bytecode-recovery-coordinator",
                     org.apache.pekko.actor.typed.DispatcherSelector.fromConfig("sync-dispatcher")
                   )

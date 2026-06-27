@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.blockchain.sync.snap.actors
 
 import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.SupervisorStrategy
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
@@ -701,11 +702,15 @@ private class ByteCodeCoordinatorImpl(
 
   private def createWorker(): WorkerRef = {
     val worker: WorkerRef = context.spawnAnonymous(
-      ByteCodeWorker(
-        coordinator = context.self,
-        networkPeerManager = networkPeerManager,
-        requestTracker = requestTracker
-      ),
+      Behaviors
+        .supervise(
+          ByteCodeWorker(
+            coordinator = context.self,
+            networkPeerManager = networkPeerManager,
+            requestTracker = requestTracker
+          )
+        )
+        .onFailure[Throwable](SupervisorStrategy.restart.withLimit(5, 1.minute)),
       org.apache.pekko.actor.typed.Props.empty.withDispatcherFromConfig("sync-dispatcher")
     )
     // Typed watch: on worker stop, deliver WorkerTerminated(worker) instead of a raw Terminated signal.

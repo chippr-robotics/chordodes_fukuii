@@ -60,6 +60,12 @@ object SyncProtocol {
       extends SyncProtocolMsg
       with RegularSyncCommand
 
+  /** Delivered to RegularSync via watchWith when BlockFetcher terminates (RF-2 Option A). RegularSync re-spawns both
+    * BlockFetcher and BlockImporter: BlockImporter holds a captured fetcher ref in its constructor, so it must be
+    * replaced together with BlockFetcher to avoid a dead-letter sink.
+    */
+  case object BlockFetcherStopped extends RegularSyncCommand
+
   /** Signals that SNAP finalization detected a state root mismatch (snapStateRoot != pivotHeader.stateRoot).
     * SyncController responds by clearing SnapSyncDone and restarting SNAP with a fresh pivot. Mirrors Besu BUG-008
     * class recovery: abort finalization rather than commit a broken state.
