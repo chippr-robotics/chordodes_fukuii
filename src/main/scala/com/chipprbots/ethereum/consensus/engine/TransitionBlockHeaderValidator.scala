@@ -7,6 +7,7 @@ import com.chipprbots.ethereum.consensus.validators.BlockHeaderError
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValidator
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 /** Hybrid validator for Engine API chains that transition from PoW to PoS.
@@ -31,11 +32,11 @@ object TransitionBlockHeaderValidator extends BlockHeaderValidator:
       blockHeader: BlockHeader,
       getBlockHeaderByHash: GetBlockHeaderByHash
   )(implicit blockchainConfig: BlockchainConfig): Either[BlockHeaderError, BlockHeaderValid] =
-    if blockHeader.difficulty == 0 then PoSBlockHeaderValidator.validate(blockHeader, getBlockHeaderByHash)
+    if blockHeader.difficulty == Difficulty.Zero then PoSBlockHeaderValidator.validate(blockHeader, getBlockHeaderByHash)
     else poWValidator.validate(blockHeader, getBlockHeaderByHash)
 
   override def validateHeaderOnly(blockHeader: BlockHeader)(implicit
       blockchainConfig: BlockchainConfig
   ): Either[BlockHeaderError, BlockHeaderValid] =
-    if blockHeader.difficulty == 0 then PoSBlockHeaderValidator.validateHeaderOnly(blockHeader)
+    if blockHeader.difficulty == Difficulty.Zero then PoSBlockHeaderValidator.validateHeaderOnly(blockHeader)
     else poWValidator.validateHeaderOnly(blockHeader)

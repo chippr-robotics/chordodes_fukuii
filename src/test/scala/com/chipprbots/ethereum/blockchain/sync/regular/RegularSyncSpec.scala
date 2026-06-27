@@ -246,7 +246,7 @@ class RegularSyncSpec
 
         val sub249 = peerEventBus.expectMsgType[SubscribeCmd]
         sub249.subscriber ! MessageFromPeer(
-          NewBlock(testBlocks.last, ChainWeight(testBlocks.last.header.difficulty).totalDifficulty),
+          NewBlock(testBlocks.last, ChainWeight(testBlocks.last.header.difficulty.value).totalDifficulty),
           defaultPeer.id
         )
 

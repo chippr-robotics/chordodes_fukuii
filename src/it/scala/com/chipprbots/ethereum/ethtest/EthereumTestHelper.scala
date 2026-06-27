@@ -241,7 +241,7 @@ class EthereumTestHelper(using bc: BlockchainConfig) extends ScenarioSetup:
       receiptsRoot =
         TrieRoot(ByteString(parseHex("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
       logsBloom = BloomFilter(ByteString(Array.fill(256)(0.toByte))),
-      difficulty = BigInt(0),
+      difficulty = Difficulty(BigInt(0)),
       number = blockNumber,
       gasLimit = parseBigInt(testBlock.blockHeader.gasLimit),
       gasUsed = BigInt(0),

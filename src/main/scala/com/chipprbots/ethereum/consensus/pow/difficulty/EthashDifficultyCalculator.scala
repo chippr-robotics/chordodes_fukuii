@@ -2,6 +2,7 @@ package com.chipprbots.ethereum.consensus.pow.difficulty
 
 import com.chipprbots.ethereum.consensus.difficulty.DifficultyCalculator
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 object EthashDifficultyCalculator extends DifficultyCalculator:
@@ -13,12 +14,13 @@ object EthashDifficultyCalculator extends DifficultyCalculator:
 
   def calculateDifficulty(blockNumber: BigInt, blockTimestamp: Long, parentHeader: BlockHeader)(implicit
       blockchainConfig: BlockchainConfig
-  ): BigInt =
+  ): Difficulty =
     import blockchainConfig.forkBlockNumbers.*
 
     lazy val timestampDiff = blockTimestamp - parentHeader.unixTimestamp
 
-    val x: BigInt = parentHeader.difficulty / DifficultyBoundDivision
+    val parentDiff: BigInt = parentHeader.difficulty.value
+    val x: BigInt = parentDiff / DifficultyBoundDivision
     val c: BigInt =
       if blockNumber < homesteadBlockNumber then if blockTimestamp < parentHeader.unixTimestamp + 13 then 1 else -1
       else if blockNumber >= byzantiumBlockNumber || blockNumber >= atlantisBlockNumber then
@@ -43,8 +45,8 @@ object EthashDifficultyCalculator extends DifficultyCalculator:
         else 0
       else 0
 
-    val difficultyWithoutBomb = MinimumDifficulty.max(parentHeader.difficulty + x * c)
-    difficultyWithoutBomb + extraDifficulty
+    val difficultyWithoutBomb = MinimumDifficulty.max(Difficulty(parentDiff + x * c))
+    Difficulty(difficultyWithoutBomb.value + extraDifficulty)
 
   private def calculateBombExponent(blockNumber: BigInt)(implicit
       blockchainConfig: BlockchainConfig

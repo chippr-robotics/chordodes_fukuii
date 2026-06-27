@@ -192,7 +192,7 @@ object SubscriptionManager:
         "stateRoot" -> JString("0x" + h.stateRoot.value.toHex),
         "receiptsRoot" -> JString("0x" + h.receiptsRoot.value.toHex),
         "miner" -> JString(h.beneficiary.toString),
-        "difficulty" -> JString("0x" + h.difficulty.toString(16)),
+        "difficulty" -> JString("0x" + h.difficulty.value.toString(16)),
         "extraData" -> JString("0x" + h.extraData.toHex),
         "gasLimit" -> JString("0x" + h.gasLimit.toString(16)),
         "gasUsed" -> JString("0x" + h.gasUsed.toString(16)),

@@ -13,6 +13,7 @@ import org.json4s.jvalue2monadic
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
@@ -46,7 +47,7 @@ class EngineApiGetPayloadV5Spec extends AnyWordSpec with Matchers:
       transactionsRoot = TrieRoot(BlockHeader.EmptyMpt),
       receiptsRoot = TrieRoot(BlockHeader.EmptyMpt),
       logsBloom = BloomFilter.Empty,
-      difficulty = 0,
+      difficulty = Difficulty.Zero,
       number = 1,
       gasLimit = 30000000,
       gasUsed = 0,

@@ -295,7 +295,7 @@ object RegularSyncItSpecUtils:
           parentHash = parent.header.hash,
           number = newBlockNumber,
           stateRoot = TrieRoot(newWorld.stateRootHash),
-          difficulty = plusDifficulty + parent.header.difficulty
+          difficulty = Difficulty(plusDifficulty) + parent.header.difficulty
         )
       )
       val newWeight = parentWeight.increase(newBlock.header)

@@ -458,7 +458,7 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
     val localStatusMsg: ETHPackets.Status68.Status68 = ETHPackets.Status68.Status68(
       protocolVersion = Capability.ETH68.version,
       networkId = Config.Network.peer.networkId,
-      totalDifficulty = genesisBlock.header.difficulty,
+      totalDifficulty = genesisBlock.header.difficulty.value,
       bestHash = genesisBlock.header.hash.value,
       genesisHash = genesisBlock.header.hash.value,
       forkId = ForkId(0xfc64ec04L, Some(1150000)) // ETC genesis forkId (block 0)
@@ -477,7 +477,7 @@ class IrregularStateChangeDaoForkHandshakerSpec extends AnyFlatSpec with Matcher
     val localStatusMsg: ETHPackets.Status68.Status68 = ETHPackets.Status68.Status68(
       protocolVersion = Capability.ETH68.version,
       networkId = Config.Network.peer.networkId,
-      totalDifficulty = genesisBlock.header.difficulty,
+      totalDifficulty = genesisBlock.header.difficulty.value,
       bestHash = genesisBlock.header.hash.value,
       genesisHash = genesisBlock.header.hash.value,
       forkId = ForkId(1L, None)

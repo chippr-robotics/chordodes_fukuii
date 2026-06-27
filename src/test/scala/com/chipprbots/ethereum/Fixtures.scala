@@ -40,7 +40,7 @@ object Fixtures:
         receiptsRoot =
           TrieRoot(ByteString(Hex.decode("8b472d8d4d39bae6a5570c2a42276ed2d6a56ac51a1a356d5b17c5564d01fd5d"))),
         logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
-        difficulty = BigInt("14005986920576"),
+        difficulty = Difficulty(BigInt("14005986920576")),
         number = 3125369,
         gasLimit = 4699996,
         gasUsed = 84000,
@@ -135,7 +135,7 @@ object Fixtures:
         receiptsRoot =
           TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
         logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
-        difficulty = BigInt("17179869184"),
+        difficulty = Difficulty(BigInt("17179869184")),
         number = 0,
         gasLimit = 5000,
         gasUsed = 0,
@@ -167,7 +167,7 @@ object Fixtures:
         receiptsRoot =
           TrieRoot(ByteString(Hex.decode("7bda9aa65977800376129148cbfe89d35a016dd51c95d6e6dc1e76307d315468"))),
         logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
-        difficulty = BigInt("62413376722602"),
+        difficulty = Difficulty(BigInt("62413376722602")),
         number = 1920000,
         gasLimit = 4712384,
         gasUsed = 84000,
@@ -261,7 +261,7 @@ object Fixtures:
         receiptsRoot =
           TrieRoot(ByteString(Hex.decode("26cf9d9422e9dd95aedc7914db690b92bab6902f5221d62694a2fa5d065f534b"))),
         logsBloom = BloomFilter(ByteString(Hex.decode("0" * 512))),
-        difficulty = BigInt("62413376722602"),
+        difficulty = Difficulty(BigInt("62413376722602")),
         number = 1920000,
         gasLimit = 4712384,
         gasUsed = 84000,
@@ -354,7 +354,7 @@ object Fixtures:
         receiptsRoot =
           TrieRoot(ByteString(Hex.decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))),
         logsBloom = BloomFilter(ByteString(Hex.decode("00" * 256))),
-        difficulty = BigInt("62382916183238"),
+        difficulty = Difficulty(BigInt("62382916183238")),
         number = 1919999,
         gasLimit = 4707788,
         gasUsed = 0,

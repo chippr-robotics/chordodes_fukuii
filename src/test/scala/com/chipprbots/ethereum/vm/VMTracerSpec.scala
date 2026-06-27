@@ -45,7 +45,7 @@ class VMTracerSpec extends AnyFreeSpec with Matchers:
   private val world = MockWorldState().saveAccount(senderAddr, senderAcc)
 
   private val blockHeader = BlockFixtures.ValidBlock.header.copy(
-    difficulty = 1000000,
+    difficulty = Difficulty(1000000),
     number = 1,
     gasLimit = 10000000,
     gasUsed = 0,

@@ -7,6 +7,7 @@ import com.chipprbots.ethereum.consensus.validators.BlockHeaderError.*
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValid
 import com.chipprbots.ethereum.consensus.validators.BlockHeaderValidatorSkeleton
 import com.chipprbots.ethereum.domain.BlockHeader
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.utils.BlockchainConfig
 
 /** Post-merge block header validator. Skips PoW (Ethash) validation entirely. Enforces: difficulty=0, nonce=0, empty
@@ -30,7 +31,7 @@ object PoSBlockHeaderValidator extends BlockHeaderValidatorSkeleton:
   private def validatePoSDifficulty(
       blockHeader: BlockHeader
   ): Either[BlockHeaderError, BlockHeaderValid] =
-    if blockHeader.difficulty == 0 then Right(BlockHeaderValid)
+    if blockHeader.difficulty == Difficulty.Zero then Right(BlockHeaderValid)
     else Left(HeaderDifficultyError)
 
   private def validatePoSNonce(

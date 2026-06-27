@@ -3930,7 +3930,7 @@ private class SNAPSyncControllerImpl(
     val genesisBlockTD = blockchainReader
       .getChainWeightByHash(blockchainReader.genesisHeader.hash)
       .map(_.totalDifficulty)
-      .getOrElse(blockchainReader.genesisHeader.difficulty)
+      .getOrElse(blockchainReader.genesisHeader.difficulty.value)
 
     // Current peers + best peer seen historically this session (fallback when all ETH68
     // peers have disconnected by the time finalization runs, which is common on long syncs).
@@ -3988,11 +3988,12 @@ private class SNAPSyncControllerImpl(
         .map(cw => (cw.totalDifficulty, "REAL_PIVOT_TD"))
         .orElse(calibratePivotTD(pivotBlockNumber).map(td => (td, "PEER_INTERPOLATED_TD")))
         .getOrElse {
-          val genesisTD = blockchainReader
+          val genesisTD: BigInt = blockchainReader
             .getChainWeightByHash(blockchainReader.genesisHeader.hash)
             .map(_.totalDifficulty)
-            .getOrElse(blockchainReader.genesisHeader.difficulty)
-          val proxy = if pivotBlockNumber == BigInt(0) then header.difficulty else pivotBlockNumber.max(genesisTD)
+            .getOrElse(blockchainReader.genesisHeader.difficulty.value)
+          val proxy: BigInt =
+            if pivotBlockNumber == BigInt(0) then header.difficulty.value else pivotBlockNumber.max(genesisTD)
           (proxy, "BLOCK_NUMBER_PROXY")
         }
     blockchainWriter.storeBlockHeader(header).commit()
@@ -4521,10 +4522,10 @@ private class SNAPSyncControllerImpl(
           // 1000× genesis TD (rejects genesis-proxy values written by earlier updateBestBlockForPivot
           // calls). (2) Peer-interpolated TD from a connected ETH68 peer. (3) Block-number proxy as
           // last resort (no ETH68 peers at all — rare but possible in isolated test environments).
-          val genesisBlockTD = blockchainReader
+          val genesisBlockTD: BigInt = blockchainReader
             .getChainWeightByHash(blockchainReader.genesisHeader.hash)
             .map(_.totalDifficulty)
-            .getOrElse(blockchainReader.genesisHeader.difficulty)
+            .getOrElse(blockchainReader.genesisHeader.difficulty.value)
           val (finalTD, tdSource) =
             blockchainReader
               .getChainWeightByHash(pivotHash)

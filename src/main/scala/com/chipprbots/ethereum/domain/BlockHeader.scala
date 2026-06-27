@@ -27,7 +27,7 @@ case class BlockHeader(
     transactionsRoot: TrieRoot,
     receiptsRoot: TrieRoot,
     logsBloom: BloomFilter,
-    difficulty: BigInt,
+    difficulty: Difficulty,
     number: BigInt,
     gasLimit: BigInt,
     gasUsed: BigInt,
@@ -76,7 +76,7 @@ case class BlockHeader(
     case HefPostPrague(_, _, _, _, _, rh) => Some(rh)
     case _                                => None
 
-  def isPoS: Boolean = difficulty == 0 && baseFee.isDefined
+  def isPoS: Boolean = difficulty == Difficulty.Zero && baseFee.isDefined
   def isPoW: Boolean = !isPoS
 
   /** Post-merge, mixHash carries the prevRandao value from the beacon chain. */
@@ -215,7 +215,7 @@ object BlockHeaderImplicits:
         RLPValue(transactionsRoot.value.toArray),
         RLPValue(receiptsRoot.value.toArray),
         RLPValue(logsBloom.toArray),
-        RLPValue(ByteUtils.bigIntToUnsignedByteArray(difficulty)),
+        RLPValue(ByteUtils.bigIntToUnsignedByteArray(difficulty.value)),
         RLPValue(ByteUtils.bigIntToUnsignedByteArray(number)),
         RLPValue(ByteUtils.bigIntToUnsignedByteArray(gasLimit)),
         RLPValue(ByteUtils.bigIntToUnsignedByteArray(gasUsed)),
@@ -274,7 +274,7 @@ object BlockHeaderImplicits:
             transactionsRoot = TrieRoot(byteStringFromEncodeable(items(4))),
             receiptsRoot = TrieRoot(byteStringFromEncodeable(items(5))),
             logsBloom = BloomFilter(byteStringFromEncodeable(items(6))),
-            difficulty = bigIntFromEncodeable(items(7)),
+            difficulty = Difficulty(bigIntFromEncodeable(items(7))),
             number = bigIntFromEncodeable(items(8)),
             gasLimit = bigIntFromEncodeable(items(9)),
             gasUsed = bigIntFromEncodeable(items(10)),

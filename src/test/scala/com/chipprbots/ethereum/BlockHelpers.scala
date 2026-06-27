@@ -16,7 +16,7 @@ object BlockHelpers extends SecureRandomBuilder:
 
   // scalastyle:off magic.number
   val defaultHeader: BlockHeader = Fixtures.Blocks.ValidBlock.header.copy(
-    difficulty = 1000000,
+    difficulty = Difficulty(1000000),
     number = 1,
     gasLimit = 1000000,
     gasUsed = 0,

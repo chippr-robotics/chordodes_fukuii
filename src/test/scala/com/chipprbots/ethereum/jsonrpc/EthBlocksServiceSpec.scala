@@ -21,6 +21,7 @@ import com.chipprbots.ethereum.consensus.mining.MiningConfigs
 import com.chipprbots.ethereum.consensus.mining.TestMining
 import com.chipprbots.ethereum.consensus.pow.blocks.PoWBlockGenerator
 import com.chipprbots.ethereum.db.storage.AppStateStorage
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.ChainWeight
@@ -463,10 +464,10 @@ class EthBlocksServiceSpec
     val blockToRequest: Block = Block(Fixtures.Blocks.Block3125369.header, Fixtures.Blocks.Block3125369.body)
     val blockToRequestNumber = blockToRequest.header.number
     val blockToRequestHash = blockToRequest.header.hash.value
-    val blockWeight: ChainWeight = ChainWeight.totalDifficultyOnly(blockToRequest.header.difficulty)
+    val blockWeight: ChainWeight = ChainWeight.totalDifficultyOnly(blockToRequest.header.difficulty.value)
 
     val uncle = Fixtures.Blocks.DaoForkBlock.header
-    val uncleWeight: ChainWeight = ChainWeight.totalDifficultyOnly(uncle.difficulty)
+    val uncleWeight: ChainWeight = ChainWeight.totalDifficultyOnly(uncle.difficulty.value)
     val blockToRequestWithUncles: Block = blockToRequest.copy(body = BlockBody(Nil, Seq(uncle)))
 
     val fakeWorld: InMemoryWorldStateProxy = InMemoryWorldStateProxy(

@@ -521,7 +521,7 @@ class FilterManagerSpec
           )
         )
       ),
-      difficulty = BigInt("17864037202"),
+      difficulty = Difficulty(BigInt("17864037202")),
       number = 1,
       gasLimit = 5000,
       gasUsed = 0,

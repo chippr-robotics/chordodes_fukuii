@@ -164,7 +164,7 @@ object EthSimulateJsonMethodsImplicits extends JsonMethodsImplicits:
 
         // Standard block header fields — conditionally include fork-specific fields
         val baseHeaderFields = List(
-          "difficulty" -> encodeAsHex(h.difficulty),
+          "difficulty" -> encodeAsHex(h.difficulty.value),
           "extraData" -> encodeAsHex(h.extraData),
           "gasLimit" -> encodeAsHex(h.gasLimit),
           "gasUsed" -> encodeAsHex(h.gasUsed),

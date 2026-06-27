@@ -5,6 +5,7 @@ import org.apache.pekko.util.ByteString
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.BlockHash
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BloomFilter
@@ -31,7 +32,7 @@ class MESSIntegrationSpec extends AnyFlatSpec with Matchers:
       transactionsRoot = TrieRoot(ByteString.empty),
       receiptsRoot = TrieRoot(ByteString.empty),
       logsBloom = BloomFilter(ByteString.empty),
-      difficulty = difficulty,
+      difficulty = Difficulty(difficulty),
       number = number,
       gasLimit = 0,
       gasUsed = 0,

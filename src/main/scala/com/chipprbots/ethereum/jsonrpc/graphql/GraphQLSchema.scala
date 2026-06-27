@@ -637,11 +637,11 @@ object GraphQLSchema:
         Field("timestamp", LongType, resolve = _.value.header.unixTimestamp),
         Field("logsBloom", BytesType, resolve = _.value.header.logsBloom.value),
         Field("mixHash", Bytes32Type, resolve = _.value.header.mixHash.value),
-        Field("difficulty", BigIntType, resolve = _.value.header.difficulty),
+        Field("difficulty", BigIntType, resolve = _.value.header.difficulty.value),
         Field(
           "totalDifficulty",
           BigIntType,
-          resolve = c => c.value.totalDifficulty.getOrElse(c.value.header.difficulty)
+          resolve = c => c.value.totalDifficulty.getOrElse(c.value.header.difficulty.value)
         ),
         Field(
           "ommerCount",

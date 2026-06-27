@@ -28,6 +28,7 @@ import com.chipprbots.ethereum.consensus.mining.MiningConfigs
 import com.chipprbots.ethereum.consensus.mining.TestMining
 import com.chipprbots.ethereum.consensus.pow.blocks.PoWBlockGenerator
 import com.chipprbots.ethereum.db.storage.AppStateStorage
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.ChainWeight
 import com.chipprbots.ethereum.jsonrpc.EthBlocksService
@@ -208,7 +209,7 @@ class GraphQLHttpRouteSpec extends AnyFlatSpec with Matchers with ScalatestRoute
 
     // Pre-populate the chain so { chainID } returns something deterministic.
     val block: Block = Block(Fixtures.Blocks.Block3125369.header, Fixtures.Blocks.Block3125369.body)
-    val weight: ChainWeight = ChainWeight.totalDifficultyOnly(block.header.difficulty)
+    val weight: ChainWeight = ChainWeight.totalDifficultyOnly(block.header.difficulty.value)
     blockchainWriter.storeBlock(block).and(blockchainWriter.storeChainWeight(block.header.hash, weight)).commit()
     blockchainWriter.saveBestKnownBlocks(block.hash, block.number)
 

@@ -11,6 +11,7 @@ import com.chipprbots.ethereum.consensus.mess.MESSConfig
 import com.chipprbots.ethereum.domain.BlockHeader
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.testing.Tags.*
 import com.chipprbots.ethereum.utils.BlockchainConfig
@@ -96,7 +97,7 @@ class ETChashDifficultyManipulationSpec extends AnyFlatSpec with Matchers with S
       transactionsRoot = TrieRoot(ByteString(new Array[Byte](32))),
       receiptsRoot = TrieRoot(ByteString(new Array[Byte](32))),
       logsBloom = BloomFilter.Empty,
-      difficulty = difficulty,
+      difficulty = Difficulty(difficulty),
       number = number,
       gasLimit = BigInt(8000000),
       gasUsed = BigInt(0),
@@ -120,7 +121,7 @@ class ETChashDifficultyManipulationSpec extends AnyFlatSpec with Matchers with S
           fromSnapshot(parent)
         )
         withClue(s"block ${child.number} (gap=${child.timestamp - parent.timestamp}s)") {
-          computed shouldBe child.difficulty
+          computed.value shouldBe child.difficulty
         }
       case _ => // sliding(2) on Seq of 1 — can't happen given the require above
     }
@@ -143,8 +144,8 @@ class ETChashDifficultyManipulationSpec extends AnyFlatSpec with Matchers with S
       val childTs = prevTs + gapSecs
       val parentHdr = header(num - 1, prevDiff, prevTs)
       val newDiff = EthashDifficultyCalculator.calculateDifficulty(num, childTs, parentHdr)
-      results += ((num, newDiff))
-      prevDiff = newDiff
+      results += ((num, newDiff.value))
+      prevDiff = newDiff.value
       prevTs = childTs
     results.toSeq
 

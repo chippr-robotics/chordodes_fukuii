@@ -106,8 +106,8 @@ class BranchResolution(blockchainReader: BlockchainReader) extends Logger:
         val currentHeadTimestamp = oldBlocks.last.header.unixTimestamp
         val timeDeltaSeconds = math.max(0L, currentHeadTimestamp - commonAncestorTimestamp)
 
-        val localSubchainTD = oldBlocks.map(_.header.difficulty).foldLeft(BigInt(0))(_ + _)
-        val proposedSubchainTD = newHeaders.map(_.difficulty).foldLeft(BigInt(0))(_ + _)
+        val localSubchainTD = oldBlocks.map(_.header.difficulty.value).foldLeft(BigInt(0))(_ + _)
+        val proposedSubchainTD = newHeaders.map(_.difficulty.value).foldLeft(BigInt(0))(_ + _)
 
         val shouldReject = ArtificialFinality.shouldRejectReorg(timeDeltaSeconds, localSubchainTD, proposedSubchainTD)
 

@@ -15,6 +15,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.ObjectGenerators
 import com.chipprbots.ethereum.consensus.mess.MESSConfig
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.Block
 import com.chipprbots.ethereum.domain.BlockBody
 import com.chipprbots.ethereum.domain.BlockHeader
@@ -71,7 +72,7 @@ class BranchResolutionSpec
         setHeaderInChain(headers.head.parentHash.value)
         setChainWeightByHash(headers.head.parentHash.value, ChainWeight.zero)
 
-        val oldBlocks: List[Block] = getChain(1, 10, headers.head.parentHash.value, headers.head.difficulty - 1)
+        val oldBlocks: List[Block] = getChain(1, 10, headers.head.parentHash.value, headers.head.difficulty.value - 1)
         oldBlocks.map(b => setBlockByNumber(b.header.number, Some(b)))
 
         branchResolution.resolveBranch(headers) shouldEqual NewBetterBranch(oldBlocks)
@@ -84,7 +85,7 @@ class BranchResolutionSpec
         setHeaderInChain(headers.head.parentHash.value)
         setChainWeightByHash(headers.head.parentHash.value, ChainWeight.zero)
 
-        val oldBlocks: List[Block] = getChain(1, 10, headers.head.parentHash.value, headers.head.difficulty)
+        val oldBlocks: List[Block] = getChain(1, 10, headers.head.parentHash.value, headers.head.difficulty.value)
         oldBlocks.map(b => setBlockByNumber(b.header.number, Some(b)))
 
         branchResolution.resolveBranch(headers) shouldEqual NoChainSwitch
@@ -98,7 +99,7 @@ class BranchResolutionSpec
       setChainWeightByHash(genesisHeader.hash.value, ChainWeight.zero)
       setBlockByNumber(0, Some(Block(genesisHeader, BlockBody(Nil, Nil))))
 
-      val oldBlocks: List[Block] = getChain(1, 10, genesisHeader.hash.value, headers.tail.head.difficulty - 1)
+      val oldBlocks: List[Block] = getChain(1, 10, genesisHeader.hash.value, headers.tail.head.difficulty.value - 1)
       oldBlocks.foreach(b => setBlockByNumber(b.header.number, Some(b)))
 
       branchResolution.resolveBranch(headers) shouldEqual NewBetterBranch(oldBlocks)
@@ -321,7 +322,7 @@ class BranchResolutionSpec
       // Best block is 5; new header extends at 6 — no old blocks displaced
       val newHeader: BlockHeader =
         Block(
-          defaultHeader.copy(number = 6, difficulty = 0, parentHash = BlockHash(parentHash)),
+          defaultHeader.copy(number = 6, difficulty = Difficulty.Zero, parentHash = BlockHash(parentHash)),
           BlockBody(Nil, Nil)
         ).header
       val parentWeight: ChainWeight = ChainWeight.totalDifficultyOnly(1000)

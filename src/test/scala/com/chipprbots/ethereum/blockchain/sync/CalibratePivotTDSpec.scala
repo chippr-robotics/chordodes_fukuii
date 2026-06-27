@@ -68,7 +68,7 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers:
       .filter(_ > genesisTD * BigInt(1000))
       .maxOption
 
-  private val genesisTD = Fixtures.Blocks.Genesis.header.difficulty // ≈ 1.7×10^10
+  private val genesisTD: BigInt = Fixtures.Blocks.Genesis.header.difficulty.value // ≈ 1.7×10^10
   private val pivotBlock = BigInt(20000000)
   private val peerTD_high = BigInt("24000000000000000000000") // 24×10^21
   private val peerBlock_a = BigInt(25000000)
@@ -376,7 +376,7 @@ class CalibratePivotTDSpec extends AnyFlatSpec with Matchers:
     blockchainWriter
       .storeChainWeight(
         Fixtures.Blocks.Genesis.header.hash,
-        ChainWeight.totalDifficultyOnly(Fixtures.Blocks.Genesis.header.difficulty)
+        ChainWeight.totalDifficultyOnly(Fixtures.Blocks.Genesis.header.difficulty.value)
       )
       .commit()
     blockchainWriter.storeChainWeight(Fixtures.Blocks.Genesis.header.parentHash, ChainWeight.zero).commit()

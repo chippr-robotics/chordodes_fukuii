@@ -9,6 +9,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import com.chipprbots.ethereum.Fixtures.Blocks as BlockFixtures
 import com.chipprbots.ethereum.crypto.*
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.domain.Address
 import com.chipprbots.ethereum.domain.UInt256
@@ -30,7 +31,7 @@ class PrecompiledContractsSpec extends AnyFunSuite with Matchers with ScalaCheck
     val origin = Address(0xcafebabe)
 
     val fakeHeader = BlockFixtures.ValidBlock.header.copy(
-      difficulty = 0,
+      difficulty = Difficulty.Zero,
       number = blockNumber,
       gasLimit = 0,
       gasUsed = 0,

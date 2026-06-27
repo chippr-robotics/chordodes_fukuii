@@ -234,7 +234,7 @@ class PoWMiningCoordinatorSpec
     val parentBlockNumber: Int = 23499
     override val origin: Block = Block(
       Fixtures.Blocks.Genesis.header.copy(
-        difficulty = UInt256(Hex.decode("0400")).toBigInt,
+        difficulty = Difficulty(UInt256(Hex.decode("0400")).toBigInt),
         number = 0,
         gasUsed = 0,
         unixTimestamp = 0

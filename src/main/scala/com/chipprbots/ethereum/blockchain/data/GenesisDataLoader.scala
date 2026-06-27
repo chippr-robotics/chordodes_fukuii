@@ -120,7 +120,7 @@ class GenesisDataLoader(
         blockchainWriter.save(
           Block(header, BlockBody(Nil, Nil)),
           Nil,
-          ChainWeight.totalDifficultyOnly(header.difficulty),
+          ChainWeight.totalDifficultyOnly(header.difficulty.value),
           saveAsBestBlock = true
         )
         Success(())
@@ -218,7 +218,7 @@ class GenesisDataLoader(
       transactionsRoot = TrieRoot(emptyTrieRootHash),
       receiptsRoot = TrieRoot(emptyTrieRootHash),
       logsBloom = BloomFilter(zeros(bloomLength)),
-      difficulty = BigInt(genesisData.difficulty.replace("0x", ""), 16),
+      difficulty = Difficulty(BigInt(genesisData.difficulty.replace("0x", ""), 16)),
       number = 0,
       gasLimit = BigInt(genesisData.gasLimit.replace("0x", ""), 16),
       gasUsed = 0,

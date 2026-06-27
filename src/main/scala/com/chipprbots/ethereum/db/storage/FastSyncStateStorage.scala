@@ -12,6 +12,7 @@ import boopickle.Default.*
 import com.chipprbots.ethereum.blockchain.sync.fast.FastSync.*
 import com.chipprbots.ethereum.db.dataSource.DataSource
 import com.chipprbots.ethereum.domain.BlockHash
+import com.chipprbots.ethereum.domain.Difficulty
 import com.chipprbots.ethereum.domain.TrieRoot
 import com.chipprbots.ethereum.domain.BloomFilter
 import com.chipprbots.ethereum.domain.BlockHeader.HeaderExtraFields
@@ -29,6 +30,8 @@ class FastSyncStateStorage(val dataSource: DataSource) extends KeyValueStorage[S
 
   override val namespace: IndexedSeq[Byte] = Namespaces.FastSyncStateNamespace
 
+  given difficultyPickler: Pickler[Difficulty] =
+    transformPickler[Difficulty, BigInt](Difficulty(_))(_.value)
   given byteStringPickler: Pickler[ByteString] =
     transformPickler[ByteString, Array[Byte]](ByteString(_))(_.toArray[Byte])
   given bloomFilterPickler: Pickler[BloomFilter] =
