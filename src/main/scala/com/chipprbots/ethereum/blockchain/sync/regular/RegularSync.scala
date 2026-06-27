@@ -33,7 +33,12 @@ object RegularSync {
   type Command = SyncProtocol.RegularSyncCommand
 
   private val FetcherStatusKey = "RegularSyncFetcherStatus"
-  private val PrintStatusKey = "RegularSyncPrintStatus"
+  private val PrintStatusKey   = "RegularSyncPrintStatus"
+
+  // Epoch counter for BlockFetcher/BlockImporter re-spawns. Pekko requires a unique child name
+  // before the old child's Terminated signal is processed; appending the epoch avoids
+  // InvalidActorNameException when re-spawning immediately after ctx.stop.
+  private val spawnEpoch = new java.util.concurrent.atomic.AtomicInteger(0)
 
   /** Type alias so callers using `RegularSync.ProgressProtocol` keep working without import changes. */
   type ProgressProtocol = SyncProtocol.ProgressProtocol
@@ -64,12 +69,6 @@ object RegularSync {
   ): Behavior[Command] =
     Behaviors.setup { ctx =>
       Behaviors.withTimers { timers =>
-        val fetcher: TypedActorRef[BlockFetcher.FetchCommand] =
-          ctx.spawn(
-            BlockFetcher(peersClient, peerEventBus, ctx.self.narrow[ProgressProtocol], syncConfig, blockValidator),
-            "block-fetcher"
-          )
-
         val broadcaster: TypedActorRef[BlockBroadcasterActor.BroadcasterMsg] =
           ctx.spawn(
             Behaviors
@@ -89,30 +88,60 @@ object RegularSync {
             "block-broadcaster"
           )
 
-        val importer: TypedActorRef[BlockImporter.Command] =
-          ctx.spawn(
-            BlockImporter.apply(
-              fetcher,
-              consensus,
-              blockchainReader,
-              blockchainWriter,
-              stateStorage,
-              evmCodeStorage,
-              branchResolution,
-              syncConfig,
-              ommersPool,
-              broadcaster,
-              pendingTransactionsManager,
-              blockTopic,
-              ctx.self,
-              peerEventBus,
-              networkPeerManager,
-              blockchain,
-              blacklist,
-              configBuilder
-            ),
-            "block-importer"
+        // Spawns a fresh BlockFetcher and registers a death-watch so RegularSync receives
+        // BlockFetcherStopped when it terminates. Re-called on each re-spawn (RF-2 Option A).
+        // The epoch suffix avoids InvalidActorNameException: Pekko requires a unique child name
+        // until the previous child's Terminated signal is fully processed.
+        def spawnFetcher(epoch: Int): TypedActorRef[BlockFetcher.FetchCommand] = {
+          // BlockFetcher uses AbstractBehavior and spawns children (HeadersFetcher, BodiesFetcher,
+          // StateNodeFetcher) in its constructor. Pekko restart would re-run the constructor and
+          // ghost the old children. Default stop-on-failure is intentional; RegularSync re-spawns
+          // on BlockFetcherStopped.
+          val f = ctx.spawn(
+            BlockFetcher(peersClient, peerEventBus, ctx.self.narrow[ProgressProtocol], syncConfig, blockValidator),
+            s"block-fetcher-$epoch"
           )
+          ctx.watchWith(f, SyncProtocol.BlockFetcherStopped)
+          f
+        }
+
+        def spawnImporter(
+            fetcher: TypedActorRef[BlockFetcher.FetchCommand],
+            epoch: Int
+        ): TypedActorRef[BlockImporter.Command] =
+          ctx.spawn(
+            Behaviors
+              .supervise(
+                BlockImporter.apply(
+                  fetcher,
+                  consensus,
+                  blockchainReader,
+                  blockchainWriter,
+                  stateStorage,
+                  evmCodeStorage,
+                  branchResolution,
+                  syncConfig,
+                  ommersPool,
+                  broadcaster,
+                  pendingTransactionsManager,
+                  blockTopic,
+                  ctx.self,
+                  peerEventBus,
+                  networkPeerManager,
+                  blockchain,
+                  blacklist,
+                  configBuilder
+                )
+              )
+              .onFailure[Throwable](
+                SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2).withMaxRestarts(3)
+              ),
+            s"block-importer-$epoch"
+          )
+
+        val initialEpoch    = spawnEpoch.getAndIncrement()
+        val initialFetcher  = spawnFetcher(initialEpoch)
+        val initialImporter = spawnImporter(initialFetcher, initialEpoch)
 
         timers.startTimerWithFixedDelay(
           FetcherStatusKey,
@@ -123,10 +152,16 @@ object RegularSync {
 
         running(
           ProgressState(startedFetching = false, initialBlock = 0, currentBlock = 0, bestKnownNetworkBlock = 0),
-          fetcher,
-          importer,
+          initialFetcher,
+          initialImporter,
           supervisor,
-          ctx
+          ctx,
+          respawn = () => {
+            val epoch = spawnEpoch.getAndIncrement()
+            val f     = spawnFetcher(epoch)
+            val i     = spawnImporter(f, epoch)
+            (f, i)
+          }
         )
       }
     }
@@ -136,9 +171,19 @@ object RegularSync {
       fetcher: TypedActorRef[BlockFetcher.FetchCommand],
       importer: TypedActorRef[BlockImporter.Command],
       supervisor: TypedActorRef[SyncController.Command],
-      ctx: org.apache.pekko.actor.typed.scaladsl.ActorContext[Command]
+      ctx: org.apache.pekko.actor.typed.scaladsl.ActorContext[Command],
+      respawn: () => (TypedActorRef[BlockFetcher.FetchCommand], TypedActorRef[BlockImporter.Command])
   ): Behavior[Command] =
     Behaviors.receiveMessage {
+      case SyncProtocol.BlockFetcherStopped =>
+        // RF-2 Option A: BlockFetcher stopped (failed or was stopped). Its children (HeadersFetcher,
+        // BodiesFetcher, StateNodeFetcher) terminated automatically as Pekko children.
+        // BlockImporter holds a now-dead fetcher ref, so we stop it and re-spawn both actors.
+        ctx.log.warn("BlockFetcher stopped — re-spawning BlockFetcher and BlockImporter")
+        ctx.stop(importer)
+        val (newFetcher, newImporter) = respawn()
+        running(progressState.copy(startedFetching = false), newFetcher, newImporter, supervisor, ctx, respawn)
+
       case SyncProtocol.Start =>
         ctx.log.info("Starting regular sync")
         importer ! BlockImporter.Start
@@ -154,18 +199,18 @@ object RegularSync {
         Behaviors.same
 
       case ProgressProtocol.StartedFetching =>
-        running(progressState.copy(startedFetching = true), fetcher, importer, supervisor, ctx)
+        running(progressState.copy(startedFetching = true), fetcher, importer, supervisor, ctx, respawn)
 
       case ProgressProtocol.StartingFrom(blockNumber) =>
         val newState = progressState.copy(initialBlock = blockNumber, currentBlock = blockNumber)
         RegularSyncMetrics.setCurrentBlock(blockNumber)
-        running(newState, fetcher, importer, supervisor, ctx)
+        running(newState, fetcher, importer, supervisor, ctx, respawn)
 
       case ProgressProtocol.GotNewBlock(blockNumber) =>
         ctx.log.debug("Got information about new block [number = {}]", blockNumber)
         val newState = progressState.copy(bestKnownNetworkBlock = blockNumber)
         RegularSyncMetrics.setBestKnownNetworkBlock(blockNumber)
-        running(newState, fetcher, importer, supervisor, ctx)
+        running(newState, fetcher, importer, supervisor, ctx, respawn)
 
       case ProgressProtocol.ImportedBlock(blockNumber, internally) =>
         ctx.log.debug("Imported new block [number = {}, internally = {}]", blockNumber, internally)
@@ -175,7 +220,7 @@ object RegularSync {
         if internally then {
           fetcher ! InternalLastBlockImport(blockNumber)
         }
-        running(newState, fetcher, importer, supervisor, ctx)
+        running(newState, fetcher, importer, supervisor, ctx, respawn)
 
       case msg: SyncProtocol.RegularSyncStuck =>
         // Forward escape-valve signal to SyncController. BlockImporter detects this condition and emits the
@@ -229,7 +274,8 @@ object RegularSync {
           fetcher,
           importer,
           supervisor,
-          ctx
+          ctx,
+          respawn
         )
 
     }
