@@ -141,17 +141,19 @@ Read it before planning or implementing. Highlights:
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/007-hotpath-alloc-reduction/plan.md` (reduce hot-path CPU allocations on the
-keccak-256 + SNAP inline-merkleization paths to cut GC/allocation pressure and return CPU
-to sync — PURE PERFORMANCE, byte-for-byte identical consensus output. P1: replace per-call
-`new KeccakDigest(256)` with a thread-confined `ThreadLocal[KeccakDigest]` reset-on-entry
-(the load-bearing parity mechanism — guards the aborted-mid-update window). P2: reuse
-StackTrie transient scratch but NEVER the aliased final node blob (chain-split risk). P3:
-single-`Array[Byte]` `kec256` overload, `SnapHashTrie.emit` clone elision, `RLP.encode`
-O(n²)→O(n) — each FR-010-gated on proven parity + measured win. forge protocol; byte-for-byte
-gate via crypto/MPT/ethereum-tests + dedicated keccak vector/reset-after-abort/concurrency
-spec + A/B replay; perf is report-and-record, parity is the hard gate. Honest expectation:
-low single-digit to low-double-digit % throughput; the real CPU fix remains more cores.)
-Prior plans: `specs/004-decoupled-heal-serve-root/plan.md`,
-`specs/003-scoped-heal-verification/plan.md`.
+`specs/008-flat-account-merkleize/plan.md` (make a fresh ETC SNAP-from-scratch COMPLETE against
+snapshot-root-only peers like core-geth by computing + self-verifying the state root LOCALLY at
+finalize — escaping the heal's GetTrieNodes path, which provably cannot reconcile an already-formed
+multi-lineage trie mosaic. Mechanism C: write FlatAccountStorage during download to RETAIN account
+leaves (symmetric to the already-written FlatSlotStorage); at finalize FREEZE one servable
+R_final = networkBest−offset and LATCH both range coordinators to ignore pivot-advance (the named hard
+constraint), RE-FETCH stale account ranges against R_final via GetAccountRange into FlatAccountStorage
+(~11 min for 2.71M Mordor accounts at raw range throughput — fits the ~28-min serve window),
+MERKLEIZE in one ascending StackTrie pass taking each storageRoot off the re-fetched leaf, and GATE
+finalize on computedRoot==pivotHeader.stateRoot (additional gate; content-hash gate + anchor guard
+byte-untouched). Fail-closed on any failure (retry fresher R_final, else the #1371 handoff). forge
+Phase-0 verdict YELLOW — feasible on Mordor (validation target), genuinely YELLOW at ETC-mainnet
+86M-account scale; RED fallback = checkpoint import. Fresh-sync only — cannot rescue a wedged mosaic node.)
+Prior plans: `specs/007-hotpath-alloc-reduction/plan.md`,
+`specs/004-decoupled-heal-serve-root/plan.md`.
 <!-- SPECKIT END -->
