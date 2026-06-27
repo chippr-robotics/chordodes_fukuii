@@ -38,6 +38,10 @@ When a finding maps to an established protocol, cite it so the downstream fix ag
 - Multi-bucket commit advice (mixing A/B/C risks in one diff): `~/.claude/agent-protocols/risk-stratified-commit.md`
 - Test quality gaps (Thread.sleep, missing tier coverage, non-determinism): `~/.claude/agent-protocols/testing-protocol.md`
 - Dead code candidates (zero callers, orphaned implementations, unregistered strategies): `~/.claude/agent-protocols/dead-code-review.md` — before labelling something DEAD, apply the three-verdict assessment: Wire it / Delete it / Defer
+- Opaque type violations (S11 — `.value` inside a layer boundary): `~/.claude/agent-protocols/scala3-style.md` § S11 + `.local/best-practices/scala/type-safety.md`
+- Pekko Typed API violations (P17–P25: messageAdapter placement, spawnAnonymous, PreRestart, bounded restart): `~/.claude/agent-protocols/pekko-typed-api.md`
+- Cats Effect integration violations (TL1: IORuntime.global outside root; TL2: unsafeRunSync in actors): `~/.claude/agent-protocols/pekko-typed-api.md` § TL1/TL2
+- Known violation index (52 findings, 9 categories, file:line): `.local/best-practices/codebase-audit.md`
 
 **Contributing protocols**: If a finding type recurs across multiple reviews and no protocol covers it yet, note it in `~/.claude/agent-protocols/working-docs/CHASE-QUEUE.md` with a suggested protocol name. Prism reviews surface systemic issues — those are the right inputs for new protocols.
 

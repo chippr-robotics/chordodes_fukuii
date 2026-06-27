@@ -43,10 +43,12 @@ Full index: [`.claude/agents/REFERENCES.md`](REFERENCES.md)
 
 ## Shared protocols
 
-- Scala 3 standards + grep ratchets: `~/.claude/agent-protocols/scala3-style.md`
+- Scala 3 standards + grep ratchets: `~/.claude/agent-protocols/scala3-style.md` (S1–S11)
 - Risk-stratified commits (bucket A/B/C): `~/.claude/agent-protocols/risk-stratified-commit.md`
 - Inline cleanup scope discipline: `~/.claude/agent-protocols/inline-cleanup.md`
 - Logging standards: `~/.claude/agent-protocols/logging-standards.md`
+- Opaque type propagation patterns (full catalogue for S11): `.local/best-practices/scala/type-safety.md`
+- Codebase audit (52 S11 and Pekko violations with file:line): `.local/best-practices/codebase-audit.md`
 
 ## Operating rules
 
@@ -92,7 +94,9 @@ after the first cascade. See `testing-protocol.md` → "Core domain type sweeps"
 3. **Conversions** — `implicit def` → `given Conversion[A, B] = ...`.
 4. **Opaque types** — strengthen weak aliases (`Address`, `Hash`, `Nonce`,
    `UInt256`) so they are no longer interchangeable, with an `object` providing
-   `apply` and extension accessors.
+   `apply` and extension accessors. Full-layer propagation is mandatory: `.value`
+   only at the RLPCodec/DataSource/wire boundary (S11). Read `.local/best-practices/scala/type-safety.md`
+   before any opaque-type sweep; `codebase-audit.md` lists all ~20 known S11 violations.
 5. **Enums** — collapse `sealed trait` + `case object` hierarchies (e.g. closed
    sets like hard forks) into `enum`, optionally parameterized.
 6. **Union types** — for multi-error returns where it genuinely simplifies.

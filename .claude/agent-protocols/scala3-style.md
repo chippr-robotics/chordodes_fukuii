@@ -179,8 +179,71 @@ sealed trait SyncPhase; case object Idle extends SyncPhase
 
 ---
 
+### S11 — Opaque type full-layer propagation: no `.value` inside a layer boundary
+
+**Status:** Not yet enforced. ~20 violations identified in sync layer (audit June 2026).
+See `.local/best-practices/scala/type-safety.md` for full pattern catalogue.
+
+The core rule: an opaque type (`TrieRoot`, `CodeHash`, `BlockHash`) must flow through
+every var, val, Map key, collection element, and Command ADT field within a layer.
+`.value` is called **exactly once** — inside the type's `RLPCodec`, `DataSource`
+serialiser, or wire-encoding call. Calling `.value` anywhere else is the "half-typed"
+anti-pattern: the type exists at the surface but `.value` scatters the underlying raw
+type through the internals, making root-vs-hash transposition bugs invisible to the compiler.
+
+**True boundaries where `.value` is correct:**
+- `RLPCodec[T]` xmap extractor (inside companion `given`)
+- `DataSource` `put` serialiser lambda
+- Wire-encoding call (`encode(root.value)` in `MessageCodec`)
+- `toHexString` / `toArray` for logging only
+
+**Half-typed anti-pattern:**
+```scala
+// ❌ Type exists at the entry point, then discarded immediately
+class HealingCoordinator(stateRoot: ByteString) {  // param should be TrieRoot
+  var currentRoot: ByteString = stateRoot          // var should be TrieRoot
+  def refresh(r: TrieRoot): Unit = currentRoot = r.value  // leaks inside the layer
+}
+```
+
+**Correct:**
+```scala
+// ✅ TrieRoot flows through; .value only at the RocksDB/RLP boundary
+class HealingCoordinator(stateRoot: TrieRoot) {
+  var currentRoot: TrieRoot = stateRoot
+  def refresh(r: TrieRoot): Unit = currentRoot = r
+  def persist(): Unit = db.put(currentRoot.value.toArray)  // .value at boundary
+}
+```
+
+**Known violations (audit June 2026):**
+- `StorageRecoveryActor` — 7 Command ADT fields and actor var using `ByteString` instead of `TrieRoot`
+- `CombinedRecoveryScanner` — constructor param and `Vector[(ByteString, ByteString)]` where second element is a storage root
+- `SyncStateSchedulerActor` — `private var currentStateRoot: ByteString`
+- `BytecodeRecoveryActor`, `BlockFetcher` — mid-layer `.value` into mutable collections
+
+**Greps:**
+```bash
+# Detect mid-layer .value calls (adjust path)
+grep -rn "\.value\b" src/main/scala/com/chipprbots/ethereum/blockchain/sync/ \
+  --include="*.scala" | grep -v "//\|rlp\|encode\|RocksDB\|put(\|wire\|toHex\|toArray"
+
+# Detect ByteString vars/vals that should be opaque types
+grep -rn ": ByteString = .*\.value\b" src/main/ --include="*.scala"
+grep -rn "var.*: ByteString\|val.*: ByteString" src/main/scala/com/chipprbots/ethereum/blockchain/sync/ \
+  --include="*.scala" | grep -v "//\|node\|hash\|path\|code\|key\|Builder"
+
+# Detect untyped tuple pairs (both elements same ByteString but semantically distinct)
+grep -rn "Seq\[(ByteString, ByteString)\]\|Vector\[(ByteString, ByteString)\]" \
+  src/main/ --include="*.scala" | grep -v "//"
+```
+
+Ratchet: none yet — enforce via PRISM review and MITHRIL sweep after LOOM CAPSTONE.
+
+---
+
 ## Consensus-critical exception
 
-Standards S3–S8 do NOT apply to `consensus/`, `vm/`, `crypto/`, `domain/` without
+Standards S3–S11 do NOT apply to `consensus/`, `vm/`, `crypto/`, `domain/` without
 specialist review. Those paths require FORGE (ETC) or BEACON (ETH) before any
 idiom modernization. See `consensus-change-protocol.md`.

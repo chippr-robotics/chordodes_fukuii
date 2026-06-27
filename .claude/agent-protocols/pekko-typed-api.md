@@ -514,6 +514,198 @@ class FastSync(
 
 ---
 
+---
+
+## P17 — `messageAdapter` in `Behaviors.setup` only, never inside receive
+
+**Status:** Violation confirmed — `PeersClient.scala:224` creates a new adapter per `RequestPeer` message.
+
+Pekko docs: "one adapter per message class, last registration wins." Creating an adapter inside a receive handler silently replaces the previous one on every message. With multiple in-flight requests, the second registration discards the first adapter — responses for request A get misrouted to request B's handler.
+
+```bash
+grep -rn "messageAdapter\[" src/main/ --include="*.scala"
+# All hits must be inside Behaviors.setup blocks, not case branches
+```
+
+When per-request reply routing is needed: use `context.ask` (designed for one-shot request/response, safe under concurrent in-flight calls) or embed a correlation ID into the result type and use a single setup-level adapter.
+
+---
+
+## P18 — `spawnAnonymous` only for truly identity-free workers; prefer named
+
+**Status:** 6 violations — `ByteCodeCoordinator`, `AccountRangeCoordinator`, `SyncStateSchedulerActor`, `BlockImporter`, `FastSyncBranchResolverActor`.
+
+`spawnAnonymous` is correct only when a worker has no stable identity and no parent needs to correlate its termination to specific work. Use a named actor with a discriminator when the parent `watchWith`'s the child or needs traceable log output.
+
+```scala
+// ✅ Named with stable counter
+private var n = 0
+def spawnWorker(): ActorRef[WorkerCmd] =
+  context.spawn(Worker(config), s"bytecode-worker-${n += 1; n}")
+```
+
+```bash
+grep -rn "spawnAnonymous" src/main/ --include="*.scala"
+# Review each: does the parent watchWith it? If yes, name it.
+```
+
+---
+
+## P19 — `PreRestart` signal handler required when `Behaviors.supervise` is present
+
+**Status:** Zero `PreRestart` handlers in the codebase. Two supervised actors exist (`FastSync`, `FaucetSupervisor`).
+
+`PreRestart` fires before the new behavior instance starts, giving the crashing behavior one chance to release resources (subscriptions, open connections, messageAdapter refs). `PostStop` fires on permanent termination only. An actor under `restartWithBackoff` that opens a subscription in `Behaviors.setup` leaks one subscription per crash if `PreRestart` does not unsubscribe.
+
+```bash
+grep -rn "Behaviors\.supervise\|\.onFailure\[" src/main/ --include="*.scala" -l
+# Each file must also contain PreRestart:
+grep -rn "PreRestart" src/main/ --include="*.scala"
+```
+
+---
+
+## P20 — `Behaviors.supervise` restart strategy must include `.withLimit` or backoff
+
+**Status:** `FastSync.scala:425` uses unlimited `SupervisorStrategy.restart` — no bound.
+
+Unlimited restart causes infinite loops on persistent failures (codec bug, bad peer message). For I/O-bound actors prefer `restartWithBackoff`; for local workers use `.withLimit`.
+
+```scala
+// ✅ Bounded backoff — operational visibility via withCriticalLogLevel
+Behaviors.supervise(behavior).onFailure[Exception](
+  SupervisorStrategy
+    .restartWithBackoff(100.millis, 10.seconds, randomFactor = 0.2)
+    .withMaxRestarts(10)
+    .withCriticalLogLevel(Level.ERROR, afterErrors = 3)
+)
+```
+
+Exception: `SupervisorStrategy.stop` on a domain exception that means the actor must not continue — no limit needed.
+
+```bash
+grep -rn "SupervisorStrategy\.restart\b" src/main/ --include="*.scala" \
+  | grep -v "withLimit\|restartWithBackoff\|WithLimit"
+# Target: 0 hits
+```
+
+---
+
+## P21 — `ChildFailed` signal to capture crash cause from direct children
+
+**Status:** Zero uses in the codebase.
+
+`ChildFailed <: Terminated` is emitted when a **direct unsupervised child** crashes. It carries the `cause: Throwable`. Use `watch(child)` + `ChildFailed` match in `receiveSignal` when the coordinator needs to distinguish crash from clean stop and log the exception.
+
+**Important:** `ChildFailed` only arrives for direct children without a `Behaviors.supervise` wrapper. If the child has a supervisor, the parent sees `Terminated` after max-restarts is exceeded.
+
+```bash
+grep -rn "watchWith\|Terminated\b" src/main/ --include="*.scala" -l
+# Review each: would knowing the crash cause aid debugging? If yes, use watch + ChildFailed.
+```
+
+---
+
+## P22 — `Behaviors.withMdc` for per-actor structured logging context
+
+**Status:** Not used. All MDC is manual (`Logger.scala:22–24`) — unsafe on actor threads.
+
+`Behaviors.withMdc` injects MDC automatically before each message and clears it after. It integrates with `context.log` (actor-thread-safe). Manual `MDC.put`/`MDC.clear` pairs called from actor code are not thread-safe and silently produce incorrect MDC under load.
+
+```scala
+def apply(peerId: PeerId): Behavior[Command] =
+  Behaviors.withMdc[Command](
+    staticMdc = Map("peerId" -> peerId.value, "chainId" -> "61")
+  )(Behaviors.setup { ctx => ... })
+```
+
+Highest-value targets: `PeerActor`, `PeerRequestHandler`, `SNAPSyncController` — adding `peerId` as static MDC makes peer-session log correlation trivial.
+
+```bash
+grep -rn "org\.slf4j\.MDC\|MDC\.put\|MDC\.clear" src/main/ --include="*.scala"
+# Target: 0 hits in Typed actors — replace with Behaviors.withMdc
+```
+
+---
+
+## P23 — `ManualTime` for all tests that exercise `withTimers` behavior
+
+**Status:** Partially enforced — `PeerRequestHandlerSpec`, `FilterManagerSpec` use it. `SNAPSyncController`, `BlockchainHostActor` tests do not.
+
+Tests using real wall-clock time for timer assertions are flaky on the NUC under `testEssential` load (24 min, high CPU contention). `ManualTime` provides deterministic timer control.
+
+```bash
+grep -rn "withTimers\|startTimerWithFixedDelay\|startSingleTimer" src/test/ --include="*.scala" -l \
+  | xargs grep -L "ManualTime"
+# Target: 0 hits — all timer specs must use ManualTime
+```
+
+---
+
+## P24 — `LoggingTestKit` assertions for supervised actor crash paths
+
+**Status:** Only `PoWMiningCoordinatorSpec` uses it. `FastSync` and `FaucetSupervisor` have no log-level tests.
+
+`LoggingTestKit` verifies log events are emitted at the expected level. Use it to assert ERROR logging on crash, WARN on recovery, and absence of unexpected errors in the happy path.
+
+```bash
+grep -rn "Behaviors\.supervise\|onFailure\[" src/main/ --include="*.scala" -l \
+  | while read f; do
+      base=$(basename "$f" .scala)
+      grep -rn "LoggingTestKit" src/test/ --include="*${base}Spec*" &>/dev/null \
+        || echo "MISSING: $base"
+    done
+# Target: each supervised actor spec contains at least one LoggingTestKit assertion
+```
+
+---
+
+## P25 — `ActorRef.narrow` for interface segregation over `messageAdapter`
+
+**Status:** Used once (`RegularSync.scala:73`). Should be standard for coordinators exposing sub-protocols to children.
+
+`narrow[U]` (where `U <: T`) is a zero-cost cast — no wrapping, no new ActorRef. Prefer it over `messageAdapter` when the child's reply type is already a subtype of the coordinator's Command. Use `messageAdapter` only when transformation is needed.
+
+```bash
+grep -rn "messageAdapter\[" src/main/ --include="*.scala"
+# For each: is the mapped type a subtype of Command? If yes, prefer .narrow[U] instead.
+grep -rn "\.narrow\[" src/main/ --include="*.scala"
+# Expect: one per coordinator actor that exposes a sub-protocol to children
+```
+
+---
+
+## TL1 — `IORuntime.global` only at the composition root (`NodeApp`)
+
+**Status:** 26 actor files use `given IORuntime = IORuntime.global`. Only `DiscoveryServiceBuilder` correctly accepts `IORuntime` as a constructor parameter.
+
+Each actor reaching for the global runtime independently makes coordinated shutdown metrics impossible and creates hidden coupling. Wire `IORuntime` once at `NodeApp` and pass it down as a constructor implicit.
+
+```bash
+grep -rn "IORuntime\.global" src/main/ --include="*.scala" | grep -v "NodeApp\|DiscoveryService"
+# Target: 0 hits — all non-root uses should accept IORuntime as a constructor param
+```
+
+---
+
+## TL2 — `unsafeRunSync` only at composition root and test code
+
+**Status:** 4 actionable violations in production storage and RPC code.
+
+`unsafeRunSync` blocks the calling thread — in actor message handlers this starves the dispatcher; in storage methods called from actor handlers it deadlocks under backpressure. Known violations:
+- `HealingFrontierStorage.scala:43`
+- `PathNodeStorage.scala:146, 156`
+- `JsonRpcIpcServer.scala:104`
+
+Fix: actor callers use `pipeToSelf`; IPC server uses `Dispatcher.sequential` scoped to a `Resource`.
+
+```bash
+grep -rn "unsafeRunSync" src/main/ --include="*.scala" | grep -v "//\|Benchmark\|NodeApp\|Main"
+# Each hit is a production thread-blocking risk — investigate before accepting
+```
+
+---
+
 ## CAPSTONE cleanup targets
 
 After all actors are Typed, sweep for:

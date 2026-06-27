@@ -68,9 +68,9 @@ Tracked protocols that all agents reference live in `.claude/agent-protocols/`:
 | `consensus-change-protocol.md` | Hard stop + routing table before touching consensus paths |
 | `inline-cleanup.md` | "Hunt and seek" — what to fix opportunistically, what to log in CHASE-QUEUE |
 | `logging-standards.md` | Preferred logging API, levels, message format, SLF4J patterns |
-| `scala3-style.md` | S1-S10 Scala 3 standards with grep-verifiable ratchets |
-| `scala3-given-migration.md` | G1-G3 operational pitfalls for `given/using` migration (P3a findings, applies to P3b) |
-| `pekko-typed-api.md` | P1-P13 Pekko Typed API preferences for migration and new code |
+| `scala3-style.md` | S1–S11 Scala 3 standards with grep-verifiable ratchets (S11: opaque type full-layer propagation) |
+| `scala3-given-migration.md` | G1–G3 operational pitfalls for `given/using` migration (P3a findings, applies to P3b) |
+| `pekko-typed-api.md` | P1–P25 Pekko Typed API preferences + TL1/TL2 Cats Effect integration rules |
 | `pre-migration-checklist.md` | LOOM pre-flight: grep each actor for sender(), returns, timers, workers before migrating |
 | `migration-handoff.md` | Continuation file protocol when a thread ends mid-migration |
 | `storage-rocksdb.md` | DataSource contract, column families, iterator lifecycle, WriteBatch, EphemDataSource, RocksDB config |
@@ -78,6 +78,14 @@ Tracked protocols that all agents reference live in `.claude/agent-protocols/`:
 
 Working documents (public, code patterns only): `.claude/agent-protocols/working-docs/`
 - `CHASE-QUEUE.md` — cross-file issues logged during inline sessions, batched into sprint clusters
+
+Best practices library (research-backed patterns, June 2026 sprint): `.local/best-practices/`
+- `scala/type-safety.md` — 10 opaque type propagation patterns (full S11 reference)
+- `pekko/typed-patterns.md` — P17–P25 detailed patterns with greps
+- `pekko/concurrency.md` — Pekko concurrency and dispatcher patterns
+- `evm-clients/` — snap/2 protocol patterns, anti-patterns, p2p, error recovery
+- `typelevel/patterns.md` — IO/Resource/Fiber idiomatic patterns
+- `codebase-audit.md` — 52 known violations across 9 categories (11 critical, 27 medium, 14 low) with file:line
 
 ## Specialist subagents
 
