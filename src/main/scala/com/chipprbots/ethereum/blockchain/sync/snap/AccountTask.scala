@@ -20,6 +20,12 @@ case class AccountTask(
     var next: ByteString,
     last: ByteString,
     var rootHash: ByteString,
+    // Immutable lower bound of this range. `next` advances as the range downloads (and is set to
+    // `last` on completion), so the pristine start is captured separately. Used by the spec 008 US3
+    // finalize re-fetch to re-arm a COMPLETED range from its original start (`next = rangeStart`,
+    // `done = false`) so the workers re-download it against the frozen `R_final`. `None` ⇒ fall back
+    // to the construction-time `next` via `rangeStart` so every existing construction is unchanged.
+    firstHash: Option[ByteString] = None,
     // Runtime fields
     var pending: Boolean = false,
     var done: Boolean = false,
@@ -40,6 +46,12 @@ case class AccountTask(
     // Analogous to go-ethereum accountTask.pend (sync.go:316).
     var pend: Int = 0
 ) {
+
+  /** Pristine lower bound of this range, captured at construction. Falls back to the current `next` only when
+    * `firstHash` was never set (test-only tasks that never participate in the spec 008 finalize re-fetch). Production
+    * tasks (`createInitialTasks`) always set `firstHash`, so this returns the original start even after `next` advances.
+    */
+  def rangeStart: ByteString = firstHash.getOrElse(next)
 
   /** Check if this task is completed */
   def isComplete: Boolean = done
@@ -107,7 +119,8 @@ object AccountTask {
           // Core-Geth expects a 32-byte hash here (RLP-decoded into common.Hash).
           // Use 0xFF..FF as the practical upper bound.
           last = MaxHash32,
-          rootHash = rootHash
+          rootHash = rootHash,
+          firstHash = Some(min)
         )
       )
     }
@@ -120,10 +133,12 @@ object AccountTask {
       // For the last chunk, use the maximum possible hash as the upper bound.
       val endOpt = if (i == concurrency - 1) None else Some(chunkSize * (i + 1))
 
+      val startHash = bigIntTo32ByteString(start)
       AccountTask(
-        next = bigIntTo32ByteString(start),
+        next = startHash,
         last = endOpt.map(bigIntTo32ByteString).getOrElse(MaxHash32),
-        rootHash = rootHash
+        rootHash = rootHash,
+        firstHash = Some(startHash)
       )
     }
   }

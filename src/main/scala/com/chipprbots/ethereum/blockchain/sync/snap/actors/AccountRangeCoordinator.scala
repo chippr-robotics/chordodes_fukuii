@@ -141,6 +141,15 @@ class AccountRangeCoordinator(
   private val EmptyResponseStrikeThreshold: Int = 5
   private var pivotRefreshRequested = false
 
+  // Spec 008 US3 (Decision 3 / C2) — the finalize freeze latch. Set by `BeginFinalizing(rFinal)` for the duration of
+  // the local-merkleize finalize re-fetch; cleared by `EndFinalizing`. While `true`, the `PivotRefreshed` handler is a
+  // no-op (the advance is IGNORED — no `rootHash` re-tag, no re-enqueue) so the re-fetch against the frozen `rFinal`
+  // is never re-targeted mid-stream, which would otherwise re-introduce the stale-leaf mosaic the feature eliminates.
+  // This follows the existing precedent: the `finalizing` Receive state already ignores `PivotRefreshed` during async
+  // trie finalization (see line ~936). Named distinctly from that `Receive` to avoid shadowing it. Package-private so
+  // the spec can drive/inspect the latch deterministically.
+  private[actors] var finalizeFreezeLatch: Boolean = false
+
   private def isPeerStateless(peer: Peer): Boolean =
     statelessPeers.contains(peer.id)
 
@@ -615,6 +624,14 @@ class AccountRangeCoordinator(
           worker ! AccountRangeResponseMsg(response)
       }
 
+    case PivotRefreshed(newStateRoot) if finalizeFreezeLatch =>
+      // Spec 008 US3 (C2): freeze latch is engaged — a pivot advance MUST NOT re-tag the in-flight finalize
+      // re-fetch or it re-creates the stale-leaf mosaic. Ignore exactly as the async trie-finalization state does.
+      log.info(
+        s"Ignoring PivotRefreshed to ${newStateRoot.take(4).toHex} during finalize re-fetch " +
+          s"(frozen root ${stateRoot.take(4).toHex})"
+      )
+
     case PivotRefreshed(newStateRoot) =>
       log.info(s"Pivot refreshed: ${stateRoot.take(4).toHex} -> ${newStateRoot.take(4).toHex}")
       stateRoot = newStateRoot
@@ -662,6 +679,23 @@ class AccountRangeCoordinator(
       // immediate idle-pool restoration after pivot (sync.go revertAccountRequest).
       tryRedispatchPendingTasks()
       knownAvailablePeers.filterNot(isPeerStateless).foreach(dispatchIfPossible)
+
+    case BeginFinalizing(rFinal) =>
+      // Spec 008 US3 (Decision 1 + 3 / C2): freeze on `rFinal` and re-fetch every range so the retained flat-account
+      // leaves are made coherent for one final pivot. This sets the latch (so incoming PivotRefreshed is ignored —
+      // see the guarded handler above) and re-targets ALL ranges to `rFinal`. Completed ranges are re-armed from their
+      // pristine start (`next = rangeStart`, `done = false`) — the missing piece today (PivotRefreshed only re-tags
+      // PENDING tasks). The existing dispatch loop + worker proof-verify (against the per-request `expectedRoot` =
+      // the re-tagged `rootHash`) + `handleStoreAccountChunk` flat-store write then re-download against `rFinal`,
+      // overwriting the stale leaves. No worker-pool rewrite: we only re-tag tasks and re-enqueue.
+      beginFinalizing(rFinal)
+
+    case EndFinalizing =>
+      // Spec 008 US3 (C2): release the latch (success or fail-closed abort). Pivot-advance is honored again.
+      if (finalizeFreezeLatch) {
+        log.info(s"EndFinalizing: releasing finalize freeze latch (was frozen at root ${stateRoot.take(4).toHex})")
+        finalizeFreezeLatch = false
+      }
 
     case PeerAvailable(peer) =>
       // Evict stale entry for same physical node (reconnection creates new PeerId).
@@ -864,6 +898,15 @@ class AccountRangeCoordinator(
     case StoreAccountChunk(task, remaining, totalCount, storedSoFar, isTaskRangeComplete) =>
       handleStoreAccountChunk(task, remaining, totalCount, storedSoFar, isTaskRangeComplete)
 
+    case CheckCompletion if finalizeFreezeLatch =>
+      // Spec 008 US3: during a finalize re-fetch we are NOT re-running the inline trie build/flush — the trie was
+      // already finalized when the original account download completed. Route completion to the re-fetch signal so
+      // the controller runs the local-merkleize gate, bypassing the `context.become(finalizing)` + self-stop path.
+      computeKeyspaceEstimate().foreach { est =>
+        snapSyncController ! SNAPSyncController.ProgressAccountEstimate(est)
+      }
+      maybeSignalFinalizeRefetchComplete()
+
     case CheckCompletion =>
       computeKeyspaceEstimate().foreach { est =>
         snapSyncController ! SNAPSyncController.ProgressAccountEstimate(est)
@@ -991,6 +1034,78 @@ class AccountRangeCoordinator(
   private def markWorkerIdle(worker: ActorRef): Unit =
     if (workers.contains(worker)) {
       idleWorkers += worker
+    }
+
+  /** Spec 008 US3 (Decision 1 + 3 / C2) — engage the finalize freeze latch on `rFinal` and re-target EVERY range so
+    * the retained flat-account leaves are made coherent for one final pivot.
+    *
+    * Today only PENDING tasks are re-tagged on a pivot advance (`PivotRefreshed`), and COMPLETED ranges are never
+    * re-fetched — that is precisely why the retained leaves form a mosaic across pivots. Here we re-arm completed
+    * ranges from their pristine start (`next = rangeStart`, `done = false`), re-tag every range's `rootHash` to
+    * `rFinal`, drain any in-flight tasks back to pending, and resume dispatch. The existing worker dispatch then
+    * issues `GetAccountRange(rFinal)` (the worker snapshots `task.rootHash` as `expectedRoot`, so proofs are verified
+    * against `rFinal`), and `handleStoreAccountChunk` overwrites the stale leaves in `flatAccountStorage`. No
+    * worker-pool rewrite — we only re-tag and re-enqueue tasks through the same path a pivot refresh uses.
+    *
+    * Full re-fetch fallback (research Decision 1): we re-fetch ALL ranges, not just those whose completion root differs
+    * from `rFinal`. On an advancing sync most ranges are stale at finalize, so the distinction saves little; ~11 min
+    * (Mordor) sits well inside the ~28-min serve window. A targeted variant can follow if measured.
+    */
+  private def beginFinalizing(rFinal: ByteString): Unit = {
+    if (finalizeFreezeLatch) {
+      log.warning(s"BeginFinalizing(${rFinal.take(4).toHex}) received while already finalizing — ignoring duplicate")
+      return
+    }
+    finalizeFreezeLatch = true
+    stateRoot = rFinal
+    log.info(
+      s"[FLAT-MERKLEIZE] BeginFinalizing: freezing on root ${rFinal.take(4).toHex} and re-fetching all ranges " +
+        s"(${completedTasks.size} completed + ${pendingTasks.size} pending + ${activeTasks.size} active)"
+    )
+
+    // Drain in-flight tasks back to pending so they too re-fetch against rFinal (their old-root responses, if any,
+    // are dropped by the worker's expectedRoot proof-verify and by handleTaskComplete's already-drained guard).
+    drainActiveTasks(s"begin finalizing re-fetch on ${rFinal.take(4).toHex}")
+
+    // Re-arm completed ranges from their pristine start and move them back into the pending queue.
+    val reArmed = completedTasks.toVector
+    completedTasks.clear()
+    reArmed.foreach { task =>
+      task.next = task.rangeStart
+      task.done = false
+      task.pending = false
+      task.requeueCount = 0
+      task.rootHash = rFinal
+      pendingTasks.enqueue(task)
+    }
+
+    // Re-tag any tasks already pending (drained or never-completed) to rFinal.
+    pendingTasks.foreach(_.rootHash = rFinal)
+
+    // Fresh slate for the new root: peers may or may not serve rFinal; let stateless detection re-learn.
+    statelessPeers.clear()
+    snaplessPeers.clear()
+    emptyResponseStrikes.clear()
+    peerCooldownUntilMs.clear()
+    pivotRefreshRequested = false
+    lastDispatchOrResponseMs = System.currentTimeMillis()
+
+    log.info(s"[FLAT-MERKLEIZE] Re-armed ${pendingTasks.size} ranges for finalize re-fetch against ${rFinal.take(4).toHex}")
+    tryRedispatchPendingTasks()
+    knownAvailablePeers.filterNot(isPeerStateless).foreach(dispatchIfPossible)
+  }
+
+  /** Spec 008 US3 — during a finalize re-fetch, signal the controller once every range has re-completed against the
+    * frozen root so it can run the local-merkleize gate. No-op outside the latch (the normal account-download
+    * completion path is unchanged).
+    */
+  private def maybeSignalFinalizeRefetchComplete(): Unit =
+    if (finalizeFreezeLatch && pendingTasks.isEmpty && activeTasks.isEmpty && completedTasks.size >= concurrency) {
+      log.info(
+        s"[FLAT-MERKLEIZE] Finalize re-fetch complete: all ${completedTasks.size} ranges re-downloaded against " +
+          s"${stateRoot.take(4).toHex}. Signaling controller to run the local-merkleize gate."
+      )
+      snapSyncController ! SNAPSyncController.FinalizingRefetchComplete(stateRoot)
     }
 
   /** Dispatch up to maxInFlightPerPeer tasks to the given peer (pipelining). Mirrors

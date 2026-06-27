@@ -71,6 +71,31 @@ object Messages {
     */
   case object RecoverStalledAccountTasks extends AccountRangeCoordinatorMessage
 
+  /** Spec 008 US3 (Decision 3 / C2) — the finalize freeze latch.
+    *
+    * Sent by `SNAPSyncController` at the start of the local-merkleize finalize re-fetch. It (1) sets the coordinator's
+    * `finalizing` latch so any subsequent `PivotRefreshed` is IGNORED (no `rootHash` re-tag, no re-enqueue) — without
+    * this, an incoming pivot advance would re-tag the in-flight re-fetch mid-stream and re-create the stale-leaf
+    * mosaic the feature exists to eliminate; and (2) re-targets EVERY range (completed + pending + active) to
+    * `rFinal`, re-arming completed ranges from their pristine start so the workers re-fetch them via
+    * `GetAccountRange(rFinal)` and `handleStoreAccountChunk` overwrites the stale leaves in `flatAccountStorage`.
+    *
+    * On re-fetch completion the coordinator reports `FinalizingRefetchComplete(rFinal)` to the controller, which then
+    * runs the `computedRoot == header.stateRoot` gate. The latch is released by `EndFinalizing`.
+    */
+  final case class BeginFinalizing(rFinal: ByteString) extends AccountRangeCoordinatorMessage
+
+  /** Spec 008 US3 — release the finalize freeze latch (success or fail-closed abort). After this, pivot-advance
+    * (`PivotRefreshed`) is honored again.
+    */
+  case object EndFinalizing extends AccountRangeCoordinatorMessage
+
+  /** Spec 008 US3 — sent by `AccountRangeCoordinator` to `SNAPSyncController` once the finalize re-fetch has
+    * re-downloaded every range against `rFinal` (all ranges complete again). The controller runs the local-merkleize
+    * gate on receipt. `rFinal` echoes the frozen root so a stale completion from a superseded attempt can be dropped.
+    */
+  final case class FinalizingRefetchComplete(rFinal: ByteString) extends AccountRangeCoordinatorMessage
+
   /** Sent by `StorageRangeCoordinator` (via `SNAPSyncController`) when its pending-task queue depth crosses a
     * watermark. `paused = true` is emitted on the high-water transition: AccountRangeCoordinator should stop
     * dispatching new account-range requests so it stops producing new storage tasks. `paused = false` is emitted on the
@@ -194,6 +219,18 @@ object Messages {
     * root and clears per-peer adaptive state.
     */
   case class StoragePivotRefreshed(newStateRoot: ByteString) extends StorageRangeCoordinatorMessage
+
+  /** Spec 008 US3 (Decision 3 / C2) — the symmetric storage finalize freeze latch. Sets the coordinator's
+    * `finalizing` latch so any subsequent `StoragePivotRefreshed` is IGNORED for the duration of the finalize
+    * re-fetch, mirroring `BeginFinalizing` on the account coordinator. The frozen `rFinal` becomes the storage
+    * `stateRoot` so slot reconciliation fetches `GetStorageRange(rFinal)`.
+    */
+  final case class BeginStorageFinalizing(rFinal: ByteString) extends StorageRangeCoordinatorMessage
+
+  /** Spec 008 US3 — release the storage finalize freeze latch (success or fail-closed abort). After this,
+    * `StoragePivotRefreshed` is honored again.
+    */
+  case object EndStorageFinalizing extends StorageRangeCoordinatorMessage
 
   /** Signal that no more storage tasks will arrive (all accounts downloaded). Coordinator may now report completion
     * when pending + active tasks drain.

@@ -173,6 +173,12 @@ class StorageRangeCoordinator(
   private val EmptyResponseStrikeThreshold: Int = 5
   private var pivotRefreshRequested = false
 
+  // Spec 008 US3 (Decision 3 / C2) — the symmetric storage finalize freeze latch. Set by `BeginStorageFinalizing`
+  // for the duration of the local-merkleize finalize re-fetch; cleared by `EndStorageFinalizing`. While `true`,
+  // `StoragePivotRefreshed` is a no-op so a pivot advance cannot re-target the slot reconciliation mid-stream.
+  // Package-private so the spec can drive/inspect the latch deterministically.
+  private[actors] var finalizeFreezeLatch: Boolean = false
+
   // Contract completion tracking for progress estimation.
   // totalStorageContracts counts unique contracts added via AddStorageTasks.
   // Unique completed accounts are tracked via the bounded `completedAccountCount` counter below
@@ -862,6 +868,32 @@ class StorageRangeCoordinator(
         flushPendingFlatBatch()
         log.info("Storage range sync force-completed (promoting to healing phase)")
         snapSyncController ! SNAPSyncController.StorageRangeSyncForceCompleted
+      }
+
+    case StoragePivotRefreshed(newStateRoot) if finalizeFreezeLatch =>
+      // Spec 008 US3 (C2): freeze latch engaged — a pivot advance MUST NOT re-target the in-flight slot
+      // reconciliation against the frozen root. Ignore, mirroring the account coordinator's PivotRefreshed guard.
+      log.info(
+        s"Ignoring StoragePivotRefreshed to ${newStateRoot.take(4).toHex} during finalize re-fetch " +
+          s"(frozen root ${stateRoot.take(4).toHex})"
+      )
+
+    case BeginStorageFinalizing(rFinal) =>
+      // Spec 008 US3 (C2): engage the storage freeze latch and adopt rFinal so slot reconciliation fetches
+      // GetStorageRange(rFinal). Idempotent on a duplicate.
+      if (finalizeFreezeLatch) {
+        log.warning(s"BeginStorageFinalizing(${rFinal.take(4).toHex}) while already finalizing — ignoring duplicate")
+      } else {
+        finalizeFreezeLatch = true
+        stateRoot = rFinal
+        log.info(s"[FLAT-MERKLEIZE] BeginStorageFinalizing: freezing storage on root ${rFinal.take(4).toHex}")
+      }
+
+    case EndStorageFinalizing =>
+      // Spec 008 US3 (C2): release the latch (success or fail-closed abort). StoragePivotRefreshed honored again.
+      if (finalizeFreezeLatch) {
+        log.info(s"EndStorageFinalizing: releasing storage finalize freeze latch (was frozen at ${stateRoot.take(4).toHex})")
+        finalizeFreezeLatch = false
       }
 
     case StoragePivotRefreshed(newStateRoot) =>
