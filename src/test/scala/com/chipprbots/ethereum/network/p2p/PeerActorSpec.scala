@@ -7,6 +7,7 @@ import java.security.SecureRandom
 import java.util.concurrent.atomic.AtomicReference
 
 import org.apache.pekko.actor.typed.ActorRef
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.adapter.*
 import org.apache.pekko.actor.testkit.typed.scaladsl.ManualTime
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
@@ -58,10 +59,7 @@ import com.chipprbots.ethereum.utils.Config
 import com.chipprbots.ethereum.utils.NodeStatus
 import com.chipprbots.ethereum.utils.ServerStatus
 
-class PeerActorSpec
-    extends ScalaTestWithActorTestKit(ManualTime.config)
-    with AnyFlatSpecLike
-    with Matchers:
+class PeerActorSpec extends ScalaTestWithActorTestKit(ManualTime.config) with AnyFlatSpecLike with Matchers:
 
   val manualTime: ManualTime = ManualTime()
 
@@ -95,12 +93,26 @@ class PeerActorSpec
     with HandshakerSetup:
     override def protocol: Capability = Capability.ETH63
 
-    // Pre-create both probes so there is no shared mutable state between test and factory threads.
-    val probe1 = testKit.createTestProbe[RLPxConnectionHandler.Command]()
-    val probe2 = testKit.createTestProbe[RLPxConnectionHandler.Command]()
-    val probeQueue = new java.util.concurrent.LinkedBlockingQueue[TestProbe[RLPxConnectionHandler.Command]]()
-    probeQueue.add(probe1)
-    probeQueue.add(probe2)
+    // Test probes live under /system and cannot be stopped via testKit.stop(), which routes
+    // through the /user guardian (can only stop its direct children). Spawning user actors
+    // lets testKit.stop() work correctly. Spy probes capture messages PeerActor sends.
+    val conn1Spy = testKit.createTestProbe[RLPxConnectionHandler.Command]()
+    val conn2Spy = testKit.createTestProbe[RLPxConnectionHandler.Command]()
+    val conn1: ActorRef[RLPxConnectionHandler.Command] = testKit.spawn(
+      Behaviors.receiveMessage[RLPxConnectionHandler.Command] { msg =>
+        conn1Spy.ref ! msg; Behaviors.same
+      },
+      s"rlpx-conn-1-${java.util.UUID.randomUUID()}"
+    )
+    val conn2: ActorRef[RLPxConnectionHandler.Command] = testKit.spawn(
+      Behaviors.receiveMessage[RLPxConnectionHandler.Command] { msg =>
+        conn2Spy.ref ! msg; Behaviors.same
+      },
+      s"rlpx-conn-2-${java.util.UUID.randomUUID()}"
+    )
+    val connQueue = new java.util.concurrent.LinkedBlockingQueue[ActorRef[RLPxConnectionHandler.Command]]()
+    connQueue.add(conn1)
+    connQueue.add(conn2)
 
     val peerMessageBus = testKit.spawn(PeerEventBusActor.behavior(), s"peer-event-bus-${java.util.UUID.randomUUID()}")
     val knownNodesManager: TestProbe[KnownNodesManager.Command] = testKit.createTestProbe()
@@ -108,7 +120,7 @@ class PeerActorSpec
     val peer: ActorRef[PeerActor.Command] = testKit.spawn(
       PeerActor.apply(
         new InetSocketAddress("127.0.0.1", 0),
-        _ => probeQueue.poll().ref,
+        _ => connQueue.poll(),
         peerConf,
         peerMessageBus,
         knownNodesManager.ref,
@@ -119,15 +131,15 @@ class PeerActorSpec
 
     peer ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
 
-    probe1.expectMessageType[RLPxConnectionHandler.ConnectTo]
+    conn1Spy.expectMessageType[RLPxConnectionHandler.ConnectTo]
     peer ! RLPxConnectionHandler.ConnectionEstablished(remoteNodeId)
-    probe1.expectMessageType[RLPxConnectionHandler.SendMessage]
+    conn1Spy.expectMessageType[RLPxConnectionHandler.SendMessage]
 
-    // Stop probe1 → PeerActor gets RlpxTerminated → schedules retry at connectRetryDelay (1s)
-    testKit.stop(probe1.ref)
+    // Stop conn1 (user actor) → PeerActor deathwatch fires RlpxTerminated → retry scheduled
+    testKit.stop(conn1)
     manualTime.timePasses(2.seconds)
-    // After timer fires, factory is called → probe2 consumed → ConnectTo sent to probe2
-    probe2.expectMessageType[RLPxConnectionHandler.ConnectTo]
+    // After timer fires, factory returns conn2 → PeerActor sends ConnectTo to conn2
+    conn2Spy.expectMessageType[RLPxConnectionHandler.ConnectTo]
 
   it should "successfully connect to ETC peer" taggedAs (UnitTest, NetworkTest) in new TestSetup:
     val uri = new URI(s"enode://${Hex.toHexString(remoteNodeId.toArray[Byte])}@localhost:9000")
@@ -412,7 +424,6 @@ class PeerActorSpec
         handshaker
       )
     )
-
 
     peerUnderTest ! PeerActor.ConnectTo(new URI("encode://localhost:9000"))
     rlpxConnection.expectMessageType[RLPxConnectionHandler.ConnectTo]
