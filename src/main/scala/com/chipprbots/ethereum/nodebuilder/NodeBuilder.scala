@@ -458,14 +458,18 @@ trait BlockchainHostBuilder {
     NetworkPeerManagerActorBuilder & PeerEventBusBuilder & PendingTransactionsManagerBuilder =>
 
   val blockchainHost: org.apache.pekko.actor.typed.ActorRef[BlockchainHostActor.Command] = classicSystem.spawn(
-    BlockchainHostActor(
-      blockchainReader,
-      storagesInstance.storages.evmCodeStorage,
-      peerConfiguration,
-      peerEventBus,
-      networkPeerManager,
-      pendingTransactionsManagerTyped
-    ),
+    Behaviors
+      .supervise(
+        BlockchainHostActor(
+          blockchainReader,
+          storagesInstance.storages.evmCodeStorage,
+          peerConfiguration,
+          peerEventBus,
+          networkPeerManager,
+          pendingTransactionsManagerTyped
+        )
+      )
+      .onFailure[Throwable](SupervisorStrategy.restart),
     "blockchain-host"
   )
 

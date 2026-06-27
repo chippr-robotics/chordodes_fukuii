@@ -6,6 +6,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.DispatcherSelector
+import org.apache.pekko.actor.typed.SupervisorStrategy
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
@@ -269,17 +270,21 @@ object FastSync {
       log.info("Starting fast sync from scratch")
       val pivotBlockSelector = ctx
         .spawn(
-          PivotBlockSelector(
-            networkPeerManager,
-            peerEventBus,
-            syncConfig,
-            pivotResultAdapter,
-            pivotFailedAdapter,
-            blacklist,
-            () => ourBestTotalDifficulty(),
-            getCanonicalHeaderByNumber,
-            validateHeaderPoW
-          ),
+          Behaviors
+            .supervise(
+              PivotBlockSelector(
+                networkPeerManager,
+                peerEventBus,
+                syncConfig,
+                pivotResultAdapter,
+                pivotFailedAdapter,
+                blacklist,
+                () => ourBestTotalDifficulty(),
+                getCanonicalHeaderByNumber,
+                validateHeaderPoW
+              )
+            )
+            .onFailure[Throwable](SupervisorStrategy.restart),
           "pivot-block-selector"
         )
       pivotBlockSelector ! PivotBlockSelector.SelectPivotBlock
@@ -295,17 +300,21 @@ object FastSync {
             log.info("Retrying pivot block selection")
             val pivotBlockSelector = ctx
               .spawn(
-                PivotBlockSelector(
-                  networkPeerManager,
-                  peerEventBus,
-                  syncConfig,
-                  pivotResultAdapter,
-                  pivotFailedAdapter,
-                  blacklist,
-                  () => ourBestTotalDifficulty(),
-                  getCanonicalHeaderByNumber,
-                  validateHeaderPoW
-                ),
+                Behaviors
+                  .supervise(
+                    PivotBlockSelector(
+                      networkPeerManager,
+                      peerEventBus,
+                      syncConfig,
+                      pivotResultAdapter,
+                      pivotFailedAdapter,
+                      blacklist,
+                      () => ourBestTotalDifficulty(),
+                      getCanonicalHeaderByNumber,
+                      validateHeaderPoW
+                    )
+                  )
+                  .onFailure[Throwable](SupervisorStrategy.restart),
                 s"pivot-block-selector-retry-${java.util.UUID.randomUUID()}"
               )
             pivotBlockSelector ! PivotBlockSelector.SelectPivotBlock
@@ -394,7 +403,9 @@ object FastSync {
     private def initSyncSession(initial: SyncState): Unit = {
       val storageActor: TypedActorRef[StateStorageActor.Command] = ctx
         .spawn(
-          StateStorageActor(),
+          Behaviors
+            .supervise(StateStorageActor())
+            .onFailure[Throwable](SupervisorStrategy.restart),
           s"$countActor-state-storage",
           DispatcherSelector.fromConfig("sync-dispatcher")
         )
@@ -422,7 +433,7 @@ object FastSync {
                 stateSyncStatsAdapter
               )
             )
-            .onFailure[Exception](org.apache.pekko.actor.typed.SupervisorStrategy.restart),
+            .onFailure[Exception](SupervisorStrategy.restart),
           s"$countActor-state-scheduler"
         )
 
@@ -681,17 +692,21 @@ object FastSync {
       val pivotBlockSelector =
         ctx
           .spawn(
-            PivotBlockSelector(
-              networkPeerManager,
-              peerEventBus,
-              syncConfig,
-              pivotResultAdapter,
-              pivotFailedAdapter,
-              blacklist,
-              () => ourBestTotalDifficulty(),
-              getCanonicalHeaderByNumber,
-              validateHeaderPoW
-            ),
+            Behaviors
+              .supervise(
+                PivotBlockSelector(
+                  networkPeerManager,
+                  peerEventBus,
+                  syncConfig,
+                  pivotResultAdapter,
+                  pivotFailedAdapter,
+                  blacklist,
+                  () => ourBestTotalDifficulty(),
+                  getCanonicalHeaderByNumber,
+                  validateHeaderPoW
+                )
+              )
+              .onFailure[Throwable](SupervisorStrategy.restart),
             s"$countActor-pivot-block-selector-update"
           )
       pivotBlockSelector ! PivotBlockSelector.SelectPivotBlock
@@ -1116,17 +1131,21 @@ object FastSync {
             )
             blacklist.add(peer.id, syncConfig.blacklistDuration, BlockHeaderValidationFailed)
             val resolver = ctx.spawn(
-              FastSyncBranchResolverActor(
-                replyTo = ctx.messageAdapter[FastSyncBranchResolverActor.BranchResolverResponse](
-                  WrappedBranchResolverResponse(_)
-                ),
-                peerEventBus = peerEventBus,
-                networkPeerManager = networkPeerManager,
-                blockchain = blockchain,
-                blockchainReader = blockchainReader,
-                blacklist = blacklist,
-                syncConfig = syncConfig
-              ),
+              Behaviors
+                .supervise(
+                  FastSyncBranchResolverActor(
+                    replyTo = ctx.messageAdapter[FastSyncBranchResolverActor.BranchResolverResponse](
+                      WrappedBranchResolverResponse(_)
+                    ),
+                    peerEventBus = peerEventBus,
+                    networkPeerManager = networkPeerManager,
+                    blockchain = blockchain,
+                    blockchainReader = blockchainReader,
+                    blacklist = blacklist,
+                    syncConfig = syncConfig
+                  )
+                )
+                .onFailure[Throwable](SupervisorStrategy.restart),
               s"fast-sync-branch-resolver-${java.util.UUID.randomUUID()}"
             )
             resolver ! FastSyncBranchResolverActor.StartBranchResolver

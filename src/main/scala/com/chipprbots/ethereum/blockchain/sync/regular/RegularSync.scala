@@ -1,6 +1,7 @@
 package com.chipprbots.ethereum.blockchain.sync.regular
 
 import org.apache.pekko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.SupervisorStrategy
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import scala.concurrent.duration.*
@@ -71,16 +72,20 @@ object RegularSync {
 
         val broadcaster: TypedActorRef[BlockBroadcasterActor.BroadcasterMsg] =
           ctx.spawn(
-            BlockBroadcasterActor.apply(
-              new BlockBroadcast(
-                networkPeerManager,
-                isPoWChain = configBuilder.blockchainConfig.terminalTotalDifficulty.isEmpty
-              ),
-              peerEventBus,
-              networkPeerManager,
-              blacklist,
-              syncConfig
-            ),
+            Behaviors
+              .supervise(
+                BlockBroadcasterActor.apply(
+                  new BlockBroadcast(
+                    networkPeerManager,
+                    isPoWChain = configBuilder.blockchainConfig.terminalTotalDifficulty.isEmpty
+                  ),
+                  peerEventBus,
+                  networkPeerManager,
+                  blacklist,
+                  syncConfig
+                )
+              )
+              .onFailure[Throwable](SupervisorStrategy.restart),
             "block-broadcaster"
           )
 

@@ -5,6 +5,7 @@ import org.apache.pekko.actor.typed.ActorRef as TypedActorRef
 import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.DispatcherSelector
 import org.apache.pekko.actor.typed.PostStop
+import org.apache.pekko.actor.typed.SupervisorStrategy
 import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
@@ -608,20 +609,28 @@ object SyncController {
             val gen = bootstrapGeneration
             val peersClient =
               ctx.spawn(
-                PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig),
+                Behaviors
+                  .supervise(PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig))
+                  .onFailure[Throwable](
+                    SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2).withMaxRestarts(5)
+                  ),
                 s"peers-client-bootstrap-$gen"
               )
             val headerBootstrap =
               ctx
                 .spawn(
-                  PivotHeaderBootstrap(
-                    peersClient,
-                    blockchainWriter,
-                    targetBlock,
-                    replyTo = pivotBootstrapAdapter,
-                    syncConfig,
-                    preferSnapPeers = true
-                  ),
+                  Behaviors
+                    .supervise(
+                      PivotHeaderBootstrap(
+                        peersClient,
+                        blockchainWriter,
+                        targetBlock,
+                        replyTo = pivotBootstrapAdapter,
+                        syncConfig,
+                        preferSnapPeers = true
+                      )
+                    )
+                    .onFailure[Throwable](SupervisorStrategy.restart),
                   s"pivot-header-bootstrap-$gen"
                 )
 
@@ -641,20 +650,28 @@ object SyncController {
             val gen = bootstrapGeneration
             val peersClient =
               ctx.spawn(
-                PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig),
+                Behaviors
+                  .supervise(PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig))
+                  .onFailure[Throwable](
+                    SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2).withMaxRestarts(5)
+                  ),
                 s"peers-client-bootstrap-$gen"
               )
             val headerBootstrap =
               ctx
                 .spawn(
-                  PivotHeaderBootstrap.applyByHash(
-                    peersClient,
-                    blockchainWriter,
-                    headHash,
-                    replyTo = pivotBootstrapAdapter,
-                    syncConfig,
-                    preferSnapPeers = false
-                  ),
+                  Behaviors
+                    .supervise(
+                      PivotHeaderBootstrap.applyByHash(
+                        peersClient,
+                        blockchainWriter,
+                        headHash,
+                        replyTo = pivotBootstrapAdapter,
+                        syncConfig,
+                        preferSnapPeers = false
+                      )
+                    )
+                    .onFailure[Throwable](SupervisorStrategy.restart),
                   s"pivot-header-bootstrap-$gen"
                 )
             // We pass `targetBlock = 0` as a placeholder — the bootstrap reply carries the
@@ -838,19 +855,27 @@ object SyncController {
           healingServeRootGeneration += 1
           val gen = healingServeRootGeneration
           val peersClient = ctx.spawn(
-            PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig),
+            Behaviors
+              .supervise(PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig))
+              .onFailure[Throwable](
+                SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2).withMaxRestarts(5)
+              ),
             s"healing-serve-root-peers-$gen"
           )
           val bootstrap = ctx
             .spawn(
-              PivotHeaderBootstrap(
-                peersClient,
-                blockchainWriter,
-                recentBlock,
-                replyTo = pivotBootstrapAdapter,
-                syncConfig,
-                preferSnapPeers = true
-              ),
+              Behaviors
+                .supervise(
+                  PivotHeaderBootstrap(
+                    peersClient,
+                    blockchainWriter,
+                    recentBlock,
+                    replyTo = pivotBootstrapAdapter,
+                    syncConfig,
+                    preferSnapPeers = true
+                  )
+                )
+                .onFailure[Throwable](SupervisorStrategy.restart),
               s"healing-serve-root-bootstrap-$gen"
             )
           healingServeRootBootstrap = Some((peersClient, bootstrap))
@@ -1147,20 +1172,28 @@ object SyncController {
           val gen = bootstrapGeneration
           val newPeersClient =
             ctx.spawn(
-              PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig),
+              Behaviors
+                .supervise(PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig))
+                .onFailure[Throwable](
+                  SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2).withMaxRestarts(5)
+                ),
               s"peers-client-bootstrap-$gen"
             )
           val newHeaderBootstrap =
             ctx
               .spawn(
-                PivotHeaderBootstrap(
-                  newPeersClient,
-                  blockchainWriter,
-                  newTargetBlock,
-                  replyTo = pivotBootstrapAdapter,
-                  syncConfig,
-                  preferSnapPeers = true
-                ),
+                Behaviors
+                  .supervise(
+                    PivotHeaderBootstrap(
+                      newPeersClient,
+                      blockchainWriter,
+                      newTargetBlock,
+                      replyTo = pivotBootstrapAdapter,
+                      syncConfig,
+                      preferSnapPeers = true
+                    )
+                  )
+                  .onFailure[Throwable](SupervisorStrategy.restart),
                 s"pivot-header-bootstrap-$gen"
               )
           runningPivotHeaderBootstrap(newPeersClient, newHeaderBootstrap, newTargetBlock, originalSnapSyncRef)
@@ -1223,19 +1256,27 @@ object SyncController {
           val gen = bootstrapGeneration
           val newPeersClient =
             ctx.spawn(
-              PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig),
+              Behaviors
+                .supervise(PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig))
+                .onFailure[Throwable](
+                  SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2).withMaxRestarts(5)
+                ),
               s"peers-client-bootstrap-$gen"
             )
           val newHeaderBootstrap =
             ctx.spawn(
-              PivotHeaderBootstrap.applyByHash(
-                newPeersClient,
-                blockchainWriter,
-                headHash,
-                replyTo = pivotBootstrapAdapter,
-                syncConfig,
-                preferSnapPeers = false
-              ),
+              Behaviors
+                .supervise(
+                  PivotHeaderBootstrap.applyByHash(
+                    newPeersClient,
+                    blockchainWriter,
+                    headHash,
+                    replyTo = pivotBootstrapAdapter,
+                    syncConfig,
+                    preferSnapPeers = false
+                  )
+                )
+                .onFailure[Throwable](SupervisorStrategy.restart),
               s"pivot-header-bootstrap-$gen"
             )
           runningPivotHeaderBootstrap(newPeersClient, newHeaderBootstrap, targetBlock = BigInt(0), originalSnapSyncRef)
@@ -1775,7 +1816,11 @@ object SyncController {
 
       val peersClient =
         ctx.spawn(
-          PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig),
+          Behaviors
+            .supervise(PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig))
+            .onFailure[Throwable](
+              SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2).withMaxRestarts(5)
+            ),
           s"peers-client-$syncGeneration",
           DispatcherSelector.fromConfig("sync-dispatcher")
         )
@@ -1842,17 +1887,21 @@ object SyncController {
         // Classic so the existing `! ChainDownloader.X` sends below keep compiling.
         val resumer = ctx
           .spawn(
-            ChainDownloader(
-              blockchainReader = blockchainReader,
-              blockchainWriter = blockchainWriter,
-              appStateStorage = appStateStorage,
-              networkPeerManager = networkPeerManager,
-              peerEventBus = peerEventBus,
-              syncConfig = syncConfig,
-              replyTo = chainDownloaderAdapter,
-              maxConcurrentRequests = snapSyncConfig.chainBackfillConcurrentRequests,
-              requestTimeout = snapSyncConfig.chainDownloadTimeout
-            ),
+            Behaviors
+              .supervise(
+                ChainDownloader(
+                  blockchainReader = blockchainReader,
+                  blockchainWriter = blockchainWriter,
+                  appStateStorage = appStateStorage,
+                  networkPeerManager = networkPeerManager,
+                  peerEventBus = peerEventBus,
+                  syncConfig = syncConfig,
+                  replyTo = chainDownloaderAdapter,
+                  maxConcurrentRequests = snapSyncConfig.chainBackfillConcurrentRequests,
+                  requestTimeout = snapSyncConfig.chainDownloadTimeout
+                )
+              )
+              .onFailure[Throwable](SupervisorStrategy.restart),
             s"backfill-resumer-$syncGeneration",
             DispatcherSelector.fromConfig("sync-dispatcher")
           )
@@ -1931,15 +1980,19 @@ object SyncController {
               if needStorage then RecoveryMetrics.PhaseScanning else RecoveryMetrics.PhaseComplete
             )
             ctx.spawn(
-              CombinedRecoveryScanActor(
-                stateRoot,
-                stateStorage,
-                evmCodeStorage,
-                appStateStorage,
-                combinedScanAdapter,
-                pivotBlock,
-                snapSyncConfig
-              ),
+              Behaviors
+                .supervise(
+                  CombinedRecoveryScanActor(
+                    stateRoot,
+                    stateStorage,
+                    evmCodeStorage,
+                    appStateStorage,
+                    combinedScanAdapter,
+                    pivotBlock,
+                    snapSyncConfig
+                  )
+                )
+                .onFailure[Throwable](SupervisorStrategy.restart),
               s"combined-recovery-scan-$syncGeneration",
               DispatcherSelector.fromConfig("sync-dispatcher")
             )
@@ -1951,16 +2004,22 @@ object SyncController {
                 Some(
                   ctx
                     .spawn(
-                      BytecodeRecoveryActor(
-                        stateRoot,
-                        stateStorage,
-                        evmCodeStorage,
-                        appStateStorage,
-                        networkPeerManager,
-                        bytecodeRecoveryAdapter,
-                        pivotBlock,
-                        snapSyncConfig
-                      ),
+                      Behaviors
+                        .supervise(
+                          BytecodeRecoveryActor(
+                            stateRoot,
+                            stateStorage,
+                            evmCodeStorage,
+                            appStateStorage,
+                            networkPeerManager,
+                            bytecodeRecoveryAdapter,
+                            pivotBlock,
+                            snapSyncConfig
+                          )
+                        )
+                        .onFailure[Throwable](
+                          SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2).withMaxRestarts(2)
+                        ),
                       s"bytecode-recovery-$syncGeneration",
                       DispatcherSelector.fromConfig("sync-dispatcher")
                     )
@@ -1971,16 +2030,22 @@ object SyncController {
                 Some(
                   ctx
                     .spawn(
-                      StorageRecoveryActor(
-                        stateRoot,
-                        stateStorage,
-                        appStateStorage,
-                        flatSlotStorage,
-                        networkPeerManager,
-                        storageRecoveryAdapter,
-                        pivotBlock,
-                        snapSyncConfig
-                      ),
+                      Behaviors
+                        .supervise(
+                          StorageRecoveryActor(
+                            stateRoot,
+                            stateStorage,
+                            appStateStorage,
+                            flatSlotStorage,
+                            networkPeerManager,
+                            storageRecoveryAdapter,
+                            pivotBlock,
+                            snapSyncConfig
+                          )
+                        )
+                        .onFailure[Throwable](
+                          SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2).withMaxRestarts(2)
+                        ),
                       s"storage-recovery-$syncGeneration",
                       DispatcherSelector.fromConfig("sync-dispatcher")
                     )
@@ -2027,17 +2092,23 @@ object SyncController {
               Some(
                 ctx
                   .spawn(
-                    BytecodeRecoveryActor.applyPreloaded(
-                      stateRoot,
-                      stateStorage,
-                      evmCodeStorage,
-                      appStateStorage,
-                      networkPeerManager,
-                      bytecodeRecoveryAdapter,
-                      pivotBlock,
-                      snapSyncConfig,
-                      effByte
-                    ),
+                    Behaviors
+                      .supervise(
+                        BytecodeRecoveryActor.applyPreloaded(
+                          stateRoot,
+                          stateStorage,
+                          evmCodeStorage,
+                          appStateStorage,
+                          networkPeerManager,
+                          bytecodeRecoveryAdapter,
+                          pivotBlock,
+                          snapSyncConfig,
+                          effByte
+                        )
+                      )
+                      .onFailure[Throwable](
+                        SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2).withMaxRestarts(2)
+                      ),
                     s"bytecode-recovery-dl-$syncGeneration",
                     DispatcherSelector.fromConfig("sync-dispatcher")
                   )
@@ -2048,17 +2119,23 @@ object SyncController {
               Some(
                 ctx
                   .spawn(
-                    StorageRecoveryActor.applyPreloaded(
-                      stateRoot,
-                      stateStorage,
-                      appStateStorage,
-                      flatSlotStorage,
-                      networkPeerManager,
-                      storageRecoveryAdapter,
-                      pivotBlock,
-                      snapSyncConfig,
-                      effStor
-                    ),
+                    Behaviors
+                      .supervise(
+                        StorageRecoveryActor.applyPreloaded(
+                          stateRoot,
+                          stateStorage,
+                          appStateStorage,
+                          flatSlotStorage,
+                          networkPeerManager,
+                          storageRecoveryAdapter,
+                          pivotBlock,
+                          snapSyncConfig,
+                          effStor
+                        )
+                      )
+                      .onFailure[Throwable](
+                        SupervisorStrategy.restartWithBackoff(1.second, 30.seconds, 0.2).withMaxRestarts(2)
+                      ),
                     s"storage-recovery-dl-$syncGeneration",
                     DispatcherSelector.fromConfig("sync-dispatcher")
                   )
@@ -2274,19 +2351,27 @@ object SyncController {
           recentRootGeneration += 1
           val gen = recentRootGeneration
           val peersClient = ctx.spawn(
-            PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig),
+            Behaviors
+              .supervise(PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig))
+              .onFailure[Throwable](
+                SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2).withMaxRestarts(5)
+              ),
             s"recovery-recent-root-peers-$gen"
           )
           val bootstrap = ctx
             .spawn(
-              PivotHeaderBootstrap(
-                peersClient,
-                blockchainWriter,
-                recentBlock,
-                replyTo = pivotBootstrapAdapter,
-                syncConfig,
-                preferSnapPeers = true
-              ),
+              Behaviors
+                .supervise(
+                  PivotHeaderBootstrap(
+                    peersClient,
+                    blockchainWriter,
+                    recentBlock,
+                    replyTo = pivotBootstrapAdapter,
+                    syncConfig,
+                    preferSnapPeers = true
+                  )
+                )
+                .onFailure[Throwable](SupervisorStrategy.restart),
               s"recovery-recent-root-bootstrap-$gen"
             )
           recentRootBootstrap = Some((peersClient, bootstrap))
@@ -2455,7 +2540,11 @@ object SyncController {
 
       val peersClient =
         ctx.spawn(
-          PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig),
+          Behaviors
+            .supervise(PeersClient.behavior(networkPeerManager, peerEventBus, blacklist, syncConfig))
+            .onFailure[Throwable](
+              SupervisorStrategy.restartWithBackoff(500.millis, 10.seconds, 0.2).withMaxRestarts(5)
+            ),
           s"peers-client-bootstrap-$gen"
         )
       val regularSync = ctx

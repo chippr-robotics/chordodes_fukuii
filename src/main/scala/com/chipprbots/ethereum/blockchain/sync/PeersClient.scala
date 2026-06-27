@@ -286,6 +286,8 @@ object PeersClient {
         R
       ]] // cast: existential ClassTag[? <: Message] narrowed to fresh local R for PRH.behavior type param
       given toSerializer: (Message => MessageSerializable) = toSer
+      // PeerRequestHandler: default stop intentional — self-limiting leaf actor;
+      // PeersClient re-issues requests on failure.
       ctx.spawn(
         PeerRequestHandler.behavior[Message, R](
           peer,
