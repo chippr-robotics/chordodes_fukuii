@@ -23,7 +23,8 @@ import scala.concurrent.duration._
 import scala.util.{Success, Failure}
 
 import com.chipprbots.ethereum.blockchain.sync.snap._
-import com.chipprbots.ethereum.db.storage.{MptStorage, PathNodeStorage}
+import com.chipprbots.ethereum.db.dataSource.DataSourceBatchUpdate
+import com.chipprbots.ethereum.db.storage.{FlatAccountStorage, MptStorage, PathNodeStorage}
 import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
@@ -72,7 +73,13 @@ class AccountRangeCoordinator(
     minResponseBytesConfig: Int = 102400,
     accountTrieEcOverride: Option[ExecutionContext] = None,
     storageScheme: StorageScheme = StorageScheme.Hash,
-    pathNodeStorage: Option[PathNodeStorage] = None
+    pathNodeStorage: Option[PathNodeStorage] = None,
+    // Spec 008 US2: retained-leaf flat store + gate. When `flatAccountMerkleize` is true, every
+    // downloaded `(accountHash, accountRLP)` is ALSO written to `flatAccountStorage` (additive to the
+    // inline StackTrie build) so finalize can merkleize the state root locally. Both default to the
+    // legacy no-op (None / false) so existing constructions are unchanged.
+    flatAccountStorage: Option[FlatAccountStorage] = None,
+    flatAccountMerkleize: Boolean = false
 ) extends Actor
     with ActorLogging {
 
@@ -1393,9 +1400,27 @@ class AccountRangeCoordinator(
       // Route accounts to this task's per-range StackTrie. Inserts are O(depth) memory + O(1)
       // amortised compute; emitted nodes batch-flush to RocksDB inside SnapHashTrie at the 8 MiB
       // threshold, so we never accumulate a multi-GiB in-memory pivot trie.
+      //
+      // Spec 008 US2 (additive, flag-gated): when `flatAccountMerkleize` is on, also retain each
+      // `(accountHash, accountRLP)` in `flatAccountStorage` so the state root can be merkleized
+      // locally at finalize. This MUST NOT disturb the inline StackTrie build above — it reuses the
+      // same RLP bytes and only adds a flat-store write. Symmetric to StorageRangeCoordinator's
+      // `flatSlotStorage.putSlotsBatch`.
       val trie = getOrCreateTaskStackTrie(task)
+      val retainLeaves = flatAccountMerkleize && flatAccountStorage.isDefined
+      val flatPairs =
+        if (retainLeaves) new mutable.ArrayBuffer[(ByteString, ByteString)](chunk.size) else null
       chunk.foreach { case (accountHash, account) =>
-        trie.update(accountHash.toArray, Account.accountSerializer.toBytes(account))
+        val accountRlp = Account.accountSerializer.toBytes(account)
+        trie.update(accountHash.toArray, accountRlp)
+        if (retainLeaves) flatPairs += (accountHash -> ByteString.fromArrayUnsafe(accountRlp))
+      }
+      if (retainLeaves && flatPairs.nonEmpty) {
+        // Synchronous commit keeps Batch 1 surgical (the StorageRangeCoordinator async-flush
+        // optimisation can follow later if measured). Fail-loud: a flat-store write failure must
+        // surface, not silently drop retained leaves (the finalize merkleize depends on them).
+        val batch: DataSourceBatchUpdate = flatAccountStorage.get.putAccountsBatch(flatPairs.toSeq)
+        batch.commit()
       }
 
       val newStored = storedSoFar + chunk.size
@@ -1727,7 +1752,9 @@ object AccountRangeCoordinator {
       minResponseBytes: Int = 102400,
       accountTrieEcOverride: Option[ExecutionContext] = None,
       storageScheme: StorageScheme = StorageScheme.Hash,
-      pathNodeStorage: Option[PathNodeStorage] = None
+      pathNodeStorage: Option[PathNodeStorage] = None,
+      flatAccountStorage: Option[FlatAccountStorage] = None,
+      flatAccountMerkleize: Boolean = false
   ): Props =
     Props(
       new AccountRangeCoordinator(
@@ -1743,7 +1770,9 @@ object AccountRangeCoordinator {
         minResponseBytes,
         accountTrieEcOverride,
         storageScheme = storageScheme,
-        pathNodeStorage = pathNodeStorage
+        pathNodeStorage = pathNodeStorage,
+        flatAccountStorage = flatAccountStorage,
+        flatAccountMerkleize = flatAccountMerkleize
       )
     )
 }

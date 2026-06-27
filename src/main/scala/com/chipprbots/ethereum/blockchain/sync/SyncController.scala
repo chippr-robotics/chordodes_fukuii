@@ -29,6 +29,7 @@ import com.chipprbots.ethereum.db.storage.AppStateStorage
 import com.chipprbots.ethereum.db.storage.BlockNumberMappingStorage
 import com.chipprbots.ethereum.db.storage.EvmCodeStorage
 import com.chipprbots.ethereum.db.storage.FastSyncStateStorage
+import com.chipprbots.ethereum.db.storage.FlatAccountStorage
 import com.chipprbots.ethereum.db.storage.FlatSlotStorage
 import com.chipprbots.ethereum.db.storage.NodeStorage
 import com.chipprbots.ethereum.db.storage.StateStorage
@@ -50,6 +51,7 @@ class SyncController(
     stateStorage: StateStorage,
     nodeStorage: NodeStorage,
     flatSlotStorage: FlatSlotStorage,
+    flatAccountStorage: FlatAccountStorage,
     fastSyncStateStorage: FastSyncStateStorage,
     consensus: ConsensusAdapter,
     validators: Validators,
@@ -1178,6 +1180,7 @@ class SyncController(
           stateStorage,
           evmCodeStorage,
           flatSlotStorage,
+          flatAccountStorage,
           networkPeerManager,
           peerEventBus,
           syncConfig,
@@ -1904,6 +1907,7 @@ object SyncController {
       stateStorage: StateStorage,
       nodeStorage: NodeStorage,
       flatSlotStorage: FlatSlotStorage,
+      flatAccountStorage: FlatAccountStorage,
       syncStateStorage: FastSyncStateStorage,
       consensus: ConsensusAdapter,
       validators: Validators,
@@ -1928,6 +1932,7 @@ object SyncController {
         stateStorage,
         nodeStorage,
         flatSlotStorage,
+        flatAccountStorage,
         syncStateStorage,
         consensus,
         validators,

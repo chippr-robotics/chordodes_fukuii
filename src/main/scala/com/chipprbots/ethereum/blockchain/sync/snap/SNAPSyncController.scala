@@ -13,6 +13,7 @@ import com.chipprbots.ethereum.db.storage.{
   AppStateStorage,
   BfsQueueStorage,
   EvmCodeStorage,
+  FlatAccountStorage,
   FlatSlotStorage,
   HealingFrontierStorage,
   MptStorage,
@@ -36,6 +37,7 @@ class SNAPSyncController(
     stateStorage: StateStorage,
     evmCodeStorage: EvmCodeStorage,
     flatSlotStorage: FlatSlotStorage,
+    flatAccountStorage: FlatAccountStorage,
     val networkPeerManager: ActorRef,
     val peerEventBus: ActorRef,
     val syncConfig: SyncConfig,
@@ -3021,7 +3023,11 @@ class SNAPSyncController(
             initialResponseBytes = snapSyncConfig.accountInitialResponseBytes,
             minResponseBytes = snapSyncConfig.accountMinResponseBytes,
             storageScheme = snapSyncConfig.storageScheme,
-            pathNodeStorage = pathNodeStorageOpt
+            pathNodeStorage = pathNodeStorageOpt,
+            // Spec 008 US2: retain account leaves to the flat store during download (additive to the
+            // inline StackTrie build), gated by the flat-account-merkleize flag.
+            flatAccountStorage = Some(flatAccountStorage),
+            flatAccountMerkleize = snapSyncConfig.flatAccountMerkleize
           )
           .withDispatcher("sync-dispatcher"),
         s"account-range-coordinator-$coordinatorGeneration"
@@ -4918,6 +4924,7 @@ object SNAPSyncController {
       stateStorage: StateStorage,
       evmCodeStorage: EvmCodeStorage,
       flatSlotStorage: FlatSlotStorage,
+      flatAccountStorage: FlatAccountStorage,
       networkPeerManager: ActorRef,
       peerEventBus: ActorRef,
       syncConfig: SyncConfig,
@@ -4934,6 +4941,7 @@ object SNAPSyncController {
         stateStorage,
         evmCodeStorage,
         flatSlotStorage,
+        flatAccountStorage,
         networkPeerManager,
         peerEventBus,
         syncConfig,
@@ -5036,6 +5044,15 @@ case class SNAPSyncConfig(
     snapPeerEvictionInterval: FiniteDuration = 15.seconds,
     maxEvictionsPerCycle: Int = 3,
     deferredMerkleization: Boolean = true,
+    // Flat-account retention + local state-root merkleization (spec 008). When true (default for
+    // fresh ETC SNAP), every downloaded account leaf is also written to FlatAccountStorage (the
+    // symmetric counterpart to FlatSlotStorage), so the canonical state root can be merkleized
+    // LOCALLY at finalize from the retained leaves — escaping the in-place-pivot account-trie mosaic
+    // that core-geth peers can't heal. Off ⇒ no flat-account write + today's legacy finalize
+    // (byte-identical). Additive: the inline StackTrie build is untouched. No-op on the
+    // deferred-merkleization path; no ETH/Sepolia effect. Batch 1 (spec 008) wires only the retention
+    // write; the finalize-time merkleize/verify (US1) and freeze/re-fetch (US3) land in later batches.
+    flatAccountMerkleize: Boolean = true,
     // Bug 30b: post-SNAP storage recovery can't refresh the pivot root. If every peer
     // rejects the saved root for this long with no slot progress, abandon recovery and
     // let regular sync's on-demand GetTrieNodes pick up missing subtrees.
@@ -5222,6 +5239,10 @@ object SNAPSyncConfig {
       deferredMerkleization =
         if (snapConfig.hasPath("deferred-merkleization"))
           snapConfig.getBoolean("deferred-merkleization")
+        else true,
+      flatAccountMerkleize =
+        if (snapConfig.hasPath("flat-account-merkleize"))
+          snapConfig.getBoolean("flat-account-merkleize")
         else true,
       storageRecoveryAbandonTimeout =
         if (snapConfig.hasPath("storage-recovery-abandon-timeout"))

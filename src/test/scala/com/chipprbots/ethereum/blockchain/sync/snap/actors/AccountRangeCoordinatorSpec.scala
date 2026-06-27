@@ -11,13 +11,23 @@ import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
 import com.chipprbots.ethereum.blockchain.sync.snap._
+import com.chipprbots.ethereum.blockchain.sync.snap.fixtures.FlatAccountMerkleizeFixtures
 import com.chipprbots.ethereum.crypto.kec256
+import com.chipprbots.ethereum.db.dataSource.{RocksDbConfig, RocksDbDataSource}
+import com.chipprbots.ethereum.db.dataSource.RocksDbDataSource.IterationError
+import com.chipprbots.ethereum.db.storage.{FlatAccountStorage, Namespaces}
+import com.chipprbots.ethereum.domain.Account
 import com.chipprbots.ethereum.mpt.MerklePatriciaTrie
 import com.chipprbots.ethereum.network.Peer
 import com.chipprbots.ethereum.network.NetworkPeerManagerActor
 import com.chipprbots.ethereum.network.p2p.messages.SNAP.GetAccountRange.GetAccountRangeEnc
 import com.chipprbots.ethereum.testing.Tags._
 import com.chipprbots.ethereum.testing.{PeerTestHelpers, TestMptStorage}
+
+import java.io.File
+import java.nio.file.Files
+
+import cats.effect.unsafe.IORuntime
 
 class AccountRangeCoordinatorSpec
     extends TestKit(ActorSystem("AccountRangeCoordinatorSpec"))
@@ -1365,5 +1375,164 @@ class AccountRangeCoordinatorSpec
     // Release bytecode — set is now empty, dispatch resumes.
     coord ! Messages.ByteCodeQueuePressure(paused = false)
     networkPeerManager.expectMsgType[NetworkPeerManagerActor.SendMessage](2.seconds)
+  }
+
+  // ========================================
+  // Spec 008 US2 — flat-account retention during download (T007, T008)
+  // ========================================
+
+  /** Build a TestActorRef coordinator wired to a real RocksDB-backed FlatAccountStorage so the additive retention write
+    * can be exercised and the persisted leaves enumerated. `flatMerkleize` gates the write (the production
+    * `flat-account-merkleize` flag).
+    */
+  private def newFlatRetentionCoordinator(
+      dataSource: RocksDbDataSource,
+      flatMerkleize: Boolean,
+      stateRoot: ByteString
+  ): (TestActorRef[AccountRangeCoordinator], FlatAccountStorage) = {
+    val flat = new FlatAccountStorage(dataSource)
+    val coord = TestActorRef[AccountRangeCoordinator](
+      AccountRangeCoordinator.props(
+        stateRoot = stateRoot,
+        networkPeerManager = TestProbe().ref,
+        requestTracker = new SNAPRequestTracker()(system.scheduler),
+        mptStorage = new TestMptStorage(),
+        concurrency = 4,
+        snapSyncController = TestProbe().ref,
+        accountTrieEcOverride = Some(system.dispatcher),
+        flatAccountStorage = Some(flat),
+        flatAccountMerkleize = flatMerkleize
+      )
+    )
+    (coord, flat)
+  }
+
+  /** Enumerate the whole flat-account keyspace ascending (seekFrom 0x00..). */
+  private def seekAllAccounts(flat: FlatAccountStorage): Vector[(ByteString, ByteString)] = {
+    implicit val rt: IORuntime = IORuntime.global
+    flat
+      .seekFrom(ByteString(Array.fill(32)(0x00.toByte)))
+      .compile
+      .toVector
+      .unsafeRunSync()
+      .map {
+        case Right(pair)               => pair
+        case Left(err: IterationError) => fail(s"seek iteration error: $err")
+      }
+  }
+
+  private def storeChunkOnce(
+      coord: TestActorRef[AccountRangeCoordinator],
+      accounts: Seq[(ByteString, Account)],
+      rootHash: ByteString
+  ): Unit = {
+    // Full-range task; isTaskRangeComplete=false so the call stores the chunk WITHOUT entering the
+    // task-complete commit/finalize path (out of scope for Batch 1). TestActorRef dispatches
+    // synchronously, so the flat write is committed by the time send returns.
+    val task = AccountTask(
+      next = ByteString(Array.fill[Byte](32)(0x00)),
+      last = AccountTask.MaxHash32,
+      rootHash = rootHash
+    )
+    coord ! Messages.StoreAccountChunk(task, accounts, accounts.size, 0, isTaskRangeComplete = false)
+  }
+
+  private def withFlatRocksDb(test: RocksDbDataSource => Unit): Unit = {
+    val dbPath = Files.createTempDirectory("flat-account-retention-rocksdb").toAbsolutePath.toString
+    val ds = openFlatRocksDb(dbPath)
+    try test(ds)
+    finally {
+      ds.destroy()
+      val dir = new File(dbPath)
+      !dir.exists() || dir.delete()
+    }
+  }
+
+  private def openFlatRocksDb(dbPath: String): RocksDbDataSource =
+    RocksDbDataSource(
+      new RocksDbConfig {
+        override val createIfMissing: Boolean = true
+        override val paranoidChecks: Boolean = true
+        override val path: String = dbPath
+        override val maxThreads: Int = 1
+        override val maxOpenFiles: Int = 32
+        override val verifyChecksums: Boolean = true
+        override val levelCompaction: Boolean = true
+        override val blockSize: Long = 16384
+        override val blockCacheSize: Long = 33554432
+      },
+      Namespaces.nsSeq
+    )
+
+  private val FlatRetentionRoot: ByteString = kec256(ByteString("flat-retention-root"))
+
+  it should "retain every downloaded account leaf in ascending order when flat-account-merkleize is ON (T007)" taggedAs
+    UnitTest in withFlatRocksDb { ds =>
+      val (coord, flat) = newFlatRetentionCoordinator(ds, flatMerkleize = true, FlatRetentionRoot)
+      val accounts = FlatAccountMerkleizeFixtures.canonicalAccountsAscending
+
+      storeChunkOnce(coord, accounts, FlatRetentionRoot)
+
+      val retained = seekAllAccounts(flat)
+      // retained-leaf count == accounts served
+      retained.size shouldBe accounts.size
+      // enumeration is strictly ascending by 32-byte key
+      val keys = retained.map(_._1)
+      keys shouldBe keys.sortWith((a, b) => java.util.Arrays.compareUnsigned(a.toArray, b.toArray) < 0)
+      // exact key-set parity with what was served (no gaps, no dupes)
+      keys.toSet shouldBe accounts.map(_._1).toSet
+      // values are the RLP-encoded leaves (symmetric to the inline trie build's bytes)
+      retained.toMap shouldBe FlatAccountMerkleizeFixtures.canonicalLeavesAscending.toMap
+
+      system.stop(coord)
+    }
+
+  it should "write NO flat-account leaves when flat-account-merkleize is OFF (legacy path unchanged, T007)" taggedAs
+    UnitTest in withFlatRocksDb { ds =>
+      val (coord, flat) = newFlatRetentionCoordinator(ds, flatMerkleize = false, FlatRetentionRoot)
+      val accounts = FlatAccountMerkleizeFixtures.canonicalAccountsAscending
+
+      storeChunkOnce(coord, accounts, FlatRetentionRoot)
+
+      // Legacy path: the inline StackTrie build still ran (accountsDownloaded advances) but the flat
+      // store stays empty.
+      seekAllAccounts(flat) shouldBe empty
+      coord ! Messages.GetProgress
+      val stats = expectMsgType[AccountRangeStats](3.seconds)
+      stats.accountsDownloaded shouldBe accounts.size.toLong
+
+      system.stop(coord)
+    }
+
+  it should "persist retained leaves across a simulated restart (RocksDB-backed, flag ON, T008)" taggedAs UnitTest in {
+    // T008: retained leaves are durable. NOTE: coherence of the retained set across a real
+    // advancing sync still comes from the US3 finalize freeze+re-fetch (a later batch), NOT from
+    // resume bookkeeping — this test only proves the flat store survives a process restart.
+    val dbPath = Files.createTempDirectory("flat-account-restart-rocksdb").toAbsolutePath.toString
+    val accounts = FlatAccountMerkleizeFixtures.canonicalAccountsAscending
+    try {
+      // --- "process 1": write leaves, then tear the data source down (simulated crash/stop) ---
+      val ds1 = openFlatRocksDb(dbPath)
+      val (coord1, flat1) = newFlatRetentionCoordinator(ds1, flatMerkleize = true, FlatRetentionRoot)
+      storeChunkOnce(coord1, accounts, FlatRetentionRoot)
+      seekAllAccounts(flat1).size shouldBe accounts.size
+      system.stop(coord1)
+      ds1.close()
+
+      // --- "process 2": re-open the SAME on-disk db; the leaves must still be there ---
+      val ds2 = openFlatRocksDb(dbPath)
+      try {
+        val flat2 = new FlatAccountStorage(ds2)
+        val retained = seekAllAccounts(flat2)
+        retained.size shouldBe accounts.size
+        retained.toMap shouldBe FlatAccountMerkleizeFixtures.canonicalLeavesAscending.toMap
+      } finally ds2.close()
+    } finally {
+      val dir = new File(dbPath)
+      if (dir.exists()) {
+        Option(dir.listFiles()).foreach(_.foreach(_.delete()))
+        dir.delete()
+      }
+    }
   }
 }

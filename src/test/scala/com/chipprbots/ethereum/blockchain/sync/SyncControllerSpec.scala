@@ -805,6 +805,7 @@ class SyncControllerSpec
           storagesInstance.storages.stateStorage,
           storagesInstance.storages.nodeStorage,
           storagesInstance.storages.flatSlotStorage,
+          storagesInstance.storages.flatAccountStorage,
           storagesInstance.storages.fastSyncStateStorage,
           consensusAdapter,
           validators,
