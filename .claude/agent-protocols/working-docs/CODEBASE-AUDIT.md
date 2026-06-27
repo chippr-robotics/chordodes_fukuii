@@ -173,7 +173,7 @@ Must complete without `noReturns` violations.
 
 **Gate:** AkkaTaskOps deleted.
 **Agent:** MITHRIL
-**Status (verified 2026-06-26):** BRIDGE-A ✅ zero. BRIDGE-B ✅ one TCP-floor site (`RLPxConnectionHandler:323`, permanent). BRIDGE-C ✅ TCP-layer refs only. `Behavior[Any]` ✅ zero. W7 ✅ DONE. INFO-13 ✅ DONE `913c22363`. INFO-14 ✅ DONE. **AkkaTaskOps** ❌ open (`askFor`/`askForVia` dead methods).
+**Status (verified 2026-06-27):** BRIDGE-A ✅ zero. BRIDGE-B ✅ one TCP-floor site (`RLPxConnectionHandler:197,235`, permanent — uses `ClassicActor` alias). BRIDGE-C ✅ TCP-layer refs only. `Behavior[Any]` ✅ zero in code (two scaladoc mentions only). W7 ✅ DONE. INFO-13 ✅ DONE `913c22363`. INFO-14 ✅ DONE. **AkkaTaskOps** ✅ DONE `82a1e3a43` (`askFor`/`askForVia` deleted, Classic extension block + 3 dead imports removed). **POST-MIGRATION-SWEEP COMPLETE.**
 
 **Step 0 — Worktree setup:**
 ```bash
